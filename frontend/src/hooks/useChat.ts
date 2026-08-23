@@ -7,8 +7,10 @@ import {
   listConversations,
   saveConversation,
 } from "../api/conversations";
+import { createUser, listUsers } from "../api/users";
 import { deriveTitle } from "../utils/title";
-import type { ConversationMeta, Message, TutorMode } from "../types/api";
+import { nextDefaultUserName } from "../utils/users";
+import type { ConversationMeta, Message, TutorMode, User } from "../types/api";
 
 const DEFAULT_MODEL = "qwen3.5:9b";
 
@@ -21,15 +23,18 @@ export function useChat() {
   const [mode, setMode] = useState<TutorMode>("conversation");
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
+    if (!currentUserId) return;
     try {
-      setConversations(await listConversations());
+      setConversations(await listConversations(currentUserId));
     } catch {
       /* backend no disponible */
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     getModels()
@@ -40,24 +45,57 @@ export function useChat() {
         }
       })
       .catch(() => {});
-    void refreshConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const existing = await listUsers();
+        if (cancelled) return;
+        if (existing.length > 0) {
+          setUsers(existing);
+          setCurrentUserId(existing[0].id);
+        } else {
+          const created = await createUser(nextDefaultUserName([]));
+          if (cancelled) return;
+          setUsers([created]);
+          setCurrentUserId(created.id);
+        }
+      } catch {
+        /* backend no disponible */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    setConversations([]);
+    setConversationId(null);
+    setMessages([]);
+    void refreshConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
   const newConversation = useCallback(async () => {
+    if (!currentUserId) return;
     try {
-      const conv = await createConversation();
+      const conv = await createConversation(currentUserId);
       setConversationId(conv.id);
       setMessages([]);
       await refreshConversations();
     } catch {
       /* backend no disponible */
     }
-  }, [refreshConversations]);
+  }, [currentUserId, refreshConversations]);
 
   const loadConversation = useCallback(async (id: string) => {
     try {
@@ -97,14 +135,33 @@ export function useChat() {
     [refreshConversations],
   );
 
+  const selectUser = useCallback((userId: string) => {
+    setCurrentUserId(userId);
+  }, []);
+
+  const addUser = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      const finalName = trimmed || nextDefaultUserName(users.map((u) => u.name));
+      try {
+        const created = await createUser(finalName);
+        setUsers((prev) => [...prev, created]);
+        setCurrentUserId(created.id);
+      } catch {
+        /* backend no disponible */
+      }
+    },
+    [users],
+  );
+
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || loading || !currentUserId) return;
 
     let cid = conversationId;
     if (!cid) {
       try {
-        cid = (await createConversation()).id;
+        cid = (await createConversation(currentUserId)).id;
         setConversationId(cid);
       } catch {
         return;
@@ -164,7 +221,7 @@ export function useChat() {
         { role: "assistant", content: assistantReply },
       ]);
     }
-  }, [input, loading, messages, model, mode, conversationId, persist]);
+  }, [input, loading, messages, model, mode, conversationId, currentUserId, persist]);
 
   return {
     messages,
@@ -178,10 +235,14 @@ export function useChat() {
     setMode,
     conversations,
     conversationId,
+    users,
+    currentUserId,
     bottomRef,
     send,
     newConversation,
     loadConversation,
     removeConversation,
+    selectUser,
+    addUser,
   };
 }

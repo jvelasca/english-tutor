@@ -31,7 +31,10 @@ Hecho y verificado (tests verdes):
 - **M4** modo profesor: 4 modos de tutor (`conversation`, `grammar`, `exercises`, `pronunciation`)
   + corrección de pronunciación (`POST /api/pronunciation`).
 - **M6** release a GitHub.
-- Tests: backend `pytest tests/ -q` (13+ tests), frontend `npm test` (vitest) + `tsc --noEmit`.
+- **M7** multi-usuario: tabla `users` + columna `user_id` en `conversations` (migración
+  idempotente, usuario por defecto `Usuario`), `GET/POST /api/users`, CRUD de conversaciones
+  filtrado por `user_id`, selector de perfil en frontend con aislamiento al cambiar.
+- Tests: backend `pytest tests/ -q` (20 tests), frontend `npm test` (vitest, 14 tests) + `tsc --noEmit`.
 
 ## 4. GitHub
 
@@ -61,32 +64,17 @@ Hecho y verificado (tests verdes):
   ejecutar `eval_model.py --model qwen3.5:9b` y `--model llama3.1:8b` → comparar calidad →
   decidir `DEFAULT_MODEL` en `backend/config.py` → documentar en `PLAN.md` → commit.
 
-## 6. PENDIENTE — M7: multi-usuario (próximo hito grande)
+## 6. HECHO — M7: multi-usuario
 
-**Requisito (premisa 13):** varios perfiles locales, cada uno con conversaciones, progreso,
-puntuaciones y ajustes **independientes**; aislamiento total de datos entre usuarios; sin
-cuentas en la nube.
+**Implementado y verificado** (backend 20 tests, frontend 14 tests, `tsc` sin errores).
 
-**Estado:** solo analizado, sin implementar. Ya se han leído los archivos afectados:
-
-- `backend/services/store.py` — persistencia SQLite. Hoy es **global** (sin columna usuario).
-- `backend/routers/conversations.py` — CRUD `/api/conversations`.
-- `backend/schemas/conversations.py` — `ConversationMeta`, `Conversation`, `ConversationUpsert`.
-- `frontend/src/api/conversations.ts` — cliente del CRUD.
-- `frontend/src/hooks/useChat.ts` — estado; guarda `conversationId` sin concepto de usuario.
-- `frontend/src/components/Sidebar.tsx` — lista de conversaciones.
-
-**Plan propuesto (por fases, hito a hito según premisa 6):**
-1. Backend: tabla `users` (id, name, created_at) + columna `user_id` en `conversations`
-   (FK, con migración idempotente en `init_db`); endpoints `/api/users` (listar/crear) y
-   filtrado de conversaciones por `user_id` (query param o header). Tests en `backend/tests/`.
-2. Frontend: selector de perfil (crear/seleccionar usuario), pasar `user_id` al cliente de
-   conversaciones y al hook. Tests con vitest.
-3. Definición de terminado: tests verdes + docs actualizadas (`ARQUITECTURA.md`, `PLAN.md`,
-   `README.md`).
-
-**Nota:** es un cambio transversal (afecta núcleo de persistencia), hacerlo con cuidado y
-con tests (premisa 12).
+- Backend: `services/store.py` ahora gestiona `users` y `conversations` con `user_id`
+  (migración idempotente; usuario por defecto `Usuario` y reasignación de huérfanas).
+  `routers/users.py` (`GET/POST /api/users`), `routers/conversations.py` filtra por `user_id`
+  (query param). `schemas/users.py` (`User`, `UserCreate`).
+- Frontend: `api/users.ts`, `components/UserSelect.tsx`, `utils/users.ts` (`nextDefaultUserName`),
+  hook `useChat.ts` con estado de usuario y aislamiento al cambiar de perfil.
+- Briefings: `agentes/m7-backend-multiusuario.md`, `agentes/m7-frontend-multiusuario.md`.
 
 ## 7. PENDIENTE — M8: diseño y UX nivel top
 
@@ -97,6 +85,15 @@ micro-interacciones, estados vacíos/carga/error cuidados.
 - Hoy el CSS está en `frontend/src/index.css` (tema oscuro fijo, variables `--*` ya definidas
   en `:root`). No hay sistema de tokens formal ni toggle de tema.
 - No iniciado.
+
+## 8. Notas de diseño de M7 (para no romper en M8)
+
+- Contrato de la API (no cambiar sin coordinar frontend):
+  - `GET /api/users` → `User[]`; `POST /api/users` con `{ name }` → `User`.
+  - `GET /api/conversations?user_id=<id>` y `POST /api/conversations?user_id=<id>`.
+  - `ConversationMeta` incluye `user_id`.
+- El usuario por defecto se llama `Usuario`; el frontend genera nombres sin colisión con
+  `nextDefaultUserName` (`Usuario`, `Usuario 2`, ...).
 
 ## 8. Cómo arrancar y verificar desde cero
 

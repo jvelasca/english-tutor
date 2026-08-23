@@ -4,6 +4,7 @@ import { Composer } from "./components/Composer";
 import { ModeSelect } from "./components/ModeSelect";
 import { PronunciationPractice } from "./components/PronunciationPractice";
 import { Sidebar } from "./components/Sidebar";
+import { UserSelect } from "./components/UserSelect";
 
 const SUGGESTIONS = [
   "Let's have a conversation. Ask me anything!",
@@ -24,11 +25,15 @@ export default function App() {
     setMode,
     conversations,
     conversationId,
+    users,
+    currentUserId,
     bottomRef,
     send,
     newConversation,
     loadConversation,
     removeConversation,
+    selectUser,
+    addUser,
   } = useChat();
 
   return (
@@ -51,6 +56,12 @@ export default function App() {
             </div>
           </div>
           <div className="header-controls">
+            <UserSelect
+              users={users}
+              currentUserId={currentUserId}
+              onSelect={selectUser}
+              onAdd={addUser}
+            />
             <ModeSelect value={mode} onChange={setMode} />
             <select
               className="model-select"

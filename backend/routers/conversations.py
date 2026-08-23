@@ -10,13 +10,16 @@ router = APIRouter()
 
 
 @router.post("/api/conversations", response_model=ConversationMeta)
-async def create() -> ConversationMeta:
-    return store.create_conversation()
+async def create(user_id: str) -> dict:
+    conv = store.create_conversation(user_id)
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return conv
 
 
 @router.get("/api/conversations", response_model=list[ConversationMeta])
-async def list_all() -> list[dict]:
-    return store.list_conversations()
+async def list_all(user_id: str) -> list[dict]:
+    return store.list_conversations(user_id)
 
 
 @router.get("/api/conversations/{cid}", response_model=Conversation)

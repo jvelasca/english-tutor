@@ -63,10 +63,16 @@
 - Repositorio **público**: https://github.com/jvelasca/english-tutor
 - V1.0 (tag `v1.0.0`) subida con release e issues de seguimiento.
 
-### M7 — Multi-usuario  [NUEVO]
+### M7 — Multi-usuario  [HECHO ✔]
 - Perfiles locales con **seguimiento independiente** (conversaciones, progreso, puntuaciones, ajustes).
 - Selección simple de perfil al abrir; aislamiento total de datos entre usuarios (premisa 13).
-- Implica migrar la persistencia (SQLite) a esquema por usuario.
+- Backend: tabla `users`, columna `user_id` en `conversations` (migración idempotente no
+  destructiva con usuario por defecto `Usuario`), `GET/POST /api/users` y CRUD de
+  conversaciones filtrado por `user_id` (query param).
+- Frontend: selector de perfil (`UserSelect`) en la cabecera, creación de usuarios, y
+  aislamiento al cambiar de perfil (resetea conversación y recarga la lista del nuevo usuario).
+- Verificado: backend 20 tests, frontend 14 tests, `tsc` sin errores.
+- Subagentes (ejecutados por el gerente): `agentes/m7-backend-multiusuario.md`, `agentes/m7-frontend-multiusuario.md`.
 
 ### M8 — Diseño y UX nivel top  [NUEVO]
 - Rediseño de la interfaz al nivel de apps líderes (ChatGPT/Duolingo): sistema de tokens,
@@ -91,6 +97,8 @@
 | M4 Backend modo profesor | `agentes/m4-backend-modo.md` | ✔ hecho |
 | M4 Frontend modo profesor | `agentes/m4-frontend-modo.md` | ✔ hecho |
 | M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ⏳ descargando (VPN) |
+| M7 Backend multi-usuario | `agentes/m7-backend-multiusuario.md` | ✔ hecho |
+| M7 Frontend multi-usuario | `agentes/m7-frontend-multiusuario.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

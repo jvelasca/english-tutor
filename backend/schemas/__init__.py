@@ -2,6 +2,7 @@
 from schemas.chat import ChatMessage, ChatRequest, ChatResponse
 from schemas.conversations import Conversation, ConversationMeta, ConversationUpsert
 from schemas.pronunciation import PronunciationResponse
+from schemas.users import User, UserCreate
 from schemas.voz import TTSRequest, TranscribeResponse
 
 __all__ = [
@@ -14,4 +15,6 @@ __all__ = [
     "PronunciationResponse",
     "TTSRequest",
     "TranscribeResponse",
+    "User",
+    "UserCreate",
 ]

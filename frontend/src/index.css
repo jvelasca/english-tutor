@@ -180,6 +180,96 @@ body {
   font-size: 13px;
 }
 
+.user-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-select-dropdown {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  max-width: 160px;
+}
+
+.user-select-add-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.user-select-add-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.user-select-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-select-input {
+  width: 110px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.user-select-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.user-select-ok,
+.user-select-cancel {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.user-select-ok {
+  color: #22c55e;
+}
+
+.user-select-ok:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.user-select-cancel {
+  color: var(--text-dim);
+}
+
+.user-select-cancel:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
 /* M4: práctica de pronunciación */
 .pronunciation {
   background: var(--card);

@@ -18,22 +18,24 @@ backend/
 ├── routers/             # Capa HTTP: endpoints + validación. SIN lógica de negocio.
 │   ├── __init__.py
 │   ├── chat.py          # POST /api/chat, POST /api/chat/stream (aceptan mode)
-│   ├── conversations.py # CRUD /api/conversations
+│   ├── conversations.py # CRUD /api/conversations (filtrado por user_id)
 │   ├── models.py        # GET /api/health, GET /api/models
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
+│   ├── users.py         # GET /api/users, POST /api/users
 │   └── voz.py           # POST /api/transcribe, POST /api/tts
 ├── schemas/             # Contratos de datos (Pydantic).
 │   ├── __init__.py
 │   ├── chat.py          # ChatMessage, ChatRequest, ChatResponse
-│   ├── conversations.py # Conversation, ConversationMeta, ConversationUpsert
+│   ├── conversations.py # Conversation, ConversationMeta (con user_id), ConversationUpsert
 │   ├── pronunciation.py # PronunciationResponse
+│   ├── users.py         # User, UserCreate
 │   └── voz.py           # TTSRequest, TranscribeResponse
 ├── services/            # Lógica de negocio. NO conoce HTTP.
 │   ├── __init__.py
 │   ├── llm.py           # cliente Ollama (chat normal + streaming; system prompt por modo)
 │   ├── pronunciation.py # score_pronunciation (puro, difflib)
 │   ├── stt.py           # faster-whisper
-│   ├── store.py         # persistencia SQLite (conversaciones)
+│   ├── store.py         # persistencia SQLite (usuarios + conversaciones; aislamiento por user_id)
 │   └── tts.py           # piper-tts
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
 ├── data/                # base SQLite (tutor.db). GITIGNORED.
@@ -43,7 +45,8 @@ backend/
 │   ├── test_modes.py    # modos de tutor (prompts)
 │   ├── test_pronunciation.py
 │   ├── test_schemas.py
-│   └── test_store.py
+│   ├── test_store.py
+│   └── test_users.py    # usuarios + aislamiento entre perfiles
 ├── scripts/             # scripts de utilidad.
 │   ├── eval_model.py    # evalúa un modelo como tutor (M5)
 │   └── smoke_test.py    # verifica el servidor en ejecución
@@ -68,8 +71,9 @@ frontend/src/
 ├── api/                 # Cliente HTTP (única capa que habla con el backend).
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
 │   ├── chat.ts          # chat normal + streaming (envía mode).
-│   ├── conversations.ts # CRUD de conversaciones.
+│   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score).
+│   ├── users.ts         # listUsers, createUser.
 │   └── voz.ts           # transcribe + tts.
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
 │   ├── ChatMessage.tsx
@@ -78,18 +82,21 @@ frontend/src/
 │   ├── ModeSelect.tsx   # selector de modo de tutor
 │   ├── PronunciationPractice.tsx
 │   ├── Sidebar.tsx      # lista de conversaciones
-│   └── SpeakButton.tsx
+│   ├── SpeakButton.tsx
+│   └── UserSelect.tsx   # selector de perfil de usuario
 ├── hooks/               # Estado y lógica de UI.
-│   └── useChat.ts
+│   └── useChat.ts       # incluye estado de usuario y aislamiento por perfil
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
-│   └── api.ts
+│   └── api.ts           # incluye User y user_id en ConversationMeta
 ├── utils/               # Funciones puras (testables).
 │   ├── title.ts         # deriveTitle
 │   ├── title.test.ts
 │   ├── sse.ts           # parseo de eventos SSE
 │   ├── sse.test.ts
 │   ├── modes.ts         # MODES + isTutorMode
-│   └── modes.test.ts
+│   ├── modes.test.ts
+│   ├── users.ts         # nextDefaultUserName
+│   └── users.test.ts
 ├── scripts/             # scripts de utilidad.
 │   └── check.ps1        # tsc + vitest
 ├── vitest.config.ts

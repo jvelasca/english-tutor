@@ -16,11 +16,18 @@ export interface ModelsResponse {
   models?: string[];
 }
 
+export interface User {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 export interface ConversationMeta {
   id: string;
   title: string;
   created_at: string;
   updated_at: string;
+  user_id: string;
 }
 
 export interface Conversation extends ConversationMeta {

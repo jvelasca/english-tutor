@@ -12,7 +12,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 
 ## Repositorio
 
-- **GitHub (privado):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
+- **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
 - Última versión estable: **v1.0.0**.
 
 ## Estructura
@@ -29,6 +29,8 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 - **Memoria e historial**: conversaciones guardadas en SQLite (sidebar).
 - **Modo profesor (M4)**: 4 modos de tutor (conversación, gramática, ejercicios, pronunciación)
   y **corrección de pronunciación** (graba y recibe una puntuación).
+- **Multi-usuario (M7)**: perfiles locales con conversaciones e historial **independientes**
+  (selector de perfil en la cabecera, aislamiento total de datos entre usuarios).
 
 ## Arranque rápido
 
@@ -105,7 +107,8 @@ Abre **http://localhost:5173** y empieza a conversar.
 | `POST` | `/api/transcribe` | Audio → texto (Whisper) |
 | `POST` | `/api/tts` | Texto → audio WAV (Piper) |
 | `POST` | `/api/pronunciation` | Audio + texto esperado → puntuación de pronunciación |
-| `GET/POST` | `/api/conversations` | Listar / crear conversaciones |
+| `GET/POST` | `/api/users` | Listar / crear perfiles de usuario |
+| `GET/POST` | `/api/conversations?user_id=<id>` | Listar / crear conversaciones del usuario |
 | `GET/PUT/DELETE` | `/api/conversations/{id}` | Leer / guardar / borrar una conversación |
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.

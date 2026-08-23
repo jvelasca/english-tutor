@@ -10,6 +10,7 @@ from routers.chat import router as chat_router
 from routers.conversations import router as conversations_router
 from routers.models import router as models_router
 from routers.pronunciation import router as pronunciation_router
+from routers.users import router as users_router
 from routers.voz import router as voz_router
 from services.store import init_db
 
@@ -36,3 +37,4 @@ app.include_router(models_router)
 app.include_router(voz_router)
 app.include_router(pronunciation_router)
 app.include_router(conversations_router)
+app.include_router(users_router)

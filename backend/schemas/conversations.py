@@ -11,6 +11,7 @@ class ConversationMeta(BaseModel):
     title: str
     created_at: str
     updated_at: str
+    user_id: str
 
 
 class Conversation(ConversationMeta):

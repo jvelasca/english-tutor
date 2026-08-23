@@ -1,12 +1,14 @@
 import { deleteJson, getJson, postJson, putJson } from "./client";
 import type { Conversation, ConversationMeta, Message } from "../types/api";
 
-export function createConversation(): Promise<ConversationMeta> {
-  return postJson<ConversationMeta>("/api/conversations", {});
+export function createConversation(userId: string): Promise<ConversationMeta> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<ConversationMeta>(`/api/conversations?${query}`, {});
 }
 
-export function listConversations(): Promise<ConversationMeta[]> {
-  return getJson<ConversationMeta[]>("/api/conversations");
+export function listConversations(userId: string): Promise<ConversationMeta[]> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return getJson<ConversationMeta[]>(`/api/conversations?${query}`);
 }
 
 export function getConversation(id: string): Promise<Conversation> {
