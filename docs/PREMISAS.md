@@ -42,7 +42,7 @@ completo.
   se cambia a un agente/contexto nuevo.
 - Cada subagente es autocontenido precisamente para no depender del contexto acumulado.
 
-## 12. Vigilancia anti-saturación de agentes
+## 8. Vigilancia anti-saturación de agentes
 - **Todos** los agentes (gerente y subagentes) se vigilan contra la saturación de contexto:
   cuando un agente acumula demasiada información y se vuelve propenso a alucinar, se detiene
   y se abre un agente/subagente nuevo con contexto limpio.
@@ -52,21 +52,21 @@ completo.
   `README.md`, `PLAN.md`) es el ancla para reanudar desde cero sin perder el hilo.
 - Un cambio de contexto no es un fallo: es parte del proceso de calidad.
 
-## 8. Documentación VITAL
+## 9. Documentación VITAL
 - Cualquier programador debe poder seguir el proyecto **desde 0** en cualquier momento.
 - Todo cambio relevante actualiza la documentación (`docs/`, `README.md`, `PLAN.md`).
 - La documentación forma parte de la definición de "terminado", no es opcional.
 
-## 9. Modularidad y estructura
+## 10. Modularidad y estructura
 - Súper modular, estructurado, con responsabilidades claras por capa.
 - Mantenible y ampliable: añadir una feature no debe tocar código no relacionado.
 - Estructura y responsabilidades definidas en `docs/ARQUITECTURA.md`.
 
-## 10. GitHub
+## 11. GitHub
 - Al alcanzar una **versión previa estable**, se sube a la cuenta GitHub del cliente.
 - A partir de ahí, el seguimiento (issues, PR, releases, ramas) se hace desde GitHub.
 
-## 11. Tests y scripts (obligatorio)
+## 12. Tests y scripts (obligatorio)
 - **Toda la app debe tener tests** en sus carpetas correspondientes:
   - Backend: `backend/tests/` (pytest).
   - Frontend: `frontend/src/**/*.test.ts` (vitest).
@@ -75,3 +75,24 @@ completo.
   - Frontend: `frontend/scripts/`.
 - Los tests son parte de la definición de "terminado": ninguna feature se da por acabada sin sus tests.
 - Los tests deben ser **rápidos y deterministas** (sin depender de la red ni de modelos externos).
+
+## 13. Multi-usuario (seguimiento independiente)
+- La app admite **varios usuarios locales** (perfiles), cada uno con su propio espacio:
+  conversaciones, progreso, correcciones, puntuaciones de pronunciación y ajustes,
+  **totalmente independientes** entre sí.
+- Sin cuentas en la nube (coherente con la premisa 2): los perfiles son locales y se
+  seleccionan de forma simple al abrir la app.
+- **Aislamiento total de datos entre usuarios**: nada de un usuario puede verse desde otro.
+- El seguimiento de progreso (historial, estadísticas, logros) es **por usuario**.
+
+## 14. Diseño y UX nivel "top del mercado"
+- La interfaz aspira al nivel de las mejores apps del mercado (p. ej. ChatGPT, Duolingo,
+  Grammarly): moderna, pulida, atractiva y con las mejores prácticas de UX.
+- Responsive (móvil y escritorio), accesible (a11y), con estados vacíos, de carga y de
+  error cuidados.
+- Sistema de diseño con **tokens** (colores, tipografía, espaciado, radios) para consistencia,
+  y soporte de **tema claro/oscuro**.
+- Micro-interacciones y feedback visual (transiciones, animaciones sutiles, indicadores al
+  hablar/escuchar).
+- El diseño forma parte de la definición de "terminado": ninguna feature se da por acabada
+  si queda "fea" o inconsistente con el resto.

@@ -62,11 +62,21 @@
 - Repositorio **público**: https://github.com/jvelasca/english-tutor
 - V1.0 (tag `v1.0.0`) subida con release e issues de seguimiento.
 
+### M7 — Multi-usuario  [NUEVO]
+- Perfiles locales con **seguimiento independiente** (conversaciones, progreso, puntuaciones, ajustes).
+- Selección simple de perfil al abrir; aislamiento total de datos entre usuarios (premisa 13).
+- Implica migrar la persistencia (SQLite) a esquema por usuario.
+
+### M8 — Diseño y UX nivel top  [NUEVO]
+- Rediseño de la interfaz al nivel de apps líderes (ChatGPT/Duolingo): sistema de tokens,
+  tema claro/oscuro, responsive, micro-interacciones y estados vacíos/carga/error (premisa 14).
+
 ## Decisiones tomadas
 
 - Hitos M1 y M2 en paralelo (tras M0).
 - STT → Whisper (`faster-whisper`). TTS → Piper.
 - Ritmo: poco a poco, hito a hito.
+- Requisitos nuevos (premisas 13 y 14): **multi-usuario** y **diseño nivel top**. Quedan como M7 y M8.
 
 ## Tablero de subagentes
 
