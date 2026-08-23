@@ -38,14 +38,16 @@ Abrir **http://localhost:5173**.
 1. El **gerente** mantiene `PLAN.md` (backlog) y `docs/` (premisas y arquitectura).
 2. Para cada tarea, el gerente escribe un **briefing autocontenido** en `agentes/<nombre>.md`.
    El briefing incluye: rol, objetivo, contexto, tarea, criterios de aceptación, restricciones y salida.
-3. El **cliente** lanza el briefing en su agente local (sin gastar tokens del gerente).
-4. El agente local devuelve el resultado; el cliente lo pega de vuelta.
-5. El **gerente** revisa, integra, actualiza la documentación y genera el siguiente paso.
+3. El briefing se **ejecuta** (el gerente directamente, o el cliente desde su agente local).
+4. El **gerente** revisa, integra, actualiza la documentación y genera el siguiente paso.
 
 ## 3. Regla de contexto (anti-alucinación)
 
-- Si el chat del gerente se satura y hay riesgo de alucinación, se abre un **agente/contexto nuevo**.
+- Si un agente (gerente o subagente) se satura y hay riesgo de alucinación, se abre un
+  **agente/contexto nuevo** con contexto limpio (premisa 12).
 - Los subagentes son autocontenidos a propósito: no dependen del historial acumulado.
+- **Antes de alucinar, reiniciar el contexto.** La documentación (`docs/`) es el ancla
+  para reanudar desde cero sin perder el hilo.
 
 ## 4. Estándares de documentación (VITAL)
 
@@ -56,9 +58,21 @@ Abrir **http://localhost:5173**.
 
 ## 5. Git / GitHub
 
+- Repositorio remoto: **https://github.com/jvelasca/english-tutor** (privado).
 - Durante el desarrollo: commits locales con mensajes claros (formato `tipo: descripción`).
-- Al llegar a **versión previa estable**, se sube a la cuenta GitHub del cliente.
-- Desde GitHub: seguimiento con issues, PR y releases.
+- Cada hito estable se etiqueta (`git tag vX.Y.Z`) y se publica como **release** en GitHub.
+- Desde GitHub: seguimiento con **issues** (backlog), **PR** (cambios revisables) y **releases**.
+- Flujo típico por hito:
+  1. Rama `feature/<hito>` → commits pequeños.
+  2. PR a `main` con descripción y checklist de la Definition of Done.
+  3. Merge, tag `vX.Y.Z` y release en GitHub.
+
+```powershell
+git checkout -b feature/<hito>
+# ... commits ...
+git push -u origin feature/<hito>
+gh pr create --title "<hito>" --body "..."
+```
 
 ## 6. Definición de "terminado" (Definition of Done)
 

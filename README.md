@@ -10,6 +10,11 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 - **`docs/DESARROLLO.md`** — cómo arrancar y trabajar desde 0, flujo con subagentes, Git/GitHub.
 - **`PLAN.md`** — hoja de ruta y tablero de subagentes.
 
+## Repositorio
+
+- **GitHub (privado):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
+- Última versión estable: **v1.0.0**.
+
 ## Estructura
 
 - `backend/` — API en Python con **FastAPI + Pydantic** (tipado fuerte). Habla con Ollama.
