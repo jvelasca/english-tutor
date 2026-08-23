@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend (uvicorn :8000)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": ".venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "Frontend (Vite :5173)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev -- --open",
+      "cwd": "${workspaceFolder}/frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "English Tutor (F5)",
+      "configurations": ["Backend (uvicorn :8000)", "Frontend (Vite :5173)"],
+      "stopAll": true
+    }
+  ]
+}
