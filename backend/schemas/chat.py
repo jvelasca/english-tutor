@@ -15,6 +15,7 @@ class ChatMessage(BaseModel):
 
     role: Role
     content: str = Field(min_length=1)
+    mode: str | None = None
 
 
 class ChatRequest(BaseModel):

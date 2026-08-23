@@ -5,6 +5,7 @@ import { ChatMessage } from "./components/ChatMessage";
 import { Composer } from "./components/Composer";
 import { ModeSelect } from "./components/ModeSelect";
 import { PronunciationPractice } from "./components/PronunciationPractice";
+import { ProgressSummary } from "./components/ProgressSummary";
 import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserSelect } from "./components/UserSelect";
@@ -37,6 +38,8 @@ export default function App() {
     removeConversation,
     selectUser,
     addUser,
+    progress,
+    refreshProgress,
   } = useChat();
 
   const { theme, toggleTheme } = useTheme();
@@ -139,8 +142,15 @@ export default function App() {
           </div>
         </header>
 
+        <ProgressSummary progress={progress} />
+
         <main className="chat">
-          {mode === "pronunciation" && <PronunciationPractice />}
+          {mode === "pronunciation" && (
+            <PronunciationPractice
+              userId={currentUserId}
+              onAttempt={refreshProgress}
+            />
+          )}
 
           {messages.length === 0 && (
             <div className="empty">

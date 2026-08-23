@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-23 22:25 (UTC+2).
+> Actualizado por última vez: 2026-08-23 22:53 (UTC+2).
 
 ## 1. Qué es el proyecto
 
@@ -36,7 +36,11 @@ Hecho y verificado (tests verdes):
   filtrado por `user_id`, selector de perfil en frontend con aislamiento al cambiar.
 - **M8** diseño y UX: tokens en `index.css`, tema claro/oscuro (`useTheme`, `ThemeToggle`,
   anti-FOUC), responsive (drawer + hamburguesa ≤768px), a11y y micro-interacciones.
-- Tests: backend `pytest tests/ -q` (20 tests), frontend `npm test` (vitest, 19 tests) + `tsc --noEmit`.
+- **M9** seguimiento de progreso: `GET /api/progress?user_id=<id>` (`ProgressSummary`:
+  conversaciones, mensajes, ejercicios, correcciones, pronunciación) + `POST /api/pronunciation`
+  con `user_id` opcional para persistir intentos (`pronunciation_attempts` + columna `mode`).
+  Frontend: panel colapsable `ProgressSummary` + `api/progress.ts`.
+- Tests: backend `pytest tests/ -q` (27 tests), frontend `npm test` (vitest, 26 tests) + `tsc --noEmit`.
 
 ## 4. GitHub
 
@@ -59,9 +63,10 @@ Hecho y verificado (tests verdes):
   Causa raíz: MITM del ISP **DigiMobil (AS57269)** sobre el CDN de pesos
   (`r2.cloudflarestorage.com`), efecto colateral de los bloqueos de IP de LaLiga
   (certificado falso `CN=core1.netops.test`). **Solución: usar VPN.**
-- **Estado al redactar esto:** descarga de `llama3.1:8b` corriendo en segundo plano con VPN,
-  ~51% (2.5 GB/4.9 GB), ETA ~1h30m. La VPN es algo inestable (la descarga se reinició un par
-  de veces).
+- **Estado al redactar esto:** descarga de `llama3.1:8b` **relanzada** en segundo plano con
+  VPN (Proton VPN, adaptador `ProTUN` activo con ruta por defecto). Al retomar, iba ~25%
+  (1.2 GB/4.9 GB) a ~250–540 KB/s (la VPN ralentiza). ETA estimada **2–4 h**. La VPN es
+  algo inestable (ya se reinició la descarga un par de veces).
 - **Siguiente paso cuando termine:** `ollama pull llama3.1:8b` → `ollama list` para confirmar →
   ejecutar `eval_model.py --model qwen3.5:9b` y `--model llama3.1:8b` → comparar calidad →
   decidir `DEFAULT_MODEL` en `backend/config.py` → documentar en `PLAN.md` → commit.
@@ -89,6 +94,31 @@ Hecho y verificado (tests verdes):
 - Responsive ≤768px: sidebar drawer + hamburguesa + backdrop. a11y: `:focus-visible`,
   `aria-*`, `prefers-reduced-motion`.
 - Briefing: `agentes/m8-diseno-ux.md`.
+
+## 7b. HECHO — M9: seguimiento de progreso del alumno
+
+**Implementado y verificado** (backend 27 tests, frontend 26 tests, `tsc` sin errores,
+`npm run build` OK).
+
+- Backend: `schemas/progress.py` (`PronunciationStats`, `ProgressSummary`),
+  `routers/progress.py` (`GET /api/progress?user_id=<id>` con 404 si no existe el usuario),
+  `services/store.py` (tabla `pronunciation_attempts`, columna `mode` en `messages` con
+  migración idempotente, `record_pronunciation`, `get_progress`), `routers/pronunciation.py`
+  (`user_id: str = Form(None)` persistente), `ChatMessage.mode: str | None = None`.
+- Frontend: `api/progress.ts`, `components/ProgressSummary.tsx` (panel colapsable con 4
+  stats + sección de pronunciación y estados vacíos), `utils/progress.ts`
+  (`formatScore`/`formatAverage`/`pronunciationLevelLabel`, tolerantes a `null`),
+  `types/api.ts` (`PronunciationStats`/`ProgressSummary` con campos anulables),
+  `hooks/useChat.ts` (estado `progress` + `refreshProgress`, `mode` adjuntado a los mensajes),
+  `PronunciationPractice.tsx` (pasa `user_id` y refresca), `App.tsx` (renderiza el panel).
+- Nota de tipado: los campos `best`/`average`/`last_score`/`last_level` son `null` si no hay
+  intentos (reflejado en frontend como anulables).
+- Briefings: `agentes/m9-backend-progreso.md`, `agentes/m9-frontend-progreso.md`.
+
+## 7c. BORRADOR — M10: conversación por voz continua (manos libres)
+
+- Briefing borrador: `agentes/m10-voz-continua.md` (issue #3). VAD en cliente, transcripción
+  automática y respuesta hablada sin pulsar botones. Se lanza tras cerrar M5.
 
 ## 8. Notas de diseño de M7 (para no romper en M8)
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from schemas.pronunciation import PronunciationResponse
+from services import store
 from services.pronunciation import score_pronunciation
 from services.stt import transcribe as transcribe_audio
 
@@ -16,6 +17,7 @@ async def pronunciation(
     file: UploadFile = File(...),
     expected: str = Form(...),
     language: str = Form("en"),
+    user_id: str = Form(None),
 ) -> PronunciationResponse:
     audio = await file.read()
     try:
@@ -24,4 +26,9 @@ async def pronunciation(
         raise HTTPException(
             status_code=500, detail=f"Error transcribiendo el audio: {exc}"
         ) from exc
-    return PronunciationResponse(**score_pronunciation(expected, heard))
+    result = score_pronunciation(expected, heard)
+    if user_id:
+        store.record_pronunciation(
+            user_id, result["expected"], result["heard"], result["score"], result["level"]
+        )
+    return PronunciationResponse(**result)

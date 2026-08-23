@@ -61,11 +61,28 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pronunciation_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                expected TEXT NOT NULL,
+                heard TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                level TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
         if "user_id" not in columns:
             conn.execute("ALTER TABLE conversations ADD COLUMN user_id TEXT")
+
+        msg_columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)")}
+        if "mode" not in msg_columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN mode TEXT")
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
@@ -147,7 +164,8 @@ def get_conversation(cid: str) -> dict | None:
         if conv is None:
             return None
         msgs = conn.execute(
-            "SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id ASC",
+            "SELECT role, content, mode FROM messages "
+            "WHERE conversation_id = ? ORDER BY id ASC",
             (cid,),
         ).fetchall()
     result = dict(conv)
@@ -170,9 +188,9 @@ def save_conversation(cid: str, title: str, messages: list[dict]) -> dict | None
         )
         conn.execute("DELETE FROM messages WHERE conversation_id = ?", (cid,))
         conn.executemany(
-            "INSERT INTO messages (conversation_id, role, content, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            [(cid, m["role"], m["content"], now) for m in messages],
+            "INSERT INTO messages (conversation_id, role, content, mode, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [(cid, m["role"], m["content"], m.get("mode"), now) for m in messages],
         )
     return {
         "id": cid,
@@ -187,3 +205,66 @@ def delete_conversation(cid: str) -> bool:
     with closing(_conn()) as conn, conn:
         cur = conn.execute("DELETE FROM conversations WHERE id = ?", (cid,))
     return cur.rowcount > 0
+
+
+def record_pronunciation(
+    user_id: str, expected: str, heard: str, score: int, level: str
+) -> None:
+    """Persiste un intento de pronunciación evaluado para un usuario."""
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO pronunciation_attempts "
+            "(user_id, expected, heard, score, level, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, expected, heard, score, level, _now()),
+        )
+
+
+def get_progress(user_id: str) -> dict:
+    """Agrega el progreso del alumno: conversaciones, mensajes, modos y pronunciación."""
+    with closing(_conn()) as conn:
+        conversations = conn.execute(
+            "SELECT COUNT(*) FROM conversations WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+
+        def _count(where: str, params: tuple) -> int:
+            return conn.execute(
+                "SELECT COUNT(*) FROM messages m "
+                "JOIN conversations c ON m.conversation_id = c.id "
+                f"WHERE c.user_id = ? {where}",
+                (user_id, *params),
+            ).fetchone()[0]
+
+        messages = _count("", ())
+        exercises = _count("AND m.role = 'user' AND m.mode = 'exercises'", ())
+        corrections = _count("AND m.role = 'user' AND m.mode = 'grammar'", ())
+
+        attempts = conn.execute(
+            "SELECT COUNT(*) FROM pronunciation_attempts WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        best = conn.execute(
+            "SELECT MAX(score) FROM pronunciation_attempts WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        avg = conn.execute(
+            "SELECT AVG(score) FROM pronunciation_attempts WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        last = conn.execute(
+            "SELECT score, level FROM pronunciation_attempts "
+            "WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+
+    return {
+        "user_id": user_id,
+        "conversations": conversations,
+        "messages": messages,
+        "exercises": exercises,
+        "corrections": corrections,
+        "pronunciation": {
+            "attempts": attempts,
+            "best": best,
+            "average": round(avg, 1) if avg is not None else None,
+            "last_score": last["score"] if last is not None else None,
+            "last_level": last["level"] if last is not None else None,
+        },
+    }

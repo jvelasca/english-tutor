@@ -8,7 +8,15 @@ const SAMPLES = [
   "The weather is nice today.",
 ];
 
-export function PronunciationPractice() {
+interface PronunciationPracticeProps {
+  userId: string | null;
+  onAttempt: () => void;
+}
+
+export function PronunciationPractice({
+  userId,
+  onAttempt,
+}: PronunciationPracticeProps) {
   const [sentence, setSentence] = useState(SAMPLES[0]);
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -37,7 +45,10 @@ export function PronunciationPractice() {
         if (blob.size === 0) return;
         setProcessing(true);
         try {
-          setResult(await checkPronunciation(blob, sentence));
+          setResult(
+            await checkPronunciation(blob, sentence, userId ?? undefined),
+          );
+          onAttempt();
         } catch (e) {
           alert(`Error al evaluar la pronunciación: ${(e as Error).message}`);
         } finally {

@@ -85,6 +85,20 @@
 - Verificado: frontend 19 tests (5 nuevos de tema), `tsc` sin errores, `npm run build` OK.
 - Subagente (ejecutado por el gerente): `agentes/m8-diseno-ux.md`.
 
+### M9 — Seguimiento de progreso del alumno  [HECHO ✔]
+- Registrar el progreso por usuario: nº de ejercicios, correcciones y puntuaciones de
+  pronunciación; mostrar un resumen en el frontend (issue #2, pendiente diferido de M4).
+- Backend: tabla `pronunciation_attempts` + columna `mode` en `messages` (migración
+  idempotente), `GET /api/progress?user_id=<id>` y `POST /api/pronunciation` con `user_id`
+  opcional. Frontend: panel `ProgressSummary` + api `progress.ts`.
+- Verificado: backend 27 tests, frontend 26 tests, `tsc` sin errores, `npm run build` OK.
+- Subagentes (ejecutados por el gerente): `agentes/m9-backend-progreso.md`, `agentes/m9-frontend-progreso.md`.
+
+### M10 — Conversación por voz continua (manos libres)  [BORRADOR]
+- Modo continuo: VAD (detección de silencio), transcripción automática y respuesta hablada
+  sin pulsar botones (issue #3).
+- Subagente (briefing borrador): `agentes/m10-voz-continua.md`. Se lanza tras cerrar M5 y M9.
+
 ## Decisiones tomadas
 
 - Hitos M1 y M2 en paralelo (tras M0).
@@ -107,6 +121,9 @@
 | M7 Backend multi-usuario | `agentes/m7-backend-multiusuario.md` | ✔ hecho |
 | M7 Frontend multi-usuario | `agentes/m7-frontend-multiusuario.md` | ✔ hecho |
 | M8 Diseño y UX | `agentes/m8-diseno-ux.md` | ✔ hecho |
+| M9 Backend progreso | `agentes/m9-backend-progreso.md` | ✔ hecho |
+| M9 Frontend progreso | `agentes/m9-frontend-progreso.md` | ✔ hecho |
+| M10 Voz continua | `agentes/m10-voz-continua.md` | 📝 borrador |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

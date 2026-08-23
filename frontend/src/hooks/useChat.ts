@@ -8,9 +8,16 @@ import {
   saveConversation,
 } from "../api/conversations";
 import { createUser, listUsers } from "../api/users";
+import { getProgress } from "../api/progress";
 import { deriveTitle } from "../utils/title";
 import { nextDefaultUserName } from "../utils/users";
-import type { ConversationMeta, Message, TutorMode, User } from "../types/api";
+import type {
+  ConversationMeta,
+  Message,
+  ProgressSummary,
+  TutorMode,
+  User,
+} from "../types/api";
 
 const DEFAULT_MODEL = "qwen3.5:9b";
 
@@ -25,12 +32,22 @@ export function useChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressSummary | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
     if (!currentUserId) return;
     try {
       setConversations(await listConversations(currentUserId));
+    } catch {
+      /* backend no disponible */
+    }
+  }, [currentUserId]);
+
+  const refreshProgress = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      setProgress(await getProgress(currentUserId));
     } catch {
       /* backend no disponible */
     }
@@ -80,6 +97,11 @@ export function useChat() {
     void refreshConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
+
+  useEffect(() => {
+    setProgress(null);
+    void refreshProgress();
+  }, [refreshProgress]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -168,7 +190,10 @@ export function useChat() {
       }
     }
 
-    const history: Message[] = [...messages, { role: "user", content: text }];
+    const history: Message[] = [
+      ...messages,
+      { role: "user", content: text, mode },
+    ];
     setMessages(history);
     setInput("");
     setLoading(true);
@@ -187,9 +212,10 @@ export function useChat() {
               next[next.length - 1] = {
                 role: "assistant",
                 content: last.content + content,
+                mode,
               };
             } else {
-              next.push({ role: "assistant", content });
+              next.push({ role: "assistant", content, mode });
             }
             return next;
           });
@@ -200,7 +226,7 @@ export function useChat() {
           assistantReply = `Error al hablar con el modelo: ${message}`;
           setMessages((prev) => [
             ...prev,
-            { role: "assistant", content: assistantReply },
+            { role: "assistant", content: assistantReply, mode },
           ]);
         },
       });
@@ -209,7 +235,7 @@ export function useChat() {
       assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: assistantReply },
+        { role: "assistant", content: assistantReply, mode },
       ]);
     } finally {
       setLoading(false);
@@ -218,7 +244,7 @@ export function useChat() {
     if (assistantReply && !errored) {
       void persist(cid, [
         ...history,
-        { role: "assistant", content: assistantReply },
+        { role: "assistant", content: assistantReply, mode },
       ]);
     }
   }, [input, loading, messages, model, mode, conversationId, currentUserId, persist]);
@@ -244,5 +270,7 @@ export function useChat() {
     removeConversation,
     selectUser,
     addUser,
+    progress,
+    refreshProgress,
   };
 }

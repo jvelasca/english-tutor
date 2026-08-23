@@ -20,7 +20,8 @@ backend/
 │   ├── chat.py          # POST /api/chat, POST /api/chat/stream (aceptan mode)
 │   ├── conversations.py # CRUD /api/conversations (filtrado por user_id)
 │   ├── models.py        # GET /api/health, GET /api/models
-│   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
+│   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score; user_id opcional)
+│   ├── progress.py      # GET /api/progress?user_id=<id> (resumen de progreso)
 │   ├── users.py         # GET /api/users, POST /api/users
 │   └── voz.py           # POST /api/transcribe, POST /api/tts
 ├── schemas/             # Contratos de datos (Pydantic).
@@ -28,6 +29,7 @@ backend/
 │   ├── chat.py          # ChatMessage, ChatRequest, ChatResponse
 │   ├── conversations.py # Conversation, ConversationMeta (con user_id), ConversationUpsert
 │   ├── pronunciation.py # PronunciationResponse
+│   ├── progress.py      # PronunciationStats, ProgressSummary
 │   ├── users.py         # User, UserCreate
 │   └── voz.py           # TTSRequest, TranscribeResponse
 ├── services/            # Lógica de negocio. NO conoce HTTP.
@@ -35,7 +37,7 @@ backend/
 │   ├── llm.py           # cliente Ollama (chat normal + streaming; system prompt por modo)
 │   ├── pronunciation.py # score_pronunciation (puro, difflib)
 │   ├── stt.py           # faster-whisper
-│   ├── store.py         # persistencia SQLite (usuarios + conversaciones; aislamiento por user_id)
+│   ├── store.py         # persistencia SQLite (usuarios + conversaciones + progreso; aislamiento por user_id)
 │   └── tts.py           # piper-tts
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
 ├── data/                # base SQLite (tutor.db). GITIGNORED.
@@ -46,6 +48,7 @@ backend/
 │   ├── test_pronunciation.py
 │   ├── test_schemas.py
 │   ├── test_store.py
+│   ├── test_progress.py # progreso + migración de mode + endpoint
 │   └── test_users.py    # usuarios + aislamiento entre perfiles
 ├── scripts/             # scripts de utilidad.
 │   ├── eval_model.py    # evalúa un modelo como tutor (M5)
@@ -72,7 +75,8 @@ frontend/src/
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
 │   ├── chat.ts          # chat normal + streaming (envía mode).
 │   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
-│   ├── pronunciation.ts # checkPronunciation (audio + texto → score).
+│   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).
+│   ├── progress.ts      # getProgress (resumen de progreso del usuario).
 │   ├── users.ts         # listUsers, createUser.
 │   └── voz.ts           # transcribe + tts.
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
@@ -81,6 +85,7 @@ frontend/src/
 │   ├── MicButton.tsx
 │   ├── ModeSelect.tsx   # selector de modo de tutor
 │   ├── PronunciationPractice.tsx
+│   ├── ProgressSummary.tsx  # panel de progreso del alumno (M9)
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
 │   ├── ThemeToggle.tsx  # toggle claro/oscuro (M8)
@@ -99,6 +104,8 @@ frontend/src/
 │   ├── modes.test.ts
 │   ├── users.ts         # nextDefaultUserName
 │   ├── users.test.ts
+│   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel (M9)
+│   ├── progress.test.ts
 │   ├── theme.ts         # resolveInitialTheme (M8)
 │   └── theme.test.ts
 ├── scripts/             # scripts de utilidad.

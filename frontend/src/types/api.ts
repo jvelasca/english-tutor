@@ -2,9 +2,12 @@ export type Role = "user" | "assistant";
 
 export type TutorMode = "conversation" | "grammar" | "exercises" | "pronunciation";
 
+export type PronunciationLevel = "good" | "fair" | "needs_practice";
+
 export interface Message {
   role: Role;
   content: string;
+  mode?: TutorMode;
 }
 
 export interface ChatResponse {
@@ -38,6 +41,23 @@ export interface PronunciationResponse {
   expected: string;
   heard: string;
   score: number;
-  level: "good" | "fair" | "needs_practice";
+  level: PronunciationLevel;
   ok: boolean;
+}
+
+export interface PronunciationStats {
+  attempts: number;
+  best: number | null;
+  average: number | null;
+  last_score: number | null;
+  last_level: PronunciationLevel | null;
+}
+
+export interface ProgressSummary {
+  user_id: string;
+  conversations: number;
+  messages: number;
+  exercises: number;
+  corrections: number;
+  pronunciation: PronunciationStats;
 }

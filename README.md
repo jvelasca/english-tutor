@@ -112,6 +112,7 @@ Abre **http://localhost:5173** y empieza a conversar.
 | `GET/POST` | `/api/users` | Listar / crear perfiles de usuario |
 | `GET/POST` | `/api/conversations?user_id=<id>` | Listar / crear conversaciones del usuario |
 | `GET/PUT/DELETE` | `/api/conversations/{id}` | Leer / guardar / borrar una conversación |
+| `GET` | `/api/progress?user_id=<id>` | Resumen del progreso del alumno (ejercicios, correcciones, pronunciación) |
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 

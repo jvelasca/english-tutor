@@ -58,7 +58,7 @@ Abrir **http://localhost:5173**.
 
 ## 5. Git / GitHub
 
-- Repositorio remoto: **https://github.com/jvelasca/english-tutor** (privado).
+- Repositorio remoto: **https://github.com/jvelasca/english-tutor** (público).
 - Durante el desarrollo: commits locales con mensajes claros (formato `tipo: descripción`).
 - Cada hito estable se etiqueta (`git tag vX.Y.Z`) y se publica como **release** en GitHub.
 - Desde GitHub: seguimiento con **issues** (backlog), **PR** (cambios revisables) y **releases**.
