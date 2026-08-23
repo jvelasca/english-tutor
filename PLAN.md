@@ -49,11 +49,14 @@
 - Verificado: backend 13 tests, frontend 10 tests, `tsc` sin errores.
 - Subagentes (ejecutados por el gerente): `agentes/m4-backend-modo.md`, `agentes/m4-frontend-modo.md`.
 
-### M5 — Modelo conversacional  [EN CURSO]
+### M5 — Modelo conversacional  [BLOQUEADO ⚠]
 - Evaluar cambiar a un modelo no-coder (ej. `llama3.1:8b` o `mistral`) para mejor calidad de tutor.
 - Criterio: calidad como profesor (correcciones, explicaciones, tono) + tamaño/VRAM (RTX 4060 Ti 4 GB).
 - Entregable: script de evaluación repetible + decisión documentada del modelo por defecto.
 - Subagente (ejecutado por el gerente): `agentes/m5-modelo-conversacional.md`.
+- **Bloqueo:** `ollama pull llama3.1:8b` falla con `tls: failed to verify certificate`
+  (certificado TLS interceptado o CA no confiable en Windows). La descarga funcionó hace 36 h.
+  Pendiente de resolver en el entorno (instalar el CA del antivirus/firewall o revisar la inspección HTTPS).
 
 ### M6 — Release a GitHub  [HECHO ✔]
 - Repositorio **público**: https://github.com/jvelasca/english-tutor
@@ -76,7 +79,7 @@
 | M2 Frontend voz | `agentes/m2-frontend-voz.md` | ✔ hecho |
 | M4 Backend modo profesor | `agentes/m4-backend-modo.md` | ✔ hecho |
 | M4 Frontend modo profesor | `agentes/m4-frontend-modo.md` | ✔ hecho |
-| M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ⏳ en curso |
+| M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ⚠ bloqueado (TLS) |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
