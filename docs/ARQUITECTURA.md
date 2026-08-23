@@ -45,6 +45,7 @@ backend/
 │   ├── test_schemas.py
 │   └── test_store.py
 ├── scripts/             # scripts de utilidad.
+│   ├── eval_model.py    # evalúa un modelo como tutor (M5)
 │   └── smoke_test.py    # verifica el servidor en ejecución
 ├── download_models.py   # script de descarga de modelos de voz (1ª vez)
 ├── requirements.txt

@@ -88,6 +88,11 @@ Abre **http://localhost:5173** y empieza a conversar.
   cd backend
   .venv\Scripts\python.exe scripts/smoke_test.py
   ```
+- **Evaluación de modelo** (M5; compara calidad como tutor):
+  ```powershell
+  cd backend
+  .venv\Scripts\python.exe scripts/eval_model.py --model llama3.1:8b
+  ```
 
 ## API
 

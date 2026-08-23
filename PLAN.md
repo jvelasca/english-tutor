@@ -49,11 +49,15 @@
 - Verificado: backend 13 tests, frontend 10 tests, `tsc` sin errores.
 - Subagentes (ejecutados por el gerente): `agentes/m4-backend-modo.md`, `agentes/m4-frontend-modo.md`.
 
-### M5 — Modelo conversacional  [PENDIENTE]
+### M5 — Modelo conversacional  [EN CURSO]
 - Evaluar cambiar a un modelo no-coder (ej. `llama3.1:8b` o `mistral`) para mejor calidad de tutor.
+- Criterio: calidad como profesor (correcciones, explicaciones, tono) + tamaño/VRAM (RTX 4060 Ti 4 GB).
+- Entregable: script de evaluación repetible + decisión documentada del modelo por defecto.
+- Subagente (ejecutado por el gerente): `agentes/m5-modelo-conversacional.md`.
 
-### M6 — Release a GitHub  [EN CURSO]
-- V1.0 subida a la cuenta GitHub del cliente (`jvelasca`). Seguimiento desde allí (issues, PR, releases).
+### M6 — Release a GitHub  [HECHO ✔]
+- Repositorio **público**: https://github.com/jvelasca/english-tutor
+- V1.0 (tag `v1.0.0`) subida con release e issues de seguimiento.
 
 ## Decisiones tomadas
 
@@ -72,6 +76,7 @@
 | M2 Frontend voz | `agentes/m2-frontend-voz.md` | ✔ hecho |
 | M4 Backend modo profesor | `agentes/m4-backend-modo.md` | ✔ hecho |
 | M4 Frontend modo profesor | `agentes/m4-frontend-modo.md` | ✔ hecho |
+| M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ⏳ en curso |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
