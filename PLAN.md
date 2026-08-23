@@ -55,8 +55,11 @@
 - Entregable: script de evaluación repetible + decisión documentada del modelo por defecto.
 - Subagente (ejecutado por el gerente): `agentes/m5-modelo-conversacional.md`.
 - **Bloqueo:** `ollama pull llama3.1:8b` falla con `tls: failed to verify certificate`
-  (certificado TLS interceptado o CA no confiable en Windows). La descarga funcionó hace 36 h.
-  Pendiente de resolver en el entorno (instalar el CA del antivirus/firewall o revisar la inspección HTTPS).
+  (`x509: certificate signed by unknown authority`). Causa raíz identificada: el ISP
+  **DigiMobil (AS57269)** intercepta el tráfico al CDN de pesos (`r2.cloudflarestorage.com`)
+  con un certificado autofirmado `CN=core1.netops.test` como efecto colateral de los bloqueos
+  de IP de LaLiga (ver OONI). Solución: usar VPN u otra red para descargar el modelo.
+  No es un problema del proyecto, de Windows ni del firewall.
 
 ### M6 — Release a GitHub  [HECHO ✔]
 - Repositorio **público**: https://github.com/jvelasca/english-tutor
