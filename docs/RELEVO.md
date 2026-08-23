@@ -34,7 +34,9 @@ Hecho y verificado (tests verdes):
 - **M7** multi-usuario: tabla `users` + columna `user_id` en `conversations` (migración
   idempotente, usuario por defecto `Usuario`), `GET/POST /api/users`, CRUD de conversaciones
   filtrado por `user_id`, selector de perfil en frontend con aislamiento al cambiar.
-- Tests: backend `pytest tests/ -q` (20 tests), frontend `npm test` (vitest, 14 tests) + `tsc --noEmit`.
+- **M8** diseño y UX: tokens en `index.css`, tema claro/oscuro (`useTheme`, `ThemeToggle`,
+  anti-FOUC), responsive (drawer + hamburguesa ≤768px), a11y y micro-interacciones.
+- Tests: backend `pytest tests/ -q` (20 tests), frontend `npm test` (vitest, 19 tests) + `tsc --noEmit`.
 
 ## 4. GitHub
 
@@ -76,15 +78,17 @@ Hecho y verificado (tests verdes):
   hook `useChat.ts` con estado de usuario y aislamiento al cambiar de perfil.
 - Briefings: `agentes/m7-backend-multiusuario.md`, `agentes/m7-frontend-multiusuario.md`.
 
-## 7. PENDIENTE — M8: diseño y UX nivel top
+## 7. HECHO — M8: diseño y UX nivel top
 
-**Requisito (premisa 14):** rediseño al nivel de apps líderes (ChatGPT/Duolingo): sistema de
-tokens (colores/tipografía/espaciado/radios), tema claro/oscuro, responsive, accesibilidad,
-micro-interacciones, estados vacíos/carga/error cuidados.
+**Implementado y verificado** (frontend 19 tests, `tsc` sin errores, `npm run build` OK).
 
-- Hoy el CSS está en `frontend/src/index.css` (tema oscuro fijo, variables `--*` ya definidas
-  en `:root`). No hay sistema de tokens formal ni toggle de tema.
-- No iniciado.
+- Tokens de diseño en `index.css` (`--color-*`, `--font-*`, `--text-*`, `--space-*`,
+  `--radius-*`, `--shadow-*`, motion), tema claro en `:root[data-theme="light"]`.
+- Tema claro/oscuro: `hooks/useTheme.ts` + `utils/theme.ts` (`resolveInitialTheme`) +
+  `components/ThemeToggle.tsx`; persistencia en `localStorage` y anti-FOUC en `index.html`.
+- Responsive ≤768px: sidebar drawer + hamburguesa + backdrop. a11y: `:focus-visible`,
+  `aria-*`, `prefers-reduced-motion`.
+- Briefing: `agentes/m8-diseno-ux.md`.
 
 ## 8. Notas de diseño de M7 (para no romper en M8)
 

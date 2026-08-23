@@ -21,6 +21,13 @@ export function Sidebar({
         + Nuevo chat
       </button>
       <div className="conversation-list">
+        {conversations.length === 0 && (
+          <p className="conversation-empty">
+            Aún no hay conversaciones.
+            <br />
+            Crea una para empezar.
+          </p>
+        )}
         {conversations.map((c) => (
           <div
             key={c.id}
@@ -37,6 +44,7 @@ export function Sidebar({
               className="conversation-delete"
               onClick={() => onDelete(c.id)}
               title="Eliminar"
+              aria-label={`Eliminar conversación ${c.title}`}
             >
               ×
             </button>

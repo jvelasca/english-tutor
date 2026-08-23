@@ -34,8 +34,9 @@ export function Composer({
         onKeyDown={onKeyDown}
         placeholder="Escribe tu mensaje…"
         rows={1}
+        aria-label="Mensaje"
       />
-      <button onClick={onSend} disabled={disabled}>
+      <button className="send-button" onClick={onSend} disabled={disabled}>
         Enviar
       </button>
     </footer>

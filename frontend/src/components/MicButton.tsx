@@ -60,6 +60,8 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
       onClick={recording ? stop : start}
       disabled={disabled}
       title={recording ? "Detener grabación" : "Grabar mensaje"}
+      aria-label={recording ? "Detener grabación" : "Grabar mensaje"}
+      aria-pressed={recording}
     >
       <MicIcon />
     </button>

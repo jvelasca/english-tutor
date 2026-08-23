@@ -13,6 +13,7 @@ export function ModeSelect({ value, onChange }: ModeSelectProps) {
       value={value}
       onChange={(e) => onChange(e.target.value as TutorMode)}
       title="Modo del tutor"
+      aria-label="Modo del tutor"
     >
       {MODES.map((m) => (
         <option key={m.id} value={m.id}>

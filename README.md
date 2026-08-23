@@ -31,6 +31,8 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   y **corrección de pronunciación** (graba y recibe una puntuación).
 - **Multi-usuario (M7)**: perfiles locales con conversaciones e historial **independientes**
   (selector de perfil en la cabecera, aislamiento total de datos entre usuarios).
+- **Diseño y UX (M8)**: tema claro/oscuro, responsive (móvil/escritorio), accesibilidad
+  y sistema de tokens de diseño.
 
 ## Arranque rápido
 

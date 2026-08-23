@@ -83,9 +83,11 @@ frontend/src/
 │   ├── PronunciationPractice.tsx
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
+│   ├── ThemeToggle.tsx  # toggle claro/oscuro (M8)
 │   └── UserSelect.tsx   # selector de perfil de usuario
 ├── hooks/               # Estado y lógica de UI.
-│   └── useChat.ts       # incluye estado de usuario y aislamiento por perfil
+│   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
+│   └── useTheme.ts      # tema claro/oscuro + persistencia (M8)
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
 │   └── api.ts           # incluye User y user_id en ConversationMeta
 ├── utils/               # Funciones puras (testables).
@@ -96,12 +98,19 @@ frontend/src/
 │   ├── modes.ts         # MODES + isTutorMode
 │   ├── modes.test.ts
 │   ├── users.ts         # nextDefaultUserName
-│   └── users.test.ts
+│   ├── users.test.ts
+│   ├── theme.ts         # resolveInitialTheme (M8)
+│   └── theme.test.ts
 ├── scripts/             # scripts de utilidad.
 │   └── check.ps1        # tsc + vitest
 ├── vitest.config.ts
-└── index.css
+└── index.css             # tokens de diseño, tema claro/oscuro, responsive (M8)
 ```
+
+> **Sistema de diseño (M8):** los tokens viven en `:root` de `index.css`
+> (`--color-*`, `--font-*`, `--text-*`, `--space-*`, `--radius-*`, `--shadow-*`),
+> con el tema claro sobrescrito en `:root[data-theme="light"]`. El tema se controla
+> desde `hooks/useTheme.ts` + `utils/theme.ts` y se aplica en `<html data-theme="...">`.
 
 ### Responsabilidades frontend
 - **`api/`**: único lugar donde se hace `fetch`. Expone funciones tipadas.

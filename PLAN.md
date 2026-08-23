@@ -74,9 +74,16 @@
 - Verificado: backend 20 tests, frontend 14 tests, `tsc` sin errores.
 - Subagentes (ejecutados por el gerente): `agentes/m7-backend-multiusuario.md`, `agentes/m7-frontend-multiusuario.md`.
 
-### M8 — Diseño y UX nivel top  [NUEVO]
-- Rediseño de la interfaz al nivel de apps líderes (ChatGPT/Duolingo): sistema de tokens,
-  tema claro/oscuro, responsive, micro-interacciones y estados vacíos/carga/error (premisa 14).
+### M8 — Diseño y UX nivel top  [HECHO ✔]
+- Rediseño al nivel de apps líderes (ChatGPT/Duolingo): sistema de tokens, tema claro/oscuro,
+  responsive, micro-interacciones y estados vacíos/carga/error (premisa 14).
+- Sistema de **tokens** en `index.css` (`--color-*`, `--font-*`, `--text-*`, `--space-*`,
+  `--radius-*`, `--shadow-*`, motion). Tema **claro/oscuro** (`data-theme`, hook `useTheme`,
+  toggle accesible, persistencia en `localStorage`, anti-FOUC en `index.html`).
+- **Responsive** (≤768px): sidebar drawer + hamburguesa. **a11y**: `:focus-visible`,
+  `aria-*`, `prefers-reduced-motion`.
+- Verificado: frontend 19 tests (5 nuevos de tema), `tsc` sin errores, `npm run build` OK.
+- Subagente (ejecutado por el gerente): `agentes/m8-diseno-ux.md`.
 
 ## Decisiones tomadas
 
@@ -99,6 +106,7 @@
 | M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ⏳ descargando (VPN) |
 | M7 Backend multi-usuario | `agentes/m7-backend-multiusuario.md` | ✔ hecho |
 | M7 Frontend multi-usuario | `agentes/m7-frontend-multiusuario.md` | ✔ hecho |
+| M8 Diseño y UX | `agentes/m8-diseno-ux.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

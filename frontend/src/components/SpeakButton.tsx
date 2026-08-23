@@ -18,10 +18,12 @@ export function SpeakButton({ text }: { text: string }) {
   return (
     <button
       type="button"
-      className="speak-button"
+      className={`speak-button${loading ? " speaking" : ""}`}
       onClick={onClick}
       disabled={loading}
       title="Escuchar respuesta"
+      aria-label="Escuchar respuesta"
+      aria-busy={loading}
     >
       <SpeakerIcon />
     </button>
