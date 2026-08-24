@@ -9,6 +9,8 @@
 
 **Posición actual (2026-08-24):** Fases 0–10 del plan de endurecimiento **completas, verificadas
 y commiteadas**. Working tree limpio. Últimos commits:
+- `fix: hallazgos de auditoria` — concurrencia launcher + ratio gramática + marcador "let's".
+- `docs: documentacion final` — README, docs, changelog, auditoría interna.
 - `release: version 1.1.0` — versión unificada (config + health + root + frontend).
 - `fix: launcher no duplica servicios` — guard anti-duplicado al iniciar.
 - `feat: launcher A.2` — GUI tkinter + procesos + atajo/icono.
@@ -21,8 +23,10 @@ y commiteadas**. Working tree limpio. Últimos commits:
 la app y muestra estado de servicios, BD y usuarios. Acceso directo del escritorio con
 `launcher/install_shortcut.ps1` (icono incluido).
 
-**Siguiente paso: documentación final + auditorías.** Ver `docs/PLAN-ENDURECIMIENTO.md`
-(FASE 10 cerrada) y la sección 17 de este documento.
+**Siguiente paso: publicar release.** Documentación final hecha (`docs/AUDITORIA-INTERNA.md`,
+`CHANGELOG.md`). Auditorías completadas: interna (gerente), Bugbot (4 hallazgos corregidos) y
+security-review (sin hallazgos accionables). Único pendiente: push + tag `v1.1.0` + release en
+GitHub (premisa 11).
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).

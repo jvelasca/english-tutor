@@ -54,8 +54,40 @@ publicar la release en GitHub (premisa 11), que requiere push del gerente.
 | 3 | Baja | La GUI `tkinter` no tiene tests E2E (solo la lógica pura). | Aceptado: la GUI se verifica manualmente; la lógica está cubierta. |
 | 4 | Informativa | La version `1.1.0` se expone en `/api/health` y `/`, pero el launcher no la muestra. | Opcional: añadir versión a la cabecera del launcher en una iteración futura. |
 
-## 6. Conclusión
+## 6. Hallazgos de auditoría externa (bugbot) — corregidos
+
+La revisión externa con Bugbot detectó 4 hallazgos reales. Todos fueron corregidos y
+verificados con tests antes del commit `f6d7558`.
+
+| # | Severidad | Hallazgo | Corrección | Verificación |
+|---|---|---|---|---|
+| 1 | Alta | Condición de carrera en `launcher/launcher.py`: `start()` mutaba el `ProcessManager` desde un hilo de fondo mientras `stop()` (hilo principal) podía leerlo/limpiarlo; además `root.after()` se llamaba desde hilo no-principal antes de `mainloop()`. | Refactor a cola `queue.Queue` + `threading.Lock`; las actualizaciones de GUI se encolan y las procesa el hilo principal (`_poll_queue`). | Tests launcher verdes + arranque manual. |
+| 2 | Alta | `grammar_error_rate` en `backend/domain/profile.py` dividía entre `messages` totales (incluía respuestas del asistente), reduciendo a la mitad la tasa real. | Se cuenta `user_messages` por separado en `repositories/pronunciation.py` y `profile.py` lo usa como denominador. | `test_profile_grammar_rate_uses_user_messages`. |
+| 3 | Media | El marcador amistoso `"let's"` nunca coincidía: `normalize` eliminaba los apóstrofos antes de comparar con `FRIENDLY_MARKERS`. | Se normalizan los propios marcadores antes de comprobar inclusión en la respuesta normalizada (backend y frontend espejo). | `test_engagement_marker_with_apostrophe` (backend) y test espejo en frontend. |
+| 4 | Informativa | La security-review externa no pudo calcular el diff inicialmente (ruta con espacios). | Reintento con base explícita `origin/main`. | Completada sin hallazgos accionables. |
+
+## 7. Auditoría de seguridad externa (security-review) — sin hallazgos
+
+Revisión de seguridad de la solución completa (versión 1.1.0) con base explícita `origin/main`.
+Resultado: **no se identificaron vulnerabilidades accionables**.
+
+- **CI** (`.github/workflows/ci.yml`): usa `pull_request` (no `pull_request_target`), sin
+  secretos referenciados, sin input inseguro en pasos shell, acciones pineadas (`@v4`/`@v5`).
+- **Launcher**: `subprocess` con listas de comandos fijas (sin `shell=True`, sin inyección);
+  `taskkill` con PID numérico del proceso hijo real; SQLite en modo solo-lectura y con
+  parámetros; scripts `.ps1` derivan rutas de su propia ubicación, sin input del usuario.
+- **Backend**: las mejoras descritas en e1/e2/e3/f4 son endurecimiento neto (filtrado por
+  `user_id`, rechazo de `role="system"`, límites de tamaño, mensajes de error genéricos, CORS
+  restringido a orígenes locales, FK reales + mensajes append-only).
+
+Elementos deliberadamente no reportados (por alcance/modelo de amenaza): sin autenticación en
+la API multi-usuario (diseño explícito "100% local, sin cuentas"), `_content_type_ok` fail-open
+(baja severidad, mitigado por límites + Whisper), y `-ExecutionPolicy Bypass` (script propio en
+máquina propia).
+
+## 8. Conclusión
 
 Solución **estable y auditada**: 3 componentes con tests verdes, arquitectura respetada,
-documentación al día y premisas cumplidas. Único pendiente operativo: publicar la release
-v1.1.0 en GitHub.
+documentación al día y premisas cumplidas. Auditorías completadas: interna (gerente), externa
+Bugbot (4 hallazgos corregidos) y externa security-review (sin hallazgos accionables). Único
+pendiente operativo: publicar la release v1.1.0 en GitHub.
