@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getLevels, recordAttempts, submitExam, submitPlacement } from "./academy";
+import {
+  completeLesson,
+  getLevels,
+  recordAttempts,
+  submitExam,
+  submitObjectiveAssessment,
+  submitPlacement,
+} from "./academy";
 
 function mockJsonFetch(data: unknown) {
   const fn = vi.fn().mockResolvedValue({ ok: true, json: async () => data });
@@ -50,6 +57,36 @@ describe("academy api", () => {
         { skill: "grammar", result: "correct" },
         { skill: "vocabulary", result: "incorrect" },
       ],
+    });
+  });
+
+  it("completeLesson envía level/objective", async () => {
+    const fn = mockJsonFetch({ level_id: "a1", objective_id: "o1", recorded: true });
+    await completeLesson("u1", "a1", "o1");
+    const url = fn.mock.calls[0][0] as string;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/lessons/complete?user_id=u1");
+    expect(body).toEqual({ level_id: "a1", objective_id: "o1" });
+  });
+
+  it("submitObjectiveAssessment envía respuestas, no scores", async () => {
+    const fn = mockJsonFetch({
+      level_id: "a1",
+      objective_id: "o1",
+      overall: 1,
+      correct: 2,
+      total: 2,
+      skills: {},
+      mastery: {},
+    });
+    await submitObjectiveAssessment("u1", "a1", "o1", { c1: 1, c2: 0 });
+    const url = fn.mock.calls[0][0] as string;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/objective/assessment?user_id=u1");
+    expect(body).toEqual({
+      level_id: "a1",
+      objective_id: "o1",
+      answers: { c1: 1, c2: 0 },
     });
   });
 });

@@ -16,6 +16,69 @@ from services.curriculum import (
     next_level_id,
 )
 
+# --- Modelo de mastery determinista (recencia + racha + confianza) ---------
+
+# Suavizado EMA aplicado a la evidencia (recent_score) y a la consistencia.
+MASTERY_ALPHA = 0.5
+# Racha de aciertos sobre el umbral que satura el bonus de consistencia.
+STREAK_TARGET = 3
+
+
+def _default_mastery_state() -> dict:
+    """Estado inicial de una destreza sin evidencia registrada."""
+    return {
+        "score": 0.0,
+        "recent_score": 0.0,
+        "confidence": 0.0,
+        "streak": 0,
+        "attempts": 0,
+        "last_seen_at": "",
+    }
+
+
+def next_mastery_state(
+    current: dict | None, score: float, threshold: float, now: str = ""
+) -> dict:
+    """Transición determinista del estado de mastery ante una evidencia (0..1).
+
+    Sustituye a ``score = MAX(score, new)``: el dominio puede **bajar** si la
+    evidencia empeora (decay), de modo que un objetivo dominado puede volver a
+    "a repasar".
+
+    - ``recent_score``: EMA de la evidencia; refleja el rendimiento reciente.
+    - ``confidence``: EMA del indicador "supera el umbral" (consistencia), 0..1;
+      no depende del número de preguntas.
+    - ``streak``: aciertos consecutivos sobre el umbral; se reinicia si falla.
+    - ``score`` (mastery): ``0.7·recent + 0.3·min(1, streak/3)``; exige algo de
+      consistencia para consolidar el dominio.
+    """
+    prev = current or _default_mastery_state()
+    attempts = int(prev.get("attempts", 0)) + 1
+    prev_recent = float(prev.get("recent_score", 0.0))
+    if attempts == 1:
+        recent = score
+    else:
+        recent = MASTERY_ALPHA * score + (1 - MASTERY_ALPHA) * prev_recent
+
+    met = 1.0 if score >= threshold else 0.0
+    prev_conf = float(prev.get("confidence", 0.0))
+    if attempts == 1:
+        confidence = met
+    else:
+        confidence = MASTERY_ALPHA * met + (1 - MASTERY_ALPHA) * prev_conf
+
+    streak = int(prev.get("streak", 0)) + 1 if score >= threshold else 0
+    mastery = round(0.7 * recent + 0.3 * min(1.0, streak / STREAK_TARGET), 3)
+    return {
+        "score": mastery,
+        "recent_score": round(recent, 3),
+        "confidence": round(confidence, 3),
+        "streak": streak,
+        "attempts": attempts,
+        "last_seen_at": now,
+    }
+
+
 # --- Mastery y progresión -------------------------------------------------
 
 
@@ -282,13 +345,33 @@ def placement_result(items: list, answers: dict[str, int]) -> dict:
             highest_passed = d
 
     level = CEFR_ORDER[highest_passed - 1] if highest_passed >= 1 else CEFR_ORDER[0]
-    confidence = round(min(0.5 + 0.05 * answered, 0.95), 2) if answered else 0.0
+    confidence = _placement_confidence(by_diff, answered, len(items))
     return {
         "level": level,
         "confidence": confidence,
         "answered": answered,
         "correct": sum(1 for it in items if answers.get(it.id) == it.correct_index),
     }
+
+
+def _placement_confidence(
+    by_diff: dict[int, dict[str, int]], answered: int, total: int
+) -> float:
+    """Confianza del test de nivel basada en cobertura y consistencia.
+
+    No crece linealmente con el nº de respuestas: premia cubrir el test (cobertura)
+    y que el rendimiento sea homogéneo entre bandas de dificultad (consistencia).
+    Un rendimiento muy dispar (acierto perfecto en lo fácil y cero en lo difícil)
+    baja la confianza, lo que corrige el antiguo ``0.5 + 0.05·answered``."""
+    if answered == 0 or total == 0:
+        return 0.0
+    accs = [
+        b["correct"] / b["total"] for b in by_diff.values() if b["total"] > 0
+    ]
+    coverage = answered / total
+    consistency = 1.0 - (max(accs) - min(accs)) if accs else 0.0
+    confidence = coverage * (0.4 + 0.6 * consistency)
+    return round(min(0.95, max(0.0, confidence)), 2)
 
 
 def exam_result(exam: Exam, answers: dict[str, int]) -> dict:

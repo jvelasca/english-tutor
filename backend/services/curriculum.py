@@ -46,6 +46,20 @@ class Activity(BaseModel):
     target: str = ""
 
 
+class ObjectiveCheck(BaseModel):
+    """Check determinista de un objetivo (auto-evaluable, con respuesta correcta).
+
+    A diferencia de `Activity` (instrucción abierta), un check es una pregunta de
+    opción múltiple con `correct_index`, que el Mastery Engine puntúa en servidor.
+    El cliente nunca recibe `correct_index` (se oculta en los esquemas de salida)."""
+
+    id: str
+    skill: str
+    prompt: str
+    options: list[str]
+    correct_index: int
+
+
 class Objective(BaseModel):
     id: str
     can_do: str
@@ -55,6 +69,7 @@ class Objective(BaseModel):
     vocabulary: list[str] = Field(default_factory=list)
     thresholds: dict[str, float] = Field(default_factory=dict)
     activities: list[Activity] = Field(default_factory=list)
+    checks: list[ObjectiveCheck] = Field(default_factory=list)
 
     def threshold(self, skill: str) -> float:
         """Umbral de dominio de una destreza (0..1); por defecto 0.8."""

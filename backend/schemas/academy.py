@@ -38,6 +38,15 @@ class ObjectiveProgressOut(BaseModel):
     mastered: bool
 
 
+class ObjectiveCheckOut(BaseModel):
+    """Check determinista expuesto al cliente (sin la respuesta correcta)."""
+
+    id: str
+    skill: str
+    prompt: str
+    options: list[str]
+
+
 class ObjectiveStateOut(BaseModel):
     id: str
     can_do: str
@@ -47,6 +56,7 @@ class ObjectiveStateOut(BaseModel):
     vocabulary: list[str]
     thresholds: dict[str, float]
     activities: list[CurriculumActivityOut]
+    checks: list[ObjectiveCheckOut]
     module_id: str
     module_title: str
     unit_id: str
@@ -223,3 +233,36 @@ class AttemptRequest(BaseModel):
 
 class AttemptOut(BaseModel):
     recorded: int
+
+
+class LessonCompleteRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+
+
+class LessonCompletedOut(BaseModel):
+    level_id: str
+    objective_id: str
+    recorded: bool
+
+
+class ObjectiveAssessmentRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+    answers: dict[str, int] = Field(default_factory=dict)
+
+
+class ObjectiveSkillResultOut(BaseModel):
+    correct: int
+    total: int
+    score: float
+
+
+class ObjectiveAssessmentOut(BaseModel):
+    level_id: str
+    objective_id: str
+    overall: float
+    correct: int
+    total: int
+    skills: dict[str, ObjectiveSkillResultOut]
+    mastery: dict[str, float]

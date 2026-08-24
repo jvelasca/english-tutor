@@ -34,6 +34,29 @@
                       "instruction": "Introduce yourself to the tutor: your name, country, city and job.",
                       "target": "I am ... / My name is ... / I live in ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m01-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'país'?",
+                      "options": ["name", "country", "city"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'trabajo'?",
+                      "options": ["age", "job", "hobby"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I is from Spain.", "I am from Spain.", "I are from Spain."],
+                      "correct_index": 1
+                    }
                   ]
                 },
                 {
@@ -88,6 +111,22 @@
                       "type": "listen",
                       "instruction": "Listen to the tutor and write down the number you hear.",
                       "target": "recognize numbers 1-100"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m01-u01-l02-o02-c01",
+                      "skill": "listening",
+                      "prompt": "Listen: 'fifty'. Which number is it?",
+                      "options": ["15", "50", "5"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m01-u01-l02-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which number comes after twenty-nine?",
+                      "options": ["twenty", "thirty", "forty"],
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -286,6 +325,29 @@
                       "type": "listen",
                       "instruction": "Listen and say where the object is.",
                       "target": "The book is on the table."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m04-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct word: 'The book is ___ the table.' (sobre la mesa)",
+                      "options": ["on", "under", "behind"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'detrás de'?",
+                      "options": ["next to", "behind", "under"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o02-c03",
+                      "skill": "listening",
+                      "prompt": "Listen: 'The keys are under the chair.' Where are the keys?",
+                      "options": ["On the chair", "Under the chair", "Behind the chair"],
+                      "correct_index": 1
                     }
                   ]
                 }

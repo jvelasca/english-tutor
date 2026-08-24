@@ -3087,6 +3087,7 @@ body.is-resizing {
 .academy-objective {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
@@ -3158,6 +3159,46 @@ body.is-resizing {
 
 .academy-objective-start:hover {
   background: var(--color-accent-hover);
+}
+
+.academy-checks {
+  flex-basis: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-soft);
+}
+
+.academy-checks h5 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
+.academy-check {
+  margin-bottom: var(--space-3);
+}
+
+.academy-check p {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.academy-check-submit {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.academy-check-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .academy-flow {

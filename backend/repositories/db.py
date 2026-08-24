@@ -180,6 +180,11 @@ def init_db() -> None:
                 level_id TEXT NOT NULL,
                 skill TEXT NOT NULL,
                 score REAL NOT NULL DEFAULT 0.0,
+                recent_score REAL NOT NULL DEFAULT 0.0,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                streak INTEGER NOT NULL DEFAULT 0,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_seen_at TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (user_id, level_id, skill),
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -223,6 +228,7 @@ def init_db() -> None:
                 objective_id TEXT NOT NULL,
                 skill TEXT NOT NULL,
                 result TEXT NOT NULL,
+                event_type TEXT NOT NULL DEFAULT 'attempt',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -306,6 +312,51 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE grammar_errors ADD COLUMN mastered INTEGER "
                 "NOT NULL DEFAULT 0"
+            )
+
+        # Migración idempotente: modelo de mastery determinista (recencia EMA,
+        # confianza, racha, nº de evidencias y última vista). Sustituye a
+        # `score = MAX(score, new)` para poder detectar deterioro del dominio.
+        mastery_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(academy_skill_mastery)")
+        }
+        if "recent_score" not in mastery_cols:
+            conn.execute(
+                "ALTER TABLE academy_skill_mastery ADD COLUMN recent_score REAL "
+                "NOT NULL DEFAULT 0.0"
+            )
+        if "confidence" not in mastery_cols:
+            conn.execute(
+                "ALTER TABLE academy_skill_mastery ADD COLUMN confidence REAL "
+                "NOT NULL DEFAULT 0.0"
+            )
+        if "streak" not in mastery_cols:
+            conn.execute(
+                "ALTER TABLE academy_skill_mastery ADD COLUMN streak INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "attempts" not in mastery_cols:
+            conn.execute(
+                "ALTER TABLE academy_skill_mastery ADD COLUMN attempts INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "last_seen_at" not in mastery_cols:
+            conn.execute(
+                "ALTER TABLE academy_skill_mastery ADD COLUMN last_seen_at TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
+        # Migración idempotente: tipificar eventos de actividad ('attempt' para
+        # intentos binarios; 'lesson_completed' para finalizar una lección sin
+        # declarar acierto).
+        attempt_cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(academy_activity_attempts)")
+        }
+        if "event_type" not in attempt_cols:
+            conn.execute(
+                "ALTER TABLE academy_activity_attempts ADD COLUMN event_type TEXT "
+                "NOT NULL DEFAULT 'attempt'"
             )
 
         conn.execute(

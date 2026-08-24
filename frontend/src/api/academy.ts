@@ -6,10 +6,12 @@ import type {
   Enrollment,
   Exam,
   ExamResult,
+  LessonCompleted,
   LevelDetail,
   LevelsResponse,
   MasteryLevel,
   NextObjective,
+  ObjectiveAssessmentResult,
   Placement,
   PlacementResult,
   StudyPlanStep,
@@ -108,5 +110,28 @@ export function recordAttempts(
   return postJson<AttemptResponse>(
     `/api/academy/attempts${userQuery(userId)}`,
     { level_id: levelId, objective_id: objectiveId, results },
+  );
+}
+
+export function completeLesson(
+  userId: string,
+  levelId: string,
+  objectiveId: string,
+): Promise<LessonCompleted> {
+  return postJson<LessonCompleted>(
+    `/api/academy/lessons/complete${userQuery(userId)}`,
+    { level_id: levelId, objective_id: objectiveId },
+  );
+}
+
+export function submitObjectiveAssessment(
+  userId: string,
+  levelId: string,
+  objectiveId: string,
+  answers: Record<string, number>,
+): Promise<ObjectiveAssessmentResult> {
+  return postJson<ObjectiveAssessmentResult>(
+    `/api/academy/objective/assessment${userQuery(userId)}`,
+    { level_id: levelId, objective_id: objectiveId, answers },
   );
 }

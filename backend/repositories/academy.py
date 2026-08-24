@@ -57,27 +57,58 @@ def set_enrollment_status(user_id: str, level_id: str, status: str) -> bool:
     return cur.rowcount > 0
 
 
-def record_skill_evidence(
-    user_id: str, level_id: str, skill: str, score: float
+def get_skill_row(user_id: str, level_id: str, skill: str) -> dict | None:
+    """Lee el estado completo de mastery de una destreza en un nivel, o None."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT score, recent_score, confidence, streak, attempts, last_seen_at "
+            "FROM academy_skill_mastery WHERE user_id = ? AND level_id = ? "
+            "AND skill = ?",
+            (user_id, level_id, skill),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def apply_skill_evidence(
+    user_id: str, level_id: str, skill: str, state: dict
 ) -> bool:
-    """Guarda la mejor puntuación (0..1) de una destreza en un nivel (upsert)."""
+    """Persiste el estado completo de mastery de una destreza (upsert, sin MAX).
+
+    `state` es el resultado de `services.academy.next_mastery_state`. Guardar la
+    fila completa (y no el máximo histórico) permite que el dominio detecte
+    deterioro de la destreza."""
     if get_user(user_id) is None:
         return False
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO academy_skill_mastery "
-            "(user_id, level_id, skill, score, updated_at) "
-            "VALUES (?, ?, ?, ?, ?) "
+            "(user_id, level_id, skill, score, recent_score, confidence, streak, "
+            "attempts, last_seen_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id, level_id, skill) DO UPDATE SET "
-            "score = MAX(score, excluded.score), updated_at = excluded.updated_at",
-            (user_id, level_id, skill, score, now),
+            "score = excluded.score, recent_score = excluded.recent_score, "
+            "confidence = excluded.confidence, streak = excluded.streak, "
+            "attempts = excluded.attempts, last_seen_at = excluded.last_seen_at, "
+            "updated_at = excluded.updated_at",
+            (
+                user_id,
+                level_id,
+                skill,
+                state["score"],
+                state["recent_score"],
+                state["confidence"],
+                state["streak"],
+                state["attempts"],
+                state.get("last_seen_at") or now,
+                now,
+            ),
         )
     return True
 
 
 def get_skill_mastery(user_id: str, level_id: str) -> dict[str, float]:
-    """Mapa destreza → mejor puntuación en un nivel."""
+    """Mapa destreza → puntuación de mastery actual en un nivel."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT skill, score FROM academy_skill_mastery "
@@ -180,29 +211,45 @@ def list_certificates(user_id: str) -> list[dict]:
 
 
 def record_attempt(
-    user_id: str, level_id: str, objective_id: str, skill: str, result: str
+    user_id: str,
+    level_id: str,
+    objective_id: str,
+    skill: str,
+    result: str,
+    event_type: str = "attempt",
 ) -> bool:
-    """Registra un intento de actividad ('correct' | 'incorrect')."""
+    """Registra un evento de actividad ('correct' | 'incorrect' | 'completed')."""
     if get_user(user_id) is None:
         return False
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO academy_activity_attempts "
-            "(user_id, level_id, objective_id, skill, result, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, level_id, objective_id, skill, result, now),
+            "(user_id, level_id, objective_id, skill, result, event_type, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, level_id, objective_id, skill, result, event_type, now),
         )
     return True
 
 
+def record_lesson_completed(
+    user_id: str, level_id: str, objective_id: str
+) -> bool:
+    """Registra la finalización de una lección (no declara acierto/fallo)."""
+    return record_attempt(
+        user_id, level_id, objective_id, "", "completed", "lesson_completed"
+    )
+
+
 def list_attempts(user_id: str, level_id: str) -> dict[str, dict[str, int]]:
-    """Agregado por objetivo: {objective_id: {correct: n, incorrect: n}}."""
+    """Agregado por objetivo: {objective_id: {correct: n, incorrect: n}}.
+
+    Solo cuenta eventos 'attempt' (los 'lesson_completed' no contaminan)."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT objective_id, result, COUNT(*) AS n "
             "FROM academy_activity_attempts "
-            "WHERE user_id = ? AND level_id = ? "
+            "WHERE user_id = ? AND level_id = ? AND event_type = 'attempt' "
             "GROUP BY objective_id, result",
             (user_id, level_id),
         ).fetchall()
@@ -215,12 +262,12 @@ def list_attempts(user_id: str, level_id: str) -> dict[str, dict[str, int]]:
 
 
 def list_skill_attempts(user_id: str, level_id: str) -> dict[str, dict[str, int]]:
-    """Agregado por destreza: {skill: {correct: n, incorrect: n}}."""
+    """Agregado por destreza: {skill: {correct: n, incorrect: n}} (solo 'attempt')."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT skill, result, COUNT(*) AS n "
             "FROM academy_activity_attempts "
-            "WHERE user_id = ? AND level_id = ? "
+            "WHERE user_id = ? AND level_id = ? AND event_type = 'attempt' "
             "GROUP BY skill, result",
             (user_id, level_id),
         ).fetchall()

@@ -168,15 +168,53 @@ def test_lesson_prompt_unknown_objective_none(monkeypatch, tmp_path):
 # --- Repositorio ----------------------------------------------------------
 
 
-def test_enroll_and_skill_evidence_best_score(monkeypatch, tmp_path):
+def test_next_mastery_state_decays_with_bad_evidence():
+    s0 = academy_svc.next_mastery_state(None, 0.6, 0.8)
+    s1 = academy_svc.next_mastery_state(s0, 0.9, 0.8)
+    s2 = academy_svc.next_mastery_state(s1, 0.4, 0.8)
+    assert s2["score"] < s1["score"]  # decaimiento (ya no es MAX)
+    assert s2["streak"] == 0  # racha reiniciada
+    assert s2["attempts"] == 3
+    assert s2["recent_score"] < s1["recent_score"]
+
+
+def test_next_mastery_state_streak_and_confidence():
+    s = None
+    for _ in range(3):
+        s = academy_svc.next_mastery_state(s, 1.0, 0.8)
+    assert s["streak"] == 3
+    assert s["confidence"] == 1.0
+    assert s["score"] >= 0.8  # dominado tras una racha consistente
+
+
+def test_apply_skill_evidence_persists_and_decays(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     assert academy_repo.enroll(a, "a1", "A1") is True
     assert academy_repo.get_enrollment(a, "a1")["level"] == "A1"
 
-    assert academy_repo.record_skill_evidence(a, "a1", "grammar", 0.6) is True
-    assert academy_repo.record_skill_evidence(a, "a1", "grammar", 0.9) is True
-    assert academy_repo.record_skill_evidence(a, "a1", "grammar", 0.4) is True
-    assert academy_repo.get_skill_mastery(a, "a1")["grammar"] == 0.9
+    assert academy_repo.get_skill_row(a, "a1", "grammar") is None
+    state = academy_svc.next_mastery_state(None, 0.9, 0.8)
+    assert academy_repo.apply_skill_evidence(a, "a1", "grammar", state) is True
+    assert academy_repo.get_skill_mastery(a, "a1")["grammar"] == state["score"]
+
+    row = academy_repo.get_skill_row(a, "a1", "grammar")
+    assert row["attempts"] == 1
+    # Una evidencia mala posterior baja el mastery (no es el máximo histórico).
+    worse = academy_svc.next_mastery_state(row, 0.4, 0.8)
+    academy_repo.apply_skill_evidence(a, "a1", "grammar", worse)
+    assert academy_repo.get_skill_mastery(a, "a1")["grammar"] < state["score"]
+
+
+def test_lesson_completed_does_not_change_mastery(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    state = academy_svc.next_mastery_state(None, 1.0, 0.8)
+    academy_repo.apply_skill_evidence(a, "a1", "grammar", state)
+
+    assert academy_repo.record_lesson_completed(a, "a1", "o1") is True
+    # Los 'lesson_completed' no se cuentan como intentos.
+    assert academy_repo.list_attempts(a, "a1") == {}
+    # Y no alteran el mastery.
+    assert academy_repo.get_skill_mastery(a, "a1")["grammar"] == state["score"]
 
 
 def test_certificate_and_isolation(monkeypatch, tmp_path):
@@ -371,7 +409,7 @@ def test_endpoint_attempts_rejects_invalid_result(monkeypatch, tmp_path):
     assert r.status_code == 422
 
 
-def test_endpoint_attempts_live_mastery(monkeypatch, tmp_path):
+def test_endpoint_attempts_do_not_grant_mastery(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     obj = load_level("a1").objectives()[0]
     results = [{"skill": s, "result": "correct"} for s in obj.skills for _ in range(3)]
@@ -390,4 +428,62 @@ def test_endpoint_attempts_live_mastery(monkeypatch, tmp_path):
 
     with TestClient(app) as client:
         detail = client.get("/api/academy/levels/a1", params={"user_id": a}).json()
-    assert detail["objectives"][0]["status"] == "mastered"
+        mastery = client.get("/api/academy/mastery", params={"user_id": a}).json()
+    # Los intentos binarios solo alimentan contadores, no conceden dominio.
+    assert detail["objectives"][0]["status"] == "review"
+    assert mastery["mastery"] == []
+
+
+def test_endpoint_objective_assessment_updates_mastery(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    checks = {c.id: c.correct_index for c in obj.checks}
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["overall"] == 1.0
+    assert body["correct"] == len(checks)
+    # Una única evidencia perfecta aún no consolida dominio total.
+    assert body["mastery"]["grammar"] == 0.8
+
+
+def test_endpoint_lesson_complete(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/lessons/complete",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": obj.id},
+        )
+    assert r.status_code == 200
+    assert r.json()["recorded"] is True
+
+    with TestClient(app) as client:
+        detail = client.get("/api/academy/levels/a1", params={"user_id": a}).json()
+    # Terminar una lección no declara acierto ni cambia contadores.
+    assert detail["objectives"][0]["attempts"] == 0
+    assert detail["objectives"][0]["status"] == "available"
+
+
+def test_endpoint_isolation_between_users(monkeypatch, tmp_path):
+    a, b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    checks = {c.id: c.correct_index for c in obj.checks}
+    with TestClient(app) as client:
+        client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
+        )
+        mastery_a = client.get("/api/academy/mastery", params={"user_id": a}).json()
+        mastery_b = client.get("/api/academy/mastery", params={"user_id": b}).json()
+        certs_b = client.get("/api/academy/certificates", params={"user_id": b}).json()
+    assert mastery_a["mastery"] != []
+    assert mastery_b["mastery"] == []  # B no hereda datos de A
+    assert certs_b["certificates"] == []

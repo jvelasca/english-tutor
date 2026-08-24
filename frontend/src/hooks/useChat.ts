@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getModels, streamChat } from "../api/chat";
-import { recordAttempts } from "../api/academy";
+import { completeLesson as completeLessonRequest } from "../api/academy";
 import { readUserIdCookie, writeUserIdCookie } from "../utils/cookie";
 import {
   createConversation,
@@ -242,17 +242,12 @@ export function useChat() {
 
   const clearLesson = useCallback(() => setActiveObjective(null), []);
 
-  const finishLesson = useCallback(async () => {
+  const completeLesson = useCallback(async () => {
     const objective = activeObjective;
     setActiveObjective(null);
-    if (!objective || !currentUserId || objective.skills.length === 0) return;
+    if (!objective || !currentUserId) return;
     try {
-      await recordAttempts(
-        currentUserId,
-        objective.levelId,
-        objective.id,
-        objective.skills.map((skill) => ({ skill, result: "correct" as const })),
-      );
+      await completeLessonRequest(currentUserId, objective.levelId, objective.id);
     } catch {
       /* backend no disponible */
     }
@@ -507,6 +502,6 @@ export function useChat() {
     activeObjective,
     startLesson,
     clearLesson,
-    finishLesson,
+    completeLesson,
   };
 }

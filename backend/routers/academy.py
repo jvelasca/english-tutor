@@ -12,10 +12,14 @@ from schemas.academy import (
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
+    LessonCompletedOut,
+    LessonCompleteRequest,
     LevelDetailOut,
     LevelsOut,
     MasteryListOut,
     NextObjectiveOut,
+    ObjectiveAssessmentOut,
+    ObjectiveAssessmentRequest,
     StudyPlanOut,
     StudyPlanRequest,
 )
@@ -79,6 +83,32 @@ async def record_attempts(
         body.level_id,
         body.objective_id,
         [r.model_dump() for r in body.results],
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post("/api/academy/lessons/complete", response_model=LessonCompletedOut)
+async def complete_lesson(
+    body: LessonCompleteRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.record_lesson_completed(
+        user["id"], body.level_id, body.objective_id
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post(
+    "/api/academy/objective/assessment", response_model=ObjectiveAssessmentOut
+)
+async def objective_assessment(
+    body: ObjectiveAssessmentRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.submit_objective_assessment(
+        user["id"], body.level_id, body.objective_id, body.answers
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")

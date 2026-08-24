@@ -223,6 +223,13 @@ export interface CurriculumActivity {
   target: string;
 }
 
+export interface ObjectiveCheck {
+  id: string;
+  skill: string;
+  prompt: string;
+  options: string[];
+}
+
 export interface SkillScore {
   skill: string;
   score: number;
@@ -245,6 +252,7 @@ export interface CurriculumObjective {
   vocabulary: string[];
   thresholds: Record<string, number>;
   activities: CurriculumActivity[];
+  checks: ObjectiveCheck[];
   module_id: string;
   module_title: string;
   unit_id: string;
@@ -419,4 +427,26 @@ export interface AttemptEntry {
 
 export interface AttemptResponse {
   recorded: number;
+}
+
+export interface LessonCompleted {
+  level_id: string;
+  objective_id: string;
+  recorded: boolean;
+}
+
+export interface ObjectiveSkillResult {
+  correct: number;
+  total: number;
+  score: number;
+}
+
+export interface ObjectiveAssessmentResult {
+  level_id: string;
+  objective_id: string;
+  overall: number;
+  correct: number;
+  total: number;
+  skills: Record<string, ObjectiveSkillResult>;
+  mastery: Record<string, number>;
 }

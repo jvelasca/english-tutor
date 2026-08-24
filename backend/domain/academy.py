@@ -13,12 +13,14 @@ from schemas.academy import (
     ExamItemOut,
     ExamOut,
     ExamResultOut,
+    LessonCompletedOut,
     LevelDetailOut,
     LevelProgressOut,
     LevelSummaryOut,
     MasteryOut,
     ModuleProgressOut,
     NextObjectiveOut,
+    ObjectiveAssessmentOut,
     ObjectiveProgressOut,
     ObjectiveStateOut,
     PlacementItemOut,
@@ -45,10 +47,6 @@ _LEVEL_TITLES = {
     "C1": ("Advanced", "Nuance, register and abstract topics."),
     "C2": ("Proficiency", "Precision, subtlety and near-native command."),
 }
-
-# Aciertos necesarios en una destreza para marcarla como dominada en vivo.
-LIVE_MASTERY_EVIDENCE = 3
-
 
 def _iter_objectives(level: Level):
     """Recorre (module, unit, lesson, objective, order) en orden de aparición."""
@@ -99,6 +97,15 @@ def _objective_state(
                 "target": a.target,
             }
             for a in obj.activities
+        ],
+        checks=[
+            {
+                "id": c.id,
+                "skill": c.skill,
+                "prompt": c.prompt,
+                "options": c.options,
+            }
+            for c in obj.checks
         ],
         module_id=mod.id,
         module_title=mod.title,
@@ -274,11 +281,11 @@ async def record_attempts(
     objective_id: str,
     results: list[dict],
 ) -> AttemptOut | None:
-    """Registra los intentos de una actividad y actualiza el mastery en vivo.
+    """Registra los intentos de una actividad (solo alimentan contadores).
 
-    Solo se guardan intentos válidos ('correct'/'incorrect' sobre destrezas del
-    objetivo). Al acumular suficientes aciertos en una destreza, esta se marca como
-    dominada (evidencia en vivo), sin esperar al examen de nivel.
+    Los intentos binarios ('correct'/'incorrect') NO conceden mastery: la evidencia
+    determinista que mueve el modelo de mastery llega por `/objective/assessment`
+    y el examen de nivel. Así se separa "actividad completada" de "evidencia".
     """
     lv = _levels_by_id.get(level_id)
     if lv is None:
@@ -302,16 +309,62 @@ async def record_attempts(
         )
         if ok:
             recorded += 1
-
-    counts = await run_in_threadpool(
-        academy_repo.list_skill_attempts, user_id, level_id
-    )
-    for skill in obj.skills:
-        if counts.get(skill, {}).get("correct", 0) >= LIVE_MASTERY_EVIDENCE:
-            await run_in_threadpool(
-                academy_repo.record_skill_evidence, user_id, level_id, skill, 1.0
-            )
     return AttemptOut(recorded=recorded)
+
+
+async def record_lesson_completed(
+    user_id: str, level_id: str, objective_id: str
+) -> LessonCompletedOut | None:
+    """Registra que el alumno terminó una lección (sin declarar acierto)."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None or get_objective(lv, objective_id) is None:
+        return None
+    ok = await run_in_threadpool(
+        academy_repo.record_lesson_completed, user_id, level_id, objective_id
+    )
+    if not ok:
+        return None
+    return LessonCompletedOut(
+        level_id=level_id, objective_id=objective_id, recorded=True
+    )
+
+
+async def submit_objective_assessment(
+    user_id: str, level_id: str, objective_id: str, answers: dict[str, int]
+) -> ObjectiveAssessmentOut | None:
+    """Puntúa los checks deterministas de un objetivo y aplica la evidencia.
+
+    El cliente envía respuestas (item_id → índice elegido), nunca puntuaciones.
+    El servidor puntúa con `correct_index` y alimenta el modelo de mastery
+    determinista por destreza."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        return None
+    scored = academy_svc.score_items(obj.checks, answers)
+    mastery_updates: dict[str, float] = {}
+    for skill, b in scored["skills"].items():
+        row = await run_in_threadpool(
+            academy_repo.get_skill_row, user_id, level_id, skill
+        )
+        state = academy_svc.next_mastery_state(
+            row, b["score"], obj.threshold(skill)
+        )
+        await run_in_threadpool(
+            academy_repo.apply_skill_evidence, user_id, level_id, skill, state
+        )
+        mastery_updates[skill] = state["score"]
+    return ObjectiveAssessmentOut(
+        level_id=level_id,
+        objective_id=objective_id,
+        overall=scored["overall"],
+        correct=scored["correct"],
+        total=scored["total"],
+        skills=scored["skills"],
+        mastery=mastery_updates,
+    )
 
 
 async def get_placement() -> PlacementOut:
@@ -388,10 +441,15 @@ async def submit_exam(
         result["passed"],
     )
     if result["passed"]:
-        # Persiste evidencia por destreza, certificado y desbloqueo del siguiente nivel.
+        # Persiste evidencia por destreza vía el modelo de mastery determinista,
+        # certificado y desbloqueo del siguiente nivel.
         for skill, b in result["skills"].items():
+            row = await run_in_threadpool(
+                academy_repo.get_skill_row, user_id, level_id, skill
+            )
+            state = academy_svc.next_mastery_state(row, b["score"], exam.min_per_skill)
             await run_in_threadpool(
-                academy_repo.record_skill_evidence, user_id, level_id, skill, b["score"]
+                academy_repo.apply_skill_evidence, user_id, level_id, skill, state
             )
         await run_in_threadpool(
             academy_repo.award_certificate,

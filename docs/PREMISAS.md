@@ -138,3 +138,16 @@ completo.
 - **Estándar estricto:** al crear código nuevo o al **refactorizar** código existente, se
   añaden/actualizan los docstrings y se regenera la referencia. Es parte de la definición
   de "terminado" (como los tests de la premisa 12).
+
+## 19. La IA produce evidencia; el Mastery Engine determinista decide
+- La IA (AI Teacher) **interactúa** y **da feedback**, pero **nunca decide** si un objetivo
+  está dominado: esa decisión la toma el **Mastery Engine determinista** (recencia EMA,
+  racha y confianza), igual que el resto de la lógica de la Academy.
+- El **frontend tampoco declara** "acertado" por sí mismo: envía respuestas (nunca
+  puntuaciones) y el backend las puntúa y convierte en evidencia.
+- Terminar una lección (`lesson_completed`) **no** es evidencia de dominio; la evidencia
+  proviene de evaluaciones deterministas (grammar, vocabulary, reading, listening) y del
+  examen de nivel. Speaking/writing/pronunciation (con IA) quedan diferidos y, cuando
+  lleguen, alimentarán el mismo motor determinista.
+- El dominio puede **bajar** (decay): un objetivo dominado puede volver a "a repasar" si la
+  evidencia reciente empeora. Se descarta el patrón `score = MAX(score, new)`.

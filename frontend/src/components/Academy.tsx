@@ -7,6 +7,7 @@ import {
   getLevels,
   getPlacement,
   submitExam,
+  submitObjectiveAssessment,
   submitPlacement,
 } from "../api/academy";
 import type {
@@ -17,6 +18,7 @@ import type {
   LevelDetail,
   LevelSummary,
   ModuleProgress,
+  ObjectiveAssessmentResult,
   Placement,
   PlacementResult,
 } from "../types/api";
@@ -86,6 +88,16 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
     try {
       if (!level.enrolled) await enroll(userId, level.level_id);
       setDetail(await getLevelDetail(userId, level.level_id));
+      void loadLevels();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function reloadDetail() {
+    if (!userId || !detail) return;
+    try {
+      setDetail(await getLevelDetail(userId, detail.level_id));
       void loadLevels();
     } catch (e) {
       setError((e as Error).message);
@@ -279,7 +291,12 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
 
           {flow === "none" &&
             (detail ? (
-              <LevelView detail={detail} onStartLesson={onStartLesson} />
+              <LevelView
+                detail={detail}
+                onStartLesson={onStartLesson}
+                userId={userId ?? ""}
+                onUpdated={() => void reloadDetail()}
+              />
             ) : (
               <div className="academy-empty">
                 Selecciona el nivel <strong>A1</strong> para empezar.
@@ -392,6 +409,8 @@ function CounterBadges({
 function LevelView({
   detail,
   onStartLesson,
+  userId,
+  onUpdated,
 }: {
   detail: LevelDetail;
   onStartLesson: (
@@ -400,6 +419,8 @@ function LevelView({
     levelId: string,
     skills: string[],
   ) => void;
+  userId: string;
+  onUpdated: () => void;
 }) {
   return (
     <div className="academy-level-view">
@@ -428,7 +449,9 @@ function LevelView({
             module={mod}
             objectives={objectives}
             levelId={detail.level_id}
+            userId={userId}
             onStartLesson={onStartLesson}
+            onUpdated={onUpdated}
           />
         );
       })}
@@ -440,17 +463,21 @@ function ModuleSection({
   module,
   objectives,
   levelId,
+  userId,
   onStartLesson,
+  onUpdated,
 }: {
   module: ModuleProgress;
   objectives: CurriculumObjective[];
   levelId: string;
+  userId: string;
   onStartLesson: (
     objectiveId: string,
     title: string,
     levelId: string,
     skills: string[],
   ) => void;
+  onUpdated: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   return (
@@ -483,7 +510,9 @@ function ModuleSection({
               key={obj.id}
               objective={obj}
               levelId={levelId}
+              userId={userId}
               onStart={onStartLesson}
+              onUpdated={onUpdated}
             />
           ))}
         </ol>
@@ -495,16 +524,20 @@ function ModuleSection({
 function ObjectiveRow({
   objective,
   levelId,
+  userId,
   onStart,
+  onUpdated,
 }: {
   objective: CurriculumObjective;
   levelId: string;
+  userId: string;
   onStart: (
     objectiveId: string,
     title: string,
     levelId: string,
     skills: string[],
   ) => void;
+  onUpdated: () => void;
 }) {
   return (
     <li className={`academy-objective status-${objective.status}`}>
@@ -537,6 +570,95 @@ function ObjectiveRow({
           {objective.status === "mastered" ? "Repasar" : "Empezar"}
         </button>
       )}
+      {objective.checks.length > 0 && (
+        <ObjectiveChecks
+          objective={objective}
+          levelId={levelId}
+          userId={userId}
+          onUpdated={onUpdated}
+        />
+      )}
     </li>
+  );
+}
+
+function ObjectiveChecks({
+  objective,
+  levelId,
+  userId,
+  onUpdated,
+}: {
+  objective: CurriculumObjective;
+  levelId: string;
+  userId: string;
+  onUpdated: () => void;
+}) {
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [result, setResult] = useState<ObjectiveAssessmentResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const answeredAll = objective.checks.every((c) => c.id in answers);
+
+  async function submit() {
+    if (busy || !answeredAll) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(
+        await submitObjectiveAssessment(userId, levelId, objective.id, answers),
+      );
+      onUpdated();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="academy-checks">
+      <h5>Evaluación rápida</h5>
+      {objective.checks.map((check) => (
+        <div key={check.id} className="academy-check">
+          <p>{check.prompt}</p>
+          <div className="academy-options">
+            {check.options.map((opt, i) => (
+              <button
+                key={opt}
+                type="button"
+                className={answers[check.id] === i ? "selected" : ""}
+                onClick={() =>
+                  setAnswers((prev) => ({ ...prev, [check.id]: i }))
+                }
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {error && <p className="academy-error">{error}</p>}
+      {result && (
+        <div
+          className={`academy-result ${
+            result.overall >= 0.8 ? "ok" : "ko"
+          }`}
+        >
+          <strong>Resultado: {Math.round(result.overall * 100)}%</strong>
+          <span>
+            {result.correct}/{result.total} aciertos
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        className="academy-check-submit"
+        onClick={submit}
+        disabled={busy || !answeredAll}
+      >
+        {busy ? "Enviando…" : "Comprobar respuestas"}
+      </button>
+    </div>
   );
 }

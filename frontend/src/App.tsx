@@ -62,7 +62,7 @@ export default function App() {
     activeObjective,
     startLesson,
     clearLesson,
-    finishLesson,
+    completeLesson,
   } = useChat();
 
   const { theme, toggleTheme } = useTheme();
@@ -250,7 +250,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={async () => {
-                      await finishLesson();
+                      await completeLesson();
                       setView("academy");
                     }}
                     aria-label="Terminar la lección"
