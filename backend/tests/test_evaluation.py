@@ -54,6 +54,10 @@ def test_engagement_marker():
     assert engagement_score("Great work, keep going.") == 70
 
 
+def test_engagement_marker_with_apostrophe():
+    assert engagement_score("Let's practice together.") == 70
+
+
 def test_engagement_none():
     assert engagement_score("Just a statement.") == 0
 

@@ -59,7 +59,7 @@ export function concisenessScore(wordCount: number): number {
 export function engagementScore(reply: string): number {
   if (reply.includes("?")) return 100;
   const n = normalize(reply);
-  if (FRIENDLY_MARKERS.some((m) => n.includes(m))) return 70;
+  if (FRIENDLY_MARKERS.some((m) => n.includes(normalize(m).trim()))) return 70;
   return 0;
 }
 

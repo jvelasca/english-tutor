@@ -4,6 +4,7 @@ import sqlite3
 from fastapi.testclient import TestClient
 
 from main import app
+from repositories import conversations as conversations_repo
 from repositories import db
 from repositories import grammar as grammar_repo
 from repositories import profile as profile_repo
@@ -138,3 +139,26 @@ def test_profile_endpoint_404(monkeypatch, tmp_path):
             client.get("/api/profile", params={"user_id": "no-existe"}).status_code
             == 404
         )
+
+
+def test_profile_grammar_rate_uses_user_messages(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    cid = conversations_repo.create_conversation(a)["id"]
+    conversations_repo.save_conversation(
+        cid,
+        a,
+        "Clase",
+        [
+            {"role": "user", "content": "He go to school", "mode": "grammar"},
+            {"role": "assistant", "content": "You mean goes"},
+            {"role": "user", "content": "She like coffee", "mode": "grammar"},
+            {"role": "assistant", "content": "You mean likes"},
+        ],
+    )
+    grammar_repo.record_errors(a, find_errors("He go to school"))
+
+    with TestClient(app) as client:
+        r = client.get("/api/profile", params={"user_id": a})
+        assert r.status_code == 200
+        # 2 mensajes de usuario y 1 error → ratio 0.5 → banda A1 (no A2).
+        assert r.json()["cefr_bands"]["grammar"] == "A1"

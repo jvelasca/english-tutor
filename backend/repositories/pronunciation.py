@@ -40,6 +40,7 @@ def get_progress(user_id: str) -> dict:
             ).fetchone()[0]
 
         messages = _count("", ())
+        user_messages = _count("AND m.role = 'user'", ())
         exercises = _count("AND m.role = 'user' AND m.mode = 'exercises'", ())
         corrections = _count("AND m.role = 'user' AND m.mode = 'grammar'", ())
 
@@ -64,6 +65,7 @@ def get_progress(user_id: str) -> dict:
         "user_id": user_id,
         "conversations": conversations,
         "messages": messages,
+        "user_messages": user_messages,
         "exercises": exercises,
         "corrections": corrections,
         "pronunciation": {

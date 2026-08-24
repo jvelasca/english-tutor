@@ -131,7 +131,7 @@ def engagement_score(reply: str) -> int:
     if "?" in reply:
         return 100
     normalized = normalize(reply)
-    if any(marker in normalized for marker in FRIENDLY_MARKERS):
+    if any(normalize(marker).strip() in normalized for marker in FRIENDLY_MARKERS):
         return 70
     return 0
 

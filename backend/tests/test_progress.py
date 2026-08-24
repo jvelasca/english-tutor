@@ -67,6 +67,7 @@ def test_progress_counts_modes(monkeypatch, tmp_path):
     p = pronunciation_repo.get_progress(uid)
     assert p["conversations"] == 1
     assert p["messages"] == 4
+    assert p["user_messages"] == 2
     assert p["exercises"] == 1
     assert p["corrections"] == 1
 

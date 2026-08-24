@@ -23,8 +23,9 @@ async def _compute_profile(user_id: str) -> dict | None:
 
     pron_avg = progress["pronunciation"]["average"]
     messages = progress["messages"]
+    user_messages = progress["user_messages"]
     total_errors = sum(e["count"] for e in errors)
-    grammar_error_rate = (total_errors / messages) if messages > 0 else None
+    grammar_error_rate = (total_errors / user_messages) if user_messages > 0 else None
 
     evaluation = evaluate_cefr(
         {

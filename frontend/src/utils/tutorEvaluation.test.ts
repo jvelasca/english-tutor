@@ -64,6 +64,10 @@ describe("engagementScore", () => {
     expect(engagementScore("Great work, keep going.")).toBe(70);
   });
 
+  it("marcador con apóstrofe (let's) → 70", () => {
+    expect(engagementScore("Let's practice together.")).toBe(70);
+  });
+
   it("sin pregunta ni marcador → 0", () => {
     expect(engagementScore("Just a statement.")).toBe(0);
   });

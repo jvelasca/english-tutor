@@ -5,10 +5,17 @@ la app, las dependencias, la base de datos y los usuarios. 100% local.
 
 Uso:
     python launcher.py
+
+Concurrencia: todo el I/O (HTTP, SQLite, subprocesos) se ejecuta en hilos de
+trabajo; los resultados se comunican al hilo principal (tkinter) a través de una
+cola. El hilo principal solo toca la UI y nunca llama `after` desde un hilo
+secundario. El acceso al `ProcessManager` se protege con un candado.
 """
 from __future__ import annotations
 
+import queue
 import threading
+import time
 import tkinter as tk
 import webbrowser
 from tkinter import ttk
@@ -25,6 +32,8 @@ from process_manager import ProcessManager
 from status import fetch_frontend, fetch_health, read_db_counts, read_users
 
 REFRESH_MS = 2000
+POLL_MS = 100
+BROWSER_DELAY_S = 2.0
 
 
 class LauncherApp:
@@ -32,11 +41,15 @@ class LauncherApp:
         self.root = root
         self.pm = ProcessManager()
         self._busy = False
+        self._queue: queue.Queue = queue.Queue()
+        self._lock = threading.Lock()
         root.title("English Tutor — Launcher")
         root.geometry("560x520")
         root.minsize(500, 460)
         self._build_ui()
-        self.refresh()
+        # Programar desde el hilo principal (antes de mainloop es seguro).
+        root.after(0, self.refresh)
+        root.after(POLL_MS, self._poll_queue)
 
     def _build_ui(self) -> None:
         pad = {"padx": 12, "pady": 4}
@@ -104,6 +117,42 @@ class LauncherApp:
             row=5, column=0, columnspan=2, sticky="w", **pad
         )
 
+    # --- Bucle de eventos (hilo principal) ---
+    def _poll_queue(self) -> None:
+        try:
+            while True:
+                self._handle(self._queue.get_nowait())
+        except queue.Empty:
+            pass
+        self.root.after(POLL_MS, self._poll_queue)
+
+    def _handle(self, item: tuple) -> None:
+        kind = item[0]
+        if kind == "refresh":
+            self._apply(*item[1])
+            self.root.after(REFRESH_MS, self._next_refresh)
+        elif kind == "error":
+            self._msg.set(f"Error: {item[1]}")
+            self._busy = False
+        elif kind == "started":
+            if item[1]:
+                webbrowser.open(frontend_url())
+            self.refresh()
+        elif kind == "stopped":
+            self.refresh()
+        elif kind == "open_app":
+            if item[1]:
+                webbrowser.open(frontend_url())
+                self._msg.set("Abriendo app…")
+            else:
+                self._msg.set("El frontend no está activo. Pulsa 'Iniciar app'.")
+                self.refresh()
+
+    def _next_refresh(self) -> None:
+        self._busy = False
+        self.refresh()
+
+    # --- Acciones ---
     def refresh(self) -> None:
         if self._busy:
             return
@@ -117,10 +166,9 @@ class LauncherApp:
                 counts = read_db_counts(str(DB_PATH))
                 users = read_users(str(DB_PATH))
             except Exception as exc:  # noqa: BLE001
-                error = f"Error: {exc}"
-                health, frontend_up, counts, users = None, False, {}, []
-                self.root.after(0, lambda: self._msg.set(error))
-            self.root.after(0, lambda: self._apply(health, frontend_up, counts, users))
+                self._queue.put(("error", str(exc)))
+                return
+            self._queue.put(("refresh", (health, frontend_up, counts, users)))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -166,34 +214,34 @@ class LauncherApp:
         self._msg.set("Arrancando servicios…")
 
         def work() -> None:
-            # No duplicar un servicio que ya está activo (p. ej. lanzado con F5).
-            backend_up = fetch_health() is not None
-            frontend_up = fetch_frontend()
-            if not self.pm.backend_running() and not backend_up:
-                self.pm.start_backend()
-            if not self.pm.frontend_running() and not frontend_up:
-                self.pm.start_frontend()
-            self.root.after(2500, self._open_browser_when_ready)
+            with self._lock:
+                # No duplicar un servicio que ya está activo (p. ej. lanzado con F5).
+                backend_up = fetch_health() is not None
+                frontend_up = fetch_frontend()
+                if not self.pm.backend_running() and not backend_up:
+                    self.pm.start_backend()
+                if not self.pm.frontend_running() and not frontend_up:
+                    self.pm.start_frontend()
+            time.sleep(BROWSER_DELAY_S)
+            self._queue.put(("started", fetch_frontend()))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _open_browser_when_ready(self) -> None:
-        if fetch_frontend():
-            webbrowser.open(frontend_url())
-        self.refresh()
-
     def stop(self) -> None:
         self._msg.set("Deteniendo servicios…")
-        self.pm.stop_all()
-        self.root.after(500, self.refresh)
+
+        def work() -> None:
+            with self._lock:
+                self.pm.stop_all()
+            self._queue.put(("stopped", None))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def open_app(self) -> None:
-        if fetch_frontend():
-            webbrowser.open(frontend_url())
-            self._msg.set("Abriendo app…")
-        else:
-            self._msg.set("El frontend no está activo. Pulsa 'Iniciar app'.")
-            self.refresh()
+        def work() -> None:
+            self._queue.put(("open_app", fetch_frontend()))
+
+        threading.Thread(target=work, daemon=True).start()
 
 
 def main() -> None:
