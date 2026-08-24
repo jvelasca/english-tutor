@@ -40,6 +40,7 @@ SECTION_ICONS = {
     "Acceso a la app": "📡",
     "Base de datos": "💾",
     "Usuarios": "👥",
+    "Cookies navegador": "🍪",
     "Registros": "📄",
 }
 

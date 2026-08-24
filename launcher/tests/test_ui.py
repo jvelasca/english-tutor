@@ -18,6 +18,7 @@ def test_icons_have_expected_keys():
     assert ui.SERVICE_ICONS["Backend"] == "🖥️"
     assert ui.SERVICE_ICONS["Ollama"] == "🦙"
     assert ui.SECTION_ICONS["Servicios"] == "🛠️"
+    assert ui.SECTION_ICONS["Cookies navegador"] == "🍪"
     assert ui.ACTION_ICONS["start"] == "▶️"
 
 

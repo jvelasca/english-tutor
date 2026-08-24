@@ -14,6 +14,7 @@ un hilo secundario. El acceso al `ProcessManager` se protege con un candado.
 """
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import time
@@ -21,12 +22,15 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk
 
+from browser_cookies import collect_cookies
 from core import (
     DB_PATH,
     app_summary,
+    author_line,
     db_summary,
     frontend_url,
     health_status,
+    icon_file,
     lan_url,
     user_overview,
 )
@@ -51,6 +55,13 @@ from ui import (
 REFRESH_MS = 2000
 POLL_MS = 100
 BROWSER_DELAY_S = 2.0
+
+# Tamaño fijo y estable de la ventana y de las columnas de secciones. El ancho
+# no sigue al contenido (evita el "vaivén" al refrescar datos); si algo se sale,
+# aparecen las barras de desplazamiento horizontal/vertical.
+WINDOW_W = 1160
+WINDOW_H = 800
+COLUMN_W = 540
 
 _SERVICE_ORDER = ["Backend", "Frontend", "Ollama", "STT", "TTS", "Base de datos"]
 
@@ -100,13 +111,25 @@ class LauncherApp:
         self._queue: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
         root.title("English Tutor — Launcher")
-        root.geometry("680x800")
-        root.minsize(560, 640)
+        root.geometry(f"{WINDOW_W}x{WINDOW_H}")
+        # Tamaño totalmente fijo: los desbordes se resuelven con scrollbars,
+        # nunca estirando la ventana.
+        root.resizable(False, False)
+        self._apply_window_icon()
         self._build_style()
         self._build_ui()
         # Programar desde el hilo principal (antes de mainloop es seguro).
         root.after(0, self.refresh)
         root.after(POLL_MS, self._poll_queue)
+
+    def _apply_window_icon(self) -> None:
+        """Icono de la ventana (icon.ico); si falta, se usa el icono por defecto."""
+        path = icon_file()
+        if os.path.exists(path):
+            try:
+                self.root.iconbitmap(path)
+            except tk.TclError:
+                pass
 
     # --- Estilos ---
     def _build_style(self) -> None:
@@ -260,6 +283,9 @@ class LauncherApp:
         ttk.Label(
             txt, textvariable=self._version, style="Sub.TLabel"
         ).pack(anchor="w")
+        ttk.Label(
+            txt, text=author_line(), style="DimCard.TLabel"
+        ).pack(anchor="w", pady=(2, 0))
 
         self._status = tk.StringVar(value="Comprobando…")
         self._status_dot = tk.StringVar(value=status_dot("unknown"))
@@ -302,21 +328,8 @@ class LauncherApp:
             command=self.refresh,
         ).pack(side="left", padx=(8, 0))
 
-        # Contenedor desplazable de secciones.
-        canvas = tk.Canvas(root, bg=c["bg"], highlightthickness=0)
-        scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
-        self._sections = ttk.Frame(canvas, style="TFrame")
-        self._sections.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-        )
-        win = canvas.create_window((0, 0), window=self._sections, anchor="nw")
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # Panel de estado final (footer).
+        # Panel de estado final (footer): se empaqueta primero para que quede
+        # anclado abajo, debajo de la barra horizontal.
         self._msg = tk.StringVar(value="")
         footer = ttk.Frame(root, style="Card.TFrame")
         footer.pack(fill="x", side="bottom")
@@ -325,19 +338,48 @@ class LauncherApp:
             footer, textvariable=self._msg, style="DimCard.TLabel"
         ).pack(anchor="w", padx=16, pady=6)
 
-        self._build_services()
-        self._build_access()
-        self._build_database()
-        self._build_users()
-        self._build_logs()
+        # Contenedor desplazable de secciones (scroll horizontal y vertical).
+        canvas = tk.Canvas(root, bg=c["bg"], highlightthickness=0)
+        vbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
+        hbar = ttk.Scrollbar(root, orient="horizontal", command=canvas.xview)
+        self._sections = ttk.Frame(canvas, style="TFrame")
+        self._sections.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        win = canvas.create_window((0, 0), window=self._sections, anchor="nw")
+        # Ancho del contenido fijado al del viewport: las columnas no "respiran"
+        # al refrescar datos; si algo se sale, actúa la barra horizontal.
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+        hbar.pack(side="bottom", fill="x")
+        vbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
-    def _section(self, title: str, expanded: bool = True) -> Collapsible:
-        sec = Collapsible(self._sections, title, SECTION_ICONS.get(title, ""), expanded)
+        # Dos columnas de ancho fijo y estable (mínimo garantizado por columna).
+        self._sections.columnconfigure(0, weight=1, uniform="cols", minsize=COLUMN_W)
+        self._sections.columnconfigure(1, weight=1, uniform="cols", minsize=COLUMN_W)
+        self._col_left = ttk.Frame(self._sections, style="TFrame")
+        self._col_left.grid(row=0, column=0, sticky="nsew")
+        self._col_right = ttk.Frame(self._sections, style="TFrame")
+        self._col_right.grid(row=0, column=1, sticky="nsew")
+
+        self._build_services(self._col_left)
+        self._build_access(self._col_left)
+        self._build_database(self._col_left)
+        self._build_users(self._col_right)
+        self._build_cookies(self._col_right)
+        self._build_logs(self._col_right)
+
+    def _section(
+        self, parent: tk.Misc, title: str, expanded: bool = True
+    ) -> Collapsible:
+        sec = Collapsible(parent, title, SECTION_ICONS.get(title, ""), expanded)
         sec.pack(fill="x", padx=16, pady=(10, 0))
         return sec
 
-    def _build_services(self) -> None:
-        sec = self._section("Servicios")
+    def _build_services(self, parent: tk.Misc) -> None:
+        sec = self._section(parent, "Servicios")
         grid = ttk.Frame(sec.body, style="Card.TFrame")
         grid.pack(fill="x", padx=14, pady=(4, 12))
         self._svc_vars: dict[str, tk.StringVar] = {}
@@ -356,8 +398,8 @@ class LauncherApp:
             )
             grid.columnconfigure(1, weight=1)
 
-    def _build_access(self) -> None:
-        sec = self._section("Acceso a la app")
+    def _build_access(self, parent: tk.Misc) -> None:
+        sec = self._section(parent, "Acceso a la app")
         grid = ttk.Frame(sec.body, style="Card.TFrame")
         grid.pack(fill="x", padx=14, pady=(4, 12))
         ttk.Label(grid, text="🖥️", style="Service.TLabel").grid(
@@ -381,8 +423,8 @@ class LauncherApp:
         )
         grid.columnconfigure(1, weight=1)
 
-    def _build_database(self) -> None:
-        sec = self._section("Base de datos")
+    def _build_database(self, parent: tk.Misc) -> None:
+        sec = self._section(parent, "Base de datos")
         body = ttk.Frame(sec.body, style="Card.TFrame")
         body.pack(fill="x", padx=14, pady=(4, 12))
         self._db_var = tk.StringVar(value="…")
@@ -390,12 +432,15 @@ class LauncherApp:
             anchor="w"
         )
         self._detail_var = tk.StringVar(value="")
-        ttk.Label(body, textvariable=self._detail_var, style="DimCard.TLabel").pack(
-            anchor="w", pady=(6, 0)
-        )
+        ttk.Label(
+            body,
+            textvariable=self._detail_var,
+            style="DimCard.TLabel",
+            wraplength=COLUMN_W - 30,
+        ).pack(anchor="w", fill="x", pady=(6, 0))
 
-    def _build_users(self) -> None:
-        sec = self._section("Usuarios")
+    def _build_users(self, parent: tk.Misc) -> None:
+        sec = self._section(parent, "Usuarios")
         wrap = ttk.Frame(sec.body, style="Card.TFrame")
         wrap.pack(fill="both", expand=True, padx=14, pady=(4, 12))
         cols = ("name", "conversations", "messages")
@@ -403,13 +448,39 @@ class LauncherApp:
         self._tree.heading("name", text="Nombre")
         self._tree.heading("conversations", text="Conversaciones")
         self._tree.heading("messages", text="Mensajes")
-        self._tree.column("name", width=300, anchor="w")
-        self._tree.column("conversations", width=130, anchor="e")
-        self._tree.column("messages", width=120, anchor="e")
+        self._tree.column("name", width=230, anchor="w")
+        self._tree.column("conversations", width=110, anchor="e")
+        self._tree.column("messages", width=100, anchor="e")
         self._tree.pack(fill="both", expand=True)
 
-    def _build_logs(self) -> None:
-        sec = self._section("Registros", expanded=False)
+    def _build_cookies(self, parent: tk.Misc) -> None:
+        sec = self._section(parent, "Cookies navegador")
+        wrap = ttk.Frame(sec.body, style="Card.TFrame")
+        wrap.pack(fill="both", expand=True, padx=14, pady=(4, 12))
+        self._cookie_var = tk.StringVar(value="…")
+        ttk.Label(wrap, textvariable=self._cookie_var, style="Service.TLabel").pack(
+            anchor="w"
+        )
+        cols = ("browser", "profile", "name", "host", "expires", "value")
+        self._cookie_tree = ttk.Treeview(
+            wrap, columns=cols, show="headings", height=8
+        )
+        self._cookie_tree.heading("browser", text="Navegador")
+        self._cookie_tree.heading("profile", text="Perfil")
+        self._cookie_tree.heading("name", text="Nombre")
+        self._cookie_tree.heading("host", text="Host")
+        self._cookie_tree.heading("expires", text="Caducidad")
+        self._cookie_tree.heading("value", text="Valor")
+        self._cookie_tree.column("browser", width=90, anchor="w")
+        self._cookie_tree.column("profile", width=110, anchor="w")
+        self._cookie_tree.column("name", width=130, anchor="w")
+        self._cookie_tree.column("host", width=130, anchor="w")
+        self._cookie_tree.column("expires", width=90, anchor="w")
+        self._cookie_tree.column("value", width=280, anchor="w")
+        self._cookie_tree.pack(fill="both", expand=True, pady=(6, 0))
+
+    def _build_logs(self, parent: tk.Misc) -> None:
+        sec = self._section(parent, "Registros", expanded=False)
         wrap = ttk.Frame(sec.body, style="Card.TFrame")
         wrap.pack(fill="both", expand=True, padx=14, pady=(4, 12))
         nb = ttk.Notebook(wrap)
@@ -484,6 +555,7 @@ class LauncherApp:
                 counts = read_db_counts(str(DB_PATH))
                 details = read_db_details(str(DB_PATH))
                 users = read_users(str(DB_PATH))
+                cookies, cookies_summary = collect_cookies()
                 backend_log = read_log_tail("backend")
                 frontend_log = read_log_tail("frontend")
             except Exception as exc:  # noqa: BLE001
@@ -499,6 +571,8 @@ class LauncherApp:
                         counts,
                         details,
                         users,
+                        cookies,
+                        cookies_summary,
                         backend_log,
                         frontend_log,
                     ),
@@ -515,6 +589,8 @@ class LauncherApp:
         counts,
         details,
         users,
+        cookies,
+        cookies_summary,
         backend_log,
         frontend_log,
     ) -> None:
@@ -554,11 +630,42 @@ class LauncherApp:
                 "", "end", values=("👤 " + u["name"], u["conversations"], u["messages"])
             )
 
+        self._apply_cookies(cookies, cookies_summary)
+
         self._set_log("backend", backend_log)
         self._set_log("frontend", frontend_log)
 
         self._msg.set("Última comprobación realizada.")
         self._busy = False
+
+    def _apply_cookies(self, rows: list[dict], summary: dict) -> None:
+        browser_txt = (
+            ", ".join(f"{b} ({n})" for b, n in summary["browsers"].items())
+            or "ningún navegador detectado"
+        )
+        remembered = summary["remembered"]
+        if remembered:
+            remembered_txt = f" · usuario recordado: {remembered}"
+        else:
+            remembered_txt = " · sin usuario recordado todavía"
+        self._cookie_var.set(
+            f"{summary['total']} cookies de la app · {browser_txt}{remembered_txt}"
+        )
+
+        self._cookie_tree.delete(*self._cookie_tree.get_children())
+        for c in rows:
+            self._cookie_tree.insert(
+                "",
+                "end",
+                values=(
+                    c["browser"],
+                    c["profile"],
+                    c["name"],
+                    c["host"],
+                    c["expires"],
+                    c["value"],
+                ),
+            )
 
     def _set_log(self, name: str, content: str) -> None:
         widget = self._log_widgets[name]

@@ -19,6 +19,21 @@ DB_PATH = BACKEND_DIR / "data" / "tutor.db"
 BACKEND_PORT = 8000
 FRONTEND_PORT = 5173
 
+AUTHOR_NAME = "José Alberto Velasco"
+AUTHOR_EMAIL = "josealberto.vel@gmail.com"
+
+ICON_PATH = Path(__file__).resolve().parent / "icon.ico"
+
+
+def author_line() -> str:
+    """Crédito del autor para mostrar en el launcher."""
+    return f"{AUTHOR_NAME} · {AUTHOR_EMAIL}"
+
+
+def icon_file() -> str:
+    """Ruta del icono de la ventana (icon.ico generado por make_icon.ps1)."""
+    return str(ICON_PATH)
+
 
 def backend_command() -> list[str]:
     """Comando para arrancar el backend con el venv del proyecto (uvicorn).

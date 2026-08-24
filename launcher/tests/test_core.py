@@ -1,20 +1,35 @@
 """Tests del núcleo puro del launcher (launcher/core.py)."""
 from core import (
+    AUTHOR_EMAIL,
+    AUTHOR_NAME,
     BACKEND_DIR,
     BACKEND_PORT,
     FRONTEND_DIR,
     FRONTEND_PORT,
+    ICON_PATH,
     REPO_ROOT,
     app_summary,
+    author_line,
     backend_command,
     backend_url,
     db_summary,
     frontend_command,
     frontend_url,
     health_status,
+    icon_file,
     lan_url,
     user_overview,
 )
+
+
+def test_author_line():
+    assert AUTHOR_NAME and AUTHOR_EMAIL
+    assert author_line() == f"{AUTHOR_NAME} · {AUTHOR_EMAIL}"
+
+
+def test_icon_file_points_to_launcher_icon():
+    assert ICON_PATH.name == "icon.ico"
+    assert icon_file().endswith("icon.ico")
 
 
 def test_repo_root_contains_backend_and_frontend():
