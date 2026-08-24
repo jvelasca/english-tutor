@@ -8,7 +8,7 @@ from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services.cefr import estimate_cefr, recommendations
+from services.cefr import evaluate_cefr, recommendations
 
 
 async def _compute_profile(user_id: str) -> dict | None:
@@ -22,11 +22,17 @@ async def _compute_profile(user_id: str) -> dict | None:
     progress = await run_in_threadpool(pronunciation_repo.get_progress, user_id)
 
     pron_avg = progress["pronunciation"]["average"]
-    level = estimate_cefr(
+    messages = progress["messages"]
+    total_errors = sum(e["count"] for e in errors)
+    grammar_error_rate = (total_errors / messages) if messages > 0 else None
+
+    evaluation = evaluate_cefr(
         {
             "vocab_size": len(vocab),
             "pronunciation_avg": pron_avg,
             "exercises": progress["exercises"],
+            "grammar_error_rate": grammar_error_rate,
+            "messages": messages,
         }
     )
 
@@ -39,7 +45,9 @@ async def _compute_profile(user_id: str) -> dict | None:
     )
     return {
         "user_id": user_id,
-        "cefr_level": level,
+        "cefr_level": evaluation["level"],
+        "cefr_bands": evaluation["bands"],
+        "cefr_descriptor": evaluation["descriptor"],
         "vocabulary_size": len(vocab),
         "top_words": [v["word"] for v in vocab[:5]],
         "recurring_errors": errors,
