@@ -23,10 +23,10 @@ y commiteadas**. Working tree limpio. Últimos commits:
 la app y muestra estado de servicios, BD y usuarios. Acceso directo del escritorio con
 `launcher/install_shortcut.ps1` (icono incluido).
 
-**Siguiente paso: publicar release.** Documentación final hecha (`docs/AUDITORIA-INTERNA.md`,
+**Siguiente paso: nada pendiente.** Documentación final hecha (`docs/AUDITORIA-INTERNA.md`,
 `CHANGELOG.md`). Auditorías completadas: interna (gerente), Bugbot (4 hallazgos corregidos) y
-security-review (sin hallazgos accionables). Único pendiente: push + tag `v1.1.0` + release en
-GitHub (premisa 11).
+security-review (sin hallazgos accionables). Release `v1.1.0` publicada en GitHub (premisa 11
+cumplida). Proyecto cerrado.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).

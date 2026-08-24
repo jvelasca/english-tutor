@@ -6,9 +6,9 @@
 
 ## 1. Resultado global
 
-**Aprobado con 1 acción pendiente.** El proyecto cumple las 14 premisas y la definición de
-"terminado" en las tres capas (backend, frontend, launcher). La única acción pendiente es
-publicar la release en GitHub (premisa 11), que requiere push del gerente.
+**Aprobado.** El proyecto cumple las 14 premisas y la definición de "terminado" en las tres
+capas (backend, frontend, launcher). Todas las auditorías (interna y externas) completadas y
+la release `v1.1.0` publicada en GitHub.
 
 ## 2. Cumplimiento de premisas
 
@@ -24,7 +24,7 @@ publicar la release en GitHub (premisa 11), que requiere push del gerente.
 | 8 | Anti-saturación | ✔ | Briefings autocontenidos; relevo disponible. |
 | 9 | Documentación VITAL | ✔ | README, PLAN, ARQUITECTURA, DESARROLLO, RELEVO, CHANGELOG actualizados. |
 | 10 | Modularidad | ✔ | Router → Service → Repository → SQLite; `launcher/` con capas puras. |
-| 11 | GitHub | ⚠ | Repo público existe; falta push + tag `v1.1.0` + release (acción pendiente). |
+| 11 | GitHub | ✔ | Repo público + release `v1.1.0` publicada (tag + release notes). |
 | 12 | Tests y scripts | ✔ | Backend 217, frontend 88, launcher 22; scripts en `scripts/`. |
 | 13 | Multi-usuario | ✔ | Perfiles locales aislados (tablas + filtro `user_id`). |
 | 14 | Diseño UX top + responsive | ✔ | Tokens, tema claro/oscuro, responsive, a11y, micro-interacciones. |
@@ -49,7 +49,7 @@ publicar la release en GitHub (premisa 11), que requiere push del gerente.
 
 | # | Severidad | Hallazgo | Recomendación |
 |---|---|---|---|
-| 1 | Media | `main` local va ~30 commits por delante de `origin` (premisa 11). | Push + tag `v1.1.0` + release notes (decisión del gerente). |
+| 1 | Resuelta | `main` local iba ~30 commits por delante de `origin` (premisa 11). | Push + tag `v1.1.0` + release publicada el 2026-08-24. |
 | 2 | Baja | El launcher solo **detiene** procesos que él mismo inició; si la app se lanzó con F5, se para con F5. | Documentado en README/DESARROLLO; aceptado como límite del MVP. |
 | 3 | Baja | La GUI `tkinter` no tiene tests E2E (solo la lógica pura). | Aceptado: la GUI se verifica manualmente; la lógica está cubierta. |
 | 4 | Informativa | La version `1.1.0` se expone en `/api/health` y `/`, pero el launcher no la muestra. | Opcional: añadir versión a la cabecera del launcher en una iteración futura. |
@@ -89,5 +89,5 @@ máquina propia).
 
 Solución **estable y auditada**: 3 componentes con tests verdes, arquitectura respetada,
 documentación al día y premisas cumplidas. Auditorías completadas: interna (gerente), externa
-Bugbot (4 hallazgos corregidos) y externa security-review (sin hallazgos accionables). Único
-pendiente operativo: publicar la release v1.1.0 en GitHub.
+Bugbot (4 hallazgos corregidos) y externa security-review (sin hallazgos accionables). Release
+`v1.1.0` publicada en GitHub. Proyecto cerrado.
