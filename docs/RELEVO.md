@@ -3,7 +3,30 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 10:30 (UTC+2).
+> Actualizado por última vez: 2026-08-24 10:35 (UTC+2).
+
+## 0. START HERE — para el gerente que retoma ahora
+
+**Posición actual (2026-08-24):** Fases 0–3 del plan de endurecimiento **completas, verificadas
+y commiteadas**. Working tree limpio. Últimos commits:
+- `f7b8dc8` — Fase 3: persistencia y dominio (append-only, capa de dominio, FKs reales).
+- `b1e3590` — Fases 1+2 (P0+P1): aislamiento multiusuario, límites, robustez, CI.
+
+**Estado verde:** backend `71 tests` + `ruff` limpio + `import main` OK; frontend `40 tests`
++ `tsc`/`build` OK.
+
+**Siguiente paso: diseñar y ejecutar la FASE 4 — Learning Profile** (CEFR, gramática,
+vocabulario, errores recurrentes, eventos de aprendizaje, recomendaciones). Es la primera fase
+"nueva" tras el endurecimiento; requiere diseño antes de codificar.
+
+**Acciones del nuevo gerente (en orden):**
+1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
+2. Leer `docs/PLAN-ENDURECIMIENTO.md` (hoja de ruta Fase 4→10 y protocolo anti-saturación).
+3. Leer la sección 10 de este documento (estado de Fases 1–3 y arquitectura resultante).
+4. Diseñar los subagentes F4.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
+   respetando la arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
+5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`)
+   antes de cada commit `feat: ...`.
 
 ## 1. Qué es el proyecto
 
