@@ -116,6 +116,6 @@ Abre **http://localhost:5173** y empieza a conversar.
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 
-> Nota: los modelos instalados (`qwen3-coder`, `qwen3.5`) son orientados a código.
-> `qwen3.5:9b` funciona bien para conversación; si quieres más calidad como tutor,
-> considera descargar un modelo conversacional, p. ej. `ollama pull llama3.1:8b`.
+> Nota: `qwen3.5:9b` es el modelo por defecto y funciona bien como tutor. También está
+> instalado `llama3.1:8b` (más rápido, pero con menor precisión en pronunciación), y
+> `qwen3-coder:30b`/`qwen2.5-coder:1.5b` (orientados a código).

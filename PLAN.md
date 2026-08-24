@@ -49,15 +49,23 @@
 - Verificado: backend 13 tests, frontend 10 tests, `tsc` sin errores.
 - Subagentes (ejecutados por el gerente): `agentes/m4-backend-modo.md`, `agentes/m4-frontend-modo.md`.
 
-### M5 — Modelo conversacional  [EN CURSO]
+### M5 — Modelo conversacional  [HECHO ✔]
 - Evaluar cambiar a un modelo no-coder (ej. `llama3.1:8b` o `mistral`) para mejor calidad de tutor.
 - Criterio: calidad como profesor (correcciones, explicaciones, tono) + tamaño/VRAM (RTX 4060 Ti 4 GB).
 - Entregable: script de evaluación repetible + decisión documentada del modelo por defecto.
 - Subagente (ejecutado por el gerente): `agentes/m5-modelo-conversacional.md`.
-- **Bloqueo (resuelto con VPN):** `ollama pull llama3.1:8b` fallaba con
-  `tls: failed to verify certificate` por un MITM del ISP **DigiMobil (AS57269)**
-  (certificado `CN=core1.netops.test`, efecto colateral de los bloqueos de IP de LaLiga).
-  **Solución:** usar VPN u otra red para descargar el modelo. Con VPN activa, la descarga funciona.
+- **Decisión:** se mantiene **`qwen3.5:9b`** como `DEFAULT_MODEL`. Tras evaluar ambos con
+  `scripts/eval_model.py` (4 prompts de tutor), `qwen3.5:9b` gana en calidad como tutor:
+  correcciones más estructuradas, ejercicios con contexto y una guía de pronunciación IPA
+  mucho más detallada y **correcta**. `llama3.1:8b` es ~6x más rápido (21s vs 125s) pero
+  comete un error de pronunciación (confunde la fricativa sorda /θ/ de *through* con la
+  sonora /ð/ de *this/that*), así que **no es claramente mejor**. `llama3.1:8b` queda
+  instalado como alternativa selectable en el frontend.
+- **Descarga desbloqueada:** con VPN iba lenta (~400-900 KB/s) y se atascaba cada ~30 min.
+  Al **quitar la VPN** la descarga terminó en ~1 min a 52 MB/s y sin error de certificado
+  (el MITM del ISP ya no afectaba a esa conexión). `ollama pull llama3.1:8b` completado.
+- **Fix:** `scripts/eval_model.py` ahora fuerza UTF-8 en stdout/stderr (Windows usaba cp1252
+  y fallaba al imprimir emojis/símbolos fonéticos).
 
 ### M6 — Release a GitHub  [HECHO ✔]
 - Repositorio **público**: https://github.com/jvelasca/english-tutor
@@ -117,7 +125,7 @@
 | M2 Frontend voz | `agentes/m2-frontend-voz.md` | ✔ hecho |
 | M4 Backend modo profesor | `agentes/m4-backend-modo.md` | ✔ hecho |
 | M4 Frontend modo profesor | `agentes/m4-frontend-modo.md` | ✔ hecho |
-| M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ⏳ descargando (VPN) |
+| M5 Modelo conversacional | `agentes/m5-modelo-conversacional.md` | ✔ hecho |
 | M7 Backend multi-usuario | `agentes/m7-backend-multiusuario.md` | ✔ hecho |
 | M7 Frontend multi-usuario | `agentes/m7-frontend-multiusuario.md` | ✔ hecho |
 | M8 Diseño y UX | `agentes/m8-diseno-ux.md` | ✔ hecho |

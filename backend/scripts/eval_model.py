@@ -11,8 +11,15 @@ No depende de la red salvo Ollama local; no usa Whisper/Piper.
 from __future__ import annotations
 
 import argparse
+import sys
 
 import ollama
+
+# Windows: la consola por defecto usa cp1252 y falla al imprimir emojis/símbolos
+# fonéticos (😊, θ). Forzamos UTF-8 para que el script no reviente en esos casos.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # (modo, system prompt, mensaje del alumno). Cubren los 4 modos del tutor (M4).
 PROMPTS: list[tuple[str, str, str]] = [

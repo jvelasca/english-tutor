@@ -30,6 +30,8 @@ Hecho y verificado (tests verdes):
 - **M0** esqueleto modular · **M1** streaming (SSE) · **M2** voz local · **M3** memoria/historial.
 - **M4** modo profesor: 4 modos de tutor (`conversation`, `grammar`, `exercises`, `pronunciation`)
   + corrección de pronunciación (`POST /api/pronunciation`).
+- **M5** modelo conversacional: evaluado `llama3.1:8b` vs `qwen3.5:9b`; se mantiene
+  `qwen3.5:9b` (mejor calidad de tutor). `llama3.1:8b` queda instalado como alternativa.
 - **M6** release a GitHub.
 - **M7** multi-usuario: tabla `users` + columna `user_id` en `conversations` (migración
   idempotente, usuario por defecto `Usuario`), `GET/POST /api/users`, CRUD de conversaciones
@@ -53,23 +55,22 @@ Hecho y verificado (tests verdes):
   - #4 M7 multi-usuario
   - #5 M8 diseño y UX nivel top
 
-## 5. EN CURSO — M5: modelo conversacional (descarga bloqueada por MITM del ISP)
+## 5. HECHO — M5: modelo conversacional (se mantiene qwen3.5:9b)
 
 **Tarea:** evaluar `llama3.1:8b` como reemplazo de `qwen3.5:9b` para el rol de tutor.
 
-- Script listo: `backend/scripts/eval_model.py` (`--model <m>` envía 4 prompts de tutor).
+- Script: `backend/scripts/eval_model.py` (`--model <m>` envía 4 prompts de tutor).
 - Briefing: `agentes/m5-modelo-conversacional.md`.
-- **Problema resuelto:** `ollama pull` fallaba con `tls: certificate signed by unknown authority`.
-  Causa raíz: MITM del ISP **DigiMobil (AS57269)** sobre el CDN de pesos
-  (`r2.cloudflarestorage.com`), efecto colateral de los bloqueos de IP de LaLiga
-  (certificado falso `CN=core1.netops.test`). **Solución: usar VPN.**
-- **Estado al redactar esto:** descarga de `llama3.1:8b` **relanzada** en segundo plano con
-  VPN (Proton VPN, adaptador `ProTUN` activo con ruta por defecto). Al retomar, iba ~25%
-  (1.2 GB/4.9 GB) a ~250–540 KB/s (la VPN ralentiza). ETA estimada **2–4 h**. La VPN es
-  algo inestable (ya se reinició la descarga un par de veces).
-- **Siguiente paso cuando termine:** `ollama pull llama3.1:8b` → `ollama list` para confirmar →
-  ejecutar `eval_model.py --model qwen3.5:9b` y `--model llama3.1:8b` → comparar calidad →
-  decidir `DEFAULT_MODEL` en `backend/config.py` → documentar en `PLAN.md` → commit.
+- **Descarga:** con VPN iba lenta (~400-900 KB/s) y se atascaba cada ~30 min. Al
+  **quitar la VPN** (2026-08-24) la descarga terminó en ~1 min a 52 MB/s y sin error de
+  certificado (el MITM de DigiMobil ya no afectaba a esa conexión). `llama3.1:8b` instalado.
+- **Decisión:** se mantiene **`qwen3.5:9b`** como `DEFAULT_MODEL`. `qwen3.5:9b` gana en
+  calidad como tutor (correcciones estructuradas, ejercicios con contexto, guía IPA de
+  pronunciación detallada y correcta). `llama3.1:8b` es ~6x más rápido (21s vs 125s) pero
+  comete un error de pronunciación (confunde /θ/ con /ð/), así que **no es claramente
+  mejor**. Queda instalado como alternativa selectable en el frontend.
+- **Fix:** `scripts/eval_model.py` ahora fuerza UTF-8 en stdout/stderr (Windows usaba cp1252
+  y fallaba al imprimir emojis/símbolos fonéticos).
 
 ## 6. HECHO — M7: multi-usuario
 
