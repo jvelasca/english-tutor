@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from config import VERSION
 from main import app
 from repositories import db
 from services import llm, stt, tts
@@ -10,6 +11,7 @@ def test_root():
         r = client.get("/")
         assert r.status_code == 200
         assert r.json()["service"] == "english-tutor"
+        assert r.json()["version"] == VERSION
 
 
 def test_health():
@@ -17,6 +19,7 @@ def test_health():
         r = client.get("/api/health")
         assert r.status_code == 200
         assert r.json()["status"] == "ok"
+        assert r.json()["version"] == VERSION
 
 
 def _all_ok(monkeypatch):

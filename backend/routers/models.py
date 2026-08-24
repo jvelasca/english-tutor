@@ -5,6 +5,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from config import VERSION
 from services.llm import list_models as list_ollama_models
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ router = APIRouter()
 async def root() -> dict[str, str]:
     return {
         "service": "english-tutor",
+        "version": VERSION,
         "docs": "/docs",
         "health": "/api/health",
     }

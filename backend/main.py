@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import ALLOWED_ORIGINS
+from config import ALLOWED_ORIGINS, VERSION
 from repositories.db import init_db
 from routers.chat import router as chat_router
 from routers.conversations import router as conversations_router
@@ -29,7 +29,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="English Tutor API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="English Tutor API", version=VERSION, lifespan=lifespan)
 
 # CORS abierto solo para desarrollo local (frontend Vite en :5173).
 app.add_middleware(

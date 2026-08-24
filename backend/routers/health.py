@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from config import VERSION
 from repositories import db
 from services import llm, stt, tts
 
@@ -13,7 +14,7 @@ router = APIRouter()
 
 @router.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "english-tutor"}
+    return {"status": "ok", "service": "english-tutor", "version": VERSION}
 
 
 @router.get("/api/health/live")
