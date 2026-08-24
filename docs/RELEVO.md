@@ -3,27 +3,30 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 10:35 (UTC+2).
+> Actualizado por última vez: 2026-08-24 10:58 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–3 del plan de endurecimiento **completas, verificadas
+**Posición actual (2026-08-24):** Fases 0–4 del plan de endurecimiento **completas, verificadas
 y commiteadas**. Working tree limpio. Últimos commits:
-- `f7b8dc8` — Fase 3: persistencia y dominio (append-only, capa de dominio, FKs reales).
-- `b1e3590` — Fases 1+2 (P0+P1): aislamiento multiusuario, límites, robustez, CI.
+- `f5dd4a6` — Fase 4 frontend: panel Learning Profile (CEFR, vocabulario, errores, recomendaciones).
+- `5a77a74` — Fase 4: CEFR y recomendaciones (perfil agregado).
+- `96acec0` — Fase 4: errores gramaticales recurrentes (detección + persistencia).
+- `08ba7b9` — Fase 4: vocabulario (extracción, persistencia, endpoints).
+- `c10bbbd` — Fase 4: eventos de aprendizaje (tabla + CRUD + endpoints).
 
-**Estado verde:** backend `71 tests` + `ruff` limpio + `import main` OK; frontend `40 tests`
+**Estado verde:** backend `114 tests` + `ruff` limpio + `import main` OK; frontend `48 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: diseñar y ejecutar la FASE 4 — Learning Profile** (CEFR, gramática,
-vocabulario, errores recurrentes, eventos de aprendizaje, recomendaciones). Es la primera fase
-"nueva" tras el endurecimiento; requiere diseño antes de codificar.
+**Siguiente paso: FASE 5 — Tutor Policy + Context Builder** (correctness policy, el perfil del
+alumno entra al prompt del tutor). Requiere diseño antes de codificar; ver
+`docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer `docs/PLAN-ENDURECIMIENTO.md` (hoja de ruta Fase 4→10 y protocolo anti-saturación).
 3. Leer la sección 10 de este documento (estado de Fases 1–3 y arquitectura resultante).
-4. Diseñar los subagentes F4.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
+4. Diseñar los subagentes F5.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
    respetando la arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`)
    antes de cada commit `feat: ...`.
@@ -225,7 +228,9 @@ propietario, y `/api/pronunciation` no valida el usuario. M7 no debe considerars
 > input externo, límites de payload (chat/messages/TTS/audio) y sanitización de errores.
 > **Fase 2 (P1) cerrada** (store no bloqueante, health real, chat integrable, CI + deps + CORS).
 > **Fase 3 (persistencia y dominio) cerrada** (mensajes append-only, capa de dominio, FKs reales).
-> Siguiente bloque: **FASE 4 (Learning Profile)** — ver `docs/PLAN-ENDURECIMIENTO.md`.
+> **Fase 4 (Learning Profile) cerrada** (ver sección 11).
+> Siguiente bloque: **FASE 5 (Tutor Policy + Context Builder)** — ver
+> `docs/PLAN-ENDURECIMIENTO.md`.
 
 ### HECHO — E1.1: aislamiento real en store y routers
 
@@ -392,3 +397,56 @@ workspace: Python 3.13.7 (global), dependencias de runtime ya instaladas
 frontend `40 tests` + `tsc`/`build` OK. Arquitectura ahora `Router → Service (domain) →
 Repository (repositories) → SQLite`, con mensajes append-only y FKs reales. Siguiente bloque:
 **FASE 4 — Learning Profile** (CEFR, gramática, vocabulario, errores recurrentes, eventos).
+
+## 11. FASE 4 — Learning Profile (CERRADA ✔)
+
+Backend primero (F4.1–F4.4), frontend al final (F4.5). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F4.1 Eventos de aprendizaje | `agentes/endurecimiento/f4-01-eventos-aprendizaje.md` | ✔ hecho |
+| F4.2 Vocabulario | `agentes/endurecimiento/f4-02-vocabulario.md` | ✔ hecho |
+| F4.3 Errores gramaticales recurrentes | `agentes/endurecimiento/f4-03-gramatica.md` | ✔ hecho |
+| F4.4 CEFR + recomendaciones | `agentes/endurecimiento/f4-04-cefr-perfil.md` | ✔ hecho |
+| F4.5 Frontend Learning Profile | `agentes/endurecimiento/f4-05-frontend-perfil.md` | ✔ hecho |
+
+### HECHO — F4.1: eventos de aprendizaje
+- `schemas/learning.py` (`LearningEventType`, `LearningEvent`, `LearningEventCreate`),
+  `repositories/learning.py` (`record_event`, `list_events`), `domain/learning.py`,
+  `routers/learning.py` (`POST/GET /api/learning/events`).
+- `repositories/db.py`: tabla `learning_events` con FK inline + índice. Total backend **79 tests**.
+
+### HECHO — F4.2: vocabulario
+- `services/vocabulary.py` (`EN_STOPWORDS`, `extract_words` puro), `repositories/vocabulary.py`
+  (`record_words` upsert, `get_vocabulary`), `domain/vocabulary.py`, `schemas/vocabulary.py`,
+  `routers/vocabulary.py` (`POST /api/vocabulary/analyze`, `GET /api/vocabulary`).
+- `repositories/db.py`: tabla `vocabulary` (`UNIQUE(user_id, word)` + FK). Total **89 tests**.
+
+### HECHO — F4.3: errores gramaticales recurrentes
+- `services/grammar.py` (7 reglas regex deterministas + `find_errors`), `repositories/grammar.py`
+  (`record_errors` upsert, `get_recurring_errors`), `domain/grammar.py`, `schemas/grammar.py`,
+  `routers/grammar.py` (`POST /api/grammar/analyze`, `GET /api/grammar/errors`).
+- `repositories/db.py`: tabla `grammar_errors` (`UNIQUE(user_id, rule)` + FK). Total **102 tests**.
+
+### HECHO — F4.4: CEFR + recomendaciones
+- `services/cefr.py` (`CEFR_LEVELS`, `estimate_cefr`, `recommendations` puras),
+  `repositories/profile.py` (`get_profile`, `set_cefr`), `domain/profile.py` (compone
+  vocabulario + errores + pronunciación + CEFR), `schemas/profile.py`, `routers/profile.py`
+  (`GET /api/profile`).
+- `repositories/db.py`: tabla `learning_profile` (PK `user_id` + FK). Total **114 tests**.
+- Nota: se simplificó el plan (`GET /api/profile` recalcula la estimación en cada consulta;
+  no se creó `POST /api/profile/assess` por ser redundante).
+
+### HECHO — F4.5: frontend Learning Profile
+- `types/api.ts` (`CefrLevel`, `GrammarRecurringError`, `LearningProfile`),
+  `api/learning.ts` (`getProfile`, `analyzeText`), `utils/cefr.ts` (`cefrTone`, `cefrLabel`),
+  `components/LearningProfile.tsx` (badge CEFR + vocabulario + errores + recomendaciones).
+- `hooks/useChat.ts`: estado `profile` + `refreshProfile` (aislamiento al cambiar de usuario) y
+  `analyzeText(trimmed, currentUserId)` tras cada envío del alumno. `App.tsx` renderiza el panel.
+- `index.css`: sección `.learning-profile` con tokens + responsive. Total frontend **48 tests**.
+
+**Estado global al cierre de Fase 4:** backend `114 tests` + `ruff` limpio + `import main` OK;
+frontend `48 tests` + `tsc`/`build` OK. La tabla `learning_events` queda lista pero aún sin
+consumidor de UI (se cableará en Fase 5/6). Siguiente bloque: **FASE 5 — Tutor Policy +
+Context Builder** (el perfil del alumno entra al prompt del tutor).

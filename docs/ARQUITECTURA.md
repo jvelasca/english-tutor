@@ -19,49 +19,95 @@ backend/
 │   ├── __init__.py
 │   ├── chat.py          # POST /api/chat, POST /api/chat/stream (aceptan mode)
 │   ├── conversations.py # CRUD /api/conversations (filtrado por user_id)
+│   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
+│   ├── health.py        # /api/health/live, /ready, /dependencies
+│   ├── learning.py      # POST/GET /api/learning/events (F4)
 │   ├── models.py        # GET /api/health, GET /api/models
-│   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score; user_id opcional)
+│   ├── profile.py       # GET /api/profile (F4)
 │   ├── progress.py      # GET /api/progress?user_id=<id> (resumen de progreso)
+│   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
 │   ├── users.py         # GET /api/users, POST /api/users
+│   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
 │   └── voz.py           # POST /api/transcribe, POST /api/tts
 ├── schemas/             # Contratos de datos (Pydantic).
 │   ├── __init__.py
 │   ├── chat.py          # ChatMessage, ChatRequest, ChatResponse
 │   ├── conversations.py # Conversation, ConversationMeta (con user_id), ConversationUpsert
+│   ├── grammar.py       # GrammarAnalyze*, GrammarFinding, GrammarRecurringError (F4)
+│   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
+│   ├── profile.py       # LearningProfile (F4)
 │   ├── pronunciation.py # PronunciationResponse
 │   ├── progress.py      # PronunciationStats, ProgressSummary
 │   ├── users.py         # User, UserCreate
+│   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
 │   └── voz.py           # TTSRequest, TranscribeResponse
-├── services/            # Lógica de negocio. NO conoce HTTP.
+├── domain/              # Servicios de dominio (async, orquestan la lógica).
 │   ├── __init__.py
+│   ├── conversations.py
+│   ├── grammar.py       # análisis de errores + persistencia (F4)
+│   ├── learning.py      # eventos de aprendizaje (F4)
+│   ├── pronunciation.py
+│   ├── profile.py       # compone vocabulario + errores + pronunciación + CEFR (F4)
+│   ├── users.py
+│   └── vocabulary.py    # extracción + persistencia (F4)
+├── repositories/        # Acceso a datos puro (SQLite). Sin reglas de negocio.
+│   ├── __init__.py
+│   ├── db.py            # conexión, esquema, migraciones, ping
+│   ├── conversations.py
+│   ├── grammar.py       # grammar_errors (F4)
+│   ├── learning.py      # learning_events (F4)
+│   ├── profile.py       # learning_profile (F4)
+│   ├── pronunciation.py
+│   ├── users.py
+│   └── vocabulary.py    # vocabulary (F4)
+├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
+│   ├── __init__.py
+│   ├── cefr.py          # estimate_cefr, recommendations (puros, F4)
+│   ├── grammar.py       # reglas de errores deterministas (F4)
 │   ├── llm.py           # cliente Ollama (chat normal + streaming; system prompt por modo)
 │   ├── pronunciation.py # score_pronunciation (puro, difflib)
 │   ├── stt.py           # faster-whisper
-│   ├── store.py         # persistencia SQLite (usuarios + conversaciones + progreso; aislamiento por user_id)
-│   └── tts.py           # piper-tts
+│   ├── tts.py           # piper-tts
+│   └── vocabulary.py    # extract_words (puro, F4)
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
 ├── data/                # base SQLite (tutor.db). GITIGNORED.
 ├── tests/               # pruebas (pytest).
 │   ├── conftest.py      # asegura el import desde backend/
+│   ├── test_api_security.py
+│   ├── test_chat_integration.py
+│   ├── test_cors.py
+│   ├── test_domain_async.py
+│   ├── test_foreign_keys.py
+│   ├── test_grammar.py  # F4
 │   ├── test_health.py
-│   ├── test_modes.py    # modos de tutor (prompts)
+│   ├── test_learning_events.py # F4
+│   ├── test_modes.py
+│   ├── test_profile.py  # F4
+│   ├── test_progress.py
 │   ├── test_pronunciation.py
+│   ├── test_robustness.py
 │   ├── test_schemas.py
 │   ├── test_store.py
-│   ├── test_progress.py # progreso + migración de mode + endpoint
-│   └── test_users.py    # usuarios + aislamiento entre perfiles
+│   ├── test_store_append_only.py
+│   ├── test_store_isolation.py
+│   ├── test_users.py
+│   └── test_vocabulary.py # F4
 ├── scripts/             # scripts de utilidad.
 │   ├── eval_model.py    # evalúa un modelo como tutor (M5)
 │   └── smoke_test.py    # verifica el servidor en ejecución
 ├── download_models.py   # script de descarga de modelos de voz (1ª vez)
 ├── requirements.txt
-└── requirements-dev.txt # incluye pytest + httpx
+└── requirements-dev.txt # incluye pytest + httpx + ruff
 ```
 
 ### Responsabilidades backend
 - **`main.py`**: solo crear la app y registrar routers. Nada de lógica.
-- **`routers/`**: parsear la petición, validar con schemas, llamar a un service, devolver respuesta.
-- **`services/`**: toda la lógica real (hablar con Ollama, transcribir, sintetizar). No importa FastAPI.
+- **`routers/`**: parsear la petición, validar con schemas, llamar a un service de `domain/`.
+- **`domain/`**: servicios asíncronos que orquestan la lógica (delegan en `repositories/` vía
+  `run_in_threadpool`).
+- **`repositories/`**: acceso a datos puro (SQLite); sin reglas de negocio.
+- **`services/`**: lógica pura/testable (scoring, análisis determinista) y clientes de infra
+  (Ollama, whisper, piper). No importa FastAPI.
 - **`schemas/`**: tipos Pydantic. Son el contrato de la API.
 - **`config.py`**: constantes de entorno/configuración, sin lógica.
 
@@ -75,6 +121,7 @@ frontend/src/
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
 │   ├── chat.ts          # chat normal + streaming (envía mode).
 │   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
+│   ├── learning.ts      # getProfile + analyzeText (F4).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).
 │   ├── progress.ts      # getProgress (resumen de progreso del usuario).
 │   ├── users.ts         # listUsers, createUser.
@@ -83,6 +130,7 @@ frontend/src/
 │   ├── ChatMessage.tsx
 │   ├── Composer.tsx
 │   ├── HandsFreeToggle.tsx  # activar/parar modo manos libres + estado (M10)
+│   ├── LearningProfile.tsx  # panel del perfil: CEFR, vocabulario, errores, recomendaciones (F4)
 │   ├── MicButton.tsx
 │   ├── ModeSelect.tsx   # selector de modo de tutor
 │   ├── PronunciationPractice.tsx
@@ -100,6 +148,8 @@ frontend/src/
 ├── utils/               # Funciones puras (testables).
 │   ├── title.ts         # deriveTitle
 │   ├── title.test.ts
+│   ├── cefr.ts          # cefrTone, cefrLabel (F4)
+│   ├── cefr.test.ts
 │   ├── sse.ts           # parseo de eventos SSE
 │   ├── sse.test.ts
 │   ├── modes.ts         # MODES + isTutorMode

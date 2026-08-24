@@ -13,7 +13,10 @@
   chat integrable (DI + tests con Ollama mockeado), CI + deps reproducibles + CORS restringido.
 - **Fase 3 (persistencia y dominio) CERRADA** el 2026-08-24: mensajes append-only (con `id`),
   capa de dominio (`Router → Service → Repository`) y FKs reales `user_id → users(id)`.
-- Backend `71 tests` verdes + `ruff` limpio, `import main` OK; frontend `40 tests` verdes,
+- **Fase 4 (Learning Profile) CERRADA** el 2026-08-24: eventos de aprendizaje, vocabulario,
+  errores gramaticales recurrentes, estimación CEFR + recomendaciones (backend) y panel de
+  perfil en el frontend.
+- Backend `114 tests` verdes + `ruff` limpio, `import main` OK; frontend `48 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -83,11 +86,27 @@ Auditoría completa + línea base verde. Ver arriba.
 | E3.3 | Capa de dominio (Service → Repository) | Separar `store` en `repositories/` (users, conversations, pronunciation) + `domain/` (servicios async); routers dependen de `domain/`. | `agentes/endurecimiento/e3-03-capa-dominio.md` |
 | E3.4 | FK reales | `FOREIGN KEY user_id → users(id)` en `conversations` y `pronunciation_attempts` con migración idempotente (reconstrucción de tabla). | `agentes/endurecimiento/e3-04-fk-reales.md` |
 
-### FASE 4 → 10 — Backlog (se detallará al llegar)
+### FASE 4 — Learning Profile (detallada)
+
+Eventos de aprendizaje, vocabulario, errores gramaticales recurrentes, estimación CEFR y
+recomendaciones. Secuencia (backend primero, frontend al final):
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| F4.1 | Eventos de aprendizaje | Tabla `learning_events` (append-only, FK) + CRUD + `POST/GET /api/learning/events`. | `agentes/endurecimiento/f4-01-eventos-aprendizaje.md` |
+| F4.2 | Vocabulario | Extractor determinista + tabla `vocabulary` (UNIQUE user_id+word, upsert) + `POST /api/vocabulary/analyze`, `GET /api/vocabulary`. | `agentes/endurecimiento/f4-02-vocabulario.md` |
+| F4.3 | Errores gramaticales recurrentes | Reglas regex deterministas + tabla `grammar_errors` (UNIQUE user_id+rule, upsert) + `POST /api/grammar/analyze`, `GET /api/grammar/errors`. | `agentes/endurecimiento/f4-03-gramatica.md` |
+| F4.4 | CEFR + recomendaciones | `estimate_cefr`/`recommendations` puras + tabla `learning_profile` + `GET /api/profile` (compone todo). | `agentes/endurecimiento/f4-04-cefr-perfil.md` |
+| F4.5 | Frontend Learning Profile | Tipos + `api/learning` + `utils/cefr` + componente `LearningProfile` + integración en `useChat` (analiza el texto tras cada envío). | `agentes/endurecimiento/f4-05-frontend-perfil.md` |
+
+> **Notas de Fase 4:** el análisis (vocabulario/gramática) es **determinista, sin LLM** (premisa
+> 12). La estimación CEFR es **heurística v1** (la evaluación CEFR real es la Fase 8). La tabla
+> `learning_events` queda lista pero aún sin consumidor de UI (se cableará en Fase 5/6).
+
+### FASE 5 → 10 — Backlog (se detallará al llegar)
 
 | Fase | Alcance |
 |---|---|
-| 4 | Learning Profile (CEFR, gramática, vocabulario, errores recurrentes, eventos). |
 | 5 | Tutor Policy + Context Builder (correctness policy, perfil entra al prompt). |
 | 6 | Progreso pedagógico real (no solo counts). |
 | 7 | Pronunciación fonética (evaluadores compuestos). |
