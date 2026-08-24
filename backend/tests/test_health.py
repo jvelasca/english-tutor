@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 
 from main import app
-from services import llm, store, stt, tts
+from repositories import db
+from services import llm, stt, tts
 
 
 def test_root():
@@ -19,7 +20,7 @@ def test_health():
 
 
 def _all_ok(monkeypatch):
-    monkeypatch.setattr(store, "ping", lambda: True)
+    monkeypatch.setattr(db, "ping", lambda: True)
     monkeypatch.setattr(llm, "ping", _async_true)
     monkeypatch.setattr(stt, "is_ready", lambda: True)
     monkeypatch.setattr(tts, "is_ready", lambda: True)
@@ -64,7 +65,7 @@ def test_ready_200_when_all_ok(monkeypatch):
 
 
 def test_ready_503_when_ollama_down(monkeypatch):
-    monkeypatch.setattr(store, "ping", lambda: True)
+    monkeypatch.setattr(db, "ping", lambda: True)
     monkeypatch.setattr(llm, "ping", _async_false)
     monkeypatch.setattr(stt, "is_ready", lambda: True)
     monkeypatch.setattr(tts, "is_ready", lambda: True)

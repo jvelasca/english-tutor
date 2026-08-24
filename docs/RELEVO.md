@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 08:50 (UTC+2).
+> Actualizado por última vez: 2026-08-24 10:30 (UTC+2).
 
 ## 1. Qué es el proyecto
 
@@ -177,7 +177,7 @@ npx tsc --noEmit    # tipos
 - **Tests obligatorios:** ninguna feature se da por acabada sin sus tests (premisa 12).
 - **Ritmo:** hito a hito, un cambio a la vez (premisa 6).
 
-## 10. Fase de endurecimiento (FASE 1 P0 Y FASE 2 P1 CERRADAS — post v1.0.0)
+## 10. Fase de endurecimiento (FASES 1, 2 Y 3 CERRADAS — post v1.0.0)
 
 **Motivo:** auditoría interna + externa. La app es un MVP/RC arquitectónico; NO rehacer, pero
 sí endurecer antes de seguir con features. Hallazgo crítico: **el aislamiento multiusuario
@@ -201,7 +201,8 @@ propietario, y `/api/pronunciation` no valida el usuario. M7 no debe considerars
 > **Fase 1 (P0) cerrada.** Aislamiento multiusuario extremo a extremo, `system` fuera del
 > input externo, límites de payload (chat/messages/TTS/audio) y sanitización de errores.
 > **Fase 2 (P1) cerrada** (store no bloqueante, health real, chat integrable, CI + deps + CORS).
-> Siguiente bloque: **FASE 3 (persistencia y dominio)** — ver `docs/PLAN-ENDURECIMIENTO.md`.
+> **Fase 3 (persistencia y dominio) cerrada** (mensajes append-only, capa de dominio, FKs reales).
+> Siguiente bloque: **FASE 4 (Learning Profile)** — ver `docs/PLAN-ENDURECIMIENTO.md`.
 
 ### HECHO — E1.1: aislamiento real en store y routers
 
@@ -315,3 +316,56 @@ propietario, y `/api/pronunciation` no valida el usuario. M7 no debe considerars
 **Línea base (pre-fase):** backend `27 tests` verdes, `import main` OK. Entorno de este
 workspace: Python 3.13.7 (global), dependencias de runtime ya instaladas
 (`ollama`, `faster-whisper`, `piper-tts`, `python-multipart`).
+
+### Estado de subagentes (FASE 3 · persistencia y dominio) — COMPLETA ✔
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| E3.1 Mensajes append-only (backend) | `agentes/endurecimiento/e3-01-mensajes-append-only.md` | ✔ hecho |
+| E3.2 Mensajes con id (frontend) | `agentes/endurecimiento/e3-02-mensajes-id-frontend.md` | ✔ hecho |
+| E3.3 Capa de dominio (Service → Repository) | `agentes/endurecimiento/e3-03-capa-dominio.md` | ✔ hecho |
+| E3.4 FK reales | `agentes/endurecimiento/e3-04-fk-reales.md` | ✔ hecho |
+
+### HECHO — E3.1: mensajes append-only (backend)
+
+- `schemas/chat.py`: `ChatMessage.id: str | None = None` (opcional, no rompe `/api/chat`).
+- `repositories/db.py` (antes `services/store.py`): columna `message_id` + índice único
+  `(conversation_id, message_id)`; `get_conversation` devuelve `id` (= `message_id`);
+  `save_conversation` append-only (`INSERT OR IGNORE`) cuando todos los mensajes traen `id`,
+  y fallback legacy (replace-all) si no.
+- Test `tests/test_store_append_only.py` (3 tests). Total backend **65 tests verdes**.
+
+### HECHO — E3.2: mensajes con id estable (frontend)
+
+- `types/api.ts`: `Message.id?: string`.
+- `hooks/useChat.ts`: `id` (`crypto.randomUUID()`) en mensaje de usuario y en el de asistente
+  (un único `assistantId` por envío, reutilizado en `onDelta` y `persist`); las ramas de error
+  usan su propio id. `App.tsx`: `key={m.id ?? ...}`.
+- Frontend: **40 tests verdes**, `npm run build` OK. El backend ya recibe todos los mensajes
+  con `id` → persistencia append-only activa.
+
+### HECHO — E3.3: capa de dominio (Router → Service → Repository)
+
+- **Refactor puro, sin cambio de comportamiento** (65 tests verdes).
+- Nuevo `repositories/` (acceso a datos puro): `db.py` (conexión/esquema/migraciones/ping),
+  `users.py`, `conversations.py`, `pronunciation.py`.
+- Nuevo `domain/` (servicios async vía `run_in_threadpool`): `users.py`, `conversations.py`,
+  `pronunciation.py`.
+- Recableados `routers/{users,conversations,progress,pronunciation,health}.py`, `dependencies.py`
+  y `main.py` para depender de `domain/` y `repositories.db`.
+- Eliminados `services/store.py` y `services/store_async.py` (sustituidos).
+- Tests re-apuntados (cambio mecánico de imports); `test_store_async.py` → `test_domain_async.py`.
+
+### HECHO — E3.4: FKs reales (user_id → users.id)
+
+- `repositories/db.py`: `_conn(foreign_keys=True)`; en `init_db` se añade una **fase 2** que
+  reconstruye `conversations` y `pronunciation_attempts` (idempotente, con `foreign_keys OFF`)
+  para añadir `FOREIGN KEY user_id → users(id)`. Sentencias `CREATE TABLE IF NOT EXISTS`
+  intactas.
+- Test `tests/test_foreign_keys.py` (6 tests: presencia de FK, enforcement con `IntegrityError`,
+  idempotencia, migración desde esquema legacy). Total backend **71 tests verdes**.
+
+**Estado global al cierre de Fase 3:** backend `71 tests` + `ruff` limpio + `import main` OK;
+frontend `40 tests` + `tsc`/`build` OK. Arquitectura ahora `Router → Service (domain) →
+Repository (repositories) → SQLite`, con mensajes append-only y FKs reales. Siguiente bloque:
+**FASE 4 — Learning Profile** (CEFR, gramática, vocabulario, errores recurrentes, eventos).

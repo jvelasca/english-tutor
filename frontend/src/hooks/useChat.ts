@@ -199,11 +199,12 @@ export function useChat() {
 
       const history: Message[] = [
         ...messages,
-        { role: "user", content: trimmed, mode },
+        { id: crypto.randomUUID(), role: "user", content: trimmed, mode },
       ];
       setMessages(history);
       setLoading(true);
 
+      const assistantId = crypto.randomUUID();
       let assistantReply = "";
       let errored = false;
 
@@ -216,12 +217,13 @@ export function useChat() {
               const last = next[next.length - 1];
               if (last && last.role === "assistant") {
                 next[next.length - 1] = {
+                  id: assistantId,
                   role: "assistant",
                   content: last.content + content,
                   mode,
                 };
               } else {
-                next.push({ role: "assistant", content, mode });
+                next.push({ id: assistantId, role: "assistant", content, mode });
               }
               return next;
             });
@@ -232,7 +234,7 @@ export function useChat() {
             assistantReply = `Error al hablar con el modelo: ${message}`;
             setMessages((prev) => [
               ...prev,
-              { role: "assistant", content: assistantReply, mode },
+              { id: crypto.randomUUID(), role: "assistant", content: assistantReply, mode },
             ]);
           },
         });
@@ -241,7 +243,7 @@ export function useChat() {
         assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: assistantReply, mode },
+          { id: crypto.randomUUID(), role: "assistant", content: assistantReply, mode },
         ]);
       } finally {
         setLoading(false);
@@ -250,7 +252,7 @@ export function useChat() {
       if (assistantReply && !errored) {
         void persist(cid, [
           ...history,
-          { role: "assistant", content: assistantReply, mode },
+          { id: assistantId, role: "assistant", content: assistantReply, mode },
         ]);
       }
 

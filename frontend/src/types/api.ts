@@ -5,6 +5,7 @@ export type TutorMode = "conversation" | "grammar" | "exercises" | "pronunciatio
 export type PronunciationLevel = "good" | "fair" | "needs_practice";
 
 export interface Message {
+  id?: string;
   role: Role;
   content: string;
   mode?: TutorMode;

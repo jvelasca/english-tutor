@@ -1,32 +1,34 @@
-from services import store
+from repositories import conversations as conversations_repo
+from repositories import db
+from repositories import users as users_repo
 
 
 def test_store_crud(tmp_path, monkeypatch):
-    monkeypatch.setattr(store, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(store, "DB_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
 
-    store.init_db()
+    db.init_db()
 
-    user = store.list_users()[0]
+    user = users_repo.list_users()[0]
     uid = user["id"]
 
-    conv = store.create_conversation(uid)
+    conv = conversations_repo.create_conversation(uid)
     cid = conv["id"]
     assert cid
     assert conv["user_id"] == uid
 
-    saved = store.save_conversation(
+    saved = conversations_repo.save_conversation(
         cid, uid, "Mi clase", [{"role": "user", "content": "Hello"}]
     )
     assert saved["title"] == "Mi clase"
     assert saved["user_id"] == uid
 
-    got = store.get_conversation(cid, uid)
+    got = conversations_repo.get_conversation(cid, uid)
     assert got is not None
     assert got["title"] == "Mi clase"
     assert got["messages"][0]["content"] == "Hello"
 
-    assert any(c["id"] == cid for c in store.list_conversations(uid))
+    assert any(c["id"] == cid for c in conversations_repo.list_conversations(uid))
 
-    assert store.delete_conversation(cid, uid) is True
-    assert store.get_conversation(cid, uid) is None
+    assert conversations_repo.delete_conversation(cid, uid) is True
+    assert conversations_repo.get_conversation(cid, uid) is None

@@ -5,7 +5,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from services import llm, store, stt, tts
+from repositories import db
+from services import llm, stt, tts
 
 router = APIRouter()
 
@@ -21,7 +22,7 @@ async def live() -> dict[str, str]:
 
 
 async def _dependencies() -> dict[str, str]:
-    db_ok = await run_in_threadpool(store.ping)
+    db_ok = await run_in_threadpool(db.ping)
     ollama_ok = await llm.ping()
     stt_ready = await run_in_threadpool(stt.is_ready)
     tts_ready = await run_in_threadpool(tts.is_ready)

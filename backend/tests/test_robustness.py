@@ -2,13 +2,13 @@ from fastapi.testclient import TestClient
 
 import config
 from main import app
-from services import store
+from repositories import db
 
 
 def _setup(monkeypatch, tmp_path):
-    monkeypatch.setattr(store, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(store, "DB_PATH", tmp_path / "test.db")
-    store.init_db()
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
 
 
 async def _raise(*args, **kwargs):

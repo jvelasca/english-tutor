@@ -11,9 +11,9 @@
   `system` fuera del input, límites de payload y sanitización de errores.
 - **Fase 2 (P1) CERRADA** el 2026-08-24: store no bloqueante (threadpool), health real,
   chat integrable (DI + tests con Ollama mockeado), CI + deps reproducibles + CORS restringido.
-- **Próximo:** Fase 3 (persistencia y dominio): `Router → Service → Repository`, mensajes
-  append-only, FK reales.
-- Backend `62 tests` verdes + `ruff` limpio, `import main` OK; frontend `40 tests` verdes,
+- **Fase 3 (persistencia y dominio) CERRADA** el 2026-08-24: mensajes append-only (con `id`),
+  capa de dominio (`Router → Service → Repository`) y FKs reales `user_id → users(id)`.
+- Backend `71 tests` verdes + `ruff` limpio, `import main` OK; frontend `40 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -72,11 +72,21 @@ Auditoría completa + línea base verde. Ver arriba.
 | E2.3 | Chat integrable + tests | Inyección de cliente Ollama (DI) en `llm.py`; tests de `/api/chat` y `/api/chat/stream` con Ollama mockeado. | `agentes/endurecimiento/e2-03-chat-integrable.md` |
 | E2.4 | CI + deps + CORS | GitHub Actions (pytest/ruff + tsc/vitest/build), deps reproducibles (`requirements.in`), CORS restringido a `localhost`. | `agentes/endurecimiento/e2-04-ci-deps-cors.md` |
 
-### FASE 3 → 10 — Backlog (se detallará al llegar)
+### FASE 3 — Persistencia y dominio (detallada)
+
+`Router → Service → Repository`, mensajes append-only y FK reales. Secuencia:
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| E3.1 | Mensajes append-only (backend) | Añadir `id` a `ChatMessage`; columna `message_id` + índice único en `messages`; `save_conversation` append-only cuando hay ids (fallback legacy); `get_conversation` devuelve `id`. | `agentes/endurecimiento/e3-01-mensajes-append-only.md` |
+| E3.2 | Mensajes con id (frontend) | Generar `id` (`crypto.randomUUID()`) en `useChat`; añadir `id` al tipo `Message`; propagar en persistencia. | `agentes/endurecimiento/e3-02-mensajes-id-frontend.md` |
+| E3.3 | Capa de dominio (Service → Repository) | Separar `store` en `repositories/` (users, conversations, pronunciation) + `domain/` (servicios async); routers dependen de `domain/`. | `agentes/endurecimiento/e3-03-capa-dominio.md` |
+| E3.4 | FK reales | `FOREIGN KEY user_id → users(id)` en `conversations` y `pronunciation_attempts` con migración idempotente (reconstrucción de tabla). | `agentes/endurecimiento/e3-04-fk-reales.md` |
+
+### FASE 4 → 10 — Backlog (se detallará al llegar)
 
 | Fase | Alcance |
 |---|---|
-| 3 | Persistencia y dominio: `Router → Service → Repository`, mensajes append-only, FK reales. |
 | 4 | Learning Profile (CEFR, gramática, vocabulario, errores recurrentes, eventos). |
 | 5 | Tutor Policy + Context Builder (correctness policy, perfil entra al prompt). |
 | 6 | Progreso pedagógico real (no solo counts). |

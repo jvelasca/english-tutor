@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import ALLOWED_ORIGINS
+from repositories.db import init_db
 from routers.chat import router as chat_router
 from routers.conversations import router as conversations_router
 from routers.health import router as health_router
@@ -15,7 +16,6 @@ from routers.progress import router as progress_router
 from routers.pronunciation import router as pronunciation_router
 from routers.users import router as users_router
 from routers.voz import router as voz_router
-from services.store import init_db
 
 
 @asynccontextmanager

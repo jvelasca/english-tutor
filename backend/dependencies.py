@@ -4,12 +4,12 @@ from __future__ import annotations
 from fastapi import HTTPException, Query, UploadFile
 
 import config
-from services import store_async
+from domain import users as user_service
 
 
 async def current_user(user_id: str = Query(...)) -> dict:
     """Resuelve y valida el perfil activo. 404 si no existe."""
-    user = await store_async.get_user(user_id)
+    user = await user_service.get_user(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user

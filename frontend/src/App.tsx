@@ -181,8 +181,8 @@ export default function App() {
             </div>
           )}
 
-          {messages.map((m, i) => (
-            <ChatMessage key={i} message={m} />
+          {messages.map((m) => (
+            <ChatMessage key={m.id ?? `${m.role}-${m.content}`} message={m} />
           ))}
 
           {loading && (

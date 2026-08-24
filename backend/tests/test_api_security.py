@@ -1,16 +1,19 @@
 from fastapi.testclient import TestClient
 
 from main import app
-from services import store
+from repositories import conversations as conversations_repo
+from repositories import db
+from repositories import pronunciation as pronunciation_repo
+from repositories import users as users_repo
 
 
 def _setup(monkeypatch, tmp_path):
-    monkeypatch.setattr(store, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(store, "DB_PATH", tmp_path / "test.db")
-    store.init_db()
-    a = store.create_user("A")["id"]
-    b = store.create_user("B")["id"]
-    cid = store.create_conversation(a)["id"]
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    a = users_repo.create_user("A")["id"]
+    b = users_repo.create_user("B")["id"]
+    cid = conversations_repo.create_conversation(a)["id"]
     return a, b, cid
 
 
@@ -105,5 +108,5 @@ def test_pronunciation_records_only_for_declared_user(monkeypatch, tmp_path):
             files={"file": ("a.webm", b"fake", "audio/webm")},
         )
         assert r.status_code == 200
-    assert store.get_progress(a)["pronunciation"]["attempts"] == 1
-    assert store.get_progress(b)["pronunciation"]["attempts"] == 0
+    assert pronunciation_repo.get_progress(a)["pronunciation"]["attempts"] == 1
+    assert pronunciation_repo.get_progress(b)["pronunciation"]["attempts"] == 0

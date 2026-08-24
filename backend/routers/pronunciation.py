@@ -7,8 +7,9 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from dependencies import read_audio_limited
+from domain import pronunciation as pronunciation_service
+from domain import users as user_service
 from schemas.pronunciation import PronunciationResponse
-from services import store_async
 from services.pronunciation import score_pronunciation
 from services.stt import transcribe as transcribe_audio
 
@@ -24,7 +25,7 @@ async def pronunciation(
     language: str = Form("en"),
     user_id: str = Form(...),
 ) -> PronunciationResponse:
-    if await store_async.get_user(user_id) is None:
+    if await user_service.get_user(user_id) is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     audio = await read_audio_limited(file)
     try:
@@ -35,7 +36,7 @@ async def pronunciation(
             status_code=500, detail="No se pudo transcribir el audio"
         ) from None
     result = score_pronunciation(expected, heard)
-    await store_async.record_pronunciation(
+    await pronunciation_service.record_pronunciation(
         user_id, result["expected"], result["heard"], result["score"], result["level"]
     )
     return PronunciationResponse(**result)
