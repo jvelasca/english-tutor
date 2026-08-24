@@ -3,42 +3,40 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 15:05 (UTC+2).
+> Actualizado por última vez: 2026-08-24 17:25 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–10 del plan de endurecimiento **completas** y
-**Release Audit 1.1 (M12) cerrada**: versión `1.1.1` unificada. Working tree limpio. Últimos commits:
+**Posición actual (2026-08-24):** Fases 0–10 de endurecimiento y Release Audit 1.1 (M12) cerradas
+(`v1.1.1` publicada). **Etapa 2 — Pedagogía (M13) en curso**: P1 y P2 hechos; P3–P6 pendientes.
+Working tree limpio. Últimos commits:
+- `feat: P2 error mastery` — evidencia positiva + first_seen/correct_after/streak/mastered.
+- `feat: P1 politica pedagogica formal` — CORRECT/NATURAL/OPTIONAL/STYLE/PRONUNCIATION.
 - `release: version 1.1.1` — Release Audit 1.1 + subida a GitHub.
-- `feat: release audit 1.1` — RA1–RA7 (current_user, fluidez verificada, estimated level,
-  appearances, grammar confidence, aislamiento cross-user).
-- `fix: hallazgos de auditoria` — concurrencia launcher + ratio gramática + marcador "let's".
-- `docs: documentacion final` — README, docs, changelog, auditoría interna.
-- `release: version 1.1.0` — versión unificada (config + health + root + frontend).
+- `feat: release audit 1.1` — RA1–RA7.
 
-**Estado verde:** backend `231 tests` + `ruff` limpio + `import main` OK; frontend `92 tests`
-+ `tsc`/`build` OK; launcher `22 tests` + `ruff` limpio.
+**Estado verde:** backend `244 tests` + `ruff` limpio; frontend `92 tests` + `tsc`/`build` OK;
+launcher `22 tests` + `ruff` limpio.
 
-**Entregable nuevo:** Release Audit 1.1 (M12) que cierra los 6 puntos de la auditoría externa:
-(1) `current_user` unificado en endpoints sensibles, (2) fluidez (`FluencyStats`) verificada,
-(3) renombrado
-"CEFR estimate" → `estimated_level/bands/descriptor`, (4) `occurrences` → `appearances`,
-(5) gramática con `confidence`/`source`/`confirmed` y prompt filtrado a errores confirmados,
-(6) tests de aislamiento cross-user + tests del prompt/contexto.
+**Entregable nuevo (Etapa 2):** plan en `docs/PLAN-ETAPA-PEDAGOGICA.md`. Hechos:
+- **P1** política pedagógica formal (`services/policy.py::feedback_policy`, integrada siempre en
+  `build_system_prompt`).
+- **P2** error mastery: `grammar_errors` con `first_seen`/`correct_after`/`streak`/`mastered`,
+  evidencia positiva (`services/grammar.py::find_correct_usage` para `he_she_it_s` y `to_too`),
+  perfil separa activos/dominados, y `classify_errors` trata `mastered` como resuelto.
 
-**Siguiente paso: nada pendiente.** Arquitectura congelada. La próxima etapa es **exclusivamente
-pedagógica** (mastery de errores, CEFR basado en evidencia, pronunciación fonémica). Release
-`v1.1.1` publicada en GitHub (premisa 11 cumplida).
+**Siguiente paso:** continuar la Etapa 2 con **P3** (vocabulario exposure/production/mastery),
+luego **P4** (listening como competencia), **P5** (CEFR basado en evidencia) y **P6**
+(pronunciación fonémica). Ver tabla en `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer `docs/PLAN-ENDURECIMIENTO.md` (hoja de ruta Fase 4→10 y protocolo anti-saturación).
-3. Leer las secciones 10–12 de este documento (estado de Fases 1–5 y arquitectura resultante).
-4. Diseñar los subagentes de la siguiente fase en `agentes/endurecimiento/` (autocontenidos,
-   uno a la vez), respetando la arquitectura `Router → Service (domain) → Repository
-   (repositories) → SQLite`.
-5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`,
-   launcher `pytest` + `ruff`) antes de cada commit `feat: ...`.
+2. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
+3. Leer las secciones 10–17 de este documento (estado de Fases 1–10 y arquitectura resultante).
+4. Redactar y ejecutar `agentes/pedagogia/p3-*.md` (un subagente a la vez), respetando la
+   arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
+5. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
+   `tsc` + `vitest`, launcher `pytest` + `ruff`).
 
 ## 1. Qué es el proyecto
 
