@@ -19,9 +19,10 @@
 - **Fase 5 (Tutor Policy + Context Builder) CERRADA** el 2026-08-24: política de corrección por
   CEFR, Context Builder (el perfil del alumno entra al system prompt) y propagación de `user_id`
   al chat en el frontend.
-- **Fase 6 (Progreso pedagógico real) EN CURSO** el 2026-08-24: F6.1 (registro automático de
-  eventos) y F6.2 (progreso histórico) hechos; F6.3 (frontend dashboard) pendiente.
-- Backend `151 tests` verdes + `ruff` limpio, `import main` OK; frontend `51 tests` verdes,
+- **Fase 6 (Progreso pedagógico real) CERRADA** el 2026-08-24: F6.1 (registro automático de
+  eventos), F6.2 (progreso histórico: tendencias, racha, dominio, hitos) y F6.3 (dashboard
+  frontend responsive móvil/tablet).
+- Backend `151 tests` verdes + `ruff` limpio, `import main` OK; frontend `56 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -141,7 +142,7 @@ móvil/tablet). Se reutiliza la tabla `learning_events` (F4) que F6.1 activa.
 
 | Fase | Alcance |
 |---|---|
-| 6 | Progreso pedagógico real (no solo counts). |
+| 6 | Progreso pedagógico real (no solo counts). ✔ CERRADA (ver detalle arriba). |
 | 7 | Pronunciación fonética (evaluadores compuestos). |
 | 8 | Listening / Speaking / CEFR. |
 | 9 | Evaluación objetiva del tutor. |

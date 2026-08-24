@@ -24,7 +24,7 @@ backend/
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
 │   ├── models.py        # GET /api/health, GET /api/models
 │   ├── profile.py       # GET /api/profile (F4)
-│   ├── progress.py      # GET /api/progress?user_id=<id> (resumen de progreso)
+│   ├── progress.py      # GET /api/progress?user_id=<id>, GET /api/progress/history (F6)
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
 │   ├── users.py         # GET /api/users, POST /api/users
 │   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
@@ -37,7 +37,7 @@ backend/
 │   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
 │   ├── profile.py       # LearningProfile (F4)
 │   ├── pronunciation.py # PronunciationResponse
-│   ├── progress.py      # PronunciationStats, ProgressSummary
+│   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
 │   ├── users.py         # User, UserCreate
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
 │   └── voz.py           # TTSRequest, TranscribeResponse
@@ -48,6 +48,7 @@ backend/
 │   ├── learning.py      # eventos de aprendizaje (F4)
 │   ├── pronunciation.py
 │   ├── profile.py       # get_profile_summary + get_profile_context (compone el perfil) (F4/F5)
+│   ├── progress.py      # get_progress_history: series + racha + dominio + hitos (F6)
 │   ├── users.py
 │   └── vocabulary.py    # extracción + persistencia (F4)
 ├── repositories/        # Acceso a datos puro (SQLite). Sin reglas de negocio.
@@ -58,6 +59,7 @@ backend/
 │   ├── learning.py      # learning_events (F4)
 │   ├── profile.py       # learning_profile (F4)
 │   ├── pronunciation.py
+│   ├── progress.py      # activity_events (mensajes con modo + pronunciaciones) (F6)
 │   ├── users.py
 │   └── vocabulary.py    # vocabulary (F4)
 ├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
@@ -66,15 +68,18 @@ backend/
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
+│   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
 │   ├── pronunciation.py # score_pronunciation (puro, difflib)
 │   ├── stt.py           # faster-whisper
+│   ├── trends.py        # daily_activity + aggregate_series + compute_streak (puros, F6)
 │   ├── tts.py           # piper-tts
 │   └── vocabulary.py    # extract_words (puro, F4)
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
 ├── data/                # base SQLite (tutor.db). GITIGNORED.
 ├── tests/               # pruebas (pytest).
 │   ├── conftest.py      # asegura el import desde backend/
+│   ├── test_activity.py # F6
 │   ├── test_api_security.py
 │   ├── test_chat_integration.py
 │   ├── test_chat_profile.py # F5
@@ -85,16 +90,19 @@ backend/
 │   ├── test_grammar.py  # F4
 │   ├── test_health.py
 │   ├── test_learning_events.py # F4
+│   ├── test_mastery.py # F6
 │   ├── test_modes.py
 │   ├── test_policy.py   # F5
 │   ├── test_profile.py  # F4
 │   ├── test_progress.py
+│   ├── test_progress_history.py # F6
 │   ├── test_pronunciation.py
 │   ├── test_robustness.py
 │   ├── test_schemas.py
 │   ├── test_store.py
 │   ├── test_store_append_only.py
 │   ├── test_store_isolation.py
+│   ├── test_trends.py  # F6
 │   ├── test_users.py
 │   └── test_vocabulary.py # F4
 ├── scripts/             # scripts de utilidad.
@@ -126,9 +134,9 @@ frontend/src/
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
 │   ├── chat.ts          # chat normal + streaming (envía mode + user_id).
 │   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
-│   ├── learning.ts      # getProfile + analyzeText (F4).
+│   ├── learning.ts      # getProfile + analyzeText + getEvents (F4/F6).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).
-│   ├── progress.ts      # getProgress (resumen de progreso del usuario).
+│   ├── progress.ts      # getProgress + getProgressHistory (resumen + histórico) (F6).
 │   ├── users.ts         # listUsers, createUser.
 │   └── voz.ts           # transcribe + tts.
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
@@ -139,7 +147,7 @@ frontend/src/
 │   ├── MicButton.tsx
 │   ├── ModeSelect.tsx   # selector de modo de tutor
 │   ├── PronunciationPractice.tsx
-│   ├── ProgressSummary.tsx  # panel de progreso del alumno (M9)
+│   ├── ProgressDashboard.tsx # dashboard de progreso real: tendencias, racha, dominio, hitos (F6)
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
 │   ├── ThemeToggle.tsx  # toggle claro/oscuro (M8)
@@ -161,7 +169,7 @@ frontend/src/
 │   ├── modes.test.ts
 │   ├── users.ts         # nextDefaultUserName
 │   ├── users.test.ts
-│   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel (M9)
+│   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel + bucketLabel/eventLabel (M9/F6)
 │   ├── progress.test.ts
 │   ├── theme.ts         # resolveInitialTheme (M8)
 │   ├── theme.test.ts

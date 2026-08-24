@@ -7,18 +7,17 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–5 **completas, verificadas y commiteadas**. FASE 6
-(Progreso pedagógico real) **en curso**: F6.1 y F6.2 hechos, F6.3 (frontend) pendiente. Últimos commits:
+**Posición actual (2026-08-24):** Fases 0–6 del plan de endurecimiento **completas, verificadas
+y commiteadas**. Working tree limpio. Últimos commits:
+- `feat: fase 6.3` — dashboard de progreso real (reemplaza `ProgressSummary`).
 - `feat: fase 6.2` — progreso histórico: tendencias, racha, dominio de errores e hitos.
 - `feat: fase 6.1` — registro automático de eventos de aprendizaje (`learning_events` activa).
-- `938c989` — Fase 5 frontend: `user_id` al chat (personaliza el tutor).
 
-**Estado verde:** backend `151 tests` + `ruff` limpio + `import main` OK; frontend `51 tests`
+**Estado verde:** backend `151 tests` + `ruff` limpio + `import main` OK; frontend `56 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: F6.3 — Frontend dashboard de progreso real** (reemplaza `ProgressSummary` por
-`ProgressDashboard`: series, racha, dominio, hitos, timeline; responsive móvil/tablet).
-Ver `docs/PLAN-ENDURECIMIENTO.md`.
+**Siguiente paso: FASE 7 — Pronunciación fonética** (evaluadores compuestos). Ver
+`docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
@@ -486,7 +485,7 @@ frontend `51 tests` + `tsc`/`build` OK. El perfil del alumno (CEFR + errores rec
 recomendaciones) ya entra al system prompt del tutor; sin `user_id` el chat queda como antes.
 Siguiente bloque: **FASE 6 — Progreso pedagógico real** (no solo counts).
 
-## 13. FASE 6 — Progreso pedagógico real (EN CURSO)
+## 13. FASE 6 — Progreso pedagógico real (CERRADA)
 
 Backend primero (F6.1–F6.2), frontend al final (F6.3). Un commit `feat:` por subagente, cada uno
 verificado en verde antes de commitear. Decisiones de diseño: un único endpoint nuevo
@@ -497,7 +496,7 @@ verificado en verde antes de commitear. Decisiones de diseño: un único endpoin
 |---|---|---|
 | F6.1 Registro automático de eventos | `agentes/endurecimiento/f6-01-registro-eventos.md` | ✔ hecho |
 | F6.2 Progreso histórico (tendencias, racha, dominio, hitos) | `agentes/endurecimiento/f6-02-progreso-historico.md` | ✔ hecho |
-| F6.3 Frontend dashboard de progreso | `agentes/endurecimiento/f6-03-frontend-dashboard.md` | ⏳ pendiente |
+| F6.3 Frontend dashboard de progreso | `agentes/endurecimiento/f6-03-frontend-dashboard.md` | ✔ hecho |
 
 ### HECHO — F6.1: registro automático de eventos de aprendizaje
 - `domain/learning.py`: `_MODE_TO_EVENT` (`exercises→exercise`, `grammar→correction`, resto→
@@ -525,3 +524,18 @@ verificado en verde antes de commitear. Decisiones de diseño: un único endpoin
 - `domain/progress.py`: `get_progress_history` compone repo + servicios puros.
 - Tests: `test_trends.py` (7) + `test_mastery.py` (3) + `test_progress_history.py` (5).
   Total backend **151 tests**.
+
+### HECHO — F6.3: frontend dashboard de progreso real
+- `components/ProgressDashboard.tsx` reemplaza a `ProgressSummary.tsx` (eliminado): racha,
+  gráfico de actividad (por día/semana/mes), dominio de errores (activos/resueltos), hitos y
+  timeline de eventos recientes. **Responsive total**: tablet (`@media 1024px`) + móvil
+  (`@media 768px`), según premisa 14.
+- `api/progress.ts::getProgressHistory`, `api/learning.ts::getEvents`; tipos nuevos en
+  `types/api.ts`; helpers `bucketLabel`/`eventLabel` en `utils/progress.ts`.
+- `useChat` expone `history`/`events`/`bucket` y refresca tras cada envío y pronunciación.
+- Tests: `api/progress.test.ts` (2) + `utils/progress.test.ts` (2) + `api/learning.test.ts` (1).
+  Total frontend **56 tests**.
+
+**Estado al cierre de Fase 6:** backend `151 tests` + `ruff` limpio; frontend `56 tests` +
+`tsc`/`build` OK. El progreso dejó de ser "counts estáticos": ahora hay tendencias temporales,
+racha, dominio de errores (activos vs resueltos) e hitos, deterministas y sin LLM.
