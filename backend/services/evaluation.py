@@ -196,3 +196,86 @@ def summarize(results: list[dict]) -> dict:
         "avg_conciseness": _avg("conciseness"),
         "avg_engagement": _avg("engagement"),
     }
+
+
+TUTOR_PROMPTS: dict[str, str] = {
+    "conversation": (
+        "You are a friendly, patient English tutor. Answer in English, keep it "
+        "brief, and ask a follow-up question to keep the conversation going."
+    ),
+    "grammar": (
+        "You are an English grammar coach. Correct mistakes clearly and explain "
+        "briefly, always in English."
+    ),
+    "exercises": (
+        "You are an English teacher who creates short, focused exercises. Reply "
+        "in English and keep it concise."
+    ),
+    "pronunciation": (
+        "You are an English pronunciation coach. Reply in English with clear, "
+        "concise guidance."
+    ),
+}
+
+
+def build_tutor_prompt(case: dict) -> str:
+    """Devuelve el system prompt del tutor según el modo del caso."""
+    mode = case.get("mode", "conversation")
+    return TUTOR_PROMPTS.get(mode, TUTOR_PROMPTS["conversation"])
+
+
+def _verdict(summary: dict) -> str:
+    avg = summary.get("avg_total")
+    if avg is None:
+        return "sin datos"
+    if avg >= 80:
+        return "excelente"
+    if avg >= 60:
+        return "bueno"
+    if avg >= 40:
+        return "regular"
+    return "deficiente"
+
+
+def _fmt(value: float | int | None) -> str:
+    return "-" if value is None else str(value)
+
+
+def build_report(results: list[dict]) -> dict:
+    """Compone el informe agregado: resumen + desglose por caso + veredicto."""
+    summary = summarize(results)
+    per_case = [
+        {
+            "case_id": r.get("case_id"),
+            "correction": r.get("correction"),
+            "english": r.get("english"),
+            "conciseness": r.get("conciseness"),
+            "engagement": r.get("engagement"),
+            "total": r.get("total"),
+        }
+        for r in results
+    ]
+    return {"summary": summary, "per_case": per_case, "verdict": _verdict(summary)}
+
+
+def format_report(report: dict) -> str:
+    """Convierte el informe a texto legible para consola."""
+    s = report["summary"]
+    lines = [
+        "== Informe de evaluacion del tutor ==",
+        f"Casos evaluados: {s['cases']}",
+        f"Total medio: {_fmt(s['avg_total'])}",
+        f"Correccion media: {_fmt(s['avg_correction'])}",
+        f"Ingles medio: {_fmt(s['avg_english'])}",
+        f"Concision media: {_fmt(s['avg_conciseness'])}",
+        f"Engagement medio: {_fmt(s['avg_engagement'])}",
+        f"Veredicto: {report['verdict']}",
+        "",
+    ]
+    for case in report["per_case"]:
+        lines.append(
+            f"- [{case['case_id']}] total={_fmt(case['total'])} "
+            f"(corr={_fmt(case['correction'])}, en={_fmt(case['english'])}, "
+            f"conc={_fmt(case['conciseness'])}, eng={_fmt(case['engagement'])})"
+        )
+    return "\n".join(lines)
