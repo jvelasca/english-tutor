@@ -27,7 +27,10 @@
 - **Fase 8 (Listening / Speaking / CEFR) CERRADA** el 2026-08-24: F8.1 (CEFR multi-señal con
   bandas por destreza), F8.2 (fluidez oral con duración/WPM), F8.3 (listening: banco de
   preguntas + evaluación) y F8.4 (frontend: CEFR + fluidez + listening UI).
-- Backend `191 tests` verdes + `ruff` limpio, `import main` OK; frontend `74 tests` verdes,
+- **Fase 9 (Evaluación objetiva del tutor) CERRADA** el 2026-08-24: F9.1 (evaluador objetivo
+  del tutor, puro y determinista), F9.2 (informe agregado + script por lotes) y F9.3 (panel
+  de calidad del tutor en el frontend).
+- Backend `217 tests` verdes + `ruff` limpio, `import main` OK; frontend `88 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -180,13 +183,30 @@ ya (banco estático + TTS ya existente en `/api/tts`).
 > y un descriptor descriptivo. Listening es un banco estático de 8 preguntas A1–B1 (opción
 > múltiple, evaluación determinista) reproducidas con el TTS existente.
 
-### FASE 7 → 10 — Backlog (se detallará al llegar)
+### FASE 9 — Evaluación objetiva del tutor (detallada)
+
+Evaluar al tutor de forma **objetiva y determinista** (sin LLM-juez, premisa 12) con señales
+medibles: si corrige el error conocido (`correction`), cuánto habla en inglés (`english`), la
+concisión (`conciseness`) y si invita a seguir (`engagement`). Backend primero (F9.1–F9.2),
+frontend al final (F9.3, opcional). Decisiones: evaluador puro en `services/evaluation.py` con
+corpus canónico; script por lotes para puntuar un modelo; panel de calidad en el frontend que
+evalúa las respuestas del tutor en local.
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| F9.1 | Evaluador objetivo del tutor (backend) | `services/evaluation.py` (`evaluate_tutor_reply`, `summarize`, corpus `EVAL_CASES`) + tests. | `agentes/endurecimiento/f9-01-evaluador-tutor.md` |
+| F9.2 | Informe agregado + script por lotes (backend) | `build_report`/`format_report`/`build_tutor_prompt` en `services/evaluation.py`, `scripts/eval_tutor.py` (CLI), tests. | `agentes/endurecimiento/f9-02-informe-agregado.md` |
+| F9.3 | Panel de calidad del tutor (frontend) | `utils/tutorEvaluation.ts` (puro) + `components/TutorQualityPanel.tsx` + integración en `App.tsx` + estilos responsive. | `agentes/endurecimiento/f9-03-panel-calidad-tutor.md` |
+
+> **Notas de Fase 9:** el evaluador es determinista y sin LLM-juez (premisa 12); la señal
+> `correction` requiere el caso con `expected_fragments` (el panel frontend usa solo las
+> señales libres de contexto). El script `scripts/eval_tutor.py` es un CLI de utilidad: puntúa
+> un modelo contra el corpus y no persiste nada en BD.
+
+### FASE 10 — Backlog (se detallará al llegar)
 
 | Fase | Alcance |
 |---|---|
-| 7 | Pronunciación fonética (evaluadores compuestos). ✔ CERRADA (ver detalle arriba). |
-| 8 | Listening / Speaking / CEFR. ✔ CERRADA (ver detalle arriba). |
-| 9 | Evaluación objetiva del tutor. |
 | 10 | Release 1.0 realmente estable. |
 
 ## Protocolo anti-saturación y documentos de paso

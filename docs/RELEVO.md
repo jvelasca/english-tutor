@@ -3,29 +3,30 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 13:05 (UTC+2).
+> Actualizado por última vez: 2026-08-24 13:20 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–8 del plan de endurecimiento **completas, verificadas
+**Posición actual (2026-08-24):** Fases 0–9 del plan de endurecimiento **completas, verificadas
 y commiteadas**. Working tree limpio. Últimos commits:
-- `feat: fase 8.4` — UI CEFR multi-señal + fluidez + listening.
-- `feat: fase 8.3` — listening (banco de preguntas + evaluación determinista).
-- `feat: fase 8.2` — fluidez oral con duración (WPM) en pronunciación.
-- `feat: fase 8.1` — evaluación CEFR multi-señal (bandas por destreza + descriptor).
+- `feat: fase 9.3` — panel de calidad del tutor (frontend).
+- `feat: fase 9.2` — informe agregado + script por lotes (backend).
+- `feat: fase 9.1` — evaluador objetivo del tutor (backend, puro).
+- `docs: cierre de fase 8` — CEFR multi-señal + fluidez + listening.
 
-**Estado verde:** backend `191 tests` + `ruff` limpio + `import main` OK; frontend `74 tests`
+**Estado verde:** backend `217 tests` + `ruff` limpio + `import main` OK; frontend `88 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: FASE 9 — Evaluación objetiva del tutor.** Ver
+**Siguiente paso: FASE 10 — Release 1.0 realmente estable.** Ver
 `docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer `docs/PLAN-ENDURECIMIENTO.md` (hoja de ruta Fase 4→10 y protocolo anti-saturación).
 3. Leer las secciones 10–12 de este documento (estado de Fases 1–5 y arquitectura resultante).
-4. Diseñar los subagentes F7.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
-   respetando la arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
+4. Diseñar los subagentes de la siguiente fase en `agentes/endurecimiento/` (autocontenidos,
+   uno a la vez), respetando la arquitectura `Router → Service (domain) → Repository
+   (repositories) → SQLite`.
 5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`)
    antes de cada commit `feat: ...`.
 
@@ -639,3 +640,43 @@ frontend `74 tests` + `tsc`/`build` OK. CEFR dejó de ser una heurística plana:
 evaluación multi-señal con bandas por destreza y descriptor; la pronunciación añade fluidez
 (WPM) con la duración del audio; y hay ejercicios de comprensión auditiva (banco + preguntas)
 reproducidos con el TTS local.
+
+## 16. FASE 9 — Evaluación objetiva del tutor (CERRADA)
+
+Backend primero (F9.1–F9.2), frontend al final (F9.3). Un commit `feat:` por subagente, cada
+uno verificado en verde antes de commitear. Evaluación determinista y sin LLM-juez (premisa 12).
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F9.1 Evaluador objetivo del tutor (backend) | `agentes/endurecimiento/f9-01-evaluador-tutor.md` | ✔ hecho |
+| F9.2 Informe agregado + script por lotes (backend) | `agentes/endurecimiento/f9-02-informe-agregado.md` | ✔ hecho |
+| F9.3 Panel de calidad del tutor (frontend) | `agentes/endurecimiento/f9-03-panel-calidad-tutor.md` | ✔ hecho |
+
+### HECHO — F9.1: evaluador objetivo del tutor (backend, puro)
+- `services/evaluation.py` (puro, sin LLM-juez): `SPANISH_WORDS`, `FRIENDLY_MARKERS`,
+  `EVAL_CASES` (8 casos canónicos A1–B1), `normalize`, `_words`, `contains_fragment`,
+  `contains_any_fragment`, `spanish_word_ratio`, `english_word_ratio`, `conciseness_score`,
+  `engagement_score`, `evaluate_tutor_reply` (señales `correction`/`english`/`conciseness`/
+  `engagement` + `total` ponderado) y `summarize` (medias por señal).
+- Tests: `test_evaluation.py` (16). Total backend **207 tests**.
+
+### HECHO — F9.2: informe agregado + script por lotes (backend)
+- `services/evaluation.py`: `TUTOR_PROMPTS` + `build_tutor_prompt`, `build_report`
+  (resumen + desglose por caso + `verdict`), `format_report` (texto legible).
+- `scripts/eval_tutor.py` (CLI): `--model` + `--json`; envía `EVAL_CASES` al modelo, puntúa
+  cada respuesta y emite el informe agregado. No persiste nada en BD.
+- Tests: `test_evaluation_report.py` (10). Total backend **217 tests**.
+
+### HECHO — F9.3: panel de calidad del tutor (frontend)
+- `utils/tutorEvaluation.ts` (puro, espejo del evaluador): `normalize`, `words`,
+  `spanishWordRatio`, `englishWordRatio`, `concisenessScore`, `engagementScore`,
+  `evaluateTutorReply`, `averageEvaluations`.
+- `components/TutorQualityPanel.tsx` (presentacional): medias de `Inglés`/`Concisión`/
+  `Engagement`/`Total` + últimos 3 turnos del tutor. Responsive móvil/tablet. `App.tsx` lo
+  monta tras `LearningProfile`; estilos `.tutor-quality` en `index.css`.
+- Tests: `utils/tutorEvaluation.test.ts` (14). Total frontend **88 tests**.
+
+**Estado al cierre de Fase 9:** backend `217 tests` + `ruff` limpio + `import main` OK;
+frontend `88 tests` + `tsc`/`build` OK. El tutor ya se puede evaluar objetivamente (sin
+LLM-juez): por corpus en backend (script por lotes) y en vivo en el frontend (panel de calidad
+sobre la conversación actual).

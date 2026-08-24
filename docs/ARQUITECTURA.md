@@ -70,6 +70,7 @@ backend/
 │   ├── __init__.py
 │   ├── cefr.py          # evaluate_cefr (multi-señal) + bandas + recommendations (puros, F4/F8)
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
+│   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
 │   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
 │   ├── listening.py     # banco de preguntas + score_answer (puro, F8)
@@ -94,6 +95,8 @@ backend/
 │   ├── test_context.py      # F5
 │   ├── test_cors.py
 │   ├── test_domain_async.py
+│   ├── test_evaluation.py # F9
+│   ├── test_evaluation_report.py # F9
 │   ├── test_fluency.py  # F8
 │   ├── test_foreign_keys.py
 │   ├── test_grammar.py  # F4
@@ -118,6 +121,7 @@ backend/
 │   └── test_vocabulary.py # F4
 ├── scripts/             # scripts de utilidad.
 │   ├── eval_model.py    # evalúa un modelo como tutor (M5)
+│   ├── eval_tutor.py    # evalúa un modelo con el corpus canónico (F9)
 │   └── smoke_test.py    # verifica el servidor en ejecución
 ├── download_models.py   # script de descarga de modelos de voz (1ª vez)
 ├── requirements.txt
@@ -164,6 +168,7 @@ frontend/src/
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
 │   ├── ThemeToggle.tsx  # toggle claro/oscuro (M8)
+│   ├── TutorQualityPanel.tsx # panel de calidad del tutor (F9)
 │   └── UserSelect.tsx   # selector de perfil de usuario
 ├── hooks/               # Estado y lógica de UI.
 │   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
@@ -190,7 +195,9 @@ frontend/src/
 │   ├── theme.ts         # resolveInitialTheme (M8)
 │   ├── theme.test.ts
 │   ├── vad.ts           # VAD: rms + shouldEndUtterance + constantes (M10)
-│   └── vad.test.ts
+│   ├── vad.test.ts
+│   ├── tutorEvaluation.ts # evaluador del tutor: ratios + scores + medias (puro, F9)
+│   └── tutorEvaluation.test.ts
 ├── scripts/             # scripts de utilidad.
 │   └── check.ps1        # tsc + vitest
 ├── vitest.config.ts
