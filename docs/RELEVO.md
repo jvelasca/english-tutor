@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 11:55 (UTC+2).
+> Actualizado por última vez: 2026-08-24 12:05 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
@@ -16,14 +16,24 @@ y commiteadas**. Working tree limpio. Últimos commits:
 **Estado verde:** backend `151 tests` + `ruff` limpio + `import main` OK; frontend `56 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: FASE 7 — Pronunciación fonética** (evaluadores compuestos). Ver
-`docs/PLAN-ENDURECIMIENTO.md`.
+**Siguiente paso: FASE 7 — Pronunciación fonética** (evaluadores compuestos). Sustituir el
+evaluador único actual (`services/pronunciation.py`, `difflib` a nivel de caracteres) por un
+**evaluador compuesto determinista**: precisión por palabra (alineación) + similitud fonética
+(Soundex) + similitud de caracteres, ponderado. Ver `docs/PLAN-ENDURECIMIENTO.md`.
+
+**Punto de partida de F7 (estado actual de pronunciación):**
+- `services/pronunciation.py::score_pronunciation(expected, heard)` → `{expected, heard, score,
+  level, ok}` con `SequenceMatcher` sobre texto normalizado (umbrales: `good ≥80`, `fair ≥50`).
+- `schemas/pronunciation.py::PronunciationResponse` = `{expected, heard, score, level, ok}`.
+- `routers/pronunciation.py` transcribe → `score_pronunciation` → `record_pronunciation` →
+  `record_event`. `pronunciation_attempts` persiste `{expected, heard, score, level}`.
+- Frontend: `PronunciationPractice.tsx` muestra `score`/`level`/`expected`/`heard`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer `docs/PLAN-ENDURECIMIENTO.md` (hoja de ruta Fase 4→10 y protocolo anti-saturación).
 3. Leer las secciones 10–12 de este documento (estado de Fases 1–5 y arquitectura resultante).
-4. Diseñar los subagentes F6.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
+4. Diseñar los subagentes F7.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
    respetando la arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`)
    antes de cada commit `feat: ...`.
