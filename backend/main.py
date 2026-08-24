@@ -10,6 +10,7 @@ from config import ALLOWED_ORIGINS
 from repositories.db import init_db
 from routers.chat import router as chat_router
 from routers.conversations import router as conversations_router
+from routers.grammar import router as grammar_router
 from routers.health import router as health_router
 from routers.learning import router as learning_router
 from routers.models import router as models_router
@@ -38,6 +39,7 @@ app.add_middleware(
 )
 
 app.include_router(chat_router)
+app.include_router(grammar_router)
 app.include_router(health_router)
 app.include_router(learning_router)
 app.include_router(models_router)
