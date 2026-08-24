@@ -3,20 +3,21 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 17:25 (UTC+2).
+> Actualizado por última vez: 2026-08-24 17:50 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
 **Posición actual (2026-08-24):** Fases 0–10 de endurecimiento y Release Audit 1.1 (M12) cerradas
 (`v1.1.1` publicada). **Etapa 2 — Pedagogía (M13) en curso**: P1 y P2 hechos; P3–P6 pendientes.
-Working tree limpio. Últimos commits:
+Además se ha cerrado **M14 — Rediseño de GUI responsive + personalización + acceso en red** (ver
+sección 18). Working tree con cambios de M14 sin commitear. Últimos commits:
 - `feat: P2 error mastery` — evidencia positiva + first_seen/correct_after/streak/mastered.
 - `feat: P1 politica pedagogica formal` — CORRECT/NATURAL/OPTIONAL/STYLE/PRONUNCIATION.
 - `release: version 1.1.1` — Release Audit 1.1 + subida a GitHub.
 - `feat: release audit 1.1` — RA1–RA7.
 
-**Estado verde:** backend `244 tests` + `ruff` limpio; frontend `92 tests` + `tsc`/`build` OK;
-launcher `22 tests` + `ruff` limpio.
+**Estado verde:** backend `260 tests` + `ruff` limpio; frontend `106 tests` + `tsc`/`build` OK;
+launcher `24 tests` + `ruff` limpio.
 
 **Entregable nuevo (Etapa 2):** plan en `docs/PLAN-ETAPA-PEDAGOGICA.md`. Hechos:
 - **P1** política pedagógica formal (`services/policy.py::feedback_policy`, integrada siempre en
@@ -720,3 +721,61 @@ Versión unificada `1.1.0`, gate verde completo y nuevo componente `launcher/`.
 **Estado al cierre de Fase 10:** backend `217 tests` + `ruff` limpio; frontend `88 tests` +
 `tsc`/`build` OK; launcher `22 tests` + `ruff` limpio. Versión `1.1.0` unificada y lanzador
 de escritorio con acceso directo e icono.
+
+## 18. M14 — GUI responsive a ancho completo + personalización + acceso en red (HECHO)
+
+Requisito del usuario: que la GUI sea más atractiva y **responsive** (adaptarse a tablets/móvil
+y, en escritorio, **aprovechar todo el ancho** en vez de concentrar el contenido en una columna
+central), con **zonas redimensionables** al gusto, **persistencia por usuario** de todos los
+ajustes (incluido el modelo), aspecto **100% profesional**, **personalización visual del
+perfil** (avatar/imagen/icono/color) y **acceso desde toda la red local** mostrando la URL de
+acceso en la propia web y en el launcher.
+
+### Layout multi-panel responsive y redimensionable
+- `App.tsx`: la zona principal pasa de una columna centrada a un `workspace` flex con tres
+  paneles: `pane--sidebar` (conversaciones), `pane--main` (chat) y `pane--insights`
+  (dashboard de progreso + perfil + calidad del tutor + listening). El ancho se aprovecha al
+  máximo en escritorio.
+- `components/ResizeHandle.tsx`: asa de redimensionado horizontal (pointer events + teclado
+  ←/→, `role="separator"`, `aria-*`) entre paneles.
+- `utils/layout.ts`: `LAYOUT_DEFAULTS`, `clampSidebar`/`clampRight` (mín/máx), `parseLayout`/
+  `serializeLayout`. Tests en `utils/layout.test.ts`.
+- `index.css`: clases `workspace`/`pane`/`pane--*`/`resize-handle`; en ≤1024px los paneles
+  laterales pasan a **drawers superpuestos** (hamburguesa/insights-toggle + backdrop), y en
+  ≤768px se compacta el header. El chat usa `chat-scroll` + `chat-inner` (máx 860px, centrado).
+
+### Persistencia de preferencias por usuario (modelo, modo, layout)
+- Backend: tabla `settings` (clave/valor, PK `user_id+key`, upsert) en `repositories/db.py`;
+  `repositories/settings.py`, `domain/settings.py`, `schemas/settings.py` y
+  `routers/settings.py` (`GET/PUT /api/settings`). El modelo (`qwen3.5:9b` por defecto), el
+  modo y las dimensiones del layout se guardan por usuario y se restauran al reabrir.
+- Frontend: `api/settings.ts` + `hooks/useChat.ts` (`persistSettings`, `selectModel`,
+  `selectMode`, `setLayout` cargan/guardan por `currentUserId`).
+
+### Personalización del perfil (avatar/imagen/icono/color)
+- Backend: columnas `avatar_color`/`avatar_emoji`/`avatar_image` en `users` (migración
+  idempotente), `schemas/users.py` (`UserUpdate`), `repositories/users.py::update_user`,
+  `domain/users.py`, y `PATCH /api/users/{id}` en `routers/users.py`.
+- Frontend: `components/UserAvatar.tsx` (imagen → emoji → iniciales con color determinista),
+  `components/ProfileDialog.tsx` (nombre, icono, color, subir/quitar imagen con
+  `utils/image.ts::resizeImageToDataUrl`), `components/UserMenu.tsx` (selector de perfil,
+  crear/editar). `UserSelect.tsx` eliminado (sustituido por `UserMenu`).
+
+### Acceso en red local (LAN)
+- Backend: `config.py` añade `ALLOWED_ORIGIN_REGEX` (IPs privadas IPv4) y `main.py` la usa en
+  `CORSMiddleware` (`allow_origin_regex`). `services/network.py::get_lan_ip` +
+  `routers/network.py::GET /api/network` (IP + URLs).
+- Launcher: `core.py::backend_command` enlaza uvicorn a `0.0.0.0`; `core.py::lan_ip`/`lan_url`;
+  `launcher.py` añade el recuadro "Acceso a la app" (URL local y LAN).
+- Frontend: `components/NetworkBadge.tsx` muestra la URL LAN y permite copiarla.
+
+### Tests añadidos
+- Backend: `test_settings.py`, `test_user_profile.py`, `test_network.py`, +`test_cors.py`
+  (caso LAN). Total backend **260 tests**.
+- Frontend: `utils/layout.test.ts`, `utils/avatar.test.ts` (más los tests existentes). Total
+  frontend **106 tests**.
+- Launcher: `test_core.py` (+`test_backend_command_binds_lan`, `test_lan_url`). Total **24 tests**.
+
+### Decisión de modelo (respuesta al usuario)
+Se mantiene **`qwen3.5:9b`** como modelo por defecto (mejor calidad como tutor, ver sección 5);
+`llama3.1:8b` queda instalado y seleccionable. La elección ahora es persistente por usuario.

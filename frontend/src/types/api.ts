@@ -23,7 +23,25 @@ export interface ModelsResponse {
 export interface User {
   id: string;
   name: string;
+  avatar_color?: string;
+  avatar_emoji?: string;
+  avatar_image?: string;
   created_at: string;
+}
+
+export interface NetworkInfo {
+  ip: string;
+  frontend_port: string;
+  backend_port: string;
+  url: string;
+}
+
+export interface Settings {
+  [key: string]: string;
+}
+
+export interface SettingsResponse {
+  settings: Settings;
 }
 
 export interface ConversationMeta {

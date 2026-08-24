@@ -146,6 +146,18 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                user_id TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, key),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
 
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
@@ -158,6 +170,21 @@ def init_db() -> None:
 
         if "message_id" not in msg_columns:
             conn.execute("ALTER TABLE messages ADD COLUMN message_id TEXT")
+
+        # Migración idempotente: personalización visual del perfil (avatar).
+        user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if "avatar_color" not in user_cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN avatar_color TEXT NOT NULL DEFAULT ''"
+            )
+        if "avatar_emoji" not in user_cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN avatar_emoji TEXT NOT NULL DEFAULT ''"
+            )
+        if "avatar_image" not in user_cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN avatar_image TEXT NOT NULL DEFAULT ''"
+            )
 
         # Migración idempotente: `occurrences` → `appearances` (nº de mensajes en
         # los que apareció la palabra, no frecuencia real de uso).

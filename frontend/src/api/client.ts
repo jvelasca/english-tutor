@@ -27,6 +27,10 @@ export function putJson<T>(url: string, body: unknown): Promise<T> {
   return sendJson<T>(url, "PUT", body);
 }
 
+export function patchJson<T>(url: string, body: unknown): Promise<T> {
+  return sendJson<T>(url, "PATCH", body);
+}
+
 export function deleteJson<T>(url: string): Promise<T> {
   return request<T>(url, { method: "DELETE" });
 }

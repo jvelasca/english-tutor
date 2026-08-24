@@ -12,6 +12,7 @@ from core import (
     frontend_command,
     frontend_url,
     health_status,
+    lan_url,
     user_overview,
 )
 
@@ -31,10 +32,20 @@ def test_backend_command_uses_venv_python():
     assert str(BACKEND_PORT) in cmd
 
 
+def test_backend_command_binds_lan():
+    cmd = backend_command()
+    assert "0.0.0.0" in cmd
+
+
 def test_frontend_command_runs_dev():
     cmd = frontend_command()
     assert "run" in cmd
     assert cmd[-1] == "dev"
+
+
+def test_lan_url(monkeypatch):
+    monkeypatch.setattr("core.lan_ip", lambda: "192.168.1.42")
+    assert lan_url() == f"http://192.168.1.42:{FRONTEND_PORT}"
 
 
 def test_urls():

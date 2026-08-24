@@ -26,6 +26,7 @@ from core import (
     db_summary,
     frontend_url,
     health_status,
+    lan_url,
     user_overview,
 )
 from process_manager import ProcessManager
@@ -44,8 +45,8 @@ class LauncherApp:
         self._queue: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
         root.title("English Tutor — Launcher")
-        root.geometry("560x520")
-        root.minsize(500, 460)
+        root.geometry("560x620")
+        root.minsize(500, 520)
         self._build_ui()
         # Programar desde el hilo principal (antes de mainloop es seguro).
         root.after(0, self.refresh)
@@ -91,16 +92,32 @@ class LauncherApp:
             side="left", padx=4
         )
 
+        access = ttk.LabelFrame(self.root, text="Acceso a la app")
+        access.grid(row=3, column=0, columnspan=2, sticky="ew", **pad)
+        access.columnconfigure(1, weight=1)
+        ttk.Label(access, text="Este equipo").grid(
+            row=0, column=0, sticky="w", padx=12, pady=2
+        )
+        ttk.Label(access, text=frontend_url(), foreground="#2563eb").grid(
+            row=0, column=1, sticky="e", padx=12, pady=2
+        )
+        ttk.Label(access, text="Red local (LAN)").grid(
+            row=1, column=0, sticky="w", padx=12, pady=2
+        )
+        ttk.Label(access, text=lan_url(), foreground="#2563eb").grid(
+            row=1, column=1, sticky="e", padx=12, pady=2
+        )
+
         db_frame = ttk.LabelFrame(self.root, text="Base de datos")
-        db_frame.grid(row=3, column=0, columnspan=2, sticky="ew", **pad)
+        db_frame.grid(row=4, column=0, columnspan=2, sticky="ew", **pad)
         self._db_var = tk.StringVar(value="…")
         ttk.Label(db_frame, textvariable=self._db_var).grid(
             row=0, column=0, sticky="w", padx=12, pady=2
         )
 
         users_frame = ttk.LabelFrame(self.root, text="Usuarios")
-        users_frame.grid(row=4, column=0, columnspan=2, sticky="nsew", **pad)
-        self.root.rowconfigure(4, weight=1)
+        users_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", **pad)
+        self.root.rowconfigure(5, weight=1)
         self.root.columnconfigure(0, weight=1)
         cols = ("name", "conversations", "messages")
         self._tree = ttk.Treeview(users_frame, columns=cols, show="headings", height=6)
@@ -114,7 +131,7 @@ class LauncherApp:
 
         self._msg = tk.StringVar(value="")
         ttk.Label(self.root, textvariable=self._msg, foreground="#6b7280").grid(
-            row=5, column=0, columnspan=2, sticky="w", **pad
+            row=6, column=0, columnspan=2, sticky="w", **pad
         )
 
     # --- Bucle de eventos (hilo principal) ---

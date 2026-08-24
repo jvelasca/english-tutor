@@ -7,6 +7,7 @@ sin lanzar nada.
 from __future__ import annotations
 
 import os
+import socket
 from pathlib import Path
 
 # El launcher vive en <repo>/launcher/, así que el repo raíz es el padre del padre.
@@ -20,7 +21,10 @@ FRONTEND_PORT = 5173
 
 
 def backend_command() -> list[str]:
-    """Comando para arrancar el backend con el venv del proyecto (uvicorn)."""
+    """Comando para arrancar el backend con el venv del proyecto (uvicorn).
+
+    Se enlaza a ``0.0.0.0`` para que otros equipos de la LAN puedan acceder.
+    """
     exe = "python.exe" if os.name == "nt" else "python"
     python = BACKEND_DIR / ".venv" / "Scripts" / exe
     return [
@@ -29,7 +33,7 @@ def backend_command() -> list[str]:
         "uvicorn",
         "main:app",
         "--host",
-        "127.0.0.1",
+        "0.0.0.0",
         "--port",
         str(BACKEND_PORT),
     ]
@@ -47,6 +51,24 @@ def backend_url() -> str:
 
 def frontend_url() -> str:
     return f"http://localhost:{FRONTEND_PORT}"
+
+
+def lan_ip() -> str:
+    """IP IPv4 de la LAN desde la que se sirve la app (o 127.0.0.1)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # UDP connect es perezoso: no envía paquetes, solo elige la ruta.
+        sock.connect(("8.8.8.8", 80))
+        return sock.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        sock.close()
+
+
+def lan_url() -> str:
+    """URL de acceso desde otros equipos de la red local."""
+    return f"http://{lan_ip()}:{FRONTEND_PORT}"
 
 
 def app_summary(backend_up: bool, frontend_up: bool) -> dict[str, str]:

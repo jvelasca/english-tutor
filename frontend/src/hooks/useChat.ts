@@ -7,11 +7,18 @@ import {
   listConversations,
   saveConversation,
 } from "../api/conversations";
-import { createUser, listUsers } from "../api/users";
+import { createUser, listUsers, updateUser as updateUserApi, type UserPatch } from "../api/users";
 import { getProgressHistory } from "../api/progress";
+import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
 import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";
+import {
+  LAYOUT_DEFAULTS,
+  parseLayout,
+  serializeLayout,
+  type LayoutState,
+} from "../utils/layout";
 import type {
   Bucket,
   ConversationMeta,
@@ -25,6 +32,13 @@ import type {
 
 const DEFAULT_MODEL = "qwen3.5:9b";
 
+const TUTOR_MODES: TutorMode[] = [
+  "conversation",
+  "grammar",
+  "exercises",
+  "pronunciation",
+];
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -32,6 +46,7 @@ export function useChat() {
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [models, setModels] = useState<string[]>([]);
   const [mode, setMode] = useState<TutorMode>("conversation");
+  const [layout, setLayoutState] = useState<LayoutState>(LAYOUT_DEFAULTS);
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -41,6 +56,11 @@ export function useChat() {
   const [bucket, setBucket] = useState<Bucket>("week");
   const [profile, setProfile] = useState<LearningProfile | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const modelRef = useRef<string>(DEFAULT_MODEL);
+
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
 
   const refreshConversations = useCallback(async () => {
     if (!currentUserId) return;
@@ -83,7 +103,7 @@ export function useChat() {
       .then((d) => {
         if (d.models && d.models.length) {
           setModels(d.models);
-          if (!d.models.includes(model)) setModel(d.models[0]);
+          if (!d.models.includes(modelRef.current)) setModel(d.models[0]);
         }
       })
       .catch(() => {});
@@ -114,6 +134,29 @@ export function useChat() {
       cancelled = true;
     };
   }, []);
+
+  // Carga las preferencias persistidas del usuario (modelo, modo, layout).
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getSettings(currentUserId);
+        if (cancelled) return;
+        const s = res.settings ?? {};
+        if (typeof s.model === "string" && s.model) setModel(s.model);
+        if (typeof s.mode === "string" && (TUTOR_MODES as string[]).includes(s.mode)) {
+          setMode(s.mode as TutorMode);
+        }
+        if (typeof s.layout === "string") setLayoutState(parseLayout(s.layout));
+      } catch {
+        /* sin preferencias guardadas todavía */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -202,9 +245,54 @@ export function useChat() {
     [currentUserId, refreshConversations],
   );
 
+  const persistSettings = useCallback(
+    (patch: Record<string, string>) => {
+      if (!currentUserId) return;
+      void saveSettings(currentUserId, patch).catch(() => {});
+    },
+    [currentUserId],
+  );
+
   const selectUser = useCallback((userId: string) => {
     setCurrentUserId(userId);
   }, []);
+
+  const selectModel = useCallback(
+    (next: string) => {
+      setModel(next);
+      persistSettings({ model: next });
+    },
+    [persistSettings],
+  );
+
+  const selectMode = useCallback(
+    (next: TutorMode) => {
+      setMode(next);
+      persistSettings({ mode: next });
+    },
+    [persistSettings],
+  );
+
+  const setLayout = useCallback(
+    (next: LayoutState) => {
+      setLayoutState(next);
+      persistSettings({ layout: serializeLayout(next) });
+    },
+    [persistSettings],
+  );
+
+  const editUser = useCallback(
+    async (id: string, patch: UserPatch): Promise<User | null> => {
+      try {
+        const updated = await updateUserApi(id, patch);
+        setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+        return updated;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
 
   const addUser = useCallback(
     async (name: string) => {
@@ -335,9 +423,13 @@ export function useChat() {
     loading,
     model,
     setModel,
+    selectModel,
     models,
     mode,
     setMode,
+    selectMode,
+    layout,
+    setLayout,
     conversations,
     conversationId,
     users,
@@ -350,6 +442,7 @@ export function useChat() {
     removeConversation,
     selectUser,
     addUser,
+    editUser,
     history,
     events,
     bucket,

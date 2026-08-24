@@ -7,8 +7,19 @@ DEFAULT_MODEL = "qwen3.5:9b"
 
 VERSION = "1.1.1"
 
-# Orígenes permitidos para CORS (solo el frontend de desarrollo local).
+# Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+# Regex adicional para permitir el acceso desde cualquier equipo de la red local
+# (IPs privadas IPv4, por el puerto que sea) sin abrir CORS a dominios arbitrarios.
+# La app es 100% local y se sirve en la LAN, así que aceptamos localhost + IPs.
+ALLOWED_ORIGIN_REGEX = (
+    r"^https?://(localhost|127\.0\.0\.1|"
+    r"(10\.\d{1,3}\.\d{1,3}\.\d{1,3})|"
+    r"(192\.168\.\d{1,3}\.\d{1,3})|"
+    r"(172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})"
+    r")(:\d+)?$"
+)
 
 # Límites de payload para evitar abusos de RAM/CPU/contexto.
 MAX_CHAT_MESSAGES = 100
