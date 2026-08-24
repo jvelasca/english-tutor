@@ -116,6 +116,16 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS learning_profile (
+                user_id TEXT PRIMARY KEY,
+                cefr_level TEXT NOT NULL DEFAULT 'A1',
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
 
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}

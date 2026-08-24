@@ -14,6 +14,7 @@ from routers.grammar import router as grammar_router
 from routers.health import router as health_router
 from routers.learning import router as learning_router
 from routers.models import router as models_router
+from routers.profile import router as profile_router
 from routers.progress import router as progress_router
 from routers.pronunciation import router as pronunciation_router
 from routers.users import router as users_router
@@ -43,6 +44,7 @@ app.include_router(grammar_router)
 app.include_router(health_router)
 app.include_router(learning_router)
 app.include_router(models_router)
+app.include_router(profile_router)
 app.include_router(voz_router)
 app.include_router(pronunciation_router)
 app.include_router(progress_router)
