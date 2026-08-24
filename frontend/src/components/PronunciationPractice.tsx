@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { checkPronunciation } from "../api/pronunciation";
 import type { PronunciationResponse } from "../types/api";
+import { fluencyLevelLabel, wpmLabel } from "../utils/fluency";
 import { feedbackHints, wordsCorrectLabel } from "../utils/pronunciationFeedback";
 
 const SAMPLES = [
@@ -122,6 +123,11 @@ export function PronunciationPractice({
             <div>
               <span className="label">Similitud fonética:</span>{" "}
               {result.phonetic_score}%
+            </div>
+            <div>
+              <span className="label">Fluidez:</span>{" "}
+              {fluencyLevelLabel(result.fluency.level)} ·{" "}
+              {wpmLabel(result.fluency.wpm)}
             </div>
           </div>
           <p className="pronunciation-words-label">

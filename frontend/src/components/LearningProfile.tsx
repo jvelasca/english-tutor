@@ -1,4 +1,4 @@
-import { cefrLabel, cefrTone } from "../utils/cefr";
+import { bandLabel, cefrLabel, cefrTone } from "../utils/cefr";
 import { formatAverage } from "../utils/progress";
 import type { LearningProfile as ProfileData } from "../types/api";
 
@@ -28,6 +28,26 @@ export function LearningProfile({ profile }: LearningProfileProps) {
           {profile.cefr_level} · {cefrLabel(profile.cefr_level)}
         </span>
       </header>
+
+      {profile.cefr_descriptor && (
+        <p className="cefr-descriptor">{profile.cefr_descriptor}</p>
+      )}
+
+      <div className="cefr-bands">
+        {(["vocabulary", "grammar", "fluency", "pronunciation"] as const).map(
+          (skill) => (
+            <span
+              key={skill}
+              className={`cefr-band ${cefrTone(profile.cefr_bands[skill])}`}
+            >
+              <span className="cefr-band-label">{bandLabel(skill)}</span>
+              <span className="cefr-band-value">
+                {profile.cefr_bands[skill]}
+              </span>
+            </span>
+          ),
+        )}
+      </div>
 
       <div className="learning-grid">
         <div className="learning-block">

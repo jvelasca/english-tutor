@@ -24,3 +24,18 @@ export function cefrLabel(level: string): string {
       return level;
   }
 }
+
+export function bandLabel(skill: string): string {
+  switch (skill) {
+    case "vocabulary":
+      return "Vocabulario";
+    case "grammar":
+      return "Gramática";
+    case "fluency":
+      return "Fluidez";
+    case "pronunciation":
+      return "Pronunciación";
+    default:
+      return skill;
+  }
+}

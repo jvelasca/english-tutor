@@ -51,6 +51,13 @@ export interface PronunciationBreakdown {
   total: number;
 }
 
+export interface FluencyStats {
+  word_count: number;
+  duration_seconds: number | null;
+  wpm: number | null;
+  level: string;
+}
+
 export interface PronunciationResponse {
   expected: string;
   heard: string;
@@ -60,6 +67,7 @@ export interface PronunciationResponse {
   word_accuracy: number;
   phonetic_score: number;
   breakdown: PronunciationBreakdown;
+  fluency: FluencyStats;
 }
 
 export interface PronunciationStats {
@@ -81,6 +89,13 @@ export interface ProgressSummary {
 
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
+export interface CefrBands {
+  vocabulary: string;
+  grammar: string;
+  fluency: string;
+  pronunciation: string;
+}
+
 export interface GrammarRecurringError {
   rule: string;
   message: string;
@@ -92,6 +107,8 @@ export interface GrammarRecurringError {
 export interface LearningProfile {
   user_id: string;
   cefr_level: CefrLevel;
+  cefr_bands: CefrBands;
+  cefr_descriptor: string;
   vocabulary_size: number;
   top_words: string[];
   recurring_errors: GrammarRecurringError[];
@@ -148,4 +165,25 @@ export interface ProgressHistory {
   streak: Streak;
   mastery: ErrorMastery;
   milestones: Milestone[];
+}
+
+export interface ListeningQuestion {
+  id: string;
+  level: string;
+  script: string;
+  question: string;
+  options: string[];
+}
+
+export interface ListeningAnswerResponse {
+  question_id: string;
+  correct: boolean;
+  correct_index: number;
+  level: string;
+}
+
+export interface ListeningStats {
+  attempts: number;
+  correct: number;
+  accuracy: number | null;
 }

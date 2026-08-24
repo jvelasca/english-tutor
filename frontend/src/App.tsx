@@ -6,6 +6,7 @@ import { ChatMessage } from "./components/ChatMessage";
 import { Composer } from "./components/Composer";
 import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { LearningProfile } from "./components/LearningProfile";
+import { ListeningPractice } from "./components/ListeningPractice";
 import { ModeSelect } from "./components/ModeSelect";
 import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
@@ -165,6 +166,14 @@ export default function App() {
         />
 
         <LearningProfile profile={profile} />
+
+        <ListeningPractice
+          userId={currentUserId}
+          onAttempt={() => {
+            refreshHistory();
+            refreshEvents();
+          }}
+        />
 
         <main className="chat">
           {mode === "pronunciation" && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cefrLabel, cefrTone } from "./cefr";
+import { bandLabel, cefrLabel, cefrTone } from "./cefr";
 
 describe("cefrTone", () => {
   it("maps A1/A2 to basic", () => {
@@ -34,5 +34,18 @@ describe("cefrLabel", () => {
 
   it("returns the raw value for unknown levels", () => {
     expect(cefrLabel("Z9")).toBe("Z9");
+  });
+});
+
+describe("bandLabel", () => {
+  it("mapea cada destreza a su etiqueta", () => {
+    expect(bandLabel("vocabulary")).toBe("Vocabulario");
+    expect(bandLabel("grammar")).toBe("Gramática");
+    expect(bandLabel("fluency")).toBe("Fluidez");
+    expect(bandLabel("pronunciation")).toBe("Pronunciación");
+  });
+
+  it("devuelve el valor crudo para destrezas desconocidas", () => {
+    expect(bandLabel("writing")).toBe("writing");
   });
 });
