@@ -9,3 +9,4 @@ __pycache__/
 backend/models/
 backend/data/
 launcher/logs/
+launcher/state.json

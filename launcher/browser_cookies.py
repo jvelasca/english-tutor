@@ -7,13 +7,17 @@ SQLite en modo solo lectura.
 
 Nota: Chrome/Edge cifran el valor de las cookies (``encrypted_value``), así que
 aquí se muestra su tamaño en bytes y no el valor en claro; Firefox las guarda
-en claro y sí se puede leer el valor. Esto se degrada con elegancia: si un
-navegador no existe o su base de datos está bloqueada, simplemente no aparece.
+en claro y sí se puede leer el valor. Como los navegadores mantienen sus bases
+de cookies bloqueadas mientras están abiertos, se copian a un temporal antes de
+leerlas. Esto se degrada con elegancia: si un navegador no existe o su base no
+se puede leer, simplemente no aparece.
 """
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -203,19 +207,33 @@ def _read_firefox(conn: sqlite3.Connection, store: dict) -> list[dict]:
 
 
 def read_store(store: dict) -> list[dict]:
-    """Lee las cookies de la app desde una base de datos de navegador."""
+    """Lee las cookies de la app desde una base de datos de navegador.
+
+    Los navegadores bloquean sus bases de cookies mientras están abiertos, así
+    que primero se copia el archivo (y sus ``-wal``/``-shm`` en Firefox) a un
+    directorio temporal y se lee la copia. Si el archivo no existe o no se puede
+    leer, devuelve una lista vacía (se degrada con elegancia).
+    """
+    src = Path(store["db"])
+    if not src.is_file():
+        return []
     try:
-        conn = _connect_ro(store["db"])
+        with tempfile.TemporaryDirectory() as tmp:
+            dst = Path(tmp) / src.name
+            shutil.copy2(src, dst)
+            for suffix in ("-wal", "-shm"):
+                side = Path(str(src) + suffix)
+                if side.is_file():
+                    shutil.copy2(side, Path(str(dst) + suffix))
+            conn = _connect_ro(str(dst))
+            try:
+                if store["kind"] == "firefox":
+                    return _read_firefox(conn, store)
+                return _read_chromium(conn, store)
+            finally:
+                conn.close()
     except (sqlite3.Error, OSError):
         return []
-    try:
-        if store["kind"] == "firefox":
-            return _read_firefox(conn, store)
-        return _read_chromium(conn, store)
-    except sqlite3.Error:
-        return []
-    finally:
-        conn.close()
 
 
 # --- Agregación ---

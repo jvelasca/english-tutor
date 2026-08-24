@@ -35,6 +35,7 @@ from core import (
     user_overview,
 )
 from process_manager import ProcessManager
+from state_store import load_state, save_state
 from status import (
     fetch_frontend,
     fetch_health,
@@ -56,9 +57,8 @@ REFRESH_MS = 2000
 POLL_MS = 100
 BROWSER_DELAY_S = 2.0
 
-# Tamaño fijo y estable de la ventana y de las columnas de secciones. El ancho
-# no sigue al contenido (evita el "vaivén" al refrescar datos); si algo se sale,
-# aparecen las barras de desplazamiento horizontal/vertical.
+# Tamaño por defecto de la ventana y posición inicial del divisor entre columnas.
+# Ambos se redimensionan y se persisten al cerrar (ver state_store.py).
 WINDOW_W = 1160
 WINDOW_H = 800
 COLUMN_W = 540
@@ -102,6 +102,10 @@ class Collapsible(ttk.Frame):
             self._expanded.set(True)
         self._btn.configure(text=self._label())
 
+    def is_expanded(self) -> bool:
+        """True si el panel está expandido (para persistir el estado)."""
+        return self._expanded.get()
+
 
 class LauncherApp:
     def __init__(self, root: tk.Tk) -> None:
@@ -110,14 +114,17 @@ class LauncherApp:
         self._busy = False
         self._queue: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
+        self._state = load_state()
+        self._sections_map: dict[str, Collapsible] = {}
         root.title("English Tutor — Launcher")
-        root.geometry(f"{WINDOW_W}x{WINDOW_H}")
-        # Tamaño totalmente fijo: los desbordes se resuelven con scrollbars,
-        # nunca estirando la ventana.
-        root.resizable(False, False)
+        # La ventana es redimensionable; el tamaño y la posición del divisor se
+        # restauran del estado persistido (state.json) y se guardan al cerrar.
+        root.resizable(True, True)
         self._apply_window_icon()
         self._build_style()
         self._build_ui()
+        self._restore_window()
+        root.protocol("WM_DELETE_WINDOW", self._on_close)
         # Programar desde el hilo principal (antes de mainloop es seguro).
         root.after(0, self.refresh)
         root.after(POLL_MS, self._poll_queue)
@@ -268,7 +275,6 @@ class LauncherApp:
     # --- UI ---
     def _build_ui(self) -> None:
         root = self.root
-        c = COLORS
 
         # Cabecera (banner).
         header = ttk.Frame(root, style="Card.TFrame")
@@ -329,7 +335,7 @@ class LauncherApp:
         ).pack(side="left", padx=(8, 0))
 
         # Panel de estado final (footer): se empaqueta primero para que quede
-        # anclado abajo, debajo de la barra horizontal.
+        # anclado abajo.
         self._msg = tk.StringVar(value="")
         footer = ttk.Frame(root, style="Card.TFrame")
         footer.pack(fill="x", side="bottom")
@@ -338,31 +344,18 @@ class LauncherApp:
             footer, textvariable=self._msg, style="DimCard.TLabel"
         ).pack(anchor="w", padx=16, pady=6)
 
-        # Contenedor desplazable de secciones (scroll horizontal y vertical).
-        canvas = tk.Canvas(root, bg=c["bg"], highlightthickness=0)
-        vbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
-        hbar = ttk.Scrollbar(root, orient="horizontal", command=canvas.xview)
-        self._sections = ttk.Frame(canvas, style="TFrame")
-        self._sections.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-        )
-        win = canvas.create_window((0, 0), window=self._sections, anchor="nw")
-        # Ancho del contenido fijado al del viewport: las columnas no "respiran"
-        # al refrescar datos; si algo se sale, actúa la barra horizontal.
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
-        hbar.pack(side="bottom", fill="x")
-        vbar.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
+        # PanedWindow horizontal: dos columnas redimensionables arrastrando el
+        # divisor central. Cada columna tiene su propio scroll vertical.
+        paned = ttk.PanedWindow(root, orient="horizontal")
+        paned.pack(fill="both", expand=True, padx=16, pady=(0, 10))
+        left_outer, self._col_left = self._make_scrollable_column(paned)
+        right_outer, self._col_right = self._make_scrollable_column(paned)
+        paned.add(left_outer, weight=1)
+        paned.add(right_outer, weight=1)
+        self._paned = paned
 
-        # Dos columnas de ancho fijo y estable (mínimo garantizado por columna).
-        self._sections.columnconfigure(0, weight=1, uniform="cols", minsize=COLUMN_W)
-        self._sections.columnconfigure(1, weight=1, uniform="cols", minsize=COLUMN_W)
-        self._col_left = ttk.Frame(self._sections, style="TFrame")
-        self._col_left.grid(row=0, column=0, sticky="nsew")
-        self._col_right = ttk.Frame(self._sections, style="TFrame")
-        self._col_right.grid(row=0, column=1, sticky="nsew")
+        # El wraplength del detalle de la BD sigue al ancho real de la columna.
+        self._col_left.bind("<Configure>", lambda e: self._update_detail_wrap())
 
         self._build_services(self._col_left)
         self._build_access(self._col_left)
@@ -371,11 +364,32 @@ class LauncherApp:
         self._build_cookies(self._col_right)
         self._build_logs(self._col_right)
 
+    def _make_scrollable_column(self, parent: tk.Misc) -> tuple[ttk.Frame, ttk.Frame]:
+        """Columna con scroll vertical: devuelve (contenedor, frame interior)."""
+        outer = ttk.Frame(parent, style="TFrame")
+        canvas = tk.Canvas(outer, bg=COLORS["bg"], highlightthickness=0)
+        vbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas, style="TFrame")
+        inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        canvas.configure(yscrollcommand=vbar.set)
+        vbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        return outer, inner
+
     def _section(
         self, parent: tk.Misc, title: str, expanded: bool = True
     ) -> Collapsible:
+        saved = self._state["sections"].get(title)
+        if saved is not None:
+            expanded = saved
         sec = Collapsible(parent, title, SECTION_ICONS.get(title, ""), expanded)
         sec.pack(fill="x", padx=16, pady=(10, 0))
+        self._sections_map[title] = sec
         return sec
 
     def _build_services(self, parent: tk.Misc) -> None:
@@ -432,12 +446,13 @@ class LauncherApp:
             anchor="w"
         )
         self._detail_var = tk.StringVar(value="")
-        ttk.Label(
+        self._db_detail_label = ttk.Label(
             body,
             textvariable=self._detail_var,
             style="DimCard.TLabel",
             wraplength=COLUMN_W - 30,
-        ).pack(anchor="w", fill="x", pady=(6, 0))
+        )
+        self._db_detail_label.pack(anchor="w", fill="x", pady=(6, 0))
 
     def _build_users(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Usuarios")
@@ -677,6 +692,41 @@ class LauncherApp:
             widget.insert("1.0", f"(sin registro todavía para {name}.log)")
         widget.configure(state="disabled")
         widget.see("end")
+
+    def _update_detail_wrap(self) -> None:
+        """Ajusta el wraplength del detalle de la BD al ancho real de su columna."""
+        width = self._col_left.winfo_width()
+        if width > 60:
+            self._db_detail_label.configure(wraplength=width - 30)
+
+    def _restore_window(self) -> None:
+        """Restaura tamaño/posición de la ventana y el divisor desde el estado."""
+        win = self._state["window"]
+        x, y = win["x"], win["y"]
+        if x is not None and y is not None:
+            self.root.geometry(f"{win['width']}x{win['height']}+{x}+{y}")
+        else:
+            self.root.geometry(f"{win['width']}x{win['height']}")
+        # Fijar el divisor una vez la ventana esté mapeada.
+        self.root.after(50, lambda: self._paned.sashpos(0, self._state["sash"]))
+
+    def _on_close(self) -> None:
+        """Guarda el estado visual y cierra la ventana."""
+        try:
+            self._state["window"] = {
+                "width": self.root.winfo_width(),
+                "height": self.root.winfo_height(),
+                "x": self.root.winfo_x(),
+                "y": self.root.winfo_y(),
+            }
+            self._state["sash"] = self._paned.sashpos(0)
+            self._state["sections"] = {
+                title: sec.is_expanded() for title, sec in self._sections_map.items()
+            }
+            save_state(self._state)
+        except (tk.TclError, ValueError):
+            pass
+        self.root.destroy()
 
     @staticmethod
     def _label(value: str) -> str:
