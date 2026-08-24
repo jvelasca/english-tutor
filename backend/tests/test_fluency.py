@@ -52,7 +52,8 @@ def test_pronunciation_endpoint_returns_fluency(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/pronunciation",
-            data={"expected": "Hello world", "user_id": uid},
+            params={"user_id": uid},
+            data={"expected": "Hello world"},
             files={"file": ("a.webm", b"fake", "audio/webm")},
         )
     assert r.status_code == 200

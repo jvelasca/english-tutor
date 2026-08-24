@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from schemas.grammar import GrammarRecurringError
 
 
-class CefrBands(BaseModel):
+class EstimatedBands(BaseModel):
     vocabulary: str
     grammar: str
     fluency: str
@@ -15,9 +15,9 @@ class CefrBands(BaseModel):
 
 class LearningProfile(BaseModel):
     user_id: str
-    cefr_level: str
-    cefr_bands: CefrBands
-    cefr_descriptor: str
+    estimated_level: str
+    estimated_bands: EstimatedBands
+    estimated_descriptor: str
     vocabulary_size: int
     top_words: list[str]
     recurring_errors: list[GrammarRecurringError]

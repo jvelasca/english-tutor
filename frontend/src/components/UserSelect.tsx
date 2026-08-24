@@ -39,6 +39,11 @@ export function UserSelect({
         title="Perfil de usuario"
         aria-label="Perfil de usuario"
       >
+        {currentUserId === null && (
+          <option value="" disabled>
+            Selecciona perfil
+          </option>
+        )}
         {users.map((u) => (
           <option key={u.id} value={u.id}>
             {u.name}

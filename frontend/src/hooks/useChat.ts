@@ -11,7 +11,7 @@ import { createUser, listUsers } from "../api/users";
 import { getProgressHistory } from "../api/progress";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
-import { nextDefaultUserName } from "../utils/users";
+import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";
 import type {
   Bucket,
   ConversationMeta,
@@ -96,14 +96,15 @@ export function useChat() {
       try {
         const existing = await listUsers();
         if (cancelled) return;
-        if (existing.length > 0) {
-          setUsers(existing);
-          setCurrentUserId(existing[0].id);
-        } else {
+        if (existing.length === 0) {
           const created = await createUser(nextDefaultUserName([]));
           if (cancelled) return;
           setUsers([created]);
           setCurrentUserId(created.id);
+        } else {
+          setUsers(existing);
+          // Con varios perfiles no se auto-selecciona: el usuario elige.
+          setCurrentUserId(resolveInitialUserId(existing));
         }
       } catch {
         /* backend no disponible */

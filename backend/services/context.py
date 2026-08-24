@@ -17,11 +17,13 @@ def build_system_prompt(mode: str, profile: dict | None = None) -> str:
 
     parts = [base]
 
-    level = profile.get("cefr_level")
+    level = profile.get("estimated_level")
     if level:
         parts.append(correctness_guidance(level))
 
-    errors = profile.get("recurring_errors") or []
+    errors = [
+        e for e in (profile.get("recurring_errors") or []) if e.get("confirmed", True)
+    ]
     if errors:
         top = "; ".join(e["message"] for e in errors[:MAX_ERRORS_IN_PROMPT])
         parts.append(

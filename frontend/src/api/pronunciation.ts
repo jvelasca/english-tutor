@@ -9,9 +9,12 @@ export async function checkPronunciation(
   form.append("file", blob, "audio.webm");
   form.append("expected", expected);
   form.append("language", "en");
-  form.append("user_id", userId);
 
-  const res = await fetch("/api/pronunciation", { method: "POST", body: form });
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  const res = await fetch(`/api/pronunciation?${query}`, {
+    method: "POST",
+    body: form,
+  });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(err.detail ?? `HTTP ${res.status}`);

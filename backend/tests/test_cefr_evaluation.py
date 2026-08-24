@@ -94,7 +94,7 @@ def test_estimate_cefr_delegates():
     assert estimate_cefr(signals) == evaluate_cefr(signals)["level"]
 
 
-def test_profile_endpoint_has_cefr_bands_and_descriptor(monkeypatch, tmp_path):
+def test_profile_endpoint_has_estimated_bands_and_descriptor(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     vocabulary_repo.record_words(a, ["cat", "dog"])
     grammar_repo.record_errors(a, find_errors("He go to school"))
@@ -103,5 +103,5 @@ def test_profile_endpoint_has_cefr_bands_and_descriptor(monkeypatch, tmp_path):
         r = client.get("/api/profile", params={"user_id": a})
         assert r.status_code == 200
         body = r.json()
-        assert body["cefr_bands"]["vocabulary"]
-        assert body["cefr_descriptor"]
+        assert body["estimated_bands"]["vocabulary"]
+        assert body["estimated_descriptor"]

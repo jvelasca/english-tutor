@@ -48,11 +48,11 @@ def test_extract_words_removes_short_tokens(monkeypatch, tmp_path):
     assert extract_words("I am a cat") == ["cat"]
 
 
-def test_record_words_increments_occurrences(monkeypatch, tmp_path):
+def test_record_words_increments_appearances(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     assert vocabulary_repo.record_words(a, ["cat", "dog"]) is True
     assert vocabulary_repo.record_words(a, ["cat"]) is True
-    vocab = {v["word"]: v["occurrences"] for v in vocabulary_repo.get_vocabulary(a)}
+    vocab = {v["word"]: v["appearances"] for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["cat"] == 2
     assert vocab["dog"] == 1
 
@@ -62,13 +62,34 @@ def test_record_words_unknown_user_false(monkeypatch, tmp_path):
     assert vocabulary_repo.record_words("no-existe", ["cat"]) is False
 
 
+def test_vocabulary_occurrences_migration(monkeypatch, tmp_path):
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    # Simula una BD legacy con la columna antigua `occurrences`.
+    conn = sqlite3.connect(db.DB_PATH)
+    conn.execute("ALTER TABLE vocabulary RENAME COLUMN appearances TO occurrences")
+    conn.commit()
+    conn.close()
+
+    # init_db debe volver a renombrar a `appearances` de forma idempotente.
+    db.init_db()
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
+    finally:
+        conn.close()
+    assert "appearances" in cols
+    assert "occurrences" not in cols
+
+
 def test_vocabulary_isolation(monkeypatch, tmp_path):
     a, b = _setup(monkeypatch, tmp_path)
     vocabulary_repo.record_words(a, ["cat"])
     assert vocabulary_repo.get_vocabulary(b) == []
 
 
-def test_get_vocabulary_ordered_by_occurrences(monkeypatch, tmp_path):
+def test_get_vocabulary_ordered_by_appearances(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     vocabulary_repo.record_words(a, ["zebra"])
     vocabulary_repo.record_words(a, ["apple", "apple"])

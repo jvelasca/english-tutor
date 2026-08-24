@@ -16,6 +16,6 @@ class VocabularyAnalyzeResponse(BaseModel):
 
 class VocabularyItem(BaseModel):
     word: str
-    occurrences: int
+    appearances: int
     first_seen: str
     last_seen: str

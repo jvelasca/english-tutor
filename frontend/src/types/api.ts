@@ -87,9 +87,9 @@ export interface ProgressSummary {
   pronunciation: PronunciationStats;
 }
 
-export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+export type EstimatedLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
-export interface CefrBands {
+export interface EstimatedBands {
   vocabulary: string;
   grammar: string;
   fluency: string;
@@ -106,9 +106,9 @@ export interface GrammarRecurringError {
 
 export interface LearningProfile {
   user_id: string;
-  cefr_level: CefrLevel;
-  cefr_bands: CefrBands;
-  cefr_descriptor: string;
+  estimated_level: EstimatedLevel;
+  estimated_bands: EstimatedBands;
+  estimated_descriptor: string;
   vocabulary_size: number;
   top_words: string[];
   recurring_errors: GrammarRecurringError[];

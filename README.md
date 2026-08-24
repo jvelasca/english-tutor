@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v1.1.0**.
+- Última versión estable: **v1.1.1**.
 
 ## Estructura
 
@@ -38,7 +38,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   (VAD por silencio vía Web Audio API, transcripción y respuesta hablada automáticas).
 - **Progreso pedagógico real (F6)**: dashboard con tendencias, racha, dominio de errores e hitos.
 - **Pronunciación fonética (F7)**: evaluador compuesto (palabras + Soundex + caracteres) con fluidez (WPM).
-- **Listening / CEFR (F8)**: ejercicios de comprensión auditiva y evaluación CEFR multi-señal.
+- **Listening / nivel estimado (F8)**: ejercicios de comprensión auditiva y **nivel estimado** multi-señal (heurístico, no certificación CEFR).
 - **Evaluación objetiva del tutor (F9)**: métricas deterministas del tutor (backend + panel).
 - **Lanzador de escritorio**: GUI que arranca/detiene la app y muestra estado, BD y usuarios.
 
@@ -148,7 +148,7 @@ Abre **http://localhost:5173** y empieza a conversar.
 | `POST/GET` | `/api/learning/events` | Registrar / listar eventos de aprendizaje |
 | `POST` | `/api/vocabulary/analyze` · `GET /api/vocabulary` | Extraer / listar vocabulario |
 | `POST` | `/api/grammar/analyze` · `GET /api/grammar/errors` | Detectar / listar errores recurrentes |
-| `GET` | `/api/profile?user_id=<id>` | Perfil de aprendizaje (CEFR + bandas + recomendaciones) |
+| `GET` | `/api/profile?user_id=<id>` | Perfil de aprendizaje (nivel estimado + bandas + recomendaciones) |
 | `GET` | `/api/progress?user_id=<id>` | Resumen de progreso del alumno |
 | `GET` | `/api/progress/history?user_id=<id>` | Historial: tendencias, racha, dominio, hitos |
 | `GET` | `/api/listening/question` · `POST /api/listening/answer` · `GET /api/listening/stats` | Ejercicios de listening |

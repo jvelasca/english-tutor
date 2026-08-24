@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from dependencies import read_audio_limited
+from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import pronunciation as pronunciation_service
-from domain import users as user_service
 from schemas.pronunciation import PronunciationResponse
 from services.fluency import compute_fluency
 from services.pronunciation import score_pronunciation
@@ -25,10 +24,9 @@ async def pronunciation(
     file: UploadFile = File(...),
     expected: str = Form(...),
     language: str = Form("en"),
-    user_id: str = Form(...),
+    user: dict = Depends(current_user),
 ) -> PronunciationResponse:
-    if await user_service.get_user(user_id) is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    user_id = user["id"]
     audio = await read_audio_limited(file)
     try:
         timed = await run_in_threadpool(transcribe_with_timing, audio, language)

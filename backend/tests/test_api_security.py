@@ -89,7 +89,8 @@ def test_pronunciation_unknown_user_404(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/pronunciation",
-            data={"expected": "Hello world", "user_id": "no-existe"},
+            params={"user_id": "no-existe"},
+            data={"expected": "Hello world"},
             files={"file": ("a.webm", b"fake", "audio/webm")},
         )
         assert r.status_code == 404
@@ -104,7 +105,8 @@ def test_pronunciation_records_only_for_declared_user(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/pronunciation",
-            data={"expected": "Hello world", "user_id": a},
+            params={"user_id": a},
+            data={"expected": "Hello world"},
             files={"file": ("a.webm", b"fake", "audio/webm")},
         )
         assert r.status_code == 200

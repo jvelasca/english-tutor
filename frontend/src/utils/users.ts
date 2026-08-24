@@ -1,3 +1,5 @@
+import type { User } from "../types/api";
+
 const DEFAULT_NAME = "Usuario";
 
 /**
@@ -9,4 +11,14 @@ export function nextDefaultUserName(existingNames: readonly string[]): string {
   let n = 2;
   while (existingNames.includes(`${DEFAULT_NAME} ${n}`)) n++;
   return `${DEFAULT_NAME} ${n}`;
+}
+
+/**
+ * Decide si auto-seleccionar un perfil al abrir la app:
+ * - con exactamente un usuario se selecciona ese;
+ * - con varios no se auto-selecciona ninguno (null), para que el usuario elija
+ *   y evitar entrar accidentalmente en el perfil equivocado.
+ */
+export function resolveInitialUserId(users: readonly User[]): string | null {
+  return users.length === 1 ? users[0].id : null;
 }

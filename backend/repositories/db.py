@@ -93,7 +93,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
                 word TEXT NOT NULL,
-                occurrences INTEGER NOT NULL DEFAULT 1,
+                appearances INTEGER NOT NULL DEFAULT 1,
                 first_seen TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 UNIQUE (user_id, word),
@@ -111,6 +111,9 @@ def init_db() -> None:
                 count INTEGER NOT NULL DEFAULT 1,
                 last_example TEXT NOT NULL DEFAULT '',
                 last_seen TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                source TEXT NOT NULL DEFAULT 'heuristic',
+                confirmed INTEGER NOT NULL DEFAULT 1,
                 UNIQUE (user_id, rule),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -151,6 +154,37 @@ def init_db() -> None:
 
         if "message_id" not in msg_columns:
             conn.execute("ALTER TABLE messages ADD COLUMN message_id TEXT")
+
+        # Migración idempotente: `occurrences` → `appearances` (nº de mensajes en
+        # los que apareció la palabra, no frecuencia real de uso).
+        vocab_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")
+        }
+        if "occurrences" in vocab_cols and "appearances" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary RENAME COLUMN occurrences TO appearances"
+            )
+
+        # Migración idempotente: confianza y estado de confirmación en errores
+        # gramaticales (candidato vs confirmado), para verificación futura por LLM.
+        grammar_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(grammar_errors)")
+        }
+        if "confidence" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN confidence REAL "
+                "NOT NULL DEFAULT 1.0"
+            )
+        if "source" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN source TEXT "
+                "NOT NULL DEFAULT 'heuristic'"
+            )
+        if "confirmed" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN confirmed INTEGER "
+                "NOT NULL DEFAULT 1"
+            )
 
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "

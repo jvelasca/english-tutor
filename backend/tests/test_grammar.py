@@ -68,6 +68,26 @@ def test_find_errors_capitalization_i(monkeypatch, tmp_path):
     assert "capitalization_i" not in _rules(find_errors("I like it"))
 
 
+def test_find_errors_confidence_and_confirmed(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    errors = {e["rule"]: e for e in find_errors("He go to school. I ate a apple.")}
+    assert errors["he_she_it_s"]["confirmed"] is True
+    assert errors["he_she_it_s"]["source"] == "heuristic"
+    assert errors["he_she_it_s"]["confidence"] >= 0.8
+    assert errors["a_an"]["confirmed"] is False
+    assert errors["a_an"]["confidence"] < 0.8
+
+
+def test_record_errors_persists_confidence_and_confirmed(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    grammar_repo.record_errors(a, find_errors("I ate a apple"))
+    recurring = grammar_repo.get_recurring_errors(a)
+    assert recurring[0]["rule"] == "a_an"
+    assert recurring[0]["confirmed"] is False
+    assert recurring[0]["confidence"] == 0.5
+    assert recurring[0]["source"] == "heuristic"
+
+
 def test_record_errors_increments_count(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     errors = find_errors("He go to school")

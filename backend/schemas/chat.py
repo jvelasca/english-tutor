@@ -26,7 +26,6 @@ class ChatRequest(BaseModel):
     model: str = Field(default=DEFAULT_MODEL, min_length=1)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     mode: str = Field(default=DEFAULT_MODE)
-    user_id: str | None = None
 
 
 class ChatResponse(BaseModel):

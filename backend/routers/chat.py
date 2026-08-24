@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from dependencies import current_user_optional
 from domain import learning as learning_service
 from domain import profile as profile_service
 from schemas.chat import ChatRequest, ChatResponse
@@ -18,27 +19,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _system_prompt(req: ChatRequest) -> str:
+async def _system_prompt(req: ChatRequest, user_id: str | None) -> str:
     """Construye el system prompt del tutor a partir del modo y, si hay un
-    user_id válido, del perfil del alumno."""
+    usuario activo, del perfil del alumno."""
     profile = None
-    if req.user_id:
-        profile = await profile_service.get_profile_context(req.user_id)
+    if user_id:
+        profile = await profile_service.get_profile_context(user_id)
     return build_system_prompt(req.mode, profile)
 
 
-async def _record_activity(req: ChatRequest) -> None:
-    """Registra la actividad del alumno si viene un user_id (opcional)."""
-    if not req.user_id:
+async def _record_activity(req: ChatRequest, user_id: str | None) -> None:
+    """Registra la actividad del alumno si hay un usuario activo (opcional)."""
+    if not user_id:
         return
     detail = req.messages[-1].content[:200] if req.messages else ""
-    await learning_service.record_chat_activity(req.user_id, req.mode, detail)
+    await learning_service.record_chat_activity(user_id, req.mode, detail)
 
 
 @router.post("/api/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest) -> ChatResponse:
-    system_prompt = await _system_prompt(req)
-    await _record_activity(req)
+async def chat(
+    req: ChatRequest, user: dict | None = Depends(current_user_optional)
+) -> ChatResponse:
+    user_id = user["id"] if user else None
+    system_prompt = await _system_prompt(req, user_id)
+    await _record_activity(req, user_id)
     try:
         return await chat_once(
             req.messages, req.model, req.temperature, req.mode, system_prompt
@@ -51,10 +55,13 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
 
 @router.post("/api/chat/stream")
-async def chat_stream_endpoint(req: ChatRequest) -> StreamingResponse:
+async def chat_stream_endpoint(
+    req: ChatRequest, user: dict | None = Depends(current_user_optional)
+) -> StreamingResponse:
     """Emite la respuesta como Server-Sent Events (texto incremental)."""
-    system_prompt = await _system_prompt(req)
-    await _record_activity(req)
+    user_id = user["id"] if user else None
+    system_prompt = await _system_prompt(req, user_id)
+    await _record_activity(req, user_id)
 
     async def generate():
         try:

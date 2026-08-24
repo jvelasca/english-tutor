@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.1.0` (fases 1–10 del plan de endurecimiento cerradas).
+- ✅ Versión estable `1.1.1` (Release Audit 1.1 + fases 1–10 del plan de endurecimiento cerradas).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -124,6 +124,19 @@
 - Subagentes (ejecutados por el gerente): `agentes/endurecimiento/a1-launcher-core.md`,
   `agentes/endurecimiento/a2-launcher-gui.md`.
 
+### M12 — Release Audit 1.1 + versión 1.1.1  [HECHO ✔]
+- Cierre de los 6 puntos señalados por la auditoría externa antes de congelar la arquitectura.
+  1. Unificar `current_user` en todos los endpoints sensibles.
+  2. Fluidez ya expuesta como `FluencyStats` en `PronunciationResponse` (verificado, sin cambios).
+  3. Renombrar "CEFR estimate" → `estimated_level/bands/descriptor`.
+  4. Corregir semántica de vocabulario: `occurrences` → `appearances` (+ migración idempotente).
+  5. Añadir `confidence`/`source`/`confirmed` a gramática y filtrar el prompt a errores confirmados.
+  6. Tests de aislamiento cross-user + tests del Learning Context/Prompt.
+- Selector de perfil: no auto-seleccionar el primer usuario si hay varios.
+- Versión unificada `1.1.1`.
+- Verificado: backend 231 tests, frontend 92 tests, launcher 22 tests, ruff limpio, build OK.
+- Subagentes (ejecutados por el gerente): `agentes/endurecimiento/ra-*.md` (RA1–RA7).
+
 ## Decisiones tomadas
 
 - Hitos M1 y M2 en paralelo (tras M0).
@@ -151,6 +164,7 @@
 | M10 Voz continua | `agentes/m10-voz-continua.md` | ✔ hecho |
 | A.1 Launcher núcleo puro | `agentes/endurecimiento/a1-launcher-core.md` | ✔ hecho |
 | A.2 Launcher GUI + procesos + atajo | `agentes/endurecimiento/a2-launcher-gui.md` | ✔ hecho |
+| RA1–RA7 Release Audit 1.1 | `agentes/endurecimiento/ra-*.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

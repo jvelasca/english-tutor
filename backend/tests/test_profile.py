@@ -124,7 +124,7 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         assert r.status_code == 200
         body = r.json()
         assert body["user_id"] == a
-        assert body["cefr_level"] in ("A1", "A2")
+        assert body["estimated_level"] in ("A1", "A2")
         assert body["vocabulary_size"] == 2
         assert set(body["top_words"]) == {"cat", "dog"}
         assert body["recurring_errors"][0]["rule"] == "he_she_it_s"
@@ -161,4 +161,4 @@ def test_profile_grammar_rate_uses_user_messages(monkeypatch, tmp_path):
         r = client.get("/api/profile", params={"user_id": a})
         assert r.status_code == 200
         # 2 mensajes de usuario y 1 error → ratio 0.5 → banda A1 (no A2).
-        assert r.json()["cefr_bands"]["grammar"] == "A1"
+        assert r.json()["estimated_bands"]["grammar"] == "A1"

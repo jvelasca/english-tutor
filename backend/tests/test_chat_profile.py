@@ -55,7 +55,8 @@ def test_chat_with_user_id_personalizes_prompt(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/chat",
-            json={"messages": [{"role": "user", "content": "Hello"}], "user_id": uid},
+            params={"user_id": uid},
+            json={"messages": [{"role": "user", "content": "Hello"}]},
         )
     assert r.status_code == 200
     sent = fake.calls[0]["messages"][0]["content"]
@@ -76,21 +77,17 @@ def test_chat_without_user_id_uses_base_prompt(monkeypatch, tmp_path):
     assert sent == MODE_PROMPTS["conversation"]
 
 
-def test_chat_unknown_user_id_uses_base_prompt(monkeypatch, tmp_path):
+def test_chat_unknown_user_id_404(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     fake = FakeOllamaClient()
     monkeypatch.setattr(llm, "get_client", lambda: fake)
     with TestClient(app) as client:
         r = client.post(
             "/api/chat",
-            json={
-                "messages": [{"role": "user", "content": "Hello"}],
-                "user_id": "no-existe",
-            },
+            params={"user_id": "no-existe"},
+            json={"messages": [{"role": "user", "content": "Hello"}]},
         )
-    assert r.status_code == 200
-    sent = fake.calls[0]["messages"][0]["content"]
-    assert sent == MODE_PROMPTS["conversation"]
+    assert r.status_code == 404
 
 
 def test_chat_stream_with_user_id_personalizes(monkeypatch, tmp_path):
@@ -101,7 +98,8 @@ def test_chat_stream_with_user_id_personalizes(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/chat/stream",
-            json={"messages": [{"role": "user", "content": "Hello"}], "user_id": uid},
+            params={"user_id": uid},
+            json={"messages": [{"role": "user", "content": "Hello"}]},
         )
     assert r.status_code == 200
     sent = fake.calls[0]["messages"][0]["content"]

@@ -47,9 +47,8 @@ def _setup(monkeypatch, tmp_path):
 
 def _post_chat(client, uid=None, mode="conversation"):
     body = {"messages": [{"role": "user", "content": "Hello"}], "mode": mode}
-    if uid is not None:
-        body["user_id"] = uid
-    return client.post("/api/chat", json=body)
+    params = {"user_id": uid} if uid is not None else {}
+    return client.post("/api/chat", params=params, json=body)
 
 
 def test_chat_conversation_mode_records_message_event(monkeypatch, tmp_path):
@@ -88,12 +87,12 @@ def test_chat_without_user_id_records_nothing(monkeypatch, tmp_path):
     assert learning_repo.list_events(uid) == []
 
 
-def test_chat_unknown_user_id_records_nothing(monkeypatch, tmp_path):
+def test_chat_unknown_user_id_404(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     monkeypatch.setattr(llm, "get_client", lambda: FakeOllamaClient())
     with TestClient(app) as client:
         r = _post_chat(client, uid="no-existe")
-    assert r.status_code == 200
+    assert r.status_code == 404
     assert learning_repo.list_events("no-existe") == []
 
 
@@ -106,7 +105,8 @@ def test_pronunciation_records_event(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/pronunciation",
-            data={"expected": "Hello world", "user_id": uid},
+            params={"user_id": uid},
+            data={"expected": "Hello world"},
             files={"file": ("a.webm", b"fake", "audio/webm")},
         )
     assert r.status_code == 200

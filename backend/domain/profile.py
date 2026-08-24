@@ -46,9 +46,9 @@ async def _compute_profile(user_id: str) -> dict | None:
     )
     return {
         "user_id": user_id,
-        "cefr_level": evaluation["level"],
-        "cefr_bands": evaluation["bands"],
-        "cefr_descriptor": evaluation["descriptor"],
+        "estimated_level": evaluation["level"],
+        "estimated_bands": evaluation["bands"],
+        "estimated_descriptor": evaluation["descriptor"],
         "vocabulary_size": len(vocab),
         "top_words": [v["word"] for v in vocab[:5]],
         "recurring_errors": errors,
@@ -58,12 +58,12 @@ async def _compute_profile(user_id: str) -> dict | None:
 
 
 async def get_profile_summary(user_id: str) -> dict | None:
-    """Compone el perfil del alumno y persiste el CEFR estimado como caché.
+    """Compone el perfil del alumno y persiste el nivel estimado como caché.
     Devuelve None si el usuario no existe."""
     profile = await _compute_profile(user_id)
     if profile is None:
         return None
-    await run_in_threadpool(profile_repo.set_cefr, user_id, profile["cefr_level"])
+    await run_in_threadpool(profile_repo.set_cefr, user_id, profile["estimated_level"])
     return profile
 
 

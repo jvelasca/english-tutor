@@ -33,21 +33,25 @@ function mockStreamFetch() {
 describe("chat api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("sendChat incluye user_id en el body", async () => {
+  it("sendChat incluye user_id en la query", async () => {
     const fn = mockJsonFetch({ model: "m", content: "x" });
     await sendChat([MSG], "m", "conversation", "u1");
+    const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(body.user_id).toBe("u1");
+    expect(url).toBe("/api/chat?user_id=u1");
+    expect(body.user_id).toBeUndefined();
   });
 
-  it("sendChat manda user_id null cuando no hay usuario", async () => {
+  it("sendChat no incluye user_id cuando no hay usuario", async () => {
     const fn = mockJsonFetch({ model: "m", content: "x" });
     await sendChat([MSG], "m", "conversation");
+    const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(body.user_id).toBeNull();
+    expect(url).toBe("/api/chat");
+    expect(body.user_id).toBeUndefined();
   });
 
-  it("streamChat incluye user_id en el body", async () => {
+  it("streamChat incluye user_id en la query", async () => {
     const fn = mockStreamFetch();
     const onDelta = vi.fn();
     const onDone = vi.fn();
@@ -59,8 +63,8 @@ describe("chat api", () => {
       { onDelta, onDone, onError },
       "u1",
     );
-    const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(body.user_id).toBe("u1");
+    const url = fn.mock.calls[0][0] as string;
+    expect(url).toBe("/api/chat/stream?user_id=u1");
     expect(onDelta).toHaveBeenCalledWith("Hi");
     expect(onDone).toHaveBeenCalled();
   });

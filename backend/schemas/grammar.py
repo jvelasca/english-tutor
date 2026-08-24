@@ -14,6 +14,9 @@ class GrammarFinding(BaseModel):
     rule: str
     message: str
     example: str
+    confidence: float
+    source: str
+    confirmed: bool
 
 
 class GrammarAnalyzeResponse(BaseModel):
@@ -26,3 +29,6 @@ class GrammarRecurringError(BaseModel):
     count: int
     last_example: str
     last_seen: str
+    confidence: float
+    source: str
+    confirmed: bool

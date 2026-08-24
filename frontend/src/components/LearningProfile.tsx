@@ -1,4 +1,4 @@
-import { bandLabel, cefrLabel, cefrTone } from "../utils/cefr";
+import { bandLabel, cefrTone } from "../utils/cefr";
 import { formatAverage } from "../utils/progress";
 import type { LearningProfile as ProfileData } from "../types/api";
 
@@ -18,19 +18,19 @@ export function LearningProfile({ profile }: LearningProfileProps) {
     );
   }
 
-  const tone = cefrTone(profile.cefr_level);
+  const tone = cefrTone(profile.estimated_level);
 
   return (
     <section className="learning-profile">
       <header className="learning-header">
         <span className="learning-title">Tu perfil</span>
-        <span className={`cefr-badge ${tone}`}>
-          {profile.cefr_level} · {cefrLabel(profile.cefr_level)}
+        <span className={`cefr-badge ${tone}`} title="Nivel estimado a partir de tu actividad">
+          Nivel estimado · {profile.estimated_level}
         </span>
       </header>
 
-      {profile.cefr_descriptor && (
-        <p className="cefr-descriptor">{profile.cefr_descriptor}</p>
+      {profile.estimated_descriptor && (
+        <p className="cefr-descriptor">{profile.estimated_descriptor}</p>
       )}
 
       <div className="cefr-bands">
@@ -38,11 +38,11 @@ export function LearningProfile({ profile }: LearningProfileProps) {
           (skill) => (
             <span
               key={skill}
-              className={`cefr-band ${cefrTone(profile.cefr_bands[skill])}`}
+              className={`cefr-band ${cefrTone(profile.estimated_bands[skill])}`}
             >
               <span className="cefr-band-label">{bandLabel(skill)}</span>
               <span className="cefr-band-value">
-                {profile.cefr_bands[skill]}
+                {profile.estimated_bands[skill]}
               </span>
             </span>
           ),

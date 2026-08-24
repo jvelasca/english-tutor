@@ -15,6 +15,14 @@ async def current_user(user_id: str = Query(...)) -> dict:
     return user
 
 
+async def current_user_optional(user_id: str | None = Query(None)) -> dict | None:
+    """Resuelve el perfil activo si se pasa `user_id`; None si no viene (el endpoint
+    queda en modo sin perfil). 404 si el usuario no existe."""
+    if user_id is None:
+        return None
+    return await current_user(user_id)
+
+
 _ALLOWED_AUDIO_TYPES = {
     "application/octet-stream",
     "audio/mpeg",

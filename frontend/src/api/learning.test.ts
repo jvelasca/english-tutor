@@ -11,7 +11,7 @@ describe("learning api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("getProfile llama con user_id en la query", async () => {
-    const fn = mockFetch(true, { user_id: "u1", cefr_level: "A2" });
+    const fn = mockFetch(true, { user_id: "u1", estimated_level: "A2" });
     await getProfile("u1");
     const [url] = fn.mock.calls[0];
     expect(url).toBe("/api/profile?user_id=u1");

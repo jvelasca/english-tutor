@@ -37,7 +37,7 @@ backend/
 │   ├── grammar.py       # GrammarAnalyze*, GrammarFinding, GrammarRecurringError (F4)
 │   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
 │   ├── listening.py     # ListeningQuestion, ListeningAnswer*, ListeningStats (F8)
-│   ├── profile.py       # LearningProfile, CefrBands (F4/F8)
+│   ├── profile.py       # LearningProfile, EstimatedBands (F4/F8)
 │   ├── pronunciation.py # PronunciationResponse, FluencyStats, PronunciationBreakdown (F7/F8)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
 │   ├── users.py         # User, UserCreate
