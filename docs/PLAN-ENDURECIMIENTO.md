@@ -20,8 +20,8 @@
   CEFR, Context Builder (el perfil del alumno entra al system prompt) y propagación de `user_id`
   al chat en el frontend.
 - **Fase 6 (Progreso pedagógico real) EN CURSO** el 2026-08-24: F6.1 (registro automático de
-  eventos de aprendizaje) hecho; F6.2 (progreso histórico) y F6.3 (frontend) pendientes.
-- Backend `136 tests` verdes + `ruff` limpio, `import main` OK; frontend `51 tests` verdes,
+  eventos) y F6.2 (progreso histórico) hechos; F6.3 (frontend dashboard) pendiente.
+- Backend `151 tests` verdes + `ruff` limpio, `import main` OK; frontend `51 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.

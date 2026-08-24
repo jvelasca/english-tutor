@@ -3,22 +3,22 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 11:40 (UTC+2).
+> Actualizado por última vez: 2026-08-24 11:55 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
 **Posición actual (2026-08-24):** Fases 0–5 **completas, verificadas y commiteadas**. FASE 6
-(Progreso pedagógico real) **en curso**: F6.1 hecho y commiteado, F6.2 pendiente. Últimos commits:
+(Progreso pedagógico real) **en curso**: F6.1 y F6.2 hechos, F6.3 (frontend) pendiente. Últimos commits:
+- `feat: fase 6.2` — progreso histórico: tendencias, racha, dominio de errores e hitos.
 - `feat: fase 6.1` — registro automático de eventos de aprendizaje (`learning_events` activa).
 - `938c989` — Fase 5 frontend: `user_id` al chat (personaliza el tutor).
-- `c5e627b` — Fase 5: Context Builder (perfil del alumno al system prompt).
-- `022680e` — Fase 5: política de corrección (correctness policy) por CEFR.
 
-**Estado verde:** backend `136 tests` + `ruff` limpio + `import main` OK; frontend `51 tests`
+**Estado verde:** backend `151 tests` + `ruff` limpio + `import main` OK; frontend `51 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: F6.2 — Progreso histórico real** (tendencias, racha, dominio, hitos). Un único
-endpoint `GET /api/progress/history`. Ver `docs/PLAN-ENDURECIMIENTO.md`.
+**Siguiente paso: F6.3 — Frontend dashboard de progreso real** (reemplaza `ProgressSummary` por
+`ProgressDashboard`: series, racha, dominio, hitos, timeline; responsive móvil/tablet).
+Ver `docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
@@ -496,7 +496,7 @@ verificado en verde antes de commitear. Decisiones de diseño: un único endpoin
 | Subagente | Briefing | Estado |
 |---|---|---|
 | F6.1 Registro automático de eventos | `agentes/endurecimiento/f6-01-registro-eventos.md` | ✔ hecho |
-| F6.2 Progreso histórico (tendencias, racha, dominio, hitos) | `agentes/endurecimiento/f6-02-progreso-historico.md` | ⏳ pendiente |
+| F6.2 Progreso histórico (tendencias, racha, dominio, hitos) | `agentes/endurecimiento/f6-02-progreso-historico.md` | ✔ hecho |
 | F6.3 Frontend dashboard de progreso | `agentes/endurecimiento/f6-03-frontend-dashboard.md` | ⏳ pendiente |
 
 ### HECHO — F6.1: registro automático de eventos de aprendizaje
@@ -510,3 +510,18 @@ verificado en verde antes de commitear. Decisiones de diseño: un único endpoin
 - Tests: `tests/test_activity.py` (8 tests). Total backend **136 tests**.
 - La tabla `learning_events` deja de estar dormida: ahora la alimentan los endpoints reales.
   La consumirán F6.2 (backend) y F6.3 (UI).
+
+### HECHO — F6.2: progreso histórico real (tendencias, racha, dominio, hitos)
+- Nuevo endpoint `GET /api/progress/history?user_id=<id>&bucket=day|week|month` (default `week`)
+  con `ProgressHistory` = `series` + `streak` + `mastery` + `milestones`. Sin romper
+  `/api/progress` ni `/api/profile`.
+- `schemas/progress.py`: `Bucket`, `SeriesPoint`, `Streak`, `ErrorMastery`, `Milestone`,
+  `ProgressHistory`.
+- `services/trends.py` (puro): `daily_activity`, `active_days`, `aggregate_series` (day/week/
+  month), `compute_streak` (racha actual + mejor).
+- `services/mastery.py` (puro): `classify_errors` (activos vs resueltos por `last_seen`,
+  umbral 14 días) y `compute_milestones` (catálogo de 10 hitos).
+- `repositories/progress.py`: `activity_events` (mensajes con modo + pronunciaciones).
+- `domain/progress.py`: `get_progress_history` compone repo + servicios puros.
+- Tests: `test_trends.py` (7) + `test_mastery.py` (3) + `test_progress_history.py` (5).
+  Total backend **151 tests**.
