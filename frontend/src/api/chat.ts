@@ -21,8 +21,14 @@ export function sendChat(
   messages: Message[],
   model: string,
   mode: TutorMode,
+  userId?: string | null,
 ): Promise<ChatResponse> {
-  return postJson<ChatResponse>("/api/chat", { model, messages, mode });
+  return postJson<ChatResponse>("/api/chat", {
+    model,
+    messages,
+    mode,
+    user_id: userId ?? null,
+  });
 }
 
 export async function streamChat(
@@ -30,11 +36,12 @@ export async function streamChat(
   model: string,
   mode: TutorMode,
   callbacks: StreamCallbacks,
+  userId?: string | null,
 ): Promise<void> {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, mode }),
+    body: JSON.stringify({ model, messages, mode, user_id: userId ?? null }),
   });
 
   if (!res.ok || !res.body) {

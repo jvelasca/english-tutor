@@ -254,7 +254,7 @@ export function useChat() {
               { id: crypto.randomUUID(), role: "assistant", content: assistantReply, mode },
             ]);
           },
-        });
+        }, currentUserId);
       } catch (e) {
         errored = true;
         assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
