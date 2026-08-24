@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getModels, streamChat } from "../api/chat";
+import { recordAttempts } from "../api/academy";
+import { readUserIdCookie, writeUserIdCookie } from "../utils/cookie";
 import {
   createConversation,
   deleteConversation,
@@ -12,8 +14,7 @@ import { getProgressHistory } from "../api/progress";
 import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
-import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";
-import {
+import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";import {
   LAYOUT_DEFAULTS,
   parseLayout,
   serializeLayout,
@@ -55,6 +56,13 @@ export function useChat() {
   const [events, setEvents] = useState<LearningEvent[]>([]);
   const [bucket, setBucket] = useState<Bucket>("week");
   const [profile, setProfile] = useState<LearningProfile | null>(null);
+  const [favoriteModel, setFavoriteModel] = useState<string | null>(null);
+  const [activeObjective, setActiveObjective] = useState<{
+    id: string;
+    title: string;
+    levelId: string;
+    skills: string[];
+  } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<string>(DEFAULT_MODEL);
 
@@ -123,8 +131,9 @@ export function useChat() {
           setCurrentUserId(created.id);
         } else {
           setUsers(existing);
-          // Con varios perfiles no se auto-selecciona: el usuario elige.
-          setCurrentUserId(resolveInitialUserId(existing));
+          // Se recuerda el último perfil usado (cookie); si no existe, con un
+          // único usuario se auto-selecciona y si hay varios el usuario elige.
+          setCurrentUserId(resolveInitialUserId(existing, readUserIdCookie()));
         }
       } catch {
         /* backend no disponible */
@@ -144,7 +153,12 @@ export function useChat() {
         const res = await getSettings(currentUserId);
         if (cancelled) return;
         const s = res.settings ?? {};
-        if (typeof s.model === "string" && s.model) setModel(s.model);
+        if (typeof s.favorite_model === "string" && s.favorite_model) {
+          setFavoriteModel(s.favorite_model);
+          setModel(s.favorite_model);
+        } else if (typeof s.model === "string" && s.model) {
+          setModel(s.model);
+        }
         if (typeof s.mode === "string" && (TUTOR_MODES as string[]).includes(s.mode)) {
           setMode(s.mode as TutorMode);
         }
@@ -163,6 +177,7 @@ export function useChat() {
     setConversations([]);
     setConversationId(null);
     setMessages([]);
+    setActiveObjective(null);
     void refreshConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
@@ -195,6 +210,7 @@ export function useChat() {
       const conv = await createConversation(currentUserId);
       setConversationId(conv.id);
       setMessages([]);
+      setActiveObjective(null);
       await refreshConversations();
     } catch {
       /* backend no disponible */
@@ -214,6 +230,33 @@ export function useChat() {
     },
     [currentUserId],
   );
+
+  const startLesson = useCallback(
+    (objectiveId: string, title: string, levelId: string, skills: string[]) => {
+      setConversationId(null);
+      setMessages([]);
+      setActiveObjective({ id: objectiveId, title, levelId, skills });
+    },
+    [],
+  );
+
+  const clearLesson = useCallback(() => setActiveObjective(null), []);
+
+  const finishLesson = useCallback(async () => {
+    const objective = activeObjective;
+    setActiveObjective(null);
+    if (!objective || !currentUserId || objective.skills.length === 0) return;
+    try {
+      await recordAttempts(
+        currentUserId,
+        objective.levelId,
+        objective.id,
+        objective.skills.map((skill) => ({ skill, result: "correct" as const })),
+      );
+    } catch {
+      /* backend no disponible */
+    }
+  }, [activeObjective, currentUserId]);
 
   const removeConversation = useCallback(
     async (id: string) => {
@@ -255,6 +298,7 @@ export function useChat() {
 
   const selectUser = useCallback((userId: string) => {
     setCurrentUserId(userId);
+    writeUserIdCookie(userId);
   }, []);
 
   const selectModel = useCallback(
@@ -264,6 +308,12 @@ export function useChat() {
     },
     [persistSettings],
   );
+
+  const toggleFavorite = useCallback(() => {
+    const next = favoriteModel === model ? null : model;
+    setFavoriteModel(next);
+    persistSettings({ favorite_model: next ?? "" });
+  }, [model, favoriteModel, persistSettings]);
 
   const selectMode = useCallback(
     (next: TutorMode) => {
@@ -364,7 +414,7 @@ export function useChat() {
               { id: crypto.randomUUID(), role: "assistant", content: assistantReply, mode },
             ]);
           },
-        }, currentUserId);
+        }, currentUserId, activeObjective?.id);
       } catch (e) {
         errored = true;
         assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
@@ -402,6 +452,7 @@ export function useChat() {
       mode,
       conversationId,
       currentUserId,
+      activeObjective,
       persist,
       refreshProfile,
       refreshEvents,
@@ -425,6 +476,8 @@ export function useChat() {
     setModel,
     selectModel,
     models,
+    favoriteModel,
+    toggleFavorite,
     mode,
     setMode,
     selectMode,
@@ -451,5 +504,9 @@ export function useChat() {
     refreshEvents,
     profile,
     refreshProfile,
+    activeObjective,
+    startLesson,
+    clearLesson,
+    finishLesson,
   };
 }

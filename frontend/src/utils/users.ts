@@ -14,11 +14,17 @@ export function nextDefaultUserName(existingNames: readonly string[]): string {
 }
 
 /**
- * Decide si auto-seleccionar un perfil al abrir la app:
- * - con exactamente un usuario se selecciona ese;
- * - con varios no se auto-selecciona ninguno (null), para que el usuario elija
- *   y evitar entrar accidentalmente en el perfil equivocado.
+ * Decide el perfil inicial al abrir la app:
+ * - si hay un perfil recordado (cookie) que existe, se selecciona ese;
+ * - si no, con exactamente un usuario se selecciona ese;
+ * - en cualquier otro caso, null (el usuario elige).
  */
-export function resolveInitialUserId(users: readonly User[]): string | null {
+export function resolveInitialUserId(
+  users: readonly User[],
+  rememberedId: string | null = null,
+): string | null {
+  if (rememberedId && users.some((u) => u.id === rememberedId)) {
+    return rememberedId;
+  }
   return users.length === 1 ? users[0].id : null;
 }

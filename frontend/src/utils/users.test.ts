@@ -34,4 +34,12 @@ describe("resolveInitialUserId", () => {
   it("devuelve null cuando no hay usuarios", () => {
     expect(resolveInitialUserId([])).toBeNull();
   });
+
+  it("prefiere el perfil recordado cuando existe", () => {
+    expect(resolveInitialUserId([user("a"), user("b")], "b")).toBe("b");
+  });
+
+  it("ignora el perfil recordado si ya no existe", () => {
+    expect(resolveInitialUserId([user("a"), user("b")], "desaparecido")).toBeNull();
+  });
 });

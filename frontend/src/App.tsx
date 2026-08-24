@@ -4,11 +4,11 @@ import { useHandsFree } from "./hooks/useHandsFree";
 import { useTheme } from "./hooks/useTheme";
 import { ChatMessage } from "./components/ChatMessage";
 import { Composer } from "./components/Composer";
+import { Academy } from "./components/Academy";
 import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { LearningProfile } from "./components/LearningProfile";
 import { ListeningPractice } from "./components/ListeningPractice";
-import { ModeSelect } from "./components/ModeSelect";
-import { NetworkBadge } from "./components/NetworkBadge";
+import { ModeBar, type AppView } from "./components/ModeBar";
 import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
 import { ResizeHandle } from "./components/ResizeHandle";
@@ -33,6 +33,8 @@ export default function App() {
     model,
     selectModel,
     models,
+    favoriteModel,
+    toggleFavorite,
     mode,
     selectMode,
     layout,
@@ -57,12 +59,17 @@ export default function App() {
     refreshHistory,
     refreshEvents,
     profile,
+    activeObjective,
+    startLesson,
+    clearLesson,
+    finishLesson,
   } = useChat();
 
   const { theme, toggleTheme } = useTheme();
   const handsFree = useHandsFree(sendText);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [view, setView] = useState<AppView>("chat");
 
   const closeSidebar = () => setSidebarOpen(false);
   const closeInsights = () => setInsightsOpen(false);
@@ -86,6 +93,11 @@ export default function App() {
   const onAttempt = () => {
     refreshHistory();
     refreshEvents();
+  };
+
+  const handleSelectMode = (next: typeof mode) => {
+    selectMode(next);
+    setView("chat");
   };
 
   return (
@@ -130,7 +142,13 @@ export default function App() {
             onAdd={addUser}
             onEdit={editUser}
           />
-          <ModeSelect value={mode} onChange={selectMode} />
+          <ModeBar
+            mode={mode}
+            view={view}
+            bands={profile?.estimated_bands}
+            onSelectMode={handleSelectMode}
+            onSelectAcademy={() => setView("academy")}
+          />
           <HandsFreeToggle
             enabled={handsFree.enabled}
             status={handsFree.status}
@@ -149,7 +167,22 @@ export default function App() {
               </option>
             ))}
           </select>
-          <NetworkBadge />
+          <button
+            type="button"
+            className={`model-favorite${
+              favoriteModel === model ? " active" : ""
+            }`}
+            onClick={toggleFavorite}
+            title={
+              favoriteModel === model
+                ? "Quitar de favoritos"
+                : "Marcar como favorito (modelo por defecto)"
+            }
+            aria-label="Modelo favorito"
+            aria-pressed={favoriteModel === model}
+          >
+            <StarIcon filled={favoriteModel === model} />
+          </button>
           <button
             type="button"
             className="insights-toggle"
@@ -163,6 +196,16 @@ export default function App() {
         </div>
       </header>
 
+      {view === "academy" ? (
+        <Academy
+          userId={currentUserId}
+          onStartLesson={(id, title, levelId, skills) => {
+            startLesson(id, title, levelId, skills);
+            setView("chat");
+          }}
+          onClose={() => setView("chat")}
+        />
+      ) : (
       <div className="workspace">
         <aside
           className={`pane pane--sidebar${sidebarOpen ? " open" : ""}`}
@@ -200,6 +243,30 @@ export default function App() {
         <main className="pane pane--main">
           <div className="chat-scroll">
             <div className="chat-inner">
+              {activeObjective && (
+                <div className="lesson-banner">
+                  <span>Lección activa</span>
+                  <strong>{activeObjective.title}</strong>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await finishLesson();
+                      setView("academy");
+                    }}
+                    aria-label="Terminar la lección"
+                  >
+                    Terminar lección
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearLesson}
+                    aria-label="Salir de la lección"
+                  >
+                    Salir
+                  </button>
+                </div>
+              )}
+
               {mode === "pronunciation" && (
                 <PronunciationPractice
                   userId={currentUserId}
@@ -302,7 +369,26 @@ export default function App() {
           tabIndex={-1}
         />
       </div>
+      )}
     </div>
+  );
+}
+
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
   );
 }
 

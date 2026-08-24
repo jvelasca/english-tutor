@@ -68,4 +68,31 @@ describe("chat api", () => {
     expect(onDelta).toHaveBeenCalledWith("Hi");
     expect(onDone).toHaveBeenCalled();
   });
+
+  it("streamChat incluye objective_id cuando hay lección activa", async () => {
+    const fn = mockStreamFetch();
+    await streamChat(
+      [MSG],
+      "m",
+      "conversation",
+      { onDelta: () => {}, onDone: () => {}, onError: () => {} },
+      "u1",
+      "a1-m01-u01-l01-o01",
+    );
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body.objective_id).toBe("a1-m01-u01-l01-o01");
+  });
+
+  it("streamChat omite objective_id cuando no hay lección", async () => {
+    const fn = mockStreamFetch();
+    await streamChat(
+      [MSG],
+      "m",
+      "conversation",
+      { onDelta: () => {}, onDone: () => {}, onError: () => {} },
+      "u1",
+    );
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body.objective_id).toBeUndefined();
+  });
 });

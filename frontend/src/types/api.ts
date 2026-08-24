@@ -29,13 +29,6 @@ export interface User {
   created_at: string;
 }
 
-export interface NetworkInfo {
-  ip: string;
-  frontend_port: string;
-  backend_port: string;
-  url: string;
-}
-
 export interface Settings {
   [key: string]: string;
 }
@@ -213,4 +206,217 @@ export interface ListeningStats {
   attempts: number;
   correct: number;
   accuracy: number | null;
+}
+
+// --- Academy (currículum CEFR, mastery, evaluación) ---
+
+export type AcademyObjectiveStatus =
+  | "locked"
+  | "available"
+  | "review"
+  | "mastered";
+
+export interface CurriculumActivity {
+  id: string;
+  type: string;
+  instruction: string;
+  target: string;
+}
+
+export interface SkillScore {
+  skill: string;
+  score: number;
+  required: number;
+  met: boolean;
+}
+
+export interface ObjectiveProgress {
+  objective_id: string;
+  skills: SkillScore[];
+  mastered: boolean;
+}
+
+export interface CurriculumObjective {
+  id: string;
+  can_do: string;
+  title: string;
+  skills: string[];
+  concepts: string[];
+  vocabulary: string[];
+  thresholds: Record<string, number>;
+  activities: CurriculumActivity[];
+  module_id: string;
+  module_title: string;
+  unit_id: string;
+  unit_title: string;
+  lesson_id: string;
+  lesson_title: string;
+  order: number;
+  status: AcademyObjectiveStatus;
+  attempts: number;
+  correct: number;
+  incorrect: number;
+  progress: ObjectiveProgress;
+}
+
+export interface ModuleProgress {
+  module_id: string;
+  title: string;
+  order: number;
+  mastered: number;
+  total: number;
+  progress: number;
+  correct: number;
+  incorrect: number;
+  to_review: number;
+}
+
+export interface LevelProgress {
+  level: string;
+  mastered: number;
+  total: number;
+  progress: number;
+  correct: number;
+  incorrect: number;
+  to_review: number;
+}
+
+export interface LevelDetail {
+  level_id: string;
+  level: string;
+  title: string;
+  description: string;
+  objectives: CurriculumObjective[];
+  modules_progress: ModuleProgress[];
+  progress: LevelProgress;
+}
+
+export interface LevelSummary {
+  level_id: string;
+  level: string;
+  title: string;
+  description: string;
+  objective_count: number;
+  available: boolean;
+  enrolled: boolean;
+  progress: number;
+  correct: number;
+  incorrect: number;
+  to_review: number;
+}
+
+export interface LevelsResponse {
+  levels: LevelSummary[];
+}
+
+export interface Enrollment {
+  level_id: string;
+  level: string;
+  status: string;
+  enrolled_at: string;
+  updated_at: string;
+}
+
+export interface EnrollmentsResponse {
+  enrollments: Enrollment[];
+}
+
+export interface MasteryLevel {
+  level_id: string;
+  skills: Record<string, number>;
+}
+
+export interface MasteryResponse {
+  mastery: MasteryLevel[];
+}
+
+export interface NextObjective {
+  objective_id: string | null;
+  level_id: string;
+  reason: string;
+}
+
+export interface PlacementItem {
+  id: string;
+  skill: string;
+  difficulty: number;
+  prompt: string;
+  options: string[];
+}
+
+export interface Placement {
+  id: string;
+  title: string;
+  description: string;
+  items: PlacementItem[];
+}
+
+export interface PlacementResult {
+  level: string;
+  confidence: number;
+  answered: number;
+  correct: number;
+}
+
+export interface ExamItem {
+  id: string;
+  skill: string;
+  prompt: string;
+  options: string[];
+}
+
+export interface Exam {
+  id: string;
+  title: string;
+  min_per_skill: number;
+  skills: string[];
+  items: ExamItem[];
+}
+
+export interface ExamSkillResult {
+  correct: number;
+  total: number;
+  score: number;
+  passed: boolean;
+}
+
+export interface ExamResult {
+  overall: number;
+  passed: boolean;
+  failed_skills: string[];
+  skills: Record<string, ExamSkillResult>;
+  remediation: Record<string, string[]>;
+}
+
+export interface Certificate {
+  id: number;
+  level_id: string;
+  level: string;
+  overall: number;
+  awarded_at: string;
+}
+
+export interface CertificatesResponse {
+  certificates: Certificate[];
+}
+
+export interface StudyPlanStep {
+  level: string;
+  weeks: number;
+  next_level_id: string | null;
+}
+
+export interface StudyPlanResponse {
+  steps: StudyPlanStep[];
+}
+
+export type AttemptResult = "correct" | "incorrect";
+
+export interface AttemptEntry {
+  skill: string;
+  result: AttemptResult;
+}
+
+export interface AttemptResponse {
+  recorded: number;
 }
