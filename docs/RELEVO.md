@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 08:15 (UTC+2).
+> Actualizado por última vez: 2026-08-24 08:50 (UTC+2).
 
 ## 1. Qué es el proyecto
 
@@ -176,3 +176,142 @@ npx tsc --noEmit    # tipos
 - **Documentación VITAL:** todo cambio actualiza `docs/`, `PLAN.md`, `README.md` (premisa 8).
 - **Tests obligatorios:** ninguna feature se da por acabada sin sus tests (premisa 12).
 - **Ritmo:** hito a hito, un cambio a la vez (premisa 6).
+
+## 10. Fase de endurecimiento (FASE 1 P0 Y FASE 2 P1 CERRADAS — post v1.0.0)
+
+**Motivo:** auditoría interna + externa. La app es un MVP/RC arquitectónico; NO rehacer, pero
+sí endurecer antes de seguir con features. Hallazgo crítico: **el aislamiento multiusuario
+(M7) no está realmente garantizado** — el CRUD de conversaciones por `cid` no comprueba el
+propietario, y `/api/pronunciation` no valida el usuario. M7 no debe considerarse "terminado".
+
+- Plan completo y secuencia de subagentes: `docs/PLAN-ENDURECIMIENTO.md`.
+- Prioridades: P0 aislamiento · P1 robustez · P2 Learning Profile · P3 pronunciación real.
+- Briefings en `agentes/endurecimiento/` (uno por subagente, autocontenidos).
+
+### Estado de subagentes (FASE 1 · P0) — COMPLETA ✔
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| E1.1 Store ownership + routers | `agentes/endurecimiento/e1-01-store-ownership.md` | ✔ hecho |
+| E1.2 Frontend propagar user_id | `agentes/endurecimiento/e1-02-frontend-userid.md` | ✔ hecho |
+| E1.3 LocalUserContext + tests seguridad API | `agentes/endurecimiento/e1-03-context-security-tests.md` | ✔ hecho |
+| E1.4 Contratos y límites | `agentes/endurecimiento/e1-04-contratos-limites.md` | ✔ hecho |
+| E1.5 Límites de audio + sanitización de errores | `agentes/endurecimiento/e1-05-audio-errores.md` | ✔ hecho |
+
+> **Fase 1 (P0) cerrada.** Aislamiento multiusuario extremo a extremo, `system` fuera del
+> input externo, límites de payload (chat/messages/TTS/audio) y sanitización de errores.
+> **Fase 2 (P1) cerrada** (store no bloqueante, health real, chat integrable, CI + deps + CORS).
+> Siguiente bloque: **FASE 3 (persistencia y dominio)** — ver `docs/PLAN-ENDURECIMIENTO.md`.
+
+### HECHO — E1.1: aislamiento real en store y routers
+
+- `services/store.py`: `get_conversation(cid, user_id)`, `save_conversation(cid, user_id, …)`,
+  `delete_conversation(cid, user_id)` con `AND user_id = ?`; `record_pronunciation(...) -> bool`
+  (valida usuario); índices `idx_conversations_user_id` y `idx_pronunciation_user_id`.
+- `routers/conversations.py` y `routers/pronunciation.py`: exigen/validan `user_id`.
+- Tests: `test_store_isolation.py` (5 tests nuevos); total backend **32 tests verdes**.
+- **ATENCIÓN:** el contrato de la API cambió (GET/PUT/DELETE y pronunciación ahora exigen
+  `user_id`). El frontend queda temporalmente roto para cargar/guardar/borrar conversaciones
+  hasta cerrar E1.2 (siguiente subagente).
+
+### HECHO — E1.2: frontend propaga user_id (cierra el par de contrato)
+
+- `api/conversations.ts`: `getConversation(id, userId)`, `saveConversation(id, userId, …)`,
+  `deleteConversation(id, userId)` con `user_id` en la query vía `URLSearchParams`.
+- `api/pronunciation.ts`: `checkPronunciation(blob, expected, userId)` con `userId` obligatorio.
+- `hooks/useChat.ts`: `loadConversation`/`removeConversation`/`persist` pasan `currentUserId`
+  con guard `if (!currentUserId) return;` y deps actualizadas.
+- `components/PronunciationPractice.tsx`: guard `!userId` + `disabled={processing || !userId}`.
+- Test nuevo `api/conversations.test.ts` (3 tests, mock de fetch). Frontend: **40 tests verdes**,
+  `tsc` sin errores, `npm run build` OK.
+- **Contrato cerrado:** la app queda funcional de nuevo y con aislamiento extremo a extremo
+  (backend exige `user_id`, frontend lo envía).
+
+### HECHO — E1.3: LocalUserContext + tests canónicos de seguridad API
+
+- `dependencies.py`: dependencia `current_user(user_id: str = Query(...))` que resuelve y
+  valida el perfil activo (`store.get_user`), `404` si no existe.
+- `routers/conversations.py` y `routers/progress.py`: `get_one`/`save`/`delete`/`progress`
+  usan `Depends(current_user)` (DRY) en lugar de recibir `user_id` crudo.
+- Tests: `tests/test_api_security.py` (aislamiento por API: no leer/actualizar/borrar la
+  conversación de otro usuario, pronunciación con usuario desconocido → 404). Total backend
+  **38 tests verdes**.
+
+### HECHO — E1.4: contratos (quitar `system`) y límites de payload
+
+- `schemas/chat.py`: `Role = Literal["user", "assistant"]` (fuera `system`); `content`
+  con `max_length=MAX_CONTENT_CHARS`; `messages` con `max_length=MAX_CHAT_MESSAGES`.
+- `schemas/voz.py`: `TTSRequest.text` con `max_length=MAX_TTS_CHARS`.
+- `config.py`: constantes `MAX_CHAT_MESSAGES=100`, `MAX_CONTENT_CHARS=8000`, `MAX_TTS_CHARS=4000`.
+- Tests: `tests/test_schemas.py` (rechaza `system`, rechaza content/messages/TTS fuera de
+  límite). Total backend **43 tests verdes**.
+
+### HECHO — E1.5: límites de subida de audio + sanitización de errores
+
+- `config.py`: `MAX_AUDIO_BYTES = 25 * 1024 * 1024` (25 MB).
+- `dependencies.py`: `read_audio_limited(file) -> bytes` (415 si el content-type no es audio,
+  413 si excede `MAX_AUDIO_BYTES`, lectura por chunks de 1 MB).
+- `routers/voz.py`: `/api/transcribe` usa `read_audio_limited`; errores de transcribir/TTS
+  sanitizados (`logger.exception` + `500` genérico).
+- `routers/pronunciation.py`: usa `read_audio_limited`; error de transcripción sanitizado.
+- `routers/chat.py`: `/api/chat` → `502` "No se pudo completar la respuesta"; `/api/chat/stream`
+  emite `{"error": "..."}` sin filtrar `exc`.
+- `routers/models.py`: `/api/models` → `502` "No se pudo contactar con Ollama".
+- Tests: `tests/test_robustness.py` (413, 415, models/chat no filtran `exc`). Total backend
+  **47 tests verdes**.
+
+### Estado de subagentes (FASE 2 · P1) — COMPLETA ✔
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| E2.1 Store no bloqueante (threadpool) | `agentes/endurecimiento/e2-01-store-no-bloqueante.md` | ✔ hecho |
+| E2.2 Health real (live/ready/dependencies) | `agentes/endurecimiento/e2-02-health-real.md` | ✔ hecho |
+| E2.3 Chat integrable + tests Ollama mockeado | `agentes/endurecimiento/e2-03-chat-integrable.md` | ✔ hecho |
+| E2.4 CI + deps + CORS | `agentes/endurecimiento/e2-04-ci-deps-cors.md` | ✔ hecho |
+
+### HECHO — E2.4: CI + dependencias reproducibles + CORS
+
+- CORS: `config.py` `ALLOWED_ORIGINS` (solo `localhost:5173`/`127.0.0.1:5173`); `main.py` la usa
+  (antes `["*"]`). Test `tests/test_cors.py` (3 tests).
+- Deps: `requirements.in` (intención) + `requirements.txt` y `requirements-dev.txt` pineados
+  (versiones exactas verificadas) + `ruff` en dev.
+- Ruff determinista: `pyproject.toml` (`select E,F,W,I,B`, `ignore B008`, `line-length 88`).
+  Se arreglaron issues preexistentes (F401/I001/E501/B904) con cambios mecánicos sin alterar
+  comportamiento (reenvuelto de líneas y `raise ... from None`).
+- CI: `.github/workflows/ci.yml` (backend: ruff + pytest; frontend: tsc + vitest + build).
+- Total backend **62 tests verdes**; frontend **40 tests** + tsc + build OK; `ruff` limpio.
+
+### HECHO — E2.3: chat integrable (DI del cliente Ollama) + tests
+
+- `services/llm.py`: cliente Ollama inyectable (`_client`, `get_client()`, `set_client()`);
+  `chat_once`, `chat_stream`, `list_models`, `ping` usan `get_client()` en vez de instanciar
+  `ollama.AsyncClient()`. Firmas y comportamiento público sin cambios.
+- Tests: `tests/test_chat_integration.py` (7 tests con `FakeOllamaClient`): system prompt +
+  modo correcto, fallback a conversación con modo desconocido, stream OK, role inválido 422,
+  mensajes vacíos 422, Ollama caído 502 sin fuga, error en stream → evento `error` sin fuga.
+  Total backend **59 tests verdes**.
+
+### HECHO — E2.2: health real (live / ready / dependencies)
+
+- `services/store.py` (`ping()`), `services/llm.py` (`ping()` async), `services/stt.py`
+  (`is_ready()`), `services/tts.py` (`is_ready()`): checks de cada dependencia.
+- `routers/health.py` (nuevo): `/api/health` (compat), `/api/health/live`,
+  `/api/health/dependencies` (estado por dependencia), `/api/health/ready` (200/503).
+- `routers/models.py`: eliminado el `/api/health` estático. `main.py`: registra `health_router`.
+- Tests: `tests/test_health.py` +4 (live, dependencies ok, ready 200, ready 503 con Ollama
+  caído, todo con monkeypatch). Total backend **52 tests verdes**.
+
+### HECHO — E2.1: store no bloqueante (threadpool)
+
+- `services/store_async.py` (nuevo): 11 envolturas `async` que delegan en `store` vía
+  `starlette.concurrency.run_in_threadpool` (referencias resueltas en runtime → compatible con
+  `monkeypatch`). `store.py` síncrono queda **intacto**.
+- `dependencies.py`: `current_user` pasa a corrutina (`await store_async.get_user`).
+- `routers/users.py`, `conversations.py`, `progress.py`, `pronunciation.py`: usan `store_async`
+  (`await`). Firmas y contratos (200/404) sin cambios; `create`/`list_all` conservan `user_id: str`.
+- Tests: `tests/test_store_async.py` (delega igual que el store síncrono). Total backend
+  **48 tests verdes**.
+
+**Línea base (pre-fase):** backend `27 tests` verdes, `import main` OK. Entorno de este
+workspace: Python 3.13.7 (global), dependencias de runtime ya instaladas
+(`ollama`, `faster-whisper`, `piper-tts`, `python-multipart`).

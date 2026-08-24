@@ -67,7 +67,9 @@ def eval_model(model: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evalúa un modelo como tutor de inglés.")
+    parser = argparse.ArgumentParser(
+        description="Evalúa un modelo como tutor de inglés."
+    )
     parser.add_argument("--model", required=True, help="Nombre del modelo en Ollama")
     args = parser.parse_args()
     eval_model(args.model)

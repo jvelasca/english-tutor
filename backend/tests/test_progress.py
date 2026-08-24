@@ -52,6 +52,7 @@ def test_progress_counts_modes(monkeypatch, tmp_path):
     cid = store.create_conversation(uid)["id"]
     store.save_conversation(
         cid,
+        uid,
         "Clase",
         [
             {"role": "user", "content": "I have a question", "mode": "grammar"},
@@ -72,9 +73,9 @@ def test_messages_roundtrip_mode(monkeypatch, tmp_path):
     uid = _uid()
     cid = store.create_conversation(uid)["id"]
     store.save_conversation(
-        cid, "Clase", [{"role": "user", "content": "Hi", "mode": "grammar"}]
+        cid, uid, "Clase", [{"role": "user", "content": "Hi", "mode": "grammar"}]
     )
-    got = store.get_conversation(cid)
+    got = store.get_conversation(cid, uid)
     assert got["messages"][0]["mode"] == "grammar"
 
 
@@ -115,7 +116,7 @@ def test_progress_endpoint_shape(monkeypatch, tmp_path):
     uid = _uid()
     cid = store.create_conversation(uid)["id"]
     store.save_conversation(
-        cid, "Clase", [{"role": "user", "content": "Hi", "mode": "exercises"}]
+        cid, uid, "Clase", [{"role": "user", "content": "Hi", "mode": "exercises"}]
     )
     store.record_pronunciation(uid, "Hi", "Hi", 100, "good")
 

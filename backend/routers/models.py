@@ -1,9 +1,13 @@
 """Endpoints de estado y modelos disponibles."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from services.llm import list_models as list_ollama_models
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -17,14 +21,12 @@ async def root() -> dict[str, str]:
     }
 
 
-@router.get("/api/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "english-tutor"}
-
-
 @router.get("/api/models")
 async def models() -> dict[str, list[str]]:
     try:
         return {"models": await list_ollama_models()}
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"Ollama error: {exc}") from exc
+    except Exception:  # noqa: BLE001
+        logger.exception("Error en /api/models")
+        raise HTTPException(
+            status_code=502, detail="No se pudo contactar con Ollama"
+        ) from None

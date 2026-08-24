@@ -1,0 +1,7 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["B008"]  # Query/Form/File/Depends de FastAPI son llamadas en default args

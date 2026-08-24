@@ -33,3 +33,11 @@ def transcribe(audio_bytes: bytes, language: str = "en") -> str:
         io.BytesIO(audio_bytes), language=language, beam_size=5
     )
     return "".join(segment.text for segment in segments).strip()
+
+
+def is_ready() -> bool:
+    """True si el modelo Whisper está descargado (directorio no vacío)."""
+    try:
+        return WHISPER_DIR.exists() and any(WHISPER_DIR.iterdir())
+    except OSError:
+        return False

@@ -43,11 +43,10 @@ export function PronunciationPractice({
           type: recorder.mimeType || "audio/webm",
         });
         if (blob.size === 0) return;
+        if (!userId) return;
         setProcessing(true);
         try {
-          setResult(
-            await checkPronunciation(blob, sentence, userId ?? undefined),
-          );
+          setResult(await checkPronunciation(blob, sentence, userId));
           onAttempt();
         } catch (e) {
           alert(`Error al evaluar la pronunciación: ${(e as Error).message}`);
@@ -85,7 +84,7 @@ export function PronunciationPractice({
         <button
           className={`record-button${recording ? " recording" : ""}`}
           onClick={toggle}
-          disabled={processing}
+          disabled={processing || !userId}
         >
           {processing
             ? "Evaluando…"

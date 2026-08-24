@@ -119,20 +119,25 @@ export function useChat() {
     }
   }, [currentUserId, refreshConversations]);
 
-  const loadConversation = useCallback(async (id: string) => {
-    try {
-      const conv = await getConversation(id);
-      setConversationId(id);
-      setMessages(conv.messages);
-    } catch {
-      /* backend no disponible */
-    }
-  }, []);
+  const loadConversation = useCallback(
+    async (id: string) => {
+      if (!currentUserId) return;
+      try {
+        const conv = await getConversation(id, currentUserId);
+        setConversationId(id);
+        setMessages(conv.messages);
+      } catch {
+        /* backend no disponible */
+      }
+    },
+    [currentUserId],
+  );
 
   const removeConversation = useCallback(
     async (id: string) => {
+      if (!currentUserId) return;
       try {
-        await deleteConversation(id);
+        await deleteConversation(id, currentUserId);
         await refreshConversations();
         if (conversationId === id) {
           setConversationId(null);
@@ -142,19 +147,20 @@ export function useChat() {
         /* backend no disponible */
       }
     },
-    [conversationId, refreshConversations],
+    [conversationId, currentUserId, refreshConversations],
   );
 
   const persist = useCallback(
     async (id: string, history: Message[]) => {
+      if (!currentUserId) return;
       try {
-        await saveConversation(id, deriveTitle(history), history);
+        await saveConversation(id, currentUserId, deriveTitle(history), history);
         await refreshConversations();
       } catch {
         /* backend no disponible */
       }
     },
-    [refreshConversations],
+    [currentUserId, refreshConversations],
   );
 
   const selectUser = useCallback((userId: string) => {

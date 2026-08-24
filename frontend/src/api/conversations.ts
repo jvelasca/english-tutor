@@ -11,21 +11,25 @@ export function listConversations(userId: string): Promise<ConversationMeta[]> {
   return getJson<ConversationMeta[]>(`/api/conversations?${query}`);
 }
 
-export function getConversation(id: string): Promise<Conversation> {
-  return getJson<Conversation>(`/api/conversations/${id}`);
+export function getConversation(id: string, userId: string): Promise<Conversation> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return getJson<Conversation>(`/api/conversations/${id}?${query}`);
 }
 
 export function saveConversation(
   id: string,
+  userId: string,
   title: string,
   messages: Message[],
 ): Promise<ConversationMeta> {
-  return putJson<ConversationMeta>(`/api/conversations/${id}`, {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return putJson<ConversationMeta>(`/api/conversations/${id}?${query}`, {
     title,
     messages,
   });
 }
 
-export function deleteConversation(id: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(`/api/conversations/${id}`);
+export function deleteConversation(id: string, userId: string): Promise<{ ok: boolean }> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return deleteJson<{ ok: boolean }>(`/api/conversations/${id}?${query}`);
 }

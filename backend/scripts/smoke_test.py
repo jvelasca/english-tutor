@@ -34,7 +34,8 @@ def tts_works() -> bool:
         with urllib.request.urlopen(req, timeout=60) as r:
             body = r.read()
             ok = r.status == 200 and body.startswith(b"RIFF") and len(body) > 44
-            print(f"[{'OK' if ok else 'FAIL'}]   POST /api/tts -> {r.status} ({len(body)} bytes)")
+            label = "OK" if ok else "FAIL"
+            print(f"[{label}]   POST /api/tts -> {r.status} ({len(body)} bytes)")
             return ok
     except Exception as exc:  # noqa: BLE001
         print(f"[FAIL] POST /api/tts -> {exc}")

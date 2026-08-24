@@ -1,4 +1,5 @@
-"""Evaluación de pronunciación: compara texto esperado con el transcrito (puro, testable)."""
+"""Evaluación de pronunciación: compara texto esperado con el transcrito (puro,
+testable)."""
 from __future__ import annotations
 
 import re

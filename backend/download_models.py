@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import urllib.request
-from pathlib import Path
 
 from config import PIPER_DIR, PIPER_VOICE, WHISPER_DIR, WHISPER_SIZE
 

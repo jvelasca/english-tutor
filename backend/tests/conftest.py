@@ -1,4 +1,5 @@
-"""Asegura que los imports del backend resuelvan al ejecutar pytest desde cualquier cwd."""
+"""Asegura que los imports del backend resuelvan al ejecutar pytest desde cualquier
+cwd."""
 import sys
 from pathlib import Path
 

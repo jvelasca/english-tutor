@@ -84,4 +84,4 @@ def test_migration_assigns_orphans_to_default_user(monkeypatch, tmp_path):
 
     users = store.list_users()
     assert len(users) == 1
-    assert store.get_conversation("old1")["user_id"] == users[0]["id"]
+    assert store.get_conversation("old1", users[0]["id"])["user_id"] == users[0]["id"]

@@ -5,6 +5,15 @@ from pathlib import Path
 
 DEFAULT_MODEL = "qwen3.5:9b"
 
+# Orígenes permitidos para CORS (solo el frontend de desarrollo local).
+ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+# Límites de payload para evitar abusos de RAM/CPU/contexto.
+MAX_CHAT_MESSAGES = 100
+MAX_CONTENT_CHARS = 8000
+MAX_TTS_CHARS = 4000
+MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB
+
 SYSTEM_PROMPT = (
     "You are a friendly, patient English tutor. Help the user practice English: "
     "converse naturally, correct mistakes gently, and explain briefly. "
@@ -34,19 +43,20 @@ MODE_PROMPTS: dict[str, str] = {
     ),
     "grammar": (
         "You are an English grammar coach. The user will write sentences. "
-        "Correct any grammar mistakes, explain the rule briefly, and give the corrected "
-        "sentence. Use Spanish for explanations when helpful, but always provide the "
-        "corrected sentence in English."
+        "Correct any grammar mistakes, explain the rule briefly, and give the "
+        "corrected sentence. Use Spanish for explanations when helpful, but always "
+        "provide the corrected sentence in English."
     ),
     "exercises": (
         "You are an English teacher who creates exercises. Ask the user what topic or "
-        "level they want, then generate a short exercise (fill-in-the-blank, vocabulary, "
-        "or a short translation) and give feedback on their answers. Keep exercises short "
-        "and focused."
+        "level they want, then generate a short exercise (fill-in-the-blank, "
+        "vocabulary, or a short translation) and give feedback on their answers. Keep "
+        "exercises short and focused."
     ),
     "pronunciation": (
-        "You are an English pronunciation coach. Guide the user on how to pronounce words "
-        "and sentences correctly: explain difficult sounds, stress, and intonation. "
-        "Provide phonetic hints and tips. Use Spanish for explanations when helpful."
+        "You are an English pronunciation coach. Guide the user on how to "
+        "pronounce words and sentences correctly: explain difficult sounds, "
+        "stress, and intonation. Provide phonetic hints and tips. Use Spanish for "
+        "explanations when helpful."
     ),
 }

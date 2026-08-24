@@ -33,3 +33,10 @@ def synthesize(text: str) -> bytes:
     with wave.open(buf, "wb") as wav_file:
         voice.synthesize_wav(text, wav_file)
     return buf.getvalue()
+
+
+def is_ready() -> bool:
+    """True si el modelo Piper (onnx + config) está presente."""
+    return (PIPER_DIR / f"{PIPER_VOICE}.onnx").exists() and (
+        PIPER_DIR / f"{PIPER_VOICE}.onnx.json"
+    ).exists()

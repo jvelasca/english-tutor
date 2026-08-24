@@ -8,9 +8,26 @@ import ollama
 from config import DEFAULT_MODE, MODE_PROMPTS
 from schemas.chat import ChatMessage, ChatResponse
 
+_client: ollama.AsyncClient | None = None
+
+
+def get_client() -> ollama.AsyncClient:
+    """Devuelve el cliente Ollama (inyectable para tests)."""
+    global _client
+    if _client is None:
+        _client = ollama.AsyncClient()
+    return _client
+
+
+def set_client(client: ollama.AsyncClient | None) -> None:
+    """Sustituye el cliente (DI) para tests. Pasa None para restaurar el por defecto."""
+    global _client
+    _client = client
+
 
 def system_prompt_for(mode: str) -> str:
-    """Devuelve el system prompt del modo; si el modo no existe, usa el de conversación."""
+    """Devuelve el system prompt del modo; si el modo no existe, usa el de
+    conversación."""
     return MODE_PROMPTS.get(mode, MODE_PROMPTS[DEFAULT_MODE])
 
 
@@ -27,7 +44,7 @@ async def chat_once(
     temperature: float,
     mode: str = DEFAULT_MODE,
 ) -> ChatResponse:
-    response = await ollama.AsyncClient().chat(
+    response = await get_client().chat(
         model=model,
         messages=_messages(messages, mode),
         options={"temperature": temperature},
@@ -50,7 +67,7 @@ async def chat_stream(
     mode: str = DEFAULT_MODE,
 ) -> AsyncIterator[str]:
     """Emite el contenido incremental del modelo (un chunk de texto a la vez)."""
-    stream = await ollama.AsyncClient().chat(
+    stream = await get_client().chat(
         model=model,
         messages=_messages(messages, mode),
         options={"temperature": temperature},
@@ -63,5 +80,14 @@ async def chat_stream(
 
 
 async def list_models() -> list[str]:
-    result = await ollama.AsyncClient().list()
+    result = await get_client().list()
     return [m["model"] for m in result.get("models", [])]
+
+
+async def ping() -> bool:
+    """Comprueba que Ollama responde."""
+    try:
+        await get_client().list()
+        return True
+    except Exception:  # noqa: BLE001
+        return False

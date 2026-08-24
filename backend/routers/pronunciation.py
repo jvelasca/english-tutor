@@ -1,13 +1,18 @@
 """Endpoint de corrección de pronunciación."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+from dependencies import read_audio_limited
 from schemas.pronunciation import PronunciationResponse
-from services import store
+from services import store_async
 from services.pronunciation import score_pronunciation
 from services.stt import transcribe as transcribe_audio
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -17,18 +22,20 @@ async def pronunciation(
     file: UploadFile = File(...),
     expected: str = Form(...),
     language: str = Form("en"),
-    user_id: str = Form(None),
+    user_id: str = Form(...),
 ) -> PronunciationResponse:
-    audio = await file.read()
+    if await store_async.get_user(user_id) is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    audio = await read_audio_limited(file)
     try:
         heard = await run_in_threadpool(transcribe_audio, audio, language)
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
+        logger.exception("Error transcribiendo el audio")
         raise HTTPException(
-            status_code=500, detail=f"Error transcribiendo el audio: {exc}"
-        ) from exc
+            status_code=500, detail="No se pudo transcribir el audio"
+        ) from None
     result = score_pronunciation(expected, heard)
-    if user_id:
-        store.record_pronunciation(
-            user_id, result["expected"], result["heard"], result["score"], result["level"]
-        )
+    await store_async.record_pronunciation(
+        user_id, result["expected"], result["heard"], result["score"], result["level"]
+    )
     return PronunciationResponse(**result)
