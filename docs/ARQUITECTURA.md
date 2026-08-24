@@ -17,7 +17,7 @@ backend/
 ├── config.py            # Configuración: URLs, rutas de modelos, defaults.
 ├── routers/             # Capa HTTP: endpoints + validación. SIN lógica de negocio.
 │   ├── __init__.py
-│   ├── chat.py          # POST /api/chat, POST /api/chat/stream (aceptan mode)
+│   ├── chat.py          # POST /api/chat, POST /api/chat/stream (mode + user_id opcional)
 │   ├── conversations.py # CRUD /api/conversations (filtrado por user_id)
 │   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
 │   ├── health.py        # /api/health/live, /ready, /dependencies
@@ -47,7 +47,7 @@ backend/
 │   ├── grammar.py       # análisis de errores + persistencia (F4)
 │   ├── learning.py      # eventos de aprendizaje (F4)
 │   ├── pronunciation.py
-│   ├── profile.py       # compone vocabulario + errores + pronunciación + CEFR (F4)
+│   ├── profile.py       # get_profile_summary + get_profile_context (compone el perfil) (F4/F5)
 │   ├── users.py
 │   └── vocabulary.py    # extracción + persistencia (F4)
 ├── repositories/        # Acceso a datos puro (SQLite). Sin reglas de negocio.
@@ -63,8 +63,10 @@ backend/
 ├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
 │   ├── __init__.py
 │   ├── cefr.py          # estimate_cefr, recommendations (puros, F4)
+│   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
-│   ├── llm.py           # cliente Ollama (chat normal + streaming; system prompt por modo)
+│   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
+│   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
 │   ├── pronunciation.py # score_pronunciation (puro, difflib)
 │   ├── stt.py           # faster-whisper
 │   ├── tts.py           # piper-tts
@@ -75,6 +77,8 @@ backend/
 │   ├── conftest.py      # asegura el import desde backend/
 │   ├── test_api_security.py
 │   ├── test_chat_integration.py
+│   ├── test_chat_profile.py # F5
+│   ├── test_context.py      # F5
 │   ├── test_cors.py
 │   ├── test_domain_async.py
 │   ├── test_foreign_keys.py
@@ -82,6 +86,7 @@ backend/
 │   ├── test_health.py
 │   ├── test_learning_events.py # F4
 │   ├── test_modes.py
+│   ├── test_policy.py   # F5
 │   ├── test_profile.py  # F4
 │   ├── test_progress.py
 │   ├── test_pronunciation.py
@@ -119,7 +124,7 @@ frontend/src/
 ├── App.tsx              # Orquesta: compone la página.
 ├── api/                 # Cliente HTTP (única capa que habla con el backend).
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
-│   ├── chat.ts          # chat normal + streaming (envía mode).
+│   ├── chat.ts          # chat normal + streaming (envía mode + user_id).
 │   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
 │   ├── learning.ts      # getProfile + analyzeText (F4).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).

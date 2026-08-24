@@ -3,30 +3,29 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 10:58 (UTC+2).
+> Actualizado por última vez: 2026-08-24 11:15 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–4 del plan de endurecimiento **completas, verificadas
+**Posición actual (2026-08-24):** Fases 0–5 del plan de endurecimiento **completas, verificadas
 y commiteadas**. Working tree limpio. Últimos commits:
+- `938c989` — Fase 5 frontend: `user_id` al chat (personaliza el tutor).
+- `c5e627b` — Fase 5: Context Builder (perfil del alumno al system prompt).
+- `022680e` — Fase 5: política de corrección (correctness policy) por CEFR.
 - `f5dd4a6` — Fase 4 frontend: panel Learning Profile (CEFR, vocabulario, errores, recomendaciones).
 - `5a77a74` — Fase 4: CEFR y recomendaciones (perfil agregado).
-- `96acec0` — Fase 4: errores gramaticales recurrentes (detección + persistencia).
-- `08ba7b9` — Fase 4: vocabulario (extracción, persistencia, endpoints).
-- `c10bbbd` — Fase 4: eventos de aprendizaje (tabla + CRUD + endpoints).
 
-**Estado verde:** backend `114 tests` + `ruff` limpio + `import main` OK; frontend `48 tests`
+**Estado verde:** backend `128 tests` + `ruff` limpio + `import main` OK; frontend `51 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: FASE 5 — Tutor Policy + Context Builder** (correctness policy, el perfil del
-alumno entra al prompt del tutor). Requiere diseño antes de codificar; ver
-`docs/PLAN-ENDURECIMIENTO.md`.
+**Siguiente paso: FASE 6 — Progreso pedagógico real** (no solo counts). Requiere diseño antes
+de codificar; ver `docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer `docs/PLAN-ENDURECIMIENTO.md` (hoja de ruta Fase 4→10 y protocolo anti-saturación).
-3. Leer la sección 10 de este documento (estado de Fases 1–3 y arquitectura resultante).
-4. Diseñar los subagentes F5.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
+3. Leer las secciones 10–12 de este documento (estado de Fases 1–5 y arquitectura resultante).
+4. Diseñar los subagentes F6.x en `agentes/endurecimiento/` (autocontenidos, uno a la vez),
    respetando la arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`)
    antes de cada commit `feat: ...`.
@@ -229,7 +228,8 @@ propietario, y `/api/pronunciation` no valida el usuario. M7 no debe considerars
 > **Fase 2 (P1) cerrada** (store no bloqueante, health real, chat integrable, CI + deps + CORS).
 > **Fase 3 (persistencia y dominio) cerrada** (mensajes append-only, capa de dominio, FKs reales).
 > **Fase 4 (Learning Profile) cerrada** (ver sección 11).
-> Siguiente bloque: **FASE 5 (Tutor Policy + Context Builder)** — ver
+> **Fase 5 (Tutor Policy + Context Builder) cerrada** (ver sección 12).
+> Siguiente bloque: **FASE 6 (Progreso pedagógico real)** — ver
 > `docs/PLAN-ENDURECIMIENTO.md`.
 
 ### HECHO — E1.1: aislamiento real en store y routers
@@ -450,3 +450,39 @@ verificado en verde antes de commitear.
 frontend `48 tests` + `tsc`/`build` OK. La tabla `learning_events` queda lista pero aún sin
 consumidor de UI (se cableará en Fase 5/6). Siguiente bloque: **FASE 5 — Tutor Policy +
 Context Builder** (el perfil del alumno entra al prompt del tutor).
+
+## 12. FASE 5 — Tutor Policy + Context Builder (CERRADA ✔)
+
+Backend primero (F5.1–F5.2), frontend al final (F5.3). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F5.1 Tutor Policy (correctness policy) | `agentes/endurecimiento/f5-01-politica-correccion.md` | ✔ hecho |
+| F5.2 Context Builder + perfil al prompt | `agentes/endurecimiento/f5-02-context-builder.md` | ✔ hecho |
+| F5.3 Frontend propagar user_id al chat | `agentes/endurecimiento/f5-03-frontend-user-id.md` | ✔ hecho |
+
+### HECHO — F5.1: política de corrección (correctness policy)
+- `services/policy.py` (`CORRECTNESS_GUIDANCE` por nivel CEFR + `correctness_guidance(cefr_level)`,
+  pura y determinista, sin LLM). Tests `test_policy.py` (4). Total backend **118 tests**.
+
+### HECHO — F5.2: Context Builder + perfil al prompt
+- `services/context.py` (`build_system_prompt(mode, profile)`: prompt base + política por CEFR +
+  errores recurrentes + áreas de enfoque).
+- `schemas/chat.py`: `ChatRequest.user_id: str | None = None` (opcional → sin ventana rota).
+- `services/llm.py`: `_messages`/`chat_once`/`chat_stream` aceptan `system_prompt` inyectable.
+- `domain/profile.py`: extrae `_compute_profile` y añade `get_profile_context` (lectura sin
+  persistir CEFR; `get_profile_summary` intacto y con mismo comportamiento).
+- `routers/chat.py`: `_system_prompt(req)` resuelve el perfil vía `get_profile_context` y pasa el
+  prompt a `chat_once`/`chat_stream`. Sin `user_id` (o usuario inexistente) → prompt base.
+- Tests `test_context.py` (6) + `test_chat_profile.py` (4). Total backend **128 tests**.
+
+### HECHO — F5.3: frontend propaga user_id al chat
+- `api/chat.ts`: `sendChat`/`streamChat` envían `user_id` (`null` si no hay usuario).
+- `hooks/useChat.ts`: `sendText` pasa `currentUserId` a `streamChat`.
+- Test `api/chat.test.ts` (3). Total frontend **51 tests**.
+
+**Estado global al cierre de Fase 5:** backend `128 tests` + `ruff` limpio + `import main` OK;
+frontend `51 tests` + `tsc`/`build` OK. El perfil del alumno (CEFR + errores recurrentes +
+recomendaciones) ya entra al system prompt del tutor; sin `user_id` el chat queda como antes.
+Siguiente bloque: **FASE 6 — Progreso pedagógico real** (no solo counts).

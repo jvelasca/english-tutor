@@ -16,7 +16,10 @@
 - **Fase 4 (Learning Profile) CERRADA** el 2026-08-24: eventos de aprendizaje, vocabulario,
   errores gramaticales recurrentes, estimación CEFR + recomendaciones (backend) y panel de
   perfil en el frontend.
-- Backend `114 tests` verdes + `ruff` limpio, `import main` OK; frontend `48 tests` verdes,
+- **Fase 5 (Tutor Policy + Context Builder) CERRADA** el 2026-08-24: política de corrección por
+  CEFR, Context Builder (el perfil del alumno entra al system prompt) y propagación de `user_id`
+  al chat en el frontend.
+- Backend `128 tests` verdes + `ruff` limpio, `import main` OK; frontend `51 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -101,13 +104,27 @@ recomendaciones. Secuencia (backend primero, frontend al final):
 
 > **Notas de Fase 4:** el análisis (vocabulario/gramática) es **determinista, sin LLM** (premisa
 > 12). La estimación CEFR es **heurística v1** (la evaluación CEFR real es la Fase 8). La tabla
-> `learning_events` queda lista pero aún sin consumidor de UI (se cableará en Fase 5/6).
+> `learning_events` queda lista pero aún sin consumidor de UI (se cableará en Fase 6).
 
-### FASE 5 → 10 — Backlog (se detallará al llegar)
+### FASE 5 — Tutor Policy + Context Builder (detallada)
+
+Política de corrección (correctness policy) por nivel CEFR y Context Builder que inyecta el
+perfil del alumno al system prompt del tutor. Secuencia (backend primero, frontend al final):
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| F5.1 | Tutor Policy (correctness policy) | `services/policy.py` (`correctness_guidance(cefr_level)` pura) + tests. | `agentes/endurecimiento/f5-01-politica-correccion.md` |
+| F5.2 | Context Builder + perfil al prompt | `services/context.py` (`build_system_prompt`), `ChatRequest.user_id` opcional, `llm.py` acepta `system_prompt`, router resuelve el perfil vía `domain/profile`. | `agentes/endurecimiento/f5-02-context-builder.md` |
+| F5.3 | Frontend propagar user_id | `api/chat.ts` + `hooks/useChat.ts` envían `user_id` al chat. | `agentes/endurecimiento/f5-03-frontend-user-id.md` |
+
+> **Notas de Fase 5:** `user_id` es **opcional** en `ChatRequest` (sin ventana rota); si falta o
+> el usuario no existe, se usa el prompt base. La política de corrección es determinista y sin
+> LLM (premisa 12).
+
+### FASE 6 → 10 — Backlog (se detallará al llegar)
 
 | Fase | Alcance |
 |---|---|
-| 5 | Tutor Policy + Context Builder (correctness policy, perfil entra al prompt). |
 | 6 | Progreso pedagógico real (no solo counts). |
 | 7 | Pronunciación fonética (evaluadores compuestos). |
 | 8 | Listening / Speaking / CEFR. |
