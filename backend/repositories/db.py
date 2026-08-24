@@ -87,6 +87,20 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vocabulary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                word TEXT NOT NULL,
+                occurrences INTEGER NOT NULL DEFAULT 1,
+                first_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                UNIQUE (user_id, word),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
 
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
@@ -115,6 +129,9 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_learning_events_user_id "
             "ON learning_events(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vocabulary_user_id ON vocabulary(user_id)"
         )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).

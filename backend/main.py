@@ -16,6 +16,7 @@ from routers.models import router as models_router
 from routers.progress import router as progress_router
 from routers.pronunciation import router as pronunciation_router
 from routers.users import router as users_router
+from routers.vocabulary import router as vocabulary_router
 from routers.voz import router as voz_router
 
 
@@ -45,3 +46,4 @@ app.include_router(pronunciation_router)
 app.include_router(progress_router)
 app.include_router(conversations_router)
 app.include_router(users_router)
+app.include_router(vocabulary_router)
