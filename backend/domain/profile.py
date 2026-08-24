@@ -11,9 +11,9 @@ from repositories import vocabulary as vocabulary_repo
 from services.cefr import estimate_cefr, recommendations
 
 
-async def get_profile_summary(user_id: str) -> dict | None:
-    """Compone el perfil del alumno: vocabulario, errores, pronunciación, CEFR
-    estimado y recomendaciones. Devuelve None si el usuario no existe."""
+async def _compute_profile(user_id: str) -> dict | None:
+    """Calcula el perfil del alumno (vocabulario, errores, pronunciación, CEFR y
+    recomendaciones) sin persistir nada. Devuelve None si el usuario no existe."""
     if await run_in_threadpool(users_repo.get_user, user_id) is None:
         return None
 
@@ -29,7 +29,6 @@ async def get_profile_summary(user_id: str) -> dict | None:
             "exercises": progress["exercises"],
         }
     )
-    await run_in_threadpool(profile_repo.set_cefr, user_id, level)
 
     recs = recommendations(
         {
@@ -47,3 +46,19 @@ async def get_profile_summary(user_id: str) -> dict | None:
         "pronunciation_average": pron_avg,
         "recommendations": recs,
     }
+
+
+async def get_profile_summary(user_id: str) -> dict | None:
+    """Compone el perfil del alumno y persiste el CEFR estimado como caché.
+    Devuelve None si el usuario no existe."""
+    profile = await _compute_profile(user_id)
+    if profile is None:
+        return None
+    await run_in_threadpool(profile_repo.set_cefr, user_id, profile["cefr_level"])
+    return profile
+
+
+async def get_profile_context(user_id: str) -> dict | None:
+    """Devuelve el perfil para construir el prompt del tutor (sin persistir).
+    Devuelve None si el usuario no existe."""
+    return await _compute_profile(user_id)

@@ -31,9 +31,14 @@ def system_prompt_for(mode: str) -> str:
     return MODE_PROMPTS.get(mode, MODE_PROMPTS[DEFAULT_MODE])
 
 
-def _messages(messages: list[ChatMessage], mode: str = DEFAULT_MODE) -> list[dict]:
+def _messages(
+    messages: list[ChatMessage],
+    mode: str = DEFAULT_MODE,
+    system_prompt: str | None = None,
+) -> list[dict]:
+    prompt = system_prompt if system_prompt is not None else system_prompt_for(mode)
     return [
-        {"role": "system", "content": system_prompt_for(mode)},
+        {"role": "system", "content": prompt},
         *[m.model_dump() for m in messages],
     ]
 
@@ -43,10 +48,11 @@ async def chat_once(
     model: str,
     temperature: float,
     mode: str = DEFAULT_MODE,
+    system_prompt: str | None = None,
 ) -> ChatResponse:
     response = await get_client().chat(
         model=model,
-        messages=_messages(messages, mode),
+        messages=_messages(messages, mode, system_prompt),
         options={"temperature": temperature},
     )
 
@@ -65,11 +71,12 @@ async def chat_stream(
     model: str,
     temperature: float,
     mode: str = DEFAULT_MODE,
+    system_prompt: str | None = None,
 ) -> AsyncIterator[str]:
     """Emite el contenido incremental del modelo (un chunk de texto a la vez)."""
     stream = await get_client().chat(
         model=model,
-        messages=_messages(messages, mode),
+        messages=_messages(messages, mode, system_prompt),
         options={"temperature": temperature},
         stream=True,
     )
