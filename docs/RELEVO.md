@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-23 22:53 (UTC+2).
+> Actualizado por última vez: 2026-08-24 08:15 (UTC+2).
 
 ## 1. Qué es el proyecto
 
@@ -42,7 +42,11 @@ Hecho y verificado (tests verdes):
   conversaciones, mensajes, ejercicios, correcciones, pronunciación) + `POST /api/pronunciation`
   con `user_id` opcional para persistir intentos (`pronunciation_attempts` + columna `mode`).
   Frontend: panel colapsable `ProgressSummary` + `api/progress.ts`.
-- Tests: backend `pytest tests/ -q` (27 tests), frontend `npm test` (vitest, 26 tests) + `tsc --noEmit`.
+- **M10** voz continua / manos libres: modo conversación por voz sin pulsar botones. VAD en
+  cliente (RMS + silencio ≥1.2s vía Web Audio API), bucle escuchar → transcribir → responder →
+  leer en voz alta → volver a escuchar. Frontend: `useChat.sendText`, `utils/vad.ts`,
+  `hooks/useHandsFree.ts`, `components/HandsFreeToggle.tsx`. Sin cambios de backend.
+- Tests: backend `pytest tests/ -q` (27 tests), frontend `npm test` (vitest, 37 tests) + `tsc --noEmit`.
 
 ## 4. GitHub
 
@@ -116,10 +120,26 @@ Hecho y verificado (tests verdes):
   intentos (reflejado en frontend como anulables).
 - Briefings: `agentes/m9-backend-progreso.md`, `agentes/m9-frontend-progreso.md`.
 
-## 7c. BORRADOR — M10: conversación por voz continua (manos libres)
+## 7c. HECHO — M10: conversación por voz continua (manos libres)
 
-- Briefing borrador: `agentes/m10-voz-continua.md` (issue #3). VAD en cliente, transcripción
-  automática y respuesta hablada sin pulsar botones. Se lanza tras cerrar M5.
+**Implementado y verificado** (frontend 37 tests, `tsc` sin errores, `npm run build` OK;
+backend intacto, `import main` OK).
+
+- **Sin cambios de backend:** reutiliza `POST /api/transcribe`, `POST /api/tts` y
+  `POST /api/chat/stream` ya existentes.
+- Frontend: `hooks/useChat.ts` extrae y exporta `sendText(text): Promise<string>` (el `send`
+  actual se apoya en él). `utils/vad.ts` (`rms`, `shouldEndUtterance`, constantes
+  `SILENCE_THRESHOLD=0.02`, `SILENCE_MS=1200`, `MIN_SPEECH_MS=300`, `MAX_CHUNK_MS=15000`).
+  `hooks/useHandsFree.ts` (un `MediaStream` persistente, `AnalyserNode` para energía,
+  `MediaRecorder` por chunk; estados `idle/listening/transcribing/thinking/speaking`).
+  `components/HandsFreeToggle.tsx` (toggle accesible + indicador de estado con `role="status"`).
+  `App.tsx` lo conecta en `header-controls`. Estilos en `index.css` (tokens, tema claro/oscuro).
+- **VAD:** muestreo cada 50 ms con `getByteTimeDomainData`; si `rms > 0.02` marca habla; al
+  llegar silencio ≥1.2 s tras habla (y duración ≥0.3 s para descartar clics) cierra el chunk;
+  tope de seguridad 15 s. Sin barge-in (fuera de alcance en esta iteración).
+- **Limitaciones conocidas:** autoplay (el `AudioContext`/mic se lanzan dentro del clic),
+  umbral fijo (podría calibrarse), sin interrupción de la voz del asistente.
+- Briefing: `agentes/m10-voz-continua.md`.
 
 ## 8. Notas de diseño de M7 (para no romper en M8)
 

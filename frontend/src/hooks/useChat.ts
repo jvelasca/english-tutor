@@ -176,78 +176,89 @@ export function useChat() {
     [users],
   );
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || loading || !currentUserId) return;
+  const sendText = useCallback(
+    async (text: string): Promise<string> => {
+      const trimmed = text.trim();
+      if (!trimmed || loading || !currentUserId) return "";
 
-    let cid = conversationId;
-    if (!cid) {
-      try {
-        cid = (await createConversation(currentUserId)).id;
-        setConversationId(cid);
-      } catch {
-        return;
+      let cid = conversationId;
+      if (!cid) {
+        try {
+          cid = (await createConversation(currentUserId)).id;
+          setConversationId(cid);
+        } catch {
+          return "";
+        }
       }
-    }
 
-    const history: Message[] = [
-      ...messages,
-      { role: "user", content: text, mode },
-    ];
-    setMessages(history);
+      const history: Message[] = [
+        ...messages,
+        { role: "user", content: trimmed, mode },
+      ];
+      setMessages(history);
+      setLoading(true);
+
+      let assistantReply = "";
+      let errored = false;
+
+      try {
+        await streamChat(history, model, mode, {
+          onDelta: (content) => {
+            assistantReply += content;
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (last && last.role === "assistant") {
+                next[next.length - 1] = {
+                  role: "assistant",
+                  content: last.content + content,
+                  mode,
+                };
+              } else {
+                next.push({ role: "assistant", content, mode });
+              }
+              return next;
+            });
+          },
+          onDone: () => {},
+          onError: (message) => {
+            errored = true;
+            assistantReply = `Error al hablar con el modelo: ${message}`;
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: assistantReply, mode },
+            ]);
+          },
+        });
+      } catch (e) {
+        errored = true;
+        assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: assistantReply, mode },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+
+      if (assistantReply && !errored) {
+        void persist(cid, [
+          ...history,
+          { role: "assistant", content: assistantReply, mode },
+        ]);
+      }
+
+      return errored ? "" : assistantReply;
+    },
+    [loading, messages, model, mode, conversationId, currentUserId, persist],
+  );
+
+  const send = useCallback(() => {
+    const text = input.trim();
+    if (!text) return;
     setInput("");
-    setLoading(true);
-
-    let assistantReply = "";
-    let errored = false;
-
-    try {
-      await streamChat(history, model, mode, {
-        onDelta: (content) => {
-          assistantReply += content;
-          setMessages((prev) => {
-            const next = [...prev];
-            const last = next[next.length - 1];
-            if (last && last.role === "assistant") {
-              next[next.length - 1] = {
-                role: "assistant",
-                content: last.content + content,
-                mode,
-              };
-            } else {
-              next.push({ role: "assistant", content, mode });
-            }
-            return next;
-          });
-        },
-        onDone: () => {},
-        onError: (message) => {
-          errored = true;
-          assistantReply = `Error al hablar con el modelo: ${message}`;
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: assistantReply, mode },
-          ]);
-        },
-      });
-    } catch (e) {
-      errored = true;
-      assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: assistantReply, mode },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-
-    if (assistantReply && !errored) {
-      void persist(cid, [
-        ...history,
-        { role: "assistant", content: assistantReply, mode },
-      ]);
-    }
-  }, [input, loading, messages, model, mode, conversationId, currentUserId, persist]);
+    void sendText(text);
+  }, [input, sendText]);
 
   return {
     messages,
@@ -265,6 +276,7 @@ export function useChat() {
     currentUserId,
     bottomRef,
     send,
+    sendText,
     newConversation,
     loadConversation,
     removeConversation,

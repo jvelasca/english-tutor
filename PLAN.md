@@ -102,10 +102,15 @@
 - Verificado: backend 27 tests, frontend 26 tests, `tsc` sin errores, `npm run build` OK.
 - Subagentes (ejecutados por el gerente): `agentes/m9-backend-progreso.md`, `agentes/m9-frontend-progreso.md`.
 
-### M10 — Conversación por voz continua (manos libres)  [BORRADOR]
-- Modo continuo: VAD (detección de silencio), transcripción automática y respuesta hablada
-  sin pulsar botones (issue #3).
-- Subagente (briefing borrador): `agentes/m10-voz-continua.md`. Se lanza tras cerrar M5 y M9.
+### M10 — Conversación por voz continua (manos libres)  [HECHO ✔]
+- Modo continuo: VAD (detección de silencio vía Web Audio API), transcripción automática y
+  respuesta hablada sin pulsar botones (issue #3). Sin cambios de backend
+  (transcribe/tts/stream ya existían).
+- Frontend: refactor `useChat.sendText(text): Promise<string>`, `utils/vad.ts` (RMS +
+  `shouldEndUtterance`), `hooks/useHandsFree.ts` (bucle de estados + VAD por energía),
+  `components/HandsFreeToggle.tsx` (toggle + indicador de estado accesible).
+- Verificado: frontend 37 tests, `tsc` sin errores, `npm run build` OK.
+- Subagente (ejecutado por el gerente): `agentes/m10-voz-continua.md`.
 
 ## Decisiones tomadas
 
@@ -131,7 +136,7 @@
 | M8 Diseño y UX | `agentes/m8-diseno-ux.md` | ✔ hecho |
 | M9 Backend progreso | `agentes/m9-backend-progreso.md` | ✔ hecho |
 | M9 Frontend progreso | `agentes/m9-frontend-progreso.md` | ✔ hecho |
-| M10 Voz continua | `agentes/m10-voz-continua.md` | 📝 borrador |
+| M10 Voz continua | `agentes/m10-voz-continua.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

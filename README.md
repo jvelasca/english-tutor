@@ -33,6 +33,8 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   (selector de perfil en la cabecera, aislamiento total de datos entre usuarios).
 - **Diseño y UX (M8)**: tema claro/oscuro, responsive (móvil/escritorio), accesibilidad
   y sistema de tokens de diseño.
+- **Voz continua / manos libres (M10)**: modo conversación por voz sin pulsar botones
+  (VAD por silencio vía Web Audio API, transcripción y respuesta hablada automáticas).
 
 ## Arranque rápido
 

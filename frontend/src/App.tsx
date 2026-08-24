@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useChat } from "./hooks/useChat";
+import { useHandsFree } from "./hooks/useHandsFree";
 import { useTheme } from "./hooks/useTheme";
 import { ChatMessage } from "./components/ChatMessage";
 import { Composer } from "./components/Composer";
+import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { ModeSelect } from "./components/ModeSelect";
 import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressSummary } from "./components/ProgressSummary";
@@ -33,6 +35,7 @@ export default function App() {
     currentUserId,
     bottomRef,
     send,
+    sendText,
     newConversation,
     loadConversation,
     removeConversation,
@@ -43,6 +46,7 @@ export default function App() {
   } = useChat();
 
   const { theme, toggleTheme } = useTheme();
+  const handsFree = useHandsFree(sendText);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -125,6 +129,11 @@ export default function App() {
               onAdd={addUser}
             />
             <ModeSelect value={mode} onChange={setMode} />
+            <HandsFreeToggle
+              enabled={handsFree.enabled}
+              status={handsFree.status}
+              onToggle={handsFree.toggle}
+            />
             <select
               className="model-select"
               value={model}

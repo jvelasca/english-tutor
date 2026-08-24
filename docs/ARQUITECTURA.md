@@ -82,6 +82,7 @@ frontend/src/
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
 │   ├── ChatMessage.tsx
 │   ├── Composer.tsx
+│   ├── HandsFreeToggle.tsx  # activar/parar modo manos libres + estado (M10)
 │   ├── MicButton.tsx
 │   ├── ModeSelect.tsx   # selector de modo de tutor
 │   ├── PronunciationPractice.tsx
@@ -92,6 +93,7 @@ frontend/src/
 │   └── UserSelect.tsx   # selector de perfil de usuario
 ├── hooks/               # Estado y lógica de UI.
 │   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
+│   ├── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
 │   └── useTheme.ts      # tema claro/oscuro + persistencia (M8)
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
 │   └── api.ts           # incluye User y user_id en ConversationMeta
@@ -107,7 +109,9 @@ frontend/src/
 │   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel (M9)
 │   ├── progress.test.ts
 │   ├── theme.ts         # resolveInitialTheme (M8)
-│   └── theme.test.ts
+│   ├── theme.test.ts
+│   ├── vad.ts           # VAD: rms + shouldEndUtterance + constantes (M10)
+│   └── vad.test.ts
 ├── scripts/             # scripts de utilidad.
 │   └── check.ps1        # tsc + vitest
 ├── vitest.config.ts
