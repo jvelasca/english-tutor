@@ -11,8 +11,9 @@ from domain import learning as learning_service
 from domain import pronunciation as pronunciation_service
 from domain import users as user_service
 from schemas.pronunciation import PronunciationResponse
+from services.fluency import compute_fluency
 from services.pronunciation import score_pronunciation
-from services.stt import transcribe as transcribe_audio
+from services.stt import transcribe_with_timing
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,15 @@ async def pronunciation(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     audio = await read_audio_limited(file)
     try:
-        heard = await run_in_threadpool(transcribe_audio, audio, language)
+        timed = await run_in_threadpool(transcribe_with_timing, audio, language)
     except Exception:  # noqa: BLE001
         logger.exception("Error transcribiendo el audio")
         raise HTTPException(
             status_code=500, detail="No se pudo transcribir el audio"
         ) from None
+    heard = timed["text"]
     result = score_pronunciation(expected, heard)
+    result["fluency"] = compute_fluency(heard, timed.get("duration"))
     await pronunciation_service.record_pronunciation(
         user_id, result["expected"], result["heard"], result["score"], result["level"]
     )

@@ -21,6 +21,13 @@ class PronunciationBreakdown(BaseModel):
     total: int
 
 
+class FluencyStats(BaseModel):
+    word_count: int
+    duration_seconds: float | None = None
+    wpm: float | None = None
+    level: str
+
+
 class PronunciationResponse(BaseModel):
     expected: str
     heard: str
@@ -30,3 +37,4 @@ class PronunciationResponse(BaseModel):
     word_accuracy: int
     phonetic_score: int
     breakdown: PronunciationBreakdown
+    fluency: FluencyStats

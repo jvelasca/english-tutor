@@ -26,13 +26,23 @@ def _get_model() -> WhisperModel:
     return _model
 
 
-def transcribe(audio_bytes: bytes, language: str = "en") -> str:
-    """Convierte audio (WAV/WebM) a texto. Bloqueante: ejecutar en un threadpool."""
+def transcribe_with_timing(audio_bytes: bytes, language: str = "en") -> dict:
+    """Convierte audio a texto y devuelve también la duración en segundos.
+
+    Bloqueante: ejecutar en un threadpool.
+    """
     model = _get_model()
-    segments, _ = model.transcribe(
+    segments, info = model.transcribe(
         io.BytesIO(audio_bytes), language=language, beam_size=5
     )
-    return "".join(segment.text for segment in segments).strip()
+    text = "".join(segment.text for segment in segments).strip()
+    duration = round(info.duration, 2) if info.duration else 0.0
+    return {"text": text, "duration": duration}
+
+
+def transcribe(audio_bytes: bytes, language: str = "en") -> str:
+    """Convierte audio (WAV/WebM) a texto. Bloqueante: ejecutar en un threadpool."""
+    return transcribe_with_timing(audio_bytes, language)["text"]
 
 
 def is_ready() -> bool:

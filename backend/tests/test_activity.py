@@ -100,8 +100,8 @@ def test_chat_unknown_user_id_records_nothing(monkeypatch, tmp_path):
 def test_pronunciation_records_event(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     monkeypatch.setattr(
-        "routers.pronunciation.transcribe_audio",
-        lambda audio, language="en": "Hello world",
+        "routers.pronunciation.transcribe_with_timing",
+        lambda audio, language="en": {"text": "Hello world", "duration": 2.0},
     )
     with TestClient(app) as client:
         r = client.post(

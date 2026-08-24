@@ -98,8 +98,8 @@ def test_pronunciation_unknown_user_404(monkeypatch, tmp_path):
 def test_pronunciation_records_only_for_declared_user(monkeypatch, tmp_path):
     a, b, _cid = _setup(monkeypatch, tmp_path)
     monkeypatch.setattr(
-        "routers.pronunciation.transcribe_audio",
-        lambda audio, language="en": "Hello world",
+        "routers.pronunciation.transcribe_with_timing",
+        lambda audio, language="en": {"text": "Hello world", "duration": 2.0},
     )
     with TestClient(app) as client:
         r = client.post(
