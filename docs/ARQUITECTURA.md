@@ -36,7 +36,7 @@ backend/
 │   ├── grammar.py       # GrammarAnalyze*, GrammarFinding, GrammarRecurringError (F4)
 │   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
 │   ├── profile.py       # LearningProfile (F4)
-│   ├── pronunciation.py # PronunciationResponse
+│   ├── pronunciation.py # PronunciationResponse, WordSubstitution, PronunciationBreakdown (F7)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
 │   ├── users.py         # User, UserCreate
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
@@ -70,7 +70,8 @@ backend/
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
-│   ├── pronunciation.py # score_pronunciation (puro, difflib)
+│   ├── phonetics.py     # evaluador compuesto: word_alignment + soundex + composite_score (F7)
+│   ├── pronunciation.py # score_pronunciation (puro, delega en phonetics)
 │   ├── stt.py           # faster-whisper
 │   ├── trends.py        # daily_activity + aggregate_series + compute_streak (puros, F6)
 │   ├── tts.py           # piper-tts
@@ -92,6 +93,7 @@ backend/
 │   ├── test_learning_events.py # F4
 │   ├── test_mastery.py # F6
 │   ├── test_modes.py
+│   ├── test_phonetics.py # F7
 │   ├── test_policy.py   # F5
 │   ├── test_profile.py  # F4
 │   ├── test_progress.py
@@ -170,6 +172,7 @@ frontend/src/
 │   ├── users.ts         # nextDefaultUserName
 │   ├── users.test.ts
 │   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel + bucketLabel/eventLabel (M9/F6)
+│   ├── pronunciationFeedback.ts # joinWords/feedbackHints/wordsCorrectLabel (puros, F7)
 │   ├── progress.test.ts
 │   ├── theme.ts         # resolveInitialTheme (M8)
 │   ├── theme.test.ts

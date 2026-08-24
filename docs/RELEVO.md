@@ -3,21 +3,20 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 12:15 (UTC+2).
+> Actualizado por última vez: 2026-08-24 12:25 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–6 **completas, verificadas y commiteadas**. FASE 7
-(Pronunciación fonética) **en curso**: F7.1 hecho, F7.2 (frontend) pendiente. Últimos commits:
+**Posición actual (2026-08-24):** Fases 0–7 del plan de endurecimiento **completas, verificadas
+y commiteadas**. Working tree limpio. Últimos commits:
+- `feat: fase 7.2` — frontend feedback fonético en pronunciación.
 - `feat: fase 7.1` — evaluador compuesto de pronunciación (word + Soundex + char).
 - `feat: fase 6.3` — dashboard de progreso real (reemplaza `ProgressSummary`).
-- `feat: fase 6.2` — progreso histórico: tendencias, racha, dominio de errores e hitos.
 
-**Estado verde:** backend `163 tests` + `ruff` limpio + `import main` OK; frontend `56 tests`
+**Estado verde:** backend `163 tests` + `ruff` limpio + `import main` OK; frontend `65 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: F7.2 — Frontend feedback fonético** (`PronunciationPractice` muestra el
-breakdown por palabra: correctas/omitidas/sustituidas + score fonético). Ver
+**Siguiente paso: FASE 8 — Listening / Speaking / CEFR** (evaluación CEFR real). Ver
 `docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
@@ -541,7 +540,7 @@ verificado en verde antes de commitear. Decisiones de diseño: un único endpoin
 `tsc`/`build` OK. El progreso dejó de ser "counts estáticos": ahora hay tendencias temporales,
 racha, dominio de errores (activos vs resueltos) e hitos, deterministas y sin LLM.
 
-## 14. FASE 7 — Pronunciación fonética (EN CURSO)
+## 14. FASE 7 — Pronunciación fonética (CERRADA)
 
 Sustituir el evaluador único (`difflib` a nivel de caracteres) por un **evaluador compuesto
 determinista** (sin LLM): precisión por palabra + similitud fonética (Soundex) + caracteres.
@@ -564,3 +563,15 @@ solo en respuesta (sí).
 ### PENDIENTE — F7.2: frontend feedback fonético
 `PronunciationPractice.tsx` mostrará el breakdown (palabras correctas/omitidas/sustituidas +
 score fonético) vía `utils/pronunciationFeedback.ts` (puro) y tipos nuevos en `types/api.ts`.
+
+### HECHO — F7.2: frontend feedback fonético
+- `types/api.ts`: `WordSubstitution`, `PronunciationBreakdown` y `PronunciationResponse`
+  ampliado (`word_accuracy`, `phonetic_score`, `breakdown`).
+- `utils/pronunciationFeedback.ts` (puro): `joinWords`, `feedbackHints`, `wordsCorrectLabel`.
+- `PronunciationPractice.tsx`: muestra precisión por palabra, similitud fonética, resumen de
+  aciertos y avisos (omitidas/sustituidas/de más). Responsive con tokens.
+- Tests: `utils/pronunciationFeedback.test.ts` (9). Total frontend **65 tests**.
+
+**Estado al cierre de Fase 7:** backend `163 tests` + `ruff` limpio; frontend `65 tests` +
+`tsc`/`build` OK. La pronunciación pasó de un único `difflib` a un evaluador compuesto
+(precisión por palabra + Soundex + caracteres) con feedback por palabra, determinista y sin LLM.

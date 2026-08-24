@@ -22,9 +22,9 @@
 - **Fase 6 (Progreso pedagógico real) CERRADA** el 2026-08-24: F6.1 (registro automático de
   eventos), F6.2 (progreso histórico: tendencias, racha, dominio, hitos) y F6.3 (dashboard
   frontend responsive móvil/tablet).
-- **Fase 7 (Pronunciación fonética) EN CURSO** el 2026-08-24: F7.1 (evaluador compuesto
-  word+Soundex+char) hecho; F7.2 (frontend feedback) pendiente.
-- Backend `163 tests` verdes + `ruff` limpio, `import main` OK; frontend `56 tests` verdes,
+- **Fase 7 (Pronunciación fonética) CERRADA** el 2026-08-24: F7.1 (evaluador compuesto
+  word+Soundex+char) y F7.2 (frontend feedback fonético).
+- Backend `163 tests` verdes + `ruff` limpio, `import main` OK; frontend `65 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -160,7 +160,7 @@ frontend al final.
 
 | Fase | Alcance |
 |---|---|
-| 7 | Pronunciación fonética (evaluadores compuestos). EN CURSO (ver detalle arriba). |
+| 7 | Pronunciación fonética (evaluadores compuestos). ✔ CERRADA (ver detalle arriba). |
 | 8 | Listening / Speaking / CEFR. |
 | 9 | Evaluación objetiva del tutor. |
 | 10 | Release 1.0 realmente estable. |
