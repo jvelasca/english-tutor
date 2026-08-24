@@ -96,3 +96,45 @@ completo.
   hablar/escuchar).
 - El diseño forma parte de la definición de "terminado": ninguna feature se da por acabada
   si queda "fea" o inconsistente con el resto.
+
+## 15. 100% libre (sin pago, por ahora)
+- Todas las opciones de la app están disponibles para **todos los usuarios**, sin
+  suscripción, paywall ni limitaciones por nivel de cuenta.
+- No hay muro de pago: la Academy (currículum CEFR, mastery, evaluaciones, Study Plan y
+  AI Teacher por lección) es accesible para cualquier perfil local.
+- La capa comercial (`subscriptions`/`entitlements`) queda **diferida** hasta que exista
+  contenido que la justifique, y no se referencia en la UI.
+- Coherente con la premisa 2 (100% local, sin cuentas, sin costes).
+
+## 16. Nivel "mejor de cada plataforma profesional"
+- La UI toma como referencia lo mejor de las apps profesionales del sector
+  (Duolingo, Busuu, Babbel, British Council, etc.), adaptándolo —no copiando— a una app
+  100% local y de uso personal.
+- Se elige lo mejor de cada plataforma: claridad de progreso (árbol de niveles y
+  seguimiento por objetivo), indicadores visuales por estado (acertado / fallado / a
+  repasar), y navegación por pestañas con indicador de nivel CEFR.
+- El resultado debe sentirse "PRO" sin sacrificar las premisas de localidad, privacidad
+  y ausencia de cuentas.
+
+## 17. Documentación accesible y Ayuda para no ingenieros
+- La documentación de `docs/` es la fuente de verdad técnica. La **Ayuda** de la app
+  enlaza a `docs/` en lugar de copiar su contenido: **no se duplica información**.
+- La Ayuda está pensada para un usuario **no ingeniero**: lenguaje claro, pasos concretos
+  y sin jerga. Si un término técnico es imprescindible, se explica brevemente.
+- Cualquier usuario debe poder entender qué hace la app, cómo arrancarla y cómo resolver
+  problemas frecuentes **sin conocimientos de programación**.
+- **Autor del proyecto:** José Alberto Velasco — <josealberto.vel@gmail.com>.
+
+## 18. Docstrings y documentación autogenerada (obligatorio)
+- **Todo el código lleva docstrings/docblocks**: en Python, docstrings de módulo, clase y
+  función (qué hace, parámetros, retorno, excepciones relevantes); en TypeScript/React,
+  comentarios JSDoc/TSDoc equivalentes. No hay fichero "sin explicar".
+- La documentación técnica se **genera automáticamente desde los docstrings** con una
+  herramienta estándar (p. ej. **mkdocstrings** + MkDocs o Sphinx/autodoc en backend;
+  **TypeDoc** o VitePress en frontend), enlazada desde `docs/`. Nunca se redacta a mano lo
+  que el código ya declara: la referencia de API sale de los docstrings.
+- `docs/` mantiene lo que **no** puede derivarse del código (visión, decisiones,
+  arquitectura, guías de uso, planes), sin duplicar la referencia autogenerada.
+- **Estándar estricto:** al crear código nuevo o al **refactorizar** código existente, se
+  añaden/actualizan los docstrings y se regenera la referencia. Es parte de la definición
+  de "terminado" (como los tests de la premisa 12).
