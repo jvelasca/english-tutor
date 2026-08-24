@@ -24,7 +24,11 @@ async def _compute_profile(user_id: str) -> dict | None:
     pron_avg = progress["pronunciation"]["average"]
     messages = progress["messages"]
     user_messages = progress["user_messages"]
-    total_errors = sum(e["count"] for e in errors)
+
+    confirmed = [e for e in errors if e.get("confirmed", True)]
+    active_errors = [e for e in confirmed if not e.get("mastered")]
+    mastered_errors = [e for e in confirmed if e.get("mastered")]
+    total_errors = sum(e["count"] for e in confirmed)
     grammar_error_rate = (total_errors / user_messages) if user_messages > 0 else None
 
     evaluation = evaluate_cefr(
@@ -39,7 +43,7 @@ async def _compute_profile(user_id: str) -> dict | None:
 
     recs = recommendations(
         {
-            "recurring_errors": errors,
+            "recurring_errors": active_errors,
             "pronunciation_avg": pron_avg,
             "vocab_size": len(vocab),
         }
@@ -51,7 +55,9 @@ async def _compute_profile(user_id: str) -> dict | None:
         "estimated_descriptor": evaluation["descriptor"],
         "vocabulary_size": len(vocab),
         "top_words": [v["word"] for v in vocab[:5]],
-        "recurring_errors": errors,
+        "recurring_errors": active_errors,
+        "mastered_errors": mastered_errors,
+        "mastered_count": len(mastered_errors),
         "pronunciation_average": pron_avg,
         "recommendations": recs,
     }

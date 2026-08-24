@@ -173,8 +173,9 @@
 | A.1 Launcher núcleo puro | `agentes/endurecimiento/a1-launcher-core.md` | ✔ hecho |
 | A.2 Launcher GUI + procesos + atajo | `agentes/endurecimiento/a2-launcher-gui.md` | ✔ hecho |
 | RA1–RA7 Release Audit 1.1 | `agentes/endurecimiento/ra-*.md` | ✔ hecho |
-| P1 Política pedagógica formal | `agentes/pedagogia/p1-politica-pedagogica.md` | ⏳ en curso |
-| P2–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ⏳ pendiente |
+| P1 Política pedagógica formal | `agentes/pedagogia/p1-politica-pedagogica.md` | ✔ hecho |
+| P2 Error Mastery | `agentes/pedagogia/p2-error-mastery.md` | ✔ hecho |
+| P3–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ⏳ pendiente |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

@@ -102,6 +102,13 @@ export interface GrammarRecurringError {
   count: number;
   last_example: string;
   last_seen: string;
+  first_seen: string;
+  confidence: number;
+  source: string;
+  confirmed: boolean;
+  correct_after: number;
+  streak: number;
+  mastered: boolean;
 }
 
 export interface LearningProfile {
@@ -112,6 +119,8 @@ export interface LearningProfile {
   vocabulary_size: number;
   top_words: string[];
   recurring_errors: GrammarRecurringError[];
+  mastered_errors: GrammarRecurringError[];
+  mastered_count: number;
   pronunciation_average: number | null;
   recommendations: string[];
 }

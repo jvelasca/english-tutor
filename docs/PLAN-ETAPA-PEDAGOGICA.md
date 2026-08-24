@@ -18,14 +18,14 @@ aprendizaje real:
 
 ## Orden de trabajo (hito a hito, un subagente a la vez)
 
-| Id | Track | Impacto | Depende de |
-|---|---|---|---|
-| **P1** | Política pedagógica formal (`CORRECT`/`NATURAL`/`OPTIONAL`/`STYLE`/`PRONUNCIATION`) | Alto (todo el prompt del tutor) | — |
-| **P2** | Error Mastery (cometido/corregido/superado/dominado) | Alto (núcleo adaptativo) | P1 |
-| **P3** | Vocabulario: exposure/production/mastery | Medio | — |
-| **P4** | Listening como competencia (dificultad/tema/tendencia/tiempo/reincidencia) | Medio | — |
-| **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 |
-| **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — |
+| Id | Track | Impacto | Depende de | Estado |
+|---|---|---|---|---|
+| **P1** | Política pedagógica formal (`CORRECT`/`NATURAL`/`OPTIONAL`/`STYLE`/`PRONUNCIATION`) | Alto (todo el prompt del tutor) | — | ✔ hecho |
+| **P2** | Error Mastery (cometido/corregido/superado/dominado) | Alto (núcleo adaptativo) | P1 | ✔ hecho |
+| **P3** | Vocabulario: exposure/production/mastery | Medio | — | ⏳ pendiente |
+| **P4** | Listening como competencia (dificultad/tema/tendencia/tiempo/reincidencia) | Medio | — | ⏳ pendiente |
+| **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ⏳ pendiente |
+| **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | ⏳ pendiente |
 
 ## Detalle por track
 

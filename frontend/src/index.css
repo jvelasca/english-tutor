@@ -1317,6 +1317,13 @@ button {
   font-weight: 700;
 }
 
+.learning-mastered {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-success, #2f9e44);
+  font-weight: 600;
+}
+
 .learning-recs {
   margin: 0;
   padding-left: var(--space-4);

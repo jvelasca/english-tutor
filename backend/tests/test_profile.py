@@ -141,6 +141,19 @@ def test_profile_endpoint_404(monkeypatch, tmp_path):
         )
 
 
+def test_profile_separates_mastered_errors(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    grammar_repo.record_errors(a, find_errors("He go to school"))
+    for _ in range(3):
+        grammar_repo.record_correct_usage(a, "he_she_it_s", 3)
+
+    with TestClient(app) as client:
+        body = client.get("/api/profile", params={"user_id": a}).json()
+    assert body["mastered_count"] == 1
+    assert body["recurring_errors"] == []
+    assert body["mastered_errors"][0]["rule"] == "he_she_it_s"
+
+
 def test_profile_grammar_rate_uses_user_messages(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     cid = conversations_repo.create_conversation(a)["id"]

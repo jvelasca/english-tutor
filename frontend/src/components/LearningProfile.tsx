@@ -90,6 +90,11 @@ export function LearningProfile({ profile }: LearningProfileProps) {
             ))}
           </ul>
         )}
+        {profile.mastered_count > 0 && (
+          <p className="learning-mastered">
+            Errores superados: {profile.mastered_count}
+          </p>
+        )}
       </div>
 
       <div className="learning-block">

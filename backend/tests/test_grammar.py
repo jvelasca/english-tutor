@@ -7,7 +7,7 @@ from main import app
 from repositories import db
 from repositories import grammar as grammar_repo
 from repositories import users as users_repo
-from services.grammar import find_errors
+from services.grammar import find_correct_usage, find_errors
 
 
 def _setup(monkeypatch, tmp_path):
@@ -119,6 +119,75 @@ def test_get_recurring_errors_ordered(monkeypatch, tmp_path):
     assert recurring[0]["count"] == 2
     assert recurring[1]["rule"] == "a_an"
     assert recurring[1]["count"] == 1
+
+
+def test_find_correct_usage_third_person_s(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert find_correct_usage("He goes to school", "he_she_it_s") is True
+    assert find_correct_usage("He go to school", "he_she_it_s") is False
+
+
+def test_find_correct_usage_to_too(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert find_correct_usage("It is too much", "to_too") is True
+    assert find_correct_usage("It is to much", "to_too") is False
+
+
+def test_find_correct_usage_no_positive_pattern(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert find_correct_usage("I like it", "capitalization_i") is False
+
+
+def test_record_correct_usage_increments_and_masters(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    grammar_repo.record_errors(a, find_errors("He go to school"))
+    for _ in range(3):
+        assert grammar_repo.record_correct_usage(a, "he_she_it_s", 3) is True
+    rec = grammar_repo.get_recurring_errors(a)[0]
+    assert rec["correct_after"] == 3
+    assert rec["streak"] == 3
+    assert rec["mastered"] is True
+
+
+def test_record_correct_usage_unknown_rule_false(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert grammar_repo.record_correct_usage(a, "nope", 3) is False
+
+
+def test_record_errors_reopens_mastered(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    grammar_repo.record_errors(a, find_errors("He go to school"))
+    for _ in range(3):
+        grammar_repo.record_correct_usage(a, "he_she_it_s", 3)
+    assert grammar_repo.get_recurring_errors(a)[0]["mastered"] is True
+
+    # Vuelve a cometer el error → se reabre, conservando la evidencia histórica.
+    grammar_repo.record_errors(a, find_errors("He go again"))
+    rec = grammar_repo.get_recurring_errors(a)[0]
+    assert rec["mastered"] is False
+    assert rec["streak"] == 0
+    assert rec["correct_after"] == 3
+
+
+def test_analyze_endpoint_tracks_positive_evidence(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        client.post(
+            "/api/grammar/analyze",
+            params={"user_id": a},
+            json={"text": "He go to school"},
+        )
+        for _ in range(3):
+            client.post(
+                "/api/grammar/analyze",
+                params={"user_id": a},
+                json={"text": "He goes to school"},
+            )
+        rec = client.get("/api/grammar/errors", params={"user_id": a}).json()[0]
+    assert rec["rule"] == "he_she_it_s"
+    assert rec["mastered"] is True
+    assert rec["streak"] == 3
+    assert rec["correct_after"] == 3
 
 
 def test_grammar_endpoint_shape(monkeypatch, tmp_path):

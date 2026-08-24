@@ -32,6 +32,31 @@ def test_classify_errors_empty():
     }
 
 
+def test_classify_errors_mastered_is_resolved():
+    now = "2026-08-24T10:00:00+00:00"
+    errors = [
+        {
+            "rule": "a",
+            "message": "m1",
+            "count": 1,
+            "last_example": "",
+            "last_seen": "2026-08-20T10:00:00+00:00",
+            "mastered": True,
+        },
+        {
+            "rule": "b",
+            "message": "m2",
+            "count": 1,
+            "last_example": "",
+            "last_seen": "2026-08-20T10:00:00+00:00",
+            "mastered": False,
+        },
+    ]
+    result = classify_errors(errors, now)
+    assert [e["rule"] for e in result["resolved"]] == ["a"]
+    assert [e["rule"] for e in result["active"]] == ["b"]
+
+
 def test_compute_milestones_flags():
     none = compute_milestones(
         {

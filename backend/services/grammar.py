@@ -12,6 +12,9 @@ import re
 # Por debajo de este umbral, el hallazgo es un "candidato", no un error confirmado.
 CONFIRMED_THRESHOLD = 0.8
 
+# Nº de usos correctos consecutivos para considerar "dominado" un error.
+MASTERY_STREAK = 3
+
 RULES: list[dict] = [
     {
         "rule": "he_she_it_s",
@@ -101,3 +104,25 @@ def find_errors(text: str) -> list[dict]:
                 }
             )
     return findings
+
+
+# Patrones de "uso correcto" por regla. Solo se definen para las reglas cuyo uso
+# correcto es detectable de forma determinista (sin análisis gramatical completo).
+POSITIVE_PATTERNS: dict[str, re.Pattern] = {
+    "he_she_it_s": re.compile(
+        r"\b(he|she|it)\s+(goes|does|has|likes|wants|needs|knows|works|plays|"
+        r"says|thinks|makes|comes|looks|uses|takes|runs|walks|eats|drinks)\b",
+        re.IGNORECASE,
+    ),
+    "to_too": re.compile(
+        r"\btoo\s+(much|many|late|early|far|big|small|easy|hard|slow|fast)\b",
+        re.IGNORECASE,
+    ),
+}
+
+
+def find_correct_usage(text: str, rule: str) -> bool:
+    """Devuelve True si el texto contiene evidencia positiva (uso correcto) de la
+    regla. Solo para reglas con patrón positivo definido; el resto devuelve False."""
+    pattern = POSITIVE_PATTERNS.get(rule)
+    return bool(pattern and pattern.search(text))

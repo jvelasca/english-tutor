@@ -29,6 +29,10 @@ class GrammarRecurringError(BaseModel):
     count: int
     last_example: str
     last_seen: str
+    first_seen: str
     confidence: float
     source: str
     confirmed: bool
+    correct_after: int
+    streak: int
+    mastered: bool

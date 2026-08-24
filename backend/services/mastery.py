@@ -22,12 +22,16 @@ _MILESTONES = [
 def classify_errors(
     errors: list[dict], now_iso: str, resolved_after_days: int = RESOLVED_AFTER_DAYS
 ) -> dict:
-    """Separa errores recurrentes en activos (last_seen reciente) y resueltos
-    (sin recurrencia reciente). Heurística v1, determinista."""
+    """Separa errores recurrentes en activos y resueltos. Un error está resuelto si
+    está marcado como `mastered` (evidencia positiva) o si no recurre desde hace más
+    de `resolved_after_days`. Heurística v1, determinista."""
     now = datetime.fromisoformat(now_iso)
     active: list[dict] = []
     resolved: list[dict] = []
     for e in errors:
+        if e.get("mastered"):
+            resolved.append(e)
+            continue
         try:
             last = datetime.fromisoformat(e["last_seen"])
         except (KeyError, ValueError):

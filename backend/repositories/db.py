@@ -111,9 +111,13 @@ def init_db() -> None:
                 count INTEGER NOT NULL DEFAULT 1,
                 last_example TEXT NOT NULL DEFAULT '',
                 last_seen TEXT NOT NULL,
+                first_seen TEXT NOT NULL DEFAULT '',
                 confidence REAL NOT NULL DEFAULT 1.0,
                 source TEXT NOT NULL DEFAULT 'heuristic',
                 confirmed INTEGER NOT NULL DEFAULT 1,
+                correct_after INTEGER NOT NULL DEFAULT 0,
+                streak INTEGER NOT NULL DEFAULT 0,
+                mastered INTEGER NOT NULL DEFAULT 0,
                 UNIQUE (user_id, rule),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -184,6 +188,30 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE grammar_errors ADD COLUMN confirmed INTEGER "
                 "NOT NULL DEFAULT 1"
+            )
+        if "first_seen" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN first_seen TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+            conn.execute(
+                "UPDATE grammar_errors SET first_seen = last_seen "
+                "WHERE first_seen = ''"
+            )
+        if "correct_after" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN correct_after INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "streak" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN streak INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "mastered" not in grammar_cols:
+            conn.execute(
+                "ALTER TABLE grammar_errors ADD COLUMN mastered INTEGER "
+                "NOT NULL DEFAULT 0"
             )
 
         conn.execute(

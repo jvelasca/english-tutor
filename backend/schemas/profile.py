@@ -21,5 +21,7 @@ class LearningProfile(BaseModel):
     vocabulary_size: int
     top_words: list[str]
     recurring_errors: list[GrammarRecurringError]
+    mastered_errors: list[GrammarRecurringError]
+    mastered_count: int
     pronunciation_average: float | None
     recommendations: list[str]
