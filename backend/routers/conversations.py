@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from dependencies import current_user
 from domain import conversations as conversation_service
+from domain import learning as learning_service
 from schemas.conversations import Conversation, ConversationMeta, ConversationUpsert
 
 router = APIRouter()
@@ -15,6 +16,7 @@ async def create(user_id: str) -> dict:
     conv = await conversation_service.create_conversation(user_id)
     if conv is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    await learning_service.record_event(user_id, "conversation", conv["id"])
     return conv
 
 

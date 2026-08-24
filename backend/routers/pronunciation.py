@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from dependencies import read_audio_limited
+from domain import learning as learning_service
 from domain import pronunciation as pronunciation_service
 from domain import users as user_service
 from schemas.pronunciation import PronunciationResponse
@@ -39,4 +40,5 @@ async def pronunciation(
     await pronunciation_service.record_pronunciation(
         user_id, result["expected"], result["heard"], result["score"], result["level"]
     )
+    await learning_service.record_event(user_id, "pronunciation", result["expected"])
     return PronunciationResponse(**result)

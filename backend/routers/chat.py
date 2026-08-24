@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from domain import learning as learning_service
 from domain import profile as profile_service
 from schemas.chat import ChatRequest, ChatResponse
 from services.context import build_system_prompt
@@ -26,9 +27,18 @@ async def _system_prompt(req: ChatRequest) -> str:
     return build_system_prompt(req.mode, profile)
 
 
+async def _record_activity(req: ChatRequest) -> None:
+    """Registra la actividad del alumno si viene un user_id (opcional)."""
+    if not req.user_id:
+        return
+    detail = req.messages[-1].content[:200] if req.messages else ""
+    await learning_service.record_chat_activity(req.user_id, req.mode, detail)
+
+
 @router.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest) -> ChatResponse:
     system_prompt = await _system_prompt(req)
+    await _record_activity(req)
     try:
         return await chat_once(
             req.messages, req.model, req.temperature, req.mode, system_prompt
@@ -44,6 +54,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
 async def chat_stream_endpoint(req: ChatRequest) -> StreamingResponse:
     """Emite la respuesta como Server-Sent Events (texto incremental)."""
     system_prompt = await _system_prompt(req)
+    await _record_activity(req)
 
     async def generate():
         try:
