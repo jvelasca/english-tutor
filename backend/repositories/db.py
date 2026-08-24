@@ -118,6 +118,19 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS listening_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                answer_index INTEGER NOT NULL,
+                correct INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS learning_profile (
                 user_id TEXT PRIMARY KEY,
                 cefr_level TEXT NOT NULL DEFAULT 'A1',
@@ -161,6 +174,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_grammar_errors_user_id "
             "ON grammar_errors(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_listening_attempts_user_id "
+            "ON listening_attempts(user_id)"
         )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
