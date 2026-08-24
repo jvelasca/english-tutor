@@ -3,23 +3,22 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 11:15 (UTC+2).
+> Actualizado por última vez: 2026-08-24 11:40 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–5 del plan de endurecimiento **completas, verificadas
-y commiteadas**. Working tree limpio. Últimos commits:
+**Posición actual (2026-08-24):** Fases 0–5 **completas, verificadas y commiteadas**. FASE 6
+(Progreso pedagógico real) **en curso**: F6.1 hecho y commiteado, F6.2 pendiente. Últimos commits:
+- `feat: fase 6.1` — registro automático de eventos de aprendizaje (`learning_events` activa).
 - `938c989` — Fase 5 frontend: `user_id` al chat (personaliza el tutor).
 - `c5e627b` — Fase 5: Context Builder (perfil del alumno al system prompt).
 - `022680e` — Fase 5: política de corrección (correctness policy) por CEFR.
-- `f5dd4a6` — Fase 4 frontend: panel Learning Profile (CEFR, vocabulario, errores, recomendaciones).
-- `5a77a74` — Fase 4: CEFR y recomendaciones (perfil agregado).
 
-**Estado verde:** backend `128 tests` + `ruff` limpio + `import main` OK; frontend `51 tests`
+**Estado verde:** backend `136 tests` + `ruff` limpio + `import main` OK; frontend `51 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: FASE 6 — Progreso pedagógico real** (no solo counts). Requiere diseño antes
-de codificar; ver `docs/PLAN-ENDURECIMIENTO.md`.
+**Siguiente paso: F6.2 — Progreso histórico real** (tendencias, racha, dominio, hitos). Un único
+endpoint `GET /api/progress/history`. Ver `docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
@@ -486,3 +485,28 @@ verificado en verde antes de commitear.
 frontend `51 tests` + `tsc`/`build` OK. El perfil del alumno (CEFR + errores recurrentes +
 recomendaciones) ya entra al system prompt del tutor; sin `user_id` el chat queda como antes.
 Siguiente bloque: **FASE 6 — Progreso pedagógico real** (no solo counts).
+
+## 13. FASE 6 — Progreso pedagógico real (EN CURSO)
+
+Backend primero (F6.1–F6.2), frontend al final (F6.3). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear. Decisiones de diseño: un único endpoint nuevo
+(`GET /api/progress/history`), análisis **determinista sin LLM** (premisa 12), y el frontend
+**reemplaza** `ProgressSummary` por un dashboard de progreso real (responsive móvil/tablet).
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F6.1 Registro automático de eventos | `agentes/endurecimiento/f6-01-registro-eventos.md` | ✔ hecho |
+| F6.2 Progreso histórico (tendencias, racha, dominio, hitos) | `agentes/endurecimiento/f6-02-progreso-historico.md` | ⏳ pendiente |
+| F6.3 Frontend dashboard de progreso | `agentes/endurecimiento/f6-03-frontend-dashboard.md` | ⏳ pendiente |
+
+### HECHO — F6.1: registro automático de eventos de aprendizaje
+- `domain/learning.py`: `_MODE_TO_EVENT` (`exercises→exercise`, `grammar→correction`, resto→
+  `message`) + `record_chat_activity(user_id, mode, detail)` async.
+- `routers/chat.py`: `_record_activity(req)` (solo si hay `user_id`; detail = último mensaje
+  truncado a 200) llamada en `chat` y `chat_stream_endpoint` tras `_system_prompt`. Sin `user_id`
+  o usuario inexistente → no registra y el chat sigue con prompt base (sin ventana rota).
+- `routers/pronunciation.py`: registra evento `pronunciation` (detail = `expected`).
+- `routers/conversations.py`: registra evento `conversation` (detail = `conv["id"]`).
+- Tests: `tests/test_activity.py` (8 tests). Total backend **136 tests**.
+- La tabla `learning_events` deja de estar dormida: ahora la alimentan los endpoints reales.
+  La consumirán F6.2 (backend) y F6.3 (UI).

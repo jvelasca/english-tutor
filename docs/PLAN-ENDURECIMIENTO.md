@@ -19,7 +19,9 @@
 - **Fase 5 (Tutor Policy + Context Builder) CERRADA** el 2026-08-24: política de corrección por
   CEFR, Context Builder (el perfil del alumno entra al system prompt) y propagación de `user_id`
   al chat en el frontend.
-- Backend `128 tests` verdes + `ruff` limpio, `import main` OK; frontend `51 tests` verdes,
+- **Fase 6 (Progreso pedagógico real) EN CURSO** el 2026-08-24: F6.1 (registro automático de
+  eventos de aprendizaje) hecho; F6.2 (progreso histórico) y F6.3 (frontend) pendientes.
+- Backend `136 tests` verdes + `ruff` limpio, `import main` OK; frontend `51 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -120,6 +122,20 @@ perfil del alumno al system prompt del tutor. Secuencia (backend primero, fronte
 > **Notas de Fase 5:** `user_id` es **opcional** en `ChatRequest` (sin ventana rota); si falta o
 > el usuario no existe, se usa el prompt base. La política de corrección es determinista y sin
 > LLM (premisa 12).
+
+### FASE 6 — Progreso pedagógico real (detallada)
+
+Pasar de "cuánto" a "cómo evoluciona en el tiempo": **tendencias**, **racha/constancia**,
+**dominio** (errores que se resuelven vs. persisten) e **hitos**. Todo determinista, sin LLM.
+Decisiones: un único endpoint nuevo `GET /api/progress/history`; no se rompen `/api/progress` ni
+`/api/profile`; el frontend **reemplaza** `ProgressSummary` por un dashboard (responsive total
+móvil/tablet). Se reutiliza la tabla `learning_events` (F4) que F6.1 activa.
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| F6.1 | Registro automático de eventos | Activar `learning_events`: `chat` (message/exercise/correction por modo), `pronunciation` (pronunciation), `conversations` (conversation). | `agentes/endurecimiento/f6-01-registro-eventos.md` |
+| F6.2 | Progreso histórico (backend) | `services/trends.py` + `services/mastery.py` (puros), `repositories/progress.py`, `domain/progress.py`, `schemas/progress.py` (SeriesPoint, Streak, ErrorMastery, Milestone, ProgressHistory), `routers/progress.py` (`GET /api/progress/history`). | `agentes/endurecimiento/f6-02-progreso-historico.md` |
+| F6.3 | Frontend dashboard | Tipos + `api/progress.ts` (`getProgressHistory`) + `api/learning.ts` (`getEvents`), helpers `utils/progress.ts`, `components/ProgressDashboard.tsx` (reemplaza `ProgressSummary`), `hooks/useChat.ts`, `App.tsx`, `index.css`. | `agentes/endurecimiento/f6-03-frontend-dashboard.md` |
 
 ### FASE 6 → 10 — Backlog (se detallará al llegar)
 
