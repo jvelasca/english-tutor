@@ -3,31 +3,22 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 12:05 (UTC+2).
+> Actualizado por última vez: 2026-08-24 12:15 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–6 del plan de endurecimiento **completas, verificadas
-y commiteadas**. Working tree limpio. Últimos commits:
+**Posición actual (2026-08-24):** Fases 0–6 **completas, verificadas y commiteadas**. FASE 7
+(Pronunciación fonética) **en curso**: F7.1 hecho, F7.2 (frontend) pendiente. Últimos commits:
+- `feat: fase 7.1` — evaluador compuesto de pronunciación (word + Soundex + char).
 - `feat: fase 6.3` — dashboard de progreso real (reemplaza `ProgressSummary`).
 - `feat: fase 6.2` — progreso histórico: tendencias, racha, dominio de errores e hitos.
-- `feat: fase 6.1` — registro automático de eventos de aprendizaje (`learning_events` activa).
 
-**Estado verde:** backend `151 tests` + `ruff` limpio + `import main` OK; frontend `56 tests`
+**Estado verde:** backend `163 tests` + `ruff` limpio + `import main` OK; frontend `56 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: FASE 7 — Pronunciación fonética** (evaluadores compuestos). Sustituir el
-evaluador único actual (`services/pronunciation.py`, `difflib` a nivel de caracteres) por un
-**evaluador compuesto determinista**: precisión por palabra (alineación) + similitud fonética
-(Soundex) + similitud de caracteres, ponderado. Ver `docs/PLAN-ENDURECIMIENTO.md`.
-
-**Punto de partida de F7 (estado actual de pronunciación):**
-- `services/pronunciation.py::score_pronunciation(expected, heard)` → `{expected, heard, score,
-  level, ok}` con `SequenceMatcher` sobre texto normalizado (umbrales: `good ≥80`, `fair ≥50`).
-- `schemas/pronunciation.py::PronunciationResponse` = `{expected, heard, score, level, ok}`.
-- `routers/pronunciation.py` transcribe → `score_pronunciation` → `record_pronunciation` →
-  `record_event`. `pronunciation_attempts` persiste `{expected, heard, score, level}`.
-- Frontend: `PronunciationPractice.tsx` muestra `score`/`level`/`expected`/`heard`.
+**Siguiente paso: F7.2 — Frontend feedback fonético** (`PronunciationPractice` muestra el
+breakdown por palabra: correctas/omitidas/sustituidas + score fonético). Ver
+`docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
@@ -549,3 +540,27 @@ verificado en verde antes de commitear. Decisiones de diseño: un único endpoin
 **Estado al cierre de Fase 6:** backend `151 tests` + `ruff` limpio; frontend `56 tests` +
 `tsc`/`build` OK. El progreso dejó de ser "counts estáticos": ahora hay tendencias temporales,
 racha, dominio de errores (activos vs resueltos) e hitos, deterministas y sin LLM.
+
+## 14. FASE 7 — Pronunciación fonética (EN CURSO)
+
+Sustituir el evaluador único (`difflib` a nivel de caracteres) por un **evaluador compuesto
+determinista** (sin LLM): precisión por palabra + similitud fonética (Soundex) + caracteres.
+El breakdown viaja solo en la respuesta (sin migración). Decisiones: Soundex (sí), persistencia
+solo en respuesta (sí).
+
+### HECHO — F7.1: evaluador compuesto (backend)
+- `services/phonetics.py` (puro): `tokenize`, `soundex` (variante simplificada, sin deps),
+  `word_alignment` (correct/missing/extra/substituted + total), `word_accuracy`,
+  `phonetic_similarity` (greedy por Soundex) y `composite_score`
+  (pesos `word 0.6 / phonetic 0.3 / char 0.1`).
+- `services/pronunciation.py::score_pronunciation` delega en `composite_score` y amplía el
+  contrato: `score`, `level`, `ok`, `word_accuracy`, `phonetic_score`, `breakdown`. Umbrales
+  `good ≥80` / `fair ≥50` intactos.
+- `schemas/pronunciation.py`: `WordSubstitution`, `PronunciationBreakdown` y
+  `PronunciationResponse` ampliado. `routers/pronunciation.py` sin cambios.
+- Sin migración de `pronunciation_attempts` (sigue guardando `score`/`level` agregados).
+- Tests: `test_phonetics.py` (12). Total backend **163 tests**.
+
+### PENDIENTE — F7.2: frontend feedback fonético
+`PronunciationPractice.tsx` mostrará el breakdown (palabras correctas/omitidas/sustituidas +
+score fonético) vía `utils/pronunciationFeedback.ts` (puro) y tipos nuevos en `types/api.ts`.

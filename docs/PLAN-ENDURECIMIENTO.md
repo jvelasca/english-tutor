@@ -22,7 +22,9 @@
 - **Fase 6 (Progreso pedagógico real) CERRADA** el 2026-08-24: F6.1 (registro automático de
   eventos), F6.2 (progreso histórico: tendencias, racha, dominio, hitos) y F6.3 (dashboard
   frontend responsive móvil/tablet).
-- Backend `151 tests` verdes + `ruff` limpio, `import main` OK; frontend `56 tests` verdes,
+- **Fase 7 (Pronunciación fonética) EN CURSO** el 2026-08-24: F7.1 (evaluador compuesto
+  word+Soundex+char) hecho; F7.2 (frontend feedback) pendiente.
+- Backend `163 tests` verdes + `ruff` limpio, `import main` OK; frontend `56 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -138,12 +140,27 @@ móvil/tablet). Se reutiliza la tabla `learning_events` (F4) que F6.1 activa.
 | F6.2 | Progreso histórico (backend) | `services/trends.py` + `services/mastery.py` (puros), `repositories/progress.py`, `domain/progress.py`, `schemas/progress.py` (SeriesPoint, Streak, ErrorMastery, Milestone, ProgressHistory), `routers/progress.py` (`GET /api/progress/history`). | `agentes/endurecimiento/f6-02-progreso-historico.md` |
 | F6.3 | Frontend dashboard | Tipos + `api/progress.ts` (`getProgressHistory`) + `api/learning.ts` (`getEvents`), helpers `utils/progress.ts`, `components/ProgressDashboard.tsx` (reemplaza `ProgressSummary`), `hooks/useChat.ts`, `App.tsx`, `index.css`. | `agentes/endurecimiento/f6-03-frontend-dashboard.md` |
 
-### FASE 6 → 10 — Backlog (se detallará al llegar)
+### FASE 7 — Pronunciación fonética (detallada)
+
+Sustituir el evaluador único actual (`difflib` a nivel de caracteres) por un **evaluador
+compuesto determinista** (sin LLM, premisa 12): precisión por palabra (alineación) + similitud
+fonética (Soundex) + similitud de caracteres, ponderado. El **breakdown** (detalle por palabra)
+viaja **solo en la respuesta** (sin migración de `pronunciation_attempts`). Backend primero,
+frontend al final.
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| F7.1 | Evaluador compuesto (backend) | `services/phonetics.py` (puro: `tokenize`, `soundex`, `word_alignment`, `word_accuracy`, `phonetic_similarity`, `composite_score`), `services/pronunciation.py` delega, `schemas/pronunciation.py` (`WordSubstitution`, `PronunciationBreakdown`, `PronunciationResponse` ampliado). | `agentes/endurecimiento/f7-01-evaluador-compuesto.md` |
+| F7.2 | Frontend feedback fonético | Tipos + `utils/pronunciationFeedback.ts` (puro) + `components/PronunciationPractice.tsx` (muestra el breakdown). | `agentes/endurecimiento/f7-02-frontend-feedback.md` |
+
+> **Notas de Fase 7:** pesos compuestos `word 0.6 / phonetic 0.3 / char 0.1`; umbrales
+> `good ≥80`, `fair ≥50` intactos. Soundex es una variante simplificada determinista (sin deps).
+
+### FASE 7 → 10 — Backlog (se detallará al llegar)
 
 | Fase | Alcance |
 |---|---|
-| 6 | Progreso pedagógico real (no solo counts). ✔ CERRADA (ver detalle arriba). |
-| 7 | Pronunciación fonética (evaluadores compuestos). |
+| 7 | Pronunciación fonética (evaluadores compuestos). EN CURSO (ver detalle arriba). |
 | 8 | Listening / Speaking / CEFR. |
 | 9 | Evaluación objetiva del tutor. |
 | 10 | Release 1.0 realmente estable. |
