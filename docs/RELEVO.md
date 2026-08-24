@@ -3,20 +3,21 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 12:25 (UTC+2).
+> Actualizado por última vez: 2026-08-24 13:05 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–7 del plan de endurecimiento **completas, verificadas
+**Posición actual (2026-08-24):** Fases 0–8 del plan de endurecimiento **completas, verificadas
 y commiteadas**. Working tree limpio. Últimos commits:
-- `feat: fase 7.2` — frontend feedback fonético en pronunciación.
-- `feat: fase 7.1` — evaluador compuesto de pronunciación (word + Soundex + char).
-- `feat: fase 6.3` — dashboard de progreso real (reemplaza `ProgressSummary`).
+- `feat: fase 8.4` — UI CEFR multi-señal + fluidez + listening.
+- `feat: fase 8.3` — listening (banco de preguntas + evaluación determinista).
+- `feat: fase 8.2` — fluidez oral con duración (WPM) en pronunciación.
+- `feat: fase 8.1` — evaluación CEFR multi-señal (bandas por destreza + descriptor).
 
-**Estado verde:** backend `163 tests` + `ruff` limpio + `import main` OK; frontend `65 tests`
+**Estado verde:** backend `191 tests` + `ruff` limpio + `import main` OK; frontend `74 tests`
 + `tsc`/`build` OK.
 
-**Siguiente paso: FASE 8 — Listening / Speaking / CEFR** (evaluación CEFR real). Ver
+**Siguiente paso: FASE 9 — Evaluación objetiva del tutor.** Ver
 `docs/PLAN-ENDURECIMIENTO.md`.
 
 **Acciones del nuevo gerente (en orden):**
@@ -575,3 +576,66 @@ score fonético) vía `utils/pronunciationFeedback.ts` (puro) y tipos nuevos en 
 **Estado al cierre de Fase 7:** backend `163 tests` + `ruff` limpio; frontend `65 tests` +
 `tsc`/`build` OK. La pronunciación pasó de un único `difflib` a un evaluador compuesto
 (precisión por palabra + Soundex + caracteres) con feedback por palabra, determinista y sin LLM.
+
+## 15. FASE 8 — Listening / Speaking / CEFR (CERRADA)
+
+Backend primero (F8.1–F8.3), frontend al final (F8.4). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear. Decisiones: CEFR **multi-señal rico** (bandas por
+destreza + descriptor); fluidez **con duración** (STT expone `info.duration`); **listening**
+incluido ya (banco estático + TTS existente). Todo determinista, sin LLM.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F8.1 CEFR multi-señal (backend) | `agentes/endurecimiento/f8-01-cefr-multisenial.md` | ✔ hecho |
+| F8.2 Fluidez oral (backend) | `agentes/endurecimiento/f8-02-fluidez-oral.md` | ✔ hecho |
+| F8.3 Listening (backend) | `agentes/endurecimiento/f8-03-listening.md` | ✔ hecho |
+| F8.4 Frontend CEFR + fluidez + listening | `agentes/endurecimiento/f8-04-frontend.md` | ✔ hecho |
+
+### HECHO — F8.1: evaluación CEFR multi-señal (backend)
+- `services/cefr.py`: `evaluate_cefr` (punto-sum: vocab + pron + ejercicios + gramática +
+  fluidez) + bandas `vocabulary_band`/`grammar_band`/`fluency_band`/`pronunciation_band` +
+  `_LEVEL_DESCRIPTORS`/`level_descriptor`; `estimate_cefr` delega (compat v1). `recommendations`
+  intacta.
+- `schemas/profile.py`: `CefrBands` + `LearningProfile.cefr_bands`/`cefr_descriptor`.
+- `domain/profile.py::_compute_profile` calcula `grammar_error_rate` + `messages` y usa
+  `evaluate_cefr`.
+- Tests: `test_cefr_evaluation.py` (9). Total backend **172 tests**.
+
+### HECHO — F8.2: fluidez oral con duración (backend)
+- `services/fluency.py` (puro): `compute_fluency` (WPM = palabras/min; `fluent ≥120`,
+  `good 60–119`, `slow <60`, `—` sin audio válido).
+- `services/stt.py`: `transcribe_with_timing` (devuelve `{text, duration}` con `info.duration`);
+  `transcribe` delega (contrato de string intacto para `voz.py`).
+- `schemas/pronunciation.py`: `FluencyStats` + `PronunciationResponse.fluency`.
+- `routers/pronunciation.py`: usa `transcribe_with_timing` + `compute_fluency`.
+- Se actualizaron 2 monkeypatch de tests existentes (`test_activity.py`, `test_api_security.py`)
+  para devolver `{text, duration}`. Tests: `test_fluency.py` (6). Total backend **178 tests**.
+
+### HECHO — F8.3: listening (banco + preguntas, backend)
+- `services/listening.py` (puro): `QUESTION_BANK` (8 preguntas A1–B1, opción múltiple) +
+  `get_question`/`pick_next_question`/`score_answer`.
+- `schemas/listening.py`: `ListeningQuestion`, `ListeningAnswerRequest`, `ListeningAnswerResponse`,
+  `ListeningStats`.
+- `repositories/listening.py`: tabla `listening_attempts` + `record_attempt`/`seen_question_ids`/
+  `get_stats`; `domain/listening.py`: `next_question`/`submit_answer`/`get_stats`.
+- `routers/listening.py`: `GET /api/listening/question`, `POST /api/listening/answer`,
+  `GET /api/listening/stats` (registra evento `exercise`). `db.py` (tabla+índice) y `main.py`
+  (registro router) solo aditivos.
+- Tests: `test_listening.py` (13). Total backend **191 tests**.
+
+### HECHO — F8.4: frontend CEFR + speaking + listening
+- `types/api.ts`: `FluencyStats`, `CefrBands`, `PronunciationResponse.fluency`,
+  `LearningProfile.cefr_bands/cefr_descriptor`, tipos de listening.
+- `utils/cefr.ts` (`bandLabel`), `utils/fluency.ts` (`wpmLabel`, `fluencyLevelLabel`),
+  `api/listening.ts` (3 funciones).
+- `LearningProfile.tsx`: descriptor CEFR + bandas por destreza. `PronunciationPractice.tsx`:
+  línea de fluidez (nivel · WPM). `ListeningPractice.tsx` (nuevo): TTS + opciones + feedback +
+  stats + "Siguiente". `App.tsx` lo monta; `index.css` con estilos responsive.
+- Tests: `utils/fluency.test.ts` (4) + `utils/cefr.test.ts` (+2) + `api/listening.test.ts` (3).
+  Total frontend **74 tests**.
+
+**Estado al cierre de Fase 8:** backend `191 tests` + `ruff` limpio + `import main` OK;
+frontend `74 tests` + `tsc`/`build` OK. CEFR dejó de ser una heurística plana: ahora hay
+evaluación multi-señal con bandas por destreza y descriptor; la pronunciación añade fluidez
+(WPM) con la duración del audio; y hay ejercicios de comprensión auditiva (banco + preguntas)
+reproducidos con el TTS local.

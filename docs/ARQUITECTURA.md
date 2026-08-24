@@ -22,6 +22,7 @@ backend/
 │   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
 │   ├── health.py        # /api/health/live, /ready, /dependencies
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
+│   ├── listening.py     # GET /api/listening/question, POST /api/listening/answer, GET /api/listening/stats (F8)
 │   ├── models.py        # GET /api/health, GET /api/models
 │   ├── profile.py       # GET /api/profile (F4)
 │   ├── progress.py      # GET /api/progress?user_id=<id>, GET /api/progress/history (F6)
@@ -35,8 +36,9 @@ backend/
 │   ├── conversations.py # Conversation, ConversationMeta (con user_id), ConversationUpsert
 │   ├── grammar.py       # GrammarAnalyze*, GrammarFinding, GrammarRecurringError (F4)
 │   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
-│   ├── profile.py       # LearningProfile (F4)
-│   ├── pronunciation.py # PronunciationResponse, WordSubstitution, PronunciationBreakdown (F7)
+│   ├── listening.py     # ListeningQuestion, ListeningAnswer*, ListeningStats (F8)
+│   ├── profile.py       # LearningProfile, CefrBands (F4/F8)
+│   ├── pronunciation.py # PronunciationResponse, FluencyStats, PronunciationBreakdown (F7/F8)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
 │   ├── users.py         # User, UserCreate
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
@@ -46,6 +48,7 @@ backend/
 │   ├── conversations.py
 │   ├── grammar.py       # análisis de errores + persistencia (F4)
 │   ├── learning.py      # eventos de aprendizaje (F4)
+│   ├── listening.py     # next_question + submit_answer + stats (F8)
 │   ├── pronunciation.py
 │   ├── profile.py       # get_profile_summary + get_profile_context (compone el perfil) (F4/F5)
 │   ├── progress.py      # get_progress_history: series + racha + dominio + hitos (F6)
@@ -57,6 +60,7 @@ backend/
 │   ├── conversations.py
 │   ├── grammar.py       # grammar_errors (F4)
 │   ├── learning.py      # learning_events (F4)
+│   ├── listening.py     # listening_attempts (F8)
 │   ├── profile.py       # learning_profile (F4)
 │   ├── pronunciation.py
 │   ├── progress.py      # activity_events (mensajes con modo + pronunciaciones) (F6)
@@ -64,9 +68,11 @@ backend/
 │   └── vocabulary.py    # vocabulary (F4)
 ├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
 │   ├── __init__.py
-│   ├── cefr.py          # estimate_cefr, recommendations (puros, F4)
+│   ├── cefr.py          # evaluate_cefr (multi-señal) + bandas + recommendations (puros, F4/F8)
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
+│   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
+│   ├── listening.py     # banco de preguntas + score_answer (puro, F8)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
@@ -82,15 +88,18 @@ backend/
 │   ├── conftest.py      # asegura el import desde backend/
 │   ├── test_activity.py # F6
 │   ├── test_api_security.py
+│   ├── test_cefr_evaluation.py # F8
 │   ├── test_chat_integration.py
 │   ├── test_chat_profile.py # F5
 │   ├── test_context.py      # F5
 │   ├── test_cors.py
 │   ├── test_domain_async.py
+│   ├── test_fluency.py  # F8
 │   ├── test_foreign_keys.py
 │   ├── test_grammar.py  # F4
 │   ├── test_health.py
 │   ├── test_learning_events.py # F4
+│   ├── test_listening.py # F8
 │   ├── test_mastery.py # F6
 │   ├── test_modes.py
 │   ├── test_phonetics.py # F7
@@ -137,6 +146,7 @@ frontend/src/
 │   ├── chat.ts          # chat normal + streaming (envía mode + user_id).
 │   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
 │   ├── learning.ts      # getProfile + analyzeText + getEvents (F4/F6).
+│   ├── listening.ts     # getListeningQuestion + submitListeningAnswer + getListeningStats (F8).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).
 │   ├── progress.ts      # getProgress + getProgressHistory (resumen + histórico) (F6).
 │   ├── users.ts         # listUsers, createUser.
@@ -145,10 +155,11 @@ frontend/src/
 │   ├── ChatMessage.tsx
 │   ├── Composer.tsx
 │   ├── HandsFreeToggle.tsx  # activar/parar modo manos libres + estado (M10)
-│   ├── LearningProfile.tsx  # panel del perfil: CEFR, vocabulario, errores, recomendaciones (F4)
+│   ├── LearningProfile.tsx  # panel del perfil: CEFR + bandas por destreza + recomendaciones (F4/F8)
+│   ├── ListeningPractice.tsx # comprensión auditiva: TTS + responder + stats (F8)
 │   ├── MicButton.tsx
 │   ├── ModeSelect.tsx   # selector de modo de tutor
-│   ├── PronunciationPractice.tsx
+│   ├── PronunciationPractice.tsx # feedback fonético + fluidez (WPM) (F7/F8)
 │   ├── ProgressDashboard.tsx # dashboard de progreso real: tendencias, racha, dominio, hitos (F6)
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
@@ -163,8 +174,10 @@ frontend/src/
 ├── utils/               # Funciones puras (testables).
 │   ├── title.ts         # deriveTitle
 │   ├── title.test.ts
-│   ├── cefr.ts          # cefrTone, cefrLabel (F4)
+│   ├── cefr.ts          # cefrTone, cefrLabel, bandLabel (F4/F8)
 │   ├── cefr.test.ts
+│   ├── fluency.ts       # wpmLabel, fluencyLevelLabel (F8)
+│   ├── fluency.test.ts
 │   ├── sse.ts           # parseo de eventos SSE
 │   ├── sse.test.ts
 │   ├── modes.ts         # MODES + isTutorMode

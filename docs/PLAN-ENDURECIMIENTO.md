@@ -24,7 +24,10 @@
   frontend responsive móvil/tablet).
 - **Fase 7 (Pronunciación fonética) CERRADA** el 2026-08-24: F7.1 (evaluador compuesto
   word+Soundex+char) y F7.2 (frontend feedback fonético).
-- Backend `163 tests` verdes + `ruff` limpio, `import main` OK; frontend `65 tests` verdes,
+- **Fase 8 (Listening / Speaking / CEFR) CERRADA** el 2026-08-24: F8.1 (CEFR multi-señal con
+  bandas por destreza), F8.2 (fluidez oral con duración/WPM), F8.3 (listening: banco de
+  preguntas + evaluación) y F8.4 (frontend: CEFR + fluidez + listening UI).
+- Backend `191 tests` verdes + `ruff` limpio, `import main` OK; frontend `74 tests` verdes,
   `tsc`/`build` OK.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
@@ -156,12 +159,33 @@ frontend al final.
 > **Notas de Fase 7:** pesos compuestos `word 0.6 / phonetic 0.3 / char 0.1`; umbrales
 > `good ≥80`, `fair ≥50` intactos. Soundex es una variante simplificada determinista (sin deps).
 
+### FASE 8 — Listening / Speaking / CEFR (detallada)
+
+CEFR real (evaluador multi-señal), fluidez oral (speaking con duración) y listening
+(banco + preguntas). Todo determinista, sin LLM (premisa 12). Backend primero (F8.1–F8.3),
+frontend al final (F8.4). Decisiones: evaluador CEFR **multi-señal rico** con bandas por
+destreza; fluidez **con duración** (el STT expone timestamps/duración); **incluir listening**
+ya (banco estático + TTS ya existente en `/api/tts`).
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| F8.1 | CEFR real multi-señal (backend) | `services/cefr.py` (`evaluate_cefr` + bandas + descriptor; `estimate_cefr` delega), `schemas/profile.py` (`CefrBands`), `domain/profile.py`. | `agentes/endurecimiento/f8-01-cefr-multisenial.md` |
+| F8.2 | Fluidez oral / speaking (backend) | `services/fluency.py` (`compute_fluency` WPM), `services/stt.py` (`transcribe_with_timing`), `schemas/pronunciation.py` (`FluencyStats`), `routers/pronunciation.py`. | `agentes/endurecimiento/f8-02-fluidez-oral.md` |
+| F8.3 | Listening: banco + preguntas (backend) | `services/listening.py` (banco + `score_answer`), `schemas/listening.py`, `repositories/listening.py`, `domain/listening.py`, `routers/listening.py`, tabla `listening_attempts` en `db.py`, registro en `main.py`. | `agentes/endurecimiento/f8-03-listening.md` |
+| F8.4 | Frontend: CEFR + speaking + listening UI | Tipos, `api/listening.ts`, `utils/fluency.ts`, `utils/cefr.ts` (`bandLabel`), `LearningProfile` (bandas+descriptor), `PronunciationPractice` (fluidez), `ListeningPractice.tsx`, `App.tsx`, `index.css`. | `agentes/endurecimiento/f8-04-frontend.md` |
+
+> **Notas de Fase 8:** la fluidez se calcula con `info.duration` de faster-whisper (WPM =
+> palabras / minutos); niveles `fluent ≥120`, `good 60–119`, `slow <60`. El CEFR global es un
+> punto-sum ponderado con bandas por destreza (vocabulario, gramática, fluidez, pronunciación)
+> y un descriptor descriptivo. Listening es un banco estático de 8 preguntas A1–B1 (opción
+> múltiple, evaluación determinista) reproducidas con el TTS existente.
+
 ### FASE 7 → 10 — Backlog (se detallará al llegar)
 
 | Fase | Alcance |
 |---|---|
 | 7 | Pronunciación fonética (evaluadores compuestos). ✔ CERRADA (ver detalle arriba). |
-| 8 | Listening / Speaking / CEFR. |
+| 8 | Listening / Speaking / CEFR. ✔ CERRADA (ver detalle arriba). |
 | 9 | Evaluación objetiva del tutor. |
 | 10 | Release 1.0 realmente estable. |
 
