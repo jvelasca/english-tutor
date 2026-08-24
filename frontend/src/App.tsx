@@ -8,7 +8,7 @@ import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { LearningProfile } from "./components/LearningProfile";
 import { ModeSelect } from "./components/ModeSelect";
 import { PronunciationPractice } from "./components/PronunciationPractice";
-import { ProgressSummary } from "./components/ProgressSummary";
+import { ProgressDashboard } from "./components/ProgressDashboard";
 import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { UserSelect } from "./components/UserSelect";
@@ -42,8 +42,12 @@ export default function App() {
     removeConversation,
     selectUser,
     addUser,
-    progress,
-    refreshProgress,
+    history,
+    events,
+    bucket,
+    setBucket,
+    refreshHistory,
+    refreshEvents,
     profile,
   } = useChat();
 
@@ -153,7 +157,12 @@ export default function App() {
           </div>
         </header>
 
-        <ProgressSummary progress={progress} />
+        <ProgressDashboard
+          history={history}
+          events={events}
+          bucket={bucket}
+          onBucketChange={setBucket}
+        />
 
         <LearningProfile profile={profile} />
 
@@ -161,7 +170,10 @@ export default function App() {
           {mode === "pronunciation" && (
             <PronunciationPractice
               userId={currentUserId}
-              onAttempt={refreshProgress}
+              onAttempt={() => {
+                refreshHistory();
+                refreshEvents();
+              }}
             />
           )}
 

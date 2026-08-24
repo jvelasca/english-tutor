@@ -82,3 +82,54 @@ export interface LearningProfile {
   pronunciation_average: number | null;
   recommendations: string[];
 }
+
+export type Bucket = "day" | "week" | "month";
+
+export type LearningEventType =
+  | "message"
+  | "exercise"
+  | "correction"
+  | "pronunciation"
+  | "conversation";
+
+export interface LearningEvent {
+  id: number;
+  user_id: string;
+  type: LearningEventType;
+  detail: string;
+  created_at: string;
+}
+
+export interface SeriesPoint {
+  bucket: string;
+  messages: number;
+  exercises: number;
+  corrections: number;
+  pronunciation: number;
+}
+
+export interface Streak {
+  current_days: number;
+  best_days: number;
+  last_active_date: string | null;
+}
+
+export interface ErrorMastery {
+  active: GrammarRecurringError[];
+  resolved: GrammarRecurringError[];
+}
+
+export interface Milestone {
+  id: string;
+  label: string;
+  achieved: boolean;
+}
+
+export interface ProgressHistory {
+  user_id: string;
+  bucket: Bucket;
+  series: SeriesPoint[];
+  streak: Streak;
+  mastery: ErrorMastery;
+  milestones: Milestone[];
+}

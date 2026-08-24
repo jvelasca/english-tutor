@@ -8,15 +8,17 @@ import {
   saveConversation,
 } from "../api/conversations";
 import { createUser, listUsers } from "../api/users";
-import { getProgress } from "../api/progress";
-import { analyzeText, getProfile } from "../api/learning";
+import { getProgressHistory } from "../api/progress";
+import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
 import { nextDefaultUserName } from "../utils/users";
 import type {
+  Bucket,
   ConversationMeta,
+  LearningEvent,
   LearningProfile,
   Message,
-  ProgressSummary,
+  ProgressHistory,
   TutorMode,
   User,
 } from "../types/api";
@@ -34,7 +36,9 @@ export function useChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<ProgressSummary | null>(null);
+  const [history, setHistory] = useState<ProgressHistory | null>(null);
+  const [events, setEvents] = useState<LearningEvent[]>([]);
+  const [bucket, setBucket] = useState<Bucket>("week");
   const [profile, setProfile] = useState<LearningProfile | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -47,10 +51,19 @@ export function useChat() {
     }
   }, [currentUserId]);
 
-  const refreshProgress = useCallback(async () => {
+  const refreshHistory = useCallback(async () => {
     if (!currentUserId) return;
     try {
-      setProgress(await getProgress(currentUserId));
+      setHistory(await getProgressHistory(currentUserId, bucket));
+    } catch {
+      /* backend no disponible */
+    }
+  }, [currentUserId, bucket]);
+
+  const refreshEvents = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      setEvents(await getEvents(currentUserId));
     } catch {
       /* backend no disponible */
     }
@@ -111,9 +124,17 @@ export function useChat() {
   }, [currentUserId]);
 
   useEffect(() => {
-    setProgress(null);
-    void refreshProgress();
-  }, [refreshProgress]);
+    setHistory(null);
+    setEvents([]);
+  }, [currentUserId]);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
+
+  useEffect(() => {
+    void refreshEvents();
+  }, [refreshEvents]);
 
   useEffect(() => {
     setProfile(null);
@@ -275,11 +296,28 @@ export function useChat() {
 
       // Alimenta el perfil de aprendizaje (vocabulario + gramática) de forma
       // no bloqueante y refresca el perfil.
-      void analyzeText(trimmed, currentUserId).then(refreshProfile).catch(() => {});
+      void analyzeText(trimmed, currentUserId)
+        .then(() => {
+          refreshProfile();
+          refreshEvents();
+          refreshHistory();
+        })
+        .catch(() => {});
 
       return errored ? "" : assistantReply;
     },
-    [loading, messages, model, mode, conversationId, currentUserId, persist, refreshProfile],
+    [
+      loading,
+      messages,
+      model,
+      mode,
+      conversationId,
+      currentUserId,
+      persist,
+      refreshProfile,
+      refreshEvents,
+      refreshHistory,
+    ],
   );
 
   const send = useCallback(() => {
@@ -311,8 +349,12 @@ export function useChat() {
     removeConversation,
     selectUser,
     addUser,
-    progress,
-    refreshProgress,
+    history,
+    events,
+    bucket,
+    setBucket,
+    refreshHistory,
+    refreshEvents,
     profile,
     refreshProfile,
   };

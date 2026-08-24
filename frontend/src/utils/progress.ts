@@ -1,4 +1,4 @@
-import type { PronunciationLevel } from "../types/api";
+import type { Bucket, LearningEventType, PronunciationLevel } from "../types/api";
 
 /** Redondea una puntuación a texto, p. ej. 95 → "95"; `null` → "—". */
 export function formatScore(value: number | null): string {
@@ -23,5 +23,31 @@ export function pronunciationLevelLabel(level: PronunciationLevel | null): strin
       return "Sigue practicando";
     case null:
       return "—";
+  }
+}
+
+export function bucketLabel(bucket: Bucket): string {
+  switch (bucket) {
+    case "day":
+      return "Día";
+    case "week":
+      return "Semana";
+    case "month":
+      return "Mes";
+  }
+}
+
+export function eventLabel(type: LearningEventType): string {
+  switch (type) {
+    case "message":
+      return "Mensaje";
+    case "exercise":
+      return "Ejercicio";
+    case "correction":
+      return "Corrección";
+    case "pronunciation":
+      return "Pronunciación";
+    case "conversation":
+      return "Conversación";
   }
 }

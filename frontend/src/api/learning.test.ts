@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { analyzeText, getProfile } from "./learning";
+import { analyzeText, getEvents, getProfile } from "./learning";
 
 function mockFetch(ok: boolean, data: unknown) {
   const fn = vi.fn().mockResolvedValue({ ok, json: async () => data });
@@ -26,5 +26,12 @@ describe("learning api", () => {
 
     const bodies = fn.mock.calls.map((c) => JSON.parse(c[1].body as string));
     expect(bodies.every((b) => b.text === "hi")).toBe(true);
+  });
+
+  it("getEvents llama con user_id en la query", async () => {
+    const fn = mockFetch(true, []);
+    await getEvents("u1");
+    const [url] = fn.mock.calls[0];
+    expect(url).toBe("/api/learning/events?user_id=u1");
   });
 });

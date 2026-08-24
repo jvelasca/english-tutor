@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  bucketLabel,
+  eventLabel,
   formatAverage,
   formatScore,
   pronunciationLevelLabel,
@@ -42,5 +44,23 @@ describe("pronunciationLevelLabel", () => {
 
   it("renders a dash for null", () => {
     expect(pronunciationLevelLabel(null)).toBe("—");
+  });
+});
+
+describe("bucketLabel", () => {
+  it("maps each bucket to a Spanish label", () => {
+    expect(bucketLabel("day")).toBe("Día");
+    expect(bucketLabel("week")).toBe("Semana");
+    expect(bucketLabel("month")).toBe("Mes");
+  });
+});
+
+describe("eventLabel", () => {
+  it("maps each event type to a Spanish label", () => {
+    expect(eventLabel("message")).toBe("Mensaje");
+    expect(eventLabel("exercise")).toBe("Ejercicio");
+    expect(eventLabel("correction")).toBe("Corrección");
+    expect(eventLabel("pronunciation")).toBe("Pronunciación");
+    expect(eventLabel("conversation")).toBe("Conversación");
   });
 });
