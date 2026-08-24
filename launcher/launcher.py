@@ -166,9 +166,12 @@ class LauncherApp:
         self._msg.set("Arrancando servicios…")
 
         def work() -> None:
-            if not self.pm.backend_running():
+            # No duplicar un servicio que ya está activo (p. ej. lanzado con F5).
+            backend_up = fetch_health() is not None
+            frontend_up = fetch_frontend()
+            if not self.pm.backend_running() and not backend_up:
                 self.pm.start_backend()
-            if not self.pm.frontend_running():
+            if not self.pm.frontend_running() and not frontend_up:
                 self.pm.start_frontend()
             self.root.after(2500, self._open_browser_when_ready)
 
