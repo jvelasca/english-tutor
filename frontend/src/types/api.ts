@@ -38,12 +38,28 @@ export interface Conversation extends ConversationMeta {
   messages: Message[];
 }
 
+export interface WordSubstitution {
+  expected: string;
+  heard: string;
+}
+
+export interface PronunciationBreakdown {
+  correct: string[];
+  missing: string[];
+  extra: string[];
+  substituted: WordSubstitution[];
+  total: number;
+}
+
 export interface PronunciationResponse {
   expected: string;
   heard: string;
   score: number;
   level: PronunciationLevel;
   ok: boolean;
+  word_accuracy: number;
+  phonetic_score: number;
+  breakdown: PronunciationBreakdown;
 }
 
 export interface PronunciationStats {

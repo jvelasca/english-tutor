@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { checkPronunciation } from "../api/pronunciation";
 import type { PronunciationResponse } from "../types/api";
+import { feedbackHints, wordsCorrectLabel } from "../utils/pronunciationFeedback";
 
 const SAMPLES = [
   "Hello, how are you?",
@@ -23,6 +24,8 @@ export function PronunciationPractice({
   const [result, setResult] = useState<PronunciationResponse | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  const hints = result ? feedbackHints(result.breakdown) : [];
 
   async function toggle() {
     if (recording) {
@@ -112,7 +115,25 @@ export function PronunciationPractice({
                   ? "Aceptable"
                   : "Sigue practicando"}
             </div>
+            <div>
+              <span className="label">Precisión por palabra:</span>{" "}
+              {result.word_accuracy}%
+            </div>
+            <div>
+              <span className="label">Similitud fonética:</span>{" "}
+              {result.phonetic_score}%
+            </div>
           </div>
+          <p className="pronunciation-words-label">
+            {wordsCorrectLabel(result.breakdown)}
+          </p>
+          {hints.length > 0 && (
+            <ul className="pronunciation-hints">
+              {hints.map((hint) => (
+                <li key={hint}>{hint}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </section>
