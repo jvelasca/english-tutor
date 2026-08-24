@@ -3,7 +3,8 @@ testable)."""
 from __future__ import annotations
 
 import re
-from difflib import SequenceMatcher
+
+from services.phonetics import composite_score
 
 # Umbral de "buena pronunciación" (porcentaje de similitud).
 PASS_THRESHOLD = 80
@@ -22,15 +23,16 @@ def _level(score: int) -> str:
 
 
 def score_pronunciation(expected: str, heard: str) -> dict:
-    """Devuelve un dict con score (0-100), level y ok, además de expected/heard."""
-    e = _normalize(expected)
-    h = _normalize(heard)
-    ratio = SequenceMatcher(None, e, h).ratio() if (e and h) else 0.0
-    score = round(ratio * 100)
+    """Devuelve score/level/ok + word_accuracy + phonetic_score + breakdown."""
+    comp = composite_score(expected, heard)
+    score = comp["score"]
     return {
         "expected": expected.strip(),
         "heard": heard.strip(),
         "score": score,
         "level": _level(score),
         "ok": score >= PASS_THRESHOLD,
+        "word_accuracy": comp["word_accuracy"],
+        "phonetic_score": comp["phonetic_score"],
+        "breakdown": comp["breakdown"],
     }

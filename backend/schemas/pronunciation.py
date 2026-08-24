@@ -8,9 +8,25 @@ from pydantic import BaseModel
 Level = Literal["good", "fair", "needs_practice"]
 
 
+class WordSubstitution(BaseModel):
+    expected: str
+    heard: str
+
+
+class PronunciationBreakdown(BaseModel):
+    correct: list[str]
+    missing: list[str]
+    extra: list[str]
+    substituted: list[WordSubstitution]
+    total: int
+
+
 class PronunciationResponse(BaseModel):
     expected: str
     heard: str
     score: int
     level: Level
     ok: bool
+    word_accuracy: int
+    phonetic_score: int
+    breakdown: PronunciationBreakdown
