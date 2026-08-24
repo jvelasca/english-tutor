@@ -1,0 +1,295 @@
+{
+  "course_id": "english-tutor-academy",
+  "level_id": "a2",
+  "level": "A2",
+  "title": "A2 · Elementary",
+  "description": "Talk about the past, compare things, make plans and handle everyday situations.",
+  "modules": [
+    {
+      "id": "a2-m01",
+      "title": "Past Experiences",
+      "order": 1,
+      "units": [
+        {
+          "id": "a2-m01-u01",
+          "title": "Past Simple and Present Perfect",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m01-u01-l01",
+              "title": "Talking about the past",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m01-u01-l01-o01",
+                  "can_do": "I can describe past experiences and events.",
+                  "title": "Experiencias pasadas",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["Past Simple (irregular verbs)", "I went", "I saw", "I had"],
+                  "vocabulary": ["went", "saw", "had", "did", "last year", "ago"],
+                  "activities": [
+                    {
+                      "id": "a2-m01-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell the tutor about three things you did last year.",
+                      "target": "Last year I went to ... / I saw ... / I had ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m01-u01-l01-o02",
+                  "can_do": "I can talk about life experiences using the present perfect.",
+                  "title": "Present Perfect (introducción)",
+                  "skills": ["grammar", "speaking"],
+                  "concepts": ["Present Perfect", "have/has + past participle", "ever", "never"],
+                  "vocabulary": ["ever", "never", "been", "seen", "done"],
+                  "activities": [
+                    {
+                      "id": "a2-m01-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Say two places you have visited and one thing you have never done.",
+                      "target": "I have been to ... / I have never ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a2-m02",
+      "title": "People & Places",
+      "order": 2,
+      "units": [
+        {
+          "id": "a2-m02-u01",
+          "title": "Comparisons",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m02-u01-l01",
+              "title": "Comparing things",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m02-u01-l01-o01",
+                  "can_do": "I can compare people, places and things.",
+                  "title": "Comparativos",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["comparatives", "bigger than", "more interesting than"],
+                  "vocabulary": ["bigger", "smaller", "cheaper", "more", "than"],
+                  "activities": [
+                    {
+                      "id": "a2-m02-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Compare your city with another city using two comparatives.",
+                      "target": "My city is bigger than ... / more expensive than ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m02-u01-l01-o02",
+                  "can_do": "I can describe the best or worst of something.",
+                  "title": "Superlativos",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["superlatives", "the biggest", "the most beautiful"],
+                  "vocabulary": ["the best", "the worst", "the biggest", "the most"],
+                  "activities": [
+                    {
+                      "id": "a2-m02-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Say the best and the worst thing about your city.",
+                      "target": "The best thing is ... / The worst thing is ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a2-m03",
+      "title": "Future Plans",
+      "order": 3,
+      "units": [
+        {
+          "id": "a2-m03-u01",
+          "title": "Going to and will",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m03-u01-l01",
+              "title": "Expressing future",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m03-u01-l01-o01",
+                  "can_do": "I can talk about plans and intentions.",
+                  "title": "Planes e intenciones",
+                  "skills": ["grammar", "speaking"],
+                  "concepts": ["going to + verb", "plan to", "hope to"],
+                  "vocabulary": ["plan", "hope", "intend", "next month"],
+                  "activities": [
+                    {
+                      "id": "a2-m03-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell the tutor two things you are going to do next month.",
+                      "target": "Next month I am going to ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m03-u01-l01-o02",
+                  "can_do": "I can make predictions and spontaneous decisions.",
+                  "title": "Predicciones y decisiones",
+                  "skills": ["grammar", "speaking"],
+                  "concepts": ["will + verb", "I think it will", "I will help"],
+                  "vocabulary": ["will", "probably", "maybe", "soon"],
+                  "activities": [
+                    {
+                      "id": "a2-m03-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Make one prediction about the weather and one spontaneous decision.",
+                      "target": "I think it will ... / I will ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a2-m04",
+      "title": "Travel & Transport",
+      "order": 4,
+      "units": [
+        {
+          "id": "a2-m04-u01",
+          "title": "Getting around",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m04-u01-l01",
+              "title": "Travel situations",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m04-u01-l01-o01",
+                  "can_do": "I can buy tickets and ask about transport.",
+                  "title": "Comprar billetes",
+                  "skills": ["vocabulary", "speaking", "listening"],
+                  "concepts": ["Can I have ...?", "How much is a ticket to ...?"],
+                  "vocabulary": ["ticket", "train", "bus", "airport", "return"],
+                  "activities": [
+                    {
+                      "id": "a2-m04-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Buy a train ticket from the tutor.",
+                      "target": "Can I have a return ticket to ...?"
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m04-u01-l01-o02",
+                  "can_do": "I can describe what I have to do and what I must not do.",
+                  "title": "Obligación",
+                  "skills": ["grammar", "speaking"],
+                  "concepts": ["have to", "must", "mustn't"],
+                  "vocabulary": ["have to", "must", "mustn't", "allowed"],
+                  "activities": [
+                    {
+                      "id": "a2-m04-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Say two things you have to do before a trip.",
+                      "target": "I have to ... / I mustn't ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a2-m05",
+      "title": "Health",
+      "order": 5,
+      "units": [
+        {
+          "id": "a2-m05-u01",
+          "title": "Giving advice",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m05-u01-l01",
+              "title": "At the doctor",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m05-u01-l01-o01",
+                  "can_do": "I can describe how I feel and give simple advice.",
+                  "title": "Salud y consejos",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["should / shouldn't", "I feel", "I have a ..."],
+                  "vocabulary": ["headache", "cold", "tired", "should", "rest"],
+                  "activities": [
+                    {
+                      "id": "a2-m05-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell the tutor you feel ill and ask for advice.",
+                      "target": "I have a headache. / You should rest."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a2-m06",
+      "title": "Stories",
+      "order": 6,
+      "units": [
+        {
+          "id": "a2-m06-u01",
+          "title": "Telling a story",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m06-u01-l01",
+              "title": "Narrating",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m06-u01-l01-o01",
+                  "can_do": "I can tell a short story using linking words.",
+                  "title": "Contar una historia",
+                  "skills": ["speaking", "grammar", "vocabulary"],
+                  "concepts": ["then", "after that", "suddenly", "finally"],
+                  "vocabulary": ["first", "then", "after that", "suddenly", "finally"],
+                  "activities": [
+                    {
+                      "id": "a2-m06-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell a short story about a trip or a funny day.",
+                      "target": "First ... / Then ... / Finally ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,601 @@
+{
+  "course_id": "english-tutor-academy",
+  "level_id": "a1",
+  "level": "A1",
+  "title": "A1 · Beginner",
+  "description": "Introduce yourself, talk about everyday life, family, home, food and plans.",
+  "modules": [
+    {
+      "id": "a1-m01",
+      "title": "Introductions",
+      "order": 1,
+      "units": [
+        {
+          "id": "a1-m01-u01",
+          "title": "Personal information",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m01-u01-l01",
+              "title": "Introducing yourself",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m01-u01-l01-o01",
+                  "can_do": "I can introduce myself and give basic personal information.",
+                  "title": "Presentarme",
+                  "skills": ["speaking", "vocabulary", "grammar"],
+                  "concepts": ["I am", "My name is", "I live in", "I am from", "I work as"],
+                  "vocabulary": ["name", "country", "city", "job", "age", "family", "hobby"],
+                  "activities": [
+                    {
+                      "id": "a1-m01-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Introduce yourself to the tutor: your name, country, city and job.",
+                      "target": "I am ... / My name is ... / I live in ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m01-u01-l01-o02",
+                  "can_do": "I can ask someone's name and where they are from.",
+                  "title": "Preguntar el nombre y origen",
+                  "skills": ["speaking", "grammar", "vocabulary"],
+                  "concepts": ["What is your name?", "Where are you from?", "What's"],
+                  "vocabulary": ["what", "where", "your", "from", "name"],
+                  "activities": [
+                    {
+                      "id": "a1-m01-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Ask the tutor three personal questions using What / Where.",
+                      "target": "What is your name? / Where are you from?"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "a1-m01-u01-l02",
+              "title": "Countries and numbers",
+              "order": 2,
+              "objectives": [
+                {
+                  "id": "a1-m01-u01-l02-o01",
+                  "can_do": "I can say my country and nationality.",
+                  "title": "Países y nacionalidades",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["I am from + country", "I am + nationality", "to be"],
+                  "vocabulary": ["Spain", "Spanish", "Mexico", "Mexican", "France", "French", "England", "English"],
+                  "activities": [
+                    {
+                      "id": "a1-m01-u01-l02-o01-a01",
+                      "type": "fill_gap",
+                      "instruction": "Complete: 'I am ___ Spain. I am ___.'",
+                      "target": "I am from Spain. I am Spanish."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m01-u01-l02-o02",
+                  "can_do": "I can say and understand numbers from 1 to 100.",
+                  "title": "Números 1-100",
+                  "skills": ["vocabulary", "listening", "speaking"],
+                  "concepts": ["numbers 1-100"],
+                  "vocabulary": ["one", "ten", "twenty", "fifty", "hundred"],
+                  "activities": [
+                    {
+                      "id": "a1-m01-u01-l02-o02-a01",
+                      "type": "listen",
+                      "instruction": "Listen to the tutor and write down the number you hear.",
+                      "target": "recognize numbers 1-100"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m02",
+      "title": "Everyday Life",
+      "order": 2,
+      "units": [
+        {
+          "id": "a1-m02-u01",
+          "title": "Daily routines",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m02-u01-l01",
+              "title": "Routines and time",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m02-u01-l01-o01",
+                  "can_do": "I can describe my daily routine.",
+                  "title": "Mi rutina diaria",
+                  "skills": ["speaking", "grammar", "vocabulary"],
+                  "concepts": ["Present Simple", "I get up", "I go to", "I have breakfast"],
+                  "vocabulary": ["get up", "work", "breakfast", "lunch", "dinner", "sleep"],
+                  "activities": [
+                    {
+                      "id": "a1-m02-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Describe a typical day to the tutor using the Present Simple.",
+                      "target": "I get up at ... / I go to ... / I have breakfast at ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m02-u01-l01-o02",
+                  "can_do": "I can tell the time and talk about days and months.",
+                  "title": "La hora, días y meses",
+                  "skills": ["vocabulary", "listening", "speaking"],
+                  "concepts": ["What time is it?", "days of the week", "months"],
+                  "vocabulary": ["Monday", "Sunday", "January", "December", "morning", "evening"],
+                  "activities": [
+                    {
+                      "id": "a1-m02-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Say what time you do two activities and on which day.",
+                      "target": "I ... at ... on Monday."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m02-u01-l01-o03",
+                  "can_do": "I can talk about how often I do things.",
+                  "title": "Frecuencia",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["always", "usually", "sometimes", "never", "every day"],
+                  "vocabulary": ["always", "usually", "often", "sometimes", "never"],
+                  "activities": [
+                    {
+                      "id": "a1-m02-u01-l01-o03-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell the tutor how often you do three activities.",
+                      "target": "I always ... / I sometimes ... / I never ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m03",
+      "title": "Family & People",
+      "order": 3,
+      "units": [
+        {
+          "id": "a1-m03-u01",
+          "title": "Family and description",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m03-u01-l01",
+              "title": "My family",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m03-u01-l01-o01",
+                  "can_do": "I can talk about my family.",
+                  "title": "Mi familia",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["have got", "This is my", "I have a brother/sister"],
+                  "vocabulary": ["mother", "father", "brother", "sister", "son", "daughter", "grandmother", "grandfather"],
+                  "activities": [
+                    {
+                      "id": "a1-m03-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Describe your family to the tutor using 'I have got'.",
+                      "target": "I have got a brother. / My mother is ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m03-u01-l01-o02",
+                  "can_do": "I can describe people's appearance and personality.",
+                  "title": "Describir personas",
+                  "skills": ["vocabulary", "grammar", "speaking"],
+                  "concepts": ["be + adjective", "tall", "short", "friendly"],
+                  "vocabulary": ["tall", "short", "young", "old", "friendly", "kind", "happy"],
+                  "activities": [
+                    {
+                      "id": "a1-m03-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Describe a friend using three adjectives.",
+                      "target": "He/She is tall and friendly."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "a1-m03-u01-l02",
+              "title": "Possessives",
+              "order": 2,
+              "objectives": [
+                {
+                  "id": "a1-m03-u01-l02-o01",
+                  "can_do": "I can talk about what belongs to people.",
+                  "title": "Posesivos",
+                  "skills": ["grammar", "vocabulary", "speaking"],
+                  "concepts": ["my", "your", "his", "her", "their", "'s"],
+                  "vocabulary": ["my", "your", "his", "her", "our", "their"],
+                  "activities": [
+                    {
+                      "id": "a1-m03-u01-l02-o01-a01",
+                      "type": "fill_gap",
+                      "instruction": "Complete: 'This is Maria and ___ brother.'",
+                      "target": "This is Maria and her brother."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m04",
+      "title": "Home",
+      "order": 4,
+      "units": [
+        {
+          "id": "a1-m04-u01",
+          "title": "My home",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m04-u01-l01",
+              "title": "Rooms and furniture",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m04-u01-l01-o01",
+                  "can_do": "I can describe my home and the rooms in it.",
+                  "title": "Mi casa",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["There is / There are", "rooms of the house"],
+                  "vocabulary": ["kitchen", "bedroom", "bathroom", "living room", "garden", "door", "window"],
+                  "activities": [
+                    {
+                      "id": "a1-m04-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Describe your home using 'There is / There are'.",
+                      "target": "There is a kitchen. / There are two bedrooms."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m04-u01-l01-o02",
+                  "can_do": "I can say where things are using prepositions.",
+                  "title": "Preposiciones de lugar",
+                  "skills": ["grammar", "vocabulary", "listening"],
+                  "concepts": ["in", "on", "under", "next to", "behind"],
+                  "vocabulary": ["in", "on", "under", "next to", "behind", "in front of"],
+                  "activities": [
+                    {
+                      "id": "a1-m04-u01-l01-o02-a01",
+                      "type": "listen",
+                      "instruction": "Listen and say where the object is.",
+                      "target": "The book is on the table."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m05",
+      "title": "Food",
+      "order": 5,
+      "units": [
+        {
+          "id": "a1-m05-u01",
+          "title": "Food and drink",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m05-u01-l01",
+              "title": "Ordering food",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m05-u01-l01-o01",
+                  "can_do": "I can talk about food and drinks.",
+                  "title": "Comida y bebida",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["I would like", "I like / I don't like", "countable / uncountable"],
+                  "vocabulary": ["water", "bread", "apple", "rice", "coffee", "milk", "cheese", "fruit"],
+                  "activities": [
+                    {
+                      "id": "a1-m05-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Say what food and drink you like and don't like.",
+                      "target": "I like ... / I don't like ..."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m05-u01-l01-o02",
+                  "can_do": "I can order food in a restaurant or cafe.",
+                  "title": "Pedir comida",
+                  "skills": ["speaking", "vocabulary", "grammar"],
+                  "concepts": ["I would like", "Can I have", "some / any"],
+                  "vocabulary": ["menu", "order", "please", "some", "any", "bill"],
+                  "activities": [
+                    {
+                      "id": "a1-m05-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Order a drink and a dish from the tutor.",
+                      "target": "Can I have a coffee and some bread, please?"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m06",
+      "title": "Shopping",
+      "order": 6,
+      "units": [
+        {
+          "id": "a1-m06-u01",
+          "title": "Prices and clothes",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m06-u01-l01",
+              "title": "Buying things",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m06-u01-l01-o01",
+                  "can_do": "I can ask about prices and buy things.",
+                  "title": "Precios",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["How much is ...?", "this / that / these / those"],
+                  "vocabulary": ["price", "cheap", "expensive", "this", "that", "these", "those"],
+                  "activities": [
+                    {
+                      "id": "a1-m06-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Ask the tutor the price of two items.",
+                      "target": "How much is this?"
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m06-u01-l01-o02",
+                  "can_do": "I can talk about clothes.",
+                  "title": "La ropa",
+                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "concepts": ["comparatives", "bigger", "cheaper"],
+                  "vocabulary": ["shirt", "trousers", "shoes", "dress", "hat", "jacket", "size", "colour"],
+                  "activities": [
+                    {
+                      "id": "a1-m06-u01-l01-o02-a01",
+                      "type": "fill_gap",
+                      "instruction": "Compare two items: 'This shirt is ___ than that one.'",
+                      "target": "This shirt is cheaper than that one."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m07",
+      "title": "Places & Directions",
+      "order": 7,
+      "units": [
+        {
+          "id": "a1-m07-u01",
+          "title": "Around town",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m07-u01-l01",
+              "title": "Directions",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m07-u01-l01-o01",
+                  "can_do": "I can talk about places in a town.",
+                  "title": "Lugares de la ciudad",
+                  "skills": ["vocabulary", "speaking", "listening"],
+                  "concepts": ["there is a ...", "places in town"],
+                  "vocabulary": ["bank", "supermarket", "station", "hospital", "park", "school", "restaurant"],
+                  "activities": [
+                    {
+                      "id": "a1-m07-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Name three places near your home.",
+                      "target": "There is a supermarket near my home."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m07-u01-l01-o02",
+                  "can_do": "I can ask for and give simple directions.",
+                  "title": "Pedir indicaciones",
+                  "skills": ["speaking", "listening", "grammar"],
+                  "concepts": ["Imperatives", "turn left", "go straight", "next to"],
+                  "vocabulary": ["left", "right", "straight", "turn", "cross", "opposite"],
+                  "activities": [
+                    {
+                      "id": "a1-m07-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Ask the tutor how to get to the station and follow their directions.",
+                      "target": "How do I get to the station? / Turn left ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m08",
+      "title": "Past",
+      "order": 8,
+      "units": [
+        {
+          "id": "a1-m08-u01",
+          "title": "Talking about the past",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m08-u01-l01",
+              "title": "Past Simple",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m08-u01-l01-o01",
+                  "can_do": "I can talk about where I was and what I did yesterday.",
+                  "title": "El pasado (was/were)",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["was / were", "yesterday", "last week"],
+                  "vocabulary": ["yesterday", "last week", "last night", "ago"],
+                  "activities": [
+                    {
+                      "id": "a1-m08-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell the tutor where you were yesterday.",
+                      "target": "I was at home yesterday."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m08-u01-l01-o02",
+                  "can_do": "I can say what I did in the past.",
+                  "title": "Past Simple (verbos regulares)",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["Past Simple", "-ed", "played", "worked"],
+                  "vocabulary": ["played", "worked", "visited", "watched", "stayed"],
+                  "activities": [
+                    {
+                      "id": "a1-m08-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Say three things you did last week.",
+                      "target": "I played ... / I visited ..."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m09",
+      "title": "Plans",
+      "order": 9,
+      "units": [
+        {
+          "id": "a1-m09-u01",
+          "title": "Future plans",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m09-u01-l01",
+              "title": "Going to",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m09-u01-l01-o01",
+                  "can_do": "I can talk about my future plans.",
+                  "title": "Planes futuros",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "concepts": ["going to", "tomorrow", "next week"],
+                  "vocabulary": ["tomorrow", "next week", "next year", "plan"],
+                  "activities": [
+                    {
+                      "id": "a1-m09-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell the tutor two things you are going to do next week.",
+                      "target": "I am going to ... next week."
+                    }
+                  ]
+                },
+                {
+                  "id": "a1-m09-u01-l01-o02",
+                  "can_do": "I can make and respond to invitations.",
+                  "title": "Invitar",
+                  "skills": ["speaking", "vocabulary", "grammar"],
+                  "concepts": ["Would you like to ...?", "Let's ...", "I'd love to"],
+                  "vocabulary": ["invite", "party", "cinema", "would", "together"],
+                  "activities": [
+                    {
+                      "id": "a1-m09-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Invite the tutor to do something and accept an invitation.",
+                      "target": "Would you like to go to the cinema?"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1-m10",
+      "title": "A1 Final",
+      "order": 10,
+      "units": [
+        {
+          "id": "a1-m10-u01",
+          "title": "Review and assessment",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a1-m10-u01-l01",
+              "title": "A1 Review",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a1-m10-u01-l01-o01",
+                  "can_do": "I can hold a short basic conversation about myself, my life and my plans.",
+                  "title": "Conversación final A1",
+                  "skills": ["speaking", "listening", "grammar", "vocabulary"],
+                  "concepts": ["review: introductions, routines, family, past, plans"],
+                  "vocabulary": ["review A1"],
+                  "activities": [
+                    {
+                      "id": "a1-m10-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Have a short conversation with the tutor covering introductions, your routine and your plans.",
+                      "target": "A1 level conversation"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

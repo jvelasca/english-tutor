@@ -1,4 +1,5 @@
 """Punto de entrada: crea la app y monta los routers. Código mínimo."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -8,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, VERSION
 from repositories.db import init_db
+from routers.academy import router as academy_router
+from routers.assessment import router as assessment_router
 from routers.chat import router as chat_router
 from routers.conversations import router as conversations_router
 from routers.grammar import router as grammar_router
@@ -59,3 +62,5 @@ app.include_router(conversations_router)
 app.include_router(settings_router)
 app.include_router(users_router)
 app.include_router(vocabulary_router)
+app.include_router(academy_router)
+app.include_router(assessment_router)

@@ -1,4 +1,5 @@
 """Infraestructura de datos: conexión, esquema y migraciones (SQLite, 100% local)."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -158,6 +159,75 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS academy_enrollments (
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                enrolled_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, level_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS academy_skill_mastery (
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                skill TEXT NOT NULL,
+                score REAL NOT NULL DEFAULT 0.0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, level_id, skill),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS academy_assessment_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                assessment_id TEXT NOT NULL,
+                level_id TEXT NOT NULL DEFAULT '',
+                results_json TEXT NOT NULL,
+                passed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS academy_certificates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                overall REAL NOT NULL,
+                awarded_at TEXT NOT NULL,
+                UNIQUE (user_id, level_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS academy_activity_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                objective_id TEXT NOT NULL,
+                skill TEXT NOT NULL,
+                result TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
 
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
@@ -188,9 +258,7 @@ def init_db() -> None:
 
         # Migración idempotente: `occurrences` → `appearances` (nº de mensajes en
         # los que apareció la palabra, no frecuencia real de uso).
-        vocab_cols = {
-            row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")
-        }
+        vocab_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
         if "occurrences" in vocab_cols and "appearances" not in vocab_cols:
             conn.execute(
                 "ALTER TABLE vocabulary RENAME COLUMN occurrences TO appearances"
@@ -222,8 +290,7 @@ def init_db() -> None:
                 "NOT NULL DEFAULT ''"
             )
             conn.execute(
-                "UPDATE grammar_errors SET first_seen = last_seen "
-                "WHERE first_seen = ''"
+                "UPDATE grammar_errors SET first_seen = last_seen WHERE first_seen = ''"
             )
         if "correct_after" not in grammar_cols:
             conn.execute(

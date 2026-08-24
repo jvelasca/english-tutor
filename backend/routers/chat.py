@@ -1,4 +1,5 @@
 """Endpoints de chat."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from dependencies import current_user_optional
+from domain import academy as academy_service
 from domain import learning as learning_service
 from domain import profile as profile_service
 from schemas.chat import ChatRequest, ChatResponse
@@ -21,7 +23,12 @@ router = APIRouter()
 
 async def _system_prompt(req: ChatRequest, user_id: str | None) -> str:
     """Construye el system prompt del tutor a partir del modo y, si hay un
-    usuario activo, del perfil del alumno."""
+    usuario activo, del perfil del alumno. Si la petición trae `objective_id`,
+    activa el AI Teacher de la Academy para esa lección."""
+    if req.objective_id and user_id:
+        lesson = await academy_service.lesson_prompt(user_id, req.objective_id)
+        if lesson is not None:
+            return lesson
     profile = None
     if user_id:
         profile = await profile_service.get_profile_context(user_id)

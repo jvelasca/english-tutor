@@ -1,4 +1,5 @@
 """Esquemas Pydantic del chat."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -26,6 +27,8 @@ class ChatRequest(BaseModel):
     model: str = Field(default=DEFAULT_MODEL, min_length=1)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     mode: str = Field(default=DEFAULT_MODE)
+    # Objetivo de la Academy (opcional): activa el AI Teacher de la lección.
+    objective_id: str | None = None
 
 
 class ChatResponse(BaseModel):

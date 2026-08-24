@@ -1,0 +1,192 @@
+{
+  "placement": {
+    "id": "placement-v1",
+    "title": "English Tutor Placement Test",
+    "description": "Estimate your starting level (A1-C2) with a short adaptive test.",
+    "items": [
+      {
+        "id": "pl-01",
+        "skill": "grammar",
+        "difficulty": 1,
+        "prompt": "Choose the correct sentence:",
+        "options": ["I is a student.", "I am a student.", "I are a student."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-02",
+        "skill": "vocabulary",
+        "difficulty": 1,
+        "prompt": "What is the opposite of 'big'?",
+        "options": ["small", "tall", "fast"],
+        "correct_index": 0
+      },
+      {
+        "id": "pl-03",
+        "skill": "grammar",
+        "difficulty": 2,
+        "prompt": "Choose the correct sentence:",
+        "options": ["She don't like coffee.", "She doesn't likes coffee.", "She doesn't like coffee."],
+        "correct_index": 2
+      },
+      {
+        "id": "pl-04",
+        "skill": "reading",
+        "difficulty": 2,
+        "prompt": "Read: 'I go to work at eight every day.' When does he go to work?",
+        "options": ["At night", "At eight", "At noon"],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-05",
+        "skill": "grammar",
+        "difficulty": 3,
+        "prompt": "Choose the correct sentence:",
+        "options": ["I have seen that film yesterday.", "I saw that film yesterday.", "I seen that film yesterday."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-06",
+        "skill": "vocabulary",
+        "difficulty": 3,
+        "prompt": "Which word means 'the money you earn for work'?",
+        "options": ["salary", "holiday", "weather"],
+        "correct_index": 0
+      },
+      {
+        "id": "pl-07",
+        "skill": "grammar",
+        "difficulty": 4,
+        "prompt": "Choose the correct sentence:",
+        "options": ["If I will see him, I tell him.", "If I see him, I will tell him.", "If I saw him, I will tell him."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-08",
+        "skill": "reading",
+        "difficulty": 4,
+        "prompt": "Read: 'Despite the rain, the match went ahead.' What happened?",
+        "options": ["The match was cancelled.", "The match was played.", "The match was delayed a week."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-09",
+        "skill": "grammar",
+        "difficulty": 5,
+        "prompt": "Choose the sentence closest in meaning to 'He is said to be rich.'",
+        "options": ["People say he is rich.", "He says he is rich.", "He said he was rich."],
+        "correct_index": 0
+      },
+      {
+        "id": "pl-10",
+        "skill": "vocabulary",
+        "difficulty": 5,
+        "prompt": "Which word is a synonym of 'ubiquitous'?",
+        "options": ["rare", "everywhere", "hidden"],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-11",
+        "skill": "grammar",
+        "difficulty": 6,
+        "prompt": "Choose the most natural sentence:",
+        "options": ["Little did she know the truth.", "Little she knew the truth.", "Little knew she the truth."],
+        "correct_index": 0
+      },
+      {
+        "id": "pl-12",
+        "skill": "reading",
+        "difficulty": 6,
+        "prompt": "Read: 'His argument, though subtle, was ultimately compelling.' What is the tone?",
+        "options": ["Negative", "Neutral-positive", "Confused"],
+        "correct_index": 1
+      }
+    ]
+  },
+  "exams": {
+    "a1": {
+      "id": "a1-final",
+      "title": "A1 Final Assessment",
+      "min_per_skill": 0.75,
+      "skills": ["grammar", "vocabulary", "reading", "listening"],
+      "items": [
+        {
+          "id": "a1f-01",
+          "skill": "grammar",
+          "prompt": "Choose the correct sentence:",
+          "options": ["He go to school.", "He goes to school.", "He going to school."],
+          "correct_index": 1
+        },
+        {
+          "id": "a1f-02",
+          "skill": "grammar",
+          "prompt": "Choose the correct question:",
+          "options": ["What your name is?", "What is your name?", "What is your name"],
+          "correct_index": 1
+        },
+        {
+          "id": "a1f-03",
+          "skill": "grammar",
+          "prompt": "Complete: 'There ___ two bedrooms in my house.'",
+          "options": ["is", "are", "be"],
+          "correct_index": 1
+        },
+        {
+          "id": "a1f-04",
+          "skill": "vocabulary",
+          "prompt": "Which word is a family member?",
+          "options": ["sister", "table", "Monday"],
+          "correct_index": 0
+        },
+        {
+          "id": "a1f-05",
+          "skill": "vocabulary",
+          "prompt": "Which word is food?",
+          "options": ["bread", "chair", "bus"],
+          "correct_index": 0
+        },
+        {
+          "id": "a1f-06",
+          "skill": "vocabulary",
+          "prompt": "What day comes after Sunday?",
+          "options": ["Monday", "Saturday", "Friday"],
+          "correct_index": 0
+        },
+        {
+          "id": "a1f-07",
+          "skill": "reading",
+          "prompt": "Read: 'My name is Ana. I am from Spain and I live in Madrid.' Where is Ana from?",
+          "options": ["Madrid", "Spain", "England"],
+          "correct_index": 1
+        },
+        {
+          "id": "a1f-08",
+          "skill": "reading",
+          "prompt": "Read: 'I get up at seven and I have breakfast at eight.' What does he do at eight?",
+          "options": ["Gets up", "Has breakfast", "Goes to work"],
+          "correct_index": 1
+        },
+        {
+          "id": "a1f-09",
+          "skill": "listening",
+          "prompt": "The tutor will say a number. Choose the number you hear (practice item):",
+          "options": ["15", "50", "5"],
+          "correct_index": 0
+        },
+        {
+          "id": "a1f-10",
+          "skill": "listening",
+          "prompt": "The tutor will say a time. Choose the time you hear (practice item):",
+          "options": ["8:00", "9:00", "10:00"],
+          "correct_index": 0
+        }
+      ]
+    }
+  },
+  "remediation": {
+    "grammar": ["a1-m02-u01-l01-o03", "a1-m08-u01-l01-o01", "a1-m03-u01-l02-o01"],
+    "vocabulary": ["a1-m01-u01-l02-o02", "a1-m03-u01-l01-o01", "a1-m05-u01-l01-o01"],
+    "reading": ["a1-m01-u01-l01-o01", "a1-m07-u01-l01-o01"],
+    "listening": ["a1-m01-u01-l02-o02", "a1-m04-u01-l01-o02", "a1-m07-u01-l01-o02"],
+    "speaking": ["a1-m01-u01-l01-o01", "a1-m05-u01-l01-o02", "a1-m09-u01-l01-o01"]
+  }
+}
