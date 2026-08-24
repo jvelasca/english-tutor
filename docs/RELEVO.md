@@ -3,21 +3,21 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 17:50 (UTC+2).
+> Actualizado por última vez: 2026-08-24 18:10 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
 **Posición actual (2026-08-24):** Fases 0–10 de endurecimiento y Release Audit 1.1 (M12) cerradas
 (`v1.1.1` publicada). **Etapa 2 — Pedagogía (M13) en curso**: P1 y P2 hechos; P3–P6 pendientes.
-Además se ha cerrado **M14 — Rediseño de GUI responsive + personalización + acceso en red** (ver
-sección 18). Working tree con cambios de M14 sin commitear. Últimos commits:
+Cerrados además **M14 — GUI responsive + personalización + acceso en red** (sección 18) y
+**M15 — Launcher con UI moderna: iconos, paneles colapsables y logs** (sección 19). Últimos commits:
+- `fix: Vite escucha en 0.0.0.0 para acceso LAN`
+- `feat: M14 GUI responsive + personalizacion + acceso en red`
 - `feat: P2 error mastery` — evidencia positiva + first_seen/correct_after/streak/mastered.
 - `feat: P1 politica pedagogica formal` — CORRECT/NATURAL/OPTIONAL/STYLE/PRONUNCIATION.
-- `release: version 1.1.1` — Release Audit 1.1 + subida a GitHub.
-- `feat: release audit 1.1` — RA1–RA7.
 
 **Estado verde:** backend `260 tests` + `ruff` limpio; frontend `106 tests` + `tsc`/`build` OK;
-launcher `24 tests` + `ruff` limpio.
+launcher `33 tests` + `ruff` limpio.
 
 **Entregable nuevo (Etapa 2):** plan en `docs/PLAN-ETAPA-PEDAGOGICA.md`. Hechos:
 - **P1** política pedagógica formal (`services/policy.py::feedback_policy`, integrada siempre en
@@ -779,3 +779,30 @@ acceso en la propia web y en el launcher.
 ### Decisión de modelo (respuesta al usuario)
 Se mantiene **`qwen3.5:9b`** como modelo por defecto (mejor calidad como tutor, ver sección 5);
 `llama3.1:8b` queda instalado y seleccionable. La elección ahora es persistente por usuario.
+
+## 19. M15 — Launcher: UI moderna con iconos, paneles colapsables y logs (HECHO)
+
+Requisito del usuario: hacer el programa de arranque de escritorio más atractivo y completo,
+con iconos en la UI y más información en paneles colapsables.
+
+- **`launcher/ui.py`** (nuevo, puro y testeable): `COLORS` (paleta claro con acento índigo),
+  `SERVICE_ICONS`/`SECTION_ICONS`/`ACTION_ICONS` (emoji), `status_dot()` (punto de estado por
+  color) y `read_log_tail()` (últimas N líneas de `logs/*.log`).
+- **`launcher/status.py`**: `fetch_version()` (versión desde `/api/health`) y
+  `read_db_details()` (contadores de tablas opcionales — vocabulario, errores, eventos,
+  pronunciación, listening, preferencias — tolerante a tablas inexistentes vía `sqlite_master`).
+- **`launcher/launcher.py`** (reescrito):
+  - Tema `clam` personalizado (`ttk.Style`) con banner de cabecera (logo "EN" + título +
+    versión + píldora de estado "En marcha/Detenida" con punto de color).
+  - Botones con iconos (Iniciar/Detener/Abrir/Actualizar).
+  - **Paneles colapsables** reutilizables (`class Collapsible`): Servicios, Acceso a la app,
+    Base de datos (con detalle de tablas), Usuarios y Registros (logs de backend/frontend en
+    un `Notebook`, colapsado por defecto).
+  - Contenido desplazable (Canvas + Scrollbar) y footer de estado. Lógica de concurrencia
+    (cola + hilos + `ProcessManager`) intacta.
+- **Tests**: `tests/test_ui.py` (nuevo, 5) + `tests/test_status.py` (+4). Total launcher
+  **33 tests** + `ruff` limpio.
+
+> Nota de arranque en red: el frontend (Vite) ahora escucha en `0.0.0.0` (`vite.config.ts`
+> `host: true`), igual que el backend, para que la app sea accesible desde otros equipos de la
+> LAN (antes solo respondía `localhost` y el puerto 5173 no era alcanzable).

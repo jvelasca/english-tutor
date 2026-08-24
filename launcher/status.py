@@ -22,6 +22,14 @@ def fetch_health() -> dict | None:
     return _get_json(backend_url() + "/api/health/dependencies")
 
 
+def fetch_version() -> str:
+    """Versión de la app desde /api/health ('' si el backend está caído)."""
+    data = _get_json(backend_url() + "/api/health")
+    if not data:
+        return ""
+    return str(data.get("version", ""))
+
+
 def fetch_frontend() -> bool:
     """True si el frontend responde (GET /)."""
     try:
@@ -54,6 +62,41 @@ def read_db_counts(db_path: str) -> dict:
         }
     except Exception:  # noqa: BLE001
         return {"users": 0, "conversations": 0, "messages": 0}
+
+
+def read_db_details(db_path: str) -> dict[str, int]:
+    """Contadores de tablas opcionales (0 si la tabla aún no existe).
+
+    Estas tablas se crean al arrancar el backend; en una BD recién inicializada
+    pueden no existir todavía, por lo que se comprueban contra ``sqlite_master``.
+    """
+    tables = {
+        "vocabulary": "vocabulario",
+        "grammar_errors": "errores_gramaticales",
+        "learning_events": "eventos_aprendizaje",
+        "pronunciation_attempts": "intentos_pronunciacion",
+        "listening_attempts": "intentos_listening",
+        "settings": "preferencias",
+    }
+    result: dict[str, int] = {}
+    try:
+        with closing(_connect_readonly(db_path)) as conn:
+            existing = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            for table, key in tables.items():
+                if table in existing:
+                    result[key] = int(
+                        conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                    )
+                else:
+                    result[key] = 0
+    except Exception:  # noqa: BLE001
+        return {key: 0 for key in tables.values()}
+    return result
 
 
 def read_users(db_path: str) -> list[tuple]:

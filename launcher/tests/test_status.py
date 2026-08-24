@@ -61,6 +61,26 @@ def test_read_db_counts_missing_file():
     }
 
 
+def test_read_db_details_counts_existing_tables(tmp_path):
+    db = tmp_path / "t.db"
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.execute("CREATE TABLE vocabulary (id INTEGER)")
+        conn.execute("CREATE TABLE learning_events (id INTEGER)")
+        conn.execute("INSERT INTO vocabulary VALUES (1),(2),(3)")
+        conn.execute("INSERT INTO learning_events VALUES (1)")
+    details = status.read_db_details(str(db))
+    assert details["vocabulario"] == 3
+    assert details["eventos_aprendizaje"] == 1
+    # Tablas no creadas → 0.
+    assert details["errores_gramaticales"] == 0
+    assert details["intentos_pronunciacion"] == 0
+
+
+def test_read_db_details_missing_file_is_zeroed():
+    details = status.read_db_details("Z:/no/existe/tutor.db")
+    assert set(details.values()) == {0}
+
+
 class _FakeResp:
     def __init__(self, payload=b"", code=200):
         self._payload = payload
@@ -107,3 +127,19 @@ def test_fetch_frontend_down(monkeypatch):
 
     monkeypatch.setattr("status.urllib.request.urlopen", boom)
     assert status.fetch_frontend() is False
+
+
+def test_fetch_version_ok(monkeypatch):
+    monkeypatch.setattr(
+        "status.urllib.request.urlopen",
+        lambda url, timeout: _FakeResp(b'{"status":"ok","version":"1.2.3"}'),
+    )
+    assert status.fetch_version() == "1.2.3"
+
+
+def test_fetch_version_unreachable(monkeypatch):
+    def boom(url, timeout):
+        raise OSError("refused")
+
+    monkeypatch.setattr("status.urllib.request.urlopen", boom)
+    assert status.fetch_version() == ""
