@@ -5,6 +5,7 @@ import { useTheme } from "./hooks/useTheme";
 import { ChatMessage } from "./components/ChatMessage";
 import { Composer } from "./components/Composer";
 import { HandsFreeToggle } from "./components/HandsFreeToggle";
+import { LearningProfile } from "./components/LearningProfile";
 import { ModeSelect } from "./components/ModeSelect";
 import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressSummary } from "./components/ProgressSummary";
@@ -43,6 +44,7 @@ export default function App() {
     addUser,
     progress,
     refreshProgress,
+    profile,
   } = useChat();
 
   const { theme, toggleTheme } = useTheme();
@@ -152,6 +154,8 @@ export default function App() {
         </header>
 
         <ProgressSummary progress={progress} />
+
+        <LearningProfile profile={profile} />
 
         <main className="chat">
           {mode === "pronunciation" && (

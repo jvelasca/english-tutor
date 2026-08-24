@@ -62,3 +62,23 @@ export interface ProgressSummary {
   corrections: number;
   pronunciation: PronunciationStats;
 }
+
+export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+
+export interface GrammarRecurringError {
+  rule: string;
+  message: string;
+  count: number;
+  last_example: string;
+  last_seen: string;
+}
+
+export interface LearningProfile {
+  user_id: string;
+  cefr_level: CefrLevel;
+  vocabulary_size: number;
+  top_words: string[];
+  recurring_errors: GrammarRecurringError[];
+  pronunciation_average: number | null;
+  recommendations: string[];
+}

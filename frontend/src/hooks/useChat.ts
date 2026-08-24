@@ -9,10 +9,12 @@ import {
 } from "../api/conversations";
 import { createUser, listUsers } from "../api/users";
 import { getProgress } from "../api/progress";
+import { analyzeText, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
 import { nextDefaultUserName } from "../utils/users";
 import type {
   ConversationMeta,
+  LearningProfile,
   Message,
   ProgressSummary,
   TutorMode,
@@ -33,6 +35,7 @@ export function useChat() {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressSummary | null>(null);
+  const [profile, setProfile] = useState<LearningProfile | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
@@ -48,6 +51,15 @@ export function useChat() {
     if (!currentUserId) return;
     try {
       setProgress(await getProgress(currentUserId));
+    } catch {
+      /* backend no disponible */
+    }
+  }, [currentUserId]);
+
+  const refreshProfile = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      setProfile(await getProfile(currentUserId));
     } catch {
       /* backend no disponible */
     }
@@ -102,6 +114,11 @@ export function useChat() {
     setProgress(null);
     void refreshProgress();
   }, [refreshProgress]);
+
+  useEffect(() => {
+    setProfile(null);
+    void refreshProfile();
+  }, [refreshProfile]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -256,9 +273,13 @@ export function useChat() {
         ]);
       }
 
+      // Alimenta el perfil de aprendizaje (vocabulario + gramática) de forma
+      // no bloqueante y refresca el perfil.
+      void analyzeText(trimmed, currentUserId).then(refreshProfile).catch(() => {});
+
       return errored ? "" : assistantReply;
     },
-    [loading, messages, model, mode, conversationId, currentUserId, persist],
+    [loading, messages, model, mode, conversationId, currentUserId, persist, refreshProfile],
   );
 
   const send = useCallback(() => {
@@ -292,5 +313,7 @@ export function useChat() {
     addUser,
     progress,
     refreshProgress,
+    profile,
+    refreshProfile,
   };
 }

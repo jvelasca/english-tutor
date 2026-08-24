@@ -1181,6 +1181,133 @@ button {
 }
 
 /* ==========================================================================
+   Learning profile (Fase 4)
+   ========================================================================== */
+
+.learning-profile {
+  margin: var(--space-2) 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.learning-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.learning-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cefr-badge {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cefr-badge.basic {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+}
+
+.cefr-badge.intermediate {
+  color: var(--color-accent);
+  background: var(--color-accent-ring);
+}
+
+.cefr-badge.advanced {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+}
+
+.learning-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.learning-block {
+  margin-bottom: var(--space-3);
+}
+
+.learning-block:last-child {
+  margin-bottom: 0;
+}
+
+.learning-block h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.learning-big {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.learning-chips {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.learning-chip {
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+.learning-errors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.learning-error {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.learning-error-count {
+  color: var(--color-error);
+  font-weight: 700;
+}
+
+.learning-recs {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
+/* ==========================================================================
    Animations
    ========================================================================== */
 
@@ -1355,6 +1482,10 @@ button {
 
   .progress-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .learning-grid {
+    grid-template-columns: 1fr;
   }
 }
 
