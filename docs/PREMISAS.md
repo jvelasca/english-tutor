@@ -88,8 +88,8 @@ completo.
 ## 14. Diseño y UX nivel "top del mercado"
 - La interfaz aspira al nivel de las mejores apps del mercado (p. ej. ChatGPT, Duolingo,
   Grammarly): moderna, pulida, atractiva y con las mejores prácticas de UX.
-- Responsive (móvil y escritorio), accesible (a11y), con estados vacíos, de carga y de
-  error cuidados.
+- **Responsive total:** toda la UI debe adaptarse perfectamente a **móviles y tablets**
+  (además de escritorio), accesible (a11y), con estados vacíos, de carga y de error cuidados.
 - Sistema de diseño con **tokens** (colores, tipografía, espaciado, radios) para consistencia,
   y soporte de **tema claro/oscuro**.
 - Micro-interacciones y feedback visual (transiciones, animaciones sutiles, indicadores al
