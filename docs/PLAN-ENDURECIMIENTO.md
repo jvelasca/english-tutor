@@ -30,8 +30,11 @@
 - **Fase 9 (Evaluación objetiva del tutor) CERRADA** el 2026-08-24: F9.1 (evaluador objetivo
   del tutor, puro y determinista), F9.2 (informe agregado + script por lotes) y F9.3 (panel
   de calidad del tutor en el frontend).
+- **Fase 10 (Release 1.0 estable) CERRADA** el 2026-08-24: versión unificada `1.1.0`, gate
+  verde completo y **lanzador de escritorio** (`launcher/`, GUI `tkinter` + acceso directo
+  con icono).
 - Backend `217 tests` verdes + `ruff` limpio, `import main` OK; frontend `88 tests` verdes,
-  `tsc`/`build` OK.
+  `tsc`/`build` OK; launcher `22 tests` verdes + `ruff` limpio.
 - Línea base inicial: backend `27 tests`, frontend `npm test`/`tsc` verdes, 13 commits,
   tag `v1.0.0`.
 
@@ -203,11 +206,20 @@ evalúa las respuestas del tutor en local.
 > señales libres de contexto). El script `scripts/eval_tutor.py` es un CLI de utilidad: puntúa
 > un modelo contra el corpus y no persiste nada en BD.
 
-### FASE 10 — Backlog (se detallará al llegar)
+### FASE 10 — Release 1.0 realmente estable (CERRADA)
 
-| Fase | Alcance |
-|---|---|
-| 10 | Release 1.0 realmente estable. |
+Versión unificada, gate verde completo y entrega del lanzador de escritorio.
+
+| # | Subagente | Responsabilidad | Briefing |
+|---|---|---|---|
+| A.1 | Launcher: núcleo puro | `launcher/core.py` (rutas, comandos, normalización de estado) + tests pytest. | `agentes/endurecimiento/a1-launcher-core.md` |
+| A.2 | Launcher: GUI + procesos + atajo | `launcher/launcher.py` (GUI `tkinter`), `process_manager.py`, `status.py`, `make_icon.ps1`, `install_shortcut.ps1`, `icon.ico` + tests. | `agentes/endurecimiento/a2-launcher-gui.md` |
+
+> **Notas de Fase 10:** la versión `1.1.0` vive en `backend/config.py::VERSION` y se expone en
+> `/api/health` y en la raíz `/`; el frontend la refleja en `package.json`. El launcher es un
+> tercer componente (`launcher/`) con su propio `pyproject.toml` (ruff) y tests pytest, que
+> arranca/para backend y frontend y muestra el estado de servicios, BD y usuarios. El acceso
+> directo del escritorio se crea con `launcher/install_shortcut.ps1`.
 
 ## Protocolo anti-saturación y documentos de paso
 

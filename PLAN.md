@@ -8,10 +8,12 @@
 
 ## Estado actual
 
-- ✅ Backend FastAPI + Pydantic (chat con Ollama).
-- ✅ Frontend Vite + React + TypeScript (chat por texto).
+- ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
+- ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
+- ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `1.1.0` (fases 1–10 del plan de endurecimiento cerradas).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
-- ✅ Documentación base (`docs/`, premisas, arquitectura, guía de desarrollo).
+- ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
 ## Hitos (roadmap)
 
@@ -112,6 +114,16 @@
 - Verificado: frontend 37 tests, `tsc` sin errores, `npm run build` OK.
 - Subagente (ejecutado por el gerente): `agentes/m10-voz-continua.md`.
 
+### M11 — Lanzador de escritorio + release estable  [HECHO ✔]
+- Lanzador de escritorio (`launcher/`, GUI `tkinter` sin dependencias nuevas) que arranca/detiene
+  la app (backend + frontend) y muestra el estado de servicios, base de datos y usuarios.
+- Acceso directo del escritorio con icono (`launcher/install_shortcut.ps1` + `make_icon.ps1`).
+- Versión unificada `1.1.0` (backend `config.py::VERSION` expuesta en `/api/health` y `/`, y
+  frontend `package.json`).
+- Verificado: launcher 22 tests + ruff limpio; backend 217 tests, frontend 88 tests, build OK.
+- Subagentes (ejecutados por el gerente): `agentes/endurecimiento/a1-launcher-core.md`,
+  `agentes/endurecimiento/a2-launcher-gui.md`.
+
 ## Decisiones tomadas
 
 - Hitos M1 y M2 en paralelo (tras M0).
@@ -137,6 +149,8 @@
 | M9 Backend progreso | `agentes/m9-backend-progreso.md` | ✔ hecho |
 | M9 Frontend progreso | `agentes/m9-frontend-progreso.md` | ✔ hecho |
 | M10 Voz continua | `agentes/m10-voz-continua.md` | ✔ hecho |
+| A.1 Launcher núcleo puro | `agentes/endurecimiento/a1-launcher-core.md` | ✔ hecho |
+| A.2 Launcher GUI + procesos + atajo | `agentes/endurecimiento/a2-launcher-gui.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

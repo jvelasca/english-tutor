@@ -216,6 +216,32 @@ frontend/src/
 - **`types/`**: interfaces TypeScript compartidas.
 - **`App.tsx`**: composición de alto nivel, mínimo estado.
 
+## Launcher (`launcher/`)
+
+```
+launcher/
+├── launcher.py          # PUNTO DE ENTRADA: GUI mínima (tkinter), arranca/para la app
+├── core.py              # lógica pura: rutas, comandos de arranque, normalización de estado
+├── process_manager.py   # subprocesos: arrancar/parar backend (uvicorn) y frontend (Vite)
+├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
+├── make_icon.ps1        # genera icon.ico (System.Drawing, Windows)
+├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
+├── icon.ico             # icono del acceso directo
+├── pyproject.toml       # configuración de ruff (mismas reglas que el backend)
+└── tests/               # pytest (conftest.py + test_core/test_status/test_process_manager)
+```
+
+### Responsabilidades launcher
+- **`launcher.py`**: GUI `tkinter` (ventana de estado con servicios, BD y usuarios; botones
+  Iniciar/Detener/Abrir/Actualizar). Solo orquesta; no contiene lógica de negocio.
+- **`core.py`**: funciones puras y testables (resolver rutas, construir comandos, normalizar
+  estado de salud y contadores).
+- **`process_manager.py`**: ciclo de vida de los dos subprocesos (backend/frontend), con
+  matado del árbol de procesos en Windows (`taskkill /T /F`).
+- **`status.py`**: obtiene el estado real: `/api/health/dependencies` (HTTP) y consultas de
+  solo lectura a la BD SQLite (contadores globales y usuarios).
+- **`*.ps1`**: utilidades de Windows para generar el icono y crear el acceso directo.
+
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en
 > `main.py` ni en `App.tsx`. Un archivo = una responsabilidad.

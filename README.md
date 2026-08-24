@@ -13,12 +13,13 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v1.0.0**.
+- Última versión estable: **v1.1.0**.
 
 ## Estructura
 
 - `backend/` — API en Python con **FastAPI + Pydantic** (tipado fuerte). Habla con Ollama.
 - `frontend/` — Interfaz web con **Vite + React + TypeScript**.
+- `launcher/` — lanzador de escritorio (GUI `tkinter`): arranca/para la app y muestra su estado.
 - `agentes/` — briefings autocontenidos de subagentes (premisa 5: todo trabajo se descompone en subagentes).
 - `docs/` — documentación del proyecto.
 
@@ -35,8 +36,23 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   y sistema de tokens de diseño.
 - **Voz continua / manos libres (M10)**: modo conversación por voz sin pulsar botones
   (VAD por silencio vía Web Audio API, transcripción y respuesta hablada automáticas).
+- **Progreso pedagógico real (F6)**: dashboard con tendencias, racha, dominio de errores e hitos.
+- **Pronunciación fonética (F7)**: evaluador compuesto (palabras + Soundex + caracteres) con fluidez (WPM).
+- **Listening / CEFR (F8)**: ejercicios de comprensión auditiva y evaluación CEFR multi-señal.
+- **Evaluación objetiva del tutor (F9)**: métricas deterministas del tutor (backend + panel).
+- **Lanzador de escritorio**: GUI que arranca/detiene la app y muestra estado, BD y usuarios.
 
 ## Arranque rápido
+
+### Con el lanzador de escritorio (recomendado)
+1. Crea el acceso directo del escritorio (una sola vez):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File launcher/install_shortcut.ps1
+   ```
+2. Haz doble clic en el acceso directo **"English Tutor"** del escritorio.
+3. En la ventana del lanzador pulsa **"Iniciar app"** (arranca backend + frontend y abre
+   el navegador) y **"Detener app"** para pararlos. La ventana muestra el estado de los
+   servicios, la base de datos y los usuarios.
 
 ### Con F5 (recomendado en Cursor)
 1. Abre el proyecto en Cursor.
@@ -89,6 +105,12 @@ Abre **http://localhost:5173** y empieza a conversar.
   # o todo junto (tipos + tests):
   ./scripts/check.ps1
   ```
+- **Launcher** (pytest):
+  ```powershell
+  cd launcher
+  ..\backend\.venv\Scripts\python.exe -m pytest tests/ -q
+  ..\backend\.venv\Scripts\python.exe -m ruff check .
+  ```
 - **Smoke test** (requiere el servidor arrancado con F5):
   ```powershell
   cd backend
@@ -99,22 +121,37 @@ Abre **http://localhost:5173** y empieza a conversar.
   cd backend
   .venv\Scripts\python.exe scripts/eval_model.py --model llama3.1:8b
   ```
+- **Evaluación objetiva del tutor** (F9; puntúa un modelo contra el corpus canónico):
+  ```powershell
+  cd backend
+  .venv\Scripts\python.exe scripts/eval_tutor.py --model qwen3.5:9b
+  ```
 
 ## API
 
 | Método | Ruta | Descripción |
 |---|---|---|
+| `GET` | `/` | Metadatos del servicio (nombre + versión) |
 | `GET` | `/api/health` | Estado del servicio |
+| `GET` | `/api/health/live` | Liveness |
+| `GET` | `/api/health/ready` | Readiness (200/503 según dependencias) |
+| `GET` | `/api/health/dependencies` | Estado por dependencia (BD, Ollama, STT, TTS) |
 | `GET` | `/api/models` | Modelos disponibles en Ollama |
-| `POST` | `/api/chat` | Diálogo con el modelo (acepta `mode`) |
-| `POST` | `/api/chat/stream` | Diálogo con streaming (SSE, acepta `mode`) |
+| `POST` | `/api/chat` | Diálogo con el modelo (acepta `mode`, `user_id`) |
+| `POST` | `/api/chat/stream` | Diálogo con streaming (SSE) |
 | `POST` | `/api/transcribe` | Audio → texto (Whisper) |
 | `POST` | `/api/tts` | Texto → audio WAV (Piper) |
-| `POST` | `/api/pronunciation` | Audio + texto esperado → puntuación de pronunciación |
+| `POST` | `/api/pronunciation` | Audio + texto esperado → puntuación + fluidez |
 | `GET/POST` | `/api/users` | Listar / crear perfiles de usuario |
 | `GET/POST` | `/api/conversations?user_id=<id>` | Listar / crear conversaciones del usuario |
 | `GET/PUT/DELETE` | `/api/conversations/{id}` | Leer / guardar / borrar una conversación |
-| `GET` | `/api/progress?user_id=<id>` | Resumen del progreso del alumno (ejercicios, correcciones, pronunciación) |
+| `POST/GET` | `/api/learning/events` | Registrar / listar eventos de aprendizaje |
+| `POST` | `/api/vocabulary/analyze` · `GET /api/vocabulary` | Extraer / listar vocabulario |
+| `POST` | `/api/grammar/analyze` · `GET /api/grammar/errors` | Detectar / listar errores recurrentes |
+| `GET` | `/api/profile?user_id=<id>` | Perfil de aprendizaje (CEFR + bandas + recomendaciones) |
+| `GET` | `/api/progress?user_id=<id>` | Resumen de progreso del alumno |
+| `GET` | `/api/progress/history?user_id=<id>` | Historial: tendencias, racha, dominio, hitos |
+| `GET` | `/api/listening/question` · `POST /api/listening/answer` · `GET /api/listening/stats` | Ejercicios de listening |
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 

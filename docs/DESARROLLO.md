@@ -13,6 +13,17 @@ Pulsa **F5** en Cursor y elige la configuración **"English Tutor (F5)"** la pri
 Arranca backend + frontend en dos terminales y abre el navegador. Configuración en
 `.vscode/launch.json` (compuesto con `stopAll`, así que al parar se cierran ambos).
 
+### Con el lanzador de escritorio (sin abrir Cursor)
+1. Crea el acceso directo del escritorio (una sola vez):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File launcher/install_shortcut.ps1
+   ```
+2. Doble clic en **"English Tutor"** del escritorio → se abre la ventana del launcher.
+3. **"Iniciar app"** arranca backend (`:8000`) + frontend (`:5173`) y abre el navegador;
+   **"Detener app"** los para. La ventana muestra el estado de servicios, BD y usuarios.
+   El launcher vive en `launcher/` (GUI `tkinter`, sin dependencias nuevas; logs en
+   `launcher/logs/`).
+
 ### Manual
 
 ### Backend

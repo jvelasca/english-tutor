@@ -3,22 +3,26 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 13:20 (UTC+2).
+> Actualizado por última vez: 2026-08-24 14:05 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–9 del plan de endurecimiento **completas, verificadas
+**Posición actual (2026-08-24):** Fases 0–10 del plan de endurecimiento **completas, verificadas
 y commiteadas**. Working tree limpio. Últimos commits:
-- `feat: fase 9.3` — panel de calidad del tutor (frontend).
-- `feat: fase 9.2` — informe agregado + script por lotes (backend).
-- `feat: fase 9.1` — evaluador objetivo del tutor (backend, puro).
-- `docs: cierre de fase 8` — CEFR multi-señal + fluidez + listening.
+- `release: version 1.1.0` — versión unificada (config + health + root + frontend).
+- `fix: launcher no duplica servicios` — guard anti-duplicado al iniciar.
+- `feat: launcher A.2` — GUI tkinter + procesos + atajo/icono.
+- `feat: launcher A.1` — núcleo puro + tests.
 
 **Estado verde:** backend `217 tests` + `ruff` limpio + `import main` OK; frontend `88 tests`
-+ `tsc`/`build` OK.
++ `tsc`/`build` OK; launcher `22 tests` + `ruff` limpio.
 
-**Siguiente paso: FASE 10 — Release 1.0 realmente estable.** Ver
-`docs/PLAN-ENDURECIMIENTO.md`.
+**Entregable nuevo:** lanzador de escritorio en `launcher/` (GUI `tkinter`) que arranca/detiene
+la app y muestra estado de servicios, BD y usuarios. Acceso directo del escritorio con
+`launcher/install_shortcut.ps1` (icono incluido).
+
+**Siguiente paso: documentación final + auditorías.** Ver `docs/PLAN-ENDURECIMIENTO.md`
+(FASE 10 cerrada) y la sección 17 de este documento.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
@@ -27,8 +31,8 @@ y commiteadas**. Working tree limpio. Últimos commits:
 4. Diseñar los subagentes de la siguiente fase en `agentes/endurecimiento/` (autocontenidos,
    uno a la vez), respetando la arquitectura `Router → Service (domain) → Repository
    (repositories) → SQLite`.
-5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`)
-   antes de cada commit `feat: ...`.
+5. Lanzarlos de uno en uno, verificando (backend `pytest` + `ruff`, frontend `tsc` + `vitest`,
+   launcher `pytest` + `ruff`) antes de cada commit `feat: ...`.
 
 ## 1. Qué es el proyecto
 
@@ -680,3 +684,35 @@ uno verificado en verde antes de commitear. Evaluación determinista y sin LLM-j
 frontend `88 tests` + `tsc`/`build` OK. El tutor ya se puede evaluar objetivamente (sin
 LLM-juez): por corpus en backend (script por lotes) y en vivo en el frontend (panel de calidad
 sobre la conversación actual).
+
+## 17. FASE 10 — Release 1.0 estable + Launcher de escritorio (CERRADA)
+
+Versión unificada `1.1.0`, gate verde completo y nuevo componente `launcher/`.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| A.1 Launcher núcleo puro | `agentes/endurecimiento/a1-launcher-core.md` | ✔ hecho |
+| A.2 Launcher GUI + procesos + atajo | `agentes/endurecimiento/a2-launcher-gui.md` | ✔ hecho |
+
+### HECHO — Launcher de escritorio (`launcher/`)
+- `core.py` (puro): rutas (`REPO_ROOT`, `BACKEND_DIR`, `FRONTEND_DIR`, `DB_PATH`), comandos
+  (`backend_command`, `frontend_command`), URLs y normalización (`app_summary`,
+  `health_status`, `db_summary`, `user_overview`).
+- `process_manager.py`: `ProcessManager` (arranca/para backend `uvicorn` y frontend `npm run
+  dev`; matado del árbol de procesos en Windows con `taskkill /T /F`; logs en `launcher/logs/`).
+- `status.py`: `fetch_health`/`fetch_frontend` (HTTP) y `read_db_counts`/`read_users`
+  (SQLite solo lectura).
+- `launcher.py`: GUI `tkinter` (servicios, BD, usuarios; botones Iniciar/Detener/Abrir/
+  Actualizar; refresco en hilo de fondo). No duplica servicios ya activos al iniciar.
+- `make_icon.ps1` (genera `icon.ico`) y `install_shortcut.ps1` (crea `English Tutor.lnk`
+  en el escritorio).
+- Tests: `test_core.py` (13) + `test_status.py` (7) + `test_process_manager.py` (2) = **22 tests**.
+
+### HECHO — Versión 1.1.0
+- `backend/config.py::VERSION = "1.1.0"`; expuesta en `/api/health` y en `/`; `main.py`
+  (`FastAPI(version=VERSION)`); `frontend/package.json` → `1.1.0`.
+- Tests de versión en `test_health.py` (`test_root` y `test_health`).
+
+**Estado al cierre de Fase 10:** backend `217 tests` + `ruff` limpio; frontend `88 tests` +
+`tsc`/`build` OK; launcher `22 tests` + `ruff` limpio. Versión `1.1.0` unificada y lanzador
+de escritorio con acceso directo e icono.
