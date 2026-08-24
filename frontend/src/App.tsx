@@ -12,6 +12,7 @@ import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
 import { Sidebar } from "./components/Sidebar";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { TutorQualityPanel } from "./components/TutorQualityPanel";
 import { UserSelect } from "./components/UserSelect";
 
 const SUGGESTIONS = [
@@ -166,6 +167,8 @@ export default function App() {
         />
 
         <LearningProfile profile={profile} />
+
+        <TutorQualityPanel messages={messages} />
 
         <ListeningPractice
           userId={currentUserId}
