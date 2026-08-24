@@ -74,7 +74,9 @@ def test_chat_ok_injects_system_prompt_and_mode(monkeypatch):
     assert r.status_code == 200
     assert r.json()["content"] == "Hi there!"
     sent = fake.calls[0]["messages"]
-    assert sent[0] == {"role": "system", "content": MODE_PROMPTS["grammar"]}
+    assert sent[0]["role"] == "system"
+    assert sent[0]["content"].startswith(MODE_PROMPTS["grammar"])
+    assert "CORRECT" in sent[0]["content"]
     assert sent[1]["role"] == "user"
     assert sent[1]["content"] == "Hello"
 
@@ -88,7 +90,9 @@ def test_chat_unknown_mode_falls_back_to_conversation(monkeypatch):
             json={"messages": [{"role": "user", "content": "Hi"}], "mode": "nope"},
         )
     assert r.status_code == 200
-    assert fake.calls[0]["messages"][0]["content"] == MODE_PROMPTS["conversation"]
+    assert fake.calls[0]["messages"][0]["content"].startswith(
+        MODE_PROMPTS["conversation"]
+    )
 
 
 def test_chat_stream_ok(monkeypatch):

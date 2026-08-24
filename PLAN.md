@@ -137,6 +137,14 @@
 - Verificado: backend 231 tests, frontend 92 tests, launcher 22 tests, ruff limpio, build OK.
 - Subagentes (ejecutados por el gerente): `agentes/endurecimiento/ra-*.md` (RA1–RA7).
 
+### M13 — Etapa 2: Pedagogía (Learning Engine v2)  [EN CURSO]
+- Arquitectura congelada; solo se añade rigor pedagógico a lo ya medido (ver
+  `docs/PLAN-ETAPA-PEDAGOGICA.md`).
+- Tracks (un subagente a la vez): P1 política pedagógica formal, P2 error mastery,
+  P3 vocabulario exposure/production/mastery, P4 listening como competencia, P5 CEFR basado
+  en evidencia, P6 pronunciación fonémica.
+- Subagentes (ejecutados por el gerente): `agentes/pedagogia/p-*.md` (P1–P6).
+
 ## Decisiones tomadas
 
 - Hitos M1 y M2 en paralelo (tras M0).
@@ -165,6 +173,8 @@
 | A.1 Launcher núcleo puro | `agentes/endurecimiento/a1-launcher-core.md` | ✔ hecho |
 | A.2 Launcher GUI + procesos + atajo | `agentes/endurecimiento/a2-launcher-gui.md` | ✔ hecho |
 | RA1–RA7 Release Audit 1.1 | `agentes/endurecimiento/ra-*.md` | ✔ hecho |
+| P1 Política pedagógica formal | `agentes/pedagogia/p1-politica-pedagogica.md` | ⏳ en curso |
+| P2–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ⏳ pendiente |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

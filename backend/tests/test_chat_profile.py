@@ -74,7 +74,8 @@ def test_chat_without_user_id_uses_base_prompt(monkeypatch, tmp_path):
         )
     assert r.status_code == 200
     sent = fake.calls[0]["messages"][0]["content"]
-    assert sent == MODE_PROMPTS["conversation"]
+    assert sent.startswith(MODE_PROMPTS["conversation"])
+    assert "CORRECT" in sent
 
 
 def test_chat_unknown_user_id_404(monkeypatch, tmp_path):

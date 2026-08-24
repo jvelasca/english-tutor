@@ -34,3 +34,30 @@ def correctness_guidance(cefr_level: str) -> str:
     """Devuelve la guía de corrección para un nivel CEFR; si el nivel no se
     reconoce, usa la del intermedio (B1)."""
     return CORRECTNESS_GUIDANCE.get(cefr_level, CORRECTNESS_GUIDANCE["B1"])
+
+
+# Taxonomía formal de corrección: el tutor debe distinguir un error real de una
+# sugerencia de estilo o una variante opcional, para no marcarlo como error.
+FEEDBACK_CATEGORIES: dict[str, str] = {
+    "CORRECT": "the sentence is grammatically correct; do not flag it",
+    "NATURAL": "correct but unnatural; suggest a more idiomatic phrasing",
+    "OPTIONAL": "an acceptable variation; do not mark it as a mistake",
+    "STYLE": "a register or tone issue; label it as a style note, not an error",
+    "PRONUNCIATION": "a sound, stress or intonation point; give pronunciation guidance",
+}
+
+
+def feedback_policy() -> str:
+    """Devuelve la política formal de categorías de corrección para el system prompt.
+
+    Instruye al tutor para clasificar cada corrección con una única categoría y para
+    no presentar como error lo que es natural, opcional o de estilo."""
+    lines = [
+        "Classify each correction using exactly one of these categories:",
+        *[f"- {name}: {desc}." for name, desc in FEEDBACK_CATEGORIES.items()],
+        (
+            "Only correct real errors. Never report natural, optional or stylistic "
+            "phrasing as a mistake."
+        ),
+    ]
+    return "\n".join(lines)

@@ -2,20 +2,20 @@
 from __future__ import annotations
 
 from config import DEFAULT_MODE, MODE_PROMPTS
-from services.policy import correctness_guidance
+from services.policy import correctness_guidance, feedback_policy
 
 MAX_ERRORS_IN_PROMPT = 3
 MAX_RECS_IN_PROMPT = 3
 
 
 def build_system_prompt(mode: str, profile: dict | None = None) -> str:
-    """Compone el system prompt: prompt base del modo + política de corrección por
-    CEFR + errores recurrentes + áreas de enfoque. Sin perfil, solo el base."""
+    """Compone el system prompt: prompt base del modo + política formal de corrección
+    + (si hay perfil) guía por nivel, errores recurrentes y áreas de enfoque."""
     base = MODE_PROMPTS.get(mode, MODE_PROMPTS[DEFAULT_MODE])
-    if not profile:
-        return base
 
-    parts = [base]
+    parts = [base, feedback_policy()]
+    if not profile:
+        return "\n".join(parts)
 
     level = profile.get("estimated_level")
     if level:

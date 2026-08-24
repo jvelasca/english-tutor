@@ -1,19 +1,30 @@
 """Tests del Context Builder: composición del system prompt."""
 from config import MODE_PROMPTS
 from services.context import build_system_prompt
+from services.policy import feedback_policy
 
 
-def test_no_profile_returns_base_mode_prompt():
-    assert build_system_prompt("grammar", None) == MODE_PROMPTS["grammar"]
+def test_no_profile_returns_base_prompt_plus_feedback_policy():
+    prompt = build_system_prompt("grammar", None)
+    assert prompt.startswith(MODE_PROMPTS["grammar"])
+    assert feedback_policy() in prompt
 
 
 def test_unknown_mode_falls_back_to_conversation():
-    assert build_system_prompt("nope", None) == MODE_PROMPTS["conversation"]
+    prompt = build_system_prompt("nope", None)
+    assert prompt.startswith(MODE_PROMPTS["conversation"])
+    assert feedback_policy() in prompt
 
 
 def test_profile_includes_estimated_level_guidance():
     prompt = build_system_prompt("conversation", {"estimated_level": "A1"})
     assert "beginner" in prompt
+
+
+def test_profile_includes_feedback_policy():
+    prompt = build_system_prompt("conversation", {"estimated_level": "B1"})
+    assert feedback_policy() in prompt
+    assert "CORRECT" in prompt
 
 
 def test_profile_includes_recurring_errors():
@@ -37,8 +48,10 @@ def test_profile_includes_recommendations():
     assert "Practica pronunciación." in prompt
 
 
-def test_empty_profile_returns_base_mode_prompt():
-    assert build_system_prompt("conversation", {}) == MODE_PROMPTS["conversation"]
+def test_empty_profile_returns_base_prompt_plus_feedback_policy():
+    prompt = build_system_prompt("conversation", {})
+    assert prompt.startswith(MODE_PROMPTS["conversation"])
+    assert feedback_policy() in prompt
 
 
 def test_profile_excludes_unconfirmed_errors():
