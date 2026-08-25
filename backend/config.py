@@ -5,7 +5,7 @@ from pathlib import Path
 
 DEFAULT_MODEL = "qwen3.5:9b"
 
-VERSION = "1.5.3"
+VERSION = "1.6.0"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]

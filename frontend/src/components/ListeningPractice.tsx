@@ -116,6 +116,12 @@ export function ListeningPractice({
           >
             {playing ? "Reproduciendo…" : "Escuchar audio"}
           </button>
+          {question.speech_rate > 0 && (
+            <p className="listening-audio-meta">
+              {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}
+              {question.duration.toFixed(1)}s
+            </p>
+          )}
           <p className="listening-question">{question.question}</p>
           <div className="listening-options">
             {question.options.map((opt, i) => {
@@ -179,6 +185,9 @@ export function ListeningPractice({
                   >
                     {s.skill} · {s.attempts} ·{" "}
                     {s.accuracy !== null ? `${s.accuracy}%` : "—"}
+                    {s.automaticity !== null
+                      ? ` · auto ${Math.round(s.automaticity * 100)}%`
+                      : ""}
                     {s.review_due ? " · revisar" : ""}
                   </li>
                 ))}

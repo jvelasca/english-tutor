@@ -10,6 +10,7 @@ from main import app
 from repositories import db
 from repositories import users as users_repo
 from services import academy as academy_svc
+from services.curriculum import load_level
 from services.listening import QUESTION_BANK
 
 
@@ -71,6 +72,30 @@ def test_overall_cefr_score_critical_min_ignored_without_evidence():
     assert academy_svc.overall_cefr_score(profile) == 0.80
 
 
+def test_critical_skills_empty_when_none_below_minimum():
+    profile = [
+        _entry("grammar", 0.9, 3),
+        _entry("vocabulary", 0.9, 3),
+    ]
+    assert academy_svc.critical_skills(profile) == []
+
+
+def test_critical_skills_flags_weak_critical():
+    profile = [
+        _entry("grammar", 0.2, 3),  # crítica y débil
+        _entry("vocabulary", 1.0, 3),
+    ]
+    assert academy_svc.critical_skills(profile) == ["grammar"]
+
+
+def test_critical_skills_ignored_without_evidence():
+    profile = [
+        _entry("grammar", 0.0, 0),  # sin evidencia: no es crítica todavía
+        _entry("vocabulary", 1.0, 3),
+    ]
+    assert academy_svc.critical_skills(profile) == []
+
+
 def test_profile_exposes_listening_subskills(monkeypatch, tmp_path):
     a = _setup(monkeypatch, tmp_path)
     q = QUESTION_BANK[0]
@@ -89,3 +114,26 @@ def test_profile_exposes_listening_subskills(monkeypatch, tmp_path):
     assert listening["subskills"], "la destreza 'listening' no expone subskills"
     by_sub = {s["skill"]: s for s in listening["subskills"]}
     assert by_sub[q["skill"]]["attempts"] == 1
+
+
+def test_profile_exposes_critical_skills(monkeypatch, tmp_path):
+    a = _setup(monkeypatch, tmp_path)
+    lv = load_level("a1")
+    obj = next(
+        o for o in lv.objectives() if any(c.skill == "grammar" for c in o.checks)
+    )
+    wrong = {c.id: (c.correct_index + 1) % len(c.options) for c in obj.checks}
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": obj.id, "answers": wrong},
+        )
+        assert r.status_code == 200
+        prof = client.get(
+            "/api/academy/profile", params={"user_id": a, "level_id": "a1"}
+        )
+    assert prof.status_code == 200
+    body = prof.json()
+    assert "critical_skills" in body
+    assert "grammar" in body["critical_skills"]

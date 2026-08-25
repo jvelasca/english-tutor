@@ -192,9 +192,19 @@ export interface ListeningQuestion {
   level: string;
   skill: string;
   difficulty: number;
+  difficulty_vector: Record<string, number>;
   script: string;
   question: string;
   options: string[];
+  audio_id: string;
+  duration: number;
+  speaker_id: string;
+  accent: string;
+  speech_rate: number;
+  transcript: string;
+  clean_transcript: string;
+  noise_level: number;
+  repetition_policy: string;
 }
 
 export interface ListeningAnswerResponse {
@@ -225,8 +235,10 @@ export interface ListeningSubskillProgress {
   attempts: number;
   correct: number;
   accuracy: number | null;
+  first_pass_accuracy: number | null;
   avg_response_ms: number | null;
   avg_replay_count: number;
+  automaticity: number | null;
   review_due: boolean;
 }
 
@@ -234,6 +246,9 @@ export interface ListeningDiagnostic {
   subskills: ListeningSubskillProgress[];
   weak: string[];
   recommendation: string;
+  first_pass_accuracy: number | null;
+  automaticity: number | null;
+  bank_version: string;
 }
 
 // --- Academy (currículum CEFR, mastery, evaluación) ---

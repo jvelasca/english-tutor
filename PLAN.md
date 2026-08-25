@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.5.3` (Hardening: rechazo controlado de evidencia inválida, trazabilidad de sesión de placement, tests de reproducibilidad y regresión del vector de dificultad de listening).
+- ✅ Versión estable `1.6.0` (Listening 2.0: audio como entidad de primer nivel, vector de dificultad de 8 dimensiones con dificultad derivada, sub-destrezas ampliadas y métrica de automaticidad).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 

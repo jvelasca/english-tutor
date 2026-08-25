@@ -10,6 +10,7 @@ from services.listening import (
     LISTENING_SUBSKILLS,
     QUESTION_BANK,
     current_level,
+    difficulty_from_vector,
     get_question,
     level_status,
     listening_diagnostic,
@@ -101,7 +102,7 @@ def test_bank_shape_valid():
         assert len(q["options"]) >= 2
         assert 0 <= q["answer_index"] < len(q["options"])
         assert q["skill"] in LISTENING_SUBSKILLS
-        assert 1 <= q["difficulty"] <= 6
+        assert 1 <= difficulty_from_vector(q["difficulty_vector"]) <= 6
     from collections import Counter
 
     skill_counts = Counter(q["skill"] for q in QUESTION_BANK)
@@ -323,4 +324,4 @@ def test_answer_records_metrics(monkeypatch, tmp_path):
     assert row["response_time_ms"] == 1234
     assert row["replay_count"] == 2
     assert row["skill"] == q["skill"]
-    assert row["difficulty"] == q["difficulty"]
+    assert row["difficulty"] == difficulty_from_vector(q["difficulty_vector"])

@@ -13,6 +13,16 @@ class ListeningQuestion(BaseModel):
     script: str
     question: str
     options: list[str]
+    # Metadatos de audio de primer nivel (defaults seguros para el banco heredado).
+    audio_id: str = ""
+    duration: float = 0.0
+    speaker_id: str = ""
+    accent: str = "neutral"
+    speech_rate: float = 0.0
+    transcript: str = ""
+    clean_transcript: str = ""
+    noise_level: int = 0
+    repetition_policy: str = "none"
 
 
 class ListeningAnswerRequest(BaseModel):
@@ -53,6 +63,7 @@ class ListeningSubskillOut(BaseModel):
     first_pass_accuracy: float | None = None
     avg_response_ms: float | None = None
     avg_replay_count: float
+    automaticity: float | None = None
     review_due: bool
 
 
@@ -61,4 +72,5 @@ class ListeningDiagnostic(BaseModel):
     weak: list[str]
     recommendation: str
     first_pass_accuracy: float | None = None
+    automaticity: float | None = None
     bank_version: str = ""

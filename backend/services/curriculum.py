@@ -69,7 +69,7 @@ CURRICULUM_VERSION = "1.2.5"
 ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exámenes)
 PLACEMENT_VERSION = "1.0.0"  # motor de placement adaptativo (IRT)
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
-LISTENING_BANK_VERSION = "1.0.0"  # banco de ítems de listening
+LISTENING_BANK_VERSION = "2.0.0"  # banco de ítems de listening (audio 1ª clase, 8D)
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 

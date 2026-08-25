@@ -525,6 +525,25 @@ def overall_cefr_score(skill_profile: list[dict]) -> float:
     return round(overall, 3)
 
 
+def critical_skills(skill_profile: list[dict]) -> list[str]:
+    """Destrezas críticas evaluadas por debajo de su mínimo (lista, vacía = ok).
+
+    Complementa a `overall_cefr_score`: aquella topa el overall al mínimo cuando
+    una destreza crítica cae por debajo de su umbral; esta función expone CUÁLES
+    son, para que el perfil y la remediación puedan señalarlas. Solo se activa
+    con evidencia (una destreza sin evaluar no es "crítica": aún no hay dato)."""
+    result: list[str] = []
+    for skill, minimum in CRITICAL_MINIMUMS.items():
+        entry = next((e for e in skill_profile if e["skill"] == skill), None)
+        if (
+            entry is not None
+            and entry.get("evidence_count", 0) > 0
+            and entry["score"] < minimum
+        ):
+            result.append(skill)
+    return result
+
+
 def remediation_plan(
     level: Level,
     skill_profile: list[dict],

@@ -347,6 +347,7 @@ class CefrProfileOut(BaseModel):
     level: str
     overall: float
     skills: list[SkillProfileOut]
+    critical_skills: list[str] = Field(default_factory=list)
 
 
 class RemediationSkillOut(BaseModel):

@@ -4,6 +4,40 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.6.0] — 2026-08-25
+
+Listening 2.0: convierte el listening en un motor con audio como entidad de primer nivel,
+vector de dificultad de 8 dimensiones y métrica de automaticidad.
+
+### Añadido
+- **Audio como entidad de primer nivel**: `ListeningAsset` ahora modela `audio_id`, `duration`,
+  `speaker_id`, `accent`, `speech_rate`, `transcript`, `clean_transcript`, `noise_level` y
+  `repetition_policy`, separando el contenido lingüístico del recurso multimedia.
+- **Vector de dificultad de 8 dimensiones**: `DIFFICULTY_FACTORS` pasa a
+  `speed`/`vocabulary`/`accent`/`syntactic`/`length`/`speaker_count`/`noise`/`connected_speech`.
+- **Dificultad derivada por construcción**: `difficulty_from_vector` es la única fuente de verdad
+  del escalar `difficulty` (media redondeada clampada a 1..6); `ListeningAsset.difficulty` es
+  un campo computado, eliminando la posible incoherencia media↔dificultad.
+- **Sub-destrezas ampliadas** (9 nuevas): `speaker_intention`, `fast_speech`, `connected_speech`,
+  `dictation`, `shadowing`, `multiple_speakers`, `note_taking`, `prediction`, `sequencing`, con
+  ítems nuevos en B1/B2 (`l15`–`l23`).
+- **Métrica `automaticity`** (0..1) por sub-destreza y global, derivada de `replay_count` y
+  `response_time_ms` como señal de fluidez procesal (no es un score CEFR directo).
+- `LISTENING_BANK_VERSION` → `2.0.0`.
+
+### Añadido (cierre de P1 de la auditoría de V1.5.2)
+- **`critical_skills` en el perfil CEFR**: nueva `critical_skills(skill_profile)` expone las
+  destrezas críticas (grammar/vocabulary) evaluadas por debajo de su mínimo; `CefrProfileOut`
+  devuelve ahora `critical_skills` y `get_skill_profile` lo rellena, completando la regla de
+  mínimo crítico que antes solo topaba el `overall` sin señalar qué destreza lo provocaba.
+
+### Cambiado
+- Frontend (`ListeningPractice`) muestra `automaticity` y metadatos de audio (accent/wpm/duración).
+
+### Nota
+- `LEVEL_ORDER` de listening sigue en A1/A2/B1; los ítems B2 existen y se sirven en rotación tras
+  dominar A1–B1, pero aún no gatean la progresión por nivel (pendiente de la expansión A1..C2).
+
 ## [1.5.3] — 2026-08-25
 
 Release de hardening: cierra los hallazgos de la auditoría externa de V1.5.2 (validez y

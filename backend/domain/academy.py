@@ -386,7 +386,11 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
             entry["subskills"] = subskills
     overall = academy_svc.overall_cefr_score(skills)
     return CefrProfileOut(
-        level_id=level_id, level=lv.level, overall=overall, skills=skills
+        level_id=level_id,
+        level=lv.level,
+        overall=overall,
+        skills=skills,
+        critical_skills=academy_svc.critical_skills(skills),
     )
 
 

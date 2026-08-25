@@ -10,6 +10,8 @@ from services.listening import (
     LISTENING_BANK_VERSION,
     LISTENING_SUBSKILLS,
     QUESTION_BANK,
+    automaticity_from_metrics,
+    difficulty_from_vector,
     listening_diagnostic,
     validate_listening_bank,
 )
@@ -31,8 +33,7 @@ def test_bank_is_valid():
 
 def test_bank_vector_mean_matches_difficulty():
     for q in QUESTION_BANK:
-        mean = sum(q["difficulty_vector"].values()) / len(DIFFICULTY_FACTORS)
-        assert round(mean) == q["difficulty"], q["id"]
+        assert difficulty_from_vector(q["difficulty_vector"]) in range(1, 7), q["id"]
 
 
 def test_bank_covers_every_subskill():
@@ -53,11 +54,13 @@ def test_validate_listening_bank_detects_invalid_skill():
     assert any("invalid skill" in e for e in errors)
 
 
-def test_validate_listening_bank_detects_vector_mean_mismatch():
+def test_validate_listening_bank_detects_vector_out_of_range():
+    # Con la dificultad derivada ya no hay "mean != difficulty"; el invariante
+    # equivalente es que cada dimensión del vector esté en 1..6.
     bad = dict(QUESTION_BANK[0])
-    bad["difficulty_vector"] = {f: 6 for f in DIFFICULTY_FACTORS}
+    bad["difficulty_vector"] = dict(bad["difficulty_vector"], speed=0)
     errors = validate_listening_bank([bad])
-    assert any("mean != difficulty" in e for e in errors)
+    assert any("out of range" in e for e in errors)
 
 
 def test_validate_listening_bank_detects_missing_factor():
@@ -71,7 +74,7 @@ def test_validate_listening_bank_detects_missing_factor():
 
 def test_validate_listening_bank_detects_extra_factor():
     bad = dict(QUESTION_BANK[0])
-    bad["difficulty_vector"] = dict(QUESTION_BANK[0]["difficulty_vector"], noise=1)
+    bad["difficulty_vector"] = dict(QUESTION_BANK[0]["difficulty_vector"], syntax=1)
     errors = validate_listening_bank([bad])
     assert any("factors mismatch" in e for e in errors)
 
@@ -81,6 +84,69 @@ def test_validate_listening_bank_detects_bad_answer_index():
     bad["answer_index"] = 99
     errors = validate_listening_bank([bad])
     assert any("answer_index" in e for e in errors)
+
+
+# --- Vector de 8 dimensiones y dificultad derivada -----------------------------
+
+
+def test_difficulty_factors_are_exactly_8_in_order():
+    assert DIFFICULTY_FACTORS == (
+        "speed",
+        "vocabulary",
+        "accent",
+        "syntactic",
+        "length",
+        "speaker_count",
+        "noise",
+        "connected_speech",
+    )
+
+
+def test_bank_vectors_have_all_8_factors():
+    for q in QUESTION_BANK:
+        assert set(q["difficulty_vector"]) == set(DIFFICULTY_FACTORS), q["id"]
+
+
+def test_difficulty_from_vector_rounds_mean():
+    # Media 1.0 → 1; media 2.625 → 3 (redondeo al par de Python).
+    assert difficulty_from_vector({"speed": 1, "vocabulary": 1}) == 1
+    assert difficulty_from_vector({f: 3 for f in DIFFICULTY_FACTORS}) == 3
+
+
+def test_difficulty_from_vector_clamps_to_1_6():
+    assert difficulty_from_vector({}) == 1
+    assert difficulty_from_vector({"speed": 0, "vocabulary": 0}) == 1
+    assert difficulty_from_vector({"speed": 100, "vocabulary": 100}) == 6
+
+
+def test_automaticity_is_none_without_attempts():
+    assert automaticity_from_metrics(0.0, None, attempts=0) is None
+
+
+def test_automaticity_penalizes_replays_and_latency():
+    # Sin replays y respuesta rápida → alta automaticidad.
+    fast = automaticity_from_metrics(0.0, 1000.0, attempts=3)
+    # Con replays y respuesta lenta → menor automaticidad.
+    slow = automaticity_from_metrics(2.0, 5000.0, attempts=3)
+    assert fast is not None and slow is not None
+    assert 0 <= fast <= 1
+    assert 0 <= slow <= 1
+    assert slow < fast
+
+
+def test_diagnostic_exposes_automaticity():
+    rows = [
+        {"question_id": "l1", "skill": "detail", "correct": True,
+         "response_time_ms": 1000, "replay_count": 0},
+        {"question_id": "l2", "skill": "detail", "correct": True,
+         "response_time_ms": 1200, "replay_count": 0},
+    ]
+    diag = listening_diagnostic(rows)
+    by_skill = {s["skill"]: s for s in diag["subskills"]}
+    assert by_skill["detail"]["automaticity"] is not None
+    assert 0 <= by_skill["detail"]["automaticity"] <= 1
+    assert diag["automaticity"] is not None
+    assert 0 <= diag["automaticity"] <= 1
 
 
 # --- First-pass accuracy ---------------------------------------------------------

@@ -6,6 +6,7 @@ from starlette.concurrency import run_in_threadpool
 from repositories import listening as listening_repo
 from services.listening import (
     current_level,
+    difficulty_from_vector,
     get_question,
     level_status,
     listening_diagnostic,
@@ -15,8 +16,10 @@ from services.listening import (
 
 
 def _public(question: dict) -> dict:
-    """Quita la respuesta (answer_index) antes de exponerla al cliente."""
-    return {k: v for k, v in question.items() if k != "answer_index"}
+    """Quita la respuesta (answer_index) y añade la dificultad derivada del vector."""
+    out = {k: v for k, v in question.items() if k != "answer_index"}
+    out["difficulty"] = difficulty_from_vector(question.get("difficulty_vector", {}))
+    return out
 
 
 async def next_question(user_id: str) -> dict:
@@ -37,6 +40,7 @@ async def submit_answer(
     if question is None:
         return None
     correct = score_answer(answer_index, question["answer_index"])
+    difficulty = difficulty_from_vector(question.get("difficulty_vector", {}))
     await run_in_threadpool(
         listening_repo.record_attempt,
         user_id,
@@ -44,7 +48,7 @@ async def submit_answer(
         answer_index,
         correct,
         question.get("skill", ""),
-        question.get("difficulty", 1),
+        difficulty,
         response_time_ms,
         replay_count,
     )
@@ -54,7 +58,7 @@ async def submit_answer(
         "correct_index": question["answer_index"],
         "level": question["level"],
         "skill": question.get("skill", ""),
-        "difficulty": question.get("difficulty", 1),
+        "difficulty": difficulty,
     }
 
 
