@@ -4,6 +4,43 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.5.0] — 2026-08-25
+
+Evidence & Performance Engine, Listening Engine y Placement adaptativo. Cierra el ciclo
+`Evidence → Mastery → CEFR Skill Profile → Remediación → Olvido` para las destrezas de
+producción (speaking/writing/pronunciation) y convierte el listening y el test de nivel en
+motores adaptativos.
+
+### Añadido
+- **Speaking Evidence Engine (V1.3.0)**: scorer determinista CEFR de 6 dimensiones
+  (`services/speaking.py`), extracción de evidencia con LLM (`services/speaking_llm.py`,
+  el LLM extrae, el scorer puntúa), puente a mastery y endpoints read-aloud/tarea (JSON y
+  audio → Whisper).
+- **Writing Evidence Engine**: mismo patrón que speaking (rubric de 6 criterios +
+  `services/writing_llm.py`), con `writing` declarado en el currículum.
+- **Pronunciación fonémica (P6)**: `services/phonemes.py` (grapheme→phoneme ARPAbet +
+  precisión de fonemas por Levenshtein), `phoneme_accuracy` expuesto en el evaluador, y
+  puente pronunciation → mastery. Declarado `pronunciation` en el currículum.
+- **CEFR Skill Profile (V1.3.1)**: `GET /api/academy/profile` devuelve, por destreza,
+  `score`/`confidence`/`evidence_count`/`last_evidence`/`review_due`.
+- **Remediación adaptativa (V1.3.2)**: `GET /api/academy/remediation` devuelve las destrezas
+  débiles y sus objetivos; el AI Teacher lee el perfil CEFR en su system prompt.
+- **Modelo de olvido (V1.4)**: `services/forgetting.py` (curva de olvido exponencial,
+  `retrieval_probability` y `review_due` real en función del tiempo, sustituyendo la
+  heurística por umbral).
+- **Listening Engine**: sub-destrezas (`gist`/`detail`/`inference`/`vocabulary`/`numbers`) y
+  dificultad en el banco, métricas (`response_time_ms`, `replay_count`), diagnóstico
+  adaptativo (`GET /api/listening/diagnostic`) y panel en el frontend.
+- **Placement Engine adaptativo (V1.5)**: IRT-lite (estimación de habilidad θ, selección de
+  ítem por dificultad más cercana a θ) con `POST /api/academy/placement/next` (flujo stateless).
+- **UI**: favicon de la app y selector de modelo IA con favorito integrado en el desplegable.
+
+### Cambiado
+- Currículum: `writing` y `pronunciation` declarados en los objetivos de A1/A2;
+  `CURRICULUM_VERSION` → `1.2.5`.
+- Listening pasa de banco plano a motor con sub-destrezas y diagnóstico.
+- Placement pasa de scoring por bandas a estimación adaptativa de habilidad (θ).
+
 ## [1.2.2] — 2026-08-25
 
 Hardening de la Academy antes del Evidence & Performance Engine (V1.3). Sin funcionalidad nueva:

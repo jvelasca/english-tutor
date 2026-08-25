@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.2.2` (hardening: gating de `get_level_detail`, versionado consistente, sin hardcodes A1; integridad curricular: gating CEFR, mastery por objetivo, decay y mínimo de evidencias).
+- ✅ Versión estable `1.5.0` (Evidence & Performance Engine: speaking/writing/pronunciación + CEFR Skill Profile + remediación + modelo de olvido; Listening Engine con sub-destrezas y diagnóstico; Placement Engine adaptativo IRT-lite).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -144,6 +144,18 @@
   P3 vocabulario exposure/production/mastery, P4 listening como competencia, P5 CEFR basado
   en evidencia, P6 pronunciación fonémica.
 - Subagentes (ejecutados por el gerente): `agentes/pedagogia/p-*.md` (P1–P6).
+
+### M14 — Evidence & Performance + Listening + Placement  [HECHO ✔]
+- **Evidence & Performance Engine (V1.3)**: ciclo `Evidence → Mastery → Skill Profile →
+  Remediación` para speaking, writing y pronunciation (scorer determinista + extracción de
+  evidencia con LLM + puente a mastery). CEFR Skill Profile (`/api/academy/profile`) y
+  remediación adaptativa (`/api/academy/remediation`); el tutor lee el perfil CEFR.
+- **Modelo de olvido (V1.4)**: `services/forgetting.py` (retrieval_probability + `review_due`
+  real en función del tiempo).
+- **Listening Engine**: sub-destrezas + dificultad + diagnóstico adaptativo
+  (`/api/listening/diagnostic`).
+- **Placement Engine (V1.5)**: IRT-lite adaptativo (`POST /api/academy/placement/next`).
+- Verificado: backend 406 tests + ruff limpio; frontend 137 tests + `tsc`/`build` OK.
 
 ## Decisiones tomadas
 

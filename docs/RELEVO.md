@@ -7,16 +7,20 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.2.2` publicada. Cerradas: Release Audit 1.1 (M12), Etapa 2
+**Posición actual (2026-08-25):** `v1.5.0` publicada. Cerradas: Release Audit 1.1 (M12), Etapa 2
 (P1–P2), M14 (GUI responsive + personalización), M15 (Launcher), **Academy v2 con integridad
-curricular (v1.2.1)**, **M16 — Apariencia configurable + Ayuda + progresión de listening**, y
-**hardening v1.2.2** (gating de `get_level_detail`, versionado consistente, sin hardcodes A1).
+curricular (v1.2.1)**, **M16 — Apariencia configurable + Ayuda + progresión de listening**,
+**hardening v1.2.2**, y el bloque **Evidence & Performance + Listening + Placement (V1.3/V1.4/V1.5)**:
+Speaking/Writing/Pronunciation Evidence Engine, CEFR Skill Profile, remediación adaptativa,
+modelo de olvido, Listening Engine (sub-destrezas + diagnóstico) y Placement adaptativo IRT-lite.
 Últimos commits:
-- `release: v1.2.2 - hardening (gating get_level_detail, versionado consistente, sin hardcodes A1)`
-- `release: v1.2.1 - integridad curricular, apariencia configurable, ayuda y listening`
-- `release: v1.2.0 - Academy A1/A2 funcional y cierre del ciclo de evidencia`
+- `feat: V1.5 - Placement Engine adaptativo (IRT-lite: theta + seleccion de item + endpoint /placement/next)`
+- `feat: V1.3 - Pronunciacion fonemica (grapheme->phoneme + puente pronunciation->mastery)`
+- `feat: V1.3 - Listening Engine (sub-destrezas + diagnostico adaptativo + panel Listening Lab)`
+- `feat: V1.3 - Writing Evidence Engine (scorer determinista + LLM + mastery, mismo patron que Speaking)`
+- `feat: V1.4 - modelo de olvido (repeticion espaciada: retrieval_probability y review_due real)`
 
-**Estado verde:** backend `314 tests` + `ruff` limpio; frontend `136 tests` + `tsc`/`build` OK;
+**Estado verde:** backend `406 tests` + `ruff` limpio; frontend `137 tests` + `tsc`/`build` OK;
 launcher `33 tests` + `ruff` limpio.
 
 **Entregables recientes:**
@@ -96,7 +100,7 @@ Hecho y verificado (tests verdes):
 ## 4. GitHub
 
 - Repo **público**: https://github.com/jvelasca/english-tutor
-- Rama por defecto: `main`. Última versión estable: tag `v1.2.2` (release publicado).
+- Rama por defecto: `main`. Última versión estable: tag `v1.5.0` (release publicado).
 - Issues de seguimiento:
   - #1 M5 modelo conversacional
   - #2 Seguimiento de progreso del alumno
