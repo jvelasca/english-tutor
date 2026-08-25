@@ -318,6 +318,7 @@ def test_session_plan_steps_have_subskill_key():
     )
     expected_keys = {
         "kind",
+        "step_key",
         "skill",
         "subskill",
         "objective_id",
@@ -356,6 +357,56 @@ def test_session_plan_new_step_carries_level_and_skills():
     assert new_step["objective_id"] == obj.id
     assert new_step["level_id"] == level.level_id
     assert set(new_step["skills"]) == set(obj.skills)
+
+
+def test_step_key_is_deterministic_per_kind():
+    assert adaptive.step_key({"kind": "review", "skill": "grammar"}) == "review:grammar"
+    assert (
+        adaptive.step_key({"kind": "easy_wins", "skill": "vocabulary"})
+        == "easy_wins:vocabulary"
+    )
+    assert (
+        adaptive.step_key({"kind": "listening", "subskill": "gist"})
+        == "listening:gist"
+    )
+    assert (
+        adaptive.step_key(
+            {"kind": "new", "level_id": "a1", "objective_id": "o1"}
+        )
+        == "new:a1:o1"
+    )
+
+
+def test_session_plan_exclude_keys_filters_and_respreads_minutes():
+    level = load_level("a1")
+    obj = level.objectives()[0]
+    steps = adaptive.session_plan(
+        [],
+        level=level,
+        listening_weak=["gist", "detail"],
+        next_objective_id=obj.id,
+        budget_minutes=15,
+        exclude_keys={"listening:gist"},
+    )
+    keys = {s["step_key"] for s in steps}
+    assert "listening:gist" not in keys
+    assert "listening:detail" in keys
+    # Los minutos se reparten solo entre los pasos restantes.
+    assert sum(s["minutes"] for s in steps) == 15
+
+
+def test_session_plan_excludes_all_steps_gives_empty():
+    level = load_level("a1")
+    obj = level.objectives()[0]
+    steps = adaptive.session_plan(
+        [],
+        level=level,
+        listening_weak=["gist", "detail"],
+        next_objective_id=obj.id,
+        budget_minutes=15,
+        exclude_keys={"listening:gist", "listening:detail", f"new:a1:{obj.id}"},
+    )
+    assert steps == []
 
 
 # --- Integración con build_skill_profile ----------------------------------

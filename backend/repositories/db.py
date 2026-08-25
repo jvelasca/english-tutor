@@ -174,6 +174,18 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS session_completions (
+                user_id TEXT NOT NULL,
+                step_key TEXT NOT NULL,
+                completed_on TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, step_key),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS academy_enrollments (
                 user_id TEXT NOT NULL,
                 level_id TEXT NOT NULL,

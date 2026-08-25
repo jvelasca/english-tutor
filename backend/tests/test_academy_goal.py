@@ -185,3 +185,47 @@ def test_endpoint_session_uses_goal_budget(monkeypatch, tmp_path):
         r = client.get("/api/academy/session", params={"user_id": a})
     assert r.status_code == 200
     assert r.json()["total_minutes"] == 45
+
+
+def test_mark_session_step_and_list(monkeypatch, tmp_path):
+    a = _setup(monkeypatch, tmp_path)
+    assert academy_repo.mark_session_step(a, "review:grammar", "2026-08-25") is True
+    assert academy_repo.list_session_steps(a, "2026-08-25") == {"review:grammar"}
+    # Otra fecha no devuelve el paso (reseteo diario).
+    assert academy_repo.list_session_steps(a, "2026-08-26") == set()
+
+
+def test_mark_session_step_rejects_unknown_user(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert (
+        academy_repo.mark_session_step("no-existe", "review:grammar", "2026-08-25")
+        is False
+    )
+
+
+def test_endpoint_complete_session_step_filters_it_out(monkeypatch, tmp_path):
+    a = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        before = client.get("/api/academy/session", params={"user_id": a}).json()
+        first_key = before["items"][0]["step_key"]
+        r = client.post(
+            "/api/academy/session/complete",
+            params={"user_id": a},
+            json={"step_key": first_key},
+        )
+    assert r.status_code == 200
+    after = r.json()
+    assert first_key not in {i["step_key"] for i in after["items"]}
+    # La sesión reasigna el presupuesto entre los pasos restantes.
+    assert after["total_minutes"] == sum(i["minutes"] for i in after["items"])
+
+
+def test_endpoint_complete_session_step_rejects_unknown_user(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/session/complete",
+            params={"user_id": "no-existe"},
+            json={"step_key": "review:grammar"},
+        )
+    assert r.status_code == 404

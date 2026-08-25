@@ -88,6 +88,12 @@ DEFAULT_GOAL = {
     "target_level": "B1",
 }
 
+
+def _today() -> str:
+    """Fecha UTC de hoy en `YYYY-MM-DD` (reseteo diario de la sesión)."""
+    return datetime.now(timezone.utc).date().isoformat()
+
+
 def _iter_objectives(level: Level):
     """Recorre (module, unit, lesson, objective, order) en orden de aparición."""
     order = 0
@@ -534,7 +540,8 @@ async def get_today_plan(user_id: str) -> TodayPlanOut:
 async def get_session(user_id: str) -> SessionOut:
     """Sesión diaria (Session Engine): repaso vencido → listening → debilidad →
     nuevo → refuerzo, unificando las señales CEFR y de listening en una secuencia
-    accionable con presupuesto del objetivo personal."""
+    accionable con presupuesto del objetivo personal. Los pasos ya completados hoy
+    se omiten (filtro por `step_key`)."""
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
     skills = await _annotated_profile(user_id, lv)
@@ -554,6 +561,9 @@ async def get_session(user_id: str) -> SessionOut:
     listening_rows = await run_in_threadpool(listening_repo.list_attempts, user_id)
     listening_weak = listening_diagnostic(listening_rows)["weak"]
 
+    done = await run_in_threadpool(
+        academy_repo.list_session_steps, user_id, _today()
+    )
     steps = adaptive.session_plan(
         skills,
         lv,
@@ -562,6 +572,7 @@ async def get_session(user_id: str) -> SessionOut:
         oid,
         listening_weak=listening_weak,
         budget_minutes=goal.minutes_per_day,
+        exclude_keys=done,
     )
     summary = adaptive.session_summary(steps)
     return SessionOut(
@@ -570,6 +581,18 @@ async def get_session(user_id: str) -> SessionOut:
         review_count=summary["review_count"],
         practice_count=summary["practice_count"],
     )
+
+
+async def set_session_step_done(user_id: str, step_key: str) -> SessionOut | None:
+    """Marca un paso de la sesión como completado hoy y devuelve la sesión actualizada.
+
+    None si el usuario no existe."""
+    ok = await run_in_threadpool(
+        academy_repo.mark_session_step, user_id, step_key, _today()
+    )
+    if not ok:
+        return None
+    return await get_session(user_id)
 
 
 async def get_learning_goal(user_id: str) -> LearningGoalOut:

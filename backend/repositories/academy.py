@@ -614,3 +614,37 @@ def upsert_goal(
             (user_id, goal_type, minutes_per_day, days_per_week, target_level, now),
         )
     return True
+
+
+# --- Sesión diaria (Session Engine): pasos completados --------------------
+
+
+def mark_session_step(user_id: str, step_key: str, completed_on: str) -> bool:
+    """Marca un paso de la sesión como completado hoy. False si no existe el usuario.
+
+    La clave es (user_id, step_key): remarcar el mismo paso en un día posterior
+    actualiza `completed_on`, así el filtro "hoy" se autolimpia sin acumular filas."""
+    if get_user(user_id) is None:
+        return False
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO session_completions "
+            "(user_id, step_key, completed_on, completed_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id, step_key) DO UPDATE SET "
+            "completed_on = excluded.completed_on, "
+            "completed_at = excluded.completed_at",
+            (user_id, step_key, completed_on, now),
+        )
+    return True
+
+
+def list_session_steps(user_id: str, completed_on: str) -> set[str]:
+    """Claves de los pasos de sesión completados en una fecha concreta."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT step_key FROM session_completions "
+            "WHERE user_id = ? AND completed_on = ?",
+            (user_id, completed_on),
+        ).fetchall()
+    return {r["step_key"] for r in rows}

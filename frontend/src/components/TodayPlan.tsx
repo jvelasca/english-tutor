@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getGoal, getSession, getStudentModel, putGoal } from "../api/academy";
+import { completeSessionStep, getGoal, getSession, getStudentModel, putGoal } from "../api/academy";
 import type {
   LearningGoal,
   LearningGoalType,
@@ -78,6 +78,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
   const [draft, setDraft] = useState<LearningGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -135,6 +136,19 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
       /* backend no disponible */
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function markDone(step: SessionStep) {
+    if (!userId || completing) return;
+    setCompleting(true);
+    try {
+      const next = await completeSessionStep(userId, step.step_key);
+      setSession(next);
+    } catch {
+      /* backend no disponible */
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -325,6 +339,8 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
                 key={`${item.kind}-${item.subskill ?? item.objective_id ?? item.title}-${i}`}
                 item={item}
                 onClick={onStep}
+                onDone={markDone}
+                busy={completing}
               />
             ))}
           </ol>
@@ -360,9 +376,13 @@ function stepTitle(item: SessionStep): string {
 function SessionStepRow({
   item,
   onClick,
+  onDone,
+  busy = false,
 }: {
   item: SessionStep;
   onClick?: (step: SessionStep) => void;
+  onDone?: (step: SessionStep) => void;
+  busy?: boolean;
 }) {
   const label = KIND_LABELS[item.kind] ?? item.kind;
   const reason =
@@ -385,6 +405,30 @@ function SessionStepRow({
         <span className="today-item-kind">{label}</span>
         <span className="today-item-minutes">{item.minutes} min</span>
       </button>
+      {onDone && (
+        <button
+          type="button"
+          className="today-item-done"
+          onClick={() => onDone(item)}
+          disabled={busy}
+          aria-label={`Marcar como hecho: ${stepTitle(item)}`}
+          title="Marcar como hecho"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </button>
+      )}
     </li>
   );
 }

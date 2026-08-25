@@ -184,6 +184,15 @@ export function getSession(userId: string): Promise<Session> {
   return getJson<Session>(`/api/academy/session${userQuery(userId)}`);
 }
 
+export function completeSessionStep(
+  userId: string,
+  stepKey: string,
+): Promise<Session> {
+  return postJson<Session>(`/api/academy/session/complete${userQuery(userId)}`, {
+    step_key: stepKey,
+  });
+}
+
 export function getGoal(userId: string): Promise<LearningGoal> {
   return getJson<LearningGoal>(`/api/academy/goal${userQuery(userId)}`);
 }

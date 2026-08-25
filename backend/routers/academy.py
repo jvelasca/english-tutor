@@ -29,6 +29,7 @@ from schemas.academy import (
     PronunciationSubmitRequest,
     ReadinessOut,
     RemediationPlanOut,
+    SessionCompleteRequest,
     SessionOut,
     SpeakingResultOut,
     SpeakingSubmitRequest,
@@ -144,6 +145,16 @@ async def today(user: dict = Depends(current_user)) -> dict:
 @router.get("/api/academy/session", response_model=SessionOut)
 async def session(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_session(user["id"])
+
+
+@router.post("/api/academy/session/complete", response_model=SessionOut)
+async def complete_session_step(
+    body: SessionCompleteRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.set_session_step_done(user["id"], body.step_key)
+    if out is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return out
 
 
 @router.get("/api/academy/goal", response_model=LearningGoalOut)

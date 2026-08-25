@@ -425,6 +425,7 @@ class TodayPlanOut(BaseModel):
 
 class SessionStepOut(BaseModel):
     kind: str
+    step_key: str
     skill: str | None = None
     subskill: str | None = None
     objective_id: str | None = None
@@ -433,6 +434,10 @@ class SessionStepOut(BaseModel):
     title: str
     reason: str
     minutes: int
+
+
+class SessionCompleteRequest(BaseModel):
+    step_key: str = Field(min_length=1, max_length=128)
 
 
 class SessionOut(BaseModel):

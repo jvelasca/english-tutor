@@ -875,11 +875,32 @@ con iconos en la UI y más información en paneles colapsables.
   (botón de paso), `.kind-listening`.
 
 ### 20.5 Pendiente / siguiente incremento natural
-- **Marcar pasos completados de forma explícita**: hoy el refresco se dispara con `onAttempt` y
-  al terminar lección; los pasos `review`/`easy_wins` (que solo cambian de modo) aún no persisten
-  un "hecho". Opción: registrar un evento/estado por paso y filtrarlo en `session_plan`.
 - **P3–P6 de Etapa 2** (vocabulario, listening competencia, CEFR evidencia, pronunciación fonémica):
   ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 21. HECHO (sin commitear) — Marcar pasos de la sesión como "hechos"
+
+Cierra el hueco de `review`/`easy_wins` (que solo cambiaban de modo): ahora cualquier
+paso se puede marcar como completado y desaparece de la sesión de hoy, con reseteo diario.
+
+- **`services/adaptive.py`**: `step_key(step)` (clave estable: `listening:<subskill>`,
+  `<weakness|new>:<level>:<objective>`, `<review|easy_wins>:<skill>`) y
+  `session_plan(..., exclude_keys=...)` que anota cada paso con `step_key`, filtra los
+  ya completados y **reparte los minutos solo entre los pasos restantes**.
+- **`repositories/db.py`**: tabla `session_completions` (`PK (user_id, step_key)`,
+  `completed_on` para el reseteo diario, FK a users).
+- **`repositories/academy.py`**: `mark_session_step(user_id, step_key, completed_on)`
+  (upsert) y `list_session_steps(user_id, completed_on) -> set[str]`.
+- **`schemas/academy.py`**: `SessionStepOut.step_key` + `SessionCompleteRequest`.
+- **`domain/academy.py`**: `_today()` (fecha UTC `YYYY-MM-DD`); `get_session` excluye los
+  pasos de hoy (`exclude_keys`); `set_session_step_done(user_id, step_key)` → devuelve la
+  sesión actualizada.
+- **`routers/academy.py`**: `POST /api/academy/session/complete` (`{step_key}`) → `SessionOut`.
+- **Frontend**: `SessionStep.step_key`, `completeSessionStep` en `api/academy.ts`; en
+  `TodayPlan.tsx` cada paso tiene un botón "✓" (`.today-item-done`) que llama al endpoint
+  y sustituye la sesión con la respuesta (el paso marcado desaparece). Estilos en `index.css`.
+- **Tests**: `test_adaptive.py` (+`step_key`, +`exclude_keys`), `test_academy_goal.py`
+  (+repo mark/list y +endpoint complete), `api/academy.test.ts` (+`completeSessionStep`).
 
 ### Verificación rápida del estado sin commitear
 ```powershell

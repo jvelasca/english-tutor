@@ -579,6 +579,7 @@ export interface TodayPlan {
 
 export interface SessionStep {
   kind: string;
+  step_key: string;
   skill: string | null;
   subskill: string | null;
   objective_id: string | null;

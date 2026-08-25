@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   completeLesson,
+  completeSessionStep,
   getGoal,
   getLevels,
   getSession,
@@ -96,6 +97,22 @@ describe("academy api", () => {
     });
     await getSession("u1");
     expect(fn.mock.calls[0][0]).toBe("/api/academy/session?user_id=u1");
+  });
+
+  it("completeSessionStep envía step_key por POST", async () => {
+    const fn = mockJsonFetch({
+      items: [],
+      total_minutes: 10,
+      review_count: 1,
+      practice_count: 1,
+    });
+    await completeSessionStep("u1", "review:grammar");
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/session/complete?user_id=u1");
+    expect(method).toBe("POST");
+    expect(body).toEqual({ step_key: "review:grammar" });
   });
 
   it("putGoal envía el objetivo con PUT", async () => {

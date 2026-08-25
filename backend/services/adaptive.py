@@ -428,6 +428,21 @@ def steps_of(steps: list[dict], kind: str) -> list[dict]:
     return [s for s in steps if s["kind"] == kind]
 
 
+def step_key(step: dict) -> str:
+    """Clave estable que identifica un paso (misma identidad para el mismo material).
+
+    Es la identidad con la que el frontend marca un paso como "hecho hoy" y con la
+    que `session_plan` filtra los pasos ya completados (`exclude_keys`). Debe ser
+    determinista: listening por sub-destreza, debilidad/nuevo por nivel+objetivo y
+    repaso/refuerzo por destreza."""
+    kind = step["kind"]
+    if kind == "listening":
+        return f"listening:{step.get('subskill') or 'listening'}"
+    if kind in ("weakness", "new"):
+        return f"{kind}:{step.get('level_id')}:{step.get('objective_id')}"
+    return f"{kind}:{step.get('skill')}"
+
+
 def session_plan(
     profile: list[dict],
     level=None,
@@ -436,6 +451,7 @@ def session_plan(
     next_objective_id: str | None = None,
     listening_weak: list[str] | None = None,
     budget_minutes: int = TODAY_BUDGET,
+    exclude_keys: set[str] | None = None,
 ) -> list[dict]:
     """Sesión diaria ordenada por prioridad pedagógica.
 
@@ -448,14 +464,16 @@ def session_plan(
         4. new        — siguiente objetivo del currículo (progresión)
         5. easy_wins  — refuerzo de confianza
 
-    Devuelve pasos `{kind, skill, subskill, objective_id, level_id, skills,
-    title, reason, minutes}` con minutos que suman `budget_minutes` según
-    `SESSION_MIX`. Cada categoría está limitada por `SESSION_CAPS`. Determinista
-    dados los mismos inputs.
+    Devuelve pasos `{kind, step_key, skill, subskill, objective_id, level_id,
+    skills, title, reason, minutes}` con minutos que suman `budget_minutes` según
+    `SESSION_MIX`. Cada categoría está limitada por `SESSION_CAPS`. Los pasos cuya
+    `step_key` esté en `exclude_keys` (ya completados hoy) se omiten antes de
+    repartir los minutos. Determinista dados los mismos inputs.
     """
     remediation = remediation or []
     mastered_ids = mastered_ids or set()
     listening_weak = listening_weak or []
+    exclude_keys = exclude_keys or set()
     steps: list[dict] = []
 
     def _cap(kind: str) -> int:
@@ -553,6 +571,12 @@ def session_plan(
                 "reason": "confidence boost",
             }
         )
+
+    # Identidad estable por paso y filtro de "ya completados hoy".
+    for s in steps:
+        s["step_key"] = step_key(s)
+    if exclude_keys:
+        steps = [s for s in steps if s["step_key"] not in exclude_keys]
 
     return _assign_minutes(steps, budget_minutes, mix=SESSION_MIX)
 
