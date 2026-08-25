@@ -10,8 +10,9 @@ Modelo de mastery (dirección única, nunca al revés):
         → CEFR profile      (destreza → score/confidence/evidence/review_due)
         → Level completion  (certificación interna, reproducible)
 Las destrezas de conocimiento (grammar, vocabulary, reading, listening) se
-evalúan con checks deterministas; las de producción (speaking, writing,
-pronunciation) se declaran pero aún no integran evidencia de rendimiento.
+evalúan con checks deterministas (opción múltiple); las de producción (speaking,
+writing, pronunciation) se evalúan con rúbricas deterministas + extracción LLM
+y, desde V1.3, integran evidencia de rendimiento versionada en el Student Model.
 """
 
 from __future__ import annotations
@@ -650,7 +651,7 @@ EVIDENCE_SOURCES: tuple[str, ...] = (
 )
 
 
-def validate_evidence_record(
+def evidence_record_errors(
     record: dict,
     *,
     user_id: str,
@@ -659,8 +660,8 @@ def validate_evidence_record(
     item_types: tuple[str, ...] = EVIDENCE_ITEM_TYPES,
     sources: tuple[str, ...] = EVIDENCE_SOURCES,
 ) -> list[str]:
-    """Valida los invariantes de un registro de evidencia y devuelve las
-    violaciones (lista vacía = válido).
+    """Devuelve las violaciones de invariantes de un registro de evidencia
+    (lista vacía = válido).
 
     Invariantes: `user_id` no vacío; `objective_id` vacío (evidencia de nivel,
     p. ej. un examen) o perteneciente al nivel; `skill` canónica; `item_type` y

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, VERSION
+from domain.errors import EvidenceInvariantError
 from repositories.db import init_db
 from routers.academy import router as academy_router
 from routers.assessment import router as assessment_router
@@ -35,6 +37,21 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="English Tutor API", version=VERSION, lifespan=lifespan)
+
+
+@app.exception_handler(EvidenceInvariantError)
+async def evidence_invariant_handler(
+    _request: Request, exc: EvidenceInvariantError
+) -> JSONResponse:
+    """Expone la evidencia rechazada como error controlado y visible en logs."""
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "EVIDENCE_INVARIANT",
+            "message": "Evidencia rechazada por violación de invariantes",
+            "violations": exc.violations,
+        },
+    )
 
 # CORS para desarrollo local + acceso desde la LAN (frontend Vite en :5173,
 # accesible desde cualquier equipo de la red por su IP privada).

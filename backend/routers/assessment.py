@@ -14,6 +14,7 @@ from schemas.academy import (
     PlacementAdaptiveOut,
     PlacementOut,
     PlacementResultOut,
+    PlacementStartOut,
 )
 
 router = APIRouter()
@@ -38,7 +39,17 @@ async def submit_placement(
 async def next_placement(
     body: AssessmentSubmit, user: dict = Depends(current_user)
 ) -> dict:
-    result = await academy_service.next_placement(user["id"], body.answers)
+    result = await academy_service.next_placement(
+        user["id"], body.answers, body.session_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return result
+
+
+@router.post("/api/academy/placement/start", response_model=PlacementStartOut)
+async def start_placement(user: dict = Depends(current_user)) -> dict:
+    result = await academy_service.start_placement(user["id"])
     if result is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return result

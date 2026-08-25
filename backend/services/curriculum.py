@@ -30,8 +30,8 @@ CANONICAL_SKILLS: tuple[str, ...] = (
     "writing",
 )
 
-# Destrezas que el Mastery Engine puede evaluar con evidencia determinista
-# (ObjectiveCheck de opción múltiple). Solo estas gatean el dominio.
+# Destrezas auto-scorables: el Mastery Engine las evalúa con evidencia
+# determinista (ObjectiveCheck de opción múltiple). Solo estas gatean el dominio.
 ASSESSABLE_SKILLS: tuple[str, ...] = (
     "grammar",
     "vocabulary",
@@ -39,8 +39,9 @@ ASSESSABLE_SKILLS: tuple[str, ...] = (
     "listening",
 )
 
-# Destrezas de producción que requieren evidencia de rendimiento (voz/texto),
-# aún no evaluadas automáticamente. No gatean el dominio por ahora.
+# Destrezas performance-scorables: se evalúan con rúbricas deterministas + LLM
+# (voz/texto) y registran evidencia de rendimiento versionada. Ambas familias
+# son evaluables; difieren en el mecanismo de puntuación, no en si lo son.
 PERFORMANCE_SKILLS: tuple[str, ...] = (
     "speaking",
     "writing",

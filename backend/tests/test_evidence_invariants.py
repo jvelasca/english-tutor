@@ -54,14 +54,14 @@ def _valid_record():
 
 def test_valid_objective_record_passes():
     lv, record = _valid_record()
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv) == []
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv) == []
 
 
 def test_valid_level_record_with_empty_objective_passes():
     lv, record = _valid_record()
     record["objective_id"] = ""  # evidencia de nivel (p. ej. examen)
     record["source"] = "exam"
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv) == []
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv) == []
 
 
 # --- Violaciones individuales ---------------------------------------------
@@ -69,55 +69,55 @@ def test_valid_level_record_with_empty_objective_passes():
 
 def test_invalid_user_id():
     lv, record = _valid_record()
-    assert academy_svc.validate_evidence_record(record, user_id="", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="", level=lv)
 
 
 def test_invalid_objective_id():
     lv, record = _valid_record()
     record["objective_id"] = "no-existe"
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_invalid_skill():
     lv, record = _valid_record()
     record["skill"] = "dancing"
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_invalid_item_type():
     lv, record = _valid_record()
     record["item_type"] = "essay"
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_invalid_source():
     lv, record = _valid_record()
     record["source"] = "magic"
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_empty_curriculum_version():
     lv, record = _valid_record()
     record["curriculum_version"] = ""
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_empty_assessment_version():
     lv, record = _valid_record()
     record["assessment_version"] = ""
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_result_out_of_range():
     lv, record = _valid_record()
     record["result"] = 1.5
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 def test_result_non_numeric():
     lv, record = _valid_record()
     record["result"] = "high"
-    assert academy_svc.validate_evidence_record(record, user_id="u1", level=lv)
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
 # --- Los builders de producción generan evidencia válida -------------------
@@ -155,7 +155,7 @@ def test_production_evidence_builders_are_valid():
         assert records, "el builder no generó registros"
         for record in records:
             assert (
-                academy_svc.validate_evidence_record(
+                academy_svc.evidence_record_errors(
                     record, user_id="u1", level=lv
                 )
                 == []
@@ -180,4 +180,4 @@ def test_objective_assessment_records_only_valid_evidence(monkeypatch, tmp_path)
     rows = academy_repo.list_evidence(a)
     assert rows, "no se registró evidencia"
     for row in rows:
-        assert academy_svc.validate_evidence_record(row, user_id=a, level=lv) == []
+        assert academy_svc.evidence_record_errors(row, user_id=a, level=lv) == []

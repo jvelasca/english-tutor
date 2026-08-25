@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from starlette.concurrency import run_in_threadpool
 
+from domain.errors import EvidenceInvariantError
 from repositories import academy as academy_repo
 from repositories import grammar as grammar_repo
 from repositories import listening as listening_repo
@@ -31,6 +33,7 @@ from schemas.academy import (
     PlacementItemOut,
     PlacementOut,
     PlacementResultOut,
+    PlacementStartOut,
     PronunciationResultOut,
     RemediationPlanOut,
     SkillScoreOut,
@@ -48,6 +51,7 @@ from services.context import build_lesson_prompt
 from services.curriculum import (
     ASSESSMENT_VERSION,
     CEFR_ORDER,
+    PLACEMENT_VERSION,
     Level,
     get_objective,
     load_all_levels,
@@ -55,6 +59,8 @@ from services.curriculum import (
     next_level_id,
 )
 from services.listening import listening_diagnostic
+
+logger = logging.getLogger(__name__)
 
 _LEVEL_TITLES = {
     "A1": ("Beginner", "Introduce yourself, everyday life, family, home and plans."),
@@ -296,16 +302,28 @@ async def _completed_level_ids(user_id: str) -> set[str]:
 async def _record_evidence_validated(
     user_id: str, level: Level, records: list[dict]
 ) -> int:
-    """Valida y persiste registros de evidencia; omite los que violen invariantes.
+    """Valida y persiste registros de evidencia; rechaza los que violen invariantes.
 
-    Punto único por el que pasa toda la evidencia del dominio. Los invariantes se
-    validan en `services.academy.validate_evidence_record`; en la práctica ningún
-    registro válido se omite (los tests de invariantes lo garantizan). Devuelve el
-    nº de registros persistidos."""
+    Punto único por el que pasa toda la evidencia del dominio. Cualquier
+    violación es un bug de servidor (la evidencia la genera internamente el
+    dominio), así que se registra en logs y se eleva `EvidenceInvariantError`
+    sin persistir nada. Devuelve el nº de registros persistidos.
+    """
+    violations: list[str] = []
+    for ev in records:
+        violations.extend(
+            academy_svc.evidence_record_errors(ev, user_id=user_id, level=level)
+        )
+    if violations:
+        logger.error(
+            "Evidence rejected user=%s level=%s: %s",
+            user_id,
+            level.level_id,
+            "; ".join(violations),
+        )
+        raise EvidenceInvariantError(user_id, level.level_id, violations)
     recorded = 0
     for ev in records:
-        if academy_svc.validate_evidence_record(ev, user_id=user_id, level=level):
-            continue
         await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
         recorded += 1
     return recorded
@@ -853,16 +871,54 @@ async def submit_placement(
     return PlacementResultOut(**result)
 
 
+async def start_placement(user_id: str) -> PlacementStartOut | None:
+    """Inicia una sesión de placement adaptativo trazable y devuelve el primer ítem.
+
+    Persiste una fila en `placement_sessions` con los ítems del instrumento (y su
+    `placement_version`) para poder reconstruir qué se evaluó, con qué dificultad y
+    bajo qué algoritmo, aunque el núcleo del motor siga siendo stateless. El primer
+    ítem se elige por máxima información en θ inicial."""
+    data = load_assessments()
+    items = data.placement.items
+    session = await run_in_threadpool(
+        academy_repo.create_placement_session,
+        user_id,
+        PLACEMENT_VERSION,
+        [it.model_dump() for it in items],
+    )
+    if session is None:
+        return None
+    next_item = academy_svc.select_next_item(
+        items, set(), academy_svc.PLACEMENT_START_THETA
+    )
+    next_out = None
+    if next_item is not None:
+        next_out = PlacementItemOut(
+            id=next_item.id,
+            skill=next_item.skill,
+            difficulty=next_item.difficulty,
+            prompt=next_item.prompt,
+            options=next_item.options,
+        )
+    return PlacementStartOut(
+        session_id=session["id"],
+        next_item=next_out,
+        placement_version=PLACEMENT_VERSION,
+    )
+
+
 async def next_placement(
-    user_id: str, answers: dict[str, int]
+    user_id: str, answers: dict[str, int], session_id: int | None = None
 ) -> PlacementAdaptiveOut | None:
     """Siguiente ítem del placement adaptativo (IRT-lite) y resultado al terminar.
 
-    Stateless: el cliente envía sus respuestas parciales; el servidor calcula la
-    habilidad θ, elige el siguiente ítem por máxima información (dificultad más
-    cercana a θ en la 1PL) y se detiene cuando se alcanza el máximo de ítems, no
-    quedan ítems, o el error estándar de θ baja del umbral (tras un mínimo de
-    ítems). Al terminar persiste el resultado como evaluación."""
+    El núcleo es stateless: el cliente envía sus respuestas parciales; el servidor
+    recalcula la habilidad θ, elige el siguiente ítem por máxima información
+    (Fisher; en la 1PL, dificultad más cercana a θ) y se detiene al agotar ítems,
+    alcanzar el máximo, o cuando el error estándar de θ baja del umbral (tras un
+    mínimo de ítems). Si se pasa `session_id`, además persiste la traza de la
+    sesión (respuestas, historial de θ y resultado final) en `placement_sessions`
+    para reconstruir la trazabilidad histórica del resultado CEFR."""
     data = load_assessments()
     items = data.placement.items
     answered_ids = set(answers)
@@ -874,6 +930,18 @@ async def next_placement(
     theta = academy_svc.ability_theta(responses)
     se = academy_svc.placement_standard_error(theta, responses)
     done = academy_svc.placement_should_stop(len(answered_ids), len(items), se)
+
+    theta_trace: list[dict] | None = None
+    if session_id is not None:
+        session = await run_in_threadpool(
+            academy_repo.get_placement_session, session_id
+        )
+        if session is None:
+            return None
+        theta_trace = list(session["theta_trace"]) + [
+            {"answered": len(answered_ids), "theta": theta, "standard_error": se}
+        ]
+
     if done:
         result = academy_svc.placement_result_adaptive(items, answers)
         await run_in_threadpool(
@@ -884,7 +952,16 @@ async def next_placement(
             result,
             True,
         )
+        if session_id is not None:
+            await run_in_threadpool(
+                academy_repo.update_placement_session,
+                session_id,
+                answers=answers,
+                theta_trace=theta_trace,
+                final_result=result,
+            )
         return PlacementAdaptiveOut(
+            session_id=session_id,
             next_item=None,
             theta=theta,
             standard_error=se,
@@ -892,6 +969,15 @@ async def next_placement(
             done=True,
             result=result,
         )
+
+    if session_id is not None:
+        await run_in_threadpool(
+            academy_repo.update_placement_session,
+            session_id,
+            answers=answers,
+            theta_trace=theta_trace,
+        )
+
     next_item = academy_svc.select_next_item(items, answered_ids, theta)
     next_out = None
     if next_item is not None:
@@ -903,6 +989,7 @@ async def next_placement(
             options=next_item.options,
         )
     return PlacementAdaptiveOut(
+        session_id=session_id,
         next_item=next_out,
         theta=theta,
         standard_error=se,

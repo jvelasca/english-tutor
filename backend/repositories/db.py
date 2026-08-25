@@ -274,6 +274,23 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS placement_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                placement_version TEXT NOT NULL DEFAULT '',
+                items_json TEXT NOT NULL DEFAULT '[]',
+                answers_json TEXT NOT NULL DEFAULT '{}',
+                theta_trace_json TEXT NOT NULL DEFAULT '[]',
+                final_result_json TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
         if "user_id" not in columns:
@@ -453,6 +470,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "
             "ON academy_evidence(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_placement_sessions_user_id "
+            "ON placement_sessions(user_id)"
         )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).

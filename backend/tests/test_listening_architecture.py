@@ -60,6 +60,22 @@ def test_validate_listening_bank_detects_vector_mean_mismatch():
     assert any("mean != difficulty" in e for e in errors)
 
 
+def test_validate_listening_bank_detects_missing_factor():
+    bad = dict(QUESTION_BANK[0])
+    bad["difficulty_vector"] = {
+        f: v for f, v in QUESTION_BANK[0]["difficulty_vector"].items() if f != "accent"
+    }
+    errors = validate_listening_bank([bad])
+    assert any("factors mismatch" in e for e in errors)
+
+
+def test_validate_listening_bank_detects_extra_factor():
+    bad = dict(QUESTION_BANK[0])
+    bad["difficulty_vector"] = dict(QUESTION_BANK[0]["difficulty_vector"], noise=1)
+    errors = validate_listening_bank([bad])
+    assert any("factors mismatch" in e for e in errors)
+
+
 def test_validate_listening_bank_detects_bad_answer_index():
     bad = dict(QUESTION_BANK[0])
     bad["answer_index"] = 99

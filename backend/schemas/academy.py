@@ -155,6 +155,7 @@ class PlacementOut(BaseModel):
 
 class AssessmentSubmit(BaseModel):
     answers: dict[str, int] = Field(default_factory=dict)
+    session_id: int | None = None
 
 
 class PlacementSkillResultOut(BaseModel):
@@ -174,12 +175,19 @@ class PlacementResultOut(BaseModel):
 
 
 class PlacementAdaptiveOut(BaseModel):
+    session_id: int | None = None
     next_item: PlacementItemOut | None
     theta: float
     standard_error: float | None = None
     answered: int
     done: bool
     result: PlacementResultOut | None
+
+
+class PlacementStartOut(BaseModel):
+    session_id: int
+    next_item: PlacementItemOut | None
+    placement_version: str
 
 
 class ExamItemOut(BaseModel):

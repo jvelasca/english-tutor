@@ -418,3 +418,82 @@ def list_evidence(user_id: str, level_id: str | None = None) -> list[dict]:
                 (user_id,),
             ).fetchall()
     return [dict(r) for r in rows]
+
+
+def create_placement_session(
+    user_id: str,
+    placement_version: str,
+    items: list[dict],
+) -> dict | None:
+    """Crea una sesión de placement trazable. None si el usuario no existe."""
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "INSERT INTO placement_sessions "
+            "(user_id, started_at, placement_version, items_json) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, now, placement_version, json.dumps(items, ensure_ascii=False)),
+        )
+    return get_placement_session(cur.lastrowid)
+
+
+def update_placement_session(
+    session_id: int,
+    *,
+    answers: dict[str, int] | None = None,
+    theta_trace: list[dict] | None = None,
+    final_result: dict | None = None,
+) -> dict | None:
+    """Actualiza la traza de una sesión (respuestas, θ, resultado final)."""
+    with closing(_conn()) as conn, conn:
+        if answers is not None:
+            conn.execute(
+                "UPDATE placement_sessions SET answers_json = ? WHERE id = ?",
+                (json.dumps(answers, ensure_ascii=False), session_id),
+            )
+        if theta_trace is not None:
+            conn.execute(
+                "UPDATE placement_sessions SET theta_trace_json = ? WHERE id = ?",
+                (json.dumps(theta_trace, ensure_ascii=False), session_id),
+            )
+        if final_result is not None:
+            conn.execute(
+                "UPDATE placement_sessions "
+                "SET final_result_json = ?, completed_at = ? WHERE id = ?",
+                (json.dumps(final_result, ensure_ascii=False), _now(), session_id),
+            )
+    return get_placement_session(session_id)
+
+
+def get_placement_session(session_id: int) -> dict | None:
+    """Lee una sesión de placement con sus columnas JSON ya parseadas."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT id, user_id, started_at, completed_at, placement_version, "
+            "items_json, answers_json, theta_trace_json, final_result_json "
+            "FROM placement_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    d["items"] = json.loads(d.pop("items_json"))
+    d["answers"] = json.loads(d.pop("answers_json"))
+    d["theta_trace"] = json.loads(d.pop("theta_trace_json"))
+    d["final_result"] = (
+        json.loads(d.pop("final_result_json")) if d.get("final_result_json") else None
+    )
+    return d
+
+
+def list_placement_sessions(user_id: str) -> list[dict]:
+    """Sesiones de placement de un usuario, más reciente primero (parseadas)."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT id FROM placement_sessions WHERE user_id = ? ORDER BY id DESC",
+            (user_id,),
+        ).fetchall()
+    sessions = [get_placement_session(r["id"]) for r in rows]
+    return [s for s in sessions if s is not None]

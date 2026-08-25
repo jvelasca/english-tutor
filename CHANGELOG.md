@@ -4,6 +4,31 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.5.3] — 2026-08-25
+
+Release de hardening: cierra los hallazgos de la auditoría externa de V1.5.2 (validez y
+trazabilidad). Sin funcionalidad nueva para el alumno.
+
+### Corregido
+- **Evidencia inválida ya no se omite en silencio**: `validate_evidence_record` se renombra a
+  `evidence_record_errors` (lista de violaciones, vacía = válido) y `_record_evidence_validated`
+  ahora registra en logs y lanza `EvidenceInvariantError` (HTTP 500 estructurado) en vez de
+  saltarse el registro. Un intento nunca termina "sin evidencia" de forma silenciosa.
+- **Docstrings obsoletos**: `services/academy.py` y `services/curriculum.py` ya no afirman que las
+  destrezas de producción "aún no integran evidencia"; se distingue auto-scorable (check MC) de
+  performance-scorable (rúbrica/LLM), ambas evaluables.
+- **Regresión del vector de dificultad de listening**: se fija con tests el invariante de que el
+  `difficulty_vector` de cada ítem debe coincidir exactamente con `DIFFICULTY_FACTORS`
+  (factor faltante y factor sobrante).
+
+### Añadido
+- **Trazabilidad de la sesión de placement**: nueva tabla `placement_sessions` y endpoints
+  `POST /api/academy/placement/start` + `session_id` en `/placement/next`. Persiste ítems,
+  respuestas, historial de θ y resultado final para reconstruir un resultado CEFR (qué versión,
+  qué ítems, qué respuestas, qué θ/SE).
+- **Tests de reproducibilidad**: determinismo de placement/evidencia/listening/perfil CEFR y
+  monotonicidad de θ (acierto no reduce θ, fallo no lo aumenta).
+
 ## [1.5.2] — 2026-08-25
 
 Release de Quality & Validity: sin funcionalidad nueva, endurece la reproducibilidad y la
