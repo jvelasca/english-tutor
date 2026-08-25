@@ -507,6 +507,11 @@ def init_db() -> None:
                 "ALTER TABLE listening_attempts ADD COLUMN replay_count INTEGER "
                 "NOT NULL DEFAULT 0"
             )
+        if "topic" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN topic TEXT "
+                "NOT NULL DEFAULT ''"
+            )
 
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "

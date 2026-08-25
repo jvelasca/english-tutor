@@ -3651,6 +3651,63 @@ body.is-resizing {
   margin: var(--space-2) 0 0;
 }
 
+/* Comprensión auditiva: competencia (P4) — tendencia, tema y dificultad. */
+.listening-trend {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
+.trend-up {
+  color: var(--color-success);
+}
+
+.trend-down {
+  color: var(--color-error);
+}
+
+.trend-flat {
+  color: var(--color-text-dim);
+}
+
+.listening-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.listening-breakdown-title {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.listening-pills {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.listening-pill {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.listening-recurrence {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
 /* ==========================================================================
    Today's Plan (Student Model 2.0)
    ========================================================================== */

@@ -23,6 +23,7 @@ class ListeningQuestion(BaseModel):
     clean_transcript: str = ""
     noise_level: int = 0
     repetition_policy: str = "none"
+    topic: str = ""
 
 
 class ListeningAnswerRequest(BaseModel):
@@ -67,10 +68,43 @@ class ListeningSubskillOut(BaseModel):
     review_due: bool
 
 
+class ListeningDifficultyOut(BaseModel):
+    difficulty: int
+    attempts: int
+    correct: int
+    accuracy: float | None = None
+
+
+class ListeningTopicOut(BaseModel):
+    topic: str
+    attempts: int
+    correct: int
+    accuracy: float | None = None
+
+
+class ListeningTrend(BaseModel):
+    recent_accuracy: float | None = None
+    prior_accuracy: float | None = None
+    delta: float | None = None
+    direction: str
+
+
+class ListeningRecurrence(BaseModel):
+    questions_seen: int
+    retried: int
+    recovered: int
+    retry_rate: float | None = None
+    recovery_rate: float | None = None
+
+
 class ListeningDiagnostic(BaseModel):
     subskills: list[ListeningSubskillOut]
     weak: list[str]
     recommendation: str
     first_pass_accuracy: float | None = None
     automaticity: float | None = None
+    by_difficulty: list[ListeningDifficultyOut] = Field(default_factory=list)
+    by_topic: list[ListeningTopicOut] = Field(default_factory=list)
+    trend: ListeningTrend
+    recurrence: ListeningRecurrence
     bank_version: str = ""

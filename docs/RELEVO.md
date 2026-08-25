@@ -3,38 +3,37 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-25 20:25 (UTC+2).
+> Actualizado por última vez: 2026-08-25 20:50 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.8.1` publicada. Cerradas hasta ahora: Release Audit 1.1
+**Posición actual (2026-08-25):** `v1.9` publicada (P3). Cerradas hasta ahora: Release Audit 1.1
 (M12), M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
-Listening 1.0/2.0, Placement 1.0 (IRT-lite) y **Placement 2.0** (calibración observacional +
-perfil multiskill). Etapa 2 (pedagogía): **P1, P2 y P3** hechos; **P4–P6** pendientes.
+Listening 1.0/2.0, Placement 1.0 (IRT-lite), **Placement 2.0** (calibración observacional +
+perfil multiskill) y Etapa 2 (pedagogía) **P1–P4**; **P5–P6** pendientes.
 
 **Últimos commits publicados:**
+- `feat: V1.9 - Vocabulario exposure/production/mastery (P3)`
 - `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
 - `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 - `release: v1.7.0 - Placement 2.0 (calibracion observacional + perfil multiskill)`
-- `release: v1.6.0 - Listening 2.0 + cierre de P1 (critical_skills y E2E regression)`
 
-**⚠️ TRABAJO SIN COMMITEAR (P3 — vocabulario exposure/production/mastery):** ver sección 22. Es el
+**⚠️ TRABAJO SIN COMMITEAR (P4 — listening como competencia):** ver sección 23. Es el
 incremento en curso y NO está versionado. Resumen:
-- **Separación exposure/production/mastery** en la tabla `vocabulary` (columnas `exposures`,
-  `last_exposed_at`, `production_days`) + `classify()` puro en `services/vocabulary.py`.
-- **Exposición capturada de las respuestas del tutor** (`routers/chat.py`, chat y stream).
-- **Perfil** expone `vocabulary_exposed` y `vocabulary_mastered` además de `vocabulary_size`
-  (que ahora cuenta solo palabras producidas, no las solo-expuestas).
+- **Tema (`topic`)** en el banco de listening y en `listening_attempts` (migración idempotente).
+- **Métricas de competencia** (puras, en `services/listening.py`): precisión por dificultad,
+  precisión por tema, tendencia reciente y reincidencia (reintentos/recuperación), expuestas
+  en `/api/listening/diagnostic`.
 
-**Estado verde:** backend `543 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
+**Estado verde:** backend `556 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
 launcher `33 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 22** de este documento (trabajo sin commitear — P3 vocabulario).
+2. Leer la **sección 23** de este documento (trabajo sin commitear — P4 listening).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
-4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P4–P6.
-5. Redactar y ejecutar `agentes/pedagogia/p4-*.md` (un subagente a la vez), respetando la
+4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P5–P6.
+5. Redactar y ejecutar `agentes/pedagogia/p5-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
@@ -961,7 +960,43 @@ cd frontend && npx tsc --noEmit && npx vitest run
 - `test_profile.py`: perfil separa `vocabulary_size`/`vocabulary_exposed`/`vocabulary_mastered`.
 - `test_chat_profile.py`: `chat` y `chat_stream` registran la exposición del tutor.
 
-### 22.9 Pendiente / siguiente incremento natural
-- **P4–P6 de Etapa 2** (listening como competencia, CEFR por evidencia, pronunciación fonémica):
-  ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+### 22.9 Siguiente incremento natural
+- **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
+  `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 23. EN CURSO (sin commitear) — P4: listening como competencia
+
+> **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P4: el listening ya medía `difficulty`,
+> `response_time_ms` y `replay_count`, pero no distinguía **tema**, ni precisión por
+> dificultad/tema, ni tendencia reciente, ni reincidencia. Este incremento lo convierte en
+> una señal de **competencia**.
+
+### 23.1 Tema (`topic`)
+- **`services/listening.py`**: `LISTENING_TOPICS` (10 temas canónicos), campo `topic` en
+  `ListeningAsset` y en los 23 ítems de `QUESTION_BANK`; `validate_listening_bank` exige
+  `topic` válido.
+
+### 23.2 Métricas de competencia (puras y deterministas)
+- `accuracy_by_difficulty(rows)`, `accuracy_by_topic(rows)`, `recent_trend(rows, window=10)` y
+  `recurrence_stats(rows)`; `listening_diagnostic` expone `by_difficulty`, `by_topic`, `trend`
+  y `recurrence`.
+
+### 23.3 Persistencia + dominio + esquemas
+- `repositories/db.py`: migración idempotente `topic` en `listening_attempts`.
+- `repositories/listening.py`: `record_attempt(..., topic=...)` y `list_attempts` incluyen `topic`.
+- `domain/listening.py`: `submit_answer` pasa el tema de la pregunta.
+- `schemas/listening.py`: `topic` en `ListeningQuestion` + `ListeningDifficultyOut`,
+  `ListeningTopicOut`, `ListeningTrend`, `ListeningRecurrence` en `ListeningDiagnostic`.
+
+### 23.4 Frontend
+- `types/api.ts` (nuevos tipos) y `ListeningPractice.tsx` (precisión por tema/dificultad,
+  tendencia reciente y reincidencia). Estilos en `index.css`.
+
+### 23.5 Tests
+- `test_listening.py` (+11) y `test_listening_architecture.py` (+2). Total backend
+  **556 tests**; frontend **143 tests**.
+
+### 23.6 Pendiente / siguiente incremento natural
+- **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
+  `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 

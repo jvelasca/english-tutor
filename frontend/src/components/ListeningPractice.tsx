@@ -13,6 +13,23 @@ import type {
   ListeningStats,
 } from "../types/api";
 
+function topicLabel(topic: string): string {
+  return topic.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function trendLabel(direction: string): string {
+  switch (direction) {
+    case "up":
+      return "mejorando";
+    case "down":
+      return "empeorando";
+    case "flat":
+      return "estable";
+    default:
+      return "—";
+  }
+}
+
 interface ListeningPracticeProps {
   userId: string | null;
   onAttempt: () => void;
@@ -192,6 +209,54 @@ export function ListeningPractice({
                   </li>
                 ))}
               </ul>
+              {diagnostic.trend.direction !== "n/a" && (
+                <p className="listening-trend">
+                  Tendencia reciente:{" "}
+                  <strong className={`trend-${diagnostic.trend.direction}`}>
+                    {trendLabel(diagnostic.trend.direction)}
+                  </strong>
+                  {diagnostic.trend.delta !== null
+                    ? ` (${diagnostic.trend.delta > 0 ? "+" : ""}${
+                        diagnostic.trend.delta
+                      })`
+                    : ""}
+                </p>
+              )}
+              {diagnostic.by_topic.length > 0 && (
+                <div className="listening-breakdown">
+                  <p className="listening-breakdown-title">Precisión por tema</p>
+                  <ul className="listening-pills">
+                    {diagnostic.by_topic.map((t) => (
+                      <li key={t.topic} className="listening-pill">
+                        {topicLabel(t.topic)} ·{" "}
+                        {t.accuracy !== null ? `${t.accuracy}%` : "—"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {diagnostic.by_difficulty.length > 0 && (
+                <div className="listening-breakdown">
+                  <p className="listening-breakdown-title">
+                    Precisión por dificultad
+                  </p>
+                  <ul className="listening-pills">
+                    {diagnostic.by_difficulty.map((d) => (
+                      <li key={d.difficulty} className="listening-pill">
+                        Nivel {d.difficulty} ·{" "}
+                        {d.accuracy !== null ? `${d.accuracy}%` : "—"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {diagnostic.recurrence.questions_seen > 0 && (
+                <p className="listening-recurrence">
+                  Reintentos: {diagnostic.recurrence.retried} de{" "}
+                  {diagnostic.recurrence.questions_seen} · recuperados{" "}
+                  {diagnostic.recurrence.recovered}
+                </p>
+              )}
             </div>
           )}
           {stats?.completed && (

@@ -9,12 +9,16 @@ from services.listening import (
     LEVEL_ORDER,
     LISTENING_SUBSKILLS,
     QUESTION_BANK,
+    accuracy_by_difficulty,
+    accuracy_by_topic,
     current_level,
     difficulty_from_vector,
     get_question,
     level_status,
     listening_diagnostic,
     pick_next_question,
+    recent_trend,
+    recurrence_stats,
     score_answer,
 )
 
@@ -324,4 +328,139 @@ def test_answer_records_metrics(monkeypatch, tmp_path):
     assert row["response_time_ms"] == 1234
     assert row["replay_count"] == 2
     assert row["skill"] == q["skill"]
+    assert row["topic"] == q["topic"]
     assert row["difficulty"] == difficulty_from_vector(q["difficulty_vector"])
+
+
+# --- P4: competencia (tema, dificultad, tendencia, reincidencia) -------------
+
+
+def _attempt(qid, correct, difficulty=2, topic="travel", rms=None, replay=0):
+    return {
+        "question_id": qid,
+        "correct": correct,
+        "difficulty": difficulty,
+        "topic": topic,
+        "response_time_ms": rms,
+        "replay_count": replay,
+    }
+
+
+def test_accuracy_by_difficulty_groups_and_orders():
+    rows = [
+        _attempt("a", True, difficulty=3),
+        _attempt("b", False, difficulty=1),
+        _attempt("c", True, difficulty=3),
+        _attempt("d", True, difficulty=1),
+    ]
+    result = accuracy_by_difficulty(rows)
+    assert [r["difficulty"] for r in result] == [1, 3]
+    by_d = {r["difficulty"]: r for r in result}
+    assert by_d[1]["attempts"] == 2
+    assert by_d[1]["correct"] == 1
+    assert by_d[1]["accuracy"] == 50.0
+    assert by_d[3]["accuracy"] == 100.0
+
+
+def test_accuracy_by_difficulty_skips_missing():
+    assert accuracy_by_difficulty([{"question_id": "a", "correct": True}]) == []
+
+
+def test_accuracy_by_topic_groups_and_orders():
+    rows = [
+        _attempt("a", True, topic="travel"),
+        _attempt("b", False, topic="food"),
+        _attempt("c", True, topic="travel"),
+    ]
+    result = accuracy_by_topic(rows)
+    assert [r["topic"] for r in result] == ["food", "travel"]
+    by_t = {r["topic"]: r for r in result}
+    assert by_t["food"]["accuracy"] == 0.0
+    assert by_t["travel"]["accuracy"] == 100.0
+
+
+def test_accuracy_by_topic_skips_empty():
+    assert accuracy_by_topic([{"question_id": "a", "correct": True, "topic": ""}]) == []
+
+
+def test_recent_trend_compares_windows():
+    # 20 intentos: los primeros 10 mal, los últimos 10 bien. Con ventana 10, la
+    # precisión reciente es 100% y la previa 0%.
+    rows = [_attempt(f"q{i}", False) for i in range(10)]
+    rows += [_attempt(f"r{i}", True) for i in range(10)]
+    trend = recent_trend(rows, window=10)
+    assert trend["recent_accuracy"] == 100.0
+    assert trend["prior_accuracy"] == 0.0
+    assert trend["delta"] == 100.0
+    assert trend["direction"] == "up"
+
+
+def test_recent_trend_no_prior_window():
+    trend = recent_trend([_attempt(f"q{i}", True) for i in range(5)], window=10)
+    assert trend["recent_accuracy"] == 100.0
+    assert trend["prior_accuracy"] is None
+    assert trend["direction"] == "n/a"
+
+
+def test_recent_trend_empty():
+    trend = recent_trend([])
+    assert trend["direction"] == "n/a"
+    assert trend["recent_accuracy"] is None
+
+
+def test_recurrence_stats_measures_retries_and_recovery():
+    rows = [
+        _attempt("a", False),
+        _attempt("a", True),
+        _attempt("b", True),
+        _attempt("c", False),
+        _attempt("c", False),
+    ]
+    stats = recurrence_stats(rows)
+    assert stats["questions_seen"] == 3
+    assert stats["retried"] == 2
+    assert stats["recovered"] == 1
+    assert stats["retry_rate"] == round(2 / 3, 3)
+    assert stats["recovery_rate"] == 0.5
+
+
+def test_recurrence_stats_empty():
+    stats = recurrence_stats([])
+    assert stats["questions_seen"] == 0
+    assert stats["retried"] == 0
+    assert stats["recovered"] == 0
+    assert stats["retry_rate"] is None
+    assert stats["recovery_rate"] is None
+
+
+def test_diagnostic_includes_competence_metrics():
+    rows = [
+        _attempt("a", True, difficulty=1, topic="travel"),
+        _attempt("b", False, difficulty=3, topic="food"),
+    ]
+    diag = listening_diagnostic(rows)
+    assert diag["by_difficulty"][0]["difficulty"] == 1
+    assert diag["by_topic"][0]["topic"] == "food"
+    assert diag["trend"]["direction"] == "n/a"
+    assert diag["recurrence"]["questions_seen"] == 2
+
+
+def test_diagnostic_endpoint_exposes_competence(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    q = QUESTION_BANK[0]
+    with TestClient(app) as client:
+        client.post(
+            "/api/listening/answer",
+            params={"user_id": uid},
+            json={"question_id": q["id"], "answer_index": q["answer_index"]},
+        )
+        r = client.get("/api/listening/diagnostic", params={"user_id": uid})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["trend"]["direction"] == "n/a"
+    assert body["recurrence"]["questions_seen"] == 1
+    assert any(
+        d["difficulty"] == difficulty_from_vector(q["difficulty_vector"])
+        for d in body["by_difficulty"]
+    )
+    assert any(t["topic"] == q["topic"] for t in body["by_topic"])

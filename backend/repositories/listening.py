@@ -16,6 +16,7 @@ def record_attempt(
     difficulty: int = 1,
     response_time_ms: int | None = None,
     replay_count: int = 0,
+    topic: str = "",
 ) -> bool:
     """Persiste un intento de listening para un usuario existente."""
     if get_user(user_id) is None:
@@ -24,8 +25,8 @@ def record_attempt(
         conn.execute(
             "INSERT INTO listening_attempts "
             "(user_id, question_id, answer_index, correct, skill, difficulty, "
-            "response_time_ms, replay_count, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "response_time_ms, replay_count, topic, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 question_id,
@@ -35,6 +36,7 @@ def record_attempt(
                 difficulty,
                 response_time_ms,
                 replay_count,
+                topic,
                 _now(),
             ),
         )
@@ -46,7 +48,7 @@ def list_attempts(user_id: str) -> list[dict]:
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT question_id, answer_index, correct, skill, difficulty, "
-            "response_time_ms, replay_count, created_at "
+            "response_time_ms, replay_count, topic, created_at "
             "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
             (user_id,),
         ).fetchall()

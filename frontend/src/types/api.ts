@@ -207,6 +207,7 @@ export interface ListeningQuestion {
   clean_transcript: string;
   noise_level: number;
   repetition_policy: string;
+  topic: string;
 }
 
 export interface ListeningAnswerResponse {
@@ -244,12 +245,45 @@ export interface ListeningSubskillProgress {
   review_due: boolean;
 }
 
+export interface ListeningDifficultyProgress {
+  difficulty: number;
+  attempts: number;
+  correct: number;
+  accuracy: number | null;
+}
+
+export interface ListeningTopicProgress {
+  topic: string;
+  attempts: number;
+  correct: number;
+  accuracy: number | null;
+}
+
+export interface ListeningTrend {
+  recent_accuracy: number | null;
+  prior_accuracy: number | null;
+  delta: number | null;
+  direction: string;
+}
+
+export interface ListeningRecurrence {
+  questions_seen: number;
+  retried: number;
+  recovered: number;
+  retry_rate: number | null;
+  recovery_rate: number | null;
+}
+
 export interface ListeningDiagnostic {
   subskills: ListeningSubskillProgress[];
   weak: string[];
   recommendation: string;
   first_pass_accuracy: number | null;
   automaticity: number | null;
+  by_difficulty: ListeningDifficultyProgress[];
+  by_topic: ListeningTopicProgress[];
+  trend: ListeningTrend;
+  recurrence: ListeningRecurrence;
   bank_version: string;
 }
 

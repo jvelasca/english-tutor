@@ -38,6 +38,21 @@ DIFFICULTY_FACTORS: tuple[str, ...] = (
     "connected_speech",
 )
 
+# Taxonomía de temas del banco de listening. Cada ítem declara un tema canónico
+# para poder medir precisión por tema (P4 — listening como competencia).
+LISTENING_TOPICS: tuple[str, ...] = (
+    "daily_routine",
+    "shopping",
+    "travel",
+    "work",
+    "weather",
+    "free_time",
+    "food",
+    "education",
+    "sports",
+    "functional",
+)
+
 
 def difficulty_from_vector(vector: dict[str, int]) -> int:
     """Deriva el escalar de dificultad (1..6) como la media redondeada del vector.
@@ -116,6 +131,7 @@ class ListeningAsset(BaseModel):
     clean_transcript: str = ""
     noise_level: int = Field(default=0, ge=0, le=5)
     repetition_policy: str = "none"
+    topic: str = ""
 
     @computed_field
     @property
@@ -126,6 +142,7 @@ class ListeningAsset(BaseModel):
 QUESTION_BANK: list[dict] = [
     {
         "id": "l1",
+        "topic": "daily_routine",
         "level": "A1",
         "skill": "numbers",
         "difficulty_vector": {
@@ -145,6 +162,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l2",
+        "topic": "shopping",
         "level": "A1",
         "skill": "detail",
         "difficulty_vector": {
@@ -164,6 +182,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l3",
+        "topic": "sports",
         "level": "A1",
         "skill": "detail",
         "difficulty_vector": {
@@ -183,6 +202,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l4",
+        "topic": "shopping",
         "level": "A2",
         "skill": "detail",
         "difficulty_vector": {
@@ -207,6 +227,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l5",
+        "topic": "travel",
         "level": "A2",
         "skill": "inference",
         "difficulty_vector": {
@@ -231,6 +252,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l6",
+        "topic": "work",
         "level": "A2",
         "skill": "numbers",
         "difficulty_vector": {
@@ -255,6 +277,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l7",
+        "topic": "sports",
         "level": "B1",
         "skill": "inference",
         "difficulty_vector": {
@@ -274,6 +297,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l8",
+        "topic": "education",
         "level": "B1",
         "skill": "inference",
         "difficulty_vector": {
@@ -298,6 +322,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l9",
+        "topic": "travel",
         "level": "A1",
         "skill": "gist",
         "difficulty_vector": {
@@ -323,6 +348,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l10",
+        "topic": "daily_routine",
         "level": "A2",
         "skill": "gist",
         "difficulty_vector": {
@@ -348,6 +374,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l11",
+        "topic": "food",
         "level": "A1",
         "skill": "vocabulary",
         "difficulty_vector": {
@@ -367,6 +394,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l12",
+        "topic": "education",
         "level": "A2",
         "skill": "vocabulary",
         "difficulty_vector": {
@@ -387,6 +415,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l13",
+        "topic": "free_time",
         "level": "A2",
         "skill": "attitude",
         "difficulty_vector": {
@@ -407,6 +436,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l14",
+        "topic": "work",
         "level": "B1",
         "skill": "attitude",
         "difficulty_vector": {
@@ -427,6 +457,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l15",
+        "topic": "work",
         "level": "B1",
         "skill": "speaker_intention",
         "difficulty_vector": {
@@ -458,6 +489,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l16",
+        "topic": "shopping",
         "level": "B2",
         "skill": "fast_speech",
         "difficulty_vector": {
@@ -489,6 +521,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l17",
+        "topic": "free_time",
         "level": "B2",
         "skill": "connected_speech",
         "difficulty_vector": {
@@ -518,6 +551,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l18",
+        "topic": "daily_routine",
         "level": "B1",
         "skill": "dictation",
         "difficulty_vector": {
@@ -551,6 +585,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l19",
+        "topic": "functional",
         "level": "B1",
         "skill": "shadowing",
         "difficulty_vector": {
@@ -584,6 +619,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l20",
+        "topic": "food",
         "level": "B2",
         "skill": "multiple_speakers",
         "difficulty_vector": {
@@ -620,6 +656,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l21",
+        "topic": "free_time",
         "level": "B2",
         "skill": "note_taking",
         "difficulty_vector": {
@@ -656,6 +693,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l22",
+        "topic": "weather",
         "level": "B1",
         "skill": "prediction",
         "difficulty_vector": {
@@ -684,6 +722,7 @@ QUESTION_BANK: list[dict] = [
     },
     {
         "id": "l23",
+        "topic": "travel",
         "level": "B1",
         "skill": "sequencing",
         "difficulty_vector": {
@@ -763,6 +802,8 @@ def validate_listening_bank(
         seen_ids.add(asset.id)
         if asset.skill not in LISTENING_SUBSKILLS:
             errors.append(f"{asset.id}: invalid skill {asset.skill!r}")
+        if asset.topic not in LISTENING_TOPICS:
+            errors.append(f"{asset.id}: invalid topic {asset.topic!r}")
         if set(asset.difficulty_vector) != set(factors):
             errors.append(f"{asset.id}: difficulty_vector factors mismatch")
         else:
@@ -863,6 +904,125 @@ def _accuracy(rows: list[dict]) -> float | None:
         return None
     correct = sum(1 for r in rows if r.get("correct"))
     return round(correct / len(rows) * 100, 1)
+
+
+TREND_WINDOW = 10
+
+
+def accuracy_by_difficulty(rows: list[dict]) -> list[dict]:
+    """Precisión agrupada por dificultad escalar (1..6).
+
+    Devuelve una lista `{difficulty, attempts, correct, accuracy}` ordenada por
+    dificultad ascendente. Omite filas sin dificultad (vistas agregadas)."""
+    groups: dict[int, list[dict]] = {}
+    for row in rows:
+        difficulty = row.get("difficulty")
+        if difficulty is None:
+            continue
+        groups.setdefault(int(difficulty), []).append(row)
+    return [
+        {
+            "difficulty": difficulty,
+            "attempts": len(group),
+            "correct": sum(1 for r in group if r.get("correct")),
+            "accuracy": _accuracy(group),
+        }
+        for difficulty, group in sorted(groups.items())
+    ]
+
+
+def accuracy_by_topic(rows: list[dict]) -> list[dict]:
+    """Precisión agrupada por tema canónico.
+
+    Devuelve una lista `{topic, attempts, correct, accuracy}` ordenada
+    alfabéticamente. Omite filas sin tema (intentos legacy previos a P4)."""
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        topic = row.get("topic") or ""
+        if not topic:
+            continue
+        groups.setdefault(topic, []).append(row)
+    return [
+        {
+            "topic": topic,
+            "attempts": len(group),
+            "correct": sum(1 for r in group if r.get("correct")),
+            "accuracy": _accuracy(group),
+        }
+        for topic, group in sorted(groups.items())
+    ]
+
+
+def recent_trend(rows: list[dict], window: int = TREND_WINDOW) -> dict:
+    """Tendencia reciente: precisión de los últimos `window` intentos vs. la previa.
+
+    Las filas llegan en orden cronológico (id ASC). Devuelve
+    `{recent_accuracy, prior_accuracy, delta, direction}` con `direction` en
+    `{"up", "down", "flat", "n/a"}`."""
+    if not rows:
+        return {
+            "recent_accuracy": None,
+            "prior_accuracy": None,
+            "delta": None,
+            "direction": "n/a",
+        }
+    if len(rows) <= window:
+        return {
+            "recent_accuracy": _accuracy(rows),
+            "prior_accuracy": None,
+            "delta": None,
+            "direction": "n/a",
+        }
+    recent = _accuracy(rows[-window:])
+    prior = _accuracy(rows[:-window])
+    delta = (
+        round(recent - prior, 1)
+        if recent is not None and prior is not None
+        else None
+    )
+    if delta is None:
+        direction = "n/a"
+    elif delta > 0:
+        direction = "up"
+    elif delta < 0:
+        direction = "down"
+    else:
+        direction = "flat"
+    return {
+        "recent_accuracy": recent,
+        "prior_accuracy": prior,
+        "delta": delta,
+        "direction": direction,
+    }
+
+
+def recurrence_stats(rows: list[dict]) -> dict:
+    """Reincidencia: reintentos de la misma pregunta y recuperación.
+
+    `retried` = preguntas con más de un intento; `recovered` = preguntas falladas
+    al menos una vez y luego acertadas; `retry_rate = retried/questions_seen`;
+    `recovery_rate = recovered/retried` (`None` si el denominador es 0)."""
+    by_question: dict[str, list[dict]] = {}
+    for row in rows:
+        question_id = row.get("question_id")
+        if question_id is None:
+            continue
+        by_question.setdefault(question_id, []).append(row)
+    questions_seen = len(by_question)
+    retried = sum(1 for attempts in by_question.values() if len(attempts) > 1)
+    recovered = sum(
+        1
+        for attempts in by_question.values()
+        if any(not r.get("correct") for r in attempts)
+        and any(r.get("correct") for r in attempts)
+    )
+    return {
+        "questions_seen": questions_seen,
+        "retried": retried,
+        "recovered": recovered,
+        "retry_rate": round(retried / questions_seen, 3) if questions_seen else None,
+        "recovery_rate": round(recovered / retried, 3) if retried else None,
+    }
 
 
 def listening_diagnostic(attempt_rows: list[dict]) -> dict:
@@ -974,5 +1134,9 @@ def listening_diagnostic(attempt_rows: list[dict]) -> dict:
             global_stats["avg_response_ms"],
             attempts=global_stats["attempts"],
         ),
+        "by_difficulty": accuracy_by_difficulty(attempt_rows),
+        "by_topic": accuracy_by_topic(attempt_rows),
+        "trend": recent_trend(attempt_rows),
+        "recurrence": recurrence_stats(attempt_rows),
         "bank_version": LISTENING_BANK_VERSION,
     }

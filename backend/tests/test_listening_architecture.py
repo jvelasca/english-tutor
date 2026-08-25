@@ -9,6 +9,7 @@ from services.listening import (
     DIFFICULTY_FACTORS,
     LISTENING_BANK_VERSION,
     LISTENING_SUBSKILLS,
+    LISTENING_TOPICS,
     QUESTION_BANK,
     automaticity_from_metrics,
     difficulty_from_vector,
@@ -41,6 +42,11 @@ def test_bank_covers_every_subskill():
     assert skills == set(LISTENING_SUBSKILLS)
 
 
+def test_bank_declares_valid_topic_on_every_item():
+    for q in QUESTION_BANK:
+        assert q["topic"] in LISTENING_TOPICS, q["id"]
+
+
 def test_validate_listening_bank_detects_duplicate_id():
     bank = [dict(QUESTION_BANK[0]), dict(QUESTION_BANK[0])]
     errors = validate_listening_bank(bank)
@@ -52,6 +58,13 @@ def test_validate_listening_bank_detects_invalid_skill():
     bad["skill"] = "nope"
     errors = validate_listening_bank([bad])
     assert any("invalid skill" in e for e in errors)
+
+
+def test_validate_listening_bank_detects_invalid_topic():
+    bad = dict(QUESTION_BANK[0])
+    bad["topic"] = "nope"
+    errors = validate_listening_bank([bad])
+    assert any("invalid topic" in e for e in errors)
 
 
 def test_validate_listening_bank_detects_vector_out_of_range():

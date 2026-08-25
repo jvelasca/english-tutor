@@ -51,6 +51,7 @@ async def submit_answer(
         difficulty,
         response_time_ms,
         replay_count,
+        question.get("topic", ""),
     )
     return {
         "question_id": question_id,
