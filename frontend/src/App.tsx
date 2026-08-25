@@ -10,6 +10,7 @@ import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { HelpDialog } from "./components/HelpDialog";
 import { LearningProfile } from "./components/LearningProfile";
 import { ListeningPractice } from "./components/ListeningPractice";
+import { ModelSelect } from "./components/ModelSelect";
 import { ModeBar, type AppView } from "./components/ModeBar";
 import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
@@ -35,7 +36,7 @@ export default function App() {
     selectModel,
     models,
     favoriteModel,
-    toggleFavorite,
+    makeFavorite,
     mode,
     selectMode,
     layout,
@@ -157,35 +158,13 @@ export default function App() {
             status={handsFree.status}
             onToggle={handsFree.toggle}
           />
-          <select
-            className="model-select"
-            value={model}
-            onChange={(e) => selectModel(e.target.value)}
-            title="Modelo de Ollama"
-            aria-label="Modelo de Ollama"
-          >
-            {(models.length ? models : [model]).map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className={`model-favorite${
-              favoriteModel === model ? " active" : ""
-            }`}
-            onClick={toggleFavorite}
-            title={
-              favoriteModel === model
-                ? "Quitar de favoritos"
-                : "Marcar como favorito (modelo por defecto)"
-            }
-            aria-label="Modelo favorito"
-            aria-pressed={favoriteModel === model}
-          >
-            <StarIcon filled={favoriteModel === model} />
-          </button>
+          <ModelSelect
+            model={model}
+            models={models}
+            favoriteModel={favoriteModel}
+            onSelect={selectModel}
+            onFavorite={makeFavorite}
+          />
           <button
             type="button"
             className="insights-toggle"
@@ -404,24 +383,6 @@ export default function App() {
       </div>
       )}
     </div>
-  );
-}
-
-function StarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
   );
 }
 

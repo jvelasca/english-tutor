@@ -304,11 +304,14 @@ export function useChat() {
     [persistSettings],
   );
 
-  const toggleFavorite = useCallback(() => {
-    const next = favoriteModel === model ? null : model;
-    setFavoriteModel(next);
-    persistSettings({ favorite_model: next ?? "" });
-  }, [model, favoriteModel, persistSettings]);
+  const makeFavorite = useCallback(
+    (next: string) => {
+      setFavoriteModel(next);
+      setModel(next);
+      persistSettings({ favorite_model: next, model: next });
+    },
+    [persistSettings],
+  );
 
   const selectMode = useCallback(
     (next: TutorMode) => {
@@ -468,7 +471,7 @@ export function useChat() {
     selectModel,
     models,
     favoriteModel,
-    toggleFavorite,
+    makeFavorite,
     mode,
     setMode,
     selectMode,
