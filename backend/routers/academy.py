@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 
-from dependencies import current_user
+from config import DEFAULT_MODEL
+from dependencies import current_user, read_audio_limited
 from domain import academy as academy_service
 from schemas.academy import (
     AttemptOut,
@@ -28,6 +30,7 @@ from schemas.academy import (
     StudyPlanRequest,
 )
 from services.academy import study_plan
+from services.stt import transcribe_with_timing
 
 router = APIRouter()
 
@@ -160,6 +163,63 @@ async def objective_speaking_task(
         body.heard,
         body.model,
         body.duration_seconds,
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post(
+    "/api/academy/objective/speaking/audio", response_model=SpeakingResultOut
+)
+async def objective_speaking_audio(
+    file: UploadFile = File(...),
+    level_id: str = Form(...),
+    objective_id: str = Form(...),
+    expected: str = Form(...),
+    language: str = Form("en"),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Read-aloud: audio → Whisper → score_speaking → mastery de speaking."""
+    audio = await read_audio_limited(file)
+    try:
+        timed = await run_in_threadpool(transcribe_with_timing, audio, language)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(
+            status_code=500, detail="No se pudo transcribir el audio"
+        ) from None
+    heard = timed["text"]
+    out = await academy_service.submit_speaking(
+        user["id"], level_id, objective_id, expected, heard, timed.get("duration")
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post(
+    "/api/academy/objective/speaking/task/audio", response_model=SpeakingTaskResultOut
+)
+async def objective_speaking_task_audio(
+    file: UploadFile = File(...),
+    level_id: str = Form(...),
+    objective_id: str = Form(...),
+    task: str = Form(...),
+    model: str = Form(DEFAULT_MODEL),
+    language: str = Form("en"),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Tarea libre: audio → Whisper → LLM extrae evidencia → mastery de speaking."""
+    audio = await read_audio_limited(file)
+    try:
+        timed = await run_in_threadpool(transcribe_with_timing, audio, language)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(
+            status_code=500, detail="No se pudo transcribir el audio"
+        ) from None
+    heard = timed["text"]
+    out = await academy_service.submit_speaking_task(
+        user["id"], level_id, objective_id, task, heard, model, timed.get("duration")
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")

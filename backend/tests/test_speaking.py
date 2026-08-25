@@ -7,6 +7,7 @@ from main import app
 from repositories import academy as academy_repo
 from repositories import db
 from repositories import users as users_repo
+from routers import academy as academy_router
 from services import llm
 from services import speaking as speaking_svc
 from services.curriculum import load_level
@@ -221,5 +222,111 @@ def test_speaking_task_rejects_blocked_level(monkeypatch, tmp_path):
                 "task": "Introduce yourself",
                 "heard": "I am a student",
             },
+        )
+    assert r.status_code == 404
+
+
+# --- Endpoint / integración (audio → Whisper → scorer) ----------------------
+
+
+def test_speaking_audio_read_aloud_records_mastery(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    monkeypatch.setattr(
+        academy_router,
+        "transcribe_with_timing",
+        lambda audio, language="en": {"text": "I am a student", "duration": 3.0},
+    )
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/audio",
+            params={"user_id": a},
+            data={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "expected": "I am a student",
+            },
+            files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert 0.0 <= body["overall"] <= 1.0
+    assert len(body["criteria"]) == 6
+    assert body["speaking_mastery"] > 0
+
+    speaking_rows = [
+        row for row in academy_repo.list_evidence(a) if row["source"] == "speaking"
+    ]
+    assert speaking_rows, "no se registró evidencia de speaking"
+
+
+def test_speaking_task_audio_records_evidence(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    fake = FakeOllamaClient(
+        content='{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student", "live", "city", "name", "job"], '
+        '"coherence": 0.9}'
+    )
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    monkeypatch.setattr(
+        academy_router,
+        "transcribe_with_timing",
+        lambda audio, language="en": {"text": "I am a student", "duration": 3.0},
+    )
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/task/audio",
+            params={"user_id": a},
+            data={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "task": "Introduce yourself",
+            },
+            files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["evidence"]["task_achieved"] is True
+    assert body["speaking_mastery"] > 0
+
+    speaking_rows = [
+        row for row in academy_repo.list_evidence(a) if row["source"] == "speaking"
+    ]
+    assert speaking_rows, "no se registró evidencia de speaking"
+
+
+def test_speaking_audio_transcribe_error_500(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+
+    def boom(audio, language="en"):
+        raise Exception("boom")
+
+    monkeypatch.setattr(academy_router, "transcribe_with_timing", boom)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/audio",
+            params={"user_id": a},
+            data={"level_id": "a1", "objective_id": obj.id, "expected": "hi"},
+            files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+        )
+    assert r.status_code == 500
+
+
+def test_speaking_audio_rejects_blocked_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a2").objectives()[0]
+    monkeypatch.setattr(
+        academy_router,
+        "transcribe_with_timing",
+        lambda audio, language="en": {"text": "hi", "duration": 1.0},
+    )
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/audio",
+            params={"user_id": a},
+            data={"level_id": "a2", "objective_id": obj.id, "expected": "hi"},
+            files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
         )
     assert r.status_code == 404
