@@ -60,7 +60,7 @@ CEFR_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 # Versión del esquema/contenido del currículum y las evaluaciones. Independiente
 # de la versión de la aplicación: identifica QUÉ contenido se evaluó.
-CURRICULUM_VERSION = "1.2.4"
+CURRICULUM_VERSION = "1.2.5"
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 

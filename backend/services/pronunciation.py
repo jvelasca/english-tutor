@@ -23,7 +23,8 @@ def _level(score: int) -> str:
 
 
 def score_pronunciation(expected: str, heard: str) -> dict:
-    """Devuelve score/level/ok + word_accuracy + phonetic_score + breakdown."""
+    """Devuelve score/level/ok + word_accuracy + phonetic_score + phoneme_accuracy
+    + breakdown."""
     comp = composite_score(expected, heard)
     score = comp["score"]
     return {
@@ -34,5 +35,83 @@ def score_pronunciation(expected: str, heard: str) -> dict:
         "ok": score >= PASS_THRESHOLD,
         "word_accuracy": comp["word_accuracy"],
         "phonetic_score": comp["phonetic_score"],
+        "phoneme_accuracy": comp["phoneme_accuracy"],
         "breakdown": comp["breakdown"],
     }
+
+
+# Criterios del rubric de pronunciación (read-aloud) y sus pesos (suman 1).
+PRONUNCIATION_CRITERIA: tuple[str, ...] = (
+    "phoneme_accuracy",
+    "word_accuracy",
+    "phonetic_similarity",
+)
+
+PRONUNCIATION_WEIGHTS: dict[str, float] = {
+    "phoneme_accuracy": 0.4,
+    "word_accuracy": 0.4,
+    "phonetic_similarity": 0.2,
+}
+
+
+def score_pronunciation_cefr(expected: str, heard: str) -> dict:
+    """Score de pronunciación 0..1 por criterio y overall ponderado (read-aloud).
+
+    Reutiliza `composite_score` y normaliza sus componentes a 0..1: phoneme_accuracy,
+    word_accuracy y phonetic_similarity (phonetic_score). Devuelve
+    {"expected", "heard", "criteria", "overall"} con overall redondeado a 3."""
+    comp = composite_score(expected, heard)
+    criteria = {
+        "phoneme_accuracy": comp["phoneme_accuracy"] / 100,
+        "word_accuracy": comp["word_accuracy"] / 100,
+        "phonetic_similarity": comp["phonetic_score"] / 100,
+    }
+    overall = round(
+        sum(PRONUNCIATION_WEIGHTS[c] * criteria[c] for c in PRONUNCIATION_CRITERIA), 3
+    )
+    return {
+        "expected": expected,
+        "heard": heard,
+        "criteria": criteria,
+        "overall": overall,
+    }
+
+
+def evidence_from_pronunciation(
+    result: dict, *, level_id: str, objective_id: str, curriculum_version: str = ""
+) -> list[dict]:
+    """Convierte el resultado en registros de evidencia (una fila por criterio
+    + overall).
+
+    Todas con source='pronunciation', skill='pronunciation', item_type='pronunciation',
+    difficulty=1."""
+    records = [
+        {
+            "level_id": level_id,
+            "objective_id": objective_id,
+            "skill": "pronunciation",
+            "item_id": criterion,
+            "item_type": "pronunciation",
+            "difficulty": 1,
+            "source": "pronunciation",
+            "result": float(result["criteria"][criterion]),
+            "curriculum_version": curriculum_version,
+            "assessment_version": "",
+        }
+        for criterion in PRONUNCIATION_CRITERIA
+    ]
+    records.append(
+        {
+            "level_id": level_id,
+            "objective_id": objective_id,
+            "skill": "pronunciation",
+            "item_id": "overall",
+            "item_type": "pronunciation",
+            "difficulty": 1,
+            "source": "pronunciation",
+            "result": float(result["overall"]),
+            "curriculum_version": curriculum_version,
+            "assessment_version": "",
+        }
+    )
+    return records

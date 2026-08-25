@@ -73,3 +73,8 @@ def test_composite_score_exact_empty_partial():
         "I have twenty years old", "I am twenty years old"
     )["score"]
     assert 50 <= partial < 100
+
+
+def test_composite_score_includes_phoneme_accuracy():
+    assert composite_score("Hello world", "Hello world")["phoneme_accuracy"] == 100
+    assert composite_score("Hello", "")["phoneme_accuracy"] == 0

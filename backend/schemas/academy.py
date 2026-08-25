@@ -366,3 +366,20 @@ class WritingTaskResultOut(BaseModel):
     criteria: dict[str, float]
     writing_mastery: float
     evidence: dict
+
+
+class PronunciationSubmitRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+    expected: str = Field(min_length=1, max_length=2000)
+    heard: str = Field(min_length=1, max_length=2000)
+
+
+class PronunciationResultOut(BaseModel):
+    level_id: str
+    objective_id: str
+    expected: str
+    heard: str
+    overall: float
+    criteria: dict[str, float]
+    pronunciation_mastery: float

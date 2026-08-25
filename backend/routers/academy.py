@@ -23,6 +23,8 @@ from schemas.academy import (
     NextObjectiveOut,
     ObjectiveAssessmentOut,
     ObjectiveAssessmentRequest,
+    PronunciationResultOut,
+    PronunciationSubmitRequest,
     RemediationPlanOut,
     SpeakingResultOut,
     SpeakingSubmitRequest,
@@ -205,6 +207,20 @@ async def objective_writing(
 ) -> dict:
     out = await academy_service.submit_writing(
         user["id"], body.level_id, body.objective_id, body.expected, body.text
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post(
+    "/api/academy/objective/pronunciation", response_model=PronunciationResultOut
+)
+async def objective_pronunciation(
+    body: PronunciationSubmitRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.submit_pronunciation(
+        user["id"], body.level_id, body.objective_id, body.expected, body.heard
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")

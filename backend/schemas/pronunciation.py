@@ -36,5 +36,6 @@ class PronunciationResponse(BaseModel):
     ok: bool
     word_accuracy: int
     phonetic_score: int
+    phoneme_accuracy: int
     breakdown: PronunciationBreakdown
     fluency: FluencyStats

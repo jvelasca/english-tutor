@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
+from services.phonemes import phoneme_accuracy
+
 # Pesos del score compuesto (deben sumar 1.0).
 W_WORD = 0.6
 W_PHONETIC = 0.3
@@ -125,7 +127,11 @@ def phonetic_similarity(expected: str, heard: str) -> float:
 
 
 def composite_score(expected: str, heard: str) -> dict:
-    """Devuelve el score compuesto (0-100), sus componentes y el breakdown."""
+    """Devuelve el score compuesto (0-100), sus componentes y el breakdown.
+
+    Además de `score`, `word_accuracy`, `phonetic_score` y `breakdown`, incluye
+    `phoneme_accuracy` (0-100): precisión de la secuencia de fonemas esperados
+    frente a lo oído (proxy fonémico sin audio)."""
     wa = word_accuracy(expected, heard)
     ps = phonetic_similarity(expected, heard)
     e = tokenize(expected)
@@ -139,5 +145,6 @@ def composite_score(expected: str, heard: str) -> dict:
         "score": score,
         "word_accuracy": round(wa * 100),
         "phonetic_score": round(ps * 100),
+        "phoneme_accuracy": round(phoneme_accuracy(expected, heard) * 100),
         "breakdown": word_alignment(expected, heard),
     }

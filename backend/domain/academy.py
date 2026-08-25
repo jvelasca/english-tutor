@@ -29,6 +29,7 @@ from schemas.academy import (
     PlacementItemOut,
     PlacementOut,
     PlacementResultOut,
+    PronunciationResultOut,
     RemediationPlanOut,
     SkillScoreOut,
     SpeakingResultOut,
@@ -37,6 +38,7 @@ from schemas.academy import (
     WritingTaskResultOut,
 )
 from services import academy as academy_svc
+from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
 from services import speaking_llm, writing_llm
 from services import writing as writing_svc
@@ -671,6 +673,47 @@ async def submit_writing(
         overall=result["overall"],
         criteria=result["criteria"],
         writing_mastery=state["score"],
+    )
+
+
+async def submit_pronunciation(
+    user_id: str, level_id: str, objective_id: str, expected: str, heard: str
+) -> PronunciationResultOut | None:
+    """Puntúa una lectura en voz alta y alimenta el mastery de 'pronunciation'."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        return None
+    if await enrollment_blocked(user_id, level_id):
+        return None
+    result = pronunciation_svc.score_pronunciation_cefr(expected, heard)
+    for ev in pronunciation_svc.evidence_from_pronunciation(
+        result,
+        level_id=level_id,
+        objective_id=objective_id,
+        curriculum_version=lv.version,
+    ):
+        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    row = await run_in_threadpool(
+        academy_repo.get_objective_row, user_id, level_id, objective_id, "pronunciation"
+    )
+    state = academy_svc.next_mastery_state(
+        row, result["overall"], obj.threshold("pronunciation")
+    )
+    await run_in_threadpool(
+        academy_repo.apply_objective_evidence,
+        user_id, level_id, objective_id, "pronunciation", state,
+    )
+    return PronunciationResultOut(
+        level_id=level_id,
+        objective_id=objective_id,
+        expected=result["expected"],
+        heard=result["heard"],
+        overall=result["overall"],
+        criteria=result["criteria"],
+        pronunciation_mastery=state["score"],
     )
 
 

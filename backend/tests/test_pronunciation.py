@@ -24,3 +24,9 @@ def test_partial_match_levels():
     r = score_pronunciation("I have twenty years old", "I am twenty years old")
     # ~ 90%+ similitud con una palabra distinta
     assert 50 <= r["score"] < 100
+
+
+def test_phoneme_accuracy_field_present():
+    r = score_pronunciation("Hello world", "Hello world")
+    assert "phoneme_accuracy" in r
+    assert r["phoneme_accuracy"] == 100
