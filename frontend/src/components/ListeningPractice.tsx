@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  getListeningDiagnostic,
   getListeningQuestion,
   getListeningStats,
   submitListeningAnswer,
@@ -7,6 +8,7 @@ import {
 import { speak } from "../api/voz";
 import type {
   ListeningAnswerResponse,
+  ListeningDiagnostic,
   ListeningQuestion,
   ListeningStats,
 } from "../types/api";
@@ -24,8 +26,11 @@ export function ListeningPractice({
   const [selected, setSelected] = useState<number | null>(null);
   const [result, setResult] = useState<ListeningAnswerResponse | null>(null);
   const [stats, setStats] = useState<ListeningStats | null>(null);
+  const [diagnostic, setDiagnostic] = useState<ListeningDiagnostic | null>(null);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replayCount, setReplayCount] = useState(0);
+  const [startedAt, setStartedAt] = useState(0);
 
   async function load() {
     if (!userId) return;
@@ -34,6 +39,8 @@ export function ListeningPractice({
     setSelected(null);
     try {
       setQuestion(await getListeningQuestion(userId));
+      setStartedAt(Date.now());
+      setReplayCount(0);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -43,6 +50,11 @@ export function ListeningPractice({
     if (!userId) return;
     try {
       setStats(await getListeningStats(userId));
+    } catch {
+      /* backend no disponible */
+    }
+    try {
+      setDiagnostic(await getListeningDiagnostic(userId));
     } catch {
       /* backend no disponible */
     }
@@ -57,6 +69,7 @@ export function ListeningPractice({
   async function play() {
     if (!question || playing) return;
     setPlaying(true);
+    setReplayCount((count) => count + 1);
     try {
       await speak(question.script);
     } catch (e) {
@@ -70,7 +83,16 @@ export function ListeningPractice({
     if (!userId || !question || result) return;
     setSelected(index);
     try {
-      setResult(await submitListeningAnswer(userId, question.id, index));
+      setResult(
+        await submitListeningAnswer(
+          userId,
+          question.id,
+          index,
+          Date.now() - startedAt,
+          replayCount,
+        ),
+      );
+      setReplayCount(0);
       onAttempt();
       void refreshStats();
     } catch (e) {
@@ -137,6 +159,27 @@ export function ListeningPractice({
                     }`}
                   >
                     {lv.level} · {lv.mastered}/{lv.total}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {diagnostic && (
+            <div className="listening-diagnostic">
+              <p className="listening-recommendation">
+                {diagnostic.recommendation}
+              </p>
+              <ul className="listening-subskills">
+                {diagnostic.subskills.map((s) => (
+                  <li
+                    key={s.skill}
+                    className={`listening-subskill${
+                      s.review_due ? " review" : ""
+                    }`}
+                  >
+                    {s.skill} · {s.attempts} ·{" "}
+                    {s.accuracy !== null ? `${s.accuracy}%` : "—"}
+                    {s.review_due ? " · revisar" : ""}
                   </li>
                 ))}
               </ul>

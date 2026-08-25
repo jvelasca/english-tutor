@@ -8,7 +8,14 @@ from repositories.users import get_user
 
 
 def record_attempt(
-    user_id: str, question_id: str, answer_index: int, correct: bool
+    user_id: str,
+    question_id: str,
+    answer_index: int,
+    correct: bool,
+    skill: str = "",
+    difficulty: int = 1,
+    response_time_ms: int | None = None,
+    replay_count: int = 0,
 ) -> bool:
     """Persiste un intento de listening para un usuario existente."""
     if get_user(user_id) is None:
@@ -16,11 +23,34 @@ def record_attempt(
     with closing(_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO listening_attempts "
-            "(user_id, question_id, answer_index, correct, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (user_id, question_id, answer_index, int(correct), _now()),
+            "(user_id, question_id, answer_index, correct, skill, difficulty, "
+            "response_time_ms, replay_count, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                question_id,
+                answer_index,
+                int(correct),
+                skill,
+                difficulty,
+                response_time_ms,
+                replay_count,
+                _now(),
+            ),
         )
     return True
+
+
+def list_attempts(user_id: str) -> list[dict]:
+    """Todas las filas de intentos de listening del usuario, en orden de creación."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT question_id, answer_index, correct, skill, difficulty, "
+            "response_time_ms, replay_count, created_at "
+            "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def seen_question_ids(user_id: str) -> set[str]:

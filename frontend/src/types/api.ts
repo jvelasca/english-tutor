@@ -190,6 +190,8 @@ export interface ProgressHistory {
 export interface ListeningQuestion {
   id: string;
   level: string;
+  skill: string;
+  difficulty: number;
   script: string;
   question: string;
   options: string[];
@@ -216,6 +218,22 @@ export interface ListeningStats {
   level: string;
   completed: boolean;
   levels: ListeningLevelProgress[];
+}
+
+export interface ListeningSubskillProgress {
+  skill: string;
+  attempts: number;
+  correct: number;
+  accuracy: number | null;
+  avg_response_ms: number | null;
+  avg_replay_count: number;
+  review_due: boolean;
+}
+
+export interface ListeningDiagnostic {
+  subskills: ListeningSubskillProgress[];
+  weak: string[];
+  recommendation: string;
 }
 
 // --- Academy (currículum CEFR, mastery, evaluación) ---

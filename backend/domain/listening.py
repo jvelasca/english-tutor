@@ -8,6 +8,7 @@ from services.listening import (
     current_level,
     get_question,
     level_status,
+    listening_diagnostic,
     pick_next_question,
     score_answer,
 )
@@ -25,7 +26,11 @@ async def next_question(user_id: str) -> dict:
 
 
 async def submit_answer(
-    user_id: str, question_id: str, answer_index: int
+    user_id: str,
+    question_id: str,
+    answer_index: int,
+    response_time_ms: int | None = None,
+    replay_count: int = 0,
 ) -> dict | None:
     """Evalúa y persiste la respuesta. Devuelve None si la pregunta no existe."""
     question = get_question(question_id)
@@ -33,13 +38,23 @@ async def submit_answer(
         return None
     correct = score_answer(answer_index, question["answer_index"])
     await run_in_threadpool(
-        listening_repo.record_attempt, user_id, question_id, answer_index, correct
+        listening_repo.record_attempt,
+        user_id,
+        question_id,
+        answer_index,
+        correct,
+        question.get("skill", ""),
+        question.get("difficulty", 1),
+        response_time_ms,
+        replay_count,
     )
     return {
         "question_id": question_id,
         "correct": correct,
         "correct_index": question["answer_index"],
         "level": question["level"],
+        "skill": question.get("skill", ""),
+        "difficulty": question.get("difficulty", 1),
     }
 
 
@@ -51,3 +66,9 @@ async def get_stats(user_id: str) -> dict:
     stats["completed"] = all(s["completed"] for s in levels)
     stats["levels"] = levels
     return stats
+
+
+async def get_diagnostic(user_id: str) -> dict:
+    """Diagnóstico de sub-destrezas derivado de los intentos registrados."""
+    attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
+    return listening_diagnostic(attempts)

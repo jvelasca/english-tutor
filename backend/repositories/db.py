@@ -398,6 +398,31 @@ def init_db() -> None:
                 "NOT NULL DEFAULT 'attempt'"
             )
 
+        # Migración idempotente: sub-destreza, dificultad y métricas del intento
+        # de listening (diagnóstico adaptativo de comprensión auditiva).
+        listening_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(listening_attempts)")
+        }
+        if "skill" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN skill TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "difficulty" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN difficulty INTEGER "
+                "NOT NULL DEFAULT 1"
+            )
+        if "response_time_ms" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN response_time_ms INTEGER"
+            )
+        if "replay_count" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN replay_count INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "
             "ON messages(conversation_id, message_id)"

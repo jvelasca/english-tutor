@@ -3,13 +3,16 @@ from fastapi.testclient import TestClient
 
 from main import app
 from repositories import db
+from repositories import listening as listening_repo
 from repositories import users as users_repo
 from services.listening import (
     LEVEL_ORDER,
+    LISTENING_SUBSKILLS,
     QUESTION_BANK,
     current_level,
     get_question,
     level_status,
+    listening_diagnostic,
     pick_next_question,
     score_answer,
 )
@@ -51,13 +54,16 @@ def test_pick_next_serves_unseen_before_retrying():
 
 
 def test_pick_next_retries_wrong_after_unseen_exhausted():
-    # Con las tres vistas y solo l1/l2 dominadas, se reintenta l3 (la fallada).
-    assert pick_next_question({"l1", "l2", "l3"}, {"l1", "l2"})["id"] == "l3"
+    # Con todo el nivel visto y solo l3 sin dominar, se reintenta la fallada tras
+    # agotar las no vistas.
+    a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
+    assert pick_next_question(a1_ids, a1_ids - {"l3"})["id"] == "l3"
 
 
 def test_pick_next_advances_when_level_mastered():
-    # A1 completo (l1/l2/l3 dominadas) → siguiente pregunta es de A2 (l4).
-    assert pick_next_question(set(), {"l1", "l2", "l3"})["id"] == "l4"
+    # A1 completo → siguiente pregunta es de A2 (l4).
+    a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
+    assert pick_next_question(set(), a1_ids)["id"] == "l4"
 
 
 def test_pick_next_completes_all_levels_and_rotates():
@@ -67,15 +73,18 @@ def test_pick_next_completes_all_levels_and_rotates():
 
 
 def test_current_level_advances_with_mastery():
+    a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
+    a2_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A2"}
     assert current_level(set()) == "A1"
-    assert current_level({"l1", "l2", "l3"}) == "A2"
-    assert current_level({"l1", "l2", "l3", "l4", "l5", "l6"}) == "B1"
+    assert current_level(a1_ids) == "A2"
+    assert current_level(a1_ids | a2_ids) == "B1"
     # Completados todos → se mantiene en el último nivel para seguir practicando.
     assert current_level({q["id"] for q in QUESTION_BANK}) == "B1"
 
 
 def test_level_status_marks_completed():
-    status = level_status({"l1", "l2", "l3"})
+    a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
+    status = level_status(a1_ids)
     by_level = {s["level"]: s for s in status}
     assert [s["level"] for s in status] == LEVEL_ORDER
     assert by_level["A1"]["completed"] is True
@@ -91,6 +100,13 @@ def test_bank_shape_valid():
         assert q["question"]
         assert len(q["options"]) >= 2
         assert 0 <= q["answer_index"] < len(q["options"])
+        assert q["skill"] in LISTENING_SUBSKILLS
+        assert 1 <= q["difficulty"] <= 6
+    from collections import Counter
+
+    skill_counts = Counter(q["skill"] for q in QUESTION_BANK)
+    assert skill_counts["gist"] >= 2
+    assert skill_counts["vocabulary"] >= 2
 
 
 def test_next_question_endpoint(monkeypatch, tmp_path):
@@ -217,3 +233,94 @@ def test_all_levels_completed_marks_completed(monkeypatch, tmp_path):
     assert stats["completed"] is True
     assert stats["level"] == "B1"
     assert all(lv["completed"] for lv in stats["levels"])
+
+
+def test_listening_diagnostic_empty():
+    diag = listening_diagnostic([])
+    assert [s["skill"] for s in diag["subskills"]] == list(LISTENING_SUBSKILLS)
+    assert all(s["attempts"] == 0 for s in diag["subskills"])
+    assert all(s["accuracy"] is None for s in diag["subskills"])
+    assert diag["weak"] == list(LISTENING_SUBSKILLS)
+    assert diag["recommendation"].startswith("Focus on:")
+
+
+def test_listening_diagnostic_groups_and_weak():
+    def _row(skill, correct, rms, replay):
+        return {
+            "skill": skill,
+            "correct": correct,
+            "response_time_ms": rms,
+            "replay_count": replay,
+        }
+
+    rows = [
+        _row("detail", True, 1000, 0),
+        _row("detail", True, 1200, 0),
+        _row("detail", True, 800, 1),
+        _row("numbers", False, 2000, 2),
+        _row("numbers", False, 2100, 3),
+        _row("numbers", False, 1900, 1),
+    ]
+    diag = listening_diagnostic(rows)
+    by_skill = {s["skill"]: s for s in diag["subskills"]}
+
+    assert by_skill["detail"]["attempts"] == 3
+    assert by_skill["detail"]["correct"] == 3
+    assert by_skill["detail"]["accuracy"] == 100.0
+    assert by_skill["detail"]["avg_response_ms"] == 1000.0
+    assert by_skill["detail"]["review_due"] is False
+
+    assert by_skill["numbers"]["attempts"] == 3
+    assert by_skill["numbers"]["correct"] == 0
+    assert by_skill["numbers"]["accuracy"] == 0.0
+    assert by_skill["numbers"]["avg_replay_count"] == 2.0
+    assert by_skill["numbers"]["review_due"] is True
+
+    # gist no tiene muestras → review_due True para animar a explorar.
+    assert by_skill["gist"]["attempts"] == 0
+    assert by_skill["gist"]["review_due"] is True
+
+    assert "numbers" in diag["weak"]
+    assert "gist" in diag["weak"]
+    assert "detail" not in diag["weak"]
+
+
+def test_diagnostic_endpoint(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    q = QUESTION_BANK[0]
+    with TestClient(app) as client:
+        client.post(
+            "/api/listening/answer",
+            params={"user_id": uid},
+            json={"question_id": q["id"], "answer_index": q["answer_index"]},
+        )
+        r = client.get("/api/listening/diagnostic", params={"user_id": uid})
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["subskills"]) >= len(LISTENING_SUBSKILLS)
+    by_skill = {s["skill"]: s for s in body["subskills"]}
+    assert by_skill[q["skill"]]["attempts"] == 1
+
+
+def test_answer_records_metrics(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    q = QUESTION_BANK[0]
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/listening/answer",
+            params={"user_id": uid},
+            json={
+                "question_id": q["id"],
+                "answer_index": q["answer_index"],
+                "response_time_ms": 1234,
+                "replay_count": 2,
+            },
+        )
+    assert r.status_code == 200
+    attempts = listening_repo.list_attempts(uid)
+    assert len(attempts) == 1
+    row = attempts[0]
+    assert row["response_time_ms"] == 1234
+    assert row["replay_count"] == 2
+    assert row["skill"] == q["skill"]
+    assert row["difficulty"] == q["difficulty"]

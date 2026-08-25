@@ -9,6 +9,7 @@ from domain import listening as listening_service
 from schemas.listening import (
     ListeningAnswerRequest,
     ListeningAnswerResponse,
+    ListeningDiagnostic,
     ListeningQuestion,
     ListeningStats,
 )
@@ -26,7 +27,11 @@ async def answer(
     body: ListeningAnswerRequest, user: dict = Depends(current_user)
 ) -> dict:
     result = await listening_service.submit_answer(
-        user["id"], body.question_id, body.answer_index
+        user["id"],
+        body.question_id,
+        body.answer_index,
+        body.response_time_ms,
+        body.replay_count,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
@@ -41,3 +46,8 @@ async def answer(
 @router.get("/api/listening/stats", response_model=ListeningStats)
 async def stats(user: dict = Depends(current_user)) -> dict:
     return await listening_service.get_stats(user["id"])
+
+
+@router.get("/api/listening/diagnostic", response_model=ListeningDiagnostic)
+async def diagnostic(user: dict = Depends(current_user)) -> dict:
+    return await listening_service.get_diagnostic(user["id"])
