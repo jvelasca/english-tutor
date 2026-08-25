@@ -39,11 +39,34 @@ def build_system_prompt(mode: str, profile: dict | None = None) -> str:
     return "\n".join(parts)
 
 
+def cefr_profile_prompt(skill_profile: list[dict]) -> str:
+    """Renderiza el perfil CEFR por destreza como bloque de texto para el system prompt.
+
+    Solo incluye destrezas con evidencia (`evidence_count > 0`); separa débiles
+    (`review_due`) de fuertes. Devuelve '' si no hay ninguna con evidencia."""
+    assessed = [s for s in skill_profile if s["evidence_count"] > 0]
+    if not assessed:
+        return ""
+    weak = [s for s in assessed if s["review_due"]]
+    strong = [s for s in assessed if not s["review_due"]]
+
+    def _fmt(items: list[dict]) -> str:
+        return ", ".join(f"{s['skill']} {round(s['score'] * 100)}%" for s in items)
+
+    parts = []
+    if weak:
+        parts.append("weak: " + _fmt(weak))
+    if strong:
+        parts.append("strong: " + _fmt(strong))
+    return "Current CEFR skill profile: " + "; ".join(parts) + "."
+
+
 def build_lesson_prompt(
     objective: dict,
     level: str,
     mastery: dict[str, float] | None = None,
     errors: list[dict] | None = None,
+    skill_profile: list[dict] | None = None,
 ) -> str:
     """Construye el system prompt del AI Teacher para una lección de la Academy.
 
@@ -89,6 +112,10 @@ def build_lesson_prompt(
         "student's answer, then correct and praise. Keep turns short and focused on "
         "the objective."
     )
+    if skill_profile:
+        snapshot = cefr_profile_prompt(skill_profile)
+        if snapshot:
+            parts.append(snapshot)
     parts.append(feedback_policy())
 
     return "\n".join(parts)

@@ -320,3 +320,15 @@ class CefrProfileOut(BaseModel):
     level: str
     overall: float
     skills: list[SkillProfileOut]
+
+
+class RemediationSkillOut(BaseModel):
+    skill: str
+    score: float
+    objective_ids: list[str]
+
+
+class RemediationPlanOut(BaseModel):
+    level_id: str
+    level: str
+    skills: list[RemediationSkillOut]

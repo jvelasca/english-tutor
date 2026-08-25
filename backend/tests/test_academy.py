@@ -964,3 +964,146 @@ def test_skill_profile_unknown_level_404(monkeypatch, tmp_path):
             "/api/academy/profile", params={"user_id": a, "level_id": "zz"}
         )
     assert r.status_code == 404
+
+
+# --- Remediación adaptativa (V1.3.2) --------------------------------------
+
+
+def test_remediation_plan_orders_weak_skills():
+    lv = load_level("a1")
+    objs = lv.objectives()
+    grammar_objs = [o for o in objs if "grammar" in o.skills]
+    assert len(grammar_objs) >= 2
+
+    g0, g1 = grammar_objs[0], grammar_objs[1]
+    # Dejamos solo g0/g1 sin dominar para que sean los únicos candidatos.
+    mastered = {o.id for o in objs if o.id not in {g0.id, g1.id}}
+
+    skill_profile = [
+        {
+            "skill": "vocabulary",
+            "score": 0.6,
+            "confidence": 0.6,
+            "evidence_count": 3,
+            "last_evidence": "2026-08-25T00:00:00Z",
+            "review_due": True,
+        },
+        {
+            "skill": "grammar",
+            "score": 0.4,
+            "confidence": 0.4,
+            "evidence_count": 3,
+            "last_evidence": "2026-08-25T00:00:00Z",
+            "review_due": True,
+        },
+        {
+            "skill": "listening",
+            "score": 0.9,
+            "confidence": 0.9,
+            "evidence_count": 3,
+            "last_evidence": "2026-08-25T00:00:00Z",
+            "review_due": False,
+        },
+    ]
+
+    objective_scores = {g0.id: {"grammar": 0.2}, g1.id: {"grammar": 0.5}}
+
+    plan = academy_svc.remediation_plan(lv, skill_profile, objective_scores, mastered)
+
+    # Solo destrezas débiles, ordenadas por score ascendente (grammar 0.4 < vocab 0.6).
+    assert [r["skill"] for r in plan] == ["grammar", "vocabulary"]
+    for r in plan:
+        assert set(r.keys()) == {"skill", "score", "objective_ids"}
+        assert r["objective_ids"]
+    grammar_plan = next(r for r in plan if r["skill"] == "grammar")
+    assert grammar_plan["objective_ids"][0] == g0.id  # 0.2 < 0.5
+    assert "listening" not in [r["skill"] for r in plan]
+
+
+def test_remediation_endpoint_empty_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get(
+            "/api/academy/remediation", params={"user_id": a, "level_id": "a1"}
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["level"] == "A1"
+    assert body["skills"] == []
+
+
+def test_remediation_endpoint_rejects_blocked_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get(
+            "/api/academy/remediation", params={"user_id": a, "level_id": "a2"}
+        )
+    assert r.status_code == 403
+
+
+def test_remediation_endpoint_unknown_level_404(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get(
+            "/api/academy/remediation", params={"user_id": a, "level_id": "zz"}
+        )
+    assert r.status_code == 404
+
+
+# --- AI Teacher adaptativo (perfil CEFR en el prompt) ---------------------
+
+
+def test_cefr_profile_prompt_renders_weak_and_strong():
+    from services.context import cefr_profile_prompt
+
+    profile = [
+        {"skill": "grammar", "score": 0.4, "evidence_count": 2, "review_due": True},
+        {
+            "skill": "vocabulary",
+            "score": 0.9,
+            "evidence_count": 2,
+            "review_due": False,
+        },
+        {"skill": "listening", "score": 0.0, "evidence_count": 0, "review_due": False},
+    ]
+    text = cefr_profile_prompt(profile)
+    assert "Current CEFR skill profile" in text
+    assert "weak: grammar 40%" in text
+    assert "strong: vocabulary 90%" in text
+    assert "listening" not in text  # sin evidencia → excluida
+
+
+def test_cefr_profile_prompt_empty_without_evidence():
+    from services.context import cefr_profile_prompt
+
+    assert cefr_profile_prompt([]) == ""
+    assert (
+        cefr_profile_prompt(
+            [
+                {
+                    "skill": "grammar",
+                    "score": 0.0,
+                    "evidence_count": 0,
+                    "review_due": False,
+                }
+            ]
+        )
+        == ""
+    )
+
+
+def test_build_lesson_prompt_includes_cefr_profile():
+    from services.context import build_lesson_prompt
+
+    obj = {
+        "can_do": "I can introduce myself and give basic personal information.",
+        "concepts": ["I am"],
+        "vocabulary": ["name"],
+        "skills": ["grammar", "vocabulary"],
+    }
+    profile = [
+        {"skill": "grammar", "score": 0.4, "evidence_count": 2, "review_due": True}
+    ]
+    prompt = build_lesson_prompt(obj, "A1", {"grammar": 0.4}, [], profile)
+    assert "Current CEFR skill profile" in prompt
+    assert "weak" in prompt

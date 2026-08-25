@@ -27,6 +27,7 @@ from schemas.academy import (
     PlacementItemOut,
     PlacementOut,
     PlacementResultOut,
+    RemediationPlanOut,
     SkillScoreOut,
     SpeakingResultOut,
     SpeakingTaskResultOut,
@@ -335,6 +336,25 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
     )
 
 
+async def get_remediation(user_id: str, level_id: str) -> RemediationPlanOut | None:
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, level_id
+    )
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, level_id
+    )
+    profile = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows)
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    skills = academy_svc.remediation_plan(lv, profile, objective_scores, mastered)
+    return RemediationPlanOut(level_id=level_id, level=lv.level, skills=skills)
+
+
 async def next_objective(user_id: str, level_id: str) -> NextObjectiveOut | None:
     lv = _levels_by_id.get(level_id)
     if lv is None:
@@ -360,7 +380,18 @@ async def lesson_prompt(user_id: str, objective_id: str) -> str | None:
                 academy_repo.get_objective_mastery, user_id, lv.level_id, objective_id
             )
             errors = await run_in_threadpool(grammar_repo.get_recurring_errors, user_id)
-            return build_lesson_prompt(obj.model_dump(), lv.level, mastery, errors)
+            obj_mastery = await run_in_threadpool(
+                academy_repo.list_objective_mastery, user_id, lv.level_id
+            )
+            evidence_rows = await run_in_threadpool(
+                academy_repo.list_evidence, user_id, lv.level_id
+            )
+            skill_profile = academy_svc.build_skill_profile(
+                lv, obj_mastery, evidence_rows
+            )
+            return build_lesson_prompt(
+                obj.model_dump(), lv.level, mastery, errors, skill_profile
+            )
     return None
 
 

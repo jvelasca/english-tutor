@@ -459,6 +459,41 @@ def build_skill_profile(
     return profile
 
 
+def remediation_plan(
+    level: Level,
+    skill_profile: list[dict],
+    objective_scores: dict[str, dict[str, float]],
+    mastered_ids: set[str],
+) -> list[dict]:
+    """Plan de remediación: destrezas débiles y objetivos concretos para reforzarlas.
+
+    Para cada destreza débil del perfil (`review_due` True), ordena los objetivos del
+    nivel que la declaran y aún no están dominados por su score ascendente (empate por
+    orden curricular, que conserva el sort estable), y devuelve
+    `{"skill", "score", "objective_ids"}`. La lista final va ordenada por score
+    ascendente (más débil primero).
+    """
+    result = []
+    for entry in skill_profile:
+        if not entry["review_due"]:
+            continue
+        skill = entry["skill"]
+        candidates = [
+            (objective_scores.get(o.id, {}).get(skill, 0.0), o.id)
+            for o in level.objectives()
+            if skill in o.skills and o.id not in mastered_ids
+        ]
+        candidates.sort(key=lambda t: t[0])
+        objective_ids = [oid for _, oid in candidates]
+        if not objective_ids:
+            continue
+        result.append(
+            {"skill": skill, "score": entry["score"], "objective_ids": objective_ids}
+        )
+    result.sort(key=lambda r: r["score"])
+    return result
+
+
 # --- Evaluación -----------------------------------------------------------
 
 
