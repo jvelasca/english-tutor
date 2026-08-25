@@ -16,6 +16,7 @@ pronunciation) se declaran pero aún no integran evidencia de rendimiento.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 
 from services.curriculum import (
@@ -624,6 +625,108 @@ def _placement_confidence(
     consistency = 1.0 - (max(accs) - min(accs)) if accs else 0.0
     confidence = coverage * (0.4 + 0.6 * consistency)
     return round(min(0.95, max(0.0, confidence)), 2)
+
+
+# --- Placement adaptativo (IRT-lite) -------------------------------------
+
+PLACEMENT_START_THETA = 3.0
+PLACEMENT_THETA_MIN = -3.0
+PLACEMENT_THETA_MAX = 9.0
+MAX_PLACEMENT_ITEMS = 8
+
+
+def _p_correct(theta: float, difficulty: int) -> float:
+    """Probabilidad de acierto del modelo logístico de un parámetro (1PL)."""
+    return 1.0 / (1.0 + math.exp(difficulty - theta))
+
+
+def ability_theta(responses: list[tuple[int, bool]]) -> float:
+    """Estima la habilidad θ por máxima verosimilitud con prior débil (MAP).
+
+    `responses` es una lista de tuplas `(difficulty, correct)`. Se maximiza la
+    log-verosimilitud de la 1PL mediante Newton-Raphson; el prior débil (una
+    normal suave centrada en `PLACEMENT_START_THETA`) estabiliza el caso
+    todo-acierto/todo-fallo. Devuelve θ redondeado a 3 decimales."""
+    if not responses:
+        return PLACEMENT_START_THETA
+    theta = PLACEMENT_START_THETA
+    for _ in range(20):
+        grad = 0.0
+        hess = 0.0
+        for difficulty, correct in responses:
+            p = _p_correct(theta, difficulty)
+            grad += (1.0 - p) if correct else -p
+            hess -= p * (1.0 - p)
+        grad += (PLACEMENT_START_THETA - theta) * 0.1
+        hess -= 0.1
+        if abs(hess) < 1e-12:
+            break
+        delta = grad / hess
+        theta -= delta
+        theta = max(PLACEMENT_THETA_MIN, min(PLACEMENT_THETA_MAX, theta))
+        if abs(delta) < 1e-6:
+            break
+    return round(theta, 3)
+
+
+def theta_to_level(theta: float) -> str:
+    """Mapea θ (escala ~dificultad 1..6) a nivel CEFR con fronteras de media banda."""
+    if theta < 1.5:
+        return "A1"
+    if theta < 2.5:
+        return "A2"
+    if theta < 3.5:
+        return "B1"
+    if theta < 4.5:
+        return "B2"
+    if theta < 5.5:
+        return "C1"
+    return "C2"
+
+
+def select_next_item(
+    items: list, answered_ids: set[str], theta: float
+) -> object | None:
+    """Ítem sin responder con dificultad más cercana a θ; empate: menor dificultad
+    y, si persiste, el primero en el orden de `items`. None si no quedan."""
+    remaining = [it for it in items if it.id not in answered_ids]
+    if not remaining:
+        return None
+    return min(remaining, key=lambda it: (abs(it.difficulty - theta), it.difficulty))
+
+
+def placement_adaptive_confidence(
+    theta: float, responses: list[tuple[int, bool]]
+) -> float:
+    """Confianza (0..0.95) derivada del error estándar de θ (información de Fisher)."""
+    if not responses:
+        return 0.0
+    info = 1.0 + sum(
+        p * (1.0 - p) for p in (_p_correct(theta, b) for b, _ in responses)
+    )
+    se = 1.0 / math.sqrt(info)
+    return round(min(0.95, max(0.0, 1.0 - se)), 2)
+
+
+def placement_result_adaptive(items: list, answers: dict[str, int]) -> dict:
+    """Resultado del placement adaptativo: θ, nivel CEFR, confianza y contadores."""
+    responses = [
+        (it.difficulty, answers[it.id] == it.correct_index)
+        for it in items
+        if it.id in answers
+    ]
+    theta = ability_theta(responses) if responses else PLACEMENT_START_THETA
+    level = theta_to_level(theta)
+    confidence = placement_adaptive_confidence(theta, responses)
+    correct = sum(1 for it in items if answers.get(it.id) == it.correct_index)
+    answered = len(responses)
+    return {
+        "level": level,
+        "theta": theta,
+        "confidence": confidence,
+        "answered": answered,
+        "correct": correct,
+    }
 
 
 def exam_result(exam: Exam, answers: dict[str, int]) -> dict:

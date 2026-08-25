@@ -26,6 +26,7 @@ from schemas.academy import (
     ObjectiveAssessmentOut,
     ObjectiveProgressOut,
     ObjectiveStateOut,
+    PlacementAdaptiveOut,
     PlacementItemOut,
     PlacementOut,
     PlacementResultOut,
@@ -804,6 +805,63 @@ async def submit_placement(
         True,
     )
     return PlacementResultOut(**result)
+
+
+async def next_placement(
+    user_id: str, answers: dict[str, int]
+) -> PlacementAdaptiveOut | None:
+    """Siguiente ítem del placement adaptativo (IRT-lite) y resultado al terminar.
+
+    Stateless: el cliente envía sus respuestas parciales; el servidor calcula la
+    habilidad θ, elige el siguiente ítem por dificultad más cercana a θ, y cuando
+    se alcanza el máximo de ítems (o no quedan) devuelve `done=True` con el
+    resultado y lo persiste como resultado de evaluación."""
+    data = load_assessments()
+    items = data.placement.items
+    answered_ids = set(answers)
+    responses = [
+        (it.difficulty, answers[it.id] == it.correct_index)
+        for it in items
+        if it.id in answers
+    ]
+    theta = academy_svc.ability_theta(responses)
+    done = len(answered_ids) >= academy_svc.MAX_PLACEMENT_ITEMS or len(
+        answered_ids
+    ) >= len(items)
+    if done:
+        result = academy_svc.placement_result_adaptive(items, answers)
+        await run_in_threadpool(
+            academy_repo.record_assessment_result,
+            user_id,
+            data.placement.id,
+            "",
+            result,
+            True,
+        )
+        return PlacementAdaptiveOut(
+            next_item=None,
+            theta=theta,
+            answered=result["answered"],
+            done=True,
+            result=result,
+        )
+    next_item = academy_svc.select_next_item(items, answered_ids, theta)
+    next_out = None
+    if next_item is not None:
+        next_out = PlacementItemOut(
+            id=next_item.id,
+            skill=next_item.skill,
+            difficulty=next_item.difficulty,
+            prompt=next_item.prompt,
+            options=next_item.options,
+        )
+    return PlacementAdaptiveOut(
+        next_item=next_out,
+        theta=theta,
+        answered=len(answered_ids),
+        done=False,
+        result=None,
+    )
 
 
 async def get_exam(level_id: str) -> ExamOut | None:

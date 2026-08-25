@@ -164,6 +164,14 @@ class PlacementResultOut(BaseModel):
     correct: int
 
 
+class PlacementAdaptiveOut(BaseModel):
+    next_item: PlacementItemOut | None
+    theta: float
+    answered: int
+    done: bool
+    result: PlacementResultOut | None
+
+
 class ExamItemOut(BaseModel):
     id: str
     skill: str
