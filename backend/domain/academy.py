@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from starlette.concurrency import run_in_threadpool
 
 from repositories import academy as academy_repo
@@ -327,7 +329,8 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
     evidence_rows = await run_in_threadpool(
         academy_repo.list_evidence, user_id, level_id
     )
-    skills = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows)
+    now = datetime.now(timezone.utc).isoformat()
+    skills = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows, now)
     overall = (
         round(sum(s["score"] for s in skills) / len(skills), 3) if skills else 0.0
     )
@@ -346,7 +349,8 @@ async def get_remediation(user_id: str, level_id: str) -> RemediationPlanOut | N
     evidence_rows = await run_in_threadpool(
         academy_repo.list_evidence, user_id, level_id
     )
-    profile = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows)
+    now = datetime.now(timezone.utc).isoformat()
+    profile = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows, now)
     objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
     mastered = academy_svc.mastered_objective_ids(
         lv, objective_scores, objective_attempts
@@ -386,8 +390,9 @@ async def lesson_prompt(user_id: str, objective_id: str) -> str | None:
             evidence_rows = await run_in_threadpool(
                 academy_repo.list_evidence, user_id, lv.level_id
             )
+            now = datetime.now(timezone.utc).isoformat()
             skill_profile = academy_svc.build_skill_profile(
-                lv, obj_mastery, evidence_rows
+                lv, obj_mastery, evidence_rows, now
             )
             return build_lesson_prompt(
                 obj.model_dump(), lv.level, mastery, errors, skill_profile

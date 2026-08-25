@@ -966,6 +966,38 @@ def test_skill_profile_unknown_level_404(monkeypatch, tmp_path):
     assert r.status_code == 404
 
 
+def test_build_skill_profile_review_due_uses_forgetting():
+    lv = load_level("a1")
+    obj = next(iter(lv.objectives()))
+    skill = obj.skills[0]
+    objective_mastery = {
+        obj.id: {
+            skill: {
+                "score": 0.9,
+                "recent_score": 0.9,
+                "confidence": 0.8,
+                "streak": 3,
+                "attempts": 3,
+                "last_seen_at": "2026-01-01T00:00:00+00:00",
+            }
+        }
+    }
+    evidence_rows = [{"skill": skill, "created_at": "2026-01-01T00:00:00+00:00"}]
+
+    profile = academy_svc.build_skill_profile(
+        lv, objective_mastery, evidence_rows, now="2026-08-01T00:00:00+00:00"
+    )
+    entry = next(e for e in profile if e["skill"] == skill)
+    assert entry["evidence_count"] == 1
+    assert entry["review_due"] is True
+
+    profile = academy_svc.build_skill_profile(
+        lv, objective_mastery, evidence_rows, now="2026-01-01T00:00:01+00:00"
+    )
+    entry = next(e for e in profile if e["skill"] == skill)
+    assert entry["review_due"] is False
+
+
 # --- Remediación adaptativa (V1.3.2) --------------------------------------
 
 

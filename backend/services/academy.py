@@ -21,12 +21,12 @@ from collections import defaultdict
 from services.curriculum import (
     CANONICAL_SKILLS,
     CEFR_ORDER,
-    DEFAULT_THRESHOLD,
     Exam,
     Level,
     Objective,
     next_level_id,
 )
+from services.forgetting import review_due as forgetting_review_due
 
 # --- Modelo de mastery determinista (recencia + racha + confianza) ---------
 
@@ -395,14 +395,15 @@ def build_skill_profile(
     level: Level,
     objective_mastery: dict[str, dict[str, dict]],
     evidence_rows: list[dict],
+    now: str = "",
 ) -> list[dict]:
     """Vista derivada del perfil CEFR por destreza de un nivel.
 
     Agrega el mastery por objetivo (`academy_objective_mastery`, fuente de verdad)
     y la evidencia por ítem (`academy_evidence`) en una entrada por destreza con
     `score` (media), `confidence` (media), `evidence_count`, `last_evidence`
-    (ISO más reciente, o ''), y `review_due` (heurística simple: hay evidencia y
-    el score está por debajo del umbral; el modelo de olvido real llega en V1.4).
+    (ISO más reciente, o ''), y `review_due`, derivado del modelo de olvido
+    (`services.forgetting`) a partir del `last_seen_at`/última evidencia y `now`.
 
     Devuelve una lista ordenada por `CANONICAL_SKILLS` y, tras ellas, cualquier
     destreza extra en orden alfabético.
@@ -427,11 +428,15 @@ def build_skill_profile(
     for skill in skills:
         scores: list[float] = []
         confidences: list[float] = []
+        last_seen = ""
         for skills_by_obj in objective_mastery.values():
             state = skills_by_obj.get(skill)
             if state is not None:
                 scores.append(float(state["score"]))
                 confidences.append(float(state["confidence"]))
+                seen = state.get("last_seen_at", "")
+                if seen:
+                    last_seen = max(last_seen, seen)
         score = round(sum(scores) / len(scores), 3) if scores else 0.0
         confidence = (
             round(sum(confidences) / len(confidences), 3) if confidences else 0.0
@@ -439,6 +444,7 @@ def build_skill_profile(
         rows = evidence_by_skill.get(skill, [])
         evidence_count = len(rows)
         last_evidence = max(r["created_at"] for r in rows) if rows else ""
+        review_ts = last_seen or last_evidence
         profile.append(
             {
                 "skill": skill,
@@ -446,7 +452,9 @@ def build_skill_profile(
                 "confidence": confidence,
                 "evidence_count": evidence_count,
                 "last_evidence": last_evidence,
-                "review_due": evidence_count > 0 and score < DEFAULT_THRESHOLD,
+                "review_due": (
+                    evidence_count > 0 and forgetting_review_due(score, review_ts, now)
+                ),
             }
         )
 
