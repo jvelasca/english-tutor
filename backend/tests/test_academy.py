@@ -368,7 +368,8 @@ def test_endpoint_levels_lists_a1(monkeypatch, tmp_path):
     assert levels["a1"]["available"] is True
     assert levels["a1"]["objective_count"] > 20
     assert levels["a2"]["available"] is True
-    assert levels["b1"]["available"] is False
+    assert levels["b1"]["available"] is True
+    assert levels["b1"]["objective_count"] > 0
 
 
 # --- Gating de matrícula y examen (integridad curricular) -----------------
@@ -434,7 +435,7 @@ def test_level_detail_rejects_locked_level(monkeypatch, tmp_path):
 def test_level_detail_unknown_level_404(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.get("/api/academy/levels/b1", params={"user_id": a})
+        r = client.get("/api/academy/levels/zz", params={"user_id": a})
     assert r.status_code == 404
 
 
@@ -1139,3 +1140,67 @@ def test_build_lesson_prompt_includes_cefr_profile():
     prompt = build_lesson_prompt(obj, "A1", {"grammar": 0.4}, [], profile)
     assert "Current CEFR skill profile" in prompt
     assert "weak" in prompt
+
+
+# --- Student Model 2.0 (núcleo adaptativo) --------------------------------
+
+
+def test_endpoint_student_model_empty(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/student-model", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["level_id"] == "a1"
+    assert body["current_level"] == "A1"
+    assert body["estimated_level"] == "A1"
+    assert body["target_level"] == "A2"
+    assert body["confidence"] == 0.0
+    assert body["skills"], "el perfil incluye las destrezas de A1"
+    for entry in body["skills"]:
+        assert "stability" in entry
+        assert entry["stability"] == 0.0
+    assert body["readiness"]["overall"] == 0.0
+    assert body["readiness"]["ready"] is False
+    assert body["reassessment"] is None
+
+
+def test_endpoint_readiness_default_b1(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/readiness", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["target_level"] == "B1"
+    assert body["overall"] == 0.0
+    assert body["blocking_skills"] == []
+
+
+def test_endpoint_today_empty_returns_next_objective(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/today", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"], "el plan no está vacío para un usuario nuevo"
+    assert body["total_minutes"] == sum(i["minutes"] for i in body["items"])
+    assert any(i["kind"] == "new" for i in body["items"])
+
+
+def test_endpoint_student_model_reflects_evidence(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    checks = {c.id: c.correct_index for c in obj.checks}
+    with TestClient(app) as client:
+        for _ in range(obj.minimum_attempts):
+            client.post(
+                "/api/academy/objective/assessment",
+                params={"user_id": a},
+                json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
+            )
+        r = client.get("/api/academy/student-model", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assessed = obj.assessable_skills()
+    skills = {s["skill"]: s for s in body["skills"]}
+    assert any(skills[s]["score"] > 0 for s in assessed)

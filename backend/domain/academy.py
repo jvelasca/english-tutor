@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from starlette.concurrency import run_in_threadpool
 
@@ -18,6 +18,8 @@ from schemas.academy import (
     ExamItemOut,
     ExamOut,
     ExamResultOut,
+    LearningGoalIn,
+    LearningGoalOut,
     LessonCompletedOut,
     LevelCompletionOut,
     LevelDetailOut,
@@ -36,17 +38,24 @@ from schemas.academy import (
     PlacementResultOut,
     PlacementStartOut,
     PronunciationResultOut,
+    ReadinessOut,
+    ReassessmentOut,
     RemediationPlanOut,
+    SessionOut,
+    SessionStepOut,
     SkillScoreOut,
     SpeakingResultOut,
     SpeakingTaskResultOut,
+    StudentModelOut,
+    TodayItemOut,
+    TodayPlanOut,
     WritingResultOut,
     WritingTaskResultOut,
 )
 from services import academy as academy_svc
+from services import adaptive, speaking_llm, writing_llm
 from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
-from services import speaking_llm, writing_llm
 from services import writing as writing_svc
 from services.context import build_lesson_prompt
 from services.curriculum import (
@@ -70,6 +79,13 @@ _LEVEL_TITLES = {
     "B2": ("Upper-Intermediate", "Argumentation and complex texts."),
     "C1": ("Advanced", "Nuance, register and abstract topics."),
     "C2": ("Proficiency", "Precision, subtlety and near-native command."),
+}
+
+DEFAULT_GOAL = {
+    "goal_type": "general",
+    "minutes_per_day": 15,
+    "days_per_week": 5,
+    "target_level": "B1",
 }
 
 def _iter_objectives(level: Level):
@@ -365,26 +381,81 @@ async def get_mastery(user_id: str) -> list[MasteryOut]:
     return [MasteryOut(level_id=k, skills=v) for k, v in by_level.items()]
 
 
-async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | None:
-    lv = _levels_by_id.get(level_id)
-    if lv is None:
-        return None
+async def _skill_trends(user_id: str) -> dict[str, float | None]:
+    """Tendencia por destreza (% de variación de accuracy, últimos 7d vs anterior).
+
+    Se calcula sobre toda la evidencia del usuario (no solo del nivel actual): la
+    precisión media de los últimos 7 días comparada con la de los 7 días previos.
+    Devuelve `None` cuando no hay línea base comparable.
+    """
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    now = datetime.now(timezone.utc)
+    cutoff7 = (now - timedelta(days=7)).isoformat()
+    cutoff14 = (now - timedelta(days=14)).isoformat()
+    recent: dict[str, list[float]] = {}
+    previous: dict[str, list[float]] = {}
+    for r in rows:
+        skill = r["skill"]
+        created = r["created_at"]
+        if created >= cutoff7:
+            recent.setdefault(skill, []).append(r["result"])
+        elif created >= cutoff14:
+            previous.setdefault(skill, []).append(r["result"])
+    trends: dict[str, float | None] = {}
+    for skill in set(recent) | set(previous):
+        r = recent.get(skill, [])
+        p = previous.get(skill, [])
+        recent_acc = sum(r) / len(r) if r else None
+        previous_acc = sum(p) / len(p) if p else None
+        if recent_acc is not None and previous_acc is not None:
+            trends[skill] = round((recent_acc - previous_acc) * 100, 1)
+        else:
+            trends[skill] = None
+    return trends
+
+
+async def _annotated_profile(user_id: str, lv: Level) -> list[dict]:
+    """Perfil CEFR por destreza del nivel `lv`, anotado con stability y trend."""
     obj_mastery = await run_in_threadpool(
-        academy_repo.list_objective_mastery, user_id, level_id
+        academy_repo.list_objective_mastery, user_id, lv.level_id
     )
     evidence_rows = await run_in_threadpool(
-        academy_repo.list_evidence, user_id, level_id
+        academy_repo.list_evidence, user_id, lv.level_id
     )
     now = datetime.now(timezone.utc).isoformat()
     skills = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows, now)
     # Puente con el motor de listening: expone sus sub-destrezas dentro de 'listening'.
-    listening_attempts = await run_in_threadpool(
-        listening_repo.list_attempts, user_id
-    )
+    listening_attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
     subskills = listening_diagnostic(listening_attempts)["subskills"]
+    trends = await _skill_trends(user_id)
     for entry in skills:
         if entry["skill"] == "listening":
             entry["subskills"] = subskills
+        entry["stability"] = adaptive.skill_stability(
+            entry["score"], entry["confidence"], entry["last_evidence"], now
+        )
+        entry["trend"] = trends.get(entry["skill"])
+    return skills
+
+
+async def _current_level_id(user_id: str) -> str:
+    """Nivel CEFR más alto en el que el alumno está matriculado (o `a1` si ninguno)."""
+    enrollments = await run_in_threadpool(academy_repo.list_enrollments, user_id)
+    best = None
+    for e in enrollments:
+        if e["level"] in CEFR_ORDER:
+            if best is None or CEFR_ORDER.index(e["level"]) > CEFR_ORDER.index(
+                best["level"]
+            ):
+                best = e
+    return best["level_id"] if best is not None else "a1"
+
+
+async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | None:
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    skills = await _annotated_profile(user_id, lv)
     overall = academy_svc.overall_cefr_score(skills)
     return CefrProfileOut(
         level_id=level_id,
@@ -393,6 +464,137 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
         skills=skills,
         critical_skills=academy_svc.critical_skills(skills),
     )
+
+
+async def get_student_model(user_id: str) -> StudentModelOut:
+    """Student Model 2.0: nivel actual/estimado, perfil por destreza con stability
+    y trend, readiness hacia el siguiente nivel y reevaluación pendiente (si hay)."""
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    skills = await _annotated_profile(user_id, lv)
+    est = adaptive.estimated_level(skills)
+    goal_row = await run_in_threadpool(academy_repo.get_goal, user_id)
+    target = (
+        goal_row["target_level"]
+        if goal_row
+        else (next_level_id(lv.level) or lv.level)
+    )
+    target = target.upper()
+    history = await run_in_threadpool(academy_repo.list_assessment_results, user_id)
+    now = datetime.now(timezone.utc).isoformat()
+    reassessment = adaptive.reassessment_due(skills, history, now)
+    return StudentModelOut(
+        level_id=lv.level_id,
+        current_level=lv.level,
+        estimated_level=est["level"],
+        estimated_numeric=est["numeric"],
+        confidence=est["confidence"],
+        target_level=target,
+        skills=skills,
+        critical_skills=academy_svc.critical_skills(skills),
+        readiness=ReadinessOut(**adaptive.readiness(skills, target)),
+        reassessment=ReassessmentOut(**reassessment) if reassessment else None,
+    )
+
+
+async def get_readiness(user_id: str, target_level: str) -> ReadinessOut:
+    """Preparación por destreza para un nivel objetivo (p. ej. B1)."""
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    skills = await _annotated_profile(user_id, lv)
+    return ReadinessOut(**adaptive.readiness(skills, target_level))
+
+
+async def get_today_plan(user_id: str) -> TodayPlanOut:
+    """Plan de estudio de hoy: equilibrio weakness/review/new/easy_wins con minutos."""
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    skills = await _annotated_profile(user_id, lv)
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    remediation = academy_svc.remediation_plan(
+        lv, skills, objective_scores, mastered
+    )
+    oid, _reason = academy_svc.recommend_next(lv, mastered, objective_scores)
+    goal = await get_learning_goal(user_id)
+    items = adaptive.today_plan(
+        skills, lv, remediation, mastered, oid, budget_minutes=goal.minutes_per_day
+    )
+    return TodayPlanOut(
+        items=[TodayItemOut(**i) for i in items],
+        total_minutes=sum(i["minutes"] for i in items),
+    )
+
+
+async def get_session(user_id: str) -> SessionOut:
+    """Sesión diaria (Session Engine): repaso vencido → listening → debilidad →
+    nuevo → refuerzo, unificando las señales CEFR y de listening en una secuencia
+    accionable con presupuesto del objetivo personal."""
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    skills = await _annotated_profile(user_id, lv)
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    remediation = academy_svc.remediation_plan(
+        lv, skills, objective_scores, mastered
+    )
+    oid, _reason = academy_svc.recommend_next(lv, mastered, objective_scores)
+    goal = await get_learning_goal(user_id)
+
+    listening_rows = await run_in_threadpool(listening_repo.list_attempts, user_id)
+    listening_weak = listening_diagnostic(listening_rows)["weak"]
+
+    steps = adaptive.session_plan(
+        skills,
+        lv,
+        remediation,
+        mastered,
+        oid,
+        listening_weak=listening_weak,
+        budget_minutes=goal.minutes_per_day,
+    )
+    summary = adaptive.session_summary(steps)
+    return SessionOut(
+        items=[SessionStepOut(**s) for s in steps],
+        total_minutes=sum(s["minutes"] for s in steps),
+        review_count=summary["review_count"],
+        practice_count=summary["practice_count"],
+    )
+
+
+async def get_learning_goal(user_id: str) -> LearningGoalOut:
+    """Objetivo personal del usuario, con valores por defecto si aún no lo fija."""
+    row = await run_in_threadpool(academy_repo.get_goal, user_id)
+    if row is None:
+        return LearningGoalOut(**DEFAULT_GOAL)
+    return LearningGoalOut(**row)
+
+
+async def set_learning_goal(
+    user_id: str, goal: LearningGoalIn
+) -> LearningGoalOut | None:
+    """Crea o actualiza el objetivo personal. None si el usuario no existe."""
+    ok = await run_in_threadpool(
+        academy_repo.upsert_goal,
+        user_id,
+        goal.goal_type,
+        goal.minutes_per_day,
+        goal.days_per_week,
+        goal.target_level,
+    )
+    if not ok:
+        return None
+    return await get_learning_goal(user_id)
 
 
 async def get_remediation(user_id: str, level_id: str) -> RemediationPlanOut | None:

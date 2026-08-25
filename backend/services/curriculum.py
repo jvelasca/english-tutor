@@ -48,6 +48,85 @@ PERFORMANCE_SKILLS: tuple[str, ...] = (
     "pronunciation",
 )
 
+# Subdestrezas por destreza canónica. Son una descomposición más granular del
+# "can-do" CEFR: cada objetivo puede declarar a qué subdestrezas entrena. La
+# validación exige que cada subdestreza pertenezca a la tupla de su destreza.
+SUBSKILLS: dict[str, tuple[str, ...]] = {
+    "listening": (
+        "sound_recognition",
+        "word_recognition",
+        "phrase_recognition",
+        "connected_speech",
+        "gist",
+        "detail",
+        "inference",
+        "speaker_intention",
+        "attitude",
+        "multiple_speakers",
+        "fast_speech",
+        "accents",
+        "dictation",
+        "shadowing",
+        "real_world",
+    ),
+    "speaking": (
+        "pronunciation",
+        "fluency",
+        "grammar",
+        "vocabulary",
+        "interaction",
+        "coherence",
+        "intelligibility",
+        "lexical_retrieval",
+        "self_correction",
+        "turn_taking",
+    ),
+    "reading": (
+        "skimming",
+        "scanning",
+        "detail",
+        "inference",
+        "vocabulary",
+        "structure",
+    ),
+    "writing": (
+        "grammar",
+        "vocabulary",
+        "coherence",
+        "cohesion",
+        "register",
+        "spelling",
+        "punctuation",
+    ),
+    "grammar": (
+        "tenses",
+        "modals",
+        "articles",
+        "prepositions",
+        "conditionals",
+        "passive",
+        "reported_speech",
+        "relative_clauses",
+        "word_order",
+    ),
+    "vocabulary": (
+        "collocations",
+        "phrasal_verbs",
+        "word_families",
+        "idioms",
+        "register",
+        "spelling",
+    ),
+    "pronunciation": (
+        "sounds",
+        "stress",
+        "intonation",
+        "rhythm",
+        "linking",
+        "minimal_pairs",
+    ),
+}
+
 # Umbral por defecto para dominar una destreza de un objetivo (0..1).
 DEFAULT_THRESHOLD = 0.8
 
@@ -100,6 +179,7 @@ class Objective(BaseModel):
     can_do: str
     title: str
     skills: list[str]
+    subskills: list[str] = Field(default_factory=list)
     concepts: list[str] = Field(default_factory=list)
     vocabulary: list[str] = Field(default_factory=list)
     thresholds: dict[str, float] = Field(default_factory=dict)
@@ -299,6 +379,17 @@ def validate_level(level: Level) -> list[str]:
         for skill in obj.skills:
             if skill not in CANONICAL_SKILLS:
                 errors.append(f"{lid}: objetivo {obj.id} skill '{skill}' no canónica")
+
+        # Subskills: cada una debe pertenecer a la tupla de una de las destrezas
+        # declaradas por el objetivo.
+        for subskill in obj.subskills:
+            if not any(
+                subskill in SUBSKILLS.get(skill, ()) for skill in obj.skills
+            ):
+                errors.append(
+                    f"{lid}: objetivo {obj.id} subskill '{subskill}' "
+                    f"no pertenece a ninguna destreza declarada"
+                )
 
         # Cada check solo evalúa una skill declarada por el objetivo.
         for check in obj.checks:

@@ -161,6 +161,19 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS learning_goal (
+                user_id TEXT PRIMARY KEY,
+                goal_type TEXT NOT NULL DEFAULT 'general',
+                minutes_per_day INTEGER NOT NULL DEFAULT 15,
+                days_per_week INTEGER NOT NULL DEFAULT 5,
+                target_level TEXT NOT NULL DEFAULT 'B1',
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS academy_enrollments (
                 user_id TEXT NOT NULL,
                 level_id TEXT NOT NULL,

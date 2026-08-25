@@ -1,10 +1,11 @@
-import { getJson, postJson } from "./client";
+import { getJson, postJson, putJson } from "./client";
 import type {
   AttemptEntry,
   AttemptResponse,
   Enrollment,
   Exam,
   ExamResult,
+  LearningGoal,
   LessonCompleted,
   LevelCompletion,
   LevelDetail,
@@ -13,8 +14,14 @@ import type {
   NextObjective,
   ObjectiveAssessmentResult,
   Placement,
+  PlacementAdaptive,
   PlacementResult,
+  PlacementStart,
+  Readiness,
+  Session,
+  StudentModel,
   StudyPlanStep,
+  TodayPlan,
 } from "../types/api";
 
 function userQuery(userId: string): string {
@@ -65,6 +72,24 @@ export function submitPlacement(
   return postJson<PlacementResult>(
     `/api/academy/placement/submit${userQuery(userId)}`,
     { answers },
+  );
+}
+
+export function startAdaptivePlacement(userId: string): Promise<PlacementStart> {
+  return postJson<PlacementStart>(
+    `/api/academy/placement/start${userQuery(userId)}`,
+    {},
+  );
+}
+
+export function nextAdaptivePlacement(
+  userId: string,
+  answers: Record<string, number>,
+  sessionId: number,
+): Promise<PlacementAdaptive> {
+  return postJson<PlacementAdaptive>(
+    `/api/academy/placement/next${userQuery(userId)}`,
+    { answers, session_id: sessionId },
   );
 }
 
@@ -134,4 +159,38 @@ export function submitObjectiveAssessment(
     `/api/academy/objective/assessment${userQuery(userId)}`,
     { level_id: levelId, objective_id: objectiveId, answers },
   );
+}
+
+export function getStudentModel(userId: string): Promise<StudentModel> {
+  return getJson<StudentModel>(`/api/academy/student-model${userQuery(userId)}`);
+}
+
+export function getReadiness(
+  userId: string,
+  targetLevel = "B1",
+): Promise<Readiness> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    target_level: targetLevel,
+  });
+  return getJson<Readiness>(`/api/academy/readiness?${params.toString()}`);
+}
+
+export function getTodayPlan(userId: string): Promise<TodayPlan> {
+  return getJson<TodayPlan>(`/api/academy/today${userQuery(userId)}`);
+}
+
+export function getSession(userId: string): Promise<Session> {
+  return getJson<Session>(`/api/academy/session${userQuery(userId)}`);
+}
+
+export function getGoal(userId: string): Promise<LearningGoal> {
+  return getJson<LearningGoal>(`/api/academy/goal${userQuery(userId)}`);
+}
+
+export function putGoal(
+  userId: string,
+  goal: LearningGoal,
+): Promise<LearningGoal> {
+  return putJson<LearningGoal>(`/api/academy/goal${userQuery(userId)}`, goal);
 }

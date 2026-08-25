@@ -5,10 +5,10 @@ import {
   getLevelCompletions,
   getLevelDetail,
   getLevels,
-  getPlacement,
+  nextAdaptivePlacement,
+  startAdaptivePlacement,
   submitExam,
   submitObjectiveAssessment,
-  submitPlacement,
 } from "../api/academy";
 import type {
   CurriculumObjective,
@@ -19,7 +19,7 @@ import type {
   LevelSummary,
   ModuleProgress,
   ObjectiveAssessmentResult,
-  Placement,
+  PlacementItem,
   PlacementResult,
 } from "../types/api";
 
@@ -49,7 +49,14 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
   const [detail, setDetail] = useState<LevelDetail | null>(null);
   const [completions, setCompletions] = useState<LevelCompletion[]>([]);
   const [flow, setFlow] = useState<Flow>("none");
-  const [placement, setPlacement] = useState<Placement | null>(null);
+  const [placementItem, setPlacementItem] = useState<PlacementItem | null>(null);
+  const [placementSessionId, setPlacementSessionId] = useState<number | null>(
+    null,
+  );
+  const [placementAnswers, setPlacementAnswers] = useState<
+    Record<string, number>
+  >({});
+  const [placementAnswered, setPlacementAnswered] = useState(0);
   const [exam, setExam] = useState<Exam | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [placementResult, setPlacementResult] = useState<PlacementResult | null>(
@@ -110,10 +117,15 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
     if (!userId) return;
     setError(null);
     setFlow("placement");
-    setAnswers({});
+    setPlacementItem(null);
+    setPlacementSessionId(null);
+    setPlacementAnswers({});
+    setPlacementAnswered(0);
     setPlacementResult(null);
     try {
-      setPlacement(await getPlacement());
+      const s = await startAdaptivePlacement(userId);
+      setPlacementSessionId(s.session_id);
+      setPlacementItem(s.next_item);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -137,9 +149,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
     setBusy(true);
     setError(null);
     try {
-      if (flow === "placement") {
-        setPlacementResult(await submitPlacement(userId, answers));
-      } else if (flow === "exam") {
+      if (flow === "exam") {
         if (!selectedLevel) return;
         setExamResult(await submitExam(userId, selectedLevel.level_id, answers));
         void loadCompletions();
@@ -156,10 +166,51 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
     setAnswers((prev) => ({ ...prev, [itemId]: index }));
   }
 
+  function choosePlacement(index: number) {
+    if (!placementItem) return;
+    setPlacementAnswers((prev) => ({ ...prev, [placementItem.id]: index }));
+  }
+
+  async function submitPlacementAnswer() {
+    if (
+      !userId ||
+      busy ||
+      placementSessionId === null ||
+      !placementItem ||
+      !(placementItem.id in placementAnswers)
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await nextAdaptivePlacement(
+        userId,
+        placementAnswers,
+        placementSessionId,
+      );
+      setPlacementAnswered(res.answered);
+      if (res.done) {
+        setPlacementResult(res.result);
+        setPlacementItem(null);
+      } else {
+        setPlacementItem(res.next_item);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const closeFlow = () => {
     setFlow("none");
     setPlacementResult(null);
     setExamResult(null);
+    setPlacementItem(null);
+    setPlacementSessionId(null);
+    setPlacementAnswers({});
+    setPlacementAnswered(0);
   };
 
   return (
@@ -229,31 +280,69 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
           {error && <p className="academy-error">{error}</p>}
 
           {flow === "placement" && (
-            <AssessmentFlow
-              title={placement?.title ?? "Test de nivel"}
-              description={placement?.description}
-              items={placement?.items.map((i) => ({
-                id: i.id,
-                prompt: i.prompt,
-                options: i.options,
-              })) ?? []}
-              answers={answers}
-              onChoose={choose}
-              onSubmit={submit}
-              busy={busy}
-              onClose={closeFlow}
-              resultNode={
-                placementResult && (
-                  <div className="academy-result">
-                    <strong>Nivel estimado: {placementResult.level}</strong>
-                    <span>
-                      Confianza {Math.round(placementResult.confidence * 100)}% ·{" "}
-                      {placementResult.correct}/{placementResult.answered} aciertos
-                    </span>
+            <div className="academy-flow">
+              <div className="academy-flow-head">
+                <h3>Test de nivel adaptativo</h3>
+                <button type="button" onClick={closeFlow}>
+                  Cerrar
+                </button>
+              </div>
+              {placementResult ? (
+                <div className="academy-result ok">
+                  <strong>Nivel estimado: {placementResult.level}</strong>
+                  <span>
+                    Confianza {Math.round(placementResult.confidence * 100)}% ·{" "}
+                    {placementResult.correct}/{placementResult.answered} aciertos
+                  </span>
+                  <span>
+                    El test se ha adaptado a tu nivel en tiempo real. Ya puedes
+                    fijar tu objetivo y empezar.
+                  </span>
+                  <button
+                    type="button"
+                    className="academy-submit"
+                    onClick={closeFlow}
+                  >
+                    Listo
+                  </button>
+                </div>
+              ) : placementItem ? (
+                <>
+                  <p className="academy-flow-desc">
+                    Pregunta {placementAnswered + 1} · se ajusta a tu nivel
+                  </p>
+                  <div className="academy-question">
+                    <p>{placementItem.prompt}</p>
+                    <div className="academy-options">
+                      {placementItem.options.map((opt, i) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          className={
+                            placementAnswers[placementItem.id] === i
+                              ? "selected"
+                              : ""
+                          }
+                          onClick={() => choosePlacement(i)}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                )
-              }
-            />
+                  <button
+                    type="button"
+                    className="academy-submit"
+                    onClick={submitPlacementAnswer}
+                    disabled={busy || !(placementItem.id in placementAnswers)}
+                  >
+                    {busy ? "Comprobando…" : "Siguiente"}
+                  </button>
+                </>
+              ) : (
+                <p className="academy-empty">Cargando…</p>
+              )}
+            </div>
           )}
 
           {flow === "exam" && (

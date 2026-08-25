@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   completeLesson,
+  getGoal,
   getLevels,
+  getSession,
+  nextAdaptivePlacement,
+  putGoal,
   recordAttempts,
+  startAdaptivePlacement,
   submitExam,
   submitObjectiveAssessment,
   submitPlacement,
@@ -39,6 +44,84 @@ describe("academy api", () => {
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
     expect(url).toBe("/api/academy/placement/submit?user_id=u1");
     expect(body).toEqual({ answers: { "pl-01": 0 } });
+  });
+
+  it("startAdaptivePlacement llama a placement/start", async () => {
+    const fn = mockJsonFetch({
+      session_id: 7,
+      next_item: null,
+      placement_version: "v2",
+    });
+    await startAdaptivePlacement("u1");
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    expect(url).toBe("/api/academy/placement/start?user_id=u1");
+    expect(method).toBe("POST");
+  });
+
+  it("nextAdaptivePlacement envía answers y session_id", async () => {
+    const fn = mockJsonFetch({
+      session_id: 7,
+      next_item: null,
+      theta: 0,
+      standard_error: null,
+      answered: 1,
+      done: true,
+      result: null,
+    });
+    await nextAdaptivePlacement("u1", { "pl-01": 0 }, 7);
+    const url = fn.mock.calls[0][0] as string;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/placement/next?user_id=u1");
+    expect(body).toEqual({ answers: { "pl-01": 0 }, session_id: 7 });
+  });
+
+  it("getGoal llama al endpoint goal", async () => {
+    const fn = mockJsonFetch({
+      goal_type: "general",
+      minutes_per_day: 15,
+      days_per_week: 5,
+      target_level: "B1",
+    });
+    await getGoal("u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/goal?user_id=u1");
+  });
+
+  it("getSession llama al endpoint session", async () => {
+    const fn = mockJsonFetch({
+      items: [],
+      total_minutes: 15,
+      review_count: 2,
+      practice_count: 1,
+    });
+    await getSession("u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/session?user_id=u1");
+  });
+
+  it("putGoal envía el objetivo con PUT", async () => {
+    const fn = mockJsonFetch({
+      goal_type: "travel",
+      minutes_per_day: 20,
+      days_per_week: 6,
+      target_level: "B2",
+    });
+    await putGoal("u1", {
+      goal_type: "travel",
+      minutes_per_day: 20,
+      days_per_week: 6,
+      target_level: "B2",
+    });
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/goal?user_id=u1");
+    expect(method).toBe("PUT");
+    expect(body).toEqual({
+      goal_type: "travel",
+      minutes_per_day: 20,
+      days_per_week: 6,
+      target_level: "B2",
+    });
   });
 
   it("recordAttempts envía level/objective y results", async () => {

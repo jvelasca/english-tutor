@@ -410,6 +410,22 @@ export interface PlacementResult {
   correct: number;
 }
 
+export interface PlacementStart {
+  session_id: number;
+  next_item: PlacementItem | null;
+  placement_version: string;
+}
+
+export interface PlacementAdaptive {
+  session_id: number | null;
+  next_item: PlacementItem | null;
+  theta: number;
+  standard_error: number | null;
+  answered: number;
+  done: boolean;
+  result: PlacementResult | null;
+}
+
 export interface ExamItem {
   id: string;
   skill: string;
@@ -493,4 +509,105 @@ export interface ObjectiveAssessmentResult {
   total: number;
   skills: Record<string, ObjectiveSkillResult>;
   mastery: Record<string, number>;
+}
+
+// --- Student Model 2.0 (núcleo adaptativo) ---
+
+export interface SkillProfile {
+  skill: string;
+  score: number;
+  confidence: number;
+  evidence_count: number;
+  last_evidence: string;
+  review_due: boolean;
+  stability: number;
+  trend: number | null;
+  subskills: Record<string, unknown>[];
+}
+
+export interface ReadinessSkill {
+  skill: string;
+  score: number;
+  confidence: number;
+  evidence_count: number;
+  minimum: number;
+  ready: boolean;
+}
+
+export interface Readiness {
+  target_level: string;
+  skills: ReadinessSkill[];
+  overall: number;
+  blocking_skills: string[];
+  ready: boolean;
+}
+
+export interface Reassessment {
+  skill: string;
+  level: string;
+  reason: string;
+}
+
+export interface StudentModel {
+  level_id: string;
+  current_level: string;
+  estimated_level: string;
+  estimated_numeric: number;
+  confidence: number;
+  target_level: string;
+  skills: SkillProfile[];
+  critical_skills: string[];
+  readiness: Readiness;
+  reassessment: Reassessment | null;
+}
+
+export interface TodayItem {
+  kind: string;
+  skill: string | null;
+  objective_id: string | null;
+  title: string;
+  reason: string;
+  minutes: number;
+}
+
+export interface TodayPlan {
+  items: TodayItem[];
+  total_minutes: number;
+}
+
+// --- Session Engine (sesión diaria accionable) ---
+
+export interface SessionStep {
+  kind: string;
+  skill: string | null;
+  subskill: string | null;
+  objective_id: string | null;
+  level_id: string | null;
+  skills: string[];
+  title: string;
+  reason: string;
+  minutes: number;
+}
+
+export interface Session {
+  items: SessionStep[];
+  total_minutes: number;
+  review_count: number;
+  practice_count: number;
+}
+
+// --- Objetivo personal de aprendizaje ---
+
+export type LearningGoalType =
+  | "general"
+  | "travel"
+  | "work"
+  | "interview"
+  | "exam";
+
+export interface LearningGoal {
+  goal_type: LearningGoalType;
+  minutes_per_day: number;
+  days_per_week: number;
+  target_level: EstimatedLevel;
 }

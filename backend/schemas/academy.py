@@ -360,6 +360,8 @@ class SkillProfileOut(BaseModel):
     evidence_count: int
     last_evidence: str
     review_due: bool
+    stability: float = 0.0
+    trend: float | None = None
     subskills: list[dict] = Field(default_factory=list)
 
 
@@ -369,6 +371,75 @@ class CefrProfileOut(BaseModel):
     overall: float
     skills: list[SkillProfileOut]
     critical_skills: list[str] = Field(default_factory=list)
+
+
+class ReadinessSkillOut(BaseModel):
+    skill: str
+    score: float
+    confidence: float
+    evidence_count: int
+    minimum: float
+    ready: bool
+
+
+class ReadinessOut(BaseModel):
+    target_level: str
+    skills: list[ReadinessSkillOut]
+    overall: float
+    blocking_skills: list[str]
+    ready: bool
+
+
+class ReassessmentOut(BaseModel):
+    skill: str
+    level: str
+    reason: str
+
+
+class StudentModelOut(BaseModel):
+    level_id: str
+    current_level: str
+    estimated_level: str
+    estimated_numeric: float
+    confidence: float
+    target_level: str
+    skills: list[SkillProfileOut]
+    critical_skills: list[str] = Field(default_factory=list)
+    readiness: ReadinessOut
+    reassessment: ReassessmentOut | None = None
+
+
+class TodayItemOut(BaseModel):
+    kind: str
+    skill: str | None = None
+    objective_id: str | None = None
+    title: str
+    reason: str
+    minutes: int
+
+
+class TodayPlanOut(BaseModel):
+    items: list[TodayItemOut]
+    total_minutes: int
+
+
+class SessionStepOut(BaseModel):
+    kind: str
+    skill: str | None = None
+    subskill: str | None = None
+    objective_id: str | None = None
+    level_id: str | None = None
+    skills: list[str] = Field(default_factory=list)
+    title: str
+    reason: str
+    minutes: int
+
+
+class SessionOut(BaseModel):
+    items: list[SessionStepOut]
+    total_minutes: int
+    review_count: int
+    practice_count: int
 
 
 class RemediationSkillOut(BaseModel):
@@ -432,3 +503,23 @@ class PronunciationResultOut(BaseModel):
     overall: float
     criteria: dict[str, float]
     pronunciation_mastery: float
+
+
+# --- Objetivo personal de aprendizaje -------------------------------------
+
+GoalType = Literal["general", "travel", "work", "interview", "exam"]
+CefrLevel = Literal["A1", "A2", "B1", "B2", "C1", "C2"]
+
+
+class LearningGoalIn(BaseModel):
+    goal_type: GoalType = "general"
+    minutes_per_day: int = Field(default=15, ge=5, le=180)
+    days_per_week: int = Field(default=5, ge=1, le=7)
+    target_level: CefrLevel = "B1"
+
+
+class LearningGoalOut(BaseModel):
+    goal_type: str
+    minutes_per_day: int
+    days_per_week: int
+    target_level: str

@@ -572,3 +572,45 @@ def set_placement_calibration_estimates(
             (estimated_difficulty, standard_error, discrimination, item_id),
         )
     return cur.rowcount > 0
+
+
+# --- Objetivo personal de aprendizaje -------------------------------------
+
+
+def get_goal(user_id: str) -> dict | None:
+    """Objetivo personal del usuario (tipo, minutos/día, días/semana y meta CEFR),
+    o None si aún no lo ha configurado."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT goal_type, minutes_per_day, days_per_week, target_level "
+            "FROM learning_goal WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def upsert_goal(
+    user_id: str,
+    goal_type: str,
+    minutes_per_day: int,
+    days_per_week: int,
+    target_level: str,
+) -> bool:
+    """Crea o actualiza el objetivo personal del usuario. False si no existe."""
+    if get_user(user_id) is None:
+        return False
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO learning_goal "
+            "(user_id, goal_type, minutes_per_day, days_per_week, target_level, "
+            "updated_at) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET "
+            "goal_type = excluded.goal_type, "
+            "minutes_per_day = excluded.minutes_per_day, "
+            "days_per_week = excluded.days_per_week, "
+            "target_level = excluded.target_level, "
+            "updated_at = excluded.updated_at",
+            (user_id, goal_type, minutes_per_day, days_per_week, target_level, now),
+        )
+    return True

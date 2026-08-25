@@ -3644,3 +3644,375 @@ body.is-resizing {
   font-weight: 600;
   margin: var(--space-2) 0 0;
 }
+
+/* ==========================================================================
+   Today's Plan (Student Model 2.0)
+   ========================================================================== */
+
+.today-plan {
+  margin: var(--space-2) 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.today-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.today-total {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.session-headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-accent-ring);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+
+.session-headline strong {
+  font-size: var(--text-lg);
+  color: var(--color-accent);
+}
+
+.session-headline span {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.today-milestone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.today-arrow {
+  color: var(--color-text-dim);
+}
+
+.today-milestone-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin-left: auto;
+}
+
+.today-readiness {
+  margin-bottom: var(--space-3);
+}
+
+.today-readiness-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.today-readiness-head strong {
+  color: var(--color-text);
+}
+
+.today-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.today-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.today-blocking {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+
+.today-skills {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.today-skill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  margin-bottom: var(--space-1);
+}
+
+.today-skill-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-dim);
+  font-size: var(--text-xs);
+}
+
+.today-skill-stability {
+  color: var(--color-text-faint);
+}
+
+.trend-up {
+  color: var(--color-success);
+}
+
+.trend-down {
+  color: var(--color-error);
+}
+
+.today-reassessment {
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-accent-ring);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+}
+
+.today-items {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.today-item {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.today-item-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.today-item-action:hover {
+  border-color: var(--color-accent);
+}
+
+.today-item-action:disabled {
+  cursor: default;
+}
+
+.today-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--color-text-faint);
+}
+
+.today-dot.kind-weakness {
+  background: var(--color-error);
+}
+
+.today-dot.kind-review {
+  background: var(--color-warning);
+}
+
+.today-dot.kind-new {
+  background: var(--color-accent);
+}
+
+.today-dot.kind-easy_wins {
+  background: var(--color-success);
+}
+
+.today-dot.kind-listening {
+  background: #8b5cf6;
+}
+
+.today-item-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.today-item-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-item-reason {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.today-item-kind {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.today-item-minutes {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.today-start {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.today-start:hover {
+  background: var(--color-accent-hover);
+}
+
+.goal-editor {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+
+.goal-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.goal-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.goal-summary-text strong {
+  font-size: var(--text-sm);
+}
+
+.goal-summary-text span {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.goal-summary button {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.goal-summary button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.goal-saved {
+  font-size: var(--text-xs);
+  color: var(--color-success);
+  white-space: nowrap;
+}
+
+.goal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.goal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.goal-field select,
+.goal-field input {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.goal-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.goal-row .goal-field {
+  flex: 1;
+}
+
+.goal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.goal-actions button {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.goal-actions button.goal-save {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.goal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

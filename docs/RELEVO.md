@@ -3,55 +3,43 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-25 10:16 (UTC+2).
+> Actualizado por última vez: 2026-08-25 19:26 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.5.2` publicada. Cerradas: Release Audit 1.1 (M12), Etapa 2
-(P1–P2), M14 (GUI responsive + personalización), M15 (Launcher), **Academy v2 con integridad
-curricular (v1.2.1)**, **M16 — Apariencia configurable + Ayuda + progresión de listening**,
-**hardening v1.2.2**, y el bloque **Evidence & Performance + Listening + Placement (V1.3/V1.4/V1.5)**:
-Speaking/Writing/Pronunciation Evidence Engine, CEFR Skill Profile, remediación adaptativa,
-modelo de olvido, Listening Engine (sub-destrezas + diagnóstico) y Placement adaptativo IRT-lite.
-Últimos commits:
-- `feat: V1.5 - Placement Engine adaptativo (IRT-lite: theta + seleccion de item + endpoint /placement/next)`
-- `feat: V1.3 - Pronunciacion fonemica (grapheme->phoneme + puente pronunciation->mastery)`
-- `feat: V1.3 - Listening Engine (sub-destrezas + diagnostico adaptativo + panel Listening Lab)`
-- `feat: V1.3 - Writing Evidence Engine (scorer determinista + LLM + mastery, mismo patron que Speaking)`
-- `feat: V1.4 - modelo de olvido (repeticion espaciada: retrieval_probability y review_due real)`
+**Posición actual (2026-08-25):** `v1.7.0` publicada. Cerradas hasta ahora: Release Audit 1.1
+(M12), M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
+Listening 1.0/2.0, Placement 1.0 (IRT-lite) y **Placement 2.0** (calibración observacional +
+perfil multiskill). Etapa 2 (pedagogía): **P1** y **P2** hechos; **P3–P6** pendientes.
 
-**Estado verde:** backend `406 tests` + `ruff` limpio; frontend `137 tests` + `tsc`/`build` OK;
+**Últimos commits publicados:**
+- `release: v1.7.0 - Placement 2.0 (calibracion observacional + perfil multiskill)`
+- `release: v1.6.0 - Listening 2.0 + cierre de P1 (critical_skills y E2E regression)`
+- `release: v1.5.3 - Hardening (validez y trazabilidad)`
+- `release: v1.5.2 - Quality & Validity`
+
+**⚠️ TRABAJO SIN COMMITEAR (núcleo del loop diario — Sesión diaria):** ver sección 20. Es el
+incremento en curso y NO está versionado. Resumen:
+- **Placement adaptativo cableado a la UI** (`Academy.tsx` usa `/placement/start` + `/placement/next`).
+- **Objetivo personal editable** (tabla `learning_goal`, endpoints `GET/PUT /api/academy/goal`,
+  editor en `TodayPlan.tsx`).
+- **Session Engine** (`services/adaptive.py::session_plan`/`session_summary` + endpoint
+  `GET /api/academy/session`): unifica review/listening/debilidad/nuevo/refuerzo en una secuencia
+  priorizada con presupuesto del objetivo.
+- **Cada paso enruta a su actividad** (`App.tsx::handleSessionStep`) y **la sesión se refresca
+  al completar** (prop `refreshKey` en `TodayPlan.tsx`).
+
+**Estado verde:** backend `525 tests` + `ruff` limpio; frontend `142 tests` + `tsc` OK;
 launcher `33 tests` + `ruff` limpio.
-
-**Entregables recientes:**
-- **Integridad curricular (v1.2.1):** gating por nivel CEFR en `enroll()`/`submit_exam()`,
-  renombrado `certificates` → `level_completions` (tabla + endpoint + esquemas + UI), y estado
-  `unlocked` expuesto en el listado de niveles.
-- **M16 — Apariencia configurable por usuario:** botón de herramientas (gear) con tema claro/oscuro,
-  acento (7 colores), tamaño de letra y densidad; persistido por usuario (`settings` + `localStorage`).
-- **M16 — Ayuda:** botón `?` con HelpDialog en lenguaje llano, enlazado a `docs/` (sin duplicar textos).
-- **Listening con progresión:** `pick_next_question` avanza A1→A2→B1 por dominio de preguntas (fix del
-  bug de "se queda en 12 aciertos"); stats exponen `level`/`completed`/`levels` y script de verificación
-  `backend/scripts/listening_check.py`.
-
-**Entregable nuevo (Etapa 2):** plan en `docs/PLAN-ETAPA-PEDAGOGICA.md`. Hechos:
-- **P1** política pedagógica formal (`services/policy.py::feedback_policy`, integrada siempre en
-  `build_system_prompt`).
-- **P2** error mastery: `grammar_errors` con `first_seen`/`correct_after`/`streak`/`mastered`,
-  evidencia positiva (`services/grammar.py::find_correct_usage` para `he_she_it_s` y `to_too`),
-  perfil separa activos/dominados, y `classify_errors` trata `mastered` como resuelto.
-
-**Siguiente paso:** continuar la Etapa 2 con **P3** (vocabulario exposure/production/mastery),
-luego **P4** (listening como competencia), **P5** (CEFR basado en evidencia) y **P6**
-(pronunciación fonémica). Ver tabla en `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
-3. Leer las secciones 10–17 de este documento (estado de Fases 1–10 y arquitectura resultante).
-4. Redactar y ejecutar `agentes/pedagogia/p3-*.md` (un subagente a la vez), respetando la
+2. Leer la **sección 20** de este documento (trabajo sin commitear — loop diario).
+3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
+4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P3–P6.
+5. Redactar y ejecutar `agentes/pedagogia/p3-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
-5. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
+6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
 
 ## 1. Qué es el proyecto
@@ -821,3 +809,80 @@ con iconos en la UI y más información en paneles colapsables.
 > Nota de arranque en red: el frontend (Vite) ahora escucha en `0.0.0.0` (`vite.config.ts`
 > `host: true`), igual que el backend, para que la app sea accesible desde otros equipos de la
 > LAN (antes solo respondía `localhost` y el puerto 5173 no era alcanzable).
+
+## 20. EN CURSO (sin commitear) — Loop diario: placement adaptativo + objetivo + Session Engine
+
+> **Origen.** Auditoría pedagógica: faltaba un "loop diario" integrado. Este bloque cierra ese
+> hueco cableando a la UI el placement adaptativo ya existente en backend, añadiendo un objetivo
+> personal editable y un **Session Engine** que unifica las señales CEFR y de listening en una
+> sesión diaria priorizada. TODO ESTO ESTÁ SIN COMMITEAR (working tree).
+
+### 20.1 Placement adaptativo cableado a la UI
+- `frontend/src/components/Academy.tsx`: el placement pasó de batch (`getPlacement` +
+  `submitPlacement`) a adaptativo (`startAdaptivePlacement` + `nextAdaptivePlacement`), con
+  estado `placementItem`/`placementSessionId`/`placementAnswers`/`placementAnswered`.
+- `frontend/src/api/academy.ts`: `startAdaptivePlacement`, `nextAdaptivePlacement`.
+- `frontend/src/types/api.ts`: `PlacementStart`, `PlacementAdaptive`.
+
+### 20.2 Objetivo personal editable
+- **DB** (`backend/repositories/db.py`): tabla `learning_goal`
+  (`user_id PK, goal_type, minutes_per_day, days_per_week, target_level, updated_at`, FK a users).
+- **Repo** (`backend/repositories/academy.py`): `get_goal`, `upsert_goal`.
+- **Schemas** (`backend/schemas/academy.py`): `LearningGoalIn` (`GoalType` literal, minutos 5–180,
+  días 1–7, `target_level` CEFR), `LearningGoalOut`.
+- **Domain** (`backend/domain/academy.py`): `DEFAULT_GOAL`, `get_learning_goal`, `set_learning_goal`;
+  `get_today_plan` y `get_student_model` usan el objetivo (`minutes_per_day` y `target_level`).
+- **Routers** (`backend/routers/academy.py`): `GET/PUT /api/academy/goal`.
+- **Frontend**: `getGoal`/`putGoal` en `api/academy.ts`; editor de objetivo (tipo, meta CEFR,
+  min/día, días/semana) en `components/TodayPlan.tsx`, con `putGoal` + recarga de modelo/sesión.
+- **Tests**: `backend/tests/test_academy_goal.py` (repo + endpoints); `frontend/src/api/academy.test.ts`.
+
+### 20.3 Session Engine (backend puro)
+- `backend/services/adaptive.py`:
+  - Refactor `_assign_minutes(items, budget, mix=None)` para repartir minutos con un `mix` por
+    categoría (antes pesos fijos).
+  - `SESSION_MIX` = `{review: .30, listening: .15, weakness: .30, new: .15, easy_wins: .10}`.
+  - `SESSION_CAPS` = `{review: 3, listening: 2, weakness: 2, new: 1, easy_wins: 1}`.
+  - `session_plan(profile, level, remediation, mastered_ids, next_objective_id, listening_weak,
+    budget_minutes)`: secuencia priorizada review → listening → debilidad → nuevo → refuerzo,
+    con `level_id` y `skills` en los pasos con objetivo (para arrancar la lección).
+  - `steps_of(steps, kind)` y `session_summary(steps)` → `{review_count, practice_count}`.
+- `backend/schemas/academy.py`: `SessionStepOut` (`kind, skill, subskill, objective_id, level_id,
+  skills, title, reason, minutes`) y `SessionOut` (`items, total_minutes, review_count,
+  practice_count`).
+- `backend/domain/academy.py`: `get_session(user_id)` une el perfil CEFR (`list_objective_mastery`,
+  `mastered_objective_ids`, `remediation_plan`, `recommend_next`) con el diagnóstico de listening
+  (`listening_repo.list_attempts` + `listening_diagnostic`) y llama a `session_plan` con el
+  presupuesto del objetivo.
+- `backend/routers/academy.py`: `GET /api/academy/session`.
+- **Tests**: `backend/tests/test_adaptive.py` (session_plan/session_summary, pasos con
+  level_id/skills) + `test_academy_goal.py` (endpoint session).
+
+### 20.4 Frontend: sesión en "Hoy" + enrutado por paso
+- `frontend/src/types/api.ts`: `SessionStep`, `Session`, `LearningGoal`, `LearningGoalType`.
+- `frontend/src/api/academy.ts`: `getSession`.
+- `frontend/src/components/TodayPlan.tsx`:
+  - Muestra `Session` (no `TodayPlan`): cabecera `total_minutes` + "repasa N · practica M" y
+    lista `SessionStepRow` (botón accionable) con `KIND_LABELS`/`SUBSKILL_LABELS`/`SKILL_LABELS`.
+  - Botón "Empezar la sesión de hoy" lanza el primer paso.
+  - Nueva prop `refreshKey` que recarga modelo+sesión al cambiar (para reflejar pasos completados).
+- `frontend/src/App.tsx`:
+  - `handleSessionStep(step)`: listening → abre insights + scroll a `#listening-practice`;
+    objetivo → `startLesson(...)`; skill → cambia `mode` vía `SKILL_MODE`.
+  - `sessionVersion` state: `onAttempt` y "Terminar lección" lo incrementan; se pasa como
+    `refreshKey` a `TodayPlan` para que el paso completado desaparezca al recargar la sesión.
+- `frontend/src/index.css`: estilos `.goal-editor`, `.session-headline`, `.today-item-action`
+  (botón de paso), `.kind-listening`.
+
+### 20.5 Pendiente / siguiente incremento natural
+- **Marcar pasos completados de forma explícita**: hoy el refresco se dispara con `onAttempt` y
+  al terminar lección; los pasos `review`/`easy_wins` (que solo cambian de modo) aún no persisten
+  un "hecho". Opción: registrar un evento/estado por paso y filtrarlo en `session_plan`.
+- **P3–P6 de Etapa 2** (vocabulario, listening competencia, CEFR evidencia, pronunciación fonémica):
+  ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+### Verificación rápida del estado sin commitear
+```powershell
+cd backend && .venv\Scripts\python.exe -m pytest -q && .venv\Scripts\python.exe -m ruff check .
+cd frontend && npx tsc --noEmit && npx vitest run
+```

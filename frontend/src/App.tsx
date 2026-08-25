@@ -16,9 +16,11 @@ import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { Sidebar } from "./components/Sidebar";
+import { TodayPlan } from "./components/TodayPlan";
 import { TutorQualityPanel } from "./components/TutorQualityPanel";
 import { UserMenu } from "./components/UserMenu";
 import { clampRight, clampSidebar } from "./utils/layout";
+import type { SessionStep, TutorMode } from "./types/api";
 
 const SUGGESTIONS = [
   "Let's have a conversation. Ask me anything!",
@@ -74,6 +76,7 @@ export default function App() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [view, setView] = useState<AppView>("chat");
+  const [sessionVersion, setSessionVersion] = useState(0);
 
   const closeSidebar = () => setSidebarOpen(false);
   const closeInsights = () => setInsightsOpen(false);
@@ -97,11 +100,41 @@ export default function App() {
   const onAttempt = () => {
     refreshHistory();
     refreshEvents();
+    setSessionVersion((v) => v + 1);
   };
 
   const handleSelectMode = (next: typeof mode) => {
     selectMode(next);
     setView("chat");
+  };
+
+  const SKILL_MODE: Record<string, TutorMode> = {
+    grammar: "grammar",
+    vocabulary: "conversation",
+    speaking: "conversation",
+    writing: "conversation",
+    reading: "conversation",
+    pronunciation: "pronunciation",
+    listening: "conversation",
+  };
+
+  const handleSessionStep = (step: SessionStep) => {
+    setView("chat");
+    if (step.kind === "listening") {
+      setInsightsOpen(true);
+      requestAnimationFrame(() => {
+        document
+          .getElementById("listening-practice")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return;
+    }
+    if (step.objective_id && step.level_id) {
+      startLesson(step.objective_id, step.title, step.level_id, step.skills);
+      return;
+    }
+    const nextMode = step.skill ? SKILL_MODE[step.skill] : undefined;
+    if (nextMode) selectMode(nextMode);
   };
 
   return (
@@ -263,6 +296,7 @@ export default function App() {
                     type="button"
                     onClick={async () => {
                       await completeLesson();
+                      setSessionVersion((v) => v + 1);
                       setView("academy");
                     }}
                     aria-label="Terminar la lección"
@@ -366,9 +400,16 @@ export default function App() {
               bucket={bucket}
               onBucketChange={setBucket}
             />
+            <TodayPlan
+              userId={currentUserId}
+              onStep={handleSessionStep}
+              refreshKey={sessionVersion}
+            />
             <LearningProfile profile={profile} />
             <TutorQualityPanel messages={messages} />
-            <ListeningPractice userId={currentUserId} onAttempt={onAttempt} />
+            <div id="listening-practice">
+              <ListeningPractice userId={currentUserId} onAttempt={onAttempt} />
+            </div>
           </div>
         </aside>
         <button

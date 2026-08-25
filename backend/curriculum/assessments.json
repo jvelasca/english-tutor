@@ -276,13 +276,105 @@
           "correct_index": 0
         }
       ]
+    },
+    "b1": {
+      "id": "b1-final",
+      "title": "B1 Final Assessment",
+      "min_per_skill": 0.75,
+      "skills": ["grammar", "vocabulary", "reading", "listening"],
+      "items": [
+        {
+          "id": "b1f-01",
+          "skill": "grammar",
+          "prompt": "Choose the correct sentence:",
+          "options": ["I have lived here since five years.", "I have lived here for five years.", "I live here since five years."],
+          "correct_index": 1
+        },
+        {
+          "id": "b1f-02",
+          "skill": "grammar",
+          "prompt": "Choose the correct sentence:",
+          "options": ["If it will rain, we cancel the picnic.", "If it rains, we will cancel the picnic.", "If it rains, we cancel the picnic."],
+          "correct_index": 1
+        },
+        {
+          "id": "b1f-03",
+          "skill": "grammar",
+          "prompt": "Choose the sentence that means smoking is not allowed:",
+          "options": ["You don't have to smoke here.", "You mustn't smoke here.", "You must not to smoke here."],
+          "correct_index": 1
+        },
+        {
+          "id": "b1f-04",
+          "skill": "vocabulary",
+          "prompt": "Which word means 'de acuerdo'?",
+          "options": ["agree", "argue", "avoid"],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-05",
+          "skill": "vocabulary",
+          "prompt": "Which word is the informal form of 'going to'?",
+          "options": ["gonna", "gotta", "wanna"],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-06",
+          "skill": "vocabulary",
+          "prompt": "Which phrase introduces a personal opinion?",
+          "options": ["In my opinion", "By the way", "At last"],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-07",
+          "skill": "reading",
+          "prompt": "Read: 'Although the journey was long, they enjoyed every minute of it.' What does the sentence mean?",
+          "options": ["They enjoyed the journey despite its length.", "They hated the journey.", "The journey was short."],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-08",
+          "skill": "reading",
+          "prompt": "Read: 'She had never seen the ocean until she moved to the coast.' What happened?",
+          "options": ["She saw the ocean for the first time after moving.", "She saw the ocean before moving.", "She never moved."],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-09",
+          "skill": "reading",
+          "prompt": "Read: 'Unless we book in advance, we won't find a table.' What should they do?",
+          "options": ["Book in advance.", "Not book.", "Arrive late."],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-10",
+          "skill": "listening",
+          "prompt": "You hear: 'I'd rather stay in tonight.' What does the speaker prefer?",
+          "options": ["To stay at home", "To go out", "To travel"],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-11",
+          "skill": "listening",
+          "prompt": "You hear: 'Whaddaya think about the plan?' What does 'whaddaya' mean?",
+          "options": ["what do you", "what did you", "where do you"],
+          "correct_index": 0
+        },
+        {
+          "id": "b1f-12",
+          "skill": "listening",
+          "prompt": "You hear: 'The meeting's been put off until Friday.' What happened?",
+          "options": ["The meeting was postponed.", "The meeting started.", "The meeting was cancelled."],
+          "correct_index": 0
+        }
+      ]
     }
   },
   "remediation": {
-    "grammar": ["a1-m02-u01-l01-o03", "a1-m08-u01-l01-o01", "a1-m03-u01-l02-o01"],
-    "vocabulary": ["a1-m01-u01-l02-o02", "a1-m03-u01-l01-o01", "a1-m05-u01-l01-o01"],
-    "reading": ["a1-m01-u01-l01-o01", "a1-m07-u01-l01-o01"],
-    "listening": ["a1-m01-u01-l02-o02", "a1-m04-u01-l01-o02", "a1-m07-u01-l01-o02"],
-    "speaking": ["a1-m01-u01-l01-o01", "a1-m05-u01-l01-o02", "a1-m09-u01-l01-o01"]
+    "grammar": ["a1-m02-u01-l01-o03", "a1-m08-u01-l01-o01", "a1-m03-u01-l02-o01", "b1-m01-u01-l01-o01", "b1-m02-u01-l01-o05", "b1-m02-u01-l02-o07"],
+    "vocabulary": ["a1-m01-u01-l02-o02", "a1-m03-u01-l01-o01", "a1-m05-u01-l01-o01", "b1-m01-u01-l02-o03", "b1-m01-u01-l01-o02", "b1-m03-u01-l01-o08"],
+    "reading": ["a1-m01-u01-l01-o01", "a1-m07-u01-l01-o01", "b1-m03-u01-l01-o09"],
+    "listening": ["a1-m01-u01-l02-o02", "a1-m04-u01-l01-o02", "a1-m07-u01-l01-o02", "b1-m03-u01-l01-o08", "b1-m03-u01-l01-o09"],
+    "speaking": ["a1-m01-u01-l01-o01", "a1-m05-u01-l01-o02", "a1-m09-u01-l01-o01", "b1-m01-u01-l02-o03", "b1-m02-u01-l01-o05", "b1-m02-u01-l02-o07"]
   }
 }

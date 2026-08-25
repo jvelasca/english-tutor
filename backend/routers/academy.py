@@ -15,6 +15,8 @@ from schemas.academy import (
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
+    LearningGoalIn,
+    LearningGoalOut,
     LessonCompletedOut,
     LessonCompleteRequest,
     LevelDetailOut,
@@ -25,13 +27,17 @@ from schemas.academy import (
     ObjectiveAssessmentRequest,
     PronunciationResultOut,
     PronunciationSubmitRequest,
+    ReadinessOut,
     RemediationPlanOut,
+    SessionOut,
     SpeakingResultOut,
     SpeakingSubmitRequest,
     SpeakingTaskResultOut,
     SpeakingTaskSubmitRequest,
+    StudentModelOut,
     StudyPlanOut,
     StudyPlanRequest,
+    TodayPlanOut,
     WritingResultOut,
     WritingSubmitRequest,
     WritingTaskResultOut,
@@ -116,6 +122,43 @@ async def remediation(level_id: str, user: dict = Depends(current_user)) -> dict
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel no encontrado")
     return out
+
+
+@router.get("/api/academy/student-model", response_model=StudentModelOut)
+async def student_model(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_student_model(user["id"])
+
+
+@router.get("/api/academy/readiness", response_model=ReadinessOut)
+async def readiness(
+    target_level: str = "B1", user: dict = Depends(current_user)
+) -> dict:
+    return await academy_service.get_readiness(user["id"], target_level)
+
+
+@router.get("/api/academy/today", response_model=TodayPlanOut)
+async def today(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_today_plan(user["id"])
+
+
+@router.get("/api/academy/session", response_model=SessionOut)
+async def session(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_session(user["id"])
+
+
+@router.get("/api/academy/goal", response_model=LearningGoalOut)
+async def get_goal(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_learning_goal(user["id"])
+
+
+@router.put("/api/academy/goal", response_model=LearningGoalOut)
+async def put_goal(
+    body: LearningGoalIn, user: dict = Depends(current_user)
+) -> dict:
+    goal = await academy_service.set_learning_goal(user["id"], body)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return goal
 
 
 @router.post("/api/academy/study-plan", response_model=StudyPlanOut)
