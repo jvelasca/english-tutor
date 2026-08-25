@@ -89,13 +89,17 @@ def objective_progress(
 ) -> dict:
     """Devuelve el desglose por destreza de un objetivo y si está dominado.
 
+    Solo se evalúan las destrezas con evidencia determinista
+    (`objective.assessable_skills()`); las destrezas de producción (speaking,
+    writing, pronunciation) no gatean el dominio hasta tener evidencia real.
+
     `skill_scores` mapea destreza → puntuación (0..1); `skill_attempts` mapea
     destreza → nº de evidencias. Una destreza se da por dominada solo si alcanza
     su umbral **y** acumula al menos `objective.minimum_attempts` evidencias (así
     un único acierto no marca el objetivo como dominado)."""
     skill_attempts = skill_attempts or {}
     skills = []
-    for skill in objective.skills:
+    for skill in objective.assessable_skills():
         score = skill_scores.get(skill, 0.0)
         attempts = skill_attempts.get(skill, 0)
         required = objective.threshold(skill)
@@ -294,7 +298,7 @@ def weakest_skill(
     totals: dict[str, list[float]] = defaultdict(list)
     for obj in level.objectives():
         scores = objective_scores.get(obj.id, {})
-        for skill in obj.skills:
+        for skill in obj.assessable_skills():
             totals[skill].append(scores.get(skill, 0.0))
     if not totals:
         return None
@@ -320,7 +324,8 @@ def adaptive_next(
     def key(oid: str) -> float:
         obj = objs[oid]
         scores = objective_scores.get(oid, {})
-        return min(scores.get(s, 0.0) for s in obj.skills)
+        assessable = obj.assessable_skills()
+        return min((scores.get(s, 0.0) for s in assessable), default=0.0)
 
     return min(unlocked, key=key)
 

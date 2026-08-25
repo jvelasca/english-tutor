@@ -4,6 +4,33 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.2.0] — 2026-08-25
+
+Academy curricular: A1/A2 funcional de extremo a extremo con mastery por objetivo y desbloqueo
+secuencial. Corrige el bloqueo pedagógico detectado en la auditoría: las destrezas de producción
+(speaking/writing/pronunciation) ya no impiden dominar un objetivo hasta que exista evidencia real
+de rendimiento.
+
+### Añadido
+- **Academy (curriculum CEFR)**: módulos/unidades/lecciones/objetivos `can_do` para A1 y A2, motor
+  de mastery determinista por `(user, level, objective, skill)`, `minimum_attempts` (evidencia
+  repetida), gating curricular secuencial y selección adaptativa del siguiente objetivo
+  (`adaptive_next`).
+- **Evaluación determinista**: checks de opción múltiple (`ObjectiveCheck`) para todos los objetivos
+  de A1/A2, cubriendo sus destrezas evaluables (grammar/vocabulary/reading/listening).
+- **Placement, examen final y certificados**: test de nivel CAT-lite, examen de nivel por destreza y
+  certificado de nivel con desbloqueo en cascada del siguiente nivel.
+- **Invariante de currículum** en tests: todo objetivo debe tener checks que cubran exactamente sus
+  destrezas evaluables (impide regresiones futuras).
+
+### Corregido
+- **Bloqueo de progresión**: `objective_progress` exigía dominio de *todas* las skills (incluido
+  speaking, sin vía de evidencia), por lo que ningún objetivo podía dominarse y el gating bloqueaba
+  toda la Academy. Ahora solo gatean las destrezas con evidencia determinista (`assessable_skills`),
+  dejando speaking/listening/writing como metas de rendimiento pendientes de un pipeline real.
+- **Semántica del examen**: el resultado pasa de "¡A1 superado!" a "Evaluación A1 superada",
+  explicitando que no mide producción oral/escrita.
+
 ## [1.1.1] — 2026-08-24
 
 Release Audit 1.1: corrección de los 6 puntos señalados por la auditoría externa antes de

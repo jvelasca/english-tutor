@@ -271,11 +271,15 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
                   >
                     <strong>
                       {examResult.passed
-                        ? "¡A1 superado!"
-                        : "Aún no superado"}
+                        ? "Evaluación A1 superada"
+                        : "Evaluación aún no superada"}
                     </strong>
                     <span>
                       Puntuación global {Math.round(examResult.overall * 100)}%
+                    </span>
+                    <span>
+                      Mide grammar, vocabulary, reading y listening (sin
+                      producción oral/escrita).
                     </span>
                     {examResult.failed_skills.length > 0 && (
                       <span>

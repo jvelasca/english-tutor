@@ -34,6 +34,36 @@
                       "instruction": "Tell the tutor about three things you did last year.",
                       "target": "Last year I went to ... / I saw ... / I had ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m01-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (Past Simple):",
+                      "options": ["Last year I went to France.", "Last year I go to France.", "Last year I going to France."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I saw a great film.", "I see a great film last night.", "I seeing a great film."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is the past of 'go'?",
+                      "options": ["went", "goed", "gone"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'hace un año'?",
+                      "options": ["last year", "next year", "this year"],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -49,6 +79,22 @@
                       "type": "dialogue",
                       "instruction": "Say two places you have visited and one thing you have never done.",
                       "target": "I have been to ... / I have never ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m01-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (Present Perfect):",
+                      "options": ["I have been to Italy.", "I have be to Italy.", "I has been to Italy."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She has never seen the sea.", "She have never seen the sea.", "She has never saw the sea."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -87,6 +133,36 @@
                       "instruction": "Compare your city with another city using two comparatives.",
                       "target": "My city is bigger than ... / more expensive than ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m02-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["My city is bigger than yours.", "My city is big than yours.", "My city is more big than yours."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["This film is more interesting than that one.", "This film is interestinger than that one.", "This film is more interesting that that one."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'más grande'?",
+                      "options": ["bigger", "smaller", "cheaper"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'más barato'?",
+                      "options": ["cheaper", "bigger", "more"],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -102,6 +178,36 @@
                       "type": "dialogue",
                       "instruction": "Say the best and the worst thing about your city.",
                       "target": "The best thing is ... / The worst thing is ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m02-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["This is the biggest city in the country.", "This is the most biggest city.", "This is bigger city in the country."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She is the most beautiful.", "She is the beautifulest.", "She is most beautiful the."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'el mejor'?",
+                      "options": ["the best", "the worst", "the biggest"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'el peor'?",
+                      "options": ["the worst", "the best", "the most"],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -140,6 +246,22 @@
                       "instruction": "Tell the tutor two things you are going to do next month.",
                       "target": "Next month I am going to ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m03-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["Next month I am going to start a course.", "Next month I am going start a course.", "Next month I going to start a course."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I plan to visit my family.", "I plan visit my family.", "I planning to visit my family."],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -155,6 +277,22 @@
                       "type": "dialogue",
                       "instruction": "Make one prediction about the weather and one spontaneous decision.",
                       "target": "I think it will ... / I will ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m03-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I think it will rain.", "I think it will rains.", "I think it rains will."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I will help you.", "I will helps you.", "I helping will you."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -193,6 +331,36 @@
                       "instruction": "Buy a train ticket from the tutor.",
                       "target": "Can I have a return ticket to ...?"
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m04-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'billete'?",
+                      "options": ["ticket", "train", "bus"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'aeropuerto'?",
+                      "options": ["airport", "station", "return"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-c03",
+                      "skill": "listening",
+                      "prompt": "Listen: 'How much is a return ticket to London?' What does he want?",
+                      "options": ["A return ticket", "A single ticket", "A bus"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-c04",
+                      "skill": "listening",
+                      "prompt": "Listen: 'The train leaves at ten.' What time does the train leave?",
+                      "options": ["At ten", "At nine", "At eleven"],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -208,6 +376,22 @@
                       "type": "dialogue",
                       "instruction": "Say two things you have to do before a trip.",
                       "target": "I have to ... / I mustn't ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m04-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I have to buy a ticket.", "I has to buy a ticket.", "I have buy a ticket."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["You mustn't smoke here.", "You mustn't to smoke here.", "You don't mustn't smoke here."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -246,6 +430,36 @@
                       "instruction": "Tell the tutor you feel ill and ask for advice.",
                       "target": "I have a headache. / You should rest."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m05-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'dolor de cabeza'?",
+                      "options": ["headache", "cold", "tired"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'cansado'?",
+                      "options": ["tired", "rest", "cold"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["You should rest.", "You should to rest.", "You should resting."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I have a cold.", "I has a cold.", "I am have a cold."],
+                      "correct_index": 0
+                    }
                   ]
                 }
               ]
@@ -282,6 +496,36 @@
                       "type": "dialogue",
                       "instruction": "Tell a short story about a trip or a funny day.",
                       "target": "First ... / Then ... / Finally ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m06-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct linking word: 'First, ___ after that, we went home.'",
+                      "options": ["then", "than", "that"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["We went to the beach and then we had lunch.", "We go to the beach and then we had lunch.", "We went to the beach and then we have lunch."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'de repente'?",
+                      "options": ["suddenly", "first", "finally"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'finalmente'?",
+                      "options": ["finally", "then", "after that"],
+                      "correct_index": 0
                     }
                   ]
                 }

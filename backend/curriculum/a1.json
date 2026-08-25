@@ -73,6 +73,36 @@
                       "instruction": "Ask the tutor three personal questions using What / Where.",
                       "target": "What is your name? / Where are you from?"
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m01-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct question:",
+                      "options": ["Where you are from?", "Where are you from?", "Where from you are?"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct question:",
+                      "options": ["What is your name?", "What your name is?", "What name your is?"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which question word do you use for a place?",
+                      "options": ["What", "Where", "Who"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o02-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'tu'?",
+                      "options": ["your", "my", "his"],
+                      "correct_index": 0
+                    }
                   ]
                 }
               ]
@@ -95,6 +125,36 @@
                       "type": "fill_gap",
                       "instruction": "Complete: 'I am ___ Spain. I am ___.'",
                       "target": "I am from Spain. I am Spanish."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m01-u01-l02-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a country?",
+                      "options": ["Spanish", "Spain", "Mexican"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m01-u01-l02-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "A person from France is...",
+                      "options": ["French", "France", "Spanish"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m01-u01-l02-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I am from England.", "I from England am.", "I am England from."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m01-u01-l02-o01-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She is Mexican.", "She mexican is.", "She are Mexican."],
+                      "correct_index": 0
                     }
                   ]
                 },
@@ -165,6 +225,36 @@
                       "instruction": "Describe a typical day to the tutor using the Present Simple.",
                       "target": "I get up at ... / I go to ... / I have breakfast at ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m02-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (Present Simple):",
+                      "options": ["I gets up at seven.", "I get up at seven.", "I getting up at seven."],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She have breakfast at eight.", "She has breakfast at eight.", "She having breakfast at eight."],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which verb means 'despertarse'?",
+                      "options": ["get up", "sleep", "go"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'almuerzo'?",
+                      "options": ["breakfast", "lunch", "dinner"],
+                      "correct_index": 1
+                    }
                   ]
                 },
                 {
@@ -181,6 +271,36 @@
                       "instruction": "Say what time you do two activities and on which day.",
                       "target": "I ... at ... on Monday."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m02-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a day of the week?",
+                      "options": ["January", "Monday", "morning"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a month?",
+                      "options": ["Sunday", "December", "evening"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o02-c03",
+                      "skill": "listening",
+                      "prompt": "Listen: 'quarter past eight'. What time is it?",
+                      "options": ["8:15", "8:30", "8:45"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o02-c04",
+                      "skill": "listening",
+                      "prompt": "Listen: 'It's half past three.' What time is it?",
+                      "options": ["3:00", "3:30", "4:30"],
+                      "correct_index": 1
+                    }
                   ]
                 },
                 {
@@ -196,6 +316,36 @@
                       "type": "dialogue",
                       "instruction": "Tell the tutor how often you do three activities.",
                       "target": "I always ... / I sometimes ... / I never ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m02-u01-l01-o03-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I always get up early.", "I get always up early.", "Always I get up early."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o03-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She never is late.", "She is never late.", "She is late never."],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'a veces'?",
+                      "options": ["always", "sometimes", "never"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o03-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'nunca'?",
+                      "options": ["usually", "often", "never"],
+                      "correct_index": 2
                     }
                   ]
                 }
@@ -234,6 +384,36 @@
                       "instruction": "Describe your family to the tutor using 'I have got'.",
                       "target": "I have got a brother. / My mother is ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m03-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a family member?",
+                      "options": ["sister", "table", "park"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'hermano'?",
+                      "options": ["mother", "brother", "daughter"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I have got a brother.", "I has got a brother.", "I am got a brother."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She have got two sons.", "She has got two sons.", "She having got two sons."],
+                      "correct_index": 1
+                    }
                   ]
                 },
                 {
@@ -249,6 +429,36 @@
                       "type": "dialogue",
                       "instruction": "Describe a friend using three adjectives.",
                       "target": "He/She is tall and friendly."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m03-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'alto'?",
+                      "options": ["short", "tall", "young"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'amable'?",
+                      "options": ["kind", "old", "happy"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o02-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["He is tall.", "He tall is.", "He are tall."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o02-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["They are friendly.", "They is friendly.", "They friendly are."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -272,6 +482,36 @@
                       "type": "fill_gap",
                       "instruction": "Complete: 'This is Maria and ___ brother.'",
                       "target": "This is Maria and her brother."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m03-u01-l02-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct word: 'This is Maria and ___ brother.'",
+                      "options": ["her", "his", "their"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m03-u01-l02-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct word: '___ name is John.' (él)",
+                      "options": ["His", "Her", "My"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m03-u01-l02-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'mi'?",
+                      "options": ["your", "my", "his"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m03-u01-l02-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'nuestro'?",
+                      "options": ["our", "their", "her"],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -309,6 +549,36 @@
                       "type": "dialogue",
                       "instruction": "Describe your home using 'There is / There are'.",
                       "target": "There is a kitchen. / There are two bedrooms."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m04-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a room of the house?",
+                      "options": ["kitchen", "garden", "door"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'dormitorio'?",
+                      "options": ["bathroom", "bedroom", "kitchen"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["There is a kitchen.", "There are a kitchen.", "There a kitchen is."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["There are two bedrooms.", "There is two bedrooms.", "There two bedrooms are."],
+                      "correct_index": 0
                     }
                   ]
                 },
@@ -386,6 +656,36 @@
                       "instruction": "Say what food and drink you like and don't like.",
                       "target": "I like ... / I don't like ..."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m05-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a drink?",
+                      "options": ["bread", "coffee", "cheese"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is fruit?",
+                      "options": ["rice", "apple", "milk"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I like apples.", "I likes apples.", "I liking apples."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I don't like coffee.", "I doesn't like coffee.", "I don't likes coffee."],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -401,6 +701,36 @@
                       "type": "dialogue",
                       "instruction": "Order a drink and a dish from the tutor.",
                       "target": "Can I have a coffee and some bread, please?"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m05-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'la cuenta'?",
+                      "options": ["menu", "bill", "please"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'algunos/algunas' (in positive sentences)?",
+                      "options": ["some", "any", "order"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o02-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["Can I have a coffee?", "Can I have a coffee please yes?", "I can have a coffee?"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o02-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I would like some bread.", "I would like a bread.", "I would some bread like."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -439,6 +769,36 @@
                       "instruction": "Ask the tutor the price of two items.",
                       "target": "How much is this?"
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m06-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'barato'?",
+                      "options": ["cheap", "expensive", "price"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'esto' (singular, near)?",
+                      "options": ["that", "this", "those"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct question:",
+                      "options": ["How much is this?", "How much this is?", "How many is this?"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct word: 'How much are ___ shoes?' (plural)",
+                      "options": ["this", "these", "that"],
+                      "correct_index": 1
+                    }
                   ]
                 },
                 {
@@ -454,6 +814,36 @@
                       "type": "fill_gap",
                       "instruction": "Compare two items: 'This shirt is ___ than that one.'",
                       "target": "This shirt is cheaper than that one."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m06-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is an item of clothing?",
+                      "options": ["shirt", "table", "car"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'zapatos'?",
+                      "options": ["hat", "shoes", "dress"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o02-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (comparative):",
+                      "options": ["This shirt is cheaper than that one.", "This shirt is cheap than that one.", "This shirt more cheap than that one."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o02-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["These shoes are bigger.", "These shoes is bigger.", "These shoes more bigger."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -492,6 +882,36 @@
                       "instruction": "Name three places near your home.",
                       "target": "There is a supermarket near my home."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m07-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is a place in town?",
+                      "options": ["bank", "bread", "shirt"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'estación'?",
+                      "options": ["station", "park", "school"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-c03",
+                      "skill": "listening",
+                      "prompt": "Listen: 'There is a supermarket near my home.' What is near his home?",
+                      "options": ["A supermarket", "A bank", "A hospital"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-c04",
+                      "skill": "listening",
+                      "prompt": "Listen: 'The hospital is next to the park.' Where is the hospital?",
+                      "options": ["Next to the park", "Next to the station", "Next to the school"],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -507,6 +927,36 @@
                       "type": "dialogue",
                       "instruction": "Ask the tutor how to get to the station and follow their directions.",
                       "target": "How do I get to the station? / Turn left ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m07-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct word: '___ left at the corner.'",
+                      "options": ["Turn", "Turns", "Turning"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct word: 'Go ___ ahead.'",
+                      "options": ["straight", "turn", "cross"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o02-c03",
+                      "skill": "listening",
+                      "prompt": "Listen: 'Turn right at the bank.' What do you do at the bank?",
+                      "options": ["Turn left", "Turn right", "Go straight"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o02-c04",
+                      "skill": "listening",
+                      "prompt": "Listen: 'The station is opposite the park.' Where is the station?",
+                      "options": ["Opposite the park", "Next to the park", "Behind the park"],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -545,6 +995,36 @@
                       "instruction": "Tell the tutor where you were yesterday.",
                       "target": "I was at home yesterday."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m08-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I was at home yesterday.", "I were at home yesterday.", "I am at home yesterday."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["They were at the park.", "They was at the park.", "They are at the park last week."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'ayer'?",
+                      "options": ["yesterday", "tomorrow", "today"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'la semana pasada'?",
+                      "options": ["last week", "next week", "this week"],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -560,6 +1040,36 @@
                       "type": "dialogue",
                       "instruction": "Say three things you did last week.",
                       "target": "I played ... / I visited ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m08-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (Past Simple):",
+                      "options": ["I played football yesterday.", "I play football yesterday.", "I playing football yesterday."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She visited her friend.", "She visit her friend yesterday.", "She visiting her friend."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is the past of 'work'?",
+                      "options": ["worked", "works", "working"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o02-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'vio (TV)'?",
+                      "options": ["watched", "watch", "watching"],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -598,6 +1108,36 @@
                       "instruction": "Tell the tutor two things you are going to do next week.",
                       "target": "I am going to ... next week."
                     }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m09-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I am going to travel next week.", "I am travel next week.", "I going to travel next week."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["She is going to study.", "She is going study.", "She going to study."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'mañana' (in the future)?",
+                      "options": ["tomorrow", "yesterday", "last week"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'la próxima semana'?",
+                      "options": ["next week", "last week", "this morning"],
+                      "correct_index": 0
+                    }
                   ]
                 },
                 {
@@ -613,6 +1153,36 @@
                       "type": "dialogue",
                       "instruction": "Invite the tutor to do something and accept an invitation.",
                       "target": "Would you like to go to the cinema?"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m09-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'fiesta'?",
+                      "options": ["party", "cinema", "invite"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'juntos'?",
+                      "options": ["together", "would", "invite"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o02-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["Would you like to go to the cinema?", "Do you would like to go to the cinema?", "Would you like go to the cinema?"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o02-c04",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["Let's have a party.", "Let's to have a party.", "Let's having a party."],
+                      "correct_index": 0
                     }
                   ]
                 }
@@ -650,6 +1220,50 @@
                       "type": "dialogue",
                       "instruction": "Have a short conversation with the tutor covering introductions, your routine and your plans.",
                       "target": "A1 level conversation"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a1-m10-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I am from Spain and I live in Madrid.", "I from Spain and I live in Madrid.", "I am from Spain and I lives in Madrid."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m10-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I was at school yesterday and I played football.", "I was at school yesterday and I play football.", "I am at school yesterday and I played football."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m10-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'trabajo'?",
+                      "options": ["job", "hobby", "name"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m10-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'ciudad'?",
+                      "options": ["city", "country", "name"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a1-m10-u01-l01-o01-c05",
+                      "skill": "listening",
+                      "prompt": "Listen: 'I get up at seven and I go to work at eight.' What time does he go to work?",
+                      "options": ["At seven", "At eight", "At nine"],
+                      "correct_index": 1
+                    },
+                    {
+                      "id": "a1-m10-u01-l01-o01-c06",
+                      "skill": "listening",
+                      "prompt": "Listen: 'My name is Ana. I am from Spain.' Where is Ana from?",
+                      "options": ["Spain", "England", "Mexico"],
+                      "correct_index": 0
                     }
                   ]
                 }

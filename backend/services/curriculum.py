@@ -29,6 +29,23 @@ CANONICAL_SKILLS: tuple[str, ...] = (
     "writing",
 )
 
+# Destrezas que el Mastery Engine puede evaluar con evidencia determinista
+# (ObjectiveCheck de opción múltiple). Solo estas gatean el dominio.
+ASSESSABLE_SKILLS: tuple[str, ...] = (
+    "grammar",
+    "vocabulary",
+    "reading",
+    "listening",
+)
+
+# Destrezas de producción que requieren evidencia de rendimiento (voz/texto),
+# aún no evaluadas automáticamente. No gatean el dominio por ahora.
+PERFORMANCE_SKILLS: tuple[str, ...] = (
+    "speaking",
+    "writing",
+    "pronunciation",
+)
+
 # Umbral por defecto para dominar una destreza de un objetivo (0..1).
 DEFAULT_THRESHOLD = 0.8
 
@@ -79,6 +96,12 @@ class Objective(BaseModel):
     def threshold(self, skill: str) -> float:
         """Umbral de dominio de una destreza (0..1); por defecto 0.8."""
         return self.thresholds.get(skill, DEFAULT_THRESHOLD)
+
+    def assessable_skills(self) -> list[str]:
+        """Destrezas que gatean el dominio: las que tienen al menos un check
+        determinista. Las destrezas de producción (speaking, writing,
+        pronunciation) no aparecen hasta que exista evidencia real de rendimiento."""
+        return list(dict.fromkeys(c.skill for c in self.checks))
 
 
 class Lesson(BaseModel):

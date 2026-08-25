@@ -11,7 +11,9 @@ from repositories import db
 from repositories import users as users_repo
 from services import academy as academy_svc
 from services.curriculum import (
+    ASSESSABLE_SKILLS,
     CANONICAL_SKILLS,
+    PERFORMANCE_SKILLS,
     load_assessments,
     load_level,
     next_level_id,
@@ -59,6 +61,24 @@ def test_a2_loads_reusing_same_schema():
     for o in lv.objectives():
         assert o.can_do.startswith("I can ")
         assert all(s in CANONICAL_SKILLS for s in o.skills)
+
+
+def test_every_objective_has_checks_for_its_assessable_skills():
+    """Invariante: cada objetivo debe tener checks que cubran exactamente sus
+    destrezas evaluables (grammar/vocabulary/reading/listening) y ninguno que
+    pretenda evaluar destrezas de performance (speaking/writing/pronunciation),
+    para las que aún no existe evidencia determinista."""
+    for level_id in ("a1", "a2"):
+        lv = load_level(level_id)
+        for o in lv.objectives():
+            assert o.checks, f"{level_id}: {o.id} no tiene checks"
+            check_skills = {c.skill for c in o.checks}
+            expected = set(o.skills) & set(ASSESSABLE_SKILLS)
+            assert check_skills == expected, (
+                f"{level_id}: {o.id} esperaba checks {expected} "
+                f"pero tiene {check_skills}"
+            )
+            assert not (check_skills & set(PERFORMANCE_SKILLS))
 
 
 # --- Mastery y progresión -------------------------------------------------
@@ -479,6 +499,27 @@ def test_endpoint_objective_assessment_updates_mastery(monkeypatch, tmp_path):
     assert body["correct"] == len(checks)
     # Una única evidencia perfecta aún no consolida dominio total.
     assert body["mastery"]["grammar"] == 0.8
+
+
+def test_endpoint_assessment_can_master_and_unlock_next(monkeypatch, tmp_path):
+    """Evidencia repetida sobre un objetivo lo domina y desbloquea el siguiente.
+
+    Antes de este cambio, speaking (sin check) impedía dominar ningún objetivo,
+    así que el gating bloqueaba toda la progresión en cadena."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    checks = {c.id: c.correct_index for c in obj.checks}
+    with TestClient(app) as client:
+        for _ in range(obj.minimum_attempts):
+            r = client.post(
+                "/api/academy/objective/assessment",
+                params={"user_id": a},
+                json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
+            )
+            assert r.status_code == 200
+        detail = client.get("/api/academy/levels/a1", params={"user_id": a}).json()
+    assert detail["objectives"][0]["status"] == "mastered"
+    assert detail["objectives"][1]["status"] == "available"
 
 
 def test_endpoint_lesson_complete(monkeypatch, tmp_path):
