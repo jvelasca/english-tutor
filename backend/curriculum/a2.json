@@ -24,7 +24,7 @@
                   "id": "a2-m01-u01-l01-o01",
                   "can_do": "I can describe past experiences and events.",
                   "title": "Experiencias pasadas",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["Past Simple (irregular verbs)", "I went", "I saw", "I had"],
                   "vocabulary": ["went", "saw", "had", "did", "last year", "ago"],
                   "activities": [
@@ -70,7 +70,7 @@
                   "id": "a2-m01-u01-l01-o02",
                   "can_do": "I can talk about life experiences using the present perfect.",
                   "title": "Present Perfect (introducción)",
-                  "skills": ["grammar", "speaking"],
+                  "skills": ["grammar", "speaking", "writing"],
                   "concepts": ["Present Perfect", "have/has + past participle", "ever", "never"],
                   "vocabulary": ["ever", "never", "been", "seen", "done"],
                   "activities": [
@@ -123,7 +123,7 @@
                   "id": "a2-m02-u01-l01-o01",
                   "can_do": "I can compare people, places and things.",
                   "title": "Comparativos",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["comparatives", "bigger than", "more interesting than"],
                   "vocabulary": ["bigger", "smaller", "cheaper", "more", "than"],
                   "activities": [
@@ -169,7 +169,7 @@
                   "id": "a2-m02-u01-l01-o02",
                   "can_do": "I can describe the best or worst of something.",
                   "title": "Superlativos",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["superlatives", "the biggest", "the most beautiful"],
                   "vocabulary": ["the best", "the worst", "the biggest", "the most"],
                   "activities": [
@@ -236,7 +236,7 @@
                   "id": "a2-m03-u01-l01-o01",
                   "can_do": "I can talk about plans and intentions.",
                   "title": "Planes e intenciones",
-                  "skills": ["grammar", "speaking"],
+                  "skills": ["grammar", "speaking", "writing"],
                   "concepts": ["going to + verb", "plan to", "hope to"],
                   "vocabulary": ["plan", "hope", "intend", "next month"],
                   "activities": [
@@ -268,7 +268,7 @@
                   "id": "a2-m03-u01-l01-o02",
                   "can_do": "I can make predictions and spontaneous decisions.",
                   "title": "Predicciones y decisiones",
-                  "skills": ["grammar", "speaking"],
+                  "skills": ["grammar", "speaking", "writing"],
                   "concepts": ["will + verb", "I think it will", "I will help"],
                   "vocabulary": ["will", "probably", "maybe", "soon"],
                   "activities": [
@@ -321,7 +321,7 @@
                   "id": "a2-m04-u01-l01-o01",
                   "can_do": "I can buy tickets and ask about transport.",
                   "title": "Comprar billetes",
-                  "skills": ["vocabulary", "speaking", "listening"],
+                  "skills": ["vocabulary", "speaking", "writing", "listening"],
                   "concepts": ["Can I have ...?", "How much is a ticket to ...?"],
                   "vocabulary": ["ticket", "train", "bus", "airport", "return"],
                   "activities": [
@@ -367,7 +367,7 @@
                   "id": "a2-m04-u01-l01-o02",
                   "can_do": "I can describe what I have to do and what I must not do.",
                   "title": "Obligación",
-                  "skills": ["grammar", "speaking"],
+                  "skills": ["grammar", "speaking", "writing"],
                   "concepts": ["have to", "must", "mustn't"],
                   "vocabulary": ["have to", "must", "mustn't", "allowed"],
                   "activities": [
@@ -420,7 +420,7 @@
                   "id": "a2-m05-u01-l01-o01",
                   "can_do": "I can describe how I feel and give simple advice.",
                   "title": "Salud y consejos",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["should / shouldn't", "I feel", "I have a ..."],
                   "vocabulary": ["headache", "cold", "tired", "should", "rest"],
                   "activities": [
@@ -487,7 +487,7 @@
                   "id": "a2-m06-u01-l01-o01",
                   "can_do": "I can tell a short story using linking words.",
                   "title": "Contar una historia",
-                  "skills": ["speaking", "grammar", "vocabulary"],
+                  "skills": ["speaking", "writing", "grammar", "vocabulary"],
                   "concepts": ["then", "after that", "suddenly", "finally"],
                   "vocabulary": ["first", "then", "after that", "suddenly", "finally"],
                   "activities": [

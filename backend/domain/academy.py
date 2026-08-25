@@ -33,10 +33,13 @@ from schemas.academy import (
     SkillScoreOut,
     SpeakingResultOut,
     SpeakingTaskResultOut,
+    WritingResultOut,
+    WritingTaskResultOut,
 )
 from services import academy as academy_svc
 from services import speaking as speaking_svc
-from services import speaking_llm
+from services import speaking_llm, writing_llm
+from services import writing as writing_svc
 from services.context import build_lesson_prompt
 from services.curriculum import (
     CEFR_ORDER,
@@ -622,6 +625,103 @@ async def submit_speaking_task(
         overall=result["overall"],
         criteria=result["criteria"],
         speaking_mastery=state["score"],
+        evidence=evidence,
+    )
+
+
+async def submit_writing(
+    user_id: str, level_id: str, objective_id: str, expected: str, text: str
+) -> WritingResultOut | None:
+    """Puntúa una producción escrita controlada y alimenta el mastery de 'writing'."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        return None
+    if await enrollment_blocked(user_id, level_id):
+        return None
+    result = writing_svc.score_writing(text, expected)
+    for ev in writing_svc.evidence_from_writing(
+        result,
+        level_id=level_id,
+        objective_id=objective_id,
+        curriculum_version=lv.version,
+    ):
+        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    row = await run_in_threadpool(
+        academy_repo.get_objective_row, user_id, level_id, objective_id, "writing"
+    )
+    state = academy_svc.next_mastery_state(
+        row, result["overall"], obj.threshold("writing")
+    )
+    await run_in_threadpool(
+        academy_repo.apply_objective_evidence,
+        user_id,
+        level_id,
+        objective_id,
+        "writing",
+        state,
+    )
+    return WritingResultOut(
+        level_id=level_id,
+        objective_id=objective_id,
+        expected=result["expected"],
+        text=result["text"],
+        overall=result["overall"],
+        criteria=result["criteria"],
+        writing_mastery=state["score"],
+    )
+
+
+async def submit_writing_task(
+    user_id: str,
+    level_id: str,
+    objective_id: str,
+    task: str,
+    text: str,
+    model: str,
+) -> WritingTaskResultOut | None:
+    """Puntúa una producción escrita libre (tarea) con evidencia extraída por el LLM."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        return None
+    if await enrollment_blocked(user_id, level_id):
+        return None
+    evidence = await writing_llm.extract_writing_evidence(task, text, model)
+    if evidence is None:
+        return None
+    result = writing_svc.scores_from_evidence(evidence)
+    for ev in writing_svc.evidence_from_writing(
+        result,
+        level_id=level_id,
+        objective_id=objective_id,
+        curriculum_version=lv.version,
+    ):
+        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    row = await run_in_threadpool(
+        academy_repo.get_objective_row, user_id, level_id, objective_id, "writing"
+    )
+    state = academy_svc.next_mastery_state(
+        row, result["overall"], obj.threshold("writing")
+    )
+    await run_in_threadpool(
+        academy_repo.apply_objective_evidence,
+        user_id,
+        level_id,
+        objective_id,
+        "writing",
+        state,
+    )
+    return WritingTaskResultOut(
+        level_id=level_id,
+        objective_id=objective_id,
+        overall=result["overall"],
+        criteria=result["criteria"],
+        writing_mastery=state["score"],
         evidence=evidence,
     )
 

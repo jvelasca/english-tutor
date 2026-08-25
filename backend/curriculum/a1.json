@@ -24,7 +24,7 @@
                   "id": "a1-m01-u01-l01-o01",
                   "can_do": "I can introduce myself and give basic personal information.",
                   "title": "Presentarme",
-                  "skills": ["speaking", "vocabulary", "grammar"],
+                  "skills": ["speaking", "writing", "vocabulary", "grammar"],
                   "concepts": ["I am", "My name is", "I live in", "I am from", "I work as"],
                   "vocabulary": ["name", "country", "city", "job", "age", "family", "hobby"],
                   "activities": [
@@ -63,7 +63,7 @@
                   "id": "a1-m01-u01-l01-o02",
                   "can_do": "I can ask someone's name and where they are from.",
                   "title": "Preguntar el nombre y origen",
-                  "skills": ["speaking", "grammar", "vocabulary"],
+                  "skills": ["speaking", "writing", "grammar", "vocabulary"],
                   "concepts": ["What is your name?", "Where are you from?", "What's"],
                   "vocabulary": ["what", "where", "your", "from", "name"],
                   "activities": [
@@ -116,7 +116,7 @@
                   "id": "a1-m01-u01-l02-o01",
                   "can_do": "I can say my country and nationality.",
                   "title": "Países y nacionalidades",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["I am from + country", "I am + nationality", "to be"],
                   "vocabulary": ["Spain", "Spanish", "Mexico", "Mexican", "France", "French", "England", "English"],
                   "activities": [
@@ -162,7 +162,7 @@
                   "id": "a1-m01-u01-l02-o02",
                   "can_do": "I can say and understand numbers from 1 to 100.",
                   "title": "Números 1-100",
-                  "skills": ["vocabulary", "listening", "speaking"],
+                  "skills": ["vocabulary", "listening", "speaking", "writing"],
                   "concepts": ["numbers 1-100"],
                   "vocabulary": ["one", "ten", "twenty", "fifty", "hundred"],
                   "activities": [
@@ -215,7 +215,7 @@
                   "id": "a1-m02-u01-l01-o01",
                   "can_do": "I can describe my daily routine.",
                   "title": "Mi rutina diaria",
-                  "skills": ["speaking", "grammar", "vocabulary"],
+                  "skills": ["speaking", "writing", "grammar", "vocabulary"],
                   "concepts": ["Present Simple", "I get up", "I go to", "I have breakfast"],
                   "vocabulary": ["get up", "work", "breakfast", "lunch", "dinner", "sleep"],
                   "activities": [
@@ -261,7 +261,7 @@
                   "id": "a1-m02-u01-l01-o02",
                   "can_do": "I can tell the time and talk about days and months.",
                   "title": "La hora, días y meses",
-                  "skills": ["vocabulary", "listening", "speaking"],
+                  "skills": ["vocabulary", "listening", "speaking", "writing"],
                   "concepts": ["What time is it?", "days of the week", "months"],
                   "vocabulary": ["Monday", "Sunday", "January", "December", "morning", "evening"],
                   "activities": [
@@ -307,7 +307,7 @@
                   "id": "a1-m02-u01-l01-o03",
                   "can_do": "I can talk about how often I do things.",
                   "title": "Frecuencia",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["always", "usually", "sometimes", "never", "every day"],
                   "vocabulary": ["always", "usually", "often", "sometimes", "never"],
                   "activities": [
@@ -374,7 +374,7 @@
                   "id": "a1-m03-u01-l01-o01",
                   "can_do": "I can talk about my family.",
                   "title": "Mi familia",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["have got", "This is my", "I have a brother/sister"],
                   "vocabulary": ["mother", "father", "brother", "sister", "son", "daughter", "grandmother", "grandfather"],
                   "activities": [
@@ -420,7 +420,7 @@
                   "id": "a1-m03-u01-l01-o02",
                   "can_do": "I can describe people's appearance and personality.",
                   "title": "Describir personas",
-                  "skills": ["vocabulary", "grammar", "speaking"],
+                  "skills": ["vocabulary", "grammar", "speaking", "writing"],
                   "concepts": ["be + adjective", "tall", "short", "friendly"],
                   "vocabulary": ["tall", "short", "young", "old", "friendly", "kind", "happy"],
                   "activities": [
@@ -473,7 +473,7 @@
                   "id": "a1-m03-u01-l02-o01",
                   "can_do": "I can talk about what belongs to people.",
                   "title": "Posesivos",
-                  "skills": ["grammar", "vocabulary", "speaking"],
+                  "skills": ["grammar", "vocabulary", "speaking", "writing"],
                   "concepts": ["my", "your", "his", "her", "their", "'s"],
                   "vocabulary": ["my", "your", "his", "her", "our", "their"],
                   "activities": [
@@ -540,7 +540,7 @@
                   "id": "a1-m04-u01-l01-o01",
                   "can_do": "I can describe my home and the rooms in it.",
                   "title": "Mi casa",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["There is / There are", "rooms of the house"],
                   "vocabulary": ["kitchen", "bedroom", "bathroom", "living room", "garden", "door", "window"],
                   "activities": [
@@ -646,7 +646,7 @@
                   "id": "a1-m05-u01-l01-o01",
                   "can_do": "I can talk about food and drinks.",
                   "title": "Comida y bebida",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["I would like", "I like / I don't like", "countable / uncountable"],
                   "vocabulary": ["water", "bread", "apple", "rice", "coffee", "milk", "cheese", "fruit"],
                   "activities": [
@@ -692,7 +692,7 @@
                   "id": "a1-m05-u01-l01-o02",
                   "can_do": "I can order food in a restaurant or cafe.",
                   "title": "Pedir comida",
-                  "skills": ["speaking", "vocabulary", "grammar"],
+                  "skills": ["speaking", "writing", "vocabulary", "grammar"],
                   "concepts": ["I would like", "Can I have", "some / any"],
                   "vocabulary": ["menu", "order", "please", "some", "any", "bill"],
                   "activities": [
@@ -759,7 +759,7 @@
                   "id": "a1-m06-u01-l01-o01",
                   "can_do": "I can ask about prices and buy things.",
                   "title": "Precios",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["How much is ...?", "this / that / these / those"],
                   "vocabulary": ["price", "cheap", "expensive", "this", "that", "these", "those"],
                   "activities": [
@@ -805,7 +805,7 @@
                   "id": "a1-m06-u01-l01-o02",
                   "can_do": "I can talk about clothes.",
                   "title": "La ropa",
-                  "skills": ["vocabulary", "speaking", "grammar"],
+                  "skills": ["vocabulary", "speaking", "writing", "grammar"],
                   "concepts": ["comparatives", "bigger", "cheaper"],
                   "vocabulary": ["shirt", "trousers", "shoes", "dress", "hat", "jacket", "size", "colour"],
                   "activities": [
@@ -872,7 +872,7 @@
                   "id": "a1-m07-u01-l01-o01",
                   "can_do": "I can talk about places in a town.",
                   "title": "Lugares de la ciudad",
-                  "skills": ["vocabulary", "speaking", "listening"],
+                  "skills": ["vocabulary", "speaking", "writing", "listening"],
                   "concepts": ["there is a ...", "places in town"],
                   "vocabulary": ["bank", "supermarket", "station", "hospital", "park", "school", "restaurant"],
                   "activities": [
@@ -918,7 +918,7 @@
                   "id": "a1-m07-u01-l01-o02",
                   "can_do": "I can ask for and give simple directions.",
                   "title": "Pedir indicaciones",
-                  "skills": ["speaking", "listening", "grammar"],
+                  "skills": ["speaking", "writing", "listening", "grammar"],
                   "concepts": ["Imperatives", "turn left", "go straight", "next to"],
                   "vocabulary": ["left", "right", "straight", "turn", "cross", "opposite"],
                   "activities": [
@@ -985,7 +985,7 @@
                   "id": "a1-m08-u01-l01-o01",
                   "can_do": "I can talk about where I was and what I did yesterday.",
                   "title": "El pasado (was/were)",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["was / were", "yesterday", "last week"],
                   "vocabulary": ["yesterday", "last week", "last night", "ago"],
                   "activities": [
@@ -1031,7 +1031,7 @@
                   "id": "a1-m08-u01-l01-o02",
                   "can_do": "I can say what I did in the past.",
                   "title": "Past Simple (verbos regulares)",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["Past Simple", "-ed", "played", "worked"],
                   "vocabulary": ["played", "worked", "visited", "watched", "stayed"],
                   "activities": [
@@ -1098,7 +1098,7 @@
                   "id": "a1-m09-u01-l01-o01",
                   "can_do": "I can talk about my future plans.",
                   "title": "Planes futuros",
-                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
                   "concepts": ["going to", "tomorrow", "next week"],
                   "vocabulary": ["tomorrow", "next week", "next year", "plan"],
                   "activities": [
@@ -1144,7 +1144,7 @@
                   "id": "a1-m09-u01-l01-o02",
                   "can_do": "I can make and respond to invitations.",
                   "title": "Invitar",
-                  "skills": ["speaking", "vocabulary", "grammar"],
+                  "skills": ["speaking", "writing", "vocabulary", "grammar"],
                   "concepts": ["Would you like to ...?", "Let's ...", "I'd love to"],
                   "vocabulary": ["invite", "party", "cinema", "would", "together"],
                   "activities": [
@@ -1211,7 +1211,7 @@
                   "id": "a1-m10-u01-l01-o01",
                   "can_do": "I can hold a short basic conversation about myself, my life and my plans.",
                   "title": "Conversación final A1",
-                  "skills": ["speaking", "listening", "grammar", "vocabulary"],
+                  "skills": ["speaking", "writing", "listening", "grammar", "vocabulary"],
                   "concepts": ["review: introductions, routines, family, past, plans"],
                   "vocabulary": ["review A1"],
                   "activities": [

@@ -30,6 +30,10 @@ from schemas.academy import (
     SpeakingTaskSubmitRequest,
     StudyPlanOut,
     StudyPlanRequest,
+    WritingResultOut,
+    WritingSubmitRequest,
+    WritingTaskResultOut,
+    WritingTaskSubmitRequest,
 )
 from services.academy import study_plan
 from services.stt import transcribe_with_timing
@@ -189,6 +193,30 @@ async def objective_speaking_task(
         body.heard,
         body.model,
         body.duration_seconds,
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post("/api/academy/objective/writing", response_model=WritingResultOut)
+async def objective_writing(
+    body: WritingSubmitRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.submit_writing(
+        user["id"], body.level_id, body.objective_id, body.expected, body.text
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post("/api/academy/objective/writing/task", response_model=WritingTaskResultOut)
+async def objective_writing_task(
+    body: WritingTaskSubmitRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.submit_writing_task(
+        user["id"], body.level_id, body.objective_id, body.task, body.text, body.model
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")

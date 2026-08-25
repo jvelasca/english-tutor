@@ -332,3 +332,37 @@ class RemediationPlanOut(BaseModel):
     level_id: str
     level: str
     skills: list[RemediationSkillOut]
+
+
+class WritingSubmitRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+    expected: str = Field(min_length=1, max_length=2000)
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class WritingResultOut(BaseModel):
+    level_id: str
+    objective_id: str
+    expected: str
+    text: str
+    overall: float
+    criteria: dict[str, float]
+    writing_mastery: float
+
+
+class WritingTaskSubmitRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+    task: str = Field(min_length=1, max_length=2000)
+    text: str = Field(min_length=1, max_length=2000)
+    model: str = Field(default=DEFAULT_MODEL, min_length=1)
+
+
+class WritingTaskResultOut(BaseModel):
+    level_id: str
+    objective_id: str
+    overall: float
+    criteria: dict[str, float]
+    writing_mastery: float
+    evidence: dict
