@@ -45,6 +45,10 @@ async def level_detail(level_id: str, user: dict = Depends(current_user)) -> dic
 async def enroll(body: EnrollRequest, user: dict = Depends(current_user)) -> dict:
     enrollment = await academy_service.enroll(user["id"], body.level_id)
     if enrollment is None:
+        if await academy_service.enrollment_blocked(user["id"], body.level_id):
+            raise HTTPException(
+                status_code=403, detail="Nivel bloqueado: completa el nivel anterior"
+            )
         raise HTTPException(
             status_code=404, detail="Nivel no encontrado o usuario no existe"
         )

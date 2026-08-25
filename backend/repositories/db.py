@@ -226,7 +226,7 @@ def init_db() -> None:
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS academy_certificates (
+            CREATE TABLE IF NOT EXISTS academy_level_completions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
                 level_id TEXT NOT NULL,
@@ -422,6 +422,7 @@ def init_db() -> None:
     with closing(_conn(foreign_keys=False)) as conn, conn:
         _migrate_conversations_fk(conn)
         _migrate_pronunciation_fk(conn)
+        _migrate_certificates_table(conn)
 
 
 def _has_user_fk(conn: sqlite3.Connection, table: str) -> bool:
@@ -489,6 +490,40 @@ def _migrate_pronunciation_fk(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_pronunciation_user_id "
         "ON pronunciation_attempts(user_id)"
     )
+
+
+def _migrate_certificates_table(conn: sqlite3.Connection) -> None:
+    """Renombra academy_certificates → academy_level_completions (idempotente).
+
+    Copia las filas existentes y suelta la tabla vieja. No hace nada si la tabla
+    antigua ya no existe (instalación nueva o migración ya aplicada)."""
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if "academy_certificates" not in tables:
+        return
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academy_level_completions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            level_id TEXT NOT NULL,
+            level TEXT NOT NULL,
+            overall REAL NOT NULL,
+            awarded_at TEXT NOT NULL,
+            UNIQUE (user_id, level_id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO academy_level_completions "
+        "(id, user_id, level_id, level, overall, awarded_at) "
+        "SELECT id, user_id, level_id, level, overall, awarded_at "
+        "FROM academy_certificates"
+    )
+    conn.execute("DROP TABLE academy_certificates")
 
 
 def ping() -> bool:

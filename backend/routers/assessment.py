@@ -1,4 +1,4 @@
-"""Endpoints de evaluación: placement test, examen de nivel y certificados."""
+"""Endpoints de evaluación: placement test, examen de nivel y completitud de niveles."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from dependencies import current_user
 from domain import academy as academy_service
 from schemas.academy import (
     AssessmentSubmit,
-    CertificatesOut,
     ExamOut,
     ExamResultOut,
+    LevelCompletionsOut,
     PlacementOut,
     PlacementResultOut,
 )
@@ -51,6 +51,6 @@ async def submit_exam(
     return result
 
 
-@router.get("/api/academy/certificates", response_model=CertificatesOut)
-async def certificates(user: dict = Depends(current_user)) -> dict:
-    return {"certificates": await academy_service.list_certificates(user["id"])}
+@router.get("/api/academy/level-completions", response_model=LevelCompletionsOut)
+async def level_completions(user: dict = Depends(current_user)) -> dict:
+    return {"completions": await academy_service.list_level_completions(user["id"])}

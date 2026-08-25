@@ -22,7 +22,7 @@ backend/
 │   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
 │   ├── health.py        # /api/health/live, /ready, /dependencies
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
-│   ├── listening.py     # GET /api/listening/question, POST /api/listening/answer, GET /api/listening/stats (F8)
+│   ├── listening.py     # GET /api/listening/question, POST /api/listening/answer, GET /api/listening/stats (F8; progresión A1→A2→B1)
 │   ├── models.py        # GET /api/health, GET /api/models
 │   ├── profile.py       # GET /api/profile (F4)
 │   ├── progress.py      # GET /api/progress?user_id=<id>, GET /api/progress/history (F6)
@@ -36,7 +36,7 @@ backend/
 │   ├── conversations.py # Conversation, ConversationMeta (con user_id), ConversationUpsert
 │   ├── grammar.py       # GrammarAnalyze*, GrammarFinding, GrammarRecurringError (F4)
 │   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
-│   ├── listening.py     # ListeningQuestion, ListeningAnswer*, ListeningStats (F8)
+│   ├── listening.py     # ListeningQuestion, ListeningAnswer*, ListeningStats + ListeningLevelOut (F8)
 │   ├── profile.py       # LearningProfile, EstimatedBands (F4/F8)
 │   ├── pronunciation.py # PronunciationResponse, FluencyStats, PronunciationBreakdown (F7/F8)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
@@ -48,7 +48,7 @@ backend/
 │   ├── conversations.py
 │   ├── grammar.py       # análisis de errores + persistencia (F4)
 │   ├── learning.py      # eventos de aprendizaje (F4)
-│   ├── listening.py     # next_question + submit_answer + stats (F8)
+│   ├── listening.py     # next_question + submit_answer + stats (con progresión por nivel, F8)
 │   ├── pronunciation.py
 │   ├── profile.py       # get_profile_summary + get_profile_context (compone el perfil) (F4/F5)
 │   ├── progress.py      # get_progress_history: series + racha + dominio + hitos (F6)
@@ -60,7 +60,7 @@ backend/
 │   ├── conversations.py
 │   ├── grammar.py       # grammar_errors (F4)
 │   ├── learning.py      # learning_events (F4)
-│   ├── listening.py     # listening_attempts (F8)
+│   ├── listening.py     # listening_attempts + correct_question_ids (F8)
 │   ├── profile.py       # learning_profile (F4)
 │   ├── pronunciation.py
 │   ├── progress.py      # activity_events (mensajes con modo + pronunciaciones) (F6)
@@ -73,7 +73,7 @@ backend/
 │   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
 │   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
-│   ├── listening.py     # banco de preguntas + score_answer (puro, F8)
+│   ├── listening.py     # banco de preguntas + score_answer + progresión por nivel (puro, F8)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
@@ -122,6 +122,7 @@ backend/
 ├── scripts/             # scripts de utilidad.
 │   ├── eval_model.py    # evalúa un modelo como tutor (M5)
 │   ├── eval_tutor.py    # evalúa un modelo con el corpus canónico (F9)
+│   ├── listening_check.py # verificación determinista de la progresión de listening (sin red)
 │   └── smoke_test.py    # verifica el servidor en ejecución
 ├── download_models.py   # script de descarga de modelos de voz (1ª vez)
 ├── requirements.txt
@@ -156,27 +157,30 @@ frontend/src/
 │   ├── users.ts         # listUsers, createUser.
 │   └── voz.ts           # transcribe + tts.
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
+│   ├── AppearancePanel.tsx # panel de apariencia: tema, acento, tamaño, densidad (M16)
 │   ├── ChatMessage.tsx
 │   ├── Composer.tsx
 │   ├── HandsFreeToggle.tsx  # activar/parar modo manos libres + estado (M10)
+│   ├── HelpDialog.tsx   # ayuda para no ingenieros enlazada a docs/ (M16)
 │   ├── LearningProfile.tsx  # panel del perfil: CEFR + bandas por destreza + recomendaciones (F4/F8)
-│   ├── ListeningPractice.tsx # comprensión auditiva: TTS + responder + stats (F8)
+│   ├── ListeningPractice.tsx # comprensión auditiva: TTS + responder + nivel/progreso (F8)
 │   ├── MicButton.tsx
 │   ├── ModeSelect.tsx   # selector de modo de tutor
 │   ├── PronunciationPractice.tsx # feedback fonético + fluidez (WPM) (F7/F8)
 │   ├── ProgressDashboard.tsx # dashboard de progreso real: tendencias, racha, dominio, hitos (F6)
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
-│   ├── ThemeToggle.tsx  # toggle claro/oscuro (M8)
 │   ├── TutorQualityPanel.tsx # panel de calidad del tutor (F9)
 │   └── UserSelect.tsx   # selector de perfil de usuario
 ├── hooks/               # Estado y lógica de UI.
+│   ├── useAppearance.ts # apariencia por usuario: tema/acento/tamaño/densidad + persistencia (M16)
 │   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
-│   ├── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
-│   └── useTheme.ts      # tema claro/oscuro + persistencia (M8)
+│   └── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
 │   └── api.ts           # incluye User y user_id en ConversationMeta
 ├── utils/               # Funciones puras (testables).
+│   ├── appearance.ts    # presets de acento/tamaño/densidad + parse/serialize (M16)
+│   ├── appearance.test.ts
 │   ├── title.ts         # deriveTitle
 │   ├── title.test.ts
 │   ├── cefr.ts          # cefrTone, cefrLabel, bandLabel (F4/F8)
@@ -204,10 +208,12 @@ frontend/src/
 └── index.css             # tokens de diseño, tema claro/oscuro, responsive (M8)
 ```
 
-> **Sistema de diseño (M8):** los tokens viven en `:root` de `index.css`
+> **Sistema de diseño (M8/M16):** los tokens viven en `:root` de `index.css`
 > (`--color-*`, `--font-*`, `--text-*`, `--space-*`, `--radius-*`, `--shadow-*`),
-> con el tema claro sobrescrito en `:root[data-theme="light"]`. El tema se controla
-> desde `hooks/useTheme.ts` + `utils/theme.ts` y se aplica en `<html data-theme="...">`.
+> con el tema claro sobrescrito en `:root[data-theme="light"]`. El tema, el acento,
+> el tamaño de letra y la densidad se controlan desde `hooks/useAppearance.ts` +
+> `utils/appearance.ts` y se aplican vía `data-theme`/`data-accent`/`data-font`/`data-density`
+> en `<html>`. La apariencia se persiste por usuario (backend `settings` + `localStorage`).
 
 ### Responsabilidades frontend
 - **`api/`**: único lugar donde se hace `fetch`. Expone funciones tipadas.

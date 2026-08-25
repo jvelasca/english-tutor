@@ -266,11 +266,11 @@ def test_lesson_completed_does_not_change_mastery(monkeypatch, tmp_path):
     assert academy_repo.get_skill_mastery(a, "a1")["grammar"] == state["score"]
 
 
-def test_certificate_and_isolation(monkeypatch, tmp_path):
+def test_level_completion_and_isolation(monkeypatch, tmp_path):
     a, b = _setup(monkeypatch, tmp_path)
-    academy_repo.award_certificate(a, "a1", "A1", 0.9)
-    assert len(academy_repo.list_certificates(a)) == 1
-    assert academy_repo.list_certificates(b) == []
+    academy_repo.record_level_completion(a, "a1", "A1", 0.9)
+    assert len(academy_repo.list_level_completions(a)) == 1
+    assert academy_repo.list_level_completions(b) == []
 
 
 # --- Endpoints ------------------------------------------------------------
@@ -286,6 +286,67 @@ def test_endpoint_levels_lists_a1(monkeypatch, tmp_path):
     assert levels["a1"]["objective_count"] > 20
     assert levels["a2"]["available"] is True
     assert levels["b1"]["available"] is False
+
+
+# --- Gating de matrícula y examen (integridad curricular) -----------------
+
+
+def test_enroll_a1_always_allowed(monkeypatch, tmp_path):
+    """El primer nivel (A1) no exige prerequisito y siempre se puede matricular."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/enroll", params={"user_id": a}, json={"level_id": "a1"}
+        )
+    assert r.status_code == 200
+    assert r.json()["level"] == "A1"
+
+
+def test_enroll_rejects_uncompleted_prerequisite(monkeypatch, tmp_path):
+    """A2 exige A1 completado: 403 antes de completarlo, 200 después."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/enroll", params={"user_id": a}, json={"level_id": "a2"}
+        )
+        assert r.status_code == 403
+
+        data = load_assessments()
+        exam = data.exams["a1"]
+        answers = {it.id: it.correct_index for it in exam.items}
+        client.post(
+            "/api/academy/exam/a1/submit",
+            params={"user_id": a},
+            json={"answers": answers},
+        )
+
+        r2 = client.post(
+            "/api/academy/enroll", params={"user_id": a}, json={"level_id": "a2"}
+        )
+        assert r2.status_code == 200
+
+
+def test_levels_expose_unlocked(monkeypatch, tmp_path):
+    """El listado de niveles expone `unlocked`: A1 sí, A2 no (usuario nuevo)."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/levels", params={"user_id": a})
+    levels = {lv["level_id"]: lv for lv in r.json()["levels"]}
+    assert levels["a1"]["unlocked"] is True
+    assert levels["a2"]["unlocked"] is False
+
+
+def test_exam_does_not_bypass_enrollment():
+    """El examen no salta la progresión: comparte el helper de gating.
+
+    `submit_exam` auto-matricula solo si `enrollment_unlocked` lo permite; por eso
+    la regla pura debe rechazar cualquier nivel sin su prerequisito completado."""
+    assert academy_svc.enrollment_unlocked("a1", set()) is True
+    assert academy_svc.enrollment_unlocked("a2", set()) is False
+    assert academy_svc.enrollment_unlocked("a2", {"a1"}) is True
+    assert academy_svc.enrollment_unlocked("b1", {"a1"}) is False
+    assert academy_svc.enrollment_unlocked("b1", {"a1", "a2"}) is True
+    assert academy_svc.enrollment_unlocked("zz", set()) is False
 
 
 def test_endpoint_enroll_and_detail(monkeypatch, tmp_path):
@@ -327,7 +388,7 @@ def test_endpoint_placement_submit(monkeypatch, tmp_path):
     assert r.json()["level"] == "A1"
 
 
-def test_endpoint_exam_pass_awards_certificate(monkeypatch, tmp_path):
+def test_endpoint_exam_pass_records_completion(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     data = load_assessments()
     exam = data.exams["a1"]
@@ -341,8 +402,10 @@ def test_endpoint_exam_pass_awards_certificate(monkeypatch, tmp_path):
     assert r.status_code == 200
     assert r.json()["passed"] is True
 
-    certs = client.get("/api/academy/certificates", params={"user_id": a}).json()
-    assert certs["certificates"][0]["level"] == "A1"
+    completions = client.get(
+        "/api/academy/level-completions", params={"user_id": a}
+    ).json()
+    assert completions["completions"][0]["level"] == "A1"
 
 
 def test_exam_pass_unlocks_next_level(monkeypatch, tmp_path):
@@ -362,7 +425,7 @@ def test_exam_pass_unlocks_next_level(monkeypatch, tmp_path):
     assert "a2" in by_level  # desbloqueo en cascada
 
 
-def test_endpoint_exam_fail_no_certificate(monkeypatch, tmp_path):
+def test_endpoint_exam_fail_no_completion(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     data = load_assessments()
     exam = data.exams["a1"]
@@ -376,8 +439,10 @@ def test_endpoint_exam_fail_no_certificate(monkeypatch, tmp_path):
     assert r.status_code == 200
     assert r.json()["passed"] is False
 
-    certs = client.get("/api/academy/certificates", params={"user_id": a}).json()
-    assert certs["certificates"] == []
+    completions = client.get(
+        "/api/academy/level-completions", params={"user_id": a}
+    ).json()
+    assert completions["completions"] == []
 
 
 def test_endpoint_study_plan(monkeypatch, tmp_path):
@@ -551,10 +616,12 @@ def test_endpoint_isolation_between_users(monkeypatch, tmp_path):
             params={"user_id": a},
             json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
         )
-        certs_b = client.get("/api/academy/certificates", params={"user_id": b}).json()
+        completions_b = client.get(
+            "/api/academy/level-completions", params={"user_id": b}
+        ).json()
     assert academy_repo.list_objective_mastery(a, "a1") != {}
     assert academy_repo.list_objective_mastery(b, "a1") == {}  # B no hereda datos de A
-    assert certs_b["certificates"] == []
+    assert completions_b["completions"] == []
 
 
 def test_endpoint_assessment_rejects_locked_objective(monkeypatch, tmp_path):

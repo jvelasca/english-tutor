@@ -3,21 +3,30 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-24 18:10 (UTC+2).
+> Actualizado por última vez: 2026-08-25 10:16 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-24):** Fases 0–10 de endurecimiento y Release Audit 1.1 (M12) cerradas
-(`v1.1.1` publicada). **Etapa 2 — Pedagogía (M13) en curso**: P1 y P2 hechos; P3–P6 pendientes.
-Cerrados además **M14 — GUI responsive + personalización + acceso en red** (sección 18) y
-**M15 — Launcher con UI moderna: iconos, paneles colapsables y logs** (sección 19). Últimos commits:
-- `fix: Vite escucha en 0.0.0.0 para acceso LAN`
-- `feat: M14 GUI responsive + personalizacion + acceso en red`
-- `feat: P2 error mastery` — evidencia positiva + first_seen/correct_after/streak/mastered.
-- `feat: P1 politica pedagogica formal` — CORRECT/NATURAL/OPTIONAL/STYLE/PRONUNCIATION.
+**Posición actual (2026-08-25):** `v1.2.1` publicada. Cerradas: Release Audit 1.1 (M12), Etapa 2
+(P1–P2), M14 (GUI responsive + personalización), M15 (Launcher), **Academy v2 con integridad
+curricular (v1.2.1)**, y **M16 — Apariencia configurable + Ayuda + progresión de listening**.
+Últimos commits:
+- `release: v1.2.1 - integridad curricular, apariencia configurable, ayuda y listening`
+- `release: v1.2.0 - Academy A1/A2 funcional y cierre del ciclo de evidencia`
 
-**Estado verde:** backend `260 tests` + `ruff` limpio; frontend `106 tests` + `tsc`/`build` OK;
+**Estado verde:** backend `314 tests` + `ruff` limpio; frontend `136 tests` + `tsc`/`build` OK;
 launcher `33 tests` + `ruff` limpio.
+
+**Entregables recientes:**
+- **Integridad curricular (v1.2.1):** gating por nivel CEFR en `enroll()`/`submit_exam()`,
+  renombrado `certificates` → `level_completions` (tabla + endpoint + esquemas + UI), y estado
+  `unlocked` expuesto en el listado de niveles.
+- **M16 — Apariencia configurable por usuario:** botón de herramientas (gear) con tema claro/oscuro,
+  acento (7 colores), tamaño de letra y densidad; persistido por usuario (`settings` + `localStorage`).
+- **M16 — Ayuda:** botón `?` con HelpDialog en lenguaje llano, enlazado a `docs/` (sin duplicar textos).
+- **Listening con progresión:** `pick_next_question` avanza A1→A2→B1 por dominio de preguntas (fix del
+  bug de "se queda en 12 aciertos"); stats exponen `level`/`completed`/`levels` y script de verificación
+  `backend/scripts/listening_check.py`.
 
 **Entregable nuevo (Etapa 2):** plan en `docs/PLAN-ETAPA-PEDAGOGICA.md`. Hechos:
 - **P1** política pedagógica formal (`services/policy.py::feedback_policy`, integrada siempre en

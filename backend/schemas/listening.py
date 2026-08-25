@@ -24,7 +24,17 @@ class ListeningAnswerResponse(BaseModel):
     level: str
 
 
+class ListeningLevelOut(BaseModel):
+    level: str
+    total: int
+    mastered: int
+    completed: bool
+
+
 class ListeningStats(BaseModel):
     attempts: int
     correct: int
     accuracy: float | None = None
+    level: str
+    completed: bool
+    levels: list[ListeningLevelOut]

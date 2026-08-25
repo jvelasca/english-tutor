@@ -4,7 +4,13 @@ from __future__ import annotations
 from starlette.concurrency import run_in_threadpool
 
 from repositories import listening as listening_repo
-from services.listening import get_question, pick_next_question, score_answer
+from services.listening import (
+    current_level,
+    get_question,
+    level_status,
+    pick_next_question,
+    score_answer,
+)
 
 
 def _public(question: dict) -> dict:
@@ -14,7 +20,8 @@ def _public(question: dict) -> dict:
 
 async def next_question(user_id: str) -> dict:
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
-    return _public(pick_next_question(seen))
+    correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
+    return _public(pick_next_question(seen, correct))
 
 
 async def submit_answer(
@@ -37,4 +44,10 @@ async def submit_answer(
 
 
 async def get_stats(user_id: str) -> dict:
-    return await run_in_threadpool(listening_repo.get_stats, user_id)
+    stats = await run_in_threadpool(listening_repo.get_stats, user_id)
+    correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
+    levels = level_status(correct)
+    stats["level"] = current_level(correct)
+    stats["completed"] = all(s["completed"] for s in levels)
+    stats["levels"] = levels
+    return stats

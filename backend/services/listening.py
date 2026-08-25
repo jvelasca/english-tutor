@@ -89,6 +89,9 @@ QUESTION_BANK: list[dict] = [
 ]
 
 
+LEVEL_ORDER: list[str] = ["A1", "A2", "B1"]
+
+
 def get_question(question_id: str) -> dict | None:
     """Devuelve la pregunta por id o None si no existe."""
     for q in QUESTION_BANK:
@@ -97,10 +100,70 @@ def get_question(question_id: str) -> dict | None:
     return None
 
 
-def pick_next_question(seen_ids: set[str]) -> dict:
-    """Primera pregunta no vista; si todas están vistas, reinicia por la primera."""
+def questions_for_level(level: str) -> list[dict]:
+    """Preguntas del banco pertenecientes a un nivel CEFR concreto."""
+    return [q for q in QUESTION_BANK if q["level"] == level]
+
+
+def level_status(correct_question_ids: set[str]) -> list[dict]:
+    """Progreso por nivel CEFR.
+
+    Un nivel se considera completado cuando el usuario ha respondido
+    correctamente (al menos una vez) todas sus preguntas. Devuelve una lista con
+    `{level, total, mastered, completed}` en orden CEFR."""
+    status = []
+    for level in LEVEL_ORDER:
+        questions = questions_for_level(level)
+        total = len(questions)
+        mastered = sum(1 for q in questions if q["id"] in correct_question_ids)
+        status.append(
+            {
+                "level": level,
+                "total": total,
+                "mastered": mastered,
+                "completed": total > 0 and mastered == total,
+            }
+        )
+    return status
+
+
+def current_level(correct_question_ids: set[str]) -> str:
+    """Nivel CEFR en el que el usuario está trabajando.
+
+    Es el primer nivel aún no completado; si todos están completados, devuelve el
+    último nivel para permitir seguir practicando sin quedarse atascado."""
+    for level in LEVEL_ORDER:
+        questions = questions_for_level(level)
+        if not questions:
+            continue
+        mastered = sum(1 for q in questions if q["id"] in correct_question_ids)
+        if mastered < len(questions):
+            return level
+    return LEVEL_ORDER[-1]
+
+
+def pick_next_question(
+    seen_ids: set[str], correct_ids: set[str] | None = None
+) -> dict:
+    """Siguiente pregunta respetando la progresión por nivel CEFR.
+
+    Prioriza, dentro del nivel actual, las preguntas aún no dominadas (respondidas
+    correctamente): primero las no vistas y luego las vistas pero falladas, para
+    reintentarlas. Al dominar un nivel se avanza al siguiente; al completar todos,
+    rota sobre el banco para seguir practicando en lugar de quedarse atascado."""
+    correct_ids = correct_ids or set()
+    questions = questions_for_level(current_level(correct_ids))
+
+    for q in questions:
+        if q["id"] not in seen_ids and q["id"] not in correct_ids:
+            return q
+    for q in questions:
+        if q["id"] not in correct_ids:
+            return q
+
+    # Nivel completado o sin preguntas: nunca se repite la misma pregunta en bucle.
     for q in QUESTION_BANK:
-        if q["id"] not in seen_ids:
+        if q["id"] not in correct_ids:
             return q
     return QUESTION_BANK[0]
 

@@ -2,11 +2,11 @@ import { getJson, postJson } from "./client";
 import type {
   AttemptEntry,
   AttemptResponse,
-  Certificate,
   Enrollment,
   Exam,
   ExamResult,
   LessonCompleted,
+  LevelCompletion,
   LevelDetail,
   LevelsResponse,
   MasteryLevel,
@@ -83,10 +83,10 @@ export function submitExam(
   );
 }
 
-export function getCertificates(userId: string): Promise<Certificate[]> {
-  return getJson<{ certificates: Certificate[] }>(
-    `/api/academy/certificates${userQuery(userId)}`,
-  ).then((r) => r.certificates);
+export function getLevelCompletions(userId: string): Promise<LevelCompletion[]> {
+  return getJson<{ completions: LevelCompletion[] }>(
+    `/api/academy/level-completions${userQuery(userId)}`,
+  ).then((r) => r.completions);
 }
 
 export function getStudyPlan(

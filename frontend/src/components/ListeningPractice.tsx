@@ -120,9 +120,31 @@ export function ListeningPractice({
             </div>
           )}
           {stats && (
-            <p className="listening-stats">
-              Aciertos: {stats.correct} de {stats.attempts}
-              {stats.accuracy !== null ? ` (${stats.accuracy}%)` : ""}
+            <div className="listening-stats">
+              <p>
+                Aciertos: {stats.correct} de {stats.attempts}
+                {stats.accuracy !== null ? ` (${stats.accuracy}%)` : ""}
+              </p>
+              <p className="listening-level">
+                Nivel actual: <strong>{stats.level}</strong>
+              </p>
+              <ul className="listening-levels">
+                {stats.levels.map((lv) => (
+                  <li
+                    key={lv.level}
+                    className={`listening-level-pill${
+                      lv.completed ? " completed" : ""
+                    }`}
+                  >
+                    {lv.level} · {lv.mastered}/{lv.total}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {stats?.completed && (
+            <p className="listening-completed">
+              ¡Has completado todos los niveles de comprensión auditiva!
             </p>
           )}
           <button

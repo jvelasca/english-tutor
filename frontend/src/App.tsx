@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useChat } from "./hooks/useChat";
 import { useHandsFree } from "./hooks/useHandsFree";
-import { useTheme } from "./hooks/useTheme";
+import { useAppearance } from "./hooks/useAppearance";
 import { ChatMessage } from "./components/ChatMessage";
 import { Composer } from "./components/Composer";
 import { Academy } from "./components/Academy";
+import { AppearancePanel } from "./components/AppearancePanel";
 import { HandsFreeToggle } from "./components/HandsFreeToggle";
+import { HelpDialog } from "./components/HelpDialog";
 import { LearningProfile } from "./components/LearningProfile";
 import { ListeningPractice } from "./components/ListeningPractice";
 import { ModeBar, type AppView } from "./components/ModeBar";
@@ -13,7 +15,6 @@ import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { Sidebar } from "./components/Sidebar";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { TutorQualityPanel } from "./components/TutorQualityPanel";
 import { UserMenu } from "./components/UserMenu";
 import { clampRight, clampSidebar } from "./utils/layout";
@@ -65,10 +66,12 @@ export default function App() {
     completeLesson,
   } = useChat();
 
-  const { theme, toggleTheme } = useTheme();
+  const appearance = useAppearance(currentUserId);
   const handsFree = useHandsFree(sendText);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [view, setView] = useState<AppView>("chat");
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -192,9 +195,39 @@ export default function App() {
           >
             <PanelIcon />
           </button>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setAppearanceOpen(true)}
+            title="Apariencia y tema"
+            aria-label="Abrir ajustes de apariencia"
+            aria-haspopup="dialog"
+          >
+            <GearIcon />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setHelpOpen(true)}
+            title="Ayuda"
+            aria-label="Abrir ayuda"
+            aria-haspopup="dialog"
+          >
+            <HelpIcon />
+          </button>
         </div>
       </header>
+
+      {appearanceOpen && (
+        <AppearancePanel
+          appearance={appearance.appearance}
+          onUpdate={appearance.update}
+          onReset={appearance.reset}
+          onClose={() => setAppearanceOpen(false)}
+        />
+      )}
+
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       {view === "academy" ? (
         <Academy
@@ -407,6 +440,45 @@ function PanelIcon() {
     >
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

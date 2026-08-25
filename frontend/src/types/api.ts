@@ -202,10 +202,20 @@ export interface ListeningAnswerResponse {
   level: string;
 }
 
+export interface ListeningLevelProgress {
+  level: string;
+  total: number;
+  mastered: number;
+  completed: boolean;
+}
+
 export interface ListeningStats {
   attempts: number;
   correct: number;
   accuracy: number | null;
+  level: string;
+  completed: boolean;
+  levels: ListeningLevelProgress[];
 }
 
 // --- Academy (currículum CEFR, mastery, evaluación) ---
@@ -306,6 +316,7 @@ export interface LevelSummary {
   description: string;
   objective_count: number;
   available: boolean;
+  unlocked: boolean;
   enrolled: boolean;
   progress: number;
   correct: number;
@@ -396,7 +407,7 @@ export interface ExamResult {
   remediation: Record<string, string[]>;
 }
 
-export interface Certificate {
+export interface LevelCompletion {
   id: number;
   level_id: string;
   level: string;
@@ -404,8 +415,8 @@ export interface Certificate {
   awarded_at: string;
 }
 
-export interface CertificatesResponse {
-  certificates: Certificate[];
+export interface LevelCompletionsResponse {
+  completions: LevelCompletion[];
 }
 
 export interface StudyPlanStep {

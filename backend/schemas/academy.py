@@ -110,6 +110,7 @@ class LevelSummaryOut(BaseModel):
     description: str
     objective_count: int
     available: bool
+    unlocked: bool
     enrolled: bool
     progress: float
     correct: int
@@ -192,7 +193,7 @@ class ExamResultOut(BaseModel):
     remediation: dict[str, list[str]] = Field(default_factory=dict)
 
 
-class CertificateOut(BaseModel):
+class LevelCompletionOut(BaseModel):
     id: int
     level_id: str
     level: str
@@ -200,8 +201,8 @@ class CertificateOut(BaseModel):
     awarded_at: str
 
 
-class CertificatesOut(BaseModel):
-    certificates: list[CertificateOut]
+class LevelCompletionsOut(BaseModel):
+    completions: list[LevelCompletionOut]
 
 
 class StudyPlanRequest(BaseModel):

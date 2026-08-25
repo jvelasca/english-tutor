@@ -8,12 +8,12 @@ from repositories import academy as academy_repo
 from repositories import grammar as grammar_repo
 from schemas.academy import (
     AttemptOut,
-    CertificateOut,
     EnrollmentOut,
     ExamItemOut,
     ExamOut,
     ExamResultOut,
     LessonCompletedOut,
+    LevelCompletionOut,
     LevelDetailOut,
     LevelProgressOut,
     LevelSummaryOut,
@@ -151,6 +151,7 @@ def _level_summary(
     objective_scores: dict[str, dict[str, float]],
     objective_attempts: dict[str, dict[str, int]],
     attempts: dict[str, dict[str, int]],
+    completed_level_ids: set[str],
 ) -> LevelSummaryOut:
     available = level_id in {lv.level_id for lv in _loaded_levels}
     meta = _LEVEL_TITLES.get(level_id.upper(), ("", ""))
@@ -177,6 +178,7 @@ def _level_summary(
         description=meta[1],
         objective_count=objective_count,
         available=available,
+        unlocked=academy_svc.enrollment_unlocked(level_id, completed_level_ids),
         enrolled=enrolled,
         progress=progress,
         **counters,
@@ -191,6 +193,9 @@ _levels_by_id = {lv.level_id: lv for lv in _loaded_levels}
 async def list_levels(user_id: str) -> list[LevelSummaryOut]:
     enrollments = await run_in_threadpool(academy_repo.list_enrollments, user_id)
     enrolled_ids = {e["level_id"] for e in enrollments}
+    completed_level_ids = {
+        e["level_id"] for e in enrollments if e["status"] == "completed"
+    }
     summaries = []
     for lv in _loaded_levels:
         obj_mastery = await run_in_threadpool(
@@ -207,14 +212,19 @@ async def list_levels(user_id: str) -> list[LevelSummaryOut]:
                 objective_scores,
                 objective_attempts,
                 attempts,
+                completed_level_ids,
             )
         )
-    # Añade los niveles CEFR aún no disponibles (p. ej. A2..C2 antes de F7).
+    # Añade los niveles CEFR aún no disponibles (p. ej. B1..C2 sin contenido).
     existing = {s.level_id for s in summaries}
     for code in CEFR_ORDER:
         lid = code.lower()
         if lid not in existing:
-            summaries.append(_level_summary(lid, lid in enrolled_ids, {}, {}, {}))
+            summaries.append(
+                _level_summary(
+                    lid, lid in enrolled_ids, {}, {}, {}, completed_level_ids
+                )
+            )
     order = {lid: i for i, lid in enumerate(code.lower() for code in CEFR_ORDER)}
     summaries.sort(key=lambda s: order.get(s.level_id, 99))
     return summaries
@@ -265,9 +275,26 @@ async def get_level_detail(level_id: str, user_id: str) -> LevelDetailOut | None
     )
 
 
+async def _completed_level_ids(user_id: str) -> set[str]:
+    """Ids de nivel cuyo estado de matrícula es 'completed'."""
+    enrollments = await run_in_threadpool(academy_repo.list_enrollments, user_id)
+    return {e["level_id"] for e in enrollments if e["status"] == "completed"}
+
+
+async def enrollment_blocked(user_id: str, level_id: str) -> bool:
+    """True si el nivel existe pero no está desbloqueado (para 403 vs 404)."""
+    if level_id not in _levels_by_id:
+        return False
+    completed = await _completed_level_ids(user_id)
+    return not academy_svc.enrollment_unlocked(level_id, completed)
+
+
 async def enroll(user_id: str, level_id: str) -> EnrollmentOut | None:
     lv = _levels_by_id.get(level_id)
     if lv is None:
+        return None
+    completed = await _completed_level_ids(user_id)
+    if not academy_svc.enrollment_unlocked(level_id, completed):
         return None
     ok = await run_in_threadpool(academy_repo.enroll, user_id, level_id, lv.level)
     if not ok:
@@ -509,8 +536,16 @@ async def submit_exam(
     lv = _levels_by_id.get(level_id)
     if exam is None or lv is None:
         return None
-    # Presentarse al examen garantiza la matrícula (upsert).
-    await run_in_threadpool(academy_repo.enroll, user_id, level_id, lv.level)
+    # El examen de un nivel no salta la progresión: solo puede presentarse si el
+    # nivel ya está matriculado o desbloqueado (nivel anterior completado).
+    already_enrolled = await run_in_threadpool(
+        academy_repo.get_enrollment, user_id, level_id
+    )
+    if already_enrolled is None:
+        completed = await _completed_level_ids(user_id)
+        if not academy_svc.enrollment_unlocked(level_id, completed):
+            return None
+        await run_in_threadpool(academy_repo.enroll, user_id, level_id, lv.level)
     result = academy_svc.exam_result(exam, answers)
     await run_in_threadpool(
         academy_repo.record_assessment_result,
@@ -522,7 +557,7 @@ async def submit_exam(
     )
     if result["passed"]:
         # Persiste evidencia por destreza vía el modelo de mastery determinista,
-        # certificado y desbloqueo del siguiente nivel.
+        # completitud del nivel y desbloqueo del siguiente nivel.
         for skill, b in result["skills"].items():
             row = await run_in_threadpool(
                 academy_repo.get_skill_row, user_id, level_id, skill
@@ -532,7 +567,7 @@ async def submit_exam(
                 academy_repo.apply_skill_evidence, user_id, level_id, skill, state
             )
         await run_in_threadpool(
-            academy_repo.award_certificate,
+            academy_repo.record_level_completion,
             user_id,
             level_id,
             lv.level,
@@ -552,10 +587,10 @@ async def submit_exam(
     return ExamResultOut(**result)
 
 
-async def list_certificates(user_id: str) -> list[CertificateOut]:
-    rows = await run_in_threadpool(academy_repo.list_certificates, user_id)
+async def list_level_completions(user_id: str) -> list[LevelCompletionOut]:
+    rows = await run_in_threadpool(academy_repo.list_level_completions, user_id)
     return [
-        CertificateOut(
+        LevelCompletionOut(
             id=r["id"],
             level_id=r["level_id"],
             level=r["level"],

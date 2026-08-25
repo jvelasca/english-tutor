@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   enroll,
-  getCertificates,
   getExam,
+  getLevelCompletions,
   getLevelDetail,
   getLevels,
   getPlacement,
@@ -11,10 +11,10 @@ import {
   submitPlacement,
 } from "../api/academy";
 import type {
-  Certificate,
   CurriculumObjective,
   Exam,
   ExamResult,
+  LevelCompletion,
   LevelDetail,
   LevelSummary,
   ModuleProgress,
@@ -46,7 +46,7 @@ function statusLabel(status: string): string {
 export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
   const [levels, setLevels] = useState<LevelSummary[]>([]);
   const [detail, setDetail] = useState<LevelDetail | null>(null);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [completions, setCompletions] = useState<LevelCompletion[]>([]);
   const [flow, setFlow] = useState<Flow>("none");
   const [placement, setPlacement] = useState<Placement | null>(null);
   const [exam, setExam] = useState<Exam | null>(null);
@@ -67,10 +67,10 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
     }
   }, [userId]);
 
-  const loadCertificates = useCallback(async () => {
+  const loadCompletions = useCallback(async () => {
     if (!userId) return;
     try {
-      setCertificates(await getCertificates(userId));
+      setCompletions(await getLevelCompletions(userId));
     } catch {
       /* backend no disponible */
     }
@@ -78,11 +78,11 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
 
   useEffect(() => {
     void loadLevels();
-    void loadCertificates();
-  }, [loadLevels, loadCertificates]);
+    void loadCompletions();
+  }, [loadLevels, loadCompletions]);
 
   async function openLevel(level: LevelSummary) {
-    if (!userId || !level.available) return;
+    if (!userId || !level.available || !level.unlocked) return;
     setError(null);
     setFlow("none");
     try {
@@ -139,7 +139,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
         setPlacementResult(await submitPlacement(userId, answers));
       } else if (flow === "exam") {
         setExamResult(await submitExam(userId, "a1", answers));
-        void loadCertificates();
+        void loadCompletions();
         void loadLevels();
       }
     } catch (e) {
@@ -181,9 +181,9 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
                   type="button"
                   className={`academy-level${
                     detail?.level_id === lv.level_id ? " active" : ""
-                  }${!lv.available ? " locked" : ""}`}
+                  }${!lv.available || !lv.unlocked ? " locked" : ""}`}
                   onClick={() => openLevel(lv)}
-                  disabled={!lv.available}
+                  disabled={!lv.available || !lv.unlocked}
                 >
                   <span className="academy-level-code">{lv.level}</span>
                   <span className="academy-level-title">{lv.title}</span>
@@ -206,10 +206,10 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
             </button>
           </div>
 
-          {certificates.length > 0 && (
+          {completions.length > 0 && (
             <div className="academy-certificates">
-              <h3>Certificados</h3>
-              {certificates.map((c) => (
+              <h3>Niveles completados</h3>
+              {completions.map((c) => (
                 <div key={c.id} className="academy-certificate">
                   <strong>{c.level}</strong> · {Math.round(c.overall * 100)}%
                 </div>

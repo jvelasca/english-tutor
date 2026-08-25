@@ -24,6 +24,21 @@ MASTERY_ALPHA = 0.5
 STREAK_TARGET = 3
 
 
+def enrollment_unlocked(level_id: str, completed_level_ids: set[str]) -> bool:
+    """True si el nivel puede matricularse.
+
+    Progresión CEFR estricta: el primer nivel (A1) siempre está disponible; el
+    resto solo si el nivel CEFR inmediatamente anterior está completado. Los ids
+    de nivel se normalizan a mayúsculas para compararlos con `CEFR_ORDER`."""
+    code = level_id.upper()
+    if code not in CEFR_ORDER:
+        return False
+    idx = CEFR_ORDER.index(code)
+    if idx == 0:
+        return True
+    return CEFR_ORDER[idx - 1].lower() in completed_level_ids
+
+
 def _default_mastery_state() -> dict:
     """Estado inicial de una destreza sin evidencia registrada."""
     return {

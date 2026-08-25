@@ -1,5 +1,5 @@
 """Repositorio del estado de la Academy (SQLite): matrícula, mastery, evaluaciones
-y certificados. El contenido no vive aquí (JSON en services.curriculum)."""
+y completitud de niveles. El contenido no vive aquí (JSON en services.curriculum)."""
 
 from __future__ import annotations
 
@@ -265,7 +265,7 @@ def list_assessment_results(user_id: str) -> list[dict]:
     return result
 
 
-def award_certificate(
+def record_level_completion(
     user_id: str, level_id: str, level: str, overall: float
 ) -> dict | None:
     if get_user(user_id) is None:
@@ -273,7 +273,7 @@ def award_certificate(
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
-            "INSERT INTO academy_certificates "
+            "INSERT INTO academy_level_completions "
             "(user_id, level_id, level, overall, awarded_at) "
             "VALUES (?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id, level_id) DO UPDATE SET "
@@ -289,11 +289,11 @@ def award_certificate(
     }
 
 
-def list_certificates(user_id: str) -> list[dict]:
+def list_level_completions(user_id: str) -> list[dict]:
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT id, user_id, level_id, level, overall, awarded_at "
-            "FROM academy_certificates WHERE user_id = ? ORDER BY awarded_at DESC",
+            "FROM academy_level_completions WHERE user_id = ? ORDER BY awarded_at DESC",
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
