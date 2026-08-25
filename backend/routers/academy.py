@@ -35,6 +35,12 @@ async def levels(user: dict = Depends(current_user)) -> dict:
 
 @router.get("/api/academy/levels/{level_id}", response_model=LevelDetailOut)
 async def level_detail(level_id: str, user: dict = Depends(current_user)) -> dict:
+    # El contenido curricular de un nivel bloqueado no debe filtrarse: el gating
+    # se valida en el backend (no solo en el frontend), como en enroll/exam.
+    if await academy_service.enrollment_blocked(user["id"], level_id):
+        raise HTTPException(
+            status_code=403, detail="Nivel bloqueado: completa el nivel anterior"
+        )
     detail = await academy_service.get_level_detail(level_id, user["id"])
     if detail is None:
         raise HTTPException(status_code=404, detail="Nivel no encontrado")

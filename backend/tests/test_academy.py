@@ -1,6 +1,7 @@
 """Tests de la Academy: currículum, mastery, progresión, adaptación y evaluación."""
 
 import asyncio
+import sqlite3
 
 from fastapi.testclient import TestClient
 
@@ -14,6 +15,7 @@ from services.curriculum import (
     ASSESSABLE_SKILLS,
     CANONICAL_SKILLS,
     PERFORMANCE_SKILLS,
+    load_all_levels,
     load_assessments,
     load_level,
     next_level_id,
@@ -64,18 +66,30 @@ def test_a2_loads_reusing_same_schema():
 
 
 def test_every_objective_has_checks_for_its_assessable_skills():
-    """Invariante: cada objetivo debe tener checks que cubran exactamente sus
-    destrezas evaluables (grammar/vocabulary/reading/listening) y ninguno que
-    pretenda evaluar destrezas de performance (speaking/writing/pronunciation),
-    para las que aún no existe evidencia determinista."""
-    for level_id in ("a1", "a2"):
-        lv = load_level(level_id)
+    """Invariante curricular (todos los niveles disponibles): cada objetivo debe
+    tener checks que cubran exactamente sus destrezas evaluables
+    (grammar/vocabulary/reading/listening) y ninguno que pretenda evaluar
+    destrezas de performance (speaking/writing/pronunciation), para las que aún
+    no existe evidencia determinista. Las destrezas deben ser canónicas, con
+    umbrales válidos y un mínimo de evidencias ≥ 1."""
+    levels = load_all_levels()
+    assert levels, "no hay niveles disponibles"
+    for lv in levels:
+        assert lv.modules, lv.level_id
         for o in lv.objectives():
-            assert o.checks, f"{level_id}: {o.id} no tiene checks"
+            assert o.can_do.startswith("I can "), (lv.level_id, o.id)
+            assert o.skills, (lv.level_id, o.id)
+            assert set(o.skills) <= set(CANONICAL_SKILLS), (lv.level_id, o.id)
+            assert o.minimum_attempts >= 1, (lv.level_id, o.id)
+            assert all(0 < t <= 1 for t in o.thresholds.values()), (
+                lv.level_id,
+                o.id,
+            )
+            assert o.checks, f"{lv.level_id}: {o.id} no tiene checks"
             check_skills = {c.skill for c in o.checks}
             expected = set(o.skills) & set(ASSESSABLE_SKILLS)
             assert check_skills == expected, (
-                f"{level_id}: {o.id} esperaba checks {expected} "
+                f"{lv.level_id}: {o.id} esperaba checks {expected} "
                 f"pero tiene {check_skills}"
             )
             assert not (check_skills & set(PERFORMANCE_SKILLS))
@@ -273,6 +287,44 @@ def test_level_completion_and_isolation(monkeypatch, tmp_path):
     assert academy_repo.list_level_completions(b) == []
 
 
+def test_certificates_to_level_completions_migration(monkeypatch, tmp_path):
+    """Migración academy_certificates → academy_level_completions: copia filas y
+    elimina la tabla antigua (idempotente en reinstalación)."""
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Base antigua: solo la tabla academy_certificates con una fila.
+    conn = sqlite3.connect(db.DB_PATH)
+    conn.execute(
+        "CREATE TABLE academy_certificates ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, "
+        "level_id TEXT NOT NULL, level TEXT NOT NULL, overall REAL NOT NULL, "
+        "awarded_at TEXT NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO academy_certificates "
+        "(id, user_id, level_id, level, overall, awarded_at) "
+        "VALUES (1, 'u1', 'a1', 'A1', 0.9, '2026-08-25')"
+    )
+    conn.commit()
+    conn.close()
+
+    db.init_db()  # aplica la migración en la fase 2
+
+    conn = sqlite3.connect(db.DB_PATH)
+    tables = {
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    rows = conn.execute(
+        "SELECT level, overall FROM academy_level_completions"
+    ).fetchall()
+    conn.close()
+
+    assert "academy_certificates" not in tables
+    assert rows == [("A1", 0.9)]
+
+
 # --- Endpoints ------------------------------------------------------------
 
 
@@ -334,6 +386,25 @@ def test_levels_expose_unlocked(monkeypatch, tmp_path):
     levels = {lv["level_id"]: lv for lv in r.json()["levels"]}
     assert levels["a1"]["unlocked"] is True
     assert levels["a2"]["unlocked"] is False
+
+
+def test_level_detail_rejects_locked_level(monkeypatch, tmp_path):
+    """El detalle de un nivel bloqueado (prerequisito no completado) se oculta."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/levels/a2", params={"user_id": a})
+        assert r.status_code == 403
+
+        # A1 (primer nivel) siempre es accesible.
+        r1 = client.get("/api/academy/levels/a1", params={"user_id": a})
+        assert r1.status_code == 200
+
+
+def test_level_detail_unknown_level_404(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/levels/b1", params={"user_id": a})
+    assert r.status_code == 404
 
 
 def test_exam_does_not_bypass_enrollment():

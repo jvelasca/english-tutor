@@ -14,9 +14,12 @@ los detalles internos de otra.
 ```
 backend/
 ├── main.py              # PUNTO DE ENTRADA: crea la app, monta los routers. Código mínimo.
-├── config.py            # Configuración: URLs, rutas de modelos, defaults.
+├── config.py            # Configuración: URLs, rutas de modelos, defaults, versión.
+├── dependencies.py      # current_user (perfil activo) y lectura de audio con límites.
 ├── routers/             # Capa HTTP: endpoints + validación. SIN lógica de negocio.
 │   ├── __init__.py
+│   ├── academy.py       # GET/POST /api/academy/levels, enroll, mastery, next, attempts, lessons, objective/assessment
+│   ├── assessment.py    # /api/academy/placement*, /api/academy/exam/{level_id}*, /api/academy/level-completions
 │   ├── chat.py          # POST /api/chat, POST /api/chat/stream (mode + user_id opcional)
 │   ├── conversations.py # CRUD /api/conversations (filtrado por user_id)
 │   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
@@ -24,27 +27,33 @@ backend/
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
 │   ├── listening.py     # GET /api/listening/question, POST /api/listening/answer, GET /api/listening/stats (F8; progresión A1→A2→B1)
 │   ├── models.py        # GET /api/health, GET /api/models
+│   ├── network.py       # GET /api/network (IP + URLs de acceso en LAN)
 │   ├── profile.py       # GET /api/profile (F4)
 │   ├── progress.py      # GET /api/progress?user_id=<id>, GET /api/progress/history (F6)
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
-│   ├── users.py         # GET /api/users, POST /api/users
+│   ├── settings.py      # GET/PUT /api/settings (preferencias por usuario)
+│   ├── users.py         # GET /api/users, POST /api/users, PATCH /api/users/{id}
 │   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
 │   └── voz.py           # POST /api/transcribe, POST /api/tts
 ├── schemas/             # Contratos de datos (Pydantic).
 │   ├── __init__.py
+│   ├── academy.py       # Enrollment*, Level*, Objective*, Mastery*, Assessment*, Attempt*
 │   ├── chat.py          # ChatMessage, ChatRequest, ChatResponse
 │   ├── conversations.py # Conversation, ConversationMeta (con user_id), ConversationUpsert
+│   ├── curriculum.py    # CurriculumActivityOut/ObjectiveOut/ModuleOut/LevelOut (vista del contenido)
 │   ├── grammar.py       # GrammarAnalyze*, GrammarFinding, GrammarRecurringError (F4)
 │   ├── learning.py      # LearningEventType, LearningEvent, LearningEventCreate (F4)
 │   ├── listening.py     # ListeningQuestion, ListeningAnswer*, ListeningStats + ListeningLevelOut (F8)
 │   ├── profile.py       # LearningProfile, EstimatedBands (F4/F8)
 │   ├── pronunciation.py # PronunciationResponse, FluencyStats, PronunciationBreakdown (F7/F8)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
-│   ├── users.py         # User, UserCreate
+│   ├── settings.py      # Settings* (preferencias por usuario)
+│   ├── users.py         # User, UserCreate, UserUpdate
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
 │   └── voz.py           # TTSRequest, TranscribeResponse
 ├── domain/              # Servicios de dominio (async, orquestan la lógica).
 │   ├── __init__.py
+│   ├── academy.py       # orquestación Academy: niveles, mastery, examen, gating (async)
 │   ├── conversations.py
 │   ├── grammar.py       # análisis de errores + persistencia (F4)
 │   ├── learning.py      # eventos de aprendizaje (F4)
@@ -52,11 +61,13 @@ backend/
 │   ├── pronunciation.py
 │   ├── profile.py       # get_profile_summary + get_profile_context (compone el perfil) (F4/F5)
 │   ├── progress.py      # get_progress_history: series + racha + dominio + hitos (F6)
+│   ├── settings.py      # leer/guardar preferencias por usuario
 │   ├── users.py
 │   └── vocabulary.py    # extracción + persistencia (F4)
 ├── repositories/        # Acceso a datos puro (SQLite). Sin reglas de negocio.
 │   ├── __init__.py
 │   ├── db.py            # conexión, esquema, migraciones, ping
+│   ├── academy.py       # enrollments, objective/skill mastery, assessments, level_completions
 │   ├── conversations.py
 │   ├── grammar.py       # grammar_errors (F4)
 │   ├── learning.py      # learning_events (F4)
@@ -64,18 +75,22 @@ backend/
 │   ├── profile.py       # learning_profile (F4)
 │   ├── pronunciation.py
 │   ├── progress.py      # activity_events (mensajes con modo + pronunciaciones) (F6)
+│   ├── settings.py      # tabla settings (clave/valor por usuario)
 │   ├── users.py
 │   └── vocabulary.py    # vocabulary (F4)
 ├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
 │   ├── __init__.py
+│   ├── academy.py       # mastery determinista (EMA+racha), gating, progresión, evaluación (puro)
 │   ├── cefr.py          # evaluate_cefr (multi-señal) + bandas + recommendations (puros, F4/F8)
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
+│   ├── curriculum.py    # carga/validación del currículum JSON + ASSESSABLE/PERFORMANCE_SKILLS
 │   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
 │   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
 │   ├── listening.py     # banco de preguntas + score_answer + progresión por nivel (puro, F8)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
+│   ├── network.py       # get_lan_ip + URLs de acceso LAN
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
 │   ├── phonetics.py     # evaluador compuesto: word_alignment + soundex + composite_score (F7)
 │   ├── pronunciation.py # score_pronunciation (puro, delega en phonetics)
@@ -83,10 +98,12 @@ backend/
 │   ├── trends.py        # daily_activity + aggregate_series + compute_streak (puros, F6)
 │   ├── tts.py           # piper-tts
 │   └── vocabulary.py    # extract_words (puro, F4)
+├── curriculum/          # contenido curricular versionado como JSON (a1.json, a2.json, assessments.json)
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
 ├── data/                # base SQLite (tutor.db). GITIGNORED.
 ├── tests/               # pruebas (pytest).
 │   ├── conftest.py      # asegura el import desde backend/
+│   ├── test_academy.py  # currículum, mastery por objetivo, gating, examen
 │   ├── test_activity.py # F6
 │   ├── test_api_security.py
 │   ├── test_cefr_evaluation.py # F8
@@ -94,6 +111,7 @@ backend/
 │   ├── test_chat_profile.py # F5
 │   ├── test_context.py      # F5
 │   ├── test_cors.py
+│   ├── test_cross_user_isolation.py
 │   ├── test_domain_async.py
 │   ├── test_evaluation.py # F9
 │   ├── test_evaluation_report.py # F9
@@ -105,6 +123,7 @@ backend/
 │   ├── test_listening.py # F8
 │   ├── test_mastery.py # F6
 │   ├── test_modes.py
+│   ├── test_network.py
 │   ├── test_phonetics.py # F7
 │   ├── test_policy.py   # F5
 │   ├── test_profile.py  # F4
@@ -113,10 +132,12 @@ backend/
 │   ├── test_pronunciation.py
 │   ├── test_robustness.py
 │   ├── test_schemas.py
+│   ├── test_settings.py
 │   ├── test_store.py
 │   ├── test_store_append_only.py
 │   ├── test_store_isolation.py
 │   ├── test_trends.py  # F6
+│   ├── test_user_profile.py
 │   ├── test_users.py
 │   └── test_vocabulary.py # F4
 ├── scripts/             # scripts de utilidad.
@@ -135,28 +156,54 @@ backend/
 - **`domain/`**: servicios asíncronos que orquestan la lógica (delegan en `repositories/` vía
   `run_in_threadpool`).
 - **`repositories/`**: acceso a datos puro (SQLite); sin reglas de negocio.
-- **`services/`**: lógica pura/testable (scoring, análisis determinista) y clientes de infra
-  (Ollama, whisper, piper). No importa FastAPI.
+- **`services/`**: lógica pura/testable (scoring, análisis determinista, motor de mastery) y
+  clientes de infra (Ollama, whisper, piper). No importa FastAPI.
 - **`schemas/`**: tipos Pydantic. Son el contrato de la API.
 - **`config.py`**: constantes de entorno/configuración, sin lógica.
+
+### Academy (currículum CEFR + Mastery Engine)
+
+La Academy separa **contenido** (qué debe aprender) de **evidencia** (qué sabe), con un motor
+de mastery determinista que decide el dominio sin LLM-juez.
+
+- **Contenido**: `backend/curriculum/*.json` (`a1.json`, `a2.json`, `assessments.json`) como
+  fuente de verdad, editable sin tocar lógica. `services/curriculum.py` lo carga y valida
+  (Pydantic) y define `CANONICAL_SKILLS`, `ASSESSABLE_SKILLS` (grammar/vocabulary/reading/
+  listening) y `PERFORMANCE_SKILLS` (speaking/writing/pronunciation).
+- **Mastery Engine** (`services/academy.py`, puro): `next_mastery_state` (EMA + `confidence` +
+  `streak`; sin `MAX`, con decay), `objective_progress` (exige `score ≥ threshold` **y**
+  `attempts ≥ minimum_attempts`), `mastered_objective_ids` (dominio por `(user, level, objective,
+  skill)`), `unlock_state` (gating secuencial) y `exam_result`.
+- **Orquestación** (`domain/academy.py`, async): compone currículum + repositorios y aplica el
+  gating (`enroll`, `submit_exam`) sin saltarse la progresión CEFR (A1 → A2 → B1 → ...).
+- **Persistencia** (`repositories/academy.py`): `academy_enrollments`, `academy_objective_mastery`,
+  `academy_skill_mastery`, `academy_assessment_results`, `academy_level_completions`.
+- **HTTP** (`routers/academy.py` + `routers/assessment.py`): exponen niveles, mastery, evaluación
+  de objetivo, examen de nivel y completitud. El gating se valida **en el backend**, no solo en
+  el frontend.
+
+Principio rector: **la IA genera evidencia; el Mastery Engine determinista decide el dominio.**
 
 ## Frontend (`frontend/src/`)
 
 ```
 frontend/src/
 ├── main.tsx
-├── App.tsx              # Orquesta: compone la página.
+├── App.tsx              # Orquesta: compone la página (workspace multi-panel redimensionable).
 ├── api/                 # Cliente HTTP (única capa que habla con el backend).
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
+│   ├── academy.ts       # niveles, enroll, mastery, examen, attempts, objective/assessment.
 │   ├── chat.ts          # chat normal + streaming (envía mode + user_id).
 │   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
 │   ├── learning.ts      # getProfile + analyzeText + getEvents (F4/F6).
 │   ├── listening.ts     # getListeningQuestion + submitListeningAnswer + getListeningStats (F8).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).
 │   ├── progress.ts      # getProgress + getProgressHistory (resumen + histórico) (F6).
-│   ├── users.ts         # listUsers, createUser.
+│   ├── settings.ts      # getSettings + putSettings (preferencias por usuario).
+│   ├── users.ts         # listUsers, createUser, updateUser.
 │   └── voz.ts           # transcribe + tts.
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
+│   ├── Academy.tsx      # currículum CEFR: niveles, objetivos, mastery y examen (núcleo Academy)
 │   ├── AppearancePanel.tsx # panel de apariencia: tema, acento, tamaño, densidad (M16)
 │   ├── ChatMessage.tsx
 │   ├── Composer.tsx
@@ -165,43 +212,39 @@ frontend/src/
 │   ├── LearningProfile.tsx  # panel del perfil: CEFR + bandas por destreza + recomendaciones (F4/F8)
 │   ├── ListeningPractice.tsx # comprensión auditiva: TTS + responder + nivel/progreso (F8)
 │   ├── MicButton.tsx
-│   ├── ModeSelect.tsx   # selector de modo de tutor
-│   ├── PronunciationPractice.tsx # feedback fonético + fluidez (WPM) (F7/F8)
+│   ├── ModeBar.tsx      # selector de modo de tutor
+│   ├── ProfileDialog.tsx # editar perfil: nombre, avatar, color (M14)
 │   ├── ProgressDashboard.tsx # dashboard de progreso real: tendencias, racha, dominio, hitos (F6)
+│   ├── PronunciationPractice.tsx # feedback fonético + fluidez (WPM) (F7/F8)
+│   ├── ResizeHandle.tsx # asa redimensionable entre paneles (M14)
 │   ├── Sidebar.tsx      # lista de conversaciones
 │   ├── SpeakButton.tsx
 │   ├── TutorQualityPanel.tsx # panel de calidad del tutor (F9)
-│   └── UserSelect.tsx   # selector de perfil de usuario
+│   ├── UserAvatar.tsx   # avatar (imagen → emoji → iniciales) (M14)
+│   └── UserMenu.tsx     # selector/perfil de usuario (M14)
 ├── hooks/               # Estado y lógica de UI.
 │   ├── useAppearance.ts # apariencia por usuario: tema/acento/tamaño/densidad + persistencia (M16)
 │   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
 │   └── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
 │   └── api.ts           # incluye User y user_id en ConversationMeta
-├── utils/               # Funciones puras (testables).
+├── utils/               # Funciones puras (testables, con su *.test.ts junto).
 │   ├── appearance.ts    # presets de acento/tamaño/densidad + parse/serialize (M16)
-│   ├── appearance.test.ts
-│   ├── title.ts         # deriveTitle
-│   ├── title.test.ts
+│   ├── avatar.ts        # color/emoji/iniciales deterministas (M14)
 │   ├── cefr.ts          # cefrTone, cefrLabel, bandLabel (F4/F8)
-│   ├── cefr.test.ts
+│   ├── cookie.ts        # cookies del launcher
 │   ├── fluency.ts       # wpmLabel, fluencyLevelLabel (F8)
-│   ├── fluency.test.ts
-│   ├── sse.ts           # parseo de eventos SSE
-│   ├── sse.test.ts
+│   ├── image.ts         # resizeImageToDataUrl (M14)
+│   ├── layout.ts        # dimensiones de paneles + clamp/parse/serialize (M14)
 │   ├── modes.ts         # MODES + isTutorMode
-│   ├── modes.test.ts
-│   ├── users.ts         # nextDefaultUserName
-│   ├── users.test.ts
 │   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel + bucketLabel/eventLabel (M9/F6)
 │   ├── pronunciationFeedback.ts # joinWords/feedbackHints/wordsCorrectLabel (puros, F7)
-│   ├── progress.test.ts
+│   ├── sse.ts           # parseo de eventos SSE
 │   ├── theme.ts         # resolveInitialTheme (M8)
-│   ├── theme.test.ts
-│   ├── vad.ts           # VAD: rms + shouldEndUtterance + constantes (M10)
-│   ├── vad.test.ts
+│   ├── title.ts         # deriveTitle
 │   ├── tutorEvaluation.ts # evaluador del tutor: ratios + scores + medias (puro, F9)
-│   └── tutorEvaluation.test.ts
+│   ├── users.ts         # nextDefaultUserName
+│   └── vad.ts           # VAD: rms + shouldEndUtterance + constantes (M10)
 ├── scripts/             # scripts de utilidad.
 │   └── check.ps1        # tsc + vitest
 ├── vitest.config.ts
@@ -227,6 +270,7 @@ frontend/src/
 ```
 launcher/
 ├── launcher.py          # PUNTO DE ENTRADA: GUI mínima (tkinter), arranca/para la app
+├── ui.py                # paleta, iconos, dots de estado y lectura de logs (puro)
 ├── core.py              # lógica pura: rutas, comandos de arranque, normalización de estado
 ├── process_manager.py   # subprocesos: arrancar/parar backend (uvicorn) y frontend (Vite)
 ├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
@@ -234,12 +278,14 @@ launcher/
 ├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
 ├── icon.ico             # icono del acceso directo
 ├── pyproject.toml       # configuración de ruff (mismas reglas que el backend)
-└── tests/               # pytest (conftest.py + test_core/test_status/test_process_manager)
+└── tests/               # pytest (conftest.py + test_core/test_status/test_process_manager/test_ui)
 ```
 
 ### Responsabilidades launcher
 - **`launcher.py`**: GUI `tkinter` (ventana de estado con servicios, BD y usuarios; botones
-  Iniciar/Detener/Abrir/Actualizar). Solo orquesta; no contiene lógica de negocio.
+  Iniciar/Detener/Abrir/Actualizar; paneles colapsables). Solo orquesta; no contiene lógica de
+  negocio.
+- **`ui.py`**: constantes de estilo (colores, iconos, puntos de estado) y lectura de logs.
 - **`core.py`**: funciones puras y testables (resolver rutas, construir comandos, normalizar
   estado de salud y contadores).
 - **`process_manager.py`**: ciclo de vida de los dos subprocesos (backend/frontend), con

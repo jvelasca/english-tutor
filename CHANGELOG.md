@@ -4,6 +4,62 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.2.2] — 2026-08-25
+
+Hardening de la Academy antes del Evidence & Performance Engine (V1.3). Sin funcionalidad nueva:
+refuerza la seguridad del gating curricular, elimina deuda de hardcodes y consolida la
+documentación/versionado.
+
+### Añadido
+- **Gating de lectura del detalle de nivel**: `GET /api/academy/levels/{level_id}` devuelve
+  `403` para niveles bloqueados (prerequisito no completado) y `404` solo para niveles
+  inexistentes, alineado con `enroll`/`submit_exam`.
+- **Invariante curricular ampliada a todos los niveles** (`load_all_levels`): cada objetivo
+  valida `can_do`, destrezas canónicas, umbrales válidos y `minimum_attempts ≥ 1`, y sus checks
+  cubren exactamente sus destrezas evaluables.
+- **Test de migración** `academy_certificates → academy_level_completions` (copia filas y elimina
+  la tabla antigua).
+
+### Cambiado
+- **UI de Academy sin hardcodes `"a1"`**: el examen usa el nivel seleccionado
+  (`getExam(selectedLevel.level_id)` / `submitExam(...)`), con textos dinámicos
+  ("Examen final A2", "Evaluación A2 superada") y cabecera "Currículum CEFR · A1 → C2".
+- **Documentación y versionado consistentes**: `README`, `PLAN`, `docs/RELEVO`,
+  `docs/ARQUITECTURA` y `package-lock.json` actualizados a `1.2.2`; arquitectura reescrita con
+  la estructura real de la Academy.
+
+## [1.2.1] — 2026-08-25
+
+Integridad curricular de la Academy y apariencia configurable. Refuerza el modelo de mastery
+determinista (evidencia repetida + decay + gating) y corrige la semántica de "certificado".
+
+### Añadido
+- **Gating CEFR estricto**: `enroll()` y `submit_exam()` exigen el nivel anterior completado
+  (A1 → A2 → B1 → ...); el examen no puede saltarse la progresión.
+- **Mastery por objetivo**: clave `(user, level, objective, skill)`; el dominio de una destreza
+  en un objetivo no se contagia a otros objetivos que compartan destreza.
+- **Mínimo de evidencias**: `minimum_attempts = 3`; un único acierto ya no marca un objetivo
+  como dominado (evidencia + consistencia antes que mastery).
+- **Decay del mastery**: sustituye `MAX(score, new)` por EMA (`recent_score`) + `confidence` +
+  `streak`; el dominio puede bajar si el rendimiento reciente empeora.
+- **Separación knowledge/performance**: `ASSESSABLE_SKILLS` (grammar/vocabulary/reading/listening)
+  gatean el dominio; `PERFORMANCE_SKILLS` (speaking/writing/pronunciation) quedan a la espera de
+  evidencia de rendimiento real.
+- **Listening con progresión**: `current_level()`/`level_status()`/`pick_next_question()` avanzan
+  A1→A2→B1 por dominio de preguntas (fix del bug de "se queda en 12 aciertos").
+- **Apariencia configurable (M16)**: tema claro/oscuro, acento (7 colores), tamaño de letra y
+  densidad; persistido por usuario (`settings` + `localStorage`). Botón de ayuda (`HelpDialog`).
+
+### Cambiado
+- **`certificates` → `level_completions`** (tabla + endpoint + esquemas + UI), con migración
+  idempotente `academy_certificates → academy_level_completions`.
+- **Semántica honesta del examen**: "Evaluación A1 superada" (y explícita que no mide producción
+  oral/escrita), en lugar de un "certificado" que el sistema aún no puede emitir.
+
+### Corregido
+- Bloqueo de progresión: `objective_progress` solo exige las destrezas con evidencia determinista
+  (`assessable_skills`), desbloqueando la cadena de gating.
+
 ## [1.2.0] — 2026-08-25
 
 Academy curricular: A1/A2 funcional de extremo a extremo con mastery por objetivo y desbloqueo

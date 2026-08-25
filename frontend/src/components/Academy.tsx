@@ -45,6 +45,7 @@ function statusLabel(status: string): string {
 
 export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
   const [levels, setLevels] = useState<LevelSummary[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState<LevelSummary | null>(null);
   const [detail, setDetail] = useState<LevelDetail | null>(null);
   const [completions, setCompletions] = useState<LevelCompletion[]>([]);
   const [flow, setFlow] = useState<Flow>("none");
@@ -88,6 +89,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
     try {
       if (!level.enrolled) await enroll(userId, level.level_id);
       setDetail(await getLevelDetail(userId, level.level_id));
+      setSelectedLevel(level);
       void loadLevels();
     } catch (e) {
       setError((e as Error).message);
@@ -118,13 +120,13 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
   }
 
   async function startExam() {
-    if (!userId) return;
+    if (!userId || !selectedLevel) return;
     setError(null);
     setFlow("exam");
     setAnswers({});
     setExamResult(null);
     try {
-      setExam(await getExam("a1"));
+      setExam(await getExam(selectedLevel.level_id));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -138,7 +140,8 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
       if (flow === "placement") {
         setPlacementResult(await submitPlacement(userId, answers));
       } else if (flow === "exam") {
-        setExamResult(await submitExam(userId, "a1", answers));
+        if (!selectedLevel) return;
+        setExamResult(await submitExam(userId, selectedLevel.level_id, answers));
         void loadCompletions();
         void loadLevels();
       }
@@ -164,7 +167,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
       <header className="academy-header">
         <div>
           <h2>English Tutor Academy</h2>
-          <p>Currículum CEFR · A1 piloto</p>
+          <p>Currículum CEFR · A1 → C2</p>
         </div>
         <button type="button" className="academy-close" onClick={onClose}>
           Volver al chat
@@ -201,8 +204,12 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
             <button type="button" onClick={startPlacement} disabled={!userId}>
               Test de nivel
             </button>
-            <button type="button" onClick={startExam} disabled={!userId}>
-              Examen final A1
+            <button
+              type="button"
+              onClick={startExam}
+              disabled={!userId || !selectedLevel}
+            >
+              Examen final {selectedLevel?.level ?? ""}
             </button>
           </div>
 
@@ -251,7 +258,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
 
           {flow === "exam" && (
             <AssessmentFlow
-              title={exam?.title ?? "Examen final A1"}
+              title={exam?.title ?? `Examen final ${selectedLevel?.level ?? ""}`}
               items={exam?.items.map((i) => ({
                 id: i.id,
                 prompt: i.prompt,
@@ -271,7 +278,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
                   >
                     <strong>
                       {examResult.passed
-                        ? "Evaluación A1 superada"
+                        ? `Evaluación ${selectedLevel?.level ?? ""} superada`
                         : "Evaluación aún no superada"}
                     </strong>
                     <span>
@@ -303,7 +310,7 @@ export function Academy({ userId, onStartLesson, onClose }: AcademyProps) {
               />
             ) : (
               <div className="academy-empty">
-                Selecciona el nivel <strong>A1</strong> para empezar.
+                Selecciona un nivel para empezar.
               </div>
             ))}
         </main>

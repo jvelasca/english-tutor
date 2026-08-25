@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.2.0` (Academy A1/A2 funcional + fix del bloqueo de evidencia; Release Audit 1.1 + fases 1–10 de endurecimiento cerradas).
+- ✅ Versión estable `1.2.2` (hardening: gating de `get_level_detail`, versionado consistente, sin hardcodes A1; integridad curricular: gating CEFR, mastery por objetivo, decay y mínimo de evidencias).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
