@@ -117,16 +117,27 @@ def _discover_firefox(profiles: Path) -> list[dict]:
     return stores
 
 
+# Raíces de datos de usuario de los navegadores Chromium soportados.
+# (nombre, variable de entorno base, ruta relativa). Opera/Opera GX no usan la
+# subcarpeta "User Data": sus perfiles viven directamente en la carpeta raíz.
+_BROWSER_ROOTS: list[tuple[str, str, str]] = [
+    ("Chrome", "LOCALAPPDATA", "Google/Chrome/User Data"),
+    ("Edge", "LOCALAPPDATA", "Microsoft/Edge/User Data"),
+    ("Brave", "LOCALAPPDATA", "BraveSoftware/Brave-Browser/User Data"),
+    ("Vivaldi", "LOCALAPPDATA", "Vivaldi/User Data"),
+    ("Opera", "APPDATA", "Opera Software/Opera Stable"),
+    ("Opera GX", "APPDATA", "Opera Software/Opera GX Stable"),
+]
+
+
 def discover_stores() -> list[dict]:
     """Perfiles de navegador con su base de datos de cookies (Windows)."""
     stores: list[dict] = []
-    localappdata = os.environ.get("LOCALAPPDATA")
-    if localappdata:
-        for browser, root in (
-            ("Chrome", Path(localappdata) / "Google" / "Chrome" / "User Data"),
-            ("Edge", Path(localappdata) / "Microsoft" / "Edge" / "User Data"),
-        ):
-            stores.extend(_discover_chromium(browser, root))
+    for browser, env, rel in _BROWSER_ROOTS:
+        base = os.environ.get(env)
+        if not base:
+            continue
+        stores.extend(_discover_chromium(browser, Path(base) / rel))
 
     appdata = os.environ.get("APPDATA")
     if appdata:
@@ -134,6 +145,41 @@ def discover_stores() -> list[dict]:
             _discover_firefox(Path(appdata) / "Mozilla" / "Firefox" / "Profiles")
         )
     return stores
+
+
+def diagnose_stores() -> list[dict]:
+    """Estado de cada navegador soportado: si está instalado y qué perfiles tiene.
+
+    Sirve para explicar por qué no se ven cookies (p. ej. navegador no instalado
+    o sin base de cookies), en lugar de mostrar solo "0 cookies"."""
+    diagnosis: list[dict] = []
+    for browser, env, rel in _BROWSER_ROOTS:
+        base = os.environ.get(env)
+        root = Path(base) / rel if base else None
+        item = {
+            "browser": browser,
+            "found": bool(root and root.is_dir()),
+            "root": str(root) if root else "",
+            "profiles": [],
+        }
+        if item["found"]:
+            item["profiles"] = [
+                s["profile"] for s in _discover_chromium(browser, root)
+            ]
+        diagnosis.append(item)
+
+    appdata = os.environ.get("APPDATA")
+    ff_root = Path(appdata) / "Mozilla" / "Firefox" / "Profiles" if appdata else None
+    ff_item = {
+        "browser": "Firefox",
+        "found": bool(ff_root and ff_root.is_dir()),
+        "root": str(ff_root) if ff_root else "",
+        "profiles": [],
+    }
+    if ff_item["found"]:
+        ff_item["profiles"] = [s["profile"] for s in _discover_firefox(ff_root)]
+    diagnosis.append(ff_item)
+    return diagnosis
 
 
 # --- Lectura de una base de cookies ---
@@ -251,8 +297,13 @@ def cookie_summary(rows: list[dict]) -> dict:
 
 
 def collect_cookies() -> tuple[list[dict], dict]:
-    """Detecta navegadores y lee todas las cookies de la app (rows, summary)."""
+    """Detecta navegadores y lee todas las cookies de la app (rows, summary).
+
+    El `summary` incluye la clave `diagnosis` con el estado de cada navegador
+    (instalado/no y perfiles), para explicar un posible "0 cookies"."""
     rows: list[dict] = []
     for store in discover_stores():
         rows.extend(read_store(store))
-    return rows, cookie_summary(rows)
+    summary = cookie_summary(rows)
+    summary["diagnosis"] = diagnose_stores()
+    return rows, summary

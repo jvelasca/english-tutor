@@ -328,13 +328,9 @@ export function useChat() {
 
   const editUser = useCallback(
     async (id: string, patch: UserPatch): Promise<User | null> => {
-      try {
-        const updated = await updateUserApi(id, patch);
-        setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
-        return updated;
-      } catch {
-        return null;
-      }
+      const updated = await updateUserApi(id, patch);
+      setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+      return updated;
     },
     [],
   );

@@ -145,3 +145,55 @@ def test_collect_cookies_returns_rows_and_summary(monkeypatch):
     assert rows == []
     assert summary["total"] == 0
     assert summary["remembered"] is None
+    assert isinstance(summary.get("diagnosis"), list)
+
+
+def test_collect_cookies_includes_diagnosis(monkeypatch):
+    monkeypatch.setattr(bc, "discover_stores", lambda: [])
+    monkeypatch.setattr(
+        bc,
+        "diagnose_stores",
+        lambda: [{"browser": "Chrome", "found": False, "root": "", "profiles": []}],
+    )
+    rows, summary = bc.collect_cookies()
+    assert rows == []
+    assert summary["diagnosis"] == [
+        {"browser": "Chrome", "found": False, "root": "", "profiles": []}
+    ]
+
+
+def test_browser_roots_include_chromium_family():
+    names = {b for b, _e, _r in bc._BROWSER_ROOTS}
+    assert {"Chrome", "Edge", "Brave", "Vivaldi", "Opera", "Opera GX"} <= names
+
+
+def test_diagnose_stores_reports_browsers(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    (tmp_path / "BraveSoftware" / "Brave-Browser" / "User Data").mkdir(parents=True)
+    (tmp_path / "Vivaldi" / "User Data").mkdir(parents=True)
+
+    def fake_chromium(browser, root):
+        if browser in ("Brave", "Vivaldi"):
+            return [
+                {
+                    "browser": browser,
+                    "profile": "Default",
+                    "kind": "chromium",
+                    "db": "x",
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(bc, "_discover_chromium", fake_chromium)
+    monkeypatch.setattr(bc, "_discover_firefox", lambda profiles: [])
+
+    diag = bc.diagnose_stores()
+    by_name = {d["browser"]: d for d in diag}
+    browsers = {"Chrome", "Edge", "Brave", "Vivaldi", "Opera", "Opera GX", "Firefox"}
+    assert browsers <= set(by_name)
+    assert by_name["Brave"]["found"] is True
+    assert by_name["Brave"]["profiles"] == ["Default"]
+    assert by_name["Vivaldi"]["found"] is True
+    assert by_name["Vivaldi"]["profiles"] == ["Default"]
+    assert by_name["Chrome"]["found"] is False

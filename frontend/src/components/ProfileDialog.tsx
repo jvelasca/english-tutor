@@ -41,15 +41,23 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
     if (!trimmed) return;
     setSaving(true);
     setError(null);
-    const updated = await onSave({
+    // Solo reenvía la imagen si cambió, para no reenviar data URLs ya guardados
+    // (que podrían superar el límite del backend) al editar solo el nombre.
+    const patch: UserPatch = {
       name: trimmed,
       avatar_color: color,
       avatar_emoji: emoji,
-      avatar_image: image,
-    });
-    setSaving(false);
-    if (updated) onClose();
-    else setError("No se pudo guardar el perfil.");
+    };
+    if (image !== user.avatar_image) patch.avatar_image = image;
+    try {
+      const updated = await onSave(patch);
+      setSaving(false);
+      if (updated) onClose();
+      else setError("No se pudo guardar el perfil.");
+    } catch (e) {
+      setSaving(false);
+      setError(e instanceof Error ? e.message : "No se pudo guardar el perfil.");
+    }
   }
 
   const preview = {

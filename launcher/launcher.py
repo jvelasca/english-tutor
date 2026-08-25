@@ -354,8 +354,10 @@ class LauncherApp:
         paned.add(right_outer, weight=1)
         self._paned = paned
 
-        # El wraplength del detalle de la BD sigue al ancho real de la columna.
+        # El wraplength del detalle de la BD y del diagnóstico de cookies sigue
+        # al ancho real de su columna.
         self._col_left.bind("<Configure>", lambda e: self._update_detail_wrap())
+        self._col_right.bind("<Configure>", lambda e: self._update_detail_wrap())
 
         self._build_services(self._col_left)
         self._build_access(self._col_left)
@@ -476,6 +478,15 @@ class LauncherApp:
         ttk.Label(wrap, textvariable=self._cookie_var, style="Service.TLabel").pack(
             anchor="w"
         )
+        self._cookie_diag_var = tk.StringVar(value="")
+        self._cookie_diag_label = ttk.Label(
+            wrap,
+            textvariable=self._cookie_diag_var,
+            style="DimCard.TLabel",
+            justify="left",
+            wraplength=COLUMN_W - 30,
+        )
+        self._cookie_diag_label.pack(anchor="w", fill="x", pady=(4, 0))
         cols = ("browser", "profile", "name", "host", "expires", "value")
         self._cookie_tree = ttk.Treeview(
             wrap, columns=cols, show="headings", height=8
@@ -667,6 +678,21 @@ class LauncherApp:
             f"{summary['total']} cookies de la app · {browser_txt}{remembered_txt}"
         )
 
+        diag_lines: list[str] = []
+        for d in summary.get("diagnosis", []):
+            if d["found"]:
+                profiles = (
+                    ", ".join(d["profiles"])
+                    if d["profiles"]
+                    else "sin perfiles con base de cookies"
+                )
+                diag_lines.append(f"{d['browser']}: instalado · perfiles: {profiles}")
+            else:
+                diag_lines.append(f"{d['browser']}: no instalado · {d['root']}")
+        self._cookie_diag_var.set(
+            "Diagnóstico:\n" + "\n".join(diag_lines) if diag_lines else ""
+        )
+
         self._cookie_tree.delete(*self._cookie_tree.get_children())
         for c in rows:
             self._cookie_tree.insert(
@@ -694,10 +720,13 @@ class LauncherApp:
         widget.see("end")
 
     def _update_detail_wrap(self) -> None:
-        """Ajusta el wraplength del detalle de la BD al ancho real de su columna."""
+        """Ajusta el wraplength de detalle y diagnóstico al ancho de su columna."""
         width = self._col_left.winfo_width()
         if width > 60:
             self._db_detail_label.configure(wraplength=width - 30)
+        rwidth = self._col_right.winfo_width()
+        if rwidth > 60:
+            self._cookie_diag_label.configure(wraplength=rwidth - 30)
 
     def _restore_window(self) -> None:
         """Restaura tamaño/posición de la ventana y el divisor desde el estado."""
