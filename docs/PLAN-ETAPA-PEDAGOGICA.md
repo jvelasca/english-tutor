@@ -24,7 +24,7 @@ aprendizaje real:
 | **P2** | Error Mastery (cometido/corregido/superado/dominado) | Alto (núcleo adaptativo) | P1 | ✔ hecho |
 | **P3** | Vocabulario: exposure/production/mastery | Medio | — | ✔ hecho |
 | **P4** | Listening como competencia (dificultad/tema/tendencia/tiempo/reincidencia) | Medio | — | ✔ hecho |
-| **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ⏳ pendiente |
+| **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ✔ hecho |
 | **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | ⏳ pendiente |
 
 ## Detalle por track

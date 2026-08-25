@@ -29,6 +29,7 @@ describe("modes", () => {
       grammar: "A2",
       fluency: "B1",
       pronunciation: "A2",
+      listening: "A1",
     };
     expect(modeCefrLevel("grammar", bands)).toBe("A2");
     expect(modeCefrLevel("conversation", bands)).toBe("B1");

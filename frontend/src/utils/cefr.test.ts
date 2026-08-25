@@ -43,6 +43,7 @@ describe("bandLabel", () => {
     expect(bandLabel("grammar")).toBe("Gramática");
     expect(bandLabel("fluency")).toBe("Fluidez");
     expect(bandLabel("pronunciation")).toBe("Pronunciación");
+    expect(bandLabel("listening")).toBe("Listening");
   });
 
   it("devuelve el valor crudo para destrezas desconocidas", () => {

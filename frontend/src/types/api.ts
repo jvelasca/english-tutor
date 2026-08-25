@@ -105,6 +105,15 @@ export interface EstimatedBands {
   grammar: string;
   fluency: string;
   pronunciation: string;
+  listening: string;
+}
+
+export interface CefrEvidence {
+  skill: string;
+  band: string;
+  samples: number;
+  required: number;
+  confidence: number;
 }
 
 export interface GrammarRecurringError {
@@ -127,6 +136,8 @@ export interface LearningProfile {
   estimated_level: EstimatedLevel;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
+  estimated_confidence: number;
+  estimated_evidence: CefrEvidence[];
   vocabulary_size: number;
   vocabulary_exposed: number;
   vocabulary_mastered: number;

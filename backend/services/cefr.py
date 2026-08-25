@@ -3,71 +3,30 @@ from __future__ import annotations
 
 CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
+# Mínimo de muestras por destreza para que su banda cuente como evidencia (P5).
+# Una destreza sin muestras suficientes no limita el nivel, pero reduce la confianza.
+MIN_SAMPLES: dict[str, int] = {
+    "vocabulary": 50,  # palabras distintas producidas
+    "grammar": 5,  # mensajes de usuario analizados
+    "fluency": 5,  # mensajes totales
+    "pronunciation": 3,  # intentos de pronunciación
+    "listening": 5,  # intentos de listening
+}
 
-def _vocab_points(vocab: int) -> int:
-    if vocab >= 900:
-        return 4
-    if vocab >= 400:
-        return 3
-    if vocab >= 150:
-        return 2
-    if vocab >= 50:
-        return 1
-    return 0
-
-
-def _pron_points(pron: float | None) -> int:
-    if pron is None:
-        return 0
-    if pron >= 85:
-        return 3
-    if pron >= 70:
-        return 2
-    if pron >= 50:
-        return 1
-    return 0
+TRACKED_SKILLS: tuple[str, ...] = (
+    "vocabulary",
+    "grammar",
+    "fluency",
+    "pronunciation",
+    "listening",
+)
 
 
-def _exercise_points(exercises: int) -> int:
-    if exercises >= 50:
-        return 3
-    if exercises >= 20:
-        return 2
-    if exercises >= 5:
-        return 1
-    return 0
-
-
-def _grammar_points(error_rate: float | None) -> int:
-    if error_rate is None:
-        return 0
-    if error_rate <= 0.05:
-        return 2
-    if error_rate <= 0.15:
-        return 1
-    return 0
-
-
-def _fluency_points(messages: int) -> int:
-    if messages >= 50:
-        return 2
-    if messages >= 10:
-        return 1
-    return 0
-
-
-def _level_from_points(points: int) -> str:
-    if points >= 9:
-        return "C2"
-    if points >= 7:
-        return "C1"
-    if points >= 5:
-        return "B2"
-    if points >= 3:
-        return "B1"
-    if points >= 1:
-        return "A2"
-    return "A1"
+def _band_rank(level: str) -> int:
+    """Posición de una banda CEFR; `"—"` (sin señal) vale -1."""
+    if level in CEFR_LEVELS:
+        return CEFR_LEVELS.index(level)
+    return -1
 
 
 def vocabulary_band(vocab: int) -> str:
@@ -120,6 +79,18 @@ def pronunciation_band(avg: float | None) -> str:
     return "A1"
 
 
+def listening_band(accuracy: float | None) -> str:
+    if accuracy is None:
+        return "—"
+    if accuracy >= 85:
+        return "B2"
+    if accuracy >= 70:
+        return "B1"
+    if accuracy >= 50:
+        return "A2"
+    return "A1"
+
+
 _LEVEL_DESCRIPTORS = {
     "A1": "Principiante: frases muy básicas y vocabulario esencial.",
     "A2": "Básico: comunicación en rutinas y temas cotidianos.",
@@ -135,36 +106,72 @@ def level_descriptor(level: str) -> str:
 
 
 def evaluate_cefr(signals: dict) -> dict:
-    """Evalúa el nivel CEFR con señales múltiples y devuelve nivel + bandas +
-    descriptor.
+    """Evalúa el nivel CEFR con un modelo de evidencia (P5).
 
-    Señales: vocab_size, pronunciation_avg, exercises, grammar_error_rate
-    (errores/mensaje, float|None) y messages. Las nuevas señales (grammar y
-    fluency) son opcionales: si faltan, aportan 0 puntos y el resultado coincide
-    con la heurística v1 original.
+    Sustituye al antiguo "punto-sum": cada destreza aporta una banda y un número de
+    muestras; una destreza solo cuenta como evidencia si alcanza su mínimo
+    (`MIN_SAMPLES`). El nivel global es la banda más baja entre las destrezas con
+    evidencia suficiente; si ninguna la tiene, se devuelve "A1" con confianza 0.
+
+    Señales: vocab_size, pronunciation_avg, pronunciation_attempts,
+    grammar_error_rate, messages, user_messages, listening_accuracy y
+    listening_attempts. `exercises` se acepta por compatibilidad pero ya no
+    participa en el modelo.
     """
     vocab = signals.get("vocab_size", 0)
     pron = signals.get("pronunciation_avg")
-    exercises = signals.get("exercises", 0)
+    pron_attempts = signals.get("pronunciation_attempts", 0)
     error_rate = signals.get("grammar_error_rate")
     messages = signals.get("messages", 0)
+    user_messages = signals.get("user_messages", 0)
+    listening_accuracy = signals.get("listening_accuracy")
+    listening_attempts = signals.get("listening_attempts", 0)
 
-    points = (
-        _vocab_points(vocab)
-        + _pron_points(pron)
-        + _exercise_points(exercises)
-        + _grammar_points(error_rate)
-        + _fluency_points(messages)
+    bands = {
+        "vocabulary": vocabulary_band(vocab),
+        "grammar": grammar_band(error_rate),
+        "fluency": fluency_band(messages),
+        "pronunciation": pronunciation_band(pron),
+        "listening": listening_band(listening_accuracy),
+    }
+    samples = {
+        "vocabulary": vocab,
+        "grammar": user_messages,
+        "fluency": messages,
+        "pronunciation": pron_attempts,
+        "listening": listening_attempts,
+    }
+
+    evidence: list[dict] = []
+    for skill in TRACKED_SKILLS:
+        required = MIN_SAMPLES[skill]
+        n = samples[skill]
+        confidence = round(min(1.0, n / required), 2) if required else 1.0
+        evidence.append(
+            {
+                "skill": skill,
+                "band": bands[skill],
+                "samples": n,
+                "required": required,
+                "confidence": confidence,
+            }
+        )
+
+    evidenced = [e for e in evidence if e["confidence"] >= 1.0 and e["band"] != "—"]
+    if evidenced:
+        level = min(evidenced, key=lambda e: _band_rank(e["band"]))["band"]
+    else:
+        level = "A1"
+
+    overall_confidence = round(
+        sum(e["confidence"] for e in evidence) / len(evidence), 2
     )
-    level = _level_from_points(points)
+
     return {
         "level": level,
-        "bands": {
-            "vocabulary": vocabulary_band(vocab),
-            "grammar": grammar_band(error_rate),
-            "fluency": fluency_band(messages),
-            "pronunciation": pronunciation_band(pron),
-        },
+        "bands": bands,
+        "evidence": evidence,
+        "confidence": overall_confidence,
         "descriptor": level_descriptor(level),
     }
 

@@ -11,6 +11,15 @@ class EstimatedBands(BaseModel):
     grammar: str
     fluency: str
     pronunciation: str
+    listening: str
+
+
+class CefrEvidence(BaseModel):
+    skill: str
+    band: str
+    samples: int
+    required: int
+    confidence: float
 
 
 class LearningProfile(BaseModel):
@@ -18,6 +27,8 @@ class LearningProfile(BaseModel):
     estimated_level: str
     estimated_bands: EstimatedBands
     estimated_descriptor: str
+    estimated_confidence: float
+    estimated_evidence: list[CefrEvidence]
     vocabulary_size: int
     vocabulary_exposed: int
     vocabulary_mastered: int

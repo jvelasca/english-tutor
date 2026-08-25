@@ -3,37 +3,40 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-25 20:50 (UTC+2).
+> Actualizado por última vez: 2026-08-25 20:55 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.9` publicada (P3). Cerradas hasta ahora: Release Audit 1.1
+**Posición actual (2026-08-25):** `v1.10` publicada (P4). Cerradas hasta ahora: Release Audit 1.1
 (M12), M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
 Listening 1.0/2.0, Placement 1.0 (IRT-lite), **Placement 2.0** (calibración observacional +
-perfil multiskill) y Etapa 2 (pedagogía) **P1–P4**; **P5–P6** pendientes.
+perfil multiskill) y Etapa 2 (pedagogía) **P1–P4**; **P5** en curso (CEFR por evidencia);
+**P6** pendiente.
 
 **Últimos commits publicados:**
+- `feat: V1.10 - Listening como competencia (topic + metricas por dificultad/tema/tendencia/reincidencia)`
 - `feat: V1.9 - Vocabulario exposure/production/mastery (P3)`
 - `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
 - `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 - `release: v1.7.0 - Placement 2.0 (calibracion observacional + perfil multiskill)`
 
-**⚠️ TRABAJO SIN COMMITEAR (P4 — listening como competencia):** ver sección 23. Es el
+**⚠️ TRABAJO SIN COMMITEAR (P5 — CEFR basado en evidencia):** ver sección 24. Es el
 incremento en curso y NO está versionado. Resumen:
-- **Tema (`topic`)** en el banco de listening y en `listening_attempts` (migración idempotente).
-- **Métricas de competencia** (puras, en `services/listening.py`): precisión por dificultad,
-  precisión por tema, tendencia reciente y reincidencia (reintentos/recuperación), expuestas
-  en `/api/listening/diagnostic`.
+- **Modelo de evidencia** en `services/cefr.py`: cada destreza exige un mínimo de muestras
+  (`MIN_SAMPLES`) y aporta banda + confianza; el nivel es la banda más baja entre las
+  destrezas con evidencia suficiente.
+- **Confianza + detalle por destreza** expuestos en `/api/profile` (`estimated_confidence`
+  y `estimated_evidence`), incluyendo la banda de **listening**.
 
-**Estado verde:** backend `556 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
+**Estado verde:** backend `558 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
 launcher `33 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 23** de este documento (trabajo sin commitear — P4 listening).
+2. Leer la **sección 24** de este documento (trabajo sin commitear — P5 CEFR evidencia).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
-4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P5–P6.
-5. Redactar y ejecutar `agentes/pedagogia/p5-*.md` (un subagente a la vez), respetando la
+4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P6.
+5. Redactar y ejecutar `agentes/pedagogia/p6-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
@@ -964,7 +967,7 @@ cd frontend && npx tsc --noEmit && npx vitest run
 - **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
   `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
-## 23. EN CURSO (sin commitear) — P4: listening como competencia
+## 23. HECHO (V1.10) — P4: listening como competencia
 
 > **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P4: el listening ya medía `difficulty`,
 > `response_time_ms` y `replay_count`, pero no distinguía **tema**, ni precisión por
@@ -999,4 +1002,46 @@ cd frontend && npx tsc --noEmit && npx vitest run
 ### 23.6 Pendiente / siguiente incremento natural
 - **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
   `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 24. EN CURSO (sin commitear) — P5: CEFR basado en evidencia
+
+> **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P5: `services/cefr.py::evaluate_cefr` sumaba puntos
+> (`_vocab_points`, `_pron_points`, `_exercise_points`, `_grammar_points`, `_fluency_points`) y
+> mapeaba la suma a un nivel. Era un "contador": subías de nivel con vocabulario aunque no
+> tuvieras ni una muestra de pronunciación, listening o gramática. Este incremento lo sustituye
+> por un modelo de **evidencia** y expone la **confianza** del nivel.
+
+### 24.1 Modelo de evidencia (`services/cefr.py`)
+- `MIN_SAMPLES` (mínimo de muestras por destreza): `vocabulary=50`, `grammar=5`,
+  `fluency=5`, `pronunciation=3`, `listening=5`; `TRACKED_SKILLS` con ese orden.
+- `listening_band(accuracy)` (umbrales 85/70/50, `"—"` si `None`) y `_band_rank`.
+- `evaluate_cefr` reescrito: por destreza calcula `band` + `samples` + `confidence`
+  (`min(1, samples/required)`); el nivel es la **banda más baja entre las destrezas con
+  evidencia suficiente** (`confidence >= 1` y `band != "—"`), o `A1` si no hay ninguna;
+  devuelve `{level, bands, evidence, confidence, descriptor}`.
+- Eliminadas las funciones privadas de puntos (`_vocab_points`, `_pron_points`,
+  `_exercise_points`, `_grammar_points`, `_fluency_points`, `_level_from_points`).
+- `estimate_cefr` sigue delegando en `evaluate_cefr(signals)["level"]` (API v1 intacta).
+
+### 24.2 Dominio (`domain/profile.py`)
+- `_compute_profile` ahora obtiene `listening_repo.get_stats` y pasa a `evaluate_cefr` las
+  señales nuevas: `pronunciation_attempts`, `user_messages`, `listening_accuracy`,
+  `listening_attempts`. Expone `estimated_confidence` y `estimated_evidence`.
+
+### 24.3 Esquemas (`schemas/profile.py`)
+- `EstimatedBands` + `listening`; nueva `CefrEvidence` (`skill`, `band`, `samples`,
+  `required`, `confidence`); `LearningProfile` + `estimated_confidence` y `estimated_evidence`.
+
+### 24.4 Frontend
+- `types/api.ts` (nuevos tipos), `utils/cefr.ts` (`bandLabel("listening")`),
+  `components/LearningProfile.tsx` (banda de listening + barra de confianza + detalle por
+  destreza) y estilos en `index.css`.
+
+### 24.5 Tests
+- `test_cefr_evaluation.py` (casos de evidencia, `listening_band`, 5 destrezas en `evidence`)
+  y `test_profile.py` (nuevos niveles B1/C1 y `estimated_confidence`/`estimated_evidence`).
+  Total backend **558 tests**; frontend **143 tests**.
+
+### 24.6 Pendiente / siguiente incremento natural
+- **P6 de Etapa 2** (pronunciación fonémica): ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 

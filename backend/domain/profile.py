@@ -4,6 +4,7 @@ from __future__ import annotations
 from starlette.concurrency import run_in_threadpool
 
 from repositories import grammar as grammar_repo
+from repositories import listening as listening_repo
 from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
@@ -29,6 +30,7 @@ async def _compute_profile(user_id: str) -> dict | None:
 
     errors = await run_in_threadpool(grammar_repo.get_recurring_errors, user_id)
     progress = await run_in_threadpool(pronunciation_repo.get_progress, user_id)
+    listening_stats = await run_in_threadpool(listening_repo.get_stats, user_id)
 
     pron_avg = progress["pronunciation"]["average"]
     messages = progress["messages"]
@@ -44,9 +46,12 @@ async def _compute_profile(user_id: str) -> dict | None:
         {
             "vocab_size": len(produced),
             "pronunciation_avg": pron_avg,
-            "exercises": progress["exercises"],
+            "pronunciation_attempts": progress["pronunciation"]["attempts"],
             "grammar_error_rate": grammar_error_rate,
             "messages": messages,
+            "user_messages": user_messages,
+            "listening_accuracy": listening_stats["accuracy"],
+            "listening_attempts": listening_stats["attempts"],
         }
     )
 
@@ -62,6 +67,8 @@ async def _compute_profile(user_id: str) -> dict | None:
         "estimated_level": evaluation["level"],
         "estimated_bands": evaluation["bands"],
         "estimated_descriptor": evaluation["descriptor"],
+        "estimated_confidence": evaluation["confidence"],
+        "estimated_evidence": evaluation["evidence"],
         "vocabulary_size": len(produced),
         "vocabulary_exposed": exposed_only,
         "vocabulary_mastered": len(mastered_words),

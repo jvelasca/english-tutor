@@ -43,21 +43,23 @@ def test_estimate_cefr_low_is_a1(monkeypatch, tmp_path):
     )
 
 
-def test_estimate_cefr_medium_is_b2(monkeypatch, tmp_path):
+def test_estimate_cefr_medium_is_b1(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
+    # Sin intentos de pronunciación, solo el vocabulario (B1) cuenta como evidencia.
     assert (
         estimate_cefr({"vocab_size": 200, "pronunciation_avg": 75, "exercises": 10})
-        == "B2"
+        == "B1"
     )
 
 
-def test_estimate_cefr_high_is_c2(monkeypatch, tmp_path):
+def test_estimate_cefr_high_is_c1(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
+    # Vocabulario C1 evidenciado; pronunciación sin muestras no limita el nivel.
     assert (
         estimate_cefr(
             {"vocab_size": 1000, "pronunciation_avg": 95, "exercises": 100}
         )
-        == "C2"
+        == "C1"
     )
 
 
@@ -125,6 +127,8 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         body = r.json()
         assert body["user_id"] == a
         assert body["estimated_level"] in ("A1", "A2")
+        assert 0.0 <= body["estimated_confidence"] < 0.1
+        assert len(body["estimated_evidence"]) == 5
         assert body["vocabulary_size"] == 2
         assert set(body["top_words"]) == {"cat", "dog"}
         assert body["recurring_errors"][0]["rule"] == "he_she_it_s"

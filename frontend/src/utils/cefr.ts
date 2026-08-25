@@ -35,6 +35,8 @@ export function bandLabel(skill: string): string {
       return "Fluidez";
     case "pronunciation":
       return "Pronunciación";
+    case "listening":
+      return "Listening";
     default:
       return skill;
   }

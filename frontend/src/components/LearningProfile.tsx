@@ -34,20 +34,49 @@ export function LearningProfile({ profile }: LearningProfileProps) {
       )}
 
       <div className="cefr-bands">
-        {(["vocabulary", "grammar", "fluency", "pronunciation"] as const).map(
-          (skill) => (
-            <span
-              key={skill}
-              className={`cefr-band ${cefrTone(profile.estimated_bands[skill])}`}
-            >
-              <span className="cefr-band-label">{bandLabel(skill)}</span>
-              <span className="cefr-band-value">
-                {profile.estimated_bands[skill]}
-              </span>
+        {(
+          ["vocabulary", "grammar", "fluency", "pronunciation", "listening"] as const
+        ).map((skill) => (
+          <span
+            key={skill}
+            className={`cefr-band ${cefrTone(profile.estimated_bands[skill])}`}
+          >
+            <span className="cefr-band-label">{bandLabel(skill)}</span>
+            <span className="cefr-band-value">
+              {profile.estimated_bands[skill]}
             </span>
-          ),
-        )}
+          </span>
+        ))}
       </div>
+
+      <div className="cefr-confidence" title="Confianza del nivel estimado según las muestras recogidas">
+        <span className="cefr-confidence-label">Confianza</span>
+        <div className="cefr-confidence-track">
+          <div
+            className="cefr-confidence-fill"
+            style={{
+              width: `${Math.round(profile.estimated_confidence * 100)}%`,
+            }}
+          />
+        </div>
+        <span className="cefr-confidence-value">
+          {Math.round(profile.estimated_confidence * 100)}%
+        </span>
+      </div>
+
+      {profile.estimated_evidence.length > 0 && (
+        <div className="cefr-evidence">
+          {profile.estimated_evidence.map((item) => (
+            <div key={item.skill} className="cefr-evidence-row">
+              <span className="cefr-evidence-skill">{bandLabel(item.skill)}</span>
+              <span className="cefr-evidence-band">{item.band}</span>
+              <span className="cefr-evidence-samples">
+                {item.samples}/{item.required} muestras
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="learning-grid">
         <div className="learning-block">
