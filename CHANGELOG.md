@@ -4,6 +4,37 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.5.2] — 2026-08-25
+
+Release de Quality & Validity: sin funcionalidad nueva, endurece la reproducibilidad y la
+validez pedagógica de los motores de evaluación (evidencia, CEFR, placement y listening).
+
+### Añadido
+- **Versionado de instrumentos de evaluación**: `ASSESSMENT_VERSION`, `PLACEMENT_VERSION`,
+  `RUBRIC_VERSION` y `LISTENING_BANK_VERSION` (`services/curriculum.py`). Toda evidencia persiste
+  `assessment_version` y `curriculum_version`, de modo que cada resultado es reproducible aunque
+  el contenido evolucione.
+- **Invariantes de evidencia**: `validate_evidence_record` (`services/academy.py`) valida
+  `user_id`/`objective_id`/`skill`/`item_type`/`source`/versiones/`result` antes de persistir;
+  todo el dominio pasa por el helper único `_record_evidence_validated`.
+- **Semántica CEFR ponderada**: `overall_cefr_score` sustituye la media aritmética por una media
+  ponderada por destreza con mínimos críticos (grammar/vocabulary), y el perfil expone las
+  sub-destrezas de listening dentro de `listening`.
+- **Placement con validez estadística**: selección del ítem por máxima información (Fisher),
+  parada por error estándar con mínimo de ítems, desglose multi-destreza del resultado y
+  `placement_version` reportado.
+- **Listening: first-pass accuracy**: distingue comprensión (acierto a la primera) de aprendizaje
+  por repetición, por sub-destreza y global.
+- **Listening: banco versionado con vector de dificultad**: `ListeningAsset` + factores
+  (`speed`/`vocabulary`/`accent`/`syntactic`/`length`), sub-destreza `attitude` y `bank_version`
+  expuesto en el diagnóstico.
+- **Tests**: invariantes de evidencia, E2E de regresión (placement/remediación/listening),
+  semántica CEFR, validez del placement y arquitectura de listening (450 tests).
+
+### Cambiado
+- La revisión de listening (`review_due`) integra la dependencia de repeticiones y el tiempo de
+  respuesta, además de la precisión.
+
 ## [1.5.0] — 2026-08-25
 
 Evidence & Performance Engine, Listening Engine y Placement adaptativo. Cierra el ciclo

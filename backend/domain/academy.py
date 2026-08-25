@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from repositories import academy as academy_repo
 from repositories import grammar as grammar_repo
+from repositories import listening as listening_repo
 from schemas.academy import (
     AttemptOut,
     CefrProfileOut,
@@ -45,6 +46,7 @@ from services import speaking_llm, writing_llm
 from services import writing as writing_svc
 from services.context import build_lesson_prompt
 from services.curriculum import (
+    ASSESSMENT_VERSION,
     CEFR_ORDER,
     Level,
     get_objective,
@@ -52,6 +54,7 @@ from services.curriculum import (
     load_assessments,
     next_level_id,
 )
+from services.listening import listening_diagnostic
 
 _LEVEL_TITLES = {
     "A1": ("Beginner", "Introduce yourself, everyday life, family, home and plans."),
@@ -290,6 +293,24 @@ async def _completed_level_ids(user_id: str) -> set[str]:
     return {e["level_id"] for e in enrollments if e["status"] == "completed"}
 
 
+async def _record_evidence_validated(
+    user_id: str, level: Level, records: list[dict]
+) -> int:
+    """Valida y persiste registros de evidencia; omite los que violen invariantes.
+
+    Punto único por el que pasa toda la evidencia del dominio. Los invariantes se
+    validan en `services.academy.validate_evidence_record`; en la práctica ningún
+    registro válido se omite (los tests de invariantes lo garantizan). Devuelve el
+    nº de registros persistidos."""
+    recorded = 0
+    for ev in records:
+        if academy_svc.validate_evidence_record(ev, user_id=user_id, level=level):
+            continue
+        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+        recorded += 1
+    return recorded
+
+
 async def enrollment_blocked(user_id: str, level_id: str) -> bool:
     """True si el nivel existe pero no está desbloqueado (para 403 vs 404)."""
     if level_id not in _levels_by_id:
@@ -337,9 +358,15 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
     )
     now = datetime.now(timezone.utc).isoformat()
     skills = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows, now)
-    overall = (
-        round(sum(s["score"] for s in skills) / len(skills), 3) if skills else 0.0
+    # Puente con el motor de listening: expone sus sub-destrezas dentro de 'listening'.
+    listening_attempts = await run_in_threadpool(
+        listening_repo.list_attempts, user_id
     )
+    subskills = listening_diagnostic(listening_attempts)["subskills"]
+    for entry in skills:
+        if entry["skill"] == "listening":
+            entry["subskills"] = subskills
+    overall = academy_svc.overall_cefr_score(skills)
     return CefrProfileOut(
         level_id=level_id, level=lv.level, overall=overall, skills=skills
     )
@@ -482,15 +509,19 @@ async def submit_objective_assessment(
         return None
     scored = academy_svc.score_items(obj.checks, answers)
     # Evidencia por ítem (reproducible y versionada), antes de agregar mastery.
-    for ev in academy_svc.evidence_from_items(
-        obj.checks,
-        answers,
-        level_id=level_id,
-        objective_id=objective_id,
-        source="objective_assessment",
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        academy_svc.evidence_from_items(
+            obj.checks,
+            answers,
+            level_id=level_id,
+            objective_id=objective_id,
+            source="objective_assessment",
+            curriculum_version=lv.version,
+            assessment_version=ASSESSMENT_VERSION,
+        ),
+    )
     mastery_updates: dict[str, float] = {}
     for skill, b in scored["skills"].items():
         row = await run_in_threadpool(
@@ -542,13 +573,16 @@ async def submit_speaking(
     if await enrollment_blocked(user_id, level_id):
         return None
     result = speaking_svc.score_speaking(heard, expected, duration_seconds)
-    for ev in speaking_svc.evidence_from_speaking(
-        result,
-        level_id=level_id,
-        objective_id=objective_id,
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        speaking_svc.evidence_from_speaking(
+            result,
+            level_id=level_id,
+            objective_id=objective_id,
+            curriculum_version=lv.version,
+        ),
+    )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "speaking"
     )
@@ -601,13 +635,16 @@ async def submit_speaking_task(
     if evidence is None:
         return None
     result = speaking_svc.scores_from_evidence(evidence, heard, duration_seconds)
-    for ev in speaking_svc.evidence_from_speaking(
-        result,
-        level_id=level_id,
-        objective_id=objective_id,
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        speaking_svc.evidence_from_speaking(
+            result,
+            level_id=level_id,
+            objective_id=objective_id,
+            curriculum_version=lv.version,
+        ),
+    )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "speaking"
     )
@@ -645,13 +682,16 @@ async def submit_writing(
     if await enrollment_blocked(user_id, level_id):
         return None
     result = writing_svc.score_writing(text, expected)
-    for ev in writing_svc.evidence_from_writing(
-        result,
-        level_id=level_id,
-        objective_id=objective_id,
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        writing_svc.evidence_from_writing(
+            result,
+            level_id=level_id,
+            objective_id=objective_id,
+            curriculum_version=lv.version,
+        ),
+    )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "writing"
     )
@@ -690,13 +730,16 @@ async def submit_pronunciation(
     if await enrollment_blocked(user_id, level_id):
         return None
     result = pronunciation_svc.score_pronunciation_cefr(expected, heard)
-    for ev in pronunciation_svc.evidence_from_pronunciation(
-        result,
-        level_id=level_id,
-        objective_id=objective_id,
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        pronunciation_svc.evidence_from_pronunciation(
+            result,
+            level_id=level_id,
+            objective_id=objective_id,
+            curriculum_version=lv.version,
+        ),
+    )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "pronunciation"
     )
@@ -739,13 +782,16 @@ async def submit_writing_task(
     if evidence is None:
         return None
     result = writing_svc.scores_from_evidence(evidence)
-    for ev in writing_svc.evidence_from_writing(
-        result,
-        level_id=level_id,
-        objective_id=objective_id,
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        writing_svc.evidence_from_writing(
+            result,
+            level_id=level_id,
+            objective_id=objective_id,
+            curriculum_version=lv.version,
+        ),
+    )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "writing"
     )
@@ -813,9 +859,10 @@ async def next_placement(
     """Siguiente ítem del placement adaptativo (IRT-lite) y resultado al terminar.
 
     Stateless: el cliente envía sus respuestas parciales; el servidor calcula la
-    habilidad θ, elige el siguiente ítem por dificultad más cercana a θ, y cuando
-    se alcanza el máximo de ítems (o no quedan) devuelve `done=True` con el
-    resultado y lo persiste como resultado de evaluación."""
+    habilidad θ, elige el siguiente ítem por máxima información (dificultad más
+    cercana a θ en la 1PL) y se detiene cuando se alcanza el máximo de ítems, no
+    quedan ítems, o el error estándar de θ baja del umbral (tras un mínimo de
+    ítems). Al terminar persiste el resultado como evaluación."""
     data = load_assessments()
     items = data.placement.items
     answered_ids = set(answers)
@@ -825,9 +872,8 @@ async def next_placement(
         if it.id in answers
     ]
     theta = academy_svc.ability_theta(responses)
-    done = len(answered_ids) >= academy_svc.MAX_PLACEMENT_ITEMS or len(
-        answered_ids
-    ) >= len(items)
+    se = academy_svc.placement_standard_error(theta, responses)
+    done = academy_svc.placement_should_stop(len(answered_ids), len(items), se)
     if done:
         result = academy_svc.placement_result_adaptive(items, answers)
         await run_in_threadpool(
@@ -841,6 +887,7 @@ async def next_placement(
         return PlacementAdaptiveOut(
             next_item=None,
             theta=theta,
+            standard_error=se,
             answered=result["answered"],
             done=True,
             result=result,
@@ -858,6 +905,7 @@ async def next_placement(
     return PlacementAdaptiveOut(
         next_item=next_out,
         theta=theta,
+        standard_error=se,
         answered=len(answered_ids),
         done=False,
         result=None,
@@ -901,15 +949,18 @@ async def submit_exam(
         await run_in_threadpool(academy_repo.enroll, user_id, level_id, lv.level)
     result = academy_svc.exam_result(exam, answers)
     # Evidencia por ítem del examen (reproducible y versionada).
-    for ev in academy_svc.evidence_from_items(
-        exam.items,
-        answers,
-        level_id=level_id,
-        source="exam",
-        assessment_version=exam.id,
-        curriculum_version=lv.version,
-    ):
-        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        academy_svc.evidence_from_items(
+            exam.items,
+            answers,
+            level_id=level_id,
+            source="exam",
+            assessment_version=exam.id,
+            curriculum_version=lv.version,
+        ),
+    )
     await run_in_threadpool(
         academy_repo.record_assessment_result,
         user_id,

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 
+from services.curriculum import RUBRIC_VERSION
 from services.fluency import compute_fluency
 from services.grammar import find_errors
 from services.phonetics import composite_score
@@ -182,11 +183,13 @@ def evidence_from_speaking(
     level_id: str,
     objective_id: str,
     curriculum_version: str = "",
+    assessment_version: str = RUBRIC_VERSION,
 ) -> list[dict]:
     """Convierte el resultado de score_speaking en registros de evidencia.
 
     Una fila por criterio del rubric (item_id = criterio) más una fila 'overall'.
-    Todas con source='speaking', item_type='speaking', difficulty=1."""
+    Todas con source='speaking', item_type='speaking', difficulty=1. El instrumento
+    de medida es la rúbrica, versionada en `assessment_version`."""
     records = [
         {
             "level_id": level_id,
@@ -198,7 +201,7 @@ def evidence_from_speaking(
             "source": "speaking",
             "result": float(result["criteria"][criterion]),
             "curriculum_version": curriculum_version,
-            "assessment_version": "",
+            "assessment_version": assessment_version,
         }
         for criterion in SPEAKING_CRITERIA
     ]
@@ -213,7 +216,7 @@ def evidence_from_speaking(
             "source": "speaking",
             "result": float(result["overall"]),
             "curriculum_version": curriculum_version,
-            "assessment_version": "",
+            "assessment_version": assessment_version,
         }
     )
     return records

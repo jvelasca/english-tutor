@@ -157,16 +157,26 @@ class AssessmentSubmit(BaseModel):
     answers: dict[str, int] = Field(default_factory=dict)
 
 
+class PlacementSkillResultOut(BaseModel):
+    correct: int
+    total: int
+    score: float
+
+
 class PlacementResultOut(BaseModel):
     level: str
     confidence: float
     answered: int
     correct: int
+    theta: float | None = None
+    skills: dict[str, PlacementSkillResultOut] = Field(default_factory=dict)
+    placement_version: str = ""
 
 
 class PlacementAdaptiveOut(BaseModel):
     next_item: PlacementItemOut | None
     theta: float
+    standard_error: float | None = None
     answered: int
     done: bool
     result: PlacementResultOut | None
@@ -321,6 +331,7 @@ class SkillProfileOut(BaseModel):
     evidence_count: int
     last_evidence: str
     review_due: bool
+    subskills: list[dict] = Field(default_factory=list)
 
 
 class CefrProfileOut(BaseModel):

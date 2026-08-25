@@ -9,6 +9,7 @@ class ListeningQuestion(BaseModel):
     level: str
     skill: str
     difficulty: int
+    difficulty_vector: dict[str, int] = Field(default_factory=dict)
     script: str
     question: str
     options: list[str]
@@ -49,6 +50,7 @@ class ListeningSubskillOut(BaseModel):
     attempts: int
     correct: int
     accuracy: float | None = None
+    first_pass_accuracy: float | None = None
     avg_response_ms: float | None = None
     avg_replay_count: float
     review_due: bool
@@ -58,3 +60,5 @@ class ListeningDiagnostic(BaseModel):
     subskills: list[ListeningSubskillOut]
     weak: list[str]
     recommendation: str
+    first_pass_accuracy: float | None = None
+    bank_version: str = ""

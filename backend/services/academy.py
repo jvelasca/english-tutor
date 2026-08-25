@@ -22,6 +22,7 @@ from collections import defaultdict
 from services.curriculum import (
     CANONICAL_SKILLS,
     CEFR_ORDER,
+    PLACEMENT_VERSION,
     Exam,
     Level,
     Objective,
@@ -456,6 +457,7 @@ def build_skill_profile(
                 "review_due": (
                     evidence_count > 0 and forgetting_review_due(score, review_ts, now)
                 ),
+                "subskills": [],
             }
         )
 
@@ -466,6 +468,60 @@ def build_skill_profile(
         )
     )
     return profile
+
+
+# Pesos pedagógicos por destreza para el overall del perfil CEFR (suman 1).
+# Reflejan el peso relativo de cada destreza en la competencia global.
+CEFR_SKILL_WEIGHTS: dict[str, float] = {
+    "vocabulary": 0.15,
+    "grammar": 0.20,
+    "pronunciation": 0.10,
+    "listening": 0.15,
+    "speaking": 0.15,
+    "reading": 0.10,
+    "writing": 0.15,
+}
+# Peso por defecto para destrezas no canónicas (no deberían aparecer en el perfil).
+CEFR_DEFAULT_WEIGHT = 0.1
+
+# Mínimos críticos: una destreza crítica evaluada por debajo de su mínimo limita
+# el overall (no se puede certificar un nivel sin esas bases).
+CRITICAL_MINIMUMS: dict[str, float] = {
+    "grammar": 0.4,
+    "vocabulary": 0.4,
+}
+
+
+def overall_cefr_score(skill_profile: list[dict]) -> float:
+    """Overall del perfil CEFR: media ponderada por destreza + mínimos críticos.
+
+    Sustituye a la media aritmética simple: pondera cada destreza por su peso
+    pedagógico (renormalizado sobre las destrezas presentes) y limita el resultado
+    al mínimo de una destreza crítica evaluada que esté por debajo de su umbral.
+    Sin destrezas (o sin peso total) devuelve 0.0.
+    """
+    if not skill_profile:
+        return 0.0
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for entry in skill_profile:
+        weight = CEFR_SKILL_WEIGHTS.get(entry["skill"], CEFR_DEFAULT_WEIGHT)
+        total_weight += weight
+        weighted_sum += weight * entry["score"]
+    if total_weight == 0.0:
+        return 0.0
+    overall = weighted_sum / total_weight
+
+    for skill, minimum in CRITICAL_MINIMUMS.items():
+        entry = next((e for e in skill_profile if e["skill"] == skill), None)
+        if (
+            entry is not None
+            and entry.get("evidence_count", 0) > 0
+            and entry["score"] < minimum
+        ):
+            overall = min(overall, minimum)
+
+    return round(overall, 3)
 
 
 def remediation_plan(
@@ -575,6 +631,79 @@ def evidence_from_items(
     return records
 
 
+# Tipos y fuentes de evidencia reconocidos (invariante: un registro de evidencia
+# siempre debe pertenecer a uno de estos conjuntos para ser interpretable por el
+# Student Model). Se amplían en paralelo a nuevos motores (p. ej. 'listening').
+EVIDENCE_ITEM_TYPES: tuple[str, ...] = (
+    "mcq",
+    "speaking",
+    "writing",
+    "pronunciation",
+)
+
+EVIDENCE_SOURCES: tuple[str, ...] = (
+    "objective_assessment",
+    "exam",
+    "speaking",
+    "writing",
+    "pronunciation",
+)
+
+
+def validate_evidence_record(
+    record: dict,
+    *,
+    user_id: str,
+    level: Level,
+    canonical_skills: tuple[str, ...] = CANONICAL_SKILLS,
+    item_types: tuple[str, ...] = EVIDENCE_ITEM_TYPES,
+    sources: tuple[str, ...] = EVIDENCE_SOURCES,
+) -> list[str]:
+    """Valida los invariantes de un registro de evidencia y devuelve las
+    violaciones (lista vacía = válido).
+
+    Invariantes: `user_id` no vacío; `objective_id` vacío (evidencia de nivel,
+    p. ej. un examen) o perteneciente al nivel; `skill` canónica; `item_type` y
+    `source` en sus conjuntos conocidos; `curriculum_version` y
+    `assessment_version` no vacíos (reproducibilidad); `result` numérico en [0,1].
+    """
+    errors: list[str] = []
+    if not user_id:
+        errors.append("user_id vacío")
+
+    objective_ids = {o.id for o in level.objectives()}
+    objective_id = record.get("objective_id", "")
+    if objective_id and objective_id not in objective_ids:
+        errors.append(
+            f"objective_id '{objective_id}' no pertenece a {level.level_id}"
+        )
+
+    skill = record.get("skill", "")
+    if skill not in canonical_skills:
+        errors.append(f"skill '{skill}' no canónica")
+
+    item_type = record.get("item_type", "")
+    if item_type not in item_types:
+        errors.append(f"item_type '{item_type}' desconocido")
+
+    source = record.get("source", "")
+    if source not in sources:
+        errors.append(f"source '{source}' desconocida")
+
+    if not record.get("curriculum_version"):
+        errors.append("curriculum_version vacío")
+    if not record.get("assessment_version"):
+        errors.append("assessment_version vacío")
+
+    result = record.get("result")
+    if isinstance(result, bool) or not isinstance(result, (int, float)):
+        errors.append("result no numérico")
+    elif not 0.0 <= float(result) <= 1.0:
+        errors.append(f"result {result} fuera de [0,1]")
+
+    return errors
+
+
 def placement_result(items: list, answers: dict[str, int]) -> dict:
     """Estima el nivel de inicio (A1..C2) y su confianza a partir de los ítems.
 
@@ -604,6 +733,8 @@ def placement_result(items: list, answers: dict[str, int]) -> dict:
         "confidence": confidence,
         "answered": answered,
         "correct": sum(1 for it in items if answers.get(it.id) == it.correct_index),
+        "skills": _skill_breakdown(items, answers),
+        "placement_version": PLACEMENT_VERSION,
     }
 
 
@@ -633,6 +764,12 @@ PLACEMENT_START_THETA = 3.0
 PLACEMENT_THETA_MIN = -3.0
 PLACEMENT_THETA_MAX = 9.0
 MAX_PLACEMENT_ITEMS = 8
+# Mínimo de ítems antes de poder detener por criterio estadístico (evita parar
+# con muy poca información).
+PLACEMENT_MIN_ITEMS = 4
+# Error estándar de θ por debajo del cual el placement se da por suficientemente
+# preciso y se detiene antes del máximo de ítems.
+PLACEMENT_SE_THRESHOLD = 0.5
 
 
 def _p_correct(theta: float, difficulty: int) -> float:
@@ -684,32 +821,97 @@ def theta_to_level(theta: float) -> str:
     return "C2"
 
 
+def _item_information(theta: float, difficulty: int) -> float:
+    """Información de Fisher de un ítem 1PL en θ: p·(1-p), máxima en dificultad≈θ."""
+    p = _p_correct(theta, difficulty)
+    return p * (1.0 - p)
+
+
 def select_next_item(
     items: list, answered_ids: set[str], theta: float
 ) -> object | None:
-    """Ítem sin responder con dificultad más cercana a θ; empate: menor dificultad
-    y, si persiste, el primero en el orden de `items`. None si no quedan."""
+    """Ítem sin responder con máxima información (Fisher) en θ.
+
+    En el modelo 1PL la información es máxima cuando la dificultad del ítem se
+    acerca a θ, de modo que coincide con "dificultad más cercana a θ". Empate:
+    menor dificultad y, si persiste, el primero en el orden de `items`. None si
+    no quedan."""
     remaining = [it for it in items if it.id not in answered_ids]
     if not remaining:
         return None
-    return min(remaining, key=lambda it: (abs(it.difficulty - theta), it.difficulty))
+    return max(
+        remaining,
+        key=lambda it: (_item_information(theta, it.difficulty), -it.difficulty),
+    )
+
+
+def placement_standard_error(
+    theta: float, responses: list[tuple[int, bool]]
+) -> float | None:
+    """Error estándar de θ: inverso de la raíz de la información de Fisher.
+
+    Incluye el prior débil (+1) usado en `ability_theta`. Devuelve None si no hay
+    respuestas (θ no estimada)."""
+    if not responses:
+        return None
+    info = 1.0 + sum(
+        p * (1.0 - p) for p in (_p_correct(theta, b) for b, _ in responses)
+    )
+    return round(1.0 / math.sqrt(info), 3)
 
 
 def placement_adaptive_confidence(
     theta: float, responses: list[tuple[int, bool]]
 ) -> float:
     """Confianza (0..0.95) derivada del error estándar de θ (información de Fisher)."""
-    if not responses:
+    se = placement_standard_error(theta, responses)
+    if se is None:
         return 0.0
-    info = 1.0 + sum(
-        p * (1.0 - p) for p in (_p_correct(theta, b) for b, _ in responses)
-    )
-    se = 1.0 / math.sqrt(info)
     return round(min(0.95, max(0.0, 1.0 - se)), 2)
 
 
+def placement_should_stop(
+    answered: int, total_items: int, standard_error: float | None
+) -> bool:
+    """Criterio de parada del placement adaptativo.
+
+    True si se agotaron los ítems, se alcanzó el máximo, o el error estándar de θ
+    cae bajo el umbral tras responder el mínimo de ítems. Con el banco actual de
+    8 ítems el umbral rara vez se alcanza, pero el criterio queda explícito y
+    aplicará al ampliar el banco."""
+    if answered >= total_items or answered >= MAX_PLACEMENT_ITEMS:
+        return True
+    return (
+        standard_error is not None
+        and answered >= PLACEMENT_MIN_ITEMS
+        and standard_error < PLACEMENT_SE_THRESHOLD
+    )
+
+
+def _skill_breakdown(items: list, answers: dict[str, int]) -> dict[str, dict]:
+    """Desglose por destreza de las respuestas: {skill: {correct, total, score}}."""
+    per_skill: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"correct": 0, "total": 0}
+    )
+    for it in items:
+        if it.id not in answers:
+            continue
+        per_skill[it.skill]["total"] += 1
+        if answers[it.id] == it.correct_index:
+            per_skill[it.skill]["correct"] += 1
+    return {
+        skill: {
+            "correct": b["correct"],
+            "total": b["total"],
+            "score": round(b["correct"] / b["total"], 3) if b["total"] else 0.0,
+        }
+        for skill, b in per_skill.items()
+    }
+
+
 def placement_result_adaptive(items: list, answers: dict[str, int]) -> dict:
-    """Resultado del placement adaptativo: θ, nivel CEFR, confianza y contadores."""
+    """Resultado del placement adaptativo: θ, nivel CEFR, confianza, contadores,
+    desglose por destreza y versión del motor."""
     responses = [
         (it.difficulty, answers[it.id] == it.correct_index)
         for it in items
@@ -726,6 +928,8 @@ def placement_result_adaptive(items: list, answers: dict[str, int]) -> dict:
         "confidence": confidence,
         "answered": answered,
         "correct": correct,
+        "skills": _skill_breakdown(items, answers),
+        "placement_version": PLACEMENT_VERSION,
     }
 
 

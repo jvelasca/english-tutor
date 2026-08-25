@@ -7,7 +7,7 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.5.0` publicada. Cerradas: Release Audit 1.1 (M12), Etapa 2
+**Posición actual (2026-08-25):** `v1.5.2` publicada. Cerradas: Release Audit 1.1 (M12), Etapa 2
 (P1–P2), M14 (GUI responsive + personalización), M15 (Launcher), **Academy v2 con integridad
 curricular (v1.2.1)**, **M16 — Apariencia configurable + Ayuda + progresión de listening**,
 **hardening v1.2.2**, y el bloque **Evidence & Performance + Listening + Placement (V1.3/V1.4/V1.5)**:
@@ -100,7 +100,7 @@ Hecho y verificado (tests verdes):
 ## 4. GitHub
 
 - Repo **público**: https://github.com/jvelasca/english-tutor
-- Rama por defecto: `main`. Última versión estable: tag `v1.5.0` (release publicado).
+- Rama por defecto: `main`. Última versión estable: tag `v1.5.2` (release publicado).
 - Issues de seguimiento:
   - #1 M5 modelo conversacional
   - #2 Seguimiento de progreso del alumno

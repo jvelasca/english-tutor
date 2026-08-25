@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 
+from services.curriculum import RUBRIC_VERSION
 from services.grammar import find_errors
 
 # Dimensiones del rubric de writing (alineadas con CEFR).
@@ -152,11 +153,13 @@ def evidence_from_writing(
     level_id: str,
     objective_id: str,
     curriculum_version: str = "",
+    assessment_version: str = RUBRIC_VERSION,
 ) -> list[dict]:
     """Convierte el resultado de score_writing en registros de evidencia.
 
     Una fila por criterio del rubric (item_id = criterio) más una fila 'overall'.
-    Todas con source='writing', item_type='writing', difficulty=1."""
+    Todas con source='writing', item_type='writing', difficulty=1. El instrumento
+    de medida es la rúbrica, versionada en `assessment_version`."""
     records = [
         {
             "level_id": level_id,
@@ -168,7 +171,7 @@ def evidence_from_writing(
             "source": "writing",
             "result": float(result["criteria"][criterion]),
             "curriculum_version": curriculum_version,
-            "assessment_version": "",
+            "assessment_version": assessment_version,
         }
         for criterion in WRITING_CRITERIA
     ]
@@ -183,7 +186,7 @@ def evidence_from_writing(
             "source": "writing",
             "result": float(result["overall"]),
             "curriculum_version": curriculum_version,
-            "assessment_version": "",
+            "assessment_version": assessment_version,
         }
     )
     return records

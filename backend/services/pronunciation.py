@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from services.curriculum import RUBRIC_VERSION
 from services.phonetics import composite_score
 
 # Umbral de "buena pronunciación" (porcentaje de similitud).
@@ -78,13 +79,19 @@ def score_pronunciation_cefr(expected: str, heard: str) -> dict:
 
 
 def evidence_from_pronunciation(
-    result: dict, *, level_id: str, objective_id: str, curriculum_version: str = ""
+    result: dict,
+    *,
+    level_id: str,
+    objective_id: str,
+    curriculum_version: str = "",
+    assessment_version: str = RUBRIC_VERSION,
 ) -> list[dict]:
     """Convierte el resultado en registros de evidencia (una fila por criterio
     + overall).
 
     Todas con source='pronunciation', skill='pronunciation', item_type='pronunciation',
-    difficulty=1."""
+    difficulty=1. El instrumento de medida es la rúbrica, versionada en
+    `assessment_version`."""
     records = [
         {
             "level_id": level_id,
@@ -96,7 +103,7 @@ def evidence_from_pronunciation(
             "source": "pronunciation",
             "result": float(result["criteria"][criterion]),
             "curriculum_version": curriculum_version,
-            "assessment_version": "",
+            "assessment_version": assessment_version,
         }
         for criterion in PRONUNCIATION_CRITERIA
     ]
@@ -111,7 +118,7 @@ def evidence_from_pronunciation(
             "source": "pronunciation",
             "result": float(result["overall"]),
             "curriculum_version": curriculum_version,
-            "assessment_version": "",
+            "assessment_version": assessment_version,
         }
     )
     return records

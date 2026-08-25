@@ -62,6 +62,14 @@ CEFR_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 # de la versión de la aplicación: identifica QUÉ contenido se evaluó.
 CURRICULUM_VERSION = "1.2.5"
 
+# Versiones de los instrumentos de evaluación (independientes de la versión de la
+# app y del currículum). Identifican QUÉ instrumento produjo cada resultado para
+# que dos respuestas idénticas sean reproducibles aunque el contenido evolucione.
+ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exámenes)
+PLACEMENT_VERSION = "1.0.0"  # motor de placement adaptativo (IRT)
+RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
+LISTENING_BANK_VERSION = "1.0.0"  # banco de ítems de listening
+
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
 
