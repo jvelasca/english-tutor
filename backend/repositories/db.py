@@ -371,6 +371,29 @@ def init_db() -> None:
                 "ALTER TABLE vocabulary RENAME COLUMN occurrences TO appearances"
             )
 
+        # Migración idempotente (P3): separa exposición / producción / dominio.
+        # `exposures` cuenta los mensajes del tutor en los que apareció la palabra
+        # (input que el alumno lee); `last_exposed_at` su última exposición; y
+        # `production_days` los días distintos con producción del alumno (espaciado).
+        if "exposures" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN exposures INTEGER NOT NULL DEFAULT 0"
+            )
+        if "last_exposed_at" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN last_exposed_at TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "production_days" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN production_days INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+            conn.execute(
+                "UPDATE vocabulary SET production_days = 1 "
+                "WHERE appearances > 0 AND production_days = 0"
+            )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {

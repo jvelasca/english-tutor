@@ -3,41 +3,38 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-25 19:26 (UTC+2).
+> Actualizado por última vez: 2026-08-25 20:25 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.7.0` publicada. Cerradas hasta ahora: Release Audit 1.1
+**Posición actual (2026-08-25):** `v1.8.1` publicada. Cerradas hasta ahora: Release Audit 1.1
 (M12), M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
 Listening 1.0/2.0, Placement 1.0 (IRT-lite) y **Placement 2.0** (calibración observacional +
-perfil multiskill). Etapa 2 (pedagogía): **P1** y **P2** hechos; **P3–P6** pendientes.
+perfil multiskill). Etapa 2 (pedagogía): **P1, P2 y P3** hechos; **P4–P6** pendientes.
 
 **Últimos commits publicados:**
+- `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
+- `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 - `release: v1.7.0 - Placement 2.0 (calibracion observacional + perfil multiskill)`
 - `release: v1.6.0 - Listening 2.0 + cierre de P1 (critical_skills y E2E regression)`
-- `release: v1.5.3 - Hardening (validez y trazabilidad)`
-- `release: v1.5.2 - Quality & Validity`
 
-**⚠️ TRABAJO SIN COMMITEAR (núcleo del loop diario — Sesión diaria):** ver sección 20. Es el
+**⚠️ TRABAJO SIN COMMITEAR (P3 — vocabulario exposure/production/mastery):** ver sección 22. Es el
 incremento en curso y NO está versionado. Resumen:
-- **Placement adaptativo cableado a la UI** (`Academy.tsx` usa `/placement/start` + `/placement/next`).
-- **Objetivo personal editable** (tabla `learning_goal`, endpoints `GET/PUT /api/academy/goal`,
-  editor en `TodayPlan.tsx`).
-- **Session Engine** (`services/adaptive.py::session_plan`/`session_summary` + endpoint
-  `GET /api/academy/session`): unifica review/listening/debilidad/nuevo/refuerzo en una secuencia
-  priorizada con presupuesto del objetivo.
-- **Cada paso enruta a su actividad** (`App.tsx::handleSessionStep`) y **la sesión se refresca
-  al completar** (prop `refreshKey` en `TodayPlan.tsx`).
+- **Separación exposure/production/mastery** en la tabla `vocabulary` (columnas `exposures`,
+  `last_exposed_at`, `production_days`) + `classify()` puro en `services/vocabulary.py`.
+- **Exposición capturada de las respuestas del tutor** (`routers/chat.py`, chat y stream).
+- **Perfil** expone `vocabulary_exposed` y `vocabulary_mastered` además de `vocabulary_size`
+  (que ahora cuenta solo palabras producidas, no las solo-expuestas).
 
-**Estado verde:** backend `525 tests` + `ruff` limpio; frontend `142 tests` + `tsc` OK;
+**Estado verde:** backend `543 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
 launcher `33 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 20** de este documento (trabajo sin commitear — loop diario).
+2. Leer la **sección 22** de este documento (trabajo sin commitear — P3 vocabulario).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
-4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P3–P6.
-5. Redactar y ejecutar `agentes/pedagogia/p3-*.md` (un subagente a la vez), respetando la
+4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P4–P6.
+5. Redactar y ejecutar `agentes/pedagogia/p4-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
@@ -810,12 +807,12 @@ con iconos en la UI y más información en paneles colapsables.
 > `host: true`), igual que el backend, para que la app sea accesible desde otros equipos de la
 > LAN (antes solo respondía `localhost` y el puerto 5173 no era alcanzable).
 
-## 20. EN CURSO (sin commitear) — Loop diario: placement adaptativo + objetivo + Session Engine
+## 20. HECHO (V1.8) — Loop diario: placement adaptativo + objetivo + Session Engine
 
 > **Origen.** Auditoría pedagógica: faltaba un "loop diario" integrado. Este bloque cierra ese
 > hueco cableando a la UI el placement adaptativo ya existente en backend, añadiendo un objetivo
 > personal editable y un **Session Engine** que unifica las señales CEFR y de listening en una
-> sesión diaria priorizada. TODO ESTO ESTÁ SIN COMMITEAR (working tree).
+> sesión diaria priorizada.
 
 ### 20.1 Placement adaptativo cableado a la UI
 - `frontend/src/components/Academy.tsx`: el placement pasó de batch (`getPlacement` +
@@ -878,7 +875,7 @@ con iconos en la UI y más información en paneles colapsables.
 - **P3–P6 de Etapa 2** (vocabulario, listening competencia, CEFR evidencia, pronunciación fonémica):
   ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
-## 21. HECHO (sin commitear) — Marcar pasos de la sesión como "hechos"
+## 21. HECHO (V1.8.1) — Marcar pasos de la sesión como "hechos"
 
 Cierra el hueco de `review`/`easy_wins` (que solo cambiaban de modo): ahora cualquier
 paso se puede marcar como completado y desaparece de la sesión de hoy, con reseteo diario.
@@ -907,3 +904,64 @@ paso se puede marcar como completado y desaparece de la sesión de hoy, con rese
 cd backend && .venv\Scripts\python.exe -m pytest -q && .venv\Scripts\python.exe -m ruff check .
 cd frontend && npx tsc --noEmit && npx vitest run
 ```
+
+## 22. EN CURSO (sin commitear) — P3: vocabulario exposure / production / mastery
+
+> **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P3: hoy `vocabulary` solo medía producción
+> (`appearances` = mensajes en los que el alumno escribió la palabra). Este incremento separa los
+> tres conceptos: **exposición** (palabras que lee en las respuestas del tutor), **producción**
+> (palabras que escribe) y **dominio** (producción repetida y espaciada en el tiempo).
+
+### 22.1 Modelo de datos (exposición vs producción)
+- **`repositories/db.py`**: migración idempotente en `vocabulary`:
+  - `exposures INTEGER NOT NULL DEFAULT 0` (mensajes del tutor en los que apareció la palabra).
+  - `last_exposed_at TEXT NOT NULL DEFAULT ''`.
+  - `production_days INTEGER NOT NULL DEFAULT 0` (días distintos con producción = espaciado).
+  - Backfill: `UPDATE vocabulary SET production_days = 1 WHERE appearances > 0 AND production_days = 0`.
+
+### 22.2 Señal de dominio (pura)
+- **`services/vocabulary.py`**: `classify(appearances, production_days)` → `"exposed"` (nunca
+  producida) | `"learning"` (producida, sin consolidar) | `"mastered"` (≥3 producciones y ≥2 días
+  distintos). Constantes `MASTERY_MIN_PRODUCTIONS = 3`, `MASTERY_MIN_DAYS = 2`.
+
+### 22.3 Repositorio
+- **`repositories/vocabulary.py`**:
+  - `record_words` ahora también incrementa `production_days` cuando la producción cae en un día
+    distinto al último (`_day(iso)` → `iso[:10]`).
+  - `record_exposures(user_id, words)` (nuevo): upsert con `appearances = 0` para crear filas
+    solo-expuestas.
+  - `get_vocabulary` devuelve `exposures`, `last_exposed_at`, `production_days`.
+
+### 22.4 Schemas + dominio
+- **`schemas/vocabulary.py`**: `VocabularyItem` gana `exposures`, `last_exposed_at`,
+  `production_days`, `status: Literal["exposed","learning","mastered"]`.
+- **`domain/vocabulary.py`**: `record_exposure(user_id, text)` (nuevo) y `get_vocabulary` calcula
+  `status` por palabra vía `classify`.
+
+### 22.5 Captura de exposición en el chat
+- **`routers/chat.py`**: tras la respuesta del tutor (`chat` y `chat_stream`), si hay `user_id` se
+  llama `vocabulary_service.record_exposure(user_id, reply)`; en el stream se acumulan los chunks y
+  se registra al final.
+
+### 22.6 Perfil separa producido / expuesto / dominado
+- **`domain/profile.py`**: `vocab_size` (para CEFR y recomendaciones) ahora cuenta solo palabras
+  producidas (`appearances > 0`), no las solo-expuestas; calcula `vocabulary_mastered` y
+  `vocabulary_exposed`.
+- **`schemas/profile.py`**: `LearningProfile` gana `vocabulary_exposed` y `vocabulary_mastered`.
+
+### 22.7 Frontend
+- **`frontend/src/types/api.ts`**: `LearningProfile.vocabulary_exposed`/`vocabulary_mastered`.
+- **`frontend/src/components/LearningProfile.tsx`**: bloque Vocabulario muestra "N dominadas · M
+  vistas" (`.learning-sub`).
+
+### 22.8 Tests
+- `test_vocabulary.py`: `classify` (5 casos), `record_exposures` (crea/acumula/unknown),
+  `production_days` con días controlados (monkeypatch `_now`), endpoint `status`, migración P3
+  (drop column + backfill).
+- `test_profile.py`: perfil separa `vocabulary_size`/`vocabulary_exposed`/`vocabulary_mastered`.
+- `test_chat_profile.py`: `chat` y `chat_stream` registran la exposición del tutor.
+
+### 22.9 Pendiente / siguiente incremento natural
+- **P4–P6 de Etapa 2** (listening como competencia, CEFR por evidencia, pronunciación fonémica):
+  ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+

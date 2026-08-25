@@ -9,6 +9,7 @@ from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
 from services.cefr import evaluate_cefr, recommendations
+from services.vocabulary import classify
 
 
 async def _compute_profile(user_id: str) -> dict | None:
@@ -18,6 +19,14 @@ async def _compute_profile(user_id: str) -> dict | None:
         return None
 
     vocab = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    produced = [v for v in vocab if v["appearances"] > 0]
+    mastered_words = [
+        v
+        for v in produced
+        if classify(v["appearances"], v["production_days"]) == "mastered"
+    ]
+    exposed_only = len(vocab) - len(produced)
+
     errors = await run_in_threadpool(grammar_repo.get_recurring_errors, user_id)
     progress = await run_in_threadpool(pronunciation_repo.get_progress, user_id)
 
@@ -33,7 +42,7 @@ async def _compute_profile(user_id: str) -> dict | None:
 
     evaluation = evaluate_cefr(
         {
-            "vocab_size": len(vocab),
+            "vocab_size": len(produced),
             "pronunciation_avg": pron_avg,
             "exercises": progress["exercises"],
             "grammar_error_rate": grammar_error_rate,
@@ -45,7 +54,7 @@ async def _compute_profile(user_id: str) -> dict | None:
         {
             "recurring_errors": active_errors,
             "pronunciation_avg": pron_avg,
-            "vocab_size": len(vocab),
+            "vocab_size": len(produced),
         }
     )
     return {
@@ -53,8 +62,10 @@ async def _compute_profile(user_id: str) -> dict | None:
         "estimated_level": evaluation["level"],
         "estimated_bands": evaluation["bands"],
         "estimated_descriptor": evaluation["descriptor"],
-        "vocabulary_size": len(vocab),
-        "top_words": [v["word"] for v in vocab[:5]],
+        "vocabulary_size": len(produced),
+        "vocabulary_exposed": exposed_only,
+        "vocabulary_mastered": len(mastered_words),
+        "top_words": [v["word"] for v in produced[:5]],
         "recurring_errors": active_errors,
         "mastered_errors": mastered_errors,
         "mastered_count": len(mastered_errors),

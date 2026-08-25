@@ -7,7 +7,7 @@ from main import app
 from repositories import db
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services.vocabulary import extract_words
+from services.vocabulary import classify, extract_words
 
 
 def _setup(monkeypatch, tmp_path):
@@ -128,3 +128,96 @@ def test_vocabulary_endpoint_404(monkeypatch, tmp_path):
             ).status_code
             == 404
         )
+
+
+def test_classify_statuses(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert classify(0, 0) == "exposed"
+    assert classify(1, 1) == "learning"
+    assert classify(2, 3) == "learning"  # menos de 3 producciones
+    assert classify(3, 1) == "learning"  # 3 producciones pero un solo día
+    assert classify(3, 2) == "mastered"
+
+
+def test_record_exposures_creates_exposed_rows(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert vocabulary_repo.record_exposures(a, ["travel", "culture"]) is True
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["travel"]["exposures"] == 1
+    assert vocab["travel"]["appearances"] == 0
+    assert vocab["travel"]["production_days"] == 0
+    assert vocab["travel"]["last_exposed_at"]
+
+
+def test_record_exposures_accumulates(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["travel"])
+    vocabulary_repo.record_exposures(a, ["travel"])
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["travel"]["exposures"] == 2
+    assert vocab["travel"]["appearances"] == 0
+
+
+def test_record_exposures_unknown_user_false(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert vocabulary_repo.record_exposures("no-existe", ["travel"]) is False
+
+
+def test_production_days_counts_distinct_days(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    times = iter(
+        [
+            "2026-08-20T10:00:00+00:00",
+            "2026-08-20T11:00:00+00:00",  # mismo día → no suma
+            "2026-08-21T10:00:00+00:00",  # día distinto → suma
+            "2026-08-22T10:00:00+00:00",  # día distinto → suma
+        ]
+    )
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
+    for _ in range(4):
+        vocabulary_repo.record_words(a, ["cat"])
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["cat"]["appearances"] == 4
+    assert vocab["cat"]["production_days"] == 3
+
+
+def test_vocabulary_endpoint_reports_status(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["travel"])  # exposed
+    vocabulary_repo.record_words(a, ["cat"])  # learning (1 producción, 1 día)
+    with TestClient(app) as client:
+        got = client.get("/api/vocabulary", params={"user_id": a})
+    assert got.status_code == 200
+    by_word = {v["word"]: v for v in got.json()}
+    assert by_word["travel"]["status"] == "exposed"
+    assert by_word["travel"]["appearances"] == 0
+    assert by_word["cat"]["status"] == "learning"
+
+
+def test_vocabulary_p3_columns_migration(monkeypatch, tmp_path):
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    uid = users_repo.create_user("A")["id"]
+    vocabulary_repo.record_words(uid, ["cat"])
+
+    # Simula una BD previa a P3: elimina las columnas nuevas.
+    conn = sqlite3.connect(db.DB_PATH)
+    conn.execute("ALTER TABLE vocabulary DROP COLUMN exposures")
+    conn.execute("ALTER TABLE vocabulary DROP COLUMN last_exposed_at")
+    conn.execute("ALTER TABLE vocabulary DROP COLUMN production_days")
+    conn.commit()
+    conn.close()
+
+    db.init_db()
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
+        row = conn.execute(
+            "SELECT appearances, production_days FROM vocabulary WHERE word = 'cat'"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert {"exposures", "last_exposed_at", "production_days"} <= cols
+    assert row[0] == 1  # appearances
+    assert row[1] == 1  # production_days (backfill de producciones previas)

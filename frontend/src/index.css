@@ -1337,6 +1337,12 @@ body.is-resizing {
   line-height: 1;
 }
 
+.learning-sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
 .learning-chips {
   margin: var(--space-2) 0 0;
   padding: 0;

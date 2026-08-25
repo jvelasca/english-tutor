@@ -53,6 +53,12 @@ export function LearningProfile({ profile }: LearningProfileProps) {
         <div className="learning-block">
           <h3>Vocabulario</h3>
           <p className="learning-big">{profile.vocabulary_size}</p>
+          {(profile.vocabulary_mastered > 0 || profile.vocabulary_exposed > 0) && (
+            <p className="learning-sub">
+              {profile.vocabulary_mastered} dominadas · {profile.vocabulary_exposed}{" "}
+              vistas
+            </p>
+          )}
           {profile.top_words.length > 0 ? (
             <ul className="learning-chips">
               {profile.top_words.map((w) => (

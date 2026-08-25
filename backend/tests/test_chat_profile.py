@@ -6,6 +6,7 @@ from main import app
 from repositories import db
 from repositories import grammar as grammar_repo
 from repositories import users as users_repo
+from repositories import vocabulary as vocabulary_repo
 from services import llm
 from services.grammar import find_errors
 
@@ -89,6 +90,41 @@ def test_chat_unknown_user_id_404(monkeypatch, tmp_path):
             json={"messages": [{"role": "user", "content": "Hello"}]},
         )
     assert r.status_code == 404
+
+
+def test_chat_records_tutor_exposure(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    fake = FakeOllamaClient(content="You should practice the vocabulary.")
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/chat",
+            params={"user_id": uid},
+            json={"messages": [{"role": "user", "content": "Hello"}]},
+        )
+    assert r.status_code == 200
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
+    assert vocab["practice"]["exposures"] == 1
+    assert vocab["practice"]["appearances"] == 0
+    assert vocab["vocabulary"]["exposures"] == 1
+
+
+def test_chat_stream_records_tutor_exposure(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    fake = FakeOllamaClient(content="Practice the vocabulary.")
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/chat/stream",
+            params={"user_id": uid},
+            json={"messages": [{"role": "user", "content": "Hello"}]},
+        )
+        assert r.status_code == 200
+        body = r.text  # consume el stream para que se registre la exposición
+        assert '"done": true' in body
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
+    assert vocab["practice"]["exposures"] == 1
+    assert vocab["vocabulary"]["exposures"] == 1
 
 
 def test_chat_stream_with_user_id_personalizes(monkeypatch, tmp_path):

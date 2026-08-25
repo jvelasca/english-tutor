@@ -12,6 +12,7 @@ from dependencies import current_user_optional
 from domain import academy as academy_service
 from domain import learning as learning_service
 from domain import profile as profile_service
+from domain import vocabulary as vocabulary_service
 from schemas.chat import ChatRequest, ChatResponse
 from services.context import build_system_prompt
 from services.llm import chat_once, chat_stream
@@ -51,7 +52,7 @@ async def chat(
     system_prompt = await _system_prompt(req, user_id)
     await _record_activity(req, user_id)
     try:
-        return await chat_once(
+        reply = await chat_once(
             req.messages, req.model, req.temperature, req.mode, system_prompt
         )
     except Exception:  # noqa: BLE001
@@ -59,6 +60,9 @@ async def chat(
         raise HTTPException(
             status_code=502, detail="No se pudo completar la respuesta"
         ) from None
+    if user_id:
+        await vocabulary_service.record_exposure(user_id, reply.content)
+    return reply
 
 
 @router.post("/api/chat/stream")
@@ -71,12 +75,16 @@ async def chat_stream_endpoint(
     await _record_activity(req, user_id)
 
     async def generate():
+        chunks: list[str] = []
         try:
             async for content in chat_stream(
                 req.messages, req.model, req.temperature, req.mode, system_prompt
             ):
+                chunks.append(content)
                 data = json.dumps({"content": content}, ensure_ascii=False)
                 yield f"data: {data}\n\n"
+            if user_id and chunks:
+                await vocabulary_service.record_exposure(user_id, "".join(chunks))
             yield 'data: {"done": true}\n\n'
         except Exception:  # noqa: BLE001
             logger.exception("Error en /api/chat/stream")

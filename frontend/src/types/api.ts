@@ -128,6 +128,8 @@ export interface LearningProfile {
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
   vocabulary_size: number;
+  vocabulary_exposed: number;
+  vocabulary_mastered: number;
   top_words: string[];
   recurring_errors: GrammarRecurringError[];
   mastered_errors: GrammarRecurringError[];

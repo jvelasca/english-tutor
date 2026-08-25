@@ -154,6 +154,40 @@ def test_profile_separates_mastered_errors(monkeypatch, tmp_path):
     assert body["mastered_errors"][0]["rule"] == "he_she_it_s"
 
 
+def test_profile_vocabulary_exposure_and_mastery(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["travel"])  # solo expuesta
+    for _ in range(3):
+        vocabulary_repo.record_words(a, ["cat"])  # producida 3× en un solo día
+
+    with TestClient(app) as client:
+        body = client.get("/api/profile", params={"user_id": a}).json()
+    assert body["vocabulary_size"] == 1  # solo "cat" cuenta como producida
+    assert body["vocabulary_exposed"] == 1
+    assert body["vocabulary_mastered"] == 0  # sin espaciado temporal
+    assert set(body["top_words"]) == {"cat"}
+
+
+def test_profile_vocabulary_mastered(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    times = iter(
+        [
+            "2026-08-20T10:00:00+00:00",
+            "2026-08-21T10:00:00+00:00",
+            "2026-08-22T10:00:00+00:00",
+        ]
+    )
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
+    for _ in range(3):
+        vocabulary_repo.record_words(a, ["cat"])
+
+    with TestClient(app) as client:
+        body = client.get("/api/profile", params={"user_id": a}).json()
+    assert body["vocabulary_size"] == 1
+    assert body["vocabulary_mastered"] == 1
+    assert body["vocabulary_exposed"] == 0
+
+
 def test_profile_grammar_rate_uses_user_messages(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     cid = conversations_repo.create_conversation(a)["id"]

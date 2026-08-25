@@ -32,3 +32,23 @@ def extract_words(text: str) -> list[str]:
     tokens = _normalize(text).split()
     words = {t for t in tokens if len(t) > 1 and t not in EN_STOPWORDS}
     return sorted(words)
+
+
+# Umbrales de dominio: una palabra se considera "dominada" cuando el alumno la
+# ha producido varias veces y en días distintos (producción espaciada).
+MASTERY_MIN_PRODUCTIONS = 3
+MASTERY_MIN_DAYS = 2
+
+
+def classify(appearances: int, production_days: int) -> str:
+    """Estado de dominio de una palabra según producción.
+
+    - "exposed": nunca producida por el alumno (solo exposición del tutor).
+    - "learning": producida al menos una vez, aún sin consolidar.
+    - "mastered": producida repetidas veces en días distintos.
+    """
+    if appearances == 0:
+        return "exposed"
+    if appearances >= MASTERY_MIN_PRODUCTIONS and production_days >= MASTERY_MIN_DAYS:
+        return "mastered"
+    return "learning"

@@ -19,6 +19,8 @@ class LearningProfile(BaseModel):
     estimated_bands: EstimatedBands
     estimated_descriptor: str
     vocabulary_size: int
+    vocabulary_exposed: int
+    vocabulary_mastered: int
     top_words: list[str]
     recurring_errors: list[GrammarRecurringError]
     mastered_errors: list[GrammarRecurringError]
