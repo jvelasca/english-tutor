@@ -68,6 +68,19 @@ def test_find_errors_capitalization_i(monkeypatch, tmp_path):
     assert "capitalization_i" not in _rules(find_errors("I like it"))
 
 
+def test_find_errors_capitalization_i_contractions(monkeypatch, tmp_path):
+    """El pronombre 'I' en contracciones debe ser case-sensitive y robusto."""
+    _setup(monkeypatch, tmp_path)
+    # Minúscula en contracción → error.
+    assert "capitalization_i" in _rules(find_errors("i'm going home"))
+    assert "capitalization_i" in _rules(find_errors("i'll do it"))
+    # Mayúscula correcta → sin error.
+    assert "capitalization_i" not in _rules(find_errors("I'm going home"))
+    assert "capitalization_i" not in _rules(find_errors("I'll do it"))
+    # La 'i' dentro de otras palabras no es el pronombre.
+    assert "capitalization_i" not in _rules(find_errors("This is interesting"))
+
+
 def test_find_errors_confidence_and_confirmed(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     errors = {e["rule"]: e for e in find_errors("He go to school. I ate a apple.")}

@@ -193,6 +193,25 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS academy_objective_mastery (
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                objective_id TEXT NOT NULL,
+                skill TEXT NOT NULL,
+                score REAL NOT NULL DEFAULT 0.0,
+                recent_score REAL NOT NULL DEFAULT 0.0,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                streak INTEGER NOT NULL DEFAULT 0,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, level_id, objective_id, skill),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS academy_assessment_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,

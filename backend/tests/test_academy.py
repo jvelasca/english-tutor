@@ -68,14 +68,43 @@ def test_objective_progress_mastered_when_all_skills_met():
     lv = load_level("a1")
     obj = lv.objectives()[0]
     scores = {s: 1.0 for s in obj.skills}
-    assert academy_svc.objective_progress(obj, scores)["mastered"] is True
+    attempts = {s: obj.minimum_attempts for s in obj.skills}
+    assert academy_svc.objective_progress(obj, scores, attempts)["mastered"] is True
 
 
 def test_objective_progress_not_mastered_when_skill_low():
     lv = load_level("a1")
     obj = lv.objectives()[0]
     scores = {s: 0.0 for s in obj.skills}
-    assert academy_svc.objective_progress(obj, scores)["mastered"] is False
+    attempts = {s: obj.minimum_attempts for s in obj.skills}
+    assert academy_svc.objective_progress(obj, scores, attempts)["mastered"] is False
+
+
+def test_objective_progress_requires_minimum_attempts():
+    lv = load_level("a1")
+    obj = lv.objectives()[0]
+    scores = {s: 1.0 for s in obj.skills}
+    # Puntuación perfecta pero sin intentos suficientes → no dominado (consistencia).
+    assert academy_svc.objective_progress(obj, scores, {})["mastered"] is False
+    one = {s: 1 for s in obj.skills}
+    assert academy_svc.objective_progress(obj, scores, one)["mastered"] is False
+
+
+def test_mastery_is_per_objective_not_contagious():
+    lv = load_level("a1")
+    objs = lv.objectives()
+    o1, o2 = objs[0], objs[1]
+    assert set(o1.skills) & set(o2.skills), (
+        "los dos primeros objetivos comparten destreza"
+    )
+    # Domina o1 (puntuación alta + intentos suficientes); o2 queda sin evidencia.
+    objective_scores = {o1.id: {s: 1.0 for s in o1.skills}}
+    objective_attempts = {o1.id: {s: o1.minimum_attempts for s in o1.skills}}
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    assert o1.id in mastered
+    assert o2.id not in mastered  # el dominio de o1 no se contagia a o2
 
 
 def test_unlock_state_is_gated():
@@ -481,9 +510,52 @@ def test_endpoint_isolation_between_users(monkeypatch, tmp_path):
             params={"user_id": a},
             json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
         )
-        mastery_a = client.get("/api/academy/mastery", params={"user_id": a}).json()
-        mastery_b = client.get("/api/academy/mastery", params={"user_id": b}).json()
         certs_b = client.get("/api/academy/certificates", params={"user_id": b}).json()
-    assert mastery_a["mastery"] != []
-    assert mastery_b["mastery"] == []  # B no hereda datos de A
+    assert academy_repo.list_objective_mastery(a, "a1") != {}
+    assert academy_repo.list_objective_mastery(b, "a1") == {}  # B no hereda datos de A
     assert certs_b["certificates"] == []
+
+
+def test_endpoint_assessment_rejects_locked_objective(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    objs = load_level("a1").objectives()
+    locked = objs[2]  # el tercer objetivo está bloqueado por gating
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": locked.id, "answers": {}},
+        )
+    assert r.status_code == 404
+    # No se escribe evidencia para un objetivo bloqueado.
+    assert academy_repo.list_objective_mastery(a, "a1") == {}
+
+
+def test_endpoint_attempts_reject_locked_objective(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    objs = load_level("a1").objectives()
+    locked = objs[2]
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/attempts",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": locked.id,
+                "results": [{"skill": "grammar", "result": "correct"}],
+            },
+        )
+    assert r.status_code == 404
+
+
+def test_endpoint_lesson_complete_rejects_locked_objective(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    objs = load_level("a1").objectives()
+    locked = objs[2]
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/lessons/complete",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": locked.id},
+        )
+    assert r.status_code == 404

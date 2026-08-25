@@ -59,6 +59,24 @@ def _iter_objectives(level: Level):
                     yield mod, unit, lesson, obj, order
 
 
+def _split_objective_mastery(
+    obj_mastery: dict[str, dict[str, dict]],
+) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, int]]]:
+    """Separa el mapa {objective_id: {skill: estado}} en scores y attempts.
+
+    El estado por destreza incluye `score` y `attempts`, necesarios para que la
+    lógica pura decida el dominio con el mínimo de intentos."""
+    objective_scores = {
+        oid: {skill: state["score"] for skill, state in skills.items()}
+        for oid, skills in obj_mastery.items()
+    }
+    objective_attempts = {
+        oid: {skill: state["attempts"] for skill, state in skills.items()}
+        for oid, skills in obj_mastery.items()
+    }
+    return objective_scores, objective_attempts
+
+
 def _objective_state(
     level: Level,
     mod,
@@ -69,9 +87,10 @@ def _objective_state(
     mastered_ids: set[str],
     unlocked: dict[str, bool],
     skill_scores: dict[str, float],
+    skill_attempts: dict[str, int],
     attempts: dict[str, dict[str, int]],
 ) -> ObjectiveStateOut:
-    progress = academy_svc.objective_progress(obj, skill_scores)
+    progress = academy_svc.objective_progress(obj, skill_scores, skill_attempts)
     att = academy_svc.objective_attempts(obj.id, attempts)
     if obj.id in mastered_ids:
         status = "mastered"
@@ -129,7 +148,8 @@ def _objective_state(
 def _level_summary(
     level_id: str,
     enrolled: bool,
-    skill_scores: dict[str, float],
+    objective_scores: dict[str, dict[str, float]],
+    objective_attempts: dict[str, dict[str, int]],
     attempts: dict[str, dict[str, int]],
 ) -> LevelSummaryOut:
     available = level_id in {lv.level_id for lv in _loaded_levels}
@@ -141,7 +161,9 @@ def _level_summary(
     if available:
         lv = next(x for x in _loaded_levels if x.level_id == level_id)
         objective_count = len(lv.objectives())
-        mastered = academy_svc.mastered_objective_ids(lv, skill_scores)
+        mastered = academy_svc.mastered_objective_ids(
+            lv, objective_scores, objective_attempts
+        )
         counters = academy_svc.rollup_counters(
             [o.id for o in lv.objectives()], mastered, attempts
         )
@@ -171,21 +193,28 @@ async def list_levels(user_id: str) -> list[LevelSummaryOut]:
     enrolled_ids = {e["level_id"] for e in enrollments}
     summaries = []
     for lv in _loaded_levels:
-        scores = await run_in_threadpool(
-            academy_repo.get_skill_mastery, user_id, lv.level_id
+        obj_mastery = await run_in_threadpool(
+            academy_repo.list_objective_mastery, user_id, lv.level_id
         )
+        objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
         attempts = await run_in_threadpool(
             academy_repo.list_attempts, user_id, lv.level_id
         )
         summaries.append(
-            _level_summary(lv.level_id, lv.level_id in enrolled_ids, scores, attempts)
+            _level_summary(
+                lv.level_id,
+                lv.level_id in enrolled_ids,
+                objective_scores,
+                objective_attempts,
+                attempts,
+            )
         )
     # Añade los niveles CEFR aún no disponibles (p. ej. A2..C2 antes de F7).
     existing = {s.level_id for s in summaries}
     for code in CEFR_ORDER:
         lid = code.lower()
         if lid not in existing:
-            summaries.append(_level_summary(lid, lid in enrolled_ids, {}, {}))
+            summaries.append(_level_summary(lid, lid in enrolled_ids, {}, {}, {}))
     order = {lid: i for i, lid in enumerate(code.lower() for code in CEFR_ORDER)}
     summaries.sort(key=lambda s: order.get(s.level_id, 99))
     return summaries
@@ -195,15 +224,27 @@ async def get_level_detail(level_id: str, user_id: str) -> LevelDetailOut | None
     lv = _levels_by_id.get(level_id)
     if lv is None:
         return None
-    skill_scores = await run_in_threadpool(
-        academy_repo.get_skill_mastery, user_id, level_id
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, level_id
     )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
     attempts = await run_in_threadpool(academy_repo.list_attempts, user_id, level_id)
-    mastered = academy_svc.mastered_objective_ids(lv, skill_scores)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
     unlocked = academy_svc.unlock_state(lv, mastered)
     objectives = [
         _objective_state(
-            lv, mod, unit, lesson, obj, order, mastered, unlocked, skill_scores,
+            lv,
+            mod,
+            unit,
+            lesson,
+            obj,
+            order,
+            mastered,
+            unlocked,
+            objective_scores.get(obj.id, {}),
+            objective_attempts.get(obj.id, {}),
             attempts,
         )
         for mod, unit, lesson, obj, order in _iter_objectives(lv)
@@ -252,11 +293,14 @@ async def next_objective(user_id: str, level_id: str) -> NextObjectiveOut | None
     lv = _levels_by_id.get(level_id)
     if lv is None:
         return None
-    skill_scores = await run_in_threadpool(
-        academy_repo.get_skill_mastery, user_id, level_id
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, level_id
     )
-    mastered = academy_svc.mastered_objective_ids(lv, skill_scores)
-    oid = academy_svc.adaptive_next(lv, mastered, skill_scores)
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    oid = academy_svc.adaptive_next(lv, mastered, objective_scores)
     reason = "next-in-path" if oid else "level-complete"
     return NextObjectiveOut(objective_id=oid, level_id=level_id, reason=reason)
 
@@ -268,11 +312,33 @@ async def lesson_prompt(user_id: str, objective_id: str) -> str | None:
         obj = get_objective(lv, objective_id)
         if obj is not None:
             mastery = await run_in_threadpool(
-                academy_repo.get_skill_mastery, user_id, lv.level_id
+                academy_repo.get_objective_mastery, user_id, lv.level_id, objective_id
             )
             errors = await run_in_threadpool(grammar_repo.get_recurring_errors, user_id)
             return build_lesson_prompt(obj.model_dump(), lv.level, mastery, errors)
     return None
+
+
+async def _mastered_ids(user_id: str, level_id: str) -> set[str]:
+    """Ids de objetivos dominados de un nivel (fuente: mastery por objetivo)."""
+    lv = _levels_by_id[level_id]
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    return academy_svc.mastered_objective_ids(lv, objective_scores, objective_attempts)
+
+
+def _objective_accessible(
+    level: Level, objective_id: str, mastered_ids: set[str]
+) -> bool:
+    """True si el objetivo está desbloqueado (available) o ya dominado (review).
+
+    Rechaza objetivos `locked`: no se puede evaluar, intentar ni completar un
+    objetivo al que el gating curricular aún no da acceso."""
+    if objective_id in mastered_ids:
+        return True
+    return academy_svc.unlock_state(level, mastered_ids).get(objective_id, False)
 
 
 async def record_attempts(
@@ -292,6 +358,9 @@ async def record_attempts(
         return None
     obj = get_objective(lv, objective_id)
     if obj is None:
+        return None
+    mastered = await _mastered_ids(user_id, level_id)
+    if not _objective_accessible(lv, objective_id, mastered):
         return None
     recorded = 0
     for r in results:
@@ -319,6 +388,9 @@ async def record_lesson_completed(
     lv = _levels_by_id.get(level_id)
     if lv is None or get_objective(lv, objective_id) is None:
         return None
+    mastered = await _mastered_ids(user_id, level_id)
+    if not _objective_accessible(lv, objective_id, mastered):
+        return None
     ok = await run_in_threadpool(
         academy_repo.record_lesson_completed, user_id, level_id, objective_id
     )
@@ -343,17 +415,25 @@ async def submit_objective_assessment(
     obj = get_objective(lv, objective_id)
     if obj is None:
         return None
+    mastered = await _mastered_ids(user_id, level_id)
+    if not _objective_accessible(lv, objective_id, mastered):
+        return None
     scored = academy_svc.score_items(obj.checks, answers)
     mastery_updates: dict[str, float] = {}
     for skill, b in scored["skills"].items():
         row = await run_in_threadpool(
-            academy_repo.get_skill_row, user_id, level_id, skill
+            academy_repo.get_objective_row, user_id, level_id, objective_id, skill
         )
         state = academy_svc.next_mastery_state(
             row, b["score"], obj.threshold(skill)
         )
         await run_in_threadpool(
-            academy_repo.apply_skill_evidence, user_id, level_id, skill, state
+            academy_repo.apply_objective_evidence,
+            user_id,
+            level_id,
+            objective_id,
+            skill,
+            state,
         )
         mastery_updates[skill] = state["score"]
     return ObjectiveAssessmentOut(

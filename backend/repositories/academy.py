@@ -128,6 +128,95 @@ def list_skill_mastery(user_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+# --- Mastery por objetivo (fuente de verdad del progreso curricular) -------
+
+
+def get_objective_row(
+    user_id: str, level_id: str, objective_id: str, skill: str
+) -> dict | None:
+    """Lee el estado completo de mastery de una destreza en un objetivo, o None."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT score, recent_score, confidence, streak, attempts, last_seen_at "
+            "FROM academy_objective_mastery WHERE user_id = ? AND level_id = ? "
+            "AND objective_id = ? AND skill = ?",
+            (user_id, level_id, objective_id, skill),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def apply_objective_evidence(
+    user_id: str, level_id: str, objective_id: str, skill: str, state: dict
+) -> bool:
+    """Persiste el estado completo de mastery de una destreza en un objetivo.
+
+    `state` es el resultado de `services.academy.next_mastery_state`. La clave es
+    (user, level, objective, skill): el dominio de una destreza en un objetivo no
+    se contagia a otros objetivos que comparten esa misma destreza."""
+    if get_user(user_id) is None:
+        return False
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO academy_objective_mastery "
+            "(user_id, level_id, objective_id, skill, score, recent_score, "
+            "confidence, streak, attempts, last_seen_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id, level_id, objective_id, skill) DO UPDATE SET "
+            "score = excluded.score, recent_score = excluded.recent_score, "
+            "confidence = excluded.confidence, streak = excluded.streak, "
+            "attempts = excluded.attempts, last_seen_at = excluded.last_seen_at, "
+            "updated_at = excluded.updated_at",
+            (
+                user_id,
+                level_id,
+                objective_id,
+                skill,
+                state["score"],
+                state["recent_score"],
+                state["confidence"],
+                state["streak"],
+                state["attempts"],
+                state.get("last_seen_at") or now,
+                now,
+            ),
+        )
+    return True
+
+
+def get_objective_mastery(
+    user_id: str, level_id: str, objective_id: str
+) -> dict[str, float]:
+    """Mapa destreza → score de mastery para un objetivo concreto."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT skill, score FROM academy_objective_mastery "
+            "WHERE user_id = ? AND level_id = ? AND objective_id = ?",
+            (user_id, level_id, objective_id),
+        ).fetchall()
+    return {r["skill"]: r["score"] for r in rows}
+
+
+def list_objective_mastery(
+    user_id: str, level_id: str
+) -> dict[str, dict[str, dict]]:
+    """Mapa {objective_id: {skill: estado}} para todo un nivel.
+
+    Cada `estado` contiene `score` y `attempts` (y el resto de columnas), que es
+    lo que necesita la lógica pura para decidir el dominio por objetivo."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT objective_id, skill, score, recent_score, confidence, streak, "
+            "attempts, last_seen_at FROM academy_objective_mastery "
+            "WHERE user_id = ? AND level_id = ?",
+            (user_id, level_id),
+        ).fetchall()
+    agg: dict[str, dict[str, dict]] = {}
+    for r in rows:
+        agg.setdefault(r["objective_id"], {})[r["skill"]] = dict(r)
+    return agg
+
+
 def record_assessment_result(
     user_id: str, assessment_id: str, level_id: str, results: dict, passed: bool
 ) -> dict | None:

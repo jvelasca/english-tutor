@@ -151,3 +151,12 @@ completo.
   lleguen, alimentarán el mismo motor determinista.
 - El dominio puede **bajar** (decay): un objetivo dominado puede volver a "a repasar" si la
   evidencia reciente empeora. Se descarta el patrón `score = MAX(score, new)`.
+- El **mastery es por objetivo** (`user + level + objective + skill`), no por destreza global
+  del nivel: dominar `grammar` en el objetivo 1 **no** contagia el dominio a los objetivos 2..N
+  que comparten destreza. El progreso del árbol (objetivo → módulo → nivel), el gating y el
+  estado "dominado" se calculan desde `academy_objective_mastery`. La tabla
+  `academy_skill_mastery` queda **solo** como evidencia de certificación del examen de nivel.
+- Declarar un objetivo como dominado exige **consistencia**: además de alcanzar el umbral por
+  destreza, se requiere un mínimo de intentos (`minimum_attempts`). Un único acierto no domina.
+- El **gating curricular** se valida también en los endpoints de evaluación: solo se pueden
+  evaluar, intentar o completar objetivos en estado `available` o `review` (nunca `locked`).

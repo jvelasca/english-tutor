@@ -32,6 +32,10 @@ CANONICAL_SKILLS: tuple[str, ...] = (
 # Umbral por defecto para dominar una destreza de un objetivo (0..1).
 DEFAULT_THRESHOLD = 0.8
 
+# Nº mínimo de evidencias (intentos) por destreza para poder declarar dominio.
+# Evita que un único acierto marque un objetivo como dominado.
+DEFAULT_MINIMUM_ATTEMPTS = 3
+
 # Niveles CEFR disponibles (los archivos `curriculum/<level_id>.json` son la
 # fuente de verdad del contenido; este orden fija la progresión).
 CEFR_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
@@ -68,6 +72,7 @@ class Objective(BaseModel):
     concepts: list[str] = Field(default_factory=list)
     vocabulary: list[str] = Field(default_factory=list)
     thresholds: dict[str, float] = Field(default_factory=dict)
+    minimum_attempts: int = DEFAULT_MINIMUM_ATTEMPTS
     activities: list[Activity] = Field(default_factory=list)
     checks: list[ObjectiveCheck] = Field(default_factory=list)
 

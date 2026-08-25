@@ -82,33 +82,55 @@ def next_mastery_state(
 # --- Mastery y progresión -------------------------------------------------
 
 
-def objective_progress(objective: Objective, skill_scores: dict[str, float]) -> dict:
+def objective_progress(
+    objective: Objective,
+    skill_scores: dict[str, float],
+    skill_attempts: dict[str, int] | None = None,
+) -> dict:
     """Devuelve el desglose por destreza de un objetivo y si está dominado.
 
-    `skill_scores` mapea destreza → mejor puntuación (0..1). Un objetivo se domina
-    cuando TODAS sus destrezas alcanzan su umbral."""
+    `skill_scores` mapea destreza → puntuación (0..1); `skill_attempts` mapea
+    destreza → nº de evidencias. Una destreza se da por dominada solo si alcanza
+    su umbral **y** acumula al menos `objective.minimum_attempts` evidencias (así
+    un único acierto no marca el objetivo como dominado)."""
+    skill_attempts = skill_attempts or {}
     skills = []
     for skill in objective.skills:
         score = skill_scores.get(skill, 0.0)
+        attempts = skill_attempts.get(skill, 0)
         required = objective.threshold(skill)
+        met = score >= required and attempts >= objective.minimum_attempts
         skills.append(
             {
                 "skill": skill,
                 "score": round(score, 3),
                 "required": required,
-                "met": score >= required,
+                "met": met,
             }
         )
     mastered = all(s["met"] for s in skills) if skills else False
     return {"objective_id": objective.id, "skills": skills, "mastered": mastered}
 
 
-def mastered_objective_ids(level: Level, skill_scores: dict[str, float]) -> set[str]:
-    """Ids de objetivos dominados del nivel según las puntuaciones actuales."""
+def mastered_objective_ids(
+    level: Level,
+    objective_scores: dict[str, dict[str, float]],
+    objective_attempts: dict[str, dict[str, int]] | None = None,
+) -> set[str]:
+    """Ids de objetivos dominados del nivel (mastery **por objetivo**).
+
+    `objective_scores` mapea objective_id → {skill: score}; `objective_attempts`
+    mapea objective_id → {skill: nº de intentos}. El dominio de una destreza en un
+    objetivo no se contagia a otros objetivos que compartan destreza."""
+    objective_attempts = objective_attempts or {}
     return {
         obj.id
         for obj in level.objectives()
-        if objective_progress(obj, skill_scores)["mastered"]
+        if objective_progress(
+            obj,
+            objective_scores.get(obj.id, {}),
+            objective_attempts.get(obj.id, {}),
+        )["mastered"]
     }
 
 
@@ -124,9 +146,13 @@ def unlock_state(level: Level, mastered_ids: set[str]) -> dict[str, bool]:
     return unlocked
 
 
-def module_progress(level: Level, skill_scores: dict[str, float]) -> list[dict]:
+def module_progress(
+    level: Level,
+    objective_scores: dict[str, dict[str, float]],
+    objective_attempts: dict[str, dict[str, int]] | None = None,
+) -> list[dict]:
     """Progreso por módulo: nº de objetivos dominados / total y ratio 0..1."""
-    mastered = mastered_objective_ids(level, skill_scores)
+    mastered = mastered_objective_ids(level, objective_scores, objective_attempts)
     result = []
     for mod in level.modules:
         objs = [o for u in mod.units for les in u.lessons for o in les.objectives]
@@ -144,10 +170,15 @@ def module_progress(level: Level, skill_scores: dict[str, float]) -> list[dict]:
     return result
 
 
-def level_progress(level: Level, skill_scores: dict[str, float]) -> dict:
+def level_progress(
+    level: Level,
+    objective_scores: dict[str, dict[str, float]],
+    objective_attempts: dict[str, dict[str, int]] | None = None,
+) -> dict:
     """Progreso agregado del nivel."""
     objs = level.objectives()
-    done = sum(1 for o in objs if objective_progress(o, skill_scores)["mastered"])
+    mastered = mastered_objective_ids(level, objective_scores, objective_attempts)
+    done = sum(1 for o in objs if o.id in mastered)
     return {
         "level": level.level,
         "mastered": done,
@@ -256,19 +287,24 @@ def next_objective(level: Level, mastered_ids: set[str]) -> str | None:
     return None
 
 
-def weakest_skill(level: Level, skill_scores: dict[str, float]) -> str | None:
+def weakest_skill(
+    level: Level, objective_scores: dict[str, dict[str, float]]
+) -> str | None:
     """Destreza con menor puntuación media entre los objetivos del nivel."""
     totals: dict[str, list[float]] = defaultdict(list)
     for obj in level.objectives():
+        scores = objective_scores.get(obj.id, {})
         for skill in obj.skills:
-            totals[skill].append(skill_scores.get(skill, 0.0))
+            totals[skill].append(scores.get(skill, 0.0))
     if not totals:
         return None
     return min(totals, key=lambda s: sum(totals[s]) / len(totals[s]))
 
 
 def adaptive_next(
-    level: Level, mastered_ids: set[str], skill_scores: dict[str, float]
+    level: Level,
+    mastered_ids: set[str],
+    objective_scores: dict[str, dict[str, float]],
 ) -> str | None:
     """Siguiente objetivo adaptativo: entre los desbloqueados no dominados, elige
     el que peor puntuación tiene en su destreza más débil (remediation-aware)."""
@@ -283,7 +319,8 @@ def adaptive_next(
 
     def key(oid: str) -> float:
         obj = objs[oid]
-        return min(skill_scores.get(s, 0.0) for s in obj.skills)
+        scores = objective_scores.get(oid, {})
+        return min(scores.get(s, 0.0) for s in obj.skills)
 
     return min(unlocked, key=key)
 
