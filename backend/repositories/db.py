@@ -291,6 +291,26 @@ def init_db() -> None:
             """
         )
 
+        # Calibración observacional de ítems de placement (V1.7): contadores
+        # poblacionales por ítem (no por usuario). Las columnas de estimación
+        # (estimated_difficulty/standard_error/discrimination) las rellena un
+        # proceso de calibración posterior; aquí solo se persisten las
+        # respuestas observadas y su tasa de acierto.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS placement_item_calibration (
+                item_id TEXT PRIMARY KEY,
+                responses INTEGER NOT NULL DEFAULT 0,
+                correct INTEGER NOT NULL DEFAULT 0,
+                correct_rate REAL,
+                sample_size INTEGER,
+                estimated_difficulty REAL,
+                standard_error REAL,
+                discrimination REAL
+            )
+            """
+        )
+
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
         if "user_id" not in columns:

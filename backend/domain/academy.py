@@ -32,6 +32,7 @@ from schemas.academy import (
     PlacementAdaptiveOut,
     PlacementItemOut,
     PlacementOut,
+    PlacementProfileOut,
     PlacementResultOut,
     PlacementStartOut,
     PronunciationResultOut,
@@ -858,12 +859,34 @@ async def get_placement() -> PlacementOut:
     )
 
 
+async def _record_placement_calibration(
+    items: list, answers: dict[str, int]
+) -> None:
+    """Registra en la calibración observacional cada respuesta de `answers`.
+
+    Solo los ítems conocidos del instrumento; los ids desconocidos se ignoran.
+    La calibración es poblacional (no por usuario): acumula respuestas para poder
+    estimar la dificultad/discriminación real de cada ítem en un paso posterior.
+    """
+    item_by_id = {it.id: it for it in items}
+    for item_id, answer_index in answers.items():
+        item = item_by_id.get(item_id)
+        if item is None:
+            continue
+        await run_in_threadpool(
+            academy_repo.record_placement_response,
+            item_id,
+            answer_index == item.correct_index,
+        )
+
+
 async def submit_placement(
     user_id: str, answers: dict[str, int]
 ) -> PlacementResultOut | None:
     data = load_assessments()
     items = data.placement.items
     result = academy_svc.placement_result(items, answers)
+    await _record_placement_calibration(items, answers)
     await run_in_threadpool(
         academy_repo.record_assessment_result,
         user_id,
@@ -911,18 +934,33 @@ async def start_placement(user_id: str) -> PlacementStartOut | None:
     )
 
 
+async def get_placement_profile(answers: dict[str, int]) -> PlacementProfileOut:
+    """Perfil multiskill del placement a partir de las respuestas dadas.
+
+    Cálculo puro (sin persistencia): reutiliza `placement_profile` para devolver
+    θ/nivel/confianza por destreza más los agregados globales. No depende del
+    usuario; el endpoint exige `current_user` solo para autenticar la llamada.
+    """
+    data = load_assessments()
+    items = data.placement.items
+    return PlacementProfileOut(**academy_svc.placement_profile(items, answers))
+
+
 async def next_placement(
     user_id: str, answers: dict[str, int], session_id: int | None = None
 ) -> PlacementAdaptiveOut | None:
-    """Siguiente ítem del placement adaptativo (IRT-lite) y resultado al terminar.
+    """Siguiente ítem del placement adaptativo (IRT-lite/1PL) y resultado al
+    terminar.
 
     El núcleo es stateless: el cliente envía sus respuestas parciales; el servidor
     recalcula la habilidad θ, elige el siguiente ítem por máxima información
     (Fisher; en la 1PL, dificultad más cercana a θ) y se detiene al agotar ítems,
     alcanzar el máximo, o cuando el error estándar de θ baja del umbral (tras un
     mínimo de ítems). Si se pasa `session_id`, además persiste la traza de la
-    sesión (respuestas, historial de θ y resultado final) en `placement_sessions`
-    para reconstruir la trazabilidad histórica del resultado CEFR."""
+    sesión (respuestas, historial de θ y resultado final, con el perfil multiskill)
+    en `placement_sessions`, y registra en la calibración observacional solo las
+    respuestas nuevas de esta llamada (delta contra la sesión, para no duplicar
+    contadores)."""
     data = load_assessments()
     items = data.placement.items
     answered_ids = set(answers)
@@ -936,6 +974,7 @@ async def next_placement(
     done = academy_svc.placement_should_stop(len(answered_ids), len(items), se)
 
     theta_trace: list[dict] | None = None
+    session = None
     if session_id is not None:
         session = await run_in_threadpool(
             academy_repo.get_placement_session, session_id
@@ -945,6 +984,14 @@ async def next_placement(
         theta_trace = list(session["theta_trace"]) + [
             {"answered": len(answered_ids), "theta": theta, "standard_error": se}
         ]
+
+    # Calibración observacional: solo las respuestas nuevas de esta llamada.
+    new_answers = dict(answers)
+    if session is not None:
+        new_answers = {
+            k: v for k, v in answers.items() if k not in session["answers"]
+        }
+    await _record_placement_calibration(items, new_answers)
 
     if done:
         result = academy_svc.placement_result_adaptive(items, answers)

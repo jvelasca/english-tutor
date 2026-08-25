@@ -67,7 +67,7 @@ CURRICULUM_VERSION = "1.2.5"
 # app y del currículum). Identifican QUÉ instrumento produjo cada resultado para
 # que dos respuestas idénticas sean reproducibles aunque el contenido evolucione.
 ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exámenes)
-PLACEMENT_VERSION = "1.0.0"  # motor de placement adaptativo (IRT)
+PLACEMENT_VERSION = "2.0.0"  # motor de placement adaptativo (IRT-lite/1PL multiskill)
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 LISTENING_BANK_VERSION = "2.0.0"  # banco de ítems de listening (audio 1ª clase, 8D)
 
@@ -168,6 +168,14 @@ class AssessmentItem(BaseModel):
 
 
 class PlacementTest(BaseModel):
+    """Instrumento de placement (CAT adaptativo, IRT-lite/1PL).
+
+    Los ítems de las destrezas de producción (speaking/writing/pronunciation) y de
+    listening son de **reconocimiento o meta-lenguaje** (opción múltiple), NO
+    evaluación de voz/texto real ni reproducción de audio: el placement no captura
+    audio ni producción libre. Miden conciencia de la destreza, no su ejecución.
+    """
+
     id: str
     title: str
     description: str = ""

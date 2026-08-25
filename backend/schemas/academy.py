@@ -164,6 +164,26 @@ class PlacementSkillResultOut(BaseModel):
     score: float
 
 
+class PlacementSkillProfileOut(BaseModel):
+    """Perfil de una destreza en el placement multiskill (θ, nivel y confianza)."""
+
+    skill: str
+    theta: float | None
+    level: str | None
+    confidence: float | None
+    answered: int
+
+
+class PlacementProfileOut(BaseModel):
+    """Perfil multiskill del placement: θ por destreza + agregados globales."""
+
+    profile: list[PlacementSkillProfileOut]
+    overall_level: str
+    overall_theta: float
+    overall_confidence: float | None
+    placement_version: str = ""
+
+
 class PlacementResultOut(BaseModel):
     level: str
     confidence: float
@@ -171,6 +191,7 @@ class PlacementResultOut(BaseModel):
     correct: int
     theta: float | None = None
     skills: dict[str, PlacementSkillResultOut] = Field(default_factory=dict)
+    profile: list[PlacementSkillProfileOut] = Field(default_factory=list)
     placement_version: str = ""
 
 

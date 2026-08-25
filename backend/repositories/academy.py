@@ -497,3 +497,78 @@ def list_placement_sessions(user_id: str) -> list[dict]:
         ).fetchall()
     sessions = [get_placement_session(r["id"]) for r in rows]
     return [s for s in sessions if s is not None]
+
+
+# --- Calibración observacional de ítems de placement (V1.7) ---------------
+
+
+def record_placement_response(item_id: str, correct: bool) -> dict | None:
+    """Registra una respuesta observada a un ítem de placement (calibración).
+
+    Incrementa los contadores poblacionales `responses`/`correct` y recalcula
+    `correct_rate` (= correct/responses) y `sample_size` (= responses). Las
+    columnas de estimación IRT (`estimated_difficulty`, `standard_error`,
+    `discrimination`) permanecen NULL hasta que un proceso de calibración las
+    rellene con `set_placement_calibration_estimates`. Es un contador global (no
+    por usuario): la dificultad de un ítem no depende de quién responde.
+    """
+    with closing(_conn()) as conn, conn:
+        row = conn.execute(
+            "SELECT responses, correct FROM placement_item_calibration "
+            "WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+        responses = (row["responses"] if row else 0) + 1
+        correct_count = (row["correct"] if row else 0) + (1 if correct else 0)
+        correct_rate = correct_count / responses
+        conn.execute(
+            "INSERT INTO placement_item_calibration "
+            "(item_id, responses, correct, correct_rate, sample_size) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(item_id) DO UPDATE SET "
+            "responses = excluded.responses, correct = excluded.correct, "
+            "correct_rate = excluded.correct_rate, sample_size = excluded.sample_size",
+            (item_id, responses, correct_count, correct_rate, responses),
+        )
+    return get_placement_calibration(item_id)
+
+
+def get_placement_calibration(item_id: str) -> dict | None:
+    """Lee la fila de calibración de un ítem, o None si aún no tiene respuestas."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT item_id, responses, correct, correct_rate, sample_size, "
+            "estimated_difficulty, standard_error, discrimination "
+            "FROM placement_item_calibration WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def list_placement_calibration() -> list[dict]:
+    """Calibración de todos los ítems de placement (solo los que tienen respuestas)."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT item_id, responses, correct, correct_rate, sample_size, "
+            "estimated_difficulty, standard_error, discrimination "
+            "FROM placement_item_calibration ORDER BY item_id ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_placement_calibration_estimates(
+    item_id: str,
+    estimated_difficulty: float,
+    standard_error: float,
+    discrimination: float,
+) -> bool:
+    """Escribe las estimaciones IRT de un ítem (calibración posterior). False si
+    el ítem no tiene fila de calibración todavía."""
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "UPDATE placement_item_calibration SET "
+            "estimated_difficulty = ?, standard_error = ?, discrimination = ? "
+            "WHERE item_id = ?",
+            (estimated_difficulty, standard_error, discrimination, item_id),
+        )
+    return cur.rowcount > 0

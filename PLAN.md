@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.6.0` (Listening 2.0: audio como entidad de primer nivel, vector de dificultad de 8 dimensiones con dificultad derivada, sub-destrezas ampliadas y métrica de automaticidad).
+- ✅ Versión estable `1.7.0` (Placement 2.0: calibración observacional de ítems y perfil multiskill θ-por-destreza sobre IRT-lite/1PL).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -156,6 +156,16 @@
   (`/api/listening/diagnostic`).
 - **Placement Engine (V1.5)**: IRT-lite adaptativo (`POST /api/academy/placement/next`).
 - Verificado: backend 406 tests + ruff limpio; frontend 137 tests + `tsc`/`build` OK.
+
+### M15 — Listening 2.0 + Placement 2.0  [HECHO ✔]
+- **Listening 2.0 (V1.6)**: audio como entidad de primer nivel (`ListeningAsset` con metadatos
+  de audio), vector de dificultad de 8 dimensiones con dificultad derivada por construcción,
+  15 sub-destrezas (9 nuevas) y métrica de automaticidad (fluidez procesal).
+- **Placement 2.0 (V1.7)**: calibración observacional de ítems (tabla
+  `placement_item_calibration` con contadores poblacionales) y perfil **multiskill**
+  (θ/nivel/confianza por destreza) sobre el motor IRT-lite/1PL. Endpoint
+  `POST /api/academy/placement/profile` y banco de placement ampliado a las 7 destrezas.
+- Verificado: backend 480 tests + ruff limpio; frontend 137 tests + `tsc`/`build` OK.
 
 ## Decisiones tomadas
 

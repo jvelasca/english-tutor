@@ -13,6 +13,7 @@ from schemas.academy import (
     LevelCompletionsOut,
     PlacementAdaptiveOut,
     PlacementOut,
+    PlacementProfileOut,
     PlacementResultOut,
     PlacementStartOut,
 )
@@ -53,6 +54,13 @@ async def start_placement(user: dict = Depends(current_user)) -> dict:
     if result is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return result
+
+
+@router.post("/api/academy/placement/profile", response_model=PlacementProfileOut)
+async def placement_profile(
+    body: AssessmentSubmit, user: dict = Depends(current_user)
+) -> dict:
+    return await academy_service.get_placement_profile(body.answers)
 
 
 @router.get("/api/academy/exam/{level_id}", response_model=ExamOut)

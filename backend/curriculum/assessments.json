@@ -99,6 +99,102 @@
         "prompt": "Read: 'His argument, though subtle, was ultimately compelling.' What is the tone?",
         "options": ["Negative", "Neutral-positive", "Confused"],
         "correct_index": 1
+      },
+      {
+        "id": "pl-13",
+        "skill": "listening",
+        "difficulty": 2,
+        "prompt": "You hear: 'She went to the market to buy some bread.' Where did she go?",
+        "options": ["To the market", "To the park", "To the bank"],
+        "correct_index": 0
+      },
+      {
+        "id": "pl-14",
+        "skill": "listening",
+        "difficulty": 3,
+        "prompt": "You hear: 'I'd have gone if I'd known.' What did the speaker do?",
+        "options": ["He went", "He didn't go", "He will go"],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-15",
+        "skill": "listening",
+        "difficulty": 5,
+        "prompt": "You hear a speaker say: 'Well, that's one way of looking at it.' What is the speaker's attitude?",
+        "options": ["Full agreement", "Hesitant doubt", "Anger"],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-16",
+        "skill": "speaking",
+        "difficulty": 1,
+        "prompt": "Which is the correct way to introduce yourself?",
+        "options": ["I name is John.", "My name is John.", "Me name John."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-17",
+        "skill": "speaking",
+        "difficulty": 4,
+        "prompt": "In a job interview, which reply sounds most appropriate?",
+        "options": ["Gimme the job, mate.", "I'd be delighted to contribute to your team.", "You should hire me now."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-18",
+        "skill": "speaking",
+        "difficulty": 6,
+        "prompt": "Which opener is most idiomatic for disagreeing politely in a formal meeting?",
+        "options": ["You're totally wrong.", "I see your point, but I'd argue that...", "Nah, that's dumb."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-19",
+        "skill": "writing",
+        "difficulty": 2,
+        "prompt": "Which sentence is correctly punctuated?",
+        "options": ["Its a nice day.", "It's a nice day.", "Its' a nice day."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-20",
+        "skill": "writing",
+        "difficulty": 4,
+        "prompt": "Choose the sentence that uses the passive correctly:",
+        "options": ["The report was wrote by Ana.", "The report was written by Ana.", "The report was writing by Ana."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-21",
+        "skill": "writing",
+        "difficulty": 6,
+        "prompt": "Choose the most concise and formal version:",
+        "options": ["Due to the fact that we have no funds, we must stop.", "Because we lack funds, we must stop.", "On account of the reason that funds are absent, we must stop."],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-22",
+        "skill": "pronunciation",
+        "difficulty": 1,
+        "prompt": "Which word rhymes with 'cat'?",
+        "options": ["bat", "cot", "cut"],
+        "correct_index": 0
+      },
+      {
+        "id": "pl-23",
+        "skill": "pronunciation",
+        "difficulty": 3,
+        "prompt": "In which word is the '-ed' ending pronounced as /t/?",
+        "options": ["played", "watched", "needed"],
+        "correct_index": 1
+      },
+      {
+        "id": "pl-24",
+        "skill": "pronunciation",
+        "difficulty": 5,
+        "prompt": "Which word has the primary stress on the second syllable?",
+        "options": ["PHOtograph", "phoTOGraphy", "PHOtoGRAPH"],
+        "correct_index": 1
       }
     ]
   },

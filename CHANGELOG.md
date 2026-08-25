@@ -4,6 +4,36 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.7.0] — 2026-08-25
+
+Placement 2.0: convierte el placement adaptativo (IRT-lite/1PL) en un motor con
+calibración observacional de ítems y perfil de resultado multiskill.
+
+### Añadido
+- **Calibración observacional de ítems**: nueva tabla `placement_item_calibration`
+  (contadores poblacionales `responses`/`correct` + `correct_rate`/`sample_size` y columnas
+  `estimated_difficulty`/`standard_error`/`discrimination` para estimaciones futuras).
+  Cada respuesta de placement queda registrada (`record_placement_response`, vía
+  `next_placement`/`submit_placement`), computando el delta contra la sesión para no
+  duplicar contadores.
+- **Perfil multiskill**: nueva `placement_profile(items, answers)` estima θ/nivel/confianza
+  **por destreza** reutilizando `ability_theta`/`theta_to_level`/`placement_adaptive_confidence`.
+  `placement_result_adaptive` ahora incluye `profile` y `PlacementResultOut` lo expone.
+- **Endpoint** `POST /api/academy/placement/profile` que devuelve `PlacementProfileOut`.
+- **Banco de placement ampliado** a las 7 destrezas: 12 ítems nuevos de listening, speaking,
+  writing y pronunciation (meta-lenguaje/reconocimiento, sin voz ni audio real — ver nota).
+
+### Cambiado
+- `PLACEMENT_VERSION` → `2.0.0`.
+- Docstrings de `ability_theta`, `placement_result_adaptive` y `next_placement` reflejan
+  "IRT-lite/1PL" y el perfil multiskill.
+
+### Nota
+- Los ítems de placement de producción/listening son de opción múltiple de meta-lenguaje o
+  reconocimiento (documentado en `PlacementTest`), no evaluación de voz/texto/audio real.
+- La estimación IRT de dificultad/discriminación (Joint MLE/EM) queda como siguiente paso;
+  hoy solo se persisten contadores observados.
+
 ## [1.6.0] — 2026-08-25
 
 Listening 2.0: convierte el listening en un motor con audio como entidad de primer nivel,

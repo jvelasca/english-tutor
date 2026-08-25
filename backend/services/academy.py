@@ -798,7 +798,8 @@ def _p_correct(theta: float, difficulty: int) -> float:
 
 
 def ability_theta(responses: list[tuple[int, bool]]) -> float:
-    """Estima la habilidad θ por máxima verosimilitud con prior débil (MAP).
+    """Estima la habilidad θ (IRT-lite/1PL) por máxima verosimilitud con prior débil
+    (MAP).
 
     `responses` es una lista de tuplas `(difficulty, correct)`. Se maximiza la
     log-verosimilitud de la 1PL mediante Newton-Raphson; el prior débil (una
@@ -929,9 +930,75 @@ def _skill_breakdown(items: list, answers: dict[str, int]) -> dict[str, dict]:
     }
 
 
+def placement_profile(items: list, answers: dict[str, int]) -> dict:
+    """Perfil multiskill del placement: θ (y nivel/confianza) **por destreza**.
+
+    Agrupa las respuestas por destreza y estima un θ independiente para cada una
+    con el mismo motor IRT-lite/1PL del resultado global (`ability_theta` +
+    `theta_to_level` + `placement_adaptive_confidence`). Las destrezas presentes
+    en el instrumento pero sin respuestas aparecen con `theta=None`/`level=None`
+    (aún no hay señal). Devuelve el desglose `profile` más los agregados
+    `overall_*` y la versión del motor.
+    """
+    by_skill: dict[str, list[tuple[int, bool]]] = defaultdict(list)
+    for it in items:
+        if it.id in answers:
+            by_skill[it.skill].append(
+                (it.difficulty, answers[it.id] == it.correct_index)
+            )
+
+    skills = list({it.skill for it in items})
+    canonical_index = {s: i for i, s in enumerate(CANONICAL_SKILLS)}
+    skills.sort(key=lambda s: (canonical_index.get(s, len(CANONICAL_SKILLS)), s))
+
+    profile: list[dict] = []
+    for skill in skills:
+        responses = by_skill.get(skill, [])
+        if responses:
+            theta = ability_theta(responses)
+            profile.append(
+                {
+                    "skill": skill,
+                    "theta": theta,
+                    "level": theta_to_level(theta),
+                    "confidence": placement_adaptive_confidence(theta, responses),
+                    "answered": len(responses),
+                }
+            )
+        else:
+            profile.append(
+                {
+                    "skill": skill,
+                    "theta": None,
+                    "level": None,
+                    "confidence": None,
+                    "answered": 0,
+                }
+            )
+
+    all_responses = [
+        (it.difficulty, answers[it.id] == it.correct_index)
+        for it in items
+        if it.id in answers
+    ]
+    overall_theta = (
+        ability_theta(all_responses) if all_responses else PLACEMENT_START_THETA
+    )
+    return {
+        "profile": profile,
+        "overall_level": theta_to_level(overall_theta),
+        "overall_theta": overall_theta,
+        "overall_confidence": placement_adaptive_confidence(
+            overall_theta, all_responses
+        ),
+        "placement_version": PLACEMENT_VERSION,
+    }
+
+
 def placement_result_adaptive(items: list, answers: dict[str, int]) -> dict:
-    """Resultado del placement adaptativo: θ, nivel CEFR, confianza, contadores,
-    desglose por destreza y versión del motor."""
+    """Resultado del placement adaptativo (IRT-lite/1PL): θ, nivel CEFR,
+    confianza, contadores, desglose por destreza, perfil multiskill y versión del
+    motor."""
     responses = [
         (it.difficulty, answers[it.id] == it.correct_index)
         for it in items
@@ -949,6 +1016,7 @@ def placement_result_adaptive(items: list, answers: dict[str, int]) -> dict:
         "answered": answered,
         "correct": correct,
         "skills": _skill_breakdown(items, answers),
+        "profile": placement_profile(items, answers)["profile"],
         "placement_version": PLACEMENT_VERSION,
     }
 
