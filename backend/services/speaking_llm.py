@@ -1,4 +1,4 @@
-"""Extracción de evidencia de speaking con LLM (sin llamar a Ollama aquí).
+"""Extracción de evidencia de speaking con LLM (llama a Ollama de forma asíncrona).
 
 Este módulo construye el prompt que pide al modelo EXTRAER evidencia estructurada
 de una respuesta oral libre (frente a una tarea), y parsea/valida la respuesta JSON.
@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import json
 import re
+
+from schemas.chat import ChatMessage
+from services import llm
 
 # Campos que el LLM debe devolver como evidencia estructurada (no como nota).
 SPEAKING_EVIDENCE_FIELDS: tuple[str, ...] = (
@@ -127,3 +130,25 @@ def parse_speaking_evidence(raw: str) -> dict | None:
         "lexical_tokens": lexical_tokens,
         "coherence": coherence,
     }
+
+
+async def extract_speaking_evidence(
+    task: str,
+    heard: str,
+    model: str,
+    temperature: float = 0.0,
+) -> dict | None:
+    """Extrae evidencia de una respuesta oral libre llamando a Ollama.
+
+    Devuelve el dict normalizado de parse_speaking_evidence, o None si el LLM no
+    produjo una salida JSON válida."""
+    msgs = build_speaking_prompt(task, heard)
+    system = msgs[0]["content"]
+    user = msgs[1]["content"]
+    response = await llm.chat_once(
+        messages=[ChatMessage(role="user", content=user)],
+        model=model,
+        temperature=temperature,
+        system_prompt=system,
+    )
+    return parse_speaking_evidence(response.content)

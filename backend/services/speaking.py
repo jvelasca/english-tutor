@@ -36,6 +36,9 @@ CRITERION_WEIGHTS: dict[str, float] = {
 # Referencia de fluidez: 120 palabras por minuto ≈ hablante fluido.
 _FLUENT_WPM = 120.0
 
+# Referencia léxica: 5 palabras de contenido ≈ vocabulario adecuado.
+_LEXICAL_REFERENCE = 5.0
+
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
@@ -50,6 +53,14 @@ def _tokens(text: str) -> list[str]:
     completo de tokens para que lexical (set) y task (lista) midan cosas distintas.
     """
     return re.findall(r"[a-z0-9']+", text.lower())
+
+
+def _fluency_score(heard: str, duration_seconds: float | None) -> float:
+    info = compute_fluency(heard, duration_seconds)
+    wpm = info["wpm"]
+    if wpm is None:
+        return 0.5
+    return round(_clamp(wpm / _FLUENT_WPM), 3)
 
 
 def score_speaking(
@@ -69,12 +80,7 @@ def score_speaking(
     pronunciation = round(composite_score(expected, heard)["score"] / 100, 3)
 
     # fluency: wpm frente a 120 wpm ≈ fluido; 0.5 si no se puede calcular.
-    fluency_info = compute_fluency(heard, duration_seconds)
-    wpm = fluency_info["wpm"]
-    if wpm is None:
-        fluency = 0.5
-    else:
-        fluency = round(_clamp(wpm / _FLUENT_WPM), 3)
+    fluency = _fluency_score(heard, duration_seconds)
 
     # grammatical_control: 0 errores = 1.0; cada error resta 0.25; suelo 0.0.
     grammatical_control = round(
@@ -124,6 +130,47 @@ def score_speaking(
     return {
         "heard": heard,
         "expected": expected,
+        "criteria": criteria,
+        "overall": overall,
+    }
+
+
+def scores_from_evidence(
+    evidence: dict,
+    heard: str,
+    duration_seconds: float | None = None,
+) -> dict:
+    """Convierte evidencia extraída por el LLM en los 6 criterios + overall.
+
+    `evidence` es el dict normalizado de `speaking_llm.parse_speaking_evidence`.
+    La pronunciación no es evaluable sin referencia de audio en este flujo, así que
+    se fija en 0.5 (neutro/desconocido). La fluidez se calcula por WPM si hay
+    duración; si no, 0.5. Devuelve {"criteria": {...}, "overall": float}."""
+    task_achievement = 1.0 if evidence["task_achieved"] else 0.0
+    grammatical_control = round(
+        _clamp(1.0 - 0.25 * evidence["grammar_errors"]), 3
+    )
+    lexical_resource = round(
+        _clamp(len(set(evidence["lexical_tokens"])) / _LEXICAL_REFERENCE), 3
+    )
+    coherence = round(float(evidence["coherence"]), 3)
+    fluency = _fluency_score(heard, duration_seconds)
+    pronunciation = 0.5
+
+    criteria = {
+        "task_achievement": task_achievement,
+        "grammatical_control": grammatical_control,
+        "lexical_resource": lexical_resource,
+        "fluency": fluency,
+        "pronunciation": pronunciation,
+        "coherence": coherence,
+    }
+
+    overall = round(
+        sum(CRITERION_WEIGHTS[c] * criteria[c] for c in SPEAKING_CRITERIA), 3
+    )
+
+    return {
         "criteria": criteria,
         "overall": overall,
     }

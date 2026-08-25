@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from config import DEFAULT_MODEL
 from schemas.curriculum import CurriculumActivityOut
 
 
@@ -285,3 +286,21 @@ class SpeakingResultOut(BaseModel):
     overall: float
     criteria: dict[str, float]
     speaking_mastery: float
+
+
+class SpeakingTaskSubmitRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+    task: str = Field(min_length=1, max_length=2000)
+    heard: str = Field(min_length=1, max_length=2000)
+    model: str = Field(default=DEFAULT_MODEL, min_length=1)
+    duration_seconds: float | None = None
+
+
+class SpeakingTaskResultOut(BaseModel):
+    level_id: str
+    objective_id: str
+    overall: float
+    criteria: dict[str, float]
+    speaking_mastery: float
+    evidence: dict

@@ -7,6 +7,7 @@ from main import app
 from repositories import academy as academy_repo
 from repositories import db
 from repositories import users as users_repo
+from services import llm
 from services import speaking as speaking_svc
 from services.curriculum import load_level
 from services.speaking import CRITERION_WEIGHTS, SPEAKING_CRITERIA
@@ -25,6 +26,19 @@ def _first_speaking_objective():
         if "speaking" in o.skills:
             return o
     return objs[0]
+
+
+class FakeOllamaClient:
+    def __init__(self, content="Hi!"):
+        self.content = content
+        self.calls = []
+
+    async def chat(self, *, model, messages, options=None, stream=False):
+        self.calls.append({"model": model, "messages": messages, "stream": stream})
+        return {"message": {"content": self.content}}
+
+    async def list(self):
+        return {"models": [{"model": "qwen3.5:9b"}]}
 
 
 def test_score_speaking_keys_and_range():
@@ -130,3 +144,82 @@ def test_speaking_evidence_isolation(monkeypatch, tmp_path):
             },
         )
     assert academy_repo.list_evidence(b) == []
+
+
+# --- Endpoint / integración (tarea abierta: LLM extrae, scorer puntúa) -------
+
+
+def test_speaking_task_records_evidence_and_mastery(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    assert "speaking" in obj.skills, "ningún objetivo A1 declara 'speaking'"
+    fake = FakeOllamaClient(
+        content='{"task_achieved": true, "grammar_errors": 1, '
+        '"lexical_tokens": ["student", "live", "city"], "coherence": 0.8}'
+    )
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/task",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "task": "Introduce yourself",
+                "heard": "I am a student",
+                "duration_seconds": 3.0,
+            },
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert 0.0 <= body["overall"] <= 1.0
+    assert len(body["criteria"]) == 6
+    assert body["speaking_mastery"] > 0
+    assert body["evidence"]["task_achieved"] is True
+
+    speaking_rows = [
+        row for row in academy_repo.list_evidence(a) if row["source"] == "speaking"
+    ]
+    assert speaking_rows, "no se registró evidencia de speaking"
+    assert all(row["skill"] == "speaking" for row in speaking_rows)
+
+
+def test_speaking_task_llm_invalid_returns_404(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    fake = FakeOllamaClient(content="not json")
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/task",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "task": "Introduce yourself",
+                "heard": "I am a student",
+            },
+        )
+    assert r.status_code == 404
+
+
+def test_speaking_task_rejects_blocked_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a2").objectives()[0]
+    fake = FakeOllamaClient(
+        content='{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student"], "coherence": 1.0}'
+    )
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/task",
+            params={"user_id": a},
+            json={
+                "level_id": "a2",
+                "objective_id": obj.id,
+                "task": "Introduce yourself",
+                "heard": "I am a student",
+            },
+        )
+    assert r.status_code == 404

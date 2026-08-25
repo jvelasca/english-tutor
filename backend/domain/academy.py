@@ -28,9 +28,11 @@ from schemas.academy import (
     PlacementResultOut,
     SkillScoreOut,
     SpeakingResultOut,
+    SpeakingTaskResultOut,
 )
 from services import academy as academy_svc
 from services import speaking as speaking_svc
+from services import speaking_llm
 from services.context import build_lesson_prompt
 from services.curriculum import (
     CEFR_ORDER,
@@ -507,6 +509,64 @@ async def submit_speaking(
         overall=result["overall"],
         criteria=result["criteria"],
         speaking_mastery=state["score"],
+    )
+
+
+async def submit_speaking_task(
+    user_id: str,
+    level_id: str,
+    objective_id: str,
+    task: str,
+    heard: str,
+    model: str,
+    duration_seconds: float | None = None,
+) -> SpeakingTaskResultOut | None:
+    """Puntúa una respuesta oral libre (tarea) usando evidencia extraída por el LLM.
+
+    El LLM extrae la evidencia estructurada (`speaking_llm.extract_speaking_evidence`)
+    y el scorer determinista (`scores_from_evidence`) calcula los criterios y el
+    overall, que se registran como evidencia y mueven el mastery de 'speaking' sin
+    que el LLM decida el score."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        return None
+    if await enrollment_blocked(user_id, level_id):
+        return None
+    evidence = await speaking_llm.extract_speaking_evidence(task, heard, model)
+    if evidence is None:
+        return None
+    result = speaking_svc.scores_from_evidence(evidence, heard, duration_seconds)
+    for ev in speaking_svc.evidence_from_speaking(
+        result,
+        level_id=level_id,
+        objective_id=objective_id,
+        curriculum_version=lv.version,
+    ):
+        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    row = await run_in_threadpool(
+        academy_repo.get_objective_row, user_id, level_id, objective_id, "speaking"
+    )
+    state = academy_svc.next_mastery_state(
+        row, result["overall"], obj.threshold("speaking")
+    )
+    await run_in_threadpool(
+        academy_repo.apply_objective_evidence,
+        user_id,
+        level_id,
+        objective_id,
+        "speaking",
+        state,
+    )
+    return SpeakingTaskResultOut(
+        level_id=level_id,
+        objective_id=objective_id,
+        overall=result["overall"],
+        criteria=result["criteria"],
+        speaking_mastery=state["score"],
+        evidence=evidence,
     )
 
 
