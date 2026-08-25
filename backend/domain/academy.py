@@ -27,8 +27,10 @@ from schemas.academy import (
     PlacementOut,
     PlacementResultOut,
     SkillScoreOut,
+    SpeakingResultOut,
 )
 from services import academy as academy_svc
+from services import speaking as speaking_svc
 from services.context import build_lesson_prompt
 from services.curriculum import (
     CEFR_ORDER,
@@ -450,6 +452,61 @@ async def submit_objective_assessment(
         total=scored["total"],
         skills=scored["skills"],
         mastery=mastery_updates,
+    )
+
+
+async def submit_speaking(
+    user_id: str,
+    level_id: str,
+    objective_id: str,
+    expected: str,
+    heard: str,
+    duration_seconds: float | None = None,
+) -> SpeakingResultOut | None:
+    """Puntúa una producción oral y alimenta el mastery de la destreza 'speaking'.
+
+    El cliente envía la transcripción (`heard`) y la frase/tarea esperada
+    (`expected`); el scorer determinista calcula los criterios y el overall, que se
+    registran como evidencia estructurada y mueven el modelo de mastery sin que el
+    LLM decida el score."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        return None
+    if await enrollment_blocked(user_id, level_id):
+        return None
+    result = speaking_svc.score_speaking(heard, expected, duration_seconds)
+    for ev in speaking_svc.evidence_from_speaking(
+        result,
+        level_id=level_id,
+        objective_id=objective_id,
+        curriculum_version=lv.version,
+    ):
+        await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
+    row = await run_in_threadpool(
+        academy_repo.get_objective_row, user_id, level_id, objective_id, "speaking"
+    )
+    state = academy_svc.next_mastery_state(
+        row, result["overall"], obj.threshold("speaking")
+    )
+    await run_in_threadpool(
+        academy_repo.apply_objective_evidence,
+        user_id,
+        level_id,
+        objective_id,
+        "speaking",
+        state,
+    )
+    return SpeakingResultOut(
+        level_id=level_id,
+        objective_id=objective_id,
+        expected=result["expected"],
+        heard=result["heard"],
+        overall=result["overall"],
+        criteria=result["criteria"],
+        speaking_mastery=state["score"],
     )
 
 

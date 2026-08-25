@@ -20,6 +20,8 @@ from schemas.academy import (
     NextObjectiveOut,
     ObjectiveAssessmentOut,
     ObjectiveAssessmentRequest,
+    SpeakingResultOut,
+    SpeakingSubmitRequest,
     StudyPlanOut,
     StudyPlanRequest,
 )
@@ -119,6 +121,23 @@ async def objective_assessment(
 ) -> dict:
     out = await academy_service.submit_objective_assessment(
         user["id"], body.level_id, body.objective_id, body.answers
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
+    return out
+
+
+@router.post("/api/academy/objective/speaking", response_model=SpeakingResultOut)
+async def objective_speaking(
+    body: SpeakingSubmitRequest, user: dict = Depends(current_user)
+) -> dict:
+    out = await academy_service.submit_speaking(
+        user["id"],
+        body.level_id,
+        body.objective_id,
+        body.expected,
+        body.heard,
+        body.duration_seconds,
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")

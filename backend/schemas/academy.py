@@ -267,3 +267,21 @@ class ObjectiveAssessmentOut(BaseModel):
     total: int
     skills: dict[str, ObjectiveSkillResultOut]
     mastery: dict[str, float]
+
+
+class SpeakingSubmitRequest(BaseModel):
+    level_id: str = Field(min_length=1, max_length=16)
+    objective_id: str = Field(min_length=1, max_length=64)
+    expected: str = Field(min_length=1, max_length=2000)
+    heard: str = Field(min_length=1, max_length=2000)
+    duration_seconds: float | None = None
+
+
+class SpeakingResultOut(BaseModel):
+    level_id: str
+    objective_id: str
+    expected: str
+    heard: str
+    overall: float
+    criteria: dict[str, float]
+    speaking_mastery: float

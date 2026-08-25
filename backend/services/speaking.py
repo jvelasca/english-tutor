@@ -127,3 +127,46 @@ def score_speaking(
         "criteria": criteria,
         "overall": overall,
     }
+
+
+def evidence_from_speaking(
+    result: dict,
+    *,
+    level_id: str,
+    objective_id: str,
+    curriculum_version: str = "",
+) -> list[dict]:
+    """Convierte el resultado de score_speaking en registros de evidencia.
+
+    Una fila por criterio del rubric (item_id = criterio) más una fila 'overall'.
+    Todas con source='speaking', item_type='speaking', difficulty=1."""
+    records = [
+        {
+            "level_id": level_id,
+            "objective_id": objective_id,
+            "skill": "speaking",
+            "item_id": criterion,
+            "item_type": "speaking",
+            "difficulty": 1,
+            "source": "speaking",
+            "result": float(result["criteria"][criterion]),
+            "curriculum_version": curriculum_version,
+            "assessment_version": "",
+        }
+        for criterion in SPEAKING_CRITERIA
+    ]
+    records.append(
+        {
+            "level_id": level_id,
+            "objective_id": objective_id,
+            "skill": "speaking",
+            "item_id": "overall",
+            "item_type": "speaking",
+            "difficulty": 1,
+            "source": "speaking",
+            "result": float(result["overall"]),
+            "curriculum_version": curriculum_version,
+            "assessment_version": "",
+        }
+    )
+    return records
