@@ -13,6 +13,7 @@ Separación conceptual:
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -56,6 +57,10 @@ DEFAULT_MINIMUM_ATTEMPTS = 3
 # Niveles CEFR disponibles (los archivos `curriculum/<level_id>.json` son la
 # fuente de verdad del contenido; este orden fija la progresión).
 CEFR_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
+
+# Versión del esquema/contenido del currículum y las evaluaciones. Independiente
+# de la versión de la aplicación: identifica QUÉ contenido se evaluó.
+CURRICULUM_VERSION = "1.2.3"
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
@@ -131,6 +136,7 @@ class Level(BaseModel):
     level: str
     title: str
     description: str = ""
+    version: str = CURRICULUM_VERSION
     modules: list[Module]
 
     def objectives(self) -> list[Objective]:
@@ -229,3 +235,96 @@ def next_level_id(level: str) -> str | None:
         return None
     idx = CEFR_ORDER.index(level)
     return CEFR_ORDER[idx + 1].lower() if idx + 1 < len(CEFR_ORDER) else None
+
+
+def validate_level(level: Level) -> list[str]:
+    """Valida invariantes estructurales de un nivel y devuelve las violaciones.
+
+    Cada elemento de la lista devuelta es un mensaje legible describiendo una
+    violación. Lista vacía = nivel válido. Cubre: ids duplicados (objetivos,
+    actividades, checks, módulos, unidades, lecciones), órdenes únicos por
+    contenedor, skills canónicas, checks que mapean a skills del objetivo,
+    thresholds válidos, minimum_attempts >= 1, opciones de check válidas y
+    actividades con id/tipo/instrucción no vacíos.
+    """
+    errors: list[str] = []
+    lid = level.level_id
+
+    def _dupes(values: list, what: str) -> None:
+        for value, count in Counter(values).items():
+            if count > 1:
+                errors.append(f"{lid}: {what} '{value}' duplicado ({count} veces)")
+
+    objectives = level.objectives()
+
+    # IDs únicos globales (objetivos, actividades, checks).
+    _dupes([o.id for o in objectives], "objetivo")
+    _dupes([a.id for o in objectives for a in o.activities], "actividad")
+    _dupes([c.id for o in objectives for c in o.checks], "check")
+
+    # Módulos: id y orden únicos en todo el nivel.
+    _dupes([m.id for m in level.modules], "módulo")
+    _dupes([m.order for m in level.modules], "orden de módulo")
+
+    for module in level.modules:
+        # Unidades: id y orden únicos dentro de cada módulo.
+        _dupes([u.id for u in module.units], "unidad")
+        _dupes([u.order for u in module.units], "orden de unidad")
+        for unit in module.units:
+            # Lecciones: id y orden únicos dentro de cada unidad.
+            _dupes([les.id for les in unit.lessons], "lección")
+            _dupes([les.order for les in unit.lessons], "orden de lección")
+
+    for obj in objectives:
+        # Skills: no vacías y canónicas.
+        if not obj.skills:
+            errors.append(f"{lid}: objetivo {obj.id} sin skills")
+        for skill in obj.skills:
+            if skill not in CANONICAL_SKILLS:
+                errors.append(f"{lid}: objetivo {obj.id} skill '{skill}' no canónica")
+
+        # Cada check solo evalúa una skill declarada por el objetivo.
+        for check in obj.checks:
+            if check.skill not in obj.skills:
+                errors.append(
+                    f"{lid}: check {check.id} evalúa '{check.skill}' "
+                    f"no declarada en {obj.id}"
+                )
+
+        # Thresholds: claves canónicas y valor en (0, 1].
+        for skill, value in obj.thresholds.items():
+            if skill not in CANONICAL_SKILLS:
+                errors.append(
+                    f"{lid}: objetivo {obj.id} threshold '{skill}' no canónica"
+                )
+            if not 0 < value <= 1:
+                errors.append(
+                    f"{lid}: {obj.id} threshold '{skill}'={value} no en (0,1]"
+                )
+
+        # Mínimo de intentos para consolidar dominio.
+        if obj.minimum_attempts < 1:
+            errors.append(
+                f"{lid}: objetivo {obj.id} minimum_attempts={obj.minimum_attempts} < 1"
+            )
+
+        # Checks: al menos 2 opciones e índice correcto dentro de rango.
+        for check in obj.checks:
+            if len(check.options) < 2:
+                errors.append(f"{lid}: check {check.id} con menos de 2 opciones")
+            if not 0 <= check.correct_index < len(check.options):
+                errors.append(
+                    f"{lid}: check {check.id} correct_index={check.correct_index} "
+                    f"fuera de rango"
+                )
+
+        # Actividades: id, type e instruction no vacíos.
+        for activity in obj.activities:
+            if not activity.id:
+                errors.append(f"{lid}: actividad sin id en {obj.id}")
+            if not activity.type:
+                errors.append(f"{lid}: actividad sin type en {obj.id}")
+            if not activity.instruction:
+                errors.append(f"{lid}: actividad sin instruction en {obj.id}")
+
+    return errors

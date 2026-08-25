@@ -366,3 +366,55 @@ def list_skill_attempts(user_id: str, level_id: str) -> dict[str, dict[str, int]
         key = "correct" if r["result"] == "correct" else "incorrect"
         entry[key] = r["n"]
     return agg
+
+
+def record_evidence(
+    user_id: str,
+    level_id: str,
+    objective_id: str,
+    skill: str,
+    item_id: str,
+    item_type: str = "mcq",
+    difficulty: int = 1,
+    source: str = "objective_assessment",
+    result: float = 0.0,
+    curriculum_version: str = "",
+    assessment_version: str = "",
+) -> bool:
+    """Registra una evidencia de respuesta por ítem (reproducible y versionada)."""
+    if get_user(user_id) is None:
+        return False
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO academy_evidence "
+            "(user_id, level_id, objective_id, skill, item_id, item_type, "
+            "difficulty, source, result, curriculum_version, assessment_version, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id, level_id, objective_id, skill, item_id, item_type,
+                difficulty, source, result, curriculum_version, assessment_version, now,
+            ),
+        )
+    return True
+
+
+def list_evidence(user_id: str, level_id: str | None = None) -> list[dict]:
+    with closing(_conn()) as conn:
+        if level_id is not None:
+            rows = conn.execute(
+                "SELECT id, user_id, level_id, objective_id, skill, item_id, "
+                "item_type, difficulty, source, result, curriculum_version, "
+                "assessment_version, created_at FROM academy_evidence "
+                "WHERE user_id = ? AND level_id = ? ORDER BY id ASC",
+                (user_id, level_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, user_id, level_id, objective_id, skill, item_id, "
+                "item_type, difficulty, source, result, curriculum_version, "
+                "assessment_version, created_at FROM academy_evidence "
+                "WHERE user_id = ? ORDER BY id ASC",
+                (user_id,),
+            ).fetchall()
+    return [dict(r) for r in rows]

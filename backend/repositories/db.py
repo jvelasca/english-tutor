@@ -253,6 +253,26 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS academy_evidence (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                objective_id TEXT NOT NULL DEFAULT '',
+                skill TEXT NOT NULL,
+                item_id TEXT NOT NULL DEFAULT '',
+                item_type TEXT NOT NULL DEFAULT 'mcq',
+                difficulty INTEGER NOT NULL DEFAULT 1,
+                source TEXT NOT NULL DEFAULT 'objective_assessment',
+                result REAL NOT NULL DEFAULT 0.0,
+                curriculum_version TEXT NOT NULL DEFAULT '',
+                assessment_version TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
 
         # Migración idempotente: SQLite no soporta ADD COLUMN IF NOT EXISTS.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
@@ -404,6 +424,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_listening_attempts_user_id "
             "ON listening_attempts(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "
+            "ON academy_evidence(user_id)"
         )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).

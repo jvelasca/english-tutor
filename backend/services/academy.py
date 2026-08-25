@@ -2,6 +2,16 @@
 
 No hace I/O ni toca la base de datos: recibe el currículum cargado y el estado del
 alumno, y devuelve resultados deterministas. Se apoya en `services.curriculum`.
+
+Modelo de mastery (dirección única, nunca al revés):
+    Evidence (por ítem, versionada)
+        → Objective mastery  (`academy_objective_mastery`, fuente de verdad)
+        → Skill aggregation (`aggregate_skill_mastery`, vista derivada)
+        → CEFR profile      (destreza → score/confidence/evidence/review_due)
+        → Level completion  (certificación interna, reproducible)
+Las destrezas de conocimiento (grammar, vocabulary, reading, listening) se
+evalúan con checks deterministas; las de producción (speaking, writing,
+pronunciation) se declaran pero aún no integran evidencia de rendimiento.
 """
 
 from __future__ import annotations
@@ -153,18 +163,6 @@ def mastered_objective_ids(
     }
 
 
-def unlock_state(level: Level, mastered_ids: set[str]) -> dict[str, bool]:
-    """Mapa objective_id → desbloqueado. Un objetivo está desbloqueado si es el
-    primero de la secuencia o si todos los anteriores están dominados (gating)."""
-    ids = [o.id for o in level.objectives()]
-    unlocked: dict[str, bool] = {}
-    prev_all_mastered = True
-    for oid in ids:
-        unlocked[oid] = prev_all_mastered
-        prev_all_mastered = prev_all_mastered and oid in mastered_ids
-    return unlocked
-
-
 def module_progress(
     level: Level,
     objective_scores: dict[str, dict[str, float]],
@@ -298,11 +296,11 @@ def level_progress_with_counters(
 
 
 def next_objective(level: Level, mastered_ids: set[str]) -> str | None:
-    """Primer objetivo desbloqueado y no dominado (progresión lineal)."""
-    unlocked = unlock_state(level, mastered_ids)
-    for oid in unlocked:
-        if oid not in mastered_ids:
-            return oid
+    """Primer objetivo no dominado en la secuencia del currículum
+    (progresión lineal)."""
+    for o in level.objectives():
+        if o.id not in mastered_ids:
+            return o.id
     return None
 
 
@@ -320,29 +318,75 @@ def weakest_skill(
     return min(totals, key=lambda s: sum(totals[s]) / len(totals[s]))
 
 
+def recommend_next(
+    level: Level,
+    mastered_ids: set[str],
+    objective_scores: dict[str, dict[str, float]],
+) -> tuple[str | None, str]:
+    """Recomienda el siguiente objetivo y el motivo (soft gating, remediation-aware).
+
+    Devuelve (objective_id, reason) con reason ∈ {"remediation", "next-in-path",
+    "level-complete"}. La remediación solo se propone para objetivos NO dominados
+    que ya tienen evidencia y cuya destreza más débil está por debajo de su umbral;
+    en ausencia de evidencia se sigue la progresión lineal. No hay gating duro
+    dentro del nivel: el gating duro es por nivel (A1→A2→B1)."""
+    objs = {o.id: o for o in level.objectives()}
+    non_mastered = [o.id for o in level.objectives() if o.id not in mastered_ids]
+    if not non_mastered:
+        return None, "level-complete"
+
+    weak: list[str] = []
+    for oid in non_mastered:
+        scores = objective_scores.get(oid)
+        if not scores:
+            continue
+        obj = objs[oid]
+        assessable = obj.assessable_skills()
+        if any(scores[s] < obj.threshold(s) for s in assessable if s in scores):
+            weak.append(oid)
+
+    if weak:
+        def key(oid: str) -> float:
+            obj = objs[oid]
+            scores = objective_scores[oid]
+            assessable = obj.assessable_skills()
+            return min((scores[s] for s in assessable if s in scores), default=0.0)
+
+        return min(weak, key=key), "remediation"
+
+    return next_objective(level, mastered_ids), "next-in-path"
+
+
 def adaptive_next(
     level: Level,
     mastered_ids: set[str],
     objective_scores: dict[str, dict[str, float]],
 ) -> str | None:
-    """Siguiente objetivo adaptativo: entre los desbloqueados no dominados, elige
-    el que peor puntuación tiene en su destreza más débil (remediation-aware)."""
-    unlocked = [
-        oid
-        for oid, ok in unlock_state(level, mastered_ids).items()
-        if ok and oid not in mastered_ids
-    ]
-    if not unlocked:
-        return None
-    objs = {o.id: o for o in level.objectives()}
+    """Siguiente objetivo recomendado (remediación sobre progresión)."""
+    return recommend_next(level, mastered_ids, objective_scores)[0]
 
-    def key(oid: str) -> float:
-        obj = objs[oid]
-        scores = objective_scores.get(oid, {})
-        assessable = obj.assessable_skills()
-        return min((scores.get(s, 0.0) for s in assessable), default=0.0)
 
-    return min(unlocked, key=key)
+def aggregate_skill_mastery(
+    level: Level, objective_scores: dict[str, dict[str, float]]
+) -> dict[str, float]:
+    """Vista derivada: mastery por destreza agregado desde el mastery por objetivo.
+
+    ``academy_objective_mastery`` es la fuente de verdad; esta función la agrega
+    (media aritmética de cada destreza entre los objetivos que la comparten) para
+    producir el perfil de destreza del nivel. Nunca se escribe `academy_skill_mastery`
+    como fuente primaria: se deriva de aquí cuando se necesite el CEFR profile."""
+    totals: dict[str, list[float]] = defaultdict(list)
+    for obj in level.objectives():
+        scores = objective_scores.get(obj.id, {})
+        if not scores:
+            continue
+        for skill in obj.assessable_skills():
+            totals[skill].append(scores.get(skill, 0.0))
+    return {
+        skill: round(sum(vals) / len(vals), 3)
+        for skill, vals in totals.items()
+        if vals
+    }
 
 
 # --- Evaluación -----------------------------------------------------------
@@ -377,6 +421,44 @@ def score_items(items: list, answers: dict[str, int]) -> dict:
         "total": answered,
         "overall": round(correct / answered, 3) if answered else 0.0,
     }
+
+
+def evidence_from_items(
+    items: list,
+    answers: dict[str, int],
+    *,
+    level_id: str,
+    objective_id: str = "",
+    item_type: str = "mcq",
+    source: str = "objective_assessment",
+    difficulty: int = 1,
+    curriculum_version: str = "",
+    assessment_version: str = "",
+) -> list[dict]:
+    """Convierte respuestas de ítems en registros de evidencia por ítem.
+
+    Devuelve una lista de dicts con las claves exactas que consume
+    `repositories.academy.record_evidence` (sin `user_id`)."""
+    records = []
+    for it in items:
+        if it.id not in answers:
+            continue
+        correct = answers[it.id] == it.correct_index
+        records.append(
+            {
+                "level_id": level_id,
+                "objective_id": objective_id,
+                "skill": it.skill,
+                "item_id": it.id,
+                "item_type": item_type,
+                "difficulty": getattr(it, "difficulty", difficulty),
+                "source": source,
+                "result": 1.0 if correct else 0.0,
+                "curriculum_version": curriculum_version,
+                "assessment_version": assessment_version,
+            }
+        )
+    return records
 
 
 def placement_result(items: list, answers: dict[str, int]) -> dict:

@@ -19,6 +19,7 @@ from services.curriculum import (
     load_assessments,
     load_level,
     next_level_id,
+    validate_level,
 )
 
 
@@ -141,14 +142,6 @@ def test_mastery_is_per_objective_not_contagious():
     assert o2.id not in mastered  # el dominio de o1 no se contagia a o2
 
 
-def test_unlock_state_is_gated():
-    lv = load_level("a1")
-    ids = [o.id for o in lv.objectives()]
-    unlocked = academy_svc.unlock_state(lv, set())
-    assert unlocked[ids[0]] is True
-    assert all(not unlocked[oid] for oid in ids[1:])
-
-
 def test_next_objective_returns_first_unmastered():
     lv = load_level("a1")
     first = lv.objectives()[0].id
@@ -160,6 +153,44 @@ def test_adaptive_next_prefers_weakest_skill():
     ids = [o.id for o in lv.objectives()]
     # Primero dominado; el resto desbloqueado secuencialmente: el siguiente es ids[1].
     assert academy_svc.adaptive_next(lv, {ids[0]}, {}) == ids[1]
+
+
+def test_recommend_next_prefers_remediation_over_progression():
+    lv = load_level("a1")
+    objs = [o for o in lv.objectives() if o.assessable_skills()]
+    target = objs[1]
+    skill = target.assessable_skills()[0]
+    oid, reason = academy_svc.recommend_next(lv, set(), {target.id: {skill: 0.4}})
+    assert oid == target.id
+    assert reason == "remediation"
+
+
+def test_recommend_next_picks_weakest_remediation():
+    lv = load_level("a1")
+    objs = [o for o in lv.objectives() if o.assessable_skills()]
+    weak1, weak2 = objs[1], objs[2]
+    s1 = weak1.assessable_skills()[0]
+    s2 = weak2.assessable_skills()[0]
+    scores = {weak1.id: {s1: 0.5}, weak2.id: {s2: 0.3}}
+    oid, reason = academy_svc.recommend_next(lv, set(), scores)
+    assert oid == weak2.id  # 0.3 < 0.5
+    assert reason == "remediation"
+
+
+def test_recommend_next_progression_when_no_evidence():
+    lv = load_level("a1")
+    first = lv.objectives()[0].id
+    oid, reason = academy_svc.recommend_next(lv, set(), {})
+    assert oid == first
+    assert reason == "next-in-path"
+
+
+def test_recommend_next_level_complete():
+    lv = load_level("a1")
+    all_ids = {o.id for o in lv.objectives()}
+    oid, reason = academy_svc.recommend_next(lv, all_ids, {})
+    assert oid is None
+    assert reason == "level-complete"
 
 
 # --- Evaluación -----------------------------------------------------------
@@ -432,7 +463,7 @@ def test_endpoint_enroll_and_detail(monkeypatch, tmp_path):
         assert detail["progress"]["total"] > 20
         first = detail["objectives"][0]
         assert first["status"] == "available"
-        assert detail["objectives"][1]["status"] == "locked"
+        assert detail["objectives"][1]["status"] == "available"
 
         nxt = client.get(
             "/api/academy/next", params={"user_id": a, "level_id": "a1"}
@@ -695,46 +726,171 @@ def test_endpoint_isolation_between_users(monkeypatch, tmp_path):
     assert completions_b["completions"] == []
 
 
-def test_endpoint_assessment_rejects_locked_objective(monkeypatch, tmp_path):
+def test_endpoint_assessment_allows_any_objective_in_level(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     objs = load_level("a1").objectives()
-    locked = objs[2]  # el tercer objetivo está bloqueado por gating
     with TestClient(app) as client:
         r = client.post(
             "/api/academy/objective/assessment",
             params={"user_id": a},
-            json={"level_id": "a1", "objective_id": locked.id, "answers": {}},
+            json={"level_id": "a1", "objective_id": objs[2].id, "answers": {}},
         )
-    assert r.status_code == 404
-    # No se escribe evidencia para un objetivo bloqueado.
-    assert academy_repo.list_objective_mastery(a, "a1") == {}
+    assert r.status_code == 200
 
 
-def test_endpoint_attempts_reject_locked_objective(monkeypatch, tmp_path):
+def test_endpoint_attempts_allows_any_objective_in_level(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     objs = load_level("a1").objectives()
-    locked = objs[2]
     with TestClient(app) as client:
         r = client.post(
             "/api/academy/attempts",
             params={"user_id": a},
             json={
                 "level_id": "a1",
-                "objective_id": locked.id,
+                "objective_id": objs[2].id,
                 "results": [{"skill": "grammar", "result": "correct"}],
             },
         )
-    assert r.status_code == 404
+    assert r.status_code == 200
 
 
-def test_endpoint_lesson_complete_rejects_locked_objective(monkeypatch, tmp_path):
+def test_endpoint_lesson_complete_allows_any_objective_in_level(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     objs = load_level("a1").objectives()
-    locked = objs[2]
     with TestClient(app) as client:
         r = client.post(
             "/api/academy/lessons/complete",
             params={"user_id": a},
-            json={"level_id": "a1", "objective_id": locked.id},
+            json={"level_id": "a1", "objective_id": objs[2].id},
         )
-    assert r.status_code == 404
+    assert r.status_code == 200
+
+
+def test_endpoint_assessment_rejects_blocked_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a2").objectives()[0]
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a2", "objective_id": obj.id, "answers": {}},
+        )
+    assert r.status_code == 404  # A2 bloqueado hasta completar A1
+
+
+# --- Evidencia por ítem (reproducible y versionada) ----------------------
+
+
+def test_evidence_record_and_list(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert academy_repo.record_evidence(
+        a,
+        level_id="a1",
+        objective_id="o1",
+        skill="grammar",
+        item_id="item-1",
+        item_type="mcq",
+        difficulty=2,
+        source="objective_assessment",
+        result=1.0,
+        curriculum_version="1.2.3",
+        assessment_version="",
+    ) is True
+    rows = academy_repo.list_evidence(a)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["skill"] == "grammar"
+    assert r["item_id"] == "item-1"
+    assert r["item_type"] == "mcq"
+    assert r["difficulty"] == 2
+    assert r["source"] == "objective_assessment"
+    assert r["result"] == 1.0
+    assert r["curriculum_version"] == "1.2.3"
+    assert r["assessment_version"] == ""
+
+
+def test_objective_assessment_records_evidence(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    checks = {c.id: c.correct_index for c in obj.checks}
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
+        )
+    assert r.status_code == 200
+    rows = academy_repo.list_evidence(a)
+    assert rows, "no se registró evidencia para la evaluación del objetivo"
+    assert all(row["source"] == "objective_assessment" for row in rows)
+    assert all(row["curriculum_version"] == "1.2.3" for row in rows)
+    assert all(row["result"] in {0.0, 1.0} for row in rows)
+
+
+def test_exam_records_evidence_with_versions(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    data = load_assessments()
+    exam = data.exams["a1"]
+    answers = {it.id: it.correct_index for it in exam.items}
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/exam/a1/submit",
+            params={"user_id": a},
+            json={"answers": answers},
+        )
+    assert r.status_code == 200
+    assert r.json()["passed"] is True
+    exam_rows = [
+        row for row in academy_repo.list_evidence(a) if row["source"] == "exam"
+    ]
+    assert exam_rows, "no se registró evidencia del examen"
+    assert all(row["assessment_version"] == "a1-final" for row in exam_rows)
+    assert all(row["curriculum_version"] == "1.2.3" for row in exam_rows)
+
+
+def test_evidence_isolation_between_users(monkeypatch, tmp_path):
+    a, b = _setup(monkeypatch, tmp_path)
+    assert academy_repo.record_evidence(
+        a,
+        level_id="a1",
+        objective_id="o1",
+        skill="grammar",
+        item_id="item-1",
+        result=1.0,
+    ) is True
+    assert academy_repo.list_evidence(a) != []
+    assert academy_repo.list_evidence(b) == []
+
+
+# --- Agregación de mastery por destreza (vista derivada) ------------------
+
+
+def test_aggregate_skill_mastery_derives_from_objectives():
+    lv = load_level("a1")
+    objs = lv.objectives()[:2]
+    skills0 = objs[0].assessable_skills()
+    skills1 = objs[1].assessable_skills()
+    shared = [s for s in skills0 if s in skills1]
+    assert shared, "los dos primeros objetivos comparten una destreza evaluable"
+    skill = shared[0]
+
+    objective_scores = {
+        objs[0].id: {s: 0.0 for s in skills0},
+        objs[1].id: {s: 0.0 for s in skills1},
+    }
+    objective_scores[objs[0].id][skill] = 0.8
+    objective_scores[objs[1].id][skill] = 0.4
+
+    mastery = academy_svc.aggregate_skill_mastery(lv, objective_scores)
+    assert mastery[skill] == 0.6
+
+
+def test_aggregate_skill_mastery_empty_when_no_scores():
+    lv = load_level("a1")
+    assert academy_svc.aggregate_skill_mastery(lv, {}) == {}
+
+
+def test_all_levels_pass_curriculum_invariants():
+    for lv in load_all_levels():
+        violations = validate_level(lv)
+        assert violations == [], f"{lv.level_id}: {violations}"
