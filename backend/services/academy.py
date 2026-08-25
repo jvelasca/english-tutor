@@ -19,7 +19,9 @@ from __future__ import annotations
 from collections import defaultdict
 
 from services.curriculum import (
+    CANONICAL_SKILLS,
     CEFR_ORDER,
+    DEFAULT_THRESHOLD,
     Exam,
     Level,
     Objective,
@@ -387,6 +389,74 @@ def aggregate_skill_mastery(
         for skill, vals in totals.items()
         if vals
     }
+
+
+def build_skill_profile(
+    level: Level,
+    objective_mastery: dict[str, dict[str, dict]],
+    evidence_rows: list[dict],
+) -> list[dict]:
+    """Vista derivada del perfil CEFR por destreza de un nivel.
+
+    Agrega el mastery por objetivo (`academy_objective_mastery`, fuente de verdad)
+    y la evidencia por ítem (`academy_evidence`) en una entrada por destreza con
+    `score` (media), `confidence` (media), `evidence_count`, `last_evidence`
+    (ISO más reciente, o ''), y `review_due` (heurística simple: hay evidencia y
+    el score está por debajo del umbral; el modelo de olvido real llega en V1.4).
+
+    Devuelve una lista ordenada por `CANONICAL_SKILLS` y, tras ellas, cualquier
+    destreza extra en orden alfabético.
+    """
+    skills: set[str] = set()
+    for obj in level.objectives():
+        skills.update(obj.skills)
+    for skills_by_obj in objective_mastery.values():
+        skills.update(skills_by_obj)
+    for row in evidence_rows:
+        skill = row.get("skill")
+        if skill:
+            skills.add(skill)
+
+    evidence_by_skill: dict[str, list[dict]] = defaultdict(list)
+    for row in evidence_rows:
+        evidence_by_skill[row["skill"]].append(row)
+
+    canonical_index = {skill: i for i, skill in enumerate(CANONICAL_SKILLS)}
+
+    profile: list[dict] = []
+    for skill in skills:
+        scores: list[float] = []
+        confidences: list[float] = []
+        for skills_by_obj in objective_mastery.values():
+            state = skills_by_obj.get(skill)
+            if state is not None:
+                scores.append(float(state["score"]))
+                confidences.append(float(state["confidence"]))
+        score = round(sum(scores) / len(scores), 3) if scores else 0.0
+        confidence = (
+            round(sum(confidences) / len(confidences), 3) if confidences else 0.0
+        )
+        rows = evidence_by_skill.get(skill, [])
+        evidence_count = len(rows)
+        last_evidence = max(r["created_at"] for r in rows) if rows else ""
+        profile.append(
+            {
+                "skill": skill,
+                "score": score,
+                "confidence": confidence,
+                "evidence_count": evidence_count,
+                "last_evidence": last_evidence,
+                "review_due": evidence_count > 0 and score < DEFAULT_THRESHOLD,
+            }
+        )
+
+    profile.sort(
+        key=lambda x: (
+            canonical_index.get(x["skill"], len(CANONICAL_SKILLS)),
+            x["skill"],
+        )
+    )
+    return profile
 
 
 # --- Evaluación -----------------------------------------------------------

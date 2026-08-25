@@ -8,6 +8,7 @@ from repositories import academy as academy_repo
 from repositories import grammar as grammar_repo
 from schemas.academy import (
     AttemptOut,
+    CefrProfileOut,
     EnrollmentOut,
     ExamItemOut,
     ExamOut,
@@ -313,6 +314,25 @@ async def get_mastery(user_id: str) -> list[MasteryOut]:
     for r in rows:
         by_level.setdefault(r["level_id"], {})[r["skill"]] = r["score"]
     return [MasteryOut(level_id=k, skills=v) for k, v in by_level.items()]
+
+
+async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | None:
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, level_id
+    )
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, level_id
+    )
+    skills = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows)
+    overall = (
+        round(sum(s["score"] for s in skills) / len(skills), 3) if skills else 0.0
+    )
+    return CefrProfileOut(
+        level_id=level_id, level=lv.level, overall=overall, skills=skills
+    )
 
 
 async def next_objective(user_id: str, level_id: str) -> NextObjectiveOut | None:

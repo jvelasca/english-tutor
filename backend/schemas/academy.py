@@ -304,3 +304,19 @@ class SpeakingTaskResultOut(BaseModel):
     criteria: dict[str, float]
     speaking_mastery: float
     evidence: dict
+
+
+class SkillProfileOut(BaseModel):
+    skill: str
+    score: float
+    confidence: float
+    evidence_count: int
+    last_evidence: str
+    review_due: bool
+
+
+class CefrProfileOut(BaseModel):
+    level_id: str
+    level: str
+    overall: float
+    skills: list[SkillProfileOut]

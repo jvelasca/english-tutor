@@ -11,6 +11,7 @@ from domain import academy as academy_service
 from schemas.academy import (
     AttemptOut,
     AttemptRequest,
+    CefrProfileOut,
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
@@ -84,6 +85,18 @@ async def next_step(level_id: str, user: dict = Depends(current_user)) -> dict:
     if nxt is None:
         raise HTTPException(status_code=404, detail="Nivel no encontrado")
     return nxt
+
+
+@router.get("/api/academy/profile", response_model=CefrProfileOut)
+async def skill_profile(level_id: str, user: dict = Depends(current_user)) -> dict:
+    if await academy_service.enrollment_blocked(user["id"], level_id):
+        raise HTTPException(
+            status_code=403, detail="Nivel bloqueado: completa el nivel anterior"
+        )
+    out = await academy_service.get_skill_profile(user["id"], level_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel no encontrado")
+    return out
 
 
 @router.post("/api/academy/study-plan", response_model=StudyPlanOut)

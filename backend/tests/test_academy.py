@@ -894,3 +894,73 @@ def test_all_levels_pass_curriculum_invariants():
     for lv in load_all_levels():
         violations = validate_level(lv)
         assert violations == [], f"{lv.level_id}: {violations}"
+
+
+# --- CEFR Skill Profile (vista derivada) ---------------------------------
+
+
+def test_skill_profile_empty_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get(
+            "/api/academy/profile", params={"user_id": a, "level_id": "a1"}
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["level"] == "A1"
+    assert body["overall"] == 0.0
+    skills = {s["skill"]: s for s in body["skills"]}
+    # Todas las skills declaradas en A1 están presentes en el perfil.
+    lv = load_level("a1")
+    declared = {skill for o in lv.objectives() for skill in o.skills}
+    assert declared <= set(skills)
+    grammar = skills["grammar"]
+    assert grammar["score"] == 0.0
+    assert grammar["confidence"] == 0.0
+    assert grammar["evidence_count"] == 0
+    assert grammar["last_evidence"] == ""
+    assert grammar["review_due"] is False
+
+
+def test_skill_profile_reflects_assessment(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
+    checks = {c.id: c.correct_index for c in obj.checks}
+    with TestClient(app) as client:
+        for _ in range(obj.minimum_attempts):
+            r = client.post(
+                "/api/academy/objective/assessment",
+                params={"user_id": a},
+                json={"level_id": "a1", "objective_id": obj.id, "answers": checks},
+            )
+            assert r.status_code == 200
+        resp = client.get(
+            "/api/academy/profile", params={"user_id": a, "level_id": "a1"}
+        )
+    assert resp.status_code == 200
+    skills = {s["skill"]: s for s in resp.json()["skills"]}
+    assessed = obj.assessable_skills()
+    assert assessed, "el primer objetivo de A1 tiene skills evaluables"
+    for skill in assessed:
+        entry = skills[skill]
+        assert entry["score"] > 0, skill
+        assert entry["evidence_count"] > 0, skill
+        assert entry["last_evidence"] != "", skill
+
+
+def test_skill_profile_rejects_blocked_level(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get(
+            "/api/academy/profile", params={"user_id": a, "level_id": "a2"}
+        )
+    assert r.status_code == 403
+
+
+def test_skill_profile_unknown_level_404(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get(
+            "/api/academy/profile", params={"user_id": a, "level_id": "zz"}
+        )
+    assert r.status_code == 404
