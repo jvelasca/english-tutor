@@ -6,8 +6,10 @@ import {
   formatDurationTarget,
   formatScorePct,
   formatTrendDelta,
+  isConversationalTaskType,
   nextFocus,
   numericToCefr,
+  rolePlaySetup,
 } from "./speaking";
 
 function criterion(
@@ -123,6 +125,28 @@ describe("criterionLabel", () => {
 
   it("devuelve el valor crudo para criterios desconocidos", () => {
     expect(criterionLabel("spelling")).toBe("spelling");
+  });
+});
+
+describe("isConversationalTaskType", () => {
+  it("reconoce los tipos de tarea conversacionales", () => {
+    for (const t of ["role_play", "conversation", "discussion", "interview"]) {
+      expect(isConversationalTaskType(t)).toBe(true);
+    }
+  });
+
+  it("rechaza tareas no conversacionales", () => {
+    for (const t of ["monologue", "read_aloud", "story", "description", ""]) {
+      expect(isConversationalTaskType(t)).toBe(false);
+    }
+  });
+});
+
+describe("rolePlaySetup", () => {
+  it("incluye el escenario y pide mantenerse en personaje", () => {
+    const setup = rolePlaySetup("You are a waiter.");
+    expect(setup).toContain("You are a waiter.");
+    expect(setup).toContain("stay in character");
   });
 });
 

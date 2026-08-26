@@ -3,6 +3,34 @@ import type { SpeakingCriterionProgress } from "../types/api";
 /** Niveles CEFR ordenados por su parte entera continua (1..6). */
 const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
+/**
+ * Tipos de tarea de speaking que observan interacción conversacional real
+ * (turn-taking). Espejo del `CONVERSATIONAL_TASK_TYPES` del backend.
+ */
+export const CONVERSATIONAL_TASK_TYPES: ReadonlyArray<string> = [
+  "role_play",
+  "conversation",
+  "discussion",
+  "interview",
+];
+
+/** ¿La tarea observa interacción conversacional (turn-taking real)? */
+export function isConversationalTaskType(taskType: string): boolean {
+  return CONVERSATIONAL_TASK_TYPES.includes(taskType);
+}
+
+/**
+ * Mensaje semilla para el tutor en un role-play: le pide adoptar el otro papel
+ * del escenario y mantenerse en personaje. Se envía al LLM como primer mensaje
+ * (rol "user") y NO se muestra ni persiste como turno del alumno.
+ */
+export function rolePlaySetup(scenario: string): string {
+  return (
+    "Role-play. You are the other speaker in this scenario and must stay in " +
+    `character. ${scenario} Start the conversation.`
+  );
+}
+
 /** Etiqueta legible de cada criterio del rubric de speaking. */
 export function criterionLabel(criterion: string): string {
   switch (criterion) {

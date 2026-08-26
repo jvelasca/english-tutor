@@ -315,6 +315,27 @@ describe("academy api", () => {
     expect(body).toEqual({ session_id: 1, heard: "hello" });
   });
 
+  it("submitSpeakingAssessmentPart incluye conversation_id si se pasa", async () => {
+    const fn = mockJsonFetch({
+      session_id: 1,
+      part_index: 2,
+      task_type: "role_play",
+      cefr_target: "B1",
+      prompt: "You are in a restaurant.",
+      part_scores: { overall: 0.8, criteria: {}, observed: {} },
+      done: false,
+      next_part: null,
+    });
+    await submitSpeakingAssessmentPart("u1", 1, "hello", 20, "cid-123");
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body).toEqual({
+      session_id: 1,
+      heard: "hello",
+      duration_seconds: 20,
+      conversation_id: "cid-123",
+    });
+  });
+
   it("finishSpeakingAssessment envía session_id por POST", async () => {
     const fn = mockJsonFetch({
       session_id: 1,

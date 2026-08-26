@@ -231,16 +231,19 @@ export function startSpeakingAssessment(
 
 /**
  * Envía la respuesta hablada de una parte del Speaking Assessment.
- * `durationSeconds` solo se incluye cuando está definida (vía micrófono).
+ * `durationSeconds` solo se incluye cuando está definida (vía micrófono) y
+ * `conversationId` solo cuando la parte fue un role-play en vivo (turn-taking).
  */
 export function submitSpeakingAssessmentPart(
   userId: string,
   sessionId: number,
   heard: string,
   durationSeconds?: number | null,
+  conversationId?: string | null,
 ): Promise<SpeakingAssessmentPart> {
   const body: Record<string, unknown> = { session_id: sessionId, heard };
   if (durationSeconds != null) body.duration_seconds = durationSeconds;
+  if (conversationId) body.conversation_id = conversationId;
   return postJson<SpeakingAssessmentPart>(
     `/api/academy/speaking/assessment/part${userQuery(userId)}`,
     body,

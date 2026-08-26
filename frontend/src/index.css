@@ -5099,6 +5099,132 @@ body.is-resizing {
   opacity: 0.6;
 }
 
+.speaking-roleplay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.speaking-roleplay__hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-soft);
+  color: var(--color-text-dim);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.speaking-roleplay__messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+
+.speaking-roleplay__bubble {
+  max-width: 78%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xl);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.speaking-roleplay__bubble.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  color: var(--color-on-accent);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.speaking-roleplay__bubble.assistant {
+  align-self: flex-start;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.speaking-roleplay__composer {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.speaking-roleplay__input {
+  flex: 1;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.speaking-roleplay__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-ring);
+}
+
+.speaking-roleplay__input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.speaking-roleplay__input:disabled {
+  opacity: 0.6;
+}
+
+.speaking-roleplay__send,
+.speaking-roleplay__finish {
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.speaking-roleplay__send {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.speaking-roleplay__send:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.speaking-roleplay__send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.speaking-roleplay__finish {
+  align-self: flex-start;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.speaking-roleplay__finish:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.speaking-roleplay__finish:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .speaking-assessment__error {
   margin: 0;
   padding: var(--space-2) var(--space-3);

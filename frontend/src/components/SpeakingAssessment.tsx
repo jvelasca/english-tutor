@@ -16,7 +16,9 @@ import {
   formatConfidence,
   formatDurationTarget,
   formatScorePct,
+  isConversationalTaskType,
 } from "../utils/speaking";
+import { SpeakingRolePlay } from "./SpeakingRolePlay";
 
 type Phase = "idle" | "part" | "result";
 
@@ -78,8 +80,12 @@ export function SpeakingAssessment({
     }
   }
 
-  /** Envía la respuesta hablada (transcrita o manual) de la parte actual. */
-  async function submitResponse(heard: string, durationSeconds?: number) {
+  /** Envía la respuesta hablada (transcrita, manual o role-play) de la parte actual. */
+  async function submitResponse(
+    heard: string,
+    durationSeconds?: number,
+    conversationId?: string,
+  ) {
     if (!userId || sessionId == null) return;
     setLoading(true);
     setError(null);
@@ -89,6 +95,7 @@ export function SpeakingAssessment({
         sessionId,
         heard,
         durationSeconds,
+        conversationId,
       );
       setPartScores(out.part_scores);
       setDone(out.done);
@@ -320,54 +327,65 @@ export function SpeakingAssessment({
       )}
 
       {!submitted ? (
-        <>
-          <div className="speaking-assessment__controls">
+        part && isConversationalTaskType(part.task_type) ? (
+          <SpeakingRolePlay
+            key={part.id}
+            userId={userId ?? ""}
+            scenario={part.prompt}
+            onFinish={(heard, durationSeconds, conversationId) =>
+              void submitResponse(heard, durationSeconds, conversationId)
+            }
+          />
+        ) : (
+          <>
+            <div className="speaking-assessment__controls">
+              <button
+                type="button"
+                className={`speaking-assessment__record${recording ? " recording" : ""}${processing ? " processing" : ""}`}
+                onClick={toggleRecording}
+                disabled={processing || !userId}
+                aria-pressed={recording}
+                aria-label={
+                  processing
+                    ? "Transcribiendo respuesta"
+                    : recording
+                      ? "Detener grabación"
+                      : "Grabar respuesta"
+                }
+              >
+                {processing
+                  ? "Transcribiendo…"
+                  : recording
+                    ? "Detener"
+                    : "Grabar respuesta"}
+              </button>
+            </div>
+
+            <label className="speaking-assessment__manual">
+              <span className="speaking-assessment__manual-label">
+                O escribe tu respuesta:
+              </span>
+              <textarea
+                className="speaking-assessment__textarea"
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder="Escribe aquí lo que dirías en voz alta…"
+                rows={3}
+                maxLength={2000}
+                disabled={loading}
+              />
+            </label>
+
             <button
               type="button"
-              className={`speaking-assessment__record${recording ? " recording" : ""}${processing ? " processing" : ""}`}
-              onClick={toggleRecording}
-              disabled={processing || !userId}
-              aria-pressed={recording}
-              aria-label={
-                processing
-                  ? "Transcribiendo respuesta"
-                  : recording
-                    ? "Detener grabación"
-                    : "Grabar respuesta"
-              }
+              className="speaking-assessment__submit"
+              onClick={handleManualSubmit}
+              disabled={!manualText.trim() || loading || !userId}
             >
-              {processing
-                ? "Transcribiendo…"
-                : recording
-                  ? "Detener"
-                  : "Grabar respuesta"}
+              {loading ? "Enviando…" : "Enviar"}
             </button>
-          </div>
-
-          <label className="speaking-assessment__manual">
-            <span className="speaking-assessment__manual-label">
-              O escribe tu respuesta:
-            </span>
-            <textarea
-              className="speaking-assessment__textarea"
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              placeholder="Escribe aquí lo que dirías en voz alta…"
-              rows={3}
-              maxLength={2000}
-              disabled={loading}
-            />
-          </label>
-
-          <button
-            type="button"
-            className="speaking-assessment__submit"
-            onClick={handleManualSubmit}
-            disabled={!manualText.trim() || loading || !userId}
-          >
-            {loading ? "Enviando…" : "Enviar"}
-          </button>
-        </>
+          </>
+        )
       ) : (
         <>
           {partScores && (
