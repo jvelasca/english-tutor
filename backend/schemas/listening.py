@@ -80,7 +80,7 @@ class ListeningProductionResult(BaseModel):
     score: int
     word_accuracy: int
     phonetic_score: int
-    phoneme_accuracy: int
+    phoneme_accuracy_proxy: int
     breakdown: dict
     reference: str
     level: str

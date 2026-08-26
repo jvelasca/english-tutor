@@ -92,8 +92,9 @@ export interface PronunciationResponse {
   ok: boolean;
   word_accuracy: number;
   phonetic_score: number;
-  phoneme_accuracy: number;
-  prosody_score: number;
+  phoneme_accuracy_proxy: number;
+  prosody_proxy: number;
+  pronunciation_source: string;
   breakdown: PronunciationBreakdown;
   phoneme_breakdown: PhonemeBreakdown;
   fluency: FluencyStats;
@@ -304,7 +305,7 @@ export interface ListeningProductionResult {
   score: number;
   word_accuracy: number;
   phonetic_score: number;
-  phoneme_accuracy: number;
+  phoneme_accuracy_proxy: number;
   breakdown: Record<string, unknown>;
   reference: string;
   level: string;

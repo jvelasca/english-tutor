@@ -125,15 +125,15 @@ def production_score(reference: str, heard: str) -> dict:
     """Score determinista de una producción frente a una referencia (0..100).
 
     Delega en `services.phonetics.composite_score` (sin LLM) y devuelve
-    `{score, word_accuracy, phonetic_score, phoneme_accuracy, breakdown}` con
-    enteros 0..100 salvo `breakdown` (el dict de `word_alignment`).
+    `{score, word_accuracy, phonetic_score, phoneme_accuracy_proxy, breakdown}`
+    con enteros 0..100 salvo `breakdown` (el dict de `word_alignment`).
     """
     result = composite_score(reference, heard)
     return {
         "score": int(result["score"]),
         "word_accuracy": int(result["word_accuracy"]),
         "phonetic_score": int(result["phonetic_score"]),
-        "phoneme_accuracy": int(result["phoneme_accuracy"]),
+        "phoneme_accuracy_proxy": int(result["phoneme_accuracy_proxy"]),
         "breakdown": result["breakdown"],
     }
 

@@ -24,8 +24,11 @@ def _level(score: int) -> str:
 
 
 def score_pronunciation(expected: str, heard: str) -> dict:
-    """Devuelve score/level/ok + word_accuracy + phonetic_score + phoneme_accuracy
-    + prosody_score + breakdown + phoneme_breakdown."""
+    """Devuelve score/level/ok + word_accuracy + phonetic_score +
+    phoneme_accuracy_proxy + prosody_proxy + breakdown + phoneme_breakdown.
+
+    Las señales de fonemas y prosodia son un proxy sobre transcripción, marcado
+    con `pronunciation_source: "transcript"`."""
     comp = composite_score(expected, heard)
     score = comp["score"]
     return {
@@ -36,8 +39,9 @@ def score_pronunciation(expected: str, heard: str) -> dict:
         "ok": score >= PASS_THRESHOLD,
         "word_accuracy": comp["word_accuracy"],
         "phonetic_score": comp["phonetic_score"],
-        "phoneme_accuracy": comp["phoneme_accuracy"],
-        "prosody_score": comp["prosody_score"],
+        "phoneme_accuracy_proxy": comp["phoneme_accuracy_proxy"],
+        "prosody_proxy": comp["prosody_proxy"],
+        "pronunciation_source": "transcript",
         "breakdown": comp["breakdown"],
         "phoneme_breakdown": comp["phoneme_breakdown"],
     }
@@ -45,32 +49,33 @@ def score_pronunciation(expected: str, heard: str) -> dict:
 
 # Criterios del rubric de pronunciación (read-aloud) y sus pesos (suman 1).
 PRONUNCIATION_CRITERIA: tuple[str, ...] = (
-    "phoneme_accuracy",
+    "phoneme_accuracy_proxy",
     "word_accuracy",
     "phonetic_similarity",
-    "prosody",
+    "prosody_proxy",
 )
 
 PRONUNCIATION_WEIGHTS: dict[str, float] = {
-    "phoneme_accuracy": 0.35,
+    "phoneme_accuracy_proxy": 0.35,
     "word_accuracy": 0.35,
     "phonetic_similarity": 0.15,
-    "prosody": 0.15,
+    "prosody_proxy": 0.15,
 }
 
 
 def score_pronunciation_cefr(expected: str, heard: str) -> dict:
     """Score de pronunciación 0..1 por criterio y overall ponderado (read-aloud).
 
-    Reutiliza `composite_score` y normaliza sus componentes a 0..1: phoneme_accuracy,
-    word_accuracy, phonetic_similarity (phonetic_score) y prosody. Devuelve
-    {"expected", "heard", "criteria", "overall"} con overall redondeado a 3."""
+    Reutiliza `composite_score` y normaliza sus componentes a 0..1:
+    phoneme_accuracy_proxy, word_accuracy, phonetic_similarity (phonetic_score) y
+    prosody_proxy. Devuelve {"expected", "heard", "criteria", "overall"} con
+    overall redondeado a 3."""
     comp = composite_score(expected, heard)
     criteria = {
-        "phoneme_accuracy": comp["phoneme_accuracy"] / 100,
+        "phoneme_accuracy_proxy": comp["phoneme_accuracy_proxy"] / 100,
         "word_accuracy": comp["word_accuracy"] / 100,
         "phonetic_similarity": comp["phonetic_score"] / 100,
-        "prosody": comp["prosody_score"] / 100,
+        "prosody_proxy": comp["prosody_proxy"] / 100,
     }
     overall = round(
         sum(PRONUNCIATION_WEIGHTS[c] * criteria[c] for c in PRONUNCIATION_CRITERIA), 3

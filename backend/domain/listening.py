@@ -173,7 +173,7 @@ async def submit_production(
         "score": result["score"],
         "word_accuracy": result["word_accuracy"],
         "phonetic_score": result["phonetic_score"],
-        "phoneme_accuracy": result["phoneme_accuracy"],
+        "phoneme_accuracy_proxy": result["phoneme_accuracy_proxy"],
         "breakdown": result["breakdown"],
         "reference": reference,
         "level": question["level"],

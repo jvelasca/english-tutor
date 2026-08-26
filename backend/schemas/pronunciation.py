@@ -49,8 +49,9 @@ class PronunciationResponse(BaseModel):
     ok: bool
     word_accuracy: int
     phonetic_score: int
-    phoneme_accuracy: int
-    prosody_score: int
+    phoneme_accuracy_proxy: int
+    prosody_proxy: int
+    pronunciation_source: str
     breakdown: PronunciationBreakdown
     phoneme_breakdown: PhonemeBreakdown
     fluency: FluencyStats

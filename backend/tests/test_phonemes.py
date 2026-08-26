@@ -3,9 +3,9 @@
 from services.phonemes import (
     G2P,
     levenshtein,
-    phoneme_accuracy,
+    phoneme_accuracy_proxy,
     phoneme_alignment,
-    prosody_score,
+    prosody_proxy,
     syllables,
     to_phonemes,
 )
@@ -44,25 +44,25 @@ def test_levenshtein_known_cases():
     assert levenshtein(list("kitten"), list("sitting")) == 3
 
 
-def test_phoneme_accuracy_exact_match_is_one():
-    assert phoneme_accuracy("hello", "hello") == 1.0
-    assert phoneme_accuracy("Hello world", "Hello world") == 1.0
+def test_phoneme_accuracy_proxy_exact_match_is_one():
+    assert phoneme_accuracy_proxy("hello", "hello") == 1.0
+    assert phoneme_accuracy_proxy("Hello world", "Hello world") == 1.0
 
 
-def test_phoneme_accuracy_empty_vs_something_is_zero():
-    assert phoneme_accuracy("", "hello") == 0.0
-    assert phoneme_accuracy("hello", "") == 0.0
+def test_phoneme_accuracy_proxy_empty_vs_something_is_zero():
+    assert phoneme_accuracy_proxy("", "hello") == 0.0
+    assert phoneme_accuracy_proxy("hello", "") == 0.0
 
 
-def test_phoneme_accuracy_near_miss_below_exact():
-    exact = phoneme_accuracy("like", "like")
-    near = phoneme_accuracy("like", "likes")
+def test_phoneme_accuracy_proxy_near_miss_below_exact():
+    exact = phoneme_accuracy_proxy("like", "like")
+    near = phoneme_accuracy_proxy("like", "likes")
     assert exact == 1.0
     assert 0.0 < near < 1.0
     assert near < exact
 
 
-def test_phoneme_accuracy_in_range():
+def test_phoneme_accuracy_proxy_in_range():
     for expected, heard in (
         ("hello", "hello"),
         ("hello", "help"),
@@ -70,7 +70,7 @@ def test_phoneme_accuracy_in_range():
         ("", ""),
         ("twenty years old", "twenty years"),
     ):
-        acc = phoneme_accuracy(expected, heard)
+        acc = phoneme_accuracy_proxy(expected, heard)
         assert 0.0 <= acc <= 1.0
 
 
@@ -107,18 +107,18 @@ def test_syllables_min_one_and_basic():
     assert syllables("world") == 1  # o → un grupo
 
 
-def test_prosody_score_exact_and_empty():
-    assert prosody_score("hello world", "hello world") == 1.0
-    assert prosody_score("", "") == 1.0
-    assert prosody_score("hello", "") == 0.0
-    assert prosody_score("", "hello") == 0.0
+def test_prosody_proxy_exact_and_empty():
+    assert prosody_proxy("hello world", "hello world") == 1.0
+    assert prosody_proxy("", "") == 1.0
+    assert prosody_proxy("hello", "") == 0.0
+    assert prosody_proxy("", "hello") == 0.0
 
 
-def test_prosody_score_in_range():
+def test_prosody_proxy_in_range():
     for expected, heard in (
         ("hello", "hello"),
         ("I am a student", "I am student"),
         ("twenty years old", "twenty years"),
     ):
-        score = prosody_score(expected, heard)
+        score = prosody_proxy(expected, heard)
         assert 0.0 <= score <= 1.0

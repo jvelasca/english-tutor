@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
-from services.phonemes import phoneme_accuracy, phoneme_alignment, prosody_score
+from services.phonemes import phoneme_accuracy_proxy, phoneme_alignment, prosody_proxy
 
 # Pesos del score compuesto (deben sumar 1.0). La precisión de fonemas y la de
 # palabra lideran; Soundex y prosodia aportan señal secundaria. Ya no se usa la
@@ -134,13 +134,14 @@ def composite_score(expected: str, heard: str) -> dict:
     """Devuelve el score compuesto (0-100), sus componentes y los breakdowns.
 
     Pondera palabra (0.35), fonemas (0.35), Soundex (0.15) y prosodia (0.15).
-    Además de `score`, `word_accuracy`, `phonetic_score`, `phoneme_accuracy` y
-    `breakdown` (palabras), incluye `prosody_score` (0-100) y `phoneme_breakdown`
-    (alineación fonema a fonema)."""
+    Además de `score`, `word_accuracy`, `phonetic_score`, `phoneme_accuracy_proxy`
+    y `breakdown` (palabras), incluye `prosody_proxy` (0-100) y `phoneme_breakdown`
+    (alineación fonema a fonema). Las señales de fonemas y prosodia son un proxy
+    sobre transcripción, marcado con `pronunciation_source: "transcript"`."""
     wa = word_accuracy(expected, heard)
     ps = phonetic_similarity(expected, heard)
-    pa = phoneme_accuracy(expected, heard)
-    pro = prosody_score(expected, heard)
+    pa = phoneme_accuracy_proxy(expected, heard)
+    pro = prosody_proxy(expected, heard)
     score = round(
         100 * (W_WORD * wa + W_PHONEME * pa + W_PHONETIC * ps + W_PROSODY * pro)
     )
@@ -148,8 +149,9 @@ def composite_score(expected: str, heard: str) -> dict:
         "score": score,
         "word_accuracy": round(wa * 100),
         "phonetic_score": round(ps * 100),
-        "phoneme_accuracy": round(pa * 100),
-        "prosody_score": round(pro * 100),
+        "phoneme_accuracy_proxy": round(pa * 100),
+        "prosody_proxy": round(pro * 100),
+        "pronunciation_source": "transcript",
         "breakdown": word_alignment(expected, heard),
         "phoneme_breakdown": phoneme_alignment(expected, heard),
     }

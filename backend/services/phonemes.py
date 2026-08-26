@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 
+# Origen de las señales de pronunciación: hoy se derivan de la transcripción
+# (texto), no de la señal acústica real. Los nombres `_proxy` de las funciones y
+# claves de retorno lo hacen explícito para el Student Model.
+PRONUNCIATION_SIGNAL_SOURCE = "transcript"
+
 # Diccionario grapheme→phoneme (ARPAbet) compacto. Cubre el vocabulario de uso
 # frecuente del currículum A1/A2; para palabras fuera de vocabulario se usa el
 # fallback letra-a-letra, así que `to_phonemes` nunca falla.
@@ -121,7 +126,7 @@ def levenshtein(a: list[str], b: list[str]) -> int:
     return prev[-1]
 
 
-def phoneme_accuracy(expected: str, heard: str) -> float:
+def phoneme_accuracy_proxy(expected: str, heard: str) -> float:
     """Precisión (0..1) de la secuencia de fonemas de lo oído frente a lo esperado.
 
     ``1 - lev / max(1, len(ep))`` clampeado a [0, 1] y redondeado a 3 decimales.
@@ -189,7 +194,7 @@ def syllables(word: str) -> int:
     return max(1, groups)
 
 
-def prosody_score(expected: str, heard: str) -> float:
+def prosody_proxy(expected: str, heard: str) -> float:
     """Ratio (0..1) de palabras esperadas cuyo patrón silábico coincide con el de
     alguna palabra oída no reutilizada (greedy, espejo de `phonetic_similarity`).
 

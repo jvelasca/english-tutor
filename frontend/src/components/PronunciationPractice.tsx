@@ -125,12 +125,12 @@ export function PronunciationPractice({
               {result.phonetic_score}%
             </div>
             <div>
-              <span className="label">Precisión de fonemas:</span>{" "}
-              {result.phoneme_accuracy}%
+              <span className="label">Precisión de fonemas (proxy de texto):</span>{" "}
+              {result.phoneme_accuracy_proxy}%
             </div>
             <div>
-              <span className="label">Prosodia (ritmo):</span>{" "}
-              {result.prosody_score}%
+              <span className="label">Ritmo silábico (proxy, sin audio):</span>{" "}
+              {result.prosody_proxy}%
             </div>
             <div>
               <span className="label">Fluidez:</span>{" "}

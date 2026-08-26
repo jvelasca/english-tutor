@@ -76,15 +76,17 @@ def test_composite_score_exact_empty_partial():
     assert 50 <= partial < 100
 
 
-def test_composite_score_includes_phoneme_accuracy():
-    assert composite_score("Hello world", "Hello world")["phoneme_accuracy"] == 100
-    assert composite_score("Hello", "")["phoneme_accuracy"] == 0
+def test_composite_score_includes_phoneme_accuracy_proxy():
+    r = composite_score("Hello world", "Hello world")
+    assert r["phoneme_accuracy_proxy"] == 100
+    assert r["pronunciation_source"] == "transcript"
+    assert composite_score("Hello", "")["phoneme_accuracy_proxy"] == 0
 
 
 def test_composite_score_includes_prosody_and_phoneme_breakdown():
     r = composite_score("Hello world", "Hello world")
-    assert r["prosody_score"] == 100
+    assert r["prosody_proxy"] == 100
     assert r["phoneme_breakdown"]["total"] == len(r["phoneme_breakdown"]["correct"])
     empty = composite_score("Hello", "")
-    assert empty["prosody_score"] == 0
+    assert empty["prosody_proxy"] == 0
     assert empty["phoneme_breakdown"]["total"] == len(to_phonemes("Hello"))
