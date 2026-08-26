@@ -789,6 +789,7 @@ def evidence_from_speaking(
     curriculum_version: str = "",
     assessment_version: str = RUBRIC_VERSION,
     difficulty: int = 1,
+    evidence_kind: str = "familiar",
 ) -> list[dict]:
     """Convierte el resultado de score_speaking en registros de evidencia.
 
@@ -816,6 +817,7 @@ def evidence_from_speaking(
                 "result": float(score),
                 "curriculum_version": curriculum_version,
                 "assessment_version": assessment_version,
+                "evidence_kind": evidence_kind,
             }
         )
     records.append(
@@ -830,6 +832,7 @@ def evidence_from_speaking(
             "result": float(result["overall"]),
             "curriculum_version": curriculum_version,
             "assessment_version": assessment_version,
+            "evidence_kind": evidence_kind,
         }
     )
     return records

@@ -448,6 +448,11 @@ def build_skill_profile(
         evidence_count = len(rows)
         last_evidence = max(r["created_at"] for r in rows) if rows else ""
         review_ts = last_seen or last_evidence
+        evidence_by_kind = {"familiar": 0, "transfer": 0, "novel": 0}
+        for r in rows:
+            kind = r.get("evidence_kind") or "familiar"
+            if kind in evidence_by_kind:
+                evidence_by_kind[kind] += 1
         profile.append(
             {
                 "skill": skill,
@@ -459,6 +464,8 @@ def build_skill_profile(
                     evidence_count > 0 and forgetting_review_due(score, review_ts, now)
                 ),
                 "subskills": [],
+                "evidence_by_kind": evidence_by_kind,
+                "generalized_score": generalized_mastery_score(rows),
             }
         )
 
@@ -624,6 +631,7 @@ def evidence_from_items(
     difficulty: int = 1,
     curriculum_version: str = "",
     assessment_version: str = "",
+    evidence_kind: str = "familiar",
 ) -> list[dict]:
     """Convierte respuestas de ítems en registros de evidencia por ítem.
 
@@ -646,6 +654,7 @@ def evidence_from_items(
                 "result": 1.0 if correct else 0.0,
                 "curriculum_version": curriculum_version,
                 "assessment_version": assessment_version,
+                "evidence_kind": evidence_kind,
             }
         )
     return records
@@ -668,6 +677,49 @@ EVIDENCE_SOURCES: tuple[str, ...] = (
     "writing",
     "pronunciation",
 )
+
+# Niveles de evidencia reconocidos (invariante): distinguen práctica del mismo
+# tipo de ejercicio (familiar), de transferencia (nuevo audio/ítem, misma
+# habilidad) y de novedad (nuevo audio + hablante + situación).
+EVIDENCE_KINDS: tuple[str, ...] = ("familiar", "transfer", "novel")
+
+# Pesos de dominio generalizado (novel > transfer > familiar). Solo la evidencia
+# novel pesa alto para confirmar dominio generalizado; se renormalizan sobre los
+# kinds presentes en cada perfil.
+EVIDENCE_KIND_WEIGHTS: dict[str, float] = {
+    "familiar": 0.2,
+    "transfer": 0.3,
+    "novel": 0.5,
+}
+
+
+def generalized_mastery_score(rows: list[dict]) -> float | None:
+    """Dominio generalizado (novel > transfer > familiar) sobre la evidencia.
+
+    Media ponderada de `result` por `evidence_kind`, renormalizada a los kinds
+    presentes. Devuelve None si no hay evidencia (o ninguna con `result`
+    numérico)."""
+    by_kind: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        result = row.get("result")
+        if isinstance(result, bool) or not isinstance(result, (int, float)):
+            continue
+        kind = row.get("evidence_kind") or "familiar"
+        by_kind[kind].append(float(result))
+
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for kind, results in by_kind.items():
+        weight = EVIDENCE_KIND_WEIGHTS.get(kind)
+        if weight is None:
+            continue
+        mean = sum(results) / len(results)
+        total_weight += weight
+        weighted_sum += weight * mean
+
+    if total_weight == 0.0:
+        return None
+    return round(weighted_sum / total_weight, 3)
 
 
 def evidence_record_errors(
@@ -709,6 +761,10 @@ def evidence_record_errors(
     source = record.get("source", "")
     if source not in sources:
         errors.append(f"source '{source}' desconocida")
+
+    evidence_kind = record.get("evidence_kind")
+    if evidence_kind is not None and evidence_kind not in EVIDENCE_KINDS:
+        errors.append(f"evidence_kind '{evidence_kind}' desconocido")
 
     if not record.get("curriculum_version"):
         errors.append("curriculum_version vacío")

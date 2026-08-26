@@ -863,6 +863,101 @@ def test_evidence_isolation_between_users(monkeypatch, tmp_path):
     assert academy_repo.list_evidence(b) == []
 
 
+def test_record_evidence_kind_persists_and_lists(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert academy_repo.record_evidence(
+        a,
+        level_id="a1",
+        objective_id="o1",
+        skill="grammar",
+        item_id="item-1",
+        result=1.0,
+        evidence_kind="transfer",
+    ) is True
+    rows = academy_repo.list_evidence(a)
+    assert len(rows) == 1
+    assert rows[0]["evidence_kind"] == "transfer"
+
+
+def test_record_evidence_kind_defaults_to_familiar(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert academy_repo.record_evidence(
+        a,
+        level_id="a1",
+        objective_id="o1",
+        skill="grammar",
+        item_id="item-1",
+        result=1.0,
+    ) is True
+    rows = academy_repo.list_evidence(a)
+    assert rows[0]["evidence_kind"] == "familiar"
+
+
+# --- Dominio generalizado (novel > transfer > familiar) --------------------
+
+
+def test_generalized_mastery_score_weighted():
+    rows = [
+        {"evidence_kind": "familiar", "result": 1.0},
+        {"evidence_kind": "transfer", "result": 0.5},
+        {"evidence_kind": "novel", "result": 0.0},
+    ]
+    assert academy_svc.generalized_mastery_score(rows) == 0.35
+
+
+def test_generalized_mastery_score_empty_is_none():
+    assert academy_svc.generalized_mastery_score([]) is None
+
+
+def test_generalized_mastery_score_single_kind_renormalizes():
+    rows = [
+        {"evidence_kind": "familiar", "result": 0.4},
+        {"evidence_kind": "familiar", "result": 0.8},
+    ]
+    assert academy_svc.generalized_mastery_score(rows) == 0.6
+
+
+def test_generalized_mastery_score_ignores_non_numeric():
+    rows = [
+        {"evidence_kind": "novel", "result": 0.8},
+        {"evidence_kind": "novel", "result": "high"},
+    ]
+    assert academy_svc.generalized_mastery_score(rows) == 0.8
+
+
+def test_build_skill_profile_includes_evidence_by_kind_and_generalized_score():
+    lv = load_level("a1")
+    skill = lv.objectives()[0].skills[0]
+    evidence_rows = [
+        {
+            "skill": skill,
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "evidence_kind": "familiar",
+            "result": 1.0,
+        },
+        {
+            "skill": skill,
+            "created_at": "2026-01-02T00:00:00+00:00",
+            "evidence_kind": "novel",
+            "result": 0.5,
+        },
+    ]
+    profile = academy_svc.build_skill_profile(lv, {}, evidence_rows)
+    entry = next(e for e in profile if e["skill"] == skill)
+    assert entry["evidence_by_kind"] == {"familiar": 1, "transfer": 0, "novel": 1}
+    # Pesos renormalizados: (0.2·1.0 + 0.5·0.5) / (0.2 + 0.5) = 0.45/0.7 ≈ 0.643.
+    assert entry["generalized_score"] == 0.643
+
+
+def test_build_skill_profile_generalized_score_none_without_evidence():
+    lv = load_level("a1")
+    skill = lv.objectives()[0].skills[0]
+    profile = academy_svc.build_skill_profile(lv, {}, [])
+    entry = next(e for e in profile if e["skill"] == skill)
+    assert entry["evidence_by_kind"] == {"familiar": 0, "transfer": 0, "novel": 0}
+    assert entry["generalized_score"] is None
+
+
 # --- Agregación de mastery por destreza (vista derivada) ------------------
 
 

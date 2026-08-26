@@ -90,6 +90,7 @@ def evidence_from_pronunciation(
     objective_id: str,
     curriculum_version: str = "",
     assessment_version: str = RUBRIC_VERSION,
+    evidence_kind: str = "familiar",
 ) -> list[dict]:
     """Convierte el resultado en registros de evidencia (una fila por criterio
     + overall).
@@ -109,6 +110,7 @@ def evidence_from_pronunciation(
             "result": float(result["criteria"][criterion]),
             "curriculum_version": curriculum_version,
             "assessment_version": assessment_version,
+            "evidence_kind": evidence_kind,
         }
         for criterion in PRONUNCIATION_CRITERIA
     ]
@@ -124,6 +126,7 @@ def evidence_from_pronunciation(
             "result": float(result["overall"]),
             "curriculum_version": curriculum_version,
             "assessment_version": assessment_version,
+            "evidence_kind": evidence_kind,
         }
     )
     return records

@@ -380,6 +380,7 @@ def record_evidence(
     result: float = 0.0,
     curriculum_version: str = "",
     assessment_version: str = "",
+    evidence_kind: str = "familiar",
 ) -> bool:
     """Registra una evidencia de respuesta por ítem (reproducible y versionada)."""
     if get_user(user_id) is None:
@@ -390,10 +391,11 @@ def record_evidence(
             "INSERT INTO academy_evidence "
             "(user_id, level_id, objective_id, skill, item_id, item_type, "
             "difficulty, source, result, curriculum_version, assessment_version, "
-            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "evidence_kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id, level_id, objective_id, skill, item_id, item_type,
-                difficulty, source, result, curriculum_version, assessment_version, now,
+                difficulty, source, result, curriculum_version, assessment_version,
+                evidence_kind, now,
             ),
         )
     return True
@@ -405,7 +407,7 @@ def list_evidence(user_id: str, level_id: str | None = None) -> list[dict]:
             rows = conn.execute(
                 "SELECT id, user_id, level_id, objective_id, skill, item_id, "
                 "item_type, difficulty, source, result, curriculum_version, "
-                "assessment_version, created_at FROM academy_evidence "
+                "assessment_version, evidence_kind, created_at FROM academy_evidence "
                 "WHERE user_id = ? AND level_id = ? ORDER BY id ASC",
                 (user_id, level_id),
             ).fetchall()
@@ -413,7 +415,7 @@ def list_evidence(user_id: str, level_id: str | None = None) -> list[dict]:
             rows = conn.execute(
                 "SELECT id, user_id, level_id, objective_id, skill, item_id, "
                 "item_type, difficulty, source, result, curriculum_version, "
-                "assessment_version, created_at FROM academy_evidence "
+                "assessment_version, evidence_kind, created_at FROM academy_evidence "
                 "WHERE user_id = ? ORDER BY id ASC",
                 (user_id,),
             ).fetchall()

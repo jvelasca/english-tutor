@@ -120,6 +120,28 @@ def test_result_non_numeric():
     assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
 
 
+# --- evidence_kind (familiar / transfer / novel) ---------------------------
+
+
+def test_evidence_kind_novel_is_valid():
+    lv, record = _valid_record()
+    record["evidence_kind"] = "novel"
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv) == []
+
+
+def test_evidence_kind_unknown_is_invalid():
+    lv, record = _valid_record()
+    record["evidence_kind"] = "raro"
+    errors = academy_svc.evidence_record_errors(record, user_id="u1", level=lv)
+    assert any("evidence_kind" in e for e in errors)
+
+
+def test_evidence_kind_absent_treated_as_familiar():
+    lv, record = _valid_record()
+    # Sin clave `evidence_kind` (retrocompatibilidad) no debe producir error.
+    assert academy_svc.evidence_record_errors(record, user_id="u1", level=lv) == []
+
+
 # --- Los builders de producción generan evidencia válida -------------------
 
 

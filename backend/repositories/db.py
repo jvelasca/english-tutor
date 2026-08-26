@@ -298,6 +298,17 @@ def init_db() -> None:
             )
             """
         )
+        # Migración idempotente: dimensión `evidence_kind` de la evidencia
+        # (familiar/transfer/novel). Toda la evidencia previa queda 'familiar'.
+        evidence_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(academy_evidence)")
+        }
+        if "evidence_kind" not in evidence_cols:
+            conn.execute(
+                "ALTER TABLE academy_evidence ADD COLUMN evidence_kind TEXT "
+                "NOT NULL DEFAULT 'familiar'"
+            )
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS cefr_assessment_snapshots (

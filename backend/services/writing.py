@@ -170,6 +170,7 @@ def evidence_from_writing(
     objective_id: str,
     curriculum_version: str = "",
     assessment_version: str = RUBRIC_VERSION,
+    evidence_kind: str = "familiar",
 ) -> list[dict]:
     """Convierte el resultado de score_writing en registros de evidencia.
 
@@ -188,6 +189,7 @@ def evidence_from_writing(
             "result": float(result["criteria"][criterion]),
             "curriculum_version": curriculum_version,
             "assessment_version": assessment_version,
+            "evidence_kind": evidence_kind,
         }
         for criterion in WRITING_CRITERIA
     ]
@@ -203,6 +205,7 @@ def evidence_from_writing(
             "result": float(result["overall"]),
             "curriculum_version": curriculum_version,
             "assessment_version": assessment_version,
+            "evidence_kind": evidence_kind,
         }
     )
     return records
