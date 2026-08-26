@@ -3,21 +3,28 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 12:15 (UTC+2).
+> Actualizado por última vez: 2026-08-26 13:00 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.17` **commiteada** (Speaking Assessment UI + puente
-conversación→speaking + Writing 3.0). Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16,
-Academy v2 + integridad curricular, hardening, Evidence & Performance Engine, Listening
-1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2 (pedagogía) **P1–P5**; **V1.12** (Student Model
-unificado + Assessment Loop), **V1.13** (Listening 3.0), **V1.14** (Listening Evidence &
-Adaptive Selection), **V1.15** (Speaking 3.0), **V1.16** (Speaking Assessment & Evidence 2.0)
-y **V1.17** (Speaking Assessment UI + puente conversación→speaking + Writing 3.0). El P6
-original (pronunciación fonémica) y los **P1 de listening** de la auditoría V1.14 (delayed
-retention, shadowing real, dictado real, etc.) siguen **pendientes**.
+**Posición actual (2026-08-26):** `v1.18` **commiteada** (P1 de listening de la auditoría V1.14:
+delayed retention + dictado/shadowing reales + escalera de variantes de velocidad). Cerradas
+hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular, hardening,
+Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2 (pedagogía)
+**P1–P5**; **V1.12** (Student Model unificado + Assessment Loop), **V1.13** (Listening 3.0),
+**V1.14** (Listening Evidence & Adaptive Selection), **V1.15** (Speaking 3.0), **V1.16** (Speaking
+Assessment & Evidence 2.0), **V1.17** (Speaking Assessment UI + puente conversación→speaking +
+Writing 3.0) y **V1.18** (P1 listening: retention + dictado/shadowing + variantes). Quedan
+pendientes los P1 de listening que requieren **biblioteca de audio humano** (varios hablantes,
+connected speech real, acentos reales, ruido real — P1.5–P1.8), el **P6** (pronunciación fonémica)
+y (opcional) integrar el turn-taking real del chat en la parte "Interaction" del Speaking
+Assessment.
 
 **Últimos commits:**
+- `feat: V1.18 P1.9 - escalera de variantes de velocidad en listening`
+- `feat: V1.18 P1.3/P1.4 - dictado y shadowing reales en listening`
+- `feat: V1.18 P1.2 - delayed retention en diagnostico de listening`
+- `docs: V1.17 higiene de release + documentacion (1.17.0)`
 - `feat: V1.17 - Writing 3.0 (diagnostico por criterio, nivel continuo y journey longitudinales)`
 - `feat: puente conversacion -> speaking con telemetria objetiva de interaccion`
 - `feat: add speaking assessment UI flow (start to 4 parts to result)`
@@ -72,16 +79,29 @@ incrementos naturales. Ver sección 30. Resumen:
   `WritingJourney`.
 - **Higiene de release**: `config.py`/`package.json` → `1.17.0`; CHANGELOG con entrada 1.17.0.
 
-**Estado verde:** backend `692 tests` + `ruff` limpio; frontend `195 tests` + `tsc` OK;
+**V1.18 commiteada** (`6071bca` retention, `2183849` dictado/shadowing, `26ae6c4` variantes) —
+P1 de listening de la auditoría V1.14. Ver sección 31. Resumen:
+- **Delayed retention (P1.2)**: `delayed_retention` (inmediata vs. retardada, buckets
+  0-2/2-7/7-30/30+ días) integrado en `listening_diagnostic` (clave `retention`) + frontend.
+- **Dictado y shadowing reales (P1.3/P1.4)**: sub-destrezas `dictation`/`shadowing` servidas como
+  tareas de producción (escribir/grablar) con scoring determinista vía `phonetics.composite_score`;
+  columnas `task_type`/`score`, `mean_score` en el diagnóstico y endpoints
+  `/api/listening/dictation|shadowing`.
+- **Escalera de variantes (P1.9)**: `slow`/`normal`/`fast` con cache por variante y botones en el
+  frontend (solo velocidad; acento/ruido quedan como límite de contenido).
+- **Higiene de release**: `config.py`/`package.json` → `1.18.0`; CHANGELOG con entrada 1.18.0.
+
+**Estado verde:** backend `726 tests` + `ruff` limpio; frontend `198 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 30** de este documento (V1.17 — commiteada) y su **lista de pendientes**
-   (30.4).
-3. Atacar los pendientes listados en 30.4: retomar los **P1 de listening** de la auditoría
-   V1.14 (delayed retention, shadowing real, dictado real, varios hablantes, acentos/ruido,
-   variantes de dificultad).
+2. Leer la **sección 31** de este documento (V1.18 — commiteada) y su **lista de pendientes**
+   (31.4).
+3. Atacar los pendientes listados en 31.4: los P1 de listening que requieren **biblioteca de
+   audio humano** (varios hablantes, connected speech real, acentos reales, ruido real — P1.5–P1.8),
+   el **P6** (pronunciación fonémica) y (opcional) el turn-taking real del chat en la parte
+   "Interaction" del Speaking Assessment.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
 
@@ -1421,12 +1441,63 @@ cd frontend && npx tsc --noEmit && npx vitest run
   + `WritingJourney.tsx`, CSS `.writing-*`, montaje en `App.tsx`; tests `test_writing.py`,
   `utils/writing.test.ts`, `api/academy.test.ts`.
 
-### 30.4 Pendiente / siguiente incremento natural
-- **P1 de listening** (auditoría V1.14): delayed retention (P1.2), shadowing real (P1.3), dictado
-  real, varios hablantes, acentos y ruido reales, variantes de dificultad.
+### 30.4 Pendiente → HECHO en V1.18
+- ✅ **P1 de listening** (auditoría V1.14): delayed retention (P1.2), dictado real (P1.4),
+  shadowing real (P1.3) y escalera de variantes de velocidad (P1.9). Ver sección 31.
+- ⏳ **P1.5–P1.8** (varios hablantes, connected speech real, acentos reales, ruido real) requieren
+  **biblioteca de audio humano** (límite de contenido, no de código).
+- ⏳ (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
+  Assessment.
+- ⏳ **P6** (pronunciación fonémica) sigue diferido.
+
+## 31. HECHO (commiteado) — V1.18: P1 de listening (retention + dictado/shadowing + variantes)
+
+> **Origen.** Retoma los P1 de listening que dejó pendientes la auditoría V1.14 (§27.8), lanzados
+> como subagentes autocontenidos en orden: (1) delayed retention (P1.2), (2) dictado + shadowing
+> reales (P1.3/P1.4) y (3) escalera de variantes de audio (P1.9). Filosofía intacta: el LLM solo
+> extrae evidencia (aquí ni siquiera puntúa); todo el scoring determinista y local (Whisper + Piper).
+
+### 31.1 Delayed retention (P1.2) — commit `6071bca`
+- `services/listening.py`: `delayed_retention(attempt_rows, now="")` (pura) — agrupa por
+  `question_id`, la primera exposición es `immediate` y las re-exposiciones a ≥2 días son
+  `delayed`, con buckets `0-2`/`2-7`/`7-30`/`30+` días y `retention_rate` (delayed/immediate).
+  Reutiliza `services.forgetting.days_since`. Integrada en `listening_diagnostic` (kwarg `now` +
+  clave `retention`).
+- `schemas/listening.py`: `ListeningRetentionBucket`/`ListeningRetention` + `retention` en
+  `ListeningDiagnostic`; `domain/listening.py` pasa `now=db._now()`.
+- Frontend: tipos + bloque de retention en `ListeningPractice.tsx` + CSS. Tests
+  `test_listening_retention.py`.
+
+### 31.2 Dictado y shadowing reales (P1.3/P1.4) — commit `2183849`
+- Migración idempotente: `task_type TEXT NOT NULL DEFAULT 'mcq'` y `score REAL` en
+  `listening_attempts`; `record_attempt`/`list_attempts` las manejan.
+- `services/listening.py`: `PRODUCTION_PASS_SCORE=80`, `production_score` (delega en
+  `phonetics.composite_score`) y `production_reference` (`transcript → clean_transcript → script`);
+  `mean_score` por sub-destreza en `listening_diagnostic`.
+- `domain/listening.py`: `submit_production(user_id, question_id, transcript, task_type)` (valida
+  skill, persiste `answer_index=-1` + score continuo). `routers/listening.py`:
+  `POST /api/listening/dictation` y `/api/listening/shadowing`.
+- Frontend: `ListeningPractice.tsx` bifurca por `skill` (dictado → textarea; shadowing →
+  MediaRecorder + `transcribe(blob)`); tipos, API (`submitListeningDictation/Shadowing`) y CSS.
+  Tests `test_listening_production.py` + `api/listening.test.ts`.
+
+### 31.3 Escalera de variantes de velocidad (P1.9) — commit `26ae6c4`
+- `services/listening.py`: `AUDIO_VARIANTS=("slow","normal","fast")`,
+  `VARIANT_SPEED_FACTORS={slow:.75, normal:1.0, fast:1.25}`, `variant_speech_rate`,
+  `variant_length_scale`, `audio_variants`, y `audio_digest(question, variant="normal")` que
+  **preserva** el digest de `normal` (no invalida cache).
+- `domain/listening.py`: `_audio_path(question, variant)`, `get_audio(question_id, variant)` (400
+  si variante inválida), `_public` expone `variants` + `default_variant`. Router: query param
+  `variant`. `schemas/listening.py`: `ListeningAudioVariant`.
+- Frontend: botones Slow/Normal/Fast en `ListeningPractice.tsx` + `getListeningAudioUrl(..., variant)`.
+  Tests `test_listening_variants.py` + `api/listening.test.ts`.
+
+### 31.4 Pendiente / siguiente incremento natural
+- **P1.5–P1.8** — varios hablantes, connected speech real, acentos reales, ruido real: requieren
+  **biblioteca de audio humano** (grabaciones reales o sintetizador multi-voz). Límite de
+  **contenido**, no de código; hoy Piper es una única voz.
 - (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
-  Assessment, para que la señal objetiva se alimente de un intercambio en vivo y no solo de un
-  `conversation_id` asociado manualmente.
+  Assessment (señal objetiva en vivo, no solo `conversation_id` manual).
 - **P6** (pronunciación fonémica) sigue diferido.
 
 

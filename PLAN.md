@@ -11,8 +11,9 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.17.0` (Speaking Assessment UI + puente conversación→speaking +
-  Writing 3.0 sobre el Student Model; sobre la base V1.16 de Speaking Assessment & Evidence 2.0).
+- ✅ Versión estable `1.18.0` (P1 de listening de la auditoría V1.14: delayed retention,
+  dictado + shadowing reales y escalera de variantes de velocidad; sobre la base V1.17 de
+  Speaking Assessment UI + puente conversación→speaking + Writing 3.0).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -200,6 +201,7 @@
 | P2 Error Mastery | `agentes/pedagogia/p2-error-mastery.md` | ✔ hecho |
 | P3–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ✔ hecho |
 | V1.15 Speaking 3.0 | `agentes/pedagogia/p9-speaking-3.0.md` | ✔ hecho |
+| V1.18 P1 listening (retention + dictado/shadowing + variantes) | `agentes/pedagogia/p13-p15.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

@@ -4,6 +4,33 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.18.0] — 2026-08-26
+
+Retoma los **P1 de listening** de la auditoría V1.14 (§27.8). Añade la medición de **delayed
+retention** (precisión inmediata vs. retardada), convierte **dictado** y **shadowing** en tareas
+de producción reales (no opción múltiple) con scoring determinista, y añade una **escalera de
+variantes de velocidad** (slow/normal/fast) al audio servido. El LLM sigue sin puntuar; todo el
+scoring es determinista y local (Whisper + Piper).
+
+### Añadido
+- **Delayed retention (P1.2)**: `delayed_retention(attempt_rows, now="")` en
+  `services/listening.py` — `immediate_accuracy` (primera exposición por pregunta) vs.
+  `delayed_accuracy` (re-exposición a ≥2 días) con buckets `0-2`/`2-7`/`7-30`/`30+` y
+  `retention_rate`; expuesto en `listening_diagnostic` (clave `retention`) y en el frontend.
+- **Dictado real (P1.4) y shadowing real (P1.3)**: sub-destrezas `dictation`/`shadowing` servidas
+  como tareas de producción (escribir lo oído / grabar la repetición), con scoring determinista
+  vía `services/phonetics.composite_score`. Columnas `task_type`/`score` en `listening_attempts`
+  (migración idempotente), `mean_score` por sub-destreza en el diagnóstico, endpoints
+  `POST /api/listening/dictation` y `POST /api/listening/shadowing`, y UI de producción en
+  `ListeningPractice.tsx`.
+- **Escalera de variantes de audio (P1.9)**: `slow`/`normal`/`fast` sobre el mismo contenido
+  (`variant_speech_rate`/`variant_length_scale`/`audio_variants`), con cache por variante
+  (`audio_digest(..., variant=...)` preserva el digest de `normal`), query param `variant` en
+  `GET /api/listening/audio/{id}` y botones de variante en el frontend.
+
+### Cambiado
+- Versión → `1.18.0`.
+
 ## [1.17.0] — 2026-08-26
 
 Cierre de tres incrementos naturales sobre V1.16 (Speaking Assessment & Evidence 2.0). Añade la
