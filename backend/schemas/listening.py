@@ -112,6 +112,21 @@ class ListeningRecurrence(BaseModel):
     recovery_rate: float | None = None
 
 
+class ListeningRetentionBucket(BaseModel):
+    bucket: str
+    attempts: int
+    correct: int
+    accuracy: float | None = None
+
+
+class ListeningRetention(BaseModel):
+    total_questions: int
+    immediate_accuracy: float | None = None
+    delayed_accuracy: float | None = None
+    retention_rate: float | None = None
+    by_bucket: list[ListeningRetentionBucket] = Field(default_factory=list)
+
+
 class ListeningDiagnostic(BaseModel):
     subskills: list[ListeningSubskillOut]
     weak: list[str]
@@ -122,6 +137,7 @@ class ListeningDiagnostic(BaseModel):
     by_topic: list[ListeningTopicOut] = Field(default_factory=list)
     trend: ListeningTrend
     recurrence: ListeningRecurrence
+    retention: ListeningRetention
     bank_version: str = ""
     # Resumen de integridad de evidencia: cuántos intentos tienen audio verificado
     # (realización = declaración) y cuántos presentan brecha (metadata no respaldada).

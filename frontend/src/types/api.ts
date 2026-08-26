@@ -326,6 +326,21 @@ export interface ListeningRecurrence {
   recovery_rate: number | null;
 }
 
+export interface ListeningRetentionBucket {
+  bucket: string;
+  attempts: number;
+  correct: number;
+  accuracy: number | null;
+}
+
+export interface ListeningRetention {
+  total_questions: number;
+  immediate_accuracy: number | null;
+  delayed_accuracy: number | null;
+  retention_rate: number | null;
+  by_bucket: ListeningRetentionBucket[];
+}
+
 export interface ListeningRealizationSummary {
   attempts: number;
   verified: number;
@@ -342,6 +357,7 @@ export interface ListeningDiagnostic {
   by_topic: ListeningTopicProgress[];
   trend: ListeningTrend;
   recurrence: ListeningRecurrence;
+  retention: ListeningRetention;
   bank_version: string;
   realization: ListeningRealizationSummary;
 }

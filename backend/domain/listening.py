@@ -123,7 +123,7 @@ async def get_stats(user_id: str) -> dict:
 async def get_diagnostic(user_id: str) -> dict:
     """Diagnóstico de sub-destrezas derivado de los intentos registrados."""
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
-    return listening_diagnostic(attempts)
+    return listening_diagnostic(attempts, now=db._now())
 
 
 async def get_audio(question_id: str) -> tuple[bytes | None, int | None]:

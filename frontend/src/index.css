@@ -3824,6 +3824,31 @@ body.is-resizing {
   color: var(--color-text-dim);
 }
 
+/* Comprensión auditiva: retención retardada (V1.18 P1.2). */
+.listening-retention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.listening-retention-summary {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
+.listening-retention-rate.high {
+  color: var(--color-success);
+}
+
+.listening-retention-rate.mid {
+  color: var(--color-warning);
+}
+
+.listening-retention-rate.low {
+  color: var(--color-error);
+}
+
 /* Comprensión auditiva: honestidad del audio (V1.14). */
 .listening-audio-type {
   margin: 0;

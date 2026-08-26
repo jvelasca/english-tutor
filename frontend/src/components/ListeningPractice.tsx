@@ -31,6 +31,23 @@ function trendLabel(direction: string): string {
   }
 }
 
+// Etiqueta legible de los buckets de retención retardada (días desde la primera
+// exposición): "0-2" → "0–2 días", etc.
+function retentionBucketLabel(bucket: string): string {
+  switch (bucket) {
+    case "0-2":
+      return "0–2 días";
+    case "2-7":
+      return "2–7 días";
+    case "7-30":
+      return "7–30 días";
+    case "30+":
+      return "más de 30 días";
+    default:
+      return bucket;
+  }
+}
+
 // Etiqueta honesta del tipo de audio (P0-1): no llamamos "audio real" a la voz
 // sintética local; cada tipo se presenta por lo que realmente es.
 function audioTypeLabel(audioType: string): string {
@@ -307,6 +324,44 @@ export function ListeningPractice({
                   {diagnostic.recurrence.recovered}
                 </p>
               )}
+              <div className="listening-retention">
+                <p className="listening-retention-summary">
+                  Retention:{" "}
+                  {diagnostic.retention.immediate_accuracy !== null
+                    ? `${diagnostic.retention.immediate_accuracy}%`
+                    : "—"}{" "}
+                  inmediata →{" "}
+                  {diagnostic.retention.delayed_accuracy !== null
+                    ? `${diagnostic.retention.delayed_accuracy}%`
+                    : "—"}{" "}
+                  retardada
+                  {diagnostic.retention.retention_rate !== null && (
+                    <span
+                      className={`listening-retention-rate ${
+                        diagnostic.retention.retention_rate >= 0.9
+                          ? "high"
+                          : diagnostic.retention.retention_rate >= 0.7
+                            ? "mid"
+                            : "low"
+                      }`}
+                    >
+                      {" "}
+                      · retención{" "}
+                      {Math.round(diagnostic.retention.retention_rate * 100)}%
+                    </span>
+                  )}
+                </p>
+                {diagnostic.retention.by_bucket.length > 0 && (
+                  <ul className="listening-pills">
+                    {diagnostic.retention.by_bucket.map((b) => (
+                      <li key={b.bucket} className="listening-pill">
+                        {retentionBucketLabel(b.bucket)} ·{" "}
+                        {b.accuracy !== null ? `${b.accuracy}%` : "—"}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
           {stats?.completed && (

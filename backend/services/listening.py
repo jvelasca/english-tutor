@@ -6,6 +6,7 @@ import hashlib
 from pydantic import BaseModel, Field, ValidationError, computed_field
 
 from services.curriculum import LISTENING_BANK_VERSION
+from services.forgetting import days_since
 
 LISTENING_SUBSKILLS: tuple[str, ...] = (
     "gist",
@@ -1286,16 +1287,128 @@ def recurrence_stats(rows: list[dict]) -> dict:
     }
 
 
-def listening_diagnostic(attempt_rows: list[dict]) -> dict:
+RETENTION_BUCKETS: tuple[str, ...] = ("0-2", "2-7", "7-30", "30+")
+
+
+def delayed_retention(attempt_rows: list[dict], now: str = "") -> dict:
+    """Retención retardada: precisión inmediata (Day 0) vs. re-exposiciones (≥2 días).
+
+    Agrupa los intentos por `question_id`. La primera exposición de cada pregunta
+    (la fila más antigua por `created_at`) es el baseline *inmediato* (Day 0); el
+    resto son re-exposiciones (*delayed*).
+
+    - `immediate_accuracy`: % de acierto en las primeras exposiciones (`None` sin
+      datos).
+    - `delayed_accuracy`: % de acierto en las re-exposiciones con **≥ 2 días**
+      desde su primera exposición (`None` sin datos).
+    - `retention_rate`: `delayed_accuracy / immediate_accuracy` redondeado a 3
+      decimales, o `None` si falta alguna precisión o `immediate_accuracy == 0`.
+    - `by_bucket`: re-exposiciones agrupadas por días desde su primera exposición
+      (solo re-exposiciones; se excluye la primera de cada pregunta y las filas sin
+      `created_at`):
+        - `"0-2"`  → `0 <= days < 2`
+        - `"2-7"`  → `2 <= days < 7`
+        - `"7-30"` → `7 <= days < 30`
+        - `"30+"`  → `days >= 30`
+    - `total_questions`: nº de preguntas distintas con al menos una exposición.
+
+    `now` es el instante de referencia (ISO). Por defecto (`""`) usa el máximo
+    `created_at` de las filas. Las re-exposiciones posteriores a `now` se ignoran
+    (aún no han ocurrido desde esa referencia).
+    """
+    by_question: dict[str, list[dict]] = {}
+    for row in attempt_rows:
+        question_id = row.get("question_id")
+        if question_id is None:
+            continue
+        by_question.setdefault(question_id, []).append(row)
+
+    if not by_question:
+        return {
+            "total_questions": 0,
+            "immediate_accuracy": None,
+            "delayed_accuracy": None,
+            "retention_rate": None,
+            "by_bucket": [],
+        }
+
+    created_ats = [r.get("created_at") for r in attempt_rows if r.get("created_at")]
+    effective_now = now or (max(created_ats) if created_ats else "")
+
+    immediate_rows: list[dict] = []
+    delayed_rows: list[dict] = []
+    buckets: dict[str, list[dict]] = {bucket: [] for bucket in RETENTION_BUCKETS}
+
+    for rows in by_question.values():
+        ordered = sorted(
+            rows,
+            key=lambda r: (r.get("created_at") is None, r.get("created_at") or ""),
+        )
+        first = ordered[0]
+        immediate_rows.append(first)
+        first_created = first.get("created_at")
+        if not first_created:
+            continue
+        for r in ordered[1:]:
+            re_created = r.get("created_at")
+            if not re_created:
+                continue
+            if effective_now and days_since(effective_now, re_created) > 0:
+                continue  # re-exposición posterior a la referencia
+            days = days_since(first_created, re_created)
+            if days >= 30:
+                buckets["30+"].append(r)
+            elif days >= 7:
+                buckets["7-30"].append(r)
+            elif days >= 2:
+                buckets["2-7"].append(r)
+            else:
+                buckets["0-2"].append(r)
+            if days >= 2:
+                delayed_rows.append(r)
+
+    immediate_accuracy = _accuracy(immediate_rows)
+    delayed_accuracy = _accuracy(delayed_rows)
+
+    if immediate_accuracy in (None, 0) or delayed_accuracy is None:
+        retention_rate = None
+    else:
+        retention_rate = round(delayed_accuracy / immediate_accuracy, 3)
+
+    by_bucket = [
+        {
+            "bucket": bucket,
+            "attempts": len(buckets[bucket]),
+            "correct": sum(1 for r in buckets[bucket] if r.get("correct")),
+            "accuracy": _accuracy(buckets[bucket]),
+        }
+        for bucket in RETENTION_BUCKETS
+        if buckets[bucket]
+    ]
+
+    return {
+        "total_questions": len(by_question),
+        "immediate_accuracy": immediate_accuracy,
+        "delayed_accuracy": delayed_accuracy,
+        "retention_rate": retention_rate,
+        "by_bucket": by_bucket,
+    }
+
+
+def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
     """Perfil de sub-destrezas de listening y recomendación (vista derivada).
 
     `attempt_rows` son las filas de `listening_attempts` del usuario (con `skill`,
-    `difficulty`, `response_time_ms`, `replay_count`, `correct`). Devuelve un dict
-    con `subskills` (lista de {skill, attempts, correct, accuracy, first_pass_accuracy,
-    avg_response_ms, avg_replay_count, automaticity, review_due}, ordenadas por
-    LISTENING_SUBSKILLS y luego alfabético), `weak` (skills con `review_due` True),
-    `recommendation` (texto corto), `first_pass_accuracy` global, `automaticity`
-    global y `bank_version`."""
+    `difficulty`, `response_time_ms`, `replay_count`, `correct`, `created_at`).
+    Devuelve un dict con `subskills` (lista de {skill, attempts, correct, accuracy,
+    first_pass_accuracy, avg_response_ms, avg_replay_count, automaticity,
+    review_due}, ordenadas por LISTENING_SUBSKILLS y luego alfabético), `weak`
+    (skills con `review_due` True), `recommendation` (texto corto),
+    `first_pass_accuracy` global, `automaticity` global, `retention` (ver
+    `delayed_retention`) y `bank_version`.
+
+    `now` (ISO, opcional) es el instante de referencia para la retención; por
+    defecto se deriva del máximo `created_at` de las filas."""
     groups: dict[str, list[dict]] = {}
     for row in attempt_rows:
         skill = row.get("skill") or ""
@@ -1429,6 +1542,7 @@ def listening_diagnostic(attempt_rows: list[dict]) -> dict:
         "by_topic": accuracy_by_topic(attempt_rows),
         "trend": recent_trend(attempt_rows),
         "recurrence": recurrence_stats(attempt_rows),
+        "retention": delayed_retention(attempt_rows, now),
         "bank_version": LISTENING_BANK_VERSION,
         "realization": realization_summary,
     }
