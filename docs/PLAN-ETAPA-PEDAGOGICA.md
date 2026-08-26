@@ -26,7 +26,8 @@ aprendizaje real:
 | **P4** | Listening como competencia (dificultad/tema/tendencia/tiempo/reincidencia) | Medio | — | ✔ hecho |
 | **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ✔ hecho |
 | **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | 🔁 diferido (a favor de Student Model 2.0) |
-| **V1.12** | Student Model 2.0 + Assessment Loop (unificación + snapshots + naming CEFR + Speaking 2.0) | Alto (bucle completo) | P5 | ⏳ en curso |
+| **V1.12** | Student Model 2.0 + Assessment Loop (unificación + snapshots + naming CEFR + Speaking 2.0) | Alto (bucle completo) | P5 | ✔ hecho |
+| **V1.13** | Listening 3.0 (audio real + cierre A1→B2 + evidencia por sub-destreza) | Alto (contenido + audio) | P4, V1.12 | 📋 preparado |
 
 ## Detalle por track
 
@@ -70,6 +71,13 @@ de la Academy). `/api/profile` pasa a ser proyección del modelo unificado; se c
 `readiness`, versión de release) y se añaden snapshots históricos de evaluación reproducibles
 (`cefr_assessment_snapshots` con `instrument_version`). Dos subagentes: `p6-speaking-2.0` y
 `p7-student-model-unificado` (briefings en `agentes/pedagogia/`).
+
+### V1.13 — Listening 3.0 (audio real + cierre A1→B2)
+Convertir el listening de "scripts + TTS genérico" a **audio real por ítem** (pre-renderizado y
+cacheado con Piper), servir `GET /api/listening/audio/{question_id}`, cerrar el currículo
+**A1→B2** (`b2.json` + `LEVEL_ORDER`), y garantizar evidencia independiente por sub-destreza.
+Briefing en `agentes/pedagogia/p8-listening-3.0.md` (formato P1–P5). Honesto con el límite local:
+Piper es una sola voz; los acentos/ruido/hablantes múltiples son límite de contenido, no de código.
 
 ## Reglas de proceso
 

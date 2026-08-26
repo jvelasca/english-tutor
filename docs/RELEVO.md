@@ -1104,7 +1104,8 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `ruff` limpio.
 
 ### 25.4 Pendiente / siguiente incremento natural
-- **V1.13** — Listening 3.0 (audio real B1/B2). **V1.14** — Speaking 2.0 (free-response/role-play).
+- **V1.13** — Listening 3.0 (audio real B1/B2): briefing listo en
+  `agentes/pedagogia/p8-listening-3.0.md`. **V1.14** — Speaking 2.0 (free-response/role-play).
   Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
 
