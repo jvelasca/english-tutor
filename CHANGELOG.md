@@ -4,6 +4,45 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.21.0] — 2026-08-26
+
+Cierra la **auditoría pedagógica A1→B2** de V1.21 (los seis P0/P1 del diagnóstico externo) y añade
+una **nueva UI de 3 paneles** con barra de estado y navegación por destrezas. Filosofía intacta: el
+LLM solo extrae evidencia; todo el scoring es determinista, local y honesto (lo no verificable se
+declara como tal, no se inventa).
+
+### Añadido
+- **Corpus de audio humano 1.0 (P0-1)**: `AudioLibraryEntry` ampliado con 11 metadatos auditivos
+  (`gender`, `age_band`, `region`, `speech_rate`, `spontaneity`, `recording_environment`, `overlap`,
+  `connected_speech`, `prosody`, `task_type`, `cefr`) usando `Literal`; `AUDIO_LIBRARY_VERSION` →
+  `1.1.0`; `library_summary` con desgloses `by_cefr`/`by_speaker_id`/`by_accent`/`by_region`; CLI
+  `backend/scripts/import_audio.py` (`wav_metadata` con solo `wave`).
+- **Validación determinista audio↔metadata (P0-2)**: `wav_probe`, modelo `AudioValidationIssue`,
+  `validate_audio_entry`/`validate_audio_entries` (duración verificable; `speaker_count` como proxy
+  por canales; `speech_rate`/`noise_level`/`accent`/`recording_environment`/`prosody` como `info` "no
+  verificable" sin inventar SNR) y flag `--validate-all` en el CLI de importación.
+- **Separación del proxy de pronunciación del audio real (P0-3)**: `phoneme_accuracy` →
+  `phoneme_accuracy_proxy` y `prosody_score` → `prosody_proxy`; `pronunciation_source:
+  "transcript"` y rótulos honestos "proxy de texto / sin audio" en el frontend. Sin cambios de pesos.
+- **Evidencia familiar/transfer/novel (P1-4)**: dimensión `evidence_kind` en el Student Model
+  (columna `evidence_kind` con migración idempotente), `generalized_mastery_score` ponderado por
+  tipo de evidencia y `evidence_by_kind` en `build_skill_profile`.
+- **Interaction 3.0 (P1-5)**: `turn_balance` con meseta `[0.3, 0.7]`, renombrado del objetivo
+  `turn_completion` → `turn_duration` (desambiguado del semántico del LLM), señal `repair` añadida y
+  reponderación objetivo (0.3) / subdimensiones (`turn_balance` 0.3 + `turn_duration` 0.7).
+- **Matriz de assessment CEFR A1–B2 (P1-6)**: `backend/curriculum/cefr_matrix.json` + cargador
+  `services/cefr_matrix.py`; `adaptive.readiness` consume umbrales de `minimum_mastery`/
+  `minimum_confidence`/`minimum_evidence` y gates `transfer_required`/`novel_required`
+  (retrocompatible), con campos nuevos en `ReadinessSkillOut`.
+- **UI de 3 paneles**: barra superior (logo + avatar de usuario + navegación de 6 destrezas +
+  Academy + manos libres/modelo/herramientas/ayuda), panel central de desarrollo, panel derecho de
+  análisis y **barra de estado inferior** (API/BD/Ollama/STT/TTS + URL LAN); sistema de iconos SVG
+  coherente (`Icons.tsx`), `SectionNav`, `ReadingPractice`, `StatusBar` y persistencia de la sección
+  por usuario. Script `launcher/allow-firewall.ps1` para exponer 5173/8000 en la red local.
+
+### Cambiado
+- Versión → `1.21.0`.
+
 ## [1.20.0] — 2026-08-26
 
 Cierra los tres incrementos naturales pendientes de V1.19: la **pronunciación fonémica (P6)**, la

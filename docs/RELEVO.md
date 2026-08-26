@@ -3,29 +3,31 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 15:40 (UTC+2).
+> Actualizado por última vez: 2026-08-26 19:30 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.20` **commiteada** (pronunciación fonémica P6, turn-taking
-real del chat en "Interaction" del Speaking Assessment e infraestructura de biblioteca de audio
-humano). Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
-curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0,
-Etapa 2 (pedagogía) **P1–P5**; **V1.12** (Student Model unificado + Assessment Loop), **V1.13**
-(Listening 3.0), **V1.14** (Listening Evidence & Adaptive Selection), **V1.15** (Speaking 3.0),
-**V1.16** (Speaking Assessment & Evidence 2.0), **V1.17** (Speaking Assessment UI + puente
-conversación→speaking + Writing 3.0), **V1.18** (P1 listening: retention + dictado/shadowing +
-variantes), **V1.19** (refresco UI profesional) y **V1.20** (P6 pronunciación fonémica +
-turn-taking real + infraestructura de audio humano). Queda como siguiente incremento natural el
-**contenido** de la biblioteca de audio humano (grabaciones reales de varios hablantes, connected
-speech real, acentos reales, ruido real) — la infraestructura ya está lista (P1.5–P1.8).
+**Posición actual (2026-08-26):** `v1.21` **lista para commit de higiene de release** (la versión ya
+está elevada a `1.21.0` en `config.py`/`package.json`/`CHANGELOG`). Cierra la **auditoría
+pedagógica A1→B2** de V1.21 con los seis P0/P1 del diagnóstico externo — corpus de audio humano 1.0,
+validación determinista audio↔metadata, separación del proxy de pronunciación del audio real,
+evidencia familiar/transfer/novel, Interaction 3.0 y matriz de assessment CEFR — y añade una **nueva
+UI de 3 paneles** (barra superior de destrezas + panel central de desarrollo + panel derecho de
+análisis + barra de estado inferior) con persistencia por usuario y script de firewall para LAN.
+Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
+hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
+(pedagogía) **P1–P5**; **V1.12** → **V1.20** (ver CHANGELOG). Queda como siguiente incremento
+natural el **contenido** de la biblioteca de audio humano (grabaciones reales de varios hablantes,
+connected speech real, acentos reales, ruido real) y el **Adaptive Learning Engine** de V1.22.
 
 **Últimos commits:**
+- `feat: validación determinista audio↔metadata`
+- `refactor: separar proxy de pronunciación (transcript) del audio real`
+- `feat: corpus de audio humano 1.0 (esquema + scaffolding + import)`
+- `feat: matriz de assessment CEFR A1-B2 (thresholds + confianza + transfer)`
+- `feat: evidencia familiar/transfer/novel + dominio generalizado`
+- `feat: interaction 3.0 (balance con meseta, turn_duration, repair)`
 - `docs: V1.20 higiene de release + documentacion (1.20.0)`
-- `feat: V1.20 P1.5-P1.8 - infraestructura de biblioteca de audio humano (manifest + servir grabado)`
-- `feat: V1.20 turn-taking real del chat en la parte Interaction del Speaking Assessment`
-- `feat: V1.20 P6 - pronunciacion fonemica (alineacion de fonemas + prosodia)`
-- `docs: V1.19 higiene de release + documentacion (1.19.0)`
 - `feat: V1.19 - refresco UI profesional (InsightCard + header + chat + responsive)`
 - `feat: V1.18 P1.9 - escalera de variantes de velocidad en listening`
 - `feat: V1.18 P1.3/P1.4 - dictado y shadowing reales en listening`

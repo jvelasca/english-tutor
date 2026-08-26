@@ -11,11 +11,11 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.20.0` (pronunciación fonémica P6, turn-taking real del chat en la parte
-  "Interaction" del Speaking Assessment e infraestructura de biblioteca de audio humano; sobre la
-  base V1.19 de refresco visual del frontend, V1.18 de P1 listening — delayed retention, dictado +
-  shadowing reales y escalera de variantes de velocidad — y V1.17 de Speaking Assessment UI +
-  puente conversación→speaking + Writing 3.0).
+- ✅ Versión estable `1.21.0` (cierre de la auditoría pedagógica A1→B2: corpus de audio humano 1.0 +
+  validación determinista audio↔metadata + separación del proxy de pronunciación del audio real +
+  evidencia familiar/transfer/novel + Interaction 3.0 + matriz de assessment CEFR; y nueva UI de 3
+  paneles con barra de estado y navegación por destrezas). Sobre la base V1.20 de pronunciación
+  fonémica P6, turn-taking real e infraestructura de biblioteca de audio humano.
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
