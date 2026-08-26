@@ -406,6 +406,66 @@ export interface SpeakingJourneyOut {
   steps: SpeakingJourneyStep[];
 }
 
+// --- Writing 3.0 (diagnóstico longitudinal por criterio de rúbrica) ---
+
+export interface WritingCriterionProgress {
+  criterion: string;
+  attempts: number;
+  mean: number | null;
+  min: number | null;
+  max: number | null;
+  review_due: boolean;
+  // Campos longitudinales añadidos en V1.17 (media de la ventana reciente,
+  // media histórica, confianza y estabilidad del criterio).
+  recent_score?: number | null;
+  lifetime_score?: number | null;
+  confidence?: number | null;
+  stability?: number | null;
+}
+
+export interface WritingTrend {
+  recent_mean: number | null;
+  prior_mean: number | null;
+  delta: number | null;
+  direction: string;
+}
+
+export interface WritingDiagnostic {
+  criteria: WritingCriterionProgress[];
+  weak: string[];
+  recommendation: string;
+  attempts: number;
+  overall_mean: number | null;
+  overall_recent: number | null;
+  trend: WritingTrend;
+  rubric_version: string;
+}
+
+// --- Writing 3.0: nivel continuo y journey (V1.17) ---
+
+export interface WritingLevelOut {
+  level: string | null;
+  numeric: number | null;
+  score: number | null;
+  confidence: number;
+  attempts: number;
+}
+
+export interface WritingJourneyStep {
+  at: string;
+  numeric: number;
+  level: string;
+  confidence: number;
+}
+
+export interface WritingJourneyOut {
+  current_level: string | null;
+  current_numeric: number | null;
+  current_confidence: number;
+  attempts: number;
+  steps: WritingJourneyStep[];
+}
+
 // --- Speaking Assessment (V1.17): instrumento de 4 partes + resultado ---
 
 export interface SpeakingAssessmentPartInfo {

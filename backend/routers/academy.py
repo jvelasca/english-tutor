@@ -48,6 +48,9 @@ from schemas.academy import (
     StudyPlanOut,
     StudyPlanRequest,
     TodayPlanOut,
+    WritingDiagnostic,
+    WritingJourneyOut,
+    WritingLevelOut,
     WritingResultOut,
     WritingSubmitRequest,
     WritingTaskResultOut,
@@ -348,6 +351,21 @@ async def speaking_level(user: dict = Depends(current_user)) -> dict:
 @router.get("/api/academy/speaking/journey", response_model=SpeakingJourneyOut)
 async def speaking_journey(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_speaking_journey(user["id"])
+
+
+@router.get("/api/academy/writing/diagnostic", response_model=WritingDiagnostic)
+async def writing_diagnostic(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_writing_diagnostic(user["id"])
+
+
+@router.get("/api/academy/writing/level", response_model=WritingLevelOut)
+async def writing_level(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_writing_level(user["id"])
+
+
+@router.get("/api/academy/writing/journey", response_model=WritingJourneyOut)
+async def writing_journey(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_writing_journey(user["id"])
 
 
 @router.post(

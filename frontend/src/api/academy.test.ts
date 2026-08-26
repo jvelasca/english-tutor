@@ -10,6 +10,9 @@ import {
   getSpeakingDiagnostic,
   getSpeakingJourney,
   getSpeakingLevel,
+  getWritingDiagnostic,
+  getWritingJourney,
+  getWritingLevel,
   nextAdaptivePlacement,
   putGoal,
   recordAttempts,
@@ -215,6 +218,48 @@ describe("academy api", () => {
     await getSpeakingJourney("u1");
     expect(fn.mock.calls[0][0]).toBe(
       "/api/academy/speaking/journey?user_id=u1",
+    );
+  });
+
+  it("getWritingDiagnostic incluye user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      criteria: [],
+      weak: [],
+      recommendation: "",
+      attempts: 0,
+      overall_mean: null,
+      trend: { direction: "n/a" },
+      rubric_version: "1.0.0",
+    });
+    await getWritingDiagnostic("u1");
+    expect(fn.mock.calls[0][0]).toBe(
+      "/api/academy/writing/diagnostic?user_id=u1",
+    );
+  });
+
+  it("getWritingLevel incluye user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      level: "B1",
+      numeric: 3.1,
+      score: 0.62,
+      confidence: 0.86,
+      attempts: 12,
+    });
+    await getWritingLevel("u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/writing/level?user_id=u1");
+  });
+
+  it("getWritingJourney incluye user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      current_level: "B1",
+      current_numeric: 3.1,
+      current_confidence: 0.86,
+      attempts: 12,
+      steps: [],
+    });
+    await getWritingJourney("u1");
+    expect(fn.mock.calls[0][0]).toBe(
+      "/api/academy/writing/journey?user_id=u1",
     );
   });
 

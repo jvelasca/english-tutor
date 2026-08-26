@@ -649,6 +649,62 @@ class WritingTaskResultOut(BaseModel):
     evidence: dict
 
 
+class WritingCriterionOut(BaseModel):
+    criterion: str
+    attempts: int
+    mean: float | None = None
+    min: float | None = None
+    max: float | None = None
+    review_due: bool
+    # Señales del Student Model (V1.17): EMA, lifetime, consistencia y
+    # estabilidad por criterio. El diagnóstico es una VISTA de estas señales.
+    recent_score: float | None = None
+    lifetime_score: float | None = None
+    confidence: float | None = None
+    stability: float | None = None
+
+
+class WritingTrend(BaseModel):
+    recent_mean: float | None = None
+    prior_mean: float | None = None
+    delta: float | None = None
+    direction: str
+
+
+class WritingDiagnostic(BaseModel):
+    criteria: list[WritingCriterionOut]
+    weak: list[str]
+    recommendation: str
+    attempts: int
+    overall_mean: float | None = None
+    overall_recent: float | None = None
+    trend: WritingTrend
+    rubric_version: str = ""
+
+
+class WritingLevelOut(BaseModel):
+    level: str | None = None
+    numeric: float | None = None
+    score: float | None = None
+    confidence: float = 0.0
+    attempts: int = 0
+
+
+class WritingJourneyStep(BaseModel):
+    at: str
+    numeric: float
+    level: str
+    confidence: float
+
+
+class WritingJourneyOut(BaseModel):
+    current_level: str | None = None
+    current_numeric: float | None = None
+    current_confidence: float = 0.0
+    attempts: int = 0
+    steps: list[WritingJourneyStep] = Field(default_factory=list)
+
+
 class PronunciationSubmitRequest(BaseModel):
     level_id: str = Field(min_length=1, max_length=16)
     objective_id: str = Field(min_length=1, max_length=64)

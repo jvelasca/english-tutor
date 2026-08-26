@@ -23,6 +23,8 @@ import { SpeakingPanel } from "./components/SpeakingPanel";
 import { TodayPlan } from "./components/TodayPlan";
 import { TutorQualityPanel } from "./components/TutorQualityPanel";
 import { UserMenu } from "./components/UserMenu";
+import { WritingJourney } from "./components/WritingJourney";
+import { WritingPanel } from "./components/WritingPanel";
 import { clampRight, clampSidebar } from "./utils/layout";
 import type { SessionStep, TutorMode } from "./types/api";
 
@@ -413,6 +415,8 @@ export default function App() {
             <SpeakingDiagnostic userId={currentUserId} />
             <SpeakingPanel userId={currentUserId} />
             <SpeakingJourney userId={currentUserId} />
+            <WritingPanel userId={currentUserId} />
+            <WritingJourney userId={currentUserId} />
             <SpeakingAssessment userId={currentUserId} onAttempt={onAttempt} />
             <TutorQualityPanel messages={messages} />
             <div id="listening-practice">

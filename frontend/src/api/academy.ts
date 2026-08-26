@@ -29,6 +29,9 @@ import type {
   StudentModel,
   StudyPlanStep,
   TodayPlan,
+  WritingDiagnostic,
+  WritingJourneyOut,
+  WritingLevelOut,
 } from "../types/api";
 
 function userQuery(userId: string): string {
@@ -191,6 +194,28 @@ export function getSpeakingJourney(
 ): Promise<SpeakingJourneyOut> {
   return getJson<SpeakingJourneyOut>(
     `/api/academy/speaking/journey${userQuery(userId)}`,
+  );
+}
+
+export function getWritingDiagnostic(
+  userId: string,
+): Promise<WritingDiagnostic> {
+  return getJson<WritingDiagnostic>(
+    `/api/academy/writing/diagnostic${userQuery(userId)}`,
+  );
+}
+
+export function getWritingLevel(userId: string): Promise<WritingLevelOut> {
+  return getJson<WritingLevelOut>(
+    `/api/academy/writing/level${userQuery(userId)}`,
+  );
+}
+
+export function getWritingJourney(
+  userId: string,
+): Promise<WritingJourneyOut> {
+  return getJson<WritingJourneyOut>(
+    `/api/academy/writing/journey${userQuery(userId)}`,
   );
 }
 

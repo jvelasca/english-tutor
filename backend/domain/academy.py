@@ -582,6 +582,33 @@ async def get_speaking_journey(user_id: str) -> dict:
     return speaking_svc.speaking_journey(speaking_rows)
 
 
+async def get_writing_diagnostic(user_id: str) -> dict:
+    """Diagnóstico longitudinal de writing (V1.17).
+
+    Deriva el perfil por criterio de rúbrica a partir de la evidencia de writing
+    registrada en `academy_evidence`, y lo expone con tendencia temporal y
+    criterios débiles.
+    """
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    writing_rows = [r for r in rows if r.get("skill") == "writing"]
+    now = datetime.now(timezone.utc).isoformat()
+    return writing_svc.writing_diagnostic(writing_rows, now=now)
+
+
+async def get_writing_level(user_id: str) -> dict:
+    """Writing Assessment 1.0: nivel CEFR continuo de writing + confianza."""
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    writing_rows = [r for r in rows if r.get("skill") == "writing"]
+    return writing_svc.writing_level(writing_rows)
+
+
+async def get_writing_journey(user_id: str) -> dict:
+    """Writing Journey (CEFR): trayectoria de nivel y confianza de writing."""
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    writing_rows = [r for r in rows if r.get("skill") == "writing"]
+    return writing_svc.writing_journey(writing_rows)
+
+
 # --- Speaking Assessment 1.0 (sesión trazable + instrumento versionado) ----
 
 

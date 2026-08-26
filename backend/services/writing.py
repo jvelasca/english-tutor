@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import re
 
+from services import adaptive
 from services.curriculum import RUBRIC_VERSION
+from services.forgetting import review_due as forgetting_review_due
 from services.grammar import find_errors
 
 # Dimensiones del rubric de writing (alineadas con CEFR).
@@ -31,6 +33,20 @@ CRITERION_WEIGHTS: dict[str, float] = {
     "coherence": 0.10,
     "register": 0.10,
 }
+
+# Parámetros del diagnóstico longitudinal de writing (V1.17). Un criterio está
+# "débil" si no se ha practicado (attempts == 0) o si su media está por debajo del
+# umbral con un mínimo de intentos (evidencia suficiente).
+WRITING_WEAK_THRESHOLD = 0.6
+WRITING_TREND_WINDOW = 5
+
+# --- Student Model ownership del diagnóstico (V1.17) ------------------------
+# El diagnóstico deja de ser un agregador mean/min/max: cada criterio expone las
+# mismas señales que el Student Model (EMA de recent_score y confidence, stability
+# y review_due por olvido), de modo que el diagnóstico es una VISTA de esas señales
+# y no un cálculo estadístico propio.
+WRITING_EMA_ALPHA = 0.5
+WRITING_CONFIDENCE_THRESHOLD = 0.6
 
 # Referencia léxica: 5 palabras de contenido ≈ vocabulario adecuado.
 _LEXICAL_REFERENCE = 5.0
@@ -190,3 +206,251 @@ def evidence_from_writing(
         }
     )
     return records
+
+
+def _mean_trend(rows: list[dict], window: int = WRITING_TREND_WINDOW) -> dict:
+    """Tendencia de la media de `result` (0..1) de los últimos `window` vs previos.
+
+    Las filas llegan en orden cronológico (id ASC). Devuelve
+    `{recent_mean, prior_mean, delta, direction}` con `direction` en
+    `{"up", "down", "flat", "n/a"}`. Adapta `listening.recent_trend` (que trabaja
+    sobre `correct`) a medias de scores continuos.
+    """
+    if not rows:
+        return {
+            "recent_mean": None,
+            "prior_mean": None,
+            "delta": None,
+            "direction": "n/a",
+        }
+
+    def _mean(subset: list[dict]) -> float:
+        return round(sum(r["result"] for r in subset) / len(subset), 3)
+
+    if len(rows) <= window:
+        return {
+            "recent_mean": _mean(rows),
+            "prior_mean": None,
+            "delta": None,
+            "direction": "n/a",
+        }
+    recent = _mean(rows[-window:])
+    prior = _mean(rows[:-window])
+    delta = round(recent - prior, 3)
+    if delta > 0:
+        direction = "up"
+    elif delta < 0:
+        direction = "down"
+    else:
+        direction = "flat"
+    return {
+        "recent_mean": recent,
+        "prior_mean": prior,
+        "delta": delta,
+        "direction": direction,
+    }
+
+
+def _ema(values: list[float], alpha: float = WRITING_EMA_ALPHA) -> float:
+    """EMA de una secuencia cronológica de valores (0..1); 0.0 si está vacía.
+
+    Refleja el rendimiento *reciente* (más peso a lo último), frente a la media
+    aritmética que pondera toda la historia por igual (misma idea que
+    `next_mastery_state`).
+    """
+    if not values:
+        return 0.0
+    recent = float(values[0])
+    for value in values[1:]:
+        recent = alpha * float(value) + (1 - alpha) * recent
+    return round(recent, 3)
+
+
+def writing_diagnostic(evidence_rows: list[dict], now: str = "") -> dict:
+    """Vista longitudinal de writing por criterio (Student Model ownership, V1.17).
+
+    `evidence_rows` son las filas de `academy_evidence` con `skill="writing"`
+    (cada fila tiene `item_id` = criterio del rubric y `result` = score 0..1, más
+    una fila `item_id="overall"` por intento). En lugar de un agregador mean/min/max
+    propio, cada criterio expone las señales del Student Model:
+    - `recent_score`: EMA del rendimiento (estado reciente, no toda la historia).
+    - `lifetime_score`/`mean`: media de todo el historial.
+    - `confidence`: EMA de "supera el umbral" (consistencia).
+    - `stability`: dominio × retención (curva de olvido) vía `adaptive.skill_stability`.
+    - `review_due`: olvido vencido, fallo reciente o confianza baja (no solo
+      `mean < 0.6` con `attempts >= 3`).
+
+    `now` (ISO) permite testear el olvido sin reloj de pared; vacío = sin decaimiento.
+    Devuelve `criteria`, `weak`, `recommendation`, `attempts`, `overall_mean`,
+    `overall_recent`, `trend` y `rubric_version`. Determinista, sin LLM ni red.
+    """
+    groups: dict[str, list[dict]] = {}
+    overall_rows: list[dict] = []
+    for row in evidence_rows:
+        item_id = row.get("item_id") or ""
+        if item_id == "overall":
+            overall_rows.append(row)
+            continue
+        groups.setdefault(item_id, []).append(row)
+
+    def _criterion(name: str, rows: list[dict]) -> dict:
+        attempts = len(rows)
+        results = [float(r["result"]) for r in rows if r.get("result") is not None]
+        if not results:
+            return {
+                "criterion": name,
+                "attempts": attempts,
+                "mean": None,
+                "recent_score": None,
+                "lifetime_score": None,
+                "confidence": None,
+                "stability": None,
+                "min": None,
+                "max": None,
+                "review_due": True,
+            }
+        mean = round(sum(results) / len(results), 3)
+        recent = _ema(results)
+        confidence = _ema(
+            [1.0 if r >= WRITING_WEAK_THRESHOLD else 0.0 for r in results]
+        )
+        last_seen = max(
+            r.get("created_at", "") for r in rows if r.get("result") is not None
+        )
+        review_due = (
+            forgetting_review_due(recent, last_seen, now)
+            or results[-1] < WRITING_WEAK_THRESHOLD
+            or confidence < WRITING_CONFIDENCE_THRESHOLD
+        )
+        stability = adaptive.skill_stability(recent, confidence, last_seen, now)
+        return {
+            "criterion": name,
+            "attempts": attempts,
+            "mean": mean,
+            "recent_score": recent,
+            "lifetime_score": mean,
+            "confidence": confidence,
+            "stability": stability,
+            "min": round(min(results), 3),
+            "max": round(max(results), 3),
+            "review_due": review_due,
+        }
+
+    criteria = [_criterion(c, groups.get(c, [])) for c in WRITING_CRITERIA]
+    known = set(WRITING_CRITERIA)
+    for name in sorted(set(groups) - known):
+        criteria.append(_criterion(name, groups[name]))
+
+    def _weak_key(name: str) -> tuple:
+        entry = next(c for c in criteria if c["criterion"] == name)
+        recent = entry["recent_score"]
+        return (recent is None, recent if recent is not None else 0.0)
+
+    weak = [c["criterion"] for c in criteria if c["review_due"]]
+    weak.sort(key=_weak_key)
+
+    recommendation = (
+        "All writing criteria look strong."
+        if not weak
+        else "Focus on: " + ", ".join(weak)
+    )
+
+    overall_results = [
+        float(r["result"]) for r in overall_rows if r.get("result") is not None
+    ]
+    overall_mean = (
+        round(sum(overall_results) / len(overall_results), 3)
+        if overall_results
+        else None
+    )
+
+    return {
+        "criteria": criteria,
+        "weak": weak,
+        "recommendation": recommendation,
+        "attempts": len(overall_rows),
+        "overall_mean": overall_mean,
+        "overall_recent": _ema(overall_results) if overall_results else None,
+        "trend": _mean_trend(overall_rows),
+        "rubric_version": RUBRIC_VERSION,
+    }
+
+
+def writing_level(evidence_rows: list[dict], now: str = "") -> dict:
+    """Writing Assessment 1.0: nivel CEFR continuo + confianza (determinista).
+
+    Agrega la evidencia de writing (`item_id="overall"`, una fila por intento) en
+    un `score` reciente (EMA), una `confidence` (EMA de "supera el umbral") y lo
+    proyecta a la escala continua A1=1.0 … C2=6.0 → `{level, numeric}`. Produce la
+    afirmación trazable "B1 · confidence 82%" a partir de evidencia versionada, sin
+    LLM ni red. Sin evidencia → `level`/`numeric`/`score` None y confidence 0.0.
+
+    `now` se acepta por simetría con `writing_diagnostic`/`writing_journey`
+    (el nivel agregado no decae con el tiempo; la estabilidad por criterio ya lo
+    refleja en el diagnóstico).
+    """
+    overall_rows = [r for r in evidence_rows if r.get("item_id") == "overall"]
+    results = [
+        float(r["result"]) for r in overall_rows if r.get("result") is not None
+    ]
+    if not results:
+        return {
+            "level": None,
+            "numeric": None,
+            "score": None,
+            "confidence": 0.0,
+            "attempts": 0,
+        }
+    score = _ema(results)
+    confidence = _ema(
+        [1.0 if r >= WRITING_WEAK_THRESHOLD else 0.0 for r in results]
+    )
+    numeric = round(1.0 + 5.0 * score, 2)
+    return {
+        "level": adaptive.numeric_to_level(numeric),
+        "numeric": numeric,
+        "score": score,
+        "confidence": round(confidence, 3),
+        "attempts": len(overall_rows),
+    }
+
+
+def writing_journey(evidence_rows: list[dict], now: str = "") -> dict:
+    """Writing Journey (CEFR): trayectoria de nivel y confianza (V1.17).
+
+    Proyecta la evidencia de writing (`item_id="overall"`, en orden cronológico)
+    en una secuencia de snapshots acumulados (`numeric`, `level`, `confidence`),
+    más el estado actual. Conecta el diagnóstico con el CEFR Journey: "A2.7 →
+    B1.1 → B1.3" y "Confidence 72% → 79% → 86%". Determinista y sin LLM ni red.
+
+    Devuelve `{current_level, current_numeric, current_confidence, attempts,
+    steps}` con `steps` ordenados cronológicamente.
+    """
+    overall_rows = [r for r in evidence_rows if r.get("item_id") == "overall"]
+    steps: list[dict] = []
+    results_so_far: list[float] = []
+    for row in overall_rows:
+        if row.get("result") is None:
+            continue
+        results_so_far.append(float(row["result"]))
+        score = _ema(results_so_far)
+        confidence = _ema(
+            [1.0 if r >= WRITING_WEAK_THRESHOLD else 0.0 for r in results_so_far]
+        )
+        numeric = round(1.0 + 5.0 * score, 2)
+        steps.append(
+            {
+                "at": row.get("created_at", ""),
+                "numeric": numeric,
+                "level": adaptive.numeric_to_level(numeric),
+                "confidence": round(confidence, 3),
+            }
+        )
+    current = writing_level(evidence_rows, now)
+    return {
+        "current_level": current["level"],
+        "current_numeric": current["numeric"],
+        "current_confidence": current["confidence"],
+        "attempts": len(overall_rows),
+        "steps": steps,
+    }
