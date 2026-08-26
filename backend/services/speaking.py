@@ -78,6 +78,30 @@ def lexical_diversity(tokens: list[str]) -> float:
     return round(len(set(tokens)) / len(tokens), 3)
 
 
+def _sequence_coherence(heard_tokens: list[str], expected_tokens: list[str]) -> float:
+    """Coherencia de secuencia (read-aloud): preservación del orden esperado.
+
+    Mide cuánto de la frase esperada se reproduce en el orden correcto usando la
+    subsecuencia común más larga (LCS) normalizada por la longitud esperada. Así
+    decir las palabras desordenadas o repetir la frase entera no puntúa como
+    coherente (a diferencia del ratio de longitud, que podía "engañarse" con
+    cualquier producción de la misma extensión). 1.0 si no hay referencia.
+    """
+    if not expected_tokens:
+        return 1.0
+    n, m = len(heard_tokens), len(expected_tokens)
+    prev = [0] * (m + 1)
+    for i in range(1, n + 1):
+        cur = [0] * (m + 1)
+        for j in range(1, m + 1):
+            if heard_tokens[i - 1] == expected_tokens[j - 1]:
+                cur[j] = prev[j - 1] + 1
+            else:
+                cur[j] = max(prev[j], cur[j - 1])
+        prev = cur
+    return round(_clamp(prev[m] / len(expected_tokens)), 3)
+
+
 def _fluency_score(heard: str, duration_seconds: float | None) -> float | None:
     """Fluidez (0..1) a partir de WPM; `None` cuando no se puede calcular (sin
     audio válido o sin palabras)."""
@@ -154,9 +178,9 @@ def score_speaking(
     else:
         task_achievement = 1.0
 
-    # coherence: longitud producida comparable a la esperada (read-aloud: sin
-    # señal discursiva del LLM, solo hay proporción).
-    coherence = round(_clamp(len(heard_tokens) / max(1, len(expected_tokens))), 3)
+    # coherence: preservación del orden de la frase esperada (read-aloud: sin
+    # señal discursiva del LLM, la coherencia es "reproducir en el orden correcto").
+    coherence = _sequence_coherence(heard_tokens, expected_tokens)
 
     criteria = {
         "task_achievement": task_achievement,

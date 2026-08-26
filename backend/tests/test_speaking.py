@@ -143,6 +143,31 @@ def test_scores_from_evidence_lexical_resource_is_diversity_not_overlap():
     assert result["criteria"]["lexical_resource"] >= 0.8
 
 
+def test_sequence_coherence_preserves_order():
+    # Orden exacto → coherencia total.
+    assert speaking_svc._sequence_coherence(
+        ["i", "am", "a", "student"], ["i", "am", "a", "student"]
+    ) == 1.0
+    # Palabras desordenadas → coherencia parcial (no total).
+    scrambled = speaking_svc._sequence_coherence(
+        ["student", "a", "am", "i"], ["i", "am", "a", "student"]
+    )
+    assert 0.0 < scrambled < 1.0
+    # Repetir la frase entera no infla la coherencia (no mide longitud).
+    repeated = speaking_svc._sequence_coherence(
+        ["i", "am", "a", "student", "i", "am", "a", "student"],
+        ["i", "am", "a", "student"],
+    )
+    assert repeated == 1.0
+    # Sin solapamiento → coherencia cero.
+    assert (
+        speaking_svc._sequence_coherence(
+            ["banana", "banana", "banana"], ["i", "am", "a", "student"]
+        )
+        == 0.0
+    )
+
+
 def test_scores_from_evidence_discourse_penalties_reduce_fluency():
     evidence = {
         "task_achieved": True,

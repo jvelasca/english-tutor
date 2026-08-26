@@ -191,6 +191,7 @@ async def get_profile_summary(user_id: str) -> dict | None:
             "instrument_version": s["instrument_version"],
             "curriculum_version": s["curriculum_version"],
             "created_at": s["created_at"],
+            "skills": s["skills"],
         }
         for s in history
     ]

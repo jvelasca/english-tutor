@@ -43,6 +43,7 @@ class CefrSnapshot(BaseModel):
     instrument_version: str
     curriculum_version: str
     created_at: str
+    skills: list[SkillState] = Field(default_factory=list)
 
 
 class LearningProfile(BaseModel):

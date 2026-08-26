@@ -129,6 +129,7 @@ export interface CefrSnapshot {
   instrument_version: string;
   curriculum_version: string;
   created_at: string;
+  skills: SkillState[];
 }
 
 export interface GrammarRecurringError {

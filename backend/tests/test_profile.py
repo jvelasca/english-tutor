@@ -167,6 +167,13 @@ def test_profile_records_cefr_snapshot_once(monkeypatch, tmp_path):
     assert snap["level"] == "A1"
     assert snap["instrument_version"]
     assert snap["curriculum_version"]
+    # El snapshot conserva el desglose por destreza (reproducibilidad completa).
+    assert snap["skills"]
+    assert all(
+        {"skill", "band", "score", "confidence", "samples", "stability"}
+        <= set(s)
+        for s in snap["skills"]
+    )
 
 
 def test_profile_endpoint_404(monkeypatch, tmp_path):
