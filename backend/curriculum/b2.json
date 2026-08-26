@@ -1,0 +1,357 @@
+{
+  "course_id": "english-tutor-academy",
+  "level_id": "b2",
+  "level": "B2",
+  "title": "B2 · Upper Intermediate",
+  "description": "Argue clearly, understand complex texts and fast, connected speech with multiple speakers, and express nuanced opinions.",
+  "modules": [
+    {
+      "id": "b2-m01",
+      "title": "Argumentation & Complexity",
+      "order": 1,
+      "units": [
+        {
+          "id": "b2-m01-u01",
+          "title": "Structuring arguments",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "b2-m01-u01-l01",
+              "title": "Discourse markers and cohesion",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "b2-m01-u01-l01-o01",
+                  "can_do": "I can structure a clear argument using discourse markers.",
+                  "title": "Linking ideas: contrast and concession",
+                  "skills": ["writing", "speaking", "vocabulary", "grammar"],
+                  "subskills": ["cohesion", "coherence", "collocations", "word_order"],
+                  "concepts": ["However / Nevertheless", "Although / Even though", "On the other hand"],
+                  "vocabulary": ["however", "nevertheless", "although", "whereas", "despite"],
+                  "activities": [
+                    {
+                      "id": "b2-m01-u01-l01-o01-a01",
+                      "type": "essay",
+                      "instruction": "Write a short paragraph arguing for or against remote work, using at least three discourse markers.",
+                      "target": "Although ... / However ... / On the other hand ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m01-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which discourse marker introduces a contrast?",
+                      "options": ["However", "Moreover", "Therefore"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["Although it rained, we went out.", "Although it rained, but we went out.", "Although it rained, however we went out."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'a pesar de'?",
+                      "options": ["despite", "besides", "during"],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b2-m01-u01-l01-o02",
+                  "can_do": "I can express cause and consequence precisely.",
+                  "title": "Cause and consequence",
+                  "skills": ["writing", "vocabulary", "grammar"],
+                  "subskills": ["cohesion", "collocations", "prepositions"],
+                  "concepts": ["due to / owing to", "as a result", "consequently"],
+                  "vocabulary": ["consequently", "therefore", "owing", "result", "cause"],
+                  "activities": [
+                    {
+                      "id": "b2-m01-u01-l01-o02-a01",
+                      "type": "essay",
+                      "instruction": "Explain one consequence of climate change using 'as a result' and 'owing to'.",
+                      "target": "Owing to ... / As a result ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m01-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'como resultado'?",
+                      "options": ["as a result", "in spite of", "as long as"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["The match was cancelled owing to the rain.", "The match was cancelled owing the rain.", "The match was cancelled owing to raining."],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "b2-m01-u01-l02",
+              "title": "Hypothesis and reported speech",
+              "order": 2,
+              "objectives": [
+                {
+                  "id": "b2-m01-u01-l02-o03",
+                  "can_do": "I can talk about hypothetical situations using the second and third conditional.",
+                  "title": "Second and third conditionals",
+                  "skills": ["grammar", "speaking", "vocabulary"],
+                  "subskills": ["conditionals", "fluency", "collocations"],
+                  "concepts": ["second conditional (unreal present)", "third conditional (unreal past)", "wish / if only"],
+                  "vocabulary": ["hypothetical", "regret", "imagine", "suppose", "would have"],
+                  "activities": [
+                    {
+                      "id": "b2-m01-u01-l02-o03-a01",
+                      "type": "dialogue",
+                      "instruction": "Say what you would have done differently last year.",
+                      "target": "If I had ... I would have ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m01-u01-l02-o03-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (unreal past):",
+                      "options": ["If I had studied, I would have passed.", "If I studied, I would have passed.", "If I had studied, I would passed."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l02-o03-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (unreal present):",
+                      "options": ["If I had more time, I would travel more.", "If I have more time, I would travel more.", "If I had more time, I will travel more."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l02-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'hipotético'?",
+                      "options": ["hypothetical", "historical", "hysterical"],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b2-m01-u01-l02-o04",
+                  "can_do": "I can report what others said accurately using reported speech.",
+                  "title": "Reported speech and reporting verbs",
+                  "skills": ["grammar", "reading", "vocabulary"],
+                  "subskills": ["reported_speech", "detail", "word_families"],
+                  "concepts": ["backshift of tenses", "say / tell / ask", "reporting verbs (claim, admit, deny)"],
+                  "vocabulary": ["claim", "admit", "deny", "suggest", "reported"],
+                  "activities": [
+                    {
+                      "id": "b2-m01-u01-l02-o04-a01",
+                      "type": "dialogue",
+                      "instruction": "Report what a friend told you last week about their job.",
+                      "target": "He told me that ... / She claimed that ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m01-u01-l02-o04-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct reported sentence for 'I am tired' (he said):",
+                      "options": ["He said he was tired.", "He said he is tired.", "He said he has tired."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l02-o04-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which reporting verb means 'decir que algo es verdad'?",
+                      "options": ["claim", "deny", "ask"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m01-u01-l02-o04-c03",
+                      "skill": "reading",
+                      "prompt": "Read: 'She claimed she had finished the report.' According to her, who finished it?",
+                      "options": ["She did", "The report did", "Nobody did"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2-m02",
+      "title": "Nuance & Real-world Listening",
+      "order": 2,
+      "units": [
+        {
+          "id": "b2-m02-u01",
+          "title": "Fast and connected speech",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "b2-m02-u01-l01",
+              "title": "Multiple speakers and fast speech",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "b2-m02-u01-l01-o05",
+                  "can_do": "I can follow a conversation between several speakers speaking at natural speed.",
+                  "title": "Multiple speakers and fast speech",
+                  "skills": ["listening", "vocabulary"],
+                  "subskills": ["multiple_speakers", "fast_speech", "word_recognition"],
+                  "concepts": ["turn-taking", "overlapping speech", "reduced forms"],
+                  "vocabulary": ["overlap", "interrupt", "briefly", "speaker", "turn"],
+                  "activities": [
+                    {
+                      "id": "b2-m02-u01-l01-o05-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a three-speaker conversation and identify who changed the plan.",
+                      "target": "The woman changed the plan because ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m02-u01-l01-o05-c01",
+                      "skill": "listening",
+                      "prompt": "You hear three people planning a meeting. What do they finally agree?",
+                      "options": ["To meet on Friday", "To meet on Monday", "To cancel the meeting"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m02-u01-l01-o05-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'interrumpir'?",
+                      "options": ["interrupt", "interpret", "inspect"],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b2-m02-u01-l01-o06",
+                  "can_do": "I can understand connected speech and reduced forms in fast speech.",
+                  "title": "Connected speech and reduced forms",
+                  "skills": ["listening", "vocabulary"],
+                  "subskills": ["connected_speech", "fast_speech", "phrase_recognition"],
+                  "concepts": ["gonna / wanna / gotta", "elision and assimilation", "weak forms"],
+                  "vocabulary": ["gonna", "wanna", "gotta", "kinda", "dunno"],
+                  "activities": [
+                    {
+                      "id": "b2-m02-u01-l01-o06-a01",
+                      "type": "listening",
+                      "instruction": "Listen to fast connected speech and write the full forms.",
+                      "target": "gonna → going to / wanna → want to"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m02-u01-l01-o06-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'I dunno what you mean.' What does 'dunno' mean?",
+                      "options": ["don't know", "do know", "did know"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m02-u01-l01-o06-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which reduced form means 'kind of'?",
+                      "options": ["kinda", "wanna", "gotta"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "b2-m02-u01-l02",
+              "title": "Inference and register",
+              "order": 2,
+              "objectives": [
+                {
+                  "id": "b2-m02-u01-l02-o07",
+                  "can_do": "I can infer a speaker's attitude and intention from tone and context.",
+                  "title": "Inference: attitude and intention",
+                  "skills": ["listening", "reading", "vocabulary"],
+                  "subskills": ["inference", "speaker_intention", "attitude", "detail"],
+                  "concepts": ["implied meaning", "tone and irony", "hedging"],
+                  "vocabulary": ["ironic", "sarcastic", "implied", "ambiguous", "tone"],
+                  "activities": [
+                    {
+                      "id": "b2-m02-u01-l02-o07-a01",
+                      "type": "listening",
+                      "instruction": "Listen and infer whether the speaker is being sincere or ironic.",
+                      "target": "The speaker is being ironic because ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m02-u01-l02-o07-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'Oh great, another meeting.' What is the speaker's attitude?",
+                      "options": ["Sarcastic", "Enthusiastic", "Neutral"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m02-u01-l02-o07-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'ambiguo'?",
+                      "options": ["ambiguous", "ambitious", "amusing"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m02-u01-l02-o07-c03",
+                      "skill": "reading",
+                      "prompt": "Read: 'Well, that went brilliantly,' she said, rolling her eyes. What does she really mean?",
+                      "options": ["It went badly", "It went well", "She is excited"],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b2-m02-u01-l02-o08",
+                  "can_do": "I can recognise formal and informal register in speech and writing.",
+                  "title": "Register: formal vs informal",
+                  "skills": ["reading", "writing", "vocabulary"],
+                  "subskills": ["register", "cohesion", "scanning"],
+                  "concepts": ["formal vs informal lexis", "hedging and politeness", "academic tone"],
+                  "vocabulary": ["formal", "informal", "register", "tone", "appropriate"],
+                  "activities": [
+                    {
+                      "id": "b2-m02-u01-l02-o08-a01",
+                      "type": "essay",
+                      "instruction": "Rewrite an informal message as a formal email.",
+                      "target": "I am writing to ... / I would be grateful if ..."
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m02-u01-l02-o08-c01",
+                      "skill": "reading",
+                      "prompt": "Which phrase is the most formal?",
+                      "options": ["I would be grateful if you could reply.", "Can you reply?", "Reply soon!"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m02-u01-l02-o08-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'registro (de formalidad)'?",
+                      "options": ["register", "regret", "region"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

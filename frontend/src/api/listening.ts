@@ -38,3 +38,8 @@ export function getListeningDiagnostic(
   const query = new URLSearchParams({ user_id: userId }).toString();
   return getJson<ListeningDiagnostic>(`/api/listening/diagnostic?${query}`);
 }
+
+export function getListeningAudioUrl(questionId: string, userId: string): string {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return `/api/listening/audio/${questionId}?${query}`;
+}

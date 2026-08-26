@@ -760,7 +760,41 @@ QUESTION_BANK: list[dict] = [
 ]
 
 
-LEVEL_ORDER: list[str] = ["A1", "A2", "B1"]
+LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2"]
+
+# Velocidad de referencia (wpm) de la voz Piper por defecto. `length_scale_for_rate`
+# la usa para mapear `speech_rate` (wpm) de un ítem a `length_scale` de Piper.
+DEFAULT_SPEECH_RATE = 140.0
+
+# Límites de `length_scale` para no deformar la voz (0.6 ≈ 1.67× más rápido,
+# 1.6 ≈ 0.625× más lento). Fuera de este rango el audio se degrada de forma audible.
+LENGTH_SCALE_MIN = 0.6
+LENGTH_SCALE_MAX = 1.6
+
+
+def length_scale_for_rate(speech_rate: float) -> float:
+    """Mapea `speech_rate` (wpm) a `length_scale` de Piper (determinista).
+
+    Más wpm ⇒ menor `length_scale` (más rápido). `speech_rate <= 0` (sin metadatos)
+    devuelve 1.0 (velocidad por defecto). El resultado se clampa a
+    `[LENGTH_SCALE_MIN, LENGTH_SCALE_MAX]`.
+    """
+    if not speech_rate or speech_rate <= 0:
+        return 1.0
+    scale = DEFAULT_SPEECH_RATE / speech_rate
+    return round(max(LENGTH_SCALE_MIN, min(LENGTH_SCALE_MAX, scale)), 3)
+
+
+def audio_text(question: dict) -> str:
+    """Texto a sintetizar para un ítem: `transcript` si existe, si no `script`.
+
+    `transcript` es la transcripción exacta del audio de referencia; `script` es el
+    texto legible que se muestra. Ambos coinciden en los ítems que declaran audio;
+    `script` es el fallback para el banco heredado que aún no tiene `transcript`.
+    """
+    return (question.get("transcript") or "").strip() or (
+        question.get("script") or ""
+    ).strip()
 
 
 def get_question(question_id: str) -> dict | None:

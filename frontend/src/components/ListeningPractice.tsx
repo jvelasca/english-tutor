@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  getListeningAudioUrl,
   getListeningDiagnostic,
   getListeningQuestion,
   getListeningStats,
@@ -83,12 +84,27 @@ export function ListeningPractice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  function playAudioUrl(url: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const audio = new Audio(url);
+      audio.onended = () => resolve();
+      audio.onerror = () => reject(new Error("No se pudo reproducir el audio"));
+      audio.play().catch(reject);
+    });
+  }
+
   async function play() {
-    if (!question || playing) return;
+    if (!question || !userId || playing) return;
     setPlaying(true);
     setReplayCount((count) => count + 1);
     try {
-      await speak(question.script);
+      if (question.audio_ready) {
+        // Audio de referencia pre-renderizado (respeta speech_rate y repetición).
+        await playAudioUrl(getListeningAudioUrl(question.id, userId));
+      } else {
+        // Degradación: TTS en vivo con el script del ítem.
+        await speak(question.script);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -133,6 +149,11 @@ export function ListeningPractice({
           >
             {playing ? "Reproduciendo…" : "Escuchar audio"}
           </button>
+          {!question.audio_ready && (
+            <p className="listening-audio-degraded">
+              Audio de referencia no disponible; usando voz generada en vivo.
+            </p>
+          )}
           {question.speech_rate > 0 && (
             <p className="listening-audio-meta">
               {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}

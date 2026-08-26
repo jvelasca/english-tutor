@@ -24,6 +24,10 @@ class ListeningQuestion(BaseModel):
     noise_level: int = 0
     repetition_policy: str = "none"
     topic: str = ""
+    # True si este ítem tiene audio de referencia reproducible (transcript/script no
+    # vacío y el sintetizador Piper disponible). El frontend usa esto para decidir
+    # entre reproducir el audio real o degradar al TTS en vivo.
+    audio_ready: bool = False
 
 
 class ListeningAnswerRequest(BaseModel):

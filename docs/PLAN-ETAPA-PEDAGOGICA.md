@@ -27,7 +27,7 @@ aprendizaje real:
 | **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ✔ hecho |
 | **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | 🔁 diferido (a favor de Student Model 2.0) |
 | **V1.12** | Student Model 2.0 + Assessment Loop (unificación + snapshots + naming CEFR + Speaking 2.0) | Alto (bucle completo) | P5 | ✔ hecho |
-| **V1.13** | Listening 3.0 (audio real + cierre A1→B2 + evidencia por sub-destreza) | Alto (contenido + audio) | P4, V1.12 | 📋 preparado |
+| **V1.13** | Listening 3.0 (audio real + cierre A1→B2 + evidencia por sub-destreza) | Alto (contenido + audio) | P4, V1.12 | ✔ hecho |
 
 ## Detalle por track
 

@@ -47,11 +47,11 @@ def test_b1_checks_have_valid_correct_index():
             )
 
 
-def test_available_levels_are_a1_a2_b1():
-    assert available_level_ids() == ["a1", "a2", "b1"]
+def test_available_levels_are_a1_a2_b1_b2():
+    assert available_level_ids() == ["a1", "a2", "b1", "b2"]
 
 
 def test_next_level_id_b1_points_to_b2():
-    # B2 aún no tiene archivo: seguirá listado como "no disponible" sin romper.
+    # B2 ya tiene archivo: el siguiente nivel tras B1 es b2.
     assert next_level_id("B1") == "b2"
     assert next_level_id("C2") is None

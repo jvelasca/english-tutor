@@ -1,7 +1,7 @@
 """Endpoints de listening (comprensión auditiva)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from dependencies import current_user
 from domain import learning as learning_service
@@ -20,6 +20,19 @@ router = APIRouter()
 @router.get("/api/listening/question", response_model=ListeningQuestion)
 async def question(user: dict = Depends(current_user)) -> dict:
     return await listening_service.next_question(user["id"])
+
+
+@router.get("/api/listening/audio/{question_id}")
+async def audio(question_id: str, user: dict = Depends(current_user)) -> Response:
+    data, status = await listening_service.get_audio(question_id)
+    if status is not None:
+        detail = (
+            "Audio no disponible"
+            if status == 503
+            else "Pregunta no encontrada"
+        )
+        raise HTTPException(status_code=status, detail=detail)
+    return Response(content=data, media_type="audio/wav")
 
 
 @router.post("/api/listening/answer", response_model=ListeningAnswerResponse)

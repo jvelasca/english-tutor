@@ -3,43 +3,43 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-25 22:55 (UTC+2).
+> Actualizado por última vez: 2026-08-26 08:30 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.11` publicada (P5). Cerradas hasta ahora: Release Audit 1.1
-(M12), M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
-Listening 1.0/2.0, Placement 1.0 (IRT-lite), **Placement 2.0** (calibración observacional +
-perfil multiskill) y Etapa 2 (pedagogía) **P1–P5**; **V1.12** en curso (Student Model unificado +
-Assessment Loop). El P6 original (pronunciación fonémica) se **difiere** a favor de esta unificación.
+**Posición actual (2026-08-26):** `v1.13` implementada (Listening 3.0), pendiente de commitear.
+Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
+hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-lite),
+**Placement 2.0** (calibración observacional + perfil multiskill) y Etapa 2 (pedagogía) **P1–P5**;
+**V1.12** (Student Model unificado + Assessment Loop) y **V1.13** (Listening 3.0). El P6 original
+(pronunciación fonémica) sigue **diferido**.
 
 **Últimos commits publicados:**
+- `feat: V1.12 - Student Model unificado + Assessment Loop`
 - `feat: V1.11 - CEFR basado en evidencia (muestras por destreza + confianza)`
 - `feat: V1.10 - Listening como competencia (topic + metricas por dificultad/tema/tendencia/reincidencia)`
 - `feat: V1.9 - Vocabulario exposure/production/mastery (P3)`
 - `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
 - `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
-- `release: v1.7.0 - Placement 2.0 (calibracion observacional + perfil multiskill)`
 
-**⚠️ TRABAJO SIN COMMITEAR (V1.12 — Student Model unificado + Assessment Loop):** ver
-sección 25. Es el incremento en curso y NO está versionado. Resumen:
-- **P6 — Speaking scoring 2.0**: corrige los 4 defectos del scorer (`task_achievement`,
-  `lexical_resource` por diversidad léxica, `coherence` por marcadores discursivos,
-  `pronunciation` con `observed=false` sin audio), amplía la evidencia del LLM (marcadores
-  discursivos) y hace higiene de versión (`config.py`/`README.md` → `1.11.0`).
-- **P7 — Student Model fuente única**: `/api/profile` pasa a ser proyección del Student Model de
-  la Academy (`build_student_model`), con `overall_ability`, `readiness`, desglose por destreza,
-  bandas "heuristic CEFR-aligned" y **snapshots históricos** (`cefr_assessment_snapshots`).
+**⚠️ TRABAJO SIN COMMITEAR (V1.13 — Listening 3.0):** ver sección 26. Es el incremento en curso y
+NO está versionado. Resumen:
+- **Audio real por ítem**: `GET /api/listening/audio/{question_id}` (WAV pre-renderizado y
+  cacheado con Piper, honra `speech_rate` → `length_scale` y `repetition_policy="twice"`).
+- **Cierre A1→B2**: `curriculum/b2.json` nuevo + `LEVEL_ORDER` incluye B2.
+- **Evidencia por sub-destreza**: test que cubre las sub-destrezas nuevas.
+- **Higiene de release**: `config.py`/`README.md`/`package.json` → `1.13.0`, `LISTENING_BANK_VERSION`
+  → `3.0.0`.
 
-**Estado verde:** backend `566 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
+**Estado verde:** backend `576 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 25** de este documento (trabajo sin commitear — V1.12 Student Model).
+2. Leer la **sección 26** de este documento (trabajo sin commitear — V1.13 Listening 3.0).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6 + Student Model 2.0).
-4. Decidir: **commitear** el trabajo sin versionar (dos `feat:` limpios: P6 y P7) o continuar
-   con V1.13 (Listening 3.0).
+4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con V1.14
+   (Speaking 2.0: free-response / role-play).
 5. Redactar y ejecutar `agentes/pedagogia/p*-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
@@ -1051,7 +1051,7 @@ cd frontend && npx tsc --noEmit && npx vitest run
   sección 25 y `agentes/pedagogia/p6-speaking-2.0.md` / `p7-student-model-unificado.md`.
 - El P6 original (pronunciación fonémica) queda **diferido** a favor de esta unificación.
 
-## 25. EN CURSO (sin commitear) — V1.12: Student Model unificado + Assessment Loop
+## 25. HECHO (V1.12) — Student Model unificado + Assessment Loop
 
 > **Origen.** La auditoría externa de V1.11 detectó dos estimadores CEFR paralelos que se
 > contradicen (`/api/profile` con banda mínima vs `/api/academy/student-model` con nivel continuo
@@ -1104,8 +1104,59 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `ruff` limpio.
 
 ### 25.4 Pendiente / siguiente incremento natural
-- **V1.13** — Listening 3.0 (audio real B1/B2): briefing listo en
-  `agentes/pedagogia/p8-listening-3.0.md`. **V1.14** — Speaking 2.0 (free-response/role-play).
+- **V1.13** — Listening 3.0 (audio real + cierre A1→B2): ver sección 26.
+- **V1.14** — Speaking 2.0 (free-response/role-play). Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 26. EN CURSO (sin commitear) — V1.13: Listening 3.0 (audio real + cierre A1→B2)
+
+> **Origen.** `agentes/pedagogia/p8-listening-3.0.md`. El listening tenía arquitectura sólida
+> (banco versionado, vector 8D, 15 sub-destrezas, métricas de competencia) pero **sin audio real**:
+> el frontend sintetizaba `script` en vivo con la voz Piper única, ignorando `speech_rate`/`accent`.
+> Además faltaba `b2.json` (el banco ya tenía ítems B2: `l16`, `l17`, `l20`, `l21`). V1.13 sirve
+> **audio pre-renderizado por ítem**, cierra **A1→B2** y garantiza evidencia independiente por
+> sub-destreza. Honesto con el límite local: Piper es una sola voz; acentos/ruido/hablantes son
+> límite de **contenido**, no de código.
+
+### 26.1 Audio real por ítem
+- **`services/tts.py`**: `synthesize(text, length_scale=1.0)` ahora acepta velocidad vía
+  `SynthesisConfig(length_scale=...)`.
+- **`services/listening.py`**: `length_scale_for_rate(speech_rate)` (mapea wpm → `length_scale`,
+  clamp `[0.6, 1.6]`), `audio_text(question)` (`transcript` con fallback a `script`), y
+  `LEVEL_ORDER = ["A1", "A2", "B1", "B2"]`.
+- **`domain/listening.py`**: `get_audio(question_id)` sintetiza y cachea en `DATA_DIR/listening/`
+  (primera petición) y sirve del caché después; `audio_ready(question)` y `_public` exponen
+  `audio_ready`.
+- **`routers/listening.py`**: `GET /api/listening/audio/{question_id}` → `audio/wav` (404/503).
+- **`schemas/listening.py`**: `ListeningQuestion.audio_ready`.
+
+### 26.2 Cierre A1→B2
+- **`curriculum/b2.json`**: nivel B2 (8 objetivos, checks de opción múltiple cubriendo sus
+  destrezas evaluables — invariante curricular verde).
+- **`services/curriculum.py`**: `LISTENING_BANK_VERSION` → `3.0.0`.
+- **`scripts/generate_listening_audio.py`**: pre-renderiza todo el banco (idempotente, `--force`).
+
+### 26.3 Evidencia por sub-destreza
+- `test_new_subskills_generate_independent_evidence` cubre `fast_speech`, `connected_speech`,
+  `multiple_speakers`, `dictation`, `shadowing`, `speaker_intention` en `listening_diagnostic`.
+
+### 26.4 Frontend
+- **`api/listening.ts`**: `getListeningAudioUrl(questionId, userId)`.
+- **`types/api.ts`**: `audio_ready: boolean`.
+- **`components/ListeningPractice.tsx`**: reproduce audio real cuando `audio_ready`, degrada a TTS
+  en vivo con aviso "audio de referencia no disponible"; respeta `replayCount`.
+- **`index.css`**: estilo `.listening-audio-degraded`.
+
+### 26.5 Higiene de release
+- `config.py`/`README.md`/`PLAN.md`/`package.json`/`package-lock.json` → `1.13.0`; `CHANGELOG.md`
+  con entrada 1.13.0.
+
+### 26.6 Verificación
+- Backend `576 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 26.7 Pendiente / siguiente incremento natural
+- **V1.14** — Speaking 2.0 (free-response, role-play, conversation, interview, discussion):
+  fluency/grammar/lexical/pronunciation/coherence/interaction medidos longitudinalmente.
   Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
 

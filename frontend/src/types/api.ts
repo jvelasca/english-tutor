@@ -240,6 +240,7 @@ export interface ListeningQuestion {
   noise_level: number;
   repetition_policy: string;
   topic: string;
+  audio_ready: boolean;
 }
 
 export interface ListeningAnswerResponse {

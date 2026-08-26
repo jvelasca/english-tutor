@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getListeningAudioUrl,
   getListeningDiagnostic,
   getListeningQuestion,
   getListeningStats,
@@ -63,5 +64,11 @@ describe("listening api", () => {
     await getListeningDiagnostic("u1");
     const [url] = fn.mock.calls[0];
     expect(url).toBe("/api/listening/diagnostic?user_id=u1");
+  });
+
+  it("getListeningAudioUrl construye la URL del audio con user_id", () => {
+    expect(getListeningAudioUrl("l1", "u1")).toBe(
+      "/api/listening/audio/l1?user_id=u1",
+    );
   });
 });

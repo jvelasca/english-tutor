@@ -80,11 +80,13 @@ def test_pick_next_completes_all_levels_and_rotates():
 def test_current_level_advances_with_mastery():
     a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
     a2_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A2"}
+    b1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "B1"}
     assert current_level(set()) == "A1"
     assert current_level(a1_ids) == "A2"
     assert current_level(a1_ids | a2_ids) == "B1"
+    assert current_level(a1_ids | a2_ids | b1_ids) == "B2"
     # Completados todos → se mantiene en el último nivel para seguir practicando.
-    assert current_level({q["id"] for q in QUESTION_BANK}) == "B1"
+    assert current_level({q["id"] for q in QUESTION_BANK}) == "B2"
 
 
 def test_level_status_marks_completed():
@@ -236,7 +238,7 @@ def test_all_levels_completed_marks_completed(monkeypatch, tmp_path):
             )
         stats = client.get("/api/listening/stats", params={"user_id": uid}).json()
     assert stats["completed"] is True
-    assert stats["level"] == "B1"
+    assert stats["level"] == "B2"
     assert all(lv["completed"] for lv in stats["levels"])
 
 
@@ -305,6 +307,35 @@ def test_diagnostic_endpoint(monkeypatch, tmp_path):
     assert len(body["subskills"]) >= len(LISTENING_SUBSKILLS)
     by_skill = {s["skill"]: s for s in body["subskills"]}
     assert by_skill[q["skill"]]["attempts"] == 1
+
+
+def test_new_subskills_generate_independent_evidence():
+    """Cada sub-destreza canónica produce su propia fila de evidencia en el
+    diagnóstico, con independencia del resto (V1.13)."""
+    new_subskills = [
+        "fast_speech",
+        "connected_speech",
+        "multiple_speakers",
+        "dictation",
+        "shadowing",
+        "speaker_intention",
+    ]
+    rows = [
+        {
+            "skill": skill,
+            "correct": True,
+            "response_time_ms": 1500,
+            "replay_count": 0,
+        }
+        for skill in new_subskills
+    ]
+    diag = listening_diagnostic(rows)
+    by_skill = {s["skill"]: s for s in diag["subskills"]}
+    for skill in new_subskills:
+        assert by_skill[skill]["attempts"] == 1, skill
+        assert by_skill[skill]["accuracy"] == 100.0, skill
+    # Las que no tienen intentos siguen listadas con 0 intentos (evidencia vacía).
+    assert by_skill["gist"]["attempts"] == 0
 
 
 def test_answer_records_metrics(monkeypatch, tmp_path):

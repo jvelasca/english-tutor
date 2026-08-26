@@ -53,7 +53,7 @@ def main() -> int:
         failures.append(
             f"Esperaba niveles completados {LEVEL_ORDER}, obtuve {completed}"
         )
-    if current_level(correct) != "B1":
+    if current_level(correct) != "B2":
         failures.append(f"Tras completar todo, nivel actual = {current_level(correct)}")
 
     # 3) La secuencia de niveles visitados debe ser monótona (nunca retrocede).

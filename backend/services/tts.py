@@ -6,6 +6,7 @@ import threading
 import wave
 
 from piper import PiperVoice
+from piper.config import SynthesisConfig
 
 from config import PIPER_DIR, PIPER_VOICE
 
@@ -26,12 +27,17 @@ def _get_voice() -> PiperVoice:
     return _voice
 
 
-def synthesize(text: str) -> bytes:
-    """Devuelve audio WAV en memoria. Bloqueante: ejecutar en un threadpool."""
+def synthesize(text: str, length_scale: float = 1.0) -> bytes:
+    """Devuelve audio WAV en memoria. Bloqueante: ejecutar en un threadpool.
+
+    `length_scale` controla la velocidad (Piper): < 1.0 más rápido, > 1.0 más lento.
+    """
     voice = _get_voice()
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wav_file:
-        voice.synthesize_wav(text, wav_file)
+        voice.synthesize_wav(
+            text, wav_file, SynthesisConfig(length_scale=length_scale)
+        )
     return buf.getvalue()
 
 

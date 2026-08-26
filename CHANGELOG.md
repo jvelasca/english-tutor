@@ -4,6 +4,32 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.13.0] — 2026-08-26
+
+Listening 3.0. Convierte el listening de "scripts de texto + TTS genérico en vivo" a **audio real
+por ítem** (pre-renderizado y cacheado con Piper), cierra el currículo **A1→B2** y garantiza
+evidencia independiente por sub-destreza. Todo local y determinista en el score; sin LLM ni red.
+
+### Añadido
+- **Audio real por ítem**: `GET /api/listening/audio/{question_id}` sirve `audio/wav` reproducible,
+  pre-renderizado y cacheado en disco (`DATA_DIR/listening/`). Respeta `speech_rate`
+  (mapeado a `length_scale` de Piper) y `repetition_policy="twice"`. 404 si el ítem no existe,
+  503 honesto si Piper no está disponible.
+- **`audio_ready`** en `ListeningQuestion` para que el frontend reproduzca audio real o degrade al
+  TTS en vivo con aviso.
+- **Cierre A1→B2**: `curriculum/b2.json` (8 objetivos, checks de opción múltiple) y
+  `LEVEL_ORDER = ["A1", "A2", "B1", "B2"]` en el banco de listening.
+- **Herramienta reproducible**: `scripts/generate_listening_audio.py` pre-renderiza todo el banco
+  (idempotente, `--force`).
+- **Evidencia por sub-destreza**: test que garantiza que cada sub-destreza canónica
+  (`fast_speech`, `connected_speech`, `multiple_speakers`, `dictation`, `shadowing`,
+  `speaker_intention`) produce su fila independiente en `listening_diagnostic`.
+
+### Cambiado
+- `LISTENING_BANK_VERSION` → `3.0.0`.
+- Frontend `ListeningPractice` reproduce el audio real cuando `audio_ready` y muestra metadatos;
+  `api/listening.ts` expone `getListeningAudioUrl`.
+
 ## [1.12.0] — 2026-08-26
 
 Student Model unificado + Assessment Loop. Reconciliar los dos estimadores CEFR divergentes en
