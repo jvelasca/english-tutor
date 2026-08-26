@@ -19,7 +19,9 @@ from services.fluency import compute_fluency
 from services.grammar import find_errors
 from services.phonetics import composite_score
 
-# Dimensiones del rubric de speaking (alineadas con CEFR).
+# Dimensiones del rubric de speaking (alineadas con CEFR). `interaction` (V1.15)
+# captura la capacidad de turn-taking y respuesta conversacional, observable solo
+# en el flujo libre (tarea) donde el LLM extrae la evidencia.
 SPEAKING_CRITERIA: tuple[str, ...] = (
     "task_achievement",
     "grammatical_control",
@@ -27,17 +29,19 @@ SPEAKING_CRITERIA: tuple[str, ...] = (
     "fluency",
     "pronunciation",
     "coherence",
+    "interaction",
 )
 
 # Pesos por defecto (suman 1). El overall es la media ponderada de los criterios
 # observados (renormalizada sobre los presentes).
 CRITERION_WEIGHTS: dict[str, float] = {
-    "task_achievement": 0.25,
+    "task_achievement": 0.20,
     "grammatical_control": 0.20,
     "lexical_resource": 0.20,
     "fluency": 0.15,
     "pronunciation": 0.10,
     "coherence": 0.10,
+    "interaction": 0.05,
 }
 
 # Referencia de fluidez: 120 palabras por minuto ≈ hablante fluido.
@@ -189,6 +193,9 @@ def score_speaking(
     # señal discursiva del LLM, la coherencia es "reproducir en el orden correcto").
     coherence = _sequence_coherence(heard_tokens, expected_tokens)
 
+    # interaction: no observable en read-aloud (no hay turno conversacional).
+    interaction = None
+
     criteria = {
         "task_achievement": task_achievement,
         "grammatical_control": grammatical_control,
@@ -196,6 +203,7 @@ def score_speaking(
         "fluency": fluency,
         "pronunciation": pronunciation,
         "coherence": coherence,
+        "interaction": interaction,
     }
     observed = {
         "task_achievement": True,
@@ -204,6 +212,7 @@ def score_speaking(
         "fluency": fluency is not None,
         "pronunciation": True,
         "coherence": True,
+        "interaction": False,
     }
 
     overall = _weighted_overall(criteria, observed)
@@ -253,6 +262,11 @@ def scores_from_evidence(
 
     pronunciation = None  # no observable sin audio de referencia
 
+    # interaction: observable solo si el LLM la extrae (0..1); None en caso contrario.
+    interaction = evidence.get("interaction")
+    if interaction is not None:
+        interaction = round(_clamp(float(interaction)), 3)
+
     criteria = {
         "task_achievement": task_achievement,
         "grammatical_control": grammatical_control,
@@ -260,6 +274,7 @@ def scores_from_evidence(
         "fluency": fluency,
         "pronunciation": pronunciation,
         "coherence": coherence,
+        "interaction": interaction,
     }
     observed = {
         "task_achievement": True,
@@ -268,6 +283,7 @@ def scores_from_evidence(
         "fluency": fluency is not None,
         "pronunciation": False,
         "coherence": True,
+        "interaction": interaction is not None,
     }
 
     overall = _weighted_overall(criteria, observed)

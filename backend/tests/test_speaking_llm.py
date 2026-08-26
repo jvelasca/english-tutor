@@ -19,6 +19,7 @@ def test_build_speaking_prompt_has_roles_and_content():
         "self_corrections",
         "hesitations",
         "repetitions",
+        "interaction",
     ):
         assert key in msgs[0]["content"]
 
@@ -88,6 +89,23 @@ def test_parse_speaking_evidence_tolerates_code_fence():
         "hesitations": 0,
         "repetitions": 0,
     }
+
+
+def test_parse_speaking_evidence_extracts_interaction():
+    raw = (
+        '{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student"], "coherence": 0.8, "interaction": 0.7}'
+    )
+    result = speaking_llm.parse_speaking_evidence(raw)
+    assert result["interaction"] == 0.7
+
+
+def test_parse_speaking_evidence_interaction_absent_omits_key():
+    raw = (
+        '{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student"], "coherence": 0.8}'
+    )
+    assert "interaction" not in speaking_llm.parse_speaking_evidence(raw)
 
 
 def test_parse_speaking_evidence_clamps_coherence():

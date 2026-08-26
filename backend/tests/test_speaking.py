@@ -168,6 +168,37 @@ def test_sequence_coherence_preserves_order():
     )
 
 
+def test_score_speaking_interaction_unobserved_read_aloud():
+    result = speaking_svc.score_speaking("I am a student", "I am a student", 3.0)
+    assert result["criteria"]["interaction"] is None
+    assert result["observed"]["interaction"] is False
+
+
+def test_scores_from_evidence_interaction_observed():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": ["student"],
+        "coherence": 0.9,
+        "interaction": 0.8,
+    }
+    result = speaking_svc.scores_from_evidence(evidence, "I am a student", 120.0)
+    assert result["criteria"]["interaction"] == 0.8
+    assert result["observed"]["interaction"] is True
+
+
+def test_scores_from_evidence_interaction_absent_unobserved():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": ["student"],
+        "coherence": 0.9,
+    }
+    result = speaking_svc.scores_from_evidence(evidence, "I am a student", 120.0)
+    assert result["criteria"]["interaction"] is None
+    assert result["observed"]["interaction"] is False
+
+
 def test_scores_from_evidence_discourse_penalties_reduce_fluency():
     evidence = {
         "task_achieved": True,
@@ -212,7 +243,7 @@ def test_speaking_records_evidence_and_mastery(monkeypatch, tmp_path):
     assert r.status_code == 200
     body = r.json()
     assert 0.0 <= body["overall"] <= 1.0
-    assert len(body["criteria"]) == 6
+    assert len(body["criteria"]) == 7
     assert body["speaking_mastery"] > 0
 
     speaking_rows = [
@@ -220,7 +251,8 @@ def test_speaking_records_evidence_and_mastery(monkeypatch, tmp_path):
     ]
     assert speaking_rows, "no se registró evidencia de speaking"
     assert all(row["skill"] == "speaking" for row in speaking_rows)
-    assert len(speaking_rows) >= 7  # 6 criterios + 1 overall
+    # 6 criterios observados + 1 overall (interaction no observada en read-aloud).
+    assert len(speaking_rows) >= 7
     assert academy_repo.get_objective_row(a, "a1", obj.id, "speaking") is not None
 
 
@@ -285,7 +317,7 @@ def test_speaking_task_records_evidence_and_mastery(monkeypatch, tmp_path):
     assert r.status_code == 200
     body = r.json()
     assert 0.0 <= body["overall"] <= 1.0
-    assert len(body["criteria"]) == 6
+    assert len(body["criteria"]) == 7
     assert body["speaking_mastery"] > 0
     assert body["evidence"]["task_achieved"] is True
 
@@ -362,7 +394,7 @@ def test_speaking_audio_read_aloud_records_mastery(monkeypatch, tmp_path):
     assert r.status_code == 200
     body = r.json()
     assert 0.0 <= body["overall"] <= 1.0
-    assert len(body["criteria"]) == 6
+    assert len(body["criteria"]) == 7
     assert body["speaking_mastery"] > 0
 
     speaking_rows = [

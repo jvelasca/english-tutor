@@ -28,6 +28,7 @@ SPEAKING_EVIDENCE_OPTIONAL_FIELDS: tuple[str, ...] = (
     "self_corrections",
     "hesitations",
     "repetitions",
+    "interaction",
 )
 
 
@@ -63,12 +64,14 @@ def build_speaking_prompt(task: str, heard: str) -> list[dict]:
         '- "self_corrections": integer >= 0 — times the student corrected '
         "themselves.\n"
         '- "hesitations": integer >= 0 — filled pauses or false starts.\n'
-        '- "repetitions": integer >= 0 — words or phrases repeated.\n\n'
+        '- "repetitions": integer >= 0 — words or phrases repeated.\n'
+        '- "interaction": number between 0.0 and 1.0 — how well the student '
+        "takes turns, responds appropriately and keeps the exchange going.\n\n"
         "Example of the expected JSON:\n"
         '{"task_achieved": true, "grammar_errors": 1, '
         '"lexical_tokens": ["student", "live"], "coherence": 0.8, '
         '"discourse_markers": 2, "self_corrections": 0, "hesitations": 1, '
-        '"repetitions": 0}\n\n'
+        '"repetitions": 0, "interaction": 0.7}\n\n'
         "Do not output any text before or after the JSON. Do not wrap it in "
         "markdown code fences."
     )
@@ -169,6 +172,7 @@ def parse_speaking_evidence(raw: str) -> dict | None:
     self_corrections = _parse_count_field(data, "self_corrections", 0)
     hesitations = _parse_count_field(data, "hesitations", 0)
     repetitions = _parse_count_field(data, "repetitions", 0)
+    interaction = _parse_float_field(data, "interaction", None)
 
     result: dict = {
         "task_achieved": task_achieved,
@@ -182,6 +186,8 @@ def parse_speaking_evidence(raw: str) -> dict | None:
     }
     if cohesion is not None:
         result["cohesion"] = cohesion
+    if interaction is not None:
+        result["interaction"] = interaction
     return result
 
 
