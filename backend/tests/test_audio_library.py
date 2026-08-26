@@ -22,7 +22,10 @@ from services.audio_library import (
     load_manifest,
     recorded_audio_path,
     resolve_file,
+    validate_audio_entries,
+    validate_audio_entry,
     validate_manifest,
+    wav_probe,
 )
 
 
@@ -342,3 +345,96 @@ def test_audio_ready_recorded_when_file_exists(monkeypatch, tmp_path):
 def test_audio_ready_recorded_false_when_missing(monkeypatch, tmp_path):
     _patch_library(monkeypatch, tmp_path, write_file=False)
     assert listening_domain.audio_ready(_recorded_question()) is False
+
+
+# --- validate_audio_entry / validate_audio_entries (P0-2) --------------------
+
+
+def test_wav_probe_reads_synthetic_wav(tmp_path):
+    _write_wav(tmp_path / "x.wav", duration=2.0, framerate=8000)
+    meta = wav_probe(tmp_path / "x.wav")
+    assert meta["channels"] == 1
+    assert meta["framerate"] == 8000
+    assert meta["sample_width"] == 2
+    assert meta["duration"] == pytest.approx(2.0)
+
+
+def test_validate_audio_entry_no_duration_issue(tmp_path):
+    _write_wav(tmp_path / "a1.wav", duration=2.0)
+    entry = AudioLibraryEntry(audio_id="a1", file="a1.wav", duration=2.0)
+    issues = validate_audio_entry(entry, base=tmp_path)
+    assert not any(i.field == "duration" for i in issues)
+
+
+def test_validate_audio_entry_duration_mismatch(tmp_path):
+    _write_wav(tmp_path / "a1.wav", duration=1.0)
+    entry = AudioLibraryEntry(audio_id="a1", file="a1.wav", duration=5.0)
+    issues = validate_audio_entry(entry, base=tmp_path)
+    duration_issues = [i for i in issues if i.field == "duration"]
+    assert len(duration_issues) == 1
+    issue = duration_issues[0]
+    assert issue.severity == "error"
+    assert issue.declared == "5.0"
+    assert issue.measured == "1.0"
+
+
+def test_validate_audio_entry_mono_speaker_count_warning(tmp_path):
+    _write_wav(tmp_path / "a1.wav", duration=1.0)
+    entry = AudioLibraryEntry(
+        audio_id="a1", file="a1.wav", duration=1.0, speaker_count=3
+    )
+    issues = validate_audio_entry(entry, base=tmp_path)
+    sc = [i for i in issues if i.field == "speaker_count"]
+    assert len(sc) == 1
+    assert sc[0].severity == "warning"
+    assert not any(i.field == "speaker_count" and i.severity == "error" for i in issues)
+
+
+def test_validate_audio_entry_not_verifiable_fields_are_info(tmp_path):
+    _write_wav(tmp_path / "a1.wav", duration=1.0)
+    entry = AudioLibraryEntry(
+        audio_id="a1",
+        file="a1.wav",
+        duration=1.0,
+        speech_rate=150.0,
+        noise_level=2,
+        accent="br",
+    )
+    issues = validate_audio_entry(entry, base=tmp_path)
+    assert not any(i.severity == "error" for i in issues)
+    by_field = {i.field: i for i in issues}
+    assert by_field["speech_rate"].severity == "info"
+    assert by_field["noise_level"].severity == "info"
+    assert by_field["accent"].severity == "info"
+
+
+def test_validate_audio_entry_non_wav_error(tmp_path):
+    p = tmp_path / "not_a_wav.wav"
+    p.write_bytes(b"this is not a wav file")
+    entry = AudioLibraryEntry(audio_id="a1", file="not_a_wav.wav", duration=1.0)
+    issues = validate_audio_entry(entry, base=tmp_path)
+    assert any(i.severity == "error" for i in issues)
+
+
+def test_validate_audio_entry_escapes_library_error(tmp_path):
+    entry = AudioLibraryEntry(audio_id="a1", file="../secret.wav", duration=1.0)
+    issues = validate_audio_entry(entry, base=tmp_path)
+    assert any(
+        i.severity == "error" and i.message == "invalid path (escapes library)"
+        for i in issues
+    )
+
+
+def test_validate_audio_entries_maps_all_ids(tmp_path):
+    _write_wav(tmp_path / "a1.wav", duration=1.0)
+    _write_wav(tmp_path / "a2.wav", duration=1.0)
+    manifest = _manifest_with(
+        [
+            AudioLibraryEntry(audio_id="a1", file="a1.wav", duration=1.0),
+            AudioLibraryEntry(audio_id="a2", file="a2.wav", duration=5.0),
+        ]
+    )
+    result = validate_audio_entries(manifest, base=tmp_path)
+    assert set(result) == {"a1", "a2"}
+    assert result["a1"] == []
+    assert any(i.field == "duration" for i in result["a2"])

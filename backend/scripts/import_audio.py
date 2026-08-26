@@ -35,6 +35,7 @@ from services.audio_library import (  # noqa: E402
     library_dir,
     load_manifest,
     manifest_path,
+    validate_audio_entries,
     validate_manifest,
 )
 
@@ -63,13 +64,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Importa un WAV humano a la biblioteca (manifest + copia)."
     )
-    parser.add_argument("--wav", required=True, help="Ruta al WAV a importar")
     parser.add_argument(
-        "--audio-id", required=True, help="Identificador único de audio"
+        "--validate-all",
+        action="store_true",
+        help="Valida audio↔metadata de todo el manifest y vuelca issues en JSON",
     )
-    parser.add_argument(
-        "--speaker-id", required=True, help="Identificador del hablante"
-    )
+    parser.add_argument("--wav", help="Ruta al WAV a importar")
+    parser.add_argument("--audio-id", help="Identificador único de audio")
+    parser.add_argument("--speaker-id", help="Identificador del hablante")
     parser.add_argument(
         "--file",
         help="Ruta relativa destino (por defecto {cefr}/{speaker_id}/{audio_id}.wav)",
@@ -117,8 +119,38 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_all() -> int:
+    """Audita todo el manifest: resuelve cada WAV y vuelca issues por `audio_id`."""
+    manifest = load_manifest()
+    if not manifest.entries:
+        print("No hay entradas en el manifest.")
+        return 0
+    result = validate_audio_entries(manifest)
+    print(
+        json.dumps(
+            {
+                audio_id: [issue.model_dump() for issue in issues]
+                for audio_id, issues in result.items()
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+
+    if args.validate_all:
+        return _validate_all()
+
+    if not args.wav or not args.audio_id or not args.speaker_id:
+        print(
+            "[FAIL] --wav, --audio-id y --speaker-id son obligatorios para importar",
+            file=sys.stderr,
+        )
+        return 2
 
     wav_path = Path(args.wav)
     meta = wav_metadata(wav_path)

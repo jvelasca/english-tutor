@@ -21,6 +21,7 @@ Separación conceptual (espejo de `services/curriculum.py`):
 from __future__ import annotations
 
 import json
+import wave
 from collections import Counter
 from pathlib import Path
 from typing import Literal, get_args
@@ -234,3 +235,218 @@ def validate_manifest(manifest: AudioLibraryManifest | None = None) -> list[str]
         if entry.speech_rate is not None and entry.speech_rate <= 0:
             errors.append(f"{entry.audio_id}: speech_rate must be > 0")
     return errors
+
+
+class AudioValidationIssue(BaseModel):
+    """Un problema detectado al contrastar metadata declarado vs WAV real.
+
+    `field` identifica qué metadato se está cuestionando; `severity` es
+    ``"error"`` | ``"warning"`` | ``"info"``. `declared`/`measured` llevan los
+    valores (si existen) como strings para poder serializarlos a JSON.
+    """
+
+    field: str
+    severity: str  # "error" | "warning" | "info"
+    declared: str | None
+    measured: str | None
+    message: str
+
+
+def wav_probe(path: Path) -> dict:
+    """Lee un WAV real solo con `wave` (stdlib) y devuelve sus metadatos físicos.
+
+    Devuelve ``{"duration": float, "channels": int, "framerate": int,
+    "sample_width": int}`` con ``duration = nframes / framerate``. Lanza
+    ``wave.Error``/``OSError`` si `path` no abre como WAV (o ``ValueError`` si el
+    `framerate` es 0), para no devolver una duración inventada.
+    """
+    with wave.open(str(path), "rb") as w:
+        framerate = w.getframerate()
+        if framerate <= 0:
+            raise ValueError(f"{path}: framerate must be > 0")
+        return {
+            "duration": w.getnframes() / framerate,
+            "channels": w.getnchannels(),
+            "framerate": framerate,
+            "sample_width": w.getsampwidth(),
+        }
+
+
+def validate_audio_entry(
+    entry: AudioLibraryEntry, base: Path | None = None
+) -> list[AudioValidationIssue]:
+    """Contrasta el metadata declarado de una entrada contra su WAV real.
+
+    Validación de **contenido** (requiere el WAV en disco), a diferencia de
+    `validate_manifest` que valida solo la **estructura**. Es honesta con lo no
+    medible: los campos acústicos que no se pueden verificar de forma determinista
+    se marcan como `info` (nunca `error`). Devuelve issues `AudioValidationIssue`.
+    """
+    issues: list[AudioValidationIssue] = []
+
+    # --- Metadatos no verificables de forma determinista (solo `info`) ---
+    if entry.speech_rate is not None:
+        issues.append(
+            AudioValidationIssue(
+                field="speech_rate",
+                severity="info",
+                declared=str(entry.speech_rate),
+                measured=None,
+                message=(
+                    "speech_rate (WPM) declarado no se valida automáticamente; "
+                    "requiere alineación fonética/ASR"
+                ),
+            )
+        )
+    if entry.noise_level > 0:
+        issues.append(
+            AudioValidationIssue(
+                field="noise_level",
+                severity="info",
+                declared=str(entry.noise_level),
+                measured=None,
+                message=(
+                    "noise_level no verificable de forma determinista (pendiente "
+                    "de análisis acústico)"
+                ),
+            )
+        )
+    if entry.accent not in ("", "neutral"):
+        issues.append(
+            AudioValidationIssue(
+                field="accent",
+                severity="info",
+                declared=entry.accent,
+                measured=None,
+                message=(
+                    "accent no verificable de forma determinista (pendiente de "
+                    "análisis acústico)"
+                ),
+            )
+        )
+    if entry.recording_environment != "studio":
+        issues.append(
+            AudioValidationIssue(
+                field="recording_environment",
+                severity="info",
+                declared=entry.recording_environment,
+                measured=None,
+                message=(
+                    "recording_environment no verificable de forma determinista "
+                    "(pendiente de análisis acústico)"
+                ),
+            )
+        )
+    if entry.prosody != "unknown":
+        issues.append(
+            AudioValidationIssue(
+                field="prosody",
+                severity="info",
+                declared=entry.prosody,
+                measured=None,
+                message=(
+                    "prosody no verificable de forma determinista (pendiente de "
+                    "análisis acústico)"
+                ),
+            )
+        )
+
+    # --- Resolución del archivo ---
+    path = resolve_file(entry, base)
+    if path is None:
+        issues.append(
+            AudioValidationIssue(
+                field="file",
+                severity="error",
+                declared=entry.file,
+                measured=None,
+                message="invalid path (escapes library)",
+            )
+        )
+        return issues
+
+    if not path.exists():
+        issues.append(
+            AudioValidationIssue(
+                field="file",
+                severity="error",
+                declared=entry.file,
+                measured=None,
+                message="file not found",
+            )
+        )
+        return issues
+
+    try:
+        meta = wav_probe(path)
+    except (wave.Error, ValueError, OSError, EOFError):
+        issues.append(
+            AudioValidationIssue(
+                field="file",
+                severity="error",
+                declared=entry.file,
+                measured=None,
+                message="not a valid WAV file",
+            )
+        )
+        return issues
+
+    # --- duration (medible y verificable) ---
+    measured_duration = meta["duration"]
+    tolerance = max(0.5, 0.05 * entry.duration)
+    if abs(entry.duration - measured_duration) > tolerance:
+        issues.append(
+            AudioValidationIssue(
+                field="duration",
+                severity="error",
+                declared=str(entry.duration),
+                measured=str(measured_duration),
+                message=(
+                    f"duration mismatch: declared {entry.duration}s, "
+                    f"measured {measured_duration:.3f}s"
+                ),
+            )
+        )
+
+    # --- speaker_count (solo proxy por nº de canales; nunca `error`) ---
+    channels = meta["channels"]
+    if channels == 1 and entry.speaker_count > 1:
+        issues.append(
+            AudioValidationIssue(
+                field="speaker_count",
+                severity="warning",
+                declared=str(entry.speaker_count),
+                measured=str(channels),
+                message=(
+                    "mono sugiere un único canal; speaker_count>1 no verificable "
+                    "por canales"
+                ),
+            )
+        )
+    elif channels == 2 and entry.speaker_count > 2:
+        issues.append(
+            AudioValidationIssue(
+                field="speaker_count",
+                severity="info",
+                declared=str(entry.speaker_count),
+                measured=str(channels),
+                message="el nº de hablantes no es verificable desde canales",
+            )
+        )
+
+    return issues
+
+
+def validate_audio_entries(
+    manifest: AudioLibraryManifest, base: Path | None = None
+) -> dict[str, list[AudioValidationIssue]]:
+    """Valida el contenido de todas las entradas del manifest contra sus WAV.
+
+    Devuelve un mapa `audio_id -> issues` (una entrada por `audio_id`, con lista
+    vacía cuando no hay issues). Requiere los WAV reales en disco; a diferencia de
+    `validate_manifest`, que no depende de archivos.
+    """
+    return {
+        entry.audio_id: validate_audio_entry(entry, base)
+        for entry in manifest.entries
+    }
