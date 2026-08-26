@@ -43,6 +43,8 @@ export async function streamChat(
   callbacks: StreamCallbacks,
   userId?: string | null,
   objectiveId?: string | null,
+  conversationId?: string | null,
+  messageId?: string | null,
 ): Promise<void> {
   const res = await fetch(`/api/chat/stream${userQuery(userId)}`, {
     method: "POST",
@@ -52,6 +54,8 @@ export async function streamChat(
       messages,
       mode,
       ...(objectiveId ? { objective_id: objectiveId } : {}),
+      ...(conversationId ? { conversation_id: conversationId } : {}),
+      ...(messageId ? { message_id: messageId } : {}),
     }),
   });
 

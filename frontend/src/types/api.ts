@@ -9,6 +9,8 @@ export interface Message {
   role: Role;
   content: string;
   mode?: TutorMode;
+  duration_ms?: number;
+  latency_ms?: number;
 }
 
 export interface ChatResponse {

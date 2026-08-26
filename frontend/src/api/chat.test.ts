@@ -95,4 +95,35 @@ describe("chat api", () => {
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
     expect(body.objective_id).toBeUndefined();
   });
+
+  it("streamChat incluye conversation_id y message_id cuando se pasan", async () => {
+    const fn = mockStreamFetch();
+    await streamChat(
+      [MSG],
+      "m",
+      "conversation",
+      { onDelta: () => {}, onDone: () => {}, onError: () => {} },
+      "u1",
+      undefined,
+      "conv-1",
+      "msg-1",
+    );
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body.conversation_id).toBe("conv-1");
+    expect(body.message_id).toBe("msg-1");
+  });
+
+  it("streamChat omite conversation_id y message_id cuando no se pasan", async () => {
+    const fn = mockStreamFetch();
+    await streamChat(
+      [MSG],
+      "m",
+      "conversation",
+      { onDelta: () => {}, onDone: () => {}, onError: () => {} },
+      "u1",
+    );
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body.conversation_id).toBeUndefined();
+    expect(body.message_id).toBeUndefined();
+  });
 });

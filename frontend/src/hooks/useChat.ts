@@ -14,6 +14,7 @@ import { getProgressHistory } from "../api/progress";
 import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
+import { turnTelemetry } from "../utils/telemetry";
 import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";import {
   LAYOUT_DEFAULTS,
   parseLayout,
@@ -65,10 +66,22 @@ export function useChat() {
   } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<string>(DEFAULT_MODEL);
+  const composeStartedAt = useRef<number | null>(null);
+  const lastAssistantAt = useRef<number | null>(null);
 
   useEffect(() => {
     modelRef.current = model;
   }, [model]);
+
+  // Marca el instante en que el alumno empieza a componer un mensaje (input de
+  // vacío a no-vacío) para medir la duración de su turno.
+  useEffect(() => {
+    if (input === "") {
+      composeStartedAt.current = null;
+    } else if (composeStartedAt.current === null) {
+      composeStartedAt.current = performance.now();
+    }
+  }, [input]);
 
   const refreshConversations = useCallback(async () => {
     if (!currentUserId) return;
@@ -368,12 +381,27 @@ export function useChat() {
         }
       }
 
+      const sentAt = performance.now();
+      const { duration_ms, latency_ms } = turnTelemetry({
+        sentAt,
+        composeStartedAt: composeStartedAt.current,
+        lastAssistantAt: lastAssistantAt.current,
+      });
+
       const history: Message[] = [
         ...messages,
-        { id: crypto.randomUUID(), role: "user", content: trimmed, mode },
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: trimmed,
+          mode,
+          ...(duration_ms != null ? { duration_ms } : {}),
+          ...(latency_ms != null ? { latency_ms } : {}),
+        },
       ];
       setMessages(history);
       setLoading(true);
+      composeStartedAt.current = null;
 
       const assistantId = crypto.randomUUID();
       let assistantReply = "";
@@ -399,16 +427,19 @@ export function useChat() {
               return next;
             });
           },
-          onDone: () => {},
+          onDone: () => {
+            lastAssistantAt.current = performance.now();
+          },
           onError: (message) => {
             errored = true;
             assistantReply = `Error al hablar con el modelo: ${message}`;
+            lastAssistantAt.current = performance.now();
             setMessages((prev) => [
               ...prev,
               { id: crypto.randomUUID(), role: "assistant", content: assistantReply, mode },
             ]);
           },
-        }, currentUserId, activeObjective?.id);
+        }, currentUserId, activeObjective?.id, cid, assistantId);
       } catch (e) {
         errored = true;
         assistantReply = `Error al hablar con el modelo: ${(e as Error).message}`;
@@ -418,6 +449,7 @@ export function useChat() {
         ]);
       } finally {
         setLoading(false);
+        lastAssistantAt.current = performance.now();
       }
 
       if (assistantReply && !errored) {

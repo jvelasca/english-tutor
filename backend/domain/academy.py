@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from config import DEFAULT_MODEL
 from domain.errors import EvidenceInvariantError
 from repositories import academy as academy_repo
+from repositories import conversations as conversations_repo
 from repositories import grammar as grammar_repo
 from repositories import listening as listening_repo
 from schemas.academy import (
@@ -76,6 +77,7 @@ from services.curriculum import (
     load_assessments,
     next_level_id,
 )
+from services.interaction import interaction_evidence
 from services.listening import listening_diagnostic
 
 logger = logging.getLogger(__name__)
@@ -643,12 +645,41 @@ async def start_speaking_assessment(
     )
 
 
+async def _inject_interaction_objective(
+    evidence: dict, conversation_id: str | None, user_id: str
+) -> None:
+    """Inyecta la señal objetiva de interacción en la evidencia si hay conversación.
+
+    Si `conversation_id` está presente, recupera los turnos de esa conversación y,
+    cuando `interaction_evidence` observa al menos una sub-dimensión objetiva
+    (`turn_balance` o `turn_completion`), asigna el resultado a
+    `evidence["interaction_objective"]` para que el scorer determinista lo fusione
+    con la señal semántica del LLM (`INTERACTION_OBJECTIVE_WEIGHT`). Sin
+    conversación (o sin telemetría observable), la evidencia queda intacta
+    (backward-compatible).
+    """
+    if not conversation_id:
+        return
+    turns = await run_in_threadpool(
+        conversations_repo.get_turns, conversation_id, user_id
+    )
+    if turns is None:
+        return
+    objective = interaction_evidence(turns)
+    if (
+        objective["turn_balance"] is not None
+        or objective["turn_completion"] is not None
+    ):
+        evidence["interaction_objective"] = objective
+
+
 async def submit_speaking_assessment_part(
     user_id: str,
     session_id: int,
     heard: str,
     duration_seconds: float | None = None,
     model: str = DEFAULT_MODEL,
+    conversation_id: str | None = None,
 ) -> SpeakingAssessmentPartOut | None:
     """Puntúa la siguiente parte de una sesión y avanza la traza.
 
@@ -678,6 +709,8 @@ async def submit_speaking_assessment_part(
     )
     if evidence is None:
         return None
+
+    await _inject_interaction_objective(evidence, conversation_id, user_id)
 
     result = speaking_svc.scores_from_evidence(
         evidence, heard, duration_seconds, task_type=part["task_type"]
@@ -1143,6 +1176,7 @@ async def submit_speaking_task(
     difficulty: int | None = None,
     difficulty_vector: dict[str, int] | None = None,
     expected: str | None = None,
+    conversation_id: str | None = None,
 ) -> SpeakingTaskResultOut | None:
     """Puntúa una respuesta oral libre (tarea) usando evidencia extraída por el LLM.
 
@@ -1164,6 +1198,7 @@ async def submit_speaking_task(
     evidence = await speaking_llm.extract_speaking_evidence(task, heard, model)
     if evidence is None:
         return None
+    await _inject_interaction_objective(evidence, conversation_id, user_id)
     profile_difficulty = (
         difficulty
         if difficulty is not None

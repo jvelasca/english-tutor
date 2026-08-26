@@ -353,6 +353,9 @@ class SpeakingTaskSubmitRequest(BaseModel):
     # si se aporta (p. ej. una lectura o frase modelo), el scorer calcula el
     # criterio `pronunciation` con el módulo de fonética; si no, queda no observado.
     expected: str | None = Field(default=None, max_length=2000)
+    # Conversación opcional (InteractionEvidence 2.0): si se aporta, el scorer de
+    # speaking fusiona la señal objetiva de turnos en el criterio `interaction`.
+    conversation_id: str | None = None
 
 
 class SpeakingTaskResultOut(BaseModel):
@@ -451,6 +454,9 @@ class SpeakingAssessmentPartSubmit(BaseModel):
     heard: str = Field(min_length=1, max_length=2000)
     duration_seconds: float | None = None
     model: str = Field(default=DEFAULT_MODEL, min_length=1)
+    # Conversación opcional (InteractionEvidence 2.0): si se aporta, el scorer de
+    # speaking fusiona la señal objetiva de turnos en el criterio `interaction`.
+    conversation_id: str | None = None
 
 
 class SpeakingAssessmentFinishRequest(BaseModel):

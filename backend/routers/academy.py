@@ -262,6 +262,7 @@ async def objective_speaking_task(
         body.difficulty,
         body.difficulty_vector,
         body.expected,
+        body.conversation_id,
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
@@ -373,6 +374,7 @@ async def speaking_assessment_part(
         body.heard,
         body.duration_seconds,
         body.model,
+        body.conversation_id,
     )
     if result is None:
         raise HTTPException(

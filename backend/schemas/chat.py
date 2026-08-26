@@ -18,6 +18,11 @@ class ChatMessage(BaseModel):
     content: str = Field(min_length=1, max_length=MAX_CONTENT_CHARS)
     mode: str | None = None
     id: str | None = None
+    # Telemetría de turno opcional (InteractionEvidence 2.0): duración del turno y
+    # latencia antes de responder, en ms. La captura el frontend para el turno del
+    # alumno y el backend la persiste vía `save_conversation`/`save_message`.
+    duration_ms: int | None = None
+    latency_ms: int | None = None
 
 
 class ChatRequest(BaseModel):

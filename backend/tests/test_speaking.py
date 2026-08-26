@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from main import app
 from repositories import academy as academy_repo
+from repositories import conversations as conversations_repo
 from repositories import db
 from repositories import users as users_repo
 from routers import academy as academy_router
@@ -1140,3 +1141,111 @@ def test_interaction_score_legacy_fallback_unchanged():
 
 def test_interaction_score_objective_empty_dict_is_none():
     assert speaking_svc._interaction_score({"interaction_objective": {}}) is None
+
+
+# --- V1.17: puente conversación → speaking (inyección de interaction_objective)
+
+
+def test_scores_from_evidence_interaction_objective_fused():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": [],
+        "coherence": 0.9,
+        "appropriate_responses": 0.8,
+        "turn_completion": 0.6,
+        "follow_up_questions": 0.7,
+        "topic_maintenance": 0.9,
+        "clarification_requests": 0.5,
+        "interaction_objective": {"turn_balance": 0.8, "turn_completion": 0.6},
+    }
+    result = speaking_svc.scores_from_evidence(
+        evidence, "I am a student", 60.0, task_type="conversation"
+    )
+    assert result["observed"]["interaction"] is True
+    # Señal semántica = 0.715; señal objetiva = (0.5·0.8 + 0.5·0.6) = 0.7.
+    semantic = 0.715
+    objective = 0.7
+    fused = round(0.5 * objective + 0.5 * semantic, 3)
+    interaction = result["criteria"]["interaction"]
+    assert min(objective, semantic) <= interaction <= max(objective, semantic)
+    assert interaction == pytest.approx(fused)
+
+
+def test_scores_from_evidence_interaction_without_objective_unchanged():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": [],
+        "coherence": 0.9,
+        "appropriate_responses": 0.8,
+        "turn_completion": 0.6,
+        "follow_up_questions": 0.7,
+        "topic_maintenance": 0.9,
+        "clarification_requests": 0.5,
+    }
+    result = speaking_svc.scores_from_evidence(
+        evidence, "I am a student", 60.0, task_type="conversation"
+    )
+    # Sin interaction_objective, interaction = señal semántica (backward-compat).
+    assert result["observed"]["interaction"] is True
+    assert result["criteria"]["interaction"] == pytest.approx(0.715)
+
+
+def test_speaking_task_with_conversation_injects_interaction(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    # Conversación con turnos que llevan telemetría (2 alumno, 1 asistente).
+    cid = conversations_repo.create_conversation(a)["id"]
+    conversations_repo.save_conversation(
+        cid,
+        a,
+        "T",
+        [
+            {
+                "id": "m1",
+                "role": "user",
+                "content": "Hi",
+                "duration_ms": 2000,
+                "latency_ms": 400,
+            },
+            {
+                "id": "m2",
+                "role": "assistant",
+                "content": "Hello",
+                "duration_ms": 1000,
+                "latency_ms": 200,
+            },
+            {
+                "id": "m3",
+                "role": "user",
+                "content": "Bye",
+                "duration_ms": 3000,
+                "latency_ms": 600,
+            },
+        ],
+    )
+    fake = FakeOllamaClient(
+        content='{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student", "live", "city"], "coherence": 0.8}'
+    )
+    monkeypatch.setattr(llm, "get_client", lambda: fake)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/speaking/task",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "task": "Introduce yourself",
+                "heard": "I am a student",
+                "task_type": "conversation",
+                "conversation_id": cid,
+            },
+        )
+    assert r.status_code == 200
+    body = r.json()
+    # Sin evidencia semántica de interacción, la señal objetiva de turnos debe
+    # hacer observable el criterio `interaction` (fusión end-to-end).
+    assert body["observed"]["interaction"] is True
+    assert body["criteria"]["interaction"] == pytest.approx(0.619)
