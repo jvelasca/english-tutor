@@ -343,6 +343,16 @@ class SpeakingTaskSubmitRequest(BaseModel):
     heard: str = Field(min_length=1, max_length=2000)
     model: str = Field(default=DEFAULT_MODEL, min_length=1)
     duration_seconds: float | None = None
+    # Perfil de tarea (V1.16): tipo determina los pesos de rúbrica; `difficulty` o
+    # `difficulty_vector` fijan la dificultad escalar (1..6) que se registra en la
+    # evidencia. Opcionales por backward-compat (sin ellos, difficulty=1).
+    task_type: str | None = None
+    difficulty: int | None = Field(default=None, ge=1, le=6)
+    difficulty_vector: dict[str, int] | None = None
+    # Referencia opcional para integrar pronunciación en el flujo libre (V1.16):
+    # si se aporta (p. ej. una lectura o frase modelo), el scorer calcula el
+    # criterio `pronunciation` con el módulo de fonética; si no, queda no observado.
+    expected: str | None = Field(default=None, max_length=2000)
 
 
 class SpeakingTaskResultOut(BaseModel):
@@ -362,6 +372,12 @@ class SpeakingCriterionOut(BaseModel):
     min: float | None = None
     max: float | None = None
     review_due: bool
+    # Señales del Student Model (V1.16 S5): EMA, lifetime, consistencia y
+    # estabilidad por criterio. El diagnóstico es una VISTA de estas señales.
+    recent_score: float | None = None
+    lifetime_score: float | None = None
+    confidence: float | None = None
+    stability: float | None = None
 
 
 class SpeakingTrend(BaseModel):
@@ -377,8 +393,114 @@ class SpeakingDiagnostic(BaseModel):
     recommendation: str
     attempts: int
     overall_mean: float | None = None
+    overall_recent: float | None = None
     trend: SpeakingTrend
     rubric_version: str = ""
+
+
+class SpeakingLevelOut(BaseModel):
+    level: str | None = None
+    numeric: float | None = None
+    score: float | None = None
+    confidence: float = 0.0
+    attempts: int = 0
+
+
+class SpeakingJourneyStep(BaseModel):
+    at: str
+    numeric: float
+    level: str
+    confidence: float
+
+
+class SpeakingJourneyOut(BaseModel):
+    current_level: str | None = None
+    current_numeric: float | None = None
+    current_confidence: float = 0.0
+    attempts: int = 0
+    steps: list[SpeakingJourneyStep] = Field(default_factory=list)
+
+
+# --- Speaking Assessment 1.0 ---------------------------------------------
+
+
+class SpeakingAssessmentPartInfo(BaseModel):
+    """Descripción de una parte del instrumento (para presentar al alumno)."""
+
+    id: str
+    part_index: int
+    title: str
+    task_type: str
+    cefr_target: str
+    duration_target: float
+    prompt: str
+    difficulty: int
+
+
+class SpeakingAssessmentStartOut(BaseModel):
+    session_id: int
+    assessment_version: str
+    total_parts: int
+    part: SpeakingAssessmentPartInfo | None = None
+
+
+class SpeakingAssessmentPartSubmit(BaseModel):
+    """Envío de la siguiente parte: `session_id` identifica la sesión trazable."""
+
+    session_id: int
+    heard: str = Field(min_length=1, max_length=2000)
+    duration_seconds: float | None = None
+    model: str = Field(default=DEFAULT_MODEL, min_length=1)
+
+
+class SpeakingAssessmentFinishRequest(BaseModel):
+    session_id: int
+
+
+class SpeakingAssessmentPartScores(BaseModel):
+    overall: float
+    criteria: dict[str, float | None]
+    observed: dict[str, bool] = Field(default_factory=dict)
+
+
+class SpeakingAssessmentPartOut(BaseModel):
+    """Resultado de enviar una parte del Speaking Assessment."""
+
+    session_id: int
+    part_index: int
+    task_type: str
+    cefr_target: str
+    prompt: str
+    part_scores: SpeakingAssessmentPartScores
+    done: bool
+    next_part: SpeakingAssessmentPartInfo | None = None
+
+
+class SpeakingAssessmentResultOut(BaseModel):
+    """Resultado final agregado de un Speaking Assessment."""
+
+    session_id: int
+    level: str | None = None
+    numeric: float | None = None
+    score: float | None = None
+    confidence: float = 0.0
+    attempts: int = 0
+    criteria: list[SpeakingCriterionOut] = Field(default_factory=list)
+    weak: list[str] = Field(default_factory=list)
+    recommendation: str = ""
+    assessment_version: str = ""
+    rubric_version: str = ""
+
+
+class SpeakingAssessmentStateOut(BaseModel):
+    """Estado/resultado de una sesión de Speaking Assessment."""
+
+    session_id: int
+    status: str
+    assessment_version: str
+    total_parts: int
+    next_part_index: int
+    final_result: SpeakingAssessmentResultOut | None = None
 
 
 class SkillProfileOut(BaseModel):

@@ -499,6 +499,95 @@ def list_placement_sessions(user_id: str) -> list[dict]:
     return [s for s in sessions if s is not None]
 
 
+# --- Sesión trazable de Speaking Assessment 1.0 ---------------------------
+
+
+def create_speaking_assessment_session(
+    user_id: str,
+    assessment_version: str,
+    parts: list[dict],
+) -> dict | None:
+    """Crea una sesión de Speaking Assessment trazable. None si el usuario no existe."""
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "INSERT INTO speaking_assessment_sessions "
+            "(user_id, status, assessment_version, next_part_index, parts_json, "
+            "created_at, updated_at) VALUES (?, 'in_progress', ?, 0, ?, ?, ?)",
+            (
+                user_id,
+                assessment_version,
+                json.dumps(parts, ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+    return get_speaking_assessment_session(cur.lastrowid)
+
+
+def update_speaking_assessment_session(
+    session_id: int,
+    *,
+    next_part_index: int | None = None,
+    evidence: list[dict] | None = None,
+    final_result: dict | None = None,
+    status: str | None = None,
+) -> dict | None:
+    """Actualiza la traza de una sesión (parte siguiente, evidencia, resultado)."""
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        if next_part_index is not None:
+            conn.execute(
+                "UPDATE speaking_assessment_sessions SET next_part_index = ? "
+                "WHERE id = ?",
+                (next_part_index, session_id),
+            )
+        if evidence is not None:
+            conn.execute(
+                "UPDATE speaking_assessment_sessions SET evidence_json = ? "
+                "WHERE id = ?",
+                (json.dumps(evidence, ensure_ascii=False), session_id),
+            )
+        if final_result is not None:
+            conn.execute(
+                "UPDATE speaking_assessment_sessions SET final_result_json = ? "
+                "WHERE id = ?",
+                (json.dumps(final_result, ensure_ascii=False), session_id),
+            )
+        if status is not None:
+            conn.execute(
+                "UPDATE speaking_assessment_sessions SET status = ? WHERE id = ?",
+                (status, session_id),
+            )
+        conn.execute(
+            "UPDATE speaking_assessment_sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
+    return get_speaking_assessment_session(session_id)
+
+
+def get_speaking_assessment_session(session_id: int) -> dict | None:
+    """Lee una sesión de Speaking Assessment con sus columnas JSON ya parseadas."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT id, user_id, status, assessment_version, next_part_index, "
+            "parts_json, evidence_json, final_result_json, created_at, updated_at "
+            "FROM speaking_assessment_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    d["parts"] = json.loads(d.pop("parts_json"))
+    d["evidence"] = json.loads(d.pop("evidence_json"))
+    d["final_result"] = (
+        json.loads(d.pop("final_result_json")) if d.get("final_result_json") else None
+    )
+    return d
+
+
 # --- Calibración observacional de ítems de placement (V1.7) ---------------
 
 

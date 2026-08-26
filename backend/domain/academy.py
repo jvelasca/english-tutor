@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from starlette.concurrency import run_in_threadpool
 
+from config import DEFAULT_MODEL
 from domain.errors import EvidenceInvariantError
 from repositories import academy as academy_repo
 from repositories import grammar as grammar_repo
@@ -44,6 +45,12 @@ from schemas.academy import (
     SessionOut,
     SessionStepOut,
     SkillScoreOut,
+    SpeakingAssessmentPartInfo,
+    SpeakingAssessmentPartOut,
+    SpeakingAssessmentPartScores,
+    SpeakingAssessmentResultOut,
+    SpeakingAssessmentStartOut,
+    SpeakingAssessmentStateOut,
     SpeakingResultOut,
     SpeakingTaskResultOut,
     StudentModelOut,
@@ -53,7 +60,7 @@ from schemas.academy import (
     WritingTaskResultOut,
 )
 from services import academy as academy_svc
-from services import adaptive, speaking_llm, writing_llm
+from services import adaptive, speaking_assessment, speaking_llm, writing_llm
 from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
 from services import writing as writing_svc
@@ -62,6 +69,7 @@ from services.curriculum import (
     ASSESSMENT_VERSION,
     CEFR_ORDER,
     PLACEMENT_VERSION,
+    SPEAKING_ASSESSMENT_VERSION,
     Level,
     get_objective,
     load_all_levels,
@@ -436,7 +444,9 @@ async def _annotated_profile(user_id: str, lv: Level) -> list[dict]:
     # Puente con el motor de speaking (V1.15): expone sus criterios de rúbrica como
     # sub-destrezas de 'speaking' (mismo patrón que listening).
     speaking_rows = [r for r in evidence_rows if r.get("skill") == "speaking"]
-    speaking_subskills = speaking_svc.speaking_diagnostic(speaking_rows)["criteria"]
+    speaking_subskills = speaking_svc.speaking_diagnostic(speaking_rows, now=now)[
+        "criteria"
+    ]
     trends = await _skill_trends(user_id)
     for entry in skills:
         if entry["skill"] == "listening":
@@ -552,7 +562,227 @@ async def get_speaking_diagnostic(user_id: str) -> dict:
     """
     rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
     speaking_rows = [r for r in rows if r.get("skill") == "speaking"]
-    return speaking_svc.speaking_diagnostic(speaking_rows)
+    now = datetime.now(timezone.utc).isoformat()
+    return speaking_svc.speaking_diagnostic(speaking_rows, now=now)
+
+
+async def get_speaking_level(user_id: str) -> dict:
+    """Speaking Assessment 1.0: nivel CEFR continuo de speaking + confianza."""
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    speaking_rows = [r for r in rows if r.get("skill") == "speaking"]
+    return speaking_svc.speaking_level(speaking_rows)
+
+
+async def get_speaking_journey(user_id: str) -> dict:
+    """Speaking Journey (CEFR): trayectoria de nivel y confianza de speaking."""
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    speaking_rows = [r for r in rows if r.get("skill") == "speaking"]
+    return speaking_svc.speaking_journey(speaking_rows)
+
+
+# --- Speaking Assessment 1.0 (sesión trazable + instrumento versionado) ----
+
+
+def _speaking_part_info(part: dict) -> SpeakingAssessmentPartInfo:
+    """Proyecta una parte del instrumento al schema de presentación."""
+    return SpeakingAssessmentPartInfo(
+        id=part["id"],
+        part_index=part["part_index"],
+        title=part["title"],
+        task_type=part["task_type"],
+        cefr_target=part["cefr_target"],
+        duration_target=part["duration_target"],
+        prompt=part["prompt"],
+        difficulty=part["difficulty"],
+    )
+
+
+def _speaking_result_out(
+    session_id: int, aggregated: dict
+) -> SpeakingAssessmentResultOut:
+    """Proyecta el dict de `aggregate_assessment` al schema de resultado final."""
+    return SpeakingAssessmentResultOut(
+        session_id=session_id,
+        level=aggregated["level"],
+        numeric=aggregated["numeric"],
+        score=aggregated["score"],
+        confidence=aggregated["confidence"],
+        attempts=aggregated["attempts"],
+        criteria=aggregated["criteria"],
+        weak=aggregated["weak"],
+        recommendation=aggregated["recommendation"],
+        assessment_version=aggregated["assessment_version"],
+        rubric_version=aggregated["rubric_version"],
+    )
+
+
+async def start_speaking_assessment(
+    user_id: str,
+) -> SpeakingAssessmentStartOut | None:
+    """Inicia una sesión de Speaking Assessment trazable y devuelve la 1ª parte.
+
+    Persiste una fila en `speaking_assessment_sessions` con las 4 partes del
+    instrumento (y su `assessment_version`) para reconstruir qué se evaluó y con
+    qué dificultad. El motor de scoring sigue siendo stateless y determinista.
+    """
+    parts = speaking_assessment.assessment_parts()
+    session = await run_in_threadpool(
+        academy_repo.create_speaking_assessment_session,
+        user_id,
+        SPEAKING_ASSESSMENT_VERSION,
+        parts,
+    )
+    if session is None:
+        return None
+    first = parts[0] if parts else None
+    return SpeakingAssessmentStartOut(
+        session_id=session["id"],
+        assessment_version=SPEAKING_ASSESSMENT_VERSION,
+        total_parts=len(parts),
+        part=_speaking_part_info(first) if first else None,
+    )
+
+
+async def submit_speaking_assessment_part(
+    user_id: str,
+    session_id: int,
+    heard: str,
+    duration_seconds: float | None = None,
+    model: str = DEFAULT_MODEL,
+) -> SpeakingAssessmentPartOut | None:
+    """Puntúa la siguiente parte de una sesión y avanza la traza.
+
+    El LLM extrae la evidencia (`speaking_llm.extract_speaking_evidence`) y el
+    scorer determinista (`scores_from_evidence`) calcula criterios y overall con el
+    `task_type`/`difficulty` de la parte. La evidencia se persiste en
+    `academy_evidence` (vía `_record_evidence_validated`) y se anexa a la sesión
+    para que `aggregate_assessment` sea trazable. Devuelve None si la sesión no
+    existe, no pertenece al usuario, ya terminó, no quedan partes o el LLM no
+    produjo evidencia válida.
+    """
+    session = await run_in_threadpool(
+        academy_repo.get_speaking_assessment_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    if session["status"] == "finished":
+        return None
+    parts = session["parts"]
+    next_index = session["next_part_index"]
+    if next_index >= len(parts):
+        return None  # ya se enviaron todas las partes; llamar a finish
+    part = parts[next_index]
+
+    evidence = await speaking_llm.extract_speaking_evidence(
+        part["prompt"], heard, model
+    )
+    if evidence is None:
+        return None
+
+    result = speaking_svc.scores_from_evidence(
+        evidence, heard, duration_seconds, task_type=part["task_type"]
+    )
+
+    lv = _levels_by_id.get(await _current_level_id(user_id)) or _levels_by_id["a1"]
+    evidence_rows = speaking_svc.evidence_from_speaking(
+        result,
+        level_id=lv.level_id,
+        objective_id="",
+        curriculum_version=lv.version,
+        assessment_version=SPEAKING_ASSESSMENT_VERSION,
+        difficulty=part["difficulty"],
+    )
+    await _record_evidence_validated(user_id, lv, evidence_rows)
+
+    now = datetime.now(timezone.utc).isoformat()
+    part_evidence = [
+        {
+            "part_index": next_index,
+            "task_type": part["task_type"],
+            "skill": "speaking",
+            "item_id": row["item_id"],
+            "result": row["result"],
+            "difficulty": row["difficulty"],
+            "created_at": now,
+            "assessment_version": row["assessment_version"],
+        }
+        for row in evidence_rows
+    ]
+    combined = session["evidence"] + part_evidence
+    new_next = next_index + 1
+    done = new_next >= len(parts)
+    await run_in_threadpool(
+        academy_repo.update_speaking_assessment_session,
+        session_id,
+        next_part_index=new_next,
+        evidence=combined,
+    )
+    next_part = parts[new_next] if new_next < len(parts) else None
+    return SpeakingAssessmentPartOut(
+        session_id=session_id,
+        part_index=next_index,
+        task_type=part["task_type"],
+        cefr_target=part["cefr_target"],
+        prompt=part["prompt"],
+        part_scores=SpeakingAssessmentPartScores(
+            overall=result["overall"],
+            criteria=result["criteria"],
+            observed=result["observed"],
+        ),
+        done=done,
+        next_part=_speaking_part_info(next_part) if next_part else None,
+    )
+
+
+async def finish_speaking_assessment(
+    user_id: str, session_id: int
+) -> SpeakingAssessmentResultOut | None:
+    """Agrega la evidencia de la sesión y devuelve el resultado final.
+
+    `aggregate_assessment` reutiliza el scorer determinista (`speaking_level` +
+    `speaking_diagnostic`) sobre las filas de evidencia de la sesión, produciendo
+    nivel CEFR continuo, score, confianza y resumen por criterio. El resultado se
+    persiste en la sesión y su `status` pasa a 'finished'. Es idempotente: si ya
+    está terminada, devuelve el resultado guardado.
+    """
+    session = await run_in_threadpool(
+        academy_repo.get_speaking_assessment_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    if session["status"] == "finished" and session["final_result"] is not None:
+        return _speaking_result_out(session_id, session["final_result"])
+    aggregated = speaking_assessment.aggregate_assessment(session["evidence"])
+    await run_in_threadpool(
+        academy_repo.update_speaking_assessment_session,
+        session_id,
+        final_result=aggregated,
+        status="finished",
+    )
+    return _speaking_result_out(session_id, aggregated)
+
+
+async def get_speaking_assessment(
+    user_id: str, session_id: int
+) -> SpeakingAssessmentStateOut | None:
+    """Estado/resultado de una sesión de Speaking Assessment."""
+    session = await run_in_threadpool(
+        academy_repo.get_speaking_assessment_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    return SpeakingAssessmentStateOut(
+        session_id=session_id,
+        status=session["status"],
+        assessment_version=session["assessment_version"],
+        total_parts=len(session["parts"]),
+        next_part_index=session["next_part_index"],
+        final_result=(
+            _speaking_result_out(session_id, session["final_result"])
+            if session["final_result"] is not None
+            else None
+        ),
+    )
 
 
 async def get_today_plan(user_id: str) -> TodayPlanOut:
@@ -909,13 +1139,20 @@ async def submit_speaking_task(
     heard: str,
     model: str,
     duration_seconds: float | None = None,
+    task_type: str | None = None,
+    difficulty: int | None = None,
+    difficulty_vector: dict[str, int] | None = None,
+    expected: str | None = None,
 ) -> SpeakingTaskResultOut | None:
     """Puntúa una respuesta oral libre (tarea) usando evidencia extraída por el LLM.
 
     El LLM extrae la evidencia estructurada (`speaking_llm.extract_speaking_evidence`)
     y el scorer determinista (`scores_from_evidence`) calcula los criterios y el
     overall, que se registran como evidencia y mueven el mastery de 'speaking' sin
-    que el LLM decida el score."""
+    que el LLM decida el score. `task_type` (V1.16) elige los pesos de rúbrica;
+    `difficulty`/`difficulty_vector` fijan la dificultad registrada en la evidencia;
+    `expected` (opcional) integra el módulo de pronunciación en el flujo libre.
+    """
     lv = _levels_by_id.get(level_id)
     if lv is None:
         return None
@@ -927,7 +1164,14 @@ async def submit_speaking_task(
     evidence = await speaking_llm.extract_speaking_evidence(task, heard, model)
     if evidence is None:
         return None
-    result = speaking_svc.scores_from_evidence(evidence, heard, duration_seconds)
+    profile_difficulty = (
+        difficulty
+        if difficulty is not None
+        else speaking_svc.difficulty_from_vector(difficulty_vector or {})
+    )
+    result = speaking_svc.scores_from_evidence(
+        evidence, heard, duration_seconds, task_type, expected
+    )
     await _record_evidence_validated(
         user_id,
         lv,
@@ -936,6 +1180,7 @@ async def submit_speaking_task(
             level_id=level_id,
             objective_id=objective_id,
             curriculum_version=lv.version,
+            difficulty=profile_difficulty,
         ),
     )
     row = await run_in_threadpool(

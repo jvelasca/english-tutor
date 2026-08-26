@@ -332,6 +332,29 @@ def init_db() -> None:
             """
         )
 
+        # Sesión trazable de Speaking Assessment 1.0 (análoga a placement_sessions):
+        # reconstruye qué se evaluó (parts_json), con qué dificultad (cada parte
+        # lleva su `difficulty_vector`/`difficulty`), qué evidencia se produjo
+        # (evidence_json, una fila por criterio + overall por parte) y el resultado
+        # final agregado (final_result_json).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS speaking_assessment_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'in_progress',
+                assessment_version TEXT NOT NULL DEFAULT '',
+                next_part_index INTEGER NOT NULL DEFAULT 0,
+                parts_json TEXT NOT NULL DEFAULT '[]',
+                evidence_json TEXT NOT NULL DEFAULT '[]',
+                final_result_json TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Calibración observacional de ítems de placement (V1.7): contadores
         # poblacionales por ítem (no por usuario). Las columnas de estimación
         # (estimated_difficulty/standard_error/discrimination) las rellena un
@@ -363,6 +386,14 @@ def init_db() -> None:
 
         if "message_id" not in msg_columns:
             conn.execute("ALTER TABLE messages ADD COLUMN message_id TEXT")
+
+        # Migración idempotente: telemetría de turno (InteractionEvidence 2.0).
+        # `duration_ms` = duración del turno; `latency_ms` = tiempo hasta empezar a
+        # responder. Nullables: solo se rellenan cuando el turno tiene telemetría.
+        if "duration_ms" not in msg_columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN duration_ms INTEGER")
+        if "latency_ms" not in msg_columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN latency_ms INTEGER")
 
         # Migración idempotente: personalización visual del perfil (avatar).
         user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
@@ -572,6 +603,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_placement_sessions_user_id "
             "ON placement_sessions(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_speaking_assessment_sessions_user_id "
+            "ON speaking_assessment_sessions(user_id)"
         )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).

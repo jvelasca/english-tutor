@@ -1,0 +1,80 @@
+{
+  "id": "speaking-assessment-v1",
+  "title": "Speaking Assessment",
+  "description": "Structured 4-part speaking assessment: interview, individual task, interaction and follow-up. Produces a continuous CEFR level with traceable evidence.",
+  "version": "1.0.0",
+  "parts": [
+    {
+      "id": "sa-1",
+      "part_index": 0,
+      "title": "Interview",
+      "task_type": "interview",
+      "cefr_target": "A2",
+      "duration_target": 45.0,
+      "prompt": "Introduce yourself and talk about your daily routine: your name, where you live, what you do, and one thing you enjoy about your routine.",
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 2,
+        "interaction_demand": 3,
+        "spontaneity": 3,
+        "cognitive_demand": 2,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "sa-2",
+      "part_index": 1,
+      "title": "Individual task",
+      "task_type": "monologue",
+      "cefr_target": "B1",
+      "duration_target": 60.0,
+      "prompt": "Describe a place you know well (your city, your neighbourhood, or a place you visited) and explain what you like about it and why.",
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 4,
+        "interaction_demand": 1,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "sa-3",
+      "part_index": 2,
+      "title": "Interaction",
+      "task_type": "role_play",
+      "cefr_target": "B1",
+      "duration_target": 60.0,
+      "prompt": "You are in a restaurant and the waiter has brought you the wrong order. Politely explain the problem, ask for a solution and respond naturally to what the waiter says.",
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 4,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "sa-4",
+      "part_index": 3,
+      "title": "Follow-up",
+      "task_type": "discussion",
+      "cefr_target": "B2",
+      "duration_target": 60.0,
+      "prompt": "Some people think learning a language is easier online than in a classroom. Give your opinion, support it with reasons and respond to a possible counter-argument.",
+      "difficulty_vector": {
+        "lexical_demand": 4,
+        "grammar_demand": 4,
+        "discourse_demand": 5,
+        "interaction_demand": 4,
+        "spontaneity": 4,
+        "cognitive_demand": 4,
+        "novelty": 4
+      }
+    }
+  ]
+}

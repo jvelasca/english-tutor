@@ -148,9 +148,13 @@ CURRICULUM_VERSION = "1.2.5"
 ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exámenes)
 PLACEMENT_VERSION = "2.0.0"  # motor de placement adaptativo (IRT-lite/1PL multiskill)
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
+SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
 LISTENING_BANK_VERSION = "3.0.0"  # banco de listening (TTS pre-renderizado, 8D)
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
+
+# Archivos JSON de `CURRICULUM_DIR` que NO son un nivel (instrumentos/índices).
+_NON_LEVEL_FILES = frozenset({"assessments.json", "speaking_assessment.json"})
 
 
 class Activity(BaseModel):
@@ -283,7 +287,7 @@ def _level_file(level_id: str) -> Path:
 def available_level_ids() -> list[str]:
     """Devuelve los ids de nivel con archivo de contenido (p. ej. ['a1'])."""
     return sorted(
-        p.stem for p in CURRICULUM_DIR.glob("*.json") if p.name != "assessments.json"
+        p.stem for p in CURRICULUM_DIR.glob("*.json") if p.name not in _NON_LEVEL_FILES
     )
 
 

@@ -29,6 +29,52 @@ SPEAKING_EVIDENCE_OPTIONAL_FIELDS: tuple[str, ...] = (
     "hesitations",
     "repetitions",
     "interaction",
+    # task_achievement 2.0: sub-dimensiones graduadas (P0-1) en lugar de un solo bool.
+    "task_completion",
+    "task_relevance",
+    "task_coverage",
+    "task_appropriateness",
+    # GrammarEvidence 2.0: desglose por error con severidad (P0-2).
+    "grammar_error_details",
+    # LexicalEvidence 2.0: riqueza léxica más allá del TTR (P1-2). El scorer
+    # determinista combina diversidad/range (deterministas) con estas señales
+    # semánticas del LLM (sofisticación, precisión, colocaciones).
+    "lexical_sophistication",
+    "lexical_precision",
+    "collocations",
+    # FluencyEvidence 2.0: fluidez más allá de la velocidad (P1-3). `smoothness` y
+    # `rhythm` capturan la suavidad/ritmo del discurso, que el scorer combina con
+    # la banda de velocidad determinista (speech_rate).
+    "smoothness",
+    "rhythm",
+    # InteractionEvidence 2.0 (P1-4): sub-dimensiones conversacionales que el
+    # scorer combina determinísticamente en lugar de una única estimación subjetiva
+    # de `interaction`. Siguen siendo evidencia semántica del LLM (hasta tener un
+    # conversation engine con señal objetiva de turnos/latencia).
+    "turn_completion",
+    "follow_up_questions",
+    "appropriate_responses",
+    "topic_maintenance",
+    "clarification_requests",
+)
+
+# Severidades de error gramatical reconocidas (GrammarEvidence 2.0). El scorer
+# determinista las pondera (minor < major < critical); el LLM solo las declara.
+GRAMMAR_SEVERITIES: tuple[str, ...] = ("minor", "major", "critical")
+
+# Taxonomía orientativa de tipos de error gramatical. No es exhaustiva: el parser
+# acepta cualquier `type` no vacío y lo normaliza a minúsculas para trazabilidad.
+GRAMMAR_ERROR_TYPES: tuple[str, ...] = (
+    "verb_tense",
+    "article",
+    "preposition",
+    "word_order",
+    "agreement",
+    "conditional",
+    "subordination",
+    "pronoun",
+    "auxiliary",
+    "other",
 )
 
 
@@ -66,7 +112,39 @@ def build_speaking_prompt(task: str, heard: str) -> list[dict]:
         '- "hesitations": integer >= 0 — filled pauses or false starts.\n'
         '- "repetitions": integer >= 0 — words or phrases repeated.\n'
         '- "interaction": number between 0.0 and 1.0 — how well the student '
-        "takes turns, responds appropriately and keeps the exchange going.\n\n"
+        "takes turns, responds appropriately and keeps the exchange going.\n"
+        '- "task_completion": number between 0.0 and 1.0 — how fully the task '
+        "was carried out.\n"
+        '- "task_relevance": number between 0.0 and 1.0 — how on-topic and '
+        "relevant the answer is.\n"
+        '- "task_coverage": number between 0.0 and 1.0 — how much of the task\'s '
+        "expected content is covered.\n"
+        '- "task_appropriateness": number between 0.0 and 1.0 — how appropriate '
+        "the answer is for the task context/register.\n"
+        '- "grammar_error_details": array of objects with "type" (string, e.g. '
+        '"verb_tense", "article", "preposition", "word_order", "agreement") and '
+        '"severity" ("minor", "major" or "critical") — a per-error breakdown of '
+        "grammatical mistakes.\n"
+        '- "lexical_sophistication": number between 0.0 and 1.0 — how advanced/'
+        "precise the vocabulary is (beyond simple everyday words).\n"
+        '- "lexical_precision": number between 0.0 and 1.0 — how precisely words '
+        "are chosen for the intended meaning.\n"
+        '- "collocations": number between 0.0 and 1.0 — how naturally words are '
+        "combined into common English collocations.\n"
+        '- "smoothness": number between 0.0 and 1.0 — how smooth/continuous the '
+        "speech flow is.\n"
+        '- "rhythm": number between 0.0 and 1.0 — how natural the stress/rhythm '
+        "of the speech is.\n"
+        '- "turn_completion": number between 0.0 and 1.0 — how fully the student '
+        "completes their conversational turns.\n"
+        '- "follow_up_questions": number between 0.0 and 1.0 — how much the '
+        "student asks follow-up questions to keep the exchange going.\n"
+        '- "appropriate_responses": number between 0.0 and 1.0 — how appropriately '
+        "the student responds to what was said.\n"
+        '- "topic_maintenance": number between 0.0 and 1.0 — how well the student '
+        "stays on topic.\n"
+        '- "clarification_requests": number between 0.0 and 1.0 — how appropriately '
+        "the student asks for clarification when needed.\n\n"
         "Example of the expected JSON:\n"
         '{"task_achieved": true, "grammar_errors": 1, '
         '"lexical_tokens": ["student", "live"], "coherence": 0.8, '
@@ -128,6 +206,31 @@ def _parse_count_field(data: dict, key: str, default: int = 0) -> int:
     return value
 
 
+def _parse_grammar_details(data: dict) -> list[dict] | None:
+    """Parsea `grammar_error_details` (lista opcional de `{type, severity}`).
+
+    Devuelve una lista canónica de entradas válidas (`type` no vacío y `severity`
+    en `GRAMMAR_SEVERITIES`) o `None` si el campo no está presente o no queda
+    ninguna entrada válida. Las entradas inválidas se descartan sin invalidar la
+    evidencia; el LLM solo declara, el scorer determinista pondera la severidad.
+    """
+    raw = data.get("grammar_error_details")
+    if not isinstance(raw, list):
+        return None
+    details: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        severity = item.get("severity")
+        error_type = item.get("type")
+        if severity not in GRAMMAR_SEVERITIES:
+            continue
+        if not isinstance(error_type, str) or not error_type.strip():
+            continue
+        details.append({"type": error_type.strip().lower(), "severity": severity})
+    return details or None
+
+
 def parse_speaking_evidence(raw: str) -> dict | None:
     """Parsea y normaliza la salida JSON del LLM en evidencia estructurada.
 
@@ -173,6 +276,21 @@ def parse_speaking_evidence(raw: str) -> dict | None:
     hesitations = _parse_count_field(data, "hesitations", 0)
     repetitions = _parse_count_field(data, "repetitions", 0)
     interaction = _parse_float_field(data, "interaction", None)
+    task_completion = _parse_float_field(data, "task_completion", None)
+    task_relevance = _parse_float_field(data, "task_relevance", None)
+    task_coverage = _parse_float_field(data, "task_coverage", None)
+    task_appropriateness = _parse_float_field(data, "task_appropriateness", None)
+    grammar_details = _parse_grammar_details(data)
+    lexical_sophistication = _parse_float_field(data, "lexical_sophistication", None)
+    lexical_precision = _parse_float_field(data, "lexical_precision", None)
+    collocations = _parse_float_field(data, "collocations", None)
+    smoothness = _parse_float_field(data, "smoothness", None)
+    rhythm = _parse_float_field(data, "rhythm", None)
+    turn_completion = _parse_float_field(data, "turn_completion", None)
+    follow_up_questions = _parse_float_field(data, "follow_up_questions", None)
+    appropriate_responses = _parse_float_field(data, "appropriate_responses", None)
+    topic_maintenance = _parse_float_field(data, "topic_maintenance", None)
+    clarification_requests = _parse_float_field(data, "clarification_requests", None)
 
     result: dict = {
         "task_achieved": task_achieved,
@@ -188,6 +306,36 @@ def parse_speaking_evidence(raw: str) -> dict | None:
         result["cohesion"] = cohesion
     if interaction is not None:
         result["interaction"] = interaction
+    if task_completion is not None:
+        result["task_completion"] = task_completion
+    if task_relevance is not None:
+        result["task_relevance"] = task_relevance
+    if task_coverage is not None:
+        result["task_coverage"] = task_coverage
+    if task_appropriateness is not None:
+        result["task_appropriateness"] = task_appropriateness
+    if grammar_details is not None:
+        result["grammar_error_details"] = grammar_details
+    if lexical_sophistication is not None:
+        result["lexical_sophistication"] = lexical_sophistication
+    if lexical_precision is not None:
+        result["lexical_precision"] = lexical_precision
+    if collocations is not None:
+        result["collocations"] = collocations
+    if smoothness is not None:
+        result["smoothness"] = smoothness
+    if rhythm is not None:
+        result["rhythm"] = rhythm
+    if turn_completion is not None:
+        result["turn_completion"] = turn_completion
+    if follow_up_questions is not None:
+        result["follow_up_questions"] = follow_up_questions
+    if appropriate_responses is not None:
+        result["appropriate_responses"] = appropriate_responses
+    if topic_maintenance is not None:
+        result["topic_maintenance"] = topic_maintenance
+    if clarification_requests is not None:
+        result["clarification_requests"] = clarification_requests
     return result
 
 

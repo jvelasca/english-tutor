@@ -31,7 +31,15 @@ from schemas.academy import (
     RemediationPlanOut,
     SessionCompleteRequest,
     SessionOut,
+    SpeakingAssessmentFinishRequest,
+    SpeakingAssessmentPartOut,
+    SpeakingAssessmentPartSubmit,
+    SpeakingAssessmentResultOut,
+    SpeakingAssessmentStartOut,
+    SpeakingAssessmentStateOut,
     SpeakingDiagnostic,
+    SpeakingJourneyOut,
+    SpeakingLevelOut,
     SpeakingResultOut,
     SpeakingSubmitRequest,
     SpeakingTaskResultOut,
@@ -250,6 +258,10 @@ async def objective_speaking_task(
         body.heard,
         body.model,
         body.duration_seconds,
+        body.task_type,
+        body.difficulty,
+        body.difficulty_vector,
+        body.expected,
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
@@ -327,6 +339,76 @@ async def speaking_diagnostic(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_speaking_diagnostic(user["id"])
 
 
+@router.get("/api/academy/speaking/level", response_model=SpeakingLevelOut)
+async def speaking_level(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_speaking_level(user["id"])
+
+
+@router.get("/api/academy/speaking/journey", response_model=SpeakingJourneyOut)
+async def speaking_journey(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_speaking_journey(user["id"])
+
+
+@router.post(
+    "/api/academy/speaking/assessment/start",
+    response_model=SpeakingAssessmentStartOut,
+)
+async def speaking_assessment_start(user: dict = Depends(current_user)) -> dict:
+    result = await academy_service.start_speaking_assessment(user["id"])
+    if result is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return result
+
+
+@router.post(
+    "/api/academy/speaking/assessment/part",
+    response_model=SpeakingAssessmentPartOut,
+)
+async def speaking_assessment_part(
+    body: SpeakingAssessmentPartSubmit, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.submit_speaking_assessment_part(
+        user["id"],
+        body.session_id,
+        body.heard,
+        body.duration_seconds,
+        body.model,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="Sesión no encontrada, terminada o sin evidencia"
+        )
+    return result
+
+
+@router.post(
+    "/api/academy/speaking/assessment/finish",
+    response_model=SpeakingAssessmentResultOut,
+)
+async def speaking_assessment_finish(
+    body: SpeakingAssessmentFinishRequest, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.finish_speaking_assessment(
+        user["id"], body.session_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    return result
+
+
+@router.get(
+    "/api/academy/speaking/assessment/{session_id}",
+    response_model=SpeakingAssessmentStateOut,
+)
+async def speaking_assessment_state(
+    session_id: int, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.get_speaking_assessment(user["id"], session_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    return result
+
+
 @router.post(
     "/api/academy/objective/speaking/task/audio", response_model=SpeakingTaskResultOut
 )
@@ -337,6 +419,9 @@ async def objective_speaking_task_audio(
     task: str = Form(...),
     model: str = Form(DEFAULT_MODEL),
     language: str = Form("en"),
+    task_type: str | None = Form(None),
+    difficulty: int | None = Form(None),
+    expected: str | None = Form(None),
     user: dict = Depends(current_user),
 ) -> dict:
     """Tarea libre: audio → Whisper → LLM extrae evidencia → mastery de speaking."""
@@ -349,7 +434,17 @@ async def objective_speaking_task_audio(
         ) from None
     heard = timed["text"]
     out = await academy_service.submit_speaking_task(
-        user["id"], level_id, objective_id, task, heard, model, timed.get("duration")
+        user["id"],
+        level_id,
+        objective_id,
+        task,
+        heard,
+        model,
+        timed.get("duration"),
+        task_type,
+        difficulty,
+        None,
+        expected,
     )
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
