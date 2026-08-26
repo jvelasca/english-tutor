@@ -331,7 +331,8 @@ class SpeakingResultOut(BaseModel):
     expected: str
     heard: str
     overall: float
-    criteria: dict[str, float]
+    criteria: dict[str, float | None]
+    observed: dict[str, bool] = Field(default_factory=dict)
     speaking_mastery: float
 
 
@@ -348,7 +349,8 @@ class SpeakingTaskResultOut(BaseModel):
     level_id: str
     objective_id: str
     overall: float
-    criteria: dict[str, float]
+    criteria: dict[str, float | None]
+    observed: dict[str, bool] = Field(default_factory=dict)
     speaking_mastery: float
     evidence: dict
 

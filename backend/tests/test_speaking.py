@@ -44,10 +44,19 @@ class FakeOllamaClient:
 
 def test_score_speaking_keys_and_range():
     result = speaking_svc.score_speaking("I am a student", "I am a student", 3.0)
-    assert set(result.keys()) == {"heard", "expected", "criteria", "overall"}
+    assert set(result.keys()) == {
+        "heard",
+        "expected",
+        "criteria",
+        "observed",
+        "overall",
+    }
     assert set(result["criteria"].keys()) == set(SPEAKING_CRITERIA)
+    assert set(result["observed"].keys()) == set(SPEAKING_CRITERIA)
     for criterion in SPEAKING_CRITERIA:
-        assert 0.0 <= result["criteria"][criterion] <= 1.0
+        score = result["criteria"][criterion]
+        if score is not None:
+            assert 0.0 <= score <= 1.0
     assert 0.0 <= result["overall"] <= 1.0
 
 
@@ -64,9 +73,10 @@ def test_score_speaking_mismatch_low():
     assert result["criteria"]["lexical_resource"] < 0.5
 
 
-def test_score_speaking_fluency_unknown():
+def test_score_speaking_fluency_unknown_is_unobserved():
     result = speaking_svc.score_speaking("I am a student", "I am a student", None)
-    assert result["criteria"]["fluency"] == 0.5
+    assert result["criteria"]["fluency"] is None
+    assert result["observed"]["fluency"] is False
 
 
 def test_score_speaking_empty_expected():
@@ -77,6 +87,82 @@ def test_score_speaking_empty_expected():
 
 def test_rubric_weights_sum_to_one():
     assert sum(CRITERION_WEIGHTS.values()) == pytest.approx(1.0)
+
+
+# --- Criterios no observados + diversidad léxica (P0 Speaking scoring) -------
+
+
+def test_scores_from_evidence_pronunciation_unobserved():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 1,
+        "lexical_tokens": ["student", "live", "city"],
+        "coherence": 0.8,
+    }
+    result = speaking_svc.scores_from_evidence(evidence, "I am a student", 3.0)
+    assert result["criteria"]["pronunciation"] is None
+    assert result["observed"]["pronunciation"] is False
+    # El overall se recalcula solo sobre criterios observados (pronunciación fuera).
+    assert result["overall"] > 0.0
+
+
+def test_scores_from_evidence_no_audio_pronunciation_never_half():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": ["student"],
+        "coherence": 0.9,
+    }
+    result = speaking_svc.scores_from_evidence(evidence, "I am a student")
+    assert result["criteria"]["pronunciation"] is None
+    assert result["criteria"]["fluency"] is None
+    assert result["observed"]["fluency"] is False
+    # Ningún criterio no observado entra en el overall.
+    assert 0.0 <= result["overall"] <= 1.0
+
+
+def test_lexical_diversity_measures_repetition():
+    assert speaking_svc.lexical_diversity([]) == 0.0
+    # Sin repetición → TTR = 1.0.
+    assert speaking_svc.lexical_diversity(["i", "am", "a", "student"]) == 1.0
+    # Repetición baja la diversidad.
+    assert speaking_svc.lexical_diversity(["banana", "banana", "banana"]) < 0.5
+
+
+def test_scores_from_evidence_lexical_resource_is_diversity_not_overlap():
+    # Una respuesta rica en variedad (aunque no comparta tokens con un "expected"
+    # inexistente aquí) debe puntuar alta en lexical_resource.
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": [],
+        "coherence": 0.9,
+    }
+    rich = "I travelled to Italy with my wife and we visited Rome for five days"
+    result = speaking_svc.scores_from_evidence(evidence, rich, 60.0)
+    assert result["criteria"]["lexical_resource"] >= 0.8
+
+
+def test_scores_from_evidence_discourse_penalties_reduce_fluency():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": ["student"],
+        "coherence": 0.9,
+        "self_corrections": 3,
+        "hesitations": 4,
+        "repetitions": 2,
+    }
+    clean = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": ["student"],
+        "coherence": 0.9,
+    }
+    heard = "I am a student and I live in a city near the coast with my family"
+    dirty = speaking_svc.scores_from_evidence(evidence, heard, 120.0)
+    base = speaking_svc.scores_from_evidence(clean, heard, 120.0)
+    assert dirty["criteria"]["fluency"] < base["criteria"]["fluency"]
 
 
 # --- Endpoint / integración (puente speaking → mastery) --------------------

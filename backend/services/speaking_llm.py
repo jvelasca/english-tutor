@@ -20,13 +20,24 @@ SPEAKING_EVIDENCE_FIELDS: tuple[str, ...] = (
     "coherence",
 )
 
+# Campos opcionales de discurso que enriquecen la evidencia sin romper el contrato
+# (se parsean con default si el LLM no los devuelve).
+SPEAKING_EVIDENCE_OPTIONAL_FIELDS: tuple[str, ...] = (
+    "cohesion",
+    "discourse_markers",
+    "self_corrections",
+    "hesitations",
+    "repetitions",
+)
+
 
 def build_speaking_prompt(task: str, heard: str) -> list[dict]:
     """Construye los mensajes (system + user) que piden al modelo extraer evidencia.
 
     El system prompt deja claro que el modelo es un EXTRACTOR (no un calificador):
-    debe devolver solo un objeto JSON, sin texto adicional, con exactamente las claves
-    y tipos de `SPEAKING_EVIDENCE_FIELDS`. El mensaje user lleva la tarea y la
+    debe devolver solo un objeto JSON, sin texto adicional, con las claves y tipos
+    obligatorios de `SPEAKING_EVIDENCE_FIELDS` y los opcionales de
+    `SPEAKING_EVIDENCE_OPTIONAL_FIELDS`. El mensaje user lleva la tarea y la
     transcripción etiquetadas con `TASK:` y `STUDENT:`.
     """
     system = (
@@ -34,8 +45,8 @@ def build_speaking_prompt(task: str, heard: str) -> list[dict]:
         "You do NOT grade, score, or label the student's level. Your only job is "
         "to read a free spoken answer to a task and extract structured evidence "
         "from it.\n\n"
-        "Respond with ONLY a single JSON object and no other text, with exactly "
-        "these keys and types:\n"
+        "Respond with ONLY a single JSON object and no other text, with these "
+        "required keys and types:\n"
         '- "task_achieved": boolean — whether the answer fulfils what the task '
         "asks.\n"
         '- "grammar_errors": integer >= 0 — number of grammatical errors '
@@ -44,9 +55,20 @@ def build_speaking_prompt(task: str, heard: str) -> list[dict]:
         "student used correctly, in lowercase.\n"
         '- "coherence": number between 0.0 and 1.0 — how coherent/fluent the '
         "discourse is.\n\n"
+        "You MAY also include these optional keys (do NOT invent them if you are "
+        "unsure; use a sensible default):\n"
+        '- "cohesion": number between 0.0 and 1.0 — how well ideas are linked.\n'
+        '- "discourse_markers": integer >= 0 — number of linking words (first, '
+        "then, because, finally…).\n"
+        '- "self_corrections": integer >= 0 — times the student corrected '
+        "themselves.\n"
+        '- "hesitations": integer >= 0 — filled pauses or false starts.\n'
+        '- "repetitions": integer >= 0 — words or phrases repeated.\n\n'
         "Example of the expected JSON:\n"
         '{"task_achieved": true, "grammar_errors": 1, '
-        '"lexical_tokens": ["student", "live"], "coherence": 0.8}\n\n'
+        '"lexical_tokens": ["student", "live"], "coherence": 0.8, '
+        '"discourse_markers": 2, "self_corrections": 0, "hesitations": 1, '
+        '"repetitions": 0}\n\n'
         "Do not output any text before or after the JSON. Do not wrap it in "
         "markdown code fences."
     )
@@ -86,11 +108,29 @@ def _decode_object(text: str) -> object | None:
         return None
 
 
+def _parse_float_field(data: dict, key: str, default: float | None) -> float | None:
+    """Valida un campo opcional 0..1 (o `default` si falta/tipo inválido)."""
+    value = data.get(key, default)
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return round(max(0.0, min(1.0, float(value))), 3)
+
+
+def _parse_count_field(data: dict, key: str, default: int = 0) -> int:
+    """Valida un campo opcional entero >= 0 (o `default` si falta/tipo inválido)."""
+    value = data.get(key, default)
+    # `type(...) is int` (y no isinstance) para rechazar bool; inválido → default.
+    if type(value) is not int or value < 0:
+        return default
+    return value
+
+
 def parse_speaking_evidence(raw: str) -> dict | None:
     """Parsea y normaliza la salida JSON del LLM en evidencia estructurada.
 
-    Devuelve un dict con exactamente las claves de `SPEAKING_EVIDENCE_FIELDS`, o
-    `None` si la salida no se puede extraer o no supera la validación de tipos.
+    Devuelve un dict con las claves de `SPEAKING_EVIDENCE_FIELDS` (obligatorias) y
+    las de `SPEAKING_EVIDENCE_OPTIONAL_FIELDS` (con default si faltan), o `None` si
+    la salida no se puede extraer o no supera la validación de tipos.
     """
     data = _extract_json(raw)
     if not isinstance(data, dict):
@@ -124,12 +164,25 @@ def parse_speaking_evidence(raw: str) -> dict | None:
         return None
     coherence = round(max(0.0, min(1.0, float(coherence))), 3)
 
-    return {
+    cohesion = _parse_float_field(data, "cohesion", None)
+    discourse_markers = _parse_count_field(data, "discourse_markers", 0)
+    self_corrections = _parse_count_field(data, "self_corrections", 0)
+    hesitations = _parse_count_field(data, "hesitations", 0)
+    repetitions = _parse_count_field(data, "repetitions", 0)
+
+    result: dict = {
         "task_achieved": task_achieved,
         "grammar_errors": grammar_errors,
         "lexical_tokens": lexical_tokens,
         "coherence": coherence,
+        "discourse_markers": discourse_markers,
+        "self_corrections": self_corrections,
+        "hesitations": hesitations,
+        "repetitions": repetitions,
     }
+    if cohesion is not None:
+        result["cohesion"] = cohesion
+    return result
 
 
 async def extract_speaking_evidence(

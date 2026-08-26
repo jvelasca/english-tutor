@@ -4,6 +4,11 @@ Reutiliza los evaluadores deterministas existentes (phonetics, fluency, grammar,
 vocabulary) para producir un score por criterio y un overall ponderado. Sigue la
 premisa del proyecto: la evidencia la extrae el LLM, pero el score lo calcula SIEMPRE
 un scorer determinista (nunca "el LLM te pone B1").
+
+Un criterio puede no ser observable (p. ej. `pronunciation` sin audio o `fluency`
+sin duración). En ese caso su `score` es `None`, `observed` es `False` y no entra en
+el `overall`, que se recalcula solo sobre los criterios observados (renormalizando
+los pesos). Así "desconocido" no se confunde con "50%".
 """
 from __future__ import annotations
 
@@ -24,7 +29,8 @@ SPEAKING_CRITERIA: tuple[str, ...] = (
     "coherence",
 )
 
-# Pesos por defecto (suman 1). El overall es la media ponderada de los criterios.
+# Pesos por defecto (suman 1). El overall es la media ponderada de los criterios
+# observados (renormalizada sobre los presentes).
 CRITERION_WEIGHTS: dict[str, float] = {
     "task_achievement": 0.25,
     "grammatical_control": 0.20,
@@ -37,8 +43,12 @@ CRITERION_WEIGHTS: dict[str, float] = {
 # Referencia de fluidez: 120 palabras por minuto ≈ hablante fluido.
 _FLUENT_WPM = 120.0
 
-# Referencia léxica: 5 palabras de contenido ≈ vocabulario adecuado.
-_LEXICAL_REFERENCE = 5.0
+# Penalizaciones de fluidez por señal de discurso extraída por el LLM (por
+# autocorrección, titubeo y repetición): una producción fluida no se autocorrige
+# ni titubea en exceso.
+_FLUENCY_PENALTY_SELF_CORRECTION = 0.05
+_FLUENCY_PENALTY_HESITATION = 0.03
+_FLUENCY_PENALTY_REPETITION = 0.03
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -56,12 +66,41 @@ def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z0-9']+", text.lower())
 
 
-def _fluency_score(heard: str, duration_seconds: float | None) -> float:
+def lexical_diversity(tokens: list[str]) -> float:
+    """Diversidad léxica (type-token ratio, TTR): vocabulario distinto / total.
+
+    Sustituye al "conteo de palabras de contenido": mide riqueza léxica real
+    (variedad frente a repetición), no solapamiento con un texto esperado. 0.0 si
+    no hay tokens.
+    """
+    if not tokens:
+        return 0.0
+    return round(len(set(tokens)) / len(tokens), 3)
+
+
+def _fluency_score(heard: str, duration_seconds: float | None) -> float | None:
+    """Fluidez (0..1) a partir de WPM; `None` cuando no se puede calcular (sin
+    audio válido o sin palabras)."""
     info = compute_fluency(heard, duration_seconds)
     wpm = info["wpm"]
     if wpm is None:
-        return 0.5
+        return None
     return round(_clamp(wpm / _FLUENT_WPM), 3)
+
+
+def _weighted_overall(criteria: dict, observed: dict) -> float:
+    """Overall = media ponderada de los criterios observados, con pesos
+    renormalizados sobre los presentes. 0.0 si ninguno es observable."""
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for criterion in SPEAKING_CRITERIA:
+        score = criteria.get(criterion)
+        if observed.get(criterion, False) and score is not None:
+            total_weight += CRITERION_WEIGHTS[criterion]
+            weighted_sum += CRITERION_WEIGHTS[criterion] * score
+    if total_weight == 0.0:
+        return 0.0
+    return round(weighted_sum / total_weight, 3)
 
 
 def score_speaking(
@@ -69,10 +108,11 @@ def score_speaking(
     expected: str,
     duration_seconds: float | None = None,
 ) -> dict:
-    """Puntúa una producción oral frente a una frase/tarea esperada.
+    """Puntúa una producción oral frente a una frase/tarea esperada (read-aloud).
 
     Devuelve un dict con `heard`, `expected`, `criteria` (dict criterion → score
-    0..1), y `overall` (media ponderada 0..1, redondeada a 3 decimales).
+    0..1, o `None` si el criterio no es observable), `observed` (dict criterion →
+    bool) y `overall` (media ponderada sobre los criterios observados).
     """
     heard_tokens = _tokens(heard)
     expected_tokens = _tokens(expected)
@@ -80,7 +120,7 @@ def score_speaking(
     # pronunciation: similitud palabra/fonética con lo esperado (0-100 → 0-1).
     pronunciation = round(composite_score(expected, heard)["score"] / 100, 3)
 
-    # fluency: wpm frente a 120 wpm ≈ fluido; 0.5 si no se puede calcular.
+    # fluency: wpm frente a 120 wpm ≈ fluido; None si no se puede calcular.
     fluency = _fluency_score(heard, duration_seconds)
 
     # grammatical_control: 0 errores = 1.0; cada error resta 0.25; suelo 0.0.
@@ -89,6 +129,8 @@ def score_speaking(
     )
 
     # lexical_resource: cobertura del léxico esperado (tokens únicos, sin orden).
+    # En read-aloud el objetivo es reproducir la frase esperada, así que la
+    # cobertura es la señal correcta (no la diversidad).
     if expected_tokens:
         lexical_resource = round(
             _clamp(
@@ -112,7 +154,8 @@ def score_speaking(
     else:
         task_achievement = 1.0
 
-    # coherence: longitud producida comparable a la esperada.
+    # coherence: longitud producida comparable a la esperada (read-aloud: sin
+    # señal discursiva del LLM, solo hay proporción).
     coherence = round(_clamp(len(heard_tokens) / max(1, len(expected_tokens))), 3)
 
     criteria = {
@@ -123,15 +166,22 @@ def score_speaking(
         "pronunciation": pronunciation,
         "coherence": coherence,
     }
+    observed = {
+        "task_achievement": True,
+        "grammatical_control": True,
+        "lexical_resource": True,
+        "fluency": fluency is not None,
+        "pronunciation": True,
+        "coherence": True,
+    }
 
-    overall = round(
-        sum(CRITERION_WEIGHTS[c] * criteria[c] for c in SPEAKING_CRITERIA), 3
-    )
+    overall = _weighted_overall(criteria, observed)
 
     return {
         "heard": heard,
         "expected": expected,
         "criteria": criteria,
+        "observed": observed,
         "overall": overall,
     }
 
@@ -145,18 +195,32 @@ def scores_from_evidence(
 
     `evidence` es el dict normalizado de `speaking_llm.parse_speaking_evidence`.
     La pronunciación no es evaluable sin referencia de audio en este flujo, así que
-    se fija en 0.5 (neutro/desconocido). La fluidez se calcula por WPM si hay
-    duración; si no, 0.5. Devuelve {"criteria": {...}, "overall": float}."""
+    queda `None`/no observada. La fluidez se calcula por WPM si hay duración; si no,
+    queda `None`/no observada. El `overall` se calcula solo sobre criterios
+    observados. Devuelve {"criteria": {...}, "observed": {...}, "overall": float}.
+    """
     task_achievement = 1.0 if evidence["task_achieved"] else 0.0
     grammatical_control = round(
         _clamp(1.0 - 0.25 * evidence["grammar_errors"]), 3
     )
-    lexical_resource = round(
-        _clamp(len(set(evidence["lexical_tokens"])) / _LEXICAL_REFERENCE), 3
-    )
-    coherence = round(float(evidence["coherence"]), 3)
+
+    # lexical_resource: diversidad léxica real (TTR) sobre la producción, no
+    # solapamiento con un texto esperado.
+    lexical_resource = lexical_diversity(_tokens(heard))
+
+    coherence = round(_clamp(float(evidence["coherence"])), 3)
+
     fluency = _fluency_score(heard, duration_seconds)
-    pronunciation = 0.5
+    if fluency is not None:
+        # Una producción fluida se autocorrige, titubea y repite poco.
+        penalty = (
+            _FLUENCY_PENALTY_SELF_CORRECTION * evidence.get("self_corrections", 0)
+            + _FLUENCY_PENALTY_HESITATION * evidence.get("hesitations", 0)
+            + _FLUENCY_PENALTY_REPETITION * evidence.get("repetitions", 0)
+        )
+        fluency = round(_clamp(fluency - penalty), 3)
+
+    pronunciation = None  # no observable sin audio de referencia
 
     criteria = {
         "task_achievement": task_achievement,
@@ -166,13 +230,20 @@ def scores_from_evidence(
         "pronunciation": pronunciation,
         "coherence": coherence,
     }
+    observed = {
+        "task_achievement": True,
+        "grammatical_control": True,
+        "lexical_resource": True,
+        "fluency": fluency is not None,
+        "pronunciation": False,
+        "coherence": True,
+    }
 
-    overall = round(
-        sum(CRITERION_WEIGHTS[c] * criteria[c] for c in SPEAKING_CRITERIA), 3
-    )
+    overall = _weighted_overall(criteria, observed)
 
     return {
         "criteria": criteria,
+        "observed": observed,
         "overall": overall,
     }
 
@@ -187,24 +258,31 @@ def evidence_from_speaking(
 ) -> list[dict]:
     """Convierte el resultado de score_speaking en registros de evidencia.
 
-    Una fila por criterio del rubric (item_id = criterio) más una fila 'overall'.
-    Todas con source='speaking', item_type='speaking', difficulty=1. El instrumento
-    de medida es la rúbrica, versionada en `assessment_version`."""
-    records = [
-        {
-            "level_id": level_id,
-            "objective_id": objective_id,
-            "skill": "speaking",
-            "item_id": criterion,
-            "item_type": "speaking",
-            "difficulty": 1,
-            "source": "speaking",
-            "result": float(result["criteria"][criterion]),
-            "curriculum_version": curriculum_version,
-            "assessment_version": assessment_version,
-        }
-        for criterion in SPEAKING_CRITERIA
-    ]
+    Una fila por criterio observable del rubric (item_id = criterio) más una fila
+    'overall'. Los criterios no observados (score `None`) NO se registran como
+    evidencia: "desconocido" no contamina el mastery. Todas con source='speaking',
+    item_type='speaking', difficulty=1. El instrumento de medida es la rúbrica,
+    versionada en `assessment_version`."""
+    observed = result.get("observed", {c: True for c in SPEAKING_CRITERIA})
+    records = []
+    for criterion in SPEAKING_CRITERIA:
+        score = result["criteria"].get(criterion)
+        if score is None or not observed.get(criterion, True):
+            continue
+        records.append(
+            {
+                "level_id": level_id,
+                "objective_id": objective_id,
+                "skill": "speaking",
+                "item_id": criterion,
+                "item_type": "speaking",
+                "difficulty": 1,
+                "source": "speaking",
+                "result": float(score),
+                "curriculum_version": curriculum_version,
+                "assessment_version": assessment_version,
+            }
+        )
     records.append(
         {
             "level_id": level_id,

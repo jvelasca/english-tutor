@@ -852,6 +852,7 @@ async def submit_speaking(
         heard=result["heard"],
         overall=result["overall"],
         criteria=result["criteria"],
+        observed=result["observed"],
         speaking_mastery=state["score"],
     )
 
@@ -912,6 +913,7 @@ async def submit_speaking_task(
         objective_id=objective_id,
         overall=result["overall"],
         criteria=result["criteria"],
+        observed=result["observed"],
         speaking_mastery=state["score"],
         evidence=evidence,
     )

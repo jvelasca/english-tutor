@@ -15,6 +15,10 @@ def test_build_speaking_prompt_has_roles_and_content():
         "grammar_errors",
         "lexical_tokens",
         "coherence",
+        "discourse_markers",
+        "self_corrections",
+        "hesitations",
+        "repetitions",
     ):
         assert key in msgs[0]["content"]
 
@@ -29,7 +33,44 @@ def test_parse_speaking_evidence_valid_json():
         "grammar_errors": 2,
         "lexical_tokens": ["student", "live"],
         "coherence": 0.75,
+        "discourse_markers": 0,
+        "self_corrections": 0,
+        "hesitations": 0,
+        "repetitions": 0,
     }
+
+
+def test_parse_speaking_evidence_extracts_optional_discourse_fields():
+    raw = (
+        '{"task_achieved": true, "grammar_errors": 1, '
+        '"lexical_tokens": ["student"], "coherence": 0.8, "cohesion": 0.7, '
+        '"discourse_markers": 3, "self_corrections": 1, "hesitations": 2, '
+        '"repetitions": 1}'
+    )
+    assert speaking_llm.parse_speaking_evidence(raw) == {
+        "task_achieved": True,
+        "grammar_errors": 1,
+        "lexical_tokens": ["student"],
+        "coherence": 0.8,
+        "cohesion": 0.7,
+        "discourse_markers": 3,
+        "self_corrections": 1,
+        "hesitations": 2,
+        "repetitions": 1,
+    }
+
+
+def test_parse_speaking_evidence_invalid_optional_counts_fall_back():
+    # Counts con tipo inválido caen a default (0), sin invalidar la evidencia.
+    raw = (
+        '{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": [], "coherence": 0.5, "discourse_markers": -1, '
+        '"self_corrections": "dos"}'
+    )
+    result = speaking_llm.parse_speaking_evidence(raw)
+    assert result is not None
+    assert result["discourse_markers"] == 0
+    assert result["self_corrections"] == 0
 
 
 def test_parse_speaking_evidence_tolerates_code_fence():
@@ -42,6 +83,10 @@ def test_parse_speaking_evidence_tolerates_code_fence():
         "grammar_errors": 0,
         "lexical_tokens": [],
         "coherence": 0.5,
+        "discourse_markers": 0,
+        "self_corrections": 0,
+        "hesitations": 0,
+        "repetitions": 0,
     }
 
 
