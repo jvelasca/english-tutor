@@ -9,6 +9,7 @@ from config import PIPER_VOICE
 from repositories import db
 from repositories import listening as listening_repo
 from services import tts
+from services.audio_library import is_recorded, recorded_audio_path
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
     AUDIO_VARIANTS,
@@ -48,7 +49,15 @@ def _audio_path(question: dict, variant: str = "normal") -> Path:
 
 
 def audio_ready(question: dict) -> bool:
-    """True si el ítem puede servir audio de referencia reproducible."""
+    """True si el ítem puede servir audio de referencia reproducible.
+
+    Para audio humano grabado (`audio_type="recorded"`), basta con que el WAV del
+    manifest exista en disco (no depende de Piper). Para el resto, requiere texto a
+    sintetizar y Piper disponible.
+    """
+    if is_recorded(question):
+        path = recorded_audio_path(question)
+        return path is not None and path.exists()
     return bool(audio_text(question)) and tts.is_ready()
 
 
@@ -191,21 +200,29 @@ async def get_diagnostic(user_id: str) -> dict:
 async def get_audio(
     question_id: str, variant: str = "normal"
 ) -> tuple[bytes | None, int | None]:
-    """Devuelve el audio WAV del ítem (cacheado en disco), o un código de error.
+    """Devuelve el audio WAV del ítem (grabado o sintetizado), o un código de error.
 
-    `variant` selecciona la variante de velocidad de la escalera (`AUDIO_VARIANTS`).
-    Retorna `(bytes, None)` con el audio en caso de éxito, o `(None, status)` donde
-    `status` es 400 (variante no válida), 404 (ítem inexistente) o 503 (Piper no
-    disponible). El audio se sintetiza en la primera petición de cada variante y se
-    cachea en un path versionado
+    Si el ítem es `recorded` (biblioteca de audio humano), sirve el WAV referenciado
+    en el manifest; si está referenciado pero ausente, devuelve 404 (no cae a TTS).
+    Si es `tts`, `variant` selecciona la variante de velocidad de la escalera
+    (`AUDIO_VARIANTS`). Retorna `(bytes, None)` con el audio en caso de éxito, o
+    `(None, status)` donde `status` es 400 (variante no válida), 404 (ítem
+    inexistente o audio grabado ausente) o 503 (Piper no disponible). El audio TTS
+    se sintetiza en la primera petición de cada variante y se cachea en un path
+    versionado
     (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`), con digest
     distinto por variante (la variante `normal` preserva el digest/cache actual).
     """
-    if variant not in AUDIO_VARIANTS:
-        return None, 400
     question = get_question(question_id)
     if question is None:
         return None, 404
+    if is_recorded(question):
+        recorded = recorded_audio_path(question)
+        if recorded is not None and recorded.exists():
+            return recorded.read_bytes(), None
+        return None, 404
+    if variant not in AUDIO_VARIANTS:
+        return None, 400
     if not tts.is_ready():
         return None, 503
     path = _audio_path(question, variant)
