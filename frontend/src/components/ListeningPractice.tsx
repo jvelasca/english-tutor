@@ -11,6 +11,7 @@ import {
 import { speak, transcribe } from "../api/voz";
 import type {
   ListeningAnswerResponse,
+  ListeningAudioVariant,
   ListeningDiagnostic,
   ListeningProductionResult,
   ListeningQuestion,
@@ -104,6 +105,7 @@ export function ListeningPractice({
   const [error, setError] = useState<string | null>(null);
   const [replayCount, setReplayCount] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
+  const [variant, setVariant] = useState<string>("normal");
 
   async function load() {
     if (!userId) return;
@@ -113,6 +115,7 @@ export function ListeningPractice({
     setProductionResult(null);
     setDictationText("");
     setTranscribedText("");
+    setVariant("normal");
     try {
       setQuestion(await getListeningQuestion(userId));
       setStartedAt(Date.now());
@@ -158,7 +161,7 @@ export function ListeningPractice({
     try {
       if (question.audio_ready) {
         // Audio de referencia pre-renderizado (respeta speech_rate y repetición).
-        await playAudioUrl(getListeningAudioUrl(question.id, userId));
+        await playAudioUrl(getListeningAudioUrl(question.id, userId, variant));
       } else {
         // Degradación: TTS en vivo con el script del ítem.
         await speak(question.script);
@@ -271,6 +274,31 @@ export function ListeningPractice({
           >
             {playing ? "Reproduciendo…" : "Escuchar audio"}
           </button>
+          {question.audio_ready && question.variants.length > 1 && (
+            <div className="listening-variants">
+              <span className="listening-variants-label">Velocidad:</span>
+              {question.variants.map((v: ListeningAudioVariant) => (
+                <button
+                  key={v.variant}
+                  type="button"
+                  className={`listening-variant${
+                    v.variant === variant ? " active" : ""
+                  }`}
+                  onClick={() => setVariant(v.variant)}
+                  disabled={playing || !userId}
+                >
+                  {v.label}
+                </button>
+              ))}
+              <span className="listening-variants-speed">
+                {Math.round(
+                  question.variants.find((v) => v.variant === variant)
+                    ?.speech_rate ?? question.speech_rate,
+                )}{" "}
+                wpm
+              </span>
+            </div>
+          )}
           <p className="listening-audio-type">
             {audioTypeLabel(question.audio_type)}
           </p>

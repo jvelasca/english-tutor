@@ -64,7 +64,15 @@ export function getListeningDiagnostic(
   return getJson<ListeningDiagnostic>(`/api/listening/diagnostic?${query}`);
 }
 
-export function getListeningAudioUrl(questionId: string, userId: string): string {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return `/api/listening/audio/${questionId}?${query}`;
+export function getListeningAudioUrl(
+  questionId: string,
+  userId: string,
+  variant = "normal",
+): string {
+  const params = new URLSearchParams({ user_id: userId });
+  // Retrocompatible: sin `variant` (o con "normal") la URL es la misma de antes.
+  if (variant !== "normal") {
+    params.set("variant", variant);
+  }
+  return `/api/listening/audio/${questionId}?${params.toString()}`;
 }

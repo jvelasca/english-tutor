@@ -3983,6 +3983,49 @@ body.is-resizing {
   color: var(--color-warning);
 }
 
+/* Escalera de variantes de velocidad (P1.9): selector slow/normal/fast. */
+.listening-variants {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.listening-variants-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.listening-variants-speed {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.listening-variant {
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.listening-variant:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.listening-variant:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.listening-variant.active {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  color: var(--color-on-accent);
+  border-color: transparent;
+}
+
 .listening-recommendation {
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);

@@ -871,6 +871,19 @@ DEFAULT_SPEECH_RATE = 140.0
 LENGTH_SCALE_MIN = 0.6
 LENGTH_SCALE_MAX = 1.6
 
+# Escalera de variantes de audio (P1.9): el mismo contenido a distinta velocidad.
+# `normal` es la realización actual del ítem (preserva digest/cache); `slow`/`fast`
+# aplican un factor de velocidad sobre la tasa declarada (o la de referencia).
+AUDIO_VARIANTS: tuple[str, ...] = ("slow", "normal", "fast")
+
+# Factor multiplicador de wpm por variante. La velocidad es la única dimensión
+# realizable hoy de forma determinista con una única voz Piper (no acento/ruido).
+VARIANT_SPEED_FACTORS: dict[str, float] = {
+    "slow": 0.75,
+    "normal": 1.0,
+    "fast": 1.25,
+}
+
 
 def length_scale_for_rate(speech_rate: float) -> float:
     """Mapea `speech_rate` (wpm) a `length_scale` de Piper (determinista).
@@ -883,6 +896,50 @@ def length_scale_for_rate(speech_rate: float) -> float:
         return 1.0
     scale = DEFAULT_SPEECH_RATE / speech_rate
     return round(max(LENGTH_SCALE_MIN, min(LENGTH_SCALE_MAX, scale)), 3)
+
+
+def variant_speech_rate(question: dict, variant: str = "normal") -> float:
+    """Velocidad (wpm) del ítem para una variante de la escalera.
+
+    - `normal` devuelve la tasa declarada (`speech_rate`), o `0.0` si no se
+      declara, preservando el comportamiento actual.
+    - `slow`/`fast` aplican `VARIANT_SPEED_FACTORS` sobre la tasa declarada; si el
+      ítem no declara tasa, usan `DEFAULT_SPEECH_RATE` como base.
+
+    `variant` debe pertenecer a `AUDIO_VARIANTS`; cualquier otro valor se trata
+    como `normal` (comportamiento seguro y determinista).
+    """
+    base = question.get("speech_rate") or 0.0
+    if variant == "normal" or variant not in VARIANT_SPEED_FACTORS:
+        return base
+    effective = base if base > 0 else DEFAULT_SPEECH_RATE
+    return round(effective * VARIANT_SPEED_FACTORS[variant], 1)
+
+
+def variant_length_scale(question: dict, variant: str = "normal") -> float:
+    """`length_scale` de Piper para una variante; `normal` = `length_scale_for_rate`.
+
+    Para `variant == "normal"` devuelve exactamente lo que devuelve
+    `length_scale_for_rate(speech_rate)` hoy, para no invalidar el cache existente.
+    """
+    return length_scale_for_rate(variant_speech_rate(question, variant))
+
+
+def audio_variants(question: dict) -> list[dict]:
+    """Lista de variantes de la escalera `{variant, speech_rate, label}`.
+
+    Orden fijo slow → normal → fast, con `label` legible en inglés ("Slow",
+    "Normal", "Fast"). `speech_rate` es la tasa wpm efectiva de cada variante.
+    """
+    labels = {"slow": "Slow", "normal": "Normal", "fast": "Fast"}
+    return [
+        {
+            "variant": variant,
+            "speech_rate": variant_speech_rate(question, variant),
+            "label": labels[variant],
+        }
+        for variant in AUDIO_VARIANTS
+    ]
 
 
 def audio_text(question: dict) -> str:
@@ -1006,17 +1063,22 @@ def subskill_realization_gap(question: dict, subskill: str) -> bool:
     return realized < declared
 
 
-def audio_digest(question: dict) -> str:
+def audio_digest(question: dict, variant: str = "normal") -> str:
     """Hash determinista del contenido a sintetizar (texto + velocidad + repetición).
 
     Se usa como parte de la clave de cache para que un cambio en el script, la
     velocidad, la política de repetición (o la voz, que vive en el directorio)
     invalide el WAV antiguo en lugar de seguir sirviéndolo.
+
+    `variant` selecciona la variante de velocidad de la escalera. **Invariante de
+    cache:** para `variant == "normal"` el payload es idéntico al histórico (mismo
+    orden de campos, `length_scale` derivado de `speech_rate`), de modo que no se
+    invalida el audio ya pre-renderizado.
     """
     payload = "|".join(
         [
             spoken_text(question),
-            str(length_scale_for_rate(question.get("speech_rate") or 0.0)),
+            str(variant_length_scale(question, variant)),
             question.get("repetition_policy", "none"),
         ]
     )

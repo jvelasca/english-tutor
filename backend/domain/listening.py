@@ -11,13 +11,14 @@ from repositories import listening as listening_repo
 from services import tts
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
+    AUDIO_VARIANTS,
     PRODUCTION_PASS_SCORE,
     audio_digest,
     audio_text,
+    audio_variants,
     current_level,
     difficulty_from_vector,
     get_question,
-    length_scale_for_rate,
     level_status,
     listening_diagnostic,
     pick_next_question,
@@ -27,6 +28,7 @@ from services.listening import (
     realized_difficulty,
     score_answer,
     spoken_text,
+    variant_length_scale,
 )
 
 
@@ -40,8 +42,9 @@ def _audio_cache_dir() -> Path:
     return db.DATA_DIR / "listening" / LISTENING_BANK_VERSION / PIPER_VOICE
 
 
-def _audio_path(question: dict) -> Path:
-    return _audio_cache_dir() / f"{question['id']}-{audio_digest(question)}.wav"
+def _audio_path(question: dict, variant: str = "normal") -> Path:
+    digest = audio_digest(question, variant)
+    return _audio_cache_dir() / f"{question['id']}-{digest}.wav"
 
 
 def audio_ready(question: dict) -> bool:
@@ -57,6 +60,8 @@ def _public(question: dict) -> dict:
     out["realization"] = realization_status(question)
     out["audio_type"] = question.get("audio_type") or "tts"
     out["audio_ready"] = audio_ready(question)
+    out["variants"] = audio_variants(question)
+    out["default_variant"] = "normal"
     return out
 
 
@@ -183,23 +188,30 @@ async def get_diagnostic(user_id: str) -> dict:
     return listening_diagnostic(attempts, now=db._now())
 
 
-async def get_audio(question_id: str) -> tuple[bytes | None, int | None]:
+async def get_audio(
+    question_id: str, variant: str = "normal"
+) -> tuple[bytes | None, int | None]:
     """Devuelve el audio WAV del ítem (cacheado en disco), o un código de error.
 
+    `variant` selecciona la variante de velocidad de la escalera (`AUDIO_VARIANTS`).
     Retorna `(bytes, None)` con el audio en caso de éxito, o `(None, status)` donde
-    `status` es 404 (ítem inexistente) o 503 (sintetizador Piper no disponible). El
-    audio se sintetiza en la primera petición y se cachea en un path versionado
-    (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`).
+    `status` es 400 (variante no válida), 404 (ítem inexistente) o 503 (Piper no
+    disponible). El audio se sintetiza en la primera petición de cada variante y se
+    cachea en un path versionado
+    (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`), con digest
+    distinto por variante (la variante `normal` preserva el digest/cache actual).
     """
+    if variant not in AUDIO_VARIANTS:
+        return None, 400
     question = get_question(question_id)
     if question is None:
         return None, 404
     if not tts.is_ready():
         return None, 503
-    path = _audio_path(question)
+    path = _audio_path(question, variant)
     if path.exists():
         return path.read_bytes(), None
-    length_scale = length_scale_for_rate(question.get("speech_rate") or 0.0)
+    length_scale = variant_length_scale(question, variant)
     data = await run_in_threadpool(tts.synthesize, spoken_text(question), length_scale)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".wav.tmp")

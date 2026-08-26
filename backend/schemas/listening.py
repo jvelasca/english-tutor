@@ -4,6 +4,14 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class ListeningAudioVariant(BaseModel):
+    """Una variante de velocidad de la escalera de audio (P1.9)."""
+
+    variant: str
+    speech_rate: float
+    label: str
+
+
 class ListeningQuestion(BaseModel):
     id: str
     level: str
@@ -33,6 +41,10 @@ class ListeningQuestion(BaseModel):
     audio_type: str = "tts"
     realized_difficulty: int = 0
     realization: dict[str, dict[str, int | bool]] = Field(default_factory=dict)
+    # Escalera de variantes de velocidad (P1.9): lista ordenada slow/normal/fast y
+    # la variante servida por defecto (siempre "normal", que preserva el cache).
+    variants: list[ListeningAudioVariant] = Field(default_factory=list)
+    default_variant: str = "normal"
 
 
 class ListeningAnswerRequest(BaseModel):

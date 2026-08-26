@@ -254,6 +254,16 @@ export interface ListeningQuestion {
   audio_type: string;
   realized_difficulty: number;
   realization: Record<string, RealizationFactor>;
+  // Escalera de variantes de velocidad (P1.9): slow/normal/fast + variante por
+  // defecto servida cuando el usuario no elige (siempre "normal").
+  variants: ListeningAudioVariant[];
+  default_variant: string;
+}
+
+export interface ListeningAudioVariant {
+  variant: string;
+  speech_rate: number;
+  label: string;
 }
 
 export interface ListeningAnswerResponse {

@@ -25,11 +25,17 @@ async def question(user: dict = Depends(current_user)) -> dict:
 
 
 @router.get("/api/listening/audio/{question_id}")
-async def audio(question_id: str, user: dict = Depends(current_user)) -> Response:
-    data, status = await listening_service.get_audio(question_id)
+async def audio(
+    question_id: str,
+    variant: str = "normal",
+    user: dict = Depends(current_user),
+) -> Response:
+    data, status = await listening_service.get_audio(question_id, variant)
     if status is not None:
         detail = (
-            "Audio no disponible"
+            "Variante no válida"
+            if status == 400
+            else "Audio no disponible"
             if status == 503
             else "Pregunta no encontrada"
         )

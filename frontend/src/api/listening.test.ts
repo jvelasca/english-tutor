@@ -74,6 +74,16 @@ describe("listening api", () => {
     );
   });
 
+  it("getListeningAudioUrl añade variant cuando se pasa (y omite normal)", () => {
+    expect(getListeningAudioUrl("l1", "u1", "fast")).toBe(
+      "/api/listening/audio/l1?user_id=u1&variant=fast",
+    );
+    // La variante por defecto no cambia la URL (retrocompatible).
+    expect(getListeningAudioUrl("l1", "u1", "normal")).toBe(
+      "/api/listening/audio/l1?user_id=u1",
+    );
+  });
+
   it("submitListeningDictation envía question_id y transcript", async () => {
     const fn = mockFetch(true, {
       question_id: "l18",
