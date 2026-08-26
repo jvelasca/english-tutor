@@ -154,7 +154,9 @@ LISTENING_BANK_VERSION = "3.0.0"  # banco de listening (TTS pre-renderizado, 8D)
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
 # Archivos JSON de `CURRICULUM_DIR` que NO son un nivel (instrumentos/índices).
-_NON_LEVEL_FILES = frozenset({"assessments.json", "speaking_assessment.json"})
+_NON_LEVEL_FILES = frozenset(
+    {"assessments.json", "speaking_assessment.json", "cefr_matrix.json"}
+)
 
 
 class Activity(BaseModel):

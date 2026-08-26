@@ -536,6 +536,10 @@ class ReadinessSkillOut(BaseModel):
     evidence_count: int
     minimum: float
     ready: bool
+    transfer_required: int = 0
+    novel_required: int = 0
+    transfer_count: int = 0
+    novel_count: int = 0
 
 
 class ReadinessOut(BaseModel):

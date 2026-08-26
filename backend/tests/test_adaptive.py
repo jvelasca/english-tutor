@@ -16,6 +16,7 @@ def _entry(skill, score=0.0, confidence=0.0, evidence_count=0, **kwargs):
         "last_evidence": kwargs.get("last_evidence", ""),
         "review_due": kwargs.get("review_due", False),
         "subskills": [],
+        "evidence_by_kind": kwargs.get("evidence_by_kind", {}),
     }
 
 
@@ -98,14 +99,69 @@ def test_readiness_ignores_unevaluated_skills():
 
 
 def test_readiness_all_ready():
+    # B1 exige evidencia de transferencia en reading/listening (macro-destrezas).
     profile = [
-        _entry(s, score=0.9, confidence=0.9, evidence_count=4)
+        _entry(
+            s,
+            score=0.9,
+            confidence=0.9,
+            evidence_count=4,
+            evidence_by_kind={"transfer": 1, "novel": 0},
+        )
         for s in ("grammar", "vocabulary", "reading", "listening")
     ]
     result = adaptive.readiness(profile, "B1")
     assert result["ready"] is True
     assert result["overall"] == 100.0
     assert result["blocking_skills"] == []
+
+
+def test_readiness_b1_listening_blocked_without_transfer():
+    profile = [
+        _entry(
+            "listening",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=4,
+            evidence_by_kind={"transfer": 0, "novel": 0},
+        )
+    ]
+    result = adaptive.readiness(profile, "B1")
+    by_skill = {s["skill"]: s for s in result["skills"]}
+    assert by_skill["listening"]["ready"] is False
+    assert by_skill["listening"]["transfer_required"] == 1
+    assert by_skill["listening"]["transfer_count"] == 0
+    assert result["ready"] is False
+    assert result["blocking_skills"] == ["listening"]
+
+
+def test_readiness_b2_blocked_without_novel():
+    profile = [
+        _entry(
+            "listening",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=4,
+            evidence_by_kind={"transfer": 2, "novel": 0},
+        )
+    ]
+    result = adaptive.readiness(profile, "B2")
+    by_skill = {s["skill"]: s for s in result["skills"]}
+    assert by_skill["listening"]["ready"] is False
+    assert by_skill["listening"]["novel_required"] == 1
+    assert by_skill["listening"]["novel_count"] == 0
+    assert result["blocking_skills"] == ["listening"]
+
+
+def test_readiness_legacy_profile_without_evidence_by_kind_not_blocked():
+    # Perfil legacy (sin la clave `evidence_by_kind`): el gate de transfer/novedad
+    # no se aplica y la destreza puede quedar ready por score/confianza/evidencia.
+    entry = _entry("listening", score=0.9, confidence=0.9, evidence_count=4)
+    del entry["evidence_by_kind"]
+    result = adaptive.readiness([entry], "B1")
+    by_skill = {s["skill"]: s for s in result["skills"]}
+    assert by_skill["listening"]["ready"] is True
+    assert result["ready"] is True
 
 
 # --- Reevaluación continua -------------------------------------------------

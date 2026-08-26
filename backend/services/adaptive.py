@@ -22,6 +22,7 @@ from __future__ import annotations
 import math
 
 from services.academy import overall_cefr_score
+from services.cefr_matrix import requirements_for
 from services.curriculum import get_objective
 from services.forgetting import days_since, retrieval_probability
 
@@ -122,10 +123,16 @@ def readiness(profile: list[dict], target_level: str) -> dict:
     """Preparación de cada destreza para el `target_level`.
 
     Una destreza está `ready` solo si supera simultáneamente su mínimo de score,
-    la confianza mínima y el mínimo de evidencias. No se "pasa" de nivel por
-    promedio: una destreza bloqueante deja `ready` en False aunque el resto estén
-    altas. Devuelve per-skill, `overall` (% de destrezas listas), `blocking_skills`
-    (destrezas evaluadas pero no listas) y `ready` global.
+    la confianza mínima y el mínimo de evidencias; en las 4 macro-destrezas
+    (`listening`, `speaking`, `reading`, `writing`) esos umbrales salen de la
+    matriz CEFR (`services.cefr_matrix`) para el `target_level`, y además exigen
+    evidencia de transferencia/novedad en B1/B2. El gate de transfer/novedad es
+    retrocompatible: solo se aplica si el perfil trae `evidence_by_kind`; un perfil
+    legacy sin esa clave no queda bloqueado por transferencia.
+
+    No se "pasa" de nivel por promedio: una destreza bloqueante deja `ready` en
+    False aunque el resto estén altas. Devuelve per-skill, `overall` (% de destrezas
+    listas), `blocking_skills` (destrezas evaluadas pero no listas) y `ready` global.
     """
     skills = []
     ready_count = 0
@@ -133,7 +140,30 @@ def readiness(profile: list[dict], target_level: str) -> dict:
     blocking: list[str] = []
     for entry in profile:
         skill = entry["skill"]
-        minimum = READINESS_MINIMUMS.get(skill, READINESS_DEFAULT_MINIMUM)
+        req = requirements_for(target_level, skill)
+        if req is not None:
+            minimum = req.minimum_mastery
+            min_conf = req.minimum_confidence
+            min_evidence = req.minimum_evidence
+            transfer_required = req.transfer_required
+            novel_required = req.novel_required
+        else:
+            minimum = READINESS_MINIMUMS.get(skill, READINESS_DEFAULT_MINIMUM)
+            min_conf = READINESS_MIN_CONFIDENCE
+            min_evidence = READINESS_MIN_EVIDENCE
+            transfer_required = 0
+            novel_required = 0
+
+        by_kind = entry.get("evidence_by_kind")
+        if req is not None and isinstance(by_kind, dict):
+            transfer_ok = by_kind.get("transfer", 0) >= transfer_required
+            novel_ok = by_kind.get("novel", 0) >= novel_required
+        else:
+            # Perfil legacy sin evidence_by_kind: no gatear por transfer/novedad.
+            transfer_ok = novel_ok = True
+        transfer_count = by_kind.get("transfer", 0) if isinstance(by_kind, dict) else 0
+        novel_count = by_kind.get("novel", 0) if isinstance(by_kind, dict) else 0
+
         evidence_count = entry.get("evidence_count", 0)
         score = float(entry.get("score", 0.0))
         confidence = float(entry.get("confidence", 0.0))
@@ -141,8 +171,10 @@ def readiness(profile: list[dict], target_level: str) -> dict:
         is_ready = (
             evaluated
             and score >= minimum
-            and confidence >= READINESS_MIN_CONFIDENCE
-            and evidence_count >= READINESS_MIN_EVIDENCE
+            and confidence >= min_conf
+            and evidence_count >= min_evidence
+            and transfer_ok
+            and novel_ok
         )
         if evaluated:
             evaluated_count += 1
@@ -158,6 +190,10 @@ def readiness(profile: list[dict], target_level: str) -> dict:
                 "evidence_count": evidence_count,
                 "minimum": minimum,
                 "ready": is_ready,
+                "transfer_required": transfer_required,
+                "novel_required": novel_required,
+                "transfer_count": transfer_count,
+                "novel_count": novel_count,
             }
         )
     overall = round(ready_count / evaluated_count * 100, 1) if evaluated_count else 0.0

@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "levels": {
+    "A1": {
+      "listening": {"minimum_mastery": 0.60, "minimum_confidence": 0.50, "minimum_evidence": 2, "transfer_required": 0, "novel_required": 0},
+      "speaking":  {"minimum_mastery": 0.55, "minimum_confidence": 0.50, "minimum_evidence": 2, "transfer_required": 0, "novel_required": 0},
+      "reading":   {"minimum_mastery": 0.60, "minimum_confidence": 0.50, "minimum_evidence": 2, "transfer_required": 0, "novel_required": 0},
+      "writing":   {"minimum_mastery": 0.55, "minimum_confidence": 0.50, "minimum_evidence": 2, "transfer_required": 0, "novel_required": 0}
+    },
+    "A2": {
+      "listening": {"minimum_mastery": 0.65, "minimum_confidence": 0.55, "minimum_evidence": 3, "transfer_required": 0, "novel_required": 0},
+      "speaking":  {"minimum_mastery": 0.60, "minimum_confidence": 0.55, "minimum_evidence": 3, "transfer_required": 0, "novel_required": 0},
+      "reading":   {"minimum_mastery": 0.65, "minimum_confidence": 0.55, "minimum_evidence": 3, "transfer_required": 0, "novel_required": 0},
+      "writing":   {"minimum_mastery": 0.60, "minimum_confidence": 0.55, "minimum_evidence": 3, "transfer_required": 0, "novel_required": 0}
+    },
+    "B1": {
+      "listening": {"minimum_mastery": 0.70, "minimum_confidence": 0.60, "minimum_evidence": 3, "transfer_required": 1, "novel_required": 0},
+      "speaking":  {"minimum_mastery": 0.65, "minimum_confidence": 0.60, "minimum_evidence": 3, "transfer_required": 1, "novel_required": 0},
+      "reading":   {"minimum_mastery": 0.70, "minimum_confidence": 0.60, "minimum_evidence": 3, "transfer_required": 1, "novel_required": 0},
+      "writing":   {"minimum_mastery": 0.65, "minimum_confidence": 0.60, "minimum_evidence": 3, "transfer_required": 1, "novel_required": 0}
+    },
+    "B2": {
+      "listening": {"minimum_mastery": 0.75, "minimum_confidence": 0.65, "minimum_evidence": 4, "transfer_required": 2, "novel_required": 1},
+      "speaking":  {"minimum_mastery": 0.70, "minimum_confidence": 0.65, "minimum_evidence": 4, "transfer_required": 2, "novel_required": 1},
+      "reading":   {"minimum_mastery": 0.75, "minimum_confidence": 0.65, "minimum_evidence": 4, "transfer_required": 2, "novel_required": 1},
+      "writing":   {"minimum_mastery": 0.70, "minimum_confidence": 0.65, "minimum_evidence": 4, "transfer_required": 2, "novel_required": 1}
+    }
+  }
+}
