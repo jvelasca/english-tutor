@@ -31,6 +31,7 @@ from schemas.academy import (
     RemediationPlanOut,
     SessionCompleteRequest,
     SessionOut,
+    SpeakingDiagnostic,
     SpeakingResultOut,
     SpeakingSubmitRequest,
     SpeakingTaskResultOut,
@@ -319,6 +320,11 @@ async def objective_speaking_audio(
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
     return out
+
+
+@router.get("/api/academy/speaking/diagnostic", response_model=SpeakingDiagnostic)
+async def speaking_diagnostic(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_speaking_diagnostic(user["id"])
 
 
 @router.post(

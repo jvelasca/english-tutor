@@ -433,10 +433,16 @@ async def _annotated_profile(user_id: str, lv: Level) -> list[dict]:
     # Puente con el motor de listening: expone sus sub-destrezas dentro de 'listening'.
     listening_attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
     subskills = listening_diagnostic(listening_attempts)["subskills"]
+    # Puente con el motor de speaking (V1.15): expone sus criterios de rúbrica como
+    # sub-destrezas de 'speaking' (mismo patrón que listening).
+    speaking_rows = [r for r in evidence_rows if r.get("skill") == "speaking"]
+    speaking_subskills = speaking_svc.speaking_diagnostic(speaking_rows)["criteria"]
     trends = await _skill_trends(user_id)
     for entry in skills:
         if entry["skill"] == "listening":
             entry["subskills"] = subskills
+        elif entry["skill"] == "speaking":
+            entry["subskills"] = speaking_subskills
         entry["stability"] = adaptive.skill_stability(
             entry["score"], entry["confidence"], entry["last_evidence"], now
         )
@@ -535,6 +541,18 @@ async def get_readiness(user_id: str, target_level: str) -> ReadinessOut:
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
     skills = await _annotated_profile(user_id, lv)
     return ReadinessOut(**adaptive.readiness(skills, target_level))
+
+
+async def get_speaking_diagnostic(user_id: str) -> dict:
+    """Diagnóstico longitudinal de speaking (V1.15).
+
+    Deriva el perfil por criterio de rúbrica (fluency/grammar/lexical/pronunciation/
+    coherence/interaction) a partir de la evidencia de speaking registrada en
+    `academy_evidence`, y lo expone con tendencia temporal y criterios débiles.
+    """
+    rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    speaking_rows = [r for r in rows if r.get("skill") == "speaking"]
+    return speaking_svc.speaking_diagnostic(speaking_rows)
 
 
 async def get_today_plan(user_id: str) -> TodayPlanOut:

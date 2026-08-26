@@ -50,6 +50,13 @@ _FLUENCY_PENALTY_SELF_CORRECTION = 0.05
 _FLUENCY_PENALTY_HESITATION = 0.03
 _FLUENCY_PENALTY_REPETITION = 0.03
 
+# Parámetros del diagnóstico longitudinal de speaking (V1.15). Un criterio está
+# "débil" si no se ha practicado (attempts == 0) o si su media está por debajo del
+# umbral con un mínimo de intentos (evidencia suficiente).
+SPEAKING_WEAK_THRESHOLD = 0.6
+SPEAKING_MIN_ATTEMPTS = 3
+SPEAKING_TREND_WINDOW = 5
+
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
@@ -322,3 +329,124 @@ def evidence_from_speaking(
         }
     )
     return records
+
+
+def _mean_trend(rows: list[dict], window: int = SPEAKING_TREND_WINDOW) -> dict:
+    """Tendencia de la media de `result` (0..1) de los últimos `window` vs previos.
+
+    Las filas llegan en orden cronológico (id ASC). Devuelve
+    `{recent_mean, prior_mean, delta, direction}` con `direction` en
+    `{"up", "down", "flat", "n/a"}`. Adapta `listening.recent_trend` (que trabaja
+    sobre `correct`) a medias de scores continuos.
+    """
+    if not rows:
+        return {
+            "recent_mean": None,
+            "prior_mean": None,
+            "delta": None,
+            "direction": "n/a",
+        }
+
+    def _mean(subset: list[dict]) -> float:
+        return round(sum(r["result"] for r in subset) / len(subset), 3)
+
+    if len(rows) <= window:
+        return {
+            "recent_mean": _mean(rows),
+            "prior_mean": None,
+            "delta": None,
+            "direction": "n/a",
+        }
+    recent = _mean(rows[-window:])
+    prior = _mean(rows[:-window])
+    delta = round(recent - prior, 3)
+    if delta > 0:
+        direction = "up"
+    elif delta < 0:
+        direction = "down"
+    else:
+        direction = "flat"
+    return {
+        "recent_mean": recent,
+        "prior_mean": prior,
+        "delta": delta,
+        "direction": direction,
+    }
+
+
+def speaking_diagnostic(evidence_rows: list[dict]) -> dict:
+    """Perfil longitudinal de speaking por criterio del rubric (V1.15).
+
+    `evidence_rows` son las filas de `academy_evidence` con `skill="speaking"`
+    (cada fila tiene `item_id` = criterio del rubric y `result` = score 0..1, más
+    una fila `item_id="overall"` por intento). Agrupa por criterio y calcula
+    `attempts`, `mean`, `min`, `max` y `review_due`; deriva `weak` y
+    `recommendation`; y expone el `trend` global sobre las filas `overall` (una
+    por intento) como señal longitudinal de la calidad oral.
+
+    Devuelve un dict con `criteria`, `weak`, `recommendation`, `attempts` (nº de
+    intentos = nº de filas `overall`), `overall_mean`, `trend` y `rubric_version`.
+    Es determinista y no depende de LLM ni red.
+    """
+    groups: dict[str, list[dict]] = {}
+    overall_rows: list[dict] = []
+    for row in evidence_rows:
+        item_id = row.get("item_id") or ""
+        if item_id == "overall":
+            overall_rows.append(row)
+            continue
+        groups.setdefault(item_id, []).append(row)
+
+    def _criterion(name: str, rows: list[dict]) -> dict:
+        attempts = len(rows)
+        results = [r["result"] for r in rows if r.get("result") is not None]
+        mean = round(sum(results) / len(results), 3) if results else None
+        review_due = attempts == 0 or (
+            attempts >= SPEAKING_MIN_ATTEMPTS
+            and mean is not None
+            and mean < SPEAKING_WEAK_THRESHOLD
+        )
+        return {
+            "criterion": name,
+            "attempts": attempts,
+            "mean": mean,
+            "min": round(min(results), 3) if results else None,
+            "max": round(max(results), 3) if results else None,
+            "review_due": review_due,
+        }
+
+    criteria = [_criterion(c, groups.get(c, [])) for c in SPEAKING_CRITERIA]
+    known = set(SPEAKING_CRITERIA)
+    for name in sorted(set(groups) - known):
+        criteria.append(_criterion(name, groups[name]))
+
+    def _weak_key(name: str) -> tuple:
+        entry = next(c for c in criteria if c["criterion"] == name)
+        mean = entry["mean"]
+        return (mean is None, mean if mean is not None else 0.0)
+
+    weak = [c["criterion"] for c in criteria if c["review_due"]]
+    weak.sort(key=_weak_key)
+
+    recommendation = (
+        "All speaking criteria look strong."
+        if not weak
+        else "Focus on: " + ", ".join(weak)
+    )
+
+    overall_results = [r["result"] for r in overall_rows if r.get("result") is not None]
+    overall_mean = (
+        round(sum(overall_results) / len(overall_results), 3)
+        if overall_results
+        else None
+    )
+
+    return {
+        "criteria": criteria,
+        "weak": weak,
+        "recommendation": recommendation,
+        "attempts": len(overall_rows),
+        "overall_mean": overall_mean,
+        "trend": _mean_trend(overall_rows),
+        "rubric_version": RUBRIC_VERSION,
+    }

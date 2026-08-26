@@ -355,6 +355,32 @@ class SpeakingTaskResultOut(BaseModel):
     evidence: dict
 
 
+class SpeakingCriterionOut(BaseModel):
+    criterion: str
+    attempts: int
+    mean: float | None = None
+    min: float | None = None
+    max: float | None = None
+    review_due: bool
+
+
+class SpeakingTrend(BaseModel):
+    recent_mean: float | None = None
+    prior_mean: float | None = None
+    delta: float | None = None
+    direction: str
+
+
+class SpeakingDiagnostic(BaseModel):
+    criteria: list[SpeakingCriterionOut]
+    weak: list[str]
+    recommendation: str
+    attempts: int
+    overall_mean: float | None = None
+    trend: SpeakingTrend
+    rubric_version: str = ""
+
+
 class SkillProfileOut(BaseModel):
     skill: str
     score: float

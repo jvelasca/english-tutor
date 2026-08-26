@@ -441,3 +441,94 @@ def test_speaking_audio_rejects_blocked_level(monkeypatch, tmp_path):
             files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
         )
     assert r.status_code == 404
+
+
+# --- Diagnóstico longitudinal de speaking (V1.15) -------------------------
+
+
+def _evidence_row(item_id, result, created_at="2026-08-01T00:00:00"):
+    return {
+        "skill": "speaking",
+        "item_id": item_id,
+        "result": result,
+        "created_at": created_at,
+    }
+
+
+def test_speaking_diagnostic_empty():
+    diag = speaking_svc.speaking_diagnostic([])
+    assert diag["attempts"] == 0
+    assert diag["overall_mean"] is None
+    assert diag["trend"]["direction"] == "n/a"
+    assert len(diag["criteria"]) == len(SPEAKING_CRITERIA)
+    assert all(c["attempts"] == 0 and c["mean"] is None for c in diag["criteria"])
+    assert set(diag["weak"]) == set(SPEAKING_CRITERIA)
+    assert diag["recommendation"].startswith("Focus on")
+
+
+def test_speaking_diagnostic_strong():
+    rows = []
+    for criterion in SPEAKING_CRITERIA:
+        rows.append(_evidence_row(criterion, 0.9))
+        rows.append(_evidence_row(criterion, 0.95))
+    rows.append(_evidence_row("overall", 0.9))
+    rows.append(_evidence_row("overall", 0.95))
+    diag = speaking_svc.speaking_diagnostic(rows)
+    assert diag["attempts"] == 2
+    assert diag["overall_mean"] == 0.925
+    assert diag["weak"] == []
+    assert diag["recommendation"] == "All speaking criteria look strong."
+
+
+def test_speaking_diagnostic_weak_criterion():
+    rows = []
+    for _ in range(3):
+        rows.append(_evidence_row("pronunciation", 0.4))
+        rows.append(_evidence_row("fluency", 0.9))
+    for _ in range(3):
+        rows.append(_evidence_row("overall", 0.5))
+    diag = speaking_svc.speaking_diagnostic(rows)
+    assert "pronunciation" in diag["weak"]
+    assert "fluency" not in diag["weak"]
+
+
+def test_speaking_diagnostic_trend_up():
+    rows = []
+    for i, value in enumerate([0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8]):
+        rows.append(_evidence_row("overall", value, created_at=f"2026-08-{i + 1:02d}"))
+    diag = speaking_svc.speaking_diagnostic(rows)
+    assert diag["trend"]["direction"] == "up"
+    assert diag["trend"]["delta"] > 0
+
+
+def test_speaking_diagnostic_endpoint(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    with TestClient(app) as client:
+        client.post(
+            "/api/academy/objective/speaking",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "expected": "I am a student",
+                "heard": "I am a student",
+                "duration_seconds": 3.0,
+            },
+        )
+        r = client.get("/api/academy/speaking/diagnostic", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["attempts"] == 1
+    assert body["overall_mean"] is not None
+    assert len(body["criteria"]) == len(SPEAKING_CRITERIA)
+    assert "overall" not in [c["criterion"] for c in body["criteria"]]
+    for criterion in body["criteria"]:
+        assert set(criterion.keys()) >= {
+            "criterion",
+            "attempts",
+            "mean",
+            "min",
+            "max",
+            "review_due",
+        }
