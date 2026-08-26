@@ -41,12 +41,14 @@ describe("bandLabel", () => {
   it("mapea cada destreza a su etiqueta", () => {
     expect(bandLabel("vocabulary")).toBe("Vocabulario");
     expect(bandLabel("grammar")).toBe("Gramática");
-    expect(bandLabel("fluency")).toBe("Fluidez");
     expect(bandLabel("pronunciation")).toBe("Pronunciación");
     expect(bandLabel("listening")).toBe("Listening");
+    expect(bandLabel("speaking")).toBe("Speaking");
+    expect(bandLabel("reading")).toBe("Reading");
+    expect(bandLabel("writing")).toBe("Writing");
   });
 
   it("devuelve el valor crudo para destrezas desconocidas", () => {
-    expect(bandLabel("writing")).toBe("writing");
+    expect(bandLabel("spelling")).toBe("spelling");
   });
 });

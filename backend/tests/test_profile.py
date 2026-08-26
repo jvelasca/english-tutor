@@ -128,12 +128,45 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         assert body["user_id"] == a
         assert body["estimated_level"] in ("A1", "A2")
         assert 0.0 <= body["estimated_confidence"] < 0.1
-        assert len(body["estimated_evidence"]) == 5
+        assert 1.0 <= body["overall_ability"] <= 6.0
+        assert set(body["estimated_bands"].keys()) == {
+            "vocabulary",
+            "grammar",
+            "pronunciation",
+            "listening",
+            "speaking",
+            "reading",
+            "writing",
+        }
+        assert body["skills"]
+        assert all(
+            {"skill", "band", "score", "confidence", "samples", "stability"}
+            <= set(s)
+            for s in body["skills"]
+        )
+        assert body["readiness"]["target_level"]
+        assert body["cefr_history"]  # primer snapshot registrado
         assert body["vocabulary_size"] == 2
         assert set(body["top_words"]) == {"cat", "dog"}
         assert body["recurring_errors"][0]["rule"] == "he_she_it_s"
         assert body["pronunciation_average"] is None
         assert body["recommendations"]
+
+
+def test_profile_records_cefr_snapshot_once(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r1 = client.get("/api/profile", params={"user_id": a})
+        r2 = client.get("/api/profile", params={"user_id": a})
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    # Sin cambio material entre peticiones idénticas, solo hay un snapshot.
+    assert len(r1.json()["cefr_history"]) == 1
+    assert len(r2.json()["cefr_history"]) == 1
+    snap = r1.json()["cefr_history"][0]
+    assert snap["level"] == "A1"
+    assert snap["instrument_version"]
+    assert snap["curriculum_version"]
 
 
 def test_profile_endpoint_404(monkeypatch, tmp_path):
@@ -192,7 +225,9 @@ def test_profile_vocabulary_mastered(monkeypatch, tmp_path):
     assert body["vocabulary_exposed"] == 0
 
 
-def test_profile_grammar_rate_uses_user_messages(monkeypatch, tmp_path):
+def test_profile_grammar_band_defaults_to_a1_without_academy_evidence(
+    monkeypatch, tmp_path
+):
     a, _b = _setup(monkeypatch, tmp_path)
     cid = conversations_repo.create_conversation(a)["id"]
     conversations_repo.save_conversation(
@@ -211,5 +246,5 @@ def test_profile_grammar_rate_uses_user_messages(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.get("/api/profile", params={"user_id": a})
         assert r.status_code == 200
-        # 2 mensajes de usuario y 1 error → ratio 0.5 → banda A1 (no A2).
+        # Sin evidencia de Academy, la banda de gramática es la heurística A1.
         assert r.json()["estimated_bands"]["grammar"] == "A1"

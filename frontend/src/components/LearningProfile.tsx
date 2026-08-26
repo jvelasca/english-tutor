@@ -6,6 +6,27 @@ interface LearningProfileProps {
   profile: ProfileData | null;
 }
 
+const BANDS = [
+  "vocabulary",
+  "grammar",
+  "pronunciation",
+  "listening",
+  "speaking",
+  "reading",
+  "writing",
+] as const;
+
+function formatTrend(trend: number | null): string {
+  if (trend === null) return "—";
+  const sign = trend > 0 ? "+" : "";
+  return `${sign}${trend.toFixed(0)}%`;
+}
+
+function trendDirection(trend: number | null): "up" | "down" | "flat" {
+  if (trend === null || Math.abs(trend) < 0.5) return "flat";
+  return trend > 0 ? "up" : "down";
+}
+
 export function LearningProfile({ profile }: LearningProfileProps) {
   if (profile === null) {
     return (
@@ -19,6 +40,7 @@ export function LearningProfile({ profile }: LearningProfileProps) {
   }
 
   const tone = cefrTone(profile.estimated_level);
+  const abilityPct = Math.round((profile.overall_ability / 6) * 100);
 
   return (
     <section className="learning-profile">
@@ -33,13 +55,25 @@ export function LearningProfile({ profile }: LearningProfileProps) {
         <p className="cefr-descriptor">{profile.estimated_descriptor}</p>
       )}
 
+      <div className="cefr-ability" title="Capacidad global continua (escala A1=1 … C2=6)">
+        <span className="cefr-confidence-label">Capacidad global</span>
+        <div className="cefr-confidence-track">
+          <div
+            className="cefr-confidence-fill"
+            style={{ width: `${abilityPct}%` }}
+          />
+        </div>
+        <span className="cefr-confidence-value">
+          {profile.overall_ability.toFixed(1)} / 6
+        </span>
+      </div>
+
       <div className="cefr-bands">
-        {(
-          ["vocabulary", "grammar", "fluency", "pronunciation", "listening"] as const
-        ).map((skill) => (
+        {BANDS.map((skill) => (
           <span
             key={skill}
             className={`cefr-band ${cefrTone(profile.estimated_bands[skill])}`}
+            title="Banda heurística alineada con CEFR (no es una certificación oficial)"
           >
             <span className="cefr-band-label">{bandLabel(skill)}</span>
             <span className="cefr-band-value">
@@ -49,32 +83,37 @@ export function LearningProfile({ profile }: LearningProfileProps) {
         ))}
       </div>
 
-      <div className="cefr-confidence" title="Confianza del nivel estimado según las muestras recogidas">
-        <span className="cefr-confidence-label">Confianza</span>
-        <div className="cefr-confidence-track">
-          <div
-            className="cefr-confidence-fill"
-            style={{
-              width: `${Math.round(profile.estimated_confidence * 100)}%`,
-            }}
-          />
-        </div>
-        <span className="cefr-confidence-value">
-          {Math.round(profile.estimated_confidence * 100)}%
+      <div className="cefr-readiness">
+        <span className="cefr-confidence-label">
+          Preparado para {profile.target_level}
         </span>
+        <span className="cefr-confidence-value">
+          {Math.round(profile.readiness.overall)}%
+        </span>
+        {profile.readiness.blocking_skills.length > 0 && (
+          <p className="readiness-blocking">
+            Trabaja en: {profile.readiness.blocking_skills.map(bandLabel).join(", ")}
+          </p>
+        )}
       </div>
 
-      {profile.estimated_evidence.length > 0 && (
+      {profile.skills.length > 0 && (
         <div className="cefr-evidence">
-          {profile.estimated_evidence.map((item) => (
-            <div key={item.skill} className="cefr-evidence-row">
-              <span className="cefr-evidence-skill">{bandLabel(item.skill)}</span>
-              <span className="cefr-evidence-band">{item.band}</span>
-              <span className="cefr-evidence-samples">
-                {item.samples}/{item.required} muestras
-              </span>
-            </div>
-          ))}
+          {profile.skills.map((item) => {
+            const dir = trendDirection(item.trend);
+            return (
+              <div key={item.skill} className="cefr-evidence-row">
+                <span className="cefr-evidence-skill">{bandLabel(item.skill)}</span>
+                <span className="cefr-evidence-band">{item.band}</span>
+                <span className="cefr-evidence-samples">
+                  {item.samples} muestras · {Math.round(item.confidence * 100)}%
+                </span>
+                <span className={`trend trend-${dir}`} title="Tendencia reciente">
+                  {formatTrend(item.trend)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 

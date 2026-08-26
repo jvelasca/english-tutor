@@ -103,17 +103,32 @@ export type EstimatedLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export interface EstimatedBands {
   vocabulary: string;
   grammar: string;
-  fluency: string;
   pronunciation: string;
   listening: string;
+  speaking: string;
+  reading: string;
+  writing: string;
 }
 
-export interface CefrEvidence {
+export interface SkillState {
   skill: string;
   band: string;
-  samples: number;
-  required: number;
+  score: number;
   confidence: number;
+  samples: number;
+  stability: number;
+  trend: number | null;
+  subskills: Record<string, unknown>[];
+}
+
+export interface CefrSnapshot {
+  id: number;
+  level: string;
+  numeric: number;
+  confidence: number;
+  instrument_version: string;
+  curriculum_version: string;
+  created_at: string;
 }
 
 export interface GrammarRecurringError {
@@ -133,11 +148,16 @@ export interface GrammarRecurringError {
 
 export interface LearningProfile {
   user_id: string;
+  current_level: string;
   estimated_level: EstimatedLevel;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
   estimated_confidence: number;
-  estimated_evidence: CefrEvidence[];
+  overall_ability: number;
+  target_level: string;
+  skills: SkillState[];
+  readiness: Readiness;
+  cefr_history: CefrSnapshot[];
   vocabulary_size: number;
   vocabulary_exposed: number;
   vocabulary_mastered: number;

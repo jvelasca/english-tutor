@@ -2084,6 +2084,46 @@ body.is-resizing {
   color: var(--color-text-dim);
 }
 
+.trend {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.trend-up {
+  color: var(--color-success);
+}
+
+.trend-down {
+  color: var(--color-warning);
+}
+
+.trend-flat {
+  color: var(--color-text-dim);
+}
+
+/* CEFR: capacidad global continua + readiness hacia el siguiente nivel (V1.12) */
+.cefr-ability {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.cefr-readiness {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.readiness-blocking {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
 /* Listening */
 .listening {
   margin: var(--space-2) 0;

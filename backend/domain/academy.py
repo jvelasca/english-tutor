@@ -472,9 +472,15 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
     )
 
 
-async def get_student_model(user_id: str) -> StudentModelOut:
-    """Student Model 2.0: nivel actual/estimado, perfil por destreza con stability
-    y trend, readiness hacia el siguiente nivel y reevaluación pendiente (si hay)."""
+async def build_student_model(user_id: str) -> dict:
+    """Fuente única del Student Model (sin proyección a un schema concreto).
+
+    Construye el perfil CEFR por destreza anotado (score/confidence/stability/
+    trend/subskills), el nivel estimado continuo y la preparación hacia el
+    siguiente nivel. Tanto `/api/academy/student-model` como `/api/profile`
+    proyectan sobre este mismo dict, de modo que comparten nivel, `overall_ability`
+    y confianza (única fuente de verdad).
+    """
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
     skills = await _annotated_profile(user_id, lv)
@@ -489,17 +495,37 @@ async def get_student_model(user_id: str) -> StudentModelOut:
     history = await run_in_threadpool(academy_repo.list_assessment_results, user_id)
     now = datetime.now(timezone.utc).isoformat()
     reassessment = adaptive.reassessment_due(skills, history, now)
+    return {
+        "level_id": lv.level_id,
+        "current_level": lv.level,
+        "estimated_level": est["level"],
+        "estimated_numeric": est["numeric"],
+        "confidence": est["confidence"],
+        "target_level": target,
+        "skills": skills,
+        "critical_skills": academy_svc.critical_skills(skills),
+        "readiness": adaptive.readiness(skills, target),
+        "reassessment": reassessment,
+    }
+
+
+async def get_student_model(user_id: str) -> StudentModelOut:
+    """Student Model 2.0: nivel actual/estimado, perfil por destreza con stability
+    y trend, readiness hacia el siguiente nivel y reevaluación pendiente (si hay)."""
+    sm = await build_student_model(user_id)
     return StudentModelOut(
-        level_id=lv.level_id,
-        current_level=lv.level,
-        estimated_level=est["level"],
-        estimated_numeric=est["numeric"],
-        confidence=est["confidence"],
-        target_level=target,
-        skills=skills,
-        critical_skills=academy_svc.critical_skills(skills),
-        readiness=ReadinessOut(**adaptive.readiness(skills, target)),
-        reassessment=ReassessmentOut(**reassessment) if reassessment else None,
+        level_id=sm["level_id"],
+        current_level=sm["current_level"],
+        estimated_level=sm["estimated_level"],
+        estimated_numeric=sm["estimated_numeric"],
+        confidence=sm["confidence"],
+        target_level=sm["target_level"],
+        skills=sm["skills"],
+        critical_skills=sm["critical_skills"],
+        readiness=ReadinessOut(**sm["readiness"]),
+        reassessment=(
+            ReassessmentOut(**sm["reassessment"]) if sm["reassessment"] else None
+        ),
     )
 
 

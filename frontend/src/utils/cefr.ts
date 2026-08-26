@@ -31,12 +31,16 @@ export function bandLabel(skill: string): string {
       return "Vocabulario";
     case "grammar":
       return "Gramática";
-    case "fluency":
-      return "Fluidez";
     case "pronunciation":
       return "Pronunciación";
     case "listening":
       return "Listening";
+    case "speaking":
+      return "Speaking";
+    case "reading":
+      return "Reading";
+    case "writing":
+      return "Writing";
     default:
       return skill;
   }

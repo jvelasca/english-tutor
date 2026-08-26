@@ -18,7 +18,7 @@ export function isTutorMode(value: string): value is TutorMode {
 
 // Banda CEFR asociada a cada modo, para mostrar el nivel estimado en el badge.
 const MODE_BAND: Record<TutorMode, keyof EstimatedBands> = {
-  conversation: "fluency",
+  conversation: "speaking",
   grammar: "grammar",
   exercises: "vocabulary",
   pronunciation: "pronunciation",

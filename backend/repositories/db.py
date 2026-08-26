@@ -298,6 +298,22 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cefr_assessment_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                numeric REAL NOT NULL,
+                confidence REAL NOT NULL,
+                instrument_version TEXT NOT NULL,
+                curriculum_version TEXT NOT NULL,
+                skills_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
 
         conn.execute(
             """
@@ -543,6 +559,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "
             "ON academy_evidence(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cefr_snapshots_user_id "
+            "ON cefr_assessment_snapshots(user_id)"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_placement_sessions_user_id "

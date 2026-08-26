@@ -1,7 +1,19 @@
-"""Estimación heurística de nivel CEFR y recomendaciones (puro, determinista)."""
+"""Estimación heurística de nivel CEFR y recomendaciones (puro, determinista).
+
+IMPORTANTE (naming CEFR): las funciones de banda de este módulo
+(`vocabulary_band`, `grammar_band`, `fluency_band`, `pronunciation_band`,
+`listening_band` y `heuristic_band`) producen bandas **heurísticas alineadas con
+CEFR**, NO equivalencias oficiales. Son proxies internos de visualización; la
+certificación oficial CEFR es otra cosa. Esta distinción se refleja también en la
+UI (`estimated_bands` → "banda heurística").
+"""
 from __future__ import annotations
 
 CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+
+# Versión del modelo unificado de estimación CEFR del Student Model (snapshot
+# reproducible: cada snapshot de evaluación guarda esta versión como instrumento).
+CEFR_MODEL_VERSION = "2.0.0"
 
 # Mínimo de muestras por destreza para que su banda cuente como evidencia (P5).
 # Una destreza sin muestras suficientes no limita el nivel, pero reduce la confianza.
@@ -103,6 +115,30 @@ _LEVEL_DESCRIPTORS = {
 
 def level_descriptor(level: str) -> str:
     return _LEVEL_DESCRIPTORS.get(level, "")
+
+
+def heuristic_band(score: float | None) -> str:
+    """Banda CEFR-alineada **heurística** para un score de dominio continuo (0..1).
+
+    Proxy interno de visualización (NO equivalencia oficial CEFR). Usa las mismas
+    fronteras de media banda que `adaptive.numeric_to_level`, de modo que un score
+    de destreza 0..1 mapea a A1..C2 de forma monotónica: 0.0→A1 … 1.0→C2. `None`
+    (sin observación) devuelve "—".
+    """
+    if score is None:
+        return "—"
+    numeric = 1.0 + 5.0 * score
+    if numeric < 1.5:
+        return "A1"
+    if numeric < 2.5:
+        return "A2"
+    if numeric < 3.5:
+        return "B1"
+    if numeric < 4.5:
+        return "B2"
+    if numeric < 5.5:
+        return "C1"
+    return "C2"
 
 
 def evaluate_cefr(signals: dict) -> dict:

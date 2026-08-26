@@ -17,7 +17,7 @@ describe("modes", () => {
   });
 
   it("maps each mode to its CEFR band", () => {
-    expect(modeCefrBand("conversation")).toBe("fluency");
+    expect(modeCefrBand("conversation")).toBe("speaking");
     expect(modeCefrBand("grammar")).toBe("grammar");
     expect(modeCefrBand("exercises")).toBe("vocabulary");
     expect(modeCefrBand("pronunciation")).toBe("pronunciation");
@@ -27,9 +27,11 @@ describe("modes", () => {
     const bands = {
       vocabulary: "A1",
       grammar: "A2",
-      fluency: "B1",
       pronunciation: "A2",
       listening: "A1",
+      speaking: "B1",
+      reading: "A1",
+      writing: "A1",
     };
     expect(modeCefrLevel("grammar", bands)).toBe("A2");
     expect(modeCefrLevel("conversation", bands)).toBe("B1");

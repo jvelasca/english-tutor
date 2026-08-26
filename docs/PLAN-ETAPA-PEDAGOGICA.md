@@ -25,7 +25,8 @@ aprendizaje real:
 | **P3** | Vocabulario: exposure/production/mastery | Medio | — | ✔ hecho |
 | **P4** | Listening como competencia (dificultad/tema/tendencia/tiempo/reincidencia) | Medio | — | ✔ hecho |
 | **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ✔ hecho |
-| **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | ⏳ pendiente |
+| **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | 🔁 diferido (a favor de Student Model 2.0) |
+| **V1.12** | Student Model 2.0 + Assessment Loop (unificación + snapshots + naming CEFR + Speaking 2.0) | Alto (bucle completo) | P5 | ⏳ en curso |
 
 ## Detalle por track
 
@@ -56,9 +57,19 @@ métricas: precisión por dificultad/tema, tendencia reciente, tiempo de respues
 Sustituir el "punto-sum" por un modelo de **evidencia**: cada nivel exige un mínimo de muestras
 por destreza (mensajes, listening, pronunciación, gramática) y se muestra la confianza del nivel.
 
-### P6 — Pronunciación fonémica
+### P6 — Pronunciación fonémica (diferido)
 Sustituir la similitud textual por alineación de fonemas: grapheme→phoneme (diccionario local),
 phoneme accuracy y prosodia. Mantener `score` como proxy mientras no haya fonemas.
+**Diferido** a favor de V1.12 (Student Model 2.0 + Assessment Loop): primero se unifica el modelo
+de alumno y se cierra el bucle de evaluación continua, y después se retoma la fonémica.
+
+### V1.12 — Student Model 2.0 + Assessment Loop
+Reconciliar los dos estimadores CEFR divergentes en una única fuente de verdad (el Student Model
+de la Academy). `/api/profile` pasa a ser proyección del modelo unificado; se corrigen los P0
+(Speaking scoring con `observed`, naming CEFR "heuristic CEFR-aligned band" + `overall_ability` +
+`readiness`, versión de release) y se añaden snapshots históricos de evaluación reproducibles
+(`cefr_assessment_snapshots` con `instrument_version`). Dos subagentes: `p6-speaking-2.0` y
+`p7-student-model-unificado` (briefings en `agentes/pedagogia/`).
 
 ## Reglas de proceso
 

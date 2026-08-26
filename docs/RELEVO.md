@@ -3,40 +3,44 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-25 20:55 (UTC+2).
+> Actualizado por última vez: 2026-08-25 22:55 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-25):** `v1.10` publicada (P4). Cerradas hasta ahora: Release Audit 1.1
+**Posición actual (2026-08-25):** `v1.11` publicada (P5). Cerradas hasta ahora: Release Audit 1.1
 (M12), M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
 Listening 1.0/2.0, Placement 1.0 (IRT-lite), **Placement 2.0** (calibración observacional +
-perfil multiskill) y Etapa 2 (pedagogía) **P1–P4**; **P5** en curso (CEFR por evidencia);
-**P6** pendiente.
+perfil multiskill) y Etapa 2 (pedagogía) **P1–P5**; **V1.12** en curso (Student Model unificado +
+Assessment Loop). El P6 original (pronunciación fonémica) se **difiere** a favor de esta unificación.
 
 **Últimos commits publicados:**
+- `feat: V1.11 - CEFR basado en evidencia (muestras por destreza + confianza)`
 - `feat: V1.10 - Listening como competencia (topic + metricas por dificultad/tema/tendencia/reincidencia)`
 - `feat: V1.9 - Vocabulario exposure/production/mastery (P3)`
 - `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
 - `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 - `release: v1.7.0 - Placement 2.0 (calibracion observacional + perfil multiskill)`
 
-**⚠️ TRABAJO SIN COMMITEAR (P5 — CEFR basado en evidencia):** ver sección 24. Es el
-incremento en curso y NO está versionado. Resumen:
-- **Modelo de evidencia** en `services/cefr.py`: cada destreza exige un mínimo de muestras
-  (`MIN_SAMPLES`) y aporta banda + confianza; el nivel es la banda más baja entre las
-  destrezas con evidencia suficiente.
-- **Confianza + detalle por destreza** expuestos en `/api/profile` (`estimated_confidence`
-  y `estimated_evidence`), incluyendo la banda de **listening**.
+**⚠️ TRABAJO SIN COMMITEAR (V1.12 — Student Model unificado + Assessment Loop):** ver
+sección 25. Es el incremento en curso y NO está versionado. Resumen:
+- **P6 — Speaking scoring 2.0**: corrige los 4 defectos del scorer (`task_achievement`,
+  `lexical_resource` por diversidad léxica, `coherence` por marcadores discursivos,
+  `pronunciation` con `observed=false` sin audio), amplía la evidencia del LLM (marcadores
+  discursivos) y hace higiene de versión (`config.py`/`README.md` → `1.11.0`).
+- **P7 — Student Model fuente única**: `/api/profile` pasa a ser proyección del Student Model de
+  la Academy (`build_student_model`), con `overall_ability`, `readiness`, desglose por destreza,
+  bandas "heuristic CEFR-aligned" y **snapshots históricos** (`cefr_assessment_snapshots`).
 
-**Estado verde:** backend `558 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
-launcher `33 tests` + `ruff` limpio.
+**Estado verde:** backend `566 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK;
+launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 24** de este documento (trabajo sin commitear — P5 CEFR evidencia).
-3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6).
-4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con P6.
-5. Redactar y ejecutar `agentes/pedagogia/p6-*.md` (un subagente a la vez), respetando la
+2. Leer la **sección 25** de este documento (trabajo sin commitear — V1.12 Student Model).
+3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6 + Student Model 2.0).
+4. Decidir: **commitear** el trabajo sin versionar (dos `feat:` limpios: P6 y P7) o continuar
+   con V1.13 (Listening 3.0).
+5. Redactar y ejecutar `agentes/pedagogia/p*-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
@@ -1003,7 +1007,7 @@ cd frontend && npx tsc --noEmit && npx vitest run
 - **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
   `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
-## 24. EN CURSO (sin commitear) — P5: CEFR basado en evidencia
+## 24. HECHO (V1.11) — P5: CEFR basado en evidencia
 
 > **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P5: `services/cefr.py::evaluate_cefr` sumaba puntos
 > (`_vocab_points`, `_pron_points`, `_exercise_points`, `_grammar_points`, `_fluency_points`) y
@@ -1043,5 +1047,64 @@ cd frontend && npx tsc --noEmit && npx vitest run
   Total backend **558 tests**; frontend **143 tests**.
 
 ### 24.6 Pendiente / siguiente incremento natural
-- **P6 de Etapa 2** (pronunciación fonémica): ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+- **V1.12 — Student Model unificado + Assessment Loop** (P6 speaking + P7 unificación): ver
+  sección 25 y `agentes/pedagogia/p6-speaking-2.0.md` / `p7-student-model-unificado.md`.
+- El P6 original (pronunciación fonémica) queda **diferido** a favor de esta unificación.
+
+## 25. EN CURSO (sin commitear) — V1.12: Student Model unificado + Assessment Loop
+
+> **Origen.** La auditoría externa de V1.11 detectó dos estimadores CEFR paralelos que se
+> contradicen (`/api/profile` con banda mínima vs `/api/academy/student-model` con nivel continuo
+> ponderado), 4 defectos de scoring en Speaking y la falta de histórico de evaluación. V1.12
+> convierte el **Student Model de la Academy en la fuente de verdad única**, corrige los P0 y añade
+> **snapshots de evaluación** reproducibles. Dos subagentes (`p6`, `p7`), cada uno su `feat:`.
+
+### 25.1 P6 — Speaking scoring 2.0 + higiene de release
+- **`services/speaking.py`**: `task_achievement` usa `task_achieved` del LLM en flujo libre
+  (el solapamiento de tokens es solo cota inferior con `expected`); `lexical_resource` mide
+  diversidad léxica (TTR) con `lexical_diversity(tokens)`; `coherence` usa el `coherence` del LLM
+  + marcadores discursivos (eliminado `len(heard)/len(expected)`); `pronunciation` devuelve
+  `observed=false`/`score=None` sin audio y `_weighted_overall` recalcula solo criterios
+  observados. Añade `observed` y `confidence` por criterio; penalizaciones discursivas
+  (`self_corrections`, `hesitations`, `repetitions`) reducen `fluency`.
+- **`services/speaking_llm.py`**: `SPEAKING_EVIDENCE_FIELDS` ampliada con `cohesion`,
+  `discourse_markers`, `self_corrections`, `hesitations`, `repetitions`; helpers
+  `_parse_float_field`/`_parse_count_field` con fallback.
+- **`config.py`** → `VERSION = "1.11.0"`; **`README.md`** → "v1.11.0".
+- **`schemas/academy.py`** / **`domain/academy.py`**: `observed` en speaking, `criteria` con
+  `float | None`.
+- Tests: `test_speaking.py` (observed, diversidad, sin audio, penalizaciones),
+  `test_speaking_llm.py` (campos opcionales + fallback).
+
+### 25.2 P7 — Student Model fuente única + snapshots + naming CEFR
+- **`domain/academy.py`**: `build_student_model(user_id) -> dict` como única fuente de verdad
+  (reutiliza `build_skill_profile` + `adaptive.estimated_level` + `readiness` +
+  `reassessment_due`); `get_student_model` proyecta a `StudentModelOut`.
+- **`domain/profile.py`**: `_compute_profile` delega en `build_student_model` (adiós al min-band
+  propio); helpers puros extraídos (`_bands_from_skills`, `_skill_states`, `_activity_stats`,
+  `_maybe_record_snapshot`). `get_profile_summary` incluye `cefr_history`.
+- **`repositories/db.py`**: tabla idempotente `cefr_assessment_snapshots` + índice.
+- **`repositories/profile.py`**: `record_cefr_snapshot`, `list_cefr_history`,
+  `last_cefr_snapshot`.
+- **`services/cefr.py`**: `estimate_cefr` (API v1) intacta; bandas documentadas como
+  "heuristic CEFR-aligned band"; `CEFR_MODEL_VERSION` y `heuristic_band(score)`. `evaluate_cefr`
+  deja de ser la fuente del perfil global.
+- **`schemas/profile.py`**: `EstimatedBands` con 7 destrezas (`speaking`, `reading`, `writing`);
+  nuevas `SkillState` y `CefrSnapshot`; `LearningProfile` con `overall_ability`, `target_level`,
+  `skills`, `readiness` y `cefr_history`.
+- **Frontend**: `types/api.ts` (nuevos tipos, adiós `CefrEvidence`), `utils/cefr.ts`
+  (`bandLabel` speaking/reading/writing), `utils/modes.ts` (`conversation` → `speaking`),
+  `components/LearningProfile.tsx` (barra `overall_ability`, `readiness` con `blocking_skills`,
+  desglose por destreza con muestras/confianza/tendencia, histórico CEFR), estilos en `index.css`.
+- Tests: `test_profile.py` (nuevo shape + snapshot una sola vez), `test_cefr_evaluation.py`
+  (`heuristic_band`, `CEFR_MODEL_VERSION`), frontend `cefr.test.ts`/`modes.test.ts`.
+
+### 25.3 Verificación
+- Backend `566 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 25.4 Pendiente / siguiente incremento natural
+- **V1.13** — Listening 3.0 (audio real B1/B2). **V1.14** — Speaking 2.0 (free-response/role-play).
+  Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
 
