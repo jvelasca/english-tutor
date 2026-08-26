@@ -68,9 +68,9 @@ export function UserMenu({
         title="Perfil de usuario"
       >
         {current ? (
-          <UserAvatar user={current} size={36} />
+          <UserAvatar user={current} size={44} />
         ) : (
-          <span className="user-avatar" style={{ width: 36, height: 36 }}>
+          <span className="user-avatar" style={{ width: 44, height: 44 }}>
             ?
           </span>
         )}

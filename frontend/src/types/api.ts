@@ -872,6 +872,10 @@ export interface ReadinessSkill {
   evidence_count: number;
   minimum: number;
   ready: boolean;
+  transfer_required?: number;
+  novel_required?: number;
+  transfer_count?: number;
+  novel_count?: number;
 }
 
 export interface Readiness {

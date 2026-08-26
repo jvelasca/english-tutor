@@ -21,6 +21,7 @@ import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";impor
   serializeLayout,
   type LayoutState,
 } from "../utils/layout";
+import { DEFAULT_SECTION, isSection, type Section } from "../utils/sections";
 import type {
   Bucket,
   ConversationMeta,
@@ -48,6 +49,7 @@ export function useChat() {
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [models, setModels] = useState<string[]>([]);
   const [mode, setMode] = useState<TutorMode>("conversation");
+  const [section, setSection] = useState<Section>(DEFAULT_SECTION);
   const [layout, setLayoutState] = useState<LayoutState>(LAYOUT_DEFAULTS);
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -174,6 +176,9 @@ export function useChat() {
         }
         if (typeof s.mode === "string" && (TUTOR_MODES as string[]).includes(s.mode)) {
           setMode(s.mode as TutorMode);
+        }
+        if (typeof s.section === "string" && isSection(s.section)) {
+          setSection(s.section);
         }
         if (typeof s.layout === "string") setLayoutState(parseLayout(s.layout));
       } catch {
@@ -330,6 +335,14 @@ export function useChat() {
     (next: TutorMode) => {
       setMode(next);
       persistSettings({ mode: next });
+    },
+    [persistSettings],
+  );
+
+  const selectSection = useCallback(
+    (next: Section) => {
+      setSection(next);
+      persistSettings({ section: next });
     },
     [persistSettings],
   );
@@ -507,6 +520,8 @@ export function useChat() {
     mode,
     setMode,
     selectMode,
+    section,
+    selectSection,
     layout,
     setLayout,
     conversations,
