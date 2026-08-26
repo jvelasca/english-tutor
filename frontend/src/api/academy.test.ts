@@ -5,6 +5,7 @@ import {
   getGoal,
   getLevels,
   getSession,
+  getSpeakingDiagnostic,
   nextAdaptivePlacement,
   putGoal,
   recordAttempts,
@@ -167,6 +168,22 @@ describe("academy api", () => {
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
     expect(url).toBe("/api/academy/lessons/complete?user_id=u1");
     expect(body).toEqual({ level_id: "a1", objective_id: "o1" });
+  });
+
+  it("getSpeakingDiagnostic incluye user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      criteria: [],
+      weak: [],
+      recommendation: "",
+      attempts: 0,
+      overall_mean: null,
+      trend: { direction: "n/a" },
+      rubric_version: "1.0.0",
+    });
+    await getSpeakingDiagnostic("u1");
+    expect(fn.mock.calls[0][0]).toBe(
+      "/api/academy/speaking/diagnostic?user_id=u1",
+    );
   });
 
   it("submitObjectiveAssessment envía respuestas, no scores", async () => {

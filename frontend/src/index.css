@@ -3865,6 +3865,62 @@ body.is-resizing {
   color: var(--color-warning);
 }
 
+/* Expresión oral: diagnóstico longitudinal (V1.15). */
+.speaking-diagnostic {
+  margin: var(--space-2) 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.speaking-diagnostic h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.speaking-recommendation {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.speaking-criteria {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.speaking-criterion {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.speaking-criterion.review {
+  color: var(--color-text);
+}
+
+.speaking-criterion-label {
+  font-weight: var(--font-medium, 500);
+}
+
+.speaking-criterion-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+.speaking-trend {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
 /* ==========================================================================
    Today's Plan (Student Model 2.0)
    ========================================================================== */

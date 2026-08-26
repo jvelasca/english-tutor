@@ -16,6 +16,7 @@ import { PronunciationPractice } from "./components/PronunciationPractice";
 import { ProgressDashboard } from "./components/ProgressDashboard";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { Sidebar } from "./components/Sidebar";
+import { SpeakingDiagnostic } from "./components/SpeakingDiagnostic";
 import { TodayPlan } from "./components/TodayPlan";
 import { TutorQualityPanel } from "./components/TutorQualityPanel";
 import { UserMenu } from "./components/UserMenu";
@@ -406,6 +407,7 @@ export default function App() {
               refreshKey={sessionVersion}
             />
             <LearningProfile profile={profile} />
+            <SpeakingDiagnostic userId={currentUserId} />
             <TutorQualityPanel messages={messages} />
             <div id="listening-practice">
               <ListeningPractice userId={currentUserId} onAttempt={onAttempt} />

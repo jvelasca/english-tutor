@@ -344,6 +344,34 @@ export interface ListeningDiagnostic {
   realization: ListeningRealizationSummary;
 }
 
+// --- Speaking 3.0 (diagnóstico longitudinal por criterio de rúbrica) ---
+
+export interface SpeakingCriterionProgress {
+  criterion: string;
+  attempts: number;
+  mean: number | null;
+  min: number | null;
+  max: number | null;
+  review_due: boolean;
+}
+
+export interface SpeakingTrend {
+  recent_mean: number | null;
+  prior_mean: number | null;
+  delta: number | null;
+  direction: string;
+}
+
+export interface SpeakingDiagnostic {
+  criteria: SpeakingCriterionProgress[];
+  weak: string[];
+  recommendation: string;
+  attempts: number;
+  overall_mean: number | null;
+  trend: SpeakingTrend;
+  rubric_version: string;
+}
+
 // --- Academy (currículum CEFR, mastery, evaluación) ---
 
 export type AcademyObjectiveStatus =

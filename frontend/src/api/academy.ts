@@ -19,6 +19,7 @@ import type {
   PlacementStart,
   Readiness,
   Session,
+  SpeakingDiagnostic,
   StudentModel,
   StudyPlanStep,
   TodayPlan,
@@ -163,6 +164,14 @@ export function submitObjectiveAssessment(
 
 export function getStudentModel(userId: string): Promise<StudentModel> {
   return getJson<StudentModel>(`/api/academy/student-model${userQuery(userId)}`);
+}
+
+export function getSpeakingDiagnostic(
+  userId: string,
+): Promise<SpeakingDiagnostic> {
+  return getJson<SpeakingDiagnostic>(
+    `/api/academy/speaking/diagnostic${userQuery(userId)}`,
+  );
 }
 
 export function getReadiness(
