@@ -4,6 +4,32 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.19.0] — 2026-08-26
+
+Refresco visual y de consistencia del frontend (sin cambios de backend ni de lógica de negocio).
+Unifica los ~11 paneles del panel de análisis en tarjetas colapsables (`InsightCard`) para eliminar
+la "pared de paneles" y dar jerarquía visual, pule el header (sticky con blur + menú secundario en
+móvil), enriquece el estado vacío del chat y las burbujas del tutor, y consolida primitivas CSS
+(`.card`, `.badge`, `.pill`, `.section-divider`) respetando el sistema de apariencia existente
+(`data-theme` / `data-accent` / `data-font` / `data-density`). Se refuerza el diseño responsivo con
+un breakpoint nuevo a ≤480px y accesibilidad (`aria-expanded`/`aria-controls`).
+
+### Añadido
+- **Primitivas CSS** `.card`/`.card__header`/`.card__toggle`/`.card__body`/`.badge`/`.pill`/
+  `.section-divider` y tokens `--color-surface-3`/`--shadow-card`; escala tipográfica por defecto
+  afinada (`--text-sm` 14px, `--text-xs` 12.5px).
+- **`InsightCard`** (tarjeta colapsable accesible) y envoltura de los 11 paneles del análisis;
+  `ProgressDashboard`, `TodayPlan` y `ListeningPractice` expandidos por defecto.
+- **Header** sticky con `backdrop-filter: blur()` y fondo translúcido; menú desplegable de
+  acciones secundarias (apariencia/ayuda) a ≤768px.
+- **Chat**: avatar circular del tutor en las respuestas y estado vacío más rico (kicker + badge).
+- **Responsive ≤480px**: header compacto, `composer` sin desbordamiento y drawer de análisis a
+  100% de ancho.
+
+### Cambiado
+- Controles del header con altura uniforme (36px).
+- Versión → `1.19.0`.
+
 ## [1.18.0] — 2026-08-26
 
 Retoma los **P1 de listening** de la auditoría V1.14 (§27.8). Añade la medición de **delayed

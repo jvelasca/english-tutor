@@ -3,24 +3,26 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 13:00 (UTC+2).
+> Actualizado por última vez: 2026-08-26 14:15 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.18` **commiteada** (P1 de listening de la auditoría V1.14:
-delayed retention + dictado/shadowing reales + escalera de variantes de velocidad). Cerradas
-hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular, hardening,
-Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2 (pedagogía)
-**P1–P5**; **V1.12** (Student Model unificado + Assessment Loop), **V1.13** (Listening 3.0),
-**V1.14** (Listening Evidence & Adaptive Selection), **V1.15** (Speaking 3.0), **V1.16** (Speaking
-Assessment & Evidence 2.0), **V1.17** (Speaking Assessment UI + puente conversación→speaking +
-Writing 3.0) y **V1.18** (P1 listening: retention + dictado/shadowing + variantes). Quedan
-pendientes los P1 de listening que requieren **biblioteca de audio humano** (varios hablantes,
-connected speech real, acentos reales, ruido real — P1.5–P1.8), el **P6** (pronunciación fonémica)
-y (opcional) integrar el turn-taking real del chat en la parte "Interaction" del Speaking
-Assessment.
+**Posición actual (2026-08-26):** `v1.19` **commiteada** (refresco visual y de consistencia del
+frontend: tarjetas colapsables en el panel de análisis, header pulido y responsive reforzado).
+Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
+hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
+(pedagogía) **P1–P5**; **V1.12** (Student Model unificado + Assessment Loop), **V1.13**
+(Listening 3.0), **V1.14** (Listening Evidence & Adaptive Selection), **V1.15** (Speaking 3.0),
+**V1.16** (Speaking Assessment & Evidence 2.0), **V1.17** (Speaking Assessment UI + puente
+conversación→speaking + Writing 3.0), **V1.18** (P1 listening: retention + dictado/shadowing +
+variantes) y **V1.19** (refresco UI profesional). Quedan pendientes los P1 de listening que
+requieren **biblioteca de audio humano** (varios hablantes, connected speech real, acentos reales,
+ruido real — P1.5–P1.8), el **P6** (pronunciación fonémica) y (opcional) integrar el turn-taking
+real del chat en la parte "Interaction" del Speaking Assessment.
 
 **Últimos commits:**
+- `docs: V1.19 higiene de release + documentacion (1.19.0)`
+- `feat: V1.19 - refresco UI profesional (InsightCard + header + chat + responsive)`
 - `feat: V1.18 P1.9 - escalera de variantes de velocidad en listening`
 - `feat: V1.18 P1.3/P1.4 - dictado y shadowing reales en listening`
 - `feat: V1.18 P1.2 - delayed retention en diagnostico de listening`
@@ -91,14 +93,25 @@ P1 de listening de la auditoría V1.14. Ver sección 31. Resumen:
   frontend (solo velocidad; acento/ruido quedan como límite de contenido).
 - **Higiene de release**: `config.py`/`package.json` → `1.18.0`; CHANGELOG con entrada 1.18.0.
 
+**V1.19 commiteada** (`feat:` UI + `docs:` higiene 1.19.0) — Refresco UI profesional (frontend).
+Ver sección 32. Resumen:
+- **Primitivas CSS** (`.card`, `.badge`, `.pill`, `.section-divider`) y tokens `--color-surface-3`/
+  `--shadow-card`; escala tipográfica por defecto afinada.
+- **`InsightCard`** colapsable (aria-expanded/aria-controls) envolviendo los 11 paneles del
+  análisis; expandidos por defecto `ProgressDashboard`, `TodayPlan` y `ListeningPractice`.
+- **Header** sticky con `backdrop-filter: blur()` + fondo translúcido y menú secundario a ≤768px.
+- **Chat** con avatar circular del tutor y estado vacío más rico.
+- **Responsive ≤480px** (header compacto, composer y drawer de análisis) sin romper 768/1024.
+- **Higiene de release**: `config.py`/`package.json` → `1.19.0`; CHANGELOG con entrada 1.19.0.
+
 **Estado verde:** backend `726 tests` + `ruff` limpio; frontend `198 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 31** de este documento (V1.18 — commiteada) y su **lista de pendientes**
-   (31.4).
-3. Atacar los pendientes listados en 31.4: los P1 de listening que requieren **biblioteca de
+2. Leer la **sección 32** de este documento (V1.19 — commiteada) y su **lista de pendientes**
+   (32.7).
+3. Atacar los pendientes listados en 32.7: los P1 de listening que requieren **biblioteca de
    audio humano** (varios hablantes, connected speech real, acentos reales, ruido real — P1.5–P1.8),
    el **P6** (pronunciación fonémica) y (opcional) el turn-taking real del chat en la parte
    "Interaction" del Speaking Assessment.
@@ -1493,6 +1506,61 @@ cd frontend && npx tsc --noEmit && npx vitest run
   Tests `test_listening_variants.py` + `api/listening.test.ts`.
 
 ### 31.4 Pendiente / siguiente incremento natural
+- **P1.5–P1.8** — varios hablantes, connected speech real, acentos reales, ruido real: requieren
+  **biblioteca de audio humano** (grabaciones reales o sintetizador multi-voz). Límite de
+  **contenido**, no de código; hoy Piper es una única voz.
+- (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
+  Assessment (señal objetiva en vivo, no solo `conversation_id` manual).
+- **P6** (pronunciación fonémica) sigue diferido.
+
+## 32. HECHO (commiteado) — V1.19: Refresco UI profesional (frontend)
+
+> **Origen.** Petición explícita de tomar el control de la interfaz y dejarla "100% profesional y
+> más atractiva" conservando el diseño responsivo y el sistema de apariencia existente
+> (`data-theme`/`data-accent`/`data-font`/`data-density` → variables CSS). Solo frontend, sin
+> cambios de backend ni de lógica de negocio. Ejecutado desde un plan Cursor
+> (`refresco_ui_profesional`) en vez de un subagente `agentes/*.md`.
+
+### 32.1 Fundamento: tokens y primitivas CSS
+- `index.css`: tokens `--color-surface-3` y `--shadow-card` (dark + light); escala tipográfica
+  por defecto afinada (`--text-sm` 13→14px, `--text-xs` 12→12.5px); `data-font` sigue escalando
+  por encima.
+- Primitivas reutilizables: `.card`, `.card__header`, `.card__toggle`, `.card__icon`,
+  `.card__title`, `.card__chevron`, `.card__actions`, `.card__body`, `.badge`, `.pill` y
+  `.section-divider`.
+
+### 32.2 Header
+- Sticky con `backdrop-filter: blur(12px) saturate(1.4)` + fondo translúcido
+  (`color-mix(in srgb, var(--color-bg) 80%, transparent)`) y borde inferior sutil.
+- Alturas de control uniformes (36px) en `.icon-button`, `.hands-free-toggle` y `.model-trigger`.
+- A ≤768px los controles secundarios (apariencia/ayuda) se repliegan en un menú desplegable
+  (`.header-secondary` + `.header-more`) con cierre al hacer clic fuera.
+
+### 32.3 Chat principal
+- Estado vacío más rico: kicker (`empty-kicker`) + badge mayor (64px) y `active` en las
+  sugerencias.
+- Burbujas del tutor con avatar circular (`tutor-avatar`) en `ChatMessage.tsx`.
+- Composer intacto (ya tenía foco y padding móvil); sin cambios de lógica.
+
+### 32.4 Panel de análisis: tarjetas colapsables (mayor impacto)
+- Nuevo `components/InsightCard.tsx`: cabecera con título + chevron, `aria-expanded`/
+  `aria-controls`, cuerpo colapsable y slot de `actions` (p. ej. `BucketToggle`).
+- `App.tsx` envuelve los 11 paneles; expandidos por defecto `ProgressDashboard`, `TodayPlan` y
+  `ListeningPractice`, el resto colapsados. Los paneles internos pierden su título externo (se
+  centraliza en `InsightCard`) y su "cromo" de tarjeta se neutraliza con `.card__body > section`.
+- `BucketToggle` se exporta desde `ProgressDashboard` y se monta como `actions` de su tarjeta.
+
+### 32.5 Responsive + accesibilidad
+- Nuevo breakpoint `@media (max-width: 480px)`: header compacto (se ocultan labels de modo/
+  modelo/manos libres/nombre), `composer` compacto y drawer de análisis a 100vw.
+- `aria-expanded`/`aria-controls` en las tarjetas colapsables; `:focus-visible` y
+  `prefers-reduced-motion` conservados. Breakpoints 1024/768 verificados sin roturas.
+
+### 32.6 Verificación
+- `npx tsc --noEmit` OK y `npx vitest run` → 25 archivos / 198 tests en verde. Sin tests nuevos:
+  no se añadió ninguna util nueva (el colapso usa `useState` local dentro de `InsightCard`).
+
+### 32.7 Pendiente / siguiente incremento natural
 - **P1.5–P1.8** — varios hablantes, connected speech real, acentos reales, ruido real: requieren
   **biblioteca de audio humano** (grabaciones reales o sintetizador multi-voz). Límite de
   **contenido**, no de código; hoy Piper es una única voz.

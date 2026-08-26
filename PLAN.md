@@ -11,9 +11,11 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.18.0` (P1 de listening de la auditoría V1.14: delayed retention,
-  dictado + shadowing reales y escalera de variantes de velocidad; sobre la base V1.17 de
-  Speaking Assessment UI + puente conversación→speaking + Writing 3.0).
+- ✅ Versión estable `1.19.0` (refresco visual y de consistencia del frontend: tarjetas
+  colapsables en el panel de análisis, header pulido y responsive reforzado a ≤480px; sobre la
+  base V1.18 de P1 listening — delayed retention, dictado + shadowing reales y escalera de
+  variantes de velocidad — y V1.17 de Speaking Assessment UI + puente conversación→speaking +
+  Writing 3.0).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -202,6 +204,7 @@
 | P3–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ✔ hecho |
 | V1.15 Speaking 3.0 | `agentes/pedagogia/p9-speaking-3.0.md` | ✔ hecho |
 | V1.18 P1 listening (retention + dictado/shadowing + variantes) | `agentes/pedagogia/p13-p15.md` | ✔ hecho |
+| V1.19 Refresco UI profesional (frontend) | plan Cursor `refresco_ui_profesional` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
