@@ -2,8 +2,9 @@
 
 from services.interaction import (
     INTERRUPTION_LATENCY_MS,
-    TURN_COMPLETION_FULL_MS,
-    TURN_COMPLETION_MIN_MS,
+    TURN_DURATION_FULL_MS,
+    TURN_DURATION_MIN_MS,
+    _turn_duration_score,
     interaction_evidence,
 )
 
@@ -16,7 +17,7 @@ def test_empty_turns_all_unobservable():
     ev = interaction_evidence([])
     assert ev["turn_balance"] is None
     assert ev["avg_response_latency_ms"] is None
-    assert ev["turn_completion"] is None
+    assert ev["turn_duration"] is None
     assert ev["student_turns"] == 0
     assert ev["assistant_turns"] == 0
     assert ev["interruptions"] is None
@@ -40,12 +41,44 @@ def test_turn_balance_perfect_is_one():
     assert ev["turn_balance"] == 1.0
 
 
-def test_turn_balance_imbalanced_lower():
-    ev = interaction_evidence(
-        [_turn("student"), _turn("student"), _turn("student"), _turn("assistant")]
+def test_turn_balance_within_plateau_is_one():
+    # 40% y 60% de turnos del alumno están dentro de la meseta [0.30, 0.70] → 1.0.
+    ev_40 = interaction_evidence(
+        [
+            _turn("student"),
+            _turn("student"),
+            _turn("assistant"),
+            _turn("assistant"),
+            _turn("assistant"),
+        ]
     )
-    # proporción de alumno 0.75 → 1 - 2·0.25 = 0.5.
-    assert ev["turn_balance"] == 0.5
+    assert ev_40["turn_balance"] == 1.0
+    ev_60 = interaction_evidence(
+        [
+            _turn("student"),
+            _turn("student"),
+            _turn("student"),
+            _turn("assistant"),
+            _turn("assistant"),
+        ]
+    )
+    assert ev_60["turn_balance"] == 1.0
+
+
+def test_turn_balance_imbalanced_lower():
+    # 10% de turnos del alumno → 0.1 / 0.3 (tramo bajo de la meseta).
+    ev = interaction_evidence(
+        [_turn("student")] + [_turn("assistant") for _ in range(9)]
+    )
+    assert ev["turn_balance"] == round(0.1 / 0.3, 3)
+
+
+def test_turn_balance_imbalanced_high():
+    # 90% de turnos del alumno → (1 - 0.9) / (1 - 0.7) (tramo alto).
+    ev = interaction_evidence(
+        [_turn("student") for _ in range(9)] + [_turn("assistant")]
+    )
+    assert ev["turn_balance"] == round((1.0 - 0.9) / (1.0 - 0.7), 3)
 
 
 def test_turn_balance_unobservable_without_exchange():
@@ -67,30 +100,38 @@ def test_avg_response_latency_ms_none_without_data():
     assert ev["avg_response_latency_ms"] is None
 
 
-def test_turn_completion_ramp():
-    # duración mínima → 0.0; completa → 1.0; punto medio → 0.5.
+def test_turn_duration_score_thresholds():
+    # 500ms → 0.0; 4000ms → 1.0; el mapeo de duración se mantiene intacto.
+    assert _turn_duration_score(TURN_DURATION_MIN_MS) == 0.0
+    assert _turn_duration_score(TURN_DURATION_FULL_MS) == 1.0
+    mid = (TURN_DURATION_MIN_MS + TURN_DURATION_FULL_MS) / 2
+    assert _turn_duration_score(mid) == 0.5
+
+
+def test_turn_duration_ramp():
+    # duración mínima → 0.0; plena → 1.0; punto medio → 0.5.
     assert (
         interaction_evidence(
-            [_turn("student", duration_ms=TURN_COMPLETION_MIN_MS), _turn("assistant")]
-        )["turn_completion"]
+            [_turn("student", duration_ms=TURN_DURATION_MIN_MS), _turn("assistant")]
+        )["turn_duration"]
         == 0.0
     )
     assert (
         interaction_evidence(
-            [_turn("student", duration_ms=TURN_COMPLETION_FULL_MS), _turn("assistant")]
-        )["turn_completion"]
+            [_turn("student", duration_ms=TURN_DURATION_FULL_MS), _turn("assistant")]
+        )["turn_duration"]
         == 1.0
     )
-    mid = (TURN_COMPLETION_MIN_MS + TURN_COMPLETION_FULL_MS) / 2
+    mid = (TURN_DURATION_MIN_MS + TURN_DURATION_FULL_MS) / 2
     assert (
         interaction_evidence(
             [_turn("student", duration_ms=mid), _turn("assistant")]
-        )["turn_completion"]
+        )["turn_duration"]
         == 0.5
     )
 
 
-def test_turn_completion_averages_student_durations():
+def test_turn_duration_averages_student_durations():
     turns = [
         _turn("student", duration_ms=1000),
         _turn("assistant", duration_ms=9999),  # el turno del tutor no cuenta
@@ -98,12 +139,12 @@ def test_turn_completion_averages_student_durations():
     ]
     ev = interaction_evidence(turns)
     # media 2000 ms → (2000 - 500) / 3500 = 0.4286 → 0.429.
-    assert ev["turn_completion"] == 0.429
+    assert ev["turn_duration"] == 0.429
 
 
-def test_turn_completion_unobservable_without_student_duration():
+def test_turn_duration_unobservable_without_student_duration():
     ev = interaction_evidence([_turn("student"), _turn("assistant", duration_ms=1000)])
-    assert ev["turn_completion"] is None
+    assert ev["turn_duration"] is None
 
 
 def test_interruptions_counts_low_latency_student():
@@ -127,4 +168,4 @@ def test_interruptions_unobservable_without_student_latency():
 
 def test_interruption_threshold_constant_is_positive():
     assert INTERRUPTION_LATENCY_MS > 0
-    assert TURN_COMPLETION_MIN_MS < TURN_COMPLETION_FULL_MS
+    assert TURN_DURATION_MIN_MS < TURN_DURATION_FULL_MS

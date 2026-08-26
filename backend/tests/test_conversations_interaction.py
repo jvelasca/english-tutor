@@ -61,7 +61,7 @@ def test_interaction_endpoint_returns_evidence(monkeypatch, tmp_path):
     assert body["student_turns"] == 2
     assert body["assistant_turns"] == 1
     assert body["turn_balance"] is not None
-    assert body["turn_completion"] is not None
+    assert body["turn_duration"] is not None
     assert body["avg_response_latency_ms"] == 400
     assert body["interruptions"] == 0
 
@@ -75,7 +75,7 @@ def test_interaction_endpoint_empty_conversation(monkeypatch, tmp_path):
     assert body["student_turns"] == 0
     assert body["assistant_turns"] == 0
     assert body["turn_balance"] is None
-    assert body["turn_completion"] is None
+    assert body["turn_duration"] is None
 
 
 def test_interaction_endpoint_isolation(monkeypatch, tmp_path):

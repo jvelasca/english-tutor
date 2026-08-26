@@ -28,7 +28,7 @@ class InteractionEvidence(BaseModel):
 
     turn_balance: float | None = None
     avg_response_latency_ms: int | None = None
-    turn_completion: float | None = None
+    turn_duration: float | None = None
     student_turns: int = 0
     assistant_turns: int = 0
     interruptions: int | None = None

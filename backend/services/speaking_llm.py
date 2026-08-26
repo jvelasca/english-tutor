@@ -56,6 +56,7 @@ SPEAKING_EVIDENCE_OPTIONAL_FIELDS: tuple[str, ...] = (
     "appropriate_responses",
     "topic_maintenance",
     "clarification_requests",
+    "repair",
 )
 
 # Severidades de error gramatical reconocidas (GrammarEvidence 2.0). El scorer
@@ -144,7 +145,9 @@ def build_speaking_prompt(task: str, heard: str) -> list[dict]:
         '- "topic_maintenance": number between 0.0 and 1.0 — how well the student '
         "stays on topic.\n"
         '- "clarification_requests": number between 0.0 and 1.0 — how appropriately '
-        "the student asks for clarification when needed.\n\n"
+        "the student asks for clarification when needed.\n"
+        '- "repair": number between 0.0 and 1.0 — how well the student recovers or '
+        "rephrases after a communication breakdown or misunderstanding.\n\n"
         "Example of the expected JSON:\n"
         '{"task_achieved": true, "grammar_errors": 1, '
         '"lexical_tokens": ["student", "live"], "coherence": 0.8, '
@@ -291,6 +294,7 @@ def parse_speaking_evidence(raw: str) -> dict | None:
     appropriate_responses = _parse_float_field(data, "appropriate_responses", None)
     topic_maintenance = _parse_float_field(data, "topic_maintenance", None)
     clarification_requests = _parse_float_field(data, "clarification_requests", None)
+    repair = _parse_float_field(data, "repair", None)
 
     result: dict = {
         "task_achieved": task_achieved,
@@ -336,6 +340,8 @@ def parse_speaking_evidence(raw: str) -> dict | None:
         result["topic_maintenance"] = topic_maintenance
     if clarification_requests is not None:
         result["clarification_requests"] = clarification_requests
+    if repair is not None:
+        result["repair"] = repair
     return result
 
 

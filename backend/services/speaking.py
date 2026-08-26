@@ -247,26 +247,29 @@ FLUENCY_RHYTHM_WEIGHT = 0.15
 # semántica del LLM (abajo) se complementa ahora con señal OBJETIVA de turnos
 # (`services.interaction`): balance, latencia, duración e interrupciones.
 INTERACTION_SUBDIM_WEIGHTS: dict[str, float] = {
-    "appropriate_responses": 0.30,
-    "turn_completion": 0.25,
-    "follow_up_questions": 0.20,
-    "topic_maintenance": 0.15,
-    "clarification_requests": 0.10,
+    "appropriate_responses": 0.28,
+    "turn_completion": 0.22,
+    "follow_up_questions": 0.18,
+    "topic_maintenance": 0.14,
+    "clarification_requests": 0.09,
+    "repair": 0.09,
 }
 
 # Peso de la señal OBJETIVA (telemetría de turnos) frente a la SEMÁNTICA (LLM) al
-# fusionar `interaction` (InteractionEvidence 2.0, señal objetiva). 0.5 → ambas
-# fuentes pesan por igual; cuando solo una fuente está presente se usa esa.
-INTERACTION_OBJECTIVE_WEIGHT = 0.5
+# fusionar `interaction` (InteractionEvidence 2.0, señal objetiva). 0.3 → la señal
+# semántica domina (0.7) sobre las heurísticas objetivas de duración/balance;
+# cuando solo una fuente está presente se usa esa.
+INTERACTION_OBJECTIVE_WEIGHT = 0.3
 
 # Pesos de las sub-dimensiones objetivas que entran en la señal objetiva (suman 1).
-# `turn_balance` y `turn_completion` son scores [0,1] derivados de la telemetría de
-# turnos por `services.interaction.interaction_evidence`. El resto de campos que
-# devuelve esa función (avg_response_latency_ms, student_turns, assistant_turns,
-# interruptions) son diagnósticos y NO se fusionan en el score.
+# `turn_balance` y `turn_duration` son scores [0,1] derivados de la telemetría de
+# turnos por `services.interaction.interaction_evidence`; `turn_duration` (duración,
+# no completitud) es la señal principal y `turn_balance` la secundaria. El resto de
+# campos que devuelve esa función (avg_response_latency_ms, student_turns,
+# assistant_turns, interruptions) son diagnósticos y NO se fusionan en el score.
 INTERACTION_OBJECTIVE_SUBDIM_WEIGHTS: dict[str, float] = {
-    "turn_balance": 0.5,
-    "turn_completion": 0.5,
+    "turn_balance": 0.3,
+    "turn_duration": 0.7,
 }
 
 # Pesos de las sub-dimensiones de task_achievement (suman 1). Cuando el LLM las
@@ -639,10 +642,11 @@ def _semantic_interaction_score(evidence: dict) -> float | None:
     """interaction semántica (0..1) a partir de sub-dimensiones del LLM o fallback.
 
     Si el LLM devolvió al menos una sub-dimensión conversacional (turn_completion/
-    follow_up_questions/appropriate_responses/topic_maintenance/clarification_requests),
-    se combina con sus pesos renormalizados sobre las presentes (P1-4: señal
-    estructurada, no una sola estimación subjetiva). En caso contrario se conserva
-    el fallback `interaction`; `None` si tampoco existe (criterio no observado).
+    follow_up_questions/appropriate_responses/topic_maintenance/clarification_requests/
+    repair), se combina con sus pesos renormalizados sobre las presentes (P1-4:
+    señal estructurada, no una sola estimación subjetiva). En caso contrario se
+    conserva el fallback `interaction`; `None` si tampoco existe (criterio no
+    observado).
     """
     present = [k for k in INTERACTION_SUBDIM_WEIGHTS if evidence.get(k) is not None]
     if present:
@@ -661,8 +665,9 @@ def _interaction_objective_score(objective: dict) -> float | None:
     """interaction objetiva (0..1) a partir de sub-dimensiones de telemetría de turnos.
 
     `objective` es el dict devuelto por `services.interaction.interaction_evidence`.
-    Se combinan sus sub-dimensiones en [0,1] (`turn_balance`, `turn_completion`) con
-    pesos renormalizados sobre las presentes; `None` si no hay ninguna observable.
+    Se combinan sus sub-dimensiones en [0,1] (`turn_balance`, `turn_duration`) con
+    pesos renormalizados sobre las presentes (`turn_duration` domina con 0.7);
+    `None` si no hay ninguna observable.
     """
     if not isinstance(objective, dict):
         return None
@@ -686,9 +691,10 @@ def _interaction_score(evidence: dict) -> float | None:
 
     La señal objetiva (`evidence["interaction_objective"]`, producida por
     `services.interaction.interaction_evidence`) se combina con la semántica del
-    LLM mediante `INTERACTION_OBJECTIVE_WEIGHT`. Si solo hay una fuente se usa esa;
-    si no hay ninguna, se conserva el fallback legacy `interaction`; `None` si
-    tampoco existe (criterio no observado). Backward-compatible: sin
+    LLM mediante `INTERACTION_OBJECTIVE_WEIGHT` (0.3 objetiva / 0.7 semántica, de
+    modo que la señal semántica domina). Si solo hay una fuente se usa esa; si no
+    hay ninguna, se conserva el fallback legacy `interaction`; `None` si tampoco
+    existe (criterio no observado). Backward-compatible: sin
     `interaction_objective` el comportamiento es idéntico al anterior.
     """
     semantic = _semantic_interaction_score(evidence)

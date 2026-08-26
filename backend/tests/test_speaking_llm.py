@@ -250,7 +250,7 @@ def test_parse_speaking_evidence_extracts_interaction_subdims():
         '"lexical_tokens": ["student"], "coherence": 0.8, '
         '"turn_completion": 0.9, "follow_up_questions": 0.7, '
         '"appropriate_responses": 0.8, "topic_maintenance": 0.6, '
-        '"clarification_requests": 0.4}'
+        '"clarification_requests": 0.4, "repair": 0.5}'
     )
     result = speaking_llm.parse_speaking_evidence(raw)
     assert result["turn_completion"] == 0.9
@@ -258,6 +258,7 @@ def test_parse_speaking_evidence_extracts_interaction_subdims():
     assert result["appropriate_responses"] == 0.8
     assert result["topic_maintenance"] == 0.6
     assert result["clarification_requests"] == 0.4
+    assert result["repair"] == 0.5
 
 
 def test_build_speaking_prompt_mentions_interaction_subdims():
@@ -268,5 +269,6 @@ def test_build_speaking_prompt_mentions_interaction_subdims():
         "appropriate_responses",
         "topic_maintenance",
         "clarification_requests",
+        "repair",
     ):
         assert key in msgs[0]["content"]

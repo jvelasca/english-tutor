@@ -348,8 +348,8 @@ def test_interaction_score_combines_subdims():
         "clarification_requests": 0.5,
     }
     result = speaking_svc.scores_from_evidence(evidence, "I am a student", 60.0)
-    # 0.30·0.9 + 0.25·0.8 + 0.20·0.7 + 0.15·0.8 + 0.10·0.5 = 0.78.
-    assert result["criteria"]["interaction"] == pytest.approx(0.78)
+    # (0.28·0.9 + 0.22·0.8 + 0.18·0.7 + 0.14·0.8 + 0.09·0.5) / 0.91 = 0.781.
+    assert result["criteria"]["interaction"] == pytest.approx(0.781)
     assert result["observed"]["interaction"] is True
 
 
@@ -364,6 +364,24 @@ def test_interaction_score_falls_back_to_single():
     }
     result = speaking_svc.scores_from_evidence(evidence, "I am a student", 60.0)
     assert result["criteria"]["interaction"] == 0.65
+
+
+def test_interaction_score_includes_repair():
+    # Con `repair` presente, entra en la combinación semántica con peso 0.09.
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": [],
+        "coherence": 0.9,
+        "appropriate_responses": 0.9,
+        "turn_completion": 0.8,
+        "follow_up_questions": 0.7,
+        "topic_maintenance": 0.8,
+        "clarification_requests": 0.5,
+        "repair": 0.6,
+    }
+    # 0.28·0.9 + 0.22·0.8 + 0.18·0.7 + 0.14·0.8 + 0.09·0.5 + 0.09·0.6 = 0.765.
+    assert speaking_svc._interaction_score(evidence) == pytest.approx(0.765)
 
 
 def test_scores_from_evidence_pronunciation_with_expected():
@@ -1065,11 +1083,11 @@ def test_speaking_level_and_journey_endpoint(monkeypatch, tmp_path):
 # --- V1.16 S4b: InteractionEvidence 2.0 — señal objetiva (fusión) ----------
 
 
-def _interaction_objective(turn_balance=1.0, turn_completion=0.8):
+def _interaction_objective(turn_balance=1.0, turn_duration=0.8):
     return {
         "turn_balance": turn_balance,
         "avg_response_latency_ms": 400,
-        "turn_completion": turn_completion,
+        "turn_duration": turn_duration,
         "student_turns": 2,
         "assistant_turns": 2,
         "interruptions": 0,
@@ -1088,14 +1106,14 @@ def test_interaction_score_fuses_objective_and_semantic():
         "topic_maintenance": 0.8,
         "clarification_requests": 0.5,
         "interaction_objective": _interaction_objective(
-            turn_balance=1.0, turn_completion=1.0
+            turn_balance=1.0, turn_duration=1.0
         ),
     }
-    semantic = 0.78
+    semantic = 0.781
     objective = 1.0
-    # Fusión 0.5·objetiva + 0.5·semántica = 0.5·1.0 + 0.5·0.78 = 0.89.
+    # Fusión 0.3·objetiva + 0.7·semántica = 0.3·1.0 + 0.7·0.781 = 0.847.
     assert speaking_svc._interaction_score(evidence) == pytest.approx(
-        round(0.5 * objective + 0.5 * semantic, 3)
+        round(0.3 * objective + 0.7 * semantic, 3)
     )
 
 
@@ -1106,11 +1124,11 @@ def test_interaction_score_objective_only():
         "lexical_tokens": [],
         "coherence": 0.9,
         "interaction_objective": _interaction_objective(
-            turn_balance=1.0, turn_completion=0.5
+            turn_balance=1.0, turn_duration=0.5
         ),
     }
-    # objetiva: (0.5·1.0 + 0.5·0.5) / 1.0 = 0.75.
-    assert speaking_svc._interaction_score(evidence) == 0.75
+    # objetiva: (0.3·1.0 + 0.7·0.5) / 1.0 = 0.65.
+    assert speaking_svc._interaction_score(evidence) == 0.65
 
 
 def test_interaction_score_semantic_only_unchanged():
@@ -1125,7 +1143,7 @@ def test_interaction_score_semantic_only_unchanged():
         "topic_maintenance": 0.8,
         "clarification_requests": 0.5,
     }
-    assert speaking_svc._interaction_score(evidence) == pytest.approx(0.78)
+    assert speaking_svc._interaction_score(evidence) == pytest.approx(0.781)
 
 
 def test_interaction_score_legacy_fallback_unchanged():
@@ -1157,16 +1175,16 @@ def test_scores_from_evidence_interaction_objective_fused():
         "follow_up_questions": 0.7,
         "topic_maintenance": 0.9,
         "clarification_requests": 0.5,
-        "interaction_objective": {"turn_balance": 0.8, "turn_completion": 0.6},
+        "interaction_objective": {"turn_balance": 0.8, "turn_duration": 0.6},
     }
     result = speaking_svc.scores_from_evidence(
         evidence, "I am a student", 60.0, task_type="conversation"
     )
     assert result["observed"]["interaction"] is True
-    # Señal semántica = 0.715; señal objetiva = (0.5·0.8 + 0.5·0.6) = 0.7.
-    semantic = 0.715
-    objective = 0.7
-    fused = round(0.5 * objective + 0.5 * semantic, 3)
+    # Señal semántica = 0.718; señal objetiva = (0.3·0.8 + 0.7·0.6) = 0.66.
+    semantic = 0.718
+    objective = 0.66
+    fused = round(0.3 * objective + 0.7 * semantic, 3)
     interaction = result["criteria"]["interaction"]
     assert min(objective, semantic) <= interaction <= max(objective, semantic)
     assert interaction == pytest.approx(fused)
@@ -1189,7 +1207,7 @@ def test_scores_from_evidence_interaction_without_objective_unchanged():
     )
     # Sin interaction_objective, interaction = señal semántica (backward-compat).
     assert result["observed"]["interaction"] is True
-    assert result["criteria"]["interaction"] == pytest.approx(0.715)
+    assert result["criteria"]["interaction"] == pytest.approx(0.718)
 
 
 def test_speaking_task_with_conversation_injects_interaction(monkeypatch, tmp_path):
@@ -1248,4 +1266,4 @@ def test_speaking_task_with_conversation_injects_interaction(monkeypatch, tmp_pa
     # Sin evidencia semántica de interacción, la señal objetiva de turnos debe
     # hacer observable el criterio `interaction` (fusión end-to-end).
     assert body["observed"]["interaction"] is True
-    assert body["criteria"]["interaction"] == pytest.approx(0.619)
+    assert body["criteria"]["interaction"] == pytest.approx(0.7)

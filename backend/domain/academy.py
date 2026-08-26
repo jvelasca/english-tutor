@@ -679,7 +679,7 @@ async def _inject_interaction_objective(
 
     Si `conversation_id` está presente, recupera los turnos de esa conversación y,
     cuando `interaction_evidence` observa al menos una sub-dimensión objetiva
-    (`turn_balance` o `turn_completion`), asigna el resultado a
+    (`turn_balance` o `turn_duration`), asigna el resultado a
     `evidence["interaction_objective"]` para que el scorer determinista lo fusione
     con la señal semántica del LLM (`INTERACTION_OBJECTIVE_WEIGHT`). Sin
     conversación (o sin telemetría observable), la evidencia queda intacta
@@ -695,7 +695,7 @@ async def _inject_interaction_objective(
     objective = interaction_evidence(turns)
     if (
         objective["turn_balance"] is not None
-        or objective["turn_completion"] is not None
+        or objective["turn_duration"] is not None
     ):
         evidence["interaction_objective"] = objective
 

@@ -14,16 +14,22 @@ from __future__ import annotations
 
 # --- Umbrales (constantes con nombre) --------------------------------------
 
-# Duración media del turno del alumno mapeada a [0,1] (turn_completion). Por
-# debajo de `TURN_COMPLETION_MIN_MS` el turno es demasiado corto para considerarse
-# "completado" (0.0); a partir de `TURN_COMPLETION_FULL_MS` se considera completo
-# (meseta en 1.0). Entre medias, rampa lineal.
-TURN_COMPLETION_MIN_MS = 500
-TURN_COMPLETION_FULL_MS = 4000
+# Duración media del turno del alumno mapeada a [0,1] (turn_duration). Por debajo
+# de `TURN_DURATION_MIN_MS` el turno es demasiado corto (0.0); a partir de
+# `TURN_DURATION_FULL_MS` la duración se considera plena (meseta en 1.0). Entre
+# medias, rampa lineal. Es DURACIÓN, no completitud (la completitud real del turno
+# es semántica y la estima el LLM).
+TURN_DURATION_MIN_MS = 500
+TURN_DURATION_FULL_MS = 4000
 
 # Latencia de respuesta del alumno por debajo de este umbral se considera una
 # posible interrupción (el alumno entra antes de que el tutor termine su turno).
 INTERRUPTION_LATENCY_MS = 300
+
+# Rango de proporción de turnos del alumno considerado "equilibrado" (meseta):
+# dentro de [0.30, 0.70] la interacción es plena (1.0), no solo en el 50/50.
+TURN_BALANCE_IDEAL_LOW = 0.3
+TURN_BALANCE_IDEAL_HIGH = 0.7
 
 # Roles tratados como turno del alumno (cualquier otro rol cuenta como assistant).
 _STUDENT_ROLES = frozenset({"student", "user"})
@@ -45,24 +51,34 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 
 def _turn_balance_score(student_turns: int, assistant_turns: int) -> float:
-    """Balance de turnos en [0,1]: 1.0 cuando el intercambio es ~50/50.
+    """Balance de turnos en [0,1]: 1.0 dentro de la meseta [30%, 70%] del alumno.
 
-    La proporción de turnos del alumno ideal es ~0.5; desviarse hacia 0 (solo
-    tutor) o 1 (solo alumno) reduce el score linealmente hasta 0.0.
+    Un intercambio no tiene por qué ser 50/50 para ser equilibrado: con entre el
+    30% y el 70% de turnos del alumno la interacción es plena (1.0). Por debajo
+    del 30% (el tutor domina) o por encima del 70% (el alumno monopoliza), el
+    score baja linealmente hasta 0.0.
     """
     total = student_turns + assistant_turns
     proportion = student_turns / total
-    return round(_clamp(1.0 - 2.0 * abs(proportion - 0.5)), 3)
-
-
-def _turn_completion_score(avg_duration_ms: float) -> float:
-    """Duración media del turno del alumno mapeada a [0,1] con umbrales."""
-    if avg_duration_ms <= TURN_COMPLETION_MIN_MS:
-        return 0.0
-    if avg_duration_ms >= TURN_COMPLETION_FULL_MS:
+    if TURN_BALANCE_IDEAL_LOW <= proportion <= TURN_BALANCE_IDEAL_HIGH:
         return 1.0
-    span = TURN_COMPLETION_FULL_MS - TURN_COMPLETION_MIN_MS
-    return round((avg_duration_ms - TURN_COMPLETION_MIN_MS) / span, 3)
+    if proportion < TURN_BALANCE_IDEAL_LOW:
+        return round(_clamp(proportion / TURN_BALANCE_IDEAL_LOW), 3)
+    return round(_clamp((1.0 - proportion) / (1.0 - TURN_BALANCE_IDEAL_HIGH)), 3)
+
+
+def _turn_duration_score(avg_duration_ms: float) -> float:
+    """Duración media del turno del alumno mapeada a [0,1] con umbrales.
+
+    Es una señal de DURACIÓN (no de completitud): 500ms → 0.0, 4000ms → 1.0, rampa
+    lineal entre medias. La completitud real del turno es semántica (la da el LLM).
+    """
+    if avg_duration_ms <= TURN_DURATION_MIN_MS:
+        return 0.0
+    if avg_duration_ms >= TURN_DURATION_FULL_MS:
+        return 1.0
+    span = TURN_DURATION_FULL_MS - TURN_DURATION_MIN_MS
+    return round((avg_duration_ms - TURN_DURATION_MIN_MS) / span, 3)
 
 
 def interaction_evidence(turns: list[dict]) -> dict:
@@ -73,7 +89,7 @@ def interaction_evidence(turns: list[dict]) -> dict:
     opcionalmente `created_at`. Devuelve:
     - `turn_balance`: balance de turnos en [0,1] (None sin intercambio real).
     - `avg_response_latency_ms`: latencia media de respuesta en ms (None sin datos).
-    - `turn_completion`: duración media del turno del alumno en [0,1] (None sin datos).
+    - `turn_duration`: duración media del turno del alumno en [0,1] (None sin datos).
     - `student_turns` / `assistant_turns`: recuento de turnos.
     - `interruptions`: recuento de interrupciones (None sin datos de latencia).
     """
@@ -111,17 +127,17 @@ def interaction_evidence(turns: list[dict]) -> dict:
         int(round(sum(all_latencies) / len(all_latencies))) if all_latencies else None
     )
 
-    turn_completion = None
+    turn_duration = None
     if student_durations:
         avg_duration = sum(student_durations) / len(student_durations)
-        turn_completion = _turn_completion_score(avg_duration)
+        turn_duration = _turn_duration_score(avg_duration)
 
     interruptions_result = interruptions if student_latency_observed else None
 
     return {
         "turn_balance": turn_balance,
         "avg_response_latency_ms": avg_response_latency_ms,
-        "turn_completion": turn_completion,
+        "turn_duration": turn_duration,
         "student_turns": student_turns,
         "assistant_turns": assistant_turns,
         "interruptions": interruptions_result,
