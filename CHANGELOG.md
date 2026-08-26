@@ -4,19 +4,55 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
-## [1.13.0] — 2026-08-26
+## [1.14.0] — 2026-08-26
 
-Listening 3.0. Convierte el listening de "scripts de texto + TTS genérico en vivo" a **audio real
-por ítem** (pre-renderizado y cacheado con Piper), cierra el currículo **A1→B2** y garantiza
-evidencia independiente por sub-destreza. Todo local y determinista en el score; sin LLM ni red.
+Listening Evidence & Adaptive Selection. Convierte el listening de "arquitectura muy buena" a
+"evidencia auditiva pedagógicamente válida": separa lo que el ítem **declara** de lo que el audio
+**realiza**, evita que la metadata falsa contamine el Student Model y hace que el selector consuma
+de verdad las sub-destrezas débiles del alumno. Corrige además la terminología "audio real" →
+**audio TTS pre-renderizado local** (Piper).
 
 ### Añadido
-- **Audio real por ítem**: `GET /api/listening/audio/{question_id}` sirve `audio/wav` reproducible,
-  pre-renderizado y cacheado en disco (`DATA_DIR/listening/`). Respeta `speech_rate`
-  (mapeado a `length_scale` de Piper) y `repetition_policy="twice"`. 404 si el ítem no existe,
-  503 honesto si Piper no está disponible.
-- **`audio_ready`** en `ListeningQuestion` para que el frontend reproduzca audio real o degrade al
-  TTS en vivo con aviso.
+- **Modelo de realización del audio** (`services/listening.py`): `AUDIO_TYPES`
+  (`tts`/`recorded`/`mixed`/`synthetic_multispeaker`/`real_world`), `realized_vector`,
+  `realization_status` (`declared`/`realized`/`verified`), `realized_difficulty`,
+  `realization_gap_factors` y `subskill_realization_gap`. Una voz Piper única no "realiza"
+  `accent`, `speaker_count` ni `noise` (quedan en 1); `connected_speech` se realiza solo si el
+  texto escribe la reducción; `speed` solo si el ítem fija `speech_rate`.
+- **`audio_type`** en `ListeningAsset`/`ListeningQuestion` para distinguir el tipo de audio servido.
+- **Integridad de evidencia** en `listening_diagnostic`: `realization_gap` por sub-destreza y
+  resumen `realization` (`verified` vs `gap`), para no contar como dominio real una sub-destreza
+  entrenada con audio que no la respalda.
+- **Selector adaptativo**: `pick_next_question(..., weak_subskills=...)` prioriza, dentro del nivel
+  de trabajo del alumno, las sub-destrezas débiles (con realización válida); `domain.next_question`
+  lo alimenta con el diagnóstico del Student Model.
+- **Cache de audio versionado** (`P1.1`): path `DATA_DIR/listening/{bank}/{voice}/{id}-{digest}.wav`
+  (`audio_digest` = texto + velocidad + repetición). Un cambio de script/voz/velocidad/modelo
+  invalida el WAV antiguo. `scripts/generate_listening_audio.py` usa el mismo path.
+- **`realized_difficulty`** persistido en `listening_attempts` (migración idempotente) y expuesto
+  en `ListeningQuestion`/`ListeningAnswerResponse`.
+
+### Cambiado
+- **Terminología honesta**: "audio real" → "audio TTS pre-renderizado local" en CHANGELOG, README,
+  PLAN, RELEVO y comentarios de código.
+- Frontend `ListeningPractice` muestra la **etiqueta honesta del tipo de audio** (voz sintética
+  local vs. grabación real), avisa cuando la dificultad realizada es menor que la declarada y
+  marca las sub-destrezas con evidencia no respaldada.
+
+## [1.13.0] — 2026-08-26
+
+Listening 3.0. Convierte el listening de "scripts de texto + TTS genérico en vivo" a **audio TTS
+pre-renderizado por ítem** (sintetizado y cacheado con Piper), cierra el currículo **A1→B2** y
+garantiza evidencia independiente por sub-destreza. Todo local y determinista en el score; sin
+LLM ni red.
+
+### Añadido
+- **Audio TTS pre-renderizado por ítem**: `GET /api/listening/audio/{question_id}` sirve
+  `audio/wav` reproducible, pre-renderizado y cacheado en disco (`DATA_DIR/listening/`). Respeta
+  `speech_rate` (mapeado a `length_scale` de Piper) y `repetition_policy="twice"`. 404 si el ítem
+  no existe, 503 honesto si Piper no está disponible.
+- **`audio_ready`** en `ListeningQuestion` para que el frontend reproduzca el audio TTS
+  pre-renderizado o degrade al TTS en vivo con aviso.
 - **Cierre A1→B2**: `curriculum/b2.json` (8 objetivos, checks de opción múltiple) y
   `LEVEL_ORDER = ["A1", "A2", "B1", "B2"]` en el banco de listening.
 - **Herramienta reproducible**: `scripts/generate_listening_audio.py` pre-renderiza todo el banco
@@ -27,8 +63,8 @@ evidencia independiente por sub-destreza. Todo local y determinista en el score;
 
 ### Cambiado
 - `LISTENING_BANK_VERSION` → `3.0.0`.
-- Frontend `ListeningPractice` reproduce el audio real cuando `audio_ready` y muestra metadatos;
-  `api/listening.ts` expone `getListeningAudioUrl`.
+- Frontend `ListeningPractice` reproduce el audio TTS pre-renderizado cuando `audio_ready` y muestra
+  metadatos; `api/listening.ts` expone `getListeningAudioUrl`.
 
 ## [1.12.0] — 2026-08-26
 

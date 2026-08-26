@@ -3,16 +3,17 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 08:30 (UTC+2).
+> Actualizado por última vez: 2026-08-26 09:05 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.13` implementada (Listening 3.0), pendiente de commitear.
+**Posición actual (2026-08-26):** `v1.14` en curso (Listening Evidence & Adaptive Selection).
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-lite),
 **Placement 2.0** (calibración observacional + perfil multiskill) y Etapa 2 (pedagogía) **P1–P5**;
-**V1.12** (Student Model unificado + Assessment Loop) y **V1.13** (Listening 3.0). El P6 original
-(pronunciación fonémica) sigue **diferido**.
+**V1.12** (Student Model unificado + Assessment Loop), **V1.13** (Listening 3.0) y **V1.14**
+(Listening Evidence & Adaptive Selection: modelo de realización del audio + integridad de
+evidencia + selección adaptativa). El P6 original (pronunciación fonémica) sigue **diferido**.
 
 **Últimos commits publicados:**
 - `feat: V1.12 - Student Model unificado + Assessment Loop`
@@ -22,24 +23,29 @@ hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-
 - `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
 - `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 
-**⚠️ TRABAJO SIN COMMITEAR (V1.13 — Listening 3.0):** ver sección 26. Es el incremento en curso y
-NO está versionado. Resumen:
-- **Audio real por ítem**: `GET /api/listening/audio/{question_id}` (WAV pre-renderizado y
-  cacheado con Piper, honra `speech_rate` → `length_scale` y `repetition_policy="twice"`).
-- **Cierre A1→B2**: `curriculum/b2.json` nuevo + `LEVEL_ORDER` incluye B2.
-- **Evidencia por sub-destreza**: test que cubre las sub-destrezas nuevas.
-- **Higiene de release**: `config.py`/`README.md`/`package.json` → `1.13.0`, `LISTENING_BANK_VERSION`
-  → `3.0.0`.
+**⚠️ TRABAJO SIN COMMITEAR (V1.14 — Listening Evidence & Adaptive Selection):** ver sección 27.
+Es el incremento en curso y NO está versionado. Resumen:
+- **Modelo de realización del audio** (`services/listening.py`): `AUDIO_TYPES`, `realized_vector`,
+  `realization_status` (`declared`/`realized`/`verified`), `realized_difficulty`,
+  `realization_gap_factors`, `subskill_realization_gap` y `audio_digest`.
+- **Integridad de evidencia**: `listening_diagnostic` añade `realization_gap` por sub-destreza y
+  resumen `realization` (`verified` vs `gap`).
+- **Selector adaptativo**: `pick_next_question(weak_subskills=...)` + `domain.next_question` consumen
+  el diagnóstico del Student Model (sub-destrezas débiles) con realización válida.
+- **Cache versionado** (P1.1): `DATA_DIR/listening/{bank}/{voice}/{id}-{digest}.wav`.
+- **Etiqueta honesta de audio** en frontend (TTS local vs. real) + renombrado "audio real" →
+  "audio TTS pre-renderizado".
+- **Higiene de release**: `config.py`/`README.md`/`package.json`/`package-lock.json` → `1.14.0`.
 
-**Estado verde:** backend `576 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK;
+**Estado verde:** backend `592 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 26** de este documento (trabajo sin commitear — V1.13 Listening 3.0).
+2. Leer la **sección 27** de este documento (trabajo sin commitear — V1.14 Listening Evidence).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6 + Student Model 2.0).
-4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con V1.14
-   (Speaking 2.0: free-response / role-play).
+4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con V1.15
+   (Speaking 3.0 sobre el mismo Student Model).
 5. Redactar y ejecutar `agentes/pedagogia/p*-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
@@ -1104,20 +1110,21 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `ruff` limpio.
 
 ### 25.4 Pendiente / siguiente incremento natural
-- **V1.13** — Listening 3.0 (audio real + cierre A1→B2): ver sección 26.
-- **V1.14** — Speaking 2.0 (free-response/role-play). Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+- **V1.13** — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2): ver sección 26.
+- **V1.14** — Listening Evidence & Adaptive Selection: ver sección 27.
+- **V1.15** — Speaking 3.0 (sobre el mismo Student Model). Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
-## 26. EN CURSO (sin commitear) — V1.13: Listening 3.0 (audio real + cierre A1→B2)
+## 26. V1.13 — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2)
 
 > **Origen.** `agentes/pedagogia/p8-listening-3.0.md`. El listening tenía arquitectura sólida
-> (banco versionado, vector 8D, 15 sub-destrezas, métricas de competencia) pero **sin audio real**:
-> el frontend sintetizaba `script` en vivo con la voz Piper única, ignorando `speech_rate`/`accent`.
-> Además faltaba `b2.json` (el banco ya tenía ítems B2: `l16`, `l17`, `l20`, `l21`). V1.13 sirve
-> **audio pre-renderizado por ítem**, cierra **A1→B2** y garantiza evidencia independiente por
-> sub-destreza. Honesto con el límite local: Piper es una sola voz; acentos/ruido/hablantes son
-> límite de **contenido**, no de código.
+> (banco versionado, vector 8D, 15 sub-destrezas, métricas de competencia) pero **sin audio
+> pre-renderizado**: el frontend sintetizaba `script` en vivo con la voz Piper única, ignorando
+> `speech_rate`/`accent`. Además faltaba `b2.json` (el banco ya tenía ítems B2: `l16`, `l17`, `l20`,
+> `l21`). V1.13 sirve **audio TTS pre-renderizado por ítem**, cierra **A1→B2** y garantiza evidencia
+> independiente por sub-destreza. Honesto con el límite local: Piper es una sola voz; acentos/ruido/
+> hablantes son límite de **contenido**, no de código.
 
-### 26.1 Audio real por ítem
+### 26.1 Audio TTS pre-renderizado por ítem
 - **`services/tts.py`**: `synthesize(text, length_scale=1.0)` ahora acepta velocidad vía
   `SynthesisConfig(length_scale=...)`.
 - **`services/listening.py`**: `length_scale_for_rate(speech_rate)` (mapea wpm → `length_scale`,
@@ -1142,8 +1149,8 @@ cd frontend && npx tsc --noEmit && npx vitest run
 ### 26.4 Frontend
 - **`api/listening.ts`**: `getListeningAudioUrl(questionId, userId)`.
 - **`types/api.ts`**: `audio_ready: boolean`.
-- **`components/ListeningPractice.tsx`**: reproduce audio real cuando `audio_ready`, degrada a TTS
-  en vivo con aviso "audio de referencia no disponible"; respeta `replayCount`.
+- **`components/ListeningPractice.tsx`**: reproduce audio TTS pre-renderizado cuando `audio_ready`,
+  degrada a TTS en vivo con aviso "audio de referencia no disponible"; respeta `replayCount`.
 - **`index.css`**: estilo `.listening-audio-degraded`.
 
 ### 26.5 Higiene de release
@@ -1155,8 +1162,67 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `ruff` limpio.
 
 ### 26.7 Pendiente / siguiente incremento natural
-- **V1.14** — Speaking 2.0 (free-response, role-play, conversation, interview, discussion):
-  fluency/grammar/lexical/pronunciation/coherence/interaction medidos longitudinalmente.
+- **V1.14** — Listening Evidence & Adaptive Selection: ver sección 27.
+- **V1.15** — Speaking 3.0 (sobre el mismo Student Model): fluency/grammar/lexical/
+  pronunciation/coherence/interaction medidos longitudinalmente.
   Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 27. EN CURSO (sin commitear) — V1.14: Listening Evidence & Adaptive Selection
+
+> **Origen.** Auditoría externa de V1.13 (commit `37ac52b9…`, 2026-08-26). Veredicto: arquitectura
+> muy buena, pero el "audio real" era en realidad **TTS Piper de una sola voz**, y la metadata
+> (`accent`/`speaker_count`/`noise`/`connected_speech`) podía generar **evidencia pedagógica falsa**
+> en el Student Model. V1.14 añade una capa de **AudioRealization** + **Evidence Integrity** y hace
+> que el **selector consuma de verdad el Student Model**, sin rehacer V1.13.
+
+### 27.1 Modelo de realización del audio
+- **`services/listening.py`**: `AUDIO_TYPES` (`tts`/`recorded`/`mixed`/`synthetic_multispeaker`/
+  `real_world`), `realized_vector` (qué factor realiza el audio servido), `realization_status`
+  (`declared`/`realized`/`verified`), `realized_difficulty`, `realization_gap_factors` y
+  `subskill_realization_gap` (mapa `SUBSKILL_REALIZATION_FACTOR`).
+- Para una voz Piper única: `vocabulary`/`syntactic`/`length` se realizan; `speed` solo con
+  `speech_rate`; `connected_speech` solo si el texto escribe la reducción; `accent`/
+  `speaker_count`/`noise` no se realizan (quedan en 1).
+- `audio_digest` (hash texto + velocidad + repetición) para invalidar el cache.
+
+### 27.2 Integridad de evidencia
+- `listening_diagnostic` añade `realization_gap` por sub-destreza y resumen `realization`
+  (`attempts`/`verified`/`gap`). El Student Model no debe tratar como dominio real una
+  sub-destreza entrenada con audio que no respalda su factor.
+- `schemas/listening.py`: `ListeningQuestion` expone `audio_type`, `realized_difficulty`,
+  `realization`; `ListeningSubskillOut.realization_gap`; `ListeningDiagnostic.realization`.
+- `repositories/listening.py` + migración `realized_difficulty` en `listening_attempts`.
+
+### 27.3 Selector adaptativo
+- `pick_next_question(..., weak_subskills=...)` prioriza, **dentro del nivel de trabajo** del alumno,
+  las sub-destrezas débiles con realización auditiva válida (no entrena `multiple_speakers` con una
+  sola voz). `domain.next_question` lo alimenta con `listening_diagnostic(attempts)["weak"]`.
+
+### 27.4 Cache de audio versionado (P1.1)
+- `domain/listening.py`: `_audio_cache_dir()` → `DATA_DIR/listening/{bank_version}/{voice}` y
+  `_audio_path()` → `{id}-{digest}.wav`. `scripts/generate_listening_audio.py` usa el mismo path.
+
+### 27.5 Frontend
+- `types/api.ts`: `audio_type`, `realized_difficulty`, `realization`, `realization_gap`,
+  `ListeningRealizationSummary`.
+- `components/ListeningPractice.tsx`: etiqueta honesta del tipo de audio (voz sintética local vs.
+  grabación real), aviso cuando `realized_difficulty < difficulty`, y marca `realization_gap` en
+  el diagnóstico. Estilos en `index.css`.
+
+### 27.6 Higiene de release
+- `config.py`/`README.md`/`PLAN.md`/`package.json`/`package-lock.json` → `1.14.0`; `CHANGELOG.md`
+  con entrada 1.14.0. Renombrado "audio real" → "audio TTS pre-renderizado" en CHANGELOG, README,
+  PLAN, RELEVO y comentarios de código.
+
+### 27.7 Verificación
+- Backend `592 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK.
+
+### 27.8 Pendiente / siguiente incremento natural (P1/P2 de la auditoría)
+- **Delayed retention** (P1.2): `immediate_accuracy` vs `delayed_accuracy` (Day 0/2/7/30).
+- **True listening tasks** (P1.3–P1.8): shadowing con grabación/alineamiento, dictado real,
+  varios hablantes, connected speech real, acentos reales, ruido real.
+- **Audio variants / difficulty ladder** (P1.9): variantes de un mismo contenido (slow/clean →
+  natural → fast → noise → accent).
+- **V1.15** — Speaking 3.0 sobre el mismo Student Model.
 
 

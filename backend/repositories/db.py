@@ -528,6 +528,11 @@ def init_db() -> None:
                 "ALTER TABLE listening_attempts ADD COLUMN topic TEXT "
                 "NOT NULL DEFAULT ''"
             )
+        if "realized_difficulty" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN realized_difficulty "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
 
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "

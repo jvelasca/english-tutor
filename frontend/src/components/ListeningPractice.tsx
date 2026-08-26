@@ -31,6 +31,24 @@ function trendLabel(direction: string): string {
   }
 }
 
+// Etiqueta honesta del tipo de audio (P0-1): no llamamos "audio real" a la voz
+// sintética local; cada tipo se presenta por lo que realmente es.
+function audioTypeLabel(audioType: string): string {
+  switch (audioType) {
+    case "recorded":
+      return "Grabación real";
+    case "mixed":
+      return "Mezcla grabado + sintético";
+    case "synthetic_multispeaker":
+      return "Varias voces sintéticas";
+    case "real_world":
+      return "Audio real (entorno natural)";
+    case "tts":
+    default:
+      return "Voz sintética local (TTS)";
+  }
+}
+
 interface ListeningPracticeProps {
   userId: string | null;
   onAttempt: () => void;
@@ -149,9 +167,19 @@ export function ListeningPractice({
           >
             {playing ? "Reproduciendo…" : "Escuchar audio"}
           </button>
+          <p className="listening-audio-type">
+            {audioTypeLabel(question.audio_type)}
+          </p>
           {!question.audio_ready && (
             <p className="listening-audio-degraded">
               Audio de referencia no disponible; usando voz generada en vivo.
+            </p>
+          )}
+          {question.realized_difficulty < question.difficulty && (
+            <p className="listening-audio-gap">
+              Este audio realiza una dificultad {question.realized_difficulty} de
+              las {question.difficulty} declaradas: parte de la dificultad no está
+              respaldada por el audio.
             </p>
           )}
           {question.speech_rate > 0 && (
@@ -219,7 +247,7 @@ export function ListeningPractice({
                     key={s.skill}
                     className={`listening-subskill${
                       s.review_due ? " review" : ""
-                    }`}
+                    }${s.realization_gap ? " gap" : ""}`}
                   >
                     {s.skill} · {s.attempts} ·{" "}
                     {s.accuracy !== null ? `${s.accuracy}%` : "—"}
@@ -227,6 +255,7 @@ export function ListeningPractice({
                       ? ` · auto ${Math.round(s.automaticity * 100)}%`
                       : ""}
                     {s.review_due ? " · revisar" : ""}
+                    {s.realization_gap ? " · audio no respalda" : ""}
                   </li>
                 ))}
               </ul>

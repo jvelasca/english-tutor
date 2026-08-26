@@ -3824,6 +3824,47 @@ body.is-resizing {
   color: var(--color-text-dim);
 }
 
+/* Comprensión auditiva: honestidad del audio (V1.14). */
+.listening-audio-type {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.listening-audio-gap {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+
+.listening-recommendation {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.listening-subskills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.listening-subskill {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.listening-subskill.review {
+  color: var(--color-text);
+}
+
+.listening-subskill.gap {
+  color: var(--color-warning);
+}
+
 /* ==========================================================================
    Today's Plan (Student Model 2.0)
    ========================================================================== */

@@ -1,6 +1,8 @@
 """Banco de preguntas de listening y puntuación determinista (puro)."""
 from __future__ import annotations
 
+import hashlib
+
 from pydantic import BaseModel, Field, ValidationError, computed_field
 
 from services.curriculum import LISTENING_BANK_VERSION
@@ -51,6 +53,64 @@ LISTENING_TOPICS: tuple[str, ...] = (
     "education",
     "sports",
     "functional",
+)
+
+# Tipos de audio admitidos. Separan la realización real del audio de lo que el
+# ítem *declara* en su vector de dificultad. Hoy el banco es `tts` (una única voz
+# Piper pre-renderizada); los tipos `recorded`/`mixed`/`synthetic_multispeaker`/
+# `real_world` quedan reservados para la biblioteca de audio humano (V1.15+).
+AUDIO_TYPES: tuple[str, ...] = (
+    "tts",  # voz sintética única, pre-renderizada y cacheada (Piper)
+    "recorded",  # grabación humana real (una o varias voces)
+    "mixed",  # mezcla de grabado + sintético
+    "synthetic_multispeaker",  # varias voces generadas (escenario sintético)
+    "real_world",  # audio natural: ruido, solapamiento, acentos, interrupciones
+)
+
+# Mapa sub-destreza → factor del vector de dificultad cuya realización auditiva
+# respalda (o no) la evidencia de esa sub-destreza. Las sub-destrezas de
+# comprensión textual (gist/detail/inference/…) no dependen de un factor de audio
+# concreto: lo que se lee es lo que se escucha, así que se consideran realizadas.
+SUBSKILL_REALIZATION_FACTOR: dict[str, str] = {
+    "fast_speech": "speed",
+    "connected_speech": "connected_speech",
+    "multiple_speakers": "speaker_count",
+    "accents": "accent",
+}
+
+# Reducciones fuertes del connected speech: si el texto a sintetizar las contiene
+# de forma explícita, la voz Piper las pronuncia tal cual y la dimensión
+# `connected_speech` se considera realizada al nivel declarado.
+STRONG_REDUCTIONS: tuple[str, ...] = (
+    "gonna",
+    "wanna",
+    "gotta",
+    "gimme",
+    "lemme",
+    "dunno",
+    "whaddaya",
+    "d'you",
+    "d'ya",
+    "kinda",
+    "sorta",
+    "shoulda",
+    "woulda",
+    "coulda",
+    "hafta",
+    "usta",
+    "ain't",
+    "outta",
+)
+
+# Contracciones suaves: indican cierta reducción, pero no el connected speech
+# natural (linking/reducción vocálica). Se realizan solo de forma parcial.
+MILD_CONTRACTIONS: tuple[str, ...] = (
+    "she'd", "he'd", "we'd", "they'd", "i'd", "you'd", "it'd",
+    "we'll", "she'll", "he'll", "they'll", "i'll", "you'll", "it'll",
+    "i'm", "we're", "they're", "you're", "she's", "he's", "it's",
+    "can't", "don't", "won't", "isn't", "aren't", "wasn't", "weren't",
+    "didn't", "doesn't", "haven't", "hasn't", "hadn't", "wouldn't",
+    "couldn't", "shouldn't", "mustn't",
 )
 
 
@@ -132,6 +192,9 @@ class ListeningAsset(BaseModel):
     noise_level: int = Field(default=0, ge=0, le=5)
     repetition_policy: str = "none"
     topic: str = ""
+    # Tipo de audio (ver AUDIO_TYPES). Determina qué dimensiones del vector de
+    # dificultad están realmente realizadas en el audio servido.
+    audio_type: str = "tts"
 
     @computed_field
     @property
@@ -797,6 +860,132 @@ def audio_text(question: dict) -> str:
     ).strip()
 
 
+def spoken_text(question: dict) -> str:
+    """Texto que realmente se sintetiza, respetando `repetition_policy="twice"`."""
+    text = audio_text(question)
+    if question.get("repetition_policy") == "twice":
+        text = f"{text}. {text}"
+    return text
+
+
+def _connected_speech_realized(question: dict) -> int:
+    """Nivel de `connected_speech` realmente presente en una voz Piper única.
+
+    Piper lee el texto literalmente: si el texto escribe la reducción ("Gonnago",
+    "Whaddaya", "d'you") la pronuncia y el connected speech se realiza al nivel
+    declarado; si solo hay contracciones suaves ("she'd", "we'll") se realiza de
+    forma parcial; si el texto está en ortografía estándar no hay reducción
+    audible, por lo que la realización es mínima (1).
+    """
+    declared = int(question.get("difficulty_vector", {}).get("connected_speech", 1))
+    text = audio_text(question).lower()
+    if any(marker in text for marker in STRONG_REDUCTIONS):
+        return declared
+    if any(marker in text for marker in MILD_CONTRACTIONS):
+        return min(declared, 2)
+    return 1
+
+
+def realized_vector(question: dict) -> dict[str, int]:
+    """Vector de dificultad *realmente realizado* por el audio del ítem.
+
+    Es el ancla de la integridad de evidencia (P0): el vector `difficulty_vector`
+    es lo que el ítem *declara*; `realized_vector` es lo que el audio *realiza*.
+    Para una voz Piper única (`audio_type="tts"`):
+
+    - `vocabulary`/`syntactic`/`length`: se realizan siempre (el texto se lee).
+    - `speed`: se realiza solo si el ítem fija `speech_rate` (mapeado a
+      `length_scale`); sin él, la velocidad es la del modelo (1).
+    - `accent`/`speaker_count`/`noise`: NO se realizan (una única voz neutra,
+      sin ruido ni hablantes adicionales), así que quedan en 1.
+    - `connected_speech`: se realiza según `_connected_speech_realized`.
+
+    Para el resto de `AUDIO_TYPES` (grabado/real) se confía en la realización
+    declarada, que en su caso la audita el proceso de grabación.
+    """
+    declared = question.get("difficulty_vector", {})
+    audio_type = question.get("audio_type") or "tts"
+    if audio_type != "tts":
+        return {factor: int(declared.get(factor, 1)) for factor in DIFFICULTY_FACTORS}
+    realized: dict[str, int] = {}
+    for factor in DIFFICULTY_FACTORS:
+        value = int(declared.get(factor, 1))
+        if factor == "speed":
+            realized[factor] = value if (question.get("speech_rate") or 0) > 0 else 1
+        elif factor in ("accent", "speaker_count", "noise"):
+            realized[factor] = 1
+        elif factor == "connected_speech":
+            realized[factor] = _connected_speech_realized(question)
+        else:  # vocabulary, syntactic, length
+            realized[factor] = value
+    return realized
+
+
+def realization_status(question: dict) -> dict[str, dict[str, int | bool]]:
+    """Estado de realización por factor: `declared` / `realized` / `verified`.
+
+    `verified` es True cuando la realización alcanza o supera lo declarado (es
+    decir, el audio respalda la dificultad declarada). Un factor con
+    `realized < declared` es una brecha de evidencia: el Student Model no debe
+    usarlo como evidencia fuerte.
+    """
+    declared = question.get("difficulty_vector", {})
+    realized = realized_vector(question)
+    status: dict[str, dict[str, int | bool]] = {}
+    for factor in DIFFICULTY_FACTORS:
+        d = int(declared.get(factor, 1))
+        r = int(realized.get(factor, 1))
+        status[factor] = {"declared": d, "realized": r, "verified": r >= d}
+    return status
+
+
+def realized_difficulty(question: dict) -> int:
+    """Dificultad escalar derivada del vector *realizado* (no del declarado)."""
+    return difficulty_from_vector(realized_vector(question))
+
+
+def realization_gap_factors(question: dict) -> list[str]:
+    """Factores donde el audio realiza menos de lo declarado (evidencia debilitada)."""
+    declared = question.get("difficulty_vector", {})
+    realized = realized_vector(question)
+    return [
+        factor
+        for factor in DIFFICULTY_FACTORS
+        if int(realized.get(factor, 1)) < int(declared.get(factor, 1))
+    ]
+
+
+def subskill_realization_gap(question: dict, subskill: str) -> bool:
+    """True si el audio no realiza el factor que respalda la sub-destreza.
+
+    Para sub-destrezas sin factor de audio asociado (comprensión textual), no hay
+    brecha: lo que se lee es lo que se escucha.
+    """
+    factor = SUBSKILL_REALIZATION_FACTOR.get(subskill)
+    if factor is None:
+        return False
+    declared = int(question.get("difficulty_vector", {}).get(factor, 1))
+    realized = int(realized_vector(question).get(factor, 1))
+    return realized < declared
+
+
+def audio_digest(question: dict) -> str:
+    """Hash determinista del contenido a sintetizar (texto + velocidad + repetición).
+
+    Se usa como parte de la clave de cache para que un cambio en el script, la
+    velocidad, la política de repetición (o la voz, que vive en el directorio)
+    invalide el WAV antiguo en lugar de seguir sirviéndolo.
+    """
+    payload = "|".join(
+        [
+            spoken_text(question),
+            str(length_scale_for_rate(question.get("speech_rate") or 0.0)),
+            question.get("repetition_policy", "none"),
+        ]
+    )
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def get_question(question_id: str) -> dict | None:
     """Devuelve la pregunta por id o None si no existe."""
     for q in QUESTION_BANK:
@@ -838,6 +1027,8 @@ def validate_listening_bank(
             errors.append(f"{asset.id}: invalid skill {asset.skill!r}")
         if asset.topic not in LISTENING_TOPICS:
             errors.append(f"{asset.id}: invalid topic {asset.topic!r}")
+        if asset.audio_type not in AUDIO_TYPES:
+            errors.append(f"{asset.id}: invalid audio_type {asset.audio_type!r}")
         if set(asset.difficulty_vector) != set(factors):
             errors.append(f"{asset.id}: difficulty_vector factors mismatch")
         else:
@@ -888,28 +1079,64 @@ def current_level(correct_question_ids: set[str]) -> str:
     return LEVEL_ORDER[-1]
 
 
+def _realizes_subskill(question: dict, subskill: str) -> bool:
+    """True si el audio del ítem realiza el factor que respalda la sub-destreza.
+
+    Evita servir como práctica de `multiple_speakers` un audio de una sola voz
+    (metadata declarada pero no realizada): el selector no debe entrenar una
+    sub-destreza con evidencia auditiva que no la respalda.
+    """
+    return not subskill_realization_gap(question, subskill)
+
+
 def pick_next_question(
-    seen_ids: set[str], correct_ids: set[str] | None = None
+    seen_ids: set[str],
+    correct_ids: set[str] | None = None,
+    *,
+    weak_subskills: list[str] | None = None,
 ) -> dict:
-    """Siguiente pregunta respetando la progresión por nivel CEFR.
+    """Siguiente pregunta: prioriza la sub-destreza más débil dentro del nivel actual.
 
-    Prioriza, dentro del nivel actual, las preguntas aún no dominadas (respondidas
-    correctamente): primero las no vistas y luego las vistas pero falladas, para
-    reintentarlas. Al dominar un nivel se avanza al siguiente; al completar todos,
-    rota sobre el banco para seguir practicando en lugar de quedarse atascado."""
+    Respeta la progresión por nivel CEFR (no salta a un nivel superior aunque la
+    sub-destreza débil pertenezca a él) y, cuando se le pasan `weak_subskills`
+    (procedentes del diagnóstico del Student Model), prioriza —dentro del nivel de
+    trabajo— las preguntas de esas sub-destrezas cuya realización auditiva es
+    válida. Sin sub-destrezas débiles, conserva el comportamiento anterior:
+    primero no vistas y luego falladas, avanzando de nivel al dominarlo.
+    """
     correct_ids = correct_ids or set()
-    questions = questions_for_level(current_level(correct_ids))
+    working = questions_for_level(current_level(correct_ids))
+    weak = [s for s in (weak_subskills or []) if s in LISTENING_SUBSKILLS]
 
-    for q in questions:
-        if q["id"] not in seen_ids and q["id"] not in correct_ids:
+    def _unseen_not_correct(q: dict) -> bool:
+        return q["id"] not in seen_ids and q["id"] not in correct_ids
+
+    def _not_correct(q: dict) -> bool:
+        return q["id"] not in correct_ids
+
+    # 1. Sub-destrezas débiles del nivel de trabajo (realización válida): primero
+    #    no vistas, luego falladas para reintento.
+    weak_qs = [
+        q for q in working if q["skill"] in weak and _realizes_subskill(q, q["skill"])
+    ]
+    for q in weak_qs:
+        if _unseen_not_correct(q):
             return q
-    for q in questions:
-        if q["id"] not in correct_ids:
+    for q in weak_qs:
+        if _not_correct(q):
             return q
 
-    # Nivel completado o sin preguntas: nunca se repite la misma pregunta en bucle.
+    # 2. Progresión estándar dentro del nivel: no vistas y luego falladas.
+    for q in working:
+        if _unseen_not_correct(q):
+            return q
+    for q in working:
+        if _not_correct(q):
+            return q
+
+    # 3. Nivel completado o sin preguntas: rota sobre el banco restante.
     for q in QUESTION_BANK:
-        if q["id"] not in correct_ids:
+        if _not_correct(q):
             return q
     return QUESTION_BANK[0]
 
@@ -1114,6 +1341,17 @@ def listening_diagnostic(attempt_rows: list[dict]) -> dict:
         ) or (
             stats["avg_response_ms"] is not None and stats["avg_response_ms"] >= 4000
         )
+        # Brecha de realización: True si la evidencia de esta sub-destreza proviene
+        # de al menos un ítem cuyo audio no realiza el factor que la respalda (p. ej.
+        # multiple_speakers servido con una única voz Piper). Esa evidencia no debe
+        # contarse como dominio real de la sub-destreza.
+        questions = [
+            get_question(r.get("question_id"))
+            for r in rows
+            if r.get("question_id") is not None
+        ]
+        questions = [q for q in questions if q is not None]
+        realization_gap = any(subskill_realization_gap(q, skill) for q in questions)
         subskills.append(
             {
                 "skill": skill,
@@ -1128,6 +1366,7 @@ def listening_diagnostic(attempt_rows: list[dict]) -> dict:
                     stats["avg_response_ms"],
                     attempts=attempts,
                 ),
+                "realization_gap": realization_gap,
                 "review_due": review_due,
             }
         )
@@ -1158,6 +1397,24 @@ def listening_diagnostic(attempt_rows: list[dict]) -> dict:
         recommendation = "Focus on: " + ", ".join(weak)
 
     global_stats = _stats(attempt_rows)
+
+    # Resumen de integridad de evidencia: cuántos intentos tienen audio cuya
+    # realización respalda lo declarado (verified) frente a los que presentan brecha
+    # (metadata no respaldada por el audio servido). El Student Model no debe tratar
+    # los intentos con brecha como evidencia fuerte de dominio.
+    attempt_questions = [
+        get_question(r.get("question_id"))
+        for r in attempt_rows
+        if r.get("question_id") is not None
+    ]
+    attempt_questions = [q for q in attempt_questions if q is not None]
+    verified = sum(1 for q in attempt_questions if not realization_gap_factors(q))
+    realization_summary = {
+        "attempts": len(attempt_questions),
+        "verified": verified,
+        "gap": len(attempt_questions) - verified,
+    }
+
     return {
         "subskills": subskills,
         "weak": weak,
@@ -1173,4 +1430,5 @@ def listening_diagnostic(attempt_rows: list[dict]) -> dict:
         "trend": recent_trend(attempt_rows),
         "recurrence": recurrence_stats(attempt_rows),
         "bank_version": LISTENING_BANK_VERSION,
+        "realization": realization_summary,
     }

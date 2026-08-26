@@ -5,10 +5,13 @@ from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
 
+from config import PIPER_VOICE
 from repositories import db
 from repositories import listening as listening_repo
 from services import tts
+from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
+    audio_digest,
     audio_text,
     current_level,
     difficulty_from_vector,
@@ -17,17 +20,25 @@ from services.listening import (
     level_status,
     listening_diagnostic,
     pick_next_question,
+    realization_status,
+    realized_difficulty,
     score_answer,
+    spoken_text,
 )
 
 
 def _audio_cache_dir() -> Path:
-    """Carpeta de audio pre-renderizado (cache en disco, local)."""
-    return db.DATA_DIR / "listening"
+    """Carpeta de audio pre-renderizado, versionada por banco y voz.
+
+    El versionado (`LISTENING_BANK_VERSION` + `PIPER_VOICE`) y el digest del
+    contenido garantizan que un cambio de script/velocidad/voz/modelo invalide el
+    WAV antiguo en lugar de seguir sirviéndolo (P1.1).
+    """
+    return db.DATA_DIR / "listening" / LISTENING_BANK_VERSION / PIPER_VOICE
 
 
-def _audio_path(question_id: str) -> Path:
-    return _audio_cache_dir() / f"{question_id}.wav"
+def _audio_path(question: dict) -> Path:
+    return _audio_cache_dir() / f"{question['id']}-{audio_digest(question)}.wav"
 
 
 def audio_ready(question: dict) -> bool:
@@ -36,17 +47,29 @@ def audio_ready(question: dict) -> bool:
 
 
 def _public(question: dict) -> dict:
-    """Quita la respuesta (answer_index) y añade la dificultad derivada del vector."""
+    """Quita la respuesta (answer_index) y expone dificultad derivada + realización."""
     out = {k: v for k, v in question.items() if k != "answer_index"}
     out["difficulty"] = difficulty_from_vector(question.get("difficulty_vector", {}))
+    out["realized_difficulty"] = realized_difficulty(question)
+    out["realization"] = realization_status(question)
+    out["audio_type"] = question.get("audio_type") or "tts"
     out["audio_ready"] = audio_ready(question)
     return out
 
 
 async def next_question(user_id: str) -> dict:
+    """Siguiente pregunta consumiendo el Student Model (sub-destrezas débiles).
+
+    El selector prioriza, dentro del nivel de trabajo del alumno, las sub-destrezas
+    que el diagnóstico marca como débiles, con selección consciente de la
+    realización auditiva (no entrena una sub-destreza con audio que no la respalda).
+    """
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
     correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
-    return _public(pick_next_question(seen, correct))
+    attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
+    weak = listening_diagnostic(attempts)["weak"]
+    question = pick_next_question(seen, correct, weak_subskills=weak)
+    return _public(question)
 
 
 async def submit_answer(
@@ -62,6 +85,7 @@ async def submit_answer(
         return None
     correct = score_answer(answer_index, question["answer_index"])
     difficulty = difficulty_from_vector(question.get("difficulty_vector", {}))
+    realized = realized_difficulty(question)
     await run_in_threadpool(
         listening_repo.record_attempt,
         user_id,
@@ -73,6 +97,7 @@ async def submit_answer(
         response_time_ms,
         replay_count,
         question.get("topic", ""),
+        realized,
     )
     return {
         "question_id": question_id,
@@ -81,6 +106,7 @@ async def submit_answer(
         "level": question["level"],
         "skill": question.get("skill", ""),
         "difficulty": difficulty,
+        "realized_difficulty": realized,
     }
 
 
@@ -100,31 +126,24 @@ async def get_diagnostic(user_id: str) -> dict:
     return listening_diagnostic(attempts)
 
 
-def _spoken_text(question: dict) -> str:
-    """Texto a sintetizar, respetando `repetition_policy` (duplicar para 'twice')."""
-    text = audio_text(question)
-    if question.get("repetition_policy") == "twice":
-        text = f"{text}. {text}"
-    return text
-
-
 async def get_audio(question_id: str) -> tuple[bytes | None, int | None]:
     """Devuelve el audio WAV del ítem (cacheado en disco), o un código de error.
 
     Retorna `(bytes, None)` con el audio en caso de éxito, o `(None, status)` donde
     `status` es 404 (ítem inexistente) o 503 (sintetizador Piper no disponible). El
-    audio se sintetiza en la primera petición y se cachea en `DATA_DIR/listening/`.
+    audio se sintetiza en la primera petición y se cachea en un path versionado
+    (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`).
     """
     question = get_question(question_id)
     if question is None:
         return None, 404
     if not tts.is_ready():
         return None, 503
-    path = _audio_path(question_id)
+    path = _audio_path(question)
     if path.exists():
         return path.read_bytes(), None
     length_scale = length_scale_for_rate(question.get("speech_rate") or 0.0)
-    data = await run_in_threadpool(tts.synthesize, _spoken_text(question), length_scale)
+    data = await run_in_threadpool(tts.synthesize, spoken_text(question), length_scale)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".wav.tmp")
     tmp.write_bytes(data)

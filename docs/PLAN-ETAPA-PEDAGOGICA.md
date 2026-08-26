@@ -27,7 +27,8 @@ aprendizaje real:
 | **P5** | CEFR basado en evidencia (muestras por destreza + confianza) | Medio | P2, P4 | ✔ hecho |
 | **P6** | Pronunciación fonémica (alineación de fonemas) | Medio | — | 🔁 diferido (a favor de Student Model 2.0) |
 | **V1.12** | Student Model 2.0 + Assessment Loop (unificación + snapshots + naming CEFR + Speaking 2.0) | Alto (bucle completo) | P5 | ✔ hecho |
-| **V1.13** | Listening 3.0 (audio real + cierre A1→B2 + evidencia por sub-destreza) | Alto (contenido + audio) | P4, V1.12 | ✔ hecho |
+| **V1.13** | Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2 + evidencia por sub-destreza) | Alto (contenido + audio) | P4, V1.12 | ✔ hecho |
+| **V1.14** | Listening Evidence & Adaptive Selection (modelo de realización + integridad de evidencia + selector adaptativo) | Alto (validez pedagógica) | V1.13 | ✔ hecho |
 
 ## Detalle por track
 
@@ -72,12 +73,20 @@ de la Academy). `/api/profile` pasa a ser proyección del modelo unificado; se c
 (`cefr_assessment_snapshots` con `instrument_version`). Dos subagentes: `p6-speaking-2.0` y
 `p7-student-model-unificado` (briefings en `agentes/pedagogia/`).
 
-### V1.13 — Listening 3.0 (audio real + cierre A1→B2)
-Convertir el listening de "scripts + TTS genérico" a **audio real por ítem** (pre-renderizado y
-cacheado con Piper), servir `GET /api/listening/audio/{question_id}`, cerrar el currículo
-**A1→B2** (`b2.json` + `LEVEL_ORDER`), y garantizar evidencia independiente por sub-destreza.
-Briefing en `agentes/pedagogia/p8-listening-3.0.md` (formato P1–P5). Honesto con el límite local:
-Piper es una sola voz; los acentos/ruido/hablantes múltiples son límite de contenido, no de código.
+### V1.13 — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2)
+Convertir el listening de "scripts + TTS genérico" a **audio TTS pre-renderizado por ítem**
+(sintetizado y cacheado con Piper), servir `GET /api/listening/audio/{question_id}`, cerrar el
+currículo **A1→B2** (`b2.json` + `LEVEL_ORDER`), y garantizar evidencia independiente por
+sub-destreza. Briefing en `agentes/pedagogia/p8-listening-3.0.md` (formato P1–P5). Honesto con el
+límite local: Piper es una sola voz; los acentos/ruido/hablantes múltiples son límite de contenido,
+no de código.
+
+### V1.14 — Listening Evidence & Adaptive Selection
+Corregir los P0 de la auditoría de V1.13: (1) no llamar "audio real" al TTS Piper; (2) impedir que
+la metadata (`accent`/`speaker_count`/`noise`/`connected_speech`) genere evidencia falsa; (3)
+separar `declared`/`realized`/`verified` (modelo de realización del audio); (4) selector adaptativo
+que consuma el Student Model. Incluye cache versionado (P1.1) y etiqueta honesta de audio en el
+frontend. P1 restantes (delayed retention, shadowing/dictado reales, audio humano) quedan para V1.15+.
 
 ## Reglas de proceso
 

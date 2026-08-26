@@ -221,6 +221,12 @@ export interface ProgressHistory {
   milestones: Milestone[];
 }
 
+export interface RealizationFactor {
+  declared: number;
+  realized: number;
+  verified: boolean;
+}
+
 export interface ListeningQuestion {
   id: string;
   level: string;
@@ -241,6 +247,11 @@ export interface ListeningQuestion {
   repetition_policy: string;
   topic: string;
   audio_ready: boolean;
+  // Modelo de realización (V1.14): tipo de audio servido y separación entre la
+  // dificultad declarada y la realmente realizada por el audio.
+  audio_type: string;
+  realized_difficulty: number;
+  realization: Record<string, RealizationFactor>;
 }
 
 export interface ListeningAnswerResponse {
@@ -248,6 +259,9 @@ export interface ListeningAnswerResponse {
   correct: boolean;
   correct_index: number;
   level: string;
+  skill: string;
+  difficulty: number;
+  realized_difficulty: number;
 }
 
 export interface ListeningLevelProgress {
@@ -276,6 +290,9 @@ export interface ListeningSubskillProgress {
   avg_replay_count: number;
   automaticity: number | null;
   review_due: boolean;
+  // True si la evidencia de esta sub-destreza proviene de ítems cuyo audio no
+  // realiza el factor que la respalda (p. ej. multiple_speakers con una sola voz).
+  realization_gap: boolean;
 }
 
 export interface ListeningDifficultyProgress {
@@ -307,6 +324,12 @@ export interface ListeningRecurrence {
   recovery_rate: number | null;
 }
 
+export interface ListeningRealizationSummary {
+  attempts: number;
+  verified: number;
+  gap: number;
+}
+
 export interface ListeningDiagnostic {
   subskills: ListeningSubskillProgress[];
   weak: string[];
@@ -318,6 +341,7 @@ export interface ListeningDiagnostic {
   trend: ListeningTrend;
   recurrence: ListeningRecurrence;
   bank_version: string;
+  realization: ListeningRealizationSummary;
 }
 
 // --- Academy (currículum CEFR, mastery, evaluación) ---

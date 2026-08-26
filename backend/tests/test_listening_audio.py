@@ -1,4 +1,4 @@
-"""Tests del audio real de listening (V1.13): síntesis bajo demanda, cache y
+"""Tests del audio de listening (V1.13): síntesis bajo demanda, cache versionado y
 degradación del endpoint."""
 from fastapi.testclient import TestClient
 

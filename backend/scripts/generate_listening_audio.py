@@ -1,9 +1,10 @@
 """Pre-renderiza el audio de referencia de todo el banco de listening.
 
 Genera un WAV por ítem (respetando `speech_rate` → `length_scale` y la
-`repetition_policy` "twice") y lo cachea en `DATA_DIR/listening/{id}.wav`, de modo
-que el endpoint `/api/listening/audio/{id}` sirva el audio al instante sin
-sintetizar en cada petición.
+`repetition_policy` "twice") y lo cachea en
+`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`, de modo que el
+endpoint `/api/listening/audio/{id}` sirva el audio al instante sin sintetizar en
+cada petición.
 
 Uso:
     .venv\\Scripts\\python.exe scripts/generate_listening_audio.py [--force]
@@ -21,22 +22,20 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from config import DATA_DIR  # noqa: E402
+from config import DATA_DIR, PIPER_VOICE  # noqa: E402
 from services import tts  # noqa: E402
+from services.curriculum import LISTENING_BANK_VERSION  # noqa: E402
 from services.listening import (  # noqa: E402
     QUESTION_BANK,
-    audio_text,
+    audio_digest,
     length_scale_for_rate,
+    spoken_text,
 )
 
-CACHE_DIR = DATA_DIR / "listening"
-
-
-def spoken_text(question: dict) -> str:
-    text = audio_text(question)
-    if question.get("repetition_policy") == "twice":
-        text = f"{text}. {text}"
-    return text
+# Cache versionado por banco + voz + digest del contenido (P1.1): un cambio en el
+# script, la velocidad, la voz o el modelo Piper invalida el WAV antiguo en lugar
+# de seguir sirviéndolo.
+CACHE_DIR = DATA_DIR / "listening" / LISTENING_BANK_VERSION / PIPER_VOICE
 
 
 def main() -> int:
@@ -54,7 +53,7 @@ def main() -> int:
     generated, skipped, errors = 0, 0, 0
 
     for question in QUESTION_BANK:
-        path = CACHE_DIR / f"{question['id']}.wav"
+        path = CACHE_DIR / f"{question['id']}-{audio_digest(question)}.wav"
         if path.exists() and not args.force:
             skipped += 1
             continue

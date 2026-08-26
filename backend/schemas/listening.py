@@ -26,8 +26,13 @@ class ListeningQuestion(BaseModel):
     topic: str = ""
     # True si este ítem tiene audio de referencia reproducible (transcript/script no
     # vacío y el sintetizador Piper disponible). El frontend usa esto para decidir
-    # entre reproducir el audio real o degradar al TTS en vivo.
+    # entre reproducir el audio TTS pre-renderizado o degradar al TTS en vivo.
     audio_ready: bool = False
+    # Modelo de realización (V1.14): tipo de audio y separación entre la dificultad
+    # declarada y la realmente realizada por el audio servido.
+    audio_type: str = "tts"
+    realized_difficulty: int = 0
+    realization: dict[str, dict[str, int | bool]] = Field(default_factory=dict)
 
 
 class ListeningAnswerRequest(BaseModel):
@@ -42,6 +47,9 @@ class ListeningAnswerResponse(BaseModel):
     correct: bool
     correct_index: int
     level: str
+    skill: str = ""
+    difficulty: int = 1
+    realized_difficulty: int = 1
 
 
 class ListeningLevelOut(BaseModel):
@@ -70,6 +78,9 @@ class ListeningSubskillOut(BaseModel):
     avg_replay_count: float
     automaticity: float | None = None
     review_due: bool
+    # True si la evidencia de esta sub-destreza proviene de ítems cuyo audio no
+    # realiza el factor que la respalda (p. ej. multiple_speakers con una sola voz).
+    realization_gap: bool = False
 
 
 class ListeningDifficultyOut(BaseModel):
@@ -112,3 +123,6 @@ class ListeningDiagnostic(BaseModel):
     trend: ListeningTrend
     recurrence: ListeningRecurrence
     bank_version: str = ""
+    # Resumen de integridad de evidencia: cuántos intentos tienen audio verificado
+    # (realización = declaración) y cuántos presentan brecha (metadata no respaldada).
+    realization: dict = Field(default_factory=dict)
