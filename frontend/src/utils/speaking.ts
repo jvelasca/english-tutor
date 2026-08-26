@@ -48,6 +48,26 @@ export function formatConfidence(confidence: number): string {
 }
 
 /**
+ * Formatea una puntuación 0..1 como porcentaje entero; `null` → "—".
+ * Ej.: 0.62 → "62%", null → "—".
+ */
+export function formatScorePct(score: number | null): string {
+  return score == null ? "—" : `${Math.round(score * 100)}%`;
+}
+
+/**
+ * Formatea una duración objetivo en segundos de forma legible:
+ * <60s → "45 s"; >=60s exactos → "1 min"; resto → "1:30".
+ */
+export function formatDurationTarget(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return secs === 0 ? `${mins} min` : `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+/**
  * Formatea una delta de tendencia (media 0..1) como puntos porcentuales con
  * signo; `null` → "—". Ej.: +0.12 → "+12%", -0.05 → "−5%".
  */

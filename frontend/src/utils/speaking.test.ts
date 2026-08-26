@@ -3,6 +3,8 @@ import type { SpeakingCriterionProgress } from "../types/api";
 import {
   criterionLabel,
   formatConfidence,
+  formatDurationTarget,
+  formatScorePct,
   formatTrendDelta,
   nextFocus,
   numericToCefr,
@@ -70,6 +72,41 @@ describe("formatTrendDelta", () => {
 
   it("devuelve guion para null", () => {
     expect(formatTrendDelta(null)).toBe("—");
+  });
+});
+
+describe("formatScorePct", () => {
+  it("convierte una puntuación 0..1 a porcentaje entero", () => {
+    expect(formatScorePct(0.62)).toBe("62%");
+    expect(formatScorePct(1)).toBe("100%");
+    expect(formatScorePct(0)).toBe("0%");
+  });
+
+  it("devuelve guion para null", () => {
+    expect(formatScorePct(null)).toBe("—");
+  });
+});
+
+describe("formatDurationTarget", () => {
+  it("formatea segundos sueltos", () => {
+    expect(formatDurationTarget(45)).toBe("45 s");
+    expect(formatDurationTarget(30)).toBe("30 s");
+  });
+
+  it("formatea minutos exactos", () => {
+    expect(formatDurationTarget(60)).toBe("1 min");
+    expect(formatDurationTarget(120)).toBe("2 min");
+  });
+
+  it("formatea minutos y segundos", () => {
+    expect(formatDurationTarget(90)).toBe("1:30");
+    expect(formatDurationTarget(75)).toBe("1:15");
+  });
+
+  it("devuelve guion para valores no positivos", () => {
+    expect(formatDurationTarget(0)).toBe("—");
+    expect(formatDurationTarget(-5)).toBe("—");
+    expect(formatDurationTarget(Number.NaN)).toBe("—");
   });
 });
 

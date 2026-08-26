@@ -19,6 +19,10 @@ import type {
   PlacementStart,
   Readiness,
   Session,
+  SpeakingAssessmentPart,
+  SpeakingAssessmentResult,
+  SpeakingAssessmentStart,
+  SpeakingAssessmentState,
   SpeakingDiagnostic,
   SpeakingJourneyOut,
   SpeakingLevelOut,
@@ -187,6 +191,55 @@ export function getSpeakingJourney(
 ): Promise<SpeakingJourneyOut> {
   return getJson<SpeakingJourneyOut>(
     `/api/academy/speaking/journey${userQuery(userId)}`,
+  );
+}
+
+/** Inicia una sesión de Speaking Assessment y devuelve la primera parte. */
+export function startSpeakingAssessment(
+  userId: string,
+): Promise<SpeakingAssessmentStart> {
+  return postJson<SpeakingAssessmentStart>(
+    `/api/academy/speaking/assessment/start${userQuery(userId)}`,
+    {},
+  );
+}
+
+/**
+ * Envía la respuesta hablada de una parte del Speaking Assessment.
+ * `durationSeconds` solo se incluye cuando está definida (vía micrófono).
+ */
+export function submitSpeakingAssessmentPart(
+  userId: string,
+  sessionId: number,
+  heard: string,
+  durationSeconds?: number | null,
+): Promise<SpeakingAssessmentPart> {
+  const body: Record<string, unknown> = { session_id: sessionId, heard };
+  if (durationSeconds != null) body.duration_seconds = durationSeconds;
+  return postJson<SpeakingAssessmentPart>(
+    `/api/academy/speaking/assessment/part${userQuery(userId)}`,
+    body,
+  );
+}
+
+/** Finaliza la sesión y agrega el resultado CEFR continuo del assessment. */
+export function finishSpeakingAssessment(
+  userId: string,
+  sessionId: number,
+): Promise<SpeakingAssessmentResult> {
+  return postJson<SpeakingAssessmentResult>(
+    `/api/academy/speaking/assessment/finish${userQuery(userId)}`,
+    { session_id: sessionId },
+  );
+}
+
+/** Recupera el estado/resultado de una sesión de Speaking Assessment. */
+export function getSpeakingAssessment(
+  userId: string,
+  sessionId: number,
+): Promise<SpeakingAssessmentState> {
+  return getJson<SpeakingAssessmentState>(
+    `/api/academy/speaking/assessment/${sessionId}${userQuery(userId)}`,
   );
 }
 

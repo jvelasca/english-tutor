@@ -404,6 +404,66 @@ export interface SpeakingJourneyOut {
   steps: SpeakingJourneyStep[];
 }
 
+// --- Speaking Assessment (V1.17): instrumento de 4 partes + resultado ---
+
+export interface SpeakingAssessmentPartInfo {
+  id: string;
+  part_index: number;
+  title: string;
+  task_type: string;
+  cefr_target: string;
+  duration_target: number;
+  prompt: string;
+  difficulty: number;
+}
+
+export interface SpeakingAssessmentPartScores {
+  overall: number;
+  criteria: Record<string, number | null>;
+  observed: Record<string, boolean>;
+}
+
+export interface SpeakingAssessmentStart {
+  session_id: number;
+  assessment_version: string;
+  total_parts: number;
+  part: SpeakingAssessmentPartInfo | null;
+}
+
+export interface SpeakingAssessmentPart {
+  session_id: number;
+  part_index: number;
+  task_type: string;
+  cefr_target: string;
+  prompt: string;
+  part_scores: SpeakingAssessmentPartScores;
+  done: boolean;
+  next_part: SpeakingAssessmentPartInfo | null;
+}
+
+export interface SpeakingAssessmentResult {
+  session_id: number;
+  level: string | null;
+  numeric: number | null;
+  score: number | null;
+  confidence: number;
+  attempts: number;
+  criteria: SpeakingCriterionProgress[];
+  weak: string[];
+  recommendation: string;
+  assessment_version: string;
+  rubric_version: string;
+}
+
+export interface SpeakingAssessmentState {
+  session_id: number;
+  status: string;
+  assessment_version: string;
+  total_parts: number;
+  next_part_index: number;
+  final_result: SpeakingAssessmentResult | null;
+}
+
 // --- Academy (currículum CEFR, mastery, evaluación) ---
 
 export type AcademyObjectiveStatus =

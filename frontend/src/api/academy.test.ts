@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   completeLesson,
   completeSessionStep,
+  finishSpeakingAssessment,
   getGoal,
   getLevels,
   getSession,
+  getSpeakingAssessment,
   getSpeakingDiagnostic,
   getSpeakingJourney,
   getSpeakingLevel,
@@ -12,9 +14,11 @@ import {
   putGoal,
   recordAttempts,
   startAdaptivePlacement,
+  startSpeakingAssessment,
   submitExam,
   submitObjectiveAssessment,
   submitPlacement,
+  submitSpeakingAssessmentPart,
 } from "./academy";
 
 function mockJsonFetch(data: unknown) {
@@ -212,6 +216,97 @@ describe("academy api", () => {
     expect(fn.mock.calls[0][0]).toBe(
       "/api/academy/speaking/journey?user_id=u1",
     );
+  });
+
+  it("startSpeakingAssessment llama a assessment/start por POST", async () => {
+    const fn = mockJsonFetch({
+      session_id: 1,
+      assessment_version: "1.0.0",
+      total_parts: 4,
+      part: null,
+    });
+    await startSpeakingAssessment("u1");
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/speaking/assessment/start?user_id=u1");
+    expect(method).toBe("POST");
+    expect(body).toEqual({});
+  });
+
+  it("submitSpeakingAssessmentPart envía session_id, heard y duration", async () => {
+    const fn = mockJsonFetch({
+      session_id: 1,
+      part_index: 1,
+      task_type: "Interview",
+      cefr_target: "B1",
+      prompt: "Tell me about yourself.",
+      part_scores: { overall: 0.7, criteria: {}, observed: {} },
+      done: false,
+      next_part: null,
+    });
+    await submitSpeakingAssessmentPart("u1", 1, "hello", 12.5);
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/speaking/assessment/part?user_id=u1");
+    expect(method).toBe("POST");
+    expect(body).toEqual({ session_id: 1, heard: "hello", duration_seconds: 12.5 });
+  });
+
+  it("submitSpeakingAssessmentPart omite duration_seconds si no se pasa", async () => {
+    const fn = mockJsonFetch({
+      session_id: 1,
+      part_index: 1,
+      task_type: "Interview",
+      cefr_target: "B1",
+      prompt: "Tell me about yourself.",
+      part_scores: { overall: 0.7, criteria: {}, observed: {} },
+      done: false,
+      next_part: null,
+    });
+    await submitSpeakingAssessmentPart("u1", 1, "hello");
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body).toEqual({ session_id: 1, heard: "hello" });
+  });
+
+  it("finishSpeakingAssessment envía session_id por POST", async () => {
+    const fn = mockJsonFetch({
+      session_id: 1,
+      level: "B1",
+      numeric: 3.1,
+      score: 0.62,
+      confidence: 0.86,
+      attempts: 4,
+      criteria: [],
+      weak: [],
+      recommendation: "",
+      assessment_version: "1.0.0",
+      rubric_version: "1.0.0",
+    });
+    await finishSpeakingAssessment("u1", 1);
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe("/api/academy/speaking/assessment/finish?user_id=u1");
+    expect(method).toBe("POST");
+    expect(body).toEqual({ session_id: 1 });
+  });
+
+  it("getSpeakingAssessment usa el id en la ruta y user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      session_id: 1,
+      status: "in_progress",
+      assessment_version: "1.0.0",
+      total_parts: 4,
+      next_part_index: 2,
+      final_result: null,
+    });
+    await getSpeakingAssessment("u1", 1);
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1]?.method;
+    expect(url).toBe("/api/academy/speaking/assessment/1?user_id=u1");
+    expect(method).toBeUndefined();
   });
 
   it("submitObjectiveAssessment envía respuestas, no scores", async () => {

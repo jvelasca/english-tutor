@@ -4461,6 +4461,309 @@ body.is-resizing {
 }
 
 /* ==========================================================================
+   Speaking assessment (V1.17)
+   ========================================================================== */
+
+.speaking-assessment {
+  margin: var(--space-2) 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.speaking-assessment__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.speaking-assessment__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.speaking-assessment__desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+  line-height: 1.55;
+}
+
+.speaking-assessment__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.speaking-assessment__duration {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-faint);
+}
+
+.speaking-assessment__part-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.speaking-assessment__prompt {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.55;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-soft);
+}
+
+.speaking-assessment__controls {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.speaking-assessment__record,
+.speaking-assessment__submit,
+.speaking-assessment__next,
+.speaking-assessment__start,
+.speaking-assessment__reset {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    filter var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.speaking-assessment__record,
+.speaking-assessment__start,
+.speaking-assessment__submit {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  color: var(--color-on-accent);
+}
+
+.speaking-assessment__record:hover:not(:disabled),
+.speaking-assessment__start:hover:not(:disabled),
+.speaking-assessment__submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.speaking-assessment__record:active:not(:disabled),
+.speaking-assessment__start:active:not(:disabled),
+.speaking-assessment__submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.speaking-assessment__record:disabled,
+.speaking-assessment__start:disabled,
+.speaking-assessment__submit:disabled,
+.speaking-assessment__next:disabled,
+.speaking-assessment__reset:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.speaking-assessment__record.recording {
+  background: var(--color-error);
+}
+
+.speaking-assessment__record.processing {
+  filter: brightness(0.9);
+}
+
+.speaking-assessment__next,
+.speaking-assessment__reset {
+  align-self: flex-start;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.speaking-assessment__next:hover:not(:disabled),
+.speaking-assessment__reset:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.speaking-assessment__manual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.speaking-assessment__manual-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-weight: 500;
+}
+
+.speaking-assessment__textarea {
+  resize: vertical;
+  min-height: 72px;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.speaking-assessment__textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-ring);
+}
+
+.speaking-assessment__textarea::placeholder {
+  color: var(--color-text-faint);
+}
+
+.speaking-assessment__textarea:disabled {
+  opacity: 0.6;
+}
+
+.speaking-assessment__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.speaking-assessment__part-score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-soft);
+}
+
+.speaking-assessment__part-score-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.speaking-assessment__part-score-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.speaking-assessment__observed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.speaking-assessment__observed li {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.speaking-assessment__observed li.seen {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.speaking-assessment__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-accent-ring);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.speaking-assessment__result-score {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-accent);
+  line-height: 1;
+}
+
+.speaking-assessment__result-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.speaking-assessment__criteria {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.speaking-assessment__criterion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.speaking-assessment__criterion.review {
+  color: var(--color-text);
+}
+
+.speaking-assessment__criterion-label {
+  font-weight: 500;
+}
+
+.speaking-assessment__criterion-score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.speaking-assessment__criterion-mark {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.speaking-assessment__criterion.review .speaking-assessment__criterion-mark {
+  color: var(--color-warning);
+}
+
+.speaking-assessment__recommendation {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.55;
+}
+
+/* ==========================================================================
    Speaking journey (V1.16)
    ========================================================================== */
 
