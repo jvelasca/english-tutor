@@ -3,25 +3,26 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 11:55 (UTC+2).
+> Actualizado por última vez: 2026-08-26 12:15 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.16` **commiteada** (Speaking Assessment & Evidence 2.0:
-scoring determinista S1–S6 + Speaking Assessment 1.0 + Interaction Evidence objetiva + panel/journey
-de speaking). Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
-curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-lite),
-**Placement 2.0**, Etapa 2 (pedagogía) **P1–P5**; **V1.12** (Student Model unificado + Assessment
-Loop), **V1.13** (Listening 3.0), **V1.14** (Listening Evidence & Adaptive Selection), **V1.15**
-(Speaking 3.0) y **V1.16** (Speaking Assessment & Evidence 2.0). El P6 original (pronunciación
-fonémica) sigue **diferido**.
+**Posición actual (2026-08-26):** `v1.17` **commiteada** (Speaking Assessment UI + puente
+conversación→speaking + Writing 3.0). Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16,
+Academy v2 + integridad curricular, hardening, Evidence & Performance Engine, Listening
+1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2 (pedagogía) **P1–P5**; **V1.12** (Student Model
+unificado + Assessment Loop), **V1.13** (Listening 3.0), **V1.14** (Listening Evidence &
+Adaptive Selection), **V1.15** (Speaking 3.0), **V1.16** (Speaking Assessment & Evidence 2.0)
+y **V1.17** (Speaking Assessment UI + puente conversación→speaking + Writing 3.0). El P6
+original (pronunciación fonémica) y los **P1 de listening** de la auditoría V1.14 (delayed
+retention, shadowing real, dictado real, etc.) siguen **pendientes**.
 
 **Últimos commits:**
+- `feat: V1.17 - Writing 3.0 (diagnostico por criterio, nivel continuo y journey longitudinales)`
+- `feat: puente conversacion -> speaking con telemetria objetiva de interaccion`
+- `feat: add speaking assessment UI flow (start to 4 parts to result)`
 - `docs: V1.16 higiene de release + documentacion (1.16.0)`
 - `feat: V1.16 - Speaking panel y journey (frontend)`
-- `feat: V1.16 - Interaction Evidence objetiva (telemetria de turnos + endpoint)`
-- `feat: V1.16 - Speaking Assessment & Evidence 2.0 (S1-S6 + Speaking Assessment 1.0)`
-- `docs: V1.15 higiene de release + documentacion (RELEVO/ARQUITECTURA/PLAN/README)`
 - `feat: V1.15 S3 - panel de diagnostico de speaking`
 - `feat: V1.15 S2 - Speaking 3.0 criterio interaction`
 - `feat: V1.15 S1 - Speaking 3.0 diagnostico longitudinal`
@@ -57,15 +58,30 @@ Resumen:
 - **Frontend**: `SpeakingPanel` (NEXT FOCUS + PRACTICE NOW) + `SpeakingJourney` (barra A2→B1→B2).
 - **Higiene de release**: `config.py`/`package.json` → `1.16.0`; CHANGELOG con entrada 1.16.0.
 
-**Estado verde:** backend `677 tests` + `ruff` limpio; frontend `164 tests` + `tsc` OK;
+**V1.17 commiteada** (`012ec01` UI, `e679300` puente, `34e32e6` Writing 3.0) — cierre de tres
+incrementos naturales. Ver sección 30. Resumen:
+- **UI del Speaking Assessment** (`components/SpeakingAssessment.tsx`): start → 4 partes →
+  resultado, con micrófono y entrada manual (sin micrófono), sobre los endpoints ya existentes.
+- **Puente conversación→speaking**: `duration_ms`/`latency_ms` en `ChatMessage`; captura de la
+  telemetría del turno del alumno (`utils/telemetry.ts` + `useChat`) y envío de
+  `conversation_id`/`message_id` en `/api/chat/stream`; `conversation_id` opcional en
+  `submit_speaking_assessment_part`/`submit_speaking_task` inyecta
+  `evidence["interaction_objective"]` (señal objetiva de turnos) en el scorer.
+- **Writing 3.0**: `writing_diagnostic`/`writing_level`/`writing_journey` (espejo de speaking)
+  + endpoints `/api/academy/writing/diagnostic|level|journey` + frontend `WritingPanel`/
+  `WritingJourney`.
+- **Higiene de release**: `config.py`/`package.json` → `1.17.0`; CHANGELOG con entrada 1.17.0.
+
+**Estado verde:** backend `692 tests` + `ruff` limpio; frontend `195 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 29** de este documento (V1.16 — commiteada) y su **lista de pendientes**
-   (29.8).
-3. Atacar los pendientes de producto/arquitectura listados en 29.8:
-   UI del Speaking Assessment, puente conversación→speaking, y/o Writing 3.0 / P1 de listening.
+2. Leer la **sección 30** de este documento (V1.17 — commiteada) y su **lista de pendientes**
+   (30.4).
+3. Atacar los pendientes listados en 30.4: retomar los **P1 de listening** de la auditoría
+   V1.14 (delayed retention, shadowing real, dictado real, varios hablantes, acentos/ruido,
+   variantes de dificultad).
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
 
@@ -1354,12 +1370,63 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `components/SpeakingPanel.tsx` (NEXT FOCUS + PRACTICE NOW) y `components/SpeakingJourney.tsx`
   (barra A2→B1→B2 con marcador "YOU"), CSS en `index.css`, montaje en `App.tsx`.
 
-### 29.8 Pendiente / siguiente incremento natural (para el siguiente agente)
-1. **UI del flujo de Speaking Assessment** (endpoints ya existen, falta la pantalla
-   start → 4 partes → resultado).
-2. **Puente conversación→speaking**: cablear la telemetría objetiva de interacción (29.7) desde una
-   sesión de chat real hasta una evaluación de speaking (hoy se captura y el scorer sabe fusionarla,
-   pero no hay flujo que las conecte automáticamente).
-3. **Writing 3.0** sobre el mismo Student Model, y/o retomar los **P1 de listening** (V1.14).
+### 29.8 Pendiente → HECHO en V1.17
+1. ✅ **UI del flujo de Speaking Assessment** — `components/SpeakingAssessment.tsx` (sección 30.1).
+2. ✅ **Puente conversación→speaking** — telemetría objetiva cableada de extremo a extremo (sección 30.2).
+3. ✅ **Writing 3.0** sobre el Student Model (sección 30.3). Queda **P1 de listening** (V1.14).
+
+## 30. HECHO (commiteado) — V1.17: Speaking Assessment UI + puente + Writing 3.0
+
+> **Origen.** Cierre de los tres incrementos naturales que dejó V1.16 (sección 29.8), lanzados
+> como subagentes autocontenidos en orden: (1) la pantalla del Speaking Assessment, (2) el puente
+> conversación→speaking y (3) Writing 3.0. Filosofía intacta: el LLM solo extrae evidencia; todo
+> el scoring determinista; un criterio no observado no se inventa.
+
+### 30.1 UI del flujo de Speaking Assessment (commit `012ec01`)
+- `frontend/src/types/api.ts`: `SpeakingAssessmentPartInfo`, `SpeakingAssessmentPartScores`,
+  `SpeakingAssessmentStart`, `SpeakingAssessmentPart`, `SpeakingAssessmentResult`,
+  `SpeakingAssessmentState` (espejo de `schemas/academy.py`).
+- `frontend/src/api/academy.ts`: `startSpeakingAssessment`, `submitSpeakingAssessmentPart`,
+  `finishSpeakingAssessment`, `getSpeakingAssessment`.
+- `frontend/src/components/SpeakingAssessment.tsx`: flujo `idle → part → result`; micrófono
+  (`getUserMedia`+`MediaRecorder`+`transcribe`, `duration_seconds` con `performance.now()`) y
+  entrada manual por `<textarea>` (usable sin micrófono).
+- `frontend/src/utils/speaking.ts`: `formatScorePct`, `formatDurationTarget`; CSS `.speaking-assessment*`;
+  montaje en `App.tsx`; tests en `utils/speaking.test.ts` y `api/academy.test.ts`.
+
+### 30.2 Puente conversación→speaking (commit `e679300`)
+- `backend/schemas/chat.py`: `duration_ms`/`latency_ms` en `ChatMessage` (persistidos vía
+  `save_conversation`).
+- `backend/domain/academy.py`: helper `_inject_interaction_objective`; `conversation_id` opcional
+  en `submit_speaking_assessment_part` y `submit_speaking_task` → `conversations_repo.get_turns` →
+  `services.interaction.interaction_evidence` → `evidence["interaction_objective"]` antes de
+  `scores_from_evidence` (fusionado por `_interaction_score`).
+- `backend/schemas/academy.py` + `routers/academy.py`: `conversation_id` en
+  `SpeakingAssessmentPartSubmit`/`SpeakingTaskSubmitRequest` y propagación en endpoints.
+- Frontend: `utils/telemetry.ts` (`turnTelemetry`), `api/chat.ts` (`conversationId`/`messageId`),
+  `hooks/useChat.ts` (captura `duration_ms`/`latency_ms` del turno del alumno y envía
+  `conversation_id`/`message_id` en `/api/chat/stream`).
+- Tests: `test_speaking.py` (fusión objetiva+semántica, backward-compat, E2E con `conversation_id`);
+  `utils/telemetry.test.ts`; `api/chat.test.ts`.
+
+### 30.3 Writing 3.0 (commit `34e32e6`)
+- `backend/services/writing.py`: `writing_diagnostic`/`writing_level`/`writing_journey` (espejo de
+  `speaking.py`) sobre `WRITING_CRITERIA`, con `_ema`/`_mean_trend` y constantes
+  `WRITING_EMA_ALPHA`/`WRITING_WEAK_THRESHOLD`/`WRITING_CONFIDENCE_THRESHOLD`/`WRITING_TREND_WINDOW`.
+- `backend/schemas/academy.py`: `WritingCriterionOut`, `WritingTrend`, `WritingDiagnostic`,
+  `WritingLevelOut`, `WritingJourneyStep`, `WritingJourneyOut`.
+- `backend/domain/academy.py`: `get_writing_diagnostic`/`get_writing_level`/`get_writing_journey`;
+  `backend/routers/academy.py`: `GET /api/academy/writing/diagnostic|level|journey`.
+- Frontend: tipos + `getWriting*`, `utils/writing.ts` (`writingCriterionLabel`), `WritingPanel.tsx`
+  + `WritingJourney.tsx`, CSS `.writing-*`, montaje en `App.tsx`; tests `test_writing.py`,
+  `utils/writing.test.ts`, `api/academy.test.ts`.
+
+### 30.4 Pendiente / siguiente incremento natural
+- **P1 de listening** (auditoría V1.14): delayed retention (P1.2), shadowing real (P1.3), dictado
+  real, varios hablantes, acentos y ruido reales, variantes de dificultad.
+- (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
+  Assessment, para que la señal objetiva se alimente de un intercambio en vivo y no solo de un
+  `conversation_id` asociado manualmente.
+- **P6** (pronunciación fonémica) sigue diferido.
 
 

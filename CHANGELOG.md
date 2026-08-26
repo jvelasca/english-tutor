@@ -4,6 +4,31 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.17.0] — 2026-08-26
+
+Cierre de tres incrementos naturales sobre V1.16 (Speaking Assessment & Evidence 2.0). Añade la
+**pantalla del Speaking Assessment**, cierra el **puente conversación→speaking** (la telemetría
+objetiva de interacción pasa a capturarse de extremo a extremo y a consumirse en el scorer) y
+convierte el **writing** en una señal longitudinal sobre el Student Model (espejo de speaking).
+El LLM sigue siendo solo extractor de evidencia; todo el scoring es determinista.
+
+### Añadido
+- **UI del flujo de Speaking Assessment** (`components/SpeakingAssessment.tsx`): start → 4 partes →
+  resultado, con micrófono (grabar → transcribir → medir duración) y entrada manual (sin
+  micrófono). Tipos + API (`start`/`submit part`/`finish`/`get`) sobre los endpoints ya existentes.
+- **Puente conversación→speaking**: `duration_ms`/`latency_ms` en el `ChatMessage` persistido;
+  captura de la telemetría del turno del alumno en el chat (`utils/telemetry.ts`) y envío de
+  `conversation_id`/`message_id` en `/api/chat/stream`. El scorer de speaking fusiona
+  `evidence["interaction_objective"]` (señal objetiva de turnos vía `conversation_id` opcional en
+  `submit_speaking_assessment_part` y `submit_speaking_task`).
+- **Writing 3.0**: `writing_diagnostic`/`writing_level`/`writing_journey` (espejo de speaking) con
+  señales del Student Model (EMA, lifetime, confidence, stability, review_due) por criterio;
+  endpoints `GET /api/academy/writing/diagnostic|level|journey`; frontend `WritingPanel` +
+  `WritingJourney`.
+
+### Cambiado
+- Versión → `1.17.0`.
+
 ## [1.16.0] — 2026-08-26
 
 Speaking Assessment & Evidence 2.0. Convierte el scoring de speaking de un agregador
