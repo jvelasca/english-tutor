@@ -564,6 +564,18 @@ def init_db() -> None:
                 "ALTER TABLE listening_attempts ADD COLUMN realized_difficulty "
                 "INTEGER NOT NULL DEFAULT 0"
             )
+        # Migración idempotente: tareas de producción (dictado/shadowing). `task_type`
+        # distingue MCQ de producción; `score` (0..1, nullable) es la evidencia
+        # continua del intento de producción (solo para dictado/shadowing).
+        if "task_type" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN task_type TEXT "
+                "NOT NULL DEFAULT 'mcq'"
+            )
+        if "score" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN score REAL"
+            )
 
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "

@@ -52,6 +52,29 @@ class ListeningAnswerResponse(BaseModel):
     realized_difficulty: int = 1
 
 
+class ListeningProductionRequest(BaseModel):
+    """Cuerpo de una tarea de producción (dictado/shadowing)."""
+
+    question_id: str
+    transcript: str
+
+
+class ListeningProductionResult(BaseModel):
+    """Resultado de una tarea de producción, con scoring determinista (0..100)."""
+
+    question_id: str
+    task_type: str
+    correct: bool
+    score: int
+    word_accuracy: int
+    phonetic_score: int
+    phoneme_accuracy: int
+    breakdown: dict
+    reference: str
+    level: str
+    skill: str
+
+
 class ListeningLevelOut(BaseModel):
     level: str
     total: int
@@ -78,6 +101,9 @@ class ListeningSubskillOut(BaseModel):
     avg_replay_count: float
     automaticity: float | None = None
     review_due: bool
+    # Media (0..100) del score continuo de las tareas de producción (dictado/
+    # shadowing) de esta sub-destreza, o None si no hay evidencia de producción.
+    mean_score: float | None = None
     # True si la evidencia de esta sub-destreza proviene de ítems cuyo audio no
     # realiza el factor que la respalda (p. ej. multiple_speakers con una sola voz).
     realization_gap: bool = False

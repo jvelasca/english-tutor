@@ -2,6 +2,7 @@ import { getJson, postJson } from "./client";
 import type {
   ListeningAnswerResponse,
   ListeningDiagnostic,
+  ListeningProductionResult,
   ListeningQuestion,
   ListeningStats,
 } from "../types/api";
@@ -30,6 +31,30 @@ export function submitListeningAnswer(
 export function getListeningStats(userId: string): Promise<ListeningStats> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return getJson<ListeningStats>(`/api/listening/stats?${query}`);
+}
+
+export function submitListeningDictation(
+  userId: string,
+  questionId: string,
+  transcript: string,
+): Promise<ListeningProductionResult> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<ListeningProductionResult>(
+    `/api/listening/dictation?${query}`,
+    { question_id: questionId, transcript },
+  );
+}
+
+export function submitListeningShadowing(
+  userId: string,
+  questionId: string,
+  transcript: string,
+): Promise<ListeningProductionResult> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<ListeningProductionResult>(
+    `/api/listening/shadowing?${query}`,
+    { question_id: questionId, transcript },
+  );
 }
 
 export function getListeningDiagnostic(

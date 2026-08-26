@@ -18,8 +18,15 @@ def record_attempt(
     replay_count: int = 0,
     topic: str = "",
     realized_difficulty: int = 0,
+    task_type: str = "mcq",
+    score: float | None = None,
 ) -> bool:
-    """Persiste un intento de listening para un usuario existente."""
+    """Persiste un intento de listening para un usuario existente.
+
+    Los kwargs `task_type` y `score` son opcionales y compatibles hacia atrás: el
+    flujo MCQ no los pasa (queda `task_type="mcq"` y `score=None`); las tareas de
+    producción (dictado/shadowing) sí, dejando `score` como evidencia continua 0..1.
+    """
     if get_user(user_id) is None:
         return False
     with closing(_conn()) as conn, conn:
@@ -27,8 +34,8 @@ def record_attempt(
             "INSERT INTO listening_attempts "
             "(user_id, question_id, answer_index, correct, skill, difficulty, "
             "response_time_ms, replay_count, topic, realized_difficulty, "
-            "created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "task_type, score, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 question_id,
@@ -40,6 +47,8 @@ def record_attempt(
                 replay_count,
                 topic,
                 realized_difficulty,
+                task_type,
+                score,
                 _now(),
             ),
         )
@@ -52,7 +61,7 @@ def list_attempts(user_id: str) -> list[dict]:
         rows = conn.execute(
             "SELECT question_id, answer_index, correct, skill, difficulty, "
             "response_time_ms, replay_count, topic, realized_difficulty, "
-            "created_at "
+            "task_type, score, created_at "
             "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
             (user_id,),
         ).fetchall()

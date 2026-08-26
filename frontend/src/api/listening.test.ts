@@ -5,6 +5,8 @@ import {
   getListeningQuestion,
   getListeningStats,
   submitListeningAnswer,
+  submitListeningDictation,
+  submitListeningShadowing,
 } from "./listening";
 
 function mockFetch(ok: boolean, data: unknown) {
@@ -70,5 +72,37 @@ describe("listening api", () => {
     expect(getListeningAudioUrl("l1", "u1")).toBe(
       "/api/listening/audio/l1?user_id=u1",
     );
+  });
+
+  it("submitListeningDictation envía question_id y transcript", async () => {
+    const fn = mockFetch(true, {
+      question_id: "l18",
+      task_type: "dictation",
+      correct: true,
+      score: 100,
+    });
+    await submitListeningDictation("u1", "l18", "hello world");
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/listening/dictation?user_id=u1");
+    expect(JSON.parse(init.body as string)).toEqual({
+      question_id: "l18",
+      transcript: "hello world",
+    });
+  });
+
+  it("submitListeningShadowing envía question_id y transcript", async () => {
+    const fn = mockFetch(true, {
+      question_id: "l19",
+      task_type: "shadowing",
+      correct: true,
+      score: 90,
+    });
+    await submitListeningShadowing("u1", "l19", "could you repeat that");
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/listening/shadowing?user_id=u1");
+    expect(JSON.parse(init.body as string)).toEqual({
+      question_id: "l19",
+      transcript: "could you repeat that",
+    });
   });
 });

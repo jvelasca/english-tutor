@@ -266,6 +266,25 @@ export interface ListeningAnswerResponse {
   realized_difficulty: number;
 }
 
+export interface ListeningProductionRequest {
+  question_id: string;
+  transcript: string;
+}
+
+export interface ListeningProductionResult {
+  question_id: string;
+  task_type: string;
+  correct: boolean;
+  score: number;
+  word_accuracy: number;
+  phonetic_score: number;
+  phoneme_accuracy: number;
+  breakdown: Record<string, unknown>;
+  reference: string;
+  level: string;
+  skill: string;
+}
+
 export interface ListeningLevelProgress {
   level: string;
   total: number;
@@ -292,6 +311,9 @@ export interface ListeningSubskillProgress {
   avg_replay_count: number;
   automaticity: number | null;
   review_due: boolean;
+  // Media (0..100) del score continuo de las tareas de producción (dictado/
+  // shadowing), o null si no hay evidencia de producción.
+  mean_score: number | null;
   // True si la evidencia de esta sub-destreza proviene de ítems cuyo audio no
   // realiza el factor que la respalda (p. ej. multiple_speakers con una sola voz).
   realization_gap: boolean;

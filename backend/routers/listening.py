@@ -10,6 +10,8 @@ from schemas.listening import (
     ListeningAnswerRequest,
     ListeningAnswerResponse,
     ListeningDiagnostic,
+    ListeningProductionRequest,
+    ListeningProductionResult,
     ListeningQuestion,
     ListeningStats,
 )
@@ -52,6 +54,40 @@ async def answer(
         user["id"],
         "exercise",
         f"listening:{body.question_id}:{'ok' if result['correct'] else 'ko'}",
+    )
+    return result
+
+
+@router.post("/api/listening/dictation", response_model=ListeningProductionResult)
+async def dictation(
+    body: ListeningProductionRequest, user: dict = Depends(current_user)
+) -> dict:
+    result = await listening_service.submit_production(
+        user["id"], body.question_id, body.transcript, "dictation"
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    await learning_service.record_event(
+        user["id"],
+        "exercise",
+        f"listening:dictation:{body.question_id}:{'ok' if result['correct'] else 'ko'}",
+    )
+    return result
+
+
+@router.post("/api/listening/shadowing", response_model=ListeningProductionResult)
+async def shadowing(
+    body: ListeningProductionRequest, user: dict = Depends(current_user)
+) -> dict:
+    result = await listening_service.submit_production(
+        user["id"], body.question_id, body.transcript, "shadowing"
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    await learning_service.record_event(
+        user["id"],
+        "exercise",
+        f"listening:shadowing:{body.question_id}:{'ok' if result['correct'] else 'ko'}",
     )
     return result
 

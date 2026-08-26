@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ValidationError, computed_field
 
 from services.curriculum import LISTENING_BANK_VERSION
 from services.forgetting import days_since
+from services.phonetics import composite_score
 
 LISTENING_SUBSKILLS: tuple[str, ...] = (
     "gist",
@@ -113,6 +114,41 @@ MILD_CONTRACTIONS: tuple[str, ...] = (
     "didn't", "doesn't", "haven't", "hasn't", "hadn't", "wouldn't",
     "couldn't", "shouldn't", "mustn't",
 )
+
+# Umbral de acierto (0..100) para las tareas de producción (dictado/shadowing).
+# Un intento de producción se considera `correct` cuando su score compuesto lo
+# alcanza o supera.
+PRODUCTION_PASS_SCORE = 80
+
+
+def production_score(reference: str, heard: str) -> dict:
+    """Score determinista de una producción frente a una referencia (0..100).
+
+    Delega en `services.phonetics.composite_score` (sin LLM) y devuelve
+    `{score, word_accuracy, phonetic_score, phoneme_accuracy, breakdown}` con
+    enteros 0..100 salvo `breakdown` (el dict de `word_alignment`).
+    """
+    result = composite_score(reference, heard)
+    return {
+        "score": int(result["score"]),
+        "word_accuracy": int(result["word_accuracy"]),
+        "phonetic_score": int(result["phonetic_score"]),
+        "phoneme_accuracy": int(result["phoneme_accuracy"]),
+        "breakdown": result["breakdown"],
+    }
+
+
+def production_reference(question: dict) -> str:
+    """Referencia contra la que se puntúa una producción del ítem.
+
+    Orden de preferencia: `transcript`, `clean_transcript`, `script`. La referencia
+    es la frase que el alumno debe reproducir (dictar o repetir en shadowing).
+    """
+    return (
+        (question.get("transcript") or "").strip()
+        or (question.get("clean_transcript") or "").strip()
+        or (question.get("script") or "").strip()
+    )
 
 
 def difficulty_from_vector(vector: dict[str, int]) -> int:
@@ -1465,6 +1501,12 @@ def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
         ]
         questions = [q for q in questions if q is not None]
         realization_gap = any(subskill_realization_gap(q, skill) for q in questions)
+        # Evidencia continua de producción (score 0..1 persistido): media en 0..100
+        # sobre las filas con `score` no nulo, o None si no hay tareas de producción.
+        prod_scores = [r["score"] * 100 for r in rows if r.get("score") is not None]
+        mean_score = (
+            round(sum(prod_scores) / len(prod_scores), 1) if prod_scores else None
+        )
         subskills.append(
             {
                 "skill": skill,
@@ -1479,6 +1521,7 @@ def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
                     stats["avg_response_ms"],
                     attempts=attempts,
                 ),
+                "mean_score": mean_score,
                 "realization_gap": realization_gap,
                 "review_due": review_due,
             }

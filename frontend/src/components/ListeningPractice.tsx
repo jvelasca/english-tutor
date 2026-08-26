@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getListeningAudioUrl,
   getListeningDiagnostic,
   getListeningQuestion,
   getListeningStats,
   submitListeningAnswer,
+  submitListeningDictation,
+  submitListeningShadowing,
 } from "../api/listening";
-import { speak } from "../api/voz";
+import { speak, transcribe } from "../api/voz";
 import type {
   ListeningAnswerResponse,
   ListeningDiagnostic,
+  ListeningProductionResult,
   ListeningQuestion,
   ListeningStats,
 } from "../types/api";
@@ -66,6 +69,15 @@ function audioTypeLabel(audioType: string): string {
   }
 }
 
+// Resumen legible del `breakdown` de una tarea de producción (dictado/shadowing):
+// cuántas palabras se acertaron, cuántas faltaron y cuántas sobraron.
+function breakdownLabel(breakdown: Record<string, unknown>): string {
+  const correct = Array.isArray(breakdown.correct) ? breakdown.correct.length : 0;
+  const missing = Array.isArray(breakdown.missing) ? breakdown.missing.length : 0;
+  const extra = Array.isArray(breakdown.extra) ? breakdown.extra.length : 0;
+  return `Palabras correctas: ${correct} · faltantes: ${missing} · extra: ${extra}`;
+}
+
 interface ListeningPracticeProps {
   userId: string | null;
   onAttempt: () => void;
@@ -78,6 +90,14 @@ export function ListeningPractice({
   const [question, setQuestion] = useState<ListeningQuestion | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [result, setResult] = useState<ListeningAnswerResponse | null>(null);
+  const [productionResult, setProductionResult] =
+    useState<ListeningProductionResult | null>(null);
+  const [dictationText, setDictationText] = useState("");
+  const [transcribedText, setTranscribedText] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const [stats, setStats] = useState<ListeningStats | null>(null);
   const [diagnostic, setDiagnostic] = useState<ListeningDiagnostic | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -90,6 +110,9 @@ export function ListeningPractice({
     setError(null);
     setResult(null);
     setSelected(null);
+    setProductionResult(null);
+    setDictationText("");
+    setTranscribedText("");
     try {
       setQuestion(await getListeningQuestion(userId));
       setStartedAt(Date.now());
@@ -168,6 +191,70 @@ export function ListeningPractice({
     }
   }
 
+  async function submitDictation() {
+    if (!userId || !question || productionResult) return;
+    const text = dictationText.trim();
+    if (!text) return;
+    setProcessing(true);
+    setError(null);
+    try {
+      setProductionResult(
+        await submitListeningDictation(userId, question.id, text),
+      );
+      onAttempt();
+      void refreshStats();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function toggleRecording() {
+    if (!userId || !question || productionResult) return;
+    if (recording) {
+      recorderRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        if (blob.size === 0) return;
+        if (!userId || !question) return;
+        setProcessing(true);
+        setError(null);
+        try {
+          const text = await transcribe(blob);
+          setTranscribedText(text);
+          setProductionResult(
+            await submitListeningShadowing(userId, question.id, text),
+          );
+          onAttempt();
+          void refreshStats();
+        } catch (e) {
+          setError((e as Error).message);
+        } finally {
+          setProcessing(false);
+        }
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+    } catch (e) {
+      setError(`No se pudo acceder al micrófono: ${(e as Error).message}`);
+    }
+  }
+
   return (
     <section className="listening">
       <h3>Comprensión auditiva</h3>
@@ -206,28 +293,113 @@ export function ListeningPractice({
             </p>
           )}
           <p className="listening-question">{question.question}</p>
-          <div className="listening-options">
-            {question.options.map((opt, i) => {
-              let cls = "listening-option";
-              if (result && i === result.correct_index) cls += " correct";
-              if (result && i === selected && !result.correct) cls += " wrong";
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  className={cls}
-                  onClick={() => choose(i)}
-                  disabled={!!result}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
+
+          {question.skill === "dictation" && (
+            <div className="listening-production">
+              <textarea
+                className="listening-production-textarea"
+                value={dictationText}
+                onChange={(e) => setDictationText(e.target.value)}
+                placeholder="Escribe lo que escuchas…"
+                disabled={!!productionResult || processing}
+              />
+              <button
+                type="button"
+                className="listening-production-submit"
+                onClick={submitDictation}
+                disabled={
+                  !userId ||
+                  !dictationText.trim() ||
+                  !!productionResult ||
+                  processing
+                }
+              >
+                {processing ? "Evaluando…" : "Enviar dictado"}
+              </button>
+            </div>
+          )}
+
+          {question.skill === "shadowing" && (
+            <div className="listening-production">
+              <button
+                type="button"
+                className={`listening-production-record${
+                  recording ? " recording" : ""
+                }`}
+                onClick={toggleRecording}
+                disabled={!userId || !!productionResult || processing}
+              >
+                {processing ? "Evaluando…" : recording ? "Detener" : "Grabar"}
+              </button>
+              {transcribedText && (
+                <p className="listening-production-transcript">
+                  Transcrito: {transcribedText}
+                </p>
+              )}
+            </div>
+          )}
+
+          {question.skill !== "dictation" &&
+            question.skill !== "shadowing" && (
+              <div className="listening-options">
+                {question.options.map((opt, i) => {
+                  let cls = "listening-option";
+                  if (result && i === result.correct_index) cls += " correct";
+                  if (result && i === selected && !result.correct)
+                    cls += " wrong";
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      className={cls}
+                      onClick={() => choose(i)}
+                      disabled={!!result}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
           {result && (
             <div className={`listening-result ${result.correct ? "ok" : "ko"}`}>
               {result.correct ? "¡Correcto!" : "Incorrecto."}{" "}
               <span className="listening-script">{question.script}</span>
+            </div>
+          )}
+
+          {productionResult && (
+            <div
+              className={`listening-production-result ${
+                productionResult.correct ? "ok" : "ko"
+              }`}
+            >
+              <div className="listening-production-score">
+                {productionResult.score}/100
+              </div>
+              <div className="listening-production-lines">
+                <div>
+                  <span className="label">Precisión por palabra:</span>{" "}
+                  {productionResult.word_accuracy}%
+                </div>
+                <div>
+                  <span className="label">Similitud fonética:</span>{" "}
+                  {productionResult.phonetic_score}%
+                </div>
+                <div>
+                  <span className="label">Referencia:</span>{" "}
+                  {productionResult.reference}
+                </div>
+                {transcribedText && (
+                  <div>
+                    <span className="label">Oído:</span> {transcribedText}
+                  </div>
+                )}
+              </div>
+              <p className="listening-production-breakdown">
+                {breakdownLabel(productionResult.breakdown)}
+              </p>
             </div>
           )}
           {stats && (
@@ -271,6 +443,7 @@ export function ListeningPractice({
                     {s.automaticity !== null
                       ? ` · auto ${Math.round(s.automaticity * 100)}%`
                       : ""}
+                    {s.mean_score !== null ? ` · media ${s.mean_score}%` : ""}
                     {s.review_due ? " · revisar" : ""}
                     {s.realization_gap ? " · audio no respalda" : ""}
                   </li>

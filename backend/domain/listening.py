@@ -11,6 +11,7 @@ from repositories import listening as listening_repo
 from services import tts
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
+    PRODUCTION_PASS_SCORE,
     audio_digest,
     audio_text,
     current_level,
@@ -20,6 +21,8 @@ from services.listening import (
     level_status,
     listening_diagnostic,
     pick_next_question,
+    production_reference,
+    production_score,
     realization_status,
     realized_difficulty,
     score_answer,
@@ -107,6 +110,60 @@ async def submit_answer(
         "skill": question.get("skill", ""),
         "difficulty": difficulty,
         "realized_difficulty": realized,
+    }
+
+
+async def submit_production(
+    user_id: str,
+    question_id: str,
+    transcript: str,
+    task_type: str,
+) -> dict | None:
+    """Evalúa y persiste una tarea de producción (dictado/shadowing), sin LLM.
+
+    Puntúa de forma determinista (`production_score` sobre `composite_score`) y
+    persiste la evidencia con `answer_index=-1`, `task_type` y `score` continuo
+    (0..1). Devuelve `None` si la pregunta no existe o su `skill` no coincide con
+    `task_type` (el router lo traduce a 404).
+    """
+    question = get_question(question_id)
+    if question is None:
+        return None
+    if question.get("skill") != task_type:
+        return None
+    reference = production_reference(question)
+    heard = (transcript or "").strip()
+    result = production_score(reference, heard)
+    correct = result["score"] >= PRODUCTION_PASS_SCORE
+    difficulty = difficulty_from_vector(question.get("difficulty_vector", {}))
+    realized = realized_difficulty(question)
+    await run_in_threadpool(
+        listening_repo.record_attempt,
+        user_id,
+        question_id,
+        -1,
+        correct,
+        task_type,
+        difficulty,
+        None,
+        0,
+        question.get("topic", ""),
+        realized,
+        task_type,
+        result["score"] / 100.0,
+    )
+    return {
+        "question_id": question_id,
+        "task_type": task_type,
+        "correct": correct,
+        "score": result["score"],
+        "word_accuracy": result["word_accuracy"],
+        "phonetic_score": result["phonetic_score"],
+        "phoneme_accuracy": result["phoneme_accuracy"],
+        "breakdown": result["breakdown"],
+        "reference": reference,
+        "level": question["level"],
+        "skill": question.get("skill", ""),
     }
 
 
