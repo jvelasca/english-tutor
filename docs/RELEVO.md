@@ -3,11 +3,11 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 09:05 (UTC+2).
+> Actualizado por última vez: 2026-08-26 09:20 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.14` en curso (Listening Evidence & Adaptive Selection).
+**Posición actual (2026-08-26):** `v1.14` **commiteada** (Listening Evidence & Adaptive Selection).
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-lite),
 **Placement 2.0** (calibración observacional + perfil multiskill) y Etapa 2 (pedagogía) **P1–P5**;
@@ -15,7 +15,9 @@ hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-
 (Listening Evidence & Adaptive Selection: modelo de realización del audio + integridad de
 evidencia + selección adaptativa). El P6 original (pronunciación fonémica) sigue **diferido**.
 
-**Últimos commits publicados:**
+**Últimos commits:**
+- `feat: V1.14 - Listening Evidence & Adaptive Selection (AudioRealization + Evidence Integrity + selector adaptativo)`
+- `feat: V1.13 - Listening 3.0 (audio TTS pre-renderizado + cierre A1-B2 + evidencia por sub-destreza)`
 - `feat: V1.12 - Student Model unificado + Assessment Loop`
 - `feat: V1.11 - CEFR basado en evidencia (muestras por destreza + confianza)`
 - `feat: V1.10 - Listening como competencia (topic + metricas por dificultad/tema/tendencia/reincidencia)`
@@ -23,8 +25,8 @@ evidencia + selección adaptativa). El P6 original (pronunciación fonémica) si
 - `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
 - `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 
-**⚠️ TRABAJO SIN COMMITEAR (V1.14 — Listening Evidence & Adaptive Selection):** ver sección 27.
-Es el incremento en curso y NO está versionado. Resumen:
+**V1.14 commiteada** (`fd1687c`) — Listening Evidence & Adaptive Selection. Ver sección 27.
+Resumen:
 - **Modelo de realización del audio** (`services/listening.py`): `AUDIO_TYPES`, `realized_vector`,
   `realization_status` (`declared`/`realized`/`verified`), `realized_difficulty`,
   `realization_gap_factors`, `subskill_realization_gap` y `audio_digest`.
@@ -42,10 +44,10 @@ launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 27** de este documento (trabajo sin commitear — V1.14 Listening Evidence).
+2. Leer la **sección 27** de este documento (V1.14 Listening Evidence — ya commiteada).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6 + Student Model 2.0).
-4. Decidir: **commitear** el trabajo sin versionar (un `feat:` limpio) o continuar con V1.15
-   (Speaking 3.0 sobre el mismo Student Model).
+4. Continuar con **V1.15** (Speaking 3.0 sobre el mismo Student Model), el siguiente
+   incremento natural.
 5. Redactar y ejecutar `agentes/pedagogia/p*-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
@@ -1167,7 +1169,7 @@ cd frontend && npx tsc --noEmit && npx vitest run
   pronunciation/coherence/interaction medidos longitudinalmente.
   Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
 
-## 27. EN CURSO (sin commitear) — V1.14: Listening Evidence & Adaptive Selection
+## 27. HECHO (commiteado) — V1.14: Listening Evidence & Adaptive Selection
 
 > **Origen.** Auditoría externa de V1.13 (commit `37ac52b9…`, 2026-08-26). Veredicto: arquitectura
 > muy buena, pero el "audio real" era en realidad **TTS Piper de una sola voz**, y la metadata
