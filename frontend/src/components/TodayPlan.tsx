@@ -9,42 +9,12 @@ import type {
   StudentModel,
 } from "../types/api";
 import { cefrLabel, cefrTone } from "../utils/cefr";
-
-const SKILL_LABELS: Record<string, string> = {
-  vocabulary: "Vocabulario",
-  grammar: "Gramática",
-  listening: "Listening",
-  speaking: "Speaking",
-  reading: "Reading",
-  writing: "Escritura",
-  pronunciation: "Pronunciación",
-};
-
-const KIND_LABELS: Record<string, string> = {
-  weakness: "Debilidad",
-  review: "Repaso",
-  listening: "Listening",
-  new: "Nuevo",
-  easy_wins: "Refuerzo",
-};
-
-const SUBSKILL_LABELS: Record<string, string> = {
-  gist: "Idea general",
-  detail: "Detalles",
-  inference: "Inferencia",
-  attitude: "Actitud",
-  vocabulary: "Vocabulario",
-  numbers: "Números",
-  speaker_intention: "Intención",
-  fast_speech: "Habla rápida",
-  connected_speech: "Habla conectada",
-  dictation: "Dictado",
-  shadowing: "Shadowing",
-  multiple_speakers: "Varios hablantes",
-  note_taking: "Toma de notas",
-  prediction: "Predicción",
-  sequencing: "Secuenciación",
-};
+import {
+  KIND_LABELS,
+  SKILL_LABELS,
+  SUBSKILL_LABELS,
+  stepTitle,
+} from "../utils/learningLabels";
 
 const GOAL_TYPE_LABELS: Record<LearningGoalType, string> = {
   general: "Conversación general",
@@ -351,19 +321,6 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
       )}
     </section>
   );
-}
-
-function stepTitle(item: SessionStep): string {
-  if (item.kind === "listening" && item.subskill) {
-    return `Escucha: ${SUBSKILL_LABELS[item.subskill] ?? item.subskill}`;
-  }
-  if (item.kind === "review") {
-    return `Repasa ${SKILL_LABELS[item.skill ?? ""] ?? item.skill}`;
-  }
-  if (item.kind === "easy_wins") {
-    return `Refuerzo: ${SKILL_LABELS[item.skill ?? ""] ?? item.skill}`;
-  }
-  return item.title;
 }
 
 function SessionStepRow({

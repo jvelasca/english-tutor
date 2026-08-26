@@ -14,7 +14,8 @@
 - ✅ Versión estable `1.21.0` (cierre de la auditoría pedagógica A1→B2: corpus de audio humano 1.0 +
   validación determinista audio↔metadata + separación del proxy de pronunciación del audio real +
   evidencia familiar/transfer/novel + Interaction 3.0 + matriz de assessment CEFR; y nueva UI de 3
-  paneles con barra de estado y navegación por destrezas). Sobre la base V1.20 de pronunciación
+  paneles con barra de estado y navegación por destrezas, más el **Learning Home** como pantalla
+  central con plan de hoy accionable). Sobre la base V1.20 de pronunciación
   fonémica P6, turn-taking real e infraestructura de biblioteca de audio humano.
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
@@ -205,6 +206,7 @@
 | V1.15 Speaking 3.0 | `agentes/pedagogia/p9-speaking-3.0.md` | ✔ hecho |
 | V1.18 P1 listening (retention + dictado/shadowing + variantes) | `agentes/pedagogia/p13-p15.md` | ✔ hecho |
 | V1.19 Refresco UI profesional (frontend) | plan Cursor `refresco_ui_profesional` | ✔ hecho |
+| V1.21 UI Learning Home (HOME como centro) | plan Cursor `v1.21_ui_learning_home` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

@@ -39,9 +39,16 @@ declara como tal, no se inventa).
   análisis y **barra de estado inferior** (API/BD/Ollama/STT/TTS + URL LAN); sistema de iconos SVG
   coherente (`Icons.tsx`), `SectionNav`, `ReadingPractice`, `StatusBar` y persistencia de la sección
   por usuario. Script `launcher/allow-firewall.ps1` para exponer 5173/8000 en la red local.
+- **Learning Home (HOME como centro)**: pantalla de inicio que responde a "¿qué debo hacer ahora y
+  cómo voy?", con saludo, hero de nivel (banda CEFR + preparación para el siguiente nivel +
+  tendencia), **plan de hoy como tarjetas de acción** (`LearnToday`, una acción por tarjeta), barras
+  de destrezas, racha/actividad y un único CTA "Practice now" hacia la destreza a reforzar. Reutiliza
+  `profile`/`history`/`getSession` existentes (sin backend nuevo); la marca del header vuelve a
+  Inicio. Etiquetas compartidas extraídas a `utils/learningLabels.ts`.
 
 ### Cambiado
 - Versión → `1.21.0`.
+- La app abre ahora en **Inicio** (antes abría directamente en el chat).
 
 ## [1.20.0] — 2026-08-26
 

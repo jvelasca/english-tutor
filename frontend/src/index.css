@@ -419,13 +419,38 @@ body.is-resizing {
   box-shadow: var(--shadow-sm);
 }
 
-.brand-text h1 {
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.brand-link:hover .brand-title {
+  color: var(--color-accent);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-title {
   margin: 0;
   font-size: var(--text-xl);
+  font-weight: 700;
   line-height: 1.2;
 }
 
-.brand-text p {
+.brand-sub {
   margin: 0;
   font-size: var(--text-xs);
   color: var(--color-text-dim);
@@ -1937,11 +1962,11 @@ body.is-resizing {
     height: 36px;
   }
 
-  .brand-text h1 {
+  .brand-title {
     font-size: var(--text-lg);
   }
 
-  .brand-text p {
+  .brand-sub {
     display: none;
   }
 
@@ -2039,7 +2064,7 @@ body.is-resizing {
     height: 32px;
   }
 
-  .brand-text h1 {
+  .brand-title {
     font-size: var(--text-base);
   }
 
@@ -6020,5 +6045,361 @@ body.is-resizing {
     flex-basis: 100%;
     padding-top: var(--space-2);
     border-top: 1px solid var(--color-border);
+  }
+}
+
+/* ==========================================================================
+   Learning Home (HOME como centro) — V1.21 UI
+   ========================================================================== */
+
+.home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.home-greeting__title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+}
+
+.home-greeting__sub {
+  margin: 4px 0 0;
+  font-size: var(--text-base);
+  color: var(--color-text-dim);
+}
+
+.home-hero {
+  padding: var(--space-5);
+}
+
+.home-hero__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.home-hero__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
+.home-trend {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-trend--up {
+  color: var(--color-success);
+}
+
+.home-trend--down {
+  color: var(--color-error);
+}
+
+.home-trend--flat {
+  color: var(--color-text-dim);
+}
+
+.home-hero__readiness {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.home-hero__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.home-hero__row strong {
+  font-size: var(--text-xl);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- LearnToday (tarjetas de acción) --- */
+
+.learn-today {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.learn-today__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.learn-today__title {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.learn-today__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.learn-today__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.today-card {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.today-card__body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.today-card__icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-ring);
+  color: var(--color-accent);
+}
+
+.today-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.today-card__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-card__reason {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-card__kind {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.today-card__minutes {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.today-card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.today-card__cta {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter var(--duration-fast) var(--ease-out);
+}
+
+.today-card__cta:hover {
+  filter: brightness(1.08);
+}
+
+.today-card__done {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-faint);
+  cursor: pointer;
+}
+
+.today-card__done:hover {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.today-card__done:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* --- Skills / streak / CTA del home --- */
+
+.home-skills {
+  padding: var(--space-4) var(--space-5);
+}
+
+.home-skills__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+}
+
+.home-skills__list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3) var(--space-5);
+}
+
+.home-skill__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  margin-bottom: var(--space-1);
+}
+
+.home-skill__score {
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-streak {
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.home-streak__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-streak__big {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-streak__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.home-cta {
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.home-cta__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.home-cta__kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+}
+
+.home-cta__title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.home-cta__button {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  color: var(--color-on-accent);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    filter var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.home-cta__button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.home-cta__button:active {
+  transform: translateY(0);
+}
+
+/* Responsive del home: las tarjetas se apilan y se reduce el padding. */
+@media (max-width: 768px) {
+  .home {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .learn-today__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-skills__list {
+    grid-template-columns: 1fr;
   }
 }

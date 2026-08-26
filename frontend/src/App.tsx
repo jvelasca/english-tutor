@@ -9,6 +9,7 @@ import { AppearancePanel } from "./components/AppearancePanel";
 import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { HelpDialog } from "./components/HelpDialog";
 import { InsightCard } from "./components/InsightCard";
+import { LearningHome } from "./components/LearningHome";
 import { LearningProfile } from "./components/LearningProfile";
 import { ListeningPractice } from "./components/ListeningPractice";
 import { ModelSelect } from "./components/ModelSelect";
@@ -109,7 +110,7 @@ export default function App() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "academy">("chat");
+  const [view, setView] = useState<"home" | "chat" | "academy">("home");
   const [sessionVersion, setSessionVersion] = useState(0);
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
@@ -198,11 +199,18 @@ export default function App() {
             >
               <MenuIcon size={18} />
             </button>
-            <span className="logo">EN</span>
-            <div className="brand-text">
-              <h1>English Tutor</h1>
-              <p>100% local · Ollama</p>
-            </div>
+            <button
+              type="button"
+              className="brand-link"
+              onClick={() => setView("home")}
+              aria-label="Ir a Inicio"
+            >
+              <span className="logo">EN</span>
+              <span className="brand-text">
+                <span className="brand-title">English Tutor</span>
+                <span className="brand-sub">100% local · Ollama</span>
+              </span>
+            </button>
           </div>
           <span className="header-sep" aria-hidden="true" />
           <UserMenu
@@ -311,6 +319,15 @@ export default function App() {
           userId={currentUserId}
           onStartLesson={handleStartLesson}
           onClose={() => setView("chat")}
+        />
+      ) : view === "home" ? (
+        <LearningHome
+          userId={currentUserId}
+          profile={profile}
+          history={history}
+          onStep={handleSessionStep}
+          onPracticeSkill={handleSelectSection}
+          refreshKey={sessionVersion}
         />
       ) : (
         <div className="workspace">
