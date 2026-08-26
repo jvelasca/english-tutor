@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChat } from "./hooks/useChat";
 import { useHandsFree } from "./hooks/useHandsFree";
 import { useAppearance } from "./hooks/useAppearance";
@@ -8,12 +8,13 @@ import { Academy } from "./components/Academy";
 import { AppearancePanel } from "./components/AppearancePanel";
 import { HandsFreeToggle } from "./components/HandsFreeToggle";
 import { HelpDialog } from "./components/HelpDialog";
+import { InsightCard } from "./components/InsightCard";
 import { LearningProfile } from "./components/LearningProfile";
 import { ListeningPractice } from "./components/ListeningPractice";
 import { ModelSelect } from "./components/ModelSelect";
 import { ModeBar, type AppView } from "./components/ModeBar";
 import { PronunciationPractice } from "./components/PronunciationPractice";
-import { ProgressDashboard } from "./components/ProgressDashboard";
+import { BucketToggle, ProgressDashboard } from "./components/ProgressDashboard";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { Sidebar } from "./components/Sidebar";
 import { SpeakingAssessment } from "./components/SpeakingAssessment";
@@ -83,6 +84,22 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [view, setView] = useState<AppView>("chat");
   const [sessionVersion, setSessionVersion] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const headerMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onClick(e: MouseEvent) {
+      if (
+        headerMoreRef.current &&
+        !headerMoreRef.current.contains(e.target as Node)
+      ) {
+        setMoreOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [moreOpen]);
 
   const closeSidebar = () => setSidebarOpen(false);
   const closeInsights = () => setInsightsOpen(false);
@@ -213,26 +230,47 @@ export default function App() {
           >
             <PanelIcon />
           </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => setAppearanceOpen(true)}
-            title="Apariencia y tema"
-            aria-label="Abrir ajustes de apariencia"
-            aria-haspopup="dialog"
-          >
-            <GearIcon />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => setHelpOpen(true)}
-            title="Ayuda"
-            aria-label="Abrir ayuda"
-            aria-haspopup="dialog"
-          >
-            <HelpIcon />
-          </button>
+          <div className="header-more-wrap" ref={headerMoreRef}>
+            <div className={`header-secondary${moreOpen ? " open" : ""}`}>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => {
+                  setAppearanceOpen(true);
+                  setMoreOpen(false);
+                }}
+                title="Apariencia y tema"
+                aria-label="Abrir ajustes de apariencia"
+                aria-haspopup="dialog"
+              >
+                <GearIcon />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => {
+                  setHelpOpen(true);
+                  setMoreOpen(false);
+                }}
+                title="Ayuda"
+                aria-label="Abrir ayuda"
+                aria-haspopup="dialog"
+              >
+                <HelpIcon />
+              </button>
+            </div>
+            <button
+              type="button"
+              className="icon-button header-more"
+              onClick={() => setMoreOpen((o) => !o)}
+              title="Más opciones"
+              aria-label="Más opciones"
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+            >
+              <MoreIcon />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -331,6 +369,7 @@ export default function App() {
                   <span className="empty-badge" aria-hidden="true">
                     EN
                   </span>
+                  <span className="empty-kicker">Práctica de conversación</span>
                   <h2>Hola</h2>
                   <p>
                     Soy tu profesor de inglés local. Escríbeme en inglés o en
@@ -400,28 +439,47 @@ export default function App() {
             </button>
           </div>
           <div className="insights-scroll">
-            <ProgressDashboard
-              history={history}
-              events={events}
-              bucket={bucket}
-              onBucketChange={setBucket}
-            />
-            <TodayPlan
-              userId={currentUserId}
-              onStep={handleSessionStep}
-              refreshKey={sessionVersion}
-            />
-            <LearningProfile profile={profile} />
-            <SpeakingDiagnostic userId={currentUserId} />
-            <SpeakingPanel userId={currentUserId} />
-            <SpeakingJourney userId={currentUserId} />
-            <WritingPanel userId={currentUserId} />
-            <WritingJourney userId={currentUserId} />
-            <SpeakingAssessment userId={currentUserId} onAttempt={onAttempt} />
-            <TutorQualityPanel messages={messages} />
-            <div id="listening-practice">
+            <InsightCard
+              title="Tu progreso"
+              defaultOpen
+              actions={<BucketToggle value={bucket} onChange={setBucket} />}
+            >
+              <ProgressDashboard history={history} events={events} />
+            </InsightCard>
+            <InsightCard title="Plan de hoy" defaultOpen>
+              <TodayPlan
+                userId={currentUserId}
+                onStep={handleSessionStep}
+                refreshKey={sessionVersion}
+              />
+            </InsightCard>
+            <InsightCard title="Tu perfil">
+              <LearningProfile profile={profile} />
+            </InsightCard>
+            <InsightCard title="Expresión oral">
+              <SpeakingDiagnostic userId={currentUserId} />
+            </InsightCard>
+            <InsightCard title="Speaking">
+              <SpeakingPanel userId={currentUserId} />
+            </InsightCard>
+            <InsightCard title="Speaking Journey">
+              <SpeakingJourney userId={currentUserId} />
+            </InsightCard>
+            <InsightCard title="Writing">
+              <WritingPanel userId={currentUserId} />
+            </InsightCard>
+            <InsightCard title="Writing Journey">
+              <WritingJourney userId={currentUserId} />
+            </InsightCard>
+            <InsightCard title="Speaking Assessment">
+              <SpeakingAssessment userId={currentUserId} onAttempt={onAttempt} />
+            </InsightCard>
+            <InsightCard title="Calidad del tutor">
+              <TutorQualityPanel messages={messages} />
+            </InsightCard>
+            <InsightCard title="Listening" id="listening-practice" defaultOpen>
               <ListeningPractice userId={currentUserId} onAttempt={onAttempt} />
-            </div>
+            </InsightCard>
           </div>
         </aside>
         <button
@@ -493,6 +551,26 @@ function HelpIcon() {
       <circle cx="12" cy="12" r="10" />
       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
       <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="19" r="1" />
     </svg>
   );
 }

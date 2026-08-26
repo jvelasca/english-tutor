@@ -166,13 +166,6 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
 
   return (
     <section className="today-plan">
-      <header className="today-header">
-        <span className="learning-title">Hoy</span>
-        {session && (
-          <span className="today-total">{session.total_minutes} min</span>
-        )}
-      </header>
-
       {goal && (
         <div className="goal-editor">
           {editing && draft ? (

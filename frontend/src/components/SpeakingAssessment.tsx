@@ -199,9 +199,6 @@ export function SpeakingAssessment({
   if (phase === "idle") {
     return (
       <section className="speaking-assessment">
-        <header className="speaking-assessment__header">
-          <h3 className="speaking-assessment__title">Speaking Assessment</h3>
-        </header>
         <p className="speaking-assessment__desc">
           Completa las 4 partes del assessment oral para obtener tu nivel CEFR
           continuo, con micrófono o escribiendo tus respuestas.
@@ -227,7 +224,6 @@ export function SpeakingAssessment({
     return (
       <section className="speaking-assessment">
         <header className="speaking-assessment__header">
-          <h3 className="speaking-assessment__title">Speaking Assessment</h3>
           {result.level && (
             <span className={`cefr-badge ${cefrTone(result.level)}`}>
               {result.level}
@@ -292,7 +288,6 @@ export function SpeakingAssessment({
   return (
     <section className="speaking-assessment">
       <header className="speaking-assessment__header">
-        <h3 className="speaking-assessment__title">Speaking Assessment</h3>
         {part && (
           <span className={`cefr-badge ${cefrTone(part.cefr_target)}`}>
             {part.cefr_target}

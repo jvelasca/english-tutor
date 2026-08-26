@@ -68,7 +68,6 @@ export function SpeakingPanel({ userId, onPractice }: SpeakingPanelProps) {
   if (!level && !diagnostic) {
     return (
       <section className="speaking-panel">
-        <h3>🗣 SPEAKING</h3>
         <p className="progress-empty">
           Aún no hay práctica de expresión oral registrada.
         </p>
@@ -82,7 +81,6 @@ export function SpeakingPanel({ userId, onPractice }: SpeakingPanelProps) {
   return (
     <section className="speaking-panel">
       <header className="speaking-panel__header">
-        <h3 className="speaking-panel__title">🗣 SPEAKING</h3>
         {level?.level && (
           <span className={`cefr-badge ${cefrTone(level.level)}`}>
             {level.level}

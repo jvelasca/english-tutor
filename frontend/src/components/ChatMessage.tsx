@@ -8,6 +8,11 @@ export function ChatMessage({ message }: { message: Message }) {
 
   return (
     <div className={`row ${message.role}`}>
+      {message.role === "assistant" && (
+        <span className="tutor-avatar" aria-hidden="true">
+          EN
+        </span>
+      )}
       <div className={`bubble${isError ? " is-error" : ""}`}>
         <span className="bubble-text">{message.content}</span>
         {message.role === "assistant" && <SpeakButton text={message.content} />}

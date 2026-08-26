@@ -32,8 +32,6 @@ export function TutorQualityPanel({ messages }: TutorQualityPanelProps) {
 
   return (
     <section className="tutor-quality" aria-label="Calidad del tutor">
-      <h3 className="tutor-quality-title">Calidad del tutor</h3>
-
       <div className="tutor-quality-stats" role="status" aria-live="polite">
         {chips.map((chip) => (
           <div key={chip.label} className="stat-chip">

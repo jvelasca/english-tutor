@@ -260,7 +260,6 @@ export function ListeningPractice({
 
   return (
     <section className="listening">
-      <h3>Comprensión auditiva</h3>
       {error && <p className="listening-error">{error}</p>}
       {!question ? (
         <p className="progress-empty">Cargando ejercicio…</p>

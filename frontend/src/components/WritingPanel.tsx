@@ -72,7 +72,6 @@ export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
   if (!level && !diagnostic) {
     return (
       <section className="writing-panel">
-        <h3>✍ WRITING</h3>
         <p className="progress-empty">
           Aún no hay práctica de expresión escrita registrada.
         </p>
@@ -86,7 +85,6 @@ export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
   return (
     <section className="writing-panel">
       <header className="writing-panel__header">
-        <h3 className="writing-panel__title">✍ WRITING</h3>
         {level?.level && (
           <span className={`cefr-badge ${cefrTone(level.level)}`}>
             {level.level}

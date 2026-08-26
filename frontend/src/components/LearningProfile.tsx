@@ -39,18 +39,10 @@ export function LearningProfile({ profile }: LearningProfileProps) {
     );
   }
 
-  const tone = cefrTone(profile.estimated_level);
   const abilityPct = Math.round((profile.overall_ability / 6) * 100);
 
   return (
     <section className="learning-profile">
-      <header className="learning-header">
-        <span className="learning-title">Tu perfil</span>
-        <span className={`cefr-badge ${tone}`} title="Nivel estimado a partir de tu actividad">
-          Nivel estimado · {profile.estimated_level}
-        </span>
-      </header>
-
       {profile.estimated_descriptor && (
         <p className="cefr-descriptor">{profile.estimated_descriptor}</p>
       )}

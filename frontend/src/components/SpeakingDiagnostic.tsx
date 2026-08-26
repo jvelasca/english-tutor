@@ -69,7 +69,6 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
 
   return (
     <section className="speaking-diagnostic">
-      <h3>Expresión oral</h3>
       {!diagnostic ? (
         <p className="progress-empty">
           Aún no hay práctica de expresión oral registrada.

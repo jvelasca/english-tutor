@@ -43,7 +43,6 @@ export function SpeakingJourney({ userId }: SpeakingJourneyProps) {
   if (!journey || journey.steps.length === 0) {
     return (
       <section className="speaking-journey">
-        <h3 className="speaking-journey__title">Speaking Journey</h3>
         <p className="progress-empty">
           Aún no hay recorrido de expresión oral registrado.
         </p>
@@ -56,7 +55,6 @@ export function SpeakingJourney({ userId }: SpeakingJourneyProps) {
   return (
     <section className="speaking-journey">
       <header className="speaking-journey__header">
-        <h3 className="speaking-journey__title">Speaking Journey</h3>
         {journey.current_level && (
           <span className={`cefr-badge ${cefrTone(journey.current_level)}`}>
             {journey.current_level}

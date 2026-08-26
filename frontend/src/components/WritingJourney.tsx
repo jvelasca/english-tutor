@@ -43,7 +43,6 @@ export function WritingJourney({ userId }: WritingJourneyProps) {
   if (!journey || journey.steps.length === 0) {
     return (
       <section className="writing-journey">
-        <h3 className="writing-journey__title">Writing Journey</h3>
         <p className="progress-empty">
           Aún no hay recorrido de expresión escrita registrado.
         </p>
@@ -56,7 +55,6 @@ export function WritingJourney({ userId }: WritingJourneyProps) {
   return (
     <section className="writing-journey">
       <header className="writing-journey__header">
-        <h3 className="writing-journey__title">Writing Journey</h3>
         {journey.current_level && (
           <span className={`cefr-badge ${cefrTone(journey.current_level)}`}>
             {journey.current_level}

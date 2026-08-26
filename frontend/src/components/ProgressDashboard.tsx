@@ -6,23 +6,15 @@ const BUCKETS: Bucket[] = ["day", "week", "month"];
 interface ProgressDashboardProps {
   history: ProgressHistory | null;
   events: LearningEvent[];
-  bucket: Bucket;
-  onBucketChange: (bucket: Bucket) => void;
 }
 
 export function ProgressDashboard({
   history,
   events,
-  bucket,
-  onBucketChange,
 }: ProgressDashboardProps) {
   if (history === null) {
     return (
       <section className="progress-dashboard">
-        <header className="pd-header">
-          <h2 className="pd-title">Tu progreso</h2>
-          <BucketToggle value={bucket} onChange={onBucketChange} />
-        </header>
         <p className="progress-empty">
           Aún no hay progreso. Empieza a conversar o a practicar pronunciación y
           aquí verás tu evolución, racha e hitos.
@@ -36,11 +28,6 @@ export function ProgressDashboard({
 
   return (
     <section className="progress-dashboard">
-      <header className="pd-header">
-        <h2 className="pd-title">Tu progreso</h2>
-        <BucketToggle value={bucket} onChange={onBucketChange} />
-      </header>
-
       <div className="pd-grid">
         <div className="pd-card">
           <h3>Racha</h3>
@@ -170,7 +157,7 @@ export function ProgressDashboard({
   );
 }
 
-function BucketToggle({
+export function BucketToggle({
   value,
   onChange,
 }: {
