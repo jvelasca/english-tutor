@@ -4,6 +4,34 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.20.0] — 2026-08-26
+
+Cierra los tres incrementos naturales pendientes de V1.19: la **pronunciación fonémica (P6)**, la
+**integración del turn-taking real** en la parte "Interaction" del Speaking Assessment, y la
+**infraestructura de biblioteca de audio humano** (P1.5–P1.8). Filosofía intacta: el LLM solo
+extrae evidencia; todo el scoring determinista y local.
+
+### Añadido
+- **Pronunciación fonémica (P6)**: `phoneme_alignment`/`syllables`/`prosody_score` en
+  `services/phonemes.py` (alineación de fonemas con `SequenceMatcher` + prosodia proxy por nº de
+  sílabas). `composite_score` rebalanceado a `word 0.35 / phoneme 0.35 / phonetic 0.15 / prosody
+  0.15` (se elimina la similitud por caracteres) y expone `prosody_score` + `phoneme_breakdown`.
+  El rubric de pronunciación pasa de 3 a 4 criterios (añade `prosody`); `PronunciationResponse`
+  y `PronunciationPractice.tsx` muestran "Precisión de fonemas" y "Prosodia (ritmo)".
+- **Turn-taking real → Interaction**: `components/SpeakingRolePlay.tsx` (role-play en vivo dentro
+  del Speaking Assessment) con telemetría de turnos (`duration_ms`/`latency_ms`) y persistencia de
+  la conversación; `SpeakingAssessment.tsx` bifurca por `task_type` conversacional
+  (`isConversationalTaskType` en `utils/speaking.ts`) y `submitSpeakingAssessmentPart` envía
+  `conversation_id` para inyectar `interaction_objective` (señal objetiva) en el scorer.
+- **Biblioteca de audio humano (P1.5–P1.8)**: `services/audio_library.py` con manifest versionado
+  (`backend/audio_library/manifest.json`, vacío hoy — límite de contenido), resolución segura del
+  WAV grabado (rechaza rutas fuera de la biblioteca) y servido sin Piper: `get_audio` sirve audio
+  `recorded` desde el manifest y devuelve 404 (no TTS) si falta; `audio_ready` ya no depende solo
+  de Piper.
+
+### Cambiado
+- Versión → `1.20.0`.
+
 ## [1.19.0] — 2026-08-26
 
 Refresco visual y de consistencia del frontend (sin cambios de backend ni de lógica de negocio).

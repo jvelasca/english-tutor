@@ -3,24 +3,28 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 14:15 (UTC+2).
+> Actualizado por última vez: 2026-08-26 15:40 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.19` **commiteada** (refresco visual y de consistencia del
-frontend: tarjetas colapsables en el panel de análisis, header pulido y responsive reforzado).
-Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
-hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
-(pedagogía) **P1–P5**; **V1.12** (Student Model unificado + Assessment Loop), **V1.13**
+**Posición actual (2026-08-26):** `v1.20` **commiteada** (pronunciación fonémica P6, turn-taking
+real del chat en "Interaction" del Speaking Assessment e infraestructura de biblioteca de audio
+humano). Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
+curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0,
+Etapa 2 (pedagogía) **P1–P5**; **V1.12** (Student Model unificado + Assessment Loop), **V1.13**
 (Listening 3.0), **V1.14** (Listening Evidence & Adaptive Selection), **V1.15** (Speaking 3.0),
 **V1.16** (Speaking Assessment & Evidence 2.0), **V1.17** (Speaking Assessment UI + puente
 conversación→speaking + Writing 3.0), **V1.18** (P1 listening: retention + dictado/shadowing +
-variantes) y **V1.19** (refresco UI profesional). Quedan pendientes los P1 de listening que
-requieren **biblioteca de audio humano** (varios hablantes, connected speech real, acentos reales,
-ruido real — P1.5–P1.8), el **P6** (pronunciación fonémica) y (opcional) integrar el turn-taking
-real del chat en la parte "Interaction" del Speaking Assessment.
+variantes), **V1.19** (refresco UI profesional) y **V1.20** (P6 pronunciación fonémica +
+turn-taking real + infraestructura de audio humano). Queda como siguiente incremento natural el
+**contenido** de la biblioteca de audio humano (grabaciones reales de varios hablantes, connected
+speech real, acentos reales, ruido real) — la infraestructura ya está lista (P1.5–P1.8).
 
 **Últimos commits:**
+- `docs: V1.20 higiene de release + documentacion (1.20.0)`
+- `feat: V1.20 P1.5-P1.8 - infraestructura de biblioteca de audio humano (manifest + servir grabado)`
+- `feat: V1.20 turn-taking real del chat en la parte Interaction del Speaking Assessment`
+- `feat: V1.20 P6 - pronunciacion fonemica (alineacion de fonemas + prosodia)`
 - `docs: V1.19 higiene de release + documentacion (1.19.0)`
 - `feat: V1.19 - refresco UI profesional (InsightCard + header + chat + responsive)`
 - `feat: V1.18 P1.9 - escalera de variantes de velocidad en listening`
@@ -104,17 +108,31 @@ Ver sección 32. Resumen:
 - **Responsive ≤480px** (header compacto, composer y drawer de análisis) sin romper 768/1024.
 - **Higiene de release**: `config.py`/`package.json` → `1.19.0`; CHANGELOG con entrada 1.19.0.
 
-**Estado verde:** backend `726 tests` + `ruff` limpio; frontend `198 tests` + `tsc` OK;
+**V1.20 commiteada** (P6 fonémica, turn-taking real y audio humano) — cierre de los tres pendientes
+de V1.19. Ver sección 33. Resumen:
+- **Pronunciación fonémica (P6)**: `phoneme_alignment`/`syllables`/`prosody_score` en
+  `services/phonemes.py`; `composite_score` rebalanceado (`word 0.35 / phoneme 0.35 / phonetic
+  0.15 / prosody 0.15`) y expone `prosody_score` + `phoneme_breakdown`; rubric de pronunciación
+  con 4 criterios (añade `prosody`) y UI con "Precisión de fonemas"/"Prosodia (ritmo)".
+- **Turn-taking real → Interaction**: `components/SpeakingRolePlay.tsx` (role-play en vivo con
+  telemetría de turnos) + bifurcación por `task_type` conversacional y envío de `conversation_id`
+  en `submitSpeakingAssessmentPart` para inyectar `interaction_objective`.
+- **Biblioteca de audio humano (P1.5–P1.8)**: `services/audio_library.py` + manifest versionado
+  (`backend/audio_library/manifest.json`) + servido de grabaciones sin Piper (`get_audio` 404 si
+  falta el WAV; `audio_ready` ya no depende solo de Piper).
+- **Higiene de release**: `config.py`/`package.json` → `1.20.0`; CHANGELOG con entrada 1.20.0.
+
+**Estado verde:** backend `755 tests` + `ruff` limpio; frontend `202 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 32** de este documento (V1.19 — commiteada) y su **lista de pendientes**
-   (32.7).
-3. Atacar los pendientes listados en 32.7: los P1 de listening que requieren **biblioteca de
-   audio humano** (varios hablantes, connected speech real, acentos reales, ruido real — P1.5–P1.8),
-   el **P6** (pronunciación fonémica) y (opcional) el turn-taking real del chat en la parte
-   "Interaction" del Speaking Assessment.
+2. Leer la **sección 33** de este documento (V1.20 — commiteada) y su **lista de pendientes**
+   (33.6).
+3. Atacar los pendientes listados en 33.6: el **contenido** de la biblioteca de audio humano
+   (grabaciones reales de varios hablantes, connected speech real, acentos reales, ruido real —
+   la infraestructura P1.5–P1.8 ya está lista) y, si se desea, refinar la UI de variantes de
+   velocidad para ítems `recorded`.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
 
@@ -1567,5 +1585,64 @@ cd frontend && npx tsc --noEmit && npx vitest run
 - (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
   Assessment (señal objetiva en vivo, no solo `conversation_id` manual).
 - **P6** (pronunciación fonémica) sigue diferido.
+
+## 33. HECHO (commiteado) — V1.20: P6 fonémica + turn-taking real + audio humano
+
+> **Origen.** Cierra los tres incrementos naturales que dejó pendientes V1.19 (§32.7), lanzados
+> como subagentes autocontenidos en orden: (1) P6 pronunciación fonémica, (2) turn-taking real del
+> chat en la parte "Interaction" del Speaking Assessment y (3) infraestructura de biblioteca de
+> audio humano (P1.5–P1.8). Filosofía intacta: el LLM solo extrae evidencia; todo el scoring
+> determinista y local.
+
+### 33.1 Pronunciación fonémica (P6)
+- `services/phonemes.py`: `phoneme_alignment(expected, heard)` (alineación de fonemas con
+  `difflib.SequenceMatcher`, espejo de `word_alignment`), `syllables(word)` (grupos vocálicos) y
+  `prosody_score(expected, heard)` (proxy de ritmo por nº de sílabas).
+- `services/phonetics.py::composite_score`: pesos rebalanceados `W_WORD=0.35`, `W_PHONEME=0.35`,
+  `W_PHONETIC=0.15`, `W_PROSODY=0.15` (se elimina `W_CHAR`); devuelve `prosody_score` y
+  `phoneme_breakdown`.
+- `services/pronunciation.py`: `PRONUNCIATION_CRITERIA` pasa a 4 (añade `prosody`),
+  `PRONUNCIATION_WEIGHTS` rebalanceado; `score_pronunciation`/`score_pronunciation_cefr` exponen
+  `prosody`.
+- `schemas/pronunciation.py`: `PhonemeSubstitution`/`PhonemeBreakdown`; `PronunciationResponse`
+  con `prosody_score` + `phoneme_breakdown`.
+- Frontend: tipos + `PronunciationPractice.tsx` muestra "Precisión de fonemas" y "Prosodia
+  (ritmo)". Tests `test_phonemes.py`/`test_phonetics.py`/`test_pronunciation.py`/
+  `test_pronunciation_academy.py`.
+
+### 33.2 Turn-taking real del chat → Interaction
+- `utils/speaking.ts`: `CONVERSATIONAL_TASK_TYPES`, `isConversationalTaskType`, `rolePlaySetup`.
+- `api/academy.ts`: `submitSpeakingAssessmentPart` acepta `conversationId` opcional y lo envía
+  como `conversation_id`.
+- `components/SpeakingRolePlay.tsx` (nuevo): role-play en vivo dentro del assessment (`streamChat` +
+  persistencia de conversación + `turnTelemetry` con `duration_ms`/`latency_ms`).
+- `components/SpeakingAssessment.tsx`: bifurca por `task_type` conversacional para renderizar
+  `SpeakingRolePlay`; `index.css` con `.speaking-roleplay*`. El puente backend
+  (`conversation_id` → `interaction_objective`) ya existía desde V1.17.
+- Tests `utils/speaking.test.ts` + `api/academy.test.ts`.
+
+### 33.3 Infraestructura de biblioteca de audio humano (P1.5–P1.8)
+- `services/audio_library.py` (nuevo): `AUDIO_LIBRARY_VERSION`, `AudioLibraryEntry`/
+  `AudioLibraryManifest`, `load_manifest`, `entry_for`, `resolve_file` (rechaza rutas fuera de la
+  biblioteca), `is_recorded`, `recorded_audio_path`, `library_summary`, `validate_manifest`.
+- `backend/audio_library/manifest.json` (nuevo): manifest versionado vacío (límite de contenido).
+- `domain/listening.py`: `audio_ready` ya no depende solo de Piper (para `recorded` basta el WAV);
+  `get_audio` sirve el WAV grabado del manifest y devuelve 404 (no TTS) si falta.
+- Tests `test_audio_library.py` (21 tests: manifest, resolución segura, servido y `audio_ready`).
+
+### 33.4 Higiene de release
+- `config.py`/`package.json`/`package-lock.json`/`README.md` → `1.20.0`; `CHANGELOG.md` con
+  entrada 1.20.0; `PLAN.md` y este `RELEVO.md` actualizados.
+
+### 33.5 Verificación
+- Backend `755 tests` + `ruff` limpio; frontend `202 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 33.6 Pendiente / siguiente incremento natural
+- **Contenido** de la biblioteca de audio humano: incorporar WAV reales (varios hablantes,
+  connected speech real, acentos reales, ruido real) y añadir sus entradas al manifest. La
+  infraestructura ya está lista.
+- (Opcional) Ajustar la UI de variantes de velocidad (`ListeningPractice.tsx`) para no mostrar la
+  escalera slow/normal/fast en ítems `recorded` (su velocidad es la real, no sintetizable).
 
 
