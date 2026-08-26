@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from dependencies import current_user
 from domain import conversations as conversation_service
 from domain import learning as learning_service
-from schemas.conversations import Conversation, ConversationMeta, ConversationUpsert
+from schemas.conversations import (
+    Conversation,
+    ConversationMeta,
+    ConversationUpsert,
+    InteractionEvidence,
+)
+from services.interaction import interaction_evidence
 
 router = APIRouter()
 
@@ -32,6 +38,15 @@ async def get_one(cid: str, user: dict = Depends(current_user)) -> dict:
     if conv is None:
         raise HTTPException(status_code=404, detail="Conversación no encontrada")
     return conv
+
+
+@router.get("/api/conversations/{cid}/interaction", response_model=InteractionEvidence)
+async def interaction(cid: str, user: dict = Depends(current_user)) -> dict:
+    """Evidencia objetiva de interacción (telemetría de turnos) de la conversación."""
+    turns = await conversation_service.get_turns(cid, user["id"])
+    if turns is None:
+        raise HTTPException(status_code=404, detail="Conversación no encontrada")
+    return interaction_evidence(turns)
 
 
 @router.put("/api/conversations/{cid}", response_model=ConversationMeta)

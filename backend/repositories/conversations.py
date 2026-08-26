@@ -93,10 +93,20 @@ def save_conversation(
         if append_only:
             conn.executemany(
                 "INSERT OR IGNORE INTO messages "
-                "(conversation_id, role, content, mode, created_at, message_id) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "(conversation_id, role, content, mode, created_at, message_id, "
+                "duration_ms, latency_ms) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (cid, m["role"], m["content"], m.get("mode"), now, m.get("id"))
+                    (
+                        cid,
+                        m["role"],
+                        m["content"],
+                        m.get("mode"),
+                        now,
+                        m.get("id"),
+                        m.get("duration_ms"),
+                        m.get("latency_ms"),
+                    )
                     for m in messages
                 ],
             )
@@ -104,9 +114,21 @@ def save_conversation(
             conn.execute("DELETE FROM messages WHERE conversation_id = ?", (cid,))
             conn.executemany(
                 "INSERT INTO messages "
-                "(conversation_id, role, content, mode, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                [(cid, m["role"], m["content"], m.get("mode"), now) for m in messages],
+                "(conversation_id, role, content, mode, created_at, "
+                "duration_ms, latency_ms) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        cid,
+                        m["role"],
+                        m["content"],
+                        m.get("mode"),
+                        now,
+                        m.get("duration_ms"),
+                        m.get("latency_ms"),
+                    )
+                    for m in messages
+                ],
             )
     return {
         "id": cid,
@@ -123,3 +145,67 @@ def delete_conversation(cid: str, user_id: str) -> bool:
             "DELETE FROM conversations WHERE id = ? AND user_id = ?", (cid, user_id)
         )
     return cur.rowcount > 0
+
+
+def save_message(
+    cid: str,
+    user_id: str,
+    *,
+    role: str,
+    content: str,
+    mode: str | None = None,
+    message_id: str | None = None,
+    duration_ms: int | None = None,
+    latency_ms: int | None = None,
+) -> bool:
+    """Inserta un mensaje (append-only) con telemetría de turno opcional.
+
+    Usa `INSERT OR IGNORE` sobre `(conversation_id, message_id)` para no duplicar un
+    turno ya persistido (p. ej. cuando el frontend guarda después la historia
+    completa con el mismo `message_id`). Devuelve False si la conversación no existe
+    o no pertenece al usuario.
+    """
+    with closing(_conn()) as conn, conn:
+        conv = conn.execute(
+            "SELECT id FROM conversations WHERE id = ? AND user_id = ?",
+            (cid, user_id),
+        ).fetchone()
+        if conv is None:
+            return False
+        conn.execute(
+            "INSERT OR IGNORE INTO messages "
+            "(conversation_id, role, content, mode, created_at, message_id, "
+            "duration_ms, latency_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (cid, role, content, mode, _now(), message_id, duration_ms, latency_ms),
+        )
+    return True
+
+
+def get_turns(cid: str, user_id: str) -> list[dict] | None:
+    """Telemetría de turnos de una conversación (o None si no existe / no es suya).
+
+    Devuelve una lista ordenada (por id ASC) de turnos `{role, duration_ms,
+    latency_ms, created_at}` lista para `services.interaction.interaction_evidence`.
+    El `role` de la BD ("user"/"assistant") se normaliza a "student"/"assistant".
+    """
+    with closing(_conn()) as conn:
+        conv = conn.execute(
+            "SELECT id FROM conversations WHERE id = ? AND user_id = ?",
+            (cid, user_id),
+        ).fetchone()
+        if conv is None:
+            return None
+        rows = conn.execute(
+            "SELECT role, duration_ms, latency_ms, created_at FROM messages "
+            "WHERE conversation_id = ? ORDER BY id ASC",
+            (cid,),
+        ).fetchall()
+    return [
+        {
+            "role": "student" if r["role"] == "user" else r["role"],
+            "duration_ms": r["duration_ms"],
+            "latency_ms": r["latency_ms"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from dependencies import current_user_optional
 from domain import academy as academy_service
+from domain import conversations as conversation_service
 from domain import learning as learning_service
 from domain import profile as profile_service
 from domain import vocabulary as vocabulary_service
@@ -69,23 +71,48 @@ async def chat(
 async def chat_stream_endpoint(
     req: ChatRequest, user: dict | None = Depends(current_user_optional)
 ) -> StreamingResponse:
-    """Emite la respuesta como Server-Sent Events (texto incremental)."""
+    """Emite la respuesta como Server-Sent Events (texto incremental).
+
+    Mide el tiempo-hasta-primer-token (`latency_ms`) y la duración total
+    (`duration_ms`), los incluye en el evento final `done` y, si la petición trae
+    `conversation_id`, persiste la telemetría del turno del asistente.
+    """
     user_id = user["id"] if user else None
     system_prompt = await _system_prompt(req, user_id)
     await _record_activity(req, user_id)
 
     async def generate():
         chunks: list[str] = []
+        started = time.perf_counter()
+        latency_ms: int | None = None
+        duration_ms: int | None = None
         try:
             async for content in chat_stream(
                 req.messages, req.model, req.temperature, req.mode, system_prompt
             ):
+                if latency_ms is None:
+                    latency_ms = int((time.perf_counter() - started) * 1000)
                 chunks.append(content)
                 data = json.dumps({"content": content}, ensure_ascii=False)
                 yield f"data: {data}\n\n"
+            duration_ms = int((time.perf_counter() - started) * 1000)
             if user_id and chunks:
                 await vocabulary_service.record_exposure(user_id, "".join(chunks))
-            yield 'data: {"done": true}\n\n'
+            if user_id and req.conversation_id and chunks:
+                await conversation_service.save_message(
+                    req.conversation_id,
+                    user_id,
+                    role="assistant",
+                    content="".join(chunks),
+                    mode=req.mode,
+                    message_id=req.message_id,
+                    duration_ms=duration_ms,
+                    latency_ms=latency_ms,
+                )
+            final: dict = {"done": True, "duration_ms": duration_ms}
+            if latency_ms is not None:
+                final["latency_ms"] = latency_ms
+            yield f"data: {json.dumps(final)}\n\n"
         except Exception:  # noqa: BLE001
             logger.exception("Error en /api/chat/stream")
             yield 'data: {"error": "No se pudo completar la respuesta"}\n\n'

@@ -29,6 +29,12 @@ class ChatRequest(BaseModel):
     mode: str = Field(default=DEFAULT_MODE)
     # Objetivo de la Academy (opcional): activa el AI Teacher de la lección.
     objective_id: str | None = None
+    # Identificadores opcionales para persistir telemetría de turno
+    # (InteractionEvidence 2.0): `conversation_id` asocia el turno del asistente a
+    # una conversación y `message_id` lo identifica para no duplicarlo al guardar la
+    # historia completa después.
+    conversation_id: str | None = None
+    message_id: str | None = None
 
 
 class ChatResponse(BaseModel):
