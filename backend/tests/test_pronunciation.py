@@ -30,3 +30,11 @@ def test_phoneme_accuracy_field_present():
     r = score_pronunciation("Hello world", "Hello world")
     assert "phoneme_accuracy" in r
     assert r["phoneme_accuracy"] == 100
+
+
+def test_prosody_and_phoneme_breakdown_present():
+    r = score_pronunciation("Hello world", "Hello world")
+    assert "prosody_score" in r
+    assert r["prosody_score"] == 100
+    assert "phoneme_breakdown" in r
+    assert r["phoneme_breakdown"]["total"] > 0

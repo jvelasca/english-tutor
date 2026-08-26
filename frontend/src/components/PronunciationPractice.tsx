@@ -125,6 +125,14 @@ export function PronunciationPractice({
               {result.phonetic_score}%
             </div>
             <div>
+              <span className="label">Precisión de fonemas:</span>{" "}
+              {result.phoneme_accuracy}%
+            </div>
+            <div>
+              <span className="label">Prosodia (ritmo):</span>{" "}
+              {result.prosody_score}%
+            </div>
+            <div>
               <span className="label">Fluidez:</span>{" "}
               {fluencyLevelLabel(result.fluency.level)} ·{" "}
               {wpmLabel(result.fluency.wpm)}

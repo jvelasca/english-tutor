@@ -1,6 +1,14 @@
 """Tests del módulo fonémico determinista (grapheme→phoneme + precisión)."""
 
-from services.phonemes import G2P, levenshtein, phoneme_accuracy, to_phonemes
+from services.phonemes import (
+    G2P,
+    levenshtein,
+    phoneme_accuracy,
+    phoneme_alignment,
+    prosody_score,
+    syllables,
+    to_phonemes,
+)
 
 
 def test_g2p_covers_common_words():
@@ -64,3 +72,53 @@ def test_phoneme_accuracy_in_range():
     ):
         acc = phoneme_accuracy(expected, heard)
         assert 0.0 <= acc <= 1.0
+
+
+def test_phoneme_alignment_exact_match():
+    r = phoneme_alignment("hello", "hello")
+    assert r["correct"] == ["HH", "AH", "L", "OW"]
+    assert r["missing"] == []
+    assert r["extra"] == []
+    assert r["substituted"] == []
+    assert r["total"] == 4
+
+
+def test_phoneme_alignment_substitution_and_extra():
+    # "like" (3 fonemas) vs "likes" (4 fonemas): "S" sobra.
+    r = phoneme_alignment("like", "likes")
+    assert r["correct"] == ["L", "AY", "K"]
+    assert r["extra"] == ["S"]
+    assert r["missing"] == []
+    assert r["substituted"] == []
+
+
+def test_phoneme_alignment_missing_phoneme():
+    r = phoneme_alignment("hello world", "hello")
+    assert r["correct"] == ["HH", "AH", "L", "OW"]
+    assert r["missing"] == ["W", "ER", "L", "D"]
+    assert r["extra"] == []
+    assert r["total"] == len(to_phonemes("hello world"))
+
+
+def test_syllables_min_one_and_basic():
+    assert syllables("") == 1
+    assert syllables("a") == 1
+    assert syllables("hello") == 2  # e-o → dos grupos
+    assert syllables("world") == 1  # o → un grupo
+
+
+def test_prosody_score_exact_and_empty():
+    assert prosody_score("hello world", "hello world") == 1.0
+    assert prosody_score("", "") == 1.0
+    assert prosody_score("hello", "") == 0.0
+    assert prosody_score("", "hello") == 0.0
+
+
+def test_prosody_score_in_range():
+    for expected, heard in (
+        ("hello", "hello"),
+        ("I am a student", "I am student"),
+        ("twenty years old", "twenty years"),
+    ):
+        score = prosody_score(expected, heard)
+        assert 0.0 <= score <= 1.0

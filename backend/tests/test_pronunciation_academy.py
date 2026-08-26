@@ -47,7 +47,7 @@ def test_pronunciation_records_evidence_and_mastery(monkeypatch, tmp_path):
     assert r.status_code == 200
     body = r.json()
     assert 0.0 <= body["overall"] <= 1.0
-    assert len(body["criteria"]) == 3
+    assert len(body["criteria"]) == 4
     assert body["pronunciation_mastery"] > 0
 
     pronunciation_rows = [
@@ -55,7 +55,7 @@ def test_pronunciation_records_evidence_and_mastery(monkeypatch, tmp_path):
     ]
     assert pronunciation_rows, "no se registró evidencia de pronunciation"
     assert all(row["skill"] == "pronunciation" for row in pronunciation_rows)
-    assert len(pronunciation_rows) >= 4  # 3 criterios + 1 overall
+    assert len(pronunciation_rows) >= 5  # 4 criterios + 1 overall
     assert academy_repo.get_objective_row(a, "a1", obj.id, "pronunciation") is not None
 
 

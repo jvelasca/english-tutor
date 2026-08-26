@@ -1,5 +1,6 @@
 import pytest
 
+from services.phonemes import to_phonemes
 from services.phonetics import (
     composite_score,
     phonetic_similarity,
@@ -78,3 +79,12 @@ def test_composite_score_exact_empty_partial():
 def test_composite_score_includes_phoneme_accuracy():
     assert composite_score("Hello world", "Hello world")["phoneme_accuracy"] == 100
     assert composite_score("Hello", "")["phoneme_accuracy"] == 0
+
+
+def test_composite_score_includes_prosody_and_phoneme_breakdown():
+    r = composite_score("Hello world", "Hello world")
+    assert r["prosody_score"] == 100
+    assert r["phoneme_breakdown"]["total"] == len(r["phoneme_breakdown"]["correct"])
+    empty = composite_score("Hello", "")
+    assert empty["prosody_score"] == 0
+    assert empty["phoneme_breakdown"]["total"] == len(to_phonemes("Hello"))

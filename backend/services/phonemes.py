@@ -8,6 +8,8 @@ compuesto existente como señal principal.
 """
 from __future__ import annotations
 
+from difflib import SequenceMatcher
+
 # Diccionario grapheme→phoneme (ARPAbet) compacto. Cubre el vocabulario de uso
 # frecuente del currículum A1/A2; para palabras fuera de vocabulario se usa el
 # fallback letra-a-letra, así que `to_phonemes` nunca falla.
@@ -129,3 +131,84 @@ def phoneme_accuracy(expected: str, heard: str) -> float:
     lev = levenshtein(ep, hp)
     raw = 1 - lev / max(1, len(ep))
     return round(max(0.0, min(1.0, raw)), 3)
+
+
+def phoneme_alignment(expected: str, heard: str) -> dict:
+    """Alinea fonema a fonema las secuencias de lo esperado y lo oído.
+
+    Espejo de `services.phonetics.word_alignment` pero sobre las listas de fonemas
+    (`to_phonemes`). Devuelve `{correct, missing, extra, substituted, total}` con
+    `substituted` como lista de `{"expected": fonema, "heard": fonema}` y
+    `total = len(ep)`. En un bloque `replace` de longitudes distintas, el excedente
+    de `ep` va a `missing` y el de `hp` a `extra`."""
+    ep = to_phonemes(expected)
+    hp = to_phonemes(heard)
+    correct: list[str] = []
+    missing: list[str] = []
+    extra: list[str] = []
+    substituted: list[dict] = []
+    sm = SequenceMatcher(None, ep, hp, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            correct.extend(ep[i1:i2])
+        elif tag == "delete":
+            missing.extend(ep[i1:i2])
+        elif tag == "insert":
+            extra.extend(hp[j1:j2])
+        elif tag == "replace":
+            es = ep[i1:i2]
+            hs = hp[j1:j2]
+            substituted.extend(
+                {"expected": e, "heard": h} for e, h in zip(es, hs, strict=False)
+            )
+            if len(es) > len(hs):
+                missing.extend(es[len(hs):])
+            elif len(hs) > len(es):
+                extra.extend(hs[len(es):])
+    return {
+        "correct": correct,
+        "missing": missing,
+        "extra": extra,
+        "substituted": substituted,
+        "total": len(ep),
+    }
+
+
+def syllables(word: str) -> int:
+    """Cuenta grupos vocálicos (`aeiouy`) como proxy determinista de sílabas.
+
+    No resuelve "e" muda ni diptongos; es un proxy de ritmo, no un silabeador
+    exacto. Devuelve al menos 1."""
+    groups = 0
+    prev_vowel = False
+    for ch in word.lower():
+        is_vowel = ch in "aeiouy"
+        if is_vowel and not prev_vowel:
+            groups += 1
+        prev_vowel = is_vowel
+    return max(1, groups)
+
+
+def prosody_score(expected: str, heard: str) -> float:
+    """Ratio (0..1) de palabras esperadas cuyo patrón silábico coincide con el de
+    alguna palabra oída no reutilizada (greedy, espejo de `phonetic_similarity`).
+
+    Proxy de prosodia (ritmo silábico) sin audio: el acento de palabra y la
+    entonación no son observables desde la transcripción ortográfica."""
+    from services.phonetics import tokenize
+
+    e = tokenize(expected)
+    h = tokenize(heard)
+    if not e:
+        return 1.0 if not h else 0.0
+    h_syllables = [syllables(w) for w in h]
+    used = [False] * len(h_syllables)
+    matched = 0
+    for ew in e:
+        target = syllables(ew)
+        for i, hs in enumerate(h_syllables):
+            if not used[i] and hs == target:
+                matched += 1
+                used[i] = True
+                break
+    return matched / len(e)

@@ -13,11 +13,24 @@ class WordSubstitution(BaseModel):
     heard: str
 
 
+class PhonemeSubstitution(BaseModel):
+    expected: str
+    heard: str
+
+
 class PronunciationBreakdown(BaseModel):
     correct: list[str]
     missing: list[str]
     extra: list[str]
     substituted: list[WordSubstitution]
+    total: int
+
+
+class PhonemeBreakdown(BaseModel):
+    correct: list[str]
+    missing: list[str]
+    extra: list[str]
+    substituted: list[PhonemeSubstitution]
     total: int
 
 
@@ -37,5 +50,7 @@ class PronunciationResponse(BaseModel):
     word_accuracy: int
     phonetic_score: int
     phoneme_accuracy: int
+    prosody_score: int
     breakdown: PronunciationBreakdown
+    phoneme_breakdown: PhonemeBreakdown
     fluency: FluencyStats

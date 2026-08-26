@@ -56,11 +56,24 @@ export interface WordSubstitution {
   heard: string;
 }
 
+export interface PhonemeSubstitution {
+  expected: string;
+  heard: string;
+}
+
 export interface PronunciationBreakdown {
   correct: string[];
   missing: string[];
   extra: string[];
   substituted: WordSubstitution[];
+  total: number;
+}
+
+export interface PhonemeBreakdown {
+  correct: string[];
+  missing: string[];
+  extra: string[];
+  substituted: PhonemeSubstitution[];
   total: number;
 }
 
@@ -79,7 +92,10 @@ export interface PronunciationResponse {
   ok: boolean;
   word_accuracy: number;
   phonetic_score: number;
+  phoneme_accuracy: number;
+  prosody_score: number;
   breakdown: PronunciationBreakdown;
+  phoneme_breakdown: PhonemeBreakdown;
   fluency: FluencyStats;
 }
 

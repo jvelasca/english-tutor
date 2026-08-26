@@ -1,19 +1,23 @@
 """Evaluadores fonéticos compuestos para pronunciación (puros, deterministas).
 
-Combina precisión por palabra (alineación), similitud fonética (Soundex) y
-similitud de caracteres para puntuar una lectura frente a lo esperado.
+Combina precisión por palabra (alineación), precisión de fonemas (alineación
+grapheme→phoneme), similitud fonética (Soundex) y prosodia proxy (ritmo silábico)
+para puntuar una lectura frente a lo esperado. La señal principal es la fonémica.
 """
 from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
 
-from services.phonemes import phoneme_accuracy
+from services.phonemes import phoneme_accuracy, phoneme_alignment, prosody_score
 
-# Pesos del score compuesto (deben sumar 1.0).
-W_WORD = 0.6
-W_PHONETIC = 0.3
-W_CHAR = 0.1
+# Pesos del score compuesto (deben sumar 1.0). La precisión de fonemas y la de
+# palabra lideran; Soundex y prosodia aportan señal secundaria. Ya no se usa la
+# similitud de caracteres a nivel de texto.
+W_WORD = 0.35
+W_PHONEME = 0.35
+W_PHONETIC = 0.15
+W_PROSODY = 0.15
 
 _SOUNDEX_MAP = {
     "b": "1", "f": "1", "p": "1", "v": "1",
@@ -127,24 +131,25 @@ def phonetic_similarity(expected: str, heard: str) -> float:
 
 
 def composite_score(expected: str, heard: str) -> dict:
-    """Devuelve el score compuesto (0-100), sus componentes y el breakdown.
+    """Devuelve el score compuesto (0-100), sus componentes y los breakdowns.
 
-    Además de `score`, `word_accuracy`, `phonetic_score` y `breakdown`, incluye
-    `phoneme_accuracy` (0-100): precisión de la secuencia de fonemas esperados
-    frente a lo oído (proxy fonémico sin audio)."""
+    Pondera palabra (0.35), fonemas (0.35), Soundex (0.15) y prosodia (0.15).
+    Además de `score`, `word_accuracy`, `phonetic_score`, `phoneme_accuracy` y
+    `breakdown` (palabras), incluye `prosody_score` (0-100) y `phoneme_breakdown`
+    (alineación fonema a fonema)."""
     wa = word_accuracy(expected, heard)
     ps = phonetic_similarity(expected, heard)
-    e = tokenize(expected)
-    h = tokenize(heard)
-    if e or h:
-        char_ratio = SequenceMatcher(None, " ".join(e), " ".join(h)).ratio()
-    else:
-        char_ratio = 0.0
-    score = round(100 * (W_WORD * wa + W_PHONETIC * ps + W_CHAR * char_ratio))
+    pa = phoneme_accuracy(expected, heard)
+    pro = prosody_score(expected, heard)
+    score = round(
+        100 * (W_WORD * wa + W_PHONEME * pa + W_PHONETIC * ps + W_PROSODY * pro)
+    )
     return {
         "score": score,
         "word_accuracy": round(wa * 100),
         "phonetic_score": round(ps * 100),
-        "phoneme_accuracy": round(phoneme_accuracy(expected, heard) * 100),
+        "phoneme_accuracy": round(pa * 100),
+        "prosody_score": round(pro * 100),
         "breakdown": word_alignment(expected, heard),
+        "phoneme_breakdown": phoneme_alignment(expected, heard),
     }

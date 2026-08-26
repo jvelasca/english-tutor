@@ -25,7 +25,7 @@ def _level(score: int) -> str:
 
 def score_pronunciation(expected: str, heard: str) -> dict:
     """Devuelve score/level/ok + word_accuracy + phonetic_score + phoneme_accuracy
-    + breakdown."""
+    + prosody_score + breakdown + phoneme_breakdown."""
     comp = composite_score(expected, heard)
     score = comp["score"]
     return {
@@ -37,7 +37,9 @@ def score_pronunciation(expected: str, heard: str) -> dict:
         "word_accuracy": comp["word_accuracy"],
         "phonetic_score": comp["phonetic_score"],
         "phoneme_accuracy": comp["phoneme_accuracy"],
+        "prosody_score": comp["prosody_score"],
         "breakdown": comp["breakdown"],
+        "phoneme_breakdown": comp["phoneme_breakdown"],
     }
 
 
@@ -46,12 +48,14 @@ PRONUNCIATION_CRITERIA: tuple[str, ...] = (
     "phoneme_accuracy",
     "word_accuracy",
     "phonetic_similarity",
+    "prosody",
 )
 
 PRONUNCIATION_WEIGHTS: dict[str, float] = {
-    "phoneme_accuracy": 0.4,
-    "word_accuracy": 0.4,
-    "phonetic_similarity": 0.2,
+    "phoneme_accuracy": 0.35,
+    "word_accuracy": 0.35,
+    "phonetic_similarity": 0.15,
+    "prosody": 0.15,
 }
 
 
@@ -59,13 +63,14 @@ def score_pronunciation_cefr(expected: str, heard: str) -> dict:
     """Score de pronunciación 0..1 por criterio y overall ponderado (read-aloud).
 
     Reutiliza `composite_score` y normaliza sus componentes a 0..1: phoneme_accuracy,
-    word_accuracy y phonetic_similarity (phonetic_score). Devuelve
+    word_accuracy, phonetic_similarity (phonetic_score) y prosody. Devuelve
     {"expected", "heard", "criteria", "overall"} con overall redondeado a 3."""
     comp = composite_score(expected, heard)
     criteria = {
         "phoneme_accuracy": comp["phoneme_accuracy"] / 100,
         "word_accuracy": comp["word_accuracy"] / 100,
         "phonetic_similarity": comp["phonetic_score"] / 100,
+        "prosody": comp["prosody_score"] / 100,
     }
     overall = round(
         sum(PRONUNCIATION_WEIGHTS[c] * criteria[c] for c in PRONUNCIATION_CRITERIA), 3
