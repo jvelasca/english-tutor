@@ -3,51 +3,48 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 09:20 (UTC+2).
+> Actualizado por última vez: 2026-08-26 09:50 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.14` **commiteada** (Listening Evidence & Adaptive Selection).
-Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
-hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-lite),
-**Placement 2.0** (calibración observacional + perfil multiskill) y Etapa 2 (pedagogía) **P1–P5**;
-**V1.12** (Student Model unificado + Assessment Loop), **V1.13** (Listening 3.0) y **V1.14**
-(Listening Evidence & Adaptive Selection: modelo de realización del audio + integridad de
-evidencia + selección adaptativa). El P6 original (pronunciación fonémica) sigue **diferido**.
+**Posición actual (2026-08-26):** `v1.15` **commiteada** (Speaking 3.0: diagnóstico longitudinal
+por criterio de rúbrica + criterio `interaction`). Cerradas hasta ahora: Release Audit 1.1 (M12),
+M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
+Listening 1.0/2.0, Placement 1.0 (IRT-lite), **Placement 2.0**, Etapa 2 (pedagogía) **P1–P5**;
+**V1.12** (Student Model unificado + Assessment Loop), **V1.13** (Listening 3.0), **V1.14**
+(Listening Evidence & Adaptive Selection) y **V1.15** (Speaking 3.0). El P6 original
+(pronunciación fonémica) sigue **diferido**.
 
 **Últimos commits:**
+- `feat: V1.15 S3 - panel de diagnostico de speaking`
+- `feat: V1.15 S2 - Speaking 3.0 criterio interaction`
+- `feat: V1.15 S1 - Speaking 3.0 diagnostico longitudinal`
 - `feat: V1.14 - Listening Evidence & Adaptive Selection (AudioRealization + Evidence Integrity + selector adaptativo)`
 - `feat: V1.13 - Listening 3.0 (audio TTS pre-renderizado + cierre A1-B2 + evidencia por sub-destreza)`
 - `feat: V1.12 - Student Model unificado + Assessment Loop`
 - `feat: V1.11 - CEFR basado en evidencia (muestras por destreza + confianza)`
-- `feat: V1.10 - Listening como competencia (topic + metricas por dificultad/tema/tendencia/reincidencia)`
-- `feat: V1.9 - Vocabulario exposure/production/mastery (P3)`
-- `feat: V1.8.1 - Marcar pasos de la sesion como hechos (reseteo diario)`
-- `feat: V1.8 - Sesion diaria (Session Engine + objetivo editable + placement adaptativo en UI)`
 
-**V1.14 commiteada** (`fd1687c`) — Listening Evidence & Adaptive Selection. Ver sección 27.
+**V1.15 commiteada** (S1 `2a182a8`, S2 `42602ca`, S3 `9be0f7f`) — Speaking 3.0. Ver sección 28.
 Resumen:
-- **Modelo de realización del audio** (`services/listening.py`): `AUDIO_TYPES`, `realized_vector`,
-  `realization_status` (`declared`/`realized`/`verified`), `realized_difficulty`,
-  `realization_gap_factors`, `subskill_realization_gap` y `audio_digest`.
-- **Integridad de evidencia**: `listening_diagnostic` añade `realization_gap` por sub-destreza y
-  resumen `realization` (`verified` vs `gap`).
-- **Selector adaptativo**: `pick_next_question(weak_subskills=...)` + `domain.next_question` consumen
-  el diagnóstico del Student Model (sub-destrezas débiles) con realización válida.
-- **Cache versionado** (P1.1): `DATA_DIR/listening/{bank}/{voice}/{id}-{digest}.wav`.
-- **Etiqueta honesta de audio** en frontend (TTS local vs. real) + renombrado "audio real" →
-  "audio TTS pre-renderizado".
-- **Higiene de release**: `config.py`/`README.md`/`package.json`/`package-lock.json` → `1.14.0`.
+- **Diagnóstico longitudinal** (`services/speaking.py::speaking_diagnostic`): agrupa la evidencia
+  de speaking por criterio (attempts/mean/min/max/review_due), deriva `weak` + `recommendation` y
+  expone `trend` global sobre las filas `overall` + `overall_mean`.
+- **`interaction` como séptimo criterio** del rubric: extraído del LLM en el flujo libre, no
+  observable en read-aloud.
+- **Endpoint** `GET /api/academy/speaking/diagnostic` + puente de sub-destrezas de speaking en el
+  Student Model (`_annotated_profile`).
+- **Frontend**: `SpeakingDiagnostic.tsx` (desglose por criterio + tendencia + a revisar).
+- **Higiene de release**: `config.py`/`package.json` → `1.15.0`; CHANGELOG con entrada 1.15.0.
 
-**Estado verde:** backend `592 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK;
+**Estado verde:** backend `602 tests` + `ruff` limpio; frontend `145 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 27** de este documento (V1.14 Listening Evidence — ya commiteada).
+2. Leer la **sección 28** de este documento (V1.15 Speaking 3.0 — ya commiteada).
 3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6 + Student Model 2.0).
-4. Continuar con **V1.15** (Speaking 3.0 sobre el mismo Student Model), el siguiente
-   incremento natural.
+4. Decidir el siguiente incremento natural (p. ej. **Writing 3.0** sobre el mismo Student Model,
+   o retomar los P1 de listening: delayed retention / shadowing real / audio humano).
 5. Redactar y ejecutar `agentes/pedagogia/p*-*.md` (un subagente a la vez), respetando la
    arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
 6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
@@ -1114,7 +1111,7 @@ cd frontend && npx tsc --noEmit && npx vitest run
 ### 25.4 Pendiente / siguiente incremento natural
 - **V1.13** — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2): ver sección 26.
 - **V1.14** — Listening Evidence & Adaptive Selection: ver sección 27.
-- **V1.15** — Speaking 3.0 (sobre el mismo Student Model). Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+- **V1.15** — Speaking 3.0 (sobre el mismo Student Model). Ver sección 28.
 
 ## 26. V1.13 — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2)
 
@@ -1166,8 +1163,7 @@ cd frontend && npx tsc --noEmit && npx vitest run
 ### 26.7 Pendiente / siguiente incremento natural
 - **V1.14** — Listening Evidence & Adaptive Selection: ver sección 27.
 - **V1.15** — Speaking 3.0 (sobre el mismo Student Model): fluency/grammar/lexical/
-  pronunciation/coherence/interaction medidos longitudinalmente.
-  Ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+  pronunciation/coherence/interaction medidos longitudinalmente. Ver sección 28.
 
 ## 27. HECHO (commiteado) — V1.14: Listening Evidence & Adaptive Selection
 
@@ -1225,6 +1221,50 @@ cd frontend && npx tsc --noEmit && npx vitest run
   varios hablantes, connected speech real, acentos reales, ruido real.
 - **Audio variants / difficulty ladder** (P1.9): variantes de un mismo contenido (slow/clean →
   natural → fast → noise → accent).
-- **V1.15** — Speaking 3.0 sobre el mismo Student Model.
+- **V1.15** — Speaking 3.0 sobre el mismo Student Model: ver sección 28.
+
+## 28. HECHO (commiteado) — V1.15: Speaking 3.0
+
+> **Origen.** `agentes/pedagogia/p9-speaking-3.0.md`. El speaking ya tenía un rubric determinista
+> (fluency/grammar/lexical/pronunciation/coherence) y evidencia por intento, pero **no medía la
+> evolución longitudinal por criterio** (a diferencia de `listening_diagnostic`), ni contemplaba la
+> **interacción** como dimensión. V1.15 añade `speaking_diagnostic` espejo del de listening, integra
+> `interaction` como séptimo criterio y expone el diagnóstico en el Student Model y en el frontend.
+
+### 28.1 Diagnóstico longitudinal por criterio (S1)
+- **`services/speaking.py`**: `speaking_diagnostic(evidence_rows)` agrupa por criterio
+  (`attempts`/`mean`/`min`/`max`/`review_due`), deriva `weak` (`mean < 0.7`) y `recommendation`
+  (criterio con menor media), y `trend` global sobre las filas `overall`/`overall_mean`.
+  Umbrales `SPEAKING_WEAK_THRESHOLD`/`SPEAKING_MIN_ATTEMPTS`/`SPEAKING_TREND_WINDOW`.
+- **`schemas/academy.py`**: `SpeakingCriterionOut`, `SpeakingTrend`, `SpeakingDiagnostic`.
+- **`domain/academy.py`**: `get_speaking_diagnostic(user_id)` + puente de criterios de speaking
+  como `subskills` en `_annotated_profile` (espejo de listening).
+- **`routers/academy.py`**: `GET /api/academy/speaking/diagnostic`.
+
+### 28.2 Criterio `interaction` (S2)
+- **`services/speaking.py`**: `SPEAKING_CRITERIA` pasa a 7 (`interaction`), `CRITERION_WEIGHTS`
+  rebalanceado (`interaction` 0.05); `score_speaking` trata `interaction` como `None` cuando no es
+  observable (read-aloud).
+- **`services/speaking_llm.py`**: `build_speaking_prompt` pide `interaction`, `parse_speaking_evidence`
+  lo extrae, `SPEAKING_EVIDENCE_OPTIONAL_FIELDS` lo incluye.
+
+### 28.3 Frontend (S3)
+- **`types/api.ts`**: `SpeakingCriterionProgress`, `SpeakingTrend`, `SpeakingDiagnostic`.
+- **`api/academy.ts`**: `getSpeakingDiagnostic(userId)`.
+- **`components/SpeakingDiagnostic.tsx`**: desglose por criterio, tendencia global y puntos a
+  revisar. Integrado en `App.tsx` (panel de insights). Estilos en `index.css`.
+
+### 28.4 Higiene de release
+- `config.py`/`package.json` → `1.15.0`; `CHANGELOG.md` con entrada 1.15.0; `PLAN.md`,
+  `PLAN-ETAPA-PEDAGOGICA.md` y `ARQUITECTURA.md` actualizados.
+
+### 28.5 Verificación
+- Backend `602 tests` + `ruff` limpio; frontend `145 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 28.6 Pendiente / siguiente incremento natural
+- **Writing 3.0** sobre el mismo Student Model (espejo del patrón listening/speaking).
+- Retomar los **P1 de listening** de la auditoría V1.14: delayed retention (P1.2), shadowing real
+  (P1.3), dictado real, varios hablantes, acentos y ruido reales, variantes de dificultad.
 
 

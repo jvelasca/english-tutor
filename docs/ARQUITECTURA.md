@@ -94,6 +94,8 @@ backend/
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
 │   ├── phonetics.py     # evaluador compuesto: word_alignment + soundex + composite_score (F7)
 │   ├── pronunciation.py # score_pronunciation (puro, delega en phonetics)
+│   ├── speaking.py      # rubric de speaking + speaking_diagnostic longitudinal (puro, V1.15)
+│   ├── speaking_llm.py  # extracción de evidencia de speaking con LLM (tarea libre)
 │   ├── stt.py           # faster-whisper
 │   ├── trends.py        # daily_activity + aggregate_series + compute_streak (puros, F6)
 │   ├── tts.py           # piper-tts

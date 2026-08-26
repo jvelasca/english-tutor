@@ -4,6 +4,31 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.15.0] — 2026-08-26
+
+Speaking 3.0. Convierte la destreza `speaking` de un *scorer por intento* en una señal de
+**competencia longitudinal**, sobre el mismo Student Model unificado: mide los criterios del rubric
+(fluency/grammar/lexical/pronunciation/coherence/interaction) en el tiempo, añade `interaction`
+como séptimo criterio y lo expone con tendencia y criterios débiles.
+
+### Añadido
+- **Diagnóstico longitudinal de speaking** (`services/speaking.py::speaking_diagnostic`): agrupa la
+  evidencia de speaking por criterio de rúbrica (`attempts`/`mean`/`min`/`max`/`review_due`), deriva
+  `weak` + `recommendation` y expone `trend` global (media reciente vs previa sobre las filas
+  `overall`) y `overall_mean`. Determinista, sin LLM ni red.
+- **`interaction` como séptimo criterio** del rubric (`SPEAKING_CRITERIA` + `CRITERION_WEIGHTS`):
+  extraída del LLM en el flujo libre (`speaking_llm.py`), no observable en read-aloud.
+- **Endpoint** `GET /api/academy/speaking/diagnostic` (`SpeakingDiagnostic` + schemas
+  `SpeakingCriterionOut`/`SpeakingTrend`).
+- **Puente de sub-destrezas de speaking** en el Student Model (`_annotated_profile`): la entrada
+  `speaking` del perfil recibe sus criterios como `subskills` (mismo patrón que listening).
+- **Frontend**: tipos + `getSpeakingDiagnostic`, y panel `SpeakingDiagnostic.tsx` (desglose por
+  criterio, tendencia y criterios a revisar), con estilos de tokens.
+
+### Cambiado
+- `SpeakingResultOut`/`SpeakingTaskResultOut` pasan de 6 a 7 criterios (`interaction`).
+- Versión → `1.15.0`.
+
 ## [1.14.0] — 2026-08-26
 
 Listening Evidence & Adaptive Selection. Convierte el listening de "arquitectura muy buena" a

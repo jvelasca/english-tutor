@@ -29,6 +29,7 @@ aprendizaje real:
 | **V1.12** | Student Model 2.0 + Assessment Loop (unificación + snapshots + naming CEFR + Speaking 2.0) | Alto (bucle completo) | P5 | ✔ hecho |
 | **V1.13** | Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2 + evidencia por sub-destreza) | Alto (contenido + audio) | P4, V1.12 | ✔ hecho |
 | **V1.14** | Listening Evidence & Adaptive Selection (modelo de realización + integridad de evidencia + selector adaptativo) | Alto (validez pedagógica) | V1.13 | ✔ hecho |
+| **V1.15** | Speaking 3.0 (diagnóstico longitudinal por criterio + `interaction`) | Alto (speaking como competencia) | V1.12 | ✔ hecho |
 
 ## Detalle por track
 
@@ -87,6 +88,14 @@ la metadata (`accent`/`speaker_count`/`noise`/`connected_speech`) genere evidenc
 separar `declared`/`realized`/`verified` (modelo de realización del audio); (4) selector adaptativo
 que consuma el Student Model. Incluye cache versionado (P1.1) y etiqueta honesta de audio en el
 frontend. P1 restantes (delayed retention, shadowing/dictado reales, audio humano) quedan para V1.15+.
+
+### V1.15 — Speaking 3.0 (diagnóstico longitudinal + interaction)
+Medir los criterios de speaking (fluency/grammar/lexical/pronunciation/coherence/interaction)
+**longitudinalmente** sobre el mismo Student Model: `speaking_diagnostic` agrupa la evidencia por
+criterio de rúbrica (media/tendencia/débil), expuesto en `GET /api/academy/speaking/diagnostic` y
+como sub-destrezas del perfil. Añade `interaction` como séptimo criterio del rubric (extraído del
+LLM en el flujo libre; no observable en read-aloud). Briefing en
+`agentes/pedagogia/p9-speaking-3.0.md`.
 
 ## Reglas de proceso
 

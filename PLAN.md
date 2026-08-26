@@ -11,7 +11,8 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.14.0` (Listening 3.0 + evidencia auditiva válida: modelo de realización, integridad de evidencia y selección adaptativa).
+- ✅ Versión estable `1.15.0` (Speaking 3.0: diagnóstico longitudinal por criterio de rúbrica +
+  criterio `interaction`, sobre el Student Model).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -197,7 +198,8 @@
 | RA1–RA7 Release Audit 1.1 | `agentes/endurecimiento/ra-*.md` | ✔ hecho |
 | P1 Política pedagógica formal | `agentes/pedagogia/p1-politica-pedagogica.md` | ✔ hecho |
 | P2 Error Mastery | `agentes/pedagogia/p2-error-mastery.md` | ✔ hecho |
-| P3–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ⏳ pendiente |
+| P3–P6 Etapa pedagógica | `agentes/pedagogia/p-*.md` | ✔ hecho |
+| V1.15 Speaking 3.0 | `agentes/pedagogia/p9-speaking-3.0.md` | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
