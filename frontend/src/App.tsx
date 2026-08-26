@@ -17,6 +17,8 @@ import { ProgressDashboard } from "./components/ProgressDashboard";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { Sidebar } from "./components/Sidebar";
 import { SpeakingDiagnostic } from "./components/SpeakingDiagnostic";
+import { SpeakingJourney } from "./components/SpeakingJourney";
+import { SpeakingPanel } from "./components/SpeakingPanel";
 import { TodayPlan } from "./components/TodayPlan";
 import { TutorQualityPanel } from "./components/TutorQualityPanel";
 import { UserMenu } from "./components/UserMenu";
@@ -408,6 +410,8 @@ export default function App() {
             />
             <LearningProfile profile={profile} />
             <SpeakingDiagnostic userId={currentUserId} />
+            <SpeakingPanel userId={currentUserId} />
+            <SpeakingJourney userId={currentUserId} />
             <TutorQualityPanel messages={messages} />
             <div id="listening-practice">
               <ListeningPractice userId={currentUserId} onAttempt={onAttempt} />

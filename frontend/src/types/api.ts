@@ -353,6 +353,12 @@ export interface SpeakingCriterionProgress {
   min: number | null;
   max: number | null;
   review_due: boolean;
+  // Campos longitudinales añadidos en V1.16 (media de la ventana reciente,
+  // media histórica, confianza y estabilidad del criterio).
+  recent_score?: number | null;
+  lifetime_score?: number | null;
+  confidence?: number | null;
+  stability?: number | null;
 }
 
 export interface SpeakingTrend {
@@ -368,8 +374,34 @@ export interface SpeakingDiagnostic {
   recommendation: string;
   attempts: number;
   overall_mean: number | null;
+  overall_recent: number | null;
   trend: SpeakingTrend;
   rubric_version: string;
+}
+
+// --- Speaking 3.0: nivel continuo y journey (V1.16) ---
+
+export interface SpeakingLevelOut {
+  level: string | null;
+  numeric: number | null;
+  score: number | null;
+  confidence: number;
+  attempts: number;
+}
+
+export interface SpeakingJourneyStep {
+  at: string;
+  numeric: number;
+  level: string;
+  confidence: number;
+}
+
+export interface SpeakingJourneyOut {
+  current_level: string | null;
+  current_numeric: number | null;
+  current_confidence: number;
+  attempts: number;
+  steps: SpeakingJourneyStep[];
 }
 
 // --- Academy (currículum CEFR, mastery, evaluación) ---

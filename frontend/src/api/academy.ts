@@ -20,6 +20,8 @@ import type {
   Readiness,
   Session,
   SpeakingDiagnostic,
+  SpeakingJourneyOut,
+  SpeakingLevelOut,
   StudentModel,
   StudyPlanStep,
   TodayPlan,
@@ -171,6 +173,20 @@ export function getSpeakingDiagnostic(
 ): Promise<SpeakingDiagnostic> {
   return getJson<SpeakingDiagnostic>(
     `/api/academy/speaking/diagnostic${userQuery(userId)}`,
+  );
+}
+
+export function getSpeakingLevel(userId: string): Promise<SpeakingLevelOut> {
+  return getJson<SpeakingLevelOut>(
+    `/api/academy/speaking/level${userQuery(userId)}`,
+  );
+}
+
+export function getSpeakingJourney(
+  userId: string,
+): Promise<SpeakingJourneyOut> {
+  return getJson<SpeakingJourneyOut>(
+    `/api/academy/speaking/journey${userQuery(userId)}`,
   );
 }
 

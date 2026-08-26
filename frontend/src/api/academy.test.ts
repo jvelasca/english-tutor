@@ -6,6 +6,8 @@ import {
   getLevels,
   getSession,
   getSpeakingDiagnostic,
+  getSpeakingJourney,
+  getSpeakingLevel,
   nextAdaptivePlacement,
   putGoal,
   recordAttempts,
@@ -183,6 +185,32 @@ describe("academy api", () => {
     await getSpeakingDiagnostic("u1");
     expect(fn.mock.calls[0][0]).toBe(
       "/api/academy/speaking/diagnostic?user_id=u1",
+    );
+  });
+
+  it("getSpeakingLevel incluye user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      level: "B1",
+      numeric: 3.1,
+      score: 0.62,
+      confidence: 0.86,
+      attempts: 12,
+    });
+    await getSpeakingLevel("u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/speaking/level?user_id=u1");
+  });
+
+  it("getSpeakingJourney incluye user_id en la query", async () => {
+    const fn = mockJsonFetch({
+      current_level: "B1",
+      current_numeric: 3.1,
+      current_confidence: 0.86,
+      attempts: 12,
+      steps: [],
+    });
+    await getSpeakingJourney("u1");
+    expect(fn.mock.calls[0][0]).toBe(
+      "/api/academy/speaking/journey?user_id=u1",
     );
   });
 
