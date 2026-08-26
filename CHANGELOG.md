@@ -4,6 +4,63 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.12.0] — 2026-08-26
+
+Student Model unificado + Assessment Loop. Reconciliar los dos estimadores CEFR divergentes en
+una única fuente de verdad (el Student Model de la Academy), corregir los P0 de Speaking y añadir
+snapshots de evaluación históricos reproducibles.
+
+### Añadido
+- **Student Model como fuente única**: `build_student_model()` en `domain/academy.py` centraliza el
+  modelo del alumno (nivel, `overall_ability`, confianza, `readiness`, `reassessment`);
+  `/api/profile` pasa a ser una proyección de este modelo (mismo nivel, misma confianza).
+- **Snapshots de evaluación**: tabla `cefr_assessment_snapshots` (reproducible con
+  `instrument_version`/`curriculum_version`) y `cefr_history` expuesto en `/api/profile`.
+- **Speaking scoring 2.0**: `task_achievement` por `task_achieved` del LLM, `lexical_resource` por
+  diversidad léxica (TTR), `coherence` por marcadores discursivos y `pronunciation` con
+  `observed=false` sin audio (el `overall` se recalcula solo sobre criterios observados).
+- **Evidencia de discurso ampliada**: `cohesion`, `discourse_markers`, `self_corrections`,
+  `hesitations`, `repetitions` en la extracción del LLM (`speaking_llm.py`).
+- **Naming CEFR**: `heuristic_band` + `CEFR_MODEL_VERSION`; las bandas se documentan como
+  "heuristic CEFR-aligned band" (no certificación oficial) y se exponen `overall_ability` y
+  `readiness`.
+
+### Cambiado
+- `EstimatedBands` pasa de 5 a 7 destrezas (`speaking`, `reading`, `writing`).
+- `LearningProfile` expone `skills` (con `samples`/`confidence`/`stability`/`trend`/`subskills`),
+  `readiness` y `cefr_history`.
+- Frontend `LearningProfile` muestra la barra de `overall_ability`, la `readiness` (con
+  `blocking_skills`) y el desglose por destreza.
+
+### Corregido
+- Versión de release desactualizada (`config.py`, `README.md`, `package.json`) → `1.12.0`.
+
+## [1.11.0] — 2026-08-25
+
+CEFR basado en evidencia: sustituye el "punto-sum" por muestras por destreza + confianza. Cada
+destreza exige un mínimo de muestras (`MIN_SAMPLES`) y aporta banda + confianza; el perfil expone
+`estimated_confidence` y `estimated_evidence` (incluye listening).
+
+## [1.10.0] — 2026-08-25
+
+Listening como competencia: `topic` en el banco y métricas de precisión por dificultad/tema,
+tendencia reciente y reincidencia (`listening_diagnostic`).
+
+## [1.9.0] — 2026-08-25
+
+Vocabulario exposure/production/mastery (P3): separa exposición (leer), producción (escribir) y
+dominio (producción repetida y espaciada), con `classify` determinista.
+
+## [1.8.1] — 2026-08-25
+
+Marcar pasos de la sesión como hechos: `session_completions` + `POST /api/academy/session/complete`
+con reseteo diario, para que los pasos completados desaparezcan del plan de hoy.
+
+## [1.8.0] — 2026-08-25
+
+Sesión diaria (Session Engine): plan de hoy (`/api/academy/session`) con objetivo editable y
+placement adaptativo en la UI.
+
 ## [1.7.0] — 2026-08-25
 
 Placement 2.0: convierte el placement adaptativo (IRT-lite/1PL) en un motor con
