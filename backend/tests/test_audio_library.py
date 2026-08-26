@@ -1,11 +1,17 @@
 """Tests de la infraestructura de biblioteca de audio humano (P1.5–P1.8): manifest
-versionado, resolución segura del WAV grabado y servido sin depender de Piper."""
+versionado, resolución segura del WAV grabado, servido sin depender de Piper y
+esquema ampliado de metadatos (P0-1: corpus de audio humano 1.0)."""
+import wave
+
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from domain import listening as listening_domain
 from main import app
 from repositories import db
 from repositories import users as users_repo
+from scripts.import_audio import wav_metadata
 from services.audio_library import (
     AUDIO_LIBRARY_VERSION,
     AudioLibraryEntry,
@@ -46,17 +52,25 @@ def _patch_library(monkeypatch, tmp_path, *, write_file=True):
     )
 
 
+def _write_wav(path, duration=1.0, framerate=8000):
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(framerate)
+        w.writeframes(b"\x00\x00" * int(framerate * duration))
+
+
 # --- Manifest: carga y consulta ---------------------------------------------
 
 
 def test_load_manifest_from_file(tmp_path):
     p = tmp_path / "manifest.json"
     p.write_text(
-        '{"version": "1.0.0", "entries": [{"audio_id": "a1", "file": "a1.wav"}]}',
+        '{"version": "1.1.0", "entries": [{"audio_id": "a1", "file": "a1.wav"}]}',
         encoding="utf-8",
     )
     m = load_manifest(p)
-    assert m.version == "1.0.0"
+    assert m.version == "1.1.0"
     assert len(m.entries) == 1
     assert m.entries[0].audio_id == "a1"
 
@@ -74,12 +88,44 @@ def test_entry_for_finds_and_misses():
     assert entry_for(m, "nope") is None
 
 
+# --- Esquema ampliado (P0-1) ------------------------------------------------
+
+
+def test_audio_library_entry_new_fields_defaults():
+    e = AudioLibraryEntry(audio_id="a1", file="a1.wav")
+    assert e.gender == "unknown"
+    assert e.age_band == "unknown"
+    assert e.region == "unknown"
+    assert e.speech_rate is None
+    assert e.spontaneity == "scripted"
+    assert e.recording_environment == "studio"
+    assert e.overlap is False
+    assert e.connected_speech is False
+    assert e.prosody == "unknown"
+    assert e.task_type == "unknown"
+    assert e.cefr == "unknown"
+
+
+def test_audio_library_entry_rejects_invalid_literal():
+    with pytest.raises(ValidationError):
+        AudioLibraryEntry(audio_id="a1", file="a1.wav", cefr="C3")
+    with pytest.raises(ValidationError):
+        AudioLibraryEntry(audio_id="a1", file="a1.wav", gender="robot")
+
+
 # --- Resolución de archivo (seguridad) --------------------------------------
 
 
 def test_resolve_file_within_dir(tmp_path):
     entry = AudioLibraryEntry(audio_id="a1", file="a1.wav")
     assert resolve_file(entry, base=tmp_path) == tmp_path / "a1.wav"
+
+
+def test_resolve_file_nested_dir(tmp_path):
+    entry = AudioLibraryEntry(audio_id="a1", file="B1/speaker_003/dialogue.wav")
+    assert resolve_file(entry, base=tmp_path) == (
+        tmp_path / "B1" / "speaker_003" / "dialogue.wav"
+    )
 
 
 def test_resolve_file_rejects_escape(tmp_path):
@@ -171,6 +217,35 @@ def test_validate_manifest_escape(monkeypatch, tmp_path):
     assert any("escapes" in e for e in validate_manifest(m))
 
 
+def test_validate_manifest_invalid_cefr_and_gender():
+    entry = AudioLibraryEntry.model_construct(
+        audio_id="a1",
+        file="a1.wav",
+        gender="robot",
+        age_band="unknown",
+        region="unknown",
+        speech_rate=None,
+        spontaneity="scripted",
+        recording_environment="studio",
+        overlap=False,
+        connected_speech=False,
+        prosody="unknown",
+        task_type="unknown",
+        cefr="C3",
+    )
+    m = AudioLibraryManifest.model_construct(
+        version=AUDIO_LIBRARY_VERSION, entries=[entry]
+    )
+    errors = validate_manifest(m)
+    assert any("invalid cefr" in e for e in errors)
+    assert any("invalid gender" in e for e in errors)
+
+
+def test_validate_manifest_speech_rate_must_be_positive():
+    m = _manifest_with([AudioLibraryEntry(audio_id="a1", file="a1.wav", speech_rate=0)])
+    assert any("speech_rate" in e for e in validate_manifest(m))
+
+
 # --- library_summary ---------------------------------------------------------
 
 
@@ -184,14 +259,58 @@ def test_library_summary_metadata():
         noise_level=3,
         duration=4.5,
         transcript="Hi there.",
+        cefr="B1",
+        region="es",
     )
     s = library_summary(_manifest_with([e]))
-    assert s[0]["audio_id"] == "a1"
-    assert s[0]["file"] == "a1.wav"
-    assert s[0]["speaker_id"] == "sp1"
-    assert s[0]["speaker_count"] == 2
-    assert s[0]["noise_level"] == 3
-    assert s[0]["duration"] == 4.5
+    entry = s["entries"][0]
+    assert entry["audio_id"] == "a1"
+    assert entry["file"] == "a1.wav"
+    assert entry["speaker_id"] == "sp1"
+    assert entry["speaker_count"] == 2
+    assert entry["noise_level"] == 3
+    assert entry["duration"] == 4.5
+    assert entry["cefr"] == "B1"
+    assert entry["region"] == "es"
+
+
+def test_library_summary_breakdowns():
+    e1 = AudioLibraryEntry(
+        audio_id="a1", file="a1.wav", cefr="A1", speaker_id="sp1", accent="neutral",
+        region="es",
+    )
+    e2 = AudioLibraryEntry(
+        audio_id="a2", file="a2.wav", cefr="A1", speaker_id="sp1", accent="br",
+        region="es",
+    )
+    e3 = AudioLibraryEntry(
+        audio_id="a3", file="a3.wav", cefr="B1", speaker_id="sp2", accent="br",
+        region="uk",
+    )
+    s = library_summary(_manifest_with([e1, e2, e3]))
+    assert s["by_cefr"] == {"A1": 2, "B1": 1}
+    assert s["by_speaker_id"] == {"sp1": 2, "sp2": 1}
+    assert s["by_accent"] == {"neutral": 1, "br": 2}
+    assert s["by_region"] == {"es": 2, "uk": 1}
+
+
+# --- wav_metadata (tooling de importación) -----------------------------------
+
+
+def test_wav_metadata_reads_synthetic_wav(tmp_path):
+    p = tmp_path / "x.wav"
+    _write_wav(p, duration=2.0, framerate=8000)
+    meta = wav_metadata(p)
+    assert meta["channels"] == 1
+    assert meta["framerate"] == 8000
+    assert meta["sample_width"] == 2
+    assert meta["duration"] == pytest.approx(2.0)
+
+
+def test_wav_metadata_non_wav_returns_empty(tmp_path):
+    p = tmp_path / "not_a_wav.bin"
+    p.write_bytes(b"this is not a wav file")
+    assert wav_metadata(p) == {}
 
 
 # --- Servido de audio grabado (endpoint + domain) ----------------------------
