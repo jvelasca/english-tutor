@@ -18,10 +18,10 @@ backend/
 ├── dependencies.py      # current_user (perfil activo) y lectura de audio con límites.
 ├── routers/             # Capa HTTP: endpoints + validación. SIN lógica de negocio.
 │   ├── __init__.py
-│   ├── academy.py       # GET/POST /api/academy/levels, enroll, mastery, next, attempts, lessons, objective/assessment
+│   ├── academy.py       # GET/POST /api/academy/levels, enroll, mastery, next, attempts, lessons, objective/assessment, speaking/{level,journey,assessment}
 │   ├── assessment.py    # /api/academy/placement*, /api/academy/exam/{level_id}*, /api/academy/level-completions
 │   ├── chat.py          # POST /api/chat, POST /api/chat/stream (mode + user_id opcional)
-│   ├── conversations.py # CRUD /api/conversations (filtrado por user_id)
+│   ├── conversations.py # CRUD /api/conversations (filtrado por user_id) + /{cid}/interaction
 │   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
 │   ├── health.py        # /api/health/live, /ready, /dependencies
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
@@ -87,6 +87,7 @@ backend/
 │   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
 │   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
 │   ├── grammar.py       # reglas de errores deterministas (F4)
+│   ├── interaction.py   # evidencia objetiva de interacción (turnos/latencia) (puro, V1.16)
 │   ├── listening.py     # banco de preguntas + score_answer + progresión por nivel (puro, F8)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
@@ -94,13 +95,14 @@ backend/
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
 │   ├── phonetics.py     # evaluador compuesto: word_alignment + soundex + composite_score (F7)
 │   ├── pronunciation.py # score_pronunciation (puro, delega en phonetics)
-│   ├── speaking.py      # rubric de speaking + speaking_diagnostic longitudinal (puro, V1.15)
+│   ├── speaking.py      # rubric + scoring determinista de speaking + speaking_diagnostic (puro, V1.16)
 │   ├── speaking_llm.py  # extracción de evidencia de speaking con LLM (tarea libre)
+│   ├── speaking_assessment.py # instrumento Speaking Assessment 1.0 (versionado + agregación)
 │   ├── stt.py           # faster-whisper
 │   ├── trends.py        # daily_activity + aggregate_series + compute_streak (puros, F6)
 │   ├── tts.py           # piper-tts
 │   └── vocabulary.py    # extract_words (puro, F4)
-├── curriculum/          # contenido curricular versionado como JSON (a1.json, a2.json, assessments.json)
+├── curriculum/          # contenido curricular versionado como JSON (a1.json, a2.json, assessments.json, speaking_assessment.json)
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
 ├── data/                # base SQLite (tutor.db). GITIGNORED.
 ├── tests/               # pruebas (pytest).

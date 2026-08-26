@@ -3,19 +3,25 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 09:50 (UTC+2).
+> Actualizado por última vez: 2026-08-26 11:55 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.15` **commiteada** (Speaking 3.0: diagnóstico longitudinal
-por criterio de rúbrica + criterio `interaction`). Cerradas hasta ahora: Release Audit 1.1 (M12),
-M14–M16, Academy v2 + integridad curricular, hardening, Evidence & Performance Engine,
-Listening 1.0/2.0, Placement 1.0 (IRT-lite), **Placement 2.0**, Etapa 2 (pedagogía) **P1–P5**;
-**V1.12** (Student Model unificado + Assessment Loop), **V1.13** (Listening 3.0), **V1.14**
-(Listening Evidence & Adaptive Selection) y **V1.15** (Speaking 3.0). El P6 original
-(pronunciación fonémica) sigue **diferido**.
+**Posición actual (2026-08-26):** `v1.16` **commiteada** (Speaking Assessment & Evidence 2.0:
+scoring determinista S1–S6 + Speaking Assessment 1.0 + Interaction Evidence objetiva + panel/journey
+de speaking). Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
+curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0, Placement 1.0 (IRT-lite),
+**Placement 2.0**, Etapa 2 (pedagogía) **P1–P5**; **V1.12** (Student Model unificado + Assessment
+Loop), **V1.13** (Listening 3.0), **V1.14** (Listening Evidence & Adaptive Selection), **V1.15**
+(Speaking 3.0) y **V1.16** (Speaking Assessment & Evidence 2.0). El P6 original (pronunciación
+fonémica) sigue **diferido**.
 
 **Últimos commits:**
+- `docs: V1.16 higiene de release + documentacion (1.16.0)`
+- `feat: V1.16 - Speaking panel y journey (frontend)`
+- `feat: V1.16 - Interaction Evidence objetiva (telemetria de turnos + endpoint)`
+- `feat: V1.16 - Speaking Assessment & Evidence 2.0 (S1-S6 + Speaking Assessment 1.0)`
+- `docs: V1.15 higiene de release + documentacion (RELEVO/ARQUITECTURA/PLAN/README)`
 - `feat: V1.15 S3 - panel de diagnostico de speaking`
 - `feat: V1.15 S2 - Speaking 3.0 criterio interaction`
 - `feat: V1.15 S1 - Speaking 3.0 diagnostico longitudinal`
@@ -36,18 +42,31 @@ Resumen:
 - **Frontend**: `SpeakingDiagnostic.tsx` (desglose por criterio + tendencia + a revisar).
 - **Higiene de release**: `config.py`/`package.json` → `1.15.0`; CHANGELOG con entrada 1.15.0.
 
-**Estado verde:** backend `602 tests` + `ruff` limpio; frontend `145 tests` + `tsc` OK;
+**V1.16 commiteada** (`c9021e3` backend S1-S6 + assessment, `399ce52` interaction, `fbd91fc`
+frontend, + `docs:` higiene 1.16.0) — Speaking Assessment & Evidence 2.0. Ver sección 29.
+Resumen:
+- **Scoring determinista S1–S6**: task_achievement continuo, GrammarEvidence 2.0, SpeakingTaskProfile
+  (dificultad declared/realized/verified + pesos por task_type), LexicalEvidence 2.0 (MSTTR),
+  FluencyEvidence 2.0 (WPM + smoothness/rhythm), InteractionEvidence 2.0 y diagnóstico por criterio
+  como vista del Student Model (EMA/confidence/stability).
+- **Speaking Assessment 1.0**: instrumento versionado (4 partes) + sesión trazable + endpoints
+  `/api/academy/speaking/assessment/*`.
+- **Interaction Evidence objetiva**: `services/interaction.py` + telemetría de turnos
+  (`duration_ms`/`latency_ms`) + `GET /api/conversations/{id}/interaction`.
+- **Speaking level + journey**: `GET /api/academy/speaking/level` y `/journey`.
+- **Frontend**: `SpeakingPanel` (NEXT FOCUS + PRACTICE NOW) + `SpeakingJourney` (barra A2→B1→B2).
+- **Higiene de release**: `config.py`/`package.json` → `1.16.0`; CHANGELOG con entrada 1.16.0.
+
+**Estado verde:** backend `677 tests` + `ruff` limpio; frontend `164 tests` + `tsc` OK;
 launcher `55 tests` + `ruff` limpio.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 28** de este documento (V1.15 Speaking 3.0 — ya commiteada).
-3. Leer `docs/PLAN-ETAPA-PEDAGOGICA.md` (hoja de ruta Etapa 2, P1–P6 + Student Model 2.0).
-4. Decidir el siguiente incremento natural (p. ej. **Writing 3.0** sobre el mismo Student Model,
-   o retomar los P1 de listening: delayed retention / shadowing real / audio humano).
-5. Redactar y ejecutar `agentes/pedagogia/p*-*.md` (un subagente a la vez), respetando la
-   arquitectura `Router → Service (domain) → Repository (repositories) → SQLite`.
-6. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
+2. Leer la **sección 29** de este documento (V1.16 — commiteada) y su **lista de pendientes**
+   (29.8).
+3. Atacar los pendientes de producto/arquitectura listados en 29.8:
+   UI del Speaking Assessment, puente conversación→speaking, y/o Writing 3.0 / P1 de listening.
+4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest`, launcher `pytest` + `ruff`).
 
 ## 1. Qué es el proyecto
@@ -1266,5 +1285,81 @@ cd frontend && npx tsc --noEmit && npx vitest run
 - **Writing 3.0** sobre el mismo Student Model (espejo del patrón listening/speaking).
 - Retomar los **P1 de listening** de la auditoría V1.14: delayed retention (P1.2), shadowing real
   (P1.3), dictado real, varios hablantes, acentos y ruido reales, variantes de dificultad.
+
+## 29. HECHO (commiteado) — V1.16: Speaking Assessment & Evidence 2.0
+
+> **Origen.** Auditoría externa de V1.15. Veredicto: arquitectura 9.3/10, pero **validez
+> pedagógica ~7.5–8/10** — el "Longitudinal Speaking Competence" seguía siendo un agregador
+> `mean/min/max + trend`, no un modelo de competencia, y varios criterios eran demasiado toscos.
+> V1.16 se divide en **6 piezas (S1–S6)** más **3 bloques de cierre** ejecutados con subagentes.
+> Filosofía intacta: el LLM sigue siendo **solo extractor de evidencia**; todo el scoring es
+> determinista; un criterio no observado NO se inventa (`score=None`).
+
+### 29.1 S1 — task_achievement continuo + GrammarEvidence 2.0 (P0-1, P0-2, P2)
+- `services/speaking.py`: docstrings "6→7 dimensiones"; `TASK_SUBDIM_WEIGHTS` (task_completion/
+  task_relevance/task_coverage/task_appropriateness) + `_task_achievement_score` (graduado, con
+  fallback binario `task_achieved`); `_GRAMMAR_PENALTY_MINOR/MAJOR/CRITICAL` + `_grammar_score`
+  (severidad en vez de `1 - 0.25·errores`).
+- `services/speaking_llm.py`: extrae `grammar_error_details` (type + severity) y las 4
+  sub-dimensiones de tarea.
+
+### 29.2 S2 — SpeakingTaskProfile + dificultad declared/realized/verified + pesos por task_type (P0-1)
+- `services/speaking.py`: `SpeakingTaskProfile` (task_type, cefr_target, duration_target,
+  difficulty_vector, `difficulty`), `TASK_TYPES`, `SPEAKING_DIFFICULTY_FACTORS`,
+  `CONVERSATIONAL_TASK_TYPES`, `difficulty_from_vector`, `weights_for_task_type`, `realized_vector`,
+  `realized_difficulty`, `realization_gap_factors`; `scores_from_evidence(..., task_type=...)`
+  ajusta pesos; `evidence_from_speaking(..., difficulty=...)` registra la dificultad.
+- `schemas/academy.py` + `domain/academy.py` + `routers/academy.py`: `task_type`, `difficulty`,
+  `difficulty_vector`, `expected` propagados.
+
+### 29.3 S3 — LexicalEvidence 2.0 + FluencyEvidence 2.0 (P1-2, P1-3)
+- Léxico: TTR puro → MSTTR por segmentos + `range` (mínimo de tipos) + sophistication/precision/
+  collocations del LLM (`LEXICAL_SUBDIM_WEIGHTS`, `_msttr`, `lexical_evidence`, `_lexical_score`).
+- Fluidez: `fluency ≠ speed` — bandas CEFR de WPM (`_speech_rate_score`) + smoothness/rhythm del
+  LLM (`FLUENCY_SMOOTHNESS_WEIGHT`/`FLUENCY_RHYTHM_WEIGHT`, `_fluency_score`).
+
+### 29.4 S4 — InteractionEvidence 2.0 + pronunciación integrada (P1-4, P1-5)
+- `INTERACTION_SUBDIM_WEIGHTS` (5 sub-dimensiones semánticas del LLM) + `_interaction_score`.
+- `expected` integra `pronunciation` en flujo libre (solo si hay referencia; sin `expected` sigue
+  `observed=false`).
+
+### 29.5 S5 — Student Model ownership del diagnóstico (P1-6, P1-7)
+- `speaking_diagnostic` pasa de `mean/min/max` a **vista** sobre señales del Student Model:
+  `recent_score` (EMA α=0.5), `lifetime_score`, `confidence`, `stability`, `review_due` por
+  olvido/fallo reciente/decaimiento (`_ema`, `SPEAKING_EMA_ALPHA`). `SpeakingCriterionOut` y
+  `SpeakingDiagnostic.overall_recent` ampliados.
+
+### 29.6 S6 — Speaking level continuo + Speaking Journey (CEFR)
+- `services/speaking.py`: `speaking_level` (nivel continuo `numeric = 1.0 + 5.0·score` + confianza)
+  y `speaking_journey` (steps cronológicos con nivel + confianza).
+- `schemas/academy.py`: `SpeakingLevelOut`, `SpeakingJourneyStep`, `SpeakingJourneyOut`.
+- `domain/academy.py`: `get_speaking_level`, `get_speaking_journey`.
+- `routers/academy.py`: `GET /api/academy/speaking/level`, `GET /api/academy/speaking/journey`.
+
+### 29.7 Tres bloques de cierre (subagentes)
+- **InteractionEvidence objetiva** (P1-4): `services/interaction.py` (puro: `interaction_evidence`
+  → turn_balance/avg_response_latency_ms/turn_completion/student_turns/assistant_turns/
+  interruptions, con umbrales nombrados); fusión objetiva+semántica en `_interaction_score` vía
+  `INTERACTION_OBJECTIVE_WEIGHT=0.5` (clave `evidence["interaction_objective"]`, backward-compatible);
+  columnas `duration_ms`/`latency_ms` en `messages` (migración idempotente); telemetría TTFB/duración
+  en `POST /api/chat/stream`; `GET /api/conversations/{id}/interaction`.
+- **Speaking Assessment 1.0**: instrumento `curriculum/speaking_assessment.json` (4 partes:
+  interview → individual task → interaction → follow-up); tabla trazable
+  `speaking_assessment_sessions`; `services/speaking_assessment.py` (`load_speaking_assessment`,
+  `assessment_parts`, `aggregate_assessment` — reutiliza `speaking_level`+`speaking_diagnostic`);
+  dominio + endpoints `/api/academy/speaking/assessment/{start,part,finish}` y
+  `GET /api/academy/speaking/assessment/{session_id}`.
+- **Frontend**: tipos + API (`getSpeakingLevel`/`getSpeakingJourney`), `utils/speaking.ts`
+  (`numericToCefr`, `formatConfidence`, `formatTrendDelta`, `nextFocus`, `criterionLabel`),
+  `components/SpeakingPanel.tsx` (NEXT FOCUS + PRACTICE NOW) y `components/SpeakingJourney.tsx`
+  (barra A2→B1→B2 con marcador "YOU"), CSS en `index.css`, montaje en `App.tsx`.
+
+### 29.8 Pendiente / siguiente incremento natural (para el siguiente agente)
+1. **UI del flujo de Speaking Assessment** (endpoints ya existen, falta la pantalla
+   start → 4 partes → resultado).
+2. **Puente conversación→speaking**: cablear la telemetría objetiva de interacción (29.7) desde una
+   sesión de chat real hasta una evaluación de speaking (hoy se captura y el scorer sabe fusionarla,
+   pero no hay flujo que las conecte automáticamente).
+3. **Writing 3.0** sobre el mismo Student Model, y/o retomar los **P1 de listening** (V1.14).
 
 

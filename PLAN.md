@@ -11,8 +11,8 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.15.0` (Speaking 3.0: diagnóstico longitudinal por criterio de rúbrica +
-  criterio `interaction`, sobre el Student Model).
+- ✅ Versión estable `1.16.0` (Speaking Assessment & Evidence 2.0: scoring determinista S1–S6 +
+  Speaking Assessment 1.0 + Interaction Evidence objetiva, sobre el Student Model).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 

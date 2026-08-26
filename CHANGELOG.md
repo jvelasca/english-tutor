@@ -4,6 +4,40 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.16.0] — 2026-08-26
+
+Speaking Assessment & Evidence 2.0. Convierte el scoring de speaking de un agregador
+`mean/min/max` en un modelo de competencia determinista por criterio, añade un **Speaking
+Assessment** estructurado (4 partes) con sesión trazable y la **evidencia objetiva de
+interacción** (telemetría de turnos). El LLM sigue siendo solo extractor de evidencia; todo el
+scoring es determinista y un criterio no observado no se inventa (`score=None`).
+
+### Añadido
+- **task_achievement continuo** (4 sub-dimensiones de tarea) y **GrammarEvidence 2.0** (penalización
+  por severidad en lugar de `1 - 0.25·errores`).
+- **SpeakingTaskProfile**: `task_type`, dificultad `declared/realized/verified` y pesos de rúbrica por
+  tipo de tarea (`weights_for_task_type`, `realized_difficulty`).
+- **LexicalEvidence 2.0** (MSTTR por segmentos + sophistication/precision/collocations del LLM) y
+  **FluencyEvidence 2.0** (bandas CEFR de WPM + smoothness/rhythm; `fluency ≠ speed`).
+- **InteractionEvidence 2.0**: 5 sub-dimensiones semánticas del LLM fusionadas con la señal objetiva
+  de interacción (`services/interaction.py`): turn_balance, latencia, completitud de turno e
+  interrupciones. Telemetría de turnos (`duration_ms`/`latency_ms` en `messages`) y
+  `GET /api/conversations/{id}/interaction`.
+- **Diagnóstico por criterio como vista del Student Model**: `recent_score` (EMA), `lifetime_score`,
+  `confidence` y `stability` por criterio (adiós al `mean/min/max`).
+- **Speaking level continuo** (`speaking_level`: `numeric = 1.0 + 5.0·score`) y **Speaking Journey**
+  (trayectoria CEFR): `GET /api/academy/speaking/level` y `GET /api/academy/speaking/journey`.
+- **Speaking Assessment 1.0**: instrumento versionado (`curriculum/speaking_assessment.json`, 4
+  partes: interview → individual task → interaction → follow-up), sesión trazable
+  (`speaking_assessment_sessions`) y endpoints `start`/`part`/`finish`/`{session_id}`.
+- **Frontend**: `SpeakingPanel` (NEXT FOCUS + PRACTICE NOW) y `SpeakingJourney` (barra A2→B1→B2 con
+  marcador "YOU").
+
+### Cambiado
+- `speaking_diagnostic` pasa a ser una vista de las señales del Student Model (`recent_score`/EMA),
+  ampliando `SpeakingCriterionOut` y `SpeakingDiagnostic.overall_recent`.
+- Versión → `1.16.0`.
+
 ## [1.15.0] — 2026-08-26
 
 Speaking 3.0. Convierte la destreza `speaking` de un *scorer por intento* en una señal de
