@@ -1,4 +1,3 @@
-import { apiUrl } from "./client";
 import type { PronunciationResponse } from "../types/api";
 
 export async function checkPronunciation(
@@ -12,7 +11,7 @@ export async function checkPronunciation(
   form.append("language", "en");
 
   const query = new URLSearchParams({ user_id: userId }).toString();
-  const res = await fetch(apiUrl(`/api/pronunciation?${query}`), {
+  const res = await fetch(`/api/pronunciation?${query}`, {
     method: "POST",
     body: form,
   });

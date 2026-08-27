@@ -1,4 +1,4 @@
-import { apiUrl, getJson, postJson } from "./client";
+import { getJson, postJson } from "./client";
 import type {
   ListeningAnswerResponse,
   ListeningDiagnostic,
@@ -74,5 +74,5 @@ export function getListeningAudioUrl(
   if (variant !== "normal") {
     params.set("variant", variant);
   }
-  return apiUrl(`/api/listening/audio/${questionId}?${params.toString()}`);
+  return `/api/listening/audio/${questionId}?${params.toString()}`;
 }

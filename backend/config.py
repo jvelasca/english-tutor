@@ -1,24 +1,14 @@
 """Configuración del backend (sin lógica)."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 DEFAULT_MODEL = "qwen3.5:9b"
 
-VERSION = "1.29.0"
+VERSION = "1.28.0"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
-
-# Orígenes extra permitidos para CORS vía env (lista separada por comas). Sirve
-# para admitir el dominio de despliegue del frontend estático (p. ej. Vercel)
-# sin tocar código. Vacío por defecto: el comportamiento no cambia.
-ALLOWED_ORIGINS_EXTRA = [
-    origin.strip()
-    for origin in os.environ.get("ALLOWED_ORIGINS_EXTRA", "").split(",")
-    if origin.strip()
-]
 
 # Regex adicional para permitir el acceso desde cualquier equipo de la red local
 # (IPs privadas IPv4, por el puerto que sea) sin abrir CORS a dominios arbitrarios.

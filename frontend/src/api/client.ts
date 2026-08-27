@@ -1,10 +1,5 @@
-export function apiUrl(path: string): string {
-  const base = import.meta.env.VITE_API_BASE_URL ?? "";
-  return `${base}${path}`;
-}
-
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(apiUrl(url), init);
+  const res = await fetch(url, init);
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(err.detail ?? `HTTP ${res.status}`);
