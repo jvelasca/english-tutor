@@ -1760,19 +1760,25 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `python backend/scripts/import_audio.py --wav <archivo.wav> --audio-id <id> --speaker-id <id>`
   (ver docstring del script). El agente **no** puede fabricar audio real (premisa 2/21).
 
-### 37.4 EN CURSO (V1.29) — Vercel / despliegue
-- ✅ **Preparación hecha**: `frontend/vercel.json`, helper `apiUrl` (`VITE_API_BASE_URL`, default
-  relativo), y CORS `ALLOWED_ORIGINS_EXTRA` en backend. Ver CHANGELOG 1.29.0.
-- ⏳ **Despliegue real pendiente**: requiere login/token de Vercel. Usuario `jvelasca`,
-  team `team_UpRTAAfej4S9ljubNL0Bo5ID`. El frontend se sirve estático; el backend sigue local
-  (`127.0.0.1:8000`), por lo que el sitio desplegado solo funciona con datos en la misma máquina
-  que corre el backend (y requiere CORS).
+### 37.4 HECHO (V1.29) — Vercel / despliegue
+- ✅ **Preparación + despliegue hechos**: `frontend/vercel.json`, helper `apiUrl`
+  (`VITE_API_BASE_URL`, default relativo), CORS `ALLOWED_ORIGINS_EXTRA` en backend, y despliegue a
+  producción.
+- 🌐 **URL de producción**: https://english-tutor-zeta-seven.vercel.app (proyecto
+  `jvelasca/english-tutor`).
+- ⚙️ **Config en Vercel**: `VITE_API_BASE_URL=http://127.0.0.1:8000` (env de producción). Sin esta
+  variable el frontend usaría `/api` relativo (roto en Vercel, que no proxy al backend local).
+- ⚠️ **Limitación local-first**: el backend sigue 100% local. El sitio desplegado solo muestra datos
+  cuando se abre **en la misma máquina que corre el backend** (el navegador llama a
+  `http://127.0.0.1:8000`). Para que el navegador lo permita, lanza el backend con
+  `ALLOWED_ORIGINS_EXTRA=https://english-tutor-zeta-seven.vercel.app` (CORS) — o confía en el
+  `ALLOWED_ORIGIN_REGEX` si accedes por IP local. En otros dispositivos verás la UI pero sin datos.
 
 ### 37.5 Notas de contexto para el nuevo chat
 - Versión estable actual: **1.29.0** (todo verificado: frontend 208 tests, backend 798 tests,
   Playwright 4 passed + 2 skipped, `ruff` limpio, build OK con chunks por ruta).
-- Pendiente: **37.3 contenido** (WAV reales del usuario; código listo) y **37.4 despliegue**
-  (preparación hecha; falta login/token de Vercel para el deploy real).
+- Desplegado en Vercel: https://english-tutor-zeta-seven.vercel.app (backend sigue local).
+- Pendiente: **37.3 contenido** (WAV reales del usuario; código listo). 37.4 ya está desplegado.
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 
