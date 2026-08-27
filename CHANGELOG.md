@@ -4,6 +4,24 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.29.0] — 2026-08-27
+
+**Despliegue (preparación) — Vercel**: deja el proyecto deploy-ready para servir el frontend estático
+en Vercel, manteniendo el backend 100% local. No se despliega (pendiente de login/token).
+
+### Añadido
+- `frontend/vercel.json`: config Vite SPA (`buildCommand`, `outputDirectory: dist`, rewrites
+  catch-all → `/index.html`).
+- `frontend/src/api/client.ts`: helper `apiUrl(path)` que prefija `VITE_API_BASE_URL` (por defecto
+  vacío → rutas relativas intactas en dev).
+- Backend `config.py`: `ALLOWED_ORIGINS_EXTRA` leído de env (separado por comas), concatenado a
+  `ALLOWED_ORIGINS` en `main.py`. Sin env, comportamiento idéntico.
+- Tests: `client.test.ts` (apiUrl) + 2 tests CORS (`ALLOWED_ORIGINS_EXTRA` con/sin env).
+
+### Cambiado
+- `api/chat.ts`, `pronunciation.ts`, `voz.ts`, `listening.ts`: usan `apiUrl` en los fetch/URL directas
+  (streaming, pronunciación, transcribe/tts, URL de audio).
+
 ## [1.28.0] — 2026-08-27
 
 **Biblioteca de audio humano — código (P1.5–P1.8)**: ajuste puntual de Listening para ítems

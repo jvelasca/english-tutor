@@ -1,9 +1,11 @@
+import { apiUrl } from "./client";
+
 export async function transcribe(blob: Blob): Promise<string> {
   const form = new FormData();
   form.append("file", blob, "audio.webm");
   form.append("language", "en");
 
-  const res = await fetch("/api/transcribe", { method: "POST", body: form });
+  const res = await fetch(apiUrl("/api/transcribe"), { method: "POST", body: form });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(err.detail ?? `HTTP ${res.status}`);
@@ -13,7 +15,7 @@ export async function transcribe(blob: Blob): Promise<string> {
 }
 
 export async function speak(text: string): Promise<void> {
-  const res = await fetch("/api/tts", {
+  const res = await fetch(apiUrl("/api/tts"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),

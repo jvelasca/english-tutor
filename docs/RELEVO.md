@@ -3,26 +3,28 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-27 14:35 (UTC+2).
+> Actualizado por última vez: 2026-08-27 14:50 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-27):** `v1.28` **commiteada y verificada en verde** (la versión está
-elevada a `1.28.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
-**"Biblioteca de audio humano — código (V1.28)"**: la escalera de velocidad ya no se muestra en
-ítems `recorded` (su velocidad es real, no sintetizable). El contenido real (WAV) sigue pendiente
-de grabaciones del usuario; la infraestructura + importador ya existían.
+**Posición actual (2026-08-27):** `v1.29` **commiteada y verificada en verde** (la versión está
+elevada a `1.29.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
+**"Despliegue Vercel — preparación (V1.29)"**: `vercel.json`, helper `apiUrl` (base por
+`VITE_API_BASE_URL`) y CORS `ALLOWED_ORIGINS_EXTRA`. El despliegue real queda pendiente de
+login/token de Vercel (usuario `jvelasca`, team `team_UpRTAAfej4S9ljubNL0Bo5ID`).
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de 3 paneles),
 **V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
 **V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
 chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6: práctica migrada + legacy.css
-podado), **V1.27** (code-splitting por rutas), **V1.28** (audio humano — código). Ver CHANGELOG.
+podado), **V1.27** (code-splitting por rutas), **V1.28** (audio humano — código),
+**V1.29** (despliegue Vercel — preparación). Ver CHANGELOG.
 **Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
 de empezar el siguiente incremento.
 
 **Últimos commits:**
+- `feat: V1.29 - despliegue Vercel (preparacion: vercel.json + apiUrl + CORS extra)`
 - `feat: V1.28 - listening: ocultar escalera de velocidad en items recorded`
 - `feat: V1.27 - code-splitting por rutas (React.lazy/Suspense + AnalysisPanel diferido)`
 - `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
@@ -117,9 +119,10 @@ OK; launcher `55 tests` + `ruff` limpio; Playwright `4 passed + 2 skipped`.
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
-3. Elegir el siguiente incremento (37.3 audio humano — **contenido pendiente del usuario**,
-   37.4 Vercel — **diferido por decisión**) y ejecutarlo con subagentes autocontenidos.
-   37.1 y 37.2 están cerrados; 37.3 tiene el código listo y solo falta el contenido (WAV reales).
+3. Retomar lo pendiente: **37.3 contenido** (WAV reales del usuario; código listo) y **37.4
+   despliegue Vercel** (preparación hecha en V1.29; solo falta `npx vercel login` + deploy y
+   configurar `VITE_API_BASE_URL`/`ALLOWED_ORIGINS_EXTRA`). 37.1, 37.2 y la preparación de 37.4
+   ya están cerrados.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
 
@@ -1757,17 +1760,19 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `python backend/scripts/import_audio.py --wav <archivo.wav> --audio-id <id> --speaker-id <id>`
   (ver docstring del script). El agente **no** puede fabricar audio real (premisa 2/21).
 
-### 37.4 (Diferido por decisión) Vercel / despliegue
-- **Vercel** se barajó para la **UI** (previews, hosting estático), **no** para sustituir el backend
-  (que es y seguirá siendo 100% local). Aún no se ha ejecutado; se retomará cuando el usuario lo pida.
-- El backend local implica que Vercel solo serviría el frontend; las llamadas `/api` seguirían
-  apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
+### 37.4 EN CURSO (V1.29) — Vercel / despliegue
+- ✅ **Preparación hecha**: `frontend/vercel.json`, helper `apiUrl` (`VITE_API_BASE_URL`, default
+  relativo), y CORS `ALLOWED_ORIGINS_EXTRA` en backend. Ver CHANGELOG 1.29.0.
+- ⏳ **Despliegue real pendiente**: requiere login/token de Vercel. Usuario `jvelasca`,
+  team `team_UpRTAAfej4S9ljubNL0Bo5ID`. El frontend se sirve estático; el backend sigue local
+  (`127.0.0.1:8000`), por lo que el sitio desplegado solo funciona con datos en la misma máquina
+  que corre el backend (y requiere CORS).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.28.0** (todo verificado: frontend 206 tests, backend 796 tests,
+- Versión estable actual: **1.29.0** (todo verificado: frontend 208 tests, backend 798 tests,
   Playwright 4 passed + 2 skipped, `ruff` limpio, build OK con chunks por ruta).
-- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el código está listo) y **37.4
-  Vercel** (diferido por decisión: requiere cuenta/token + decidir CORS).
+- Pendiente: **37.3 contenido** (WAV reales del usuario; código listo) y **37.4 despliegue**
+  (preparación hecha; falta login/token de Vercel para el deploy real).
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 

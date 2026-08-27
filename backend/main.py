@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, VERSION
+from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, ALLOWED_ORIGINS_EXTRA, VERSION
 from domain.errors import EvidenceInvariantError
 from repositories.db import init_db
 from routers.academy import router as academy_router
@@ -57,7 +57,7 @@ async def evidence_invariant_handler(
 # accesible desde cualquier equipo de la red por su IP privada).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS + ALLOWED_ORIGINS_EXTRA,
     allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=False,
     allow_methods=["*"],

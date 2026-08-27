@@ -1,4 +1,4 @@
-import { getJson, postJson } from "./client";
+import { apiUrl, getJson, postJson } from "./client";
 import { parseSseLine } from "../utils/sse";
 import type {
   ChatResponse,
@@ -46,7 +46,7 @@ export async function streamChat(
   conversationId?: string | null,
   messageId?: string | null,
 ): Promise<void> {
-  const res = await fetch(`/api/chat/stream${userQuery(userId)}`, {
+  const res = await fetch(apiUrl(`/api/chat/stream${userQuery(userId)}`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
