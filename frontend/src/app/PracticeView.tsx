@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { ChatApi } from "../hooks/useChat";
 import type { NextBestActivity } from "../types/api";
-import { AnalysisPanel } from "../components/AnalysisPanel";
+import { Loader2 } from "lucide-react";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
 import { ListeningPractice } from "../features/listening/ListeningPractice";
@@ -15,6 +15,10 @@ import { clampRight, clampSidebar, RIGHT_MAX, RIGHT_MIN, SIDEBAR_MAX, SIDEBAR_MI
 import type { Section } from "../utils/sections";
 import type { SessionStep } from "../types/api";
 import { useI18n } from "../hooks/useI18n";
+
+const AnalysisPanel = lazy(() =>
+  import("../components/AnalysisPanel").then((m) => ({ default: m.AnalysisPanel })),
+);
 
 const SUGGESTIONS = [
   "Let's have a conversation. Ask me anything!",
@@ -294,18 +298,31 @@ export function PracticeView({
             {t("chat.close")}
           </button>
         </div>
-        <AnalysisPanel
-          messages={messages}
-          history={history}
-          events={events}
-          bucket={bucket}
-          onBucketChange={setBucket}
-          profile={profile}
-          currentUserId={currentUserId}
-          onStep={onStep}
-          onAttempt={onAttempt}
-          onNextBestStart={onNextBestStart}
-        />
+        <Suspense
+          fallback={
+            <div
+              role="status"
+              aria-busy="true"
+              className="flex flex-col items-center justify-center gap-3 py-10 text-muted-foreground"
+            >
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+              <span className="text-sm">{t("common.loading")}</span>
+            </div>
+          }
+        >
+          <AnalysisPanel
+            messages={messages}
+            history={history}
+            events={events}
+            bucket={bucket}
+            onBucketChange={setBucket}
+            profile={profile}
+            currentUserId={currentUserId}
+            onStep={onStep}
+            onAttempt={onAttempt}
+            onNextBestStart={onNextBestStart}
+          />
+        </Suspense>
       </aside>
 
       {!insightsOpen && (

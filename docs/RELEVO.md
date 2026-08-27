@@ -3,26 +3,26 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-27 14:15 (UTC+2).
+> Actualizado por última vez: 2026-08-27 14:25 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-27):** `v1.26` **commiteada y verificada en verde** (la versión está
-elevada a `1.26.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
-**"UI 2.0 fases 3–6 (V1.26)"**: migración de Listening/Speaking/Pronunciation/Progress del CSS
-legacy a Tailwind v4 + shadcn/ui + Motion, con poda de `legacy.css` (~1.400 líneas huérfanas) y
-pasada móvil.
+**Posición actual (2026-08-27):** `v1.27` **commiteada y verificada en verde** (la versión está
+elevada a `1.27.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
+**"Code-splitting por rutas (V1.27)"**: `React.lazy`/`Suspense` en `Workspace` + `AnalysisPanel`
+diferido; el chunk inicial pasa de 537 kB a 425 kB con chunks por ruta.
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de 3 paneles),
 **V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
 **V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
 chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6: práctica migrada + legacy.css
-podado). Ver CHANGELOG.
+podado), **V1.27** (code-splitting por rutas). Ver CHANGELOG.
 **Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
 de empezar el siguiente incremento.
 
 **Últimos commits:**
+- `feat: V1.27 - code-splitting por rutas (React.lazy/Suspense + AnalysisPanel diferido)`
 - `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
 - `feat: UI 2.0 (V1.22-V1.25) — Learning UX, design system, Analysis por pestañas y paneles redimensionables`
 - `feat: Learning Home (HOME como centro) con plan de hoy accionable`
@@ -115,8 +115,8 @@ OK; launcher `55 tests` + `ruff` limpio; Playwright `4 passed + 2 skipped`.
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
-3. Elegir el siguiente incremento (37.2 code-splitting, 37.3 audio humano, 37.4 Vercel) y ejecutarlo
-   con subagentes autocontenidos. 37.1 ya está cerrado.
+3. Elegir el siguiente incremento (37.3 audio humano, 37.4 Vercel) y ejecutarlo
+   con subagentes autocontenidos. 37.1 y 37.2 ya están cerrados.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
 
@@ -1739,10 +1739,11 @@ cd frontend && npx tsc --noEmit && npx vitest run
   chat/shell/header/composer y `.journey-*` (fuera del scope de este incremento).
 - Briefing: `agentes/ui2/u1-rediseno-ui2-fases3-6.md`. Ver CHANGELOG 1.26.0.
 
-### 37.2 Code-splitting (frontend)
-- El bundle minificado principal es de **527 kB** (`index-e886hnrB.js`) y Vite avisa al construir.
-  Dividir por rutas con `React.lazy`/`Suspense` (o `rollupOptions.output.manualChunks`). Es una
-  optimización, no un bloqueo funcional; aplazable si se prefiere priorizar contenido.
+### 37.2 HECHO (V1.27) — Code-splitting (frontend)
+- ✅ Dividido por rutas con `React.lazy`/`Suspense` (`HomeScreen`, `CourseScreen`, `ProgressScreen`,
+  `PracticeView`) + `AnalysisPanel` diferido. Chunk inicial **537 kB → 425 kB** (gzip 134 kB) y ya
+  sin aviso de bundle >500 kB.
+- Briefing: `agentes/ui2/u2-code-splitting.md`. Ver CHANGELOG 1.27.0.
 
 ### 37.3 Contenido — biblioteca de audio humano (P1.5–P1.8)
 - **Límite de contenido, no de código**: hoy Piper es una única voz. Incorporar **WAV reales** de
@@ -1758,10 +1759,10 @@ cd frontend && npx tsc --noEmit && npx vitest run
   apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.26.0** (todo verificado: frontend 206 tests, backend 796 tests,
-  Playwright 4 passed + 2 skipped, `ruff` limpio, build OK).
-- Los incrementos 37.2–37.4 son **independientes entre sí**; 37.1 ya está cerrado. Se recomienda
-  seguir con 37.2 (code-splitting) o 37.3 (audio humano) según prioridad de producto.
+- Versión estable actual: **1.27.0** (todo verificado: frontend 206 tests, backend 796 tests,
+  Playwright 4 passed + 2 skipped, `ruff` limpio, build OK con chunks por ruta).
+- Los incrementos 37.3–37.4 son **independientes entre sí**; 37.1 y 37.2 ya están cerrados. 37.3 es
+  un **límite de contenido** (requiere WAV reales del usuario); 37.4 está **diferido por decisión**.
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 

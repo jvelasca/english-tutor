@@ -4,6 +4,21 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.27.0] — 2026-08-27
+
+**Code-splitting por rutas**: división del bundle con `React.lazy`/`Suspense`. Cambio solo-frontend.
+
+### Cambiado
+- **`app/Workspace.tsx`**: `HomeScreen`, `CourseScreen`, `ProgressScreen` y `PracticeView` pasan a
+  `React.lazy` (patrón named→default), envueltos en `Suspense` con fallback (`Loader2` animado,
+  `role="status"`/`aria-busy`).
+- **`app/PracticeView.tsx`**: `AnalysisPanel` también se carga diferido (panel de insights).
+- **`utils/i18n.ts`**: nueva clave `common.loading`.
+
+### Resultado
+- Chunk inicial: **537 kB → 425 kB** (gzip 134 kB), con chunks por ruta (`HomeScreen`, `CourseScreen`,
+  `ProgressScreen`, `PracticeView`, `AnalysisPanel`) y ya sin aviso de bundle >500 kB.
+
 ## [1.26.0] — 2026-08-27
 
 **Rediseño UI 2.0 — fases 3–6**: migración de las pantallas de práctica (Listening, Speaking,

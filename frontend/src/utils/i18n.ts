@@ -139,6 +139,7 @@ const STRINGS: Record<string, Entry> = {
   "status.urlTitle": { en: "Access URL on your network", es: "URL de acceso en tu red" },
 
   // Común
+  "common.loading": { en: "Loading…", es: "Cargando…" },
   "common.close": { en: "Close", es: "Cerrar" },
   "common.back": { en: "Back", es: "Volver" },
   "common.done": { en: "Done", es: "Hecho" },
