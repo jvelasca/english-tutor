@@ -1,37 +1,23 @@
 import { useEffect } from "react";
+import { useI18n } from "../hooks/useI18n";
 
 interface HelpSection {
-  title: string;
-  body: string;
+  titleKey: string;
+  bodyKey: string;
   doc?: string;
 }
 
 const DOCS_BASE = "https://github.com/jvelasca/english-tutor";
 
 const SECTIONS: HelpSection[] = [
+  { titleKey: "help.what.title", bodyKey: "help.what.body" },
+  { titleKey: "help.start.title", bodyKey: "help.start.body" },
+  { titleKey: "help.modes.title", bodyKey: "help.modes.body" },
+  { titleKey: "help.course.title", bodyKey: "help.course.body" },
+  { titleKey: "help.listening.title", bodyKey: "help.listening.body" },
   {
-    title: "¿Qué es English Tutor?",
-    body: "Un profesor de inglés que conversa contigo por texto o voz. Funciona 100% en tu ordenador, sin Internet ni cuentas: tu privacidad está garantizada.",
-  },
-  {
-    title: "Cómo empezar",
-    body: "Elige tu perfil arriba a la derecha y escribe o pulsa el micrófono. Puedes cambiar de modo de práctica en cualquier momento.",
-  },
-  {
-    title: "Modos de práctica",
-    body: "Conversación (charlar libre), Gramática (corregir frases), Ejercicios (práctica guiada) y Pronunciación (hablar y medir tu acento).",
-  },
-  {
-    title: "Academia CEFR",
-    body: "Un recorrido por niveles (A1, A2, B1…) con objetivos, evaluaciones rápidas y un examen final. Avanzas nivel a nivel a tu ritmo.",
-  },
-  {
-    title: "Comprensión auditiva",
-    body: "Escucha una frase, responde la pregunta y supera cada nivel. Tus aciertos se guardan por perfil y te indican cuándo avanzas.",
-  },
-  {
-    title: "Problemas frecuentes",
-    body: "Si el profesor no responde, asegúrate de que Ollama esté arrancado. Los detalles técnicos y la guía completa están en la documentación.",
+    titleKey: "help.troubleshooting.title",
+    bodyKey: "help.troubleshooting.body",
     doc: `${DOCS_BASE}/blob/main/docs/DESARROLLO.md`,
   },
 ];
@@ -41,6 +27,7 @@ interface HelpDialogProps {
 }
 
 export function HelpDialog({ onClose }: HelpDialogProps) {
+  const { t } = useI18n();
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -55,16 +42,16 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
         className="dialog dialog--help"
         role="dialog"
         aria-modal="true"
-        aria-label="Ayuda"
+        aria-label={t("help.title")}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="dialog-header">
-          <h2>Ayuda</h2>
+          <h2>{t("help.title")}</h2>
           <button
             type="button"
-            className="dialog-close"
+            className="dialog-close flex h-10 w-10 items-center justify-center"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             ×
           </button>
@@ -72,9 +59,9 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
 
         <div className="dialog-body">
           {SECTIONS.map((s) => (
-            <section key={s.title} className="help-section">
-              <h3>{s.title}</h3>
-              <p>{s.body}</p>
+            <section key={s.titleKey} className="help-section">
+              <h3>{t(s.titleKey)}</h3>
+              <p>{t(s.bodyKey)}</p>
               {s.doc && (
                 <a
                   className="help-link"
@@ -82,7 +69,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Ver en la documentación
+                  {t("help.viewDocs")}
                 </a>
               )}
             </section>
@@ -90,19 +77,17 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
         </div>
 
         <footer className="dialog-footer help-footer">
-          <span className="help-author">
-            Autor: José Alberto Velasco · josealberto.vel@gmail.com
-          </span>
+          <span className="help-author">{t("help.author")}</span>
           <a
             className="dialog-secondary help-docs"
             href={DOCS_BASE}
             target="_blank"
             rel="noreferrer"
           >
-            Documentación
+            {t("help.documentation")}
           </a>
           <button type="button" className="dialog-primary" onClick={onClose}>
-            Cerrar
+            {t("common.close")}
           </button>
         </footer>
       </div>

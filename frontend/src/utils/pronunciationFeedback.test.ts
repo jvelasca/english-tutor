@@ -26,31 +26,31 @@ describe("joinWords", () => {
     expect(joinWords(["world"])).toBe("world");
   });
 
-  it("une dos palabras con «y»", () => {
-    expect(joinWords(["a", "b"])).toBe("a y b");
+  it("une dos palabras con «and»", () => {
+    expect(joinWords(["a", "b"])).toBe("a and b");
   });
 
-  it("une tres palabras con comas y «y»", () => {
-    expect(joinWords(["a", "b", "c"])).toBe("a, b y c");
+  it("une tres palabras con comas y «and»", () => {
+    expect(joinWords(["a", "b", "c"])).toBe("a, b and c");
   });
 });
 
 describe("feedbackHints", () => {
   it("detecta palabras omitidas", () => {
     expect(feedbackHints(breakdown({ missing: ["world"] }))).toEqual([
-      "Te faltó: world",
+      "You missed: world",
     ]);
   });
 
   it("detecta sustituciones", () => {
     expect(
       feedbackHints(breakdown({ substituted: [{ expected: "have", heard: "am" }] })),
-    ).toEqual(["Sustituiste: have → am"]);
+    ).toEqual(["You substituted: have → am"]);
   });
 
   it("detecta palabras de más", () => {
     expect(feedbackHints(breakdown({ extra: ["world"] }))).toEqual([
-      "Añadiste de más: world",
+      "You added extra: world",
     ]);
   });
 
@@ -63,6 +63,6 @@ describe("wordsCorrectLabel", () => {
   it("resume aciertos", () => {
     expect(
       wordsCorrectLabel(breakdown({ correct: ["a", "b", "c", "d"], total: 5 })),
-    ).toBe("4 de 5 palabras correctas");
+    ).toBe("4 of 5 words correct");
   });
 });

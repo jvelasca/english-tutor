@@ -941,6 +941,19 @@ export interface Session {
   practice_count: number;
 }
 
+export interface NextBestActivity {
+  kind: string;
+  step_key: string;
+  skill: string | null;
+  subskill: string | null;
+  objective_id: string | null;
+  level_id: string | null;
+  title: string;
+  reason: string;
+  minutes: number;
+  priority: number;
+}
+
 // --- Objetivo personal de aprendizaje ---
 
 export type LearningGoalType =

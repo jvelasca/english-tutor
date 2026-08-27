@@ -3,6 +3,7 @@ import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
 import { AVATAR_COLORS, AVATAR_EMOJIS, avatarColor } from "../utils/avatar";
 import { resizeImageToDataUrl } from "../utils/image";
+import { useI18n } from "../hooks/useI18n";
 
 interface ProfileDialogProps {
   user: User;
@@ -11,6 +12,7 @@ interface ProfileDialogProps {
 }
 
 export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
+  const { t } = useI18n();
   const [name, setName] = useState(user.name);
   const [emoji, setEmoji] = useState(user.avatar_emoji ?? "");
   const [color, setColor] = useState(user.avatar_color ?? "");
@@ -32,7 +34,7 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
     try {
       setImage(await resizeImageToDataUrl(file));
     } catch {
-      setError("No se pudo procesar la imagen.");
+      setError(t("profile.imageError"));
     }
   }
 
@@ -53,10 +55,10 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
       const updated = await onSave(patch);
       setSaving(false);
       if (updated) onClose();
-      else setError("No se pudo guardar el perfil.");
+      else setError(t("profile.saveError"));
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : "No se pudo guardar el perfil.");
+      setError(e instanceof Error ? e.message : t("profile.saveError"));
     }
   }
 
@@ -74,16 +76,16 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
         className="dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Editar perfil"
+        aria-label={t("profile.editTitle")}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="dialog-header">
-          <h2>Editar perfil</h2>
+          <h2>{t("profile.editTitle")}</h2>
           <button
             type="button"
-            className="dialog-close"
+            className="dialog-close flex h-10 w-10 items-center justify-center"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             ×
           </button>
@@ -97,7 +99,7 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
               className="dialog-secondary"
               onClick={() => fileRef.current?.click()}
             >
-              Subir imagen
+              {t("profile.uploadImage")}
             </button>
             <input
               ref={fileRef}
@@ -112,30 +114,30 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
                 className="dialog-link"
                 onClick={() => setImage("")}
               >
-                Quitar imagen
+                {t("profile.removeImage")}
               </button>
             )}
           </div>
 
           <label className="field">
-            <span className="field-label">Nombre</span>
+            <span className="field-label">{t("profile.name")}</span>
             <input
               className="field-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
-              aria-label="Nombre del perfil"
+              aria-label={t("profile.name")}
             />
           </label>
 
           <div className="field">
-            <span className="field-label">Icono</span>
-            <div className="avatar-grid" role="group" aria-label="Elegir icono">
+            <span className="field-label">{t("profile.icon")}</span>
+            <div className="avatar-grid" role="group" aria-label={t("profile.chooseIcon")}>
               <button
                 type="button"
                 className={`avatar-option${emoji === "" ? " active" : ""}`}
                 onClick={() => setEmoji("")}
-                title="Sin icono"
+                title={t("profile.noIcon")}
               >
                 —
               </button>
@@ -154,15 +156,15 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
           </div>
 
           <div className="field">
-            <span className="field-label">Color</span>
-            <div className="avatar-grid" role="group" aria-label="Elegir color">
+            <span className="field-label">{t("profile.color")}</span>
+            <div className="avatar-grid" role="group" aria-label={t("profile.chooseColor")}>
               <button
                 type="button"
                 className={`avatar-option avatar-option--auto${
                   color === "" ? " active" : ""
                 }`}
                 onClick={() => setColor("")}
-                title="Automático"
+                title={t("profile.auto")}
               >
                 A
               </button>
@@ -176,7 +178,7 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
                   style={{ background: c }}
                   onClick={() => setColor(c)}
                   title={c}
-                  aria-label={`Color ${c}`}
+                  aria-label={`${t("profile.color")} ${c}`}
                 />
               ))}
             </div>
@@ -191,7 +193,7 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
             className="dialog-secondary"
             onClick={onClose}
           >
-            Cancelar
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -199,7 +201,7 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
             onClick={submit}
             disabled={saving || !name.trim()}
           >
-            {saving ? "Guardando…" : "Guardar"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
         </footer>
       </div>

@@ -1,5 +1,9 @@
 node_modules/
 dist/
+frontend/playwright-report/
+frontend/test-results/
+frontend/tests/visual/.artifacts/
+frontend/tests/visual/screenshots/
 .venv/
 __pycache__/
 *.pyc

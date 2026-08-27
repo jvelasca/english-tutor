@@ -35,19 +35,19 @@ export function rolePlaySetup(scenario: string): string {
 export function criterionLabel(criterion: string): string {
   switch (criterion) {
     case "task_achievement":
-      return "Tarea";
+      return "Task achievement";
     case "grammatical_control":
-      return "Gramática";
+      return "Grammatical control";
     case "lexical_resource":
-      return "Léxico";
+      return "Lexical resource";
     case "fluency":
-      return "Fluidez";
+      return "Fluency";
     case "pronunciation":
-      return "Pronunciación";
+      return "Pronunciation";
     case "coherence":
-      return "Coherencia";
+      return "Coherence";
     case "interaction":
-      return "Interacción";
+      return "Interaction";
     default:
       return criterion;
   }

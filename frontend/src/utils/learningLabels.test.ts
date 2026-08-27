@@ -15,32 +15,32 @@ function step(partial: Partial<SessionStep>): SessionStep {
     objective_id: null,
     level_id: null,
     skills: [],
-    title: "Tarea",
-    reason: "razón",
+    title: "Task",
+    reason: "reason",
     minutes: 5,
     ...partial,
   };
 }
 
 describe("learningLabels", () => {
-  it("expone las etiquetas canónicas de destrezas", () => {
+  it("expone las etiquetas canónicas de destrezas en inglés", () => {
     expect(SKILL_LABELS.listening).toBe("Listening");
     expect(SKILL_LABELS.speaking).toBe("Speaking");
-    expect(KIND_LABELS.review).toBe("Repaso");
+    expect(KIND_LABELS.review).toBe("Review");
   });
 
   it("stepTitle prioriza el subskill en pasos de listening", () => {
     expect(
       stepTitle(step({ kind: "listening", subskill: "connected_speech" })),
-    ).toBe("Escucha: Habla conectada");
+    ).toBe("Connected speech");
   });
 
   it("stepTitle describe repaso y refuerzo", () => {
     expect(stepTitle(step({ kind: "review", skill: "grammar" }))).toBe(
-      "Repasa Gramática",
+      "Review Grammar",
     );
     expect(stepTitle(step({ kind: "easy_wins", skill: "speaking" }))).toBe(
-      "Refuerzo: Speaking",
+      "Boost: Speaking",
     );
   });
 

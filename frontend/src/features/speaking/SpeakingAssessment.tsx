@@ -3,28 +3,34 @@ import {
   finishSpeakingAssessment,
   startSpeakingAssessment,
   submitSpeakingAssessmentPart,
-} from "../api/academy";
-import { transcribe } from "../api/voz";
+} from "../../api/academy";
+import { transcribe } from "../../api/voz";
 import type {
+  NextBestActivity,
   SpeakingAssessmentPartInfo,
   SpeakingAssessmentPartScores,
   SpeakingAssessmentResult,
-} from "../types/api";
-import { cefrTone } from "../utils/cefr";
+} from "../../types/api";
+import type { Section } from "../../utils/sections";
+import { cefrTone } from "../../utils/cefr";
 import {
   criterionLabel,
   formatConfidence,
   formatDurationTarget,
   formatScorePct,
   isConversationalTaskType,
-} from "../utils/speaking";
+} from "../../utils/speaking";
 import { SpeakingRolePlay } from "./SpeakingRolePlay";
+import { ActivityResult } from "../../components/ActivityResult";
+import { NextStep } from "../../components/NextStep";
+import { useI18n } from "../../hooks/useI18n";
 
 type Phase = "idle" | "part" | "result";
 
 interface SpeakingAssessmentProps {
   userId: string | null;
   onAttempt: () => void;
+  onNext: (section: Section | null, step: NextBestActivity) => void;
 }
 
 /**
@@ -35,7 +41,9 @@ interface SpeakingAssessmentProps {
 export function SpeakingAssessment({
   userId,
   onAttempt,
+  onNext,
 }: SpeakingAssessmentProps) {
+  const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>("idle");
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [totalParts, setTotalParts] = useState(0);
@@ -74,7 +82,7 @@ export function SpeakingAssessment({
       setManualText("");
       setPhase("part");
     } catch (e) {
-      setError(`No se pudo iniciar el assessment: ${(e as Error).message}`);
+      setError(`${t("assessment.startError")}${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -102,7 +110,7 @@ export function SpeakingAssessment({
       setNextPart(out.next_part);
       setSubmitted(true);
     } catch (e) {
-      setError(`Error al enviar la respuesta: ${(e as Error).message}`);
+      setError(`${t("assessment.submitError")}${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -114,7 +122,7 @@ export function SpeakingAssessment({
       return;
     }
     if (!nextPart) {
-      setError("No hay siguiente parte disponible.");
+      setError(t("assessment.noNextPart"));
       return;
     }
     setPart(nextPart);
@@ -134,7 +142,7 @@ export function SpeakingAssessment({
       setPhase("result");
       onAttempt();
     } catch (e) {
-      setError(`No se pudo finalizar el assessment: ${(e as Error).message}`);
+      setError(`${t("assessment.finishError")}${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -182,7 +190,7 @@ export function SpeakingAssessment({
             await submitResponse(heard.trim(), durationSeconds);
           }
         } catch (e) {
-          setError(`No se pudo transcribir el audio: ${(e as Error).message}`);
+          setError(`${t("assessment.transcribeError")}${(e as Error).message}`);
         } finally {
           setProcessing(false);
         }
@@ -192,7 +200,7 @@ export function SpeakingAssessment({
       recorderRef.current = recorder;
       setRecording(true);
     } catch (e) {
-      setError(`No se pudo acceder al micrófono: ${(e as Error).message}`);
+      setError(`${t("assessment.micError")}${(e as Error).message}`);
     }
   }
 
@@ -206,10 +214,7 @@ export function SpeakingAssessment({
   if (phase === "idle") {
     return (
       <section className="speaking-assessment">
-        <p className="speaking-assessment__desc">
-          Completa las 4 partes del assessment oral para obtener tu nivel CEFR
-          continuo, con micrófono o escribiendo tus respuestas.
-        </p>
+        <p className="speaking-assessment__desc">{t("assessment.startDesc")}</p>
         {error && (
           <p className="speaking-assessment__error" role="alert">
             {error}
@@ -221,7 +226,7 @@ export function SpeakingAssessment({
           onClick={handleStart}
           disabled={!userId || loading}
         >
-          {loading ? "Iniciando…" : "Iniciar Speaking Assessment"}
+          {loading ? t("assessment.starting") : t("assessment.start")}
         </button>
       </section>
     );
@@ -230,64 +235,71 @@ export function SpeakingAssessment({
   if (phase === "result" && result) {
     return (
       <section className="speaking-assessment">
-        <header className="speaking-assessment__header">
-          {result.level && (
-            <span className={`cefr-badge ${cefrTone(result.level)}`}>
-              {result.level}
-            </span>
-          )}
-        </header>
-
-        <div className="speaking-assessment__result">
-          <div className="speaking-assessment__result-score">
-            {formatScorePct(result.score)}
-          </div>
-          <div className="speaking-assessment__result-meta">
-            <span>Confianza {formatConfidence(result.confidence)}</span>
-            <span>·</span>
-            <span>{result.attempts} intentos</span>
-          </div>
-        </div>
-
-        <ul className="speaking-assessment__criteria">
-          {result.criteria.map((c) => {
-            const score = c.recent_score ?? c.mean;
-            const weak = c.review_due || (score != null && score < 0.6);
-            return (
-              <li
-                key={c.criterion}
-                className={`speaking-assessment__criterion${weak ? " review" : ""}`}
-              >
-                <span className="speaking-assessment__criterion-label">
-                  {criterionLabel(c.criterion)}
-                </span>
-                <span className="speaking-assessment__criterion-score">
-                  {formatScorePct(score)}
-                </span>
-                <span
-                  className="speaking-assessment__criterion-mark"
-                  aria-hidden="true"
-                >
-                  {weak ? "⚠" : "✓"}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-
-        {result.recommendation && (
-          <p className="speaking-assessment__recommendation">
-            {result.recommendation}
-          </p>
-        )}
-
-        <button
-          type="button"
-          className="speaking-assessment__reset"
-          onClick={handleReset}
+        <ActivityResult
+          outcome="neutral"
+          title={`Speaking Assessment · ${formatScorePct(result.score)}`}
+          footer={<NextStep userId={userId} onNext={onNext} />}
         >
-          Hacer otro assessment
-        </button>
+          <header className="speaking-assessment__header">
+            {result.level && (
+              <span className={`cefr-badge ${cefrTone(result.level)}`}>
+                {result.level}
+              </span>
+            )}
+          </header>
+
+          <div className="speaking-assessment__result">
+            <div className="speaking-assessment__result-meta">
+              <span>
+                {t("assessment.confidence")} {formatConfidence(result.confidence)}
+              </span>
+              <span>·</span>
+              <span>
+                {result.attempts} {t("assessment.attempts")}
+              </span>
+            </div>
+          </div>
+
+          <ul className="speaking-assessment__criteria">
+            {result.criteria.map((c) => {
+              const score = c.recent_score ?? c.mean;
+              const weak = c.review_due || (score != null && score < 0.6);
+              return (
+                <li
+                  key={c.criterion}
+                  className={`speaking-assessment__criterion${weak ? " review" : ""}`}
+                >
+                  <span className="speaking-assessment__criterion-label">
+                    {criterionLabel(c.criterion)}
+                  </span>
+                  <span className="speaking-assessment__criterion-score">
+                    {formatScorePct(score)}
+                  </span>
+                  <span
+                    className="speaking-assessment__criterion-mark"
+                    aria-hidden="true"
+                  >
+                    {weak ? "⚠" : "✓"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+
+          {result.recommendation && (
+            <p className="speaking-assessment__recommendation">
+              {result.recommendation}
+            </p>
+          )}
+
+          <button
+            type="button"
+            className="speaking-assessment__reset"
+            onClick={handleReset}
+          >
+            {t("assessment.another")}
+          </button>
+        </ActivityResult>
       </section>
     );
   }
@@ -304,7 +316,8 @@ export function SpeakingAssessment({
 
       <div className="speaking-assessment__meta">
         <span>
-          Parte {part?.part_index ?? 1} de {totalParts}
+          {t("assessment.part")} {part?.part_index ?? 1} {t("assessment.of")}{" "}
+          {totalParts}
         </span>
         {part && (
           <span className="speaking-assessment__duration">
@@ -341,35 +354,35 @@ export function SpeakingAssessment({
             <div className="speaking-assessment__controls">
               <button
                 type="button"
-                className={`speaking-assessment__record${recording ? " recording" : ""}${processing ? " processing" : ""}`}
+                className={`speaking-assessment__record min-h-10${recording ? " recording" : ""}${processing ? " processing" : ""}`}
                 onClick={toggleRecording}
                 disabled={processing || !userId}
                 aria-pressed={recording}
                 aria-label={
                   processing
-                    ? "Transcribiendo respuesta"
+                    ? t("assessment.transcribing")
                     : recording
-                      ? "Detener grabación"
-                      : "Grabar respuesta"
+                      ? t("assessment.stop")
+                      : t("assessment.record")
                 }
               >
                 {processing
-                  ? "Transcribiendo…"
+                  ? t("assessment.transcribing")
                   : recording
-                    ? "Detener"
-                    : "Grabar respuesta"}
+                    ? t("assessment.stop")
+                    : t("assessment.record")}
               </button>
             </div>
 
             <label className="speaking-assessment__manual">
               <span className="speaking-assessment__manual-label">
-                O escribe tu respuesta:
+                {t("assessment.orType")}
               </span>
               <textarea
                 className="speaking-assessment__textarea"
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
-                placeholder="Escribe aquí lo que dirías en voz alta…"
+                placeholder={t("assessment.placeholder")}
                 rows={3}
                 maxLength={2000}
                 disabled={loading}
@@ -382,7 +395,7 @@ export function SpeakingAssessment({
               onClick={handleManualSubmit}
               disabled={!manualText.trim() || loading || !userId}
             >
-              {loading ? "Enviando…" : "Enviar"}
+              {loading ? t("assessment.sending") : t("assessment.submit")}
             </button>
           </>
         )
@@ -394,7 +407,7 @@ export function SpeakingAssessment({
                 {formatScorePct(partScores.overall)}
               </span>
               <span className="speaking-assessment__part-score-label">
-                de esta parte
+                {t("assessment.ofThisPart")}
               </span>
             </div>
           )}
@@ -421,7 +434,11 @@ export function SpeakingAssessment({
             onClick={handleAdvance}
             disabled={loading}
           >
-            {loading ? "Procesando…" : done ? "Ver resultado" : "Siguiente parte"}
+            {loading
+              ? t("assessment.processing")
+              : done
+                ? t("assessment.viewResult")
+                : t("assessment.nextPart")}
           </button>
         </>
       )}

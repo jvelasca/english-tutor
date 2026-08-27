@@ -36,10 +36,10 @@ describe("formatAverage", () => {
 });
 
 describe("pronunciationLevelLabel", () => {
-  it("maps each level to a Spanish label", () => {
-    expect(pronunciationLevelLabel("good")).toBe("Muy bien");
-    expect(pronunciationLevelLabel("fair")).toBe("Aceptable");
-    expect(pronunciationLevelLabel("needs_practice")).toBe("Sigue practicando");
+  it("maps each level to an English label", () => {
+    expect(pronunciationLevelLabel("good")).toBe("Good");
+    expect(pronunciationLevelLabel("fair")).toBe("Fair");
+    expect(pronunciationLevelLabel("needs_practice")).toBe("Needs practice");
   });
 
   it("renders a dash for null", () => {
@@ -48,19 +48,19 @@ describe("pronunciationLevelLabel", () => {
 });
 
 describe("bucketLabel", () => {
-  it("maps each bucket to a Spanish label", () => {
-    expect(bucketLabel("day")).toBe("Día");
-    expect(bucketLabel("week")).toBe("Semana");
-    expect(bucketLabel("month")).toBe("Mes");
+  it("maps each bucket to an English label", () => {
+    expect(bucketLabel("day")).toBe("Day");
+    expect(bucketLabel("week")).toBe("Week");
+    expect(bucketLabel("month")).toBe("Month");
   });
 });
 
 describe("eventLabel", () => {
-  it("maps each event type to a Spanish label", () => {
-    expect(eventLabel("message")).toBe("Mensaje");
-    expect(eventLabel("exercise")).toBe("Ejercicio");
-    expect(eventLabel("correction")).toBe("Corrección");
-    expect(eventLabel("pronunciation")).toBe("Pronunciación");
-    expect(eventLabel("conversation")).toBe("Conversación");
+  it("maps each event type to an English label", () => {
+    expect(eventLabel("message")).toBe("Message");
+    expect(eventLabel("exercise")).toBe("Exercise");
+    expect(eventLabel("correction")).toBe("Correction");
+    expect(eventLabel("pronunciation")).toBe("Pronunciation");
+    expect(eventLabel("conversation")).toBe("Conversation");
   });
 });

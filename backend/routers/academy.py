@@ -22,6 +22,7 @@ from schemas.academy import (
     LevelDetailOut,
     LevelsOut,
     MasteryListOut,
+    NextBestActivityOut,
     NextObjectiveOut,
     ObjectiveAssessmentOut,
     ObjectiveAssessmentRequest,
@@ -167,6 +168,11 @@ async def complete_session_step(
     if out is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return out
+
+
+@router.get("/api/academy/next-best", response_model=NextBestActivityOut | None)
+async def next_best_activity(user: dict = Depends(current_user)) -> dict | None:
+    return await academy_service.get_next_best_activity(user["id"])
 
 
 @router.get("/api/academy/goal", response_model=LearningGoalOut)

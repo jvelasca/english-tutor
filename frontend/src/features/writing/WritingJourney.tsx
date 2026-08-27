@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { getSpeakingJourney } from "../api/academy";
-import type { SpeakingJourneyOut } from "../types/api";
-import { cefrTone } from "../utils/cefr";
-import { formatConfidence, numericToCefr } from "../utils/speaking";
+import { getWritingJourney } from "../../api/academy";
+import type { WritingJourneyOut } from "../../types/api";
+import { cefrTone } from "../../utils/cefr";
+import { formatConfidence, numericToCefr } from "../../utils/writing";
+import { useI18n } from "../../hooks/useI18n";
 
 const MILESTONES = ["A2", "B1", "B2"] as const;
 const MILESTONE_START = 2;
@@ -16,19 +17,20 @@ function markerPct(numeric: number | null): number {
   return Math.min(100, Math.max(0, pct));
 }
 
-interface SpeakingJourneyProps {
+interface WritingJourneyProps {
   userId: string | null;
 }
 
-export function SpeakingJourney({ userId }: SpeakingJourneyProps) {
-  const [journey, setJourney] = useState<SpeakingJourneyOut | null>(null);
+export function WritingJourney({ userId }: WritingJourneyProps) {
+  const { t } = useI18n();
+  const [journey, setJourney] = useState<WritingJourneyOut | null>(null);
 
   useEffect(() => {
     let active = true;
     async function load() {
       if (!userId) return;
       try {
-        const data = await getSpeakingJourney(userId);
+        const data = await getWritingJourney(userId);
         if (active) setJourney(data);
       } catch {
         /* backend no disponible */
@@ -42,10 +44,8 @@ export function SpeakingJourney({ userId }: SpeakingJourneyProps) {
 
   if (!journey || journey.steps.length === 0) {
     return (
-      <section className="speaking-journey">
-        <p className="progress-empty">
-          Aún no hay recorrido de expresión oral registrado.
-        </p>
+      <section className="writing-journey">
+        <p className="progress-empty">{t("empty.noWritingJourney")}</p>
       </section>
     );
   }
@@ -53,14 +53,14 @@ export function SpeakingJourney({ userId }: SpeakingJourneyProps) {
   const pct = markerPct(journey.current_numeric);
 
   return (
-    <section className="speaking-journey">
-      <header className="speaking-journey__header">
+    <section className="writing-journey">
+      <header className="writing-journey__header">
         {journey.current_level && (
           <span className={`cefr-badge ${cefrTone(journey.current_level)}`}>
             {journey.current_level}
           </span>
         )}
-        <span className="speaking-journey__confidence">
+        <span className="writing-journey__confidence">
           {formatConfidence(journey.current_confidence)}
         </span>
       </header>

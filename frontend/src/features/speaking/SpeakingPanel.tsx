@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { getSpeakingDiagnostic, getSpeakingLevel } from "../api/academy";
+import { getSpeakingDiagnostic, getSpeakingLevel } from "../../api/academy";
 import type {
   SpeakingCriterionProgress,
   SpeakingDiagnostic as SpeakingDiagnosticData,
   SpeakingLevelOut,
-} from "../types/api";
-import { cefrTone } from "../utils/cefr";
-import { criterionLabel, formatTrendDelta, nextFocus } from "../utils/speaking";
+} from "../../types/api";
+import { cefrTone } from "../../utils/cefr";
+import { criterionLabel, formatTrendDelta, nextFocus } from "../../utils/speaking";
+import { useI18n } from "../../hooks/useI18n";
 
 interface SpeakingPanelProps {
   userId: string | null;
@@ -38,6 +39,7 @@ function isWeak(c: SpeakingCriterionProgress): boolean {
 }
 
 export function SpeakingPanel({ userId, onPractice }: SpeakingPanelProps) {
+  const { t } = useI18n();
   const [level, setLevel] = useState<SpeakingLevelOut | null>(null);
   const [diagnostic, setDiagnostic] =
     useState<SpeakingDiagnosticData | null>(null);
@@ -68,9 +70,7 @@ export function SpeakingPanel({ userId, onPractice }: SpeakingPanelProps) {
   if (!level && !diagnostic) {
     return (
       <section className="speaking-panel">
-        <p className="progress-empty">
-          Aún no hay práctica de expresión oral registrada.
-        </p>
+        <p className="progress-empty">{t("empty.noSpeaking")}</p>
       </section>
     );
   }

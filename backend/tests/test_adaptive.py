@@ -400,6 +400,48 @@ def test_session_summary_counts_review_and_practice():
     assert summary == {"review_count": 2, "practice_count": 2}
 
 
+# --- Next Best Activity ---------------------------------------------------
+
+
+def test_next_best_activity_returns_first_step_with_priority_and_reason():
+    steps = adaptive.session_plan(
+        [
+            _entry(
+                "grammar",
+                score=0.6,
+                confidence=0.6,
+                evidence_count=4,
+                last_evidence="2026-01-01T00:00:00+00:00",
+                review_due=True,
+            )
+        ],
+        level=load_level("a1"),
+        listening_weak=["gist"],
+        next_objective_id="a1-m01-u01-l01-o01",
+        budget_minutes=20,
+    )
+    best = adaptive.next_best_activity(steps)
+    assert best is not None
+    assert best["kind"] == "review"
+    assert best["reason"] == "due_for_review"
+    assert best["skill"] == "grammar"
+    assert best["priority"] == 1.0
+    assert best["step_key"] == "review:grammar"
+    assert best["minutes"] > 0
+
+
+def test_next_best_activity_empty_returns_none():
+    assert adaptive.next_best_activity([]) is None
+
+
+def test_next_best_reason_maps_kinds():
+    assert adaptive.next_best_reason({"kind": "review"}) == "due_for_review"
+    assert adaptive.next_best_reason({"kind": "listening"}) == "weak_subskill"
+    assert adaptive.next_best_reason({"kind": "weakness"}) == "weak_skill"
+    assert adaptive.next_best_reason({"kind": "new"}) == "next_in_path"
+    assert adaptive.next_best_reason({"kind": "easy_wins"}) == "confidence_boost"
+
+
 def test_session_plan_new_step_carries_level_and_skills():
     level = load_level("a1")
     obj = level.objectives()[0]

@@ -11,6 +11,7 @@ import type {
   LevelDetail,
   LevelsResponse,
   MasteryLevel,
+  NextBestActivity,
   NextObjective,
   ObjectiveAssessmentResult,
   Placement,
@@ -288,6 +289,14 @@ export function getTodayPlan(userId: string): Promise<TodayPlan> {
 
 export function getSession(userId: string): Promise<Session> {
   return getJson<Session>(`/api/academy/session${userQuery(userId)}`);
+}
+
+export function getNextBestActivity(
+  userId: string,
+): Promise<NextBestActivity | null> {
+  return getJson<NextBestActivity | null>(
+    `/api/academy/next-best${userQuery(userId)}`,
+  );
 }
 
 export function completeSessionStep(

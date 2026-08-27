@@ -3,6 +3,7 @@ import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
 import { ProfileDialog } from "./ProfileDialog";
 import { UserAvatar } from "./UserAvatar";
+import { useI18n } from "../hooks/useI18n";
 
 interface UserMenuProps {
   users: User[];
@@ -19,6 +20,7 @@ export function UserMenu({
   onAdd,
   onEdit,
 }: UserMenuProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -65,7 +67,7 @@ export function UserMenu({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Perfil de usuario"
+        title={t("user.profileTitle")}
       >
         {current ? (
           <UserAvatar user={current} size={44} />
@@ -74,13 +76,13 @@ export function UserMenu({
             ?
           </span>
         )}
-        <span className="user-menu-name">{current?.name ?? "Perfil"}</span>
+        <span className="user-menu-name">{current?.name ?? t("user.profile")}</span>
         <ChevronIcon />
       </button>
 
       {open && (
         <div className="user-menu-pop" role="menu">
-          <div className="user-menu-title">Perfiles</div>
+          <div className="user-menu-title">{t("user.profiles")}</div>
           <div className="user-menu-list">
             {users.map((u) => (
               <button
@@ -109,9 +111,9 @@ export function UserMenu({
                   if (e.key === "Enter") submit();
                   if (e.key === "Escape") setAdding(false);
                 }}
-                placeholder="Nombre"
+                placeholder={t("user.name")}
                 autoFocus
-                aria-label="Nombre del nuevo perfil"
+                aria-label={t("user.name")}
               />
               <button
                 type="button"
@@ -119,7 +121,7 @@ export function UserMenu({
                 onClick={submit}
                 disabled={!name.trim()}
               >
-                Añadir
+                {t("user.add")}
               </button>
             </div>
           ) : (
@@ -128,7 +130,7 @@ export function UserMenu({
               className="user-menu-action"
               onClick={() => setAdding(true)}
             >
-              + Nuevo perfil
+              + {t("user.newProfile")}
             </button>
           )}
 
@@ -141,7 +143,7 @@ export function UserMenu({
               setOpen(false);
             }}
           >
-            Editar perfil
+            {t("user.editProfile")}
           </button>
         </div>
       )}

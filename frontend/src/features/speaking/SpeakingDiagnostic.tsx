@@ -1,37 +1,17 @@
 import { useEffect, useState } from "react";
-import { getSpeakingDiagnostic } from "../api/academy";
-import type { SpeakingDiagnostic as SpeakingDiagnosticData } from "../types/api";
-
-/** Etiqueta legible de cada criterio del rubric de speaking. */
-function criterionLabel(criterion: string): string {
-  switch (criterion) {
-    case "task_achievement":
-      return "Tarea";
-    case "grammatical_control":
-      return "Gramática";
-    case "lexical_resource":
-      return "Léxico";
-    case "fluency":
-      return "Fluidez";
-    case "pronunciation":
-      return "Pronunciación";
-    case "coherence":
-      return "Coherencia";
-    case "interaction":
-      return "Interacción";
-    default:
-      return criterion;
-  }
-}
+import { getSpeakingDiagnostic } from "../../api/academy";
+import type { SpeakingDiagnostic as SpeakingDiagnosticData } from "../../types/api";
+import { criterionLabel } from "../../utils/speaking";
+import { useI18n } from "../../hooks/useI18n";
 
 function trendLabel(direction: string): string {
   switch (direction) {
     case "up":
-      return "mejorando";
+      return "diag.improving";
     case "down":
-      return "empeorando";
+      return "diag.gettingWorse";
     case "flat":
-      return "estable";
+      return "diag.stable";
     default:
       return "—";
   }
@@ -47,6 +27,7 @@ interface SpeakingDiagnosticProps {
 }
 
 export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
+  const { t } = useI18n();
   const [diagnostic, setDiagnostic] =
     useState<SpeakingDiagnosticData | null>(null);
 
@@ -70,9 +51,7 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
   return (
     <section className="speaking-diagnostic">
       {!diagnostic ? (
-        <p className="progress-empty">
-          Aún no hay práctica de expresión oral registrada.
-        </p>
+        <p className="progress-empty">{t("empty.noSpeaking")}</p>
       ) : (
         <>
           <p className="speaking-recommendation">{diagnostic.recommendation}</p>
@@ -89,16 +68,16 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
                 </span>
                 <span className="speaking-criterion-meta">
                   {c.attempts} · {c.mean !== null ? `${Math.round(c.mean * 100)}%` : "—"}
-                  {c.review_due ? " · revisar" : ""}
+                  {c.review_due ? ` · ${t("diag.review")}` : ""}
                 </span>
               </li>
             ))}
           </ul>
           {diagnostic.trend.direction !== "n/a" && (
             <p className="speaking-trend">
-              Tendencia reciente:{" "}
+              {t("diag.trend")}:{" "}
               <strong className={`trend-${diagnostic.trend.direction}`}>
-                {trendLabel(diagnostic.trend.direction)}
+                {t(trendLabel(diagnostic.trend.direction))}
               </strong>
               {diagnostic.trend.delta !== null
                 ? ` (${formatDelta(diagnostic.trend.delta)})`

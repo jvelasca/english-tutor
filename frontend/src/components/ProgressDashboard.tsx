@@ -1,5 +1,6 @@
 import type { Bucket, LearningEvent, ProgressHistory } from "../types/api";
 import { bucketLabel, eventLabel } from "../utils/progress";
+import { useI18n } from "../hooks/useI18n";
 
 const BUCKETS: Bucket[] = ["day", "week", "month"];
 
@@ -12,13 +13,11 @@ export function ProgressDashboard({
   history,
   events,
 }: ProgressDashboardProps) {
+  const { t } = useI18n();
   if (history === null) {
     return (
       <section className="progress-dashboard">
-        <p className="progress-empty">
-          Aún no hay progreso. Empieza a conversar o a practicar pronunciación y
-          aquí verás tu evolución, racha e hitos.
-        </p>
+        <p className="progress-empty">{t("empty.noProgress")}</p>
       </section>
     );
   }
@@ -30,25 +29,28 @@ export function ProgressDashboard({
     <section className="progress-dashboard">
       <div className="pd-grid">
         <div className="pd-card">
-          <h3>Racha</h3>
+          <h3>{t("progress.streak")}</h3>
           <p className="pd-big">
             {history.streak.current_days}
-            <span className="pd-unit"> días</span>
+            <span className="pd-unit"> {t("progress.days")}</span>
           </p>
-          <p className="pd-sub">Mejor racha: {history.streak.best_days} días</p>
+          <p className="pd-sub">
+            {t("progress.bestStreak")}: {history.streak.best_days}{" "}
+            {t("progress.days")}
+          </p>
           {history.streak.last_active_date && (
             <p className="pd-sub pd-faint">
-              Última actividad: {history.streak.last_active_date}
+              {t("progress.lastActivity")}: {history.streak.last_active_date}
             </p>
           )}
         </div>
 
         <div className="pd-card">
-          <h3>Actividad</h3>
+          <h3>{t("progress.activity")}</h3>
           {history.series.length === 0 ? (
-            <p className="progress-empty">Sin actividad registrada.</p>
+            <p className="progress-empty">{t("progress.noActivity")}</p>
           ) : (
-            <div className="pd-chart" role="img" aria-label="Actividad por período">
+            <div className="pd-chart" role="img" aria-label={t("progress.activity")}>
               {history.series.map((p) => (
                 <div key={p.bucket} className="pd-col" title={p.bucket}>
                   <div className="pd-bars">
@@ -78,22 +80,26 @@ export function ProgressDashboard({
           )}
           <div className="pd-legend">
             <span>
-              <span className="pd-dot pd-dot-messages" aria-hidden="true" /> Mensajes
+              <span className="pd-dot pd-dot-messages" aria-hidden="true" />{" "}
+              {t("progress.messages")}
             </span>
             <span>
-              <span className="pd-dot pd-dot-pron" aria-hidden="true" /> Pronunciación
+              <span className="pd-dot pd-dot-pron" aria-hidden="true" />{" "}
+              {t("progress.pronunciation")}
             </span>
           </div>
         </div>
       </div>
 
       <div className="pd-card">
-        <h3>Dominio de errores</h3>
+        <h3>{t("progress.errorMastery")}</h3>
         <div className="pd-mastery">
           <div>
-            <h4 className="pd-subhead">Activos ({history.mastery.active.length})</h4>
+            <h4 className="pd-subhead">
+              {t("progress.active")} ({history.mastery.active.length})
+            </h4>
             {history.mastery.active.length === 0 ? (
-              <p className="progress-empty">Sin errores recurrentes activos.</p>
+              <p className="progress-empty">{t("progress.noActiveErrors")}</p>
             ) : (
               <ul className="pd-errors">
                 {history.mastery.active.map((e) => (
@@ -106,9 +112,11 @@ export function ProgressDashboard({
             )}
           </div>
           <div>
-            <h4 className="pd-subhead">Resueltos ({history.mastery.resolved.length})</h4>
+            <h4 className="pd-subhead">
+              {t("progress.resolved")} ({history.mastery.resolved.length})
+            </h4>
             {history.mastery.resolved.length === 0 ? (
-              <p className="progress-empty">Aún no hay errores resueltos.</p>
+              <p className="progress-empty">{t("progress.noResolved")}</p>
             ) : (
               <ul className="pd-errors">
                 {history.mastery.resolved.map((e) => (
@@ -124,7 +132,7 @@ export function ProgressDashboard({
       </div>
 
       <div className="pd-card">
-        <h3>Hitos</h3>
+        <h3>{t("progress.milestones")}</h3>
         <ul className="pd-milestones">
           {history.milestones.map((m) => (
             <li
@@ -138,9 +146,9 @@ export function ProgressDashboard({
       </div>
 
       <div className="pd-card">
-        <h3>Actividad reciente</h3>
+        <h3>{t("progress.recentActivity")}</h3>
         {events.length === 0 ? (
-          <p className="progress-empty">Sin actividad reciente.</p>
+          <p className="progress-empty">{t("progress.noRecentActivity")}</p>
         ) : (
           <ul className="pd-timeline">
             {events.slice(0, 8).map((e) => (
@@ -164,8 +172,9 @@ export function BucketToggle({
   value: Bucket;
   onChange: (b: Bucket) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <div className="bucket-toggle" role="group" aria-label="Período de agrupación">
+    <div className="bucket-toggle" role="group" aria-label={t("progress.bucketAria")}>
       {BUCKETS.map((b) => (
         <button
           key={b}

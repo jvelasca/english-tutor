@@ -38,7 +38,7 @@ export function HandsFreeToggle({
       </button>
       {enabled && (
         <span
-          className={`hands-free-status hands-free-status--${status}`}
+          className={`hands-free-status max-sm:hidden! hands-free-status--${status}`}
           role="status"
           aria-live="polite"
         >

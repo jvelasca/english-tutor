@@ -29,6 +29,7 @@ from schemas.academy import (
     LevelSummaryOut,
     MasteryOut,
     ModuleProgressOut,
+    NextBestActivityOut,
     NextObjectiveOut,
     ObjectiveAssessmentOut,
     ObjectiveProgressOut,
@@ -871,11 +872,14 @@ async def get_today_plan(user_id: str) -> TodayPlanOut:
     )
 
 
-async def get_session(user_id: str) -> SessionOut:
-    """Sesión diaria (Session Engine): repaso vencido → listening → debilidad →
-    nuevo → refuerzo, unificando las señales CEFR y de listening en una secuencia
-    accionable con presupuesto del objetivo personal. Los pasos ya completados hoy
-    se omiten (filtro por `step_key`)."""
+async def _session_steps(user_id: str) -> list[dict]:
+    """Pasos de la sesión diaria (Session Engine), sin proyectar a un schema.
+
+    Repaso vencido → listening → debilidad → nuevo → refuerzo, unificando las
+    señales CEFR y de listening en una secuencia accionable con presupuesto del
+    objetivo personal. Los pasos ya completados hoy se omiten (filtro por
+    `step_key`). Compartida por `get_session` y `get_next_best_activity`.
+    """
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
     skills = await _annotated_profile(user_id, lv)
@@ -898,7 +902,7 @@ async def get_session(user_id: str) -> SessionOut:
     done = await run_in_threadpool(
         academy_repo.list_session_steps, user_id, _today()
     )
-    steps = adaptive.session_plan(
+    return adaptive.session_plan(
         skills,
         lv,
         remediation,
@@ -908,6 +912,14 @@ async def get_session(user_id: str) -> SessionOut:
         budget_minutes=goal.minutes_per_day,
         exclude_keys=done,
     )
+
+
+async def get_session(user_id: str) -> SessionOut:
+    """Sesión diaria (Session Engine): repaso vencido → listening → debilidad →
+    nuevo → refuerzo, unificando las señales CEFR y de listening en una secuencia
+    accionable con presupuesto del objetivo personal. Los pasos ya completados hoy
+    se omiten (filtro por `step_key`)."""
+    steps = await _session_steps(user_id)
     summary = adaptive.session_summary(steps)
     return SessionOut(
         items=[SessionStepOut(**s) for s in steps],
@@ -915,6 +927,15 @@ async def get_session(user_id: str) -> SessionOut:
         review_count=summary["review_count"],
         practice_count=summary["practice_count"],
     )
+
+
+async def get_next_best_activity(user_id: str) -> NextBestActivityOut | None:
+    """Siguiente mejor actividad (Learning UX 2.0): proyección del primer paso de
+    la sesión. La UI no decide pedagógicamente; consume esta única acción."""
+    best = adaptive.next_best_activity(await _session_steps(user_id))
+    if best is None:
+        return None
+    return NextBestActivityOut(**best)
 
 
 async def set_session_step_done(user_id: str, step_key: str) -> SessionOut | None:

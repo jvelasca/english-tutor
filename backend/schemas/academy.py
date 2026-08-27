@@ -607,6 +607,26 @@ class SessionOut(BaseModel):
     practice_count: int
 
 
+class NextBestActivityOut(BaseModel):
+    """Proyección de UX del primer paso de la sesión (Learning UX 2.0).
+
+    El frontend no necesita saber cómo se calculó: recibe una única acción
+    dominante con su destreza/sub-destreza, minutos y un `priority` determinista
+    derivado del orden pedagógico del Adaptive Engine (no es un score predictivo).
+    """
+
+    kind: str
+    step_key: str
+    skill: str | None = None
+    subskill: str | None = None
+    objective_id: str | None = None
+    level_id: str | None = None
+    title: str
+    reason: str
+    minutes: int
+    priority: float
+
+
 class RemediationSkillOut(BaseModel):
     skill: str
     score: float

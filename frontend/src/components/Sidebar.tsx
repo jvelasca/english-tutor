@@ -1,4 +1,5 @@
 import type { ConversationMeta } from "../types/api";
+import { useI18n } from "../hooks/useI18n";
 
 interface SidebarProps {
   conversations: ConversationMeta[];
@@ -15,17 +16,18 @@ export function Sidebar({
   onSelect,
   onDelete,
 }: SidebarProps) {
+  const { t } = useI18n();
   return (
     <aside className="sidebar">
       <button className="new-chat" onClick={onNew}>
-        + Nuevo chat
+        + {t("chat.new")}
       </button>
       <div className="conversation-list">
         {conversations.length === 0 && (
           <p className="conversation-empty">
-            Aún no hay conversaciones.
+            {t("chat.empty")}
             <br />
-            Crea una para empezar.
+            {t("chat.emptyHint")}
           </p>
         )}
         {conversations.map((c) => (
@@ -43,8 +45,8 @@ export function Sidebar({
             <button
               className="conversation-delete"
               onClick={() => onDelete(c.id)}
-              title="Eliminar"
-              aria-label={`Eliminar conversación ${c.title}`}
+              title={t("common.delete")}
+              aria-label={`${t("common.delete")} ${c.title}`}
             >
               ×
             </button>

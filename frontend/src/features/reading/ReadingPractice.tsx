@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { getLevelDetail, getLevels } from "../api/academy";
-import type { CurriculumObjective, LevelDetail, LevelSummary } from "../types/api";
-import { ReadingIcon } from "./Icons";
+import { getLevelDetail, getLevels } from "../../api/academy";
+import type { CurriculumObjective, LevelDetail, LevelSummary } from "../../types/api";
+import { ReadingIcon } from "../../components/Icons";
+import { useI18n } from "../../hooks/useI18n";
 
 interface ReadingPracticeProps {
   userId: string | null;
-  onOpenAcademy: () => void;
+  onOpenCourse: () => void;
   onStartLesson: (
     objectiveId: string,
     title: string,
@@ -17,13 +18,13 @@ interface ReadingPracticeProps {
 function statusLabel(status: string): string {
   switch (status) {
     case "mastered":
-      return "Dominado";
+      return "reading.status.mastered";
     case "review":
-      return "A repasar";
+      return "reading.status.review";
     case "available":
-      return "Disponible";
+      return "reading.status.available";
     default:
-      return "Bloqueado";
+      return "reading.status.locked";
   }
 }
 
@@ -37,9 +38,10 @@ function pickLevel(levels: LevelSummary[]): LevelSummary | null {
 
 export function ReadingPractice({
   userId,
-  onOpenAcademy,
+  onOpenCourse,
   onStartLesson,
 }: ReadingPracticeProps) {
+  const { t } = useI18n();
   const [level, setLevel] = useState<LevelSummary | null>(null);
   const [detail, setDetail] = useState<LevelDetail | null>(null);
 
@@ -67,39 +69,34 @@ export function ReadingPractice({
 
   return (
     <section className="reading-practice">
-      <header className="reading-practice-header">
+      <header className="reading-practice-header flex-wrap">
         <span className="reading-practice-icon" aria-hidden="true">
           <ReadingIcon size={22} />
         </span>
-        <div>
-          <h2>Práctica de lectura</h2>
+        <div className="min-w-0 flex-1">
+          <h2>{t("reading.title")}</h2>
           <p>
-            {level
-              ? `${level.level} · ${level.title}`
-              : "Lectura guiada por el currículum CEFR"}
+            {level ? `${level.level} · ${level.title}` : t("reading.subtitle")}
           </p>
         </div>
         <button
           type="button"
           className="reading-academy-button"
-          onClick={onOpenAcademy}
+          onClick={onOpenCourse}
         >
-          Abrir en Academy
+          {t("reading.viewCourse")}
         </button>
       </header>
 
       {objectives.length === 0 ? (
-        <p className="reading-empty">
-          Aún no hay objetivos de lectura disponibles para tu nivel. Explora la
-          Academy para matricularte en un nivel.
-        </p>
+        <p className="reading-empty">{t("reading.empty")}</p>
       ) : (
         <ol className="reading-list">
           {objectives.map((obj) => (
             <li key={obj.id} className={`reading-card status-${obj.status}`}>
               <div className="reading-card-main">
                 <span className="reading-card-status">
-                  {statusLabel(obj.status)}
+                  {t(statusLabel(obj.status))}
                 </span>
                 <h3>{obj.title}</h3>
                 <p>{obj.can_do}</p>
@@ -112,7 +109,7 @@ export function ReadingPractice({
                     onStartLesson(obj.id, obj.title, level?.level_id ?? "", obj.skills)
                   }
                 >
-                  {obj.status === "mastered" ? "Repasar" : "Empezar"}
+                  {obj.status === "mastered" ? t("reading.review") : t("reading.start")}
                 </button>
               )}
             </li>

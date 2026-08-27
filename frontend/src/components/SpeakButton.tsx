@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { speak } from "../api/voz";
+import { useI18n } from "../hooks/useI18n";
 
 export function SpeakButton({ text }: { text: string }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
 
   async function onClick() {
@@ -9,7 +11,7 @@ export function SpeakButton({ text }: { text: string }) {
     try {
       await speak(text);
     } catch (e) {
-      alert(`Error al reproducir: ${(e as Error).message}`);
+      alert(t("speak.error") + (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -21,8 +23,8 @@ export function SpeakButton({ text }: { text: string }) {
       className={`speak-button${loading ? " speaking" : ""}`}
       onClick={onClick}
       disabled={loading}
-      title="Escuchar respuesta"
-      aria-label="Escuchar respuesta"
+      title={t("speak.listen")}
+      aria-label={t("speak.listen")}
       aria-busy={loading}
     >
       <SpeakerIcon />

@@ -9,17 +9,17 @@ export function cefrTone(level: string): CefrTone {
 export function cefrLabel(level: string): string {
   switch (level) {
     case "A1":
-      return "Principiante";
+      return "Beginner";
     case "A2":
-      return "Básico";
+      return "Elementary";
     case "B1":
-      return "Intermedio";
+      return "Intermediate";
     case "B2":
-      return "Intermedio alto";
+      return "Upper-intermediate";
     case "C1":
-      return "Avanzado";
+      return "Advanced";
     case "C2":
-      return "Maestría";
+      return "Mastery";
     default:
       return level;
   }
@@ -28,11 +28,11 @@ export function cefrLabel(level: string): string {
 export function bandLabel(skill: string): string {
   switch (skill) {
     case "vocabulary":
-      return "Vocabulario";
+      return "Vocabulary";
     case "grammar":
-      return "Gramática";
+      return "Grammar";
     case "pronunciation":
-      return "Pronunciación";
+      return "Pronunciation";
     case "listening":
       return "Listening";
     case "speaking":

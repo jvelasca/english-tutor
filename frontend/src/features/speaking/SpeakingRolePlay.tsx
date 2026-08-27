@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { streamChat } from "../api/chat";
-import { createConversation, saveConversation } from "../api/conversations";
-import type { Message, TutorMode } from "../types/api";
-import { rolePlaySetup } from "../utils/speaking";
-import { turnTelemetry } from "../utils/telemetry";
-import { deriveTitle } from "../utils/title";
+import { streamChat } from "../../api/chat";
+import { createConversation, saveConversation } from "../../api/conversations";
+import type { Message, TutorMode } from "../../types/api";
+import { rolePlaySetup } from "../../utils/speaking";
+import { turnTelemetry } from "../../utils/telemetry";
+import { deriveTitle } from "../../utils/title";
+import { useI18n } from "../../hooks/useI18n";
 
 const DEFAULT_MODEL = "qwen3.5:9b";
 const ROLEPLAY_MODE: TutorMode = "conversation";
@@ -31,6 +32,7 @@ export function SpeakingRolePlay({
   scenario,
   onFinish,
 }: SpeakingRolePlayProps) {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -219,7 +221,7 @@ export function SpeakingRolePlay({
       </div>
       <div className="speaking-roleplay__composer">
         <input
-          className="speaking-roleplay__input"
+          className="speaking-roleplay__input min-w-0"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -228,9 +230,9 @@ export function SpeakingRolePlay({
               void send();
             }
           }}
-          placeholder="Escribe tu turno en inglés…"
+          placeholder={t("roleplay.turnPlaceholder")}
           disabled={loading || !conversationId}
-          aria-label="Tu turno en el role-play"
+          aria-label={t("roleplay.turnAria")}
         />
         <button
           type="button"
@@ -238,7 +240,7 @@ export function SpeakingRolePlay({
           onClick={() => void send()}
           disabled={!input.trim() || loading || !conversationId}
         >
-          Enviar
+          {t("roleplay.send")}
         </button>
       </div>
       <button
@@ -247,7 +249,7 @@ export function SpeakingRolePlay({
         onClick={finish}
         disabled={!canFinish}
       >
-        Terminar interacción
+        {t("roleplay.finish")}
       </button>
     </div>
   );

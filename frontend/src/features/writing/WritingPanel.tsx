@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import { getWritingDiagnostic, getWritingLevel } from "../api/academy";
+import { getWritingDiagnostic, getWritingLevel } from "../../api/academy";
 import type {
   WritingCriterionProgress,
   WritingDiagnostic as WritingDiagnosticData,
   WritingLevelOut,
-} from "../types/api";
-import { cefrTone } from "../utils/cefr";
+} from "../../types/api";
+import { cefrTone } from "../../utils/cefr";
 import {
   formatTrendDelta,
   writingCriterionLabel,
   writingNextFocus,
-} from "../utils/writing";
+} from "../../utils/writing";
+import { useI18n } from "../../hooks/useI18n";
 
 interface WritingPanelProps {
   userId: string | null;
@@ -42,6 +43,7 @@ function isWeak(c: WritingCriterionProgress): boolean {
 }
 
 export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
+  const { t } = useI18n();
   const [level, setLevel] = useState<WritingLevelOut | null>(null);
   const [diagnostic, setDiagnostic] =
     useState<WritingDiagnosticData | null>(null);
@@ -72,9 +74,7 @@ export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
   if (!level && !diagnostic) {
     return (
       <section className="writing-panel">
-        <p className="progress-empty">
-          Aún no hay práctica de expresión escrita registrada.
-        </p>
+        <p className="progress-empty">{t("empty.noWriting")}</p>
       </section>
     );
   }

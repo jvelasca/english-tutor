@@ -3,48 +3,32 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-26 19:30 (UTC+2).
+> Actualizado por última vez: 2026-08-27 13:30 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-26):** `v1.21` **lista para commit de higiene de release** (la versión ya
-está elevada a `1.21.0` en `config.py`/`package.json`/`CHANGELOG`). Cierra la **auditoría
-pedagógica A1→B2** de V1.21 con los seis P0/P1 del diagnóstico externo — corpus de audio humano 1.0,
-validación determinista audio↔metadata, separación del proxy de pronunciación del audio real,
-evidencia familiar/transfer/novel, Interaction 3.0 y matriz de assessment CEFR — y añade una **nueva
-UI de 3 paneles** (barra superior de destrezas + panel central de desarrollo + panel derecho de
-análisis + barra de estado inferior) con persistencia por usuario y script de firewall para LAN.
+**Posición actual (2026-08-27):** `v1.25` **commiteada y verificada en verde** (la versión está
+elevada a `1.25.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
+**"Paneles del chat redimensionables + persistentes (V1.25)"**: los tres paneles del CHAT
+(conversaciones, zona central y Análisis) son redimensionables con asas visibles/accesibles y el
+ancho se persiste por usuario (debounce en `setLayout`), con test visual Playwright de redimensionado
++ persistencia.
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
-(pedagogía) **P1–P5**; **V1.12** → **V1.20** (ver CHANGELOG). Queda como siguiente incremento
-natural el **contenido** de la biblioteca de audio humano (grabaciones reales de varios hablantes,
-connected speech real, acentos reales, ruido real) y el **Adaptive Learning Engine** de V1.22.
+(pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de 3 paneles),
+**V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
+**V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
+chat redimensionables + persistentes). Ver CHANGELOG.
+**Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
+de empezar el siguiente incremento.
 
 **Últimos commits:**
+- `feat: UI 2.0 (V1.22-V1.25) — Learning UX, design system, Analysis por pestañas y paneles redimensionables`
+- `feat: Learning Home (HOME como centro) con plan de hoy accionable`
+- `docs: V1.21 higiene de release + documentacion (1.21.0)`
+- `docs: briefings de agentes de la auditoria pedagogica A1-B2`
+- `feat: UI de 3 paneles (destrezas + desarrollo + analisis + barra de estado)`
 - `feat: validación determinista audio↔metadata`
-- `refactor: separar proxy de pronunciación (transcript) del audio real`
-- `feat: corpus de audio humano 1.0 (esquema + scaffolding + import)`
-- `feat: matriz de assessment CEFR A1-B2 (thresholds + confianza + transfer)`
-- `feat: evidencia familiar/transfer/novel + dominio generalizado`
-- `feat: interaction 3.0 (balance con meseta, turn_duration, repair)`
-- `docs: V1.20 higiene de release + documentacion (1.20.0)`
-- `feat: V1.19 - refresco UI profesional (InsightCard + header + chat + responsive)`
-- `feat: V1.18 P1.9 - escalera de variantes de velocidad en listening`
-- `feat: V1.18 P1.3/P1.4 - dictado y shadowing reales en listening`
-- `feat: V1.18 P1.2 - delayed retention en diagnostico de listening`
-- `docs: V1.17 higiene de release + documentacion (1.17.0)`
-- `feat: V1.17 - Writing 3.0 (diagnostico por criterio, nivel continuo y journey longitudinales)`
-- `feat: puente conversacion -> speaking con telemetria objetiva de interaccion`
-- `feat: add speaking assessment UI flow (start to 4 parts to result)`
-- `docs: V1.16 higiene de release + documentacion (1.16.0)`
-- `feat: V1.16 - Speaking panel y journey (frontend)`
-- `feat: V1.15 S3 - panel de diagnostico de speaking`
-- `feat: V1.15 S2 - Speaking 3.0 criterio interaction`
-- `feat: V1.15 S1 - Speaking 3.0 diagnostico longitudinal`
-- `feat: V1.14 - Listening Evidence & Adaptive Selection (AudioRealization + Evidence Integrity + selector adaptativo)`
-- `feat: V1.13 - Listening 3.0 (audio TTS pre-renderizado + cierre A1-B2 + evidencia por sub-destreza)`
-- `feat: V1.12 - Student Model unificado + Assessment Loop`
-- `feat: V1.11 - CEFR basado en evidencia (muestras por destreza + confianza)`
 
 **V1.15 commiteada** (S1 `2a182a8`, S2 `42602ca`, S3 `9be0f7f`) — Speaking 3.0. Ver sección 28.
 Resumen:
@@ -124,19 +108,16 @@ de V1.19. Ver sección 33. Resumen:
   falta el WAV; `audio_ready` ya no depende solo de Piper).
 - **Higiene de release**: `config.py`/`package.json` → `1.20.0`; CHANGELOG con entrada 1.20.0.
 
-**Estado verde:** backend `755 tests` + `ruff` limpio; frontend `202 tests` + `tsc` OK;
-launcher `55 tests` + `ruff` limpio.
+**Estado verde:** backend `796 tests` + `ruff` limpio; frontend `206 tests` + `tsc` OK + `build`
+OK; launcher `55 tests` + `ruff` limpio; Playwright `4 passed + 2 skipped`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 33** de este documento (V1.20 — commiteada) y su **lista de pendientes**
-   (33.6).
-3. Atacar los pendientes listados en 33.6: el **contenido** de la biblioteca de audio humano
-   (grabaciones reales de varios hablantes, connected speech real, acentos reales, ruido real —
-   la infraestructura P1.5–P1.8 ya está lista) y, si se desea, refinar la UI de variantes de
-   velocidad para ítems `recorded`.
+2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
+3. Elegir el siguiente incremento (37.1 UI 2.0 fases 3–6, 37.2 code-splitting, 37.3 audio humano,
+   37.4 Vercel) y ejecutarlo con subagentes autocontenidos.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
-   `tsc` + `vitest`, launcher `pytest` + `ruff`).
+   `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
 
 ## 1. Qué es el proyecto
 
@@ -1646,5 +1627,140 @@ cd frontend && npx tsc --noEmit && npx vitest run
   infraestructura ya está lista.
 - (Opcional) Ajustar la UI de variantes de velocidad (`ListeningPractice.tsx`) para no mostrar la
   escalera slow/normal/fast en ítems `recorded` (su velocidad es la real, no sintetizable).
+
+## 34. HECHO (commiteado) — V1.23: UI 2.0 (incremento 1)
+
+> **Origen.** Adopción de un *design system* real (Tailwind CSS v4 + shadcn/ui + Motion) para
+> sustituir el CSS custom (~6.450 líneas) por primitivas y microinteracciones. Cambio solo-frontend.
+
+- **Stack de diseño**: `tailwindcss` + `@tailwindcss/vite`, `motion`, `lucide-react` y dependencias
+  shadcn; alias `@/*` → `src/*`; `components.json` y `lib/utils.ts` (`cn`).
+- **Tokens**: `index.css` con tokens semánticos shadcn mapeados al sistema de apariencia; `legacy.css`
+  aislado en `@layer base`.
+- **Primitivas**: `Button`, `Card`, `Badge`, `Progress` + `SkillBar`, `LevelBadge`, `JourneyNode`,
+  `Milestone`.
+- **Reestilizados**: `AppShell`/`Header`/`Navigation` (nav inferior móvil + píldora animada), `Home`,
+  `Course`.
+- **Higiene**: versión → `1.23.0`.
+
+## 35. HECHO (commiteado) — V1.24: Analysis redesign + responsive 100%
+
+> **Origen.** El panel ANALYSIS apilaba 10 acordeones colapsables y cortaba texto en el drawer
+> estrecho; el usuario pidió rediseño total por pestañas + pasada responsive completa de la app +
+> tests visuales. Se añaden las premisas 19–21.
+
+### 35.1 Panel ANALYSIS por pestañas
+- **`components/AnalysisPanel.tsx`** (nuevo): contenedor de 7 pestañas (Overview, Today, Profile,
+  Speaking, Writing, Assessment, Tutor) con iconos `lucide-react`, indicador activo animado
+  (`layoutId` de Motion), transición de contenido (`AnimatePresence`) y scroll vertical propio por
+  pestaña (sin `text-overflow: ellipsis` ni `overflow: hidden`). Speaking agrupa Diagnostic+Panel+
+  Journey; Writing agrupa Panel+Journey (se elimina el título "Speaking" duplicado).
+- **`app/PracticeView.tsx`**: sustituye las 10 `InsightCard` por `<AnalysisPanel />`.
+- **`components/InsightCard.tsx`**: eliminado (quedó huérfano, verificado con `rg`).
+- Accesibilidad: `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`.
+
+### 35.2 Pasada responsive completa
+- `ProgressScreen`, `ListeningPractice`, `ReadingPractice`, `PronunciationPractice`,
+  `SpeakingAssessment`, `SpeakingRolePlay`, `SettingsDialog`, `ProfileDialog`, `HelpDialog`,
+  `Composer`, `HandsFreeToggle`: correcciones de overflow, `flex-wrap`, `min-w-0`, tap targets
+  ≥40px (`min-h-10`), pestañas con scroll horizontal. Sin tocar `legacy.css` (usando utilidades
+  Tailwind con sufijo `!` donde el cascade legacy lo exigía).
+
+### 35.3 Tests visuales Playwright
+- **`@playwright/test`** (devDependency) + **`playwright.config.ts`** con 3 proyectos (desktop
+  1280×800, tablet 768×1024, móvil 390×844) y `webServer` que reutiliza el dev server de Vite.
+- **`tests/visual/smoke.spec.ts`**: recorre Home, Course, Progress, Chat (+ panel ANALYSIS abierto)
+  y Learn, capturando un screenshot por ruta en `tests/visual/screenshots/<proyecto>/`.
+- **`scripts/visual.ps1`** + script npm **`test:visual`** (`playwright test`).
+- `.gitignore`: excluye `playwright-report/`, `test-results/`, `.artifacts/` y `screenshots/`.
+
+### 35.4 Verificación
+- Frontend `206 tests` + `tsc` OK; `playwright test` → 3 passed (18 screenshots). Backend sin cambios.
+
+### 35.5 Pendiente / siguiente incremento natural
+- **Fases 3–6 del rediseño UI 2.0**: listening (entorno auditivo), speaking (estudio de conversación),
+  progress (dashboard pedagógico), móvil específico y **retirada de `legacy.css`**.
+- **Contenido** de la biblioteca de audio humano (grabaciones reales).
+
+## 36. HECHO (commiteado) — V1.25: paneles del chat redimensionables + persistentes
+
+> **Origen.** Los tres paneles del CHAT (conversaciones, zona central y Análisis) ya tenían
+> infraestructura de redimensionado (`ResizeHandle` + `layout.sidebarWidth`/`rightWidth` persistido
+> en settings por usuario), pero el asa era un carril de 6px transparente casi invisible, no era
+> accesible y persistía en cada `pointermove` (spam de `PUT`). Se mejora la usabilidad, la
+> accesibilidad y la eficiencia de la persistencia.
+
+### 36.1 Asa visible y accesible
+- **`components/ResizeHandle.tsx`** reescrito con Tailwind: asa de 8px (`w-2`) con *grip* central
+  visible (`w-0.5 bg-border`, `bg-primary` al hover/foco vía `group`), `cursor-col-resize`,
+  `touch-none`, `hidden lg:flex` (oculta en móvil/tablet donde los paneles son drawers).
+- Añadidos `role="separator"`, `aria-orientation="vertical"`, `aria-valuenow/min/max` y soporte de
+  teclado (←/→ = ±24px). `PracticeView` pasa `value`/`min`/`max` desde `layout` y los límites
+  (`SIDEBAR_MIN/MAX`, `RIGHT_MIN/MAX`).
+
+### 36.2 Persistencia eficiente por usuario
+- **`hooks/useChat.ts`**: `setLayout` actualiza el estado inmediatamente (preview en vivo) pero
+  persiste con **debounce de 400ms** (`layoutPersistTimer`), de modo que un arrastre produce un único
+  `PUT /api/settings` en lugar de uno por movimiento. La carga inicial (`parseLayout`) no cambia.
+
+### 36.3 Limpieza CSS
+- **`styles/legacy.css`**: eliminadas las reglas huérfanas de `.resize-handle` (base + `display:none`
+  en `≤1024px`); se conserva `body.is-resizing`.
+
+### 36.4 Test visual
+- **`tests/visual/resize.spec.ts`** (nuevo): normaliza el ancho al mínimo por teclado, lo agranda con
+  flechas, comprueba el cambio y verifica la persistencia tras `reload`. Solo desktop (skip en
+  móvil/tablet).
+
+### 36.5 Verificación
+- Frontend `206 tests` + `tsc` OK; `playwright test` → 4 passed + 2 skipped (18 screenshots +
+  redimensionado). Backend sin cambios funcionales (solo `VERSION` → `1.25.0`).
+
+### 36.6 Pendiente / siguiente incremento natural
+- Ver **sección 37** (consolidado de todos los próximos incrementos).
+
+## 37. PRÓXIMOS INCREMENTOS (consolidado)
+
+> **Punto de partida del siguiente chat.** Todo lo que queda por hacer, en orden sugerido. La
+> regla sigue siendo la premisa 6 (poco a poco, un incremento a la vez) y la 5/7/8 (subagentes
+> autocontenidos, relevo al saturar). Cada incremento cierra con: build + tests frontend
+> (`npm test`, `tsc`) + backend (`pytest`, `ruff`) + Playwright (`npm run test:visual`) + bump de
+> versión en `config.py`/`package.json`/`package-lock.json`/`README.md` + `CHANGELOG` + esta sección.
+
+### 37.1 Rediseño UI 2.0 — fases 3–6 (solo frontend)
+- **Fase 3** — `features/listening/ListeningPractice.tsx`: entorno auditivo inmersivo (reproductor,
+  onda, variantes 0.8x/1.0x/1.2x). Reutilizar `SkillBar`/`Badge`/`Card` y Motion.
+- **Fase 4** — `features/speaking/*`: "estudio de conversación" (mic que respira, fluidez/coherencia,
+  feedback). Aplica a `SpeakingPanel`/`SpeakingDiagnostic`/`SpeakingAssessment`/`SpeakingRolePlay`/
+  `SpeakingJourney` + `PronunciationPractice`.
+- **Fase 5** — `features/progress/ProgressScreen.tsx`: dashboard pedagógico limpio.
+- **Fase 6** — Móvil específico y consolidación; **retirar `legacy.css`** una vez migradas todas las
+  pantallas (solo queda retirar el archivo y sus `@import` cuando ya no quede ninguna clase legacy en uso).
+
+### 37.2 Code-splitting (frontend)
+- El bundle minificado principal es de **527 kB** (`index-e886hnrB.js`) y Vite avisa al construir.
+  Dividir por rutas con `React.lazy`/`Suspense` (o `rollupOptions.output.manualChunks`). Es una
+  optimización, no un bloqueo funcional; aplazable si se prefiere priorizar contenido.
+
+### 37.3 Contenido — biblioteca de audio humano (P1.5–P1.8)
+- **Límite de contenido, no de código**: hoy Piper es una única voz. Incorporar **WAV reales** de
+  varios hablantes (connected speech real, acentos reales, ruido real) y añadir sus entradas al
+  `manifest` de audio. La **infraestructura ya está lista** (ver §33, V1.20).
+- (Opcional) Ajustar `ListeningPractice.tsx` para **no** mostrar la escalera slow/normal/fast en ítems
+  `recorded` (su velocidad es la real, no sintetizable).
+
+### 37.4 (Diferido por decisión) Vercel / despliegue
+- **Vercel** se barajó para la **UI** (previews, hosting estático), **no** para sustituir el backend
+  (que es y seguirá siendo 100% local). Aún no se ha ejecutado; se retomará cuando el usuario lo pida.
+- El backend local implica que Vercel solo serviría el frontend; las llamadas `/api` seguirían
+  apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
+
+### 37.5 Notas de contexto para el nuevo chat
+- Versión estable actual: **1.25.0** (todo verificado: frontend 206 tests, backend 796 tests,
+  Playwright 4 passed + 2 skipped, `ruff` limpio, build OK).
+- Los incrementos 37.1–37.4 son **independientes entre sí**; se recomienda empezar por 37.1 (Fase 3)
+  o 37.3 (audio humano) según prioridad de producto.
+- Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
+  evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 
 

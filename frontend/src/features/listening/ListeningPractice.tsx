@@ -7,8 +7,8 @@ import {
   submitListeningAnswer,
   submitListeningDictation,
   submitListeningShadowing,
-} from "../api/listening";
-import { speak, transcribe } from "../api/voz";
+} from "../../api/listening";
+import { speak, transcribe } from "../../api/voz";
 import type {
   ListeningAnswerResponse,
   ListeningAudioVariant,
@@ -16,7 +16,12 @@ import type {
   ListeningProductionResult,
   ListeningQuestion,
   ListeningStats,
-} from "../types/api";
+  NextBestActivity,
+} from "../../types/api";
+import type { Section } from "../../utils/sections";
+import { ActivityResult } from "../../components/ActivityResult";
+import { NextStep } from "../../components/NextStep";
+import { useI18n } from "../../hooks/useI18n";
 
 function topicLabel(topic: string): string {
   return topic.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -25,28 +30,28 @@ function topicLabel(topic: string): string {
 function trendLabel(direction: string): string {
   switch (direction) {
     case "up":
-      return "mejorando";
+      return "diag.improving";
     case "down":
-      return "empeorando";
+      return "diag.gettingWorse";
     case "flat":
-      return "estable";
+      return "diag.stable";
     default:
       return "—";
   }
 }
 
 // Etiqueta legible de los buckets de retención retardada (días desde la primera
-// exposición): "0-2" → "0–2 días", etc.
+// exposición): "0-2" → "0–2 days", etc.
 function retentionBucketLabel(bucket: string): string {
   switch (bucket) {
     case "0-2":
-      return "0–2 días";
+      return "0–2 days";
     case "2-7":
-      return "2–7 días";
+      return "2–7 days";
     case "7-30":
-      return "7–30 días";
+      return "7–30 days";
     case "30+":
-      return "más de 30 días";
+      return "over 30 days";
     default:
       return bucket;
   }
@@ -57,16 +62,16 @@ function retentionBucketLabel(bucket: string): string {
 function audioTypeLabel(audioType: string): string {
   switch (audioType) {
     case "recorded":
-      return "Grabación real";
+      return "Real recording";
     case "mixed":
-      return "Mezcla grabado + sintético";
+      return "Mix of recorded + synthetic";
     case "synthetic_multispeaker":
-      return "Varias voces sintéticas";
+      return "Several synthetic voices";
     case "real_world":
-      return "Audio real (entorno natural)";
+      return "Real-world audio (natural environment)";
     case "tts":
     default:
-      return "Voz sintética local (TTS)";
+      return "Local synthetic voice (TTS)";
   }
 }
 
@@ -76,18 +81,21 @@ function breakdownLabel(breakdown: Record<string, unknown>): string {
   const correct = Array.isArray(breakdown.correct) ? breakdown.correct.length : 0;
   const missing = Array.isArray(breakdown.missing) ? breakdown.missing.length : 0;
   const extra = Array.isArray(breakdown.extra) ? breakdown.extra.length : 0;
-  return `Palabras correctas: ${correct} · faltantes: ${missing} · extra: ${extra}`;
+  return `Correct words: ${correct} · missing: ${missing} · extra: ${extra}`;
 }
 
 interface ListeningPracticeProps {
   userId: string | null;
   onAttempt: () => void;
+  onNext: (section: Section | null, step: NextBestActivity) => void;
 }
 
 export function ListeningPractice({
   userId,
   onAttempt,
+  onNext,
 }: ListeningPracticeProps) {
+  const { t } = useI18n();
   const [question, setQuestion] = useState<ListeningQuestion | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [result, setResult] = useState<ListeningAnswerResponse | null>(null);
@@ -149,7 +157,7 @@ export function ListeningPractice({
     return new Promise<void>((resolve, reject) => {
       const audio = new Audio(url);
       audio.onended = () => resolve();
-      audio.onerror = () => reject(new Error("No se pudo reproducir el audio"));
+      audio.onerror = () => reject(new Error("Could not play the audio"));
       audio.play().catch(reject);
     });
   }
@@ -254,7 +262,7 @@ export function ListeningPractice({
       recorderRef.current = recorder;
       setRecording(true);
     } catch (e) {
-      setError(`No se pudo acceder al micrófono: ${(e as Error).message}`);
+      setError(`${t("mic.accessError")}${(e as Error).message}`);
     }
   }
 
@@ -262,20 +270,20 @@ export function ListeningPractice({
     <section className="listening">
       {error && <p className="listening-error">{error}</p>}
       {!question ? (
-        <p className="progress-empty">Cargando ejercicio…</p>
+        <p className="progress-empty">{t("listening.loading")}</p>
       ) : (
         <>
           <button
             type="button"
-            className="listen-button"
+            className="listen-button min-h-10"
             onClick={play}
             disabled={playing || !userId}
           >
-            {playing ? "Reproduciendo…" : "Escuchar audio"}
+            {playing ? t("listening.playing") : t("listening.play")}
           </button>
           {question.audio_ready && question.variants.length > 1 && (
             <div className="listening-variants">
-              <span className="listening-variants-label">Velocidad:</span>
+              <span className="listening-variants-label">{t("listening.speed")}</span>
               {question.variants.map((v: ListeningAudioVariant) => (
                 <button
                   key={v.variant}
@@ -303,14 +311,13 @@ export function ListeningPractice({
           </p>
           {!question.audio_ready && (
             <p className="listening-audio-degraded">
-              Audio de referencia no disponible; usando voz generada en vivo.
+              {t("listening.audioUnavailable")}
             </p>
           )}
           {question.realized_difficulty < question.difficulty && (
             <p className="listening-audio-gap">
-              Este audio realiza una dificultad {question.realized_difficulty} de
-              las {question.difficulty} declaradas: parte de la dificultad no está
-              respaldada por el audio.
+              {t("listening.audioGap")} {question.realized_difficulty} of the{" "}
+              {question.difficulty} {t("listening.audioGapEnd")}
             </p>
           )}
           {question.speech_rate > 0 && (
@@ -327,12 +334,12 @@ export function ListeningPractice({
                 className="listening-production-textarea"
                 value={dictationText}
                 onChange={(e) => setDictationText(e.target.value)}
-                placeholder="Escribe lo que escuchas…"
+                placeholder={t("listening.dictationPlaceholder")}
                 disabled={!!productionResult || processing}
               />
               <button
                 type="button"
-                className="listening-production-submit"
+                className="listening-production-submit min-h-10"
                 onClick={submitDictation}
                 disabled={
                   !userId ||
@@ -341,7 +348,7 @@ export function ListeningPractice({
                   processing
                 }
               >
-                {processing ? "Evaluando…" : "Enviar dictado"}
+                {processing ? t("listening.evaluating") : t("listening.submitDictation")}
               </button>
             </div>
           )}
@@ -350,17 +357,21 @@ export function ListeningPractice({
             <div className="listening-production">
               <button
                 type="button"
-                className={`listening-production-record${
+                className={`listening-production-record min-h-10${
                   recording ? " recording" : ""
                 }`}
                 onClick={toggleRecording}
                 disabled={!userId || !!productionResult || processing}
               >
-                {processing ? "Evaluando…" : recording ? "Detener" : "Grabar"}
+                {processing
+                  ? t("listening.evaluating")
+                  : recording
+                    ? t("listening.stop")
+                    : t("listening.record")}
               </button>
               {transcribedText && (
                 <p className="listening-production-transcript">
-                  Transcrito: {transcribedText}
+                  {t("listening.transcribed")}: {transcribedText}
                 </p>
               )}
             </div>
@@ -389,54 +400,67 @@ export function ListeningPractice({
               </div>
             )}
 
-          {result && (
-            <div className={`listening-result ${result.correct ? "ok" : "ko"}`}>
-              {result.correct ? "¡Correcto!" : "Incorrecto."}{" "}
-              <span className="listening-script">{question.script}</span>
-            </div>
-          )}
-
-          {productionResult && (
-            <div
-              className={`listening-production-result ${
-                productionResult.correct ? "ok" : "ko"
-              }`}
+          {(result || productionResult) && (
+            <ActivityResult
+              outcome={
+                result
+                  ? result.correct
+                    ? "ok"
+                    : "ko"
+                  : productionResult?.correct
+                    ? "ok"
+                    : "ko"
+              }
+              title={
+                result
+                  ? result.correct
+                    ? t("listening.correct")
+                    : t("listening.incorrect")
+                  : `Dictation/Shadowing · ${productionResult?.score ?? 0}/100`
+              }
+              footer={<NextStep userId={userId} onNext={onNext} />}
             >
-              <div className="listening-production-score">
-                {productionResult.score}/100
-              </div>
-              <div className="listening-production-lines">
-                <div>
-                  <span className="label">Precisión por palabra:</span>{" "}
-                  {productionResult.word_accuracy}%
-                </div>
-                <div>
-                  <span className="label">Similitud fonética:</span>{" "}
-                  {productionResult.phonetic_score}%
-                </div>
-                <div>
-                  <span className="label">Referencia:</span>{" "}
-                  {productionResult.reference}
-                </div>
-                {transcribedText && (
-                  <div>
-                    <span className="label">Oído:</span> {transcribedText}
+              {result && (
+                <span className="listening-script">{question.script}</span>
+              )}
+              {productionResult && (
+                <>
+                  <div className="listening-production-lines">
+                    <div>
+                      <span className="label">{t("listening.wordAccuracy")}:</span>{" "}
+                      {productionResult.word_accuracy}%
+                    </div>
+                    <div>
+                      <span className="label">{t("listening.phoneticScore")}:</span>{" "}
+                      {productionResult.phonetic_score}%
+                    </div>
+                    <div>
+                      <span className="label">{t("listening.reference")}:</span>{" "}
+                      {productionResult.reference}
+                    </div>
+                    {transcribedText && (
+                      <div>
+                        <span className="label">{t("listening.heard")}:</span>{" "}
+                        {transcribedText}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <p className="listening-production-breakdown">
-                {breakdownLabel(productionResult.breakdown)}
-              </p>
-            </div>
+                  <p className="listening-production-breakdown">
+                    {breakdownLabel(productionResult.breakdown)}
+                  </p>
+                </>
+              )}
+            </ActivityResult>
           )}
           {stats && (
             <div className="listening-stats">
               <p>
-                Aciertos: {stats.correct} de {stats.attempts}
+                {t("listening.scoreOf")}: {stats.correct}{" "}
+                {t("assessment.of")} {stats.attempts}
                 {stats.accuracy !== null ? ` (${stats.accuracy}%)` : ""}
               </p>
               <p className="listening-level">
-                Nivel actual: <strong>{stats.level}</strong>
+                {t("listening.currentLevel")}: <strong>{stats.level}</strong>
               </p>
               <ul className="listening-levels">
                 {stats.levels.map((lv) => (
@@ -470,17 +494,17 @@ export function ListeningPractice({
                     {s.automaticity !== null
                       ? ` · auto ${Math.round(s.automaticity * 100)}%`
                       : ""}
-                    {s.mean_score !== null ? ` · media ${s.mean_score}%` : ""}
-                    {s.review_due ? " · revisar" : ""}
-                    {s.realization_gap ? " · audio no respalda" : ""}
+                    {s.mean_score !== null ? ` · mean ${s.mean_score}%` : ""}
+                    {s.review_due ? ` · ${t("diag.review")}` : ""}
+                    {s.realization_gap ? " · audio not backed" : ""}
                   </li>
                 ))}
               </ul>
               {diagnostic.trend.direction !== "n/a" && (
                 <p className="listening-trend">
-                  Tendencia reciente:{" "}
+                  {t("diag.trend")}:{" "}
                   <strong className={`trend-${diagnostic.trend.direction}`}>
-                    {trendLabel(diagnostic.trend.direction)}
+                    {t(trendLabel(diagnostic.trend.direction))}
                   </strong>
                   {diagnostic.trend.delta !== null
                     ? ` (${diagnostic.trend.delta > 0 ? "+" : ""}${
@@ -491,7 +515,7 @@ export function ListeningPractice({
               )}
               {diagnostic.by_topic.length > 0 && (
                 <div className="listening-breakdown">
-                  <p className="listening-breakdown-title">Precisión por tema</p>
+                  <p className="listening-breakdown-title">{t("listening.accuracyByTopic")}</p>
                   <ul className="listening-pills">
                     {diagnostic.by_topic.map((t) => (
                       <li key={t.topic} className="listening-pill">
@@ -505,12 +529,12 @@ export function ListeningPractice({
               {diagnostic.by_difficulty.length > 0 && (
                 <div className="listening-breakdown">
                   <p className="listening-breakdown-title">
-                    Precisión por dificultad
+                    {t("listening.accuracyByDifficulty")}
                   </p>
                   <ul className="listening-pills">
                     {diagnostic.by_difficulty.map((d) => (
                       <li key={d.difficulty} className="listening-pill">
-                        Nivel {d.difficulty} ·{" "}
+                        {t("pron.level")} {d.difficulty} ·{" "}
                         {d.accuracy !== null ? `${d.accuracy}%` : "—"}
                       </li>
                     ))}
@@ -519,22 +543,22 @@ export function ListeningPractice({
               )}
               {diagnostic.recurrence.questions_seen > 0 && (
                 <p className="listening-recurrence">
-                  Reintentos: {diagnostic.recurrence.retried} de{" "}
-                  {diagnostic.recurrence.questions_seen} · recuperados{" "}
-                  {diagnostic.recurrence.recovered}
+                  {t("listening.retries")}: {diagnostic.recurrence.retried}{" "}
+                  {t("assessment.of")} {diagnostic.recurrence.questions_seen} ·{" "}
+                  {t("listening.recovered")} {diagnostic.recurrence.recovered}
                 </p>
               )}
               <div className="listening-retention">
                 <p className="listening-retention-summary">
-                  Retention:{" "}
+                  {t("listening.retention")}:{" "}
                   {diagnostic.retention.immediate_accuracy !== null
                     ? `${diagnostic.retention.immediate_accuracy}%`
                     : "—"}{" "}
-                  inmediata →{" "}
+                  {t("listening.immediate")} →{" "}
                   {diagnostic.retention.delayed_accuracy !== null
                     ? `${diagnostic.retention.delayed_accuracy}%`
                     : "—"}{" "}
-                  retardada
+                  {t("listening.delayed")}
                   {diagnostic.retention.retention_rate !== null && (
                     <span
                       className={`listening-retention-rate ${
@@ -546,7 +570,7 @@ export function ListeningPractice({
                       }`}
                     >
                       {" "}
-                      · retención{" "}
+                      · {t("listening.retention")}{" "}
                       {Math.round(diagnostic.retention.retention_rate * 100)}%
                     </span>
                   )}
@@ -565,9 +589,7 @@ export function ListeningPractice({
             </div>
           )}
           {stats?.completed && (
-            <p className="listening-completed">
-              ¡Has completado todos los niveles de comprensión auditiva!
-            </p>
+            <p className="listening-completed">{t("listening.completed")}</p>
           )}
           <button
             type="button"
@@ -575,7 +597,7 @@ export function ListeningPractice({
             onClick={load}
             disabled={!userId}
           >
-            Siguiente
+            {t("listening.next")}
           </button>
         </>
       )}

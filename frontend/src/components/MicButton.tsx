@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { transcribe } from "../api/voz";
+import { useI18n } from "../hooks/useI18n";
 
 interface MicButtonProps {
   onTranscribed: (text: string) => void;
@@ -7,6 +8,7 @@ interface MicButtonProps {
 }
 
 export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
+  const { t } = useI18n();
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -32,7 +34,7 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
           const text = await transcribe(blob);
           if (text) onTranscribed(text);
         } catch (e) {
-          alert(`Error al transcribir: ${(e as Error).message}`);
+          alert(`${t("mic.transcribeError")}${(e as Error).message}`);
         } finally {
           setProcessing(false);
         }
@@ -42,7 +44,7 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
       recorderRef.current = recorder;
       setRecording(true);
     } catch (e) {
-      alert(`No se pudo acceder al micrófono: ${(e as Error).message}`);
+      alert(`${t("mic.accessError")}${(e as Error).message}`);
     }
   }
 
@@ -59,8 +61,8 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
       }`}
       onClick={recording ? stop : start}
       disabled={disabled}
-      title={recording ? "Detener grabación" : "Grabar mensaje"}
-      aria-label={recording ? "Detener grabación" : "Grabar mensaje"}
+      title={recording ? t("mic.stop") : t("mic.record")}
+      aria-label={recording ? t("mic.stop") : t("mic.record")}
       aria-pressed={recording}
     >
       <MicIcon />

@@ -623,3 +623,59 @@ def session_summary(steps: list[dict]) -> dict:
     review_count = sum(1 for s in steps if s["kind"] in ("review", "listening"))
     practice_count = sum(1 for s in steps if s["kind"] in ("weakness", "new"))
     return {"review_count": review_count, "practice_count": practice_count}
+
+
+# --- Next Best Activity ---------------------------------------------------
+
+# Prioridad relativa por categoría de sesión. Es una proyección del orden
+# pedagógico de `session_plan` (review > listening > weakness > new > easy_wins),
+# no un score predictivo. Se documenta como tal para no "inventar" números.
+NEXT_BEST_PRIORITY: dict[str, float] = {
+    "review": 1.0,
+    "listening": 0.9,
+    "weakness": 0.8,
+    "new": 0.7,
+    "easy_wins": 0.6,
+}
+
+
+def next_best_reason(step: dict) -> str:
+    """Código estable de la razón pedagógica de un paso, para la UI."""
+    kind = step.get("kind")
+    if kind == "review":
+        return "due_for_review"
+    if kind == "listening":
+        return "weak_subskill"
+    if kind == "weakness":
+        return "weak_skill"
+    if kind == "new":
+        return "next_in_path"
+    if kind == "easy_wins":
+        return "confidence_boost"
+    return "next_in_path"
+
+
+def next_best_activity(steps: list[dict]) -> dict | None:
+    """La siguiente mejor actividad: proyección del primer paso de la sesión.
+
+    La UI de Learning Home no debe decidir pedagógicamente: recibe una única
+    acción dominante derivada del mismo Adaptive Engine que construye la sesión
+    diaria. Devuelve `{kind, step_key, skill, subskill, objective_id, level_id,
+    title, reason, minutes, priority}` o None si no hay pasos pendientes.
+    """
+    if not steps:
+        return None
+    first = steps[0]
+    kind = first.get("kind", "new")
+    return {
+        "kind": kind,
+        "step_key": first.get("step_key", ""),
+        "skill": first.get("skill"),
+        "subskill": first.get("subskill"),
+        "objective_id": first.get("objective_id"),
+        "level_id": first.get("level_id"),
+        "title": first.get("title", ""),
+        "reason": next_best_reason(first),
+        "minutes": first.get("minutes", 0),
+        "priority": NEXT_BEST_PRIORITY.get(kind, 0.5),
+    }

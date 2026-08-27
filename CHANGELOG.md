@@ -4,6 +4,139 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.25.0] — 2026-08-27
+
+**Paneles del chat redimensionables y persistentes**: los tres paneles del CHAT
+(conversaciones, zona central y Análisis) son redimensionables por el usuario, con asas
+visibles y accesibles, y el ancho elegido se persiste por usuario. Cambio solo-frontend.
+
+### Cambiado
+- **`ResizeHandle`** reestilizado con Tailwind: asa de 8px con *grip* central visible
+  (`bg-border` → `bg-primary` al hover/foco), cursor de redimensionado y `touch-action: none`.
+  Se oculta en móvil/tablet (`hidden lg:flex`) donde los paneles son drawers.
+- **Accesibilidad**: el asa expone `role="separator"`, `aria-orientation="vertical"`,
+  `aria-valuenow/min/max` y es operativa por teclado (flechas ←/→, ±24px).
+- **Persistencia eficiente**: `setLayout` (hook `useChat`) persiste el ancho una sola vez al
+  terminar de arrastrar (debounce 400ms) en lugar de un `PUT` por cada `pointermove`.
+- **`styles/legacy.css`**: eliminadas las reglas huérfanas de `.resize-handle` (la clase ya no
+  se usa); se conserva `body.is-resizing`.
+
+### Añadido
+- **Test visual Playwright** (`tests/visual/resize.spec.ts`): redimensiona el panel Análisis por
+  teclado, comprueba el cambio de ancho y verifica que el ancho persiste tras recargar.
+
+### Próximos incrementos (fases 3–6)
+- **Fase 3** — `features/listening/ListeningPractice.tsx`: entorno auditivo inmersivo.
+- **Fase 4** — `features/speaking/*`: "estudio de conversación" (mic que respira, feedback).
+- **Fase 5** — `features/progress/ProgressScreen.tsx`: dashboard pedagógico limpio.
+- **Fase 6** — Móvil específico y consolidación; **retirar `legacy.css`** una vez migradas todas
+  las pantallas.
+
+## [1.24.0] — 2026-08-27
+
+**Analysis redesign + responsive 100%**: el panel ANALYSIS del chat pasa de 10 acordeones colapsables
+a **navegación por pestañas** (una sección a la vez, sin truncado de texto), se hace una **pasada
+responsive completa** de toda la app y se añaden **tests visuales Playwright** en 3 breakpoints como
+parte de la Definition of Done. Cambio solo-frontend.
+
+### Añadido
+- **`AnalysisPanel`** (`src/components/AnalysisPanel.tsx`): 7 pestañas (Overview, Today, Profile,
+  Speaking, Writing, Assessment, Tutor) con iconos, indicador activo animado (`layoutId` de Motion),
+  transición de contenido (`AnimatePresence`) y scroll vertical propio por pestaña. Speaking agrupa
+  Diagnostic + Panel + Journey; Writing agrupa Panel + Journey (se elimina el título duplicado).
+- **Tests visuales Playwright**: `@playwright/test` + `playwright.config.ts` (3 proyectos: desktop
+  1280×800, tablet 768×1024, móvil 390×844), spec `tests/visual/smoke.spec.ts`, script npm
+  `test:visual` y helper `scripts/visual.ps1`. Captura screenshots reproducibles de las rutas
+  principales en `tests/visual/screenshots/<proyecto>/`.
+
+### Cambiado
+- **`PracticeView`**: sustituye las 10 `InsightCard` por `<AnalysisPanel />`.
+- **Pasada responsive completa**: `ProgressScreen`, `ListeningPractice`, `ReadingPractice`,
+  `PronunciationPractice`, `SpeakingAssessment`, `SpeakingRolePlay`, `SettingsDialog`,
+  `ProfileDialog`, `HelpDialog`, `Composer` y `HandsFreeToggle` corrigen overflow horizontal,
+  `flex-wrap`, `min-w-0`, tap targets ≥40px y pestañas con scroll horizontal en móvil.
+- **`docs/PREMISAS.md`**: añadidas premisas 19–21 (panel de análisis por pestañas sin truncado,
+  responsive 100% verificado en 3 breakpoints y tests visuales Playwright obligatorios).
+
+### Eliminado
+- **`InsightCard`**: quedó sin uso tras la migración al panel por pestañas.
+
+### Próximos incrementos (fases 3–6)
+- **Fase 3** — `features/listening/ListeningPractice.tsx`: entorno auditivo inmersivo (reproductor,
+  onda, variantes 0.8x/1.0x/1.2x).
+- **Fase 4** — `features/speaking/*`: "estudio de conversación" (mic que respira, fluidez/coherencia,
+  feedback).
+- **Fase 5** — `features/progress/ProgressScreen.tsx`: dashboard pedagógico limpio.
+- **Fase 6** — Móvil específico y consolidación; **retirar `legacy.css`** una vez migradas todas las
+  pantallas.
+
+## [1.23.0] — 2026-08-27
+
+**UI 2.0 (incremento 1)**: adopción de un *design system* real — Tailwind CSS v4 + shadcn/ui + Motion —
+para sustituir el CSS custom (~6.450 líneas) por primitivas y microinteracciones. Cambio solo-frontend:
+no se toca backend, Student Model ni pedagogía.
+
+### Añadido
+- **Stack de diseño**: `tailwindcss` + `@tailwindcss/vite`, `motion`, `lucide-react` y dependencias de
+  shadcn (`class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`, `@radix-ui/*`); alias
+  `@/*` → `src/*` en `vite.config.ts` y `tsconfig.json`; `components.json` y `lib/utils.ts` (`cn`).
+- **Tokens de identidad**: `index.css` con tokens semánticos shadcn (`--background`, `--foreground`,
+  `--card`, `--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--border`, `--input`,
+  `--ring`, `--radius`, `--success`, `--warning`) mapeados al sistema de apariencia existente
+  (`data-theme`/`data-accent`/`data-font`/`data-density`), preservando claro/oscuro y los 7 acentos.
+- **Aislamiento del CSS legacy**: `src/index.css` → `src/styles/legacy.css` envuelto en `@layer base`
+  e importado al final, para no romper las pantallas aún no migradas.
+- **Primitivas shadcn**: `Button`, `Card`, `Badge`, `Progress` (`src/components/ui/`).
+- **Primitivas de dominio**: `SkillBar` (barra animada al entrar), `LevelBadge` (insignia CEFR por tramo),
+  `JourneyNode` (nodo del recorrido con pulso suave en el actual) y `Milestone` (hito de objetivo con icono por estado).
+
+### Cambiado
+- **AppShell/Header/Navigation**: reestilizados con Tailwind; navegación activa con píldora animada
+  (`layoutId` de Motion) y nav inferior en móvil.
+- **Home**: rediseñada con saludo personalizado (nombre), hero protagonista (insignia CEFR + preparación
+  animada + tendencia), *Next Best Activity* como protagonista, skills con `SkillBar` y racha; entrada
+  escalonada de secciones con Motion.
+- **Course**: recorrido A1→B2 rediseñado con `JourneyNode`, línea de progreso, panel de nivel
+  (insignia + barra de progreso + readiness) e hitos `Milestone`; entrada escalonada Motion.
+- Versión → `1.23.0`.
+
+## [1.22.0] — 2026-08-27
+
+**Learning UX 2.0**: simplificación radical de la interfaz sin añadir pedagogía nueva. El objetivo es que
+en 3 segundos se responda a *¿dónde estoy? ¿cómo voy? ¿qué hago ahora? ¿y después?* — y nada más compita
+con esas cuatro respuestas.
+
+### Añadido
+- **Idioma de interfaz configurable (Español/English)**: sistema i18n completo (`utils/i18n.ts` +
+  `hooks/useI18n.tsx`), persistido por usuario (localStorage + `interface_language` en backend). El
+  contenido pedagógico permanece en inglés; solo el *chrome* se traduce. Por defecto **English**.
+- **Next Best Activity**: el frontend ya no decide pedagogía; una única acción priorizada derivada del
+  Adaptive Engine (`/api/academy/next-best`) con un único CTA `Continuar` (`NextBestCard`/`NextStep`).
+- **Flujo Activity → Result → Feedback → Next**: componentes compartidos `ActivityResult` y `NextStep`
+  para un bucle de práctica uniforme.
+- **Course (antes Academy)**: renombrado a *Course* y presentado como recorrido CEFR con hitos
+  (`CourseScreen`), no como panel administrativo.
+- **Barra de estado colapsable**: indicador mínimo `● Ready` que expande el estado detallado del sistema
+  (API/BD/Ollama/STT/TTS + URL LAN) al pulsar.
+
+### Cambiado
+- **Inicio (HOME) como "¿qué hago ahora?"**: el dashboard se centra en la siguiente mejor actividad y
+  en el estado del alumno, reduciendo la carga cognitiva.
+- **Navegación por destrezas**: distinción entre *PRIMARY SKILLS* (Listening, Speaking, Reading, Writing)
+  y *SUPPORT* (Grammar, Pronunciation); sin niveles CEFR en los botones.
+- **Controles técnicos reubicados**: `Modelo` y `Herramientas` se mueven al menú de usuario / ajustes
+  (`SettingsDialog`), dejando la cabecera limpia.
+- **Eliminado el botón "Marcar como hecho"**: las actividades se marcan automáticamente al generarse
+  evidencia (elimina una acción pedagógicamente peligrosa).
+- **App.tsx dividido**: `AppShell`, `Header`, `Navigation`, `Workspace`, `PracticeView` y `routes/`,
+  más organización por features (`features/home`, `features/course`, `features/progress`, etc.).
+- **Progreso simplificado**: indicadores cualitativos (B1, barras, "Improving") combinados con el % en
+  lugar de porcentajes crudos por todas partes.
+- **Limpieza y reorganización de `index.css`**.
+- **i18n completo del chrome**: cierre de todos los strings en castellano restantes en componentes y
+  helpers de dominio (`cefr`, `progress`, `speaking`, `fluency`, `pronunciationFeedback`).
+- Versión → `1.22.0`.
+
 ## [1.21.0] — 2026-08-26
 
 Cierra la **auditoría pedagógica A1→B2** de V1.21 (los seis P0/P1 del diagnóstico externo) y añade

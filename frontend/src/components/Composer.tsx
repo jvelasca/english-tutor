@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from "react";
 import { MicButton } from "./MicButton";
+import { useI18n } from "../hooks/useI18n";
 
 interface ComposerProps {
   value: string;
@@ -18,6 +19,7 @@ export function Composer({
   disabled,
   busy,
 }: ComposerProps) {
+  const { t } = useI18n();
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -32,12 +34,13 @@ export function Composer({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Escribe tu mensaje…"
+        placeholder={t("composer.placeholder")}
         rows={1}
-        aria-label="Mensaje"
+        className="min-w-0"
+        aria-label={t("composer.aria")}
       />
       <button className="send-button" onClick={onSend} disabled={disabled}>
-        Enviar
+        {t("composer.send")}
       </button>
     </footer>
   );

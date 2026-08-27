@@ -23,13 +23,13 @@ describe("cefrTone", () => {
 });
 
 describe("cefrLabel", () => {
-  it("maps each level to a Spanish label", () => {
-    expect(cefrLabel("A1")).toBe("Principiante");
-    expect(cefrLabel("A2")).toBe("Básico");
-    expect(cefrLabel("B1")).toBe("Intermedio");
-    expect(cefrLabel("B2")).toBe("Intermedio alto");
-    expect(cefrLabel("C1")).toBe("Avanzado");
-    expect(cefrLabel("C2")).toBe("Maestría");
+  it("maps each level to an English label", () => {
+    expect(cefrLabel("A1")).toBe("Beginner");
+    expect(cefrLabel("A2")).toBe("Elementary");
+    expect(cefrLabel("B1")).toBe("Intermediate");
+    expect(cefrLabel("B2")).toBe("Upper-intermediate");
+    expect(cefrLabel("C1")).toBe("Advanced");
+    expect(cefrLabel("C2")).toBe("Mastery");
   });
 
   it("returns the raw value for unknown levels", () => {
@@ -39,9 +39,9 @@ describe("cefrLabel", () => {
 
 describe("bandLabel", () => {
   it("mapea cada destreza a su etiqueta", () => {
-    expect(bandLabel("vocabulary")).toBe("Vocabulario");
-    expect(bandLabel("grammar")).toBe("Gramática");
-    expect(bandLabel("pronunciation")).toBe("Pronunciación");
+    expect(bandLabel("vocabulary")).toBe("Vocabulary");
+    expect(bandLabel("grammar")).toBe("Grammar");
+    expect(bandLabel("pronunciation")).toBe("Pronunciation");
     expect(bandLabel("listening")).toBe("Listening");
     expect(bandLabel("speaking")).toBe("Speaking");
     expect(bandLabel("reading")).toBe("Reading");

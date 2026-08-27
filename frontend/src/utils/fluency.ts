@@ -1,15 +1,15 @@
 export function wpmLabel(wpm: number | null): string {
-  return wpm === null ? "—" : `${Math.round(wpm)} palabras/min`;
+  return wpm === null ? "—" : `${Math.round(wpm)} words/min`;
 }
 
 export function fluencyLevelLabel(level: string): string {
   switch (level) {
     case "fluent":
-      return "Fluido";
+      return "Fluent";
     case "good":
-      return "Buen ritmo";
+      return "Good pace";
     case "slow":
-      return "Lento";
+      return "Slow";
     default:
       return "—";
   }

@@ -1,8 +1,12 @@
 import { useRef, useState } from "react";
 import { checkPronunciation } from "../api/pronunciation";
-import type { PronunciationResponse } from "../types/api";
+import type { NextBestActivity, PronunciationResponse } from "../types/api";
+import type { Section } from "../utils/sections";
 import { fluencyLevelLabel, wpmLabel } from "../utils/fluency";
 import { feedbackHints, wordsCorrectLabel } from "../utils/pronunciationFeedback";
+import { ActivityResult } from "./ActivityResult";
+import { NextStep } from "./NextStep";
+import { useI18n } from "../hooks/useI18n";
 
 const SAMPLES = [
   "Hello, how are you?",
@@ -13,12 +17,15 @@ const SAMPLES = [
 interface PronunciationPracticeProps {
   userId: string | null;
   onAttempt: () => void;
+  onNext: (section: Section | null, step: NextBestActivity) => void;
 }
 
 export function PronunciationPractice({
   userId,
   onAttempt,
+  onNext,
 }: PronunciationPracticeProps) {
+  const { t } = useI18n();
   const [sentence, setSentence] = useState(SAMPLES[0]);
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -53,7 +60,7 @@ export function PronunciationPractice({
           setResult(await checkPronunciation(blob, sentence, userId));
           onAttempt();
         } catch (e) {
-          alert(`Error al evaluar la pronunciación: ${(e as Error).message}`);
+          alert(`${t("pron.evalError")}${(e as Error).message}`);
         } finally {
           setProcessing(false);
         }
@@ -62,16 +69,14 @@ export function PronunciationPractice({
       recorderRef.current = recorder;
       setRecording(true);
     } catch (e) {
-      alert(`No se pudo acceder al micrófono: ${(e as Error).message}`);
+      alert(`${t("pron.micError")}${(e as Error).message}`);
     }
   }
 
   return (
     <section className="pronunciation">
-      <h3>Práctica de pronunciación</h3>
-      <p className="pronunciation-prompt">
-        Lee la frase en voz alta y pulsa el micrófono:
-      </p>
+      <h3>{t("pron.title")}</h3>
+      <p className="pronunciation-prompt">{t("pron.prompt")}</p>
       <div className="pronunciation-samples">
         {SAMPLES.map((s) => (
           <button
@@ -86,54 +91,57 @@ export function PronunciationPractice({
 
       <div className="pronunciation-controls">
         <button
-          className={`record-button${recording ? " recording" : ""}`}
+          className={`record-button min-h-10${recording ? " recording" : ""}`}
           onClick={toggle}
           disabled={processing || !userId}
         >
           {processing
-            ? "Evaluando…"
+            ? t("pron.evaluating")
             : recording
-              ? "Detener"
-              : "Grabar"}
+              ? t("pron.stop")
+              : t("pron.record")}
         </button>
       </div>
 
       {result && (
-        <div className={`pronunciation-result ${result.level}`}>
-          <div className="score">{result.score}/100</div>
+        <ActivityResult
+          outcome={result.level === "good" ? "ok" : result.level === "fair" ? "neutral" : "ko"}
+          title={`${t("pron.title")} · ${result.score}/100`}
+          footer={<NextStep userId={userId} onNext={onNext} />}
+        >
           <div className="lines">
             <div>
-              <span className="label">Esperado:</span> {result.expected}
+              <span className="label">{t("pron.expected")}:</span> {result.expected}
             </div>
             <div>
-              <span className="label">Oído:</span> {result.heard}
+              <span className="label">{t("pron.heard")}:</span> {result.heard}
             </div>
             <div>
-              <span className="label">Nivel:</span>{" "}
+              <span className="label">{t("pron.level")}:</span>{" "}
               {result.level === "good"
-                ? "Muy bien"
+                ? t("pron.level.good")
                 : result.level === "fair"
-                  ? "Aceptable"
-                  : "Sigue practicando"}
+                  ? t("pron.level.fair")
+                  : t("pron.level.needsPractice")}
             </div>
             <div>
-              <span className="label">Precisión por palabra:</span>{" "}
+              <span className="label">{t("pron.wordAccuracy")}:</span>{" "}
               {result.word_accuracy}%
             </div>
             <div>
-              <span className="label">Similitud fonética:</span>{" "}
+              <span className="label">{t("pron.phoneticScore")}:</span>{" "}
               {result.phonetic_score}%
             </div>
             <div>
-              <span className="label">Precisión de fonemas (proxy de texto):</span>{" "}
+              <span className="label">{t("pron.phonemeAccuracy")}:</span>{" "}
               {result.phoneme_accuracy_proxy}%
             </div>
             <div>
-              <span className="label">Ritmo silábico (proxy, sin audio):</span>{" "}
+              <span className="label">{t("pron.prosody")}:</span>{" "}
               {result.prosody_proxy}%
             </div>
             <div>
-              <span className="label">Fluidez:</span>{" "}
+              <span className="label">{t("pron.fluency")}:</span>{" "}
               {fluencyLevelLabel(result.fluency.level)} ·{" "}
               {wpmLabel(result.fluency.wpm)}
             </div>
@@ -148,7 +156,7 @@ export function PronunciationPractice({
               ))}
             </ul>
           )}
-        </div>
+        </ActivityResult>
       )}
     </section>
   );

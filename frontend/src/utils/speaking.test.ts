@@ -114,13 +114,13 @@ describe("formatDurationTarget", () => {
 
 describe("criterionLabel", () => {
   it("mapea cada criterio a su etiqueta", () => {
-    expect(criterionLabel("task_achievement")).toBe("Tarea");
-    expect(criterionLabel("grammatical_control")).toBe("Gramática");
-    expect(criterionLabel("lexical_resource")).toBe("Léxico");
-    expect(criterionLabel("fluency")).toBe("Fluidez");
-    expect(criterionLabel("pronunciation")).toBe("Pronunciación");
-    expect(criterionLabel("coherence")).toBe("Coherencia");
-    expect(criterionLabel("interaction")).toBe("Interacción");
+    expect(criterionLabel("task_achievement")).toBe("Task achievement");
+    expect(criterionLabel("grammatical_control")).toBe("Grammatical control");
+    expect(criterionLabel("lexical_resource")).toBe("Lexical resource");
+    expect(criterionLabel("fluency")).toBe("Fluency");
+    expect(criterionLabel("pronunciation")).toBe("Pronunciation");
+    expect(criterionLabel("coherence")).toBe("Coherence");
+    expect(criterionLabel("interaction")).toBe("Interaction");
   });
 
   it("devuelve el valor crudo para criterios desconocidos", () => {

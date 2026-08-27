@@ -139,7 +139,23 @@ completo.
   añaden/actualizan los docstrings y se regenera la referencia. Es parte de la definición
   de "terminado" (como los tests de la premisa 12).
 
-## 19. La IA produce evidencia; el Mastery Engine determinista decide
+## 19. Panel de análisis: pestañas, no acordeones apilados
+- El panel **ANALYSIS** del chat (y cualquier panel lateral denso) usa **navegación por
+  pestañas**: una sección a la vez, agrupando paneles afines (p. ej. Speaking = diagnóstico +
+  panel + recorrido). Se prohíbe apilar acordeones colapsables como único medio de organización.
+- El contenido **nunca se corta**: cada sección tiene su propio scroll vertical; no se usa
+  `text-overflow: ellipsis` ni `overflow: hidden` para truncar títulos o cuerpos dentro del panel.
+
+## 20. Responsive 100% verificado y tests visuales
+- **Responsive total verificable**: toda la UI debe adaptarse a **móvil, tablet y escritorio**
+  sin overflow horizontal, con tap targets adecuados y drawers a pantalla completa en móvil.
+  La verificación en los 3 breakpoints forma parte de la Definition of Done.
+- **Tests visuales obligatorios**: al tocar UI (rediseños, layout, responsive) se capturan
+  screenshots reproducibles con **Playwright** en al menos 3 viewports (escritorio/tablet/móvil)
+  de las rutas principales, revisados antes de dar la tarea por terminada. El tooling y el script
+  viven en `frontend/` (p. ej. `playwright.config.ts` + `npm run test:visual`).
+
+## 21. La IA produce evidencia; el Mastery Engine determinista decide
 - La IA (AI Teacher) **interactúa** y **da feedback**, pero **nunca decide** si un objetivo
   está dominado: esa decisión la toma el **Mastery Engine determinista** (recencia EMA,
   racha y confianza), igual que el resto de la lógica de la Academy.
@@ -160,3 +176,13 @@ completo.
   destreza, se requiere un mínimo de intentos (`minimum_attempts`). Un único acierto no domina.
 - El **gating curricular** se valida también en los endpoints de evaluación: solo se pueden
   evaluar, intentar o completar objetivos en estado `available` o `review` (nunca `locked`).
+
+## 22. Paneles del chat redimensionables y persistentes
+- En CHAT los tres paneles (conversaciones, zona central y Análisis) son **redimensionables** por
+  el usuario con asas verticales visibles (grip) y accesibles (teclado, `aria-valuenow/min/max`).
+- El ancho elegido se **persiste por usuario** (`settings.layout`), con persistencia eficiente:
+  se guarda una sola vez al terminar de arrastrar (debounce), nunca en cada `pointermove`.
+- En móvil/tablet los paneles son drawers y las asas se ocultan; el redimensionado solo aplica en
+  desktop (≥1024px).
+- Los límites de ancho están acotados (`SIDEBAR_MIN/MAX`, `RIGHT_MIN/MAX`) para no dejar un panel
+  inservible; los valores persistidos se validan/recortan al cargar.

@@ -16,11 +16,11 @@ export function formatAverage(value: number | null): string {
 export function pronunciationLevelLabel(level: PronunciationLevel | null): string {
   switch (level) {
     case "good":
-      return "Muy bien";
+      return "Good";
     case "fair":
-      return "Aceptable";
+      return "Fair";
     case "needs_practice":
-      return "Sigue practicando";
+      return "Needs practice";
     case null:
       return "—";
   }
@@ -29,25 +29,25 @@ export function pronunciationLevelLabel(level: PronunciationLevel | null): strin
 export function bucketLabel(bucket: Bucket): string {
   switch (bucket) {
     case "day":
-      return "Día";
+      return "Day";
     case "week":
-      return "Semana";
+      return "Week";
     case "month":
-      return "Mes";
+      return "Month";
   }
 }
 
 export function eventLabel(type: LearningEventType): string {
   switch (type) {
     case "message":
-      return "Mensaje";
+      return "Message";
     case "exercise":
-      return "Ejercicio";
+      return "Exercise";
     case "correction":
-      return "Corrección";
+      return "Correction";
     case "pronunciation":
-      return "Pronunciación";
+      return "Pronunciation";
     case "conversation":
-      return "Conversación";
+      return "Conversation";
   }
 }

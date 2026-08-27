@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { completeSessionStep, getGoal, getSession, getStudentModel, putGoal } from "../api/academy";
+import { getGoal, getSession, getStudentModel, putGoal } from "../api/academy";
 import type {
   LearningGoal,
   LearningGoalType,
@@ -15,13 +15,14 @@ import {
   SUBSKILL_LABELS,
   stepTitle,
 } from "../utils/learningLabels";
+import { useI18n } from "../hooks/useI18n";
 
 const GOAL_TYPE_LABELS: Record<LearningGoalType, string> = {
-  general: "Conversación general",
-  travel: "Viajar",
-  work: "Trabajo",
-  interview: "Entrevista",
-  exam: "Examen",
+  general: "today.goalType.general",
+  travel: "today.goalType.travel",
+  work: "today.goalType.work",
+  interview: "today.goalType.interview",
+  exam: "today.goalType.exam",
 };
 
 const GOAL_TYPE_ORDER: LearningGoalType[] = [
@@ -41,6 +42,7 @@ interface TodayPlanProps {
 }
 
 export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
+  const { t } = useI18n();
   const [model, setModel] = useState<StudentModel | null>(null);
   const [session, setSession] = useState<SessionData | null>(null);
   const [goal, setGoal] = useState<LearningGoal | null>(null);
@@ -48,7 +50,6 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
   const [draft, setDraft] = useState<LearningGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -109,25 +110,10 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
     }
   }
 
-  async function markDone(step: SessionStep) {
-    if (!userId || completing) return;
-    setCompleting(true);
-    try {
-      const next = await completeSessionStep(userId, step.step_key);
-      setSession(next);
-    } catch {
-      /* backend no disponible */
-    } finally {
-      setCompleting(false);
-    }
-  }
-
   if (!model) {
     return (
       <section className="today-plan">
-        <p className="progress-empty">
-          Aún no hay modelo de aprendizaje. Practica y aquí verás tu plan de hoy.
-        </p>
+        <p className="progress-empty">{t("today.noModel")}</p>
       </section>
     );
   }
@@ -141,7 +127,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
           {editing && draft ? (
             <div className="goal-form">
               <label className="goal-field">
-                <span>Objetivo</span>
+                <span>{t("today.goal")}</span>
                 <select
                   value={draft.goal_type}
                   onChange={(e) =>
@@ -151,15 +137,15 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
                     })
                   }
                 >
-                  {GOAL_TYPE_ORDER.map((t) => (
-                    <option key={t} value={t}>
-                      {GOAL_TYPE_LABELS[t]}
+                  {GOAL_TYPE_ORDER.map((gt) => (
+                    <option key={gt} value={gt}>
+                      {t(GOAL_TYPE_LABELS[gt])}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="goal-field">
-                <span>Meta CEFR</span>
+                <span>{t("today.targetCefr")}</span>
                 <select
                   value={draft.target_level}
                   onChange={(e) =>
@@ -178,7 +164,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
               </label>
               <div className="goal-row">
                 <label className="goal-field">
-                  <span>Min/día</span>
+                  <span>{t("today.minPerDay")}</span>
                   <input
                     type="number"
                     min={5}
@@ -194,7 +180,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
                   />
                 </label>
                 <label className="goal-field">
-                  <span>Días/semana</span>
+                  <span>{t("today.daysPerWeek")}</span>
                   <input
                     type="number"
                     min={1}
@@ -211,7 +197,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
               </div>
               <div className="goal-actions">
                 <button type="button" onClick={cancelEdit} disabled={saving}>
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -219,23 +205,24 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
                   onClick={saveGoal}
                   disabled={saving}
                 >
-                  {saving ? "Guardando…" : "Guardar"}
+                  {saving ? t("common.saving") : t("common.save")}
                 </button>
               </div>
             </div>
           ) : (
             <div className="goal-summary">
               <div className="goal-summary-text">
-                <strong>{GOAL_TYPE_LABELS[goal.goal_type]}</strong>
+                <strong>{t(GOAL_TYPE_LABELS[goal.goal_type])}</strong>
                 <span>
-                  Meta {goal.target_level} · {goal.minutes_per_day} min/día ·{" "}
-                  {goal.days_per_week} días/semana
+                  {t("today.targetCefr")} {goal.target_level} ·{" "}
+                  {goal.minutes_per_day} {t("today.minPerDay")} ·{" "}
+                  {goal.days_per_week} {t("today.daysPerWeek")}
                 </span>
               </div>
               <button type="button" onClick={startEdit}>
-                Editar
+                {t("common.edit")}
               </button>
-              {saved && <span className="goal-saved">Guardado</span>}
+              {saved && <span className="goal-saved">{t("today.saved")}</span>}
             </div>
           )}
         </div>
@@ -252,13 +239,16 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
           {model.target_level}
         </span>
         <span className="today-milestone-label">
-          {cefrLabel(model.estimated_level)} · próximo hito {model.target_level}
+          {cefrLabel(model.estimated_level)} · {t("today.nextMilestone")}{" "}
+          {model.target_level}
         </span>
       </div>
 
       <div className="today-readiness">
         <div className="today-readiness-head">
-          <span>Preparación para {model.target_level}</span>
+          <span>
+            {t("today.readyFor")} {model.target_level}
+          </span>
           <strong>{Math.round(model.readiness.overall)}%</strong>
         </div>
         <div className="today-bar" role="progressbar" aria-valuenow={model.readiness.overall} aria-valuemin={0} aria-valuemax={100}>
@@ -266,7 +256,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
         </div>
         {model.readiness.blocking_skills.length > 0 && (
           <p className="today-blocking">
-            Destreza bloqueante:{" "}
+            {t("today.blocking")}{" "}
             {model.readiness.blocking_skills
               .map((s) => SKILL_LABELS[s] ?? s)
               .join(", ")}
@@ -284,7 +274,9 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
 
       {model.reassessment && (
         <div className="today-reassessment">
-          Listo para reevaluar {SKILL_LABELS[model.reassessment.skill] ?? model.reassessment.skill} ({model.reassessment.level})
+          {t("today.readyToReassess")}{" "}
+          {SKILL_LABELS[model.reassessment.skill] ?? model.reassessment.skill} (
+          {model.reassessment.level})
         </div>
       )}
 
@@ -293,7 +285,8 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
           <div className="session-headline">
             <strong>{session.total_minutes} min</strong>
             <span>
-              repasa {session.review_count} · practica {session.practice_count}
+              {t("today.review")} {session.review_count} · {t("today.practice")}{" "}
+              {session.practice_count}
             </span>
           </div>
           <ol className="today-items">
@@ -302,8 +295,6 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
                 key={`${item.kind}-${item.subskill ?? item.objective_id ?? item.title}-${i}`}
                 item={item}
                 onClick={onStep}
-                onDone={markDone}
-                busy={completing}
               />
             ))}
           </ol>
@@ -316,7 +307,7 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
           className="today-start"
           onClick={() => onStep(session.items[0])}
         >
-          Empezar la sesión de hoy
+          {t("today.startSession")}
         </button>
       )}
     </section>
@@ -326,18 +317,15 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
 function SessionStepRow({
   item,
   onClick,
-  onDone,
-  busy = false,
 }: {
   item: SessionStep;
   onClick?: (step: SessionStep) => void;
-  onDone?: (step: SessionStep) => void;
-  busy?: boolean;
 }) {
+  const { t } = useI18n();
   const label = KIND_LABELS[item.kind] ?? item.kind;
   const reason =
     item.kind === "listening" && item.subskill
-      ? `Sub-destreza: ${SUBSKILL_LABELS[item.subskill] ?? item.subskill}`
+      ? `${t("today.subskill")} ${SUBSKILL_LABELS[item.subskill] ?? item.subskill}`
       : item.reason;
   return (
     <li className="today-item">
@@ -355,30 +343,6 @@ function SessionStepRow({
         <span className="today-item-kind">{label}</span>
         <span className="today-item-minutes">{item.minutes} min</span>
       </button>
-      {onDone && (
-        <button
-          type="button"
-          className="today-item-done"
-          onClick={() => onDone(item)}
-          disabled={busy}
-          aria-label={`Marcar como hecho: ${stepTitle(item)}`}
-          title="Marcar como hecho"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        </button>
-      )}
     </li>
   );
 }
@@ -398,7 +362,7 @@ function SkillBar({ skill }: { skill: SkillProfile }) {
               {trend >= 0 ? "↗" : "↘"} {Math.abs(trend)}%
             </span>
           )}
-          <span className="today-skill-stability">est. {stabilityPct}%</span>
+          <span className="today-skill-stability">stability {stabilityPct}%</span>
         </span>
       </div>
       <div className="today-bar">

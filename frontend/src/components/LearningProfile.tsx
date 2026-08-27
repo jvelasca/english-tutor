@@ -1,6 +1,7 @@
 import { bandLabel, cefrTone } from "../utils/cefr";
 import { formatAverage } from "../utils/progress";
 import type { LearningProfile as ProfileData } from "../types/api";
+import { useI18n } from "../hooks/useI18n";
 
 interface LearningProfileProps {
   profile: ProfileData | null;
@@ -28,13 +29,11 @@ function trendDirection(trend: number | null): "up" | "down" | "flat" {
 }
 
 export function LearningProfile({ profile }: LearningProfileProps) {
+  const { t } = useI18n();
   if (profile === null) {
     return (
       <section className="learning-profile">
-        <p className="progress-empty">
-          Aún no hay perfil de aprendizaje. Escribe en inglés y aquí verás tu nivel,
-          vocabulario y recomendaciones.
-        </p>
+        <p className="progress-empty">{t("empty.noProfile")}</p>
       </section>
     );
   }
@@ -47,8 +46,8 @@ export function LearningProfile({ profile }: LearningProfileProps) {
         <p className="cefr-descriptor">{profile.estimated_descriptor}</p>
       )}
 
-      <div className="cefr-ability" title="Capacidad global continua (escala A1=1 … C2=6)">
-        <span className="cefr-confidence-label">Capacidad global</span>
+      <div className="cefr-ability" title={t("profile.globalAbilityTitle")}>
+        <span className="cefr-confidence-label">{t("profile.globalAbility")}</span>
         <div className="cefr-confidence-track">
           <div
             className="cefr-confidence-fill"
@@ -65,7 +64,7 @@ export function LearningProfile({ profile }: LearningProfileProps) {
           <span
             key={skill}
             className={`cefr-band ${cefrTone(profile.estimated_bands[skill])}`}
-            title="Banda heurística alineada con CEFR (no es una certificación oficial)"
+            title={t("profile.bandTitle")}
           >
             <span className="cefr-band-label">{bandLabel(skill)}</span>
             <span className="cefr-band-value">
@@ -77,14 +76,15 @@ export function LearningProfile({ profile }: LearningProfileProps) {
 
       <div className="cefr-readiness">
         <span className="cefr-confidence-label">
-          Preparado para {profile.target_level}
+          {t("profile.readyFor")} {profile.target_level}
         </span>
         <span className="cefr-confidence-value">
           {Math.round(profile.readiness.overall)}%
         </span>
         {profile.readiness.blocking_skills.length > 0 && (
           <p className="readiness-blocking">
-            Trabaja en: {profile.readiness.blocking_skills.map(bandLabel).join(", ")}
+            {t("profile.workOn")}{" "}
+            {profile.readiness.blocking_skills.map(bandLabel).join(", ")}
           </p>
         )}
       </div>
@@ -98,9 +98,10 @@ export function LearningProfile({ profile }: LearningProfileProps) {
                 <span className="cefr-evidence-skill">{bandLabel(item.skill)}</span>
                 <span className="cefr-evidence-band">{item.band}</span>
                 <span className="cefr-evidence-samples">
-                  {item.samples} muestras · {Math.round(item.confidence * 100)}%
+                  {item.samples} {t("profile.samples")} ·{" "}
+                  {Math.round(item.confidence * 100)}%
                 </span>
-                <span className={`trend trend-${dir}`} title="Tendencia reciente">
+                <span className={`trend trend-${dir}`} title={t("profile.recentTrend")}>
                   {formatTrend(item.trend)}
                 </span>
               </div>
@@ -111,12 +112,12 @@ export function LearningProfile({ profile }: LearningProfileProps) {
 
       <div className="learning-grid">
         <div className="learning-block">
-          <h3>Vocabulario</h3>
+          <h3>{t("profile.vocabulary")}</h3>
           <p className="learning-big">{profile.vocabulary_size}</p>
           {(profile.vocabulary_mastered > 0 || profile.vocabulary_exposed > 0) && (
             <p className="learning-sub">
-              {profile.vocabulary_mastered} dominadas · {profile.vocabulary_exposed}{" "}
-              vistas
+              {profile.vocabulary_mastered} {t("profile.mastered")} ·{" "}
+              {profile.vocabulary_exposed} {t("profile.seen")}
             </p>
           )}
           {profile.top_words.length > 0 ? (
@@ -128,12 +129,12 @@ export function LearningProfile({ profile }: LearningProfileProps) {
               ))}
             </ul>
           ) : (
-            <p className="progress-empty">Sin palabras registradas.</p>
+            <p className="progress-empty">{t("profile.noWords")}</p>
           )}
         </div>
 
         <div className="learning-block">
-          <h3>Pronunciación media</h3>
+          <h3>{t("profile.avgPronunciation")}</h3>
           <p className="learning-big">
             {profile.pronunciation_average === null
               ? "—"
@@ -143,9 +144,9 @@ export function LearningProfile({ profile }: LearningProfileProps) {
       </div>
 
       <div className="learning-block">
-        <h3>Errores recurrentes</h3>
+        <h3>{t("profile.recurringErrors")}</h3>
         {profile.recurring_errors.length === 0 ? (
-          <p className="progress-empty">Sin errores recurrentes detectados.</p>
+          <p className="progress-empty">{t("profile.noErrors")}</p>
         ) : (
           <ul className="learning-errors">
             {profile.recurring_errors.map((e) => (
@@ -158,13 +159,13 @@ export function LearningProfile({ profile }: LearningProfileProps) {
         )}
         {profile.mastered_count > 0 && (
           <p className="learning-mastered">
-            Errores superados: {profile.mastered_count}
+            {t("profile.errorsOvercome")} {profile.mastered_count}
           </p>
         )}
       </div>
 
       <div className="learning-block">
-        <h3>Recomendaciones</h3>
+        <h3>{t("profile.recommendations")}</h3>
         <ul className="learning-recs">
           {profile.recommendations.map((r, i) => (
             <li key={i}>{r}</li>

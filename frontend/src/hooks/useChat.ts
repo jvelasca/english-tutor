@@ -70,6 +70,7 @@ export function useChat() {
   const modelRef = useRef<string>(DEFAULT_MODEL);
   const composeStartedAt = useRef<number | null>(null);
   const lastAssistantAt = useRef<number | null>(null);
+  const layoutPersistTimer = useRef<number | null>(null);
 
   useEffect(() => {
     modelRef.current = model;
@@ -350,7 +351,13 @@ export function useChat() {
   const setLayout = useCallback(
     (next: LayoutState) => {
       setLayoutState(next);
-      persistSettings({ layout: serializeLayout(next) });
+      // Persiste una sola vez al terminar de arrastrar (no en cada pointermove).
+      if (layoutPersistTimer.current !== null) {
+        window.clearTimeout(layoutPersistTimer.current);
+      }
+      layoutPersistTimer.current = window.setTimeout(() => {
+        persistSettings({ layout: serializeLayout(next) });
+      }, 400);
     },
     [persistSettings],
   );
@@ -551,3 +558,5 @@ export function useChat() {
     completeLesson,
   };
 }
+
+export type ChatApi = ReturnType<typeof useChat>;
