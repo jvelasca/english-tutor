@@ -5,9 +5,13 @@ import type {
   SpeakingDiagnostic as SpeakingDiagnosticData,
   SpeakingLevelOut,
 } from "../../types/api";
-import { cefrTone } from "../../utils/cefr";
 import { criterionLabel, formatTrendDelta, nextFocus } from "../../utils/speaking";
 import { useI18n } from "../../hooks/useI18n";
+import { LevelBadge } from "../../components/LevelBadge";
+import { SkillBar } from "../../components/SkillBar";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
 
 interface SpeakingPanelProps {
   userId: string | null;
@@ -69,9 +73,11 @@ export function SpeakingPanel({ userId, onPractice }: SpeakingPanelProps) {
 
   if (!level && !diagnostic) {
     return (
-      <section className="speaking-panel">
-        <p className="progress-empty">{t("empty.noSpeaking")}</p>
-      </section>
+      <Card className="p-5">
+        <p className="text-center text-sm text-muted-foreground">
+          {t("empty.noSpeaking")}
+        </p>
+      </Card>
     );
   }
 
@@ -79,61 +85,55 @@ export function SpeakingPanel({ userId, onPractice }: SpeakingPanelProps) {
   const focus = diagnostic ? nextFocus(diagnostic.criteria) : [];
 
   return (
-    <section className="speaking-panel">
-      <header className="speaking-panel__header">
-        {level?.level && (
-          <span className={`cefr-badge ${cefrTone(level.level)}`}>
-            {level.level}
-          </span>
-        )}
+    <Card className="gap-5 p-5">
+      <header className="flex flex-wrap items-center gap-2">
+        {level?.level && <LevelBadge level={level.level} />}
         {trend && trend.direction !== "n/a" && (
-          <span className={`speaking-panel__trend trend-${trend.direction}`}>
+          <span
+            className={cn(
+              "ml-auto inline-flex items-center gap-1 text-xs font-bold tabular-nums",
+              trend.direction === "up" && "text-success",
+              trend.direction === "down" && "text-destructive",
+              trend.direction === "flat" && "text-muted-foreground",
+            )}
+          >
             {trendArrow(trend.direction)} {formatTrendDelta(trend.delta)}
           </span>
         )}
       </header>
 
       {diagnostic && (
-        <ul className="speaking-panel__criteria">
+        <ul className="flex flex-col gap-3">
           {diagnostic.criteria.map((c) => (
-            <li
-              key={c.criterion}
-              className={`speaking-panel__criterion${isWeak(c) ? " review" : ""}`}
-            >
-              <span className="speaking-panel__criterion-label">
-                {criterionLabel(c.criterion)}
-              </span>
-              <span className="speaking-panel__criterion-score">
-                {scorePct(c)}
-              </span>
-              <span
-                className="speaking-panel__criterion-mark"
-                aria-hidden="true"
-              >
-                {isWeak(c) ? "⚠" : "✓"}
-              </span>
+            <li key={c.criterion}>
+              <SkillBar
+                label={criterionLabel(c.criterion)}
+                value={c.recent_score ?? c.mean ?? 0}
+                hint={`${isWeak(c) ? "⚠ " : "✓ "}${scorePct(c)}`}
+              />
             </li>
           ))}
         </ul>
       )}
 
       {focus.length > 0 && (
-        <div className="speaking-focus">
-          <div className="speaking-focus__head">
-            <span className="speaking-focus__label">NEXT FOCUS</span>
-            <span className="speaking-focus__criteria">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {t("home.nextFocus")}
+            </p>
+            <p className="truncate text-sm font-semibold text-foreground">
               {focus.map(criterionLabel).join(" + ")}
-            </span>
+            </p>
           </div>
-          <button
-            type="button"
-            className="speaking-focus__action"
+          <Button
+            className="min-h-10 uppercase tracking-wide"
             onClick={() => onPractice?.()}
           >
-            PRACTICE NOW
-          </button>
+            {t("home.practiceNow")}
+          </Button>
         </div>
       )}
-    </section>
+    </Card>
   );
 }

@@ -1,14 +1,41 @@
 import { useEffect, useState } from "react";
+import { motion, type Variants } from "motion/react";
+import { ChevronDown } from "lucide-react";
 import { getStudentModel } from "../../api/academy";
 import type { SkillProfile, StudentModel } from "../../types/api";
-import { cefrLabel, cefrTone } from "../../utils/cefr";
 import { SKILL_LABELS } from "../../utils/learningLabels";
 import { useI18n } from "../../hooks/useI18n";
 import { SpeakingDiagnostic } from "../speaking/SpeakingDiagnostic";
 import { WritingJourney } from "../writing/WritingJourney";
+import { LevelBadge } from "../../components/LevelBadge";
+import { SkillBar } from "../../components/SkillBar";
+import { Card } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { Progress } from "../../components/ui/progress";
+import { cn } from "../../lib/utils";
 
 const PRIMARY = ["listening", "speaking", "reading", "writing"] as const;
 type PrimarySkill = (typeof PRIMARY)[number];
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const MASTERY_TONE: Record<string, string> = {
+  strong: "border-transparent bg-success/15 text-success",
+  developing: "border-transparent bg-warning/15 text-warning",
+  needs: "border-transparent bg-destructive/10 text-destructive",
+};
 
 interface ProgressScreenProps {
   userId: string | null;
@@ -48,85 +75,101 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
   }, [userId]);
 
   const level = model?.estimated_level ?? null;
-  const tone = level ? cefrTone(level) : "basic";
   const overall = Math.round(model?.readiness.overall ?? 0);
 
   const skills = model?.skills ?? [];
   const bySkill = new Map(skills.map((s) => [s.skill, s]));
 
   return (
-    <div className="progress-screen">
-      <header className="progress-screen__header flex-wrap">
-        <h2 className="progress-screen__title">{t("progress.title")}</h2>
-        <div className="progress-screen__headline">
-          <span className={`cefr-badge ${tone}`}>{level ?? "—"}</span>
-          {level && <span>{cefrLabel(level)}</span>}
-        </div>
-      </header>
-
-      <section className="progress-screen__overall card">
-        <div className="progress-screen__overall-row">
-          <span>{t("progress.overall")}</span>
-          <strong>{overall}%</strong>
-        </div>
-        <div
-          className="today-bar"
-          role="progressbar"
-          aria-valuenow={overall}
-          aria-valuemin={0}
-          aria-valuemax={100}
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="flex flex-col gap-5"
+      >
+        <motion.header
+          variants={item}
+          className="flex flex-wrap items-center justify-between gap-3"
         >
-          <span style={{ width: `${overall}%` }} />
-        </div>
-      </section>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {t("progress.title")}
+          </h1>
+          <LevelBadge level={level ?? "—"} showLabel={Boolean(level)} />
+        </motion.header>
 
-      <section className="progress-screen__skills card" aria-label={t("progress.title")}>
-        <ul className="progress-screen__list">
-          {PRIMARY.map((skill) => {
-            const p = bySkill.get(skill);
-            if (!p) return null;
-            return (
-              <li key={skill} className="progress-screen__skill">
-                <button
-                  type="button"
-                  className="progress-screen__skill-main max-sm:grid-cols-[minmax(0,1fr)_auto]!"
-                  onClick={() =>
-                    setSelected((cur) => (cur === skill ? null : skill))
-                  }
-                  aria-expanded={selected === skill}
-                >
-                  <span className="progress-screen__skill-name">
-                    {SKILL_LABELS[skill] ?? skill}
-                  </span>
-                  <span
-                    className={`progress-screen__skill-badge ${masteryClass(p.score)}`}
+        <motion.section variants={item} aria-label={t("progress.overall")}>
+          <Card className="gap-2 p-5">
+            <SkillBar
+              label={t("progress.overall")}
+              value={overall / 100}
+              hint={`${overall}%`}
+            />
+          </Card>
+        </motion.section>
+
+        <motion.section variants={item} aria-label={t("progress.title")}>
+          <Card className="gap-2 p-3 sm:p-4">
+            <ul className="flex flex-col gap-2">
+              {PRIMARY.map((skill) => {
+                const p = bySkill.get(skill);
+                if (!p) return null;
+                const open = selected === skill;
+                return (
+                  <li
+                    key={skill}
+                    className="overflow-hidden rounded-lg border border-border/60"
                   >
-                    {masteryLabel(p.score, t)}
-                  </span>
-                  <span className="progress-screen__skill-bar">
-                    <span style={{ width: `${Math.round(p.score * 100)}%` }} />
-                  </span>
-                  <span className="progress-screen__skill-chevron" aria-hidden="true">
-                    {selected === skill ? "▾" : "▸"}
-                  </span>
-                </button>
+                    <button
+                      type="button"
+                      className="flex min-h-10 w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-accent/50"
+                      onClick={() =>
+                        setSelected((cur) => (cur === skill ? null : skill))
+                      }
+                      aria-expanded={open}
+                    >
+                      <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">
+                        {SKILL_LABELS[skill] ?? skill}
+                      </span>
+                      <Badge
+                        className={cn(
+                          "shrink-0",
+                          MASTERY_TONE[masteryClass(p.score)],
+                        )}
+                      >
+                        {masteryLabel(p.score, t)}
+                      </Badge>
+                      <Progress
+                        value={Math.round(p.score * 100)}
+                        className="hidden h-1.5 w-24 sm:block"
+                      />
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-muted-foreground transition-transform",
+                          open && "rotate-180",
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
 
-                {selected === skill && (
-                  <div className="progress-screen__detail">
-                    {skill === "speaking" ? (
-                      <SpeakingDiagnostic userId={userId} />
-                    ) : skill === "writing" ? (
-                      <WritingJourney userId={userId} />
-                    ) : (
-                      <SkillDetail profile={p} />
+                    {open && (
+                      <div className="border-t border-dashed border-border p-3">
+                        {skill === "speaking" ? (
+                          <SpeakingDiagnostic userId={userId} />
+                        ) : skill === "writing" ? (
+                          <WritingJourney userId={userId} />
+                        ) : (
+                          <SkillDetail profile={p} />
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        </motion.section>
+      </motion.div>
     </div>
   );
 }
@@ -134,27 +177,45 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
 function SkillDetail({ profile }: { profile: SkillProfile }) {
   const { t } = useI18n();
   return (
-    <div className="skill-detail">
-      <div className="skill-detail__grid max-sm:grid-cols-2!">
-        <div className="skill-detail__item">
-          <span className="skill-detail__label">Score</span>
-          <strong>{Math.round(profile.score * 100)}%</strong>
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-muted-foreground">
+            {t("progress.score")}
+          </span>
+          <strong className="text-base text-foreground">
+            {Math.round(profile.score * 100)}%
+          </strong>
         </div>
-        <div className="skill-detail__item">
-          <span className="skill-detail__label">Confidence</span>
-          <strong>{Math.round(profile.confidence * 100)}%</strong>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-muted-foreground">
+            {t("progress.confidence")}
+          </span>
+          <strong className="text-base text-foreground">
+            {Math.round(profile.confidence * 100)}%
+          </strong>
         </div>
-        <div className="skill-detail__item">
-          <span className="skill-detail__label">Evidence</span>
-          <strong>{profile.evidence_count}</strong>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-muted-foreground">
+            {t("progress.evidence")}
+          </span>
+          <strong className="text-base text-foreground">
+            {profile.evidence_count}
+          </strong>
         </div>
-        <div className="skill-detail__item">
-          <span className="skill-detail__label">Stability</span>
-          <strong>{Math.round(profile.stability * 100)}%</strong>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-muted-foreground">
+            {t("progress.stability")}
+          </span>
+          <strong className="text-base text-foreground">
+            {Math.round(profile.stability * 100)}%
+          </strong>
         </div>
       </div>
       {profile.review_due && (
-        <span className="skill-detail__review">{t("home.needsReview")}</span>
+        <Badge className="w-fit border-transparent bg-warning/15 text-warning">
+          {t("home.needsReview")}
+        </Badge>
       )}
     </div>
   );

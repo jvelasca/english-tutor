@@ -1,4 +1,7 @@
 import { useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { motion } from "motion/react";
+import { AlertTriangle, Loader2, Mic, Send, Square } from "lucide-react";
 import {
   finishSpeakingAssessment,
   startSpeakingAssessment,
@@ -12,7 +15,6 @@ import type {
   SpeakingAssessmentResult,
 } from "../../types/api";
 import type { Section } from "../../utils/sections";
-import { cefrTone } from "../../utils/cefr";
 import {
   criterionLabel,
   formatConfidence,
@@ -23,7 +25,13 @@ import {
 import { SpeakingRolePlay } from "./SpeakingRolePlay";
 import { ActivityResult } from "../../components/ActivityResult";
 import { NextStep } from "../../components/NextStep";
+import { LevelBadge } from "../../components/LevelBadge";
+import { SkillBar } from "../../components/SkillBar";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import { useI18n } from "../../hooks/useI18n";
+import { cn } from "../../lib/utils";
 
 type Phase = "idle" | "part" | "result";
 
@@ -31,6 +39,18 @@ interface SpeakingAssessmentProps {
   userId: string | null;
   onAttempt: () => void;
   onNext: (section: Section | null, step: NextBestActivity) => void;
+}
+
+function ErrorNote({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 break-words">{children}</span>
+    </div>
+  );
 }
 
 /**
@@ -213,114 +233,92 @@ export function SpeakingAssessment({
 
   if (phase === "idle") {
     return (
-      <section className="speaking-assessment">
-        <p className="speaking-assessment__desc">{t("assessment.startDesc")}</p>
-        {error && (
-          <p className="speaking-assessment__error" role="alert">
-            {error}
-          </p>
-        )}
-        <button
-          type="button"
-          className="speaking-assessment__start"
+      <Card className="gap-4 p-5">
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {t("assessment.startDesc")}
+        </p>
+        {error && <ErrorNote>{error}</ErrorNote>}
+        <Button
+          className="min-h-10 gap-2 self-start"
           onClick={handleStart}
           disabled={!userId || loading}
         >
+          {loading && (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          )}
           {loading ? t("assessment.starting") : t("assessment.start")}
-        </button>
-      </section>
+        </Button>
+      </Card>
     );
   }
 
   if (phase === "result" && result) {
     return (
-      <section className="speaking-assessment">
-        <ActivityResult
-          outcome="neutral"
-          title={`Speaking Assessment · ${formatScorePct(result.score)}`}
-          footer={<NextStep userId={userId} onNext={onNext} />}
+      <ActivityResult
+        outcome="neutral"
+        title={`Speaking Assessment · ${formatScorePct(result.score)}`}
+        footer={<NextStep userId={userId} onNext={onNext} />}
+      >
+        <header className="flex flex-wrap items-center gap-2">
+          {result.level && <LevelBadge level={result.level} />}
+        </header>
+
+        <div className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <span>
+            {t("assessment.confidence")} {formatConfidence(result.confidence)}
+          </span>
+          <span aria-hidden="true"> · </span>
+          <span>
+            {result.attempts} {t("assessment.attempts")}
+          </span>
+        </div>
+
+        <ul className="flex flex-col gap-3">
+          {result.criteria.map((c) => {
+            const score = c.recent_score ?? c.mean;
+            const weak = c.review_due || (score != null && score < 0.6);
+            return (
+              <li key={c.criterion}>
+                <SkillBar
+                  label={criterionLabel(c.criterion)}
+                  value={score ?? 0}
+                  hint={`${weak ? "⚠ " : "✓ "}${formatScorePct(score)}`}
+                />
+              </li>
+            );
+          })}
+        </ul>
+
+        {result.recommendation && (
+          <p className="text-sm leading-relaxed text-foreground">
+            {result.recommendation}
+          </p>
+        )}
+
+        <Button
+          variant="outline"
+          className="min-h-10 self-start"
+          onClick={handleReset}
         >
-          <header className="speaking-assessment__header">
-            {result.level && (
-              <span className={`cefr-badge ${cefrTone(result.level)}`}>
-                {result.level}
-              </span>
-            )}
-          </header>
-
-          <div className="speaking-assessment__result">
-            <div className="speaking-assessment__result-meta">
-              <span>
-                {t("assessment.confidence")} {formatConfidence(result.confidence)}
-              </span>
-              <span>·</span>
-              <span>
-                {result.attempts} {t("assessment.attempts")}
-              </span>
-            </div>
-          </div>
-
-          <ul className="speaking-assessment__criteria">
-            {result.criteria.map((c) => {
-              const score = c.recent_score ?? c.mean;
-              const weak = c.review_due || (score != null && score < 0.6);
-              return (
-                <li
-                  key={c.criterion}
-                  className={`speaking-assessment__criterion${weak ? " review" : ""}`}
-                >
-                  <span className="speaking-assessment__criterion-label">
-                    {criterionLabel(c.criterion)}
-                  </span>
-                  <span className="speaking-assessment__criterion-score">
-                    {formatScorePct(score)}
-                  </span>
-                  <span
-                    className="speaking-assessment__criterion-mark"
-                    aria-hidden="true"
-                  >
-                    {weak ? "⚠" : "✓"}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-
-          {result.recommendation && (
-            <p className="speaking-assessment__recommendation">
-              {result.recommendation}
-            </p>
-          )}
-
-          <button
-            type="button"
-            className="speaking-assessment__reset"
-            onClick={handleReset}
-          >
-            {t("assessment.another")}
-          </button>
-        </ActivityResult>
-      </section>
+          {t("assessment.another")}
+        </Button>
+      </ActivityResult>
     );
   }
 
   return (
-    <section className="speaking-assessment">
-      <header className="speaking-assessment__header">
-        {part && (
-          <span className={`cefr-badge ${cefrTone(part.cefr_target)}`}>
-            {part.cefr_target}
-          </span>
-        )}
+    <Card className="gap-4 p-5">
+      <header className="flex flex-wrap items-center gap-2">
+        {part && <LevelBadge level={part.cefr_target} />}
       </header>
 
-      <div className="speaking-assessment__meta">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
           {t("assessment.part")} {part?.part_index ?? 1} {t("assessment.of")}{" "}
           {totalParts}
         </span>
         {part && (
-          <span className="speaking-assessment__duration">
+          <span className="tabular-nums text-muted-foreground">
             ~{formatDurationTarget(part.duration_target)}
           </span>
         )}
@@ -328,16 +326,14 @@ export function SpeakingAssessment({
 
       {part && (
         <>
-          <p className="speaking-assessment__part-title">{part.title}</p>
-          <p className="speaking-assessment__prompt">{part.prompt}</p>
+          <p className="text-base font-semibold leading-snug">{part.title}</p>
+          <p className="rounded-md border border-border bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">
+            {part.prompt}
+          </p>
         </>
       )}
 
-      {error && (
-        <p className="speaking-assessment__error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       {!submitted ? (
         part && isConversationalTaskType(part.task_type) ? (
@@ -351,10 +347,9 @@ export function SpeakingAssessment({
           />
         ) : (
           <>
-            <div className="speaking-assessment__controls">
-              <button
+            <div className="flex items-center gap-3">
+              <motion.button
                 type="button"
-                className={`speaking-assessment__record min-h-10${recording ? " recording" : ""}${processing ? " processing" : ""}`}
                 onClick={toggleRecording}
                 disabled={processing || !userId}
                 aria-pressed={recording}
@@ -365,21 +360,52 @@ export function SpeakingAssessment({
                       ? t("assessment.stop")
                       : t("assessment.record")
                 }
+                whileTap={
+                  processing || !userId ? undefined : { scale: 0.94 }
+                }
+                className={cn(
+                  "relative grid size-14 shrink-0 place-items-center rounded-full text-primary-foreground transition-colors disabled:opacity-50",
+                  recording
+                    ? "bg-destructive"
+                    : "bg-primary hover:bg-primary/90",
+                  processing && "opacity-60",
+                )}
               >
+                {recording && (
+                  <motion.span
+                    aria-hidden="true"
+                    className="absolute inset-0 rounded-full border-2 border-destructive"
+                    animate={{ scale: [1, 1.6], opacity: [0.6, 0] }}
+                    transition={{
+                      duration: 1.4,
+                      repeat: Infinity,
+                      ease: "easeOut",
+                    }}
+                  />
+                )}
+                {processing ? (
+                  <Loader2 className="size-6 animate-spin" aria-hidden="true" />
+                ) : recording ? (
+                  <Square className="size-5" aria-hidden="true" />
+                ) : (
+                  <Mic className="size-6" aria-hidden="true" />
+                )}
+              </motion.button>
+              <span className="text-sm font-medium text-foreground">
                 {processing
                   ? t("assessment.transcribing")
                   : recording
                     ? t("assessment.stop")
                     : t("assessment.record")}
-              </button>
+              </span>
             </div>
 
-            <label className="speaking-assessment__manual">
-              <span className="speaking-assessment__manual-label">
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
                 {t("assessment.orType")}
               </span>
               <textarea
-                className="speaking-assessment__textarea"
+                className="min-h-[72px] w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/50 disabled:opacity-60"
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
                 placeholder={t("assessment.placeholder")}
@@ -389,59 +415,66 @@ export function SpeakingAssessment({
               />
             </label>
 
-            <button
-              type="button"
-              className="speaking-assessment__submit"
+            <Button
+              className="min-h-10 gap-2 self-start"
               onClick={handleManualSubmit}
               disabled={!manualText.trim() || loading || !userId}
             >
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Send className="size-4" aria-hidden="true" />
+              )}
               {loading ? t("assessment.sending") : t("assessment.submit")}
-            </button>
+            </Button>
           </>
         )
       ) : (
         <>
           {partScores && (
-            <div className="speaking-assessment__part-score">
-              <span className="speaking-assessment__part-score-value">
+            <div className="flex items-baseline gap-2 rounded-md border border-border bg-muted px-3 py-2.5">
+              <span className="text-xl font-bold text-primary">
                 {formatScorePct(partScores.overall)}
               </span>
-              <span className="speaking-assessment__part-score-label">
+              <span className="text-xs text-muted-foreground">
                 {t("assessment.ofThisPart")}
               </span>
             </div>
           )}
 
           {partScores && Object.keys(partScores.observed).length > 0 && (
-            <ul className="speaking-assessment__observed">
+            <ul className="flex flex-wrap gap-2">
               {Object.entries(partScores.observed).map(([key, seen]) => (
-                <li key={key} className={seen ? "seen" : ""}>
-                  {seen ? "✓" : "—"} {criterionLabel(key)}
+                <li key={key}>
+                  <Badge
+                    variant={seen ? "default" : "outline"}
+                    className="gap-1.5"
+                  >
+                    {seen ? "✓" : "—"} {criterionLabel(key)}
+                  </Badge>
                 </li>
               ))}
             </ul>
           )}
 
-          {error && (
-            <p className="speaking-assessment__error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <ErrorNote>{error}</ErrorNote>}
 
-          <button
-            type="button"
-            className="speaking-assessment__next"
+          <Button
+            className="min-h-10 gap-2 self-start"
             onClick={handleAdvance}
             disabled={loading}
           >
+            {loading && (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            )}
             {loading
               ? t("assessment.processing")
               : done
                 ? t("assessment.viewResult")
                 : t("assessment.nextPart")}
-          </button>
+          </Button>
         </>
       )}
-    </section>
+    </Card>
   );
 }

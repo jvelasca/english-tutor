@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { Send } from "lucide-react";
 import { streamChat } from "../../api/chat";
 import { createConversation, saveConversation } from "../../api/conversations";
 import type { Message, TutorMode } from "../../types/api";
@@ -6,6 +8,7 @@ import { rolePlaySetup } from "../../utils/speaking";
 import { turnTelemetry } from "../../utils/telemetry";
 import { deriveTitle } from "../../utils/title";
 import { useI18n } from "../../hooks/useI18n";
+import { Button } from "../../components/ui/button";
 
 const DEFAULT_MODEL = "qwen3.5:9b";
 const ROLEPLAY_MODE: TutorMode = "conversation";
@@ -204,24 +207,49 @@ export function SpeakingRolePlay({
   const canFinish = messages.length > 0 && !loading;
 
   return (
-    <div className="speaking-roleplay">
-      <p className="speaking-roleplay__hint">
-        Role-play: {scenario}
+    <div className="flex flex-col gap-3">
+      <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+        {t("roleplay.hint")}: {scenario}
       </p>
-      <div className="speaking-roleplay__messages" aria-live="polite">
+      <div
+        className="flex max-h-80 flex-col gap-2 overflow-y-auto py-2"
+        aria-live="polite"
+      >
         {messages.map((m) => (
-          <div key={m.id} className={`speaking-roleplay__bubble ${m.role}`}>
+          <div
+            key={m.id}
+            className={
+              m.role === "user"
+                ? "max-w-[78%] self-end whitespace-pre-wrap break-words rounded-xl rounded-br-sm bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground"
+                : "max-w-[78%] self-start whitespace-pre-wrap break-words rounded-xl rounded-bl-sm border border-border bg-card px-3 py-2 text-sm leading-relaxed text-foreground"
+            }
+          >
             {m.content}
           </div>
         ))}
         {loading && (
-          <div className="speaking-roleplay__bubble assistant">…</div>
+          <div className="max-w-[78%] self-start rounded-xl rounded-bl-sm border border-border bg-card px-3 py-2">
+            <span className="flex items-center gap-1">
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="size-1.5 rounded-full bg-muted-foreground"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                  }}
+                />
+              ))}
+            </span>
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
-      <div className="speaking-roleplay__composer">
+      <div className="flex gap-2">
         <input
-          className="speaking-roleplay__input min-w-0"
+          className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/50 disabled:opacity-60"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -234,23 +262,23 @@ export function SpeakingRolePlay({
           disabled={loading || !conversationId}
           aria-label={t("roleplay.turnAria")}
         />
-        <button
-          type="button"
-          className="speaking-roleplay__send"
+        <Button
+          className="min-h-10 shrink-0"
           onClick={() => void send()}
           disabled={!input.trim() || loading || !conversationId}
         >
-          {t("roleplay.send")}
-        </button>
+          <Send className="size-4" aria-hidden="true" />
+          <span className="sr-only">{t("roleplay.send")}</span>
+        </Button>
       </div>
-      <button
-        type="button"
-        className="speaking-roleplay__finish"
+      <Button
+        variant="outline"
+        className="min-h-10 self-start"
         onClick={finish}
         disabled={!canFinish}
       >
         {t("roleplay.finish")}
-      </button>
+      </Button>
     </div>
   );
 }

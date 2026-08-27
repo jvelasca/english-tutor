@@ -1,4 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import {
+  Loader2,
+  Mic,
+  Play,
+  RefreshCw,
+  Send,
+  Square,
+  AlertTriangle,
+} from "lucide-react";
 import {
   getListeningAudioUrl,
   getListeningDiagnostic,
@@ -21,7 +31,11 @@ import type {
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
 import { NextStep } from "../../components/NextStep";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import { useI18n } from "../../hooks/useI18n";
+import { cn } from "../../lib/utils";
 
 function topicLabel(topic: string): string {
   return topic.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -82,6 +96,29 @@ function breakdownLabel(breakdown: Record<string, unknown>): string {
   const missing = Array.isArray(breakdown.missing) ? breakdown.missing.length : 0;
   const extra = Array.isArray(breakdown.extra) ? breakdown.extra.length : 0;
   return `Correct words: ${correct} · missing: ${missing} · extra: ${extra}`;
+}
+
+const WAVE_BARS = [0.45, 0.8, 0.55, 1, 0.65, 0.9, 0.5, 0.75, 0.4, 0.85, 0.6, 1, 0.7, 0.5, 0.9, 0.65];
+
+function Waveform() {
+  return (
+    <div className="flex h-10 items-center justify-center gap-1" aria-hidden="true">
+      {WAVE_BARS.map((h, i) => (
+        <motion.span
+          key={i}
+          className="w-1.5 origin-center rounded-full bg-primary"
+          style={{ height: `${h * 100}%` }}
+          animate={{ scaleY: [1, 0.45, 1.25, 1] }}
+          transition={{
+            duration: 0.9,
+            repeat: Infinity,
+            delay: i * 0.055,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 interface ListeningPracticeProps {
@@ -267,138 +304,212 @@ export function ListeningPractice({
   }
 
   return (
-    <section className="listening">
-      {error && <p className="listening-error">{error}</p>}
+    <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 sm:px-6">
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 break-words">{error}</span>
+        </div>
+      )}
+
       {!question ? (
-        <p className="progress-empty">{t("listening.loading")}</p>
+        <Card className="p-8">
+          <p className="text-center text-sm text-muted-foreground">
+            {t("listening.loading")}
+          </p>
+        </Card>
       ) : (
         <>
-          <button
-            type="button"
-            className="listen-button min-h-10"
-            onClick={play}
-            disabled={playing || !userId}
-          >
-            {playing ? t("listening.playing") : t("listening.play")}
-          </button>
-          {question.audio_ready && question.variants.length > 1 && (
-            <div className="listening-variants">
-              <span className="listening-variants-label">{t("listening.speed")}</span>
-              {question.variants.map((v: ListeningAudioVariant) => (
-                <button
-                  key={v.variant}
-                  type="button"
-                  className={`listening-variant${
-                    v.variant === variant ? " active" : ""
-                  }`}
-                  onClick={() => setVariant(v.variant)}
-                  disabled={playing || !userId}
-                >
-                  {v.label}
-                </button>
-              ))}
-              <span className="listening-variants-speed">
-                {Math.round(
-                  question.variants.find((v) => v.variant === variant)
-                    ?.speech_rate ?? question.speech_rate,
-                )}{" "}
-                wpm
-              </span>
-            </div>
-          )}
-          <p className="listening-audio-type">
-            {audioTypeLabel(question.audio_type)}
-          </p>
-          {!question.audio_ready && (
-            <p className="listening-audio-degraded">
-              {t("listening.audioUnavailable")}
-            </p>
-          )}
-          {question.realized_difficulty < question.difficulty && (
-            <p className="listening-audio-gap">
-              {t("listening.audioGap")} {question.realized_difficulty} of the{" "}
-              {question.difficulty} {t("listening.audioGapEnd")}
-            </p>
-          )}
-          {question.speech_rate > 0 && (
-            <p className="listening-audio-meta">
-              {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}
-              {question.duration.toFixed(1)}s
-            </p>
-          )}
-          <p className="listening-question">{question.question}</p>
-
-          {question.skill === "dictation" && (
-            <div className="listening-production">
-              <textarea
-                className="listening-production-textarea"
-                value={dictationText}
-                onChange={(e) => setDictationText(e.target.value)}
-                placeholder={t("listening.dictationPlaceholder")}
-                disabled={!!productionResult || processing}
-              />
-              <button
+          <Card className="gap-6 p-5 sm:p-6">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <motion.button
                 type="button"
-                className="listening-production-submit min-h-10"
-                onClick={submitDictation}
-                disabled={
-                  !userId ||
-                  !dictationText.trim() ||
-                  !!productionResult ||
-                  processing
-                }
+                onClick={play}
+                disabled={playing || !userId}
+                whileTap={playing || !userId ? undefined : { scale: 0.94 }}
+                aria-label={playing ? t("listening.playing") : t("listening.play")}
+                className="grid size-20 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
-                {processing ? t("listening.evaluating") : t("listening.submitDictation")}
-              </button>
-            </div>
-          )}
+                {playing ? (
+                  <Loader2 className="size-8 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Play className="size-8 translate-x-0.5" aria-hidden="true" />
+                )}
+              </motion.button>
 
-          {question.skill === "shadowing" && (
-            <div className="listening-production">
-              <button
-                type="button"
-                className={`listening-production-record min-h-10${
-                  recording ? " recording" : ""
-                }`}
-                onClick={toggleRecording}
-                disabled={!userId || !!productionResult || processing}
-              >
-                {processing
-                  ? t("listening.evaluating")
-                  : recording
-                    ? t("listening.stop")
-                    : t("listening.record")}
-              </button>
-              {transcribedText && (
-                <p className="listening-production-transcript">
-                  {t("listening.transcribed")}: {transcribedText}
+              {playing ? (
+                <Waveform />
+              ) : (
+                <span className="text-sm font-medium text-muted-foreground">
+                  {t("listening.play")}
+                </span>
+              )}
+            </div>
+
+            {question.audio_ready && question.variants.length > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("listening.speed")}
+                </span>
+                {question.variants.map((v: ListeningAudioVariant) => (
+                  <button
+                    key={v.variant}
+                    type="button"
+                    className={cn(
+                      "min-h-10 rounded-full border px-3 text-xs font-medium transition-colors",
+                      v.variant === variant
+                        ? "border-transparent bg-primary text-primary-foreground"
+                        : "border-border bg-secondary text-secondary-foreground hover:border-primary/50",
+                      "disabled:opacity-60",
+                    )}
+                    onClick={() => setVariant(v.variant)}
+                    disabled={playing || !userId}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {Math.round(
+                    question.variants.find((v) => v.variant === variant)
+                      ?.speech_rate ?? question.speech_rate,
+                  )}{" "}
+                  wpm
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col items-center gap-1.5 text-center">
+              <p className="text-xs text-muted-foreground">
+                {audioTypeLabel(question.audio_type)}
+              </p>
+              {!question.audio_ready && (
+                <p className="text-xs text-muted-foreground">
+                  {t("listening.audioUnavailable")}
+                </p>
+              )}
+              {question.realized_difficulty < question.difficulty && (
+                <p className="text-xs text-warning">
+                  {t("listening.audioGap")} {question.realized_difficulty} of the{" "}
+                  {question.difficulty} {t("listening.audioGapEnd")}
+                </p>
+              )}
+              {question.speech_rate > 0 && (
+                <p className="text-xs tabular-nums text-muted-foreground">
+                  {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}
+                  {question.duration.toFixed(1)}s
                 </p>
               )}
             </div>
-          )}
+          </Card>
 
-          {question.skill !== "dictation" &&
-            question.skill !== "shadowing" && (
-              <div className="listening-options">
-                {question.options.map((opt, i) => {
-                  let cls = "listening-option";
-                  if (result && i === result.correct_index) cls += " correct";
-                  if (result && i === selected && !result.correct)
-                    cls += " wrong";
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      className={cls}
-                      onClick={() => choose(i)}
-                      disabled={!!result}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
+          <Card className="gap-4 p-5">
+            <p className="text-base font-semibold leading-snug">
+              {question.question}
+            </p>
+
+            {question.skill === "dictation" && (
+              <div className="flex flex-col gap-3">
+                <textarea
+                  className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-relaxed outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-70"
+                  value={dictationText}
+                  onChange={(e) => setDictationText(e.target.value)}
+                  placeholder={t("listening.dictationPlaceholder")}
+                  disabled={!!productionResult || processing}
+                />
+                <Button
+                  className="min-h-10 gap-2 self-start"
+                  onClick={submitDictation}
+                  disabled={
+                    !userId ||
+                    !dictationText.trim() ||
+                    !!productionResult ||
+                    processing
+                  }
+                >
+                  {processing ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Send className="size-4" aria-hidden="true" />
+                  )}
+                  {processing
+                    ? t("listening.evaluating")
+                    : t("listening.submitDictation")}
+                </Button>
               </div>
             )}
+
+            {question.skill === "shadowing" && (
+              <div className="flex flex-col gap-3">
+                <Button
+                  variant={recording ? "destructive" : "default"}
+                  className="min-h-10 gap-2 self-start"
+                  onClick={toggleRecording}
+                  disabled={!userId || !!productionResult || processing}
+                >
+                  {processing ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : recording ? (
+                    <Square className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Mic className="size-4" aria-hidden="true" />
+                  )}
+                  {processing
+                    ? t("listening.evaluating")
+                    : recording
+                      ? t("listening.stop")
+                      : t("listening.record")}
+                </Button>
+                {recording && (
+                  <div className="flex items-center gap-2 text-xs font-medium text-destructive">
+                    <motion.span
+                      className="size-2 rounded-full bg-destructive"
+                      animate={{ opacity: [1, 0.25, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                      aria-hidden="true"
+                    />
+                    {t("listening.record")}
+                  </div>
+                )}
+                {transcribedText && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("listening.transcribed")}: {transcribedText}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {question.skill !== "dictation" &&
+              question.skill !== "shadowing" && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {question.options.map((opt, i) => {
+                    const isCorrect = result && i === result.correct_index;
+                    const isWrong = result && i === selected && !result.correct;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        className={cn(
+                          "min-h-10 rounded-md border px-3 py-2.5 text-left text-sm transition-colors",
+                          isCorrect
+                            ? "border-success bg-success/15 text-foreground"
+                            : isWrong
+                              ? "border-destructive bg-destructive/10 text-foreground"
+                              : "border-border bg-secondary text-secondary-foreground hover:border-primary/50",
+                          "disabled:cursor-default",
+                        )}
+                        onClick={() => choose(i)}
+                        disabled={!!result}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+          </Card>
 
           {(result || productionResult) && (
             <ActivityResult
@@ -421,73 +532,97 @@ export function ListeningPractice({
               footer={<NextStep userId={userId} onNext={onNext} />}
             >
               {result && (
-                <span className="listening-script">{question.script}</span>
+                <span className="text-foreground">{question.script}</span>
               )}
               {productionResult && (
                 <>
-                  <div className="listening-production-lines">
+                  <div className="flex flex-col gap-1 text-sm">
                     <div>
-                      <span className="label">{t("listening.wordAccuracy")}:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {t("listening.wordAccuracy")}:
+                      </span>{" "}
                       {productionResult.word_accuracy}%
                     </div>
                     <div>
-                      <span className="label">{t("listening.phoneticScore")}:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {t("listening.phoneticScore")}:
+                      </span>{" "}
                       {productionResult.phonetic_score}%
                     </div>
                     <div>
-                      <span className="label">{t("listening.reference")}:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {t("listening.reference")}:
+                      </span>{" "}
                       {productionResult.reference}
                     </div>
                     {transcribedText && (
                       <div>
-                        <span className="label">{t("listening.heard")}:</span>{" "}
+                        <span className="text-muted-foreground">
+                          {t("listening.heard")}:
+                        </span>{" "}
                         {transcribedText}
                       </div>
                     )}
                   </div>
-                  <p className="listening-production-breakdown">
+                  <p className="text-sm text-muted-foreground">
                     {breakdownLabel(productionResult.breakdown)}
                   </p>
                 </>
               )}
             </ActivityResult>
           )}
+
           {stats && (
-            <div className="listening-stats">
-              <p>
-                {t("listening.scoreOf")}: {stats.correct}{" "}
-                {t("assessment.of")} {stats.attempts}
-                {stats.accuracy !== null ? ` (${stats.accuracy}%)` : ""}
-              </p>
-              <p className="listening-level">
-                {t("listening.currentLevel")}: <strong>{stats.level}</strong>
-              </p>
-              <ul className="listening-levels">
+            <Card className="gap-3 p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                <span className="text-muted-foreground">
+                  {t("listening.scoreOf")}:{" "}
+                  <span className="font-medium text-foreground">
+                    {stats.correct}
+                  </span>{" "}
+                  {t("assessment.of")}{" "}
+                  <span className="font-medium text-foreground">
+                    {stats.attempts}
+                  </span>
+                  {stats.accuracy !== null ? ` (${stats.accuracy}%)` : ""}
+                </span>
+                <span className="text-muted-foreground">
+                  {t("listening.currentLevel")}:{" "}
+                  <span className="font-semibold text-foreground">
+                    {stats.level}
+                  </span>
+                </span>
+              </div>
+              <ul className="flex flex-wrap gap-2">
                 {stats.levels.map((lv) => (
-                  <li
-                    key={lv.level}
-                    className={`listening-level-pill${
-                      lv.completed ? " completed" : ""
-                    }`}
-                  >
-                    {lv.level} · {lv.mastered}/{lv.total}
+                  <li key={lv.level}>
+                    <Badge
+                      variant={lv.completed ? "default" : "outline"}
+                      className="gap-1.5"
+                    >
+                      {lv.level} · {lv.mastered}/{lv.total}
+                    </Badge>
                   </li>
                 ))}
               </ul>
-            </div>
+            </Card>
           )}
+
           {diagnostic && (
-            <div className="listening-diagnostic">
-              <p className="listening-recommendation">
+            <Card className="gap-4 p-5">
+              <p className="text-sm text-foreground">
                 {diagnostic.recommendation}
               </p>
-              <ul className="listening-subskills">
+
+              <ul className="flex flex-col gap-1">
                 {diagnostic.subskills.map((s) => (
                   <li
                     key={s.skill}
-                    className={`listening-subskill${
-                      s.review_due ? " review" : ""
-                    }${s.realization_gap ? " gap" : ""}`}
+                    className={cn(
+                      "text-xs text-muted-foreground",
+                      s.review_due && "text-foreground",
+                      s.realization_gap && "text-warning",
+                    )}
                   >
                     {s.skill} · {s.attempts} ·{" "}
                     {s.accuracy !== null ? `${s.accuracy}%` : "—"}
@@ -500,10 +635,18 @@ export function ListeningPractice({
                   </li>
                 ))}
               </ul>
+
               {diagnostic.trend.direction !== "n/a" && (
-                <p className="listening-trend">
+                <p className="text-sm text-muted-foreground">
                   {t("diag.trend")}:{" "}
-                  <strong className={`trend-${diagnostic.trend.direction}`}>
+                  <strong
+                    className={cn(
+                      diagnostic.trend.direction === "up" && "text-success",
+                      diagnostic.trend.direction === "down" && "text-destructive",
+                      diagnostic.trend.direction === "flat" &&
+                        "text-muted-foreground",
+                    )}
+                  >
                     {t(trendLabel(diagnostic.trend.direction))}
                   </strong>
                   {diagnostic.trend.delta !== null
@@ -513,43 +656,53 @@ export function ListeningPractice({
                     : ""}
                 </p>
               )}
+
               {diagnostic.by_topic.length > 0 && (
-                <div className="listening-breakdown">
-                  <p className="listening-breakdown-title">{t("listening.accuracyByTopic")}</p>
-                  <ul className="listening-pills">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("listening.accuracyByTopic")}
+                  </p>
+                  <ul className="flex flex-wrap gap-2">
                     {diagnostic.by_topic.map((t) => (
-                      <li key={t.topic} className="listening-pill">
-                        {topicLabel(t.topic)} ·{" "}
-                        {t.accuracy !== null ? `${t.accuracy}%` : "—"}
+                      <li key={t.topic}>
+                        <Badge variant="outline" className="gap-1.5">
+                          {topicLabel(t.topic)} ·{" "}
+                          {t.accuracy !== null ? `${t.accuracy}%` : "—"}
+                        </Badge>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
+
               {diagnostic.by_difficulty.length > 0 && (
-                <div className="listening-breakdown">
-                  <p className="listening-breakdown-title">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {t("listening.accuracyByDifficulty")}
                   </p>
-                  <ul className="listening-pills">
+                  <ul className="flex flex-wrap gap-2">
                     {diagnostic.by_difficulty.map((d) => (
-                      <li key={d.difficulty} className="listening-pill">
-                        {t("pron.level")} {d.difficulty} ·{" "}
-                        {d.accuracy !== null ? `${d.accuracy}%` : "—"}
+                      <li key={d.difficulty}>
+                        <Badge variant="outline" className="gap-1.5">
+                          {t("pron.level")} {d.difficulty} ·{" "}
+                          {d.accuracy !== null ? `${d.accuracy}%` : "—"}
+                        </Badge>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
+
               {diagnostic.recurrence.questions_seen > 0 && (
-                <p className="listening-recurrence">
+                <p className="text-sm text-muted-foreground">
                   {t("listening.retries")}: {diagnostic.recurrence.retried}{" "}
                   {t("assessment.of")} {diagnostic.recurrence.questions_seen} ·{" "}
                   {t("listening.recovered")} {diagnostic.recurrence.recovered}
                 </p>
               )}
-              <div className="listening-retention">
-                <p className="listening-retention-summary">
+
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-muted-foreground">
                   {t("listening.retention")}:{" "}
                   {diagnostic.retention.immediate_accuracy !== null
                     ? `${diagnostic.retention.immediate_accuracy}%`
@@ -561,44 +714,52 @@ export function ListeningPractice({
                   {t("listening.delayed")}
                   {diagnostic.retention.retention_rate !== null && (
                     <span
-                      className={`listening-retention-rate ${
+                      className={cn(
+                        "ml-1 font-medium",
                         diagnostic.retention.retention_rate >= 0.9
-                          ? "high"
+                          ? "text-success"
                           : diagnostic.retention.retention_rate >= 0.7
-                            ? "mid"
-                            : "low"
-                      }`}
+                            ? "text-warning"
+                            : "text-destructive",
+                      )}
                     >
-                      {" "}
                       · {t("listening.retention")}{" "}
                       {Math.round(diagnostic.retention.retention_rate * 100)}%
                     </span>
                   )}
                 </p>
                 {diagnostic.retention.by_bucket.length > 0 && (
-                  <ul className="listening-pills">
+                  <ul className="flex flex-wrap gap-2">
                     {diagnostic.retention.by_bucket.map((b) => (
-                      <li key={b.bucket} className="listening-pill">
-                        {retentionBucketLabel(b.bucket)} ·{" "}
-                        {b.accuracy !== null ? `${b.accuracy}%` : "—"}
+                      <li key={b.bucket}>
+                        <Badge variant="outline" className="gap-1.5">
+                          {retentionBucketLabel(b.bucket)} ·{" "}
+                          {b.accuracy !== null ? `${b.accuracy}%` : "—"}
+                        </Badge>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-            </div>
+            </Card>
           )}
-          {stats?.completed && (
-            <p className="listening-completed">{t("listening.completed")}</p>
-          )}
-          <button
-            type="button"
-            className="listening-next"
-            onClick={load}
-            disabled={!userId}
-          >
-            {t("listening.next")}
-          </button>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {stats?.completed && (
+              <p className="text-sm font-semibold text-success">
+                {t("listening.completed")}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              className="min-h-10 gap-2"
+              onClick={load}
+              disabled={!userId}
+            >
+              <RefreshCw className="size-4" aria-hidden="true" />
+              {t("listening.next")}
+            </Button>
+          </div>
         </>
       )}
     </section>

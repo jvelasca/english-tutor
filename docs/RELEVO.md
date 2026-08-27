@@ -3,26 +3,27 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-27 13:30 (UTC+2).
+> Actualizado por última vez: 2026-08-27 14:15 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-27):** `v1.25` **commiteada y verificada en verde** (la versión está
-elevada a `1.25.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
-**"Paneles del chat redimensionables + persistentes (V1.25)"**: los tres paneles del CHAT
-(conversaciones, zona central y Análisis) son redimensionables con asas visibles/accesibles y el
-ancho se persiste por usuario (debounce en `setLayout`), con test visual Playwright de redimensionado
-+ persistencia.
+**Posición actual (2026-08-27):** `v1.26` **commiteada y verificada en verde** (la versión está
+elevada a `1.26.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
+**"UI 2.0 fases 3–6 (V1.26)"**: migración de Listening/Speaking/Pronunciation/Progress del CSS
+legacy a Tailwind v4 + shadcn/ui + Motion, con poda de `legacy.css` (~1.400 líneas huérfanas) y
+pasada móvil.
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de 3 paneles),
 **V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
 **V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
-chat redimensionables + persistentes). Ver CHANGELOG.
+chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6: práctica migrada + legacy.css
+podado). Ver CHANGELOG.
 **Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
 de empezar el siguiente incremento.
 
 **Últimos commits:**
+- `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
 - `feat: UI 2.0 (V1.22-V1.25) — Learning UX, design system, Analysis por pestañas y paneles redimensionables`
 - `feat: Learning Home (HOME como centro) con plan de hoy accionable`
 - `docs: V1.21 higiene de release + documentacion (1.21.0)`
@@ -114,8 +115,8 @@ OK; launcher `55 tests` + `ruff` limpio; Playwright `4 passed + 2 skipped`.
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
-3. Elegir el siguiente incremento (37.1 UI 2.0 fases 3–6, 37.2 code-splitting, 37.3 audio humano,
-   37.4 Vercel) y ejecutarlo con subagentes autocontenidos.
+3. Elegir el siguiente incremento (37.2 code-splitting, 37.3 audio humano, 37.4 Vercel) y ejecutarlo
+   con subagentes autocontenidos. 37.1 ya está cerrado.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
 
@@ -1727,15 +1728,16 @@ cd frontend && npx tsc --noEmit && npx vitest run
 > (`npm test`, `tsc`) + backend (`pytest`, `ruff`) + Playwright (`npm run test:visual`) + bump de
 > versión en `config.py`/`package.json`/`package-lock.json`/`README.md` + `CHANGELOG` + esta sección.
 
-### 37.1 Rediseño UI 2.0 — fases 3–6 (solo frontend)
-- **Fase 3** — `features/listening/ListeningPractice.tsx`: entorno auditivo inmersivo (reproductor,
-  onda, variantes 0.8x/1.0x/1.2x). Reutilizar `SkillBar`/`Badge`/`Card` y Motion.
-- **Fase 4** — `features/speaking/*`: "estudio de conversación" (mic que respira, fluidez/coherencia,
-  feedback). Aplica a `SpeakingPanel`/`SpeakingDiagnostic`/`SpeakingAssessment`/`SpeakingRolePlay`/
-  `SpeakingJourney` + `PronunciationPractice`.
-- **Fase 5** — `features/progress/ProgressScreen.tsx`: dashboard pedagógico limpio.
-- **Fase 6** — Móvil específico y consolidación; **retirar `legacy.css`** una vez migradas todas las
-  pantallas (solo queda retirar el archivo y sus `@import` cuando ya no quede ninguna clase legacy en uso).
+### 37.1 HECHO (V1.26) — Rediseño UI 2.0 fases 3–6 (solo frontend)
+- ✅ **Fase 3** — `features/listening/ListeningPractice.tsx`: entorno auditivo inmersivo (reproductor
+  con onda Motion, variantes 0.8x/1.0x/1.2x). Reutiliza `SkillBar`/`Badge`/`Card`.
+- ✅ **Fase 4** — `features/speaking/*` + `PronunciationPractice`: "estudio de conversación" (mic que
+  pulsa, feedback de fluidez/coherencia con `SkillBar`/`Badge`).
+- ✅ **Fase 5** — `features/progress/ProgressScreen.tsx`: dashboard pedagógico limpio.
+- ✅ **Fase 6** — Móvil específico (tap targets ≥40px, sin overflow) + poda de `legacy.css`
+  (~1.400 líneas huérfanas retiradas). `legacy.css` NO se retira aún: quedan en uso los bloques de
+  chat/shell/header/composer y `.journey-*` (fuera del scope de este incremento).
+- Briefing: `agentes/ui2/u1-rediseno-ui2-fases3-6.md`. Ver CHANGELOG 1.26.0.
 
 ### 37.2 Code-splitting (frontend)
 - El bundle minificado principal es de **527 kB** (`index-e886hnrB.js`) y Vite avisa al construir.
@@ -1756,10 +1758,10 @@ cd frontend && npx tsc --noEmit && npx vitest run
   apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.25.0** (todo verificado: frontend 206 tests, backend 796 tests,
+- Versión estable actual: **1.26.0** (todo verificado: frontend 206 tests, backend 796 tests,
   Playwright 4 passed + 2 skipped, `ruff` limpio, build OK).
-- Los incrementos 37.1–37.4 son **independientes entre sí**; se recomienda empezar por 37.1 (Fase 3)
-  o 37.3 (audio humano) según prioridad de producto.
+- Los incrementos 37.2–37.4 son **independientes entre sí**; 37.1 ya está cerrado. Se recomienda
+  seguir con 37.2 (code-splitting) o 37.3 (audio humano) según prioridad de producto.
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 

@@ -4,6 +4,29 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.26.0] — 2026-08-27
+
+**Rediseño UI 2.0 — fases 3–6**: migración de las pantallas de práctica (Listening, Speaking,
+Pronunciation y Progress) del CSS legacy a Tailwind v4 + shadcn/ui + Motion, con retirada de las
+reglas huérfanas de `legacy.css`. Cambio solo-frontend.
+
+### Cambiado
+- **Listening** (`features/listening/ListeningPractice.tsx`): reproductor destacado con onda animada
+  (Motion), variantes de velocidad 0.8x/1.0x/1.2x y estadísticas/diagnóstico presentados con
+  `Card`/`Badge`. Lógica intacta (dictado, shadowing, retención, precisión por tema/dificultad).
+- **Speaking** (`features/speaking/*` + `PronunciationPractice.tsx`): "estudio de conversación" con
+  micrófono que pulsa (Motion) al grabar/escuchar y feedback de fluidez/coherencia con
+  `SkillBar`/`Badge`. Props y lógica intactas.
+- **Progress** (`features/progress/ProgressScreen.tsx`): dashboard pedagógico limpio con `LevelBadge`,
+  barra `SkillBar`, lista de destrezas expandible y `SkillDetail`.
+- **`styles/legacy.css`**: poda de ~1.400 líneas de reglas cuyas clases ya no se usan en ningún
+  `.tsx` (verificado con `rg`). Se conservan los bloques aún en uso (chat/shell/header/composer y
+  `.journey-*`).
+- **Móvil**: tap targets ≥40px y sin overflow horizontal en las pantallas migradas (premisa 20).
+
+### Añadido
+- Claves i18n nuevas: `roleplay.hint`, `progress.score/confidence/evidence/stability`.
+
 ## [1.25.0] — 2026-08-27
 
 **Paneles del chat redimensionables y persistentes**: los tres paneles del CHAT

@@ -3,6 +3,8 @@ import { getSpeakingDiagnostic } from "../../api/academy";
 import type { SpeakingDiagnostic as SpeakingDiagnosticData } from "../../types/api";
 import { criterionLabel } from "../../utils/speaking";
 import { useI18n } from "../../hooks/useI18n";
+import { Card } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
 
 function trendLabel(direction: string): string {
   switch (direction) {
@@ -49,34 +51,47 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
   }, [userId]);
 
   return (
-    <section className="speaking-diagnostic">
+    <Card className="gap-4 p-5">
       {!diagnostic ? (
-        <p className="progress-empty">{t("empty.noSpeaking")}</p>
+        <p className="text-center text-sm text-muted-foreground">
+          {t("empty.noSpeaking")}
+        </p>
       ) : (
         <>
-          <p className="speaking-recommendation">{diagnostic.recommendation}</p>
-          <ul className="speaking-criteria">
+          <p className="text-sm text-foreground">
+            {diagnostic.recommendation}
+          </p>
+          <ul className="flex flex-col gap-1">
             {diagnostic.criteria.map((c) => (
               <li
                 key={c.criterion}
-                className={`speaking-criterion${
-                  c.review_due ? " review" : ""
-                }`}
+                className={cn(
+                  "flex items-center justify-between gap-3 text-xs",
+                  c.review_due ? "text-foreground" : "text-muted-foreground",
+                )}
               >
-                <span className="speaking-criterion-label">
+                <span className="font-medium">
                   {criterionLabel(c.criterion)}
                 </span>
-                <span className="speaking-criterion-meta">
-                  {c.attempts} · {c.mean !== null ? `${Math.round(c.mean * 100)}%` : "—"}
+                <span className="tabular-nums">
+                  {c.attempts} ·{" "}
+                  {c.mean !== null ? `${Math.round(c.mean * 100)}%` : "—"}
                   {c.review_due ? ` · ${t("diag.review")}` : ""}
                 </span>
               </li>
             ))}
           </ul>
           {diagnostic.trend.direction !== "n/a" && (
-            <p className="speaking-trend">
+            <p className="text-xs text-muted-foreground">
               {t("diag.trend")}:{" "}
-              <strong className={`trend-${diagnostic.trend.direction}`}>
+              <strong
+                className={cn(
+                  diagnostic.trend.direction === "up" && "text-success",
+                  diagnostic.trend.direction === "down" && "text-destructive",
+                  diagnostic.trend.direction === "flat" &&
+                    "text-muted-foreground",
+                )}
+              >
                 {t(trendLabel(diagnostic.trend.direction))}
               </strong>
               {diagnostic.trend.delta !== null
@@ -86,6 +101,6 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
           )}
         </>
       )}
-    </section>
+    </Card>
   );
 }

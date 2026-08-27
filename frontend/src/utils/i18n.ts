@@ -367,6 +367,7 @@ const STRINGS: Record<string, Entry> = {
   "diag.stable": { en: "stable", es: "estable" },
 
   // Role-play
+  "roleplay.hint": { en: "Role-play", es: "Role-play" },
   "roleplay.turnPlaceholder": {
     en: "Type your turn in English…",
     es: "Escribe tu turno en inglés…",
@@ -582,6 +583,10 @@ const STRINGS: Record<string, Entry> = {
     es: "Aún no hay errores resueltos.",
   },
   "progress.milestones": { en: "Milestones", es: "Hitos" },
+  "progress.score": { en: "Score", es: "Puntuación" },
+  "progress.confidence": { en: "Confidence", es: "Confianza" },
+  "progress.evidence": { en: "Evidence", es: "Evidencia" },
+  "progress.stability": { en: "Stability", es: "Estabilidad" },
   "progress.recentActivity": { en: "Recent activity", es: "Actividad reciente" },
   "progress.noRecentActivity": {
     en: "No recent activity.",
