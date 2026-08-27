@@ -3,25 +3,27 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-27 14:25 (UTC+2).
+> Actualizado por última vez: 2026-08-27 14:35 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-27):** `v1.27` **commiteada y verificada en verde** (la versión está
-elevada a `1.27.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
-**"Code-splitting por rutas (V1.27)"**: `React.lazy`/`Suspense` en `Workspace` + `AnalysisPanel`
-diferido; el chunk inicial pasa de 537 kB a 425 kB con chunks por ruta.
+**Posición actual (2026-08-27):** `v1.28` **commiteada y verificada en verde** (la versión está
+elevada a `1.28.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
+**"Biblioteca de audio humano — código (V1.28)"**: la escalera de velocidad ya no se muestra en
+ítems `recorded` (su velocidad es real, no sintetizable). El contenido real (WAV) sigue pendiente
+de grabaciones del usuario; la infraestructura + importador ya existían.
 Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
 hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de 3 paneles),
 **V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
 **V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
 chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6: práctica migrada + legacy.css
-podado), **V1.27** (code-splitting por rutas). Ver CHANGELOG.
+podado), **V1.27** (code-splitting por rutas), **V1.28** (audio humano — código). Ver CHANGELOG.
 **Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
 de empezar el siguiente incremento.
 
 **Últimos commits:**
+- `feat: V1.28 - listening: ocultar escalera de velocidad en items recorded`
 - `feat: V1.27 - code-splitting por rutas (React.lazy/Suspense + AnalysisPanel diferido)`
 - `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
 - `feat: UI 2.0 (V1.22-V1.25) — Learning UX, design system, Analysis por pestañas y paneles redimensionables`
@@ -115,8 +117,9 @@ OK; launcher `55 tests` + `ruff` limpio; Playwright `4 passed + 2 skipped`.
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
-3. Elegir el siguiente incremento (37.3 audio humano, 37.4 Vercel) y ejecutarlo
-   con subagentes autocontenidos. 37.1 y 37.2 ya están cerrados.
+3. Elegir el siguiente incremento (37.3 audio humano — **contenido pendiente del usuario**,
+   37.4 Vercel — **diferido por decisión**) y ejecutarlo con subagentes autocontenidos.
+   37.1 y 37.2 están cerrados; 37.3 tiene el código listo y solo falta el contenido (WAV reales).
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
 
@@ -1745,12 +1748,14 @@ cd frontend && npx tsc --noEmit && npx vitest run
   sin aviso de bundle >500 kB.
 - Briefing: `agentes/ui2/u2-code-splitting.md`. Ver CHANGELOG 1.27.0.
 
-### 37.3 Contenido — biblioteca de audio humano (P1.5–P1.8)
-- **Límite de contenido, no de código**: hoy Piper es una única voz. Incorporar **WAV reales** de
-  varios hablantes (connected speech real, acentos reales, ruido real) y añadir sus entradas al
-  `manifest` de audio. La **infraestructura ya está lista** (ver §33, V1.20).
-- (Opcional) Ajustar `ListeningPractice.tsx` para **no** mostrar la escalera slow/normal/fast en ítems
-  `recorded` (su velocidad es la real, no sintetizable).
+### 37.3 PARCIAL (V1.28) — Contenido: biblioteca de audio humano (P1.5–P1.8)
+- ✅ **Código hecho**: la escalera de velocidad ya no se muestra en ítems `recorded`
+  (`ListeningPractice.tsx`). La infraestructura (manifest + resolución + servido + validación) y el
+  importador `backend/scripts/import_audio.py` ya existían (V1.20/V1.21).
+- ⏳ **Contenido pendiente del usuario**: incorporar **WAV reales** de varios hablantes (connected
+  speech real, acentos reales, ruido real). Para añadir una grabación:
+  `python backend/scripts/import_audio.py --wav <archivo.wav> --audio-id <id> --speaker-id <id>`
+  (ver docstring del script). El agente **no** puede fabricar audio real (premisa 2/21).
 
 ### 37.4 (Diferido por decisión) Vercel / despliegue
 - **Vercel** se barajó para la **UI** (previews, hosting estático), **no** para sustituir el backend
@@ -1759,10 +1764,10 @@ cd frontend && npx tsc --noEmit && npx vitest run
   apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.27.0** (todo verificado: frontend 206 tests, backend 796 tests,
+- Versión estable actual: **1.28.0** (todo verificado: frontend 206 tests, backend 796 tests,
   Playwright 4 passed + 2 skipped, `ruff` limpio, build OK con chunks por ruta).
-- Los incrementos 37.3–37.4 son **independientes entre sí**; 37.1 y 37.2 ya están cerrados. 37.3 es
-  un **límite de contenido** (requiere WAV reales del usuario); 37.4 está **diferido por decisión**.
+- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el código está listo) y **37.4
+  Vercel** (diferido por decisión: requiere cuenta/token + decidir CORS).
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 

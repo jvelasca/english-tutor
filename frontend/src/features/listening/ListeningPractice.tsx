@@ -349,7 +349,9 @@ export function ListeningPractice({
               )}
             </div>
 
-            {question.audio_ready && question.variants.length > 1 && (
+            {question.audio_ready &&
+              question.audio_type === "tts" &&
+              question.variants.length > 1 && (
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {t("listening.speed")}

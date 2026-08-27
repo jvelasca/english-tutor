@@ -4,6 +4,17 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.28.0] — 2026-08-27
+
+**Biblioteca de audio humano — código (P1.5–P1.8)**: ajuste puntual de Listening para ítems
+grabados. El contenido real (WAV de varios hablantes) sigue pendiente de grabaciones del usuario;
+la infraestructura (manifest + resolución + servido + validación) y el importador
+(`backend/scripts/import_audio.py`) ya existían.
+
+### Cambiado
+- `features/listening/ListeningPractice.tsx`: la escalera de velocidad slow/normal/fast solo se
+  muestra en ítems TTS; en ítems `recorded` la velocidad es la real y no sintetizable.
+
 ## [1.27.0] — 2026-08-27
 
 **Code-splitting por rutas**: división del bundle con `React.lazy`/`Suspense`. Cambio solo-frontend.
