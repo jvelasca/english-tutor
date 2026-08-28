@@ -22,9 +22,10 @@ test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ 
   const insights = page.locator(".pane--insights");
 
   // Normaliza al mínimo (RIGHT_MIN) para que el test sea idempotente: ArrowRight
-  // reduce el ancho del panel derecho. 24 pulsos cubren todo el rango (680→300).
+  // reduce el ancho del panel derecho. 30 pulsos cubren todo el rango
+  // (máximo → 300, incluyendo el tope relativo al viewport).
   await insightsHandle.focus();
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 30; i++) {
     await insightsHandle.press("ArrowRight");
   }
   await page.waitForTimeout(150);

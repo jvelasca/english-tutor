@@ -14,7 +14,11 @@ export default defineConfig({
   timeout: 30_000,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    // El dev server de Vite sirve por HTTPS con certificado autofirmado
+    // (@vitejs/plugin-basic-ssl), así que apuntamos a https y aceptamos el
+    // certificado local en el navegador.
+    baseURL: "https://localhost:5173",
+    ignoreHTTPSErrors: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -34,8 +38,11 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run dev",
-    url: "http://127.0.0.1:5173",
+    url: "https://localhost:5173",
     reuseExistingServer: true,
     timeout: 60_000,
+    // El dev server usa certificado autofirmado; aceptamos el cert en el
+    // chequeo de salud del webServer.
+    ignoreHTTPSErrors: true,
   },
 });

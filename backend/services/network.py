@@ -20,3 +20,12 @@ def get_lan_ip() -> str:
         return "127.0.0.1"
     finally:
         sock.close()
+
+
+def get_lan_hostname() -> str:
+    """Nombre del host en la red local (sin dominio), para acceso mDNS.
+
+    P. ej. ``ENGLISH-TUTOR-PC``. Sirve para construir una URL estable
+    (``https://<hostname>.local``) independiente de la IP dinámica del router.
+    """
+    return socket.gethostname().split(".")[0]

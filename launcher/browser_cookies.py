@@ -307,3 +307,44 @@ def collect_cookies() -> tuple[list[dict], dict]:
     summary = cookie_summary(rows)
     summary["diagnosis"] = diagnose_stores()
     return rows, summary
+
+
+def format_cookie_summary(summary: dict) -> str:
+    """Resumen legible del total de cookies y los navegadores detectados.
+
+    Ejemplo: ``"3 cookies de la app · Chrome (2), Edge (1)"``. Si no hay cookies
+    de ningún navegador, lo dice explícitamente (``"0 cookies de la app"``).
+    """
+    total = int(summary.get("total", 0))
+    browsers = summary.get("browsers") or {}
+    if browsers:
+        browser_txt = ", ".join(
+            f"{b} ({n})" for b, n in sorted(browsers.items())
+        )
+        return f"{total} cookies de la app · {browser_txt}"
+    return f"{total} cookies de la app"
+
+
+def format_cookie_diagnosis(diagnosis: list[dict]) -> str:
+    """Diagnóstico compacto de navegadores: instalados (con perfiles) y ausentes.
+
+    Oculta las rutas técnicas del sistema; solo muestra lo relevante para
+    entender por qué se ven (o no) cookies de la app.
+    """
+    detected: list[str] = []
+    missing: list[str] = []
+    for d in diagnosis:
+        browser = d.get("browser", "")
+        if d.get("found"):
+            profiles = d.get("profiles") or []
+            detail = ", ".join(profiles) if profiles else "sin perfiles con cookies"
+            detected.append(f"{browser}: {detail}")
+        else:
+            missing.append(browser)
+
+    lines: list[str] = []
+    if detected:
+        lines.append("Detectados · " + "  ·  ".join(detected))
+    if missing:
+        lines.append("No instalados · " + ", ".join(missing))
+    return "\n".join(lines)

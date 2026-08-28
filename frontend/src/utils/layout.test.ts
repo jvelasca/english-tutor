@@ -26,7 +26,7 @@ describe("parseLayout", () => {
   it("recorta valores fuera de rango", () => {
     const layout = parseLayout('{"sidebarWidth": 5, "rightWidth": 99999}');
     expect(layout.sidebarWidth).toBeGreaterThanOrEqual(200);
-    expect(layout.rightWidth).toBeLessThanOrEqual(680);
+    expect(layout.rightWidth).toBeLessThanOrEqual(900);
   });
 });
 
@@ -36,7 +36,7 @@ describe("clamps", () => {
   });
 
   it("clampRight respeta el máximo", () => {
-    expect(clampRight(100000)).toBeLessThanOrEqual(680);
+    expect(clampRight(100000)).toBeLessThanOrEqual(900);
   });
 });
 

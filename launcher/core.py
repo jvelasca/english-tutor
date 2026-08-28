@@ -65,7 +65,10 @@ def backend_url() -> str:
 
 
 def frontend_url() -> str:
-    return f"http://localhost:{FRONTEND_PORT}"
+    # El frontend (Vite) se sirve por HTTPS con certificado autofirmado
+    # (@vitejs/plugin-basic-ssl). Por HTTP no responde y el launcher lo
+    # detectaría como "Detenido".
+    return f"https://localhost:{FRONTEND_PORT}"
 
 
 def lan_ip() -> str:
@@ -81,9 +84,19 @@ def lan_ip() -> str:
         sock.close()
 
 
+def lan_hostname() -> str:
+    """Nombre del host en la red local (sin dominio), para acceso mDNS."""
+    return socket.gethostname().split(".")[0]
+
+
 def lan_url() -> str:
-    """URL de acceso desde otros equipos de la red local."""
-    return f"http://{lan_ip()}:{FRONTEND_PORT}"
+    """URL de acceso desde otros equipos de la red local (por IP)."""
+    return f"https://{lan_ip()}:{FRONTEND_PORT}"
+
+
+def local_url() -> str:
+    """URL de acceso por nombre local mDNS (p. ej. https://mi-pc.local:5173)."""
+    return f"https://{lan_hostname()}.local:{FRONTEND_PORT}"
 
 
 def app_summary(backend_up: bool, frontend_up: bool) -> dict[str, str]:

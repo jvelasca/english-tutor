@@ -7,7 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from config import VERSION
 from repositories import db
-from services import llm, stt, tts
+from services import audio_library, llm, stt, tts
 
 router = APIRouter()
 
@@ -27,12 +27,14 @@ async def _dependencies() -> dict[str, str]:
     ollama_ok = await llm.ping()
     stt_ready = await run_in_threadpool(stt.is_ready)
     tts_ready = await run_in_threadpool(tts.is_ready)
+    audio_library_ready = await run_in_threadpool(audio_library.is_ready)
     return {
         "api": "ok",
         "database": "ok" if db_ok else "error",
         "ollama": "ok" if ollama_ok else "error",
         "stt": "ready" if stt_ready else "unavailable",
         "tts": "ready" if tts_ready else "unavailable",
+        "audio_library": "ready" if audio_library_ready else "unavailable",
     }
 
 

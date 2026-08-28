@@ -11,7 +11,11 @@ export const LAYOUT_DEFAULTS: LayoutState = {
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 460;
 export const RIGHT_MIN = 300;
-export const RIGHT_MAX = 680;
+// Máximo amplio para que en monitores de escritorio el panel de análisis pueda
+// ensancharse lo suficiente como para ver todas sus pestañas sin scroll. En
+// pantallas estrechas el asa se oculta y el panel pasa a drawer (≤1024px), y
+// PracticeView aplica además un tope relativo al viewport.
+export const RIGHT_MAX = 900;
 
 function clampNumber(
   value: unknown,

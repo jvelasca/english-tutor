@@ -102,6 +102,20 @@ def load_manifest(path: Path | None = None) -> AudioLibraryManifest:
     return AudioLibraryManifest.model_validate(data)
 
 
+def is_ready() -> bool:
+    """True si el manifest de la biblioteca de audio humano carga correctamente.
+
+    Reporta la *infraestructura* (el manifest versionado está presente y válido),
+    no la cantidad de contenido: una biblioteca vacía pero correcta se considera
+    lista (el límite es de contenido, no de código).
+    """
+    try:
+        load_manifest()
+        return True
+    except (FileNotFoundError, ValueError, OSError):
+        return False
+
+
 def entry_for(
     manifest: AudioLibraryManifest, audio_id: str
 ) -> AudioLibraryEntry | None:

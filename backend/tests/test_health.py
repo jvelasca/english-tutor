@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from config import VERSION
 from main import app
 from repositories import db
-from services import llm, stt, tts
+from services import audio_library, llm, stt, tts
 
 
 def test_root():
@@ -27,6 +27,7 @@ def _all_ok(monkeypatch):
     monkeypatch.setattr(llm, "ping", _async_true)
     monkeypatch.setattr(stt, "is_ready", lambda: True)
     monkeypatch.setattr(tts, "is_ready", lambda: True)
+    monkeypatch.setattr(audio_library, "is_ready", lambda: True)
 
 
 async def _async_true():
@@ -56,6 +57,7 @@ def test_dependencies_all_ok(monkeypatch):
             "ollama": "ok",
             "stt": "ready",
             "tts": "ready",
+            "audio_library": "ready",
         }
 
 

@@ -144,7 +144,7 @@ export function AnalysisPanel({
       <div
         role="tablist"
         aria-label={t("panels.analysis")}
-        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2"
+        className="flex shrink-0 flex-wrap gap-1 border-b border-border px-2 py-1.5"
       >
         {TABS.map((tab) => {
           const selected = activeTab === tab.id;
@@ -159,7 +159,7 @@ export function AnalysisPanel({
               tabIndex={selected ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors",
+                "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 selected
                   ? "text-primary"
@@ -168,13 +168,16 @@ export function AnalysisPanel({
             >
               {selected && (
                 <motion.span
-                  layoutId="analysis-tab-indicator"
-                  className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary"
+                  layoutId="analysis-tab-pill"
+                  className="absolute inset-0 rounded-md bg-accent"
                   transition={{ type: "spring", stiffness: 500, damping: 40 }}
                 />
               )}
-              <tab.Icon className="size-4 shrink-0" aria-hidden="true" />
-              <span>{t(tab.label)}</span>
+              <tab.Icon
+                className="relative z-10 size-4 shrink-0"
+                aria-hidden="true"
+              />
+              <span className="relative z-10">{t(tab.label)}</span>
             </button>
           );
         })}

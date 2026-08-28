@@ -12,6 +12,7 @@ export interface DependencyStatus {
   ollama: string;
   stt: string;
   tts: string;
+  audio_library: string;
 }
 
 export function getHealth(): Promise<HealthInfo> {

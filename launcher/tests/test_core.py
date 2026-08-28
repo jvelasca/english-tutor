@@ -18,6 +18,7 @@ from core import (
     health_status,
     icon_file,
     lan_url,
+    local_url,
     user_overview,
 )
 
@@ -60,12 +61,17 @@ def test_frontend_command_runs_dev():
 
 def test_lan_url(monkeypatch):
     monkeypatch.setattr("core.lan_ip", lambda: "192.168.1.42")
-    assert lan_url() == f"http://192.168.1.42:{FRONTEND_PORT}"
+    assert lan_url() == f"https://192.168.1.42:{FRONTEND_PORT}"
+
+
+def test_local_url_uses_hostname(monkeypatch):
+    monkeypatch.setattr("core.lan_hostname", lambda: "english-tutor-pc")
+    assert local_url() == f"https://english-tutor-pc.local:{FRONTEND_PORT}"
 
 
 def test_urls():
     assert backend_url() == f"http://127.0.0.1:{BACKEND_PORT}"
-    assert frontend_url() == f"http://localhost:{FRONTEND_PORT}"
+    assert frontend_url() == f"https://localhost:{FRONTEND_PORT}"
 
 
 def test_app_summary_on():

@@ -1,6 +1,12 @@
 import { useRef, useState } from "react";
 import { transcribe } from "../api/voz";
 import { useI18n } from "../hooks/useI18n";
+import {
+  getMicrophoneStream,
+  MicUnavailableError,
+  type MicUnavailableReason,
+} from "../utils/browserCapabilities";
+import { MicUnavailableNotice } from "./MicUnavailableNotice";
 
 interface MicButtonProps {
   onTranscribed: (text: string) => void;
@@ -11,12 +17,21 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
   const { t } = useI18n();
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   async function start() {
+    setMicError(null);
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await getMicrophoneStream();
+    } catch (e) {
+      setMicError(e instanceof MicUnavailableError ? e.reason : "unknown");
+      return;
+    }
+
+    try {
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
 
@@ -54,19 +69,26 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
   }
 
   return (
-    <button
-      type="button"
-      className={`mic-button${recording ? " recording" : ""}${
-        processing ? " processing" : ""
-      }`}
-      onClick={recording ? stop : start}
-      disabled={disabled}
-      title={recording ? t("mic.stop") : t("mic.record")}
-      aria-label={recording ? t("mic.stop") : t("mic.record")}
-      aria-pressed={recording}
-    >
-      <MicIcon />
-    </button>
+    <div className="relative">
+      {micError && (
+        <div className="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[80vw]">
+          <MicUnavailableNotice reason={micError} />
+        </div>
+      )}
+      <button
+        type="button"
+        className={`mic-button${recording ? " recording" : ""}${
+          processing ? " processing" : ""
+        }`}
+        onClick={recording ? stop : start}
+        disabled={disabled}
+        title={recording ? t("mic.stop") : t("mic.record")}
+        aria-label={recording ? t("mic.stop") : t("mic.record")}
+        aria-pressed={recording}
+      >
+        <MicIcon />
+      </button>
+    </div>
   );
 }
 

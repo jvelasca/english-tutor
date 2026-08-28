@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import ssl
 import urllib.request
 from contextlib import closing
+from datetime import datetime
+from pathlib import Path
 
 from core import backend_url, frontend_url
 
@@ -30,10 +33,20 @@ def fetch_version() -> str:
     return str(data.get("version", ""))
 
 
+def _frontend_ssl_context() -> ssl.SSLContext:
+    """Contexto SSL que acepta el certificado autofirmado del frontend local."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def fetch_frontend() -> bool:
-    """True si el frontend responde (GET /)."""
+    """True si el frontend responde (GET / sobre HTTPS autofirmado)."""
     try:
-        with urllib.request.urlopen(frontend_url(), timeout=1.5) as resp:
+        with urllib.request.urlopen(
+            frontend_url(), timeout=1.5, context=_frontend_ssl_context()
+        ) as resp:
             return resp.status == 200
     except Exception:  # noqa: BLE001
         return False
@@ -97,6 +110,59 @@ def read_db_details(db_path: str) -> dict[str, int]:
     except Exception:  # noqa: BLE001
         return {key: 0 for key in tables.values()}
     return result
+
+
+def _human_size(num: int) -> str:
+    """Tamaño legible en bytes/KB/MB/GB/TB."""
+    value = float(num)
+    units = ["B", "KB", "MB", "GB", "TB"]
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} B"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} TB"
+
+
+def read_db_info(db_path: str) -> dict:
+    """Metadatos del archivo de base de datos (tamaño, tablas, modificación).
+
+    Devuelve ``exists``, ``size_bytes``, ``size_human``, ``modified`` y
+    ``tables`` (tablas reales, sin las internas ``sqlite_*``). Se degrada con
+    elegancia si el archivo no existe o no se puede leer.
+    """
+    info = {
+        "exists": False,
+        "size_bytes": 0,
+        "size_human": "—",
+        "modified": "—",
+        "tables": 0,
+    }
+    path = Path(db_path)
+    try:
+        if not path.is_file():
+            return info
+        st = path.stat()
+        info["exists"] = True
+        info["size_bytes"] = int(st.st_size)
+        info["size_human"] = _human_size(st.st_size)
+        info["modified"] = datetime.fromtimestamp(st.st_mtime).strftime(
+            "%Y-%m-%d %H:%M"
+        )
+    except OSError:
+        return info
+    try:
+        with closing(_connect_readonly(db_path)) as conn:
+            info["tables"] = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM sqlite_master "
+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchone()[0]
+            )
+    except Exception:  # noqa: BLE001
+        pass
+    return info
 
 
 def read_users(db_path: str) -> list[tuple]:

@@ -105,11 +105,21 @@ export function PracticeView({
     closeSidebar();
   };
 
-  const handleDragSidebar = (dx: number) =>
-    setLayout({ ...layout, sidebarWidth: clampSidebar(layout.sidebarWidth + dx) });
+  const handleDragSidebar = (dx: number) => {
+    // El asa solo se arrastra en desktop (≥1024px); además del tope absoluto,
+    // no dejamos que el panel lateral acapare más de ~35% del viewport.
+    const max = Math.max(SIDEBAR_MIN, Math.floor(window.innerWidth * 0.35));
+    const next = clampSidebar(layout.sidebarWidth + dx);
+    setLayout({ ...layout, sidebarWidth: Math.min(next, max) });
+  };
 
-  const handleDragRight = (dx: number) =>
-    setLayout({ ...layout, rightWidth: clampRight(layout.rightWidth - dx) });
+  const handleDragRight = (dx: number) => {
+    // Además del tope absoluto (RIGHT_MAX), limitamos el panel de análisis a
+    // ~60% del viewport para que la zona central conserve espacio en desktop.
+    const max = Math.max(RIGHT_MIN, Math.floor(window.innerWidth * 0.6));
+    const next = clampRight(layout.rightWidth - dx);
+    setLayout({ ...layout, rightWidth: Math.min(next, max) });
+  };
 
   return (
     <div className="workspace">

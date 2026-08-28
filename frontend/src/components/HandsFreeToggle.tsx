@@ -1,8 +1,11 @@
 import type { HandsFreeStatus } from "../hooks/useHandsFree";
+import type { MicUnavailableReason } from "../utils/browserCapabilities";
+import { MicUnavailableNotice } from "./MicUnavailableNotice";
 
 interface HandsFreeToggleProps {
   enabled: boolean;
   status: HandsFreeStatus;
+  micError: MicUnavailableReason | null;
   onToggle: () => void;
 }
 
@@ -17,25 +20,33 @@ const STATUS_LABELS: Record<HandsFreeStatus, string> = {
 export function HandsFreeToggle({
   enabled,
   status,
+  micError,
   onToggle,
 }: HandsFreeToggleProps) {
   return (
     <div className="hands-free">
-      <button
-        type="button"
-        className={`hands-free-toggle${enabled ? " active" : ""}`}
-        onClick={onToggle}
-        aria-pressed={enabled}
-        aria-label={
-          enabled ? "Desactivar modo manos libres" : "Activar modo manos libres"
-        }
-        title={
-          enabled ? "Desactivar modo manos libres" : "Activar modo manos libres"
-        }
-      >
-        <MicIcon />
-        <span className="hands-free-label">Manos libres</span>
-      </button>
+      <div className="relative">
+        {micError && (
+          <div className="absolute bottom-full right-0 z-20 mb-2 w-80 max-w-[80vw]">
+            <MicUnavailableNotice reason={micError} />
+          </div>
+        )}
+        <button
+          type="button"
+          className={`hands-free-toggle${enabled ? " active" : ""}`}
+          onClick={onToggle}
+          aria-pressed={enabled}
+          aria-label={
+            enabled ? "Desactivar modo manos libres" : "Activar modo manos libres"
+          }
+          title={
+            enabled ? "Desactivar modo manos libres" : "Activar modo manos libres"
+          }
+        >
+          <MicIcon />
+          <span className="hands-free-label">Manos libres</span>
+        </button>
+      </div>
       {enabled && (
         <span
           className={`hands-free-status max-sm:hidden! hands-free-status--${status}`}

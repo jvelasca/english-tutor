@@ -14,9 +14,12 @@ BACKEND_PORT = 8000
 @router.get("/api/network")
 async def network_info() -> dict[str, str]:
     ip = network.get_lan_ip()
+    hostname = network.get_lan_hostname()
     return {
         "ip": ip,
+        "hostname": hostname,
         "frontend_port": str(FRONTEND_PORT),
         "backend_port": str(BACKEND_PORT),
-        "url": f"http://{ip}:{FRONTEND_PORT}",
+        "url": f"https://{ip}:{FRONTEND_PORT}",
+        "local_url": f"https://{hostname}.local:{FRONTEND_PORT}",
     }

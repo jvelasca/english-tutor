@@ -4,6 +4,34 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.29.0] — 2026-08-28
+
+**Fiabilidad LAN + audio móvil (P0) y lanzador de escritorio**: corrección del micrófono en móvil,
+acceso por HTTPS autofirmado en la red local, y lanzador con estado en color, reinicio y reloj de
+arranque.
+
+### Añadido
+- **Detección de capacidades de audio** (`utils/browserCapabilities.ts` + `hooks/useAudioCapabilities.ts`):
+  capa que protege el acceso a `navigator.mediaDevices`/`getUserMedia`/secure context y muestra un
+  aviso pedagógico (`MicUnavailableNotice`) en lugar del error "Cannot read properties of undefined".
+- **`/api/network`**: expone `hostname` y `local_url` (`https://<host>.local`), con `url` ahora en HTTPS.
+- **`/api/health/dependencies`**: nuevo estado `audio_library` (infraestructura de la biblioteca de audio).
+- **Launcher**: botón "Reiniciar servidor", enlaces de acceso clicables (equipo, LAN y mDNS) y detalle
+  del archivo de base de datos (tamaño, nº de tablas, fecha de modificación).
+- **`components/ui/tooltip.tsx`**: tooltip accesible para el aviso de diferencia de dificultad del audio
+  en Listening.
+
+### Cambiado
+- **HTTPS en la LAN**: el frontend se sirve con `@vitejs/plugin-basic-ssl`; Playwright y el launcher
+  verifican el estado por HTTPS aceptando el certificado autofirmado.
+- **Launcher**: estado con colores reales (verde/rojo/ámbar) en cabecera y servicios, reloj animado
+  durante arranque/parada/reinicio, y resumen/diagnóstico de cookies más legible.
+- **Analysis panel**: ancho máximo ampliado, pestañas que se envuelven (responsive) y topes de
+  redimensionado conscientes del viewport.
+- **Footer**: la barra de estado queda anclada al fondo en todas las vistas.
+- **Listening**: el aviso de diferencia de dificultad del audio pasa de texto fijo a tooltip sobre un
+  icono de aviso (clave `listening.audioGap` con placeholders).
+
 ## [1.28.0] — 2026-08-27
 
 **Biblioteca de audio humano — código (P1.5–P1.8)**: ajuste puntual de Listening para ítems

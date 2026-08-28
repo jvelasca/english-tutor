@@ -8,6 +8,11 @@ import {
   submitSpeakingAssessmentPart,
 } from "../../api/academy";
 import { transcribe } from "../../api/voz";
+import {
+  getMicrophoneStream,
+  MicUnavailableError,
+  type MicUnavailableReason,
+} from "../../utils/browserCapabilities";
 import type {
   NextBestActivity,
   SpeakingAssessmentPartInfo,
@@ -26,6 +31,7 @@ import { SpeakingRolePlay } from "./SpeakingRolePlay";
 import { ActivityResult } from "../../components/ActivityResult";
 import { NextStep } from "../../components/NextStep";
 import { LevelBadge } from "../../components/LevelBadge";
+import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { SkillBar } from "../../components/SkillBar";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -78,6 +84,7 @@ export function SpeakingAssessment({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const [manualText, setManualText] = useState("");
 
   const [recording, setRecording] = useState(false);
@@ -188,8 +195,15 @@ export function SpeakingAssessment({
       setRecording(false);
       return;
     }
+    setMicError(null);
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await getMicrophoneStream();
+    } catch (e) {
+      setMicError(e instanceof MicUnavailableError ? e.reason : "unknown");
+      return;
+    }
+    try {
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
@@ -334,6 +348,8 @@ export function SpeakingAssessment({
       )}
 
       {error && <ErrorNote>{error}</ErrorNote>}
+
+      {micError && <MicUnavailableNotice reason={micError} />}
 
       {!submitted ? (
         part && isConversationalTaskType(part.task_type) ? (

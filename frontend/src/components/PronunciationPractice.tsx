@@ -6,8 +6,14 @@ import type { NextBestActivity, PronunciationResponse } from "../types/api";
 import type { Section } from "../utils/sections";
 import { fluencyLevelLabel, wpmLabel } from "../utils/fluency";
 import { feedbackHints, wordsCorrectLabel } from "../utils/pronunciationFeedback";
+import {
+  getMicrophoneStream,
+  MicUnavailableError,
+  type MicUnavailableReason,
+} from "../utils/browserCapabilities";
 import { ActivityResult } from "./ActivityResult";
 import { NextStep } from "./NextStep";
+import { MicUnavailableNotice } from "./MicUnavailableNotice";
 import { Card } from "./ui/card";
 import { useI18n } from "../hooks/useI18n";
 import { cn } from "../lib/utils";
@@ -34,6 +40,7 @@ export function PronunciationPractice({
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<PronunciationResponse | null>(null);
+  const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -45,8 +52,15 @@ export function PronunciationPractice({
       setRecording(false);
       return;
     }
+    setMicError(null);
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await getMicrophoneStream();
+    } catch (e) {
+      setMicError(e instanceof MicUnavailableError ? e.reason : "unknown");
+      return;
+    }
+    try {
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
@@ -83,6 +97,8 @@ export function PronunciationPractice({
         <h2 className="text-2xl font-bold tracking-tight">{t("pron.title")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t("pron.prompt")}</p>
       </header>
+
+      {micError && <MicUnavailableNotice reason={micError} />}
 
       <Card className="gap-5 p-5 sm:p-6">
         <div className="flex flex-wrap gap-2">

@@ -175,6 +175,7 @@ export default function App() {
             onEditUser={editUser}
             handsFreeEnabled={handsFree.enabled}
             handsFreeStatus={handsFree.status}
+            handsFreeMicError={handsFree.micError}
             onToggleHandsFree={handsFree.toggle}
             onOpenSettings={() => setSettingsOpen(true)}
           />

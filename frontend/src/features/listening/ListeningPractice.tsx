@@ -19,6 +19,11 @@ import {
   submitListeningShadowing,
 } from "../../api/listening";
 import { speak, transcribe } from "../../api/voz";
+import {
+  getMicrophoneStream,
+  MicUnavailableError,
+  type MicUnavailableReason,
+} from "../../utils/browserCapabilities";
 import type {
   ListeningAnswerResponse,
   ListeningAudioVariant,
@@ -31,9 +36,11 @@ import type {
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
 import { NextStep } from "../../components/NextStep";
+import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
 
@@ -148,6 +155,7 @@ export function ListeningPractice({
   const [diagnostic, setDiagnostic] = useState<ListeningDiagnostic | null>(null);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const [replayCount, setReplayCount] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [variant, setVariant] = useState<string>("normal");
@@ -265,8 +273,15 @@ export function ListeningPractice({
       setRecording(false);
       return;
     }
+    setMicError(null);
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await getMicrophoneStream();
+    } catch (e) {
+      setMicError(e instanceof MicUnavailableError ? e.reason : "unknown");
+      return;
+    }
+    try {
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
@@ -314,6 +329,8 @@ export function ListeningPractice({
           <span className="min-w-0 break-words">{error}</span>
         </div>
       )}
+
+      {micError && <MicUnavailableNotice reason={micError} />}
 
       {!question ? (
         <Card className="p-8">
@@ -384,18 +401,29 @@ export function ListeningPractice({
             )}
 
             <div className="flex flex-col items-center gap-1.5 text-center">
-              <p className="text-xs text-muted-foreground">
-                {audioTypeLabel(question.audio_type)}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs text-muted-foreground">
+                  {audioTypeLabel(question.audio_type)}
+                </p>
+                {question.realized_difficulty < question.difficulty && (
+                  <Tooltip
+                    content={t("listening.audioGap")
+                      .replace("{realized}", String(question.realized_difficulty))
+                      .replace("{declared}", String(question.difficulty))}
+                  >
+                    <button
+                      type="button"
+                      className="inline-flex text-warning"
+                      aria-label={t("listening.audioGapTitle")}
+                    >
+                      <AlertTriangle className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </Tooltip>
+                )}
+              </div>
               {!question.audio_ready && (
                 <p className="text-xs text-muted-foreground">
                   {t("listening.audioUnavailable")}
-                </p>
-              )}
-              {question.realized_difficulty < question.difficulty && (
-                <p className="text-xs text-warning">
-                  {t("listening.audioGap")} {question.realized_difficulty} of the{" "}
-                  {question.difficulty} {t("listening.audioGapEnd")}
                 </p>
               )}
               {question.speech_rate > 0 && (

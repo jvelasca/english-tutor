@@ -1,5 +1,6 @@
 import { useI18n } from "../hooks/useI18n";
 import type { HandsFreeStatus } from "../hooks/useHandsFree";
+import type { MicUnavailableReason } from "../utils/browserCapabilities";
 import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
 import type { Route } from "./routes";
@@ -18,6 +19,7 @@ interface HeaderProps {
   onEditUser: (id: string, patch: UserPatch) => Promise<User | null>;
   handsFreeEnabled: boolean;
   handsFreeStatus: HandsFreeStatus;
+  handsFreeMicError: MicUnavailableReason | null;
   onToggleHandsFree: () => void;
   onOpenSettings: () => void;
 }
@@ -32,6 +34,7 @@ export function Header({
   onEditUser,
   handsFreeEnabled,
   handsFreeStatus,
+  handsFreeMicError,
   onToggleHandsFree,
   onOpenSettings,
 }: HeaderProps) {
@@ -65,6 +68,7 @@ export function Header({
         <HandsFreeToggle
           enabled={handsFreeEnabled}
           status={handsFreeStatus}
+          micError={handsFreeMicError}
           onToggle={onToggleHandsFree}
         />
         <button

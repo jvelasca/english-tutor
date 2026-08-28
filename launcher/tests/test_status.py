@@ -116,13 +116,14 @@ def test_fetch_health_unreachable(monkeypatch):
 
 def test_fetch_frontend_ok(monkeypatch):
     monkeypatch.setattr(
-        "status.urllib.request.urlopen", lambda url, timeout: _FakeResp(b"", 200)
+        "status.urllib.request.urlopen",
+        lambda url, timeout, context=None: _FakeResp(b"", 200),
     )
     assert status.fetch_frontend() is True
 
 
 def test_fetch_frontend_down(monkeypatch):
-    def boom(url, timeout):
+    def boom(url, timeout, context=None):
         raise OSError("refused")
 
     monkeypatch.setattr("status.urllib.request.urlopen", boom)
@@ -143,3 +144,30 @@ def test_fetch_version_unreachable(monkeypatch):
 
     monkeypatch.setattr("status.urllib.request.urlopen", boom)
     assert status.fetch_version() == ""
+
+
+def test_human_size():
+    assert status._human_size(0) == "0 B"
+    assert status._human_size(512) == "512 B"
+    assert status._human_size(1024) == "1.0 KB"
+    assert status._human_size(5 * 1024 * 1024) == "5.0 MB"
+
+
+def test_read_db_info_missing_file_is_not_found():
+    info = status.read_db_info("Z:/no/existe/tutor.db")
+    assert info["exists"] is False
+    assert info["size_human"] == "—"
+    assert info["tables"] == 0
+
+
+def test_read_db_info_reports_size_and_tables(tmp_path):
+    db = tmp_path / "t.db"
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.execute("CREATE TABLE vocabulary (id INTEGER)")
+        conn.execute("CREATE TABLE users (id INTEGER)")
+    info = status.read_db_info(str(db))
+    assert info["exists"] is True
+    assert info["size_bytes"] > 0
+    assert info["size_human"].endswith(("B", "KB", "MB"))
+    assert info["tables"] == 2
+    assert info["modified"] != "—"

@@ -7,6 +7,11 @@ import {
   rms,
   shouldEndUtterance,
 } from "../utils/vad";
+import {
+  detectAudioCapabilities,
+  micErrorReason,
+  type MicUnavailableReason,
+} from "../utils/browserCapabilities";
 
 export type HandsFreeStatus =
   | "idle"
@@ -18,6 +23,7 @@ export type HandsFreeStatus =
 export interface HandsFreeController {
   enabled: boolean;
   status: HandsFreeStatus;
+  micError: MicUnavailableReason | null;
   toggle: () => void;
   stop: () => void;
 }
@@ -36,6 +42,7 @@ export function useHandsFree(
 ): HandsFreeController {
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState<HandsFreeStatus>("idle");
+  const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -264,9 +271,16 @@ export function useHandsFree(
   async function start() {
     if (enabledRef.current) return;
 
+    const caps = detectAudioCapabilities();
+    if (!caps.supported) {
+      setMicError(caps.unavailableReason ?? "unknown");
+      return;
+    }
+
     enabledRef.current = true;
     setEnabled(true);
     setStatus("listening");
+    setMicError(null);
 
     try {
       // Ambos arranques se lanzan de forma síncrona dentro del gesto de usuario
@@ -295,7 +309,8 @@ export function useHandsFree(
 
       startRecorder();
       vadTimerRef.current = window.setInterval(onVadTick, VAD_INTERVAL_MS);
-    } catch {
+    } catch (err) {
+      setMicError(micErrorReason(err));
       stopInternal();
     }
   }
@@ -312,5 +327,5 @@ export function useHandsFree(
     return () => stopInternalRef.current();
   }, []);
 
-  return { enabled, status, toggle, stop: stopInternal };
+  return { enabled, status, micError, toggle, stop: stopInternal };
 }

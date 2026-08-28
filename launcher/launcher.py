@@ -22,7 +22,11 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk
 
-from browser_cookies import collect_cookies
+from browser_cookies import (
+    collect_cookies,
+    format_cookie_diagnosis,
+    format_cookie_summary,
+)
 from core import (
     DB_PATH,
     app_summary,
@@ -32,6 +36,7 @@ from core import (
     health_status,
     icon_file,
     lan_url,
+    local_url,
     user_overview,
 )
 from process_manager import ProcessManager
@@ -42,6 +47,7 @@ from status import (
     fetch_version,
     read_db_counts,
     read_db_details,
+    read_db_info,
     read_users,
 )
 from ui import (
@@ -50,12 +56,17 @@ from ui import (
     SECTION_ICONS,
     SERVICE_ICONS,
     read_log_tail,
+    status_color,
     status_dot,
 )
 
 REFRESH_MS = 2000
 POLL_MS = 100
 BROWSER_DELAY_S = 2.0
+
+# Reloj animado mostrado en la cabecera mientras se arranca/para/reinicia.
+SPINNER_CHARS = ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"]
+SPINNER_MS = 120
 
 # Tamaño por defecto de la ventana y posición inicial del divisor entre columnas.
 # Ambos se redimensionan y se persisten al cerrar (ver state_store.py).
@@ -116,6 +127,9 @@ class LauncherApp:
         self._lock = threading.Lock()
         self._state = load_state()
         self._sections_map: dict[str, Collapsible] = {}
+        self._spinner_id: str | None = None
+        self._spinner_idx = 0
+        self._action_running = False
         root.title("English Tutor — Launcher")
         # La ventana es redimensionable; el tamaño y la posición del divisor se
         # restauran del estado persistido (state.json) y se guardan al cerrar.
@@ -180,6 +194,38 @@ class LauncherApp:
         style.map(
             "Accent.TButton",
             background=[("active", c["accent_hover"]), ("disabled", "#c7d2fe")],
+        )
+
+        # Botón de acción positiva (verde): "Iniciar app" cuando está detenida.
+        style.configure(
+            "Success.TButton",
+            background=c["success"],
+            foreground="#ffffff",
+            borderwidth=0,
+            focuscolor=c["success"],
+            padding=(12, 8),
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "Success.TButton",
+            background=[("active", c["success_hover"]), ("disabled", "#d1d5db")],
+            foreground=[("disabled", "#9ca3af")],
+        )
+
+        # Botón de acción destructiva (rojo): "Detener app" cuando está en marcha.
+        style.configure(
+            "Danger.TButton",
+            background=c["error"],
+            foreground="#ffffff",
+            borderwidth=0,
+            focuscolor=c["error"],
+            padding=(12, 8),
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "Danger.TButton",
+            background=[("active", c["error_hover"]), ("disabled", "#d1d5db")],
+            foreground=[("disabled", "#9ca3af")],
         )
 
         style.configure(
@@ -297,36 +343,48 @@ class LauncherApp:
         self._status_dot = tk.StringVar(value=status_dot("unknown"))
         pill = ttk.Frame(header, style="Card.TFrame")
         pill.pack(side="right", padx=16, pady=12)
-        ttk.Label(pill, textvariable=self._status_dot, style="Card.TLabel").pack(
-            side="left"
+        self._status_dot_label = ttk.Label(
+            pill, textvariable=self._status_dot, style="Card.TLabel"
         )
-        ttk.Label(
+        self._status_dot_label.pack(side="left")
+        self._status_label = ttk.Label(
             pill,
             textvariable=self._status,
             style="Status.TLabel",
-        ).pack(side="left", padx=(6, 0))
+        )
+        self._status_label.pack(side="left", padx=(6, 0))
 
         # Acciones.
         actions = ttk.Frame(root, style="TFrame")
         actions.pack(fill="x", padx=16, pady=(12, 6))
-        ttk.Button(
+        self._start_btn = ttk.Button(
             actions,
             text=f"  {ACTION_ICONS['start']}  Iniciar app",
-            style="Accent.TButton",
+            style="Success.TButton",
             command=self.start,
-        ).pack(side="left")
-        ttk.Button(
+        )
+        self._start_btn.pack(side="left")
+        self._stop_btn = ttk.Button(
             actions,
             text=f"  {ACTION_ICONS['stop']}  Detener app",
             style="Ghost.TButton",
             command=self.stop,
-        ).pack(side="left", padx=(8, 0))
-        ttk.Button(
+        )
+        self._stop_btn.pack(side="left", padx=(8, 0))
+        self._restart_btn = ttk.Button(
+            actions,
+            text=f"  {ACTION_ICONS['restart']}  Reiniciar servidor",
+            style="Ghost.TButton",
+            command=self.restart,
+        )
+        self._restart_btn.pack(side="left", padx=(8, 0))
+        self._open_btn = ttk.Button(
             actions,
             text=f"  {ACTION_ICONS['open']}  Abrir app",
             style="Ghost.TButton",
             command=self.open_app,
-        ).pack(side="left", padx=(8, 0))
+        )
+        self._open_btn.pack(side="left", padx=(8, 0))
         ttk.Button(
             actions,
             text=f"  {ACTION_ICONS['refresh']}  Actualizar",
@@ -399,6 +457,7 @@ class LauncherApp:
         grid = ttk.Frame(sec.body, style="Card.TFrame")
         grid.pack(fill="x", padx=14, pady=(4, 12))
         self._svc_vars: dict[str, tk.StringVar] = {}
+        self._svc_value_labels: dict[str, ttk.Label] = {}
         for i, name in enumerate(_SERVICE_ORDER):
             var = tk.StringVar(value="…")
             self._svc_vars[name] = var
@@ -409,35 +468,37 @@ class LauncherApp:
             ttk.Label(grid, text=name, style="Service.TLabel").grid(
                 row=i, column=1, sticky="w", pady=3
             )
-            ttk.Label(grid, textvariable=var, style="Service.TLabel").grid(
-                row=i, column=2, sticky="e", padx=(20, 0), pady=3
-            )
+            val = ttk.Label(grid, textvariable=var, style="Service.TLabel")
+            val.grid(row=i, column=2, sticky="e", padx=(20, 0), pady=3)
+            self._svc_value_labels[name] = val
             grid.columnconfigure(1, weight=1)
 
     def _build_access(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Acceso a la app")
         grid = ttk.Frame(sec.body, style="Card.TFrame")
         grid.pack(fill="x", padx=14, pady=(4, 12))
-        ttk.Label(grid, text="🖥️", style="Service.TLabel").grid(
-            row=0, column=0, sticky="w", padx=(0, 6), pady=3
-        )
-        ttk.Label(grid, text="Este equipo", style="Service.TLabel").grid(
-            row=0, column=1, sticky="w", pady=3
-        )
-        ttk.Label(
-            grid, text=frontend_url(), style="Link.TLabel"
-        ).grid(row=0, column=2, sticky="e", padx=(20, 0), pady=3)
-
-        ttk.Label(grid, text="📡", style="Service.TLabel").grid(
-            row=1, column=0, sticky="w", padx=(0, 6), pady=3
-        )
-        ttk.Label(grid, text="Red local (LAN)", style="Service.TLabel").grid(
-            row=1, column=1, sticky="w", pady=3
-        )
-        ttk.Label(grid, text=lan_url(), style="Link.TLabel").grid(
-            row=1, column=2, sticky="e", padx=(20, 0), pady=3
-        )
+        rows = [
+            ("🖥️", "Este equipo (HTTPS)", frontend_url()),
+            ("📡", "Red local (LAN)", lan_url()),
+            ("🏷️", "Nombre local (mDNS)", local_url()),
+        ]
+        for i, (icon, label, url) in enumerate(rows):
+            ttk.Label(grid, text=icon, style="Service.TLabel").grid(
+                row=i, column=0, sticky="w", padx=(0, 6), pady=3
+            )
+            ttk.Label(grid, text=label, style="Service.TLabel").grid(
+                row=i, column=1, sticky="w", pady=3
+            )
+            self._link(grid, url).grid(
+                row=i, column=2, sticky="e", padx=(20, 0), pady=3
+            )
         grid.columnconfigure(1, weight=1)
+
+    def _link(self, parent: tk.Misc, url: str) -> ttk.Label:
+        """Etiqueta de enlace clicable que abre la URL en el navegador."""
+        lbl = ttk.Label(parent, text=url, style="Link.TLabel", cursor="hand2")
+        lbl.bind("<Button-1>", lambda e: webbrowser.open(url))
+        return lbl
 
     def _build_database(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Base de datos")
@@ -455,6 +516,14 @@ class LauncherApp:
             wraplength=COLUMN_W - 30,
         )
         self._db_detail_label.pack(anchor="w", fill="x", pady=(6, 0))
+        self._db_file_var = tk.StringVar(value="")
+        self._db_file_label = ttk.Label(
+            body,
+            textvariable=self._db_file_var,
+            style="DimCard.TLabel",
+            wraplength=COLUMN_W - 30,
+        )
+        self._db_file_label.pack(anchor="w", fill="x", pady=(6, 0))
 
     def _build_users(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Usuarios")
@@ -478,6 +547,11 @@ class LauncherApp:
         ttk.Label(wrap, textvariable=self._cookie_var, style="Service.TLabel").pack(
             anchor="w"
         )
+        self._remembered_var = tk.StringVar(value="")
+        self._remembered_label = ttk.Label(
+            wrap, textvariable=self._remembered_var, style="Status.TLabel"
+        )
+        self._remembered_label.pack(anchor="w", pady=(4, 0))
         self._cookie_diag_var = tk.StringVar(value="")
         self._cookie_diag_label = ttk.Label(
             wrap,
@@ -546,13 +620,20 @@ class LauncherApp:
             self._apply(*item[1])
             self.root.after(REFRESH_MS, self._next_refresh)
         elif kind == "error":
+            self._action_running = False
+            self._stop_spinner()
+            self._status.set("Error")
+            self._status_dot.set(status_dot("error"))
+            self._status_label.configure(foreground=COLORS["error"])
             self._msg.set(f"Error: {item[1]}")
             self._busy = False
         elif kind == "started":
+            self._action_running = False
             if item[1]:
                 webbrowser.open(frontend_url())
             self.refresh()
         elif kind == "stopped":
+            self._action_running = False
             self.refresh()
         elif kind == "open_app":
             if item[1]:
@@ -565,6 +646,28 @@ class LauncherApp:
     def _next_refresh(self) -> None:
         self._busy = False
         self.refresh()
+
+    # --- Indicador de actividad (reloj animado) ---
+    def _start_spinner(self, text: str) -> None:
+        """Arranca el reloj animado y un mensaje de estado en la cabecera."""
+        self._stop_spinner()
+        self._spinner_idx = 0
+        self._status.set(text)
+        self._status_label.configure(foreground=COLORS["warning"])
+        self._animate_spinner()
+
+    def _animate_spinner(self) -> None:
+        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_CHARS)
+        self._status_dot.set(SPINNER_CHARS[self._spinner_idx])
+        self._spinner_id = self.root.after(SPINNER_MS, self._animate_spinner)
+
+    def _stop_spinner(self) -> None:
+        if self._spinner_id is not None:
+            try:
+                self.root.after_cancel(self._spinner_id)
+            except tk.TclError:
+                pass
+            self._spinner_id = None
 
     # --- Acciones ---
     def refresh(self) -> None:
@@ -580,6 +683,7 @@ class LauncherApp:
                 version = fetch_version()
                 counts = read_db_counts(str(DB_PATH))
                 details = read_db_details(str(DB_PATH))
+                db_info = read_db_info(str(DB_PATH))
                 users = read_users(str(DB_PATH))
                 cookies, cookies_summary = collect_cookies()
                 backend_log = read_log_tail("backend")
@@ -596,6 +700,7 @@ class LauncherApp:
                         version,
                         counts,
                         details,
+                        db_info,
                         users,
                         cookies,
                         cookies_summary,
@@ -614,6 +719,7 @@ class LauncherApp:
         version,
         counts,
         details,
+        db_info,
         users,
         cookies,
         cookies_summary,
@@ -624,17 +730,34 @@ class LauncherApp:
         summary = app_summary(svc["api"] == "ok", frontend_up)
         backend_up = summary["backend"] == "on"
         frontend_on = summary["frontend"] == "on"
-        self._svc_vars["Backend"].set("Activo" if backend_up else "Detenido")
-        self._svc_vars["Frontend"].set("Activo" if frontend_on else "Detenido")
-        self._svc_vars["Ollama"].set(self._label(svc["ollama"]))
-        self._svc_vars["STT"].set(self._label(svc["stt"]))
-        self._svc_vars["TTS"].set(self._label(svc["tts"]))
-        self._svc_vars["Base de datos"].set(self._label(svc["database"]))
+        self._svc_vars["Backend"].set(
+            "🟢 Activo" if backend_up else "🔴 Detenido"
+        )
+        self._svc_vars["Frontend"].set(
+            "🟢 Activo" if frontend_on else "🔴 Detenido"
+        )
+        self._svc_vars["Ollama"].set(self._svc_text(svc["ollama"]))
+        self._svc_vars["STT"].set(self._svc_text(svc["stt"]))
+        self._svc_vars["TTS"].set(self._svc_text(svc["tts"]))
+        self._svc_vars["Base de datos"].set(self._svc_text(svc["database"]))
+
+        self._color_service("Backend", "on" if backend_up else "off")
+        self._color_service("Frontend", "on" if frontend_on else "off")
+        self._color_service("Ollama", svc["ollama"])
+        self._color_service("STT", svc["stt"])
+        self._color_service("TTS", svc["tts"])
+        self._color_service("Base de datos", svc["database"])
 
         running = backend_up and frontend_on
-        self._status.set("En marcha" if running else "Detenida")
-        self._status_dot.set(status_dot("ok" if running else "off"))
+        if not self._action_running:
+            self._stop_spinner()
+            self._status.set("En marcha" if running else "Detenida")
+            self._status_dot.set(status_dot("ok" if running else "off"))
+            self._status_label.configure(
+                foreground=COLORS["success"] if running else COLORS["error"]
+            )
         self._version.set(f"v{version}" if version else "Launcher de escritorio")
+        self._apply_action_buttons(running)
 
         c = db_summary(counts)
         self._db_var.set(
@@ -649,6 +772,13 @@ class LauncherApp:
             f"Listening: {details.get('intentos_listening', 0)} · "
             f"Preferencias: {details.get('preferencias', 0)}"
         )
+        if not db_info.get("exists"):
+            self._db_file_var.set("La base de datos todavía no se ha creado.")
+        else:
+            self._db_file_var.set(
+                f"📁 {db_info['size_human']} · {db_info['tables']} tablas · "
+                f"modificada {db_info['modified']}"
+            )
 
         self._tree.delete(*self._tree.get_children())
         for u in user_overview(users):
@@ -664,33 +794,37 @@ class LauncherApp:
         self._msg.set("Última comprobación realizada.")
         self._busy = False
 
+    def _apply_action_buttons(self, running: bool) -> None:
+        """Refleja el estado de la app en los botones (verde/rojo/deshabilitado).
+
+        - Detenida: "Iniciar app" en verde, "Detener"/"Reiniciar"/"Abrir"
+          deshabilitados.
+        - En marcha: "Detener app" en rojo, "Reiniciar"/"Abrir" habilitados,
+          "Iniciar app" deshabilitado.
+        """
+        if running:
+            self._start_btn.configure(style="Ghost.TButton", state="disabled")
+            self._stop_btn.configure(style="Danger.TButton", state="normal")
+            self._restart_btn.configure(style="Ghost.TButton", state="normal")
+            self._open_btn.configure(state="normal")
+        else:
+            self._start_btn.configure(style="Success.TButton", state="normal")
+            self._stop_btn.configure(style="Ghost.TButton", state="disabled")
+            self._restart_btn.configure(style="Ghost.TButton", state="disabled")
+            self._open_btn.configure(state="disabled")
+
     def _apply_cookies(self, rows: list[dict], summary: dict) -> None:
-        browser_txt = (
-            ", ".join(f"{b} ({n})" for b, n in summary["browsers"].items())
-            or "ningún navegador detectado"
-        )
         remembered = summary["remembered"]
         if remembered:
-            remembered_txt = f" · usuario recordado: {remembered}"
+            self._remembered_label.configure(foreground=COLORS["success"])
+            self._remembered_var.set(f"👤 Usuario recordado: {remembered}")
         else:
-            remembered_txt = " · sin usuario recordado todavía"
-        self._cookie_var.set(
-            f"{summary['total']} cookies de la app · {browser_txt}{remembered_txt}"
-        )
+            self._remembered_label.configure(foreground=COLORS["text_dim"])
+            self._remembered_var.set("👤 Sin usuario recordado todavía")
 
-        diag_lines: list[str] = []
-        for d in summary.get("diagnosis", []):
-            if d["found"]:
-                profiles = (
-                    ", ".join(d["profiles"])
-                    if d["profiles"]
-                    else "sin perfiles con base de cookies"
-                )
-                diag_lines.append(f"{d['browser']}: instalado · perfiles: {profiles}")
-            else:
-                diag_lines.append(f"{d['browser']}: no instalado · {d['root']}")
+        self._cookie_var.set(format_cookie_summary(summary))
         self._cookie_diag_var.set(
-            "Diagnóstico:\n" + "\n".join(diag_lines) if diag_lines else ""
+            format_cookie_diagnosis(summary.get("diagnosis", []))
         )
 
         self._cookie_tree.delete(*self._cookie_tree.get_children())
@@ -724,6 +858,7 @@ class LauncherApp:
         width = self._col_left.winfo_width()
         if width > 60:
             self._db_detail_label.configure(wraplength=width - 30)
+            self._db_file_label.configure(wraplength=width - 30)
         rwidth = self._col_right.winfo_width()
         if rwidth > 60:
             self._cookie_diag_label.configure(wraplength=rwidth - 30)
@@ -766,32 +901,85 @@ class LauncherApp:
             "unknown": "—",
         }.get(value, value)
 
+    def _svc_text(self, state: str) -> str:
+        """Texto de estado de un servicio con su punto de color (🟢/🔴/🟡/⚪)."""
+        return f"{status_dot(state)} {self._label(state)}"
+
+    def _color_service(self, name: str, state: str) -> None:
+        """Tiñe el texto de estado de un servicio según su estado normalizado."""
+        label = self._svc_value_labels.get(name)
+        if label is not None:
+            label.configure(foreground=status_color(state))
+
     def start(self) -> None:
+        self._action_running = True
         self._msg.set("Arrancando servicios…")
+        self._start_spinner("Arrancando…")
 
         def work() -> None:
-            with self._lock:
-                # No duplicar un servicio que ya está activo (p. ej. lanzado con F5).
-                backend_up = fetch_health() is not None
-                frontend_up = fetch_frontend()
-                if not self.pm.backend_running() and not backend_up:
-                    self.pm.start_backend()
-                if not self.pm.frontend_running() and not frontend_up:
-                    self.pm.start_frontend()
-            time.sleep(BROWSER_DELAY_S)
-            self._queue.put(("started", fetch_frontend()))
+            try:
+                with self._lock:
+                    # No duplicar un servicio ya activo (p. ej. lanzado con F5).
+                    backend_up = fetch_health() is not None
+                    frontend_up = fetch_frontend()
+                    if not self.pm.backend_running() and not backend_up:
+                        self.pm.start_backend()
+                    if not self.pm.frontend_running() and not frontend_up:
+                        self.pm.start_frontend()
+                time.sleep(BROWSER_DELAY_S)
+                self._queue.put(("started", fetch_frontend()))
+            except Exception as exc:  # noqa: BLE001
+                self._queue.put(("error", str(exc)))
 
         threading.Thread(target=work, daemon=True).start()
 
     def stop(self) -> None:
+        self._action_running = True
         self._msg.set("Deteniendo servicios…")
+        self._start_spinner("Deteniendo…")
 
         def work() -> None:
-            with self._lock:
-                self.pm.stop_all()
-            self._queue.put(("stopped", None))
+            try:
+                with self._lock:
+                    self.pm.stop_all()
+                self._queue.put(("stopped", None))
+            except Exception as exc:  # noqa: BLE001
+                self._queue.put(("error", str(exc)))
 
         threading.Thread(target=work, daemon=True).start()
+
+    def restart(self) -> None:
+        self._action_running = True
+        self._msg.set("Reiniciando servicios…")
+        self._start_spinner("Reiniciando…")
+
+        def work() -> None:
+            try:
+                with self._lock:
+                    self.pm.stop_all()
+                    self._wait_ports_free()
+                    # Evita duplicar un servicio ya activo (p. ej. lanzado con F5).
+                    backend_up = fetch_health() is not None
+                    frontend_up = fetch_frontend()
+                    if not self.pm.backend_running() and not backend_up:
+                        self.pm.start_backend()
+                    if not self.pm.frontend_running() and not frontend_up:
+                        self.pm.start_frontend()
+                time.sleep(BROWSER_DELAY_S)
+                self._queue.put(("started", fetch_frontend()))
+            except Exception as exc:  # noqa: BLE001
+                self._queue.put(("error", str(exc)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    @staticmethod
+    def _wait_ports_free(timeout: float = 15.0) -> None:
+        """Espera a que backend y frontend liberen sus puertos tras parar."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if fetch_health() is None and not fetch_frontend():
+                return
+            time.sleep(0.3)
 
     def open_app(self) -> None:
         def work() -> None:

@@ -20,7 +20,9 @@ COLORS = {
     "accent_hover": "#4338ca",
     "on_accent": "#ffffff",
     "success": "#16a34a",
+    "success_hover": "#15803d",
     "error": "#dc2626",
+    "error_hover": "#b91c1c",
     "warning": "#d97706",
     "neutral": "#94a3b8",
 }
@@ -47,6 +49,7 @@ SECTION_ICONS = {
 ACTION_ICONS = {
     "start": "▶️",
     "stop": "⏹️",
+    "restart": "🔁",
     "open": "🔗",
     "refresh": "🔄",
 }
@@ -57,7 +60,7 @@ STATUS_DOT = {
     "error": "🔴",
     "unavailable": "🟡",
     "unknown": "⚪",
-    "off": "⚪",
+    "off": "🔴",
 }
 
 TAIL_LINES = 250
@@ -66,6 +69,24 @@ TAIL_LINES = 250
 def status_dot(value: str) -> str:
     """Emoji de punto para un estado normalizado (ok/ready/error/...)."""
     return STATUS_DOT.get(value, STATUS_DOT["unknown"])
+
+
+def status_color(value: str) -> str:
+    """Color (hex) de la paleta para un estado normalizado (ok/error/...).
+
+    Se usa para teñir el texto de estado de los servicios y la cabecera,
+    de modo que el color no dependa de que el emoji se renderice a color.
+    """
+    mapping = {
+        "ok": COLORS["success"],
+        "ready": COLORS["success"],
+        "on": COLORS["success"],
+        "error": COLORS["error"],
+        "off": COLORS["error"],
+        "unavailable": COLORS["warning"],
+        "unknown": COLORS["neutral"],
+    }
+    return mapping.get(value, COLORS["neutral"])
 
 
 def read_log_tail(name: str, max_lines: int = TAIL_LINES) -> str:

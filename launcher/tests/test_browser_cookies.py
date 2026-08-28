@@ -162,6 +162,42 @@ def test_collect_cookies_includes_diagnosis(monkeypatch):
     ]
 
 
+def test_format_cookie_summary_with_browsers():
+    summary = {"total": 3, "browsers": {"Chrome": 2, "Edge": 1}}
+    assert (
+        bc.format_cookie_summary(summary)
+        == "3 cookies de la app · Chrome (2), Edge (1)"
+    )
+
+
+def test_format_cookie_summary_without_browsers():
+    summary = {"total": 0, "browsers": {}}
+    assert bc.format_cookie_summary(summary) == "0 cookies de la app"
+
+
+def test_format_cookie_diagnosis_installed_and_missing():
+    diagnosis = [
+        {"browser": "Chrome", "found": True, "profiles": ["Default", "Trabajo"]},
+        {"browser": "Edge", "found": True, "profiles": []},
+        {"browser": "Firefox", "found": False, "profiles": []},
+    ]
+    out = bc.format_cookie_diagnosis(diagnosis)
+    assert "Chrome: Default, Trabajo" in out
+    assert "Edge: sin perfiles con cookies" in out
+    assert "Firefox" in out
+    assert out.startswith("Detectados ·")
+
+
+def test_format_cookie_diagnosis_only_missing():
+    diagnosis = [{"browser": "Chrome", "found": False, "profiles": []}]
+    out = bc.format_cookie_diagnosis(diagnosis)
+    assert out == "No instalados · Chrome"
+
+
+def test_format_cookie_diagnosis_empty():
+    assert bc.format_cookie_diagnosis([]) == ""
+
+
 def test_browser_roots_include_chromium_family():
     names = {b for b, _e, _r in bc._BROWSER_ROOTS}
     assert {"Chrome", "Edge", "Brave", "Vivaldi", "Opera", "Opera GX"} <= names

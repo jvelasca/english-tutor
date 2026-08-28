@@ -7,11 +7,24 @@ def test_status_dot_known_states():
     assert ui.status_dot("ready") == "🟢"
     assert ui.status_dot("error") == "🔴"
     assert ui.status_dot("unavailable") == "🟡"
-    assert ui.status_dot("off") == "⚪"
+    assert ui.status_dot("off") == "🔴"
 
 
 def test_status_dot_unknown_falls_back():
     assert ui.status_dot("anything-else") == "⚪"
+
+
+def test_status_color_maps_states():
+    assert ui.status_color("ok") == ui.COLORS["success"]
+    assert ui.status_color("on") == ui.COLORS["success"]
+    assert ui.status_color("error") == ui.COLORS["error"]
+    assert ui.status_color("off") == ui.COLORS["error"]
+    assert ui.status_color("unavailable") == ui.COLORS["warning"]
+    assert ui.status_color("unknown") == ui.COLORS["neutral"]
+
+
+def test_status_color_unknown_falls_back_to_neutral():
+    assert ui.status_color("anything-else") == ui.COLORS["neutral"]
 
 
 def test_icons_have_expected_keys():
@@ -20,6 +33,7 @@ def test_icons_have_expected_keys():
     assert ui.SECTION_ICONS["Servicios"] == "🛠️"
     assert ui.SECTION_ICONS["Cookies navegador"] == "🍪"
     assert ui.ACTION_ICONS["start"] == "▶️"
+    assert ui.ACTION_ICONS["restart"] == "🔁"
 
 
 def test_read_log_tail_returns_last_lines(monkeypatch, tmp_path):

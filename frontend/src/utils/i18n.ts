@@ -136,6 +136,10 @@ const STRINGS: Record<string, Entry> = {
   "status.ollama": { en: "Ollama", es: "Ollama" },
   "status.stt": { en: "STT", es: "STT" },
   "status.tts": { en: "TTS", es: "TTS" },
+  "status.audioLibrary": { en: "Audio library", es: "Biblioteca de audio" },
+  "status.secureContext": { en: "Secure context", es: "Conexión segura" },
+  "status.microphone": { en: "Microphone", es: "Micrófono" },
+  "status.scanToConnect": { en: "Scan to connect", es: "Escanea para conectar" },
   "status.urlTitle": { en: "Access URL on your network", es: "URL de acceso en tu red" },
 
   // Común
@@ -254,6 +258,58 @@ const STRINGS: Record<string, Entry> = {
   "mic.accessError": {
     en: "Could not access the microphone: ",
     es: "No se pudo acceder al micrófono: ",
+  },
+  "mic.unavailableTitle": {
+    en: "Microphone unavailable",
+    es: "Micrófono no disponible",
+  },
+  "mic.unavailable.not_secure_context": {
+    en: "This device is connected over an insecure connection (HTTP). The microphone only works over HTTPS or on localhost.",
+    es: "Este dispositivo está conectado por una conexión insegura (HTTP). El micrófono solo funciona por HTTPS o en localhost.",
+  },
+  "mic.unavailable.no_media_devices": {
+    en: "This browser does not expose media devices on this connection.",
+    es: "Este navegador no expone los dispositivos multimedia en esta conexión.",
+  },
+  "mic.unavailable.no_get_user_media": {
+    en: "This browser does not support microphone access.",
+    es: "Este navegador no admite el acceso al micrófono.",
+  },
+  "mic.unavailable.no_media_recorder": {
+    en: "This browser does not support audio recording.",
+    es: "Este navegador no admite la grabación de audio.",
+  },
+  "mic.unavailable.permission_denied": {
+    en: "Microphone permission was denied. Allow access in your browser settings and try again.",
+    es: "El permiso del micrófono fue denegado. Permite el acceso en los ajustes del navegador e inténtalo de nuevo.",
+  },
+  "mic.unavailable.no_microphone": {
+    en: "No microphone was found on this device.",
+    es: "No se encontró ningún micrófono en este dispositivo.",
+  },
+  "mic.unavailable.not_supported": {
+    en: "The microphone could not be started on this device.",
+    es: "No se pudo iniciar el micrófono en este dispositivo.",
+  },
+  "mic.unavailable.unknown": {
+    en: "The microphone could not be accessed.",
+    es: "No se pudo acceder al micrófono.",
+  },
+  "mic.unavailable.checkTitle": {
+    en: "Check these things:",
+    es: "Comprueba lo siguiente:",
+  },
+  "mic.unavailable.checkSecure": {
+    en: "Use HTTPS or a secure local connection (https://…).",
+    es: "Usa HTTPS o una conexión local segura (https://…).",
+  },
+  "mic.unavailable.checkPermission": {
+    en: "Allow microphone access in the browser.",
+    es: "Permite el acceso al micrófono en el navegador.",
+  },
+  "mic.unavailable.checkBrowser": {
+    en: "Try Chrome, Edge or Safari.",
+    es: "Prueba con Chrome, Edge o Safari.",
   },
 
   // Voz / reproducción
@@ -525,12 +581,12 @@ const STRINGS: Record<string, Entry> = {
   "listening.next": { en: "Next", es: "Siguiente" },
   "listening.review": { en: "review", es: "revisar" },
   "listening.audioGap": {
-    en: "This audio realizes a difficulty of",
-    es: "Este audio realiza una dificultad",
+    en: "This audio realizes difficulty {realized} of the {declared} declared: part of the difficulty is not backed by the audio.",
+    es: "Este audio realiza una dificultad {realized} de las {declared} declaradas: parte de la dificultad no está respaldada por el audio.",
   },
-  "listening.audioGapEnd": {
-    en: "of the declared: part of the difficulty is not backed by the audio.",
-    es: "de las declaradas: parte de la dificultad no está respaldada por el audio.",
+  "listening.audioGapTitle": {
+    en: "Audio difficulty gap",
+    es: "Diferencia de dificultad del audio",
   },
 
   // Learning profile
