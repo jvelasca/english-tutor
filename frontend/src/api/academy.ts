@@ -2,6 +2,8 @@ import { getJson, postJson, putJson } from "./client";
 import type {
   AttemptEntry,
   AttemptResponse,
+  CefrLadder,
+  ConversationEndurance,
   Enrollment,
   Exam,
   ExamResult,
@@ -176,6 +178,10 @@ export function getStudentModel(userId: string): Promise<StudentModel> {
   return getJson<StudentModel>(`/api/academy/student-model${userQuery(userId)}`);
 }
 
+export function getCefrLadder(userId: string): Promise<CefrLadder> {
+  return getJson<CefrLadder>(`/api/academy/cefr-ladder${userQuery(userId)}`);
+}
+
 export function getSpeakingDiagnostic(
   userId: string,
 ): Promise<SpeakingDiagnostic> {
@@ -195,6 +201,14 @@ export function getSpeakingJourney(
 ): Promise<SpeakingJourneyOut> {
   return getJson<SpeakingJourneyOut>(
     `/api/academy/speaking/journey${userQuery(userId)}`,
+  );
+}
+
+export function getSpeakingEndurance(
+  userId: string,
+): Promise<ConversationEndurance> {
+  return getJson<ConversationEndurance>(
+    `/api/academy/speaking/endurance${userQuery(userId)}`,
   );
 }
 

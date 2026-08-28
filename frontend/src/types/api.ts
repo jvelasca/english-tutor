@@ -265,6 +265,8 @@ export interface ListeningQuestion {
   noise_level: number;
   repetition_policy: string;
   topic: string;
+  // Contexto comunicativo del ítem (Listening 2.0); vacío en el banco heredado.
+  context: string;
   audio_ready: boolean;
   // Modelo de realización (V1.14): tipo de audio servido y separación entre la
   // dificultad declarada y la realmente realizada por el audio.
@@ -396,6 +398,19 @@ export interface ListeningRealizationSummary {
   gap: number;
 }
 
+export interface ListeningResilienceDimension {
+  dimension: string;
+  attempts: number;
+  correct: number;
+  accuracy: number | null;
+}
+
+export interface ListeningResilience {
+  dimensions: ListeningResilienceDimension[];
+  main_weakness: string | null;
+  recommendation: string;
+}
+
 export interface ListeningDiagnostic {
   subskills: ListeningSubskillProgress[];
   weak: string[];
@@ -409,6 +424,8 @@ export interface ListeningDiagnostic {
   retention: ListeningRetention;
   bank_version: string;
   realization: ListeningRealizationSummary;
+  // Indicador de resiliencia auditiva (Listening 2.0).
+  resilience: ListeningResilience;
 }
 
 // --- Speaking 3.0 (diagnóstico longitudinal por criterio de rúbrica) ---
@@ -426,6 +443,9 @@ export interface SpeakingCriterionProgress {
   lifetime_score?: number | null;
   confidence?: number | null;
   stability?: number | null;
+  // Speaking 2.0 (V1.34): true si el score es un proxy (p. ej. pronunciation
+  // derivado de similitud fonética de texto, no de análisis acústico real).
+  proxy?: boolean;
 }
 
 export interface SpeakingTrend {
@@ -433,6 +453,13 @@ export interface SpeakingTrend {
   prior_mean: number | null;
   delta: number | null;
   direction: string;
+}
+
+export interface SpeakingInteractionQuality {
+  dimension: string;
+  attempts: number;
+  mean: number | null;
+  recent_score: number | null;
 }
 
 export interface SpeakingDiagnostic {
@@ -444,6 +471,21 @@ export interface SpeakingDiagnostic {
   overall_recent: number | null;
   trend: SpeakingTrend;
   rubric_version: string;
+  interaction_quality?: SpeakingInteractionQuality[];
+}
+
+export interface EnduranceMilestone {
+  seconds: number;
+  achieved: boolean;
+}
+
+export interface ConversationEndurance {
+  milestones: EnduranceMilestone[];
+  longest_session_seconds: number;
+  longest_turn_seconds: number;
+  total_speaking_seconds: number;
+  turns: number;
+  current_goal_seconds: number | null;
 }
 
 // --- Speaking 3.0: nivel continuo y journey (V1.16) ---
@@ -952,6 +994,32 @@ export interface NextBestActivity {
   reason: string;
   minutes: number;
   priority: number;
+  signals?: Record<string, unknown>;
+  why?: string;
+}
+
+// --- Escalera CEFR (Curriculum 2.0) ---
+
+export interface CefrDimension {
+  id: string;
+  label: string;
+}
+
+export interface CefrBand {
+  id: string;
+  label: string;
+  numeric: number;
+  title: string;
+  description: string;
+  can_do: Record<string, string[]>;
+  is_current: boolean;
+}
+
+export interface CefrLadder {
+  dimensions: CefrDimension[];
+  bands: CefrBand[];
+  estimated_band: string | null;
+  estimated_numeric: number | null;
 }
 
 // --- Objetivo personal de aprendizaje ---

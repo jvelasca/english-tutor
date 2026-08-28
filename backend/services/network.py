@@ -29,3 +29,18 @@ def get_lan_hostname() -> str:
     (``https://<hostname>.local``) independiente de la IP dinámica del router.
     """
     return socket.gethostname().split(".")[0]
+
+
+def local_url_resolves() -> bool:
+    """Comprueba si ``<hostname>.local`` resuelve realmente vía mDNS.
+
+    Generar la URL ``.local`` no instala un servicio mDNS: sin un respondedor
+    (Bonjour/Avahi/mDNS en Windows) el nombre no resolverá. Se intenta una
+    resolución real y se devuelve ``False`` ante cualquier fallo (sin mDNS,
+    sin red, sin DNS).
+    """
+    try:
+        socket.getaddrinfo(f"{get_lan_hostname()}.local", None)
+        return True
+    except OSError:
+        return False

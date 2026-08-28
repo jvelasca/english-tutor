@@ -261,6 +261,23 @@ def test_parse_speaking_evidence_extracts_interaction_subdims():
     assert result["repair"] == 0.5
 
 
+def test_parse_speaking_evidence_extracts_initiation():
+    raw = (
+        '{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student"], "coherence": 0.8, "initiation": 0.6}'
+    )
+    result = speaking_llm.parse_speaking_evidence(raw)
+    assert result["initiation"] == 0.6
+
+
+def test_parse_speaking_evidence_initiation_absent_omitted():
+    raw = (
+        '{"task_achieved": true, "grammar_errors": 0, '
+        '"lexical_tokens": ["student"], "coherence": 0.8}'
+    )
+    assert "initiation" not in speaking_llm.parse_speaking_evidence(raw)
+
+
 def test_build_speaking_prompt_mentions_interaction_subdims():
     msgs = speaking_llm.build_speaking_prompt("Introduce yourself", "I am a student")
     for key in (
@@ -270,5 +287,6 @@ def test_build_speaking_prompt_mentions_interaction_subdims():
         "topic_maintenance",
         "clarification_requests",
         "repair",
+        "initiation",
     ):
         assert key in msgs[0]["content"]

@@ -4,6 +4,8 @@ import {
   getMicrophoneStream,
   micErrorReason,
   MicUnavailableError,
+  queryMicrophonePermission,
+  watchMicrophoneAvailability,
 } from "./browserCapabilities";
 
 function stubBrowser(overrides: {
@@ -130,5 +132,101 @@ describe("getMicrophoneStream", () => {
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     stubBrowser({ mediaDevices: { getUserMedia } });
     await expect(getMicrophoneStream()).resolves.toBe(stream);
+  });
+});
+
+describe("queryMicrophonePermission", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("devuelve granted cuando la Permissions API lo reporta", async () => {
+    const query = vi.fn().mockResolvedValue({ state: "granted" });
+    vi.stubGlobal("navigator", { permissions: { query } });
+    await expect(queryMicrophonePermission()).resolves.toBe("granted");
+  });
+
+  it("devuelve unknown cuando no hay Permissions API", async () => {
+    vi.stubGlobal("navigator", { permissions: undefined });
+    await expect(queryMicrophonePermission()).resolves.toBe("unknown");
+  });
+
+  it("devuelve unknown cuando query lanza", async () => {
+    const query = vi.fn().mockRejectedValue(new Error("unsupported"));
+    vi.stubGlobal("navigator", { permissions: { query } });
+    await expect(queryMicrophonePermission()).resolves.toBe("unknown");
+  });
+});
+
+describe("watchMicrophoneAvailability", () => {
+  function makeDocument() {
+    const listeners: Record<string, (() => void)[]> = {};
+    const doc = {
+      visibilityState: "visible",
+      addEventListener: (ev: string, fn: () => void) => {
+        (listeners[ev] ??= []).push(fn);
+      },
+      removeEventListener: (ev: string, fn: () => void) => {
+        listeners[ev] = (listeners[ev] ?? []).filter((f) => f !== fn);
+      },
+      _dispatch: (ev: string) => listeners[ev]?.forEach((fn) => fn()),
+    };
+    return doc as typeof doc & { _dispatch: (ev: string) => void };
+  }
+
+  it("llama onChange al recuperar visibilidad", () => {
+    const doc = makeDocument();
+    vi.stubGlobal("document", doc);
+    vi.stubGlobal("window", {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    vi.stubGlobal("navigator", { mediaDevices: undefined, permissions: undefined });
+    const onChange = vi.fn();
+    const clean = watchMicrophoneAvailability(onChange);
+    doc._dispatch("visibilitychange");
+    expect(onChange).toHaveBeenCalled();
+    clean();
+  });
+
+  it("llama onChange ante devicechange", () => {
+    const doc = makeDocument();
+    vi.stubGlobal("document", doc);
+    vi.stubGlobal("window", {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    const deviceListeners: (() => void)[] = [];
+    vi.stubGlobal("navigator", {
+      permissions: undefined,
+      mediaDevices: {
+        addEventListener: (_ev: string, fn: () => void) => deviceListeners.push(fn),
+        removeEventListener: () => {},
+      },
+    });
+    const onChange = vi.fn();
+    const clean = watchMicrophoneAvailability(onChange);
+    deviceListeners.forEach((fn) => fn());
+    expect(onChange).toHaveBeenCalled();
+    clean();
+  });
+
+  it("la limpieza elimina los listeners de document y window", () => {
+    const doc = makeDocument();
+    const winListeners: Record<string, (() => void)[]> = {};
+    const win = {
+      addEventListener: (ev: string, fn: () => void) => {
+        (winListeners[ev] ??= []).push(fn);
+      },
+      removeEventListener: (ev: string, fn: () => void) => {
+        winListeners[ev] = (winListeners[ev] ?? []).filter((f) => f !== fn);
+      },
+    };
+    vi.stubGlobal("document", doc);
+    vi.stubGlobal("window", win);
+    vi.stubGlobal("navigator", { mediaDevices: undefined, permissions: undefined });
+    const onChange = vi.fn();
+    const clean = watchMicrophoneAvailability(onChange);
+    clean();
+    doc._dispatch("visibilitychange");
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,126 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.34.0] — 2026-08-28
+
+**Speaking 2.0**: pronunciación marcada como proxy, desglose de Interaction Quality y
+Conversation Endurance.
+
+### Añadido
+- **Pronunciation proxy** (`services/speaking.py`): `PROXY_CRITERIA` + `criterion_is_proxy()` marcan
+  `pronunciation` como *proxy* porque deriva de similitud fonética de texto (no de análisis acústico
+  real). El diagnóstico (`/api/academy/speaking/diagnostic`) emite `proxy: true` en ese criterio y la
+  UI lo muestra con una insignia "proxy" para ser transparente con la limitación.
+- **Interaction Quality** (`services/speaking.py`): `INTERACTION_QUALITY_DIMENSIONS`
+  (initiation, response, follow_up, repair, turn_taking) con `interaction_quality_scores()`. Cada
+  sub-dimensión se registra como evidencia propia (`interaction:<dim>`) y se agrega en
+  `_interaction_quality_breakdown`, expuesta en el diagnóstico como `interaction_quality`.
+- **Conversation Endurance** (`services/speaking.py` + `repositories/conversations.py`):
+  `conversation_endurance()` mide cuánto puede sostener una conversación el alumno a partir de la
+  telemetría de turnos hablados (hitos 30s/60s/90s/120s/180s). Nuevo repositorio
+  `student_speaking_sessions()` y endpoint `GET /api/academy/speaking/endurance`.
+- **LLM evidence**: `speaking_llm` solicita y parsea el nuevo campo `initiation` para alimentar la
+  sub-dimensión de inicio de interacción.
+
+### Cambiado
+- **Frontend**: `SpeakingDiagnostic` renderiza la insignia "proxy", el desglose de Interaction
+  Quality y los hitos de Conversation Endurance (con traducciones ES/EN).
+
+## [1.33.0] — 2026-08-28
+
+**Listening 2.0**: indicador de resiliencia auditiva y clasificación del corpus por
+contexto comunicativo.
+
+### Añadido
+- **Listening Resilience** (`services/listening.py`): `resilience_dimensions()` clasifica cada ítem
+  según la condición de escucha que su audio *realiza* (habla clara → natural → conectada → rápida →
+  ruido → acentos) y `listening_resilience()` agrega la precisión por dimensión. El diagnóstico
+  (`/api/listening/diagnostic`) ahora emite `resilience` con `main_weakness` ("Your main weakness is
+  understanding connected speech") y `recommendation`, además de `dimensions`.
+- **Honestidad de evidencia**: la resiliencia se calcula sobre el vector *realizado* (no el declarado),
+  de modo que una voz TTS neutra no aporta evidencia a `noise`/`accents`; esas dimensiones se poblarán
+  cuando exista el corpus real.
+- **Contexto comunicativo** (`context`): nueva dimensión de clasificación del corpus en
+  `ListeningAsset`/`ListeningQuestion` (`LISTENING_CONTEXTS`: conversation, announcement, message,
+  instructions, news, interview, narrative, presentation) y en el manifest de audio humano
+  (`AudioLibraryEntry.context`, con `by_context` en `library_summary`).
+
+### Cambiado
+- **`AUDIO_LIBRARY_VERSION` → `1.2.0`**: el manifest de la biblioteca de audio humano incorpora el
+  campo `context` (comunicativo). El manifest vacío del repositorio se actualiza en consecuencia.
+
+## [1.32.0] — 2026-08-28
+
+**Curriculum 2.0**: escalera CEFR completa (Pre-A1 → C2, con bandas "plus") y descriptores
+Can-Do por dimensión, visibles en el Course.
+
+### Añadido
+- **Marco de descriptores CEFR** (`curriculum/cefr_descriptors.json` + `services/cefr_descriptors.py`):
+  la escalera completa `Pre-A1, A1, A2, A2+, B1, B1+, B2, B2+, C1, C2` con descriptores "Can-Do"
+  para 9 dimensiones (listening, speaking, reading, writing, grammar, vocabulary, pronunciation,
+  **interaction** y **mediation** — las dos nuevas del Companion Volume).
+- **Banda continua** (`band_for_numeric`): la estimación puede expresar matices (p. ej. "B1+") sin
+  alterar la progresión de matrícula (`CEFR_ORDER` sigue con los 6 cursos principales).
+- **`/api/academy/cefr-ladder`**: devuelve dimensiones + bandas con `is_current` y sitúa al alumno
+  (`estimated_band`/`estimated_numeric`) desde el Student Model.
+- **Course**: escalera CEFR completa con "You are here" y una tarjeta "What you can do" con los
+  descriptores Can-Do del nivel estimado, agrupados por dimensión.
+
+### Nota
+- Los niveles "plus" (A2+/B1+/B2+) y Pre-A1 son **bandas de competencia**, no cursos con contenido
+  propio: el contenido de los cursos (A1..B2) no cambia. La progresión de matrícula permanece intacta.
+
+## [1.31.0] — 2026-08-28
+
+**Adaptive Engine 2.0**: motor de prioridad explicable y "Why this activity?" en la tarjeta de
+siguiente mejor actividad.
+
+### Añadido
+- **Priority Engine** (`services/adaptive.py`): `priority_signals()` expone las señales observables
+  de cada candidato (recencia, retención, confianza, estabilidad, volumen de evidencia,
+  transferencia/novedad y dificultad) y `priority_score()` las combina con el orden pedagógico por
+  categoría en una prioridad compuesta determinista (0..1).
+- **"Why this activity?"**: `explain_priority()` genera una explicación pedagógica en inglés por
+  categoría (repaso, listening, debilidad, nuevo, refuerzo); `next_best_activity()` emite `signals`
+  y `why` junto a `priority`.
+- **Transparencia en la API**: `/api/academy/next-best` incluye `signals` y `why`
+  (`NextBestActivityOut`); la tarjeta `NextBestCard` muestra la explicación bajo el CTA.
+
+### Cambiado
+- **`priority` semántico**: deja de ser la proyección ordinal fija (`NEXT_BEST_PRIORITY`) y pasa a
+  ser un score compuesto explicable (base por categoría + olvido + debilidad + evidencia).
+- **`get_next_best_activity`** pasa el perfil CEFR anotado y el instante de referencia al motor
+  para calcular las señales.
+
+## [1.30.0] — 2026-08-28
+
+**LAN + Mobile 100%**: verificación real de mDNS, recuperación de permisos de micrófono,
+test de micrófono con medidor de nivel, tarjeta de conexión con QR pulido y página de ayuda
+`/help/connect` para confiar el certificado por plataforma.
+
+### Añadido
+- **mDNS real**: `/api/network` añade `local_url_available` (comprueba si `<host>.local`
+  resuelve vía mDNS); el launcher marca la fila "Nombre local (mDNS)" como `resuelve`/`no resuelve`.
+- **Recuperación de permiso**: `watchMicrophoneAvailability()` observa `visibilitychange`,
+  `focus`, `devicechange` y la Permissions API; `useAudioCapabilities` ahora es reactivo (estado +
+  `refresh`) en lugar de `useMemo(..., [])`, resolviendo el caso denegado → ajustes → conceder → volver.
+- **Test de micrófono** (`components/MicrophoneTest.tsx`): botón "Test microphone" con medidor de
+  nivel de entrada en vivo (`utils/microphoneLevel.ts`) y "Test playback"; integrado en el estado
+  del sistema.
+- **Tarjeta "Connect a device"** (`components/ConnectDeviceCard.tsx`): QR pulido, URL por IP
+  (siempre) y `.local` (solo si resuelve), con enlace a la ayuda.
+- **Página `/help/connect`** (`features/help/ConnectHelp.tsx`): instrucciones para confiar el
+  certificado autofirmado en Windows, Android e iPhone/iPad; accesible desde el header (botón Help)
+  y desde la tarjeta de conexión.
+- **E2E móvil** (`tests/visual/mobile.spec.ts`): renderizado de la página de conexión y del test de
+  micrófono, y aviso `MicUnavailableNotice` ante permiso denegado, en viewport móvil.
+- **`docs/DEVICE_MATRIX.md`**: matriz de validación física (Android/iPhone/Tablet × Mic/Audio/
+  Speaking/Listening).
+
+### Cambiado
+- **StatusBar**: la barra de estado y su popover ya no se recortan (`overflow: hidden` eliminado) y
+  el popover queda acotado al viewport (`max-height` + scroll) con `z-index` correcto.
+
 ## [1.29.0] — 2026-08-28
 
 **Fiabilidad LAN + audio móvil (P0) y lanzador de escritorio**: corrección del micrófono en móvil,

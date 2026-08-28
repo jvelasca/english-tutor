@@ -68,6 +68,7 @@ def _public(question: dict) -> dict:
     out["realized_difficulty"] = realized_difficulty(question)
     out["realization"] = realization_status(question)
     out["audio_type"] = question.get("audio_type") or "tts"
+    out["context"] = question.get("context", "")
     out["audio_ready"] = audio_ready(question)
     out["variants"] = audio_variants(question)
     out["default_variant"] = "normal"

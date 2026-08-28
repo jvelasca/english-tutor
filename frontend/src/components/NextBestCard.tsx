@@ -65,6 +65,14 @@ export function NextBestCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {t(`reason.${next.reason}`)} · {next.minutes} {t("home.min")}
           </p>
+          {next.why && (
+            <p className="mt-2 text-sm text-foreground/90">
+              <span className="font-semibold">
+                {t("home.whyThisActivity")}
+              </span>{" "}
+              {next.why}
+            </p>
+          )}
         </div>
         <Button size="lg" className="shrink-0 gap-2" onClick={onStart}>
           {t("home.continue")}

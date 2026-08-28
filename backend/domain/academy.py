@@ -62,7 +62,13 @@ from schemas.academy import (
     WritingTaskResultOut,
 )
 from services import academy as academy_svc
-from services import adaptive, speaking_assessment, speaking_llm, writing_llm
+from services import (
+    adaptive,
+    cefr_descriptors,
+    speaking_assessment,
+    speaking_llm,
+    writing_llm,
+)
 from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
 from services import writing as writing_svc
@@ -548,6 +554,39 @@ async def get_student_model(user_id: str) -> StudentModelOut:
     )
 
 
+async def get_cefr_ladder(user_id: str) -> dict:
+    """Escalera CEFR completa (Curriculum 2.0) con descriptores Can-Do.
+
+    Devuelve el marco de descriptores (Pre-A1 → C2, incluyendo las bandas "plus")
+    con las 9 dimensiones comunicativas y sitúa al alumno en la escalera continua:
+    `estimated_band`/`estimated_numeric` derivan del Student Model y `is_current`
+    marca la banda correspondiente en `bands`. No certifica CEFR: es una referencia
+    interna alineada al marco.
+    """
+    fw = cefr_descriptors.load_framework()
+    sm = await build_student_model(user_id)
+    numeric = float(sm["estimated_numeric"])
+    estimated_band = cefr_descriptors.band_for_numeric(numeric)
+    dims = cefr_descriptors.dimensions()
+    return {
+        "dimensions": [{"id": d, "label": label} for d, label in dims.items()],
+        "bands": [
+            {
+                "id": b.id,
+                "label": b.label,
+                "numeric": b.numeric,
+                "title": b.title,
+                "description": b.description,
+                "can_do": b.can_do,
+                "is_current": b.id == estimated_band,
+            }
+            for b in fw.bands
+        ],
+        "estimated_band": estimated_band,
+        "estimated_numeric": numeric,
+    }
+
+
 async def get_readiness(user_id: str, target_level: str) -> ReadinessOut:
     """Preparación por destreza para un nivel objetivo (p. ej. B1)."""
     level_id = await _current_level_id(user_id)
@@ -581,6 +620,18 @@ async def get_speaking_journey(user_id: str) -> dict:
     rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
     speaking_rows = [r for r in rows if r.get("skill") == "speaking"]
     return speaking_svc.speaking_journey(speaking_rows)
+
+
+async def get_speaking_endurance(user_id: str) -> dict:
+    """Conversation Endurance (Speaking 2.0): resistencia a mantener una conversación.
+
+    Deriva los hitos (30s→3min) de la telemetría de turnos hablados del alumno
+    (duración por conversación) sin LLM ni red.
+    """
+    sessions = await run_in_threadpool(
+        conversations_repo.student_speaking_sessions, user_id
+    )
+    return speaking_svc.conversation_endurance(sessions)
 
 
 async def get_writing_diagnostic(user_id: str) -> dict:
@@ -872,13 +923,15 @@ async def get_today_plan(user_id: str) -> TodayPlanOut:
     )
 
 
-async def _session_steps(user_id: str) -> list[dict]:
-    """Pasos de la sesión diaria (Session Engine), sin proyectar a un schema.
+async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
+    """Pasos de la sesión diaria (Session Engine) y su perfil CEFR anotado.
 
     Repaso vencido → listening → debilidad → nuevo → refuerzo, unificando las
     señales CEFR y de listening en una secuencia accionable con presupuesto del
     objetivo personal. Los pasos ya completados hoy se omiten (filtro por
-    `step_key`). Compartida por `get_session` y `get_next_best_activity`.
+    `step_key`). Devuelve `(steps, skills)`: el perfil anotado se reutiliza para
+    alimentar el Priority Engine en `get_next_best_activity`. Compartida por
+    `get_session` y `get_next_best_activity`.
     """
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
@@ -902,7 +955,7 @@ async def _session_steps(user_id: str) -> list[dict]:
     done = await run_in_threadpool(
         academy_repo.list_session_steps, user_id, _today()
     )
-    return adaptive.session_plan(
+    steps = adaptive.session_plan(
         skills,
         lv,
         remediation,
@@ -912,6 +965,7 @@ async def _session_steps(user_id: str) -> list[dict]:
         budget_minutes=goal.minutes_per_day,
         exclude_keys=done,
     )
+    return steps, skills
 
 
 async def get_session(user_id: str) -> SessionOut:
@@ -919,7 +973,7 @@ async def get_session(user_id: str) -> SessionOut:
     nuevo → refuerzo, unificando las señales CEFR y de listening en una secuencia
     accionable con presupuesto del objetivo personal. Los pasos ya completados hoy
     se omiten (filtro por `step_key`)."""
-    steps = await _session_steps(user_id)
+    steps, _ = await _session_steps(user_id)
     summary = adaptive.session_summary(steps)
     return SessionOut(
         items=[SessionStepOut(**s) for s in steps],
@@ -931,8 +985,12 @@ async def get_session(user_id: str) -> SessionOut:
 
 async def get_next_best_activity(user_id: str) -> NextBestActivityOut | None:
     """Siguiente mejor actividad (Learning UX 2.0): proyección del primer paso de
-    la sesión. La UI no decide pedagógicamente; consume esta única acción."""
-    best = adaptive.next_best_activity(await _session_steps(user_id))
+    la sesión enriquecida con las señales del Priority Engine (`signals`), la
+    prioridad compuesta (`priority`) y su explicación (`why`). La UI no decide
+    pedagógicamente; consume esta única acción."""
+    steps, skills = await _session_steps(user_id)
+    now = datetime.now(timezone.utc).isoformat()
+    best = adaptive.next_best_activity(steps, skills, now)
     if best is None:
         return None
     return NextBestActivityOut(**best)

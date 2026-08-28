@@ -11,12 +11,18 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.21.0` (cierre de la auditoría pedagógica A1→B2: corpus de audio humano 1.0 +
-  validación determinista audio↔metadata + separación del proxy de pronunciación del audio real +
-  evidencia familiar/transfer/novel + Interaction 3.0 + matriz de assessment CEFR; y nueva UI de 3
-  paneles con barra de estado y navegación por destrezas, más el **Learning Home** como pantalla
-  central con plan de hoy accionable). Sobre la base V1.20 de pronunciación
-  fonémica P6, turn-taking real e infraestructura de biblioteca de audio humano.
+- ✅ Versión estable `1.34.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+  **V1.30** LAN + Mobile 100% (mDNS real, test de micrófono con medidor, QR de conexión,
+  `/help/connect`), **V1.31** Adaptive Engine 2.0 (Priority Engine + "Why this activity?"),
+  **V1.32** Curriculum 2.0 (escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones),
+  **V1.33** Listening 2.0 (Listening Resilience + `context` del corpus) y **V1.34** Speaking 2.0
+  (pronunciation proxy + Interaction Quality + Conversation Endurance). Sobre la base **V1.21**
+  (cierre de la auditoría pedagógica A1→B2: corpus de audio humano 1.0 + validación determinista
+  audio↔metadata + separación del proxy de pronunciación del audio real + evidencia
+  familiar/transfer/novel + Interaction 3.0 + matriz de assessment CEFR; y nueva UI de 3 paneles
+  con barra de estado y navegación por destrezas, más el **Learning Home** como pantalla central)
+  y **V1.20** (pronunciación fonémica P6, turn-taking real e infraestructura de biblioteca de
+  audio humano).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -172,6 +178,21 @@
   `POST /api/academy/placement/profile` y banco de placement ampliado a las 7 destrezas.
 - Verificado: backend 480 tests + ruff limpio; frontend 137 tests + `tsc`/`build` OK.
 
+### M16 — FASE 1–5 de la auditoría externa (LAN/móvil → Speaking 2.0)  [HECHO ✔]
+> Ejecutadas **directamente por el gerente** (sin briefings separados); ver `CHANGELOG.md` y
+> `docs/RELEVO.md` (sección 37.6–37.11).
+- **V1.30 LAN + Mobile 100%**: mDNS real (`local_url_available`), recuperación de permisos de
+  micrófono, test de micrófono con medidor, QR de conexión y `/help/connect`.
+- **V1.31 Adaptive Engine 2.0**: Priority Engine (`priority_signals`/`priority_score`/
+  `explain_priority`) + "Why this activity?" en la tarjeta de siguiente mejor actividad.
+- **V1.32 Curriculum 2.0**: escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones
+  (`/api/academy/cefr-ladder`).
+- **V1.33 Listening 2.0**: Listening Resilience por condición de escucha + `context` del corpus.
+- **V1.34 Speaking 2.0**: pronunciation proxy + Interaction Quality por sub-dimensión +
+  Conversation Endurance (`/api/academy/speaking/endurance`).
+- Verificado: backend 843 tests + ruff limpio; frontend 234 tests + `tsc`/`build` OK; launcher 64
+  tests; Playwright 14 passed + 10 skipped.
+
 ## Decisiones tomadas
 
 - Hitos M1 y M2 en paralelo (tras M0).
@@ -207,6 +228,7 @@
 | V1.18 P1 listening (retention + dictado/shadowing + variantes) | `agentes/pedagogia/p13-p15.md` | ✔ hecho |
 | V1.19 Refresco UI profesional (frontend) | plan Cursor `refresco_ui_profesional` | ✔ hecho |
 | V1.21 UI Learning Home (HOME como centro) | plan Cursor `v1.21_ui_learning_home` | ✔ hecho |
+| V1.30–V1.34 FASE 1–5 auditoría (LAN/móvil → Speaking 2.0) | directo del gerente (sin briefings) | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

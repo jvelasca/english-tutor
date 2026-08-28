@@ -40,7 +40,9 @@ test("desktop: muestra todas las pestañas de Analysis y se puede ensanchar", as
   const tabs = tablist.getByRole("tab");
   await expect(tabs).toHaveCount(7);
   for (const label of TAB_LABELS) {
-    await expect(tablist.getByRole("tab", { name: label })).toBeVisible();
+    await expect(
+      tablist.getByRole("tab", { name: label, exact: true }),
+    ).toBeVisible();
   }
 
   // Ensancha el panel hasta el tope (ArrowLeft aumenta el ancho del panel derecho).
@@ -73,6 +75,8 @@ test("móvil: abre el panel de análisis y muestra todas las pestañas", async (
   const tabs = tablist.getByRole("tab");
   await expect(tabs).toHaveCount(7);
   for (const label of TAB_LABELS) {
-    await expect(tablist.getByRole("tab", { name: label })).toBeVisible();
+    await expect(
+      tablist.getByRole("tab", { name: label, exact: true }),
+    ).toBeVisible();
   }
 });

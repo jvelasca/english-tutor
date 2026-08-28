@@ -42,6 +42,23 @@ DIFFICULTY_FACTORS: tuple[str, ...] = (
     "connected_speech",
 )
 
+# Dimensiones de resiliencia auditiva (Listening 2.0). Cada dimensión es una
+# *condición de escucha* que el audio del ítem realiza y frente a la que medimos
+# precisión, de la más cómoda (habla clara) a la más exigente (acentos). Es el
+# indicador que responde "¿qué condición de escucha te cuesta más?".
+RESILIENCE_DIMENSIONS: tuple[str, ...] = (
+    "clear_speech",
+    "natural_speech",
+    "connected_speech",
+    "fast_speech",
+    "noise",
+    "accents",
+)
+
+# Mínimo de intentos requerido en una dimensión para poder nombrarla como la
+# debilidad principal de escucha (evita recomendaciones sobre muestras ruidosas).
+RESILIENCE_MIN_ATTEMPTS = 3
+
 # Taxonomía de temas del banco de listening. Cada ítem declara un tema canónico
 # para poder medir precisión por tema (P4 — listening como competencia).
 LISTENING_TOPICS: tuple[str, ...] = (
@@ -55,6 +72,21 @@ LISTENING_TOPICS: tuple[str, ...] = (
     "education",
     "sports",
     "functional",
+)
+
+# Contextos comunicativos del corpus de listening (Listening 2.0). Completan la
+# clasificación del ítem junto a nivel, hablante, acento, velocidad, ruido,
+# connected_speech y tipo de tarea. Es el eje del corpus real: la escucha progresa
+# de lo más cómodo (conversación clara) a lo más exigente (anuncios, entrevistas).
+LISTENING_CONTEXTS: tuple[str, ...] = (
+    "conversation",  # diálogo entre dos o más hablantes
+    "announcement",  # aviso público (estación, aeropuerto, tienda)
+    "message",  # mensaje grabado (buzón de voz)
+    "instructions",  # indicaciones paso a paso
+    "news",  # noticia o boletín informativo
+    "interview",  # entrevista
+    "narrative",  # relato/narración
+    "presentation",  # exposición/monólogo
 )
 
 # Tipos de audio admitidos. Separan la realización real del audio de lo que el
@@ -232,6 +264,9 @@ class ListeningAsset(BaseModel):
     # Tipo de audio (ver AUDIO_TYPES). Determina qué dimensiones del vector de
     # dificultad están realmente realizadas en el audio servido.
     audio_type: str = "tts"
+    # Contexto comunicativo del ítem (ver LISTENING_CONTEXTS). Completa la
+    # clasificación del corpus; vacío en el banco heredado que no lo declara.
+    context: str = ""
 
     @computed_field
     @property
@@ -1128,6 +1163,8 @@ def validate_listening_bank(
             errors.append(f"{asset.id}: invalid topic {asset.topic!r}")
         if asset.audio_type not in AUDIO_TYPES:
             errors.append(f"{asset.id}: invalid audio_type {asset.audio_type!r}")
+        if asset.context and asset.context not in LISTENING_CONTEXTS:
+            errors.append(f"{asset.id}: invalid context {asset.context!r}")
         if set(asset.difficulty_vector) != set(factors):
             errors.append(f"{asset.id}: difficulty_vector factors mismatch")
         else:
@@ -1493,6 +1530,93 @@ def delayed_retention(attempt_rows: list[dict], now: str = "") -> dict:
     }
 
 
+def resilience_dimensions(question: dict) -> list[str]:
+    """Dimensiones de resiliencia que el audio *realizado* del ítem ejercita.
+
+    Se apoya en `realized_vector` (no en el vector declarado) para ser honesta: una
+    voz TTS neutra no realiza ruido ni acentos, de modo que esos ítems no aportan
+    evidencia a esas dimensiones. Un ítem puede pertenecer a varias dimensiones
+    (p. ej. rápido + conectado + ruidoso). Devuelve la lista en orden canónico.
+    """
+    realized = realized_vector(question)
+    speed = int(realized.get("speed", 1))
+    noise = int(realized.get("noise", 1))
+    connected = int(realized.get("connected_speech", 1))
+    accent = int(realized.get("accent", 1))
+    speakers = int(realized.get("speaker_count", 1))
+
+    dims: list[str] = []
+    if speed <= 2 and noise <= 1 and connected <= 1 and speakers == 1:
+        dims.append("clear_speech")
+    if 3 <= speed <= 4 and noise <= 2:
+        dims.append("natural_speech")
+    if connected >= 4:
+        dims.append("connected_speech")
+    if speed >= 5:
+        dims.append("fast_speech")
+    if noise >= 3:
+        dims.append("noise")
+    if accent >= 4:
+        dims.append("accents")
+    return dims
+
+
+def listening_resilience(attempt_rows: list[dict]) -> dict:
+    """Indicador de resiliencia auditiva: precisión por condición de escucha.
+
+    Agrupa los intentos según las dimensiones de resiliencia que el audio de cada
+    ítem *realiza* y calcula la precisión (0..100) de cada una. Devuelve:
+    - `dimensions`: lista `{dimension, attempts, correct, accuracy}` en orden
+      canónico, con `accuracy=None` si no hay evidencia en esa dimensión.
+    - `main_weakness`: la dimensión con menor precisión entre las que alcanzan
+      `RESILIENCE_MIN_ATTEMPTS`, o None si ninguna lo alcanza.
+    - `recommendation`: texto corto ("Your main weakness is …") o un estado neutral.
+    """
+    by_dim: dict[str, list[dict]] = {d: [] for d in RESILIENCE_DIMENSIONS}
+    for row in attempt_rows:
+        question = get_question(row.get("question_id"))
+        if question is None:
+            continue
+        for dim in resilience_dimensions(question):
+            by_dim[dim].append(row)
+
+    dimensions: list[dict] = []
+    for dim in RESILIENCE_DIMENSIONS:
+        rows = by_dim[dim]
+        dimensions.append(
+            {
+                "dimension": dim,
+                "attempts": len(rows),
+                "correct": sum(1 for r in rows if r.get("correct")),
+                "accuracy": _accuracy(rows),
+            }
+        )
+
+    main_weakness: str | None = None
+    lowest_accuracy: float | None = None
+    for entry in dimensions:
+        accuracy = entry["accuracy"]
+        if entry["attempts"] < RESILIENCE_MIN_ATTEMPTS or accuracy is None:
+            continue
+        if lowest_accuracy is None or accuracy < lowest_accuracy:
+            lowest_accuracy = accuracy
+            main_weakness = entry["dimension"]
+
+    if main_weakness is None:
+        recommendation = (
+            "Not enough evidence yet to identify a listening weakness."
+        )
+    else:
+        label = main_weakness.replace("_", " ")
+        recommendation = f"Your main weakness is understanding {label}."
+
+    return {
+        "dimensions": dimensions,
+        "main_weakness": main_weakness,
+        "recommendation": recommendation,
+    }
+
+
 def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
     """Perfil de sub-destrezas de listening y recomendación (vista derivada).
 
@@ -1650,4 +1774,5 @@ def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
         "retention": delayed_retention(attempt_rows, now),
         "bank_version": LISTENING_BANK_VERSION,
         "realization": realization_summary,
+        "resilience": listening_resilience(attempt_rows),
     }

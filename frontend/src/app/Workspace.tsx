@@ -15,6 +15,9 @@ const CourseScreen = lazy(() =>
 const ProgressScreen = lazy(() =>
   import("../features/progress/ProgressScreen").then((m) => ({ default: m.ProgressScreen })),
 );
+const ConnectHelp = lazy(() =>
+  import("../features/help/ConnectHelp").then((m) => ({ default: m.ConnectHelp })),
+);
 const PracticeView = lazy(() =>
   import("./PracticeView").then((m) => ({ default: m.PracticeView })),
 );
@@ -89,6 +92,8 @@ export function Workspace({
     );
   } else if (route === "progress") {
     content = <ProgressScreen userId={currentUserId} />;
+  } else if (route === "help") {
+    content = <ConnectHelp />;
   } else {
     content = (
       <PracticeView

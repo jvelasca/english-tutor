@@ -21,6 +21,8 @@ export type MicUnavailableReason =
   | "not_supported"
   | "unknown";
 
+export type MicPermissionState = "granted" | "denied" | "prompt" | "unknown";
+
 export interface AudioCapabilities {
   secureContext: boolean;
   mediaDevices: boolean;
@@ -144,4 +146,87 @@ export async function getMicrophoneStream(): Promise<MediaStream> {
   } catch (err) {
     throw new MicUnavailableError(micErrorReason(err));
   }
+}
+
+/**
+ * Estado de permiso del micrófono según la Permissions API.
+ *
+ * Devuelve `"unknown"` cuando la API no está disponible (p. ej. Safari no
+ * expone `navigator.permissions.query({ name: "microphone" })`).
+ */
+export async function queryMicrophonePermission(): Promise<MicPermissionState> {
+  if (
+    typeof navigator === "undefined" ||
+    typeof navigator.permissions === "undefined" ||
+    typeof navigator.permissions.query !== "function"
+  ) {
+    return "unknown";
+  }
+  try {
+    const status = await navigator.permissions.query({
+      name: "microphone" as PermissionName,
+    });
+    return status.state as MicPermissionState;
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Observa cambios que pueden hacer que el micrófono pase de no disponible a
+ * disponible (o viceversa) sin recargar la página: cambio de permiso, cambio de
+ * dispositivo (`devicechange`), volver a la pestaña (`visibilitychange`) o
+ * recuperar el foco (`focus`).
+ *
+ * Devuelve una función de limpieza que elimina todos los listeners. Es el
+ * mecanismo que resuelve el caso "permiso denegado → ajustes → conceder →
+ * volver", donde un `useMemo(..., [])` mantendría un estado obsoleto.
+ */
+export function watchMicrophoneAvailability(onChange: () => void): () => void {
+  const handleVisibility = () => {
+    if (document.visibilityState === "visible") onChange();
+  };
+  const handleFocus = () => onChange();
+
+  document.addEventListener("visibilitychange", handleVisibility);
+  window.addEventListener("focus", handleFocus);
+
+  let removeDeviceChange = () => {};
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.mediaDevices &&
+    typeof navigator.mediaDevices.addEventListener === "function"
+  ) {
+    navigator.mediaDevices.addEventListener("devicechange", onChange);
+    removeDeviceChange = () =>
+      navigator.mediaDevices.removeEventListener("devicechange", onChange);
+  }
+
+  let removePermissionChange = () => {};
+  let permissionStatus: PermissionStatus | null = null;
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.permissions &&
+    typeof navigator.permissions.query === "function"
+  ) {
+    void navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((status) => {
+        permissionStatus = status;
+        if (typeof status.addEventListener === "function") {
+          status.addEventListener("change", onChange);
+          removePermissionChange = () =>
+            status.removeEventListener("change", onChange);
+        }
+      })
+      .catch(() => {});
+  }
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibility);
+    window.removeEventListener("focus", handleFocus);
+    removeDeviceChange();
+    removePermissionChange();
+    void permissionStatus;
+  };
 }

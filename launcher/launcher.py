@@ -37,6 +37,7 @@ from core import (
     icon_file,
     lan_url,
     local_url,
+    mdns_available,
     user_overview,
 )
 from process_manager import ProcessManager
@@ -477,10 +478,16 @@ class LauncherApp:
         sec = self._section(parent, "Acceso a la app")
         grid = ttk.Frame(sec.body, style="Card.TFrame")
         grid.pack(fill="x", padx=14, pady=(4, 12))
+        mdns_ok = mdns_available()
+        mdns_label = (
+            "Nombre local (mDNS)"
+            if mdns_ok
+            else "Nombre local (mDNS) — no resuelve, usa la IP"
+        )
         rows = [
             ("🖥️", "Este equipo (HTTPS)", frontend_url()),
             ("📡", "Red local (LAN)", lan_url()),
-            ("🏷️", "Nombre local (mDNS)", local_url()),
+            ("🏷️", mdns_label, local_url()),
         ]
         for i, (icon, label, url) in enumerate(rows):
             ttk.Label(grid, text=icon, style="Service.TLabel").grid(
@@ -493,6 +500,16 @@ class LauncherApp:
                 row=i, column=2, sticky="e", padx=(20, 0), pady=3
             )
         grid.columnconfigure(1, weight=1)
+        note = ttk.Label(
+            sec.body,
+            text=(
+                "🔐 Primera conexión desde un móvil: instala/confía el certificado "
+                "local (abre la app y ve a Ayuda → Conectar un dispositivo)."
+            ),
+            style="DimCard.TLabel",
+            wraplength=COLUMN_W - 30,
+        )
+        note.pack(anchor="w", fill="x", padx=14, pady=(0, 12))
 
     def _link(self, parent: tk.Misc, url: str) -> ttk.Label:
         """Etiqueta de enlace clicable que abre la URL en el navegador."""

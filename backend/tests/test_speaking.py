@@ -1267,3 +1267,211 @@ def test_speaking_task_with_conversation_injects_interaction(monkeypatch, tmp_pa
     # hacer observable el criterio `interaction` (fusión end-to-end).
     assert body["observed"]["interaction"] is True
     assert body["criteria"]["interaction"] == pytest.approx(0.7)
+
+
+# --- Speaking 2.0 (V1.34): proxy, Interaction Quality y Endurance ----------
+
+
+def test_criterion_is_proxy_marks_pronunciation():
+    assert speaking_svc.criterion_is_proxy("pronunciation") is True
+    assert speaking_svc.criterion_is_proxy("fluency") is False
+    assert speaking_svc.criterion_is_proxy("grammatical_control") is False
+
+
+def test_speaking_diagnostic_marks_pronunciation_proxy():
+    rows = [_evidence_row("pronunciation", 0.8), _evidence_row("overall", 0.8)]
+    diag = speaking_svc.speaking_diagnostic(rows)
+    pron = next(c for c in diag["criteria"] if c["criterion"] == "pronunciation")
+    fluency = next(c for c in diag["criteria"] if c["criterion"] == "fluency")
+    assert pron["proxy"] is True
+    assert fluency["proxy"] is False
+
+
+def test_interaction_quality_scores_observed_and_unobserved():
+    evidence = {
+        "initiation": 0.7,
+        "appropriate_responses": 0.9,
+        "follow_up_questions": 0.6,
+        "repair": 0.5,
+        "turn_completion": 0.8,
+        "interaction_objective": _interaction_objective(
+            turn_balance=1.0, turn_duration=0.5
+        ),
+    }
+    quality = speaking_svc.interaction_quality_scores(evidence)
+    assert quality["initiation"] == 0.7
+    assert quality["response"] == 0.9
+    assert quality["follow_up"] == 0.6
+    assert quality["repair"] == 0.5
+    objective = 0.3 * 1.0 + 0.7 * 0.5  # 0.65
+    expected = round(0.3 * objective + 0.7 * 0.8, 3)
+    assert quality["turn_taking"] == pytest.approx(expected)
+
+    # Sin señales, ninguna dimensión se inventa.
+    empty = speaking_svc.interaction_quality_scores({"task_achieved": True})
+    assert all(v is None for v in empty.values())
+
+
+def test_scores_from_evidence_includes_interaction_quality():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": [],
+        "coherence": 0.9,
+        "appropriate_responses": 0.8,
+        "turn_completion": 0.6,
+    }
+    result = speaking_svc.scores_from_evidence(evidence, "I am a student", 60.0)
+    assert "interaction_quality" in result
+    assert result["interaction_quality"]["response"] == 0.8
+    assert result["interaction_quality"]["turn_taking"] == 0.6
+    assert result["interaction_quality"]["initiation"] is None
+
+
+def test_evidence_from_speaking_records_interaction_quality():
+    evidence = {
+        "task_achieved": True,
+        "grammar_errors": 0,
+        "lexical_tokens": [],
+        "coherence": 0.9,
+        "appropriate_responses": 0.8,
+        "repair": 0.5,
+    }
+    result = speaking_svc.scores_from_evidence(evidence, "I am a student", 60.0)
+    rows = speaking_svc.evidence_from_speaking(
+        result,
+        level_id="a1",
+        objective_id="o1",
+        curriculum_version="1.2.5",
+        assessment_version="r",
+    )
+    item_ids = [r["item_id"] for r in rows]
+    assert "interaction:response" in item_ids
+    assert "interaction:repair" in item_ids
+    # No observada (sin señal) → no se registra.
+    assert "interaction:initiation" not in item_ids
+
+
+def test_speaking_diagnostic_interaction_quality_breakdown():
+    rows = [
+        _evidence_row("interaction:response", 0.8, "2026-08-01T00:00:00"),
+        _evidence_row("interaction:response", 0.9, "2026-08-02T00:00:00"),
+        _evidence_row("overall", 0.8),
+    ]
+    diag = speaking_svc.speaking_diagnostic(rows)
+    # No contamina el perfil de criterios de la rúbrica.
+    assert "interaction:response" not in [c["criterion"] for c in diag["criteria"]]
+    iq = {d["dimension"]: d for d in diag["interaction_quality"]}
+    assert iq["response"]["attempts"] == 2
+    assert iq["response"]["mean"] == pytest.approx(0.85)
+    assert iq["response"]["recent_score"] == pytest.approx(0.85)
+    # Las dimensiones no observadas aparecen con attempts=0 y mean=None.
+    assert iq["initiation"]["attempts"] == 0
+    assert iq["initiation"]["mean"] is None
+
+
+def test_conversation_endurance_empty():
+    e = speaking_svc.conversation_endurance([])
+    assert e["turns"] == 0
+    assert e["longest_session_seconds"] == 0.0
+    assert e["longest_turn_seconds"] == 0.0
+    assert e["total_speaking_seconds"] == 0.0
+    assert [m["seconds"] for m in e["milestones"]] == [30, 60, 90, 120, 180]
+    assert all(not m["achieved"] for m in e["milestones"])
+    assert e["current_goal_seconds"] == 30
+
+
+def test_conversation_endurance_milestones():
+    sessions = [
+        {"total_ms": 45_000, "turns": 3, "longest_turn_ms": 20_000},
+        {"total_ms": 100_000, "turns": 4, "longest_turn_ms": 30_000},
+    ]
+    e = speaking_svc.conversation_endurance(sessions)
+    assert e["longest_session_seconds"] == 100.0
+    assert e["longest_turn_seconds"] == 30.0
+    assert e["total_speaking_seconds"] == 145.0
+    assert e["turns"] == 7
+    achieved = {m["seconds"]: m["achieved"] for m in e["milestones"]}
+    assert achieved[30] is True
+    assert achieved[60] is True
+    assert achieved[90] is True
+    assert achieved[120] is False
+    assert achieved[180] is False
+    assert e["current_goal_seconds"] == 120
+
+
+def test_conversation_endurance_all_achieved():
+    sessions = [{"total_ms": 200_000, "turns": 10, "longest_turn_ms": 60_000}]
+    e = speaking_svc.conversation_endurance(sessions)
+    assert all(m["achieved"] for m in e["milestones"])
+    assert e["current_goal_seconds"] is None
+
+
+def test_speaking_endurance_endpoint(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    cid = conversations_repo.create_conversation(a)["id"]
+    conversations_repo.save_conversation(
+        cid,
+        a,
+        "T",
+        [
+            {
+                "id": "m1",
+                "role": "user",
+                "content": "Hi",
+                "duration_ms": 40_000,
+                "latency_ms": 400,
+            },
+            {
+                "id": "m2",
+                "role": "assistant",
+                "content": "Hello",
+                "duration_ms": 1000,
+                "latency_ms": 200,
+            },
+        ],
+    )
+    with TestClient(app) as client:
+        r = client.get("/api/academy/speaking/endurance", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["turns"] == 1
+    assert body["longest_session_seconds"] == 40.0
+    achieved = {m["seconds"]: m["achieved"] for m in body["milestones"]}
+    assert achieved[30] is True
+    assert achieved[60] is False
+    assert body["current_goal_seconds"] == 60
+
+
+def test_speaking_endurance_endpoint_empty(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/speaking/endurance", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["turns"] == 0
+    assert body["current_goal_seconds"] == 30
+
+
+def test_speaking_diagnostic_endpoint_exposes_proxy_and_quality(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = _first_speaking_objective()
+    with TestClient(app) as client:
+        client.post(
+            "/api/academy/objective/speaking",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": obj.id,
+                "expected": "I am a student",
+                "heard": "I am a student",
+                "duration_seconds": 3.0,
+            },
+        )
+        r = client.get("/api/academy/speaking/diagnostic", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert "interaction_quality" in body
+    assert isinstance(body["interaction_quality"], list)
+    pron = next(c for c in body["criteria"] if c["criterion"] == "pronunciation")
+    assert pron["proxy"] is True

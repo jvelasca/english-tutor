@@ -7,7 +7,7 @@ import type { Route } from "./routes";
 import { Navigation } from "./Navigation";
 import { HandsFreeToggle } from "../components/HandsFreeToggle";
 import { UserMenu } from "../components/UserMenu";
-import { GearIcon } from "../components/Icons";
+import { GearIcon, HelpIcon } from "../components/Icons";
 
 interface HeaderProps {
   route: Route;
@@ -71,6 +71,15 @@ export function Header({
           micError={handsFreeMicError}
           onToggle={onToggleHandsFree}
         />
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => onNavigate("help")}
+          title={t("help.title")}
+          aria-label={t("help.title")}
+        >
+          <HelpIcon size={18} />
+        </button>
         <button
           type="button"
           className="icon-button"

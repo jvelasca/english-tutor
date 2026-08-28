@@ -39,6 +39,9 @@ class ListeningQuestion(BaseModel):
     # Modelo de realización (V1.14): tipo de audio y separación entre la dificultad
     # declarada y la realmente realizada por el audio servido.
     audio_type: str = "tts"
+    # Contexto comunicativo del ítem (ver LISTENING_CONTEXTS); vacío en el banco
+    # heredado que no lo declara.
+    context: str = ""
     realized_difficulty: int = 0
     realization: dict[str, dict[str, int | bool]] = Field(default_factory=dict)
     # Escalera de variantes de velocidad (P1.9): lista ordenada slow/normal/fast y
@@ -165,6 +168,25 @@ class ListeningRetention(BaseModel):
     by_bucket: list[ListeningRetentionBucket] = Field(default_factory=list)
 
 
+class ListeningRealizationSummary(BaseModel):
+    attempts: int
+    verified: int
+    gap: int
+
+
+class ListeningResilienceDimension(BaseModel):
+    dimension: str
+    attempts: int
+    correct: int
+    accuracy: float | None = None
+
+
+class ListeningResilience(BaseModel):
+    dimensions: list[ListeningResilienceDimension] = Field(default_factory=list)
+    main_weakness: str | None = None
+    recommendation: str = ""
+
+
 class ListeningDiagnostic(BaseModel):
     subskills: list[ListeningSubskillOut]
     weak: list[str]
@@ -180,3 +202,6 @@ class ListeningDiagnostic(BaseModel):
     # Resumen de integridad de evidencia: cuántos intentos tienen audio verificado
     # (realización = declaración) y cuántos presentan brecha (metadata no respaldada).
     realization: dict = Field(default_factory=dict)
+    # Indicador de resiliencia auditiva (Listening 2.0): precisión por condición de
+    # escucha (clara → natural → conectada → rápida → ruido → acentos).
+    resilience: ListeningResilience = Field(default_factory=ListeningResilience)

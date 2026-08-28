@@ -99,6 +99,19 @@ def local_url() -> str:
     return f"https://{lan_hostname()}.local:{FRONTEND_PORT}"
 
 
+def mdns_available() -> bool:
+    """Comprueba si ``<hostname>.local`` resuelve realmente (mDNS activo).
+
+    Generar la URL no instala un servicio mDNS; sin Bonjour/Avahi/mDNS en
+    Windows el nombre no resolverá. Se devuelve ``False`` ante cualquier fallo.
+    """
+    try:
+        socket.getaddrinfo(f"{lan_hostname()}.local", None)
+        return True
+    except OSError:
+        return False
+
+
 def app_summary(backend_up: bool, frontend_up: bool) -> dict[str, str]:
     """Estado on/off de cada servicio."""
     return {

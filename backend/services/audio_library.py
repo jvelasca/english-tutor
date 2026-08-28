@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 
 # Versión del esquema/contenido del manifest de la biblioteca de audio humano.
 # Independiente de la versión de la app: identifica QUÉ manifest se sirvió.
-AUDIO_LIBRARY_VERSION = "1.1.0"
+AUDIO_LIBRARY_VERSION = "1.2.0"
 
 # Directorio de contenido de la biblioteca de audio humano (sibling de curriculum).
 AUDIO_LIBRARY_DIR = Path(__file__).resolve().parent.parent / "audio_library"
@@ -43,6 +43,17 @@ AgeBand = Literal["child", "teen", "adult", "senior", "unknown"]
 Spontaneity = Literal["scripted", "semi_scripted", "spontaneous"]
 RecordingEnvironment = Literal["studio", "quiet_room", "noisy", "field"]
 Cefr = Literal["A1", "A2", "B1", "B2", "unknown"]
+Context = Literal[
+    "conversation",
+    "announcement",
+    "message",
+    "instructions",
+    "news",
+    "interview",
+    "narrative",
+    "presentation",
+    "unknown",
+]
 
 
 class AudioLibraryEntry(BaseModel):
@@ -75,6 +86,7 @@ class AudioLibraryEntry(BaseModel):
     prosody: str = "unknown"
     task_type: str = "unknown"
     cefr: Cefr = "unknown"
+    context: Context = "unknown"
 
 
 class AudioLibraryManifest(BaseModel):
@@ -193,6 +205,7 @@ def library_summary(manifest: AudioLibraryManifest | None = None) -> dict:
             "prosody": e.prosody,
             "task_type": e.task_type,
             "cefr": e.cefr,
+            "context": e.context,
         }
         for e in m.entries
     ]
@@ -202,6 +215,7 @@ def library_summary(manifest: AudioLibraryManifest | None = None) -> dict:
         "by_speaker_id": dict(Counter(e.speaker_id for e in m.entries)),
         "by_accent": dict(Counter(e.accent for e in m.entries)),
         "by_region": dict(Counter(e.region for e in m.entries)),
+        "by_context": dict(Counter(e.context for e in m.entries)),
     }
 
 
@@ -246,6 +260,8 @@ def validate_manifest(manifest: AudioLibraryManifest | None = None) -> list[str]
             )
         if entry.cefr not in get_args(Cefr):
             errors.append(f"{entry.audio_id}: invalid cefr {entry.cefr!r}")
+        if entry.context not in get_args(Context):
+            errors.append(f"{entry.audio_id}: invalid context {entry.context!r}")
         if entry.speech_rate is not None and entry.speech_rate <= 0:
             errors.append(f"{entry.audio_id}: speech_rate must be > 0")
     return errors

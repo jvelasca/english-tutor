@@ -19,6 +19,7 @@ from core import (
     icon_file,
     lan_url,
     local_url,
+    mdns_available,
     user_overview,
 )
 
@@ -67,6 +68,30 @@ def test_lan_url(monkeypatch):
 def test_local_url_uses_hostname(monkeypatch):
     monkeypatch.setattr("core.lan_hostname", lambda: "english-tutor-pc")
     assert local_url() == f"https://english-tutor-pc.local:{FRONTEND_PORT}"
+
+
+def test_mdns_available_when_resolves(monkeypatch):
+    import core
+
+    monkeypatch.setattr(core, "lan_hostname", lambda: "english-tutor-pc")
+    monkeypatch.setattr(
+        core.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(2, 1, 6, "", ("192.168.1.42", 0))],
+    )
+    assert mdns_available() is True
+
+
+def test_mdns_available_false_when_no_mdns(monkeypatch):
+    import core
+
+    monkeypatch.setattr(core, "lan_hostname", lambda: "english-tutor-pc")
+
+    def _fail(*args, **kwargs):
+        raise OSError("no mDNS")
+
+    monkeypatch.setattr(core.socket, "getaddrinfo", _fail)
+    assert mdns_available() is False
 
 
 def test_urls():

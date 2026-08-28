@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v1.29.0**.
+- Última versión estable: **v1.34.0**.
 
 ## Estructura
 
@@ -41,6 +41,18 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 - **Listening / nivel estimado (F8)**: ejercicios de comprensión auditiva y **nivel estimado** multi-señal (heurístico, no certificación CEFR).
 - **Evaluación objetiva del tutor (F9)**: métricas deterministas del tutor (backend + panel).
 - **Lanzador de escritorio**: GUI que arranca/detiene la app y muestra estado, BD y usuarios.
+- **Acceso LAN / móvil**: HTTPS autofirmado en la red local, QR de conexión, verificación real de
+  mDNS (`<host>.local`), test de micrófono con medidor de nivel y página `/help/connect` para
+  confiar el certificado en Windows, Android e iPhone/iPad.
+- **Adaptive Engine 2.0**: siguiente mejor actividad con prioridad explicable y "¿por qué?"
+  (recencia, retención, confianza, evidencia, transferencia/novedad) en la tarjeta de inicio.
+- **Currículum CEFR 2.0**: escalera completa Pre-A1 → C2 (con bandas "plus" A2+/B1+/B2+) y
+  descriptores Can-Do por dimensión (listening, speaking, reading, writing, grammar, vocabulary,
+  pronunciation, interaction, mediation) en el Course.
+- **Speaking 2.0**: pronunciación marcada como *proxy* (similitud fonética, no acústica real),
+  desglose de **Interaction Quality** (initiation, response, follow-up, repair, turn-taking) y
+  **Conversation Endurance** (cuánto puede sostener una conversación el alumno), visibles en el
+  diagnóstico de speaking.
 
 ## Arranque rápido
 
@@ -136,6 +148,7 @@ Abre **http://localhost:5173** y empieza a conversar.
 | `GET` | `/api/health/live` | Liveness |
 | `GET` | `/api/health/ready` | Readiness (200/503 según dependencias) |
 | `GET` | `/api/health/dependencies` | Estado por dependencia (BD, Ollama, STT, TTS) |
+| `GET` | `/api/network` | Acceso en red: `ip`, `hostname`, `url` (HTTPS), `local_url` y `local_url_available` (mDNS real) |
 | `GET` | `/api/models` | Modelos disponibles en Ollama |
 | `POST` | `/api/chat` | Diálogo con el modelo (acepta `mode`, `user_id`) |
 | `POST` | `/api/chat/stream` | Diálogo con streaming (SSE) |
@@ -152,6 +165,7 @@ Abre **http://localhost:5173** y empieza a conversar.
 | `GET` | `/api/progress?user_id=<id>` | Resumen de progreso del alumno |
 | `GET` | `/api/progress/history?user_id=<id>` | Historial: tendencias, racha, dominio, hitos |
 | `GET` | `/api/listening/question` · `POST /api/listening/answer` · `GET /api/listening/stats` | Ejercicios de listening |
+| `GET` | `/api/academy/cefr-ladder` | Escalera CEFR completa (Pre-A1 → C2) con descriptores Can-Do por dimensión |
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 

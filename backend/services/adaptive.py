@@ -655,18 +655,143 @@ def next_best_reason(step: dict) -> str:
     return "next_in_path"
 
 
-def next_best_activity(steps: list[dict]) -> dict | None:
-    """La siguiente mejor actividad: proyección del primer paso de la sesión.
+def _human(label: str) -> str:
+    """Legible: `connected_speech` -> `connected speech`."""
+    return label.replace("_", " ")
 
-    La UI de Learning Home no debe decidir pedagógicamente: recibe una única
-    acción dominante derivada del mismo Adaptive Engine que construye la sesión
-    diaria. Devuelve `{kind, step_key, skill, subskill, objective_id, level_id,
-    title, reason, minutes, priority}` o None si no hay pasos pendientes.
+
+def priority_signals(step: dict, profile: list[dict], now: str) -> dict:
+    """Señales explicables de un paso candidato (Priority Engine 2.0).
+
+    Mapea el paso (kind/skill/subskill) a las señales observables de su destreza
+    en el perfil CEFR anotado: recencia (días desde la última evidencia),
+    retención (curva de olvido), estabilidad, confianza, volumen de evidencia y
+    cobertura de transferencia/novedad, más la dificultad del ítem si el paso la
+    porta. Es la capa de transparencia del motor: cada decisión de prioridad es
+    reproducible desde estos números.
+    """
+    skill = step.get("skill")
+    entry = (
+        next((e for e in profile if e.get("skill") == skill), None) if skill else None
+    )
+    score = float(entry.get("score", 0.0)) if entry else 0.0
+    confidence = float(entry.get("confidence", 0.0)) if entry else 0.0
+    last_evidence = entry.get("last_evidence", "") if entry else ""
+    by_kind = entry.get("evidence_by_kind", {}) if entry else {}
+    evidence_count = entry.get("evidence_count", 0) if entry else 0
+
+    retention = (
+        retrieval_probability(score, last_evidence, now)
+        if last_evidence
+        else round(score, 3)
+    )
+    recency_days = round(days_since(last_evidence, now), 2) if last_evidence else None
+    stability = (
+        skill_stability(score, confidence, last_evidence, now)
+        if last_evidence
+        else round(confidence * score, 3)
+    )
+    return {
+        "recency_days": recency_days,
+        "retention": round(retention, 3),
+        "confidence": round(confidence, 3),
+        "evidence_count": evidence_count,
+        "transfer_count": (
+            by_kind.get("transfer", 0) if isinstance(by_kind, dict) else 0
+        ),
+        "novel_count": by_kind.get("novel", 0) if isinstance(by_kind, dict) else 0,
+        "stability": round(stability, 3),
+        "difficulty": step.get("difficulty"),
+    }
+
+
+def priority_score(step: dict, signals: dict) -> float:
+    """Prioridad compuesta (0..1) del paso: base pedagógica + señales.
+
+    Combina el orden pedagógico por categoría (`NEXT_BEST_PRIORITY`, que conserva
+    review > listening > weakness > new > easy_wins) con la urgencia por olvido
+    (1 - estabilidad), la necesidad de práctica (1 - confianza) y la madurez de la
+    evidencia. No es un modelo predictivo: es un score determinista y explicable
+    cuyos términos son las señales de `priority_signals`.
+    """
+    base = NEXT_BEST_PRIORITY.get(step.get("kind", "new"), 0.5)
+    forgetting = 1.0 - float(signals.get("stability") or 0.0)
+    weakness = 1.0 - float(signals.get("confidence") or 0.0)
+    evidence = min(1.0, float(signals.get("evidence_count") or 0) / 10.0)
+    score = 0.4 * base + 0.3 * forgetting + 0.2 * weakness + 0.1 * evidence
+    return round(max(0.0, min(1.0, score)), 3)
+
+
+def _percent(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{round(value * 100)}%"
+
+
+def _days_ago(value: float | None) -> str:
+    if value is None:
+        return "a while"
+    days = round(value)
+    if days <= 0:
+        return "today"
+    if days == 1:
+        return "1 day"
+    return f"{days} days"
+
+
+def explain_priority(step: dict, signals: dict) -> str:
+    """Explicación pedagógica del "por qué" de una recomendación (en inglés).
+
+    El contenido pedagógico vive en inglés (idioma de inmersión). Cada razón
+    referencia la señal dominante del paso, para que el alumno entienda qué
+    observa el motor y por qué le propone esa actividad ahora.
+    """
+    kind = step.get("kind")
+    skill = _human(step.get("skill") or "")
+    subskill = _human(step.get("subskill") or "")
+    retention = signals.get("retention")
+    recency = signals.get("recency_days")
+    if kind == "review":
+        return (
+            f"Your {skill} accuracy is solid, but retention has dropped to "
+            f"{_percent(retention)} after {_days_ago(recency)} without practice."
+        )
+    if kind == "listening":
+        if subskill:
+            return (
+                f"You follow clear speech well, but {subskill} is still your "
+                "weakest listening area."
+            )
+        return "Listening practice to reinforce your weakest sub-skill."
+    if kind == "weakness":
+        return (
+            f"{skill.capitalize()} is your weakest skill right now, so it comes "
+            "first today."
+        )
+    if kind == "new":
+        return "You're making steady progress, so it's time for new material."
+    if kind == "easy_wins":
+        return f"A quick {skill} boost to keep your momentum going."
+    return "Recommended next step for your progress."
+
+
+def next_best_activity(
+    steps: list[dict], profile: list[dict] | None = None, now: str = ""
+) -> dict | None:
+    """La siguiente mejor actividad con su prioridad explicable y su "por qué".
+
+    La UI de Learning Home no decide pedagógicamente: recibe una única acción
+    dominante derivada del mismo Adaptive Engine que construye la sesión diaria,
+    enriquecida con las señales del Priority Engine (`signals`), la prioridad
+    compuesta (`priority`) y una explicación legible (`why`). Devuelve None si no
+    hay pasos pendientes. `profile` es el perfil CEFR anotado; sin él, las señales
+    quedan vacías y la prioridad se reduce a la base por categoría.
     """
     if not steps:
         return None
     first = steps[0]
     kind = first.get("kind", "new")
+    signals = priority_signals(first, profile or [], now)
     return {
         "kind": kind,
         "step_key": first.get("step_key", ""),
@@ -677,5 +802,7 @@ def next_best_activity(steps: list[dict]) -> dict | None:
         "title": first.get("title", ""),
         "reason": next_best_reason(first),
         "minutes": first.get("minutes", 0),
-        "priority": NEXT_BEST_PRIORITY.get(kind, 0.5),
+        "priority": priority_score(first, signals),
+        "signals": signals,
+        "why": explain_priority(first, signals),
     }

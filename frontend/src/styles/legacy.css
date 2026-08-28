@@ -3842,7 +3842,6 @@ body.is-resizing {
   background: var(--color-bg-soft);
   font-size: var(--text-xs);
   color: var(--color-text-dim);
-  overflow: hidden;
 }
 
 .status-bar-group {
@@ -4874,6 +4873,7 @@ body.is-resizing {
 
 .status-bar {
   position: relative;
+  z-index: 60;
 }
 
 .status-bar__trigger {
@@ -4908,6 +4908,9 @@ body.is-resizing {
   left: var(--space-4);
   z-index: 50;
   min-width: 260px;
+  max-width: calc(100vw - var(--space-4) * 2);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   padding: var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
@@ -4967,6 +4970,10 @@ body.is-resizing {
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-bg);
+}
+
+.system-status__mic-test {
+  margin-top: var(--space-2);
 }
 
 .system-status__urls {

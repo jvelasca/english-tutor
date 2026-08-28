@@ -209,3 +209,33 @@ def get_turns(cid: str, user_id: str) -> list[dict] | None:
         }
         for r in rows
     ]
+
+
+def student_speaking_sessions(user_id: str) -> list[dict]:
+    """Duración de habla del alumno por conversación (para Conversation Endurance).
+
+    Devuelve una lista de `{conversation_id, total_ms, turns, longest_turn_ms}` por
+    conversación del usuario con al menos un turno de alumno (`role='user'`) con
+    `duration_ms` no nulo. `total_ms` es la suma de las duraciones de sus turnos,
+    `turns` su recuento y `longest_turn_ms` su turno más largo. Ordenada por
+    `conversation_id` (estable para tests).
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT conversation_id, SUM(duration_ms) AS total_ms, "
+            "COUNT(*) AS turns, MAX(duration_ms) AS longest_turn_ms "
+            "FROM messages "
+            "WHERE role = 'user' AND duration_ms IS NOT NULL "
+            "AND conversation_id IN (SELECT id FROM conversations WHERE user_id = ?) "
+            "GROUP BY conversation_id ORDER BY conversation_id ASC",
+            (user_id,),
+        ).fetchall()
+    return [
+        {
+            "conversation_id": r["conversation_id"],
+            "total_ms": r["total_ms"],
+            "turns": r["turns"],
+            "longest_turn_ms": r["longest_turn_ms"],
+        }
+        for r in rows
+    ]

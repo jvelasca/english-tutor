@@ -3,26 +3,33 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-27 14:35 (UTC+2).
+> Actualizado por última vez: 2026-08-28 10:55 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-27):** `v1.28` **commiteada y verificada en verde** (la versión está
-elevada a `1.28.0` en `config.py`/`package.json`/`CHANGELOG`). Cerrado el incremento
-**"Biblioteca de audio humano — código (V1.28)"**: la escalera de velocidad ya no se muestra en
-ítems `recorded` (su velocidad es real, no sintetizable). El contenido real (WAV) sigue pendiente
-de grabaciones del usuario; la infraestructura + importador ya existían.
-Cerradas hasta ahora: Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad curricular,
-hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0, Etapa 2
-(pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de 3 paneles),
-**V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
+**Posición actual (2026-08-28):** `v1.34` **verificada en verde** (la versión está elevada a
+`1.34.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`). Cerradas las
+**FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+**V1.30** (LAN + Mobile 100%: mDNS real `local_url_available`, test de micrófono con medidor,
+tarjeta de conexión QR, `/help/connect`), **V1.31** (Adaptive Engine 2.0: Priority Engine con
+`priority_signals`/`priority_score`/`explain_priority` y "Why this activity?"), **V1.32**
+(Curriculum 2.0: escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones y
+`/api/academy/cefr-ladder`), **V1.33** (Listening 2.0: `listening_resilience` por condición de
+escucha + `context` del corpus) y **V1.34** (Speaking 2.0: `pronunciation` marcado como `proxy`,
+`interaction_quality` por sub-dimensión y `conversation_endurance` con
+`/api/academy/speaking/endurance`). Ver CHANGELOG.
+Cerradas hasta ahora (histórico): Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
+curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0,
+Etapa 2 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de
+3 paneles), **V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
 **V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
-chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6: práctica migrada + legacy.css
-podado), **V1.27** (code-splitting por rutas), **V1.28** (audio humano — código). Ver CHANGELOG.
+chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6), **V1.27** (code-splitting),
+**V1.28** (audio humano — código), **V1.29** (fiabilidad LAN/HTTPS + audio móvil P0 + launcher).
 **Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
 de empezar el siguiente incremento.
 
 **Últimos commits:**
+- `feat: V1.29 - fiabilidad LAN/HTTPS + audio movil (P0) + launcher` (`cb4eec5`, HEAD)
 - `feat: V1.28 - listening: ocultar escalera de velocidad en items recorded`
 - `feat: V1.27 - code-splitting por rutas (React.lazy/Suspense + AnalysisPanel diferido)`
 - `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
@@ -32,6 +39,9 @@ de empezar el siguiente incremento.
 - `docs: briefings de agentes de la auditoria pedagogica A1-B2`
 - `feat: UI de 3 paneles (destrezas + desarrollo + analisis + barra de estado)`
 - `feat: validación determinista audio↔metadata`
+
+> **V1.30–V1.34 (FASE 1–5) están en el árbol de trabajo sin commitear** (ver `git status`). El
+> código está verificado en verde; queda pendiente el commit `feat:` de cierre por fase (premisa 6).
 
 **V1.15 commiteada** (S1 `2a182a8`, S2 `42602ca`, S3 `9be0f7f`) — Speaking 3.0. Ver sección 28.
 Resumen:
@@ -111,15 +121,16 @@ de V1.19. Ver sección 33. Resumen:
   falta el WAV; `audio_ready` ya no depende solo de Piper).
 - **Higiene de release**: `config.py`/`package.json` → `1.20.0`; CHANGELOG con entrada 1.20.0.
 
-**Estado verde:** backend `796 tests` + `ruff` limpio; frontend `206 tests` + `tsc` OK + `build`
-OK; launcher `55 tests` + `ruff` limpio; Playwright `4 passed + 2 skipped`.
+**Estado verde:** backend `843 tests` + `ruff` limpio; frontend `234 tests` + `tsc` OK + `build`
+OK; launcher `64 tests` + `ruff` limpio; Playwright `14 passed + 10 skipped`.
 
 **Acciones del nuevo gerente (en orden):**
 1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
 2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
-3. Elegir el siguiente incremento (37.3 audio humano — **contenido pendiente del usuario**,
-   37.4 Vercel — **diferido por decisión**) y ejecutarlo con subagentes autocontenidos.
-   37.1 y 37.2 están cerrados; 37.3 tiene el código listo y solo falta el contenido (WAV reales).
+3. Elegir el siguiente incremento y ejecutarlo con subagentes autocontenidos (`agentes/*.md`).
+   Quedan pendientes: **37.3 contenido** (WAV reales, del usuario; código listo), **37.4 Vercel**
+   (diferido por decisión) y el **commit `feat:` de cierre de V1.30–V1.34** (FASE 1–5, en árbol).
+   Si la auditoría define **FASE 6 (Beta)**, añadirla aquí como 37.6 antes de empezar.
 4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
    `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
 
@@ -1764,11 +1775,43 @@ cd frontend && npx tsc --noEmit && npx vitest run
   apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.28.0** (todo verificado: frontend 206 tests, backend 796 tests,
-  Playwright 4 passed + 2 skipped, `ruff` limpio, build OK con chunks por ruta).
-- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el código está listo) y **37.4
-  Vercel** (diferido por decisión: requiere cuenta/token + decidir CORS).
+- Versión estable actual: **1.34.0** (todo verificado: backend 843 tests, frontend 234 tests,
+  launcher 64 tests, Playwright 14 passed + 10 skipped, `ruff` limpio, `tsc`/`build` OK).
+- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el código está listo), **37.4
+  Vercel** (diferido por decisión) y el **commit `feat:` de cierre de V1.30–V1.34** (FASE 1–5, en
+  el árbol de trabajo sin commitear).
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
+
+### 37.6 HECHO (V1.29) — Fiabilidad LAN/HTTPS + audio móvil (P0) + launcher [commit `cb4eec5`]
+- ✅ `utils/browserCapabilities.ts` + `useAudioCapabilities.ts` (detección reactiva de capacidades
+  de audio + `MicUnavailableNotice`), `/api/network` (`hostname`/`local_url`), HTTPS en la LAN
+  (`@vitejs/plugin-basic-ssl`), launcher con estado en color + reinicio + reloj.
+
+### 37.7 HECHO (V1.30) — FASE 1: LAN + Mobile 100%
+- ✅ mDNS real (`local_url_available` en `/api/network` + `mdns_available()` en launcher),
+  recuperación de permisos (`watchMicrophoneAvailability`), test de micrófono con medidor de nivel
+  (`MicrophoneTest.tsx` + `utils/microphoneLevel.ts`), tarjeta de conexión QR (`ConnectDeviceCard`),
+  página `/help/connect` (`features/help/ConnectHelp.tsx`), E2E móvil (`tests/visual/mobile.spec.ts`)
+  y `docs/DEVICE_MATRIX.md`.
+
+### 37.8 HECHO (V1.31) — FASE 2: Adaptive Engine 2.0
+- ✅ Priority Engine (`services/adaptive.py`: `priority_signals`/`priority_score`/`explain_priority`)
+  + `signals`/`why` en `NextBestActivityOut` + "Why this activity?" en `NextBestCard`.
+
+### 37.9 HECHO (V1.32) — FASE 3: Curriculum 2.0
+- ✅ `curriculum/cefr_descriptors.json` + `services/cefr_descriptors.py` (escalera Pre-A1→C2 con
+  bandas "plus" + Can-Do por 9 dimensiones), `/api/academy/cefr-ladder`, visualización en `CourseScreen`.
+
+### 37.10 HECHO (V1.33) — FASE 4: Listening 2.0
+- ✅ `listening_resilience` (precisión por condición de escucha: clara→natural→conectada→rápida→
+  ruido→acentos) + `context` del corpus (`LISTENING_CONTEXTS` + `AudioLibraryEntry.context`) y
+  `resilience` en `ListeningDiagnostic`.
+
+### 37.11 HECHO (V1.34) — FASE 5: Speaking 2.0
+- ✅ `pronunciation` marcado como `proxy` (`PROXY_CRITERIA`), `interaction_quality` por
+  sub-dimensión (initiation/response/follow_up/repair/turn_taking), `conversation_endurance`
+  (hitos 30s–180s) + `/api/academy/speaking/endurance`, campo LLM `initiation`, y render en
+  `SpeakingDiagnostic` (insignia "proxy" + desglose + hitos). Test visual `tests/visual/speaking.spec.ts`.
 
 

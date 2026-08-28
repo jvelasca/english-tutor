@@ -1,0 +1,196 @@
+{
+  "version": "1.0.0",
+  "dimensions": {
+    "listening": "Listening",
+    "speaking": "Speaking",
+    "reading": "Reading",
+    "writing": "Writing",
+    "grammar": "Grammar",
+    "vocabulary": "Vocabulary",
+    "pronunciation": "Pronunciation",
+    "interaction": "Interaction",
+    "mediation": "Mediation"
+  },
+  "bands": [
+    {
+      "id": "pre-a1",
+      "label": "Pre-A1",
+      "numeric": 0.5,
+      "title": "Foundations",
+      "description": "First words, memorised phrases and recognition of a few familiar expressions.",
+      "can_do": {
+        "listening": ["I can recognise a few very familiar everyday words and greetings when spoken slowly and clearly."],
+        "speaking": ["I can say single words and very short, memorised phrases (e.g. greetings, thanks)."],
+        "reading": ["I can recognise a few familiar written words and signs (e.g. my name, 'exit')."],
+        "writing": ["I can copy single words and write my name and address."],
+        "grammar": ["I can use a few fixed formulas without consciously controlling grammar."],
+        "vocabulary": ["I know a handful of basic words for immediate, concrete needs."],
+        "pronunciation": ["I can repeat isolated sounds and short words after a model."],
+        "interaction": ["I can respond with single words to very simple, slow questions with support."],
+        "mediation": ["I can pass on simple, memorised messages (e.g. a name or number) with help."]
+      }
+    },
+    {
+      "id": "a1",
+      "label": "A1",
+      "numeric": 1.0,
+      "title": "Beginner",
+      "description": "Introduce yourself, talk about everyday life, family, home and plans.",
+      "can_do": {
+        "listening": ["I can understand slow, clearly articulated speech about myself and my immediate surroundings."],
+        "speaking": ["I can use simple phrases to describe myself, where I live and people I know."],
+        "reading": ["I can understand very short, simple texts and find specific, predictable information."],
+        "writing": ["I can write simple sentences about myself (e.g. a postcard, a simple form)."],
+        "grammar": ["I can use a few basic structures (to be, present simple, common prepositions) correctly."],
+        "vocabulary": ["I know basic words for everyday topics (family, home, food, time)."],
+        "pronunciation": ["I can pronounce a limited set of learned words so they are mostly understood."],
+        "interaction": ["I can ask and answer simple questions in predictable, everyday situations."],
+        "mediation": ["I can convey simple information to another person using basic words."]
+      }
+    },
+    {
+      "id": "a2",
+      "label": "A2",
+      "numeric": 2.0,
+      "title": "Elementary",
+      "description": "Past, future and common everyday situations.",
+      "can_do": {
+        "listening": ["I can understand phrases and the most common vocabulary on familiar topics."],
+        "speaking": ["I can describe my background, routines and plans in simple connected sentences."],
+        "reading": ["I can read short, simple texts and find specific information in everyday material."],
+        "writing": ["I can write short, simple notes and messages about routine matters."],
+        "grammar": ["I can use past and future forms and common sentence patterns with reasonable accuracy."],
+        "vocabulary": ["I have enough words for routine transactions and familiar topics."],
+        "pronunciation": ["I can pronounce familiar words and phrases clearly enough to be generally understood."],
+        "interaction": ["I can handle simple, routine exchanges and brief social conversations."],
+        "mediation": ["I can pass on the main point of a short, simple message to someone else."]
+      }
+    },
+    {
+      "id": "a2+",
+      "label": "A2+",
+      "numeric": 2.5,
+      "title": "Elementary Plus",
+      "description": "A strong A2 with the beginnings of B1 features: more connected speech and interaction.",
+      "can_do": {
+        "listening": ["I can follow the main points of clear, standard speech on familiar matters."],
+        "speaking": ["I can give simple, connected accounts and express basic preferences and plans."],
+        "reading": ["I can understand straightforward texts and identify the main conclusions."],
+        "writing": ["I can write a short, simple paragraph connecting several ideas with basic linkers."],
+        "grammar": ["I can combine tenses and structures to talk about past, present and future."],
+        "vocabulary": ["I have a wider everyday vocabulary and can paraphrase simple gaps."],
+        "pronunciation": ["I can speak with intelligible pronunciation and some awareness of stress."],
+        "interaction": ["I can enter unprepared into conversation on familiar topics, though I may hesitate."],
+        "mediation": ["I can relay the main information from simple material, asking for help when needed."]
+      }
+    },
+    {
+      "id": "b1",
+      "label": "B1",
+      "numeric": 3.0,
+      "title": "Intermediate",
+      "description": "Opinions, experiences and connected speech.",
+      "can_do": {
+        "listening": ["I can understand the main points of clear standard speech on familiar matters in work, school and leisure."],
+        "speaking": ["I can give connected descriptions of experiences and briefly explain opinions and plans."],
+        "reading": ["I can understand texts on everyday topics and recognise the writer's main conclusions."],
+        "writing": ["I can write simple connected text on familiar topics and personal experiences."],
+        "grammar": ["I can use a range of structures with reasonable control, including some complex sentences."],
+        "vocabulary": ["I have enough vocabulary to express myself on most everyday topics, with some circumlocution."],
+        "pronunciation": ["I can speak with intelligible pronunciation, though a foreign accent is noticeable."],
+        "interaction": ["I can deal with most situations while travelling and enter unprepared into conversation on familiar topics."],
+        "mediation": ["I can summarise the main points of straightforward information and pass them on."]
+      }
+    },
+    {
+      "id": "b1+",
+      "label": "B1+",
+      "numeric": 3.5,
+      "title": "Intermediate Plus",
+      "description": "A strong B1 with the beginnings of B2: longer turns and more active discussion.",
+      "can_do": {
+        "listening": ["I can follow the main ideas of extended speech and some discussions on concrete topics."],
+        "speaking": ["I can present a straightforward topic and support opinions with reasons and examples."],
+        "reading": ["I can read texts with some unfamiliar vocabulary and still follow the argument."],
+        "writing": ["I can write clearly connected text on a range of familiar subjects with appropriate register."],
+        "grammar": ["I can use a wider range of structures with growing accuracy, though errors persist under pressure."],
+        "vocabulary": ["I can handle less routine situations with a good range of vocabulary."],
+        "pronunciation": ["I can control stress and intonation enough to keep speech clearly intelligible."],
+        "interaction": ["I can take an active part in discussion and maintain conversation on familiar topics."],
+        "mediation": ["I can summarise and report the main content of spoken and written input."]
+      }
+    },
+    {
+      "id": "b2",
+      "label": "B2",
+      "numeric": 4.0,
+      "title": "Upper-Intermediate",
+      "description": "Argumentation and complex texts.",
+      "can_do": {
+        "listening": ["I can understand extended speech and complex lines of argument when the topic is reasonably familiar."],
+        "speaking": ["I can give clear, detailed descriptions and explain viewpoints with advantages and disadvantages."],
+        "reading": ["I can read articles and reports concerned with contemporary problems and follow arguments."],
+        "writing": ["I can write clear, detailed text on a wide range of subjects, evaluating information and arguments."],
+        "grammar": ["I can control grammar well and use a variety of structures to express precise meaning."],
+        "vocabulary": ["I have a broad lexical range to express myself precisely, with only occasional gaps."],
+        "pronunciation": ["I can produce clear, natural pronunciation with good control of stress and intonation."],
+        "interaction": ["I can interact with a degree of fluency and spontaneity that makes regular interaction possible."],
+        "mediation": ["I can summarise information from different sources and reconstruct arguments coherently."]
+      }
+    },
+    {
+      "id": "b2+",
+      "label": "B2+",
+      "numeric": 4.5,
+      "title": "Upper-Intermediate Plus",
+      "description": "A strong B2 with the beginnings of C1: sustained argument and style control.",
+      "can_do": {
+        "listening": ["I can follow the essentials of lectures, talks and reports on a wide range of topics."],
+        "speaking": ["I can develop an argument systematically, linking points logically and adapting style to purpose."],
+        "reading": ["I can understand complex texts and appreciate distinctions of style, tone and register."],
+        "writing": ["I can write well-structured, detailed text, synthesising information and arguments."],
+        "grammar": ["I can use complex structures flexibly with only occasional non-systematic errors."],
+        "vocabulary": ["I can express myself with precision and nuance, using idiomatic expressions naturally."],
+        "pronunciation": ["I can vary intonation and stress for emphasis with near-native clarity."],
+        "interaction": ["I can engage in extended discussion, responding and reformulating to keep interaction flowing."],
+        "mediation": ["I can convey the content and implications of complex material to different audiences."]
+      }
+    },
+    {
+      "id": "c1",
+      "label": "C1",
+      "numeric": 5.0,
+      "title": "Advanced",
+      "description": "Nuance, register and abstract topics.",
+      "can_do": {
+        "listening": ["I can understand a wide range of demanding, longer speech and recognise implicit meaning."],
+        "speaking": ["I can express myself fluently and spontaneously, with little obvious searching for expressions."],
+        "reading": ["I can understand long, complex factual and literary texts and appreciate subtle distinctions of style."],
+        "writing": ["I can write clear, well-structured, detailed text on complex subjects, showing control of organisational patterns."],
+        "grammar": ["I can use grammar with a high degree of accuracy and control, choosing structures for effect."],
+        "vocabulary": ["I have a wide lexical repertoire, including idiomatic expressions, and can use them precisely."],
+        "pronunciation": ["I can produce clear, natural speech with effective use of stress, rhythm and intonation."],
+        "interaction": ["I can use the language flexibly and effectively for social and professional purposes."],
+        "mediation": ["I can summarise long, demanding texts and mediate concepts between speakers of different backgrounds."]
+      }
+    },
+    {
+      "id": "c2",
+      "label": "C2",
+      "numeric": 6.0,
+      "title": "Proficiency",
+      "description": "Precision, subtlety and near-native command.",
+      "can_do": {
+        "listening": ["I can understand with ease virtually everything heard, including fast, colloquial and regional speech."],
+        "speaking": ["I can present clear, smoothly flowing descriptions and arguments in a style appropriate to context."],
+        "reading": ["I can read with ease virtually all forms of written language, including abstract and specialised texts."],
+        "writing": ["I can write clear, flowing, complex text in an appropriate and effective style with a logical structure."],
+        "grammar": ["I can use grammar with full, natural control and nuance, including subtle stylistic choices."],
+        "vocabulary": ["I have an essentially native-level lexical range, with precise, idiomatic and figurative language."],
+        "pronunciation": ["I can speak with native-like pronunciation, stress and intonation across registers."],
+        "interaction": ["I can take part effortlessly in any conversation, using idiomatic expressions and colloquialisms."],
+        "mediation": ["I can mediate effectively and discreetly, conveying nuance, register and implied meaning."]
+      }
+    }
+  ]
+}

@@ -381,6 +381,20 @@ class SpeakingCriterionOut(BaseModel):
     lifetime_score: float | None = None
     confidence: float | None = None
     stability: float | None = None
+    # Speaking 2.0 (V1.34): True si el score es un PROXY (p. ej. `pronunciation`
+    # derivado de similitud fonética de texto, no de análisis acústico real).
+    proxy: bool = False
+
+
+class SpeakingInteractionQualityOut(BaseModel):
+    """Sub-dimensión de Interaction Quality (Speaking 2.0): desglose longitudinal
+    de la interacción conversacional (initiation/response/follow_up/repair/
+    turn_taking)."""
+
+    dimension: str
+    attempts: int
+    mean: float | None = None
+    recent_score: float | None = None
 
 
 class SpeakingTrend(BaseModel):
@@ -399,6 +413,28 @@ class SpeakingDiagnostic(BaseModel):
     overall_recent: float | None = None
     trend: SpeakingTrend
     rubric_version: str = ""
+    interaction_quality: list[SpeakingInteractionQualityOut] = Field(
+        default_factory=list
+    )
+
+
+class EnduranceMilestoneOut(BaseModel):
+    """Hito de Conversation Endurance: duración objetivo y si se ha alcanzado."""
+
+    seconds: int
+    achieved: bool
+
+
+class ConversationEnduranceOut(BaseModel):
+    """Conversation Endurance (Speaking 2.0): hasta cuánto puede sostener una
+    conversación el alumno, derivado de la telemetría de turnos hablados."""
+
+    milestones: list[EnduranceMilestoneOut] = Field(default_factory=list)
+    longest_session_seconds: float = 0.0
+    longest_turn_seconds: float = 0.0
+    total_speaking_seconds: float = 0.0
+    turns: int = 0
+    current_goal_seconds: int | None = None
 
 
 class SpeakingLevelOut(BaseModel):
@@ -610,9 +646,10 @@ class SessionOut(BaseModel):
 class NextBestActivityOut(BaseModel):
     """Proyección de UX del primer paso de la sesión (Learning UX 2.0).
 
-    El frontend no necesita saber cómo se calculó: recibe una única acción
-    dominante con su destreza/sub-destreza, minutos y un `priority` determinista
-    derivado del orden pedagógico del Adaptive Engine (no es un score predictivo).
+    El frontend no necesita saber cómo se calculó, pero recibe transparencia: una
+    única acción dominante con su destreza/sub-destreza, minutos, una `priority`
+    compuesta determinista (Priority Engine 2.0), las `signals` que la sustentan y
+    una explicación pedagógica `why` en inglés.
     """
 
     kind: str
@@ -625,12 +662,39 @@ class NextBestActivityOut(BaseModel):
     reason: str
     minutes: int
     priority: float
+    signals: dict = Field(default_factory=dict)
+    why: str = ""
 
 
 class RemediationSkillOut(BaseModel):
     skill: str
     score: float
     objective_ids: list[str]
+
+
+class CefrBandOut(BaseModel):
+    """Banda de la escalera CEFR (Curriculum 2.0) con sus descriptores Can-Do."""
+
+    id: str
+    label: str
+    numeric: float
+    title: str
+    description: str = ""
+    can_do: dict[str, list[str]] = Field(default_factory=dict)
+    is_current: bool = False
+
+
+class CefrLadderOut(BaseModel):
+    """Escalera CEFR completa (Pre-A1 → C2) con descriptores por dimensión.
+
+    `estimated_band`/`estimated_numeric` sitúan al alumno en la escalera continua,
+    y `is_current` marca la banda correspondiente en `bands`.
+    """
+
+    dimensions: list[dict]
+    bands: list[CefrBandOut]
+    estimated_band: str | None = None
+    estimated_numeric: float | None = None
 
 
 class RemediationPlanOut(BaseModel):

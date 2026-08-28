@@ -57,6 +57,10 @@ SPEAKING_EVIDENCE_OPTIONAL_FIELDS: tuple[str, ...] = (
     "topic_maintenance",
     "clarification_requests",
     "repair",
+    # Interaction Quality (Speaking 2.0): cuánto inicia el alumno temas/preguntas
+    # por su cuenta (proactividad), distinto de `follow_up_questions` (responder y
+    # mantener el hilo). Señal semántica del LLM.
+    "initiation",
 )
 
 # Severidades de error gramatical reconocidas (GrammarEvidence 2.0). El scorer
@@ -147,7 +151,9 @@ def build_speaking_prompt(task: str, heard: str) -> list[dict]:
         '- "clarification_requests": number between 0.0 and 1.0 — how appropriately '
         "the student asks for clarification when needed.\n"
         '- "repair": number between 0.0 and 1.0 — how well the student recovers or '
-        "rephrases after a communication breakdown or misunderstanding.\n\n"
+        "rephrases after a communication breakdown or misunderstanding.\n"
+        '- "initiation": number between 0.0 and 1.0 — how much the student '
+        "initiates new topics or questions on their own, beyond just responding.\n\n"
         "Example of the expected JSON:\n"
         '{"task_achieved": true, "grammar_errors": 1, '
         '"lexical_tokens": ["student", "live"], "coherence": 0.8, '
@@ -295,6 +301,7 @@ def parse_speaking_evidence(raw: str) -> dict | None:
     topic_maintenance = _parse_float_field(data, "topic_maintenance", None)
     clarification_requests = _parse_float_field(data, "clarification_requests", None)
     repair = _parse_float_field(data, "repair", None)
+    initiation = _parse_float_field(data, "initiation", None)
 
     result: dict = {
         "task_achieved": task_achieved,
@@ -342,6 +349,8 @@ def parse_speaking_evidence(raw: str) -> dict | None:
         result["clarification_requests"] = clarification_requests
     if repair is not None:
         result["repair"] = repair
+    if initiation is not None:
+        result["initiation"] = initiation
     return result
 
 

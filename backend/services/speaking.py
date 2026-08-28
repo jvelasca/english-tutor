@@ -305,6 +305,36 @@ SPEAKING_TREND_WINDOW = 5
 SPEAKING_EMA_ALPHA = 0.5
 SPEAKING_CONFIDENCE_THRESHOLD = 0.6
 
+# --- Speaking 2.0 (V1.34): proxy, Interaction Quality y Endurance ----------
+# Un transcript no puede medir con exactitud pronunciación/ritmo/pausas/
+# entonación/prosodia. `pronunciation` se deriva de la similitud fonética
+# texto↔texto esperado (`services.phonetics`), así que es un PROXY: se marca
+# explícitamente para no confundir "86%" con una medición fonética real.
+PROXY_CRITERIA: frozenset[str] = frozenset({"pronunciation"})
+
+
+def criterion_is_proxy(criterion: str) -> bool:
+    """True si el criterio es un proxy (no una medición directa de la destreza)."""
+    return criterion in PROXY_CRITERIA
+
+
+# Dimensiones de Interaction Quality (Speaking 2.0): desglose de la interacción
+# conversacional en sub-dimensiones medibles. `initiation`/`response`/`follow_up`/
+# `repair` son señal semántica del LLM; `turn_taking` fusiona la señal semántica
+# (`turn_completion`) con la objetiva de turnos (`turn_balance`/`turn_duration`).
+INTERACTION_QUALITY_DIMENSIONS: tuple[str, ...] = (
+    "initiation",
+    "response",
+    "follow_up",
+    "repair",
+    "turn_taking",
+)
+
+# Prefijo de `item_id` de las filas de evidencia de Interaction Quality (p. ej.
+# `interaction:response`). Distingue estas sub-dimensiones de los criterios de
+# rúbrica para agregarlas longitudinalmente sin contaminar el perfil de criterios.
+INTERACTION_QUALITY_ITEM_PREFIX = "interaction:"
+
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
@@ -712,6 +742,52 @@ def _interaction_score(evidence: dict) -> float | None:
     )
 
 
+def _quality_score(value) -> float | None:
+    """Normaliza una sub-dimensión de Interaction Quality a [0,1] o None."""
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return round(_clamp(float(value)), 3)
+
+
+def _turn_taking_quality(evidence: dict) -> float | None:
+    """`turn_taking` = fusión de la señal semántica y la objetiva de turnos.
+
+    Igual fusión que `_interaction_score` pero sobre la sub-dimensión concreta:
+    `turn_completion` (semántica, LLM) se combina con la señal objetiva de turnos
+    (`turn_balance`/`turn_duration`) con `INTERACTION_OBJECTIVE_WEIGHT`. Si solo
+    hay una fuente, se usa esa; si no hay ninguna, `None` (dimensión no observada).
+    """
+    semantic = _quality_score(evidence.get("turn_completion"))
+    objective = _interaction_objective_score(evidence.get("interaction_objective"))
+    if objective is None:
+        return semantic
+    if semantic is None:
+        return objective
+    return round(
+        _clamp(
+            INTERACTION_OBJECTIVE_WEIGHT * objective
+            + (1.0 - INTERACTION_OBJECTIVE_WEIGHT) * semantic
+        ),
+        3,
+    )
+
+
+def interaction_quality_scores(evidence: dict) -> dict[str, float | None]:
+    """Interaction Quality (Speaking 2.0): sub-dimensiones medibles de interacción.
+
+    Devuelve `{dimension: score|None}` para `INTERACTION_QUALITY_DIMENSIONS`. Una
+    dimensión sin señal queda `None` (el scorer no la inventa, mismo principio que
+    los criterios observados/no observados).
+    """
+    return {
+        "initiation": _quality_score(evidence.get("initiation")),
+        "response": _quality_score(evidence.get("appropriate_responses")),
+        "follow_up": _quality_score(evidence.get("follow_up_questions")),
+        "repair": _quality_score(evidence.get("repair")),
+        "turn_taking": _turn_taking_quality(evidence),
+    }
+
+
 def scores_from_evidence(
     evidence: dict,
     heard: str,
@@ -778,6 +854,7 @@ def scores_from_evidence(
         "criteria": criteria,
         "observed": observed,
         "overall": overall,
+        "interaction_quality": interaction_quality_scores(evidence),
     }
 
 
@@ -835,6 +912,27 @@ def evidence_from_speaking(
             "evidence_kind": evidence_kind,
         }
     )
+    # Interaction Quality (Speaking 2.0): una fila por sub-dimensión observada,
+    # con `item_id = "interaction:<dim>"`, para poder agregarlas longitudinalmente
+    # sin contaminar el perfil de criterios de la rúbrica.
+    for dimension, score in result.get("interaction_quality", {}).items():
+        if score is None:
+            continue
+        records.append(
+            {
+                "level_id": level_id,
+                "objective_id": objective_id,
+                "skill": "speaking",
+                "item_id": f"{INTERACTION_QUALITY_ITEM_PREFIX}{dimension}",
+                "item_type": "speaking",
+                "difficulty": difficulty,
+                "source": "speaking",
+                "result": float(score),
+                "curriculum_version": curriculum_version,
+                "assessment_version": assessment_version,
+                "evidence_kind": evidence_kind,
+            }
+        )
     return records
 
 
@@ -896,6 +994,37 @@ def _ema(values: list[float], alpha: float = SPEAKING_EMA_ALPHA) -> float:
     return round(recent, 3)
 
 
+def _interaction_quality_breakdown(rows: list[dict]) -> list[dict]:
+    """Agrega las filas de Interaction Quality (`interaction:<dim>`) por dimensión.
+
+    Devuelve una lista `{dimension, attempts, mean, recent_score}` en el orden de
+    `INTERACTION_QUALITY_DIMENSIONS` (más cualquier dimensión extra alfabética).
+    """
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        item_id = row.get("item_id") or ""
+        if not item_id.startswith(INTERACTION_QUALITY_ITEM_PREFIX):
+            continue
+        dim = item_id[len(INTERACTION_QUALITY_ITEM_PREFIX) :]
+        groups.setdefault(dim, []).append(row)
+
+    known = set(INTERACTION_QUALITY_DIMENSIONS)
+    order = list(INTERACTION_QUALITY_DIMENSIONS) + sorted(set(groups) - known)
+    breakdown: list[dict] = []
+    for dim in order:
+        grp = groups.get(dim, [])
+        results = [float(r["result"]) for r in grp if r.get("result") is not None]
+        breakdown.append(
+            {
+                "dimension": dim,
+                "attempts": len(grp),
+                "mean": round(sum(results) / len(results), 3) if results else None,
+                "recent_score": _ema(results) if results else None,
+            }
+        )
+    return breakdown
+
+
 def speaking_diagnostic(evidence_rows: list[dict], now: str = "") -> dict:
     """Vista longitudinal de speaking por criterio (Student Model ownership, V1.16).
 
@@ -914,9 +1043,22 @@ def speaking_diagnostic(evidence_rows: list[dict], now: str = "") -> dict:
     Devuelve `criteria`, `weak`, `recommendation`, `attempts`, `overall_mean`,
     `overall_recent`, `trend` y `rubric_version`. Determinista, sin LLM ni red.
     """
+    # Interaction Quality (Speaking 2.0): las filas `interaction:<dim>` se agregan
+    # por separado y NO entran en el perfil de criterios de la rúbrica.
+    interaction_rows = [
+        r
+        for r in evidence_rows
+        if str(r.get("item_id", "")).startswith(INTERACTION_QUALITY_ITEM_PREFIX)
+    ]
+    rows = [
+        r
+        for r in evidence_rows
+        if not str(r.get("item_id", "")).startswith(INTERACTION_QUALITY_ITEM_PREFIX)
+    ]
+
     groups: dict[str, list[dict]] = {}
     overall_rows: list[dict] = []
-    for row in evidence_rows:
+    for row in rows:
         item_id = row.get("item_id") or ""
         if item_id == "overall":
             overall_rows.append(row)
@@ -938,6 +1080,7 @@ def speaking_diagnostic(evidence_rows: list[dict], now: str = "") -> dict:
                 "min": None,
                 "max": None,
                 "review_due": True,
+                "proxy": criterion_is_proxy(name),
             }
         mean = round(sum(results) / len(results), 3)
         recent = _ema(results)
@@ -964,6 +1107,7 @@ def speaking_diagnostic(evidence_rows: list[dict], now: str = "") -> dict:
             "min": round(min(results), 3),
             "max": round(max(results), 3),
             "review_due": review_due,
+            "proxy": criterion_is_proxy(name),
         }
 
     criteria = [_criterion(c, groups.get(c, [])) for c in SPEAKING_CRITERIA]
@@ -1003,6 +1147,7 @@ def speaking_diagnostic(evidence_rows: list[dict], now: str = "") -> dict:
         "overall_recent": _ema(overall_results) if overall_results else None,
         "trend": _mean_trend(overall_rows),
         "rubric_version": RUBRIC_VERSION,
+        "interaction_quality": _interaction_quality_breakdown(interaction_rows),
     }
 
 
@@ -1083,4 +1228,62 @@ def speaking_journey(evidence_rows: list[dict], now: str = "") -> dict:
         "current_confidence": current["confidence"],
         "attempts": len(overall_rows),
         "steps": steps,
+    }
+
+
+# --- Conversation Endurance (Speaking 2.0) ----------------------------------
+
+# Hitos de duración de conversación sostenida (segundos). Un hito se alcanza
+# cuando el alumno ha acumulado al menos esa duración de HABLA en una sola
+# conversación (endurance = resistencia a mantener una conversación, no la
+# duración de un único turno).
+ENDURANCE_MILESTONES_SECONDS: tuple[int, ...] = (30, 60, 90, 120, 180)
+
+
+def conversation_endurance(sessions: list[dict]) -> dict:
+    """Conversation Endurance: hasta cuánto puede sostener una conversación.
+
+    `sessions` son los agregados por conversación devueltos por
+    `repositories.conversations.student_speaking_sessions`: cada elemento es un
+    dict `{total_ms, turns, longest_turn_ms}` con la duración de habla del alumno
+    en esa conversación. Devuelve:
+    - `milestones`: lista `{seconds, achieved}` para `ENDURANCE_MILESTONES_SECONDS`.
+    - `longest_session_seconds`: mayor duración de habla en una conversación.
+    - `longest_turn_seconds`: turno individual más largo del alumno.
+    - `total_speaking_seconds`: duración total de habla del alumno.
+    - `turns`: nº de turnos hablados del alumno.
+    - `current_goal_seconds`: siguiente hito no alcanzado (None si todos alcanzados).
+
+    Determinista y sin LLM ni red.
+    """
+    totals = [int(s.get("total_ms") or 0) for s in sessions]
+    longest_turn = max(
+        (int(s.get("longest_turn_ms") or 0) for s in sessions), default=0
+    )
+    turns = sum(int(s.get("turns") or 0) for s in sessions)
+    longest_session_ms = max(totals, default=0)
+
+    milestones = [
+        {
+            "seconds": seconds,
+            "achieved": longest_session_ms >= seconds * 1000,
+        }
+        for seconds in ENDURANCE_MILESTONES_SECONDS
+    ]
+    current_goal = next(
+        (
+            seconds
+            for seconds in ENDURANCE_MILESTONES_SECONDS
+            if longest_session_ms < seconds * 1000
+        ),
+        None,
+    )
+
+    return {
+        "milestones": milestones,
+        "longest_session_seconds": round(longest_session_ms / 1000, 1),
+        "longest_turn_seconds": round(longest_turn / 1000, 1),
+        "total_speaking_seconds": round(sum(totals) / 1000, 1),
+        "turns": turns,
+        "current_goal_seconds": current_goal,
     }

@@ -26,7 +26,7 @@ export function AppShell({
           className="w-full"
         />
       </div>
-      <StatusBar />
+      <StatusBar onOpenHelp={() => onNavigate("help")} />
     </div>
   );
 }

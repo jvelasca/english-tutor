@@ -155,7 +155,12 @@ CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
 # Archivos JSON de `CURRICULUM_DIR` que NO son un nivel (instrumentos/índices).
 _NON_LEVEL_FILES = frozenset(
-    {"assessments.json", "speaking_assessment.json", "cefr_matrix.json"}
+    {
+        "assessments.json",
+        "speaking_assessment.json",
+        "cefr_matrix.json",
+        "cefr_descriptors.json",
+    }
 )
 
 

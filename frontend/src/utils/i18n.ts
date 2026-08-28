@@ -45,6 +45,7 @@ const STRINGS: Record<string, Entry> = {
   },
   "home.nextStep": { en: "Today's next step", es: "El siguiente paso de hoy" },
   "home.continue": { en: "Continue", es: "Continuar" },
+  "home.whyThisActivity": { en: "Why?", es: "¿Por qué?" },
   "home.start": { en: "Start", es: "Empezar" },
   "home.review": { en: "Review", es: "Repasar" },
   "home.today": { en: "Today", es: "Hoy" },
@@ -111,6 +112,9 @@ const STRINGS: Record<string, Entry> = {
   "course.inProgress": { en: "In progress", es: "En curso" },
   "course.notStarted": { en: "Not started", es: "Sin empezar" },
   "course.locked": { en: "Locked", es: "Bloqueado" },
+  "course.cefrLevel": { en: "CEFR level", es: "Nivel CEFR" },
+  "course.canDo": { en: "What you can do", es: "Qué puedes hacer" },
+  "course.youAreHere": { en: "You are here", es: "Estás aquí" },
 
   // Settings
   "settings.title": { en: "Settings", es: "Ajustes" },
@@ -222,6 +226,56 @@ const STRINGS: Record<string, Entry> = {
     es: "Si el profesor no responde, asegúrate de que Ollama esté arrancado. Los detalles técnicos y la guía completa están en la documentación.",
   },
 
+  // Conectar un dispositivo (LAN / móvil)
+  "connect.title": {
+    en: "Connect a device",
+    es: "Conectar un dispositivo",
+  },
+  "connect.subtitle": {
+    en: "Use English Tutor from your phone or tablet on the same local network.",
+    es: "Usa English Tutor desde tu móvil o tableta en la misma red local.",
+  },
+  "connect.cardTitle": { en: "Connect a device", es: "Conectar un dispositivo" },
+  "connect.cardSubtitle": {
+    en: "Scan with your phone",
+    es: "Escanea con tu teléfono",
+  },
+  "connect.noNetwork": {
+    en: "Start the app and connect to your local network to see the QR code.",
+    es: "Inicia la app y conéctate a tu red local para ver el código QR.",
+  },
+  "connect.localOnly": {
+    en: "Local network only. No internet required.",
+    es: "Solo red local. No requiere Internet.",
+  },
+  "connect.trustHelp": {
+    en: "How to connect and trust the certificate",
+    es: "Cómo conectar y confiar el certificado",
+  },
+  "connect.trustTitle": {
+    en: "First connection: trust the local certificate",
+    es: "Primera conexión: confiar el certificado local",
+  },
+  "connect.trustBody": {
+    en: "English Tutor uses a self-signed certificate so the microphone works over HTTPS on your local network. The first time you connect, your device will warn you that the certificate is not trusted. Follow the steps for your platform to continue safely.",
+    es: "English Tutor usa un certificado autofirmado para que el micrófono funcione por HTTPS en tu red local. La primera vez que conectes, tu dispositivo avisará de que el certificado no es de confianza. Sigue los pasos de tu plataforma para continuar con seguridad.",
+  },
+  "connect.windows.title": { en: "Windows", es: "Windows" },
+  "connect.windows.body": {
+    en: "Open the LAN URL in your browser. On the \"Your connection is not private\" page, click Advanced, then Continue to the site. Your own PC is already the source of the app, so this is safe.",
+    es: "Abre la URL LAN en tu navegador. En la página «Tu conexión no es privada», pulsa Avanzado y luego Continuar al sitio. Tu propio PC es el origen de la app, así que es seguro.",
+  },
+  "connect.android.title": { en: "Android", es: "Android" },
+  "connect.android.body": {
+    en: "Scan the QR code with your phone camera, or type the LAN URL in Chrome. On the \"Your connection is not private\" warning, tap Advanced, then Proceed. If the microphone still doesn't work, allow microphone access in the browser settings.",
+    es: "Escanea el código QR con la cámara del teléfono, o escribe la URL LAN en Chrome. En el aviso «Tu conexión no es privada», pulsa Avanzado y luego Continuar. Si el micrófono sigue sin funcionar, permite el acceso al micrófono en los ajustes del navegador.",
+  },
+  "connect.ios.title": { en: "iPhone / iPad", es: "iPhone / iPad" },
+  "connect.ios.body": {
+    en: "Open the LAN URL in Safari. On the \"This Connection Is Not Private\" page, tap Show Details, then visit this website. If the microphone doesn't work, go to Settings → Safari → Advanced → Experimental Features and make sure microphone access is enabled for this site.",
+    es: "Abre la URL LAN en Safari. En la página «Esta conexión no es privada», pulsa Mostrar detalles y luego Visitar este sitio web. Si el micrófono no funciona, ve a Ajustes → Safari → Avanzado → Funciones experimentales y asegúrate de que el acceso al micrófono esté habilitado para este sitio.",
+  },
+
   // Menú de usuario
   "user.profile": { en: "Profile", es: "Perfil" },
   "user.profiles": { en: "Profiles", es: "Perfiles" },
@@ -310,6 +364,27 @@ const STRINGS: Record<string, Entry> = {
   "mic.unavailable.checkBrowser": {
     en: "Try Chrome, Edge or Safari.",
     es: "Prueba con Chrome, Edge o Safari.",
+  },
+
+  // Test de micrófono
+  "micTest.button": { en: "Test microphone", es: "Probar micrófono" },
+  "micTest.buttonAgain": {
+    en: "Check microphone again",
+    es: "Volver a comprobar el micrófono",
+  },
+  "micTest.stop": { en: "Stop test", es: "Detener prueba" },
+  "micTest.speakNow": { en: "Speak now…", es: "Habla ahora…" },
+  "micTest.inputLevel": { en: "Input level", es: "Nivel de entrada" },
+  "micTest.working": { en: "Microphone working", es: "El micrófono funciona" },
+  "micTest.testPlayback": { en: "Test playback", es: "Probar reproducción" },
+  "micTest.playbackSample": {
+    en: "English Tutor audio test.",
+    es: "Prueba de audio de English Tutor.",
+  },
+  "micTest.playbackOk": { en: "Playback works", es: "La reproducción funciona" },
+  "micTest.playbackError": {
+    en: "Playback failed. Check your speakers or volume.",
+    es: "La reproducción falló. Comprueba los altavoces o el volumen.",
   },
 
   // Voz / reproducción
@@ -422,6 +497,30 @@ const STRINGS: Record<string, Entry> = {
   "diag.improving": { en: "improving", es: "mejorando" },
   "diag.gettingWorse": { en: "getting worse", es: "empeorando" },
   "diag.stable": { en: "stable", es: "estable" },
+  "diag.proxy": { en: "proxy", es: "proxy" },
+
+  // Speaking 2.0 (Interaction Quality + Conversation Endurance)
+  "speaking.interactionQuality": {
+    en: "Interaction quality",
+    es: "Calidad de interacción",
+  },
+  "speaking.iq.initiation": { en: "Initiation", es: "Inicio" },
+  "speaking.iq.response": { en: "Response", es: "Respuesta" },
+  "speaking.iq.follow_up": { en: "Follow-up", es: "Continuación" },
+  "speaking.iq.repair": { en: "Repair", es: "Reparación" },
+  "speaking.iq.turn_taking": { en: "Turn-taking", es: "Toma de turnos" },
+  "speaking.endurance": {
+    en: "Conversation endurance",
+    es: "Resistencia conversacional",
+  },
+  "speaking.enduranceGoal": {
+    en: "Next goal",
+    es: "Siguiente objetivo",
+  },
+  "speaking.enduranceTurns": {
+    en: "spoken turns",
+    es: "turnos hablados",
+  },
 
   // Role-play
   "roleplay.hint": { en: "Role-play", es: "Role-play" },
@@ -587,6 +686,38 @@ const STRINGS: Record<string, Entry> = {
   "listening.audioGapTitle": {
     en: "Audio difficulty gap",
     es: "Diferencia de dificultad del audio",
+  },
+  "listening.resilience": {
+    en: "Listening resilience",
+    es: "Resiliencia auditiva",
+  },
+  "listening.resilienceMainWeakness": {
+    en: "Main weakness",
+    es: "Debilidad principal",
+  },
+  "listening.resilience.clear_speech": {
+    en: "Clear speech",
+    es: "Habla clara",
+  },
+  "listening.resilience.natural_speech": {
+    en: "Natural speech",
+    es: "Habla natural",
+  },
+  "listening.resilience.connected_speech": {
+    en: "Connected speech",
+    es: "Habla conectada",
+  },
+  "listening.resilience.fast_speech": {
+    en: "Fast speech",
+    es: "Habla rápida",
+  },
+  "listening.resilience.noise": {
+    en: "Noise",
+    es: "Ruido",
+  },
+  "listening.resilience.accents": {
+    en: "Accents",
+    es: "Acentos",
   },
 
   // Learning profile

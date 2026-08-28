@@ -107,6 +107,7 @@ def test_audio_library_entry_new_fields_defaults():
     assert e.prosody == "unknown"
     assert e.task_type == "unknown"
     assert e.cefr == "unknown"
+    assert e.context == "unknown"
 
 
 def test_audio_library_entry_rejects_invalid_literal():
@@ -114,6 +115,8 @@ def test_audio_library_entry_rejects_invalid_literal():
         AudioLibraryEntry(audio_id="a1", file="a1.wav", cefr="C3")
     with pytest.raises(ValidationError):
         AudioLibraryEntry(audio_id="a1", file="a1.wav", gender="robot")
+    with pytest.raises(ValidationError):
+        AudioLibraryEntry(audio_id="a1", file="a1.wav", context="radio_show")
 
 
 # --- Resolución de archivo (seguridad) --------------------------------------

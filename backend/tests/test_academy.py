@@ -1260,6 +1260,44 @@ def test_endpoint_student_model_empty(monkeypatch, tmp_path):
     assert body["reassessment"] is None
 
 
+def test_endpoint_cefr_ladder_empty_user(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/academy/cefr-ladder", params={"user_id": a})
+    assert r.status_code == 200
+    body = r.json()
+    assert [b["id"] for b in body["bands"]] == [
+        "pre-a1",
+        "a1",
+        "a2",
+        "a2+",
+        "b1",
+        "b1+",
+        "b2",
+        "b2+",
+        "c1",
+        "c2",
+    ]
+    assert {d["id"] for d in body["dimensions"]} == {
+        "listening",
+        "speaking",
+        "reading",
+        "writing",
+        "grammar",
+        "vocabulary",
+        "pronunciation",
+        "interaction",
+        "mediation",
+    }
+    # Sin evidencia, la estimación es A1 (numeric 1.0) → banda `a1` marcada.
+    assert body["estimated_numeric"] == 1.0
+    assert body["estimated_band"] == "a1"
+    current = [b for b in body["bands"] if b["is_current"]]
+    assert [b["id"] for b in current] == ["a1"]
+    for band in body["bands"]:
+        assert band["can_do"]["mediation"], band["id"]
+
+
 def test_endpoint_readiness_default_b1(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import {
+  getCefrLadder,
   getLevelCompletions,
   getLevelDetail,
   getLevels,
 } from "../../api/academy";
 import type {
+  CefrLadder,
   LearningProfile,
   LevelCompletion,
   LevelDetail,
@@ -66,16 +68,19 @@ export function CourseScreen({
   const [completions, setCompletions] = useState<LevelCompletion[]>([]);
   const [detail, setDetail] = useState<LevelDetail | null>(null);
   const [currentLevelId, setCurrentLevelId] = useState<string | null>(null);
+  const [ladder, setLadder] = useState<CefrLadder | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [ls, cs] = await Promise.all([
+      const [ls, cs, cefr] = await Promise.all([
         getLevels(userId),
         getLevelCompletions(userId),
+        getCefrLadder(userId),
       ]);
       setLevels(ls.levels.filter((l) => JOURNEY_LEVELS.includes(l.level_id)));
       setCompletions(cs);
+      setLadder(cefr);
     } catch {
       /* backend no disponible */
     }
@@ -190,6 +195,102 @@ export function CourseScreen({
             </div>
           </Card>
         </motion.section>
+
+        {ladder && (
+          <motion.section variants={item} aria-label={t("course.cefrLevel")}>
+            <Card className="gap-4 p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-base font-semibold">
+                  {t("course.cefrLevel")}
+                </h2>
+                {ladder.estimated_band && (
+                  <Badge variant="secondary" className="gap-1.5 tabular-nums">
+                    {ladder.estimated_band.toUpperCase()} ·{" "}
+                    {ladder.estimated_numeric}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex items-start overflow-x-auto pb-1">
+                {ladder.bands.map((band, i) => {
+                  const current = band.is_current;
+                  return (
+                    <div key={band.id} className="flex items-start">
+                      {i > 0 && (
+                        <div
+                          aria-hidden="true"
+                          className={cn(
+                            "mt-4 h-0.5 w-5 shrink-0 rounded-full sm:w-7",
+                            current ? "bg-primary" : "bg-border",
+                          )}
+                        />
+                      )}
+                      <div className="flex w-14 shrink-0 flex-col items-center gap-1.5">
+                        <div
+                          className={cn(
+                            "grid size-8 place-items-center rounded-full border text-[11px] font-bold",
+                            current
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card text-muted-foreground",
+                          )}
+                        >
+                          {band.label}
+                        </div>
+                        <span
+                          className={cn(
+                            "h-4 text-[11px] font-semibold",
+                            current ? "text-primary" : "text-muted-foreground",
+                          )}
+                        >
+                          {current ? t("course.youAreHere") : ""}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </motion.section>
+        )}
+
+        {ladder && (() => {
+          const band = ladder.bands.find((b) => b.is_current);
+          if (!band) return null;
+          return (
+            <motion.section variants={item} aria-label={t("course.canDo")}>
+              <Card className="gap-4 p-5">
+                <div>
+                  <h2 className="text-base font-semibold">
+                    {t("course.canDo")} · {band.label}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {band.title} — {band.description}
+                  </p>
+                </div>
+                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                  {ladder.dimensions.map((dim) => (
+                    <div key={dim.id} className="flex flex-col gap-1.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {dim.label}
+                      </p>
+                      <ul className="flex flex-col gap-1.5">
+                        {(band.can_do[dim.id] ?? []).map((statement, j) => (
+                          <li
+                            key={j}
+                            className="flex items-start gap-2 text-sm text-foreground/90"
+                          >
+                            <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                            <span>{statement}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </motion.section>
+          );
+        })()}
 
         {detail && (
           <motion.section variants={item} aria-label={detail.title}>

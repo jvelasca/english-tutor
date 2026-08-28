@@ -11,7 +11,9 @@ from domain import academy as academy_service
 from schemas.academy import (
     AttemptOut,
     AttemptRequest,
+    CefrLadderOut,
     CefrProfileOut,
+    ConversationEnduranceOut,
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
@@ -141,6 +143,11 @@ async def remediation(level_id: str, user: dict = Depends(current_user)) -> dict
 @router.get("/api/academy/student-model", response_model=StudentModelOut)
 async def student_model(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_student_model(user["id"])
+
+
+@router.get("/api/academy/cefr-ladder", response_model=CefrLadderOut)
+async def cefr_ladder(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_cefr_ladder(user["id"])
 
 
 @router.get("/api/academy/readiness", response_model=ReadinessOut)
@@ -357,6 +364,11 @@ async def speaking_level(user: dict = Depends(current_user)) -> dict:
 @router.get("/api/academy/speaking/journey", response_model=SpeakingJourneyOut)
 async def speaking_journey(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_speaking_journey(user["id"])
+
+
+@router.get("/api/academy/speaking/endurance", response_model=ConversationEnduranceOut)
+async def speaking_endurance(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_speaking_endurance(user["id"])
 
 
 @router.get("/api/academy/writing/diagnostic", response_model=WritingDiagnostic)

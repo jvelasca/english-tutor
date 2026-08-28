@@ -1,4 +1,4 @@
-export type Route = "home" | "learn" | "course" | "progress" | "chat";
+export type Route = "home" | "learn" | "course" | "progress" | "chat" | "help";
 
 export interface RouteOption {
   id: Route;

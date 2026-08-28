@@ -404,7 +404,60 @@ def test_session_summary_counts_review_and_practice():
 
 
 def test_next_best_activity_returns_first_step_with_priority_and_reason():
+    profile = [
+        _entry(
+            "grammar",
+            score=0.6,
+            confidence=0.6,
+            evidence_count=4,
+            last_evidence="2026-01-01T00:00:00+00:00",
+            review_due=True,
+        )
+    ]
     steps = adaptive.session_plan(
+        profile,
+        level=load_level("a1"),
+        listening_weak=["gist"],
+        next_objective_id="a1-m01-u01-l01-o01",
+        budget_minutes=20,
+    )
+    best = adaptive.next_best_activity(steps, profile, NOW)
+    assert best is not None
+    assert best["kind"] == "review"
+    assert best["reason"] == "due_for_review"
+    assert best["skill"] == "grammar"
+    assert 0.0 <= best["priority"] <= 1.0
+    assert best["step_key"] == "review:grammar"
+    assert best["minutes"] > 0
+    assert best["why"].startswith(
+        "Your grammar accuracy is solid, but retention has dropped to 0% after 212 days"
+    )
+    assert best["signals"]["evidence_count"] == 4
+    assert best["signals"]["recency_days"] == 212.0
+
+
+def test_next_best_activity_empty_returns_none():
+    assert adaptive.next_best_activity([]) is None
+
+
+def test_next_best_activity_without_profile_falls_back_to_base():
+    steps = adaptive.session_plan(
+        [],
+        level=load_level("a1"),
+        next_objective_id="a1-m01-u01-l01-o01",
+        budget_minutes=10,
+    )
+    best = adaptive.next_best_activity(steps)
+    assert best is not None
+    # Sin perfil, las señales quedan vacías y la prioridad es solo la base.
+    assert best["signals"]["evidence_count"] == 0
+    assert best["signals"]["recency_days"] is None
+    assert 0.0 <= best["priority"] <= 1.0
+
+
+def test_priority_signals_exposes_explainable_values():
+    signals = adaptive.priority_signals(
+        {"kind": "review", "skill": "grammar"},
         [
             _entry(
                 "grammar",
@@ -412,26 +465,43 @@ def test_next_best_activity_returns_first_step_with_priority_and_reason():
                 confidence=0.6,
                 evidence_count=4,
                 last_evidence="2026-01-01T00:00:00+00:00",
-                review_due=True,
+                evidence_by_kind={"familiar": 2, "transfer": 1, "novel": 1},
             )
         ],
-        level=load_level("a1"),
-        listening_weak=["gist"],
-        next_objective_id="a1-m01-u01-l01-o01",
-        budget_minutes=20,
+        NOW,
     )
-    best = adaptive.next_best_activity(steps)
-    assert best is not None
-    assert best["kind"] == "review"
-    assert best["reason"] == "due_for_review"
-    assert best["skill"] == "grammar"
-    assert best["priority"] == 1.0
-    assert best["step_key"] == "review:grammar"
-    assert best["minutes"] > 0
+    assert signals["evidence_count"] == 4
+    assert signals["confidence"] == 0.6
+    assert signals["recency_days"] == 212.0
+    assert signals["retention"] < 0.1
+    assert signals["stability"] < 0.1
+    assert signals["transfer_count"] == 1
+    assert signals["novel_count"] == 1
 
 
-def test_next_best_activity_empty_returns_none():
-    assert adaptive.next_best_activity([]) is None
+def test_priority_score_review_beats_new_with_equal_signals():
+    signals = {"stability": 0.5, "confidence": 0.6, "evidence_count": 3}
+    review = adaptive.priority_score({"kind": "review"}, signals)
+    new = adaptive.priority_score({"kind": "new"}, signals)
+    assert review > new
+
+
+def test_explain_priority_covers_each_kind():
+    assert (
+        "connected speech"
+        in adaptive.explain_priority(
+            {"kind": "listening", "subskill": "connected_speech"}, {}
+        )
+    )
+    assert (
+        "weakest skill"
+        in adaptive.explain_priority({"kind": "weakness", "skill": "grammar"}, {})
+    )
+    assert "new material" in adaptive.explain_priority({"kind": "new"}, {})
+    assert (
+        "momentum"
+        in adaptive.explain_priority({"kind": "easy_wins", "skill": "speaking"}, {})
+    )
 
 
 def test_next_best_reason_maps_kinds():

@@ -7,7 +7,7 @@ import { SystemStatus } from "./SystemStatus";
  * ("● Ready"); al hacer clic se expande en un popover con el estado del sistema
  * (API / base de datos / Ollama / STT / TTS / versión / URL LAN).
  */
-export function StatusBar() {
+export function StatusBar({ onOpenHelp }: { onOpenHelp: () => void }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +47,7 @@ export function StatusBar() {
           <div className="status-popover__head">
             <strong>{t("status.systemStatus")}</strong>
           </div>
-          <SystemStatus />
+          <SystemStatus onOpenHelp={onOpenHelp} />
         </div>
       )}
     </footer>

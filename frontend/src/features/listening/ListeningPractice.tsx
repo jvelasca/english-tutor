@@ -44,6 +44,12 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
 
+// Etiqueta legible de una dimensión de resiliencia auditiva (Listening 2.0):
+// "clear_speech" → "listening.resilience.clear_speech" (clave i18n localizada).
+function resilienceLabel(dimension: string): string {
+  return `listening.resilience.${dimension}`;
+}
+
 function topicLabel(topic: string): string {
   return topic.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
@@ -643,6 +649,36 @@ export function ListeningPractice({
               <p className="text-sm text-foreground">
                 {diagnostic.recommendation}
               </p>
+
+              {diagnostic.resilience.dimensions.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("listening.resilience")}
+                  </p>
+                  <ul className="flex flex-wrap gap-2">
+                    {diagnostic.resilience.dimensions.map((r) => (
+                      <li key={r.dimension}>
+                        <Badge
+                          variant={
+                            r.dimension === diagnostic.resilience.main_weakness
+                              ? "default"
+                              : "outline"
+                          }
+                          className="gap-1.5"
+                        >
+                          {t(resilienceLabel(r.dimension))} ·{" "}
+                          {r.accuracy !== null ? `${r.accuracy}%` : "—"}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                  {diagnostic.resilience.recommendation && (
+                    <p className="text-sm text-muted-foreground">
+                      {diagnostic.resilience.recommendation}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <ul className="flex flex-col gap-1">
                 {diagnostic.subskills.map((s) => (

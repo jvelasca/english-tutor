@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import QRCode from "react-qr-code";
 import {
   getDependencies,
   getHealth,
   type DependencyStatus,
 } from "../api/health";
-import { getNetwork, type NetworkInfo } from "../api/network";
 import { useAudioCapabilities } from "../hooks/useAudioCapabilities";
 import { useI18n } from "../hooks/useI18n";
+import { ConnectDeviceCard } from "./ConnectDeviceCard";
+import { MicrophoneTest } from "./MicrophoneTest";
 
 type Dot = "ok" | "warn" | "off" | "unknown";
 
@@ -48,12 +48,15 @@ function Check({ ok }: { ok: boolean }) {
   );
 }
 
-export function SystemStatus() {
+export function SystemStatus({
+  onOpenHelp,
+}: {
+  onOpenHelp?: () => void;
+}) {
   const { t } = useI18n();
-  const capabilities = useAudioCapabilities();
+  const { capabilities } = useAudioCapabilities();
   const [deps, setDeps] = useState<DependencyStatus | null>(null);
   const [version, setVersion] = useState("");
-  const [network, setNetwork] = useState<NetworkInfo | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,12 +69,6 @@ export function SystemStatus() {
       } catch {
         if (cancelled) return;
         setDeps(null);
-      }
-      try {
-        const n = await getNetwork();
-        if (!cancelled) setNetwork(n);
-      } catch {
-        /* red no disponible */
       }
     }
     void refresh();
@@ -106,26 +103,17 @@ export function SystemStatus() {
             <span>{t("status.microphone")}</span>
           </li>
         </ul>
+        <div className="system-status__mic-test">
+          <MicrophoneTest />
+        </div>
       </div>
 
-      {network && (
-        <div className="system-status__section">
-          <p className="system-status__section-title">
-            {t("status.scanToConnect")}
-          </p>
-          <div className="system-status__qr">
-            <QRCode value={network.url} size={112} bgColor="transparent" />
-          </div>
-          <div className="system-status__urls">
-            <a href={network.url} target="_blank" rel="noreferrer">
-              {network.url}
-            </a>
-            <a href={network.local_url} target="_blank" rel="noreferrer">
-              {network.local_url}
-            </a>
-          </div>
-        </div>
-      )}
+      <div className="system-status__section">
+        <p className="system-status__section-title">
+          {t("status.scanToConnect")}
+        </p>
+        <ConnectDeviceCard onOpenHelp={onOpenHelp} />
+      </div>
 
       <div className="system-status__meta">
         {version && <span className="status-bar-muted">v{version}</span>}

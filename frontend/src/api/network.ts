@@ -7,6 +7,7 @@ export interface NetworkInfo {
   backend_port: string;
   url: string;
   local_url: string;
+  local_url_available?: boolean;
 }
 
 export function getNetwork(): Promise<NetworkInfo> {
