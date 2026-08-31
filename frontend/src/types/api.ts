@@ -189,6 +189,40 @@ export interface LearningProfile {
   recommendations: string[];
 }
 
+export type LexicalStatus = "mastered" | "known" | "learning" | "weak";
+
+export interface LexicalItem {
+  word: string;
+  lemma: string;
+  cefr: string;
+  kind: string;
+  source: string;
+  status: LexicalStatus;
+  recall: number;
+  next_review_days: number;
+  exposures: number;
+  appearances: number;
+}
+
+export interface CefrBucket {
+  cefr: string;
+  count: number;
+}
+
+export interface LexiconSummary {
+  total: number;
+  known: number;
+  learning: number;
+  weak: number;
+  mastered: number;
+  by_cefr: CefrBucket[];
+}
+
+export interface Lexicon {
+  summary: LexiconSummary;
+  items: LexicalItem[];
+}
+
 export type Bucket = "day" | "week" | "month";
 
 export type LearningEventType =
@@ -513,6 +547,19 @@ export interface ContentValidationReport {
   issues: ContentValidationIssue[];
   by_severity: Record<string, number>;
   ok: boolean;
+  // Métrica única de contenido validado (V2.2): banco + escenarios de speaking.
+  total_validated_learning_items?: number;
+  stats?: {
+    total_validated_learning_items: number;
+    listening: {
+      total: number;
+      corpus: number;
+      legacy_tts: number;
+      with_audio_id: number;
+    };
+    speaking_scenarios: number;
+    levels: string[];
+  };
 }
 
 // --- Speaking 3.0 (diagnóstico longitudinal por criterio de rúbrica) ---
@@ -877,7 +924,28 @@ export interface CourseUnit {
   total: number;
   progress: number;
   status: "done" | "current" | "locked";
+  // V2.2: Learning Objectives ("By the end of this unit..."), plantilla de 7
+  // secciones con huecos visibles y desglose de Mastery Gates.
+  objectives: string[];
+  sections: CourseUnitSection[];
+  gates: CourseGate[];
+  gate_mastered: boolean;
   lessons: CourseLesson[];
+}
+
+export interface CourseUnitSection {
+  section: string;
+  count: number;
+  needs_content: boolean;
+}
+
+export interface CourseGate {
+  section: string;
+  label: string;
+  value: number;
+  required: number;
+  met: boolean;
+  declared: boolean;
 }
 
 export interface CoursePosition {
@@ -1103,6 +1171,16 @@ export interface Readiness {
   band: string;
 }
 
+// Tríada Progress / Mastery / Readiness (V2.2)
+export interface Dashboard {
+  progress: number;
+  mastery: number;
+  readiness: {
+    overall: number;
+    band: string;
+  };
+}
+
 export interface Reassessment {
   skill: string;
   level: string;
@@ -1194,6 +1272,7 @@ export interface NextBestActivity {
 export interface CefrDimension {
   id: string;
   label: string;
+  state?: "mastered" | "in_progress" | "not_started";
 }
 
 export interface CefrBand {

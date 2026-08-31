@@ -452,6 +452,37 @@ def init_db() -> None:
                 "WHERE appearances > 0 AND production_days = 0"
             )
 
+        # Migración idempotente (V2.3): contexto curricular del ítem léxico.
+        # Convierte la palabra en un ítem de primer nivel sembrado desde el
+        # currículo (`objective.vocabulary` + `objective.concepts`). Estas
+        # columnas solo añaden contexto; no afectan a las métricas de
+        # producción/input (`appearances`/`exposures`).
+        if "cefr" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN cefr TEXT NOT NULL DEFAULT ''"
+            )
+        if "level_id" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN level_id TEXT NOT NULL DEFAULT ''"
+            )
+        if "objective_id" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN objective_id TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "source" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN source TEXT NOT NULL DEFAULT 'user'"
+            )
+        if "lemma" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN lemma TEXT NOT NULL DEFAULT ''"
+            )
+        if "kind" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN kind TEXT NOT NULL DEFAULT 'word'"
+            )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {

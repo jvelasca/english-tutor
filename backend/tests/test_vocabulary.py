@@ -221,3 +221,41 @@ def test_vocabulary_p3_columns_migration(monkeypatch, tmp_path):
     assert {"exposures", "last_exposed_at", "production_days"} <= cols
     assert row[0] == 1  # appearances
     assert row[1] == 1  # production_days (backfill de producciones previas)
+
+
+def test_lexicon_endpoint_shape(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.seed_curriculum_items(
+        a,
+        [
+            {"word": "name", "lemma": "name", "cefr": "A1", "level_id": "a1",
+             "objective_id": "o1", "kind": "word"},
+            {"word": "i am", "lemma": "i am", "cefr": "A1", "level_id": "a1",
+             "objective_id": "o1", "kind": "structure"},
+        ],
+    )
+    vocabulary_repo.record_exposures(a, ["name"])
+    vocabulary_repo.record_words(a, ["name"])
+    with TestClient(app) as client:
+        got = client.get("/api/vocabulary/lexicon", params={"user_id": a})
+    assert got.status_code == 200
+    body = got.json()
+    assert body["summary"]["total"] == 2
+    items = {i["word"]: i for i in body["items"]}
+    assert set(items) == {"name", "i am"}
+    assert items["name"]["cefr"] == "A1"
+    assert items["name"]["source"] == "curriculum"
+    assert items["name"]["kind"] == "word"
+    assert items["i am"]["kind"] == "structure"
+    assert items["name"]["status"] in {"mastered", "known", "learning", "weak"}
+    assert 0 <= items["name"]["recall"] <= 1
+    assert isinstance(items["name"]["next_review_days"], int)
+
+
+def test_lexicon_endpoint_404(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        resp = client.get(
+            "/api/vocabulary/lexicon", params={"user_id": "no-existe"}
+        )
+        assert resp.status_code == 404

@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v2.1.0**.
+- Última versión estable: **v2.3.0**.
 
 ## Estructura
 
@@ -53,6 +53,13 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   desglose de **Interaction Quality** (initiation, response, follow-up, repair, turn-taking) y
   **Conversation Endurance** (cuánto puede sostener una conversación el alumno), visibles en el
   diagnóstico de speaking.
+- **Academy / Course Engine (V2.2)**: curso CEFR completo (`Course → Unit → Lesson → Objective`)
+  con Mastery Gates por unidad, contrato CEFR conectado al dominio, tríada
+  Progress/Mastery/Readiness y pantalla **Learning Journey** (escalera Pre-A1→C2).
+- **Personal Dictionary (V2.3)**: diccionario personal por ítem léxico (palabra/estructura)
+  sembrado automáticamente desde el currículo, con estado determinista
+  (`known`/`learning`/`weak`/`mastered`), `recall` por ítem (curva de olvido), distribución CEFR
+  y señal "reconoce pero no produce" para practicar hablando.
 
 ## Arranque rápido
 

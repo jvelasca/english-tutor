@@ -688,6 +688,11 @@ function AuditDashboard({
   if (!report) return null;
 
   const severityCounts = Object.entries(report.by_severity);
+  const validatedItems =
+    report.total_validated_learning_items ??
+    report.stats?.total_validated_learning_items;
+  const listeningCorpus = report.stats?.listening.total;
+  const speakingScenarios = report.stats?.speaking_scenarios;
 
   return (
     <div className="flex flex-col gap-3">
@@ -721,6 +726,46 @@ function AuditDashboard({
           </div>
         </CardContent>
       </Card>
+
+      {validatedItems != null && (
+        <Card className="gap-3">
+          <CardHeader className="px-4 pt-4">
+            <CardTitle className="text-sm">
+              {t("audio.audit.validatedItems")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-3 gap-3 px-4 pb-4 text-center">
+            <div>
+              <div className="text-lg font-semibold tabular-nums">
+                {validatedItems}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {t("audio.audit.validatedItems")}
+              </div>
+            </div>
+            {listeningCorpus != null && (
+              <div>
+                <div className="text-lg font-semibold tabular-nums">
+                  {listeningCorpus}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t("audio.audit.listeningCorpus")}
+                </div>
+              </div>
+            )}
+            {speakingScenarios != null && (
+              <div>
+                <div className="text-lg font-semibold tabular-nums">
+                  {speakingScenarios}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t("audio.audit.speakingScenarios")}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="gap-3">
         <CardHeader className="px-4 pt-4">

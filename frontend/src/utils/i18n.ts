@@ -17,6 +17,8 @@ const STRINGS: Record<string, Entry> = {
   "nav.learn": { en: "Learn", es: "Aprender" },
   "nav.course": { en: "Course", es: "Curso" },
   "nav.progress": { en: "Progress", es: "Progreso" },
+  "nav.journey": { en: "Journey", es: "Trayecto" },
+  "nav.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
   "nav.chat": { en: "Chat", es: "Chat" },
 
   // Destrezas
@@ -106,6 +108,17 @@ const STRINGS: Record<string, Entry> = {
   "readiness.approaching": { en: "Approaching", es: "Cerca" },
   "readiness.developing": { en: "Developing", es: "En desarrollo" },
 
+  // Tríada Progress / Mastery / Readiness (V2.2)
+  "triad.progress": { en: "Progress", es: "Progreso" },
+  "triad.mastery": { en: "Mastery", es: "Dominio" },
+  "triad.readiness": { en: "Readiness", es: "Preparación" },
+  "triad.progressHint": { en: "course coverage", es: "cobertura del curso" },
+  "triad.masteryHint": {
+    en: "of practiced skills",
+    es: "de destrezas practicadas",
+  },
+  "triad.readinessHint": { en: "to next level", es: "hacia el siguiente nivel" },
+
   // Course
   "course.title": { en: "Your English journey", es: "Tu viaje en inglés" },
   "course.subtitle": { en: "CEFR curriculum", es: "Currículum CEFR" },
@@ -128,6 +141,80 @@ const STRINGS: Record<string, Entry> = {
   "course.lesson": { en: "Lesson", es: "Lección" },
   "course.currentLesson": { en: "Current lesson", es: "Lección actual" },
   "course.review": { en: "Review", es: "Repasar" },
+  "course.byTheEnd": {
+    en: "By the end of this unit you will be able to…",
+    es: "Al terminar esta unidad serás capaz de…",
+  },
+  "course.sections": { en: "Unit sections", es: "Secciones de la unidad" },
+  "course.needsContent": { en: "needs content", es: "sin contenido" },
+  "course.unitMastered": { en: "Unit mastered", es: "Unidad dominada" },
+  "course.masteryGate": { en: "Mastery gate", es: "Puerta de dominio" },
+  "course.gates": { en: "gates met", es: "requisitos cumplidos" },
+  "section.interaction": { en: "Interaction", es: "Interacción" },
+  "section.review": { en: "Review", es: "Repaso" },
+  "section.assessment": { en: "Assessment", es: "Evaluación" },
+
+  // Learning Journey (V2.2)
+  "journey.title": { en: "Learning Journey", es: "Trayecto de aprendizaje" },
+  "journey.subtitle": {
+    en: "Your path through the CEFR levels",
+    es: "Tu recorrido por los niveles CEFR",
+  },
+  "journey.you": { en: "You", es: "Tú" },
+  "journey.currentLevel": { en: "Current level", es: "Nivel actual" },
+  "journey.unitsMastered": { en: "Units mastered", es: "Unidades dominadas" },
+  "journey.skillsReady": { en: "Skills ready", es: "Destrezas listas" },
+  "journey.retention": { en: "Retention", es: "Retención" },
+  "journey.nextMilestone": { en: "Next milestone", es: "Próximo hito" },
+  "journey.nextMilestoneHint": {
+    en: "What you reach next",
+    es: "Lo que alcanzas después",
+  },
+  "journey.dimensions": {
+    en: "Communicative dimensions",
+    es: "Dimensiones comunicativas",
+  },
+  "journey.empty": {
+    en: "Complete a few activities to start your journey.",
+    es: "Completa algunas actividades para iniciar tu trayecto.",
+  },
+
+  // Diccionario personal (V2.3)
+  "dictionary.title": { en: "Personal dictionary", es: "Diccionario personal" },
+  "dictionary.subtitle": {
+    en: "Your words and structures, item by item.",
+    es: "Tus palabras y estructuras, ítem a ítem.",
+  },
+  "dictionary.total": { en: "items", es: "ítems" },
+  "dictionary.known": { en: "Known", es: "Reconocidas" },
+  "dictionary.learning": { en: "Learning", es: "Aprendiendo" },
+  "dictionary.weak": { en: "Weak", es: "Débiles" },
+  "dictionary.mastered": { en: "Mastered", es: "Dominadas" },
+  "dictionary.byCefr": { en: "Vocabulary by CEFR", es: "Vocabulario por CEFR" },
+  "dictionary.items": { en: "Lexical items", es: "Ítems léxicos" },
+  "dictionary.recall": { en: "Recall", es: "Recuerdo" },
+  "dictionary.nextReviewIn": {
+    en: "Review in {days}d",
+    es: "Repasar en {days}d",
+  },
+  "dictionary.status.mastered": { en: "Mastered", es: "Dominada" },
+  "dictionary.status.known": { en: "Known", es: "Reconocida" },
+  "dictionary.status.learning": { en: "Learning", es: "Aprendiendo" },
+  "dictionary.status.weak": { en: "Weak", es: "Débil" },
+  "dictionary.kind.word": { en: "word", es: "palabra" },
+  "dictionary.kind.structure": { en: "structure", es: "estructura" },
+  "dictionary.recognizedNotProduced": {
+    en: "Recognized but not produced",
+    es: "Reconocidas pero no producidas",
+  },
+  "dictionary.recognizedNotProducedHint": {
+    en: "Words you understand when reading but haven't produced yet — great speaking-drill candidates.",
+    es: "Palabras que entiendes al leer pero aún no produces — candidatas a practicar hablando.",
+  },
+  "dictionary.empty": {
+    en: "No words yet. Complete course objectives to grow your dictionary.",
+    es: "Aún no hay palabras. Completa objetivos del curso para hacer crecer tu diccionario.",
+  },
 
   // Settings
   "settings.title": { en: "Settings", es: "Ajustes" },
@@ -252,6 +339,18 @@ const STRINGS: Record<string, Entry> = {
   "audio.audit.recorded": { en: "Recorded", es: "Grabados" },
   "audio.audit.tts": { en: "Synthetic (TTS)", es: "Sintéticos (TTS)" },
   "audio.audit.bySeverity": { en: "Issues by severity", es: "Problemas por severidad" },
+  "audio.audit.validatedItems": {
+    en: "Total validated learning items",
+    es: "Ítems de aprendizaje validados",
+  },
+  "audio.audit.listeningCorpus": {
+    en: "Listening corpus",
+    es: "Corpus de listening",
+  },
+  "audio.audit.speakingScenarios": {
+    en: "Speaking scenarios",
+    es: "Escenarios de speaking",
+  },
   "audio.audit.empty": { en: "No issues.", es: "Sin problemas." },
   "audio.audit.error": {
     en: "Could not load the audit. Check the admin PIN.",

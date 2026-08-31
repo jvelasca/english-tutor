@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from starlette.concurrency import run_in_threadpool
 
 from config import DEFAULT_MODEL
+from domain import vocabulary as vocabulary_domain
 from domain.errors import EvidenceInvariantError
 from repositories import academy as academy_repo
 from repositories import conversations as conversations_repo
@@ -17,6 +18,7 @@ from schemas.academy import (
     AttemptOut,
     CefrProfileOut,
     CourseMapOut,
+    DashboardOut,
     EnrollmentOut,
     ExamItemOut,
     ExamOut,
@@ -337,7 +339,10 @@ async def get_level_detail(level_id: str, user_id: str) -> LevelDetailOut | None
 
 
 async def get_course_map(level_id: str, user_id: str) -> CourseMapOut | None:
-    """Mapa del curso (V1.38): secuencia Course→Unit→Lesson + posición actual."""
+    """Mapa del curso (V1.38): secuencia Course→Unit→Lesson + posición actual.
+
+    Inyecta el perfil anotado para que cada unidad exponga sus 7 secciones,
+    Learning Objectives y Mastery Gates (V2.2)."""
     lv = _levels_by_id.get(level_id)
     if lv is None:
         return None
@@ -349,7 +354,10 @@ async def get_course_map(level_id: str, user_id: str) -> CourseMapOut | None:
     mastered = academy_svc.mastered_objective_ids(
         lv, objective_scores, objective_attempts
     )
-    return CourseMapOut(**course_svc.course_map(lv, mastered, attempts))
+    profile = await _annotated_profile(user_id, lv)
+    return CourseMapOut(
+        **course_svc.course_map(lv, mastered, attempts, profile=profile)
+    )
 
 
 async def _completed_level_ids(user_id: str) -> set[str]:
@@ -581,16 +589,26 @@ async def get_cefr_ladder(user_id: str) -> dict:
     Devuelve el marco de descriptores (Pre-A1 → C2, incluyendo las bandas "plus")
     con las 9 dimensiones comunicativas y sitúa al alumno en la escalera continua:
     `estimated_band`/`estimated_numeric` derivan del Student Model y `is_current`
-    marca la banda correspondiente en `bands`. No certifica CEFR: es una referencia
-    interna alineada al marco.
+    marca la banda correspondiente en `bands`. Cada dimensión expone su `state`
+    (V2.2) frente al dominio real del alumno: `mastered`/`in_progress`/
+    `not_started` (✓/●/○), conectando el descriptor estático al Student Model.
+    No certifica CEFR: es una referencia interna alineada al marco.
     """
     fw = cefr_descriptors.load_framework()
     sm = await build_student_model(user_id)
     numeric = float(sm["estimated_numeric"])
     estimated_band = cefr_descriptors.band_for_numeric(numeric)
     dims = cefr_descriptors.dimensions()
+    mastery = [m.model_dump() for m in sm["mastery"]]
     return {
-        "dimensions": [{"id": d, "label": label} for d, label in dims.items()],
+        "dimensions": [
+            {
+                "id": d,
+                "label": label,
+                "state": adaptive.dimension_state(mastery, d),
+            }
+            for d, label in dims.items()
+        ],
         "bands": [
             {
                 "id": b.id,
@@ -614,6 +632,29 @@ async def get_readiness(user_id: str, target_level: str) -> ReadinessOut:
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
     skills = await _annotated_profile(user_id, lv)
     return ReadinessOut(**adaptive.readiness(skills, target_level))
+
+
+async def get_dashboard(user_id: str) -> DashboardOut:
+    """Tríada Progress / Mastery / Readiness (V2.2) en una única fuente.
+
+    Reutiliza el Student Model (mastery + readiness) y el progreso objetivo del
+    nivel para que Home/Progress/Course muestren las mismas cifras.
+    """
+    sm = await build_student_model(user_id)
+    lv = _levels_by_id.get(sm["level_id"]) or _levels_by_id["a1"]
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    objs = lv.objectives()
+    progress = round(len(mastered) / len(objs), 3) if objs else 0.0
+    mastery = [m.model_dump() for m in sm["mastery"]]
+    return DashboardOut(
+        **adaptive.student_dashboard(progress, mastery, sm["readiness"])
+    )
 
 
 async def get_speaking_diagnostic(user_id: str) -> dict:
@@ -1171,7 +1212,10 @@ async def record_lesson_completed(
 ) -> LessonCompletedOut | None:
     """Registra que el alumno terminó una lección (sin declarar acierto)."""
     lv = _levels_by_id.get(level_id)
-    if lv is None or get_objective(lv, objective_id) is None:
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
@@ -1180,6 +1224,9 @@ async def record_lesson_completed(
     )
     if not ok:
         return None
+    # V2.3: sembrar el léxico del objetivo (vocabulario + estructuras) para que
+    # el diccionario personal se pueble automáticamente al avanzar.
+    await vocabulary_domain.seed_objective_vocabulary(user_id, lv, obj)
     return LessonCompletedOut(
         level_id=level_id, objective_id=objective_id, recorded=True
     )
@@ -1233,6 +1280,8 @@ async def submit_objective_assessment(
             state,
         )
         mastery_updates[skill] = state["score"]
+    # V2.3: sembrar el léxico del objetivo tras validar la evidencia de dominio.
+    await vocabulary_domain.seed_objective_vocabulary(user_id, lv, obj)
     return ObjectiveAssessmentOut(
         level_id=level_id,
         objective_id=objective_id,

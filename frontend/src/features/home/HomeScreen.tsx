@@ -13,6 +13,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { NextBestCard } from "../../components/NextBestCard";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
+import { TriadCard } from "../../components/TriadCard";
 import { Card } from "../../components/ui/card";
 import { cn } from "../../lib/utils";
 
@@ -132,6 +133,10 @@ export function HomeScreen({
           </h1>
           <p className="mt-1 text-muted-foreground">{t("home.subtitle")}</p>
         </motion.header>
+
+        <motion.section variants={item}>
+          <TriadCard userId={userId} refreshKey={refreshKey} />
+        </motion.section>
 
         <motion.section variants={item} aria-label={t("home.yourProgress")}>
           <Card className="gap-5 p-5">

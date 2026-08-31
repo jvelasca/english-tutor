@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
-import { ArrowRight, Check, Lock } from "lucide-react";
+import { ArrowRight, Check, Circle, CircleDot, Lock } from "lucide-react";
 import {
   getCefrLadder,
   getCourseMap,
@@ -25,6 +25,7 @@ import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
+import { TriadCard } from "../../components/TriadCard";
 import { cn } from "../../lib/utils";
 
 const JOURNEY_LEVELS = ["a1", "a2", "b1", "b2"];
@@ -58,6 +59,25 @@ function levelState(lv: LevelSummary): "done" | "current" | "locked" {
   if (lv.progress >= 1) return "done";
   if (lv.available && lv.unlocked) return "current";
   return "locked";
+}
+
+type CefrState = "mastered" | "in_progress" | "not_started";
+
+function DimensionStateIcon({ state }: { state: CefrState }) {
+  if (state === "mastered") {
+    return <Check className="size-4 shrink-0 text-success" />;
+  }
+  if (state === "in_progress") {
+    return <CircleDot className="size-4 shrink-0 text-amber-500" />;
+  }
+  return <Circle className="size-4 shrink-0 text-muted-foreground" />;
+}
+
+function sectionLabel(t: (k: string) => string, section: string): string {
+  if (["vocabulary", "grammar", "listening", "speaking"].includes(section)) {
+    return t(`skill.${section}`);
+  }
+  return t(`section.${section}`);
 }
 
 export function CourseScreen({
@@ -147,6 +167,13 @@ export function CourseScreen({
     Math.min(100, Math.round(readiness?.overall ?? 0)),
   );
 
+  const currentUnit =
+    course?.units.find((u) => u.status === "current") ??
+    course?.units.find((u) => u.status !== "locked") ??
+    null;
+  const gatesMet = currentUnit?.gates.filter((g) => g.met).length ?? 0;
+  const gatesTotal = currentUnit?.gates.length ?? 0;
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <motion.div
@@ -163,6 +190,10 @@ export function CourseScreen({
             {t("course.subtitle")} · A1 → B2
           </p>
         </motion.header>
+
+        <motion.section variants={item} aria-label={t("triad.progress")}>
+          <TriadCard userId={userId} />
+        </motion.section>
 
         <motion.section variants={item} aria-label={t("course.title")}>
           <Card className="gap-4 p-5">
@@ -277,24 +308,37 @@ export function CourseScreen({
                   </p>
                 </div>
                 <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                  {ladder.dimensions.map((dim) => (
-                    <div key={dim.id} className="flex flex-col gap-1.5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {dim.label}
-                      </p>
-                      <ul className="flex flex-col gap-1.5">
-                        {(band.can_do[dim.id] ?? []).map((statement, j) => (
-                          <li
-                            key={j}
-                            className="flex items-start gap-2 text-sm text-foreground/90"
-                          >
-                            <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                            <span>{statement}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                  {ladder.dimensions.map((dim) => {
+                    const state = dim.state ?? "not_started";
+                    return (
+                      <div key={dim.id} className="flex flex-col gap-1.5">
+                        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <DimensionStateIcon state={state} />
+                          {dim.label}
+                        </p>
+                        <ul className="flex flex-col gap-1.5">
+                          {(band.can_do[dim.id] ?? []).map((statement, j) => (
+                            <li
+                              key={j}
+                              className="flex items-start gap-2 text-sm text-foreground/90"
+                            >
+                              <span
+                                className={cn(
+                                  "mt-2 size-1.5 shrink-0 rounded-full",
+                                  state === "mastered"
+                                    ? "bg-success"
+                                    : state === "in_progress"
+                                      ? "bg-amber-500"
+                                      : "bg-muted-foreground/40",
+                                )}
+                              />
+                              <span>{statement}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
             </motion.section>
@@ -415,6 +459,113 @@ export function CourseScreen({
                     {course.position.lesson_title}
                   </span>
                 </p>
+              )}
+            </Card>
+          </motion.section>
+        )}
+
+        {currentUnit && (
+          <motion.section variants={item} aria-label={t("course.unit")}>
+            <Card className="gap-4 p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-base font-semibold">
+                  {t("course.unit")} {currentUnit.unit_order} ·{" "}
+                  {currentUnit.unit_title}
+                </h2>
+                <Badge
+                  variant={currentUnit.gate_mastered ? "default" : "secondary"}
+                >
+                  {currentUnit.gate_mastered
+                    ? t("course.unitMastered")
+                    : `${gatesMet}/${gatesTotal} ${t("course.gates")}`}
+                </Badge>
+              </div>
+
+              {currentUnit.objectives.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("course.byTheEnd")}
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
+                    {currentUnit.objectives.map((o, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <ArrowRight className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <span>{o}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("course.sections")}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {currentUnit.sections.map((s) => (
+                    <div
+                      key={s.section}
+                      className={cn(
+                        "flex flex-col gap-0.5 rounded-lg border px-2.5 py-2 text-xs",
+                        s.needs_content
+                          ? "border-dashed border-border text-muted-foreground"
+                          : "border-border bg-card",
+                      )}
+                    >
+                      <span className="font-medium">
+                        {sectionLabel(t, s.section)}
+                      </span>
+                      <span className="tabular-nums">
+                        {s.count}
+                        {s.needs_content ? ` · ${t("course.needsContent")}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {currentUnit.gates.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("course.masteryGate")}
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
+                    {currentUnit.gates.map((g) => {
+                      const gateValue =
+                        g.section === "transfer"
+                          ? `${g.value}/${g.required}`
+                          : g.section === "retention"
+                            ? g.met
+                              ? "PASS"
+                              : "DUE"
+                            : `${Math.round(g.value * 100)}% / ${Math.round(g.required * 100)}%`;
+                      return (
+                        <li
+                          key={g.section}
+                          className="flex items-center justify-between gap-2 text-sm"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            {g.met ? (
+                              <Check className="size-4 text-success" />
+                            ) : g.declared ? (
+                              <CircleDot className="size-4 text-amber-500" />
+                            ) : (
+                              <Circle className="size-4 text-muted-foreground/50" />
+                            )}
+                            <span
+                              className={g.declared ? "" : "text-muted-foreground"}
+                            >
+                              {g.label}
+                            </span>
+                          </span>
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {g.declared ? gateValue : "—"}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               )}
             </Card>
           </motion.section>

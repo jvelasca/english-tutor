@@ -225,6 +225,86 @@ def readiness(profile: list[dict], target_level: str) -> dict:
     }
 
 
+# --- Contrato CEFR conectado al dominio (V2.2) -----------------------------
+
+# Dimensiones comunicativas CEFR → destreza canónica del Student Model. Las
+# dimensiones `interaction`/`mediation` no tienen una destreza canónica propia:
+# se resuelven por nombre (el Mastery Engine ya las registra como destrezas).
+CEFR_DIMENSION_SKILLS: dict[str, str] = {
+    "listening": "listening",
+    "speaking": "speaking",
+    "reading": "reading",
+    "writing": "writing",
+    "grammar": "grammar",
+    "vocabulary": "vocabulary",
+    "pronunciation": "pronunciation",
+    "interaction": "interaction",
+    "mediation": "mediation",
+}
+
+# Umbral de score y mínimo de evidencias para marcar una dimensión `mastered`.
+DIMENSION_MASTERED_MIN = 0.7
+DIMENSION_MASTERED_EVIDENCE = 3
+
+
+def dimension_state(mastery: list[dict], dimension: str) -> str:
+    """Estado de una dimensión CEFR frente al dominio real del alumno (V2.2).
+
+    Devuelve uno de `mastered` / `in_progress` / `not_started` para la escalera
+    "WHAT CAN I DO?" a partir del `MasteryRecord` de la destreza correspondiente
+    (✓/●/○). `mastery` es una lista de dicts `{skill, score, evidence_count, ...}`.
+    """
+    skill = CEFR_DIMENSION_SKILLS.get(dimension, dimension)
+    record = next((m for m in mastery if m.get("skill") == skill), None)
+    if record is None or int(record.get("evidence_count", 0)) == 0:
+        return "not_started"
+    if (
+        float(record.get("score", 0.0)) >= DIMENSION_MASTERED_MIN
+        and int(record.get("evidence_count", 0)) >= DIMENSION_MASTERED_EVIDENCE
+    ):
+        return "mastered"
+    return "in_progress"
+
+
+# --- Tríada Progress / Mastery / Readiness (V2.2) --------------------------
+
+def mastery_percent(mastery: list[dict]) -> float:
+    """Dominio agregado (0..100) sobre las destrezas con evidencia.
+
+    Media del `score` de los `MasteryRecord` con al menos una evidencia; 0.0 si
+    no hay ninguna. Es el "Mastery" de la tríada, distinto de `progress`
+    (cobertura del curso) y de `readiness` (preparación para subir de nivel).
+    """
+    scored = [
+        float(m["score"])
+        for m in mastery
+        if int(m.get("evidence_count", 0)) > 0
+    ]
+    if not scored:
+        return 0.0
+    return round(sum(scored) / len(scored) * 100, 1)
+
+
+def student_dashboard(
+    progress: float | None, mastery: list[dict], readiness: dict
+) -> dict:
+    """Tríada Progress / Mastery / Readiness (V2.2) explícita y consistente.
+
+    Devuelve tres números que Home/Progress/Course reutilizan:
+    - `progress`: cobertura del nivel (0..100), ya en `course_map.progress`.
+    - `mastery`: dominio ponderado sobre destrezas con evidencia (0..100).
+    - `readiness`: banda + % de preparación para el siguiente nivel.
+    """
+    return {
+        "progress": round((progress or 0.0) * 100, 1),
+        "mastery": mastery_percent(mastery),
+        "readiness": {
+            "overall": readiness.get("overall", 0.0),
+            "band": readiness.get("band", "developing"),
+        },
+    }
+
+
 # --- Reevaluación continua -------------------------------------------------
 
 # Mínimo total de evidencias antes de considerar una reevaluación.

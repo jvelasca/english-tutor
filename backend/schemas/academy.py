@@ -151,6 +151,12 @@ class CourseUnitOut(BaseModel):
     total: int
     progress: float
     status: str
+    # V2.2: Learning Objectives ("By the end of this unit..."), plantilla de 7
+    # secciones con huecos visibles y desglose de Mastery Gates.
+    objectives: list[str] = Field(default_factory=list)
+    sections: list[dict] = Field(default_factory=list)
+    gates: list[dict] = Field(default_factory=list)
+    gate_mastered: bool = False
     lessons: list[CourseLessonOut]
 
 
@@ -675,6 +681,24 @@ class ReadinessOut(BaseModel):
     band: str = "developing"
 
 
+class DashboardReadinessOut(BaseModel):
+    overall: float
+    band: str = "developing"
+
+
+class DashboardOut(BaseModel):
+    """Tríada Progress / Mastery / Readiness (V2.2).
+
+    Tres métricas explícitas y consistentes reutilizadas por Home/Progress/Course:
+    `progress` (cobertura del nivel), `mastery` (dominio sobre destrezas con
+    evidencia) y `readiness` (preparación para el siguiente nivel).
+    """
+
+    progress: float
+    mastery: float
+    readiness: DashboardReadinessOut
+
+
 class ReassessmentOut(BaseModel):
     skill: str
     level: str
@@ -789,14 +813,27 @@ class CefrBandOut(BaseModel):
     is_current: bool = False
 
 
+class CefrDimensionOut(BaseModel):
+    """Dimensión comunicativa CEFR con su estado frente al dominio del alumno.
+
+    `state` ∈ `mastered` / `in_progress` / `not_started` (✓/●/○), conectando el
+    descriptor estático "Can-Do" al Student Model (contrato CEFR V2.2).
+    """
+
+    id: str
+    label: str
+    state: str = "not_started"
+
+
 class CefrLadderOut(BaseModel):
     """Escalera CEFR completa (Pre-A1 → C2) con descriptores por dimensión.
 
     `estimated_band`/`estimated_numeric` sitúan al alumno en la escalera continua,
-    y `is_current` marca la banda correspondiente en `bands`.
+    y `is_current` marca la banda correspondiente en `bands`. Cada `dimension`
+    expone su `state` real (contrato CEFR conectado al dominio).
     """
 
-    dimensions: list[dict]
+    dimensions: list[CefrDimensionOut]
     bands: list[CefrBandOut]
     estimated_band: str | None = None
     estimated_numeric: float | None = None

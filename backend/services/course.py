@@ -24,6 +24,34 @@ UNIT_DONE = "done"
 UNIT_CURRENT = "current"
 UNIT_LOCKED = "locked"
 
+# Plantilla fija de unidad (V2.2): 7 secciones canónicas del curso. Cada unidad
+# expone las 7 con su conteo; las vacías se marcan `needs_content` para que el
+# hueco pedagógico sea visible (y alimente el Quality Gate en V2.3).
+UNIT_SECTIONS: tuple[str, ...] = (
+    "vocabulary",
+    "grammar",
+    "listening",
+    "speaking",
+    "interaction",
+    "review",
+    "assessment",
+)
+
+# Sub-destrezas que cuentan como práctica de interacción (turnos/diálogo).
+_INTERACTION_SUBSKILLS: tuple[str, ...] = ("interaction", "turn_taking", "repair")
+
+# Umbrales compuestos de dominio por sección (Mastery Gates V2.2). Solo se exige
+# una destreza si la unidad la declara (tiene contenido en esa sección).
+UNIT_GATE_THRESHOLDS: dict[str, float] = {
+    "vocabulary": 0.80,
+    "grammar": 0.80,
+    "listening": 0.75,
+    "speaking": 0.70,
+}
+
+# Mínimo de evidencias transfer/novel para considerar dominio generalizado.
+UNIT_GATE_TRANSFER_MIN = 1
+
 
 def gate_objective_ids(level: Level) -> set[str]:
     """Objetivos que gatean la progresión: tienen checks evaluables.
@@ -77,15 +105,146 @@ def _first_non_mastered(
     return None, None
 
 
+def _unit_objectives(unit) -> list:
+    """Objetivos de una unidad en orden de aparición (aplanando lecciones)."""
+    return [o for les in unit.lessons for o in les.objectives]
+
+
+def _unit_module(level: Level, unit) -> object | None:
+    """Módulo que contiene a la unidad, o None."""
+    for mod in level.modules:
+        if any(u.id == unit.id for u in mod.units):
+            return mod
+    return None
+
+
+def unit_objectives(unit) -> list[str]:
+    """Learning Objectives de unidad (V2.2).
+
+    Agrega los `can_do` de los objetivos de la unidad para presentar
+    "By the end of this unit you will be able to...". Es la misma fuente que
+    alimenta el contrato CEFR (sin duplicar contenido).
+    """
+    return [o.can_do for o in _unit_objectives(unit)]
+
+
+def unit_sections(level: Level, unit) -> list[dict]:
+    """Plantilla fija de 7 secciones (V2.2) con conteo y huecos visibles.
+
+    Agrupa el contenido del JSON en las secciones canónicas:
+    - `vocabulary`/`grammar`/`listening`/`speaking` derivan de los objetivos
+      (destrezas declaradas + checks deterministas por destreza).
+    - `interaction` deriva de las sub-destrezas de turnos/diálogo.
+    - `review`/`assessment` derivan del módulo `Final` (repaso y evaluación).
+
+    Cada sección devuelve `count` (ítems) y `needs_content` (count == 0), para
+    que el hueco pedagógico sea visible en la UI y alimente el Quality Gate.
+    """
+    objs = _unit_objectives(unit)
+    checks = [c for o in objs for c in o.checks]
+    mod = _unit_module(level, unit)
+    is_final = bool(mod) and "final" in (mod.title or "").lower()
+
+    def objectives_with(skill: str) -> int:
+        return sum(1 for o in objs if skill in o.skills)
+
+    def checks_with(skill: str) -> int:
+        return sum(1 for c in checks if c.skill == skill)
+
+    counts: dict[str, int] = {}
+    for section in ("vocabulary", "grammar", "listening", "speaking"):
+        counts[section] = objectives_with(section) + checks_with(section)
+    counts["interaction"] = sum(
+        1 for o in objs if any(s in _INTERACTION_SUBSKILLS for s in o.subskills)
+    )
+    counts["review"] = len(objs) if is_final else 0
+    counts["assessment"] = len(checks) if is_final else 0
+
+    return [
+        {"section": section, "count": counts[section],
+         "needs_content": counts[section] == 0}
+        for section in UNIT_SECTIONS
+    ]
+
+
+def unit_gates(level: Level, unit, profile: list[dict]) -> dict:
+    """Mastery Gates de una unidad (V2.2): umbrales compuestos → UNIT MASTERED.
+
+    Evalúa las 4 destrezas macro que la unidad entrena (umbral por sección, solo
+    si la unidad declara contenido en esa sección) más dos condiciones
+    transversales: retención (sin repaso vencido) y transferencia (al menos una
+    evidencia transfer/novel). Devuelve `{mastered, gates}` con el desglose
+    `met`/`required`/`value` para que la UI muestre "qué falta para UNIT MASTERED".
+    """
+    sections = {s["section"]: s for s in unit_sections(level, unit)}
+    by_skill = {e.get("skill"): e for e in profile}
+
+    gates: list[dict] = []
+    for skill, required in UNIT_GATE_THRESHOLDS.items():
+        declared = sections.get(skill, {}).get("count", 0) > 0
+        entry = by_skill.get(skill)
+        value = round(float(entry.get("score", 0.0)), 3) if entry else 0.0
+        met = (not declared) or (value >= required)
+        gates.append({
+            "section": skill,
+            "label": f"{skill} >= {int(required * 100)}%",
+            "value": value,
+            "required": required,
+            "met": met,
+            "declared": declared,
+        })
+
+    # Destrezas efectivamente declaradas por la unidad (para retención/transfer).
+    unit_skills = [
+        s for s in UNIT_GATE_THRESHOLDS if sections.get(s, {}).get("count", 0) > 0
+    ]
+
+    due = [s for s in unit_skills if by_skill.get(s, {}).get("review_due")]
+    retention_met = not due
+    gates.append({
+        "section": "retention",
+        "label": "retention PASS",
+        "value": 1.0 if retention_met else 0.0,
+        "required": 1.0,
+        "met": retention_met,
+        "declared": bool(unit_skills),
+    })
+
+    def _transfer_count(skill: str) -> int:
+        entry = by_skill.get(skill)
+        if not entry:
+            return 0
+        kinds = entry.get("evidence_by_kind") or {}
+        return int(kinds.get("transfer", 0)) + int(kinds.get("novel", 0))
+
+    transfer_total = sum(_transfer_count(s) for s in unit_skills)
+    transfer_met = transfer_total >= UNIT_GATE_TRANSFER_MIN
+    gates.append({
+        "section": "transfer",
+        "label": "transfer PASS",
+        "value": transfer_total,
+        "required": UNIT_GATE_TRANSFER_MIN,
+        "met": transfer_met,
+        "declared": bool(unit_skills),
+    })
+
+    return {"mastered": all(g["met"] for g in gates), "gates": gates}
+
+
 def unit_sequence(
     level: Level,
     mastered_ids: set[str],
     attempts: dict[str, dict[str, int]] | None = None,
+    profile: list[dict] | None = None,
 ) -> list[dict]:
     """Unidades del nivel con sus lecciones anidadas, progreso y estado.
 
-    Cada unidad expone `status` (`done`/`current`/`locked`) y `progress` 0..1;
-    cada lección expone su progreso y el status de cada objetivo."""
+    Cada unidad expone `status` (`done`/`current`/`locked`), `progress` 0..1,
+    sus Learning Objectives (`objectives`), su plantilla de 7 secciones
+    (`sections`) y, si se inyecta `profile`, el desglose de Mastery Gates
+    (`gates`/`gate_mastered`). Cuando hay `profile`, una unidad solo queda
+    `done` si pasa el gate compuesto además de dominar todos sus objetivos.
+    """
     attempts = attempts or {}
     statuses = objective_gated_status(level, mastered_ids, attempts)
     current_id = _first_non_mastered(level, mastered_ids)[1]
@@ -128,9 +287,12 @@ def unit_sequence(
                 )
             u_mastered = sum(1 for oid in unit_obj_ids if oid in mastered_ids)
             u_total = len(unit_obj_ids)
-            if u_total and u_mastered == u_total:
+            obj_done = u_total > 0 and u_mastered == u_total
+            gates = unit_gates(level, unit, profile) if profile is not None else None
+            gate_mastered = gates["mastered"] if gates is not None else obj_done
+            if obj_done and gate_mastered:
                 u_status = UNIT_DONE
-            elif current_id in unit_obj_ids:
+            elif obj_done or current_id in unit_obj_ids:
                 u_status = UNIT_CURRENT
             else:
                 u_status = UNIT_LOCKED
@@ -146,6 +308,10 @@ def unit_sequence(
                     "total": u_total,
                     "progress": round(u_mastered / u_total, 3) if u_total else 0.0,
                     "status": u_status,
+                    "objectives": unit_objectives(unit),
+                    "sections": unit_sections(level, unit),
+                    "gates": gates["gates"] if gates is not None else [],
+                    "gate_mastered": gate_mastered,
                     "lessons": lessons,
                 }
             )
@@ -156,6 +322,7 @@ def current_position(
     level: Level,
     mastered_ids: set[str],
     attempts: dict[str, dict[str, int]] | None = None,
+    profile: list[dict] | None = None,
 ) -> dict:
     """Posición actual del alumno dentro del curso ("¿dónde estoy?").
 
@@ -163,7 +330,7 @@ def current_position(
     unidad y lección, más los índices y el progreso del nivel. Si el nivel está
     completo, `objective_id` es None y la posición es el final del curso."""
     attempts = attempts or {}
-    units = unit_sequence(level, mastered_ids, attempts)
+    units = unit_sequence(level, mastered_ids, attempts, profile)
     objs = level.objectives()
     mastered = sum(1 for o in objs if o.id in mastered_ids)
     total = len(objs)
@@ -210,6 +377,7 @@ def course_map(
     level: Level,
     mastered_ids: set[str],
     attempts: dict[str, dict[str, int]] | None = None,
+    profile: list[dict] | None = None,
 ) -> dict:
     """Mapa completo del curso de un nivel: unidades + posición + progreso."""
     attempts = attempts or {}
@@ -221,8 +389,8 @@ def course_map(
         "level": level.level,
         "title": level.title,
         "description": level.description,
-        "units": unit_sequence(level, mastered_ids, attempts),
-        "position": current_position(level, mastered_ids, attempts),
+        "units": unit_sequence(level, mastered_ids, attempts, profile),
+        "position": current_position(level, mastered_ids, attempts, profile),
         "progress": {
             "mastered": mastered,
             "total": total,

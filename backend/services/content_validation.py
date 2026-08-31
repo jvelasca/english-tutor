@@ -19,7 +19,9 @@ from services.audio_library import (
     validate_audio_entry,
     validate_manifest,
 )
+from services.curriculum import CEFR_ORDER
 from services.listening import QUESTION_BANK, validate_listening_bank
+from services.speaking_scenarios import list_scenarios
 
 
 def _issues_by_severity(issues: list[dict]) -> dict[str, int]:
@@ -27,6 +29,35 @@ def _issues_by_severity(issues: list[dict]) -> dict[str, int]:
     for issue in issues:
         counts[issue["severity"]] += 1
     return dict(counts)
+
+
+def content_stats() -> dict:
+    """Métrica única de contenido validado (V2.2).
+
+    `total_validated_learning_items` es la suma canónica de todo el material de
+    aprendizaje validado: ítems de listening (banco heredado TTS + corpus de
+    audio) + escenarios de speaking. README, CHANGELOG, validador y UI deben
+    derivar de aquí para que la cifra sea única (anti-drift).
+
+    El desglose separa explícitamente el corpus (`cNNN`) del banco heredado TTS
+    (`lNN`), de modo que "100 ítems de listening" (corpus) y "123 totales"
+    (banco completo) dejen de contradecirse.
+    """
+    corpus = [q for q in QUESTION_BANK if str(q.get("id", "")).startswith("c")]
+    legacy = [q for q in QUESTION_BANK if not str(q.get("id", "")).startswith("c")]
+    with_audio_id = sum(1 for q in QUESTION_BANK if q.get("audio_id"))
+    scenarios = list_scenarios()
+    return {
+        "total_validated_learning_items": len(QUESTION_BANK) + len(scenarios),
+        "listening": {
+            "total": len(QUESTION_BANK),
+            "corpus": len(corpus),
+            "legacy_tts": len(legacy),
+            "with_audio_id": with_audio_id,
+        },
+        "speaking_scenarios": len(scenarios),
+        "levels": list(CEFR_ORDER),
+    }
 
 
 # --- Content Quality Gate (V2.1) ---------------------------------------------
@@ -284,6 +315,7 @@ def run_content_validation() -> dict:
         for issue in validate_audio_entry(entry):
             add(issue.severity, f"audio:{issue.field}", qid, issue.message)
 
+    stats = content_stats()
     return {
         "total_items": len(QUESTION_BANK),
         "recorded": recorded,
@@ -292,4 +324,6 @@ def run_content_validation() -> dict:
         "by_severity": _issues_by_severity(issues),
         "ok": not any(i["severity"] == "error" for i in issues),
         "quality": run_quality_check(QUESTION_BANK),
+        "stats": stats,
+        "total_validated_learning_items": stats["total_validated_learning_items"],
     }

@@ -1,4 +1,12 @@
-export type Route = "home" | "learn" | "course" | "progress" | "chat" | "help";
+export type Route =
+  | "home"
+  | "learn"
+  | "course"
+  | "progress"
+  | "journey"
+  | "vocabulary"
+  | "chat"
+  | "help";
 
 export interface RouteOption {
   id: Route;
@@ -10,5 +18,7 @@ export const ROUTES: RouteOption[] = [
   { id: "learn", i18nKey: "nav.learn" },
   { id: "course", i18nKey: "nav.course" },
   { id: "progress", i18nKey: "nav.progress" },
+  { id: "journey", i18nKey: "nav.journey" },
+  { id: "vocabulary", i18nKey: "nav.vocabulary" },
   { id: "chat", i18nKey: "nav.chat" },
 ];

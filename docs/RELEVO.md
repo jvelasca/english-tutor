@@ -3,12 +3,24 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-31 10:30 (UTC+2).
+> Actualizado por última vez: 2026-08-31 15:50 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-31):** `v2.1.0` **CONTENT verificada en verde** (la versión está elevada
-a `2.1.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`). Cerradas la
+**Posición actual (2026-08-31):** `v2.3.0` **PERSONAL DICTIONARY + EVIDENCIA POR ÍTEM LÉXICO verificada en verde**
+(la versión está elevada a `2.3.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).
+Cerrada la **V2.3 PERSONAL DICTIONARY** (bajar el modelo de evidencia de "destreza" a "palabra/estructura":
+columnas `cefr`/`level_id`/`objective_id`/`source`/`lemma`/`kind` en `vocabulary` vía migración idempotente,
+siembra de `objective.vocabulary` + `objective.concepts` cableada en `submit_objective_assessment` y
+`record_lesson_completed`, servicio puro `services/lexicon.py` con `item_mastery`/`item_recall`/`item_status`
+(`mastered`/`known`/`learning`/`weak`)/`next_review_days`/`cefr_distribution`/`summary`/`recognized_not_produced`,
+endpoint `GET /api/vocabulary/lexicon`, pantalla `PersonalDictionary.tsx` con totales + barra CEFR + recall por
+ítem + señal micro-drill "reconoce pero no produce", y tests `test_lexicon.py` + `test_vocabulary.py` ampliado),
+y antes la **V2.2 ACADEMY/COURSE ENGINE** (métrica única "TOTAL VALIDATED LEARNING ITEMS" = 143,
+plantilla fija de 7 secciones por unidad, Learning Objectives "By the end of this unit…", contrato
+CEFR conectado al dominio ✓/●/○ por dimensión, Mastery Gates por unidad con umbrales compuestos,
+tríada Progress/Mastery/Readiness con endpoint `/api/academy/dashboard`, pantalla Learning Journey
+con marcador "YOU" + next milestone, y tests de regresión pedagógica `test_pedagogy.py`), y antes la
 **V2.1 CONTENT** (Content Quality Gate con umbrales de calidad + reporte + guard de CI, corpus de
 listening 40→100 ítems c041–c100, escenarios de speaking 8→20 A1–C1, niveles de curso C1/C2 y
 assessments finales por nivel) y, anteriormente, la **Beta 1.0** `v2.0.0` (gates de salida 10/10 en
@@ -1999,5 +2011,31 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `test_export_rejects_path_traversal` y `test_restore_removes_stale_files` (backend 929 tests).
 - ✅ **Verificación final**: `check_release_consistency` OK (2.0.0); backend 929 tests + `ruff`
   limpio; frontend `tsc` + `vitest` 240 tests + `build` OK. El roadmap V1.36 → Beta 1.0 queda cerrado.
+
+### 37.20 HECHO (V2.3) — Personal Dictionary + evidencia por ítem léxico
+- ✅ **Bajar el modelo de evidencia de "destreza" a "palabra/estructura"**: la tabla `vocabulary`
+  gana contexto curricular (`cefr`/`level_id`/`objective_id`/`source`/`lemma`/`kind`) vía migración
+  idempotente en `repositories/db.py` (solo contexto; no toca `appearances`/`exposures`).
+- ✅ **Siembra desde el currículo** (`services/lexicon.items_from_objective` +
+  `repositories/vocabulary.seed_curriculum_items`): `objective.vocabulary` + `objective.concepts`
+  (estructuras "I am"/"My name is" como `kind=structure`) pueblan el diccionario al avanzar, cableada
+  en `submit_objective_assessment` y `record_lesson_completed`.
+- ✅ **Servicio puro `services/lexicon.py`**: `item_mastery`, `item_recall` (reutiliza
+  `forgetting.retrieval_probability`), `item_status` determinista (`mastered`/`known`/`learning`/`weak`),
+  `next_review_days` (reutiliza `mastery.review_interval_days`), `cefr_distribution`, `summary` y
+  `recognized_not_produced` (señal *speaking micro-drill*, sin generación automática — queda V2.4).
+- ✅ **Endpoint `GET /api/vocabulary/lexicon`** → `LexiconOut { summary, items }` con `status`, `recall`
+  y `next_review_days` por ítem (`schemas/vocabulary.py` + `routers/vocabulary.py`).
+- ✅ **Frontend `PersonalDictionary.tsx`**: totales Known/Learning/Weak/Mastered, barra "Vocabulary by
+  CEFR" (A1→C2), lista de ítems con `recall %` y "next review", sección "Recognized but not produced";
+  ruta `vocabulary` + entrada en la navegación + i18n ES/EN (`api/vocabulary.ts`, `dictionary.ts`).
+- ✅ **Tests**: `backend/tests/test_lexicon.py` (invariantes: seed sin incrementar producción, estado
+  determinista, recall monótono, distribución CEFR, señal micro-drill) + `test_vocabulary.py` ampliado
+  (endpoint lexicon); frontend `vocabulary.test.ts` + `dictionary.test.ts`. Backend 962 tests + `ruff`
+  limpio; frontend `tsc` + `vitest` 245 tests + `build` OK; `check_release_consistency` OK (2.3.0).
+
+### Próximo (V2.4+)
+- FSRS completo (ajuste de parámetros por usuario), desglose speaking-vs-writing por palabra,
+  generación automática del speaking micro-drill, e Immersive Reading / import de contenido real.
 
 

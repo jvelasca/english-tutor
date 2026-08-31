@@ -31,6 +31,8 @@ def main() -> int:
             "recorded": report["recorded"],
             "tts": report["tts"],
             "by_severity": report["by_severity"],
+            "total_validated_learning_items": report["total_validated_learning_items"],
+            "stats": report["stats"],
         },
         ensure_ascii=False,
         indent=2,

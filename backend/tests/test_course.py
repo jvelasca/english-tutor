@@ -148,3 +148,42 @@ def test_endpoint_course_map_blocked_level(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.get("/api/academy/course/b1", params={"user_id": a})
     assert r.status_code == 403
+
+
+# --- V2.2: plantilla de secciones, objetivos y Mastery Gates ---------------
+
+
+def test_course_map_units_expose_sections_and_objectives():
+    lv = load_level("a1")
+    m = course_svc.course_map(lv, set())
+    for unit in m["units"]:
+        assert "sections" in unit
+        assert [s["section"] for s in unit["sections"]] == list(
+            course_svc.UNIT_SECTIONS
+        )
+        assert isinstance(unit["objectives"], list)
+
+
+def test_unit_sequence_with_profile_exposes_gates():
+    lv = load_level("a1")
+    # Perfil con dominio alto en las secciones declaradas por la primera unidad.
+    units_without_profile = course_svc.unit_sequence(lv, set())
+    first = units_without_profile[0]
+    macro = {
+        s["section"] for s in first["sections"] if s["count"] > 0
+    } & set(course_svc.UNIT_GATE_THRESHOLDS)
+    profile = [
+        {
+            "skill": s,
+            "score": 0.9,
+            "confidence": 0.9,
+            "evidence_count": 3,
+            "review_due": False,
+            "evidence_by_kind": {"familiar": 1, "transfer": 1, "novel": 0},
+        }
+        for s in macro
+    ]
+    units = course_svc.unit_sequence(lv, set(), profile=profile)
+    assert units[0]["gates"], "con profile debe desglosar los Mastery Gates"
+    assert isinstance(units[0]["gate_mastered"], bool)
+    assert units[0]["sections"] == first["sections"]

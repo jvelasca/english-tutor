@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `2.1.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+- ✅ Versión estable `2.3.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
   **V1.30** LAN + Mobile 100% (mDNS real, test de micrófono con medidor, QR de conexión,
   `/help/connect`), **V1.31** Adaptive Engine 2.0 (Priority Engine + "Why this activity?"),
   **V1.32** Curriculum 2.0 (escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones),
@@ -40,6 +40,13 @@
   con barra de estado y navegación por destrezas, más el **Learning Home** como pantalla central)
   y **V1.20** (pronunciación fonémica P6, turn-taking real e infraestructura de biblioteca de
   audio humano).
+- ✅ **V2.0 Beta 1.0** (5 gates de salida 10/10), **V2.1 Content** (Content Quality Gate + corpus de
+  listening 40→100 + escenarios de speaking 8→20 + niveles C1/C2), **V2.2 Academy/Course Engine**
+  (métrica única "TOTAL VALIDATED LEARNING ITEMS" = 143, plantilla fija de 7 secciones por unidad,
+  Mastery Gates por unidad, tríada Progress/Mastery/Readiness y pantalla Learning Journey) y
+  **V2.3 Personal Dictionary + evidencia por ítem léxico** (siembra de vocabulario/estructuras desde
+  el currículo, estado `known`/`learning`/`weak`/`mastered` + `recall` por ítem reutilizando la
+  curva de olvido, endpoint `/api/vocabulary/lexicon` y pantalla Personal Dictionary).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 

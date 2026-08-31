@@ -4,6 +4,77 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.3.0] — 2026-08-31
+
+**Personal Dictionary + evidencia por ítem léxico**: se baja el modelo de evidencia de
+"destreza" a "palabra/estructura". Cada entrada de `vocabulary` se convierte en un ítem léxico
+de primer nivel sembrado desde el currículo, con estado y `recall` por ítem, expuesto en una
+pantalla **Personal Dictionary**.
+
+### Añadido
+- **Ítem léxico con contexto curricular** (migración idempotente en `repositories/db.py`): columnas
+  `cefr`/`level_id`/`objective_id`/`source`/`lemma`/`kind` en `vocabulary` (solo contexto; no tocan
+  `appearances`/`exposures`).
+- **Siembra desde el currículo** (`repositories/vocabulary.seed_curriculum_items` +
+  `services/lexicon.items_from_objective`): `objective.vocabulary` + `objective.concepts`
+  (estructuras como "I am") pueblan el diccionario al avanzar, cableado en
+  `submit_objective_assessment` y `record_lesson_completed`.
+- **Servicio puro `services/lexicon.py`**: `item_mastery`, `item_recall` (reutiliza la curva de
+  olvido de `forgetting`), `item_status` (`mastered`/`known`/`learning`/`weak`), `next_review_days`
+  (reutiliza el scheduler de `mastery`), `cefr_distribution`, `summary` y `recognized_not_produced`
+  (señal de *speaking micro-drill*).
+- **Endpoint `GET /api/vocabulary/lexicon`** → `LexiconOut { summary, items }` con estado, `recall`
+  y `next_review_days` por ítem.
+- **Pantalla Personal Dictionary** (`features/vocabulary/PersonalDictionary.tsx`): totales
+  Known/Learning/Weak/Mastered, barra "Vocabulary by CEFR" (A1→C2), lista de ítems con `recall %` y
+  "next review", y sección "Recognized but not produced". Ruta y entrada en la navegación + i18n ES/EN.
+
+### Verificado
+- Backend `pytest` (962 passed) + `ruff` limpio; tests de invariantes `test_lexicon.py` (seed sin
+  incrementar producción, estado determinista, recall monótono, distribución CEFR, señal micro-drill).
+- Frontend `tsc` + `vitest` (245 passed) + `build` en verde.
+
+## [2.2.0] — 2026-08-31
+
+**Academy / Course Engine (profundizar lo existente)**: el foco pasa de "tener contenido"
+a "construir un curso completo y medible". Sin reescribir el Course Engine (V1.38),
+Mastery 2.0 (V1.39) ni Adaptive 2.0 (V1.31): se les añade estructura y medición pedagógica.
+
+### Añadido
+- **Métrica única "TOTAL VALIDATED LEARNING ITEMS"** (`services/content_validation.py`:
+  `content_stats()`): cifra canónica derivada de las dos fuentes (banco de listening +
+  escenarios de speaking) = **143** (123 listening: 100 corpus + 23 legacy TTS; 20 speaking).
+  `run_content_validation()` la reporta y README/CHANGELOG/UI derivan de ella (anti-drift,
+  con test que falla si validador y métrica no coinciden).
+- **Plantilla fija de unidad (7 secciones)** (`services/course.py`: `UNIT_SECTIONS` +
+  `unit_sections`): cada unidad expone vocabulary/grammar/listening/speaking/interaction/
+  review/assessment con conteo y huecos visibles (`needs_content`) que alimentan el Quality
+  Gate en V2.3.
+- **Learning Objectives de unidad** (`unit_objectives`): "By the end of this unit you will
+  be able to…" agregando los `can_do` de los objetivos, renderizado en `CourseScreen`.
+- **Contrato CEFR conectado al dominio** (`cefr-ladder`): cada dimensión "WHAT CAN I DO?"
+  emite su estado real ✓/●/○ (`mastered`/`in_progress`/`not_started`) desde el Student Model
+  (`adaptive.dimension_state`), sustituyendo el `Check` estático en `CourseScreen`.
+- **Mastery Gates por unidad** (`services/course.py`: `unit_gates`): umbrales compuestos por
+  sección (vocabulary/grammar ≥ 0.80, listening ≥ 0.75, speaking ≥ 0.70) + retención PASS +
+  transferencia PASS. Una unidad solo se marca `mastered` con el gate compuesto; la UI
+  muestra "qué falta para UNIT MASTERED" (`CourseUnit.sections/gates/gate_mastered`).
+- **Tríada Progress / Mastery / Readiness** (`adaptive.student_dashboard` + endpoint
+  `GET /api/academy/dashboard`): tres métricas explícitas y consistentes, reutilizadas por
+  Home/Progress/Course (`TriadCard`).
+- **Pantalla Learning Journey** (`features/journey/JourneyScreen.tsx`): escalera Pre-A1→C2
+  con marcador "YOU", `units mastered`, `skills ready`, `retention %` y `next milestone`,
+  enrutada desde la navegación principal.
+- **Tests de regresión pedagógica** (`backend/tests/test_pedagogy.py`): invariantes de la
+  métrica única, plantilla de 7 secciones, objetivos de unidad, Mastery Gates (sección
+  bloqueante → no `mastered`), recomendación por sub-destreza débil (connected speech),
+  contrato CEFR y tríada; `test_course.py` ampliado para secciones/objetivos/gates.
+
+### Verificado
+- `python -m scripts.content_validation` OK (143 ítems de aprendizaje validados; 12/12 checks PASS).
+- Backend `pytest` (948 passed) + `ruff` limpio; `check_release_consistency` OK.
+- Frontend `tsc` + `vitest` (240 passed) + `build` en verde.
+
 ## [2.1.0] — 2026-08-31
 
 **Contenido y calidad pedagógica**: primera iteración centrada en volumen y diversidad

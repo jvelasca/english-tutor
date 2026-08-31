@@ -5,6 +5,7 @@ import type {
   CefrLadder,
   ConversationEndurance,
   CourseMap,
+  Dashboard,
   Enrollment,
   Exam,
   ExamResult,
@@ -310,6 +311,11 @@ export function getReadiness(
     target_level: targetLevel,
   });
   return getJson<Readiness>(`/api/academy/readiness?${params.toString()}`);
+}
+
+/** Tríada Progress / Mastery / Readiness (V2.2). */
+export function getDashboard(userId: string): Promise<Dashboard> {
+  return getJson<Dashboard>(`/api/academy/dashboard${userQuery(userId)}`);
 }
 
 export function getTodayPlan(userId: string): Promise<TodayPlan> {

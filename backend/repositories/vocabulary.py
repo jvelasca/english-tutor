@@ -73,12 +73,76 @@ def record_exposures(user_id: str, words: list[str]) -> bool:
 
 def get_vocabulary(user_id: str) -> list[dict]:
     """Devuelve el vocabulario del usuario ordenado por producción (desc) y
-    palabra (asc). Incluye métricas de exposición y espaciado."""
+    palabra (asc). Incluye métricas de exposición y espaciado, y el contexto
+    curricular del ítem léxico (V2.3)."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT word, appearances, first_seen, last_seen, "
-            "exposures, last_exposed_at, production_days FROM vocabulary "
+            "exposures, last_exposed_at, production_days, "
+            "cefr, level_id, objective_id, source, lemma, kind FROM vocabulary "
             "WHERE user_id = ? ORDER BY appearances DESC, word ASC",
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
+    """Siembra ítems léxicos del currículo sin tocar producción/input (V2.3).
+
+    `items` es una lista de dicts `{word, lemma, cefr, level_id, objective_id,
+    kind}`. Crea la fila si no existe (con `appearances=0`/`exposures=0`) o
+    rellena el contexto curricular si ya existía. Nunca incrementa `appearances`
+    ni `exposures`: solo fija el contexto, para no contaminar las métricas de
+    producción/lectura del alumno. Devuelve False si el usuario no existe.
+    """
+    if get_user(user_id) is None:
+        return False
+    if not items:
+        return True
+    with closing(_conn()) as conn, conn:
+        for it in items:
+            word = it["word"]
+            row = conn.execute(
+                "SELECT word FROM vocabulary WHERE user_id = ? AND word = ?",
+                (user_id, word),
+            ).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO vocabulary "
+                    "(user_id, word, appearances, first_seen, last_seen, "
+                    "exposures, last_exposed_at, production_days, "
+                    "cefr, level_id, objective_id, source, lemma, kind) "
+                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, ?, ?, 'curriculum', ?, ?)",
+                    (
+                        user_id,
+                        word,
+                        it.get("cefr", ""),
+                        it.get("level_id", ""),
+                        it.get("objective_id", ""),
+                        it.get("lemma", word),
+                        it.get("kind", "word"),
+                    ),
+                )
+            else:
+                conn.execute(
+                    "UPDATE vocabulary SET "
+                    "cefr = CASE WHEN cefr = '' THEN ? ELSE cefr END, "
+                    "level_id = CASE WHEN level_id = '' THEN ? ELSE level_id END, "
+                    "objective_id = CASE WHEN objective_id = '' "
+                    "THEN ? ELSE objective_id END, "
+                    "source = CASE WHEN source = 'user' THEN 'curriculum' "
+                    "ELSE source END, "
+                    "lemma = CASE WHEN lemma = '' THEN ? ELSE lemma END, "
+                    "kind = CASE WHEN kind = 'word' THEN ? ELSE kind END "
+                    "WHERE user_id = ? AND word = ?",
+                    (
+                        it.get("cefr", ""),
+                        it.get("level_id", ""),
+                        it.get("objective_id", ""),
+                        it.get("lemma", word),
+                        it.get("kind", "word"),
+                        user_id,
+                        word,
+                    ),
+                )
+    return True

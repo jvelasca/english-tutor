@@ -15,6 +15,7 @@ from schemas.academy import (
     CefrProfileOut,
     ConversationEnduranceOut,
     CourseMapOut,
+    DashboardOut,
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
@@ -170,6 +171,12 @@ async def readiness(
     target_level: str = "B1", user: dict = Depends(current_user)
 ) -> dict:
     return await academy_service.get_readiness(user["id"], target_level)
+
+
+@router.get("/api/academy/dashboard", response_model=DashboardOut)
+async def dashboard(user: dict = Depends(current_user)) -> dict:
+    """Tríada Progress / Mastery / Readiness (V2.2)."""
+    return await academy_service.get_dashboard(user["id"])
 
 
 @router.get("/api/academy/today", response_model=TodayPlanOut)

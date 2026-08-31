@@ -15,6 +15,14 @@ const CourseScreen = lazy(() =>
 const ProgressScreen = lazy(() =>
   import("../features/progress/ProgressScreen").then((m) => ({ default: m.ProgressScreen })),
 );
+const JourneyScreen = lazy(() =>
+  import("../features/journey/JourneyScreen").then((m) => ({ default: m.JourneyScreen })),
+);
+const PersonalDictionary = lazy(() =>
+  import("../features/vocabulary/PersonalDictionary").then((m) => ({
+    default: m.PersonalDictionary,
+  })),
+);
 const ConnectHelp = lazy(() =>
   import("../features/help/ConnectHelp").then((m) => ({ default: m.ConnectHelp })),
 );
@@ -92,6 +100,10 @@ export function Workspace({
     );
   } else if (route === "progress") {
     content = <ProgressScreen userId={currentUserId} />;
+  } else if (route === "journey") {
+    content = <JourneyScreen userId={currentUserId} />;
+  } else if (route === "vocabulary") {
+    content = <PersonalDictionary userId={currentUserId} />;
   } else if (route === "help") {
     content = <ConnectHelp />;
   } else {

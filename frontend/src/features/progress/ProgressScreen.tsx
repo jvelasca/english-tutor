@@ -13,6 +13,7 @@ import { SpeakingDiagnostic } from "../speaking/SpeakingDiagnostic";
 import { WritingJourney } from "../writing/WritingJourney";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
+import { TriadCard } from "../../components/TriadCard";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
@@ -112,6 +113,10 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
             )}
           </div>
         </motion.header>
+
+        <motion.section variants={item} aria-label={t("progress.overall")}>
+          <TriadCard userId={userId} />
+        </motion.section>
 
         <motion.section variants={item} aria-label={t("progress.overall")}>
           <Card className="gap-2 p-5">
