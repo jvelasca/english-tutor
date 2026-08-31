@@ -352,6 +352,80 @@
           ]
         }
       ]
+    },
+    {
+      "id": "b2-m03",
+      "title": "B2 Final",
+      "order": 3,
+      "units": [
+        {
+          "id": "b2-m03-u01",
+          "title": "Review and assessment",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "b2-m03-u01-l01",
+              "title": "B2 Review",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "b2-m03-u01-l01-o09",
+                  "can_do": "I can argue a point, follow fast conversation and infer attitude and register.",
+                  "title": "Conversación final B2",
+                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
+                  "concepts": ["review: argumentation, fast speech, inference, register"],
+                  "vocabulary": ["review B2"],
+                  "activities": [
+                    {
+                      "id": "b2-m03-u01-l01-o09-a01",
+                      "type": "dialogue",
+                      "instruction": "Argue a point of view with the tutor and respond to a counter-argument.",
+                      "target": "B2 level conversation"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b2-m03-u01-l01-o09-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (mixed conditional):",
+                      "options": ["If I had studied harder, I would be working there now.", "If I studied harder, I would be worked there now.", "If I had studied harder, I would worked there now."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m03-u01-l01-o09-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'ambiguo'?",
+                      "options": ["ambiguous", "ambitious", "amusing"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m03-u01-l01-o09-c03",
+                      "skill": "reading",
+                      "prompt": "Read: 'He was hardly overjoyed by the news.' How did he feel?",
+                      "options": ["Not very happy", "Very happy", "Indifferent"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m03-u01-l01-o09-c04",
+                      "skill": "listening",
+                      "prompt": "Listen: 'I dunno what you mean.' What does 'dunno' mean?",
+                      "options": ["don't know", "do know", "did know"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b2-m03-u01-l01-o09-c05",
+                      "skill": "listening",
+                      "prompt": "Listen: 'That said, we should consider the risks before deciding.' What does 'that said' introduce?",
+                      "options": ["A contrasting point", "A conclusion", "An example"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

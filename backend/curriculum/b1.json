@@ -427,6 +427,87 @@
           ]
         }
       ]
+    },
+    {
+      "id": "b1-m04",
+      "title": "B1 Final",
+      "order": 4,
+      "units": [
+        {
+          "id": "b1-m04-u01",
+          "title": "Review and assessment",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "b1-m04-u01-l01",
+              "title": "B1 Review",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "b1-m04-u01-l01-o10",
+                  "can_do": "I can express opinions, talk about the future and understand connected speech.",
+                  "title": "Conversación final B1",
+                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
+                  "concepts": ["review: opinions, future, obligations, connected speech"],
+                  "vocabulary": ["review B1"],
+                  "activities": [
+                    {
+                      "id": "b1-m04-u01-l01-o10-a01",
+                      "type": "dialogue",
+                      "instruction": "Discuss your plans and opinions with the tutor, using connected speech naturally.",
+                      "target": "B1 level conversation"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m04-u01-l01-o10-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["If I have time, I will call you.", "If I will have time, I call you.", "If I have time, I call you."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o10-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["You don't have to stay if you're busy.", "You don't have stay if you're busy.", "You don't has to stay if you're busy."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o10-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'en mi opinión'?",
+                      "options": ["in my opinion", "by the way", "at least"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o10-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is the informal contraction of 'going to'?",
+                      "options": ["gonna", "wanna", "didja"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o10-c05",
+                      "skill": "listening",
+                      "prompt": "Listen: 'I'm gonna be a bit late, sorry.' What does the speaker mean?",
+                      "options": ["They will arrive late", "They will not come", "They are early"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o10-c06",
+                      "skill": "listening",
+                      "prompt": "Listen: 'Unless we hurry, we'll miss the start of the film.' What do they need to do?",
+                      "options": ["Hurry", "Slow down", "Stay home"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

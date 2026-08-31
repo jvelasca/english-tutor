@@ -7,10 +7,12 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-31):** `v2.0.0` **Beta 1.0 verificada en verde** (la versión está elevada
-a `2.0.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`; gates de
-salida 10/10 en `docs/BETA_GATES.md`). Cerradas la
-**gestión en-app de la biblioteca de audio humano** (V1.35), el **Audio Corpus 1.0** (V1.36),
+**Posición actual (2026-08-31):** `v2.1.0` **CONTENT verificada en verde** (la versión está elevada
+a `2.1.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`). Cerradas la
+**V2.1 CONTENT** (Content Quality Gate con umbrales de calidad + reporte + guard de CI, corpus de
+listening 40→100 ítems c041–c100, escenarios de speaking 8→20 A1–C1, niveles de curso C1/C2 y
+assessments finales por nivel) y, anteriormente, la **Beta 1.0** `v2.0.0` (gates de salida 10/10 en
+`docs/BETA_GATES.md`), la **gestión en-app de la biblioteca de audio humano** (V1.35), el **Audio Corpus 1.0** (V1.36),
 el **Audio QA + Content Audit** (V1.37), el **Course Engine** (V1.38), el **Mastery 2.0** (V1.39),
 el **Speaking 3.0** (V1.40), el **Beta Hardening** (V1.41) y la **Beta 1.0** (5 gates), además de
 las **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):

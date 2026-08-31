@@ -38,8 +38,16 @@ def main() -> int:
     for issue in report["issues"]:
         print(f"[{issue['severity'].upper():7}] {issue['category']}: "
               f"{issue['id'] or '-'}: {issue['message']}")
-    print(f"\nOK={report['ok']}")
-    return 0 if report["ok"] else 1
+
+    quality = report["quality"]
+    print("\nCONTENT QUALITY GATE")
+    for check in quality["checks"]:
+        status = "PASS" if check["pass"] else "FAIL"
+        print(f"[{status:4}] {check['label']}: "
+              f"{check['actual']}/{check['required']}")
+
+    print(f"\nOK={report['ok']} quality={quality['pass']}")
+    return 0 if (report["ok"] and quality["pass"]) else 1
 
 
 if __name__ == "__main__":

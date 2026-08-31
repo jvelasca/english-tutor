@@ -20,11 +20,11 @@ def _setup(monkeypatch, tmp_path):
 # --- Catálogo versionado ----------------------------------------------------
 
 
-def test_catalog_has_eight_scenarios_with_valid_metadata():
+def test_catalog_has_twenty_scenarios_with_valid_metadata():
     scenarios = scenarios_svc.list_scenarios()
-    assert len(scenarios) == 8
+    assert len(scenarios) == 20
     ids = [s["id"] for s in scenarios]
-    assert len(set(ids)) == 8, "ids duplicados"
+    assert len(set(ids)) == 20, "ids duplicados"
     for scenario in scenarios:
         assert scenario["communicative_objective"]
         assert scenario["prompt"]
@@ -67,7 +67,7 @@ def test_speaking_scenarios_endpoint(monkeypatch, tmp_path):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["version"]
-    assert len(body["scenarios"]) == 8
+    assert len(body["scenarios"]) == 20
     first = body["scenarios"][0]
     assert first["communicative_objective"]
     assert first["metrics"]

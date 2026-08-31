@@ -534,6 +534,87 @@
           ]
         }
       ]
+    },
+    {
+      "id": "a2-m07",
+      "title": "A2 Final",
+      "order": 7,
+      "units": [
+        {
+          "id": "a2-m07-u01",
+          "title": "Review and assessment",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "a2-m07-u01-l01",
+              "title": "A2 Review",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "a2-m07-u01-l01-o01",
+                  "can_do": "I can hold a natural conversation about my past, my plans and everyday situations.",
+                  "title": "Conversación final A2",
+                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
+                  "concepts": ["review: past, future, travel, health, stories"],
+                  "vocabulary": ["review A2"],
+                  "activities": [
+                    {
+                      "id": "a2-m07-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Have a conversation with the tutor about a past experience and a future plan.",
+                      "target": "A2 level conversation"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m07-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I went to London last year and I had a great time.", "I go to London last year and I had a great time.", "I went to London last year and I have a great time."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": ["I am going to visit my family next week.", "I am visit my family next week.", "I going to visit my family next week."],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'billete'?",
+                      "options": ["ticket", "train", "station"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'consejo'?",
+                      "options": ["advice", "rest", "health"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-c05",
+                      "skill": "listening",
+                      "prompt": "Listen: 'I had a headache, so I went to bed early.' What did she do?",
+                      "options": ["Went to bed early", "Went to the doctor", "Took a trip"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-c06",
+                      "skill": "listening",
+                      "prompt": "Listen: 'We're going to visit Rome next summer.' When are they going?",
+                      "options": ["Next summer", "Last summer", "This winter"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

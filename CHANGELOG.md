@@ -4,6 +4,34 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.1.0] — 2026-08-31
+
+**Contenido y calidad pedagógica**: primera iteración centrada en volumen y diversidad
+de contenido (recomendación inmediata de la auditoría externa), no en arquitectura.
+
+### Añadido
+- **Content Quality Gate** (`services/content_validation.py`): umbrales de calidad del banco
+  de listening (mínimo de ítems por nivel CEFR, hablantes, acentos, contextos, connected
+  speech, ruido, multihablante y habla rápida) con reporte `quality_pass`/`quality_warnings`.
+  `scripts/content_validation.py` falla (exit 1) si no se cumplen los umbrales (guard de CI).
+- **Corpus de listening 40 → 100** (`curriculum/listening_corpus.json`, c041–c100): 60 ítems
+  TTS nuevos con perfil diversificado por nivel (A1 habla clara, A2 conversación natural,
+  B1 connected speech/multihablante, B2 habla rápida/acentos/inferencia) y 15 destrezas.
+  `LISTENING_BANK_VERSION` 4.0.0 → 5.0.0.
+- **Escenarios de speaking 8 → 20** (`curriculum/speaking_scenarios.json`): banco, aeropuerto,
+  vivienda, queja, negociación, presentación de equipo, small talk avanzado, soporte técnico,
+  debate, narración, etc., cubriendo A1→C1. `SPEAKING_SCENARIOS_VERSION` 1.0.0 → 2.0.0.
+- **Niveles de curso C1 y C2** (`curriculum/c1.json`, `curriculum/c2.json`): curso secuencial
+  C1 (gramática avanzada, idioms, discurso académico) y C2 (retórica, registro, matiz cultural).
+  `CURRICULUM_VERSION` 1.2.5 → 1.3.0.
+- **Assessments finales por nivel**: módulos de repaso final añadidos a A2, B1 y B2 (A1 ya los
+  tenía), cerrando cada nivel con una evaluación de cierre.
+
+### Verificado
+- `python -m scripts.content_validation` OK (integridad + umbrales de calidad; 123 ítems, 12/12 checks PASS).
+- Backend `pytest` (936 passed) + `ruff` limpio; `check_release_consistency` OK.
+- Frontend `tsc` + `vitest` (240 passed) + `build` + `playwright` (14 passed, 10 skipped) en verde.
+
 ## [2.0.0] — 2026-08-31
 
 **Beta 1.0**: cierre del roadmap V1.36 → Beta. Los 5 gates de salida alcanzan 10/10

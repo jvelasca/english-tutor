@@ -152,6 +152,234 @@
         "cognitive_demand": 4,
         "novelty": 4
       }
+    },
+    {
+      "id": "introductions",
+      "title": "Introductions",
+      "category": "Everyday life",
+      "cefr_target": "A1",
+      "task_type": "conversation",
+      "communicative_objective": "Greet someone, say your name, where you are from and one thing about yourself.",
+      "prompt": "You meet someone for the first time. Say hello, introduce yourself, say where you are from and ask the other person a simple question about themselves.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 1,
+        "grammar_demand": 1,
+        "discourse_demand": 1,
+        "interaction_demand": 2,
+        "spontaneity": 2,
+        "cognitive_demand": 1,
+        "novelty": 1
+      }
+    },
+    {
+      "id": "bank",
+      "title": "Bank",
+      "category": "Work and services",
+      "cefr_target": "A2",
+      "task_type": "role_play",
+      "communicative_objective": "Open a bank account, ask about fees and give the necessary personal information.",
+      "prompt": "You are at a bank opening an account. Explain what you need, answer the clerk's questions about your details and ask about any fees or requirements.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "airport",
+      "title": "Airport",
+      "category": "Travel",
+      "cefr_target": "A2",
+      "task_type": "role_play",
+      "communicative_objective": "Check in for a flight, ask about your baggage and boarding information.",
+      "prompt": "You are at the airport checking in. Confirm your flight, ask about your baggage allowance and find out the gate and boarding time.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 3,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "appointment",
+      "title": "Appointment",
+      "category": "Work and services",
+      "cefr_target": "A2",
+      "task_type": "role_play",
+      "communicative_objective": "Book, change or confirm an appointment and state the date and time clearly.",
+      "prompt": "You are booking an appointment. Say what you need, choose a date and time, and confirm all the details before you finish.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 3,
+        "spontaneity": 3,
+        "cognitive_demand": 2,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "housing",
+      "title": "Housing",
+      "category": "Everyday life",
+      "cefr_target": "B1",
+      "task_type": "conversation",
+      "communicative_objective": "Ask for information about renting a flat and discuss the conditions.",
+      "prompt": "You are calling about a flat to rent. Ask about the rooms, the price, the bills and the area, and respond to what the landlord tells you.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "complaint",
+      "title": "Complaint",
+      "category": "Work and services",
+      "cefr_target": "B1",
+      "task_type": "role_play",
+      "communicative_objective": "Make a complaint clearly and reach a solution with the other person.",
+      "prompt": "You have a problem with a product or service. Explain the problem politely, say what you want as a solution and negotiate until you reach an agreement.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 4,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 4,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "tech_support",
+      "title": "Tech support",
+      "category": "Work and services",
+      "cefr_target": "B1",
+      "task_type": "role_play",
+      "communicative_objective": "Describe a technical problem and follow the instructions you are given.",
+      "prompt": "You are calling technical support about a problem with your computer or phone. Describe what is wrong, answer the support person's questions and follow their steps.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 4,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "small_talk_advanced",
+      "title": "Small talk (advanced)",
+      "category": "Everyday life",
+      "cefr_target": "B1",
+      "task_type": "conversation",
+      "communicative_objective": "Sustain a longer casual conversation with natural follow-up questions.",
+      "prompt": "You are at a social event and meet someone new. Start a casual conversation, ask follow-up questions to keep it going and share a little about yourself.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 4,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "storytelling",
+      "title": "Storytelling",
+      "category": "Everyday life",
+      "cefr_target": "B1",
+      "task_type": "conversation",
+      "communicative_objective": "Tell a short story or anecdote and respond to questions about it.",
+      "prompt": "Tell someone about something interesting or funny that happened to you recently, and answer their follow-up questions naturally.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 4,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "negotiation",
+      "title": "Negotiation",
+      "category": "Work and services",
+      "cefr_target": "B2",
+      "task_type": "discussion",
+      "communicative_objective": "Negotiate terms and reach an agreement that works for both sides.",
+      "prompt": "You are negotiating a deal or an agreement. State your position, respond to the other person's points and try to reach a compromise.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 4,
+        "grammar_demand": 4,
+        "discourse_demand": 5,
+        "interaction_demand": 5,
+        "spontaneity": 4,
+        "cognitive_demand": 5,
+        "novelty": 4
+      }
+    },
+    {
+      "id": "team_presentation",
+      "title": "Team presentation",
+      "category": "Work and services",
+      "cefr_target": "B2",
+      "task_type": "discussion",
+      "communicative_objective": "Present an idea to a group and respond to questions and objections.",
+      "prompt": "You are presenting an idea to your team. Explain your proposal clearly, give reasons and respond to questions or doubts from your colleagues.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 4,
+        "grammar_demand": 4,
+        "discourse_demand": 4,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 4,
+        "novelty": 4
+      }
+    },
+    {
+      "id": "debate",
+      "title": "Debate",
+      "category": "Work and services",
+      "cefr_target": "C1",
+      "task_type": "discussion",
+      "communicative_objective": "Argue a point of view, counter opposing arguments and reach a reasoned conclusion.",
+      "prompt": "You are taking part in a debate. Present your point of view, support it with arguments, respond to a counter-argument and work towards a balanced conclusion.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 5,
+        "grammar_demand": 5,
+        "discourse_demand": 5,
+        "interaction_demand": 5,
+        "spontaneity": 4,
+        "cognitive_demand": 5,
+        "novelty": 5
+      }
     }
   ]
 }

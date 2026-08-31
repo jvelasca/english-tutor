@@ -1,0 +1,292 @@
+{
+  "course_id": "english-tutor-academy",
+  "level_id": "c2",
+  "level": "C2",
+  "title": "C2 · Mastery",
+  "description": "Communicate with near-native precision, subtlety and rhetorical control.",
+  "modules": [
+    {
+      "id": "c2-m01",
+      "title": "Rhetoric & Persuasion",
+      "order": 1,
+      "units": [
+        {
+          "id": "c2-m01-u01",
+          "title": "Rhetorical devices",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "c2-m01-u01-l01",
+              "title": "Rhetoric",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "c2-m01-u01-l01-o01",
+                  "can_do": "I can recognise and use rhetorical devices to persuade.",
+                  "title": "Recursos retóricos",
+                  "skills": ["vocabulary", "reading", "writing", "speaking"],
+                  "subskills": ["register", "structure"],
+                  "concepts": ["metaphor", "rhetorical question", "parallelism", "understatement"],
+                  "vocabulary": ["metaphor", "parallelism", "understatement", "hyperbole"],
+                  "activities": [
+                    {
+                      "id": "c2-m01-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Make a persuasive point using at least two rhetorical devices.",
+                      "target": "metaphor / rhetorical question / parallelism / understatement"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m01-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "'The workload is a mountain' is an example of...",
+                      "options": ["a metaphor", "a simile with 'like'", "a statistic"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "A rhetorical question is asked...",
+                      "options": ["for effect, not for an answer", "to get information", "to list facts"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o01-c03",
+                      "skill": "reading",
+                      "prompt": "Read: 'It wasn't bad at all.' This is an example of...",
+                      "options": ["understatement", "hyperbole", "repetition"],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m01-u01-l01-o02",
+                  "can_do": "I can persuade subtly through implication and concession.",
+                  "title": "Persuasión sutil",
+                  "skills": ["vocabulary", "writing", "speaking"],
+                  "subskills": ["register"],
+                  "concepts": ["concession", "admittedly", "one might argue", "that said"],
+                  "vocabulary": ["admittedly", "that said", "nevertheless", "granted"],
+                  "activities": [
+                    {
+                      "id": "c2-m01-u01-l01-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Persuade the tutor using concession followed by a counter-argument.",
+                      "target": "Admittedly ... / that said ... / nevertheless"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m01-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word introduces a concession?",
+                      "options": ["admittedly", "therefore", "finally"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'aun así'?",
+                      "options": ["that said", "for example", "in conclusion"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'no obstante'?",
+                      "options": ["nevertheless", "moreover", "hence"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c2-m02",
+      "title": "Register & Cultural Fluency",
+      "order": 2,
+      "units": [
+        {
+          "id": "c2-m02-u01",
+          "title": "Register and cultural nuance",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "c2-m02-u01-l01",
+              "title": "Register shifts",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "c2-m02-u01-l01-o01",
+                  "can_do": "I can shift register fluently between formal and informal contexts.",
+                  "title": "Cambios de registro",
+                  "skills": ["vocabulary", "grammar", "writing"],
+                  "subskills": ["register"],
+                  "concepts": ["formal vs informal", "passive voice", "hedging", "contractions"],
+                  "vocabulary": ["whereas", "therefore", "kindly", "aforesaid"],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l01-o01-a01",
+                      "type": "writing",
+                      "instruction": "Rewrite the same request in a formal and then an informal register.",
+                      "target": "formal vs informal register"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l01-o01-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word is more formal?",
+                      "options": ["therefore", "so", "anyway"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which is the informal equivalent of 'to whom it may concern'?",
+                      "options": ["Hey there", "Dear Sir", "To the manager"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o01-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the more formal sentence:",
+                      "options": ["It is recommended that you arrive early.", "You should get there early.", "Get there early, okay?"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "c2-m02-u01-l02",
+              "title": "Cultural references and humour",
+              "order": 2,
+              "objectives": [
+                {
+                  "id": "c2-m02-u01-l02-o01",
+                  "can_do": "I can understand humour, irony and cultural references.",
+                  "title": "Referencias culturales y humor",
+                  "skills": ["reading", "listening", "vocabulary"],
+                  "subskills": ["inference"],
+                  "concepts": ["irony", "sarcasm", "cultural reference", "double meaning"],
+                  "vocabulary": ["irony", "sarcasm", "pun", "tongue-in-cheek"],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l02-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Explain the irony or humour in a short joke or comment.",
+                      "target": "irony / sarcasm / pun"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l02-o01-c01",
+                      "skill": "reading",
+                      "prompt": "Read: 'Oh great, another Monday.' The speaker is being...",
+                      "options": ["sarcastic", "sincere", "factual"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "A 'pun' is...",
+                      "options": ["a play on words", "a long speech", "a serious argument"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o01-c03",
+                      "skill": "listening",
+                      "prompt": "Listen: 'Well, that went well.' (said after a failure) What is the tone?",
+                      "options": ["Irony", "Genuine praise", "Excitement"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c2-m03",
+      "title": "C2 Final",
+      "order": 3,
+      "units": [
+        {
+          "id": "c2-m03-u01",
+          "title": "Review and assessment",
+          "order": 1,
+          "lessons": [
+            {
+              "id": "c2-m03-u01-l01",
+              "title": "C2 Review",
+              "order": 1,
+              "objectives": [
+                {
+                  "id": "c2-m03-u01-l01-o01",
+                  "can_do": "I can communicate with near-native precision, subtlety and rhetorical control.",
+                  "title": "Repaso final C2",
+                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
+                  "concepts": ["review: rhetoric, persuasion, register, humour"],
+                  "vocabulary": ["review C2"],
+                  "activities": [
+                    {
+                      "id": "c2-m03-u01-l01-o01-a01",
+                      "type": "dialogue",
+                      "instruction": "Discuss a subtle or abstract topic with the tutor using precise, nuanced language.",
+                      "target": "C2 level conversation"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m03-u01-l01-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the more formal sentence:",
+                      "options": ["It is essential that the matter be addressed.", "You need to fix this now.", "Sort it out, will you?"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m03-u01-l01-o01-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'subestimación deliberada'?",
+                      "options": ["understatement", "exaggeration", "confusion"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m03-u01-l01-o01-c03",
+                      "skill": "reading",
+                      "prompt": "Read: 'Given the circumstances, the outcome was hardly a triumph.' What is the writer's view?",
+                      "options": ["Disappointed", "Celebratory", "Indifferent"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m03-u01-l01-o01-c04",
+                      "skill": "listening",
+                      "prompt": "Listen: 'That said, the results are promising.' What does 'that said' introduce?",
+                      "options": ["A contrast or caveat", "An example", "A summary"],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m03-u01-l01-o01-c05",
+                      "skill": "listening",
+                      "prompt": "Listen: 'Frankly, I couldn't care less.' What is the speaker's attitude?",
+                      "options": ["Indifference", "Enthusiasm", "Confusion"],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,9 @@
 
 Fecha de evaluación: 2026-08-31. Versión: `2.0.0`.
 
+> **V2.1 CONTENT** (2026-08-31) amplió el contenido y añadió el Content Quality Gate
+> (umbrales de calidad, no solo integridad). Ver `CHANGELOG.md` [2.1.0].
+
 ---
 
 ## G1 — Infrastructure (10/10)
@@ -35,9 +38,11 @@ Currículo completo, secuenciado y validado end-to-end.
 | Escalera CEFR Pre-A1→C2 con bandas "plus" | ✅ | `curriculum/cefr_descriptors.json` + `services/cefr_descriptors.py` |
 | Can-Do por 9 dimensiones | ✅ | `services/cefr_matrix.py`, `/api/academy/cefr-ladder` |
 | Secuenciación Course→Unit→Lesson→Practice→Assessment→Review→Mastery | ✅ | `services/course.py` (gating por objetivo `available`/`review`/`locked`) |
-| Corpus de listening versionado (contenido fuera del código) | ✅ | `curriculum/listening_corpus.json` (40 ítems A1–B2) + loader |
-| Escenarios comunicativos | ✅ | `curriculum/speaking_scenarios.json` (8 escenarios) + `services/speaking_scenarios.py` |
+| Curso secuencial A1→C2 completo | ✅ | `curriculum/a1.json` … `c2.json` (A1/A2/B1/B2 + **C1/C2 nuevos en V2.1**), con módulo final de repaso por nivel |
+| Corpus de listening versionado (contenido fuera del código) | ✅ | `curriculum/listening_corpus.json` (100 ítems A1–B2, c001–c100) + loader |
+| Escenarios comunicativos | ✅ | `curriculum/speaking_scenarios.json` (20 escenarios, A1–C1) + `services/speaking_scenarios.py` |
 | Integridad de contenido end-to-end | ✅ | `scripts/content_validation.py` (question → audio → manifest → WAV → metadata → CEFR) |
+| Content Quality Gate (V2.1) | ✅ | `services/content_validation.py::run_quality_check` (umbrales de volumen/diversidad; `scripts/content_validation.py` falla si no se cumplen) |
 
 **Score: 10/10.** Currículo completo, secuenciado y con validación de integridad en CI.
 
@@ -52,7 +57,7 @@ Destrezas orales con audio real, métricas y honestidad del proxy.
 | Listening 2.0 (resiliencia + context) | ✅ | `services/listening.py` + `listening_resilience` por condición de escucha |
 | Biblioteca de audio humano en-app | ✅ | `services/audio_library.py` (upload/reemplazar/quitar WAV), `AudioLibraryEntry` multidimensional |
 | QA acústica (peak/RMS/clipping/DC/silence) | ✅ | `PASS`/`WARNING`/`REJECT` en el upload, panel "AUDIO QUALITY" |
-| Speaking 3.0 (escenarios comunicativos + métricas) | ✅ | 8 escenarios, métricas `task_completion`/`interaction`/`fluency`/`repair`/`turn_taking` |
+| Speaking 3.0 (escenarios comunicativos + métricas) | ✅ | 20 escenarios (A1–C1), métricas `task_completion`/`interaction`/`fluency`/`repair`/`turn_taking` |
 | Interacción auténtica (turn-taking + telemetría) | ✅ | `services/interaction.py`, `SpeakingRolePlay` captura `duration_ms`/`latency_ms` |
 | Honestidad del proxy de pronunciación | ✅ | `pronunciation` marcado `proxy`; UI "Confidence · automated proxy" |
 

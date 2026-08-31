@@ -29,6 +29,168 @@ def _issues_by_severity(issues: list[dict]) -> dict[str, int]:
     return dict(counts)
 
 
+# --- Content Quality Gate (V2.1) ---------------------------------------------
+# El integrity check garantiza que el contenido es *válido* (referencias, ids,
+# CEFR). El Quality Gate añade umbrales de *volumen y diversidad pedagógica*: el
+# banco de listening debe ser un corpus utilizable y variado, no solo válido.
+# Se mide sobre el banco DECLARADO (metadata), no sobre el audio realizado: las
+# dimensiones que una única voz TTS no realiza (acento, multihablante, ruido)
+# cuentan aquí como diversidad declarada, pendiente de audio real.
+
+QUALITY_THRESHOLDS: dict = {
+    "min_total_items": 100,
+    "min_items_per_level": {"A1": 20, "A2": 20, "B1": 20, "B2": 20},
+    "min_speakers": 10,
+    "min_accents": 4,
+    "min_contexts": 5,
+    "min_connected_speech_items": 8,
+    "min_noise_items": 6,
+    "min_multiple_speakers_items": 4,
+    "min_fast_speech_items": 6,
+}
+
+
+def _quality_metrics(bank: list[dict]) -> dict:
+    """Métricas de diversidad del banco de listening (sin comparar umbrales)."""
+    per_level: dict[str, int] = {
+        level: 0 for level in QUALITY_THRESHOLDS["min_items_per_level"]
+    }
+    speakers: set[str] = set()
+    accents: set[str] = set()
+    contexts: set[str] = set()
+    connected_speech = 0
+    noise = 0
+    multiple_speakers = 0
+    fast_speech = 0
+    total = 0
+
+    for q in bank:
+        total += 1
+        level = q.get("level")
+        if level in per_level:
+            per_level[level] += 1
+        speaker_id = (q.get("speaker_id") or "").strip()
+        if speaker_id:
+            speakers.add(speaker_id)
+        accent = (q.get("accent") or "").strip()
+        if accent:
+            accents.add(accent)
+        context = (q.get("context") or "").strip()
+        if context:
+            contexts.add(context)
+        vector = q.get("difficulty_vector") or {}
+        if int(vector.get("connected_speech", 1)) >= 4:
+            connected_speech += 1
+        if int(vector.get("noise", 1)) >= 3:
+            noise += 1
+        if (
+            q.get("skill") == "multiple_speakers"
+            or int(vector.get("speaker_count", 1)) >= 2
+        ):
+            multiple_speakers += 1
+        if q.get("skill") == "fast_speech" or int(vector.get("speed", 1)) >= 5:
+            fast_speech += 1
+
+    return {
+        "total_items": total,
+        "per_level": per_level,
+        "speakers": len(speakers),
+        "accents": len(accents),
+        "contexts": len(contexts),
+        "connected_speech": connected_speech,
+        "noise": noise,
+        "multiple_speakers": multiple_speakers,
+        "fast_speech": fast_speech,
+    }
+
+
+def run_quality_check(bank: list[dict] | None = None) -> dict:
+    """Evalúa los umbrales de calidad del banco (V2.1).
+
+    Devuelve `{pass, passed, total, checks}` donde `checks` es una lista de
+    `{name, label, required, actual, pass}`. `pass` es True solo si se cumplen
+    todos los umbrales.
+    """
+    bank = bank if bank is not None else QUESTION_BANK
+    metrics = _quality_metrics(bank)
+    checks: list[dict] = []
+
+    def _add(name: str, actual: int, required: int, label: str) -> None:
+        checks.append(
+            {
+                "name": name,
+                "label": label,
+                "required": required,
+                "actual": actual,
+                "pass": actual >= required,
+            }
+        )
+
+    _add(
+        "total_items",
+        metrics["total_items"],
+        QUALITY_THRESHOLDS["min_total_items"],
+        "Total listening items",
+    )
+    for level, required in QUALITY_THRESHOLDS["min_items_per_level"].items():
+        _add(
+            f"items_{level.lower()}",
+            metrics["per_level"][level],
+            required,
+            f"Items at {level}",
+        )
+    _add(
+        "speakers",
+        metrics["speakers"],
+        QUALITY_THRESHOLDS["min_speakers"],
+        "Distinct speakers",
+    )
+    _add(
+        "accents",
+        metrics["accents"],
+        QUALITY_THRESHOLDS["min_accents"],
+        "Distinct accents",
+    )
+    _add(
+        "contexts",
+        metrics["contexts"],
+        QUALITY_THRESHOLDS["min_contexts"],
+        "Distinct contexts",
+    )
+    _add(
+        "connected_speech_items",
+        metrics["connected_speech"],
+        QUALITY_THRESHOLDS["min_connected_speech_items"],
+        "Connected-speech items",
+    )
+    _add(
+        "noise_items",
+        metrics["noise"],
+        QUALITY_THRESHOLDS["min_noise_items"],
+        "Noisy items",
+    )
+    _add(
+        "multiple_speakers_items",
+        metrics["multiple_speakers"],
+        QUALITY_THRESHOLDS["min_multiple_speakers_items"],
+        "Multiple-speaker items",
+    )
+    _add(
+        "fast_speech_items",
+        metrics["fast_speech"],
+        QUALITY_THRESHOLDS["min_fast_speech_items"],
+        "Fast-speech items",
+    )
+
+    passed = sum(1 for c in checks if c["pass"])
+    return {
+        "pass": passed == len(checks),
+        "passed": passed,
+        "total": len(checks),
+        "checks": checks,
+    }
+
+
 def run_content_validation() -> dict:
     """Ejecuta el chequeo de integridad del contenido y devuelve el resumen."""
     issues: list[dict] = []
@@ -129,4 +291,5 @@ def run_content_validation() -> dict:
         "issues": issues,
         "by_severity": _issues_by_severity(issues),
         "ok": not any(i["severity"] == "error" for i in issues),
+        "quality": run_quality_check(QUESTION_BANK),
     }

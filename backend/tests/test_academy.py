@@ -14,6 +14,7 @@ from services import academy as academy_svc
 from services.curriculum import (
     ASSESSABLE_SKILLS,
     CANONICAL_SKILLS,
+    CURRICULUM_VERSION,
     PERFORMANCE_SKILLS,
     load_all_levels,
     load_assessments,
@@ -794,7 +795,7 @@ def test_evidence_record_and_list(monkeypatch, tmp_path):
         difficulty=2,
         source="objective_assessment",
         result=1.0,
-        curriculum_version="1.2.5",
+        curriculum_version=CURRICULUM_VERSION,
         assessment_version="",
     ) is True
     rows = academy_repo.list_evidence(a)
@@ -806,7 +807,7 @@ def test_evidence_record_and_list(monkeypatch, tmp_path):
     assert r["difficulty"] == 2
     assert r["source"] == "objective_assessment"
     assert r["result"] == 1.0
-    assert r["curriculum_version"] == "1.2.5"
+    assert r["curriculum_version"] == CURRICULUM_VERSION
     assert r["assessment_version"] == ""
 
 
@@ -824,7 +825,7 @@ def test_objective_assessment_records_evidence(monkeypatch, tmp_path):
     rows = academy_repo.list_evidence(a)
     assert rows, "no se registró evidencia para la evaluación del objetivo"
     assert all(row["source"] == "objective_assessment" for row in rows)
-    assert all(row["curriculum_version"] == "1.2.5" for row in rows)
+    assert all(row["curriculum_version"] == CURRICULUM_VERSION for row in rows)
     assert all(row["result"] in {0.0, 1.0} for row in rows)
 
 
@@ -846,7 +847,7 @@ def test_exam_records_evidence_with_versions(monkeypatch, tmp_path):
     ]
     assert exam_rows, "no se registró evidencia del examen"
     assert all(row["assessment_version"] == "a1-final" for row in exam_rows)
-    assert all(row["curriculum_version"] == "1.2.5" for row in exam_rows)
+    assert all(row["curriculum_version"] == CURRICULUM_VERSION for row in exam_rows)
 
 
 def test_evidence_isolation_between_users(monkeypatch, tmp_path):

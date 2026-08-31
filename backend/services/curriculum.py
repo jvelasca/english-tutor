@@ -140,7 +140,7 @@ CEFR_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 # Versión del esquema/contenido del currículum y las evaluaciones. Independiente
 # de la versión de la aplicación: identifica QUÉ contenido se evaluó.
-CURRICULUM_VERSION = "1.2.5"
+CURRICULUM_VERSION = "1.3.0"
 
 # Versiones de los instrumentos de evaluación (independientes de la versión de la
 # app y del currículum). Identifican QUÉ instrumento produjo cada resultado para
@@ -149,8 +149,8 @@ ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exám
 PLACEMENT_VERSION = "2.0.0"  # motor de placement adaptativo (IRT-lite/1PL multiskill)
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
-SPEAKING_SCENARIOS_VERSION = "1.0.0"  # catálogo de escenarios comunicativos 1.0
-LISTENING_BANK_VERSION = "4.0.0"  # banco de listening (TTS 8D + corpus de audio humano)
+SPEAKING_SCENARIOS_VERSION = "2.0.0"  # escenarios comunicativos (20 escenarios)
+LISTENING_BANK_VERSION = "5.0.0"  # listening: TTS 8D + corpus de audio (100 ítems)
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
