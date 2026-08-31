@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 from pydantic import BaseModel, Field, ValidationError, computed_field
 
-from services.curriculum import LISTENING_BANK_VERSION
+from services.curriculum import CURRICULUM_DIR, LISTENING_BANK_VERSION
 from services.forgetting import days_since
 from services.phonetics import composite_score
 
@@ -274,7 +275,7 @@ class ListeningAsset(BaseModel):
         return difficulty_from_vector(self.difficulty_vector)
 
 
-QUESTION_BANK: list[dict] = [
+_LEGACY_BANK: list[dict] = [
     {
         "id": "l1",
         "topic": "daily_routine",
@@ -893,6 +894,29 @@ QUESTION_BANK: list[dict] = [
         "answer_index": 0,
     },
 ]
+
+
+def _load_corpus_items() -> list[dict]:
+    """Carga el corpus de audio humano desde `curriculum/listening_corpus.json`.
+
+    El corpus vive como contenido versionado fuera del código (espejo de la
+    convención de `services.curriculum`): el equipo pedagógico lo edita sin tocar
+    lógica. Devuelve los ítems en el orden declarado; lanza `FileNotFoundError` si
+    falta el archivo (es contenido requerido del banco). Los ítems del corpus
+    declaran `audio_id` y, por defecto, son `tts` hasta que el manifest de la
+    biblioteca de audio humano respalda su `audio_id` (en ese momento el motor los
+    sirve como `recorded`).
+    """
+    path = CURRICULUM_DIR / "listening_corpus.json"
+    with path.open(encoding="utf-8") as f:
+        data = json.load(f)
+    return data["items"]
+
+
+# Banco completo: el banco heredado TTS (l1..l23) seguido del corpus de audio
+# humano (c001..cNNN). El orden importa para la progresión CEFR: el banco heredado
+# define la secuencia original y el corpus la amplía por nivel.
+QUESTION_BANK: list[dict] = _LEGACY_BANK + _load_corpus_items()
 
 
 LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2"]

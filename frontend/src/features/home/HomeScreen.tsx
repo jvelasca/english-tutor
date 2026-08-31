@@ -84,6 +84,7 @@ export function HomeScreen({
 
   const level = profile?.estimated_level ?? null;
   const readiness = Math.round(profile?.readiness.overall ?? 0);
+  const band = profile?.readiness.band ?? "developing";
   const trend = profile ? overallTrend(profile) : null;
   const nextFocus = profile?.readiness.blocking_skills[0] ?? null;
 
@@ -153,8 +154,13 @@ export function HomeScreen({
                 <span className="text-muted-foreground">
                   {t("home.readyFor")} {profile?.target_level ?? "…"}
                 </span>
-                <span className="text-lg font-bold tabular-nums">
-                  {readiness}%
+                <span className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-bold">
+                    {t(`readiness.${band}`)}
+                  </span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {readiness}%
+                  </span>
                 </span>
               </div>
               <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-primary/15">

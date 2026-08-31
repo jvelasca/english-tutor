@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Lock } from "lucide-react";
 import {
   getCefrLadder,
+  getCourseMap,
   getLevelCompletions,
   getLevelDetail,
   getLevels,
 } from "../../api/academy";
 import type {
   CefrLadder,
+  CourseMap,
   LearningProfile,
   LevelCompletion,
   LevelDetail,
@@ -67,6 +69,7 @@ export function CourseScreen({
   const [levels, setLevels] = useState<LevelSummary[]>([]);
   const [completions, setCompletions] = useState<LevelCompletion[]>([]);
   const [detail, setDetail] = useState<LevelDetail | null>(null);
+  const [course, setCourse] = useState<CourseMap | null>(null);
   const [currentLevelId, setCurrentLevelId] = useState<string | null>(null);
   const [ladder, setLadder] = useState<CefrLadder | null>(null);
 
@@ -105,8 +108,14 @@ export function CourseScreen({
     let cancelled = false;
     void (async () => {
       try {
-        const d = await getLevelDetail(userId, currentLevelId);
-        if (!cancelled) setDetail(d);
+        const [d, c] = await Promise.all([
+          getLevelDetail(userId, currentLevelId),
+          getCourseMap(userId, currentLevelId),
+        ]);
+        if (!cancelled) {
+          setDetail(d);
+          setCourse(c);
+        }
       } catch {
         /* backend no disponible */
       }
@@ -333,6 +342,79 @@ export function CourseScreen({
                   </div>
                   <Progress value={readinessPct} className="h-1.5" />
                 </div>
+              )}
+            </Card>
+          </motion.section>
+        )}
+
+        {course && (
+          <motion.section variants={item} aria-label={t("course.whereAmI")}>
+            <Card className="gap-4 p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-base font-semibold">
+                  {t("course.whereAmI")}
+                </h2>
+                <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                  {course.level} ·{" "}
+                  {Math.round((course.progress.progress ?? 0) * 100)}%
+                </span>
+              </div>
+
+              <div className="flex items-center overflow-x-auto pb-1">
+                {course.units.map((unit, i) => {
+                  const state = unit.status;
+                  return (
+                    <div key={unit.unit_id} className="flex items-center">
+                      {i > 0 && (
+                        <div
+                          aria-hidden="true"
+                          className={cn(
+                            "h-0.5 w-4 shrink-0 rounded-full",
+                            state === "locked" ? "bg-border" : "bg-primary/60",
+                          )}
+                        />
+                      )}
+                      <div
+                        title={unit.unit_title}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                          state === "done" &&
+                            "border-primary/40 bg-primary/10 text-primary",
+                          state === "current" &&
+                            "border-primary bg-primary text-primary-foreground",
+                          state === "locked" &&
+                            "border-border bg-card text-muted-foreground",
+                        )}
+                      >
+                        {state === "done" ? (
+                          <Check className="size-3.5" />
+                        ) : state === "locked" ? (
+                          <Lock className="size-3" />
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="size-1.5 rounded-full bg-current"
+                          />
+                        )}
+                        <span>
+                          {t("course.unit")} {i + 1}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {course.position.lesson_title && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">
+                    {t("course.currentLesson")}:
+                  </span>{" "}
+                  <span className="font-medium">
+                    {course.position.unit_title} ·{" "}
+                    {course.position.lesson_title}
+                  </span>
+                </p>
               )}
             </Card>
           </motion.section>

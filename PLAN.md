@@ -11,12 +11,29 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `1.34.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+- ✅ Versión estable `2.0.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
   **V1.30** LAN + Mobile 100% (mDNS real, test de micrófono con medidor, QR de conexión,
   `/help/connect`), **V1.31** Adaptive Engine 2.0 (Priority Engine + "Why this activity?"),
   **V1.32** Curriculum 2.0 (escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones),
-  **V1.33** Listening 2.0 (Listening Resilience + `context` del corpus) y **V1.34** Speaking 2.0
-  (pronunciation proxy + Interaction Quality + Conversation Endurance). Sobre la base **V1.21**
+  **V1.33** Listening 2.0 (Listening Resilience + `context` del corpus), **V1.34** Speaking 2.0
+  (pronunciation proxy + Interaction Quality + Conversation Endurance), **V1.35** gestión en-app
+  de la biblioteca de audio humano (Ajustes → Audio), **V1.36** Audio Corpus 1.0 (corpus de audio
+  humano versionado + pipeline de grabación + importación masiva), **V1.37** Audio QA + Content
+  Audit (QA acústica + content integrity check + Content Audit Dashboard + candado admin/PIN),
+  **V1.38** Course Engine (secuenciación Course→Unit→Lesson→Practice→Review→Assessment con gating
+  por objetivo + progreso visible "¿dónde estoy?") y **V1.39** Mastery 2.0 (`MasteryRecord`
+  transversal para las 9 destrezas + CEFR readiness con banda cualitativa "B1 developing" en lugar
+  de media simple + curva de olvido/review_due conectada a todo el currículo), y **V1.40** Speaking 3.0
+  (catálogo de 8 escenarios comunicativos con objetivo comunicativo y métricas declaradas
+  task_completion/interaction/fluency/repair/turn_taking + honestidad del proxy de pronunciación en la
+  UI: "Confidence: medium · automated proxy"), y **V1.41** Beta Hardening (sin features nuevas: backup
+  local completo SQLite+perfil+progreso+evidencia+manifest+WAV+settings con restore/export y
+  auto-backup diario "keep 7", endpoints admin con PIN local, middleware de seguridad LAN
+  origin-check + rate limiting, panel de backup en Ajustes → Sistema, matriz de dispositivos
+  actualizada PC/Android/iPhone/iPad con HTTPS/mDNS/mic/audio/listening/speaking/recovery, a11y
+  skip-link + `lang` sincronizado y code-splitting de vendors React/motion/iconos), y **Beta 1.0**
+  (5 gates de salida 10/10: Infra/Curriculum/Listening+Speaking/Adaptive+Mastery/UX — ver
+  `docs/BETA_GATES.md`). Sobre la base **V1.21**
   (cierre de la auditoría pedagógica A1→B2: corpus de audio humano 1.0 + validación determinista
   audio↔metadata + separación del proxy de pronunciación del audio real + evidencia
   familiar/transfer/novel + Interaction 3.0 + matriz de assessment CEFR; y nueva UI de 3 paneles

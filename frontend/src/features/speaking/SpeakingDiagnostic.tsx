@@ -52,6 +52,14 @@ function formatSeconds(seconds: number): string {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+/** Clave i18n de la confianza cualitativa (alta/media/baja) de un criterio. */
+function confidenceLevelKey(confidence: number | null | undefined): string | null {
+  if (confidence == null) return null;
+  if (confidence >= 0.7) return "diag.confHigh";
+  if (confidence >= 0.4) return "diag.confMedium";
+  return "diag.confLow";
+}
+
 interface SpeakingDiagnosticProps {
   userId: string | null;
 }
@@ -116,14 +124,26 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
                   c.review_due ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                <span className="font-medium">
-                  {criterionLabel(c.criterion)}
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-medium">
+                    {criterionLabel(c.criterion)}
+                    {c.proxy ? (
+                      <span
+                        className="ml-1.5 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+                        title={t("diag.proxyFull")}
+                      >
+                        {t("diag.proxy")}
+                      </span>
+                    ) : null}
+                  </span>
                   {c.proxy ? (
-                    <span
-                      className="ml-1.5 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
-                      title={t("diag.proxy")}
-                    >
-                      {t("diag.proxy")}
+                    <span className="text-[10px] text-muted-foreground">
+                      {confidenceLevelKey(c.confidence)
+                        ? `${t("assessment.confidence")}: ${t(
+                            confidenceLevelKey(c.confidence) as string,
+                          )} · `
+                        : ""}
+                      {t("diag.proxyAutomated")}
                     </span>
                   ) : null}
                 </span>

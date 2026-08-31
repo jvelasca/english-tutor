@@ -149,7 +149,8 @@ ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exám
 PLACEMENT_VERSION = "2.0.0"  # motor de placement adaptativo (IRT-lite/1PL multiskill)
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
-LISTENING_BANK_VERSION = "3.0.0"  # banco de listening (TTS pre-renderizado, 8D)
+SPEAKING_SCENARIOS_VERSION = "1.0.0"  # catálogo de escenarios comunicativos 1.0
+LISTENING_BANK_VERSION = "4.0.0"  # banco de listening (TTS 8D + corpus de audio humano)
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
@@ -158,8 +159,10 @@ _NON_LEVEL_FILES = frozenset(
     {
         "assessments.json",
         "speaking_assessment.json",
+        "speaking_scenarios.json",
         "cefr_matrix.json",
         "cefr_descriptors.json",
+        "listening_corpus.json",
     }
 )
 

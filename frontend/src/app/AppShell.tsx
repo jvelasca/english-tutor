@@ -16,8 +16,28 @@ export function AppShell({
 }) {
   return (
     <div className="relative flex h-full flex-col">
+      <a
+        href="#main-content"
+        className="skip-link"
+        onClick={(e) => {
+          const el = document.getElementById("main-content");
+          if (el) {
+            e.preventDefault();
+            el.focus();
+            el.scrollIntoView();
+          }
+        }}
+      >
+        Skip to content
+      </a>
       {header}
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+      >
+        {children}
+      </main>
       <div className="border-t border-border bg-background/95 px-2 py-1 backdrop-blur md:hidden">
         <Navigation
           route={route}

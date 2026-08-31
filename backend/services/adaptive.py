@@ -118,6 +118,23 @@ READINESS_MIN_EVIDENCE = 3
 # Mínimo por defecto para destrezas fuera del mapa (no deberían aparecer).
 READINESS_DEFAULT_MINIMUM = 0.7
 
+# Umbral de progreso (0..100) a partir del cual se considera "approaching"
+# (cerca de certificar el nivel) aunque aún no esté "ready".
+READINESS_APPROACHING_THRESHOLD = 70.0
+
+
+def readiness_band(overall: float, ready: bool) -> str:
+    """Banda cualitativa de preparación CEFR (en lugar de un "%" crudo).
+
+    `ready` (todas las destrezas evaluadas superan sus gates), `approaching`
+    (progreso alto pero falta algo) o `developing` (aún en construcción).
+    """
+    if ready:
+        return "ready"
+    if overall >= READINESS_APPROACHING_THRESHOLD:
+        return "approaching"
+    return "developing"
+
 
 def readiness(profile: list[dict], target_level: str) -> dict:
     """Preparación de cada destreza para el `target_level`.
@@ -197,12 +214,14 @@ def readiness(profile: list[dict], target_level: str) -> dict:
             }
         )
     overall = round(ready_count / evaluated_count * 100, 1) if evaluated_count else 0.0
+    ready = overall >= 100.0
     return {
         "target_level": target_level,
         "skills": skills,
         "overall": overall,
         "blocking_skills": blocking,
-        "ready": overall >= 100.0,
+        "ready": ready,
+        "band": readiness_band(overall, ready),
     }
 
 

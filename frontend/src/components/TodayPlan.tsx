@@ -247,9 +247,10 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
       <div className="today-readiness">
         <div className="today-readiness-head">
           <span>
-            {t("today.readyFor")} {model.target_level}
+            {t("today.readyFor")} {model.target_level} ·{" "}
+            {Math.round(model.readiness.overall)}%
           </span>
-          <strong>{Math.round(model.readiness.overall)}%</strong>
+          <strong>{t(`readiness.${model.readiness.band}`)}</strong>
         </div>
         <div className="today-bar" role="progressbar" aria-valuenow={model.readiness.overall} aria-valuemin={0} aria-valuemax={100}>
           <span style={{ width: `${model.readiness.overall}%` }} />

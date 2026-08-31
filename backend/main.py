@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -26,14 +29,33 @@ from routers.profile import router as profile_router
 from routers.progress import router as progress_router
 from routers.pronunciation import router as pronunciation_router
 from routers.settings import router as settings_router
+from routers.system import router as system_router
 from routers.users import router as users_router
 from routers.vocabulary import router as vocabulary_router
 from routers.voz import router as voz_router
+from security import SecurityMiddleware
+
+logger = logging.getLogger(__name__)
+
+_AUTO_BACKUP_INTERVAL_SECONDS = 3600
+
+
+def _auto_backup_daemon() -> None:
+    """Auto-backup diario (keep 7) en un hilo daemon; verifica cada hora."""
+    from services import backup as backup_svc
+
+    while True:
+        time.sleep(_AUTO_BACKUP_INTERVAL_SECONDS)
+        try:
+            backup_svc.auto_backup_if_due()
+        except Exception:  # noqa: BLE001
+            logger.exception("auto-backup falló")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    threading.Thread(target=_auto_backup_daemon, daemon=True).start()
     yield
 
 
@@ -65,6 +87,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Protección de origen (CSRF) + rate limiting (V1.41).
+app.add_middleware(SecurityMiddleware)
+
 app.include_router(chat_router)
 app.include_router(grammar_router)
 app.include_router(health_router)
@@ -83,3 +108,4 @@ app.include_router(vocabulary_router)
 app.include_router(academy_router)
 app.include_router(assessment_router)
 app.include_router(audio_library_router)
+app.include_router(system_router)

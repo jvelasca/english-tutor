@@ -16,6 +16,7 @@ from repositories import listening as listening_repo
 from schemas.academy import (
     AttemptOut,
     CefrProfileOut,
+    CourseMapOut,
     EnrollmentOut,
     ExamItemOut,
     ExamOut,
@@ -28,6 +29,7 @@ from schemas.academy import (
     LevelProgressOut,
     LevelSummaryOut,
     MasteryOut,
+    MasteryRecordOut,
     ModuleProgressOut,
     NextBestActivityOut,
     NextObjectiveOut,
@@ -67,8 +69,10 @@ from services import (
     cefr_descriptors,
     speaking_assessment,
     speaking_llm,
+    speaking_scenarios,
     writing_llm,
 )
+from services import course as course_svc
 from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
 from services import writing as writing_svc
@@ -78,6 +82,7 @@ from services.curriculum import (
     CEFR_ORDER,
     PLACEMENT_VERSION,
     SPEAKING_ASSESSMENT_VERSION,
+    SPEAKING_SCENARIOS_VERSION,
     Level,
     get_objective,
     load_all_levels,
@@ -86,6 +91,7 @@ from services.curriculum import (
 )
 from services.interaction import interaction_evidence
 from services.listening import listening_diagnostic
+from services.mastery import mastery_records
 
 logger = logging.getLogger(__name__)
 
@@ -151,15 +157,10 @@ def _objective_state(
     skill_scores: dict[str, float],
     skill_attempts: dict[str, int],
     attempts: dict[str, dict[str, int]],
+    status: str,
 ) -> ObjectiveStateOut:
     progress = academy_svc.objective_progress(obj, skill_scores, skill_attempts)
     att = academy_svc.objective_attempts(obj.id, attempts)
-    if obj.id in mastered_ids:
-        status = "mastered"
-    elif att["attempts"] > 0:
-        status = "review"
-    else:
-        status = "available"
     return ObjectiveStateOut(
         id=obj.id,
         can_do=obj.can_do,
@@ -302,6 +303,7 @@ async def get_level_detail(level_id: str, user_id: str) -> LevelDetailOut | None
     mastered = academy_svc.mastered_objective_ids(
         lv, objective_scores, objective_attempts
     )
+    statuses = course_svc.objective_gated_status(lv, mastered, attempts)
     objectives = [
         _objective_state(
             lv,
@@ -314,6 +316,7 @@ async def get_level_detail(level_id: str, user_id: str) -> LevelDetailOut | None
             objective_scores.get(obj.id, {}),
             objective_attempts.get(obj.id, {}),
             attempts,
+            statuses[obj.id],
         )
         for mod, unit, lesson, obj, order in _iter_objectives(lv)
     ]
@@ -331,6 +334,22 @@ async def get_level_detail(level_id: str, user_id: str) -> LevelDetailOut | None
             **academy_svc.level_progress_with_counters(lv, mastered, attempts)
         ),
     )
+
+
+async def get_course_map(level_id: str, user_id: str) -> CourseMapOut | None:
+    """Mapa del curso (V1.38): secuencia Course→Unit→Lesson + posición actual."""
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    attempts = await run_in_threadpool(academy_repo.list_attempts, user_id, level_id)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    return CourseMapOut(**course_svc.course_map(lv, mastered, attempts))
 
 
 async def _completed_level_ids(user_id: str) -> set[str]:
@@ -531,6 +550,7 @@ async def build_student_model(user_id: str) -> dict:
         "critical_skills": academy_svc.critical_skills(skills),
         "readiness": adaptive.readiness(skills, target),
         "reassessment": reassessment,
+        "mastery": mastery_records(skills, now),
     }
 
 
@@ -551,6 +571,7 @@ async def get_student_model(user_id: str) -> StudentModelOut:
         reassessment=(
             ReassessmentOut(**sm["reassessment"]) if sm["reassessment"] else None
         ),
+        mastery=[MasteryRecordOut(**m.model_dump()) for m in sm["mastery"]],
     )
 
 
@@ -632,6 +653,18 @@ async def get_speaking_endurance(user_id: str) -> dict:
         conversations_repo.student_speaking_sessions, user_id
     )
     return speaking_svc.conversation_endurance(sessions)
+
+
+def list_speaking_scenarios() -> dict:
+    """Catálogo de escenarios comunicativos (Speaking 3.0): contenido estático.
+
+    No depende del usuario: son los escenarios disponibles para practicar
+    conversación con objetivo comunicativo y métricas declaradas.
+    """
+    return {
+        "version": SPEAKING_SCENARIOS_VERSION,
+        "scenarios": speaking_scenarios.list_scenarios(),
+    }
 
 
 async def get_writing_diagnostic(user_id: str) -> dict:

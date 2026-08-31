@@ -14,6 +14,7 @@ from schemas.academy import (
     CefrLadderOut,
     CefrProfileOut,
     ConversationEnduranceOut,
+    CourseMapOut,
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
@@ -44,6 +45,7 @@ from schemas.academy import (
     SpeakingJourneyOut,
     SpeakingLevelOut,
     SpeakingResultOut,
+    SpeakingScenariosOut,
     SpeakingSubmitRequest,
     SpeakingTaskResultOut,
     SpeakingTaskSubmitRequest,
@@ -82,6 +84,19 @@ async def level_detail(level_id: str, user: dict = Depends(current_user)) -> dic
     if detail is None:
         raise HTTPException(status_code=404, detail="Nivel no encontrado")
     return detail
+
+
+@router.get("/api/academy/course/{level_id}", response_model=CourseMapOut)
+async def course_map(level_id: str, user: dict = Depends(current_user)) -> dict:
+    """Mapa del curso (V1.38): secuencia Course→Unit→Lesson + posición actual."""
+    if await academy_service.enrollment_blocked(user["id"], level_id):
+        raise HTTPException(
+            status_code=403, detail="Nivel bloqueado: completa el nivel anterior"
+        )
+    out = await academy_service.get_course_map(level_id, user["id"])
+    if out is None:
+        raise HTTPException(status_code=404, detail="Nivel no encontrado")
+    return out
 
 
 @router.post("/api/academy/enroll", response_model=EnrollmentOut)
@@ -369,6 +384,14 @@ async def speaking_journey(user: dict = Depends(current_user)) -> dict:
 @router.get("/api/academy/speaking/endurance", response_model=ConversationEnduranceOut)
 async def speaking_endurance(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_speaking_endurance(user["id"])
+
+
+@router.get(
+    "/api/academy/speaking/scenarios", response_model=SpeakingScenariosOut
+)
+async def speaking_scenarios(user: dict = Depends(current_user)) -> dict:
+    """Catálogo de escenarios comunicativos (Speaking 3.0): contenido estático."""
+    return academy_service.list_speaking_scenarios()
 
 
 @router.get("/api/academy/writing/diagnostic", response_model=WritingDiagnostic)

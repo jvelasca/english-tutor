@@ -17,6 +17,7 @@ from services.audio_library import (
     wav_probe_bytes,
     write_entry,
 )
+from services.listening import QUESTION_BANK
 
 
 def _setup(monkeypatch, tmp_path):
@@ -130,7 +131,14 @@ def test_slots_endpoint_lists_slots(monkeypatch, tmp_path):
     ids = {s["audio_id"] for s in slots}
     assert "audio-l15" in ids
     assert "audio-l23" in ids
-    assert len(ids) == 9
+    # El corpus de audio humano (V1.36) también es grabable desde la app.
+    assert "audio-c001" in ids
+    expected = {
+        q["audio_id"]
+        for q in QUESTION_BANK
+        if (q.get("audio_id") or "").strip()
+    }
+    assert ids == expected
     assert all(s["state"] == "empty" for s in slots)
 
 

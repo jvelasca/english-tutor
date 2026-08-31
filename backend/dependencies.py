@@ -1,10 +1,25 @@
 """Dependencias HTTP compartidas (contexto de usuario local)."""
 from __future__ import annotations
 
-from fastapi import HTTPException, Query, UploadFile
+from fastapi import Header, HTTPException, Query, UploadFile
 
 import config
 from domain import users as user_service
+
+
+async def require_admin(
+    x_admin_pin: str | None = Header(default=None),
+) -> None:
+    """Candado local de administración (V1.37).
+
+    Si `config.ADMIN_PIN` está vacío, permite el acceso (comportamiento previo).
+    Si está definido, exige la cabecera `X-Admin-Pin` coincidente. Sin OAuth/cloud:
+    separa `student` (aprender) de `admin` (gestionar audio/curriculum/diagnostics).
+    """
+    if not config.ADMIN_PIN:
+        return
+    if x_admin_pin != config.ADMIN_PIN:
+        raise HTTPException(status_code=401, detail="PIN de administración requerido")
 
 
 async def current_user(user_id: str = Query(...)) -> dict:

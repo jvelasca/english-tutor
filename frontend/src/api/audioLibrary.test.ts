@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   deleteAudioLibraryEntry,
+  getAudioLibraryAudit,
   getAudioLibrarySlots,
+  getAudioLibraryStatus,
   uploadAudioLibraryWav,
 } from "./audioLibrary";
 
@@ -52,5 +54,37 @@ describe("audioLibrary api", () => {
     const [url, init] = fn.mock.calls[0];
     expect(url).toBe("/api/audio-library/audio-l15");
     expect(init.method).toBe("DELETE");
+  });
+
+  it("getAudioLibraryStatus llama al endpoint de estado", async () => {
+    const fn = mockFetch(true, { admin_required: false, version: "1.2.0" });
+    await getAudioLibraryStatus();
+    expect(fn.mock.calls[0][0]).toBe("/api/audio-library/status");
+  });
+
+  it("getAudioLibraryAudit envía el PIN de admin cuando está definido", async () => {
+    const storage = {
+      getItem: () => "1234",
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    vi.stubGlobal("localStorage", storage);
+    const fn = mockFetch(true, { ok: true, total_items: 0 });
+    await getAudioLibraryAudit();
+    const [, init] = fn.mock.calls[0];
+    expect(init.headers["X-Admin-Pin"]).toBe("1234");
+  });
+
+  it("deleteAudioLibraryEntry envía el PIN de admin cuando está definido", async () => {
+    const storage = {
+      getItem: () => "1234",
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    vi.stubGlobal("localStorage", storage);
+    const fn = mockFetch(true, { removed: true, audio_id: "audio-l15" });
+    await deleteAudioLibraryEntry("audio-l15");
+    const [, init] = fn.mock.calls[0];
+    expect(init.headers["X-Admin-Pin"]).toBe("1234");
   });
 });

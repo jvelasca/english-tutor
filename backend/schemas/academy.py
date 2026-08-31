@@ -123,6 +123,74 @@ class LevelsOut(BaseModel):
     levels: list[LevelSummaryOut]
 
 
+class CourseObjectiveRefOut(BaseModel):
+    objective_id: str
+    title: str
+    status: str
+
+
+class CourseLessonOut(BaseModel):
+    lesson_id: str
+    lesson_title: str
+    lesson_order: int
+    mastered: int
+    total: int
+    progress: float
+    status: str
+    objectives: list[CourseObjectiveRefOut]
+
+
+class CourseUnitOut(BaseModel):
+    module_id: str
+    module_title: str
+    module_order: int
+    unit_id: str
+    unit_title: str
+    unit_order: int
+    mastered: int
+    total: int
+    progress: float
+    status: str
+    lessons: list[CourseLessonOut]
+
+
+class CoursePositionOut(BaseModel):
+    level_id: str
+    level: str
+    title: str
+    objective_id: str | None
+    objective_title: str | None
+    objective_order: int
+    module_id: str | None
+    module_title: str | None
+    unit_id: str | None
+    unit_title: str | None
+    lesson_id: str | None
+    lesson_title: str | None
+    unit_index: int
+    unit_count: int
+    mastered: int
+    total: int
+    progress: float
+    complete: bool
+
+
+class CourseProgressOut(BaseModel):
+    mastered: int
+    total: int
+    progress: float
+
+
+class CourseMapOut(BaseModel):
+    level_id: str
+    level: str
+    title: str
+    description: str
+    units: list[CourseUnitOut]
+    position: CoursePositionOut
+    progress: CourseProgressOut
+
+
 class MasteryOut(BaseModel):
     level_id: str
     skills: dict[str, float]
@@ -545,6 +613,26 @@ class SpeakingAssessmentStateOut(BaseModel):
     final_result: SpeakingAssessmentResultOut | None = None
 
 
+# --- Speaking Scenarios 3.0 ------------------------------------------------
+class SpeakingScenarioOut(BaseModel):
+    """Un escenario comunicativo (Speaking 3.0): objetivo + métricas observadas."""
+
+    id: str
+    title: str
+    category: str = "Everyday life"
+    cefr_target: str = "B1"
+    task_type: str = "role_play"
+    communicative_objective: str
+    prompt: str
+    metrics: list[str] = Field(default_factory=list)
+    difficulty: int = 1
+
+
+class SpeakingScenariosOut(BaseModel):
+    version: str
+    scenarios: list[SpeakingScenarioOut] = Field(default_factory=list)
+
+
 class SkillProfileOut(BaseModel):
     skill: str
     score: float
@@ -584,12 +672,28 @@ class ReadinessOut(BaseModel):
     overall: float
     blocking_skills: list[str]
     ready: bool
+    band: str = "developing"
 
 
 class ReassessmentOut(BaseModel):
     skill: str
     level: str
     reason: str
+
+
+class MasteryRecordOut(BaseModel):
+    skill: str
+    score: float = 0.0
+    confidence: float = 0.0
+    evidence_count: int = 0
+    last_seen_at: str = ""
+    retention: float = 0.0
+    stability: float = 0.0
+    review_due: bool = False
+    review_in_days: int | None = None
+    transfer_count: int = 0
+    novel_count: int = 0
+    stage: str = "acquire"
 
 
 class StudentModelOut(BaseModel):
@@ -603,6 +707,7 @@ class StudentModelOut(BaseModel):
     critical_skills: list[str] = Field(default_factory=list)
     readiness: ReadinessOut
     reassessment: ReassessmentOut | None = None
+    mastery: list[MasteryRecordOut] = Field(default_factory=list)
 
 
 class TodayItemOut(BaseModel):

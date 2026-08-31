@@ -20,10 +20,14 @@ Separación conceptual (espejo de `services/curriculum.py`):
 
 from __future__ import annotations
 
+import array
 import io
 import json
+import math
+import sys
 import wave
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -336,6 +340,188 @@ def wav_probe_bytes(data: bytes) -> dict:
         }
 
 
+# --- QA acústica (V1.37) -----------------------------------------------------
+# Análisis determinista (solo stdlib) del PCM para clasificar una grabación como
+# PASS/WARNING/REJECT antes de aceptarla. Los umbrales son heurísticos y honestos:
+# detectan lo medible (peak, RMS, clipping, DC offset, silencio), no lo subjetivo.
+
+_CLIPPING_LEVEL = 0.985  # fracción de full-scale a partir de la cual hay clip
+_SILENCE_LEVEL = 0.01  # fracción bajo la cual una muestra se considera silencio
+
+_CLIPPING_WARN = 0.001  # 0.1% de muestras recortadas
+_CLIPPING_REJECT = 0.01  # 1% de muestras recortadas
+_DC_WARN = 0.03  # 3% de offset respecto a full-scale
+_DC_REJECT = 0.10  # 10% de offset
+_SILENCE_WARN = 0.5  # >50% de muestras en silencio
+_SILENCE_REJECT = 0.9  # >90% de muestras en silencio
+_RMS_WARN_DBFS = -60.0
+_RMS_REJECT_DBFS = -90.0
+_PEAK_WARN_DBFS = -0.5
+
+
+def _decode_pcm_frames(frames: bytes, sample_width: int) -> list[int]:
+    """Decodifica frames PCM little-endian a enteros (8/16/32-bit; resto vacío)."""
+    if sample_width == 1:
+        # 8-bit WAV es sin signo (0..255) con centro en 128.
+        return [v - 128 for v in array.array("B", frames)]
+    if sample_width == 2:
+        a = array.array("h", frames)
+    elif sample_width == 4:
+        a = array.array("i", frames)
+    else:
+        return []
+    if sys.byteorder == "big":
+        a.byteswap()
+    return list(a)
+
+
+def _dbfs(amplitude: float) -> float:
+    """Convierte una amplitud normalizada (0..1) a dBFS, acotada a -120 dB."""
+    if amplitude <= 0:
+        return -120.0
+    return max(-120.0, 20.0 * math.log10(amplitude))
+
+
+def acoustic_metrics(data: bytes) -> dict:
+    """Métricas acústicas deterministas de un WAV (solo stdlib).
+
+    Decodifica el PCM y calcula `peak` (0..1), `peak_dbFS`, `rms` (0..1),
+    `rms_dbFS`, `clipping_ratio` (0..1), `dc_offset` (0..1) y `silence_ratio`
+    (0..1). Lanza `wave.Error`/`EOFError`/`OSError` si `data` no es WAV y
+    `ValueError` si el framerate es 0.
+    """
+    with wave.open(io.BytesIO(data), "rb") as w:
+        framerate = w.getframerate()
+        if framerate <= 0:
+            raise ValueError("framerate must be > 0")
+        sample_width = w.getsampwidth()
+        nframes = w.getnframes()
+        frames = w.readframes(nframes)
+
+    samples = _decode_pcm_frames(frames, sample_width)
+    if not samples:
+        return {
+            "peak": None,
+            "peak_dbFS": None,
+            "rms": None,
+            "rms_dbFS": None,
+            "clipping_ratio": None,
+            "dc_offset": None,
+            "silence_ratio": None,
+            "analyzed": False,
+        }
+
+    max_amp = float((1 << (8 * sample_width - 1)) - 1)  # p. ej. 32767 (16-bit)
+    n = len(samples)
+    abs_samples = [abs(s) for s in samples]
+    peak = max(abs_samples) / max_amp
+    rms = math.sqrt(sum(s * s for s in samples) / n) / max_amp
+    dc_offset = abs(sum(samples) / n) / max_amp
+    clipping = sum(1 for s in abs_samples if s >= max_amp * _CLIPPING_LEVEL) / n
+    silence = sum(1 for s in abs_samples if s <= max_amp * _SILENCE_LEVEL) / n
+
+    return {
+        "peak": round(peak, 6),
+        "peak_dbFS": round(_dbfs(peak), 2),
+        "rms": round(rms, 6),
+        "rms_dbFS": round(_dbfs(rms), 2),
+        "clipping_ratio": round(clipping, 6),
+        "dc_offset": round(dc_offset, 6),
+        "silence_ratio": round(silence, 6),
+        "analyzed": True,
+    }
+
+
+def classify_quality(metrics: dict) -> str:
+    """Clasifica un WAV como `PASS` | `WARNING` | `REJECT` a partir de sus métricas.
+
+    Prioridad REJECT > WARNING > PASS. Las dimensiones no analizadas (p. ej. PCM de
+    24-bit no soportado) no penalizan.
+    """
+    if not metrics.get("analyzed"):
+        return "PASS"
+    if metrics["silence_ratio"] > _SILENCE_REJECT:
+        return "REJECT"
+    if (metrics["rms_dbFS"] or 0.0) < _RMS_REJECT_DBFS:
+        return "REJECT"
+    if metrics["clipping_ratio"] > _CLIPPING_REJECT:
+        return "REJECT"
+    if metrics["dc_offset"] > _DC_REJECT:
+        return "REJECT"
+    if metrics["clipping_ratio"] > _CLIPPING_WARN:
+        return "WARNING"
+    if metrics["dc_offset"] > _DC_WARN:
+        return "WARNING"
+    if metrics["silence_ratio"] > _SILENCE_WARN:
+        return "WARNING"
+    if (metrics["rms_dbFS"] or 0.0) < _RMS_WARN_DBFS:
+        return "WARNING"
+    if (metrics["peak_dbFS"] or -120.0) > _PEAK_WARN_DBFS:
+        return "WARNING"
+    return "PASS"
+
+
+def wav_quality_bytes(data: bytes) -> dict:
+    """Panel de QA acústica de un WAV en memoria: metadatos físicos + acústicos +
+    clasificación `grade` (PASS/WARNING/REJECT)."""
+    with wave.open(io.BytesIO(data), "rb") as w:
+        framerate = w.getframerate()
+        if framerate <= 0:
+            raise ValueError("framerate must be > 0")
+        physical = {
+            "duration": w.getnframes() / framerate,
+            "channels": w.getnchannels(),
+            "framerate": framerate,
+            "sample_width": w.getsampwidth(),
+        }
+    acoustic = acoustic_metrics(data)
+    return {**physical, **acoustic, "grade": classify_quality(acoustic)}
+
+
+def wav_quality(path: Path) -> dict:
+    """Igual que `wav_quality_bytes` leyendo el WAV del disco."""
+    return wav_quality_bytes(path.read_bytes())
+
+
+# --- Backup + auditoría (V1.37) ----------------------------------------------
+
+
+def backups_dir() -> Path:
+    """Carpeta de copias de seguridad de grabaciones borradas (librería)."""
+    return library_dir() / "_backups"
+
+
+def audit_log_path() -> Path:
+    """Ruta del log de auditoría (JSONL) de las operaciones sobre la biblioteca."""
+    return library_dir() / "audit.log"
+
+
+def log_audit(event: dict) -> None:
+    """Añade una línea JSONL al log de auditoría (append, sin tocar el manifest)."""
+    path = audit_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {"at": datetime.now(timezone.utc).isoformat(), **event}
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _backup_entry(entry: AudioLibraryEntry) -> Path | None:
+    """Copia el WAV y su entrada a `_backups` antes de borrarla. None si no hay WAV."""
+    path = resolve_file(entry)
+    if path is None or not path.exists():
+        return None
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    dest_dir = backups_dir()
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"{stamp}_{entry.audio_id}.wav"
+    dest.write_bytes(path.read_bytes())
+    dest.with_suffix(".json").write_text(
+        json.dumps(entry.model_dump(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return dest
+
+
 def validate_audio_entry(
     entry: AudioLibraryEntry, base: Path | None = None
 ) -> list[AudioValidationIssue]:
@@ -548,6 +734,7 @@ def write_entry(entry: AudioLibraryEntry, wav: bytes) -> Path:
         json.dumps(manifest.model_dump(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    log_audit({"action": "write", "audio_id": entry.audio_id, "file": entry.file})
     return dest
 
 
@@ -567,6 +754,9 @@ def remove_entry(audio_id: str) -> bool:
         json.dumps(manifest.model_dump(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+    _backup_entry(entry)
+    log_audit({"action": "delete", "audio_id": audio_id, "file": entry.file})
 
     path = resolve_file(entry)
     if path is not None and path.exists():

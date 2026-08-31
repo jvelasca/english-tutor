@@ -36,4 +36,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Separa los vendors pesados en chunks propios (performance, V1.41):
+    // reduce el bundle principal y permite cachear React/motion/iconos aparte.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          motion: ["motion"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
+  },
 });

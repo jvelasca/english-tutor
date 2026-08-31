@@ -79,6 +79,9 @@ export function LearningProfile({ profile }: LearningProfileProps) {
           {t("profile.readyFor")} {profile.target_level}
         </span>
         <span className="cefr-confidence-value">
+          {t(`readiness.${profile.readiness.band}`)}
+        </span>
+        <span className="cefr-confidence-sub">
           {Math.round(profile.readiness.overall)}%
         </span>
         {profile.readiness.blocking_skills.length > 0 && (

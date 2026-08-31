@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
 import { ChevronDown } from "lucide-react";
 import { getStudentModel } from "../../api/academy";
-import type { SkillProfile, StudentModel } from "../../types/api";
+import type {
+  MasteryRecord,
+  SkillProfile,
+  StudentModel,
+} from "../../types/api";
 import { SKILL_LABELS } from "../../utils/learningLabels";
 import { useI18n } from "../../hooks/useI18n";
 import { SpeakingDiagnostic } from "../speaking/SpeakingDiagnostic";
@@ -76,9 +80,13 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
 
   const level = model?.estimated_level ?? null;
   const overall = Math.round(model?.readiness.overall ?? 0);
+  const band = model?.readiness.band ?? "developing";
 
   const skills = model?.skills ?? [];
   const bySkill = new Map(skills.map((s) => [s.skill, s]));
+  const masteryBySkill = new Map(
+    (model?.mastery ?? []).map((m) => [m.skill, m]),
+  );
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
@@ -95,7 +103,14 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {t("progress.title")}
           </h1>
-          <LevelBadge level={level ?? "—"} showLabel={Boolean(level)} />
+          <div className="flex items-center gap-2">
+            <LevelBadge level={level ?? "—"} showLabel={Boolean(level)} />
+            {model && (
+              <Badge variant="secondary" className="gap-1.5">
+                {model.target_level} · {t(`readiness.${band}`)}
+              </Badge>
+            )}
+          </div>
         </motion.header>
 
         <motion.section variants={item} aria-label={t("progress.overall")}>
@@ -159,7 +174,10 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
                         ) : skill === "writing" ? (
                           <WritingJourney userId={userId} />
                         ) : (
-                          <SkillDetail profile={p} />
+                          <SkillDetail
+                            profile={p}
+                            mastery={masteryBySkill.get(skill)}
+                          />
                         )}
                       </div>
                     )}
@@ -174,8 +192,15 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
   );
 }
 
-function SkillDetail({ profile }: { profile: SkillProfile }) {
+function SkillDetail({
+  profile,
+  mastery,
+}: {
+  profile: SkillProfile;
+  mastery?: MasteryRecord;
+}) {
   const { t } = useI18n();
+  const reviewIn = mastery?.review_due ? mastery.review_in_days : null;
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -214,7 +239,9 @@ function SkillDetail({ profile }: { profile: SkillProfile }) {
       </div>
       {profile.review_due && (
         <Badge className="w-fit border-transparent bg-warning/15 text-warning">
-          {t("home.needsReview")}
+          {reviewIn != null && reviewIn > 1
+            ? t("mastery.reviewIn").replace("{days}", String(reviewIn))
+            : t("mastery.reviewNow")}
         </Badge>
       )}
     </div>

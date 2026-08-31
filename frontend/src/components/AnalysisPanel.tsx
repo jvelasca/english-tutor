@@ -20,6 +20,7 @@ import { TutorQualityPanel } from "@/components/TutorQualityPanel";
 import { SpeakingDiagnostic } from "@/features/speaking/SpeakingDiagnostic";
 import { SpeakingPanel } from "@/features/speaking/SpeakingPanel";
 import { SpeakingJourney } from "@/features/speaking/SpeakingJourney";
+import { SpeakingScenarios } from "@/features/speaking/SpeakingScenarios";
 import { WritingPanel } from "@/features/writing/WritingPanel";
 import { WritingJourney } from "@/features/writing/WritingJourney";
 import { SpeakingAssessment } from "@/features/speaking/SpeakingAssessment";
@@ -106,6 +107,9 @@ export function AnalysisPanel({
       case "speaking":
         return (
           <div className="space-y-6">
+            <SubSection label={t("scenarios.title")}>
+              <SpeakingScenarios userId={currentUserId} />
+            </SubSection>
             <SubSection label={t("panels.speaking")}>
               <SpeakingDiagnostic userId={currentUserId} />
               <SpeakingPanel userId={currentUserId} />

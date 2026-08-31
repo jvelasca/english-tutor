@@ -33,6 +33,11 @@ export function I18nProvider({
   children: ReactNode;
 }) {
   const t = useCallback((key: string) => translate(lang, key), [lang]);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   return (
     <I18nContext.Provider value={{ lang, setLang, t }}>
       {children}

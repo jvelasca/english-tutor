@@ -94,3 +94,45 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
 }
+
+/* ==========================================================================
+   Accesibilidad (V1.41): skip link + utilidades de backup
+   ========================================================================== */
+
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: var(--space-3);
+  z-index: 999;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.backup-message {
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  margin: var(--space-2) 0 0;
+}
+
+.backup-error {
+  color: var(--color-danger, var(--color-warning));
+  font-size: var(--text-sm);
+  margin: var(--space-2) 0 0;
+}

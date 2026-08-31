@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "restaurant",
+      "title": "Restaurant",
+      "category": "Everyday life",
+      "cefr_target": "A2",
+      "task_type": "role_play",
+      "communicative_objective": "Order food, handle a problem with your order and reach a solution with the waiter.",
+      "prompt": "You are in a restaurant and the waiter has brought you the wrong order. Politely explain the problem, ask for a solution and respond naturally to what the waiter says.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 4,
+        "cognitive_demand": 3,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "doctor",
+      "title": "Doctor",
+      "category": "Health",
+      "cefr_target": "B1",
+      "task_type": "role_play",
+      "communicative_objective": "Describe your symptoms clearly and understand the doctor's advice and instructions.",
+      "prompt": "You are at the doctor's office. Describe what is wrong, answer the doctor's questions about how you feel and make sure you understand the advice you receive.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "travel",
+      "title": "Travel",
+      "category": "Travel",
+      "cefr_target": "A2",
+      "task_type": "conversation",
+      "communicative_objective": "Ask for and give travel information, directions and practical details.",
+      "prompt": "You are a traveller asking a local for directions and practical information. Ask questions, confirm what you hear and respond naturally to the answers.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 2,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "telephone",
+      "title": "Telephone",
+      "category": "Work and services",
+      "cefr_target": "B1",
+      "task_type": "role_play",
+      "communicative_objective": "Make a phone call to arrange or change an appointment and confirm the details.",
+      "prompt": "You are calling a receptionist to change an appointment. State what you need, negotiate a new time and confirm the day, time and place before ending the call.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 3,
+        "grammar_demand": 3,
+        "discourse_demand": 4,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 3,
+        "novelty": 3
+      }
+    },
+    {
+      "id": "work_meeting",
+      "title": "Work meeting",
+      "category": "Work and services",
+      "cefr_target": "B2",
+      "task_type": "discussion",
+      "communicative_objective": "Present your opinion, respond to a colleague and work towards a small agreement.",
+      "prompt": "You are in a work meeting. Give your opinion on a proposal, support it with reasons, respond to a different point of view and try to reach an agreement with your colleague.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 4,
+        "grammar_demand": 4,
+        "discourse_demand": 4,
+        "interaction_demand": 4,
+        "spontaneity": 4,
+        "cognitive_demand": 4,
+        "novelty": 4
+      }
+    },
+    {
+      "id": "small_talk",
+      "title": "Small talk",
+      "category": "Everyday life",
+      "cefr_target": "A2",
+      "task_type": "conversation",
+      "communicative_objective": "Sustain a casual conversation about everyday topics with natural turn-taking.",
+      "prompt": "You meet a new acquaintance at a social event. Start a light conversation about everyday topics, ask friendly questions and keep the conversation going naturally.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 2,
+        "grammar_demand": 2,
+        "discourse_demand": 3,
+        "interaction_demand": 4,
+        "spontaneity": 4,
+        "cognitive_demand": 2,
+        "novelty": 2
+      }
+    },
+    {
+      "id": "problem_solving",
+      "title": "Problem solving",
+      "category": "Work and services",
+      "cefr_target": "B2",
+      "task_type": "discussion",
+      "communicative_objective": "Propose a solution to a problem, negotiate and agree on a plan.",
+      "prompt": "You and a partner have a problem to solve together. Propose a solution, explain your reasoning, respond to alternatives and negotiate until you agree on a plan.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 4,
+        "grammar_demand": 4,
+        "discourse_demand": 5,
+        "interaction_demand": 5,
+        "spontaneity": 4,
+        "cognitive_demand": 4,
+        "novelty": 4
+      }
+    },
+    {
+      "id": "interview",
+      "title": "Interview",
+      "category": "Work and services",
+      "cefr_target": "B2",
+      "task_type": "interview",
+      "communicative_objective": "Answer questions about yourself and present your experience clearly.",
+      "prompt": "You are in a job interview. Introduce yourself, answer the interviewer's questions about your experience and ask one relevant question of your own.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 4,
+        "grammar_demand": 4,
+        "discourse_demand": 4,
+        "interaction_demand": 4,
+        "spontaneity": 3,
+        "cognitive_demand": 4,
+        "novelty": 4
+      }
+    }
+  ]
+}

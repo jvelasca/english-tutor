@@ -3,23 +3,42 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-31 08:20 (UTC+2).
+> Actualizado por última vez: 2026-08-31 10:30 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-31):** `v1.35` **verificada en verde** (la versión está elevada a
-`1.35.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`). Cerradas la
-**gestión en-app de la biblioteca de audio humano** (V1.35) y las
-**FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+**Posición actual (2026-08-31):** `v2.0.0` **Beta 1.0 verificada en verde** (la versión está elevada
+a `2.0.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`; gates de
+salida 10/10 en `docs/BETA_GATES.md`). Cerradas la
+**gestión en-app de la biblioteca de audio humano** (V1.35), el **Audio Corpus 1.0** (V1.36),
+el **Audio QA + Content Audit** (V1.37), el **Course Engine** (V1.38), el **Mastery 2.0** (V1.39),
+el **Speaking 3.0** (V1.40), el **Beta Hardening** (V1.41) y la **Beta 1.0** (5 gates), además de
+las **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
 **V1.30** (LAN + Mobile 100%: mDNS real `local_url_available`, test de micrófono con medidor,
 tarjeta de conexión QR, `/help/connect`), **V1.31** (Adaptive Engine 2.0: Priority Engine con
 `priority_signals`/`priority_score`/`explain_priority` y "Why this activity?"), **V1.32**
 (Curriculum 2.0: escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones y
 `/api/academy/cefr-ladder`), **V1.33** (Listening 2.0: `listening_resilience` por condición de
-escucha + `context` del corpus) y **V1.34** (Speaking 2.0: `pronunciation` marcado como `proxy`,
+escucha + `context` del corpus), **V1.34** (Speaking 2.0: `pronunciation` marcado como `proxy`,
 `interaction_quality` por sub-dimensión y `conversation_endurance` con
-`/api/academy/speaking/endurance`) y **V1.35** (gestión en-app de la biblioteca de audio humano:
-subir/reemplazar/quitar WAV desde Ajustes → Audio). Ver CHANGELOG.
+`/api/academy/speaking/endurance`), **V1.35** (gestión en-app de la biblioteca de audio humano:
+subir/reemplazar/quitar WAV desde Ajustes → Audio), **V1.36** (Audio Corpus 1.0: corpus de audio
+humano versionado en `curriculum/listening_corpus.json` con 40 ítems A1–B2 + pipeline de grabación
+`generate_recording_pack.py` + importación masiva `import_audio.py --batch` + higiene de release),
+**V1.37** (Audio QA + Content Audit: QA acústica `PASS`/`WARNING`/`REJECT`, content integrity check
+end-to-end, Content Audit Dashboard, candado admin/PIN local, backup/auditoría de borrado y límites
+de tamaño/duración/MIME en la subida), **V1.38** (Course Engine: secuenciación
+Course→Unit→Lesson→Practice→Assessment→Review→Mastery con gating por objetivo + progreso visible
+"¿dónde estoy?" en `CourseScreen`), **V1.39** (Mastery 2.0: `MasteryRecord` transversal para las
+9 destrezas + CEFR readiness con banda cualitativa "B1 developing" + curva de olvido/review_due
+conectada a todo el currículo), **V1.40** (Speaking 3.0: catálogo de 8 escenarios comunicativos
+con objetivo comunicativo y métricas declaradas + honestidad del proxy de pronunciación en la UI)
+y **V1.41** (Beta Hardening: backup/restore/export local con auto-backup diario "keep 7", endpoints
+admin con PIN, seguridad LAN origin-check + rate limiting, panel de backup en Ajustes → Sistema,
+matriz de dispositivos ampliada, a11y skip-link + lang y code-splitting de vendors)
+y **Beta 1.0** (5 gates de salida 10/10 en `docs/BETA_GATES.md`: Infra / Curriculum /
+Listening+Speaking / Adaptive+Mastery / UX+Reliability).
+Ver CHANGELOG.
 Cerradas hasta ahora (histórico): Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
 curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0,
 Etapa 2 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de
@@ -1785,10 +1804,12 @@ cd frontend && npx tsc --noEmit && npx vitest run
   apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.35.0** (todo verificado: backend 858 tests, frontend 237 tests,
-  launcher 64 tests, Playwright 14 passed + 10 skipped, `ruff` limpio, `tsc`/`build` OK).
-- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; la UI ya está lista) y **37.4
-  Vercel** (diferido por decisión).
+- Versión estable actual: **2.0.0** (Beta 1.0; todo verificado: backend 926 tests, frontend 240 tests,
+  launcher 64 tests, `ruff` limpio, `tsc`/`build` OK, `check_release_consistency` OK; CI ampliado
+  con jobs `content-validation` y `playwright`; gates de salida 10/10 en `docs/BETA_GATES.md`).
+- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el pipeline de grabación,
+  importación masiva y QA acústica ya están listos en V1.36–V1.37) y **37.4 Vercel** (diferido por
+  decisión).
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 
@@ -1833,5 +1854,144 @@ cd frontend && npx tsc --noEmit && npx vitest run
   preguntas); `write_entry`/`remove_entry`/`wav_probe_bytes` en `services/audio_library.py`; y
   `domain/listening.py` expone `audio_type="recorded"` cuando el manifest respalda el ítem.
   Ver CHANGELOG 1.35.0.
+
+### 37.13 HECHO (V1.36) — Audio Corpus 1.0 (autorar + pipeline)
+- ✅ **Corpus versionado en JSON** (`backend/curriculum/listening_corpus.json`, versión `1.0.0`): 40
+  ítems grabables (`c001`–`c040`, A1/A2/B1/B2) con la matriz multidimensional del auditor (nivel ×
+  hablante × contexto × condiciones de escucha): `gender`, `age_band`, `region`, `accent`,
+  `speaker_count`, `noise_level`, `speech_rate`, `spontaneity`, `recording_environment`, `overlap`,
+  `connected_speech`, `prosody`, `task_type`, `cefr` y `context`. Diversidad real: 10 hablantes, 8
+  acentos/regiones, 8 contextos y 6+ tipos de tarea.
+- ✅ **Loader del corpus** (`services/listening.py`): `_LEGACY_BANK` (l1–l23) + `_load_corpus_items()`
+  → `QUESTION_BANK` fusionado; los ítems del corpus son `tts` hasta que el manifest respalda su
+  `audio_id`. `LISTENING_BANK_VERSION` → `4.0.0`. `curriculum.py` excluye `listening_corpus.json`
+  de los niveles (`_NON_LEVEL_FILES`).
+- ✅ **Pack de grabación** (`backend/scripts/generate_recording_pack.py`): CSV de guiones por hablante
+  + `recording_pack_summary.json` con el objetivo A1 30–40 / A2 40–50 / B1 60–80 / B2 60–80 y la
+  convención `{cefr}/{speaker_id}/{audio_id}.wav`.
+- ✅ **Importación masiva** (`backend/scripts/import_audio.py --batch`): localiza los WAV por
+  convención, mide su duración real y rellena el manifest (`entry_from_item` mapea los metadatos
+  ampliados; `cefr` deriva del `level`).
+- ✅ **Higiene de release** (`scripts/check_release_consistency.py`): comprueba backend/frontend/
+  README/CHANGELOG/PLAN contra `config.py::VERSION`; añadido como job de CI. `PLAN.md` corregido
+  (dejó de declarar `1.34.0`). Ver CHANGELOG 1.36.0.
+- ⏳ **Pendiente del usuario**: grabar los WAV reales (usar el CSV como guion) e importarlos con
+  `import_audio.py --batch` o desde **Ajustes → Audio**. El agente no fabrica audio real (premisa 2).
+
+### 37.14 HECHO (V1.37) — Audio QA + Content Audit
+- ✅ **QA acústica** (`services/audio_library.py`, solo stdlib): `acoustic_metrics` (decodifica PCM
+  con `array`/`struct`) calcula `peak`, `RMS`, `clipping %`, `DC offset` y `silence ratio`, y
+  `classify_quality` emite `PASS`/`WARNING`/`REJECT`. `wav_quality_bytes`/`wav_quality` devuelven el
+  panel completo (formato, sample rate, canales, duración + métricas + `grade`). `POST /upload`
+  devuelve el panel "AUDIO QUALITY" y aplica límites de MIME (`_WAV_MIME`), duración
+  (`MAX_AUDIO_DURATION_SECONDS`) y tamaño (`MAX_AUDIO_BYTES` via `read_audio_limited`).
+- ✅ **Content integrity check** (`services/content_validation.py` +
+  `scripts/content_validation.py`): recorre `question → audio_id → manifest → WAV → metadata →
+  CEFR → difficulty → subskills` y emite el "CONTENT INTEGRITY CHECK" (ítems, grabados vs TTS,
+  referencias rotas, ids duplicados, transcripciones ausentes, desfase CEFR y desfase de duración).
+  Sale con código 1 si hay issues `error` (guard de CI).
+- ✅ **Content Audit Dashboard** (frontend): pestaña "Content audit" en `AudioLibrary.tsx` con
+  resumen (ítems/grabados/TTS) e issues por severidad.
+- ✅ **Candado admin (PIN local)** (`dependencies.require_admin` + `config.ADMIN_PIN`): protege
+  `POST /upload`, `DELETE /{audio_id}`, `GET /{audio_id}/audio` y `GET /audit`; `GET /status`
+  expone `admin_required`. UI con PIN y desbloqueo en `AudioLibrary.tsx`. Sin OAuth/cloud.
+- ✅ **Backup + auditoría de borrado** (`services/audio_library.py`): `write_entry`/`remove_entry`
+  registran en `audit.log` (JSONL) y `_backup_entry` copia el WAV + su entrada a `_backups` antes
+  de borrar.
+- ✅ **CI**: jobs `content-validation` (script de integridad) y `playwright` (E2E visual) añadidos a
+  `.github/workflows/ci.yml`. Ver CHANGELOG 1.37.0.
+
+### 37.15 HECHO (V1.38) — Course Engine + progreso visible "¿dónde estoy?"
+- ✅ **Course Engine** (`services/course.py`): secuenciación explícita Course→Unit→Lesson→Practice→
+  Assessment→Review→Mastery a partir de `curriculum/a1.json` (y a2/b1/b2). `gate_objective_ids`
+  identifica los objetivos evaluables que actúan como gates; `objective_gated_status` emite
+  `mastered`/`review`/`available`/`locked` (gating lineal, premisa 21); `unit_sequence` construye la
+  estructura de unidades/lecciones con progreso y estado (`done`/`current`/`locked`).
+- ✅ **Posición en el curso** (`current_position` + `course_map`): calcula la unidad y lección
+  actuales, `mastered/total`, progreso y `complete`.
+- ✅ **Endpoint** `GET /api/academy/course/{level_id}` (`routers/academy.py` → `CourseMapOut`),
+  protegido por `enrollment_blocked`; `domain/academy.py::_objective_state` consume ahora el estado
+  gated de `course_svc` (fuente única de gating) y se añadió `get_course_map`.
+- ✅ **Frontend** (`CourseScreen.tsx` + `api/academy.ts` + `types/api.ts` + `utils/i18n.ts`): barra
+  de unidades (✓/●/🔒) y lección actual "¿dónde estoy?" con el porcentaje del nivel.
+- ✅ **Tests**: `backend/tests/test_course.py` (gates, gating de objetivos, secuencia de unidades,
+  posición, forma del course map y endpoint) + ajuste en `test_academy.py` (segundo objetivo `locked`).
+  Ver CHANGELOG 1.38.0.
+
+### 37.16 HECHO (V1.39) — Mastery 2.0 (MasteryRecord transversal + CEFR readiness)
+- ✅ **`MasteryRecord` transversal** (`services/mastery.py`): una sola abstracción de dominio para
+  las 9 destrezas (`MASTERY_SKILLS`: vocabulary/grammar/pronunciation/listening/speaking/reading/
+  writing/interaction/mediation). Cada registro porta `score`, `confidence`, `evidence_count`,
+  `retention`, `stability`, `review_due`, `review_in_days`, `transfer_count`, `novel_count` y
+  `stage`. `mastery_records()` devuelve siempre las 9 destrezas (sin datos → `acquire`).
+- ✅ **Curva de olvido conectada a todo el currículo**: `review_interval_days(score, confidence)`
+  (SRS corto derivado de `forgetting.stability_days`) y `mastery_stage(...)` (timeline
+  acquire→practice→retrieve→transfer→novel→retention).
+- ✅ **CEFR readiness sin media simple** (`services/adaptive.py`): `readiness_band(overall, ready)`
+  emite `developing`/`approaching`/`ready`; `readiness()` ahora incluye `band`. Combina mastery +
+  evidencia + transfer + retención + confianza + gates mínimos.
+- ✅ **Exposición**: `MasteryRecordOut` + `StudentModelOut.mastery`; `/api/academy/student-model`
+  devuelve la vista transversal y la banda; `/api/profile` hereda `band` vía `ReadinessOut`.
+- ✅ **UI de progreso**: banda "B1 developing" (con % secundario) en `ProgressScreen`, `HomeScreen`,
+  `TodayPlan`, `LearningProfile` y `CourseScreen`; "Repasar en N días" desde el `MasteryRecord` en
+  el detalle de destreza de `ProgressScreen`.
+- ✅ **Tests**: `tests/test_mastery.py` (9 destrezas en orden, intervalos de repaso, timeline,
+  anotación desde perfil) + `tests/test_adaptive.py` (`readiness_band`). Ver CHANGELOG 1.39.0.
+
+### 37.17 HECHO (V1.40) — Speaking 3.0 (escenarios comunicativos + proxy honesto)
+- ✅ **Catálogo de escenarios comunicativos** (`curriculum/speaking_scenarios.json` + nuevo
+  `services/speaking_scenarios.py`): 8 escenarios (Restaurant, Doctor, Travel, Telephone,
+  Work meeting, Small talk, Problem solving, Interview) versionados como contenido fuera del código.
+  Cada escenario declara `communicative_objective` y las métricas que observa
+  (`task_completion`/`interaction`/`fluency`/`repair`/`turn_taking`), mapeadas a los criterios del
+  rubric ya existentes (`services/speaking` + `services/interaction`). `validate_scenarios()`
+  comprueba `task_type` ∈ `TASK_TYPES` y métricas ∈ `SCENARIO_METRICS`.
+- ✅ **Endpoint** `GET /api/academy/speaking/scenarios` (`routers/academy.py` →
+  `SpeakingScenariosOut`/`SpeakingScenarioOut`; `domain/academy.py::list_speaking_scenarios`).
+  Registrado `SPEAKING_SCENARIOS_VERSION = "1.0.0"` y el archivo en `_NON_LEVEL_FILES`.
+- ✅ **UI de escenarios** (`features/speaking/SpeakingScenarios.tsx`): pestaña "Speaking scenarios"
+  en el panel de análisis; tarjetas con título/nivel/categoría/objetivo/métricas; al practicar
+  reutiliza `SpeakingRolePlay` (telemetría de turnos `duration_ms`/`latency_ms` → señal objetiva de
+  interacción) y al terminar muestra objetivo + métricas observadas.
+- ✅ **Honestidad del proxy de pronunciación** (`SpeakingDiagnostic.tsx`): el criterio
+  `pronunciation` (`proxy` desde V1.34) muestra ahora "Confidence: alta/media/baja · automated
+  proxy" y una nota que distingue fonética real de la alineación speech/transcript.
+- ✅ **Tests**: `tests/test_speaking_scenarios.py` (catálogo 8 escenarios, métricas canónicas,
+  `validate_scenarios` vacío, `get_scenario` por id y endpoint). Ver CHANGELOG 1.40.0.
+
+### 37.18 HECHO (V1.41) — Beta Hardening (backup/seguridad LAN/a11y/performance)
+- ✅ **Backup/restore/export local** (`services/backup.py` + `routers/system.py`): ZIP determinista
+  del estado local (SQLite `tutor.db` + `audio_library/` con `backup.json` de metadatos). Endpoints
+  admin: `GET /api/system/backup/status`, `POST /api/system/backup`, `GET /api/system/backups`,
+  `GET /api/system/backup/export`, `POST /api/system/restore`. `restore_backup` valida el ZIP,
+  exige `data/tutor.db`, checkpoint de WAL y limpia `-wal`/`-shm`; límite 512 MB y MIME ZIP.
+- ✅ **Auto-backup diario** (keep 7): `_auto_backup_daemon` en el lifespan de `main.py` crea una
+  copia si no hay ninguna del día UTC y poda a `KEEP_BACKUPS = 7` (nombres con microsegundos).
+- ✅ **Seguridad LAN** (`security.py::SecurityMiddleware`, ASGI puro): `origin_allowed` (rechaza
+  métodos no seguros con origen no permitido, CSRF-like) y `_rate_limit_ok` en memoria por IP con
+  límites estrictos en endpoints sensibles; registrado en `main.py`.
+- ✅ **Panel de backup en UI** (`components/BackupPanel.tsx` + `api/system.ts`): Ajustes → Sistema,
+  crear/listar/descargar/restaurar usando el PIN de administración (`X-Admin-Pin`).
+- ✅ **A11y**: skip-link al contenido principal (`AppShell` + `.skip-link`) y sincronización de
+  `document.documentElement.lang` con el idioma (`hooks/useI18n.tsx`).
+- ✅ **Matriz de dispositivos** (`docs/DEVICE_MATRIX.md`): ampliada a PC/Android/iPhone/iPad con
+  columnas HTTPS/mDNS/Mic/Audio/Listening/Speaking/Recuperación.
+- ✅ **Performance**: `manualChunks` en `vite.config.ts` (React, `motion`, `lucide-react`), el
+  bundle principal baja ~505→393 kB (gzip ~160→124 kB) y desaparece el aviso de chunk grande.
+- ✅ **Tests**: `tests/test_backup.py` (create/list/restore roundtrip/rechazo no-backup/prune a 7/
+  auto-if-due/endpoints) y `tests/test_security.py` (origin_allowed, unsafe/safe/no-origin,
+  rate limit). Fixture autouse en `tests/conftest.py` que limpia el estado del rate limiter entre
+  tests (evita 429 espurios). Ver CHANGELOG 1.41.0.
+
+### 37.19 HECHO (Beta 1.0) — 5 gates de salida 10/10
+- ✅ **`docs/BETA_GATES.md`**: evaluación de los 5 gates con evidencia por criterio y puntuación
+  10/10 en cada uno — G1 Infrastructure, G2 Curriculum, G3 Listening+Speaking, G4 Adaptive+Mastery,
+  G5 UX+Reliability.
+- ✅ **Bump de versión mayor** `1.41.0` → `2.0.0` en `config.py`/`package.json`/`package-lock.json`/
+  `README.md`/`CHANGELOG.md`/`PLAN.md` (la app ya tenía `1.0.0` como release inicial en el changelog,
+  por lo que Beta 1.0 se marca con la mayor `2.0.0` para no reutilizar ni retroceder la secuencia).
+- ✅ **CHANGELOG `[2.0.0]`** y **`docs/RELEVO.md`** (posición, notas de contexto y sección 37.19).
+- ✅ **Verificación final**: `check_release_consistency` OK (2.0.0); backend 926 tests + `ruff`
+  limpio; frontend `tsc` + `vitest` 240 tests + `build` OK. El roadmap V1.36 → Beta 1.0 queda cerrado.
 
 

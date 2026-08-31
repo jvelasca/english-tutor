@@ -474,6 +474,47 @@ export interface AudioLibrarySlotsResponse {
   slots: AudioLibrarySlot[];
 }
 
+export interface AudioQualityPanel {
+  grade: "PASS" | "WARNING" | "REJECT";
+  duration: number;
+  channels: number;
+  framerate: number;
+  sample_width: number;
+  peak: number | null;
+  peak_dbFS: number | null;
+  rms: number | null;
+  rms_dbFS: number | null;
+  clipping_ratio: number | null;
+  dc_offset: number | null;
+  silence_ratio: number | null;
+  analyzed: boolean;
+}
+
+export interface AudioUploadResult extends AudioLibraryEntry {
+  quality: AudioQualityPanel;
+}
+
+export interface AudioLibraryStatusResponse {
+  admin_required: boolean;
+  version: string;
+}
+
+export interface ContentValidationIssue {
+  severity: "error" | "warning" | "info";
+  category: string;
+  id: string;
+  message: string;
+}
+
+export interface ContentValidationReport {
+  total_items: number;
+  recorded: number;
+  tts: number;
+  issues: ContentValidationIssue[];
+  by_severity: Record<string, number>;
+  ok: boolean;
+}
+
 // --- Speaking 3.0 (diagnóstico longitudinal por criterio de rúbrica) ---
 
 export interface SpeakingCriterionProgress {
@@ -679,6 +720,25 @@ export interface SpeakingAssessmentState {
   final_result: SpeakingAssessmentResult | null;
 }
 
+// --- Speaking Scenarios 3.0 (escenarios comunicativos) ---
+
+export interface SpeakingScenario {
+  id: string;
+  title: string;
+  category: string;
+  cefr_target: string;
+  task_type: string;
+  communicative_objective: string;
+  prompt: string;
+  metrics: string[];
+  difficulty: number;
+}
+
+export interface SpeakingScenarios {
+  version: string;
+  scenarios: SpeakingScenario[];
+}
+
 // --- Academy (currículum CEFR, mastery, evaluación) ---
 
 export type AcademyObjectiveStatus =
@@ -787,6 +847,74 @@ export interface LevelSummary {
 
 export interface LevelsResponse {
   levels: LevelSummary[];
+}
+
+export interface CourseObjectiveRef {
+  objective_id: string;
+  title: string;
+  status: AcademyObjectiveStatus;
+}
+
+export interface CourseLesson {
+  lesson_id: string;
+  lesson_title: string;
+  lesson_order: number;
+  mastered: number;
+  total: number;
+  progress: number;
+  status: "done" | "current" | "locked";
+  objectives: CourseObjectiveRef[];
+}
+
+export interface CourseUnit {
+  module_id: string;
+  module_title: string;
+  module_order: number;
+  unit_id: string;
+  unit_title: string;
+  unit_order: number;
+  mastered: number;
+  total: number;
+  progress: number;
+  status: "done" | "current" | "locked";
+  lessons: CourseLesson[];
+}
+
+export interface CoursePosition {
+  level_id: string;
+  level: string;
+  title: string;
+  objective_id: string | null;
+  objective_title: string | null;
+  objective_order: number;
+  module_id: string | null;
+  module_title: string | null;
+  unit_id: string | null;
+  unit_title: string | null;
+  lesson_id: string | null;
+  lesson_title: string | null;
+  unit_index: number;
+  unit_count: number;
+  mastered: number;
+  total: number;
+  progress: number;
+  complete: boolean;
+}
+
+export interface CourseProgress {
+  mastered: number;
+  total: number;
+  progress: number;
+}
+
+export interface CourseMap {
+  level_id: string;
+  level: string;
+  title: string;
+  description: string;
+  units: CourseUnit[];
+  position: CoursePosition;
+  progress: CourseProgress;
 }
 
 export interface Enrollment {
@@ -972,12 +1100,28 @@ export interface Readiness {
   overall: number;
   blocking_skills: string[];
   ready: boolean;
+  band: string;
 }
 
 export interface Reassessment {
   skill: string;
   level: string;
   reason: string;
+}
+
+export interface MasteryRecord {
+  skill: string;
+  score: number;
+  confidence: number;
+  evidence_count: number;
+  last_seen_at: string;
+  retention: number;
+  stability: number;
+  review_due: boolean;
+  review_in_days: number | null;
+  transfer_count: number;
+  novel_count: number;
+  stage: string;
 }
 
 export interface StudentModel {
@@ -991,6 +1135,7 @@ export interface StudentModel {
   critical_skills: string[];
   readiness: Readiness;
   reassessment: Reassessment | null;
+  mastery: MasteryRecord[];
 }
 
 export interface TodayItem {

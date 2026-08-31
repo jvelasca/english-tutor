@@ -12,6 +12,7 @@ import type { Theme } from "../utils/theme";
 import { ModelSelect } from "./ModelSelect";
 import { SystemStatus } from "./SystemStatus";
 import { AudioLibrary } from "./AudioLibrary";
+import { BackupPanel } from "./BackupPanel";
 
 type Tab = "appearance" | "language" | "ai" | "audio" | "system";
 
@@ -214,7 +215,12 @@ export function SettingsDialog({
             </div>
           )}
 
-          {tab === "system" && <SystemStatus />}
+          {tab === "system" && (
+            <>
+              <SystemStatus />
+              <BackupPanel />
+            </>
+          )}
           {tab === "audio" && <AudioLibrary />}
         </div>
 

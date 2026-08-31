@@ -5,7 +5,7 @@ from pathlib import Path
 
 DEFAULT_MODEL = "qwen3.5:9b"
 
-VERSION = "1.35.0"
+VERSION = "2.0.0"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -26,6 +26,13 @@ MAX_CHAT_MESSAGES = 100
 MAX_CONTENT_CHARS = 8000
 MAX_TTS_CHARS = 4000
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB
+MAX_AUDIO_DURATION_SECONDS = 120.0  # duración máxima aceptada por grabación
+
+# PIN de administración local (V1.37). Si está vacío, los endpoints de
+# administración de la biblioteca de audio quedan abiertos (comportamiento previo);
+# si se define, exigen la cabecera `X-Admin-Pin`. Sin OAuth/cloud: es un candado
+# local para separar el rol `student` (aprender) del `admin` (gestionar audio).
+ADMIN_PIN = ""
 
 SYSTEM_PROMPT = (
     "You are a friendly, patient English tutor. Help the user practice English: "

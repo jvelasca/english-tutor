@@ -3,28 +3,38 @@
 Permite cambiar las grabaciones reales de listening desde la propia app, sin tocar
 la terminal. El manifest es la fuente de verdad en tiempo de ejecución: subir un WAV
 convierte el ítem correspondiente de TTS a grabado, y borrarlo lo revierte a TTS.
+
+Desde V1.37 los endpoints de escritura (subir/borrar) y el panel de auditoría
+requieren **modo admin** (PIN local), y la subida devuelve un **panel de QA
+acústica** (PASS/WARNING/REJECT) y aplica límites de tamaño/duración/MIME.
 """
 from __future__ import annotations
 
 import wave
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from dependencies import read_audio_limited
+import config
+from dependencies import read_audio_limited, require_admin
 from services import audio_library
 from services.audio_library import (
+    AUDIO_LIBRARY_VERSION,
     AudioLibraryEntry,
     entry_for,
     load_manifest,
     resolve_file,
     wav_probe_bytes,
+    wav_quality_bytes,
 )
+from services.content_validation import run_content_validation
 from services.listening import QUESTION_BANK
 
 router = APIRouter()
+
+_WAV_MIME = {"audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"}
 
 
 def _slot_audio_ids() -> set[str]:
@@ -70,10 +80,25 @@ def _slots() -> list[dict]:
     return slots
 
 
+@router.get("/api/audio-library/status")
+async def status() -> dict:
+    """Estado de la biblioteca: si requiere PIN de admin y versión del manifest."""
+    return {
+        "admin_required": bool(config.ADMIN_PIN),
+        "version": AUDIO_LIBRARY_VERSION,
+    }
+
+
 @router.get("/api/audio-library/slots")
 async def list_slots() -> dict:
     slots = await run_in_threadpool(_slots)
     return {"slots": slots}
+
+
+@router.get("/api/audio-library/audit")
+async def audit(_: None = Depends(require_admin)) -> dict:
+    """CONTENT INTEGRITY CHECK: resumen de integridad del contenido end-to-end."""
+    return await run_in_threadpool(run_content_validation)
 
 
 @router.post("/api/audio-library/upload")
@@ -97,11 +122,18 @@ async def upload(
     task_type: str = Form("unknown"),
     cefr: str = Form("unknown"),
     context: str = Form("unknown"),
+    _: None = Depends(require_admin),
 ) -> dict:
     audio_id = audio_id.strip()
     if audio_id not in _slot_audio_ids():
         raise HTTPException(
             status_code=400, detail="audio_id no corresponde a un ítem de listening"
+        )
+
+    mime = file.content_type or ""
+    if mime.split(";")[0].strip().lower() not in _WAV_MIME:
+        raise HTTPException(
+            status_code=415, detail="El archivo debe ser un WAV PCM sin comprimir"
         )
 
     data = await read_audio_limited(file)
@@ -112,6 +144,17 @@ async def upload(
         raise HTTPException(
             status_code=400, detail="El archivo no es un WAV válido"
         ) from None
+
+    if meta["duration"] > config.MAX_AUDIO_DURATION_SECONDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Audio demasiado largo: {meta['duration']:.1f}s "
+                f"(máx {config.MAX_AUDIO_DURATION_SECONDS:.0f}s)"
+            ),
+        )
+
+    quality = wav_quality_bytes(data)
 
     try:
         entry = AudioLibraryEntry(
@@ -144,11 +187,13 @@ async def upload(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
-    return entry.model_dump()
+    return {**entry.model_dump(), "quality": quality}
 
 
 @router.get("/api/audio-library/{audio_id}/audio")
-async def preview(audio_id: str) -> Response:
+async def preview(
+    audio_id: str, _: None = Depends(require_admin)
+) -> Response:
     """Sirve el WAV grabado del `audio_id` (previsualizar, sin usuario)."""
     manifest = await run_in_threadpool(load_manifest)
     entry = entry_for(manifest, audio_id)
@@ -162,7 +207,9 @@ async def preview(audio_id: str) -> Response:
 
 
 @router.delete("/api/audio-library/{audio_id}")
-async def delete(audio_id: str) -> dict:
+async def delete(
+    audio_id: str, _: None = Depends(require_admin)
+) -> dict:
     removed = await run_in_threadpool(audio_library.remove_entry, audio_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Audio no encontrado")

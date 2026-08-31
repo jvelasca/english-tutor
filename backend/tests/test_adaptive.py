@@ -164,6 +164,49 @@ def test_readiness_legacy_profile_without_evidence_by_kind_not_blocked():
     assert result["ready"] is True
 
 
+def test_readiness_band_qualitative():
+    # Sin evidencia: developing (no se usa un "%" como resultado principal).
+    empty = adaptive.readiness([_entry("grammar")], "B1")
+    assert empty["band"] == "developing"
+
+    # Todo listo: ready.
+    ready_profile = [
+        _entry(
+            s,
+            score=0.9,
+            confidence=0.9,
+            evidence_count=4,
+            evidence_by_kind={"transfer": 1, "novel": 0},
+        )
+        for s in ("grammar", "vocabulary", "reading", "listening")
+    ]
+    ready = adaptive.readiness(ready_profile, "B1")
+    assert ready["band"] == "ready"
+
+    # Progreso alto pero aún bloqueado: approaching.
+    high_but_blocked = adaptive.readiness(
+        [
+            _entry(
+                s,
+                score=0.9,
+                confidence=0.9,
+                evidence_count=4,
+                evidence_by_kind={"transfer": 1, "novel": 0},
+            )
+            for s in ("grammar", "vocabulary", "reading")
+        ]
+        + [_entry("listening", score=0.4, confidence=0.4, evidence_count=4)],
+        "B1",
+    )
+    assert high_but_blocked["band"] == "approaching"
+
+
+def test_readiness_band_helper_frontiers():
+    assert adaptive.readiness_band(100.0, True) == "ready"
+    assert adaptive.readiness_band(70.0, False) == "approaching"
+    assert adaptive.readiness_band(69.9, False) == "developing"
+
+
 # --- Reevaluación continua -------------------------------------------------
 
 

@@ -4,6 +4,7 @@ import type {
   AttemptResponse,
   CefrLadder,
   ConversationEndurance,
+  CourseMap,
   Enrollment,
   Exam,
   ExamResult,
@@ -29,6 +30,7 @@ import type {
   SpeakingDiagnostic,
   SpeakingJourneyOut,
   SpeakingLevelOut,
+  SpeakingScenarios,
   StudentModel,
   StudyPlanStep,
   TodayPlan,
@@ -51,6 +53,12 @@ export function getLevelDetail(
 ): Promise<LevelDetail> {
   return getJson<LevelDetail>(
     `/api/academy/levels/${levelId}${userQuery(userId)}`,
+  );
+}
+
+export function getCourseMap(userId: string, levelId: string): Promise<CourseMap> {
+  return getJson<CourseMap>(
+    `/api/academy/course/${levelId}${userQuery(userId)}`,
   );
 }
 
@@ -209,6 +217,13 @@ export function getSpeakingEndurance(
 ): Promise<ConversationEndurance> {
   return getJson<ConversationEndurance>(
     `/api/academy/speaking/endurance${userQuery(userId)}`,
+  );
+}
+
+/** Catálogo de escenarios comunicativos (Speaking 3.0): contenido estático. */
+export function getSpeakingScenarios(userId: string): Promise<SpeakingScenarios> {
+  return getJson<SpeakingScenarios>(
+    `/api/academy/speaking/scenarios${userQuery(userId)}`,
   );
 }
 

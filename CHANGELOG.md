@@ -4,6 +4,197 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.0.0] — 2026-08-31
+
+**Beta 1.0**: cierre del roadmap V1.36 → Beta. Los 5 gates de salida alcanzan 10/10
+(Infra / Curriculum / Listening+Speaking / Adaptive+Mastery / UX+Reliability); ver
+`docs/BETA_GATES.md`.
+
+### Cambiado
+- **Versión mayor** `1.41.0` → `2.0.0` para marcar el producto completo (feature-complete)
+  y la entrada en Beta.
+
+### Verificado
+- Gates de salida 10/10 en `docs/BETA_GATES.md`.
+- Backend `pytest` (926 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) +
+  `build` OK; `check_release_consistency` OK; CI con `content-validation` y `playwright`.
+
+## [1.41.0] — 2026-08-31
+
+**Beta Hardening**: sin features nuevas, solo fiabilidad y seguridad para cerrar el producto.
+Backup/restore/export local, seguridad LAN, a11y y performance.
+
+### Añadido
+- **Backup / restore / export local** (`services/backup.py` + `routers/system.py`): copias de
+  seguridad ZIP deterministas del estado local (SQLite `tutor.db` — perfiles, progreso, vocabulario,
+  evidencia, settings, mastery — + biblioteca de audio `manifest.json` + WAV). Endpoints admin:
+  `GET /api/system/backup/status`, `POST /api/system/backup`, `GET /api/system/backups`,
+  `GET /api/system/backup/export` y `POST /api/system/restore`.
+- **Auto-backup diario** (keep 7): hilo `_auto_backup_daemon` en el lifespan de FastAPI que crea una
+  copia si no existe ninguna del día UTC, y poda a `KEEP_BACKUPS = 7`.
+- **Seguridad LAN** (`security.py::SecurityMiddleware`): middleware ASGI con (a) origin-check para
+  métodos no seguros (protección tipo CSRF para la app accesible por LAN) y (b) rate limiting en
+  memoria por IP cliente con límites más estrictos para endpoints sensibles.
+- **Panel de backup en la UI** (`components/BackupPanel.tsx` + `api/system.ts`): en Ajustes →
+  Sistema, permite crear copia, listar, descargar y restaurar desde un ZIP, reutilizando el PIN de
+  administración.
+- **A11y**: skip-link al contenido principal (`AppShell`) y sincronización de
+  `document.documentElement.lang` con el idioma de la interfaz.
+
+### Cambiado
+- **Matriz de dispositivos** (`docs/DEVICE_MATRIX.md`): ampliada a PC/Android/iPhone/iPad con
+  columnas explícitas HTTPS, mDNS, Mic, Audio, Listening, Speaking y Recuperación de permisos.
+- **Performance**: `manualChunks` en `vite.config.ts` separa React, `motion` y `lucide-react` en
+  chunks propios (el bundle principal baja de ~505 kB a ~393 kB, gzip de ~160 kB a ~124 kB).
+
+### Verificado
+- Backend `pytest` (926 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) + `build` OK.
+
+## [1.40.0] — 2026-08-31
+
+**Speaking 3.0**: escenarios comunicativos reales con objetivo comunicativo y métricas declaradas,
+más honestidad del proxy de pronunciación en la UI.
+
+### Añadido
+- **Catálogo de escenarios comunicativos** (`backend/curriculum/speaking_scenarios.json` + nuevo
+  `services/speaking_scenarios.py`): 8 escenarios (Restaurant, Doctor, Travel, Telephone,
+  Work meeting, Small talk, Problem solving, Interview) versionados como contenido fuera del código.
+  Cada escenario declara un `communicative_objective` (qué debe conseguir el alumno) y las métricas
+  que observa (`task_completion`, `interaction`, `fluency`, `repair`, `turn_taking`), mapeadas a los
+  criterios del rubric ya existentes (`services/speaking` + `services/interaction`).
+- **Endpoint** `GET /api/academy/speaking/scenarios` (schemas `SpeakingScenarioOut`/
+  `SpeakingScenariosOut`) que expone el catálogo estático.
+- **UI de escenarios** (`frontend/features/speaking/SpeakingScenarios.tsx`): pestaña "Speaking
+  scenarios" en el panel de análisis; cada tarjeta muestra título, nivel, categoría, objetivo
+  comunicativo y las métricas; al practicar reutiliza `SpeakingRolePlay`, que registra la telemetría
+  de turnos (`duration_ms`/`latency_ms`) para la señal objetiva de interacción.
+
+### Cambiado
+- **Honestidad del proxy de pronunciación** (`SpeakingDiagnostic.tsx`): el criterio `pronunciation`
+  (marcado `proxy` desde V1.34) ahora muestra "Confidence: alta/media/baja · automated proxy" y una
+  nota que distingue fonética real de la alineación speech/transcript (proxy), en lugar de un simple
+  badge.
+
+### Verificado
+- Backend `pytest` (912 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) + `build` OK.
+
+## [1.39.0] — 2026-08-31
+
+**Mastery 2.0**: el dominio se abstrae como evidencia + preparación (readiness), no como una media
+simple. `MasteryRecord` transversal para las 9 destrezas y CEFR readiness con banda cualitativa.
+
+### Añadido
+- **`MasteryRecord` transversal** (`services/mastery.py`): una sola abstracción de dominio para las 9
+  destrezas (vocabulary/grammar/pronunciation/listening/speaking/reading/writing/interaction/
+  mediation), de modo que el Adaptive Engine observa un conjunto homogéneo. Cada registro porta
+  `score`, `confidence`, `evidence_count`, `retention`, `stability`, `review_due`, `review_in_days`,
+  `transfer_count`, `novel_count` y la etapa del timeline
+  acquire→practice→retrieve→transfer→novel→retention.
+- **Curva de olvido conectada a todo el currículo** (`review_interval_days` + `mastery_stage`):
+  cada destreza obtiene un "review in N days" determinista derivado de la estabilidad de
+  `services.forgetting`, y `mastery_records()` devuelve siempre las 9 destrezas.
+- **CEFR readiness sin media simple** (`services/adaptive.py::readiness_band`): combina mastery +
+  evidencia + transfer + retención + confianza + gates mínimos y emite una banda cualitativa
+  (`developing`/`approaching`/`ready`) en lugar de un "%" crudo. `adaptive.readiness` ahora incluye
+  `band`.
+- **Exposición en el Student Model** (`StudentModelOut.mastery` + `MasteryRecordOut`): el endpoint
+  `/api/academy/student-model` devuelve la vista transversal y la banda de readiness; `/api/profile`
+  hereda la banda por `ReadinessOut`.
+
+### Cambiado
+- UI de progreso (`ProgressScreen`, `HomeScreen`, `TodayPlan`, `LearningProfile`, `CourseScreen`):
+  la preparación se muestra como "B1 developing" (banda) con el % como dato secundario; el detalle de
+  destreza muestra "Repasar en N días" desde el `MasteryRecord`.
+
+### Verificado
+- Backend `pytest` (906 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) OK.
+
+## [1.38.0] — 2026-08-31
+
+**Course Engine**: el mapa CEFR se convierte en un curso secuencial (Course→Unit→Lesson→Practice→
+Assessment→Review→Mastery) con gating de progreso por objetivo y una posición visible "¿dónde estoy?"
+en pantalla.
+
+### Añadido
+- **Course Engine** (`services/course.py`): secuenciación explícita de módulos/unidades/lecciones a
+  partir de `curriculum/a1.json` (y a2/b1/b2), con orden de lección y gate de progreso por objetivo
+  (`gate_objective_ids`, `objective_gated_status` → `mastered`/`review`/`available`/`locked`).
+- **Posición en el curso** (`unit_sequence` + `current_position` + `course_map`): calcula la unidad
+  y lección actuales, el progreso `mastered/total` y el estado (`done`/`current`/`locked`) de cada
+  unidad.
+- **Endpoint** `GET /api/academy/course/{level_id}` → `CourseMapOut` (protegido por el bloqueo de
+  inscripción), expone unidades, lecciones, posición actual y progreso.
+- **Progreso visible en frontend** (`CourseScreen.tsx`): barra de unidades (✓/●/🔒) y lección actual
+  "¿dónde estoy?" con el porcentaje de avance del nivel.
+
+### Cambiado
+- `domain/academy.py::_objective_state` consume el estado gated calculado por `course_svc` (fuente
+  única de gating) en lugar de determinarlo internamente; el segundo objetivo de un nivel aparece
+  `locked` hasta dominar el anterior.
+
+### Verificado
+- Backend `pytest` (900 tests, incl. `test_course.py`) + `ruff` limpio; frontend `tsc` + `vitest`
+  (240 tests) OK.
+
+## [1.37.0] — 2026-08-31
+
+**Audio QA + Content Audit**: la subida de audio se convierte en un estudio de QA acústica y la
+integridad del contenido se audita de extremo a extremo, con separación admin/estudiante por PIN.
+
+### Añadido
+- **QA acústica** (`services/audio_library.py`): análisis determinista de cada WAV (solo stdlib) —
+  `peak`, `RMS`, `clipping %`, `DC offset` y `silence ratio` — con clasificación `PASS`/`WARNING`/
+  `REJECT`. La subida devuelve un panel "AUDIO QUALITY" (formato, sample rate, canales, duración,
+  clipping, silencio, peak dBFS) antes de aceptar la grabación.
+- **Content integrity check** (`services/content_validation.py` + `scripts/content_validation.py`):
+  recorre `question → audio_id → manifest → WAV → metadata → CEFR → difficulty → subskills` y emite
+  el "CONTENT INTEGRITY CHECK" (ítems, grabados vs TTS, referencias rotas, ids duplicados,
+  transcripciones ausentes, desfase CEFR y desfase de duración).
+- **Content Audit Dashboard** (frontend): pestaña "Content audit" en Ajustes → Audio con el resumen
+  de integridad y los issues por severidad.
+- **Candado admin (PIN local)** (`dependencies.require_admin` + `ADMIN_PIN`): protege subida, borrado,
+  previsualización y auditoría. Separación `student` (aprender) / `admin` (gestionar) sin OAuth/cloud.
+- **Backup + auditoría de borrado**: `DELETE` copia el WAV y su entrada a `_backups` y registra la
+  operación en `audit.log` (JSONL) antes de borrar, para recuperación.
+- **Límites de subida**: MIME WAV estricto, `MAX_AUDIO_DURATION_SECONDS` y `MAX_AUDIO_BYTES`.
+
+### Cambiado
+- `POST /api/audio-library/upload` ahora devuelve el panel de QA y aplica límites de MIME/duración.
+- Nuevos endpoints `GET /api/audio-library/status` y `GET /api/audio-library/audit` (admin).
+
+### Verificado
+- Backend `pytest` (889 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) + `build` OK.
+- CI ampliado con jobs `content-validation` y `playwright` (E2E visual).
+
+## [1.36.0] — 2026-08-31
+
+**Audio Corpus 1.0**: corpus de audio humano versionado en `curriculum/listening_corpus.json`
+(40 ítems A1–B2 con diversidad real de hablantes, acentos, contextos, connected speech, ruido y
+velocidad), pipeline de producción de grabación e importación masiva.
+
+### Añadido
+- **Corpus de audio humano** (`backend/curriculum/listening_corpus.json`): 40 ítems grabables
+  (`c001`–`c040`) con la matriz multidimensional del auditor (nivel × hablante × contexto ×
+  condiciones de escucha) y metadatos ampliados (`gender`, `age_band`, `region`, `accent`,
+  `speaker_count`, `spontaneity`, `recording_environment`, `overlap`, `connected_speech`,
+  `prosody`, `task_type`, `cefr`, `context`).
+- **Loader del corpus** (`services/listening.py`): `QUESTION_BANK` ahora fusiona el banco heredado
+  TTS (`l1`–`l23`) con el corpus; los ítems del corpus son `tts` hasta que el manifest respalda su
+  `audio_id` (el manifest sigue siendo la fuente de verdad). `LISTENING_BANK_VERSION` → `4.0.0`.
+- **Pack de grabación** (`backend/scripts/generate_recording_pack.py`): genera el CSV de guiones por
+  hablante (transcripción, wpm objetivo, notas de connected speech, entorno, ruido) y un resumen de
+  progreso frente al objetivo A1 30–40 / A2 40–50 / B1 60–80 / B2 60–80.
+- **Importación masiva** (`backend/scripts/import_audio.py --batch`): incorpora los WAV grabados por
+  convención `{cefr}/{speaker_id}/{audio_id}.wav`, mide su duración real y rellena el manifest.
+- **Higiene de release** (`scripts/check_release_consistency.py`): comprueba que backend, frontend,
+  README, CHANGELOG y PLAN declaran la misma versión; añadido a CI.
+
+### Cambiado
+- `PLAN.md` sincronizado a la versión de la app (eliminada la inconsistencia `1.34.0`).
+
+### Verificado
+- Backend `pytest` + `ruff` limpio; frontend `tsc` + `vitest` OK.
+
 ## [1.35.0] — 2026-08-31
 
 **Gestión en-app de la biblioteca de audio humano**: subir, reemplazar y quitar las

@@ -464,7 +464,7 @@ def test_endpoint_enroll_and_detail(monkeypatch, tmp_path):
         assert detail["progress"]["total"] > 20
         first = detail["objectives"][0]
         assert first["status"] == "available"
-        assert detail["objectives"][1]["status"] == "available"
+        assert detail["objectives"][1]["status"] == "locked"
 
         nxt = client.get(
             "/api/academy/next", params={"user_id": a, "level_id": "a1"}

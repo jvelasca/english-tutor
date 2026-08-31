@@ -97,6 +97,14 @@ const STRINGS: Record<string, Entry> = {
   "mastery.strong": { en: "Strong", es: "Fuerte" },
   "mastery.developing": { en: "Developing", es: "En desarrollo" },
   "mastery.needsPractice": { en: "Needs practice", es: "Necesita práctica" },
+  "mastery.reviewIn": {
+    en: "Review in {days} days",
+    es: "Repasar en {days} días",
+  },
+  "mastery.reviewNow": { en: "Review now", es: "Repasar ahora" },
+  "readiness.ready": { en: "Ready", es: "Preparado" },
+  "readiness.approaching": { en: "Approaching", es: "Cerca" },
+  "readiness.developing": { en: "Developing", es: "En desarrollo" },
 
   // Course
   "course.title": { en: "Your English journey", es: "Tu viaje en inglés" },
@@ -115,6 +123,11 @@ const STRINGS: Record<string, Entry> = {
   "course.cefrLevel": { en: "CEFR level", es: "Nivel CEFR" },
   "course.canDo": { en: "What you can do", es: "Qué puedes hacer" },
   "course.youAreHere": { en: "You are here", es: "Estás aquí" },
+  "course.whereAmI": { en: "Where am I?", es: "¿Dónde estoy?" },
+  "course.unit": { en: "Unit", es: "Unidad" },
+  "course.lesson": { en: "Lesson", es: "Lección" },
+  "course.currentLesson": { en: "Current lesson", es: "Lección actual" },
+  "course.review": { en: "Review", es: "Repasar" },
 
   // Settings
   "settings.title": { en: "Settings", es: "Ajustes" },
@@ -145,6 +158,28 @@ const STRINGS: Record<string, Entry> = {
   "status.microphone": { en: "Microphone", es: "Micrófono" },
   "status.scanToConnect": { en: "Scan to connect", es: "Escanea para conectar" },
   "status.urlTitle": { en: "Access URL on your network", es: "URL de acceso en tu red" },
+
+  // Copias de seguridad (V1.41)
+  "backup.title": { en: "Backup & restore", es: "Copias de seguridad" },
+  "backup.subtitle": {
+    en: "Your progress, evidence and audio library are stored locally. Download a backup to keep it safe, or restore a previous backup.",
+    es: "Tu progreso, evidencia y biblioteca de audio se guardan localmente. Descarga una copia para guardarla a salvo o restaura una copia anterior.",
+  },
+  "backup.create": { en: "Create backup", es: "Crear copia" },
+  "backup.download": { en: "Download latest", es: "Descargar última" },
+  "backup.list": { en: "Stored backups", es: "Copias guardadas" },
+  "backup.empty": { en: "No backups yet", es: "Aún no hay copias" },
+  "backup.restoreTitle": { en: "Restore from file", es: "Restaurar desde archivo" },
+  "backup.restore": { en: "Restore", es: "Restaurar" },
+  "backup.chooseFile": { en: "Choose backup (.zip)", es: "Elegir copia (.zip)" },
+  "backup.created": { en: "Backup created", es: "Copia creada" },
+  "backup.restored": { en: "Backup restored", es: "Copia restaurada" },
+  "backup.adminRequired": {
+    en: "Enter the admin PIN to manage backups.",
+    es: "Introduce el PIN de administrador para gestionar las copias.",
+  },
+  "backup.keep": { en: "Keeps the last 7 backups automatically", es: "Conserva las últimas 7 copias automáticamente" },
+  "backup.error": { en: "Could not complete the operation", es: "No se pudo completar la operación" },
 
   // Biblioteca de audio (gestión en-app)
   "audio.subtitle": {
@@ -186,6 +221,41 @@ const STRINGS: Record<string, Entry> = {
   "audio.none": {
     en: "No replaceable audio slots yet.",
     es: "Aún no hay audios reemplazables.",
+  },
+  "audio.tab.library": { en: "Library", es: "Biblioteca" },
+  "audio.tab.audit": { en: "Content audit", es: "Auditoría de contenido" },
+  "audio.admin.required": {
+    en: "Administration is protected by a local PIN.",
+    es: "La administración está protegida por un PIN local.",
+  },
+  "audio.admin.pin": { en: "Admin PIN", es: "PIN de admin" },
+  "audio.admin.unlock": { en: "Unlock", es: "Desbloquear" },
+  "audio.admin.lock": { en: "Lock", es: "Bloquear" },
+  "audio.admin.unlocked": { en: "Admin unlocked", es: "Admin desbloqueado" },
+  "audio.admin.error": {
+    en: "Invalid admin PIN.",
+    es: "PIN de administración incorrecto.",
+  },
+  "audio.qa.title": { en: "AUDIO QUALITY", es: "CALIDAD DEL AUDIO" },
+  "audio.qa.grade": { en: "Grade", es: "Dictamen" },
+  "audio.qa.duration": { en: "Duration", es: "Duración" },
+  "audio.qa.sampleRate": { en: "Sample rate", es: "Frecuencia" },
+  "audio.qa.channels": { en: "Channels", es: "Canales" },
+  "audio.qa.peak": { en: "Peak", es: "Pico" },
+  "audio.qa.clipping": { en: "Clipping", es: "Clipping" },
+  "audio.qa.silence": { en: "Silence", es: "Silencio" },
+  "audio.qa.dc": { en: "DC offset", es: "Offset DC" },
+  "audio.audit.title": { en: "CONTENT INTEGRITY CHECK", es: "CHEQUEO DE INTEGRIDAD DEL CONTENIDO" },
+  "audio.audit.ok": { en: "All checks passed.", es: "Todas las comprobaciones pasaron." },
+  "audio.audit.fail": { en: "Issues found.", es: "Se encontraron problemas." },
+  "audio.audit.items": { en: "Items", es: "Ítems" },
+  "audio.audit.recorded": { en: "Recorded", es: "Grabados" },
+  "audio.audit.tts": { en: "Synthetic (TTS)", es: "Sintéticos (TTS)" },
+  "audio.audit.bySeverity": { en: "Issues by severity", es: "Problemas por severidad" },
+  "audio.audit.empty": { en: "No issues.", es: "Sin problemas." },
+  "audio.audit.error": {
+    en: "Could not load the audit. Check the admin PIN.",
+    es: "No se pudo cargar la auditoría. Comprueba el PIN de admin.",
   },
 
   // Común
@@ -540,6 +610,14 @@ const STRINGS: Record<string, Entry> = {
   "diag.gettingWorse": { en: "getting worse", es: "empeorando" },
   "diag.stable": { en: "stable", es: "estable" },
   "diag.proxy": { en: "proxy", es: "proxy" },
+  "diag.proxyAutomated": { en: "automated proxy", es: "proxy automático" },
+  "diag.proxyFull": {
+    en: "Score derives from text alignment, not acoustic analysis of your voice.",
+    es: "La puntuación deriva de la alineación de texto, no del análisis acústico de tu voz.",
+  },
+  "diag.confHigh": { en: "high", es: "alta" },
+  "diag.confMedium": { en: "medium", es: "media" },
+  "diag.confLow": { en: "low", es: "baja" },
 
   // Speaking 2.0 (Interaction Quality + Conversation Endurance)
   "speaking.interactionQuality": {
@@ -573,6 +651,31 @@ const STRINGS: Record<string, Entry> = {
   "roleplay.turnAria": { en: "Your turn in the role-play", es: "Tu turno en el role-play" },
   "roleplay.send": { en: "Send", es: "Enviar" },
   "roleplay.finish": { en: "Finish interaction", es: "Terminar interacción" },
+
+  // Escenarios comunicativos (Speaking 3.0)
+  "scenarios.title": { en: "Speaking scenarios", es: "Escenarios de conversación" },
+  "scenarios.subtitle": {
+    en: "Pick a real-life situation and practice the conversation to reach a clear goal.",
+    es: "Elige una situación real y practica la conversación para lograr un objetivo claro.",
+  },
+  "scenarios.objective": { en: "Your goal", es: "Tu objetivo" },
+  "scenarios.metrics": { en: "What is measured", es: "Qué se mide" },
+  "scenarios.practice": { en: "Practice", es: "Practicar" },
+  "scenarios.back": { en: "All scenarios", es: "Todos los escenarios" },
+  "scenarios.completed": { en: "Interaction completed", es: "Interacción completada" },
+  "scenarios.completedNote": {
+    en: "Your turns (duration and response time) were captured and will inform your speaking diagnostic.",
+    es: "Tus turnos (duración y tiempo de respuesta) quedaron registrados y alimentarán tu diagnóstico oral.",
+  },
+  "scenarios.metric.task_completion": { en: "Task completion", es: "Cumplir la tarea" },
+  "scenarios.metric.interaction": { en: "Interaction", es: "Interacción" },
+  "scenarios.metric.fluency": { en: "Fluency", es: "Fluidez" },
+  "scenarios.metric.repair": { en: "Repair", es: "Reparación" },
+  "scenarios.metric.turn_taking": { en: "Turn-taking", es: "Toma de turnos" },
+  "scenarios.empty": {
+    en: "No scenarios available yet.",
+    es: "Aún no hay escenarios disponibles.",
+  },
 
   // Lectura
   "reading.status.mastered": { en: "Mastered", es: "Dominado" },
