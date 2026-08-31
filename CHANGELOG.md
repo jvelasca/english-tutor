@@ -14,9 +14,17 @@ Todas las versiones notables de English Tutor. El formato sigue
 - **Versión mayor** `1.41.0` → `2.0.0` para marcar el producto completo (feature-complete)
   y la entrada en Beta.
 
+### Corregido
+- **Seguridad (path traversal)** en `GET /api/system/backup/export`: `read_backup` ahora
+  exige un `name` que sea basename `.zip` y lo resuelve confinado a `backups_dir()` (anti
+  CWE-22). Hallazgo de la pre-auditoría interna.
+- **Restore como reemplazo real** (`services/backup.py`): `restore_backup` ahora elimina los
+  archivos que no están en el backup (en `data/` y `audio_library/`, conservando `backups/`
+  y `_backups/`), alineando el comportamiento con el docstring "reemplaza el estado actual".
+
 ### Verificado
 - Gates de salida 10/10 en `docs/BETA_GATES.md`.
-- Backend `pytest` (926 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) +
+- Backend `pytest` (929 tests) + `ruff` limpio; frontend `tsc` + `vitest` (240 tests) +
   `build` OK; `check_release_consistency` OK; CI con `content-validation` y `playwright`.
 
 ## [1.41.0] — 2026-08-31

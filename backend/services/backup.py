@@ -125,9 +125,17 @@ def prune_backups(keep: int = KEEP_BACKUPS) -> list[str]:
 
 
 def read_backup(name: str) -> bytes:
-    """Lee los bytes de un backup por nombre. `FileNotFoundError` si no existe."""
-    path = backups_dir() / name
-    if not path.exists() or not name.endswith(".zip"):
+    """Lee los bytes de un backup por nombre. `FileNotFoundError` si no existe.
+
+    `name` debe ser un nombre de archivo plano (sin separadores de ruta) y acabar
+    en `.zip`; así el acceso queda confinado a `backups_dir()` (anti path
+    traversal). `FileNotFoundError` en cualquier otro caso.
+    """
+    if not name.endswith(".zip") or Path(name).name != name:
+        raise FileNotFoundError(name)
+    base = backups_dir().resolve()
+    path = (base / name).resolve()
+    if not path.is_relative_to(base) or not path.is_file():
         raise FileNotFoundError(name)
     return path.read_bytes()
 
@@ -163,11 +171,45 @@ def _copy_path(src: Path, dest: Path) -> None:
         shutil.copy2(src, dest)
 
 
+def _replace_tree(src: Path, dest: Path, keep_top: set[str]) -> None:
+    """Reemplaza el contenido de `dest` con el de `src` (semántica de restore).
+
+    Borra de `dest` los archivos que ya no están en `src` y copia `src` encima.
+    Los hijos directos de `dest` listados en `keep_top` se conservan (p. ej.
+    `backups/` o `_backups/`), para no destruir copias de seguridad ni la
+    recuperación de grabaciones borradas.
+    """
+    src_files = {str(p.relative_to(src)) for p in src.rglob("*") if p.is_file()}
+
+    if dest.exists():
+        for p in sorted(dest.rglob("*"), reverse=True):
+            if p.is_file():
+                rel = p.relative_to(dest)
+                if rel.parts and rel.parts[0] in keep_top:
+                    continue
+                if str(rel) not in src_files:
+                    p.unlink()
+        for p in sorted(dest.rglob("*"), reverse=True):
+            if p.is_dir() and not any(p.iterdir()):
+                try:
+                    p.rmdir()
+                except OSError:
+                    pass
+
+    for child in src.iterdir():
+        if child.name in keep_top:
+            continue
+        _copy_path(child, dest / child.name)
+
+
 def restore_backup(zip_bytes: bytes) -> dict:
     """Restaura el estado desde un backup ZIP.
 
-    Reemplaza `tutor.db` (con checkpoint y limpieza de WAL/SHM) y la biblioteca de
-    audio. Devuelve un resumen. Lanza `ValueError` si el ZIP no es un backup válido.
+    Reemplaza `tutor.db` (con checkpoint y limpieza de WAL/SHM), la carpeta `data/`
+    (conservando `backups/` y la propia DB) y la biblioteca de audio (conservando
+    `_backups/`). Los archivos que no están en el backup se eliminan, de modo que
+    la restauración reproduce el estado guardado y no solo lo superpone. Devuelve
+    un resumen. Lanza `ValueError` si el ZIP no es un backup válido.
     """
     try:
         zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
@@ -190,18 +232,10 @@ def restore_backup(zip_bytes: bytes) -> dict:
 
             data_src = root / "data"
             if data_src.exists():
-                for child in data_src.iterdir():
-                    if child.name == "tutor.db":
-                        continue
-                    _copy_path(child, DATA_DIR / child.name)
+                _replace_tree(data_src, DATA_DIR, keep_top={"backups", DB_PATH.name})
 
             audio_src = root / "audio_library"
             if audio_src.exists():
-                for child in audio_src.rglob("*"):
-                    if child.is_file():
-                        rel = child.relative_to(audio_src)
-                        target = AUDIO_LIBRARY_DIR / rel
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(child, target)
+                _replace_tree(audio_src, AUDIO_LIBRARY_DIR, keep_top={"_backups"})
 
     return {"restored": True, "version": VERSION, "created_at": _now()}

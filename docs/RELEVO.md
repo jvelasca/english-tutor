@@ -1991,7 +1991,11 @@ cd frontend && npx tsc --noEmit && npx vitest run
   `README.md`/`CHANGELOG.md`/`PLAN.md` (la app ya tenía `1.0.0` como release inicial en el changelog,
   por lo que Beta 1.0 se marca con la mayor `2.0.0` para no reutilizar ni retroceder la secuencia).
 - ✅ **CHANGELOG `[2.0.0]`** y **`docs/RELEVO.md`** (posición, notas de contexto y sección 37.19).
-- ✅ **Verificación final**: `check_release_consistency` OK (2.0.0); backend 926 tests + `ruff`
+- ✅ **Pre-auditoría interna** (security-review + Bugbot): 1 hallazgo medio corregido (path
+  traversal en `export_backup` → `read_backup` confinado a `backups_dir()`) y 1 bajo corregido
+  (restore ahora reemplaza de verdad, no solo superpone). Tests añadidos: `test_read_backup_rejects_path_traversal`,
+  `test_export_rejects_path_traversal` y `test_restore_removes_stale_files` (backend 929 tests).
+- ✅ **Verificación final**: `check_release_consistency` OK (2.0.0); backend 929 tests + `ruff`
   limpio; frontend `tsc` + `vitest` 240 tests + `build` OK. El roadmap V1.36 → Beta 1.0 queda cerrado.
 
 

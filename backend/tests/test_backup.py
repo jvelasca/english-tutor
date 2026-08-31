@@ -105,6 +105,56 @@ def test_read_backup_missing(monkeypatch, tmp_path):
         backup_svc.read_backup("backup_unknown.zip")
 
 
+def test_read_backup_rejects_path_traversal(monkeypatch, tmp_path):
+    """El nombre debe ser un basename .zip confinado a backups_dir (anti CWE-22)."""
+    _setup(monkeypatch, tmp_path)
+    backup_svc.create_backup()
+    for evil in (
+        "../../etc/passwd.zip",
+        "..\\..\\Windows\\win.ini.zip",
+        "/etc/shadow.zip",
+        "sub/backup.zip",
+        "tutor.db",
+        "",
+    ):
+        with pytest.raises(FileNotFoundError):
+            backup_svc.read_backup(evil)
+
+
+def test_export_rejects_path_traversal(monkeypatch, tmp_path):
+    """El endpoint de export no lee archivos fuera de backups_dir."""
+    data, _audio = _setup(monkeypatch, tmp_path)
+    monkeypatch.setattr(db, "DATA_DIR", data)
+    monkeypatch.setattr(db, "DB_PATH", data / "app.db")
+    db.init_db()
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/api/system/backup/export",
+            params={"name": "../../etc/passwd.zip"},
+        )
+        assert resp.status_code == 404
+
+
+def test_restore_removes_stale_files(monkeypatch, tmp_path):
+    """Restaurar reemplaza el estado: borra lo que no estaba en el backup."""
+    data, audio = _setup(monkeypatch, tmp_path)
+    backup_svc.create_backup()
+    archive = backup_svc.read_backup(backup_svc.list_backups()[0]["name"])
+
+    (audio / "stale.wav").write_bytes(b"STALE")
+    (data / "stale.txt").write_bytes(b"STALE")
+
+    result = backup_svc.restore_backup(archive)
+    assert result["restored"] is True
+
+    assert not (audio / "stale.wav").exists()
+    assert not (data / "stale.txt").exists()
+    # Lo que sí estaba en el backup se conserva.
+    assert (audio / "manifest.json").exists()
+    assert (data / "tutor.db").read_bytes() == b"SQLITE-DATA"
+
+
 def test_backup_endpoints(monkeypatch, tmp_path):
     """Flujo completo por API: crear → listar → exportar → restaurar."""
     data, _audio = _setup(monkeypatch, tmp_path)
