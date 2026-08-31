@@ -146,6 +146,48 @@ const STRINGS: Record<string, Entry> = {
   "status.scanToConnect": { en: "Scan to connect", es: "Escanea para conectar" },
   "status.urlTitle": { en: "Access URL on your network", es: "URL de acceso en tu red" },
 
+  // Biblioteca de audio (gestión en-app)
+  "audio.subtitle": {
+    en: "Replace the real recordings used in the listening exercises. Upload an uncompressed WAV and that exercise will use it instead of the synthetic voice.",
+    es: "Reemplaza las grabaciones reales de los ejercicios de listening. Sube un WAV sin comprimir y ese ejercicio lo usará en lugar de la voz sintética.",
+  },
+  "audio.upload": { en: "Upload WAV", es: "Subir WAV" },
+  "audio.chooseFile": { en: "Choose file", es: "Elegir archivo" },
+  "audio.remove": { en: "Remove recording", es: "Quitar grabación" },
+  "audio.preview": { en: "Preview", es: "Escuchar" },
+  "audio.state.recorded": { en: "Real recording", es: "Grabación real" },
+  "audio.state.missing": { en: "File missing", es: "Archivo no encontrado" },
+  "audio.state.empty": { en: "Synthetic voice (TTS)", es: "Voz sintética (TTS)" },
+  "audio.field.transcript": { en: "Transcript", es: "Transcripción" },
+  "audio.field.speaker": { en: "Speaker ID", es: "ID de hablante" },
+  "audio.field.accent": { en: "Accent", es: "Acento" },
+  "audio.field.cefr": { en: "CEFR", es: "CEFR" },
+  "audio.field.speechRate": { en: "Speech rate (WPM)", es: "Velocidad (WPM)" },
+  "audio.field.noise": { en: "Noise level (0–5)", es: "Nivel de ruido (0–5)" },
+  "audio.field.gender": { en: "Gender", es: "Género" },
+  "audio.field.region": { en: "Region", es: "Región" },
+  "audio.field.context": { en: "Context", es: "Contexto" },
+  "audio.hint.wav": {
+    en: "The file must be an uncompressed WAV (PCM).",
+    es: "El archivo debe ser un WAV sin comprimir (PCM).",
+  },
+  "audio.error.load": {
+    en: "Could not load the audio library.",
+    es: "No se pudo cargar la biblioteca de audio.",
+  },
+  "audio.error.upload": {
+    en: "Could not upload the audio. Make sure it is an uncompressed WAV.",
+    es: "No se pudo subir el audio. Comprueba que es un WAV sin comprimir.",
+  },
+  "audio.error.remove": {
+    en: "Could not remove the recording.",
+    es: "No se pudo quitar la grabación.",
+  },
+  "audio.none": {
+    en: "No replaceable audio slots yet.",
+    es: "Aún no hay audios reemplazables.",
+  },
+
   // Común
   "common.loading": { en: "Loading…", es: "Cargando…" },
   "common.close": { en: "Close", es: "Cerrar" },

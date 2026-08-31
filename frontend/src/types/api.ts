@@ -428,6 +428,52 @@ export interface ListeningDiagnostic {
   resilience: ListeningResilience;
 }
 
+// --- Biblioteca de audio humano (gestión en-app) ---
+
+export interface AudioLibraryEntry {
+  audio_id: string;
+  file: string;
+  speaker_id: string;
+  accent: string;
+  speaker_count: number;
+  noise_level: number;
+  duration: number;
+  transcript: string;
+  gender: string;
+  age_band: string;
+  region: string;
+  speech_rate: number | null;
+  spontaneity: string;
+  recording_environment: string;
+  overlap: boolean;
+  connected_speech: boolean;
+  prosody: string;
+  task_type: string;
+  cefr: string;
+  context: string;
+}
+
+export interface AudioLibrarySlot {
+  question_id: string;
+  audio_id: string;
+  level: string;
+  skill: string;
+  topic: string;
+  transcript: string;
+  clean_transcript: string;
+  speech_rate: number;
+  noise_level: number;
+  speaker_id: string;
+  accent: string;
+  duration: number;
+  state: "recorded" | "missing" | "empty";
+  entry: AudioLibraryEntry | null;
+}
+
+export interface AudioLibrarySlotsResponse {
+  slots: AudioLibrarySlot[];
+}
+
 // --- Speaking 3.0 (diagnóstico longitudinal por criterio de rúbrica) ---
 
 export interface SpeakingCriterionProgress {

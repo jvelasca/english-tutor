@@ -11,8 +11,9 @@ import {
 import type { Theme } from "../utils/theme";
 import { ModelSelect } from "./ModelSelect";
 import { SystemStatus } from "./SystemStatus";
+import { AudioLibrary } from "./AudioLibrary";
 
-type Tab = "appearance" | "language" | "ai" | "system";
+type Tab = "appearance" | "language" | "ai" | "audio" | "system";
 
 const THEME_OPTIONS: { id: Theme; labelKey: string }[] = [
   { id: "light", labelKey: "settings.theme.light" },
@@ -61,6 +62,7 @@ export function SettingsDialog({
     { id: "appearance", label: t("settings.appearance") },
     { id: "language", label: t("settings.interfaceLanguage") },
     { id: "ai", label: t("settings.ai") },
+    { id: "audio", label: t("settings.audio") },
     { id: "system", label: t("settings.system") },
   ];
 
@@ -213,6 +215,7 @@ export function SettingsDialog({
           )}
 
           {tab === "system" && <SystemStatus />}
+          {tab === "audio" && <AudioLibrary />}
         </div>
 
         <footer className="dialog-footer">

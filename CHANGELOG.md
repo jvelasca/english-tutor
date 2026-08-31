@@ -4,6 +4,32 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [1.35.0] — 2026-08-31
+
+**Gestión en-app de la biblioteca de audio humano**: subir, reemplazar y quitar las
+grabaciones WAV de los ejercicios de listening desde la propia app (Ajustes → Audio),
+sin tocar la terminal.
+
+### Añadido
+- **Switch runtime por manifest** (`services/audio_library.py`): `is_recorded` considera grabado un
+  ítem también cuando su `audio_id` está presente en el manifest. Así, subir un WAV convierte el ítem
+  de TTS a grabado (y borrarlo lo revierte) sin tocar el banco de preguntas.
+- **Helpers de escritura/borrado**: `wav_probe_bytes` (lee el WAV en memoria), `write_entry` (upsert
+  atómico + validación del manifest) y `remove_entry` (borra entrada + WAV).
+- **Router `/api/audio-library`** (`routers/audio_library.py`): `GET /slots` (los 9 slots grabables
+  con su estado), `POST /upload` (subir/reemplazar WAV con metadatos), `GET /{audio_id}/audio`
+  (previsualizar) y `DELETE /{audio_id}` (quitar grabación).
+- **Frontend**: pestaña **Audio** en Ajustes (`components/AudioLibrary.tsx`) con preview del WAV,
+  edición de metadatos (transcripción, hablante, acento, CEFR, velocidad, ruido, género, región,
+  contexto), subida y borrado. `domain/listening.py` expone `audio_type="recorded"` cuando el manifest
+  respalda el ítem (la UI muestra "Real recording" y oculta la escalera de velocidad).
+
+### Cambiado
+- `postForm` en `api/client.ts` para subidas multipart.
+
+### Verificado
+- Backend **858 tests** + `ruff` limpio; frontend **237 tests** + `tsc` OK.
+
 ## [1.34.0] — 2026-08-28
 
 **Speaking 2.0**: pronunciación marcada como proxy, desglose de Interaction Quality y

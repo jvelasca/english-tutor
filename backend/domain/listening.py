@@ -67,7 +67,11 @@ def _public(question: dict) -> dict:
     out["difficulty"] = difficulty_from_vector(question.get("difficulty_vector", {}))
     out["realized_difficulty"] = realized_difficulty(question)
     out["realization"] = realization_status(question)
-    out["audio_type"] = question.get("audio_type") or "tts"
+    out["audio_type"] = (
+        "recorded"
+        if is_recorded(question)
+        else (question.get("audio_type") or "tts")
+    )
     out["context"] = question.get("context", "")
     out["audio_ready"] = audio_ready(question)
     out["variants"] = audio_variants(question)

@@ -23,6 +23,10 @@ export function postJson<T>(url: string, body: unknown): Promise<T> {
   return sendJson<T>(url, "POST", body);
 }
 
+export function postForm<T>(url: string, form: FormData): Promise<T> {
+  return request<T>(url, { method: "POST", body: form });
+}
+
 export function putJson<T>(url: string, body: unknown): Promise<T> {
   return sendJson<T>(url, "PUT", body);
 }

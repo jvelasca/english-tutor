@@ -20,6 +20,7 @@ Separación conceptual (espejo de `services/curriculum.py`):
 
 from __future__ import annotations
 
+import io
 import json
 import wave
 from collections import Counter
@@ -154,8 +155,23 @@ def resolve_file(entry: AudioLibraryEntry, base: Path | None = None) -> Path | N
 
 
 def is_recorded(question: dict) -> bool:
-    """True si el ítem declara audio humano grabado (`audio_type="recorded"`)."""
-    return (question.get("audio_type") or "tts") == "recorded"
+    """True si el ítem se sirve desde la biblioteca de audio humano grabado.
+
+    Un ítem es grabado cuando declara `audio_type="recorded"` **o** cuando su
+    `audio_id` está presente en el manifest. El manifest es la fuente de verdad en
+    tiempo de ejecución: subir un WAV convierte el ítem de TTS a grabado sin tocar
+    el banco de preguntas, y borrarlo lo revierte a TTS.
+    """
+    if (question.get("audio_type") or "tts") == "recorded":
+        return True
+    audio_id = (question.get("audio_id") or "").strip()
+    if not audio_id:
+        return False
+    try:
+        manifest = load_manifest()
+    except (FileNotFoundError, ValueError, OSError):
+        return False
+    return entry_for(manifest, audio_id) is not None
 
 
 def recorded_audio_path(question: dict) -> Path | None:
@@ -294,6 +310,24 @@ def wav_probe(path: Path) -> dict:
         framerate = w.getframerate()
         if framerate <= 0:
             raise ValueError(f"{path}: framerate must be > 0")
+        return {
+            "duration": w.getnframes() / framerate,
+            "channels": w.getnchannels(),
+            "framerate": framerate,
+            "sample_width": w.getsampwidth(),
+        }
+
+
+def wav_probe_bytes(data: bytes) -> dict:
+    """Igual que `wav_probe` pero leyendo los bytes en memoria (para subidas HTTP).
+
+    Lanza ``wave.Error``/``OSError``/``EOFError`` si `data` no abre como WAV y
+    ``ValueError`` si el `framerate` es 0.
+    """
+    with wave.open(io.BytesIO(data), "rb") as w:
+        framerate = w.getframerate()
+        if framerate <= 0:
+            raise ValueError("framerate must be > 0")
         return {
             "duration": w.getnframes() / framerate,
             "channels": w.getnchannels(),
@@ -480,3 +514,61 @@ def validate_audio_entries(
         entry.audio_id: validate_audio_entry(entry, base)
         for entry in manifest.entries
     }
+
+
+def write_entry(entry: AudioLibraryEntry, wav: bytes) -> Path:
+    """Escribe el WAV en la biblioteca y hace *upsert* de su entrada en el manifest.
+
+    Valida que `wav` sea un WAV legible y que el manifest resultante cumpla sus
+    invariantes (`validate_manifest`) **antes** de tocar el disco. El WAV se escribe
+    de forma atómica (temp + replace) en `resolve_file(entry)`. Devuelve la ruta
+    final. Lanza `ValueError` si la ruta escapa de la biblioteca o el manifest
+    quedaría inválido, y `wave.Error`/`OSError`/`EOFError` si `wav` no es un WAV.
+    """
+    dest = resolve_file(entry)
+    if dest is None:
+        raise ValueError(f"{entry.audio_id}: file escapes library dir")
+    wav_probe_bytes(wav)
+
+    manifest = load_manifest()
+    manifest.entries = [
+        e for e in manifest.entries if e.audio_id != entry.audio_id
+    ]
+    manifest.entries.append(entry)
+    problems = validate_manifest(manifest)
+    if problems:
+        raise ValueError("; ".join(problems))
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+    tmp.write_bytes(wav)
+    tmp.replace(dest)
+
+    manifest_path().write_text(
+        json.dumps(manifest.model_dump(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return dest
+
+
+def remove_entry(audio_id: str) -> bool:
+    """Elimina la entrada del manifest y su WAV del disco. False si no existía.
+
+    Revierte el ítem referenciado a TTS (el manifest deja de declarar ese
+    `audio_id`). Nunca lanza si el archivo ya no está en disco.
+    """
+    manifest = load_manifest()
+    entry = entry_for(manifest, audio_id)
+    if entry is None:
+        return False
+
+    manifest.entries = [e for e in manifest.entries if e.audio_id != audio_id]
+    manifest_path().write_text(
+        json.dumps(manifest.model_dump(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    path = resolve_file(entry)
+    if path is not None and path.exists():
+        path.unlink()
+    return True

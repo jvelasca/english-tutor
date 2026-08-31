@@ -3,12 +3,13 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-28 10:55 (UTC+2).
+> Actualizado por última vez: 2026-08-31 08:20 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-28):** `v1.34` **verificada en verde** (la versión está elevada a
-`1.34.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`). Cerradas las
+**Posición actual (2026-08-31):** `v1.35` **verificada en verde** (la versión está elevada a
+`1.35.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`). Cerradas la
+**gestión en-app de la biblioteca de audio humano** (V1.35) y las
 **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
 **V1.30** (LAN + Mobile 100%: mDNS real `local_url_available`, test de micrófono con medidor,
 tarjeta de conexión QR, `/help/connect`), **V1.31** (Adaptive Engine 2.0: Priority Engine con
@@ -17,7 +18,8 @@ tarjeta de conexión QR, `/help/connect`), **V1.31** (Adaptive Engine 2.0: Prior
 `/api/academy/cefr-ladder`), **V1.33** (Listening 2.0: `listening_resilience` por condición de
 escucha + `context` del corpus) y **V1.34** (Speaking 2.0: `pronunciation` marcado como `proxy`,
 `interaction_quality` por sub-dimensión y `conversation_endurance` con
-`/api/academy/speaking/endurance`). Ver CHANGELOG.
+`/api/academy/speaking/endurance`) y **V1.35** (gestión en-app de la biblioteca de audio humano:
+subir/reemplazar/quitar WAV desde Ajustes → Audio). Ver CHANGELOG.
 Cerradas hasta ahora (histórico): Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
 curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0,
 Etapa 2 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de
@@ -29,7 +31,8 @@ chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6), **V1.27**
 de empezar el siguiente incremento.
 
 **Últimos commits:**
-- `feat: V1.29 - fiabilidad LAN/HTTPS + audio movil (P0) + launcher` (`cb4eec5`, HEAD)
+- `feat: V1.30-V1.34 - FASE 1-5 auditoria externa (LAN/movil -> Speaking 2.0)` (`f876496`, HEAD)
+- `feat: V1.29 - fiabilidad LAN/HTTPS + audio movil (P0) + launcher` (`cb4eec5`)
 - `feat: V1.28 - listening: ocultar escalera de velocidad en items recorded`
 - `feat: V1.27 - code-splitting por rutas (React.lazy/Suspense + AnalysisPanel diferido)`
 - `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
@@ -40,8 +43,9 @@ de empezar el siguiente incremento.
 - `feat: UI de 3 paneles (destrezas + desarrollo + analisis + barra de estado)`
 - `feat: validación determinista audio↔metadata`
 
-> **V1.30–V1.34 (FASE 1–5) están en el árbol de trabajo sin commitear** (ver `git status`). El
-> código está verificado en verde; queda pendiente el commit `feat:` de cierre por fase (premisa 6).
+> **V1.35 implementada y verificada** (gestión en-app de audio humano; aún sin commitear). Árbol de
+> trabajo limpio; solo queda pendiente 37.3 (incorporar WAV reales, ya desde la app) y 37.4 (Vercel,
+> diferido).
 
 **V1.15 commiteada** (S1 `2a182a8`, S2 `42602ca`, S3 `9be0f7f`) — Speaking 3.0. Ver sección 28.
 Resumen:
@@ -1759,14 +1763,20 @@ cd frontend && npx tsc --noEmit && npx vitest run
   sin aviso de bundle >500 kB.
 - Briefing: `agentes/ui2/u2-code-splitting.md`. Ver CHANGELOG 1.27.0.
 
-### 37.3 PARCIAL (V1.28) — Contenido: biblioteca de audio humano (P1.5–P1.8)
-- ✅ **Código hecho**: la escalera de velocidad ya no se muestra en ítems `recorded`
-  (`ListeningPractice.tsx`). La infraestructura (manifest + resolución + servido + validación) y el
-  importador `backend/scripts/import_audio.py` ya existían (V1.20/V1.21).
+### 37.3 PARCIAL — Contenido: biblioteca de audio humano (P1.5–P1.8)
+- ✅ **Código hecho**: la infraestructura (manifest + resolución + servido + validación), el
+  importador `backend/scripts/import_audio.py`, la escalera de velocidad oculta en ítems `recorded`
+  (`ListeningPractice.tsx`) y, desde **V1.35**, la **gestión en-app** (Ajustes → Audio) para
+  subir/reemplazar/quitar WAV con metadatos.
 - ⏳ **Contenido pendiente del usuario**: incorporar **WAV reales** de varios hablantes (connected
-  speech real, acentos reales, ruido real). Para añadir una grabación:
-  `python backend/scripts/import_audio.py --wav <archivo.wav> --audio-id <id> --speaker-id <id>`
-  (ver docstring del script). El agente **no** puede fabricar audio real (premisa 2/21).
+  speech real, acentos reales, ruido real). Ahora se hace desde la propia app: **Ajustes → Audio →
+  subir WAV** (sin terminal). El agente **no** puede fabricar audio real (premisa 2/21).
+- **Notas**: el corpus ya reserva 9 slots (`l15`–`l23` → `audio-l15`…`audio-l23`) con `transcript`,
+  `clean_transcript`, `speech_rate`, `noise_level` y `duration` declarados en
+  `services/listening.py::QUESTION_BANK`. Los WAV deben ser **PCM sin comprimir** (el backend usa
+  `wave`; no hay `ffmpeg`). Subir un WAV convierte el ítem de TTS a grabado automáticamente (el
+  manifest es la fuente de verdad); borrarlo lo revierte. Empezar por el subconjunto que el usuario
+  aporte.
 
 ### 37.4 (Diferido por decisión) Vercel / despliegue
 - **Vercel** se barajó para la **UI** (previews, hosting estático), **no** para sustituir el backend
@@ -1775,11 +1785,10 @@ cd frontend && npx tsc --noEmit && npx vitest run
   apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
 
 ### 37.5 Notas de contexto para el nuevo chat
-- Versión estable actual: **1.34.0** (todo verificado: backend 843 tests, frontend 234 tests,
+- Versión estable actual: **1.35.0** (todo verificado: backend 858 tests, frontend 237 tests,
   launcher 64 tests, Playwright 14 passed + 10 skipped, `ruff` limpio, `tsc`/`build` OK).
-- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el código está listo), **37.4
-  Vercel** (diferido por decisión) y el **commit `feat:` de cierre de V1.30–V1.34** (FASE 1–5, en
-  el árbol de trabajo sin commitear).
+- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; la UI ya está lista) y **37.4
+  Vercel** (diferido por decisión).
 - Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
   evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
 
@@ -1813,5 +1822,16 @@ cd frontend && npx tsc --noEmit && npx vitest run
   sub-dimensión (initiation/response/follow_up/repair/turn_taking), `conversation_endurance`
   (hitos 30s–180s) + `/api/academy/speaking/endurance`, campo LLM `initiation`, y render en
   `SpeakingDiagnostic` (insignia "proxy" + desglose + hitos). Test visual `tests/visual/speaking.spec.ts`.
+
+### 37.12 HECHO (V1.35) — Gestión en-app de la biblioteca de audio humano
+- ✅ Subir/reemplazar/quitar WAV desde **Ajustes → Audio** (`components/AudioLibrary.tsx`): preview
+  del WAV, edición de metadatos (transcripción, hablante, acento, CEFR, velocidad, ruido, género,
+  región, contexto), subida multipart y borrado.
+- ✅ Router `/api/audio-library` (`routers/audio_library.py`): `GET /slots`, `POST /upload`,
+  `GET /{audio_id}/audio` (preview) y `DELETE /{audio_id}`.
+- ✅ `is_recorded` ahora consulta el manifest (switch runtime TTS↔grabado sin tocar el banco de
+  preguntas); `write_entry`/`remove_entry`/`wav_probe_bytes` en `services/audio_library.py`; y
+  `domain/listening.py` expone `audio_type="recorded"` cuando el manifest respalda el ítem.
+  Ver CHANGELOG 1.35.0.
 
 

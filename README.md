@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v1.34.0**.
+- Última versión estable: **v1.35.0**.
 
 ## Estructura
 
