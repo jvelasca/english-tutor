@@ -25,6 +25,8 @@
                   "can_do": "I can describe past experiences and events.",
                   "title": "Experiencias pasadas",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["restaurant"],
                   "concepts": ["Past Simple (irregular verbs)", "I went", "I saw", "I had"],
                   "vocabulary": ["went", "saw", "had", "did", "last year", "ago"],
                   "activities": [
@@ -71,6 +73,8 @@
                   "can_do": "I can talk about life experiences using the present perfect.",
                   "title": "Present Perfect (introducción)",
                   "skills": ["grammar", "speaking", "writing", "pronunciation"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["travel"],
                   "concepts": ["Present Perfect", "have/has + past participle", "ever", "never"],
                   "vocabulary": ["ever", "never", "been", "seen", "done"],
                   "activities": [
@@ -124,6 +128,8 @@
                   "can_do": "I can compare people, places and things.",
                   "title": "Comparativos",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["small_talk"],
                   "concepts": ["comparatives", "bigger than", "more interesting than"],
                   "vocabulary": ["bigger", "smaller", "cheaper", "more", "than"],
                   "activities": [
@@ -170,6 +176,8 @@
                   "can_do": "I can describe the best or worst of something.",
                   "title": "Superlativos",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["bank"],
                   "concepts": ["superlatives", "the biggest", "the most beautiful"],
                   "vocabulary": ["the best", "the worst", "the biggest", "the most"],
                   "activities": [
@@ -237,6 +245,8 @@
                   "can_do": "I can talk about plans and intentions.",
                   "title": "Planes e intenciones",
                   "skills": ["grammar", "speaking", "writing", "pronunciation"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["airport"],
                   "concepts": ["going to + verb", "plan to", "hope to"],
                   "vocabulary": ["plan", "hope", "intend", "next month"],
                   "activities": [
@@ -269,6 +279,8 @@
                   "can_do": "I can make predictions and spontaneous decisions.",
                   "title": "Predicciones y decisiones",
                   "skills": ["grammar", "speaking", "writing", "pronunciation"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["appointment"],
                   "concepts": ["will + verb", "I think it will", "I will help"],
                   "vocabulary": ["will", "probably", "maybe", "soon"],
                   "activities": [
@@ -322,6 +334,9 @@
                   "can_do": "I can buy tickets and ask about transport.",
                   "title": "Comprar billetes",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "listening"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["restaurant"],
+                  "listening_items": ["l4", "l5", "l6", "l10"],
                   "concepts": ["Can I have ...?", "How much is a ticket to ...?"],
                   "vocabulary": ["ticket", "train", "bus", "airport", "return"],
                   "activities": [
@@ -368,6 +383,8 @@
                   "can_do": "I can describe what I have to do and what I must not do.",
                   "title": "Obligación",
                   "skills": ["grammar", "speaking", "writing", "pronunciation"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["travel"],
                   "concepts": ["have to", "must", "mustn't"],
                   "vocabulary": ["have to", "must", "mustn't", "allowed"],
                   "activities": [
@@ -421,6 +438,8 @@
                   "can_do": "I can describe how I feel and give simple advice.",
                   "title": "Salud y consejos",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["small_talk"],
                   "concepts": ["should / shouldn't", "I feel", "I have a ..."],
                   "vocabulary": ["headache", "cold", "tired", "should", "rest"],
                   "activities": [
@@ -488,6 +507,8 @@
                   "can_do": "I can tell a short story using linking words.",
                   "title": "Contar una historia",
                   "skills": ["speaking", "writing", "pronunciation", "grammar", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["bank"],
                   "concepts": ["then", "after that", "suddenly", "finally"],
                   "vocabulary": ["first", "then", "after that", "suddenly", "finally"],
                   "activities": [
@@ -555,6 +576,9 @@
                   "can_do": "I can hold a natural conversation about my past, my plans and everyday situations.",
                   "title": "Conversación final A2",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["airport"],
+                  "listening_items": ["l12", "l13", "c011", "c012"],
                   "concepts": ["review: past, future, travel, health, stories"],
                   "vocabulary": ["review A2"],
                   "activities": [

@@ -20,6 +20,7 @@ from services.audio_library import (
     validate_manifest,
 )
 from services.curriculum import CEFR_ORDER
+from services.curriculum_coverage import coverage_metric
 from services.listening import QUESTION_BANK, validate_listening_bank
 from services.speaking_scenarios import list_scenarios
 
@@ -40,8 +41,14 @@ def content_stats() -> dict:
     derivar de aquí para que la cifra sea única (anti-drift).
 
     El desglose separa explícitamente el corpus (`cNNN`) del banco heredado TTS
-    (`lNN`), de modo que "100 ítems de listening" (corpus) y "123 totales"
+    (`lNN`), de modo que "140 ítems de listening" (corpus) y "163 totales"
     (banco completo) dejen de contradecirse.
+
+    Además de `total_validated_learning_items` (cuántos ejercicios fiables hay),
+    se añade `total_curriculum_coverage` (V2.4): cuánto del curso completo
+    Pre-A1→C2 está cubierto por las 7 secciones canónicas. Son métricas
+    diferentes y deben convivir (una mide contenido validado; la otra, cobertura
+    curricular).
     """
     corpus = [q for q in QUESTION_BANK if str(q.get("id", "")).startswith("c")]
     legacy = [q for q in QUESTION_BANK if not str(q.get("id", "")).startswith("c")]
@@ -49,6 +56,7 @@ def content_stats() -> dict:
     scenarios = list_scenarios()
     return {
         "total_validated_learning_items": len(QUESTION_BANK) + len(scenarios),
+        "total_curriculum_coverage": coverage_metric(),
         "listening": {
             "total": len(QUESTION_BANK),
             "corpus": len(corpus),
@@ -70,7 +78,7 @@ def content_stats() -> dict:
 
 QUALITY_THRESHOLDS: dict = {
     "min_total_items": 100,
-    "min_items_per_level": {"A1": 20, "A2": 20, "B1": 20, "B2": 20},
+    "min_items_per_level": {"A1": 20, "A2": 20, "B1": 20, "B2": 20, "C1": 20, "C2": 20},
     "min_speakers": 10,
     "min_accents": 4,
     "min_contexts": 5,

@@ -24,6 +24,8 @@ pedir más contexto.
   endurecimiento (E1–E4, F4–F9): **históricos, todos hechos**.
 - `agentes/pedagogia/` — Etapa pedagógica (P1–P23): **históricos, todos hechos**.
 - `agentes/ui2/` — Rediseño UI 2.0 (u1–u3): **históricos, todos hechos**.
+- `agentes/curriculum/` — V2.5 Curriculum Completion (c1–c4): **hechos** (37.22–37.25). Ver
+  `docs/RELEVO.md` sección 37.21 y `docs/CURRICULUM_COVERAGE.md` (huecos que cierran).
 
 Las **FASE 1–5 de la auditoría externa (V1.30–V1.34)** — LAN/móvil, Adaptive 2.0,
 Curriculum 2.0, Listening 2.0 y Speaking 2.0 — fueron ejecutadas **directamente por el

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "scenarios": [
     {
       "id": "restaurant",
@@ -379,6 +379,120 @@
         "spontaneity": 4,
         "cognitive_demand": 5,
         "novelty": 5
+      }
+    },
+    {
+      "id": "persuasion",
+      "title": "Persuasion",
+      "category": "Work and services",
+      "cefr_target": "C2",
+      "task_type": "discussion",
+      "communicative_objective": "Persuade a sceptical audience using nuanced argument, hedging and rhetorical devices without appearing confrontational.",
+      "prompt": "You are presenting a proposal to a sceptical decision-maker. Build a subtle case, anticipate and defuse objections, and steer the conversation towards agreement without being pushy.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 6,
+        "grammar_demand": 5,
+        "discourse_demand": 6,
+        "interaction_demand": 5,
+        "spontaneity": 5,
+        "cognitive_demand": 6,
+        "novelty": 5
+      }
+    },
+    {
+      "id": "conflict_mediation",
+      "title": "Conflict mediation",
+      "category": "Work and services",
+      "cefr_target": "C2",
+      "task_type": "discussion",
+      "communicative_objective": "Mediate a complex disagreement between two parties, reframing positions and guiding them towards a mutually acceptable resolution.",
+      "prompt": "You are mediating between two colleagues who strongly disagree. Restate each side fairly, identify underlying interests and guide the conversation towards a compromise neither party proposed.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 5,
+        "grammar_demand": 5,
+        "discourse_demand": 6,
+        "interaction_demand": 6,
+        "spontaneity": 5,
+        "cognitive_demand": 6,
+        "novelty": 5
+      }
+    },
+    {
+      "id": "academic_defence",
+      "title": "Academic defence",
+      "category": "Work and services",
+      "cefr_target": "C2",
+      "task_type": "interview",
+      "communicative_objective": "Defend a position with evidence, handle probing questions and concede gracefully while preserving your core argument.",
+      "prompt": "You are defending a research position in an academic setting. Present your claim with evidence, respond to challenging questions and distinguish what you can and cannot yet prove.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 6,
+        "grammar_demand": 6,
+        "discourse_demand": 6,
+        "interaction_demand": 5,
+        "spontaneity": 4,
+        "cognitive_demand": 6,
+        "novelty": 5
+      }
+    },
+    {
+      "id": "abstract_conversation",
+      "title": "Abstract topics",
+      "category": "Everyday life",
+      "cefr_target": "C2",
+      "task_type": "conversation",
+      "communicative_objective": "Sustain a nuanced conversation about abstract or philosophical topics, expressing shades of meaning and uncertainty.",
+      "prompt": "You are discussing an abstract topic with a thoughtful interlocutor. Express a nuanced view, qualify your claims and explore the other person's perspective in depth.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 6,
+        "grammar_demand": 5,
+        "discourse_demand": 6,
+        "interaction_demand": 5,
+        "spontaneity": 5,
+        "cognitive_demand": 6,
+        "novelty": 6
+      }
+    },
+    {
+      "id": "stakes_negotiation",
+      "title": "High-stakes negotiation",
+      "category": "Work and services",
+      "cefr_target": "C2",
+      "task_type": "role_play",
+      "communicative_objective": "Negotiate delicate terms in a high-stakes situation, balancing firmness with diplomacy and reading implicit signals.",
+      "prompt": "You are negotiating an important agreement where both sides have much to lose. State your priorities tactfully, read between the lines and trade concessions to reach a sustainable deal.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 6,
+        "grammar_demand": 5,
+        "discourse_demand": 6,
+        "interaction_demand": 6,
+        "spontaneity": 5,
+        "cognitive_demand": 6,
+        "novelty": 5
+      }
+    },
+    {
+      "id": "diplomatic_talk",
+      "title": "Diplomatic meeting",
+      "category": "Work and services",
+      "cefr_target": "C2",
+      "task_type": "discussion",
+      "communicative_objective": "Navigate a formal, high-level meeting with tact, managing face and signalling disagreement indirectly.",
+      "prompt": "You are in a formal high-level meeting. Disagree with a proposal indirectly and tactfully, preserve a positive tone and steer the group towards a face-saving compromise.",
+      "metrics": ["task_completion", "interaction", "fluency", "repair", "turn_taking"],
+      "difficulty_vector": {
+        "lexical_demand": 6,
+        "grammar_demand": 5,
+        "discourse_demand": 6,
+        "interaction_demand": 6,
+        "spontaneity": 4,
+        "cognitive_demand": 6,
+        "novelty": 6
       }
     }
   ]

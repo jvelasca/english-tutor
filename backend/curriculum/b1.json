@@ -26,6 +26,7 @@
                   "title": "Experiences: present perfect vs past simple",
                   "skills": ["grammar", "vocabulary", "speaking", "writing", "pronunciation"],
                   "subskills": ["tenses", "word_families", "fluency"],
+                  "scenario_ids": ["doctor"],
                   "concepts": ["Present perfect for experience", "Past simple for finished time", "ever / never / already / yet"],
                   "vocabulary": ["experience", "already", "yet", "ever", "never"],
                   "activities": [
@@ -113,6 +114,7 @@
                   "title": "Giving opinions",
                   "skills": ["vocabulary", "speaking", "writing"],
                   "subskills": ["collocations", "coherence", "fluency"],
+                  "scenario_ids": ["telephone"],
                   "concepts": ["In my opinion", "I think / I believe", "From my point of view"],
                   "vocabulary": ["opinion", "believe", "agree", "disagree", "point of view"],
                   "activities": [
@@ -146,6 +148,7 @@
                   "title": "Agreeing and disagreeing",
                   "skills": ["vocabulary", "speaking"],
                   "subskills": ["collocations", "interaction", "turn_taking"],
+                  "scenario_ids": ["housing"],
                   "concepts": ["I agree with you", "I see your point, but", "That is a good point"],
                   "vocabulary": ["agree", "disagree", "point", "perhaps", "however"],
                   "activities": [
@@ -200,6 +203,7 @@
                   "title": "Future: will, going to, present continuous",
                   "skills": ["grammar", "vocabulary", "speaking", "writing"],
                   "subskills": ["tenses", "collocations", "fluency"],
+                  "scenario_ids": ["complaint"],
                   "concepts": ["will for predictions", "going to for plans", "present continuous for arrangements"],
                   "vocabulary": ["plan", "prediction", "arrangement", "probably", "definitely"],
                   "activities": [
@@ -287,6 +291,7 @@
                   "title": "Obligation: have to / must",
                   "skills": ["grammar", "vocabulary", "speaking"],
                   "subskills": ["modals", "collocations", "fluency"],
+                  "scenario_ids": ["tech_support"],
                   "concepts": ["have to (external rule)", "must (personal obligation)", "don't have to (no obligation)"],
                   "vocabulary": ["rule", "obligation", "duty", "requirement"],
                   "activities": [
@@ -348,6 +353,7 @@
                   "title": "Connected speech: gonna / wanna / didja",
                   "skills": ["listening", "vocabulary"],
                   "subskills": ["connected_speech", "word_recognition"],
+                  "listening_items": ["l7", "l8", "l14", "l15"],
                   "concepts": ["gonna = going to", "wanna = want to", "didja = did you"],
                   "vocabulary": ["gonna", "wanna", "gotta", "didja", "couldja"],
                   "activities": [
@@ -388,6 +394,7 @@
                   "title": "Narrative listening: gist and detail",
                   "skills": ["listening", "reading", "vocabulary"],
                   "subskills": ["gist", "detail", "skimming"],
+                  "listening_items": ["l18", "l19", "l22", "l23"],
                   "concepts": ["main idea (gist)", "key details", "sequence of events"],
                   "vocabulary": ["main idea", "detail", "event", "sequence"],
                   "activities": [
@@ -448,6 +455,8 @@
                   "can_do": "I can express opinions, talk about the future and understand connected speech.",
                   "title": "Conversación final B1",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
+                  "scenario_ids": ["small_talk_advanced"],
+                  "listening_items": ["c021", "c022", "c023", "c024"],
                   "concepts": ["review: opinions, future, obligations, connected speech"],
                   "vocabulary": ["review B1"],
                   "activities": [

@@ -919,7 +919,7 @@ def _load_corpus_items() -> list[dict]:
 QUESTION_BANK: list[dict] = _LEGACY_BANK + _load_corpus_items()
 
 
-LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2"]
+LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 # Velocidad de referencia (wpm) de la voz Piper por defecto. `length_scale_for_rate`
 # la usa para mapear `speech_rate` (wpm) de un ítem a `length_scale` de Piper.

@@ -149,8 +149,8 @@ ASSESSMENT_VERSION = "1.0.0"  # contenido de assessments.json (placement + exám
 PLACEMENT_VERSION = "2.0.0"  # motor de placement adaptativo (IRT-lite/1PL multiskill)
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
-SPEAKING_SCENARIOS_VERSION = "2.0.0"  # escenarios comunicativos (20 escenarios)
-LISTENING_BANK_VERSION = "5.0.0"  # listening: TTS 8D + corpus de audio (100 ítems)
+SPEAKING_SCENARIOS_VERSION = "3.0.0"  # escenarios comunicativos (26 escenarios)
+LISTENING_BANK_VERSION = "6.0.0"  # listening: TTS 8D + corpus de audio (140)
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 
@@ -194,6 +194,8 @@ class Objective(BaseModel):
     title: str
     skills: list[str]
     subskills: list[str] = Field(default_factory=list)
+    listening_items: list[str] = Field(default_factory=list)
+    scenario_ids: list[str] = Field(default_factory=list)
     concepts: list[str] = Field(default_factory=list)
     vocabulary: list[str] = Field(default_factory=list)
     thresholds: dict[str, float] = Field(default_factory=dict)
@@ -448,5 +450,34 @@ def validate_level(level: Level) -> list[str]:
                 errors.append(f"{lid}: actividad sin type en {obj.id}")
             if not activity.instruction:
                 errors.append(f"{lid}: actividad sin instruction en {obj.id}")
+
+    # Wiring curso↔bancos (V2.5-C4): cada referencia por ID debe existir y
+    # pertenecer al nivel del curso (listening) o a su `cefr_target` (speaking).
+    from services.listening import QUESTION_BANK  # late import (anti-ciclo)
+    from services.speaking_scenarios import list_scenarios  # late import (anti-ciclo)
+
+    listening_by_id = {q["id"]: q["level"] for q in QUESTION_BANK}
+    scenarios_by_id = {s["id"]: s["cefr_target"] for s in list_scenarios()}
+    for obj in objectives:
+        for item_id in obj.listening_items:
+            if item_id not in listening_by_id:
+                errors.append(
+                    f"{lid}: objetivo {obj.id} listening_items '{item_id}' no existe"
+                )
+            elif listening_by_id[item_id] != level.level:
+                errors.append(
+                    f"{lid}: objetivo {obj.id} listening_items '{item_id}' "
+                    f"nivel {listening_by_id[item_id]} != {level.level}"
+                )
+        for scenario_id in obj.scenario_ids:
+            if scenario_id not in scenarios_by_id:
+                errors.append(
+                    f"{lid}: objetivo {obj.id} scenario_ids '{scenario_id}' no existe"
+                )
+            elif scenarios_by_id[scenario_id] != level.level:
+                errors.append(
+                    f"{lid}: objetivo {obj.id} scenario_ids '{scenario_id}' "
+                    f"cefr_target {scenarios_by_id[scenario_id]} != {level.level}"
+                )
 
     return errors

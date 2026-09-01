@@ -66,7 +66,7 @@ def test_corpus_items_declare_audio_and_metadata():
 def test_corpus_covers_all_levels_and_is_diverse():
     corpus = [q for q in QUESTION_BANK if q["id"].startswith("c")]
     levels = {q["level"] for q in corpus}
-    assert levels == {"A1", "A2", "B1", "B2"}
+    assert levels == {"A1", "A2", "B1", "B2", "C1", "C2"}
     # Diversidad real: más de un hablante, más de un acento y más de un contexto.
     assert len({q["speaker_id"] for q in corpus}) >= 3
     assert len({q["accent"] for q in corpus}) >= 3

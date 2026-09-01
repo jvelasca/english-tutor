@@ -3,13 +3,21 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-31 15:50 (UTC+2).
+> Actualizado por última vez: 2026-08-31 17:15 (UTC+2).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-31):** `v2.3.0` **PERSONAL DICTIONARY + EVIDENCIA POR ÍTEM LÉXICO verificada en verde**
-(la versión está elevada a `2.3.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).
-Cerrada la **V2.3 PERSONAL DICTIONARY** (bajar el modelo de evidencia de "destreza" a "palabra/estructura":
+**Posición actual (2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
+(la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).
+Cerrada la **V2.4 AUDITORÍA DE COBERTURA CURRICULAR** (instrumentación que responde con datos a
+"¿el alumno puede recorrer completo A1→C2?": servicio puro `services/curriculum_coverage.py` con
+`coverage_sections`/`bank_intersection`/tri-estado `complete`/`partial`/`empty`/`level_coverage`/
+`curriculum_coverage_report`, métrica **TOTAL CURRICULUM COVERAGE = 42/49 celdas (85,7%)** distinta de
+TOTAL VALIDATED LEARNING ITEMS = 189, integrada en `content_stats()` (anti-drift), CLI
+`scripts/curriculum_coverage.py` (`--strict` = exit 1 si hay huecos `empty`), tests
+`test_curriculum_coverage.py` (9 invariantes, backend 971 tests) y mapa `docs/CURRICULUM_COVERAGE.md`
+con los huecos priorizados; Pre-A1 solo marcado como hueco, sin contenido), y antes la
+**V2.3 PERSONAL DICTIONARY** (bajar el modelo de evidencia de "destreza" a "palabra/estructura":
 columnas `cefr`/`level_id`/`objective_id`/`source`/`lemma`/`kind` en `vocabulary` vía migración idempotente,
 siembra de `objective.vocabulary` + `objective.concepts` cableada en `submit_objective_assessment` y
 `record_lesson_completed`, servicio puro `services/lexicon.py` con `item_mastery`/`item_recall`/`item_status`
@@ -75,6 +83,9 @@ de empezar el siguiente incremento.
 - `docs: briefings de agentes de la auditoria pedagogica A1-B2`
 - `feat: UI de 3 paneles (destrezas + desarrollo + analisis + barra de estado)`
 - `feat: validación determinista audio↔metadata`
+
+> **V2.4 implementada y verificada** (auditoría de cobertura curricular; aún sin commitear). Árbol de
+> trabajo limpio salvo los archivos de la V2.4. Ver sección 37.21 y `docs/CURRICULUM_COVERAGE.md`.
 
 > **V1.35 implementada y verificada** (gestión en-app de audio humano; aún sin commitear). Árbol de
 > trabajo limpio; solo queda pendiente 37.3 (incorporar WAV reales, ya desde la app) y 37.4 (Vercel,
@@ -2034,8 +2045,106 @@ cd frontend && npx tsc --noEmit && npx vitest run
   (endpoint lexicon); frontend `vocabulary.test.ts` + `dictionary.test.ts`. Backend 962 tests + `ruff`
   limpio; frontend `tsc` + `vitest` 245 tests + `build` OK; `check_release_consistency` OK (2.3.0).
 
-### Próximo (V2.4+)
-- FSRS completo (ajuste de parámetros por usuario), desglose speaking-vs-writing por palabra,
-  generación automática del speaking micro-drill, e Immersive Reading / import de contenido real.
+### 37.21 HECHO (V2.4) — Auditoría de cobertura curricular
+- ✅ **Servicio puro `services/curriculum_coverage.py`**: `coverage_sections(level)` (conteo por las 7
+  secciones a nivel de curso completo), `bank_intersection()` (cruce del banco de listening por `level`
+  y de los escenarios de speaking por `cefr_target` contra A1..C2), tri-estado
+  `complete`/`partial`/`empty`, `level_coverage(level_id)`, `coverage_metric()` (TOTAL CURRICULUM
+  COVERAGE sobre la matriz 7 niveles × 7 secciones = 49 celdas) y `curriculum_coverage_report()`.
+- ✅ **Métrica "TOTAL CURRICULUM COVERAGE"** integrada en `content_stats()` junto a
+  `total_validated_learning_items` (dos métricas que conviven: contenido validado vs. cobertura).
+- ✅ **CLI `scripts/curriculum_coverage.py`**: JSON completo + resumen nivel×sección + `--strict`
+  (exit 1 si hay huecos `empty` en una sección con curso).
+- ✅ **Tests** `test_curriculum_coverage.py` (9 invariantes: 7 niveles × 7 secciones, Pre-A1 banda sin
+  curso, cruce con bancos, determinismo, coexistencia de métricas). Backend **971 tests** + `ruff`
+  limpio; `check_release_consistency` OK (2.4.0).
+- ✅ **Mapa `docs/CURRICULUM_COVERAGE.md`**: tabla Pre-A1→C2 × 7 secciones + huecos priorizados.
+
+**Resultado de la auditoría (37/49 celdas = 75,5%):** huecos reales — Pre-A1 sin curso (marcado);
+interaction 1/7 (solo B1); listening desconectado (29 checks en curso vs 100 en banco) y sin C1/C2;
+speaking declarado sin evaluación y sin C2; review/assessment solo en módulos Final; C1/C2 muy finos
+(7 y 5 objetivos vs 23 en A1). **Estos huecos alimentan V2.5 (contenido)**.
+
+### 37.22 HECHO (V2.5-C1) — Listening C1/C2 (corpus 100→140, LEVEL_ORDER A1..C2)
+- ✅ **Corpus de listening 100 → 140** (`curriculum/listening_corpus.json` v1.1.0): 20 ítems C1
+  (`c101`–`c120`) y 20 C2 (`c121`–`c140`) con registro/temática avanzados (inferencia, intención,
+  actitud, ironía, hablantes múltiples, connected speech, habla rápida). Diversidad mantenida.
+- ✅ **Motor**: `LEVEL_ORDER` → A1..C2 (`services/listening.py`), `LISTENING_BANK_VERSION` 5.0.0 →
+  6.0.0 (`services/curriculum.py`), `QUALITY_THRESHOLDS["min_items_per_level"]` añade C1/C2 (20).
+- ✅ **Métrica**: TOTAL VALIDATED LEARNING ITEMS 143 → 183 (163 listening: 140 corpus + 23 legacy;
+  20 speaking), reflejada en README/CHANGELOG/PLAN y `docs/CURRICULUM_COVERAGE.md`.
+- ✅ **Tests**: `test_curriculum_coverage.py` (hueco C1/C2 invertido + invariante ≥20/nivel),
+  `test_content_quality.py` (umbrales + 6 niveles), `test_listening_corpus.py` (niveles C1/C2),
+  `test_listening.py` (tope C2). Backend 972 tests + `ruff` limpio.
+- Verificado: `content_validation` OK (14/14), `curriculum_coverage` OK (`bank_count` C1/C2 > 0),
+  `check_release_consistency` OK (2.4.0). Sin bump de versión.
+
+### 37.23 HECHO (V2.5-C2) — Speaking C2 (escenarios 20→26, cefr_target C2)
+- ✅ **Escenarios de speaking 20 → 26** (`curriculum/speaking_scenarios.json` v1.0.0 → v2.0.0): 6
+  escenarios C2 (`persuasion`, `conflict_mediation`, `academic_defence`, `abstract_conversation`,
+  `stakes_negotiation`, `diplomatic_talk`) con objetivo comunicativo C2 (persuasión sutil, mediación
+  de conflicto, defensa con evidencia, temas abstractos, negociación delicada y tacto diplomático).
+  Todos usan `task_type` conversacional (invariante de la UI de escenarios).
+- ✅ **`SPEAKING_SCENARIOS_VERSION` 2.0.0 → 3.0.0** (`services/curriculum.py`), alineando la
+  discrepancia JSON↔constante (JSON 1.0.0 → 2.0.0; constante 2.0.0 → 3.0.0).
+- ✅ **Métrica**: TOTAL VALIDATED LEARNING ITEMS 183 → 189 (163 listening + 26 speaking), reflejada
+  en README/CHANGELOG/PLAN y `docs/CURRICULUM_COVERAGE.md`.
+- ✅ **Tests**: `test_curriculum_coverage.py` (hueco C2 invertido), `test_speaking_scenarios.py`
+  (catálogo 26 + invariante ≥1 escenario por `cefr_target` A1..C2). Backend 973 tests + `ruff` limpio.
+- Verificado: `curriculum_coverage` OK (`bank_count` speaking C2 > 0), `check_release_consistency`
+  OK (2.4.0). Sin bump de versión.
+
+### 37.24 HECHO (V2.5-C3) — Interaction A1/A2/B2/C1/C2 (subskills interaction+turn_taking)
+- ✅ **Subskills de interacción en 5 niveles** (`curriculum/a1.json`, `a2.json`, `b2.json`, `c1.json`,
+  `c2.json`): 39 objetivos que declaran `speaking` con actividad `dialogue` añaden
+  `subskills: ["interaction", "turn_taking"]` (18 en A1, 11 en A2, 2 en B2, 5 en C1, 3 en C2). La
+  sección `interaction` deja de estar `empty` en A1/A2/B2/C1/C2 (solo Pre-A1, banda sin curso, queda
+  vacía). Sin tocar `services/course.py` ni el scoring de speaking.
+- ✅ **Métrica**: TOTAL CURRICULUM COVERAGE 37/49 → 42/49 (75,5% → 85,7%); interaction pasa de 1/7 a
+  6/7 poblado. `TOTAL VALIDATED LEARNING ITEMS` sigue en 189 (sin ítems nuevos: interaction se cuenta
+  por subskill, no por check).
+- ✅ **Test invariante nuevo** (`test_curriculum_coverage.py`): `interaction` con `count > 0` y
+  `status != empty` en A1/A2/B2/C1/C2.
+- ✅ **Docs**: `docs/CURRICULUM_COVERAGE.md` (interaction 6/7, cobertura 42/49), CHANGELOG, PLAN,
+  README y este RELEVO actualizados. Backend 974 tests + `ruff` limpio.
+- Verificado: `validate_level` vacío para los 6 niveles, `curriculum_coverage` OK (interaction
+  A1/A2/B2/C1/C2 con `count > 0`), `check_release_consistency` OK (2.4.0). Sin bump de versión.
+
+### 37.25 HECHO (V2.5-C4) — Wiring curso↔bancos (listening_items + scenario_ids por objetivo)
+- ✅ **Modelo `Objective`** (`services/curriculum.py`): dos campos retrocompatibles con default `[]`:
+  `listening_items: list[str]` (IDs del banco de listening) y `scenario_ids: list[str]` (IDs de
+  escenarios de speaking). `load_all_levels()` sigue parseando los 6 niveles sin cambios de firma.
+- ✅ **Conteo** (`services/course.py::unit_sections`): `listening` suma `len(listening_items)` y
+  `speaking` suma `len(scenario_ids)`, de modo que la sección refleja las referencias reales al banco
+  y no solo el `skill` declarado (sin tocar `CourseMapOut`/endpoints). `coverage_sections` lo refleja
+  por delegación (usa `unit_sections`).
+- ✅ **Wiring de contenido** en los 6 niveles (`curriculum/a1.json`–`c2.json`): 18 objetivos con
+  `listening` referencian 4 ítems del banco de su nivel (`c001`–`c140` + legacy `l1`–`l23`); 50
+  objetivos con `speaking` referencian 1 escenario de su `cefr_target` (26 escenarios). Solo
+  referencias por ID (sin duplicar ítems del banco dentro del JSON de nivel).
+- ✅ **Validación** (`services/curriculum.py::validate_level`): cada `listening_items` debe existir y
+  su `level` coincidir con el nivel; cada `scenario_ids` debe existir y su `cefr_target` coincidir.
+  Imports diferidos (anti-ciclo, porque `listening`/`speaking_scenarios` importan `curriculum`).
+- ✅ **Test invariante nuevo** (`tests/test_bank_wiring.py`, 7 tests): conteo con referencias,
+  referencia rota y desfase de nivel (listening y speaking), listening/speaking no `empty` en niveles
+  con curso y `validate_level` vacío para los 6 niveles.
+- ✅ **Docs**: `docs/CURRICULUM_COVERAGE.md` (listening/speaking pasan de "desconectado" a "cableado
+  por unidad", `count` actualizado), CHANGELOG, PLAN, README y este RELEVO. Backend **981 tests** +
+  `ruff` limpio.
+- Verificado: `validate_level` vacío para los 6 niveles, `curriculum_coverage --strict` exit 0 (sin
+  huecos `empty`; `count` de listening/speaking crecido), `check_release_consistency` OK (2.4.0). Sin
+  bump de versión y **sin UI** (la consumición visual de los ítems referenciados es un incremento
+  posterior).
+
+### Próximo (V2.5+)
+- **V2.5 — Curriculum Completion**: completar los huecos de la auditoría. Briefings en
+  `agentes/curriculum/`:
+  1. ~~`c1-listening-c1c2`~~ ✅ hecho (37.22) — corpus de listening A1→C2.
+  2. ~~`c2-speaking-c2`~~ ✅ hecho (37.23) — escenarios de speaking C2.
+  3. ~~`c3-interaction`~~ ✅ hecho (37.24) — interaction A1/A2/B2/C1/C2.
+  4. ~~`c4-wire-banks`~~ ✅ hecho (37.25) — wiring curso↔bancos (listening/speaking cableados).
+- Después (roadmap): Mastery Evidence 2.0, Daily Adaptive Plan, SRS 2.0 + Immersion, Speaking 3.0.
+- Aún pendiente de V2.3: generación automática del speaking micro-drill (`recognized_not_produced`),
+  desglose speaking-vs-writing por palabra y FSRS completo (parámetros por usuario).
 
 

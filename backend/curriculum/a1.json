@@ -25,6 +25,8 @@
                   "can_do": "I can introduce myself and give basic personal information.",
                   "title": "Presentarme",
                   "skills": ["speaking", "writing", "pronunciation", "vocabulary", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["I am", "My name is", "I live in", "I am from", "I work as"],
                   "vocabulary": ["name", "country", "city", "job", "age", "family", "hobby"],
                   "activities": [
@@ -64,6 +66,8 @@
                   "can_do": "I can ask someone's name and where they are from.",
                   "title": "Preguntar el nombre y origen",
                   "skills": ["speaking", "writing", "pronunciation", "grammar", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["What is your name?", "Where are you from?", "What's"],
                   "vocabulary": ["what", "where", "your", "from", "name"],
                   "activities": [
@@ -117,6 +121,7 @@
                   "can_do": "I can say my country and nationality.",
                   "title": "Países y nacionalidades",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["I am from + country", "I am + nationality", "to be"],
                   "vocabulary": ["Spain", "Spanish", "Mexico", "Mexican", "France", "French", "England", "English"],
                   "activities": [
@@ -163,6 +168,8 @@
                   "can_do": "I can say and understand numbers from 1 to 100.",
                   "title": "Números 1-100",
                   "skills": ["vocabulary", "listening", "speaking", "writing", "pronunciation"],
+                  "scenario_ids": ["introductions"],
+                  "listening_items": ["l1", "l2", "l3", "l9"],
                   "concepts": ["numbers 1-100"],
                   "vocabulary": ["one", "ten", "twenty", "fifty", "hundred"],
                   "activities": [
@@ -216,6 +223,8 @@
                   "can_do": "I can describe my daily routine.",
                   "title": "Mi rutina diaria",
                   "skills": ["speaking", "writing", "pronunciation", "grammar", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["Present Simple", "I get up", "I go to", "I have breakfast"],
                   "vocabulary": ["get up", "work", "breakfast", "lunch", "dinner", "sleep"],
                   "activities": [
@@ -262,6 +271,9 @@
                   "can_do": "I can tell the time and talk about days and months.",
                   "title": "La hora, días y meses",
                   "skills": ["vocabulary", "listening", "speaking", "writing", "pronunciation"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
+                  "listening_items": ["l11", "c001", "c002", "c003"],
                   "concepts": ["What time is it?", "days of the week", "months"],
                   "vocabulary": ["Monday", "Sunday", "January", "December", "morning", "evening"],
                   "activities": [
@@ -308,6 +320,8 @@
                   "can_do": "I can talk about how often I do things.",
                   "title": "Frecuencia",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["always", "usually", "sometimes", "never", "every day"],
                   "vocabulary": ["always", "usually", "often", "sometimes", "never"],
                   "activities": [
@@ -375,6 +389,8 @@
                   "can_do": "I can talk about my family.",
                   "title": "Mi familia",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["have got", "This is my", "I have a brother/sister"],
                   "vocabulary": ["mother", "father", "brother", "sister", "son", "daughter", "grandmother", "grandfather"],
                   "activities": [
@@ -421,6 +437,8 @@
                   "can_do": "I can describe people's appearance and personality.",
                   "title": "Describir personas",
                   "skills": ["vocabulary", "grammar", "speaking", "writing", "pronunciation"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["be + adjective", "tall", "short", "friendly"],
                   "vocabulary": ["tall", "short", "young", "old", "friendly", "kind", "happy"],
                   "activities": [
@@ -474,6 +492,7 @@
                   "can_do": "I can talk about what belongs to people.",
                   "title": "Posesivos",
                   "skills": ["grammar", "vocabulary", "speaking", "writing", "pronunciation"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["my", "your", "his", "her", "their", "'s"],
                   "vocabulary": ["my", "your", "his", "her", "our", "their"],
                   "activities": [
@@ -541,6 +560,8 @@
                   "can_do": "I can describe my home and the rooms in it.",
                   "title": "Mi casa",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["There is / There are", "rooms of the house"],
                   "vocabulary": ["kitchen", "bedroom", "bathroom", "living room", "garden", "door", "window"],
                   "activities": [
@@ -587,6 +608,7 @@
                   "can_do": "I can say where things are using prepositions.",
                   "title": "Preposiciones de lugar",
                   "skills": ["grammar", "vocabulary", "listening"],
+                  "listening_items": ["c004", "c005", "c006", "c007"],
                   "concepts": ["in", "on", "under", "next to", "behind"],
                   "vocabulary": ["in", "on", "under", "next to", "behind", "in front of"],
                   "activities": [
@@ -647,6 +669,8 @@
                   "can_do": "I can talk about food and drinks.",
                   "title": "Comida y bebida",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["I would like", "I like / I don't like", "countable / uncountable"],
                   "vocabulary": ["water", "bread", "apple", "rice", "coffee", "milk", "cheese", "fruit"],
                   "activities": [
@@ -693,6 +717,8 @@
                   "can_do": "I can order food in a restaurant or cafe.",
                   "title": "Pedir comida",
                   "skills": ["speaking", "writing", "pronunciation", "vocabulary", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["I would like", "Can I have", "some / any"],
                   "vocabulary": ["menu", "order", "please", "some", "any", "bill"],
                   "activities": [
@@ -760,6 +786,8 @@
                   "can_do": "I can ask about prices and buy things.",
                   "title": "Precios",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["How much is ...?", "this / that / these / those"],
                   "vocabulary": ["price", "cheap", "expensive", "this", "that", "these", "those"],
                   "activities": [
@@ -806,6 +834,7 @@
                   "can_do": "I can talk about clothes.",
                   "title": "La ropa",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["comparatives", "bigger", "cheaper"],
                   "vocabulary": ["shirt", "trousers", "shoes", "dress", "hat", "jacket", "size", "colour"],
                   "activities": [
@@ -873,6 +902,9 @@
                   "can_do": "I can talk about places in a town.",
                   "title": "Lugares de la ciudad",
                   "skills": ["vocabulary", "speaking", "writing", "pronunciation", "listening"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
+                  "listening_items": ["c008", "c009", "c010", "c041"],
                   "concepts": ["there is a ...", "places in town"],
                   "vocabulary": ["bank", "supermarket", "station", "hospital", "park", "school", "restaurant"],
                   "activities": [
@@ -919,6 +951,9 @@
                   "can_do": "I can ask for and give simple directions.",
                   "title": "Pedir indicaciones",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
+                  "listening_items": ["c042", "c043", "c044", "c045"],
                   "concepts": ["Imperatives", "turn left", "go straight", "next to"],
                   "vocabulary": ["left", "right", "straight", "turn", "cross", "opposite"],
                   "activities": [
@@ -986,6 +1021,8 @@
                   "can_do": "I can talk about where I was and what I did yesterday.",
                   "title": "El pasado (was/were)",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["was / were", "yesterday", "last week"],
                   "vocabulary": ["yesterday", "last week", "last night", "ago"],
                   "activities": [
@@ -1032,6 +1069,8 @@
                   "can_do": "I can say what I did in the past.",
                   "title": "Past Simple (verbos regulares)",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["Past Simple", "-ed", "played", "worked"],
                   "vocabulary": ["played", "worked", "visited", "watched", "stayed"],
                   "activities": [
@@ -1099,6 +1138,8 @@
                   "can_do": "I can talk about my future plans.",
                   "title": "Planes futuros",
                   "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["going to", "tomorrow", "next week"],
                   "vocabulary": ["tomorrow", "next week", "next year", "plan"],
                   "activities": [
@@ -1145,6 +1186,8 @@
                   "can_do": "I can make and respond to invitations.",
                   "title": "Invitar",
                   "skills": ["speaking", "writing", "pronunciation", "vocabulary", "grammar"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
                   "concepts": ["Would you like to ...?", "Let's ...", "I'd love to"],
                   "vocabulary": ["invite", "party", "cinema", "would", "together"],
                   "activities": [
@@ -1212,6 +1255,9 @@
                   "can_do": "I can hold a short basic conversation about myself, my life and my plans.",
                   "title": "Conversación final A1",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["introductions"],
+                  "listening_items": ["c046", "c047", "c048", "c049"],
                   "concepts": ["review: introductions, routines, family, past, plans"],
                   "vocabulary": ["review A1"],
                   "activities": [

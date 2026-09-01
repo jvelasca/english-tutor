@@ -26,6 +26,7 @@
                   "title": "Linking ideas: contrast and concession",
                   "skills": ["writing", "speaking", "vocabulary", "grammar"],
                   "subskills": ["cohesion", "coherence", "collocations", "word_order"],
+                  "scenario_ids": ["work_meeting"],
                   "concepts": ["However / Nevertheless", "Although / Even though", "On the other hand"],
                   "vocabulary": ["however", "nevertheless", "although", "whereas", "despite"],
                   "activities": [
@@ -105,7 +106,8 @@
                   "can_do": "I can talk about hypothetical situations using the second and third conditional.",
                   "title": "Second and third conditionals",
                   "skills": ["grammar", "speaking", "vocabulary"],
-                  "subskills": ["conditionals", "fluency", "collocations"],
+                  "subskills": ["conditionals", "fluency", "collocations", "interaction", "turn_taking"],
+                  "scenario_ids": ["problem_solving"],
                   "concepts": ["second conditional (unreal present)", "third conditional (unreal past)", "wish / if only"],
                   "vocabulary": ["hypothetical", "regret", "imagine", "suppose", "would have"],
                   "activities": [
@@ -207,6 +209,7 @@
                   "title": "Multiple speakers and fast speech",
                   "skills": ["listening", "vocabulary"],
                   "subskills": ["multiple_speakers", "fast_speech", "word_recognition"],
+                  "listening_items": ["l16", "l17", "l20", "l21"],
                   "concepts": ["turn-taking", "overlapping speech", "reduced forms"],
                   "vocabulary": ["overlap", "interrupt", "briefly", "speaker", "turn"],
                   "activities": [
@@ -240,6 +243,7 @@
                   "title": "Connected speech and reduced forms",
                   "skills": ["listening", "vocabulary"],
                   "subskills": ["connected_speech", "fast_speech", "phrase_recognition"],
+                  "listening_items": ["c031", "c032", "c033", "c034"],
                   "concepts": ["gonna / wanna / gotta", "elision and assimilation", "weak forms"],
                   "vocabulary": ["gonna", "wanna", "gotta", "kinda", "dunno"],
                   "activities": [
@@ -280,6 +284,7 @@
                   "title": "Inference: attitude and intention",
                   "skills": ["listening", "reading", "vocabulary"],
                   "subskills": ["inference", "speaker_intention", "attitude", "detail"],
+                  "listening_items": ["c035", "c036", "c037", "c038"],
                   "concepts": ["implied meaning", "tone and irony", "hedging"],
                   "vocabulary": ["ironic", "sarcastic", "implied", "ambiguous", "tone"],
                   "activities": [
@@ -373,6 +378,9 @@
                   "can_do": "I can argue a point, follow fast conversation and infer attitude and register.",
                   "title": "Conversación final B2",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["interview"],
+                  "listening_items": ["c039", "c040", "c086", "c087"],
                   "concepts": ["review: argumentation, fast speech, inference, register"],
                   "vocabulary": ["review B2"],
                   "activities": [

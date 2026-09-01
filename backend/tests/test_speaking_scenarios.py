@@ -20,11 +20,11 @@ def _setup(monkeypatch, tmp_path):
 # --- Catálogo versionado ----------------------------------------------------
 
 
-def test_catalog_has_twenty_scenarios_with_valid_metadata():
+def test_catalog_has_twenty_six_scenarios_with_valid_metadata():
     scenarios = scenarios_svc.list_scenarios()
-    assert len(scenarios) == 20
+    assert len(scenarios) == 26
     ids = [s["id"] for s in scenarios]
-    assert len(set(ids)) == 20, "ids duplicados"
+    assert len(set(ids)) == 26, "ids duplicados"
     for scenario in scenarios:
         assert scenario["communicative_objective"]
         assert scenario["prompt"]
@@ -32,6 +32,16 @@ def test_catalog_has_twenty_scenarios_with_valid_metadata():
         assert 1 <= scenario["difficulty"] <= 6
         # Los escenarios comunicativos son conversacionales por definición.
         assert scenario["task_type"] in CONVERSATIONAL_TASK_TYPES
+
+
+def test_catalog_covers_every_cefr_target():
+    # Invariante: hay al menos un escenario por nivel A1..C2.
+    by_cefr = {}
+    for scenario in scenarios_svc.list_scenarios():
+        by_cefr.setdefault(scenario["cefr_target"], 0)
+        by_cefr[scenario["cefr_target"]] += 1
+    for level in ("A1", "A2", "B1", "B2", "C1", "C2"):
+        assert by_cefr.get(level, 0) >= 1
 
 
 def test_catalog_metrics_are_canonical():
@@ -67,7 +77,7 @@ def test_speaking_scenarios_endpoint(monkeypatch, tmp_path):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["version"]
-    assert len(body["scenarios"]) == 20
+    assert len(body["scenarios"]) == 26
     first = body["scenarios"][0]
     assert first["communicative_objective"]
     assert first["metrics"]

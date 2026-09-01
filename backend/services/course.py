@@ -154,6 +154,10 @@ def unit_sections(level: Level, unit) -> list[dict]:
     counts: dict[str, int] = {}
     for section in ("vocabulary", "grammar", "listening", "speaking"):
         counts[section] = objectives_with(section) + checks_with(section)
+    # Wiring curso↔bancos (V2.5-C4): las referencias por ID a los bancos suman a
+    # listening/speaking, de modo que una unidad con ítems cableados no queda `empty`.
+    counts["listening"] += sum(len(o.listening_items) for o in objs)
+    counts["speaking"] += sum(len(o.scenario_ids) for o in objs)
     counts["interaction"] = sum(
         1 for o in objs if any(s in _INTERACTION_SUBSKILLS for s in o.subskills)
     )

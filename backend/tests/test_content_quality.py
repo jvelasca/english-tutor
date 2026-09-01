@@ -38,8 +38,8 @@ def _item(idx, level, speaker_id, accent, context, skill="detail", vector=None):
 def _passing_bank():
     bank = []
     idx = 0
-    for level in ("A1", "A2", "B1", "B2"):
-        for _ in range(25):
+    for level in ("A1", "A2", "B1", "B2", "C1", "C2"):
+        for _ in range(20):
             bank.append(
                 _item(
                     idx,
@@ -76,14 +76,21 @@ def test_quality_check_passes_at_thresholds():
     result = run_quality_check(_passing_bank())
     assert result["pass"] is True
     assert result["passed"] == result["total"]
-    assert len(result["checks"]) == 12  # 1 total + 4 niveles + 7 dimensiones
+    assert len(result["checks"]) == 14  # 1 total + 6 niveles + 7 dimensiones
 
 
 def test_quality_metrics_counts_dimensions():
     bank = _passing_bank()
     metrics = _quality_metrics(bank)
-    assert metrics["total_items"] == 100
-    assert metrics["per_level"] == {"A1": 25, "A2": 25, "B1": 25, "B2": 25}
+    assert metrics["total_items"] == 120
+    assert metrics["per_level"] == {
+        "A1": 20,
+        "A2": 20,
+        "B1": 20,
+        "B2": 20,
+        "C1": 20,
+        "C2": 20,
+    }
     assert metrics["speakers"] == 10
     assert metrics["accents"] == 4
     assert metrics["contexts"] == 5
@@ -119,4 +126,11 @@ def test_real_bank_passes_quality_gate():
 
 def test_quality_thresholds_are_defined():
     assert QUALITY_THRESHOLDS["min_total_items"] == 100
-    assert set(QUALITY_THRESHOLDS["min_items_per_level"]) == {"A1", "A2", "B1", "B2"}
+    assert set(QUALITY_THRESHOLDS["min_items_per_level"]) == {
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+    }

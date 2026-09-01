@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `2.3.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+- ✅ Versión estable `2.4.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
   **V1.30** LAN + Mobile 100% (mDNS real, test de micrófono con medidor, QR de conexión,
   `/help/connect`), **V1.31** Adaptive Engine 2.0 (Priority Engine + "Why this activity?"),
   **V1.32** Curriculum 2.0 (escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones),
@@ -46,7 +46,17 @@
   Mastery Gates por unidad, tríada Progress/Mastery/Readiness y pantalla Learning Journey) y
   **V2.3 Personal Dictionary + evidencia por ítem léxico** (siembra de vocabulario/estructuras desde
   el currículo, estado `known`/`learning`/`weak`/`mastered` + `recall` por ítem reutilizando la
-  curva de olvido, endpoint `/api/vocabulary/lexicon` y pantalla Personal Dictionary).
+  curva de olvido, endpoint `/api/vocabulary/lexicon` y pantalla Personal Dictionary) y
+  **V2.4 Curriculum Coverage** (auditoría de cobertura curricular: recorre Pre-A1→C2 × 7 secciones,
+  cruza el contenido del curso con los bancos de listening/speaking y genera
+  `curriculum_coverage_report.json` con la métrica "TOTAL CURRICULUM COVERAGE", distinta de
+  "TOTAL VALIDATED LEARNING ITEMS").
+- ✅ **V2.5 Curriculum Completion** (completado; cierra los huecos de la auditoría V2.4). Hecho:
+  **C1 listening C1/C2** (corpus 100→140, `c101`–`c140`), **C2 speaking C2** (escenarios 20→26),
+  **C3 interaction A1/A2/B2/C1/C2** (subskills `interaction`+`turn_taking` en 39 objetivos,
+  TOTAL VALIDATED 143→189, cobertura 37/49→42/49) y **C4 wiring curso↔bancos**
+  (`listening_items` + `scenario_ids` por objetivo, 18 objetivos de listening y 50 de speaking
+  cableados a los bancos; conteo y validación reflejan las referencias).
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 

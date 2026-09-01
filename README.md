@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v2.3.0**.
+- Última versión estable: **v2.4.0**.
 
 ## Estructura
 
@@ -60,6 +60,24 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   sembrado automáticamente desde el currículo, con estado determinista
   (`known`/`learning`/`weak`/`mastered`), `recall` por ítem (curva de olvido), distribución CEFR
   y señal "reconoce pero no produce" para practicar hablando.
+- **Curriculum Coverage (V2.4)**: auditoría de cobertura curricular que recorre Pre-A1 → C2 por
+  las 7 secciones (vocabulary/grammar/listening/speaking/interaction/review/assessment), cruza el
+  contenido del curso con los bancos de listening/speaking y genera
+  `curriculum_coverage_report.json` con la métrica "TOTAL CURRICULUM COVERAGE" (ver
+  `docs/CURRICULUM_COVERAGE.md`).
+- **Listening C1/C2 (V2.5-C1)**: corpus de listening ampliado a 140 ítems (A1→C2), con 20 ítems C1
+  y 20 C2 de registro avanzado (inferencia, intención del hablante, actitud, hablantes múltiples,
+  habla rápida y connected speech).
+- **Speaking C2 (V2.5-C2)**: catálogo de escenarios comunicativos ampliado a 26 (A1→C2), con 6
+  escenarios C2 (persuasión, mediación de conflicto, defensa académica, temas abstractos,
+  negociación de alto riesgo y reunión diplomática).
+- **Interaction A1/A2/B2/C1/C2 (V2.5-C3)**: práctica de interacción (turnos/diálogo) declarada en
+  objetivos de speaking de 5 niveles, cerrando el hueco de la sección interaction (solo Pre-A1,
+  banda sin curso, queda vacía).
+- **Wiring curso↔bancos (V2.5-C4)**: cada objetivo de listening referencia ítems del banco por ID
+  (`listening_items`) y cada objetivo de speaking referencia un escenario (`scenario_ids`),
+  cableando el curso secuencial a los bancos de destrezas (conteo y validación de integridad por
+  nivel). Sin UI en este incremento.
 
 ## Arranque rápido
 
@@ -144,6 +162,13 @@ Abre **http://localhost:5173** y empieza a conversar.
   ```powershell
   cd backend
   .venv\Scripts\python.exe scripts/eval_tutor.py --model qwen3.5:9b
+  ```
+- **Auditoría de cobertura curricular** (V2.4; genera `curriculum_coverage_report.json`):
+  ```powershell
+  cd backend
+  .venv\Scripts\python.exe -m scripts.curriculum_coverage
+  # o en modo estricto (exit 1 si hay huecos `empty` en un nivel con curso):
+  .venv\Scripts\python.exe -m scripts.curriculum_coverage --strict
   ```
 
 ## API

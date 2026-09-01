@@ -25,7 +25,8 @@
                   "can_do": "I can use inversion for emphasis in formal contexts.",
                   "title": "Inversión para énfasis",
                   "skills": ["grammar", "speaking", "writing", "vocabulary"],
-                  "subskills": ["word_order"],
+                  "subskills": ["word_order", "interaction", "turn_taking"],
+                  "scenario_ids": ["debate"],
                   "concepts": ["inversion", "Never have I", "Not only", "Only then"],
                   "vocabulary": ["rarely", "seldom", "hardly", "no sooner"],
                   "activities": [
@@ -79,7 +80,8 @@
                   "can_do": "I can use cleft sentences to focus information.",
                   "title": "Cleft sentences",
                   "skills": ["grammar", "speaking", "writing"],
-                  "subskills": ["word_order"],
+                  "subskills": ["word_order", "interaction", "turn_taking"],
+                  "scenario_ids": ["debate"],
                   "concepts": ["It is/was ... that ...", "What ... is ..."],
                   "vocabulary": [],
                   "activities": [
@@ -140,7 +142,8 @@
                   "can_do": "I can understand and use common idiomatic expressions.",
                   "title": "Idioms cotidianos",
                   "skills": ["vocabulary", "speaking", "reading", "writing"],
-                  "subskills": ["idioms"],
+                  "subskills": ["idioms", "interaction", "turn_taking"],
+                  "scenario_ids": ["debate"],
                   "concepts": ["to break the ice", "to hit the nail on the head", "to cut corners"],
                   "vocabulary": ["break the ice", "hit the nail on the head", "cut corners", "once in a blue moon"],
                   "activities": [
@@ -255,7 +258,8 @@
                   "can_do": "I can hedge my statements to sound precise and cautious.",
                   "title": "Hedging y matización",
                   "skills": ["vocabulary", "writing", "speaking"],
-                  "subskills": ["register"],
+                  "subskills": ["register", "interaction", "turn_taking"],
+                  "scenario_ids": ["debate"],
                   "concepts": ["tends to", "arguably", "it could be argued", "somewhat"],
                   "vocabulary": ["tends to", "arguably", "somewhat", "supposedly"],
                   "activities": [
@@ -356,6 +360,9 @@
                   "can_do": "I can use advanced grammar and idiomatic language to communicate precise, nuanced ideas.",
                   "title": "Repaso final C1",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["debate"],
+                  "listening_items": ["c101", "c102", "c103", "c104"],
                   "concepts": ["review: inversion, cleft, idioms, hedging, collocations"],
                   "vocabulary": ["review C1"],
                   "activities": [

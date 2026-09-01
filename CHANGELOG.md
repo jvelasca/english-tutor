@@ -4,6 +4,96 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.4.0] — 2026-08-31
+
+**Auditoría de cobertura curricular**: responde con datos a "¿el alumno puede recorrer
+completo A1→C2?". Recorre el curso completo (Pre-A1 → C2) por las 7 secciones canónicas
+(vocabulary/grammar/listening/speaking/interaction/review/assessment), cruza el contenido del
+curso con los bancos de destrezas (listening corpus + speaking scenarios) y genera
+`curriculum_coverage_report.json`. No añade contenido ni funcionalidad de alumno; es la
+instrumentación que permitirá localizar y completar los huecos reales.
+
+### Añadido
+- **Servicio puro `services/curriculum_coverage.py`**: `coverage_sections` (conteo por sección a
+  nivel de curso), `bank_intersection` (cruce del banco de listening por `level` y de los
+  escenarios de speaking por `cefr_target` contra cada nivel), tri-estado
+  `complete`/`partial`/`empty` por sección, `level_coverage` y `curriculum_coverage_report`.
+- **Métrica "TOTAL CURRICULUM COVERAGE"** (`coverage_metric`): ratio de celdas pobladas sobre la
+  matriz completa 7 niveles × 7 secciones (49 celdas), con desglose `by_level`/`by_section`.
+  Distinta y complementaria de "TOTAL VALIDATED LEARNING ITEMS" (contenido validado vs. cobertura).
+- **Integración en `content_stats()`** (`services/content_validation.py`): `total_curriculum_coverage`
+  convive junto a `total_validated_learning_items` como fuente única (anti-drift).
+- **CLI `scripts/curriculum_coverage.py`**: emite el JSON completo + resumen legible por nivel y
+  sale con código 1 (`--strict`) si hay algún hueco `empty` en una sección con curso (guard de CI).
+- **Mapa de cobertura en `docs/CURRICULUM_COVERAGE.md`**: tabla Pre-A1→C2 × 7 secciones con estado
+  y la lista priorizada de huecos detectados.
+
+### Verificado
+- Backend `pytest` (971 passed) + `ruff` limpio; tests de invariantes `test_curriculum_coverage.py`
+  (7 niveles × 7 secciones, Pre-A1 como banda sin curso, cruce con bancos, determinismo y
+  coexistencia de las dos métricas).
+- `python -m scripts.curriculum_coverage` OK (37/49 celdas, 75.5% de cobertura).
+
+### V2.5-C1 — listening C1/C2 (sin bump de versión, sigue 2.4.0)
+- **Corpus de listening 100 → 140** (`curriculum/listening_corpus.json` v1.1.0): 20 ítems C1
+  (`c101`–`c120`) y 20 C2 (`c121`–`c140`) con registro y temática avanzados (inferencia, intención
+  del hablante, actitud, ironía, hablantes múltiples, connected speech, habla rápida).
+- **`LEVEL_ORDER` ampliado** a A1..C2 (`services/listening.py`); `LISTENING_BANK_VERSION` 5.0.0 →
+  6.0.0; `QUALITY_THRESHOLDS["min_items_per_level"]` añade C1/C2 (20 cada uno).
+- **TOTAL VALIDATED LEARNING ITEMS 143 → 183** (163 listening: 140 corpus + 23 legacy TTS; 20 speaking).
+
+#### Verificado
+- `python -m scripts.content_validation` OK (183 ítems validados; 14/14 checks PASS).
+- `python -m scripts.curriculum_coverage` OK (`bank_count` listening C1/C2 > 0).
+- Backend `pytest` (972 passed) + `ruff` limpio; `check_release_consistency` OK (2.4.0).
+
+### V2.5-C2 — speaking C2 (sin bump de versión, sigue 2.4.0)
+- **Escenarios de speaking 20 → 26** (`curriculum/speaking_scenarios.json` v1.0.0 → v2.0.0): 6
+  escenarios C2 (`persuasion`, `conflict_mediation`, `academic_defence`, `abstract_conversation`,
+  `stakes_negotiation`, `diplomatic_talk`) con objetivo comunicativo de nivel C2 (persuasión sutil,
+  mediación de conflicto, defensa con evidencia, temas abstractos, negociación delicada y tacto
+  diplomático).
+- **`SPEAKING_SCENARIOS_VERSION` 2.0.0 → 3.0.0** (`services/curriculum.py`), alineando la discrepancia
+  JSON↔constante (el JSON quedó en 1.0.0 y la constante en 2.0.0; sube uno cada uno).
+- **TOTAL VALIDATED LEARNING ITEMS 183 → 189** (163 listening: 140 corpus + 23 legacy TTS; 26 speaking).
+
+#### Verificado
+- `python -m scripts.curriculum_coverage` OK (`bank_count` speaking C2 > 0).
+- Backend `pytest` (973 passed) + `ruff` limpio; `check_release_consistency` OK (2.4.0).
+
+### V2.5-C3 — interaction A1/A2/B2/C1/C2 (sin bump de versión, sigue 2.4.0)
+- **Subskills de interacción en 5 niveles** (`curriculum/a1.json`, `a2.json`, `b2.json`, `c1.json`,
+  `c2.json`): 39 objetivos que declaran `speaking` con actividad `dialogue` añaden
+  `subskills: ["interaction", "turn_taking"]`. La sección `interaction` deja de estar `empty` en
+  A1/A2/B2/C1/C2 (queda poblada en 6/7 niveles; solo Pre-A1, banda sin curso, sigue vacía).
+- **Cobertura TOTAL CURRICULUM COVERAGE 37/49 → 42/49 (75,5% → 85,7%)**.
+- **Test invariante nuevo** (`test_curriculum_coverage.py`): `interaction` con `count > 0` en
+  A1/A2/B2/C1/C2.
+
+#### Verificado
+- `python -m scripts.curriculum_coverage` OK (interaction 6/7; 42/49 celdas).
+- Backend `pytest` (974 passed) + `ruff` limpio; `check_release_consistency` OK (2.4.0).
+
+### V2.5-C4 — wiring curso↔bancos (sin bump de versión, sigue 2.4.0)
+- **Modelo `Objective`** (`services/curriculum.py`): dos campos retrocompatibles
+  `listening_items: list[str]` y `scenario_ids: list[str]` (default `[]`) que referencian por ID
+  los ítems del banco de listening y los escenarios de speaking.
+- **Conteo** (`services/course.py::unit_sections`): `listening`/`speaking` suman
+  `len(listening_items)`/`len(scenario_ids)`, de modo que la sección refleja las referencias
+  reales al banco y no solo el `skill` declarado.
+- **Wiring de contenido** en los 6 niveles (`curriculum/a1.json`–`c2.json`): cada objetivo con
+  `listening` referencia 4 ítems del banco de su nivel (`c001`–`c140` + legacy `l1`–`l23`); cada
+  objetivo con `speaking` referencia 1 escenario de su `cefr_target` (26 escenarios). Total
+  cableado: 18 objetivos de listening y 50 de speaking.
+- **Validación** (`services/curriculum.py::validate_level`): comprueba que cada ID referenciado
+  existe y que su `level`/`cefr_target` coincide con el nivel del curso (imports diferidos
+  anti-ciclo).
+
+#### Verificado
+- `python -m scripts.curriculum_coverage --strict` OK (exit 0; listening/speaking cableados por
+  unidad, `count` crecido y sin huecos `empty`).
+- Backend `pytest` (981 passed) + `ruff` limpio; `check_release_consistency` OK (2.4.0).
+
 ## [2.3.0] — 2026-08-31
 
 **Personal Dictionary + evidencia por ítem léxico**: se baja el modelo de evidencia de

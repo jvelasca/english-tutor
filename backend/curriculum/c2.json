@@ -25,7 +25,8 @@
                   "can_do": "I can recognise and use rhetorical devices to persuade.",
                   "title": "Recursos retóricos",
                   "skills": ["vocabulary", "reading", "writing", "speaking"],
-                  "subskills": ["register", "structure"],
+                  "subskills": ["register", "structure", "interaction", "turn_taking"],
+                  "scenario_ids": ["persuasion"],
                   "concepts": ["metaphor", "rhetorical question", "parallelism", "understatement"],
                   "vocabulary": ["metaphor", "parallelism", "understatement", "hyperbole"],
                   "activities": [
@@ -65,7 +66,8 @@
                   "can_do": "I can persuade subtly through implication and concession.",
                   "title": "Persuasión sutil",
                   "skills": ["vocabulary", "writing", "speaking"],
-                  "subskills": ["register"],
+                  "subskills": ["register", "interaction", "turn_taking"],
+                  "scenario_ids": ["conflict_mediation"],
                   "concepts": ["concession", "admittedly", "one might argue", "that said"],
                   "vocabulary": ["admittedly", "that said", "nevertheless", "granted"],
                   "activities": [
@@ -174,6 +176,7 @@
                   "title": "Referencias culturales y humor",
                   "skills": ["reading", "listening", "vocabulary"],
                   "subskills": ["inference"],
+                  "listening_items": ["c121", "c122", "c123", "c124"],
                   "concepts": ["irony", "sarcasm", "cultural reference", "double meaning"],
                   "vocabulary": ["irony", "sarcasm", "pun", "tongue-in-cheek"],
                   "activities": [
@@ -234,6 +237,9 @@
                   "can_do": "I can communicate with near-native precision, subtlety and rhetorical control.",
                   "title": "Repaso final C2",
                   "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
+                  "subskills": ["interaction", "turn_taking"],
+                  "scenario_ids": ["academic_defence"],
+                  "listening_items": ["c125", "c126", "c127", "c128"],
                   "concepts": ["review: rhetoric, persuasion, register, humour"],
                   "vocabulary": ["review C2"],
                   "activities": [
