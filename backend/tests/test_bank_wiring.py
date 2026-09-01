@@ -8,6 +8,7 @@ Protegen la relación por ID entre el contenido del curso (`listening_items` /
 """
 from services import course as course_svc
 from services.curriculum import (
+    Activity,
     Lesson,
     Level,
     Module,
@@ -123,3 +124,31 @@ def test_no_course_level_has_empty_listening_speaking():
 def test_validate_level_empty_for_wired_levels():
     for level_id in COURSE_LEVELS:
         assert validate_level(load_level(level_id)) == [], f"{level_id} con issues"
+
+
+# --- Marcador de fase del Unit Learning Loop (V2.6) ------------------------
+
+def test_validator_rejects_noncanonical_activity_phase():
+    activity = Activity(id="a1", type="dialogue", instruction="x", phase="bogus")
+    obj = Objective(
+        id="o1", can_do="c", title="t", skills=["speaking"], activities=[activity]
+    )
+    errors = validate_level(_minimal_level("A1", obj))
+    assert any("bogus" in e and "phase" in e for e in errors)
+
+
+def test_validator_accepts_canonical_activity_phase():
+    activity = Activity(id="a1", type="dialogue", instruction="x", phase="transfer")
+    obj = Objective(
+        id="o1", can_do="c", title="t", skills=["speaking"], activities=[activity]
+    )
+    assert validate_level(_minimal_level("A1", obj)) == []
+
+
+def test_validator_accepts_empty_phase_as_default():
+    # Sin `phase` (cadena vacía) la actividad es válida y cuenta como `practice`.
+    activity = Activity(id="a1", type="dialogue", instruction="x")
+    obj = Objective(
+        id="o1", can_do="c", title="t", skills=["speaking"], activities=[activity]
+    )
+    assert validate_level(_minimal_level("A1", obj)) == []

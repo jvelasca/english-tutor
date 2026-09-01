@@ -35,6 +35,34 @@
                       "type": "essay",
                       "instruction": "Write a short paragraph arguing for or against remote work, using at least three discourse markers.",
                       "target": "Although ... / However ... / On the other hand ..."
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three discourse markers for contrast.",
+                      "target": "however / although / on the other hand",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Argue for or against a topic you have not discussed in this unit.",
+                      "target": "Although ... / Nevertheless ... / On the other hand ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can structure a clear argument using discourse markers.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b2-m01-u01-l01-o01-a05",
+                      "type": "essay",
+                      "instruction": "On your own, write a short paragraph arguing for or against remote work using three discourse markers.",
+                      "target": "Although ... / However ... / On the other hand ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -218,6 +246,34 @@
                       "type": "listening",
                       "instruction": "Listen to a three-speaker conversation and identify who changed the plan.",
                       "target": "The woman changed the plan because ..."
+                    },
+                    {
+                      "id": "b2-m02-u01-l01-o05-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what 'dunno' and 'gotta' mean.",
+                      "target": "dunno = don't know / gotta = got to",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b2-m02-u01-l01-o05-a03",
+                      "type": "dialogue",
+                      "instruction": "Explain a reduced form you heard in a real conversation.",
+                      "target": "kinda / wanna / gonna",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b2-m02-u01-l01-o05-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can follow a conversation between several speakers at natural speed.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b2-m02-u01-l01-o05-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen to a fast conversation and identify who changed the plan.",
+                      "target": "The woman changed the plan because ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [

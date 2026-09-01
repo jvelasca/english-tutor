@@ -94,6 +94,68 @@ instrumentación que permitirá localizar y completar los huecos reales.
   unidad, `count` crecido y sin huecos `empty`).
 - Backend `pytest` (981 passed) + `ruff` limpio; `check_release_consistency` OK (2.4.0).
 
+### V2.6-C1 — capa de medición: Unit Coverage + CEFR Depth + Unit Learning Loop + Dashboard (sin bump, sigue 2.4.0)
+- **Hallazgo conceptual**: "cobertura" ≠ "profundidad". `42/49 celdas` no es "curso al 85,7%": una
+  celda cuenta como poblada si *alguna* unidad tiene contenido en esa sección. Se añaden métricas de
+  grano fino en `services/curriculum_coverage.py`:
+  - `unit_coverage(level)` — **UNIT COVERAGE**: por unidad, las 7 secciones pobladas (`coverage_pct`,
+    `missing`, `by_section`). Media A1..C2 = **61,7%**.
+  - `depth_score(level)` — **CEFR DEPTH SCORE** (0..100): 4 componentes ponderados y auditables
+    (`objective_density` 0.20 · `objective_volume` 0.35 · `section_coverage` 0.35 ·
+    `subskill_breadth` 0.10). Media **55,7**; A1 74,2 · A2 52,3 · B1 55,7 · B2 61,7 · C1 48,0 ·
+    C2 42,5. Ajuste C1b: volumen pesa más que densidad (la densidad sola premiaba a B2 por ser denso
+    con solo 9 objetivos).
+  - `unit_learning_loop(level, unit)` + `loop_coverage(level)` — **UNIT LEARNING LOOP** (9 fases).
+    Media **50,6%**; introduce/practice 100%, listen 45,2%, speak 90,3%, interact 83,9%,
+    retrieve/transfer 0%, assess/review 19,4% (solo módulos "Final").
+  - `unit_detail(level_id, unit_id)`: drill-down LEVEL → UNIT → LESSON → OBJECTIVE.
+  - `curriculum_quality_report()` — **Curriculum Quality Dashboard**: 7 dimensiones + `overall` +
+    `by_level` + bloque `learning_loop`. Overall **56,8**; review/assessment 23,5 · listening 47,8 ·
+    depth 55,7 · coverage 85,7.
+  - `quality_report_delta(before, after)`: delta antes/después por dimensión y nivel.
+- **CLI** (`scripts/curriculum_coverage.py`): dashboard + loop legibles + `--quality` (JSON completo).
+- **Dato corregido**: objetivos reales por nivel A1 23 → A2 11 → B1 10 → B2 9 → C1 7 → C2 5; la caída
+  es más abrupta de lo que sugería la auditoría previa (A2 y B1/B2 también son finos, no solo C1/C2).
+
+#### Verificado
+- Backend `pytest` (999 passed) + `ruff` limpio; tests `test_curriculum_quality.py` (18 invariantes).
+- `python -m scripts.curriculum_coverage` OK (dashboard + loop) y `--strict` exit 0.
+- `python -m scripts.content_validation` OK; `check_release_consistency` OK (2.4.0).
+
+### V2.6-C2 — marcador de fase del Unit Learning Loop (`Activity.phase` + validación) (sin bump, sigue 2.4.0)
+- **Modelo** (`services/curriculum.py`): `LEARNING_PHASES` (9 fases canónicas del loop) como fuente de
+  verdad y `Activity.phase: str = ""` (default vacío = `practice`, retrocompatible). `validate_level()`
+  rechaza `phase` no canónico.
+- **Medición** (`services/curriculum_coverage.py`): re-exporta `LEARNING_LOOP_PHASES` desde
+  `LEARNING_PHASES` (anti-drift) y `unit_learning_loop()` lee `retrieve`/`transfer`/`review`/`assess`
+  desde el `phase` de las actividades. El hueco deja de ser un 0 hardcodeado: ahora es contenido
+  etiquetable (hoy sigue 0/19,4% porque ningún JSON usa aún el marcador).
+- **Briefing de contenido** `agentes/curriculum/c5-loop-phases.md`: etiquetar fases de cierre por
+  unidad (piloto A1 → escalar), subir el loop de 50,6% → ≥ 77%.
+
+#### Verificado
+- Backend `pytest` (1005 passed) + `ruff` limpio; `validate_level` vacío para los 6 niveles.
+- `python -m scripts.curriculum_coverage --strict` exit 0; `check_release_consistency` OK (2.4.0).
+
+### V2.6-C5 — etiquetado de fases del Unit Learning Loop en el contenido (sin bump, sigue 2.4.0)
+- **Contenido** (`backend/curriculum/*.json`): las 25 unidades normales (no módulo "Final") etiquetan
+  las 4 fases de cierre del loop con el marcador `phase`:
+  - `retrieve` (recuperación espaciada desde memoria) y `transfer` (can-do aplicado a un contexto nuevo
+    no ensayado): 25/31 unidades cada una (80,6%).
+  - `review` (micro-repaso del can-do en 1 frase) y `assess` (auto-evaluación abierta de cierre):
+    31/31 unidades (100%), ya no solo en los módulos "Final".
+- **Loop por unidad**: media **50,6% → 84,7%** (objetivo ≥ 77%). introduce/practice 100%, listen 45,2%,
+  speak 90,3%, interact 83,9%, retrieve/transfer 80,6%, assess/review 100%.
+- **Invariantes de snapshot** (`tests/test_curriculum_quality.py`): los dos tests frágiles que codificaban
+  el hueco se actualizan: `test_loop_retrieve_and_transfer_are_still_ungapped` →
+  `test_loop_retrieve_and_transfer_are_tagged` (covered_units > 0) y
+  `test_loop_assess_and_review_only_in_final_module` → `test_loop_assess_and_review_cover_every_unit`
+  (covered_units == total_units).
+
+#### Verificado
+- `python -m scripts.curriculum_coverage --strict` exit 0; `validate_level` vacío para los 6 niveles.
+- Backend `pytest` (1005 passed) + `ruff` limpio.
+
 ## [2.3.0] — 2026-08-31
 
 **Personal Dictionary + evidencia por ítem léxico**: se baja el modelo de evidencia de

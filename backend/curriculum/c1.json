@@ -35,6 +35,34 @@
                       "type": "dialogue",
                       "instruction": "Rewrite a strong opinion using inversion for emphasis.",
                       "target": "Never have I ... / Not only ... / Only then ..."
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two ways to add emphasis with inversion.",
+                      "target": "Never have I ... / Not only ... / Only then ...",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Use inversion to emphasise a point about a topic you have not discussed.",
+                      "target": "Rarely ... / No sooner ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use inversion for emphasis in formal contexts.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, rewrite a strong opinion using inversion for emphasis.",
+                      "target": "Never have I ... / Not only ... / Only then ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -152,6 +180,34 @@
                       "type": "dialogue",
                       "instruction": "Use two idiomatic expressions in a short description of a situation.",
                       "target": "break the ice / hit the nail on the head / cut corners"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what 'break the ice' and 'cut corners' mean.",
+                      "target": "break the ice / cut corners",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Use two idioms in a situation you have not described before.",
+                      "target": "once in a blue moon / hit the nail on the head",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand and use common idiomatic expressions.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, use two idiomatic expressions in a short description of a situation.",
+                      "target": "break the ice / hit the nail on the head",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -268,6 +324,34 @@
                       "type": "dialogue",
                       "instruction": "Give an opinion using hedging language to sound measured and precise.",
                       "target": "Arguably ... / It could be argued ... / somewhat"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two words that make a claim more cautious.",
+                      "target": "arguably / somewhat / tends to",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Give a hedged opinion on a topic you have not discussed in this unit.",
+                      "target": "It could be argued ... / tends to ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can hedge my statements to sound precise and cautious.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, give an opinion using hedging language to sound measured and precise.",
+                      "target": "Arguably ... / It could be argued ... / somewhat",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [

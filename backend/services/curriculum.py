@@ -127,6 +127,28 @@ SUBSKILLS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Fases canónicas del Unit Learning Loop (V2.6). Convierte una unidad en un bucle
+# pedagógico completo (introduce → practice → listen → speak → interact →
+# retrieve → transfer → assess → review) y no en una colección de contenidos.
+# `Activity.phase` referencia una de estas fases; una actividad sin `phase`
+# (cadena vacía) se considera `practice` por defecto (retrocompatibilidad: todo el
+# contenido existente cuenta como práctica controlada). Es la fuente de verdad;
+# `services.curriculum_coverage` la reutiliza para no duplicar la taxonomía.
+LEARNING_PHASES: tuple[str, ...] = (
+    "introduce",
+    "practice",
+    "listen",
+    "speak",
+    "interact",
+    "retrieve",
+    "transfer",
+    "assess",
+    "review",
+)
+
+# Fase por defecto de una actividad sin marcador explícito de fase.
+DEFAULT_ACTIVITY_PHASE = "practice"
+
 # Umbral por defecto para dominar una destreza de un objetivo (0..1).
 DEFAULT_THRESHOLD = 0.8
 
@@ -172,6 +194,7 @@ class Activity(BaseModel):
     type: str
     instruction: str
     target: str = ""
+    phase: str = ""
 
 
 class ObjectiveCheck(BaseModel):
@@ -442,7 +465,8 @@ def validate_level(level: Level) -> list[str]:
                     f"fuera de rango"
                 )
 
-        # Actividades: id, type e instruction no vacíos.
+        # Actividades: id, type e instruction no vacíos; `phase` (si se declara)
+        # debe ser una fase canónica del Unit Learning Loop (V2.6).
         for activity in obj.activities:
             if not activity.id:
                 errors.append(f"{lid}: actividad sin id en {obj.id}")
@@ -450,6 +474,11 @@ def validate_level(level: Level) -> list[str]:
                 errors.append(f"{lid}: actividad sin type en {obj.id}")
             if not activity.instruction:
                 errors.append(f"{lid}: actividad sin instruction en {obj.id}")
+            if activity.phase and activity.phase not in LEARNING_PHASES:
+                errors.append(
+                    f"{lid}: actividad {activity.id} phase "
+                    f"'{activity.phase}' no canónica"
+                )
 
     # Wiring curso↔bancos (V2.5-C4): cada referencia por ID debe existir y
     # pertenecer al nivel del curso (listening) o a su `cefr_target` (speaking).

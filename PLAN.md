@@ -57,6 +57,13 @@
   TOTAL VALIDATED 143→189, cobertura 37/49→42/49) y **C4 wiring curso↔bancos**
   (`listening_items` + `scenario_ids` por objetivo, 18 objetivos de listening y 50 de speaking
   cableados a los bancos; conteo y validación reflejan las referencias).
+- ✅ **V2.6-C1 Capa de medición** (en curso): "cobertura" ≠ "profundidad". Nuevas métricas en
+  `services/curriculum_coverage.py`: **UNIT COVERAGE** por unidad, **CEFR DEPTH SCORE** (0..100,
+  4 componentes auditables), **UNIT LEARNING LOOP** (9 fases por unidad), drill-down
+  LEVEL→UNIT→LESSON→OBJECTIVE y **Curriculum Quality Dashboard** (7 dimensiones + before/after).
+  Overall **56,8**; puntos débiles medidos: review/assessment 23,5, listening 47,8 y las fases de
+  cierre del loop (retrieve/transfer 0%, assess/review 19,4%). Loop etiquetado por unidad (V2.6-C5:
+  50,6% → 84,7%); queda ampliar C1/C2 depth y subir unit coverage.
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 

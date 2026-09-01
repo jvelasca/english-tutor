@@ -35,6 +35,34 @@
                       "type": "dialogue",
                       "instruction": "Introduce yourself to the tutor: your name, country, city and job.",
                       "target": "I am ... / My name is ... / I live in ..."
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three words from this unit about personal information.",
+                      "target": "name / country / city / job",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Introduce a friend to the tutor: their name, country and city.",
+                      "target": "His/Her name is ... / He/She is from ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can introduce myself and give basic personal information.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m01-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, show you can introduce yourself: give your name, country, city and job.",
+                      "target": "I am ... / I live in ... / I work as ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -233,6 +261,34 @@
                       "type": "dialogue",
                       "instruction": "Describe a typical day to the tutor using the Present Simple.",
                       "target": "I get up at ... / I go to ... / I have breakfast at ..."
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the verbs you learned for a daily routine.",
+                      "target": "get up / go to / have breakfast",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe the daily routine of a person in your family, not your own.",
+                      "target": "He/She gets up at ... / has lunch at ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can describe my daily routine.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m02-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor your full daily routine using the Present Simple.",
+                      "target": "I get up at ... / I go to ... / I have ... at ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -399,6 +455,34 @@
                       "type": "dialogue",
                       "instruction": "Describe your family to the tutor using 'I have got'.",
                       "target": "I have got a brother. / My mother is ..."
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three family words from this unit.",
+                      "target": "mother / father / brother / sister",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a family that is not yours, such as a famous family.",
+                      "target": "He/She has got a ... / They have got ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about my family.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m03-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, describe your family to the tutor using 'I have got'.",
+                      "target": "I have got a brother. / My mother is ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -570,6 +654,34 @@
                       "type": "dialogue",
                       "instruction": "Describe your home using 'There is / There are'.",
                       "target": "There is a kitchen. / There are two bedrooms."
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three rooms of the house.",
+                      "target": "kitchen / bedroom / bathroom",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a house you saw in a film or photo, not your own.",
+                      "target": "There is a ... / There are ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can describe my home and the rooms in it.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m04-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, describe your home using 'There is / There are'.",
+                      "target": "There is a kitchen. / There are two bedrooms.",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -679,6 +791,34 @@
                       "type": "dialogue",
                       "instruction": "Say what food and drink you like and don't like.",
                       "target": "I like ... / I don't like ..."
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three food and drink words from this unit.",
+                      "target": "bread / coffee / apple / water",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a friend of yours likes and does not like to eat.",
+                      "target": "He/She likes ... / He/She doesn't like ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about food and drinks.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m05-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor what food and drink you like and do not like.",
+                      "target": "I like ... / I don't like ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -796,6 +936,34 @@
                       "type": "dialogue",
                       "instruction": "Ask the tutor the price of two items.",
                       "target": "How much is this?"
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you ask the price of something.",
+                      "target": "How much is ...? / How much are ...?",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Ask the price of two items of clothing you are not wearing today.",
+                      "target": "How much are these ...? / How much is this ...?",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can ask about prices and buy things.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m06-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, buy one item from the tutor, asking its price and using this/that/these/those.",
+                      "target": "How much is this? / I would like ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -913,6 +1081,34 @@
                       "type": "dialogue",
                       "instruction": "Name three places near your home.",
                       "target": "There is a supermarket near my home."
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three places in a town.",
+                      "target": "bank / supermarket / station / hospital",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Give directions to a place in a town you do not know well.",
+                      "target": "Go straight / turn left / next to ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about places in a town.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m07-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor three places near your home and ask how to get to one.",
+                      "target": "There is a ... / How do I get to ...?",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -1031,6 +1227,34 @@
                       "type": "dialogue",
                       "instruction": "Tell the tutor where you were yesterday.",
                       "target": "I was at home yesterday."
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the past forms you learned in this unit.",
+                      "target": "was / were / played / visited",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a friend did last weekend, not what you did.",
+                      "target": "He/She was ... / He/She played ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about where I was and what I did.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m08-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor where you were and what you did yesterday.",
+                      "target": "I was at ... / I played ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -1148,6 +1372,34 @@
                       "type": "dialogue",
                       "instruction": "Tell the tutor two things you are going to do next week.",
                       "target": "I am going to ... next week."
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you talk about future plans.",
+                      "target": "I am going to ...",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a friend is going to do next month, not what you will do.",
+                      "target": "He/She is going to ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about my future plans.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a1-m09-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor two things you are going to do next week.",
+                      "target": "I am going to ... next week.",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [

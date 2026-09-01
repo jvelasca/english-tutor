@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from services.curriculum_coverage import (  # noqa: E402
     EMPTY,
     curriculum_coverage_report,
+    curriculum_quality_report,
 )
 
 # Mapa estado → marcador corto para el resumen legible.
@@ -48,12 +49,38 @@ def _human_summary(report: dict) -> None:
     print("\nLeyenda: OK = todas las unidades, ~ = parcial, -- = vacio.")
 
 
+def _human_quality(report: dict) -> None:
+    """Resumen legible del Curriculum Quality Dashboard (V2.6)."""
+    dims = report["dimensions"]
+    print("\nCURRICULUM QUALITY DASHBOARD")
+    print(f"  {'Overall':<14}{report['overall']:>6}")
+    for key in ("coverage", "depth", "listening", "speaking", "interaction",
+                "assessment", "review"):
+        print(f"  {key.capitalize():<14}{dims[key]['score']:>6}")
+    print("\n  Nivel  Depth  UnitCov")
+    for lv in report["by_level"]:
+        print(f"  {lv['level']:<6}{lv['depth']:>7}{lv['unit_coverage_mean']:>9}")
+
+    loop = report["learning_loop"]
+    print(f"\nUNIT LEARNING LOOP (media por unidad: {loop['mean_loop_pct']}%)")
+    for entry in loop["by_phase"]:
+        print(
+            f"  {entry['phase']:<12}{entry['coverage_pct']:>6} "
+            f"({entry['covered_units']}/{entry['units']} unidades)"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Auditoría de cobertura curricular.")
     parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 si existe algún hueco `empty` en una sección con curso",
+    )
+    parser.add_argument(
+        "--quality",
+        action="store_true",
+        help="imprime además el Curriculum Quality Dashboard (V2.6) como JSON",
     )
     args = parser.parse_args()
 
@@ -73,6 +100,12 @@ def main() -> int:
         "TOTAL VALIDATED LEARNING ITEMS: "
         f"{report['metric']['total_validated_learning_items']}"
     )
+
+    quality = curriculum_quality_report()
+    _human_quality(quality)
+    if args.quality:
+        print("\nCURRICULUM QUALITY REPORT")
+        print(json.dumps(quality, ensure_ascii=False, indent=2))
 
     # Huecos reales: sección `empty` en un nivel que SÍ tiene curso.
     gaps = [

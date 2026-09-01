@@ -2136,15 +2136,90 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   bump de versión y **sin UI** (la consumición visual de los ítems referenciados es un incremento
   posterior).
 
-### Próximo (V2.5+)
-- **V2.5 — Curriculum Completion**: completar los huecos de la auditoría. Briefings en
-  `agentes/curriculum/`:
-  1. ~~`c1-listening-c1c2`~~ ✅ hecho (37.22) — corpus de listening A1→C2.
-  2. ~~`c2-speaking-c2`~~ ✅ hecho (37.23) — escenarios de speaking C2.
-  3. ~~`c3-interaction`~~ ✅ hecho (37.24) — interaction A1/A2/B2/C1/C2.
-  4. ~~`c4-wire-banks`~~ ✅ hecho (37.25) — wiring curso↔bancos (listening/speaking cableados).
-- Después (roadmap): Mastery Evidence 2.0, Daily Adaptive Plan, SRS 2.0 + Immersion, Speaking 3.0.
-- Aún pendiente de V2.3: generación automática del speaking micro-drill (`recognized_not_produced`),
-  desglose speaking-vs-writing por palabra y FSRS completo (parámetros por usuario).
+### 37.26 HECHO (V2.6-C1) — Capa de medición: Unit Coverage + CEFR Depth + Unit Learning Loop + Dashboard
+- ✅ **Hallazgo conceptual (auditoría externa):** "cobertura" ≠ "profundidad". `42/49 celdas` no
+  significa "curso al 85,7%": una celda cuenta como poblada si *alguna* unidad tiene contenido en esa
+  sección. Se añaden métricas con grano fino en `services/curriculum_coverage.py`:
+  - `unit_coverage(level)`: por unidad, cuántas de las 7 secciones están pobladas (`coverage_pct`,
+    `missing`, `by_section` con `units`/`with_content`). Media A1..C2 = **61,7%**.
+  - `depth_score(level)` — **CEFR DEPTH SCORE** (0..100): 4 componentes ponderados y auditables
+    (`objective_density` 0.20, `objective_volume` 0.35, `section_coverage` 0.35, `subskill_breadth`
+    0.10; pesos en `DEPTH_WEIGHTS`, suma 1.0). Media **55,7**; por nivel: A1 74,2 · A2 52,3 · B1 55,7
+    · B2 61,7 · C1 48,0 · C2 42,5. Ajuste V2.6-C1b: se sube el peso del *volumen* y se baja el de la
+    *densidad* (la densidad sola premiaba a B2, denso pero con solo 9 objetivos, por encima de A2).
+  - `unit_learning_loop(level, unit)` + `loop_coverage(level)` — **UNIT LEARNING LOOP** (9 fases:
+    introduce, practice, listen, speak, interact, retrieve, transfer, assess, review). Mide qué fases
+    cubre cada unidad. Media **50,6%**; introduce/practice 100%, listen 45,2%, speak 90,3%,
+    interact 83,9%, **retrieve/transfer 0%**, assess/review 19,4% (solo módulos "Final").
+  - `unit_detail(level_id, unit_id)`: drill-down LEVEL → UNIT → LESSON → OBJECTIVE (skills, subskills,
+    activities, checks, `listening_items`, `scenario_ids`) + 7 secciones.
+  - `curriculum_quality_report()` — **Curriculum Quality Dashboard**: 7 dimensiones (coverage, depth,
+    listening, speaking, interaction, assessment, review) + `overall` + `by_level` + bloque `learning_loop`.
+    Overall **56,8**; dimensiones: coverage 85,7 · depth 55,7 · listening 47,8 · speaking 84,7 ·
+    interaction 76,4 · assessment 23,5 · review 23,5.
+  - `quality_report_delta(before, after)`: delta antes/después por dimensión y nivel.
+- ✅ **CLI** (`scripts/curriculum_coverage.py`): imprime dashboard + loop legibles y `--quality` vuelca
+  el JSON completo.
+- ✅ **Hallazgo de datos:** el recuento real de objetivos es A1 23 → A2 11 → B1 10 → B2 9 → C1 7 →
+  C2 5. La caída es más abrupta de lo que sugería la auditoría previa (no solo C1/C2 son finos; A2 y
+  B1/B2 también). Los puntos débiles medidos: Review/Assessment (23,5, solo en módulos "Final"),
+  Listening (47,8, integrado en parte de las unidades) y las fases de cierre del loop (retrieve/transfer
+  0%, assess/review 19,4%).
+- ✅ **Tests** `test_curriculum_quality.py` (18 invariantes: unit coverage, pesos del depth, drill-down,
+  dashboard determinista, delta identidad, 6 del loop). Backend **999 tests** + `ruff` limpio;
+  `content_validation` OK; `check_release_consistency` OK (2.4.0).
+- Verificado: `curriculum_coverage` OK (dashboard + loop), `--strict` exit 0. Sin bump de versión y
+  **sin UI** (la visualización del dashboard/loop es un incremento posterior).
+
+### 37.27 HECHO (V2.6-C2) — Marcador de fase del Unit Learning Loop (`Activity.phase` + validación)
+- ✅ **Modelo** (`services/curriculum.py`): `LEARNING_PHASES` (9 fases canónicas) como fuente de verdad
+  y `Activity.phase: str = ""` (default vacío = `practice`, retrocompatible). `validate_level()` rechaza
+  `phase` no canónico.
+- ✅ **Medición** (`services/curriculum_coverage.py`): re-exporta `LEARNING_LOOP_PHASES = LEARNING_PHASES`
+  (anti-drift) y `unit_learning_loop()` lee `retrieve`/`transfer`/`review`/`assess` desde el `phase` de
+  las actividades (además del módulo Final para assess/review). El hueco deja de ser un 0 hardcodeado y
+  pasa a ser **datos etiquetables**: con el contenido actual sigue en 0 (retrieve/transfer) y 19,4%
+  (assess/review), porque ningún JSON usa aún el marcador.
+- ✅ **Briefing de contenido separado** `agentes/curriculum/c5-loop-phases.md`: etiquetar las fases de
+  cierre por unidad (piloto A1 → escalar), actualizar los invariantes de snapshot y subir el loop de
+  50,6% → ≥ 77%.
+- ✅ **Tests**: `test_bank_wiring.py` (validación: phase no canónico rechazado, canónico y vacío
+  aceptados) + `test_curriculum_quality.py` (medición: retrieve/transfer/review/assess leídos del
+  marcador en unidad no Final, y alias de taxonomía anti-drift). Backend **1005 tests** + `ruff` limpio.
+- Verificado: `curriculum_coverage --strict` exit 0, `validate_level` vacío para los 6 niveles. Sin bump
+  de versión y **sin UI**.
+
+### 37.28 HECHO (V2.6-C5) — Etiquetado de fases del Unit Learning Loop en el contenido
+- ✅ **Contenido** (`backend/curriculum/a1.json`…`c2.json`): las 25 unidades normales (no módulo
+  "Final") etiquetan las 4 fases de cierre con el marcador `phase`:
+  - `retrieve` (recuperación espaciada) y `transfer` (can-do en contexto nuevo): 25/31 unidades (80,6%).
+  - `review` (micro-repaso del can-do) y `assess` (auto-evaluación de cierre): 31/31 (100%), ya no solo
+    en los módulos "Final".
+- ✅ **Loop por unidad**: media **50,6% → 84,7%** (objetivo ≥ 77%). Las 9 fases: introduce/practice
+  100%, listen 45,2%, speak 90,3%, interact 83,9%, retrieve/transfer 80,6%, assess/review 100%.
+- ✅ **Invariantes de snapshot** (`tests/test_curriculum_quality.py`): los 2 tests que codificaban el
+  hueco se actualizan — `test_loop_retrieve_and_transfer_are_tagged` (covered_units > 0) y
+  `test_loop_assess_and_review_cover_every_unit` (covered_units == total_units).
+- Verificado: `curriculum_coverage --strict` exit 0, `validate_level` vacío para los 6 niveles, backend
+  **1005 tests** + `ruff` limpio. Sin bump de versión y **sin UI** (solo contenido + invariantes).
+
+### Próximo (V2.6+)
+Orden de prioridades fijado por la auditoría externa:
+- ~~**🔴 P0 — Unit Learning Loop (contenido)**~~ ✅ hecho (37.28): marcador `phase` implementado
+  (37.27) y fases de cierre etiquetadas por unidad (retrieve/transfer/assess/review). Loop por unidad
+  50,6% → 84,7%.
+- **🔴 P0 — Unit Coverage 100%**: no conformarse con 42/49; subir `unit_coverage` hasta que cada unidad
+  obligatoria integre sus secciones.
+- **🔴 P0 — C1/C2 depth**: ampliar la densidad curricular avanzada (pragmatics, discourse, register,
+  nuance, argumentation) — hoy C1=7 y C2=5 objetivos.
+- **🟠 P1 — Speaking Performance Evidence**: attempt → evaluation → weakness → targeted drill → attempt
+  again → improvement.
+- **🟠 P1 — Listening Progression**: A1 word recognition → … → C2 pragmatic interpretation.
+- **🟠 P1 — Review/SRS integrado** por unidad (micro-review + 7/30/90 días).
+- **🟡 P2 — Knowledge Graph + Daily Adaptive Plan**: conectar Can-Do ↔ destrezas ↔ dominio.
+
+Pendiente heredado de V2.3: generación automática del speaking micro-drill
+(`recognized_not_produced`), desglose speaking-vs-writing por palabra y FSRS completo (parámetros por
+usuario).
 
 

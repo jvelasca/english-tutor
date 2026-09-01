@@ -35,6 +35,34 @@
                       "type": "dialogue",
                       "instruction": "Make a persuasive point using at least two rhetorical devices.",
                       "target": "metaphor / rhetorical question / parallelism / understatement"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three rhetorical devices.",
+                      "target": "metaphor / rhetorical question / parallelism",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Use rhetorical devices to persuade about a topic you have not discussed.",
+                      "target": "metaphor / understatement / rhetorical question",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can recognise and use rhetorical devices to persuade.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, make a persuasive point using at least two rhetorical devices.",
+                      "target": "metaphor / rhetorical question / parallelism",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -137,6 +165,34 @@
                       "type": "writing",
                       "instruction": "Rewrite the same request in a formal and then an informal register.",
                       "target": "formal vs informal register"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what distinguishes formal from informal register.",
+                      "target": "formal vs informal / passive / hedging",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o01-a03",
+                      "type": "writing",
+                      "instruction": "Rewrite a request in a register you have not practised, for a new situation.",
+                      "target": "formal vs informal register",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can shift register fluently between formal and informal contexts.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o01-a05",
+                      "type": "writing",
+                      "instruction": "On your own, rewrite the same request in a formal and then an informal register.",
+                      "target": "formal vs informal register",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [

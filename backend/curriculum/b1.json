@@ -35,6 +35,34 @@
                       "type": "dialogue",
                       "instruction": "Talk about three experiences you have had and say when they happened.",
                       "target": "I have been to ... / I went there in ... / I have never ..."
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the difference between the present perfect and the past simple.",
+                      "target": "present perfect = experience / past simple = finished time",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Talk about an experience of a friend using the present perfect and the past simple.",
+                      "target": "He/She has ... / He/She went there in ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about experiences using the present perfect and the past simple.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor about three experiences you have had and say when they happened.",
+                      "target": "I have been to ... / I went there in ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -212,6 +240,34 @@
                       "type": "dialogue",
                       "instruction": "Talk about your plans for next weekend and a prediction about the future.",
                       "target": "I am going to ... / I will probably ..."
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o05-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the three ways to talk about the future.",
+                      "target": "will / going to / present continuous",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o05-a03",
+                      "type": "dialogue",
+                      "instruction": "Predict what a friend will do next weekend, not what you will do.",
+                      "target": "He/She will probably ... / is going to ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o05-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about future plans and predictions.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o05-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, talk about your plans for next weekend and a prediction about the future.",
+                      "target": "I am going to ... / I will probably ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -362,6 +418,34 @@
                       "type": "listening",
                       "instruction": "Listen to connected speech and write the full form of each phrase.",
                       "target": "gonna → going to"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o08-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what 'gonna' and 'wanna' mean.",
+                      "target": "gonna = going to / wanna = want to",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o08-a03",
+                      "type": "dialogue",
+                      "instruction": "Explain a connected-speech phrase you heard outside this lesson.",
+                      "target": "gotta / didja / couldja",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o08-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand common connected speech forms.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o08-a05",
+                      "type": "listening",
+                      "instruction": "On your own, give the full form of two connected-speech phrases you hear.",
+                      "target": "gonna → going to / didja → did you",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [

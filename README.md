@@ -60,11 +60,12 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   sembrado automáticamente desde el currículo, con estado determinista
   (`known`/`learning`/`weak`/`mastered`), `recall` por ítem (curva de olvido), distribución CEFR
   y señal "reconoce pero no produce" para practicar hablando.
-- **Curriculum Coverage (V2.4)**: auditoría de cobertura curricular que recorre Pre-A1 → C2 por
-  las 7 secciones (vocabulary/grammar/listening/speaking/interaction/review/assessment), cruza el
-  contenido del curso con los bancos de listening/speaking y genera
-  `curriculum_coverage_report.json` con la métrica "TOTAL CURRICULUM COVERAGE" (ver
-  `docs/CURRICULUM_COVERAGE.md`).
+- **Curriculum Coverage (V2.4) + Quality Dashboard (V2.6)**: auditoría de cobertura curricular que
+  recorre Pre-A1 → C2 por las 7 secciones (vocabulary/grammar/listening/speaking/interaction/
+  review/assessment), cruza el contenido del curso con los bancos de listening/speaking y genera
+  `curriculum_coverage_report.json` con "TOTAL CURRICULUM COVERAGE". V2.6 añade **UNIT COVERAGE**
+  por unidad, **CEFR DEPTH SCORE** por nivel y el **Curriculum Quality Dashboard** (7 dimensiones +
+  before/after) para dejar de desarrollar "a sensación" (ver `docs/CURRICULUM_COVERAGE.md`).
 - **Listening C1/C2 (V2.5-C1)**: corpus de listening ampliado a 140 ítems (A1→C2), con 20 ítems C1
   y 20 C2 de registro avanzado (inferencia, intención del hablante, actitud, hablantes múltiples,
   habla rápida y connected speech).
@@ -163,12 +164,14 @@ Abre **http://localhost:5173** y empieza a conversar.
   cd backend
   .venv\Scripts\python.exe scripts/eval_tutor.py --model qwen3.5:9b
   ```
-- **Auditoría de cobertura curricular** (V2.4; genera `curriculum_coverage_report.json`):
+- **Auditoría de cobertura curricular** (V2.4/V2.6; genera `curriculum_coverage_report.json`):
   ```powershell
   cd backend
   .venv\Scripts\python.exe -m scripts.curriculum_coverage
   # o en modo estricto (exit 1 si hay huecos `empty` en un nivel con curso):
   .venv\Scripts\python.exe -m scripts.curriculum_coverage --strict
+  # Curriculum Quality Dashboard (V2.6; añade el JSON completo):
+  .venv\Scripts\python.exe -m scripts.curriculum_coverage --quality
   ```
 
 ## API

@@ -35,6 +35,34 @@
                       "type": "dialogue",
                       "instruction": "Tell the tutor about three things you did last year.",
                       "target": "Last year I went to ... / I saw ... / I had ..."
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three irregular past forms from this unit.",
+                      "target": "went / saw / had / did",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a past experience of a friend, not your own.",
+                      "target": "He/She went to ... / He/She saw ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can describe past experiences and events.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor about three things you did last year.",
+                      "target": "Last year I went to ... / I saw ... / I had ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -138,6 +166,34 @@
                       "type": "dialogue",
                       "instruction": "Compare your city with another city using two comparatives.",
                       "target": "My city is bigger than ... / more expensive than ..."
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you form a comparative.",
+                      "target": "-er than / more ... than",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Compare two films or books, not two cities.",
+                      "target": "... is more ... than ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can compare people, places and things.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, compare your city with another city using two comparatives.",
+                      "target": "My city is bigger than ... / more expensive than ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -255,6 +311,34 @@
                       "type": "dialogue",
                       "instruction": "Tell the tutor two things you are going to do next month.",
                       "target": "Next month I am going to ..."
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you talk about future intentions.",
+                      "target": "going to / plan to / hope to",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a colleague is going to do next month, not what you will do.",
+                      "target": "He/She is going to ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about plans and intentions.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor two things you are going to do next month.",
+                      "target": "Next month I am going to ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -345,6 +429,34 @@
                       "type": "dialogue",
                       "instruction": "Buy a train ticket from the tutor.",
                       "target": "Can I have a return ticket to ...?"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, name three transport words from this unit.",
+                      "target": "ticket / train / bus / airport",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Ask for a bus ticket to a city you have never visited.",
+                      "target": "Can I have a return ticket to ...?",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can buy tickets and ask about transport.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, buy a train ticket from the tutor and ask the price.",
+                      "target": "How much is a ticket to ...?",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -448,6 +560,34 @@
                       "type": "dialogue",
                       "instruction": "Tell the tutor you feel ill and ask for advice.",
                       "target": "I have a headache. / You should rest."
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three words about health from this unit.",
+                      "target": "headache / cold / tired / rest",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Give advice to a friend who has a cold, not to yourself.",
+                      "target": "You should ... / You shouldn't ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can describe how I feel and give simple advice.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell the tutor you feel ill and ask for advice.",
+                      "target": "I have a headache. / You should rest.",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -517,6 +657,34 @@
                       "type": "dialogue",
                       "instruction": "Tell a short story about a trip or a funny day.",
                       "target": "First ... / Then ... / Finally ..."
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the linking words from this unit.",
+                      "target": "first / then / after that / finally",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Tell a short story about a day you have not talked about before.",
+                      "target": "First ... / Then ... / Finally ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can tell a short story using linking words.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, tell a short story about a trip or a funny day using linking words.",
+                      "target": "First ... / Then ... / Finally ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
