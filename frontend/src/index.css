@@ -15,24 +15,24 @@
 :root {
   color-scheme: dark;
 
-  --background: #0e1116;
-  --foreground: #e7ebf2;
-  --card: #1a2029;
-  --card-foreground: #e7ebf2;
-  --popover: #161b24;
-  --popover-foreground: #e7ebf2;
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface-2);
+  --popover-foreground: var(--color-text);
   --primary: var(--color-accent, #6366f1);
   --primary-foreground: var(--color-on-accent, #ffffff);
-  --secondary: #242c39;
-  --secondary-foreground: #e7ebf2;
-  --muted: #161b24;
-  --muted-foreground: #9aa5b6;
-  --accent: #242c39;
-  --accent-foreground: #e7ebf2;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #2a3342;
-  --input: #2a3342;
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-bg-soft);
+  --muted-foreground: var(--color-text-dim);
+  --accent: var(--color-surface-2);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-on-accent, #ffffff);
+  --border: var(--color-border);
+  --input: var(--color-border);
   --ring: var(--color-accent, #6366f1);
   --success: var(--color-success, #22c55e);
   --warning: var(--color-warning, #f59e0b);
@@ -42,24 +42,24 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --background: #f7f8fa;
-  --foreground: #1c2433;
-  --card: #ffffff;
-  --card-foreground: #1c2433;
-  --popover: #ffffff;
-  --popover-foreground: #1c2433;
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
   --primary: var(--color-accent, #4f46e5);
   --primary-foreground: var(--color-on-accent, #ffffff);
-  --secondary: #f1f4f8;
-  --secondary-foreground: #1c2433;
-  --muted: #eef1f5;
-  --muted-foreground: #5a6678;
-  --accent: #eef1f5;
-  --accent-foreground: #1c2433;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --border: #dfe4ec;
-  --input: #dfe4ec;
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-bg-soft);
+  --muted-foreground: var(--color-text-dim);
+  --accent: var(--color-bg-soft);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-on-accent, #ffffff);
+  --border: var(--color-border);
+  --input: var(--color-border);
   --ring: var(--color-accent, #4f46e5);
 }
 

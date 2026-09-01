@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { CheckCircle2, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { getNextBestActivity } from "../../api/academy";
 import type {
   LearningProfile,
@@ -196,10 +196,9 @@ export function HomeScreen({
           {next ? (
             <NextBestCard next={next} onStart={() => onStart(sectionFor(next), next)} />
           ) : (
-            <Card className="p-5">
-              <p className="text-center text-sm text-muted-foreground">
-                {t("home.allDone")}
-              </p>
+            <Card className="flex flex-col items-center gap-2 p-6 text-center">
+              <CheckCircle2 className="size-8 text-success" aria-hidden="true" />
+              <p className="text-sm text-muted-foreground">{t("home.allDone")}</p>
             </Card>
           )}
         </motion.section>

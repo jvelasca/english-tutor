@@ -21,6 +21,9 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // Usa el Chrome instalado en el sistema (channel) en lugar del Chromium
+    // empaquetado por Playwright, evitando `npx playwright install`.
+    channel: "chrome",
   },
   projects: [
     {

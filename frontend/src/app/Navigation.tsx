@@ -26,7 +26,7 @@ export function Navigation({
             onClick={() => onNavigate(r.id)}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "relative flex-1 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors md:flex-none",
+              "relative shrink-0 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors",
               active
                 ? "text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground",

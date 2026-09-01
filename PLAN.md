@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `2.4.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+- ✅ Versión estable `2.5.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
   **V1.30** LAN + Mobile 100% (mDNS real, test de micrófono con medidor, QR de conexión,
   `/help/connect`), **V1.31** Adaptive Engine 2.0 (Priority Engine + "Why this activity?"),
   **V1.32** Curriculum 2.0 (escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones),

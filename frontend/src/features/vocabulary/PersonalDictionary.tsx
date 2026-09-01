@@ -165,9 +165,13 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
         <motion.section variants={item} aria-label={t("dictionary.items")}>
           <Card className="gap-0 overflow-hidden p-0">
             {sorted.length === 0 ? (
-              <p className="p-5 text-sm text-muted-foreground">
-                {t("dictionary.empty")}
-              </p>
+              <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
+                <BookOpen
+                  className="size-8 text-muted-foreground/60"
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-muted-foreground">{t("dictionary.empty")}</p>
+              </div>
             ) : (
               <ul className="divide-y divide-border/60">
                 {sorted.map((lex) => (

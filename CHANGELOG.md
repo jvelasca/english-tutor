@@ -4,6 +4,36 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.5.0] — 2026-09-01
+
+**Release de consolidación para auditoría externa.** Eleva a versión estable el trabajo
+acumulado tras `2.4.0`: finalización del currículo (V2.5), capa de medición de calidad del
+currículo (V2.6) y auditoría visual de UI (2.1).
+
+### Añadido
+- **Currículo A1→C2 completado (V2.5)**: listening C1/C2 (corpus 100 → 140 ítems), speaking C2
+  (26 escenarios), subskills de interacción en A1/A2/B2/C1/C2 y wiring curso↔bancos
+  (`Objective.listening_items`/`scenario_ids`). Cobertura total 42/49 celdas (85,7%).
+- **Curriculum Quality Dashboard (V2.6)**: métricas de grano fino `unit_coverage`,
+  `depth_score`, `unit_learning_loop`/`loop_coverage` y `curriculum_quality_report` con delta
+  antes/después.
+- **Unit Learning Loop etiquetado (V2.6-C5)**: las 31 unidades etiquetan las fases de cierre
+  (`retrieve`/`transfer`/`review`/`assess`); loop por unidad 50,6% → 84,7%.
+- **UI 2.1**: banner de lección activa estilizado, "Modelo IA" i18n, estados vacíos con icono.
+
+### Corregido
+- **Navegación responsive**: la barra inferior (móvil) y la del header (tablet) desbordaban con
+  7 pestañas y tapaban otros controles; ahora desplazan horizontalmente sin desbordar.
+- **Sistema de diseño unificado**: eliminado CSS duplicado y muerto legacy y unificados radios,
+  espaciado y ancho de lectura entre `index.css` y `legacy.css` (una sola fuente de verdad).
+
+### Verificado
+- Backend `pytest` + `ruff` limpios (fases V2.5/V2.6 ya verificadas; 1005 passed).
+- Frontend `vitest` (245 tests) y `tsc && vite build` OK.
+- Visual (Playwright sobre Chrome del sistema): 14 passed / 10 skipped / 0 failed en
+  desktop/tablet/móvil.
+- `python scripts/check_release_consistency.py` OK (2.5.0).
+
 ## [2.4.0] — 2026-08-31
 
 **Auditoría de cobertura curricular**: responde con datos a "¿el alumno puede recorrer

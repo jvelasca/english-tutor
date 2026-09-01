@@ -60,8 +60,8 @@ export function Header({
         </button>
       </div>
 
-      <div className="hidden min-w-0 flex-1 justify-center md:flex">
-        <Navigation route={route} onNavigate={onNavigate} layoutId="nav-pill" />
+      <div className="hidden min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex">
+        <Navigation route={route} onNavigate={onNavigate} layoutId="nav-pill" className="mx-auto" />
       </div>
 
       <div className="flex items-center gap-2">

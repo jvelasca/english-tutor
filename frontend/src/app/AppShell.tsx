@@ -38,7 +38,7 @@ export function AppShell({
       >
         {children}
       </main>
-      <div className="border-t border-border bg-background/95 px-2 py-1 backdrop-blur md:hidden">
+      <div className="overflow-x-auto border-t border-border bg-background/95 px-2 py-1 backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:hidden">
         <Navigation
           route={route}
           onNavigate={onNavigate}

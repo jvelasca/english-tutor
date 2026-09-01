@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../hooks/useI18n";
 
 export function ModelSelect({
   model,
@@ -13,6 +14,7 @@ export function ModelSelect({
   onSelect: (m: string) => void;
   onFavorite: (m: string) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const list = models.length ? models : [model];
@@ -35,7 +37,7 @@ export function ModelSelect({
 
   return (
     <div className="model-picker" ref={ref}>
-      <span className="model-picker-label">Modelo IA:</span>
+      <span className="model-picker-label">{t("settings.model")}:</span>
       <button
         type="button"
         className="model-trigger"
