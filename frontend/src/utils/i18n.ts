@@ -85,6 +85,22 @@ const STRINGS: Record<string, Entry> = {
     es: "Ahora mismo no se ha podido cargar tu siguiente paso.",
   },
   "home.retry": { en: "Try again", es: "Reintentar" },
+  "home.todayGoal": {
+    en: "Your goal today",
+    es: "Tu objetivo de hoy",
+  },
+  "home.recommended": {
+    en: "Recommended for you",
+    es: "Recomendado para ti",
+  },
+  "home.seeProgress": {
+    en: "See my progress",
+    es: "Ver mi progreso",
+  },
+  "home.reviewUnavailable": {
+    en: "Review isn't available right now.",
+    es: "El repaso no está disponible ahora.",
+  },
 
   // Categorías de sesión
   "kind.weakness": { en: "Weakness", es: "Debilidad" },

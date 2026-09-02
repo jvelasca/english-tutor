@@ -45,6 +45,7 @@ interface WorkspaceProps {
   ) => void;
   onFinishLesson: () => void;
   onOpenCourse: () => void;
+  onOpenProgress: () => void;
   refreshKey: number;
 }
 
@@ -73,6 +74,7 @@ export function Workspace({
   onStartLesson,
   onFinishLesson,
   onOpenCourse,
+  onOpenProgress,
   refreshKey,
 }: WorkspaceProps) {
   const { currentUserId, profile, history, users } = chat;
@@ -87,6 +89,8 @@ export function Workspace({
         history={history}
         userName={userName}
         onStart={onNextBestStart}
+        onStep={onStep}
+        onOpenProgress={onOpenProgress}
         refreshKey={refreshKey}
       />
     );

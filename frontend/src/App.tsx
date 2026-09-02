@@ -137,6 +137,8 @@ export default function App() {
 
   const handleOpenCourse = useCallback(() => go("course"), [go]);
 
+  const handleOpenProgress = useCallback(() => go("progress"), [go]);
+
   const completeActiveStep = useCallback(() => {
     const key = activeStepKeyRef.current;
     if (currentUserId && key) {
@@ -197,6 +199,7 @@ export default function App() {
           onStartLesson={handleStartLesson}
           onFinishLesson={handleFinishLesson}
           onOpenCourse={handleOpenCourse}
+          onOpenProgress={handleOpenProgress}
           refreshKey={sessionVersion}
         />
       </AppShell>
