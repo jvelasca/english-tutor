@@ -16,11 +16,6 @@ const STRINGS: Record<string, Entry> = {
   "nav.home": { en: "Home", es: "Inicio" },
   "nav.formation": { en: "Course", es: "Formación" },
   "nav.learn": { en: "Learn", es: "Aprender" },
-  "nav.course": { en: "Course", es: "Curso" },
-  "nav.progress": { en: "Progress", es: "Progreso" },
-  "nav.journey": { en: "Journey", es: "Trayecto" },
-  "nav.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
-  "nav.chat": { en: "Chat", es: "Chat" },
 
   // Destrezas
   "skill.listening": { en: "Listening", es: "Listening" },
@@ -85,10 +80,6 @@ const STRINGS: Record<string, Entry> = {
   "home.morning": { en: "Good morning", es: "Buenos días" },
   "home.afternoon": { en: "Good afternoon", es: "Buenas tardes" },
   "home.evening": { en: "Good evening", es: "Buenas noches" },
-  "home.subtitle": {
-    en: "Continue your English journey.",
-    es: "Continúa tu camino con el inglés.",
-  },
   "home.nextStep": { en: "Today's next step", es: "El siguiente paso de hoy" },
   "home.continue": { en: "Continue", es: "Continuar" },
   "home.whyThisActivity": { en: "Why?", es: "¿Por qué?" },
@@ -98,27 +89,11 @@ const STRINGS: Record<string, Entry> = {
     es: "Factor limitante",
   },
   "home.missing": { en: "missing", es: "falta" },
-  "home.start": { en: "Start", es: "Empezar" },
-  "home.review": { en: "Review", es: "Repasar" },
-  "home.today": { en: "Today", es: "Hoy" },
   "home.yourProgress": { en: "Your progress", es: "Tu progreso" },
-  "home.readyFor": {
-    en: "Ready for the next level",
-    es: "Preparación para el siguiente nivel",
-  },
   "home.nextFocus": { en: "Next focus", es: "Siguiente foco" },
   "home.practiceNow": { en: "Practice now", es: "Practicar ahora" },
-  "home.yourSkills": { en: "Your skills", es: "Tus destrezas" },
   "home.streak": { en: "day streak", es: "días de racha" },
-  "home.bestStreak": { en: "best streak", es: "mejor racha" },
-  "home.activity": { en: "recent activity", es: "actividad reciente" },
-  "home.improving": { en: "Improving", es: "Mejorando" },
-  "home.stable": { en: "Stable", es: "Estable" },
-  "home.needsReview": { en: "Needs review", es: "Repasar" },
   "home.min": { en: "min", es: "min" },
-  "home.reviewN": { en: "review", es: "repasa" },
-  "home.practiceN": { en: "practice", es: "practica" },
-  "home.youAreHere": { en: "You are here", es: "Estás aquí" },
   "home.allDone": {
     en: "All done for today. Great work!",
     es: "Todo hecho por hoy. ¡Buen trabajo!",
@@ -145,13 +120,6 @@ const STRINGS: Record<string, Entry> = {
     es: "El repaso no está disponible ahora.",
   },
 
-  // Categorías de sesión
-  "kind.weakness": { en: "Weakness", es: "Debilidad" },
-  "kind.review": { en: "Review", es: "Repaso" },
-  "kind.listening": { en: "Listening", es: "Listening" },
-  "kind.new": { en: "New", es: "Nuevo" },
-  "kind.easyWins": { en: "Boost", es: "Refuerzo" },
-
   // Razones de la siguiente actividad
   "reason.due_for_review": { en: "Due for review", es: "Repaso pendiente" },
   "reason.weak_subskill": { en: "Weak sub-skill", es: "Sub-destreza débil" },
@@ -162,11 +130,6 @@ const STRINGS: Record<string, Entry> = {
   // Progress
   "progress.title": { en: "My progress", es: "Mi progreso" },
   "progress.overall": { en: "Overall", es: "General" },
-  "progress.mainFocus": { en: "Main focus", es: "Foco principal" },
-  "progress.seeDetails": { en: "See details", es: "Ver detalles" },
-  "progress.improving": { en: "Improving", es: "Mejorando" },
-  "progress.stable": { en: "Stable", es: "Estable" },
-  "progress.needsReview": { en: "Needs review", es: "Repasar" },
 
   // MI PROGRESO V3.1 — pantalla de 5 pestañas (docs/UI_V3.1.md §4.4)
   "progress.subtitle": {
@@ -237,30 +200,20 @@ const STRINGS: Record<string, Entry> = {
     en: "of practiced skills",
     es: "de destrezas practicadas",
   },
-  "triad.readinessHint": { en: "to next level", es: "hacia el siguiente nivel" },
 
   // Course
   "course.title": { en: "Your English journey", es: "Tu viaje en inglés" },
   "course.subtitle": { en: "CEFR curriculum", es: "Currículum CEFR" },
   "course.mastered": { en: "mastered", es: "dominados" },
   "course.continue": { en: "Continue", es: "Continuar" },
-  "course.placementTest": { en: "Placement test", es: "Test de nivel" },
-  "course.finalExam": { en: "Final exam", es: "Examen final" },
-  "course.back": { en: "Back", es: "Volver" },
   "course.you": { en: "You", es: "Tú" },
   "course.milestones": { en: "milestones", es: "hitos" },
   "course.completed": { en: "Completed", es: "Completado" },
   "course.inProgress": { en: "In progress", es: "En curso" },
-  "course.notStarted": { en: "Not started", es: "Sin empezar" },
   "course.locked": { en: "Locked", es: "Bloqueado" },
   "course.cefrLevel": { en: "CEFR level", es: "Nivel CEFR" },
-  "course.canDo": { en: "What you can do", es: "Qué puedes hacer" },
-  "course.youAreHere": { en: "You are here", es: "Estás aquí" },
-  "course.whereAmI": { en: "Where am I?", es: "¿Dónde estoy?" },
   "course.unit": { en: "Unit", es: "Unidad" },
-  "course.lesson": { en: "Lesson", es: "Lección" },
   "course.currentLesson": { en: "Current lesson", es: "Lección actual" },
-  "course.review": { en: "Review", es: "Repasar" },
   "course.byTheEnd": {
     en: "By the end of this unit you will be able to…",
     es: "Al terminar esta unidad serás capaz de…",
@@ -290,19 +243,10 @@ const STRINGS: Record<string, Entry> = {
     es: "Tu recorrido por los niveles CEFR",
   },
   "journey.you": { en: "You", es: "Tú" },
-  "journey.currentLevel": { en: "Current level", es: "Nivel actual" },
   "journey.unitsMastered": { en: "Units mastered", es: "Unidades dominadas" },
   "journey.skillsReady": { en: "Skills ready", es: "Destrezas listas" },
   "journey.retention": { en: "Retention", es: "Retención" },
   "journey.nextMilestone": { en: "Next milestone", es: "Próximo hito" },
-  "journey.nextMilestoneHint": {
-    en: "What you reach next",
-    es: "Lo que alcanzas después",
-  },
-  "journey.dimensions": {
-    en: "Communicative dimensions",
-    es: "Dimensiones comunicativas",
-  },
   "journey.empty": {
     en: "Complete a few activities to start your journey.",
     es: "Completa algunas actividades para iniciar tu trayecto.",
@@ -350,16 +294,12 @@ const STRINGS: Record<string, Entry> = {
   "settings.appearance": { en: "Appearance", es: "Apariencia" },
   "settings.audio": { en: "Audio", es: "Audio" },
   "settings.ai": { en: "AI model", es: "Modelo IA" },
-  "settings.advanced": { en: "Advanced", es: "Avanzado" },
   "settings.system": { en: "System", es: "Sistema" },
   "settings.interfaceLanguage": {
     en: "Interface language",
     es: "Idioma de la interfaz",
   },
   "settings.model": { en: "AI model", es: "Modelo IA" },
-  "settings.back": { en: "Back", es: "Volver" },
-  "settings.version": { en: "Version", es: "Versión" },
-  "settings.lanUrl": { en: "LAN URL", es: "URL LAN" },
 
   // Estado del sistema
   "status.ready": { en: "Ready", es: "Listo" },
@@ -386,7 +326,6 @@ const STRINGS: Record<string, Entry> = {
   "backup.list": { en: "Stored backups", es: "Copias guardadas" },
   "backup.empty": { en: "No backups yet", es: "Aún no hay copias" },
   "backup.restoreTitle": { en: "Restore from file", es: "Restaurar desde archivo" },
-  "backup.restore": { en: "Restore", es: "Restaurar" },
   "backup.chooseFile": { en: "Choose backup (.zip)", es: "Elegir copia (.zip)" },
   "backup.created": { en: "Backup created", es: "Copia creada" },
   "backup.restored": { en: "Backup restored", es: "Copia restaurada" },
@@ -453,7 +392,6 @@ const STRINGS: Record<string, Entry> = {
     es: "PIN de administración incorrecto.",
   },
   "audio.qa.title": { en: "AUDIO QUALITY", es: "CALIDAD DEL AUDIO" },
-  "audio.qa.grade": { en: "Grade", es: "Dictamen" },
   "audio.qa.duration": { en: "Duration", es: "Duración" },
   "audio.qa.sampleRate": { en: "Sample rate", es: "Frecuencia" },
   "audio.qa.channels": { en: "Channels", es: "Canales" },
@@ -462,7 +400,6 @@ const STRINGS: Record<string, Entry> = {
   "audio.qa.silence": { en: "Silence", es: "Silencio" },
   "audio.qa.dc": { en: "DC offset", es: "Offset DC" },
   "audio.audit.title": { en: "CONTENT INTEGRITY CHECK", es: "CHEQUEO DE INTEGRIDAD DEL CONTENIDO" },
-  "audio.audit.ok": { en: "All checks passed.", es: "Todas las comprobaciones pasaron." },
   "audio.audit.fail": { en: "Issues found.", es: "Se encontraron problemas." },
   "audio.audit.items": { en: "Items", es: "Ítems" },
   "audio.audit.recorded": { en: "Recorded", es: "Grabados" },
@@ -489,11 +426,7 @@ const STRINGS: Record<string, Entry> = {
   // Común
   "common.loading": { en: "Loading…", es: "Cargando…" },
   "common.close": { en: "Close", es: "Cerrar" },
-  "common.back": { en: "Back", es: "Volver" },
   "common.done": { en: "Done", es: "Hecho" },
-  "common.next": { en: "Next", es: "Siguiente" },
-  "common.completed": { en: "Completed", es: "Completado" },
-  "common.great": { en: "Great.", es: "Genial." },
   "common.cancel": { en: "Cancel", es: "Cancelar" },
   "common.save": { en: "Save", es: "Guardar" },
   "common.saving": { en: "Saving…", es: "Guardando…" },
@@ -755,8 +688,6 @@ const STRINGS: Record<string, Entry> = {
   "panels.analysis": { en: "Analysis", es: "Análisis" },
   "panels.closeAnalysis": { en: "Close analysis panel", es: "Cerrar panel de análisis" },
   "panels.openAnalysis": { en: "Open analysis panel", es: "Abrir panel de análisis" },
-  "panels.yourProgress": { en: "Your progress", es: "Tu progreso" },
-  "panels.todayPlan": { en: "Today's plan", es: "Plan de hoy" },
   "panels.yourProfile": { en: "Your profile", es: "Tu perfil" },
   "panels.speaking": { en: "Speaking", es: "Expresión oral" },
   "panels.writing": { en: "Writing", es: "Escritura" },
@@ -996,7 +927,6 @@ const STRINGS: Record<string, Entry> = {
     es: "No se pudo puntuar el assessment.",
   },
 
-  "panels.fsrsReview": { en: "Spaced review", es: "Repaso espaciado" },
   "panels.evidenceGraph": {
     en: "Evidence graph",
     es: "Grafo de evidencia",
@@ -1238,7 +1168,6 @@ const STRINGS: Record<string, Entry> = {
     es: "Precisión por dificultad",
   },
   "listening.retries": { en: "Retries", es: "Reintentos" },
-  "listening.seen": { en: "seen", es: "vistos" },
   "listening.recovered": { en: "recovered", es: "recuperados" },
   "listening.retention": { en: "Retention", es: "Retención" },
   "listening.immediate": { en: "immediate", es: "inmediata" },
@@ -1248,7 +1177,6 @@ const STRINGS: Record<string, Entry> = {
     es: "¡Has completado todos los niveles de comprensión auditiva!",
   },
   "listening.next": { en: "Next", es: "Siguiente" },
-  "listening.review": { en: "review", es: "revisar" },
   "listening.speakQuestion": {
     en: "Listen to the question",
     es: "Escuchar la pregunta",
