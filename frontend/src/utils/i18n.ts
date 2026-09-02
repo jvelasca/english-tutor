@@ -160,13 +160,62 @@ const STRINGS: Record<string, Entry> = {
   "reason.confidence_boost": { en: "Confidence boost", es: "Refuerzo de confianza" },
 
   // Progress
-  "progress.title": { en: "Your progress", es: "Tu progreso" },
+  "progress.title": { en: "My progress", es: "Mi progreso" },
   "progress.overall": { en: "Overall", es: "General" },
   "progress.mainFocus": { en: "Main focus", es: "Foco principal" },
   "progress.seeDetails": { en: "See details", es: "Ver detalles" },
   "progress.improving": { en: "Improving", es: "Mejorando" },
   "progress.stable": { en: "Stable", es: "Estable" },
   "progress.needsReview": { en: "Needs review", es: "Repasar" },
+
+  // MI PROGRESO V3.1 — pantalla de 5 pestañas (docs/UI_V3.1.md §4.4)
+  "progress.subtitle": {
+    en: "How you're learning English, at a glance.",
+    es: "Cómo estás aprendiendo inglés, de un vistazo.",
+  },
+  "progress.overviewTab": { en: "Overview", es: "Resumen" },
+  "progress.courseTab": { en: "Course", es: "Curso" },
+  "progress.skillsTab": { en: "Skills", es: "Habilidades" },
+  "progress.journeyTab": { en: "Journey", es: "Trayectoria" },
+  "progress.tracksTab": { en: "Tracks", es: "Recorridos" },
+  "progress.tabAria": {
+    en: "Progress sections",
+    es: "Secciones de mi progreso",
+  },
+  "progress.continueFormation": {
+    en: "Continue in Course",
+    es: "Continuar en Formación",
+  },
+  "progress.currentCourseLevel": {
+    en: "Current course level",
+    es: "Nivel actual del curso",
+  },
+  "progress.unitsCompleted": {
+    en: "Units completed",
+    es: "Unidades completadas",
+  },
+  "progress.nextUp": { en: "Next up", es: "Lo que sigue" },
+  "progress.levelComplete": {
+    en: "This level is complete.",
+    es: "Este nivel está completo.",
+  },
+  "progress.limitingSkill": {
+    en: "Limiting skill",
+    es: "Destreza limitante",
+  },
+  "progress.skillsHint": {
+    en: "All your skills, from your latest model. Expand a skill for its detail.",
+    es: "Todas tus destrezas, según tu modelo más reciente. Expande una para ver su detalle.",
+  },
+  "progress.tracksIntro": {
+    en: "Your evolution across each practice route.",
+    es: "Tu evolución en cada recorrido de práctica.",
+  },
+  "progress.assessmentTab": { en: "Assessment", es: "Evaluación" },
+  "progress.activityTitle": {
+    en: "Recent activity",
+    es: "Actividad reciente",
+  },
   "mastery.strong": { en: "Strong", es: "Fuerte" },
   "mastery.developing": { en: "Developing", es: "En desarrollo" },
   "mastery.needsPractice": { en: "Needs practice", es: "Necesita práctica" },

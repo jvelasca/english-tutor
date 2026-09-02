@@ -27,9 +27,6 @@ const CourseScreen = lazy(() =>
 const ProgressScreen = lazy(() =>
   import("../features/progress/ProgressScreen").then((m) => ({ default: m.ProgressScreen })),
 );
-const JourneyScreen = lazy(() =>
-  import("../features/journey/JourneyScreen").then((m) => ({ default: m.JourneyScreen })),
-);
 const PersonalDictionary = lazy(() =>
   import("../features/vocabulary/PersonalDictionary").then((m) => ({
     default: m.PersonalDictionary,
@@ -189,9 +186,19 @@ export function Workspace({
       />
     );
   } else if (route === "progress") {
-    content = <ProgressScreen userId={currentUserId} />;
+    content = (
+      <ProgressScreen userId={currentUserId} refreshKey={refreshKey} />
+    );
   } else if (route === "journey") {
-    content = <JourneyScreen userId={currentUserId} />;
+    // Sub-ruta legada #/progreso/trayectoria: la misma pantalla MI PROGRESO
+    // abriendo directamente la pestaña Trayectoria (UI_V3.1 §4.4).
+    content = (
+      <ProgressScreen
+        userId={currentUserId}
+        refreshKey={refreshKey}
+        initialTab="journey"
+      />
+    );
   } else if (route === "vocabulary") {
     // Vocabulario es una hoja de APRENDER: barra de vuelta fija + diccionario.
     content = (
