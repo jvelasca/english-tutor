@@ -1,9 +1,10 @@
 import { lazy, Suspense, useState } from "react";
 import type { ChatApi } from "../hooks/useChat";
 import type { NextBestActivity } from "../types/api";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
+import { Button } from "../components/ui/button";
 import { ListeningPractice } from "../features/listening/ListeningPractice";
 import { PronunciationPractice } from "../components/PronunciationPractice";
 import { ReadingPractice } from "../features/reading/ReadingPractice";
@@ -13,6 +14,8 @@ import { MenuIcon, PanelIcon } from "../components/Icons";
 import { clampRight, clampSidebar, RIGHT_MAX, RIGHT_MIN, SIDEBAR_MAX, SIDEBAR_MIN } from "../utils/layout";
 import type { Section } from "../utils/sections";
 import type { SessionStep } from "../types/api";
+import { navigateTo } from "../router/hash";
+import { FORMATION_PATH, LEARN_PATH } from "../router/paths";
 import { useI18n } from "../hooks/useI18n";
 
 const AnalysisPanel = lazy(() =>
@@ -29,6 +32,21 @@ const SECTION_KICKER: Partial<Record<Section, string>> = {
   speaking: "kicker.speaking",
   writing: "kicker.writing",
   grammar: "kicker.grammar",
+};
+
+/**
+ * Título de la barra de contexto en práctica libre (route "learn"): sigue la
+ * destreza que se está ejercitando en el workspace. En route "chat" la barra
+ * anuncia siempre Conversar (la conversación se sirve solo en /aprender/conversar),
+ * aunque la sección momentánea del chat sea otra.
+ */
+const FREE_ACTIVITY_TITLE: Partial<Record<Section, string>> = {
+  listening: "skill.listening",
+  speaking: "skill.speaking",
+  reading: "skill.reading",
+  writing: "skill.writing",
+  grammar: "skill.grammar",
+  pronunciation: "skill.pronunciation",
 };
 
 interface PracticeViewProps {
@@ -80,16 +98,27 @@ export function PracticeView({
     clearLesson,
   } = chat;
 
-  const isChat =
-    section === "speaking" || section === "writing" || section === "grammar";
+  const isChat = section === "speaking" || section === "writing" || section === "grammar";
   // El historial de conversaciones vive solo en Conversar (ruta "chat") y sin
   // una lección de curso activa: mientras la lección está en curso el workspace
-  // es el de la lección (sin historial; la envoltura de curso llega en WS7).
+  // es el de la lección (sin historial; la envoltura de curso vive en la barra
+  // de contexto de esta pantalla, WS7).
   const showSidebar = route === "chat" && !activeObjective;
   // En Aprender, las secciones de práctica pura (no conversación) usan todo el
   // ancho: el panel de análisis nunca se acopla y se abre como drawer con el
   // botón flotante. Las secciones conversacionales conservan su layout.
   const drawerAnalysis = route === "learn" && !isChat;
+
+  // Barra de contexto (WS7): una lección del curso solo está en curso cuando la
+  // ruta es "chat" (Conversar) y hay un objetivo activo (las lecciones se
+  // lanzan siempre desde Formación). Sin objetivo activo la práctica es libre.
+  const inLesson = route === "chat" && activeObjective !== null;
+  const freeTitleKey =
+    route === "chat"
+      ? "learn.conversation"
+      : (FREE_ACTIVITY_TITLE[section] ?? "learn.conversation");
+  const contextBackPath = inLesson ? FORMATION_PATH : LEARN_PATH;
+  const contextBackLabel = inLesson ? t("nav.formation") : t("learn.back");
 
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -120,7 +149,62 @@ export function PracticeView({
   };
 
   return (
-    <div className={`workspace${drawerAnalysis ? " workspace--learn" : ""}`}>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-background/90 px-2 py-1.5 backdrop-blur md:flex-nowrap">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => navigateTo(contextBackPath)}
+          className="min-h-11 shrink-0 gap-1 px-2 text-sm font-medium md:min-h-9"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          <span className="max-w-[45vw] truncate">{contextBackLabel}</span>
+        </Button>
+
+        {inLesson && activeObjective && (
+          <>
+            <span className="inline-flex shrink-0 items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+              {activeObjective.levelId}
+            </span>
+            <span className="hidden shrink-0 text-xs font-semibold tracking-wide text-muted-foreground uppercase sm:inline">
+              {t("chat.activeLesson")}
+            </span>
+          </>
+        )}
+
+        <span className="min-w-0 grow basis-36 truncate text-sm font-semibold text-foreground md:basis-auto"
+          title={inLesson && activeObjective ? activeObjective.title : t(freeTitleKey)}
+        >
+          {inLesson && activeObjective
+            ? activeObjective.title
+            : t(freeTitleKey)}
+        </span>
+
+        {inLesson && (
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              onClick={onFinishLesson}
+              className="min-h-11 md:min-h-9"
+            >
+              {t("chat.finishLesson")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearLesson}
+              className="min-h-11 text-muted-foreground md:min-h-9"
+            >
+              {t("chat.exit")}
+            </Button>
+          </span>
+        )}
+      </div>
+
+      <div className={`workspace${drawerAnalysis ? " workspace--learn" : ""}`}>
       {showSidebar && (
         <>
           <aside
@@ -177,27 +261,6 @@ export function PracticeView({
           <>
             <div className="chat-scroll">
               <div className="chat-inner">
-                {activeObjective && (
-                  <div className="lesson-banner">
-                    <span>{t("chat.activeLesson")}</span>
-                    <strong>{activeObjective.title}</strong>
-                    <button
-                      type="button"
-                      onClick={onFinishLesson}
-                      aria-label={t("chat.finishLesson")}
-                    >
-                      {t("chat.finishLesson")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={clearLesson}
-                      aria-label={t("chat.exit")}
-                    >
-                      {t("chat.exit")}
-                    </button>
-                  </div>
-                )}
-
                 {messages.length === 0 && (
                   <div className="empty">
                     <span className="empty-badge" aria-hidden="true">
@@ -339,6 +402,7 @@ export function PracticeView({
         aria-label={t("panels.closeAnalysis")}
         tabIndex={-1}
       />
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { ArrowLeft } from "lucide-react";
 import { navigateTo } from "../router/hash";
-import { FORMATION_PATH, LEARN_PATH } from "../router/paths";
+import { LEARN_PATH } from "../router/paths";
 import {
   GRAMMAR_ACTIVITY,
   LISTENING_ACTIVITY,
@@ -113,28 +113,6 @@ function SubpageHeader({
   );
 }
 
-/**
- * Envoltura de una práctica del workspace dentro de APRENDER: barra de vuelta
- * fija + contenido que ocupa el resto del alto (la práctica mantiene su
- * layout interno de scroll, el mismo de V3.0).
- */
-function PracticeChrome({
-  label,
-  onBack,
-  children,
-}: {
-  label: string;
-  onBack: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <SubpageHeader label={label} onBack={onBack} />
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-    </div>
-  );
-}
-
 /** Prácticas del hub que se sirven desde el workspace (Listening, Pronunciación, Gramática). */
 const WORKSPACE_ACTIVITIES: readonly LearnActivity[] = [
   LISTENING_ACTIVITY,
@@ -156,11 +134,10 @@ export function Workspace({
   refreshKey,
 }: WorkspaceProps) {
   const { t } = useI18n();
-  const { currentUserId, activeObjective } = chat;
+  const { currentUserId } = chat;
   const userName = chat.users.find((u) => u.id === currentUserId)?.name;
 
   const backToHub = () => navigateTo(LEARN_PATH);
-  const backToFormation = () => navigateTo(FORMATION_PATH);
 
   let content;
   if (route === "home") {
@@ -224,19 +201,19 @@ export function Workspace({
           />
         );
     } else if (WORKSPACE_ACTIVITIES.includes(learnActivity)) {
+      // La barra de contexto (lección del curso vs práctica libre) vive dentro
+      // de PracticeView (WS7): las prácticas del hub se sirven aquí directas.
       content = (
-        <PracticeChrome label={t("learn.back")} onBack={backToHub}>
-          <PracticeView
-            route="learn"
-            chat={chat}
-            onAttempt={onAttempt}
-            onNextBestStart={onNextBestStart}
-            onStep={onStep}
-            onStartLesson={onStartLesson}
-            onFinishLesson={onFinishLesson}
-            onOpenCourse={onOpenCourse}
-          />
-        </PracticeChrome>
+        <PracticeView
+          route="learn"
+          chat={chat}
+          onAttempt={onAttempt}
+          onNextBestStart={onNextBestStart}
+          onStep={onStep}
+          onStartLesson={onStartLesson}
+          onFinishLesson={onFinishLesson}
+          onOpenCourse={onOpenCourse}
+        />
       );
     } else {
       // Actividad desconocida bajo /aprender: degrada al hub.
@@ -250,25 +227,20 @@ export function Workspace({
     }
   } else {
     // route === "chat": Conversar (práctica libre) o una lección del curso
-    // retomada desde Formación (el workspace oculta el historial mientras la
-    // lección está activa; la envoltura de curso llega en WS7).
-    const inLesson = Boolean(activeObjective);
+    // retomada desde Formación. El workspace oculta el historial mientras la
+    // lección está activa y la propia barra de contexto de PracticeView
+    // distingue el modo lección del modo libre (WS7).
     content = (
-      <PracticeChrome
-        label={inLesson ? t("nav.formation") : t("learn.back")}
-        onBack={inLesson ? backToFormation : backToHub}
-      >
-        <PracticeView
-          route="chat"
-          chat={chat}
-          onAttempt={onAttempt}
-          onNextBestStart={onNextBestStart}
-          onStep={onStep}
-          onStartLesson={onStartLesson}
-          onFinishLesson={onFinishLesson}
-          onOpenCourse={onOpenCourse}
-        />
-      </PracticeChrome>
+      <PracticeView
+        route="chat"
+        chat={chat}
+        onAttempt={onAttempt}
+        onNextBestStart={onNextBestStart}
+        onStep={onStep}
+        onStartLesson={onStartLesson}
+        onFinishLesson={onFinishLesson}
+        onOpenCourse={onOpenCourse}
+      />
     );
   }
 
