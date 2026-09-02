@@ -2,47 +2,51 @@ import { test, expect } from "@playwright/test";
 import path from "node:path";
 
 /**
- * Smoke visual: recorre las rutas principales y captura un screenshot por ruta.
- * Los screenshots se guardan en `tests/visual/screenshots/<proyecto>/<ruta>.png`
+ * Smoke visual V3.1: recorre las rutas principales y captura un screenshot por
+ * ruta. Los screenshots se guardan en `tests/visual/screenshots/<proyecto>/<ruta>.png`
  * para su revisión manual (premisa 20: responsive 100% verificado + tests visuales).
+ *
+ * La navegación raíz de V3.1 tiene solo 3 píldoras (Home / Course / Learn); el
+ * resto de pantallas (MI PROGRESO, AYUDA y las sub-rutas de APRENDER como
+ * Listening o Conversar) se alcanzan por URL hash. Ya no hay píldoras raíz
+ * "Chat", "Progress" ni "Vocabulary" ni un panel Analysis por pestañas.
  */
-
-const ROUTES = [
-  { id: "home", label: "Home" },
-  { id: "course", label: "Course" },
-  { id: "progress", label: "Progress" },
-  { id: "chat", label: "Chat" },
-  { id: "learn", label: "Learn" },
-] as const;
 
 test("capturar rutas principales", async ({ page }, testInfo) => {
   const project = testInfo.project.name;
   const shot = (name: string) =>
     path.join("tests", "visual", "screenshots", project, `${name}.png`);
 
-  await page.goto("/");
-  await expect(page.getByRole("navigation")).toBeVisible({ timeout: 15_000 });
+  const nav = () => page.getByRole("navigation", { name: "Main navigation" });
 
   // Home es la ruta inicial.
+  await page.goto("/");
+  await expect(nav()).toBeVisible({ timeout: 15_000 });
+
   await page.waitForTimeout(600);
   await page.screenshot({ path: shot("home"), fullPage: true });
 
-  for (const route of ROUTES) {
-    if (route.id === "home") continue;
-    const nav = page.getByRole("navigation");
-    await nav.getByRole("button", { name: route.label, exact: true }).click();
+  // Píldora "Course" (navegación raíz → Formación).
+  await nav().getByRole("button", { name: "Course", exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: shot("course"), fullPage: true });
+
+  // Píldora "Learn" (navegación raíz → hub de APRENDER).
+  await nav().getByRole("button", { name: "Learn", exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: shot("learn"), fullPage: true });
+
+  // Pantallas que ya no son destino raíz: se navegan directamente por URL hash.
+  const deepRoutes = [
+    { id: "listening", url: "/#/aprender/listening" },
+    { id: "conversar", url: "/#/aprender/conversar" },
+    { id: "progress", url: "/#/progreso" },
+    { id: "help", url: "/#/ayuda" },
+  ] as const;
+  for (const route of deepRoutes) {
+    await page.goto(route.url);
+    await expect(nav()).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(600);
     await page.screenshot({ path: shot(route.id), fullPage: true });
   }
-
-  // Chat con el panel ANALYSIS abierto (verifica el rediseño por pestañas).
-  const nav = page.getByRole("navigation");
-  await nav.getByRole("button", { name: "Chat", exact: true }).click();
-  await page.waitForTimeout(400);
-  const toggle = page.getByRole("button", { name: "Open analysis panel" });
-  if (await toggle.isVisible()) {
-    await toggle.click();
-    await page.waitForTimeout(600);
-  }
-  await page.screenshot({ path: shot("chat-analysis"), fullPage: true });
 });

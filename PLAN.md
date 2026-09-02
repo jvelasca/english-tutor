@@ -11,7 +11,9 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.0.0` — **V3.0 Beta freeze** tras el stack pedagógico
+- ✅ Versión estable `3.1.0` — **UI V3.1** (release de interfaz y navegación;
+  ver `docs/UI_V3.1.md`). El stack pedagógico sigue en `3.0.0` — **V3.0
+  Beta freeze** tras el stack pedagógico
   V2.7–V2.12 (Depth → Listening → Speaking Mission → Assessment 2.0 → FSRS →
   Evidence Graph). Gates en `docs/BETA_V3.md` + `docs/BETA_GATES.md`. Base previa:
   **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):

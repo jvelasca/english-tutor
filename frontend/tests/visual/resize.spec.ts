@@ -1,25 +1,37 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Verifica que los paneles del CHAT son redimensionables y que el ancho se
- * persiste por usuario (premisa 20). Usa el teclado (accesible y determinista):
- * ArrowLeft/ArrowRight sobre el asa enfocada. Solo corre en desktop; en
- * móvil/tablet los paneles son drawers y las asas se ocultan.
+ * Verifica que los paneles del workspace de Conversar son redimensionables y
+ * que el ancho se persiste por usuario (premisa 20). Usa el teclado (accesible
+ * y determinista): ArrowLeft/ArrowRight sobre el asa enfocada. Solo corre en
+ * desktop; en móvil/tablet los paneles son drawers y las asas se ocultan.
+ *
+ * V3.1: la píldora raíz "Chat" ya no existe; el workspace conversacional vive
+ * en `#/aprender/conversar` y conserva la misma estructura de paneles
+ * (sidebar + zona central + Analysis acoplado).
  */
 test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ page }) => {
   test.skip(page.viewportSize()!.width < 1024, "Solo desktop");
 
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+
   await page.goto("/");
-  await expect(page.getByRole("navigation")).toBeVisible({ timeout: 15_000 });
+  await expect(nav).toBeVisible({ timeout: 15_000 });
   // Da tiempo a que se cree/auto-seleccione el usuario antes de persistir.
   await page.waitForTimeout(800);
 
-  // Navega a Chat (sidebar + zona central + Analysis).
-  await page.getByRole("navigation").getByRole("button", { name: "Chat", exact: true }).click();
+  // Navega a Conversar (sidebar + zona central + Analysis).
+  await page.goto("/#/aprender/conversar");
+  await expect(nav).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(500);
 
-  const insightsHandle = page.getByRole("separator").nth(1);
+  // Asa derecha del panel de análisis, localizada por su nombre accesible
+  // (chat.resizeInsights) en lugar de su posición ordinal.
+  const insightsHandle = page.getByRole("separator", {
+    name: "Resize analysis panel",
+  });
   const insights = page.locator(".pane--insights");
+  await expect(insightsHandle).toBeVisible();
 
   // Normaliza al mínimo (RIGHT_MIN) para que el test sea idempotente: ArrowRight
   // reduce el ancho del panel derecho. 30 pulsos cubren todo el rango
@@ -40,11 +52,13 @@ test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ 
     .poll(async () => (await insights.boundingBox())!.width, { timeout: 5000 })
     .toBeGreaterThan(before + 50);
 
-  // Persistencia: espera el debounce (400ms) + PUT y recarga.
+  // Persistencia: espera el debounce (400ms) + PUT y recarga. Tras la recarga
+  // la URL sigue siendo #/aprender/conversar y el layout guardado se restaura
+  // junto con los paneles del workspace.
   await page.waitForTimeout(900);
   await page.reload();
-  await expect(page.getByRole("navigation")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("navigation").getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(nav).toBeVisible({ timeout: 15_000 });
+  await expect(insightsHandle).toBeVisible();
   await page.waitForTimeout(500);
 
   await expect

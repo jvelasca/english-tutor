@@ -4,6 +4,21 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.1.0] — 2026-09-02
+
+**UI V3.1 — Reorganización en 3 mundos.** Rediseño de la interfaz y la navegación
+(ver `docs/UI_V3.1.md`). Sin cambios en el stack pedagógico (sigue congelado en 3.0.0).
+
+### Añadido / Cambiado
+- Navegación raíz reducida a 3 mundos (INICIO · FORMACIÓN · APRENDER) con URLs reales mediante hash-router propio, deep links y botón atrás.
+- INICIO: dashboard de acción con objetivo de hoy, recomendación, repaso FSRS y acceso a MI PROGRESO.
+- FORMACIÓN: escalera CEFR A1–C2, listado de unidades con gating, hero "Continuar curso" y bloque de evaluaciones.
+- APRENDER: hub de 6 tarjetas (Listening, Speaking, Pronunciación, Conversar, Vocabulario, Gramática) con sub-rutas propias y pantalla de Speaking libre.
+- MI PROGRESO: pantalla consolidada por pestañas (Resumen · Curso · Habilidades · Trayectoria · Recorridos); el antiguo panel Analysis queda como contexto ligero.
+- Workspace único con barra de contexto lección vs. práctica libre.
+- AYUDA real en la ruta de ayuda (enlaza a la documentación) y "Conectar dispositivo" movido a Ajustes → Sistema.
+- Limpieza de claves i18n huérfanas y navegación EN/ES coherente.
+
 ## [3.0.0] — 2026-09-02
 
 **Beta V3.0 — feature freeze pedagógico.** Cierra el ciclo V2.7–V2.12 y congela
