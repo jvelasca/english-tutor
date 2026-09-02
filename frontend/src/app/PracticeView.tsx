@@ -52,7 +52,6 @@ export function PracticeView({
   chat,
   onAttempt,
   onNextBestStart,
-  onStep,
   onStartLesson,
   onFinishLesson,
   onOpenCourse,
@@ -77,11 +76,6 @@ export function PracticeView({
     newConversation,
     loadConversation,
     removeConversation,
-    history,
-    events,
-    bucket,
-    setBucket,
-    profile,
     activeObjective,
     clearLesson,
   } = chat;
@@ -320,18 +314,7 @@ export function PracticeView({
             </div>
           }
         >
-          <AnalysisPanel
-            messages={messages}
-            history={history}
-            events={events}
-            bucket={bucket}
-            onBucketChange={setBucket}
-            profile={profile}
-            currentUserId={currentUserId}
-            onStep={onStep}
-            onAttempt={onAttempt}
-            onNextBestStart={onNextBestStart}
-          />
+          <AnalysisPanel messages={messages} />
         </Suspense>
       </aside>
 
