@@ -9,6 +9,10 @@ from config import DEFAULT_MODEL
 from dependencies import current_user, read_audio_limited
 from domain import academy as academy_service
 from schemas.academy import (
+    AssessmentV2LadderOut,
+    AssessmentV2StartRequest,
+    AssessmentV2StateOut,
+    AssessmentV2SubmitRequest,
     AttemptOut,
     AttemptRequest,
     CefrLadderOut,
@@ -19,6 +23,12 @@ from schemas.academy import (
     EnrollmentOut,
     EnrollmentsOut,
     EnrollRequest,
+    EvidenceGraphNodeOut,
+    EvidenceGraphOut,
+    FsrsDueOut,
+    FsrsReviewOut,
+    FsrsReviewRequest,
+    FsrsSummaryOut,
     LearningGoalIn,
     LearningGoalOut,
     LessonCompletedOut,
@@ -45,6 +55,9 @@ from schemas.academy import (
     SpeakingDiagnostic,
     SpeakingJourneyOut,
     SpeakingLevelOut,
+    SpeakingMissionAttemptSubmit,
+    SpeakingMissionStartRequest,
+    SpeakingMissionStateOut,
     SpeakingResultOut,
     SpeakingScenariosOut,
     SpeakingSubmitRequest,
@@ -202,6 +215,34 @@ async def complete_session_step(
 @router.get("/api/academy/next-best", response_model=NextBestActivityOut | None)
 async def next_best_activity(user: dict = Depends(current_user)) -> dict | None:
     return await academy_service.get_next_best_activity(user["id"])
+
+
+@router.get("/api/academy/evidence-graph", response_model=EvidenceGraphOut)
+async def evidence_graph_level(
+    level_id: str | None = None, user: dict = Depends(current_user)
+) -> dict:
+    """Evidence Graph del nivel: can-do → dimensiones → limiting factor."""
+    result = await academy_service.get_evidence_graph(user["id"], level_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Nivel no encontrado")
+    return result
+
+
+@router.get(
+    "/api/academy/evidence-graph/objective/{objective_id}",
+    response_model=EvidenceGraphNodeOut,
+)
+async def evidence_graph_objective(
+    objective_id: str,
+    level_id: str | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    result = await academy_service.get_evidence_graph_node(
+        user["id"], objective_id, level_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Objetivo no encontrado")
+    return result
 
 
 @router.get("/api/academy/goal", response_model=LearningGoalOut)
@@ -399,6 +440,188 @@ async def speaking_endurance(user: dict = Depends(current_user)) -> dict:
 async def speaking_scenarios(user: dict = Depends(current_user)) -> dict:
     """Catálogo de escenarios comunicativos (Speaking 3.0): contenido estático."""
     return academy_service.list_speaking_scenarios()
+
+
+@router.post(
+    "/api/academy/speaking/mission/start",
+    response_model=SpeakingMissionStateOut,
+)
+async def speaking_mission_start(
+    body: SpeakingMissionStartRequest, user: dict = Depends(current_user)
+) -> dict:
+    """Abre una misión de speaking (V2.9) desde un escenario del catálogo."""
+    result = await academy_service.start_speaking_mission(
+        user["id"], body.scenario_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Escenario o usuario no encontrado")
+    return result
+
+
+@router.post(
+    "/api/academy/speaking/mission/attempt",
+    response_model=SpeakingMissionStateOut,
+)
+async def speaking_mission_attempt(
+    body: SpeakingMissionAttemptSubmit, user: dict = Depends(current_user)
+) -> dict:
+    """Primer intento de la misión → evaluation + targeted drills."""
+    result = await academy_service.submit_speaking_mission_attempt(
+        user["id"],
+        body.session_id,
+        body.heard,
+        body.duration_seconds,
+        body.model or DEFAULT_MODEL,
+        body.conversation_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="Sesión no válida o evidencia no disponible"
+        )
+    return result
+
+
+@router.post(
+    "/api/academy/speaking/mission/retry",
+    response_model=SpeakingMissionStateOut,
+)
+async def speaking_mission_retry(
+    body: SpeakingMissionAttemptSubmit, user: dict = Depends(current_user)
+) -> dict:
+    """Retry tras el drill → improvement visible y cierre."""
+    result = await academy_service.submit_speaking_mission_retry(
+        user["id"],
+        body.session_id,
+        body.heard,
+        body.duration_seconds,
+        body.model or DEFAULT_MODEL,
+        body.conversation_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="Sesión no válida o evidencia no disponible"
+        )
+    return result
+
+
+@router.get(
+    "/api/academy/speaking/mission/{session_id}",
+    response_model=SpeakingMissionStateOut,
+)
+async def speaking_mission_state(
+    session_id: int, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.get_speaking_mission(user["id"], session_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    return result
+
+
+# --- Assessment 2.0 (V2.10) -----------------------------------------------
+
+
+@router.get(
+    "/api/academy/assessment/v2/ladder",
+    response_model=AssessmentV2LadderOut,
+)
+async def assessment_v2_ladder(
+    level_id: str | None = None, user: dict = Depends(current_user)
+) -> dict:
+    """Escalera formative → unit → progress → level → retention."""
+    result = await academy_service.get_assessment_v2_ladder(user["id"], level_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Nivel no encontrado")
+    return result
+
+
+@router.post(
+    "/api/academy/assessment/v2/start",
+    response_model=AssessmentV2StateOut,
+)
+async def assessment_v2_start(
+    body: AssessmentV2StartRequest, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.start_assessment_v2(
+        user["id"],
+        body.kind,
+        body.level_id,
+        unit_id=body.unit_id,
+        objective_id=body.objective_id,
+        source_session_id=body.source_session_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No se pudo abrir el assessment (contenido o requisitos)",
+        )
+    return result
+
+
+@router.post(
+    "/api/academy/assessment/v2/submit",
+    response_model=AssessmentV2StateOut,
+)
+async def assessment_v2_submit(
+    body: AssessmentV2SubmitRequest, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.submit_assessment_v2(
+        user["id"], body.session_id, body.answers
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sesión no válida")
+    return result
+
+
+@router.get(
+    "/api/academy/assessment/v2/{session_id}",
+    response_model=AssessmentV2StateOut,
+)
+async def assessment_v2_state(
+    session_id: int, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.get_assessment_v2(user["id"], session_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    return result
+
+
+# --- FSRS-lite (V2.11) ----------------------------------------------------
+
+
+@router.get("/api/academy/fsrs/due", response_model=FsrsDueOut)
+async def fsrs_due(
+    limit: int = 20, user: dict = Depends(current_user)
+) -> dict:
+    """Cola de repaso FSRS (What/Why/When/How strong/Last/Next)."""
+    return await academy_service.get_fsrs_due(user["id"], limit=max(1, min(limit, 50)))
+
+
+@router.get("/api/academy/fsrs/summary", response_model=FsrsSummaryOut)
+async def fsrs_summary(user: dict = Depends(current_user)) -> dict:
+    return await academy_service.get_fsrs_summary(user["id"])
+
+
+@router.post("/api/academy/fsrs/sync", response_model=FsrsSummaryOut)
+async def fsrs_sync(user: dict = Depends(current_user)) -> dict:
+    """Resincroniza cartas desde evidencia (perfil + léxico)."""
+    await academy_service.sync_fsrs_cards(user["id"])
+    return await academy_service.get_fsrs_summary(user["id"])
+
+
+@router.post("/api/academy/fsrs/review", response_model=FsrsReviewOut)
+async def fsrs_review(
+    body: FsrsReviewRequest, user: dict = Depends(current_user)
+) -> dict:
+    result = await academy_service.review_fsrs_card(
+        user["id"],
+        body.target_type,
+        body.target_id,
+        grade=body.grade,
+        score=body.score,
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Review FSRS no válido")
+    return result
 
 
 @router.get("/api/academy/writing/diagnostic", response_model=WritingDiagnostic)

@@ -24,11 +24,32 @@
                   "id": "c1-m01-u01-l01-o01",
                   "can_do": "I can use inversion for emphasis in formal contexts.",
                   "title": "Inversión para énfasis",
-                  "skills": ["grammar", "speaking", "writing", "vocabulary"],
-                  "subskills": ["word_order", "interaction", "turn_taking"],
-                  "scenario_ids": ["debate"],
-                  "concepts": ["inversion", "Never have I", "Not only", "Only then"],
-                  "vocabulary": ["rarely", "seldom", "hardly", "no sooner"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "word_order",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "inversion",
+                    "Never have I",
+                    "Not only",
+                    "Only then"
+                  ],
+                  "vocabulary": [
+                    "rarely",
+                    "seldom",
+                    "hardly",
+                    "no sooner"
+                  ],
                   "activities": [
                     {
                       "id": "c1-m01-u01-l01-o01-a01",
@@ -70,35 +91,55 @@
                       "id": "c1-m01-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (inversion):",
-                      "options": ["Never have I seen such a beautiful view.", "Never I have seen such a beautiful view.", "Never have I saw such a beautiful view."],
+                      "options": [
+                        "Never have I seen such a beautiful view.",
+                        "Never I have seen such a beautiful view.",
+                        "Never have I saw such a beautiful view."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (inversion):",
-                      "options": ["Not only did she pass the exam, but she got top marks.", "Not only she passed the exam, but she got top marks.", "Not only did she passed the exam, but she got top marks."],
+                      "options": [
+                        "Not only did she pass the exam, but she got top marks.",
+                        "Not only she passed the exam, but she got top marks.",
+                        "Not only did she passed the exam, but she got top marks."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c03",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (inversion):",
-                      "options": ["Only then did I realise my mistake.", "Only then I realised my mistake.", "Only then I did realise my mistake."],
+                      "options": [
+                        "Only then did I realise my mistake.",
+                        "Only then I realised my mistake.",
+                        "Only then I did realise my mistake."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'raras veces'?",
-                      "options": ["rarely", "usually", "always"],
+                      "options": [
+                        "rarely",
+                        "usually",
+                        "always"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c05",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'apenas'?",
-                      "options": ["hardly", "easily", "clearly"],
+                      "options": [
+                        "hardly",
+                        "easily",
+                        "clearly"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -107,10 +148,23 @@
                   "id": "c1-m01-u01-l01-o02",
                   "can_do": "I can use cleft sentences to focus information.",
                   "title": "Cleft sentences",
-                  "skills": ["grammar", "speaking", "writing"],
-                  "subskills": ["word_order", "interaction", "turn_taking"],
-                  "scenario_ids": ["debate"],
-                  "concepts": ["It is/was ... that ...", "What ... is ..."],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "word_order",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "It is/was ... that ...",
+                    "What ... is ..."
+                  ],
                   "vocabulary": [],
                   "activities": [
                     {
@@ -118,6 +172,34 @@
                       "type": "dialogue",
                       "instruction": "Emphasise the most important part of a sentence using a cleft structure.",
                       "target": "It was ... that ... / What ... is ..."
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you form a cleft sentence with 'it'.",
+                      "target": "It is/was + X + that ...",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Emphasise a different part of a sentence you have not practised.",
+                      "target": "It was ... that ... / What ... is ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use cleft sentences to focus information.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, emphasise the most important part of a sentence using a cleft structure.",
+                      "target": "It was ... that ... / What ... is ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -125,21 +207,224 @@
                       "id": "c1-m01-u01-l01-o02-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct cleft sentence:",
-                      "options": ["It was the manager who made the decision.", "It was the manager which made the decision.", "Was the manager who made the decision."],
+                      "options": [
+                        "It was the manager who made the decision.",
+                        "It was the manager which made the decision.",
+                        "Was the manager who made the decision."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m01-u01-l01-o02-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct cleft sentence:",
-                      "options": ["What I need is more time.", "What I need it is more time.", "What I need are more time."],
+                      "options": [
+                        "What I need is more time.",
+                        "What I need it is more time.",
+                        "What I need are more time."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m01-u01-l01-o02-c03",
                       "skill": "grammar",
                       "prompt": "Choose the correct cleft sentence:",
-                      "options": ["It is confidence that matters most.", "It is confidence what matters most.", "Confidence it is that matters most."],
+                      "options": [
+                        "It is confidence that matters most.",
+                        "It is confidence what matters most.",
+                        "Confidence it is that matters most."
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m01-u01-l01-o03",
+                  "can_do": "I can follow spoken emphasis and identify what the speaker is highlighting.",
+                  "title": "Listening: emphasis and focus",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "attitude"
+                  ],
+                  "listening_items": [
+                    "c105",
+                    "c106",
+                    "c107",
+                    "c108"
+                  ],
+                  "concepts": [
+                    "intonation and stress",
+                    "focus words",
+                    "highlighting"
+                  ],
+                  "vocabulary": [
+                    "emphasise",
+                    "highlight",
+                    "stress",
+                    "focus",
+                    "contrast"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m01-u01-l01-o03-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a speaker emphasising a point and say what they are highlighting.",
+                      "target": "The speaker is emphasising that ..."
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two ways a speaker can emphasise a word.",
+                      "target": "stress / intonation / inversion",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Identify the emphasis in a sentence you have not heard before.",
+                      "target": "The speaker is emphasising ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can follow spoken emphasis and identify what the speaker is highlighting.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o03-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and say what the speaker is highlighting.",
+                      "target": "The speaker is emphasising that ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m01-u01-l01-o03-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'It was the manager who made the decision.' What is the speaker emphasising?",
+                      "options": [
+                        "Who made the decision",
+                        "What the decision was",
+                        "When it happened"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o03-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'Never have I seen such dedication.' What is the speaker stressing?",
+                      "options": [
+                        "How unusual the dedication is",
+                        "That they were not dedicated",
+                        "A past routine"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'enfatizar'?",
+                      "options": [
+                        "emphasise",
+                        "ignore",
+                        "simplify"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m01-u01-l01-o04",
+                  "can_do": "I can use inversion and emphasis to make a point in a discussion.",
+                  "title": "Emphasis in discussion",
+                  "skills": [
+                    "speaking",
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "inversion for emphasis",
+                    "cleft for focus",
+                    "turn-taking"
+                  ],
+                  "vocabulary": [
+                    "Never have I",
+                    "Not only",
+                    "It is ... that",
+                    "point"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m01-u01-l01-o04-a01",
+                      "type": "dialogue",
+                      "instruction": "Make a point in a discussion using inversion for emphasis.",
+                      "target": "Never have I ... / Not only ... / It is ... that ..."
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two structures that add emphasis.",
+                      "target": "inversion / cleft sentences",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o04-a03",
+                      "type": "dialogue",
+                      "instruction": "Make a point about a topic you have not discussed using emphasis.",
+                      "target": "Never have I ... / It is ... that ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use inversion and emphasis to make a point in a discussion.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o04-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, make a point in a discussion using inversion for emphasis.",
+                      "target": "Never have I ... / Not only ... / It is ... that ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m01-u01-l01-o04-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (inversion):",
+                      "options": [
+                        "Not only did she pass, but she got top marks.",
+                        "Not only she passed, but she got top marks.",
+                        "Not only did she passed, but she got top marks."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m01-u01-l01-o04-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'no solo'?",
+                      "options": [
+                        "not only",
+                        "never have",
+                        "it was"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -169,11 +454,31 @@
                   "id": "c1-m02-u01-l01-o01",
                   "can_do": "I can understand and use common idiomatic expressions.",
                   "title": "Idioms cotidianos",
-                  "skills": ["vocabulary", "speaking", "reading", "writing"],
-                  "subskills": ["idioms", "interaction", "turn_taking"],
-                  "scenario_ids": ["debate"],
-                  "concepts": ["to break the ice", "to hit the nail on the head", "to cut corners"],
-                  "vocabulary": ["break the ice", "hit the nail on the head", "cut corners", "once in a blue moon"],
+                  "skills": [
+                    "vocabulary",
+                    "speaking",
+                    "reading",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "idioms",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "to break the ice",
+                    "to hit the nail on the head",
+                    "to cut corners"
+                  ],
+                  "vocabulary": [
+                    "break the ice",
+                    "hit the nail on the head",
+                    "cut corners",
+                    "once in a blue moon"
+                  ],
                   "activities": [
                     {
                       "id": "c1-m02-u01-l01-o01-a01",
@@ -215,28 +520,44 @@
                       "id": "c1-m02-u01-l01-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "'She's on cloud nine' means she is...",
-                      "options": ["very happy", "very sad", "very tired"],
+                      "options": [
+                        "very happy",
+                        "very sad",
+                        "very tired"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m02-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "'He cut corners to finish on time' means he...",
-                      "options": ["did it quickly and carelessly", "did it very carefully", "spent more money"],
+                      "options": [
+                        "did it quickly and carelessly",
+                        "did it very carefully",
+                        "spent more money"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m02-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "'It happens once in a blue moon' means it...",
-                      "options": ["rarely happens", "happens often", "never happens"],
+                      "options": [
+                        "rarely happens",
+                        "happens often",
+                        "never happens"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m02-u01-l01-o01-c04",
                       "skill": "reading",
                       "prompt": "Read: 'She hit the nail on the head with her analysis.' What does the sentence mean?",
-                      "options": ["Her analysis was exactly right", "Her analysis was wrong", "She made a mistake"],
+                      "options": [
+                        "Her analysis was exactly right",
+                        "Her analysis was wrong",
+                        "She made a mistake"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -252,16 +573,61 @@
                   "id": "c1-m02-u01-l02-o01",
                   "can_do": "I can use natural collocations instead of literal translations.",
                   "title": "Collocations",
-                  "skills": ["vocabulary", "grammar", "writing"],
-                  "subskills": ["collocations", "register"],
-                  "concepts": ["make a decision", "take a break", "do business", "heavy rain"],
-                  "vocabulary": ["make a decision", "take a break", "do business", "strong coffee"],
+                  "skills": [
+                    "vocabulary",
+                    "grammar",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "collocations",
+                    "register"
+                  ],
+                  "concepts": [
+                    "make a decision",
+                    "take a break",
+                    "do business",
+                    "heavy rain"
+                  ],
+                  "vocabulary": [
+                    "make a decision",
+                    "take a break",
+                    "do business",
+                    "strong coffee"
+                  ],
                   "activities": [
                     {
                       "id": "c1-m02-u01-l02-o01-a01",
                       "type": "dialogue",
                       "instruction": "Describe your typical workday using at least three correct collocations.",
                       "target": "make a decision / take a break / do business"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two verb-noun collocations from this unit.",
+                      "target": "make a decision / take a break / do business",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a different routine using collocations you have not practised.",
+                      "target": "make a decision / take a break / do business",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use natural collocations instead of literal translations.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, describe your typical workday using at least three correct collocations.",
+                      "target": "make a decision / take a break / do business",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -269,21 +635,222 @@
                       "id": "c1-m02-u01-l02-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "Which collocation is correct?",
-                      "options": ["make a decision", "do a decision", "make a break"],
+                      "options": [
+                        "make a decision",
+                        "do a decision",
+                        "make a break"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m02-u01-l02-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "Which collocation is correct?",
-                      "options": ["take a break", "make a break", "do a break"],
+                      "options": [
+                        "take a break",
+                        "make a break",
+                        "do a break"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m02-u01-l02-o01-c03",
                       "skill": "grammar",
                       "prompt": "Choose the natural sentence:",
-                      "options": ["We do business with several countries.", "We make business with several countries.", "We do businesses with several countries."],
+                      "options": [
+                        "We do business with several countries.",
+                        "We make business with several countries.",
+                        "We do businesses with several countries."
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m02-u01-l02-o02",
+                  "can_do": "I can understand idiomatic expressions in natural speech.",
+                  "title": "Listening: idioms in speech",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "attitude"
+                  ],
+                  "listening_items": [
+                    "c109",
+                    "c110",
+                    "c111",
+                    "c112"
+                  ],
+                  "concepts": [
+                    "idioms in context",
+                    "implied meaning",
+                    "tone"
+                  ],
+                  "vocabulary": [
+                    "break the ice",
+                    "hit the nail on the head",
+                    "once in a blue moon",
+                    "idiom"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m02-u01-l02-o02-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a speaker using idioms and say what each idiom means.",
+                      "target": "break the ice = ... / hit the nail on the head = ..."
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what 'once in a blue moon' means.",
+                      "target": "very rarely",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Explain an idiom you heard outside this lesson.",
+                      "target": "It means ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand idiomatic expressions in natural speech.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o02-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen to a speaker using idioms and say what each means.",
+                      "target": "break the ice = ... / hit the nail on the head = ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m02-u01-l02-o02-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'She broke the ice with a joke.' What did she do?",
+                      "options": [
+                        "Made people feel relaxed",
+                        "Fell on the ice",
+                        "Broke something"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o02-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'It happens once in a blue moon.' How often does it happen?",
+                      "options": [
+                        "Very rarely",
+                        "Very often",
+                        "Every day"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'expresión idiomática'?",
+                      "options": [
+                        "idiom",
+                        "idle",
+                        "ideal"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m02-u01-l02-o03",
+                  "can_do": "I can use idiomatic language naturally in conversation.",
+                  "title": "Idioms in conversation",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "natural idiom use",
+                    "responding",
+                    "building rapport"
+                  ],
+                  "vocabulary": [
+                    "break the ice",
+                    "once in a blue moon",
+                    "on cloud nine",
+                    "cut corners"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m02-u01-l02-o03-a01",
+                      "type": "dialogue",
+                      "instruction": "Use two idiomatic expressions naturally in a conversation.",
+                      "target": "break the ice / on cloud nine / cut corners"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two idioms you can use in conversation.",
+                      "target": "break the ice / once in a blue moon",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Use idioms in a conversation about a topic you have not discussed.",
+                      "target": "on cloud nine / cut corners",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use idiomatic language naturally in conversation.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o03-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, use two idiomatic expressions naturally in a conversation.",
+                      "target": "break the ice / on cloud nine / cut corners",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m02-u01-l02-o03-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'muy feliz'?",
+                      "options": [
+                        "on cloud nine",
+                        "once in a blue moon",
+                        "cut corners"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o03-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'hacer algo de forma descuidada'?",
+                      "options": [
+                        "cut corners",
+                        "break the ice",
+                        "on cloud nine"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -313,11 +880,31 @@
                   "id": "c1-m03-u01-l01-o01",
                   "can_do": "I can hedge my statements to sound precise and cautious.",
                   "title": "Hedging y matización",
-                  "skills": ["vocabulary", "writing", "speaking"],
-                  "subskills": ["register", "interaction", "turn_taking"],
-                  "scenario_ids": ["debate"],
-                  "concepts": ["tends to", "arguably", "it could be argued", "somewhat"],
-                  "vocabulary": ["tends to", "arguably", "somewhat", "supposedly"],
+                  "skills": [
+                    "vocabulary",
+                    "writing",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "register",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "tends to",
+                    "arguably",
+                    "it could be argued",
+                    "somewhat"
+                  ],
+                  "vocabulary": [
+                    "tends to",
+                    "arguably",
+                    "somewhat",
+                    "supposedly"
+                  ],
                   "activities": [
                     {
                       "id": "c1-m03-u01-l01-o01-a01",
@@ -359,21 +946,33 @@
                       "id": "c1-m03-u01-l01-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "Which word makes the claim more cautious?",
-                      "options": ["arguably", "definitely", "obviously"],
+                      "options": [
+                        "arguably",
+                        "definitely",
+                        "obviously"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m03-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'algo, en cierta medida'?",
-                      "options": ["somewhat", "entirely", "notably"],
+                      "options": [
+                        "somewhat",
+                        "entirely",
+                        "notably"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m03-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which phrase hedges an opinion?",
-                      "options": ["It could be argued that...", "It is absolutely certain that...", "There is no doubt that..."],
+                      "options": [
+                        "It could be argued that...",
+                        "It is absolutely certain that...",
+                        "There is no doubt that..."
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -382,16 +981,61 @@
                   "id": "c1-m03-u01-l01-o02",
                   "can_do": "I can structure and present a complex argument in writing.",
                   "title": "Presentar ideas complejas",
-                  "skills": ["reading", "writing", "vocabulary"],
-                  "subskills": ["inference", "structure"],
-                  "concepts": ["firstly", "moreover", "consequently", "in contrast"],
-                  "vocabulary": ["moreover", "consequently", "in contrast", "hence"],
+                  "skills": [
+                    "reading",
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "structure"
+                  ],
+                  "concepts": [
+                    "firstly",
+                    "moreover",
+                    "consequently",
+                    "in contrast"
+                  ],
+                  "vocabulary": [
+                    "moreover",
+                    "consequently",
+                    "in contrast",
+                    "hence"
+                  ],
                   "activities": [
                     {
                       "id": "c1-m03-u01-l01-o02-a01",
                       "type": "writing",
                       "instruction": "Write a short paragraph presenting a complex argument using clear linking words.",
                       "target": "firstly / moreover / consequently / in contrast"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two linking words for contrast and two for addition.",
+                      "target": "in contrast / however / moreover / furthermore",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o02-a03",
+                      "type": "writing",
+                      "instruction": "Write a paragraph on a new topic using linking words you have not practised.",
+                      "target": "firstly / moreover / consequently / in contrast",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can structure and present a complex argument in writing.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o02-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write a short paragraph presenting a complex argument using linking words.",
+                      "target": "firstly / moreover / consequently / in contrast",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -399,21 +1043,319 @@
                       "id": "c1-m03-u01-l01-o02-c01",
                       "skill": "reading",
                       "prompt": "Read: 'Many claim the policy works; however, the evidence suggests otherwise.' What does 'otherwise' indicate?",
-                      "options": ["A contrast", "An agreement", "An example"],
+                      "options": [
+                        "A contrast",
+                        "An agreement",
+                        "An example"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m03-u01-l01-o02-c02",
                       "skill": "reading",
                       "prompt": "Which word signals a result or consequence?",
-                      "options": ["consequently", "meanwhile", "similarly"],
+                      "options": [
+                        "consequently",
+                        "meanwhile",
+                        "similarly"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m03-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'además'?",
-                      "options": ["moreover", "however", "although"],
+                      "options": [
+                        "moreover",
+                        "however",
+                        "although"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m03-u01-l01-o03",
+                  "can_do": "I can follow a hedged academic argument.",
+                  "title": "Listening: hedged arguments",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "attitude"
+                  ],
+                  "listening_items": [
+                    "c113",
+                    "c114",
+                    "c115",
+                    "c116"
+                  ],
+                  "concepts": [
+                    "hedging",
+                    "cautious claims",
+                    "counter-argument"
+                  ],
+                  "vocabulary": [
+                    "arguably",
+                    "somewhat",
+                    "it could be argued",
+                    "hedge"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m03-u01-l01-o03-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a hedged argument and identify the main claim and its limits.",
+                      "target": "The speaker claims ... but ..."
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two words that make a claim more cautious.",
+                      "target": "arguably / somewhat / tends to",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Identify the hedging in an argument you have not heard before.",
+                      "target": "The speaker hedges with ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can follow a hedged academic argument.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o03-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and identify the main claim and its limits.",
+                      "target": "The speaker claims ... but ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m03-u01-l01-o03-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'Arguably, the policy has some merit, but it is not without risks.' What is the speaker's attitude?",
+                      "options": [
+                        "Cautious",
+                        "Enthusiastic",
+                        "Hostile"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o03-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'It could be argued that the evidence is inconclusive.' What is the speaker doing?",
+                      "options": [
+                        "Hedging",
+                        "Making a firm claim",
+                        "Giving a command"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'matizar una afirmación'?",
+                      "options": [
+                        "hedge",
+                        "hasten",
+                        "hinder"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m03-u01-l01-o04",
+                  "can_do": "I can use the passive and nominalisation for formal writing.",
+                  "title": "Passive and nominalisation",
+                  "skills": [
+                    "grammar",
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "passive",
+                    "register",
+                    "word_families"
+                  ],
+                  "concepts": [
+                    "passive voice",
+                    "nominalisation",
+                    "formal register"
+                  ],
+                  "vocabulary": [
+                    "analysis",
+                    "conclusion",
+                    "implementation",
+                    "the decision was made"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m03-u01-l01-o04-a01",
+                      "type": "writing",
+                      "instruction": "Rewrite an active sentence in the passive and nominalise one verb.",
+                      "target": "It was decided that ... / The analysis showed ..."
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you form the passive voice.",
+                      "target": "to be + past participle",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o04-a03",
+                      "type": "writing",
+                      "instruction": "Rewrite a sentence in formal register about a topic you have not discussed.",
+                      "target": "It was ... / The ... was ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use the passive and nominalisation for formal writing.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o04-a05",
+                      "type": "writing",
+                      "instruction": "On your own, rewrite an active sentence in the passive and nominalise one verb.",
+                      "target": "It was decided that ... / The analysis showed ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m03-u01-l01-o04-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct passive sentence:",
+                      "options": [
+                        "The report was written by the team.",
+                        "The report written by the team.",
+                        "The report was wrote by the team."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o04-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct passive sentence:",
+                      "options": [
+                        "It is expected that sales will rise.",
+                        "It is expect that sales will rise.",
+                        "It expects that sales will rise."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o04-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'análisis'?",
+                      "options": [
+                        "analysis",
+                        "analogy",
+                        "analytic"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m03-u01-l01-o05",
+                  "can_do": "I can defend an argument, conceding points and hedging.",
+                  "title": "Defending an argument",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "concession",
+                    "hedging",
+                    "counter-argument"
+                  ],
+                  "vocabulary": [
+                    "admittedly",
+                    "that said",
+                    "nevertheless",
+                    "one might argue"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m03-u01-l01-o05-a01",
+                      "type": "dialogue",
+                      "instruction": "Defend a position, conceding one point and then countering it.",
+                      "target": "Admittedly ... / that said, ... / nevertheless ..."
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o05-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two words that concede a point.",
+                      "target": "admittedly / granted",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o05-a03",
+                      "type": "dialogue",
+                      "instruction": "Defend a position on a topic you have not discussed, conceding and hedging.",
+                      "target": "Admittedly ... / that said, ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o05-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can defend an argument, conceding points and hedging.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o05-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, defend a position, conceding one point and then countering it.",
+                      "target": "Admittedly ... / that said, ... / nevertheless ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m03-u01-l01-o05-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word introduces a concession?",
+                      "options": [
+                        "admittedly",
+                        "therefore",
+                        "finally"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o05-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'aun así'?",
+                      "options": [
+                        "that said",
+                        "for example",
+                        "in conclusion"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -443,18 +1385,56 @@
                   "id": "c1-m04-u01-l01-o01",
                   "can_do": "I can use advanced grammar and idiomatic language to communicate precise, nuanced ideas.",
                   "title": "Repaso final C1",
-                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["debate"],
-                  "listening_items": ["c101", "c102", "c103", "c104"],
-                  "concepts": ["review: inversion, cleft, idioms, hedging, collocations"],
-                  "vocabulary": ["review C1"],
+                  "skills": [
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "listening",
+                    "grammar",
+                    "vocabulary",
+                    "reading"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "inference",
+                    "attitude"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "listening_items": [
+                    "c101",
+                    "c102",
+                    "c103",
+                    "c104"
+                  ],
+                  "concepts": [
+                    "review: inversion, cleft, idioms, hedging, collocations"
+                  ],
+                  "vocabulary": [
+                    "review C1"
+                  ],
                   "activities": [
                     {
                       "id": "c1-m04-u01-l01-o01-a01",
                       "type": "dialogue",
                       "instruction": "Discuss a complex topic with the tutor using precise, nuanced language.",
                       "target": "C1 level conversation"
+                    },
+                    {
+                      "id": "c1-m04-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, list three things you can now do at C1 level.",
+                      "target": "use inversion / hedge precisely / use idioms naturally",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m04-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Discuss a completely new topic using precise, nuanced C1 language.",
+                      "target": "C1 level conversation in a new context",
+                      "phase": "transfer"
                     }
                   ],
                   "checks": [
@@ -462,42 +1442,66 @@
                       "id": "c1-m04-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["Rarely do we see such dedication.", "Rarely we see such dedication.", "Rarely we do see such dedication."],
+                      "options": [
+                        "Rarely do we see such dedication.",
+                        "Rarely we see such dedication.",
+                        "Rarely we do see such dedication."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["It was the results that changed everything.", "It was the results what changed everything.", "The results it was that changed everything."],
+                      "options": [
+                        "It was the results that changed everything.",
+                        "It was the results what changed everything.",
+                        "The results it was that changed everything."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'hacer un trato'?",
-                      "options": ["do business", "make a decision", "take a break"],
+                      "options": [
+                        "do business",
+                        "make a decision",
+                        "take a break"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c04",
                       "skill": "reading",
                       "prompt": "Read: 'The proposal is, arguably, the strongest we have seen.' What does 'arguably' suggest?",
-                      "options": ["A measured claim", "An absolute fact", "An error"],
+                      "options": [
+                        "A measured claim",
+                        "An absolute fact",
+                        "An error"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c05",
                       "skill": "listening",
                       "prompt": "Listen: 'Rarely have I seen such dedication.' How does the speaker feel?",
-                      "options": ["Impressed", "Bored", "Angry"],
+                      "options": [
+                        "Impressed",
+                        "Bored",
+                        "Angry"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c06",
                       "skill": "listening",
                       "prompt": "Listen: 'It wasn't the price that bothered me; it was the service.' What bothered the speaker?",
-                      "options": ["The service", "The price", "Both"],
+                      "options": [
+                        "The service",
+                        "The price",
+                        "Both"
+                      ],
                       "correct_index": 0
                     }
                   ]

@@ -26,6 +26,7 @@ from services import course as course_svc
 from services.curriculum import (
     CEFR_ORDER,
     LEARNING_PHASES,
+    LISTENING_FOCUS_BY_LEVEL,
     SUBSKILLS,
     Level,
     load_level,
@@ -431,12 +432,6 @@ def depth_score(level: Level) -> dict:
     distinct = {ss for o in objectives for ss in o.subskills}
     breadth = len(distinct) / len(possible) if possible else 1.0
 
-    values = {
-        "objective_density": density,
-        "objective_volume": volume,
-        "section_coverage": section_cov,
-        "subskill_breadth": breadth,
-    }
     components = {
         "objective_density": {
             "value": round(density, 3),
@@ -463,7 +458,16 @@ def depth_score(level: Level) -> dict:
             "possible_subskills": len(possible),
         },
     }
-    score = round(100 * sum(DEPTH_WEIGHTS[k] * values[k] for k in DEPTH_WEIGHTS), 1)
+    # El score se deriva de los valores *redondeados* que se exponen en
+    # `components`, para que la cifra sea reproducible a partir del JSON del
+    # reporte (auditable, no una caja negra).
+    score = round(
+        100
+        * sum(
+            DEPTH_WEIGHTS[k] * components[k]["value"] for k in DEPTH_WEIGHTS
+        ),
+        1,
+    )
     return {
         "level_id": level.level_id,
         "level": level.level,
@@ -675,6 +679,64 @@ def unit_detail(level_id: str, unit_id: str) -> dict:
     }
 
 
+# --- LISTENING CURRICULUM (V2.8) ----------------------------------------------
+
+def _listening_objectives(level: Level) -> list:
+    """Objetivos con evidencia real de escucha (skill, checks o banco)."""
+    return [
+        o
+        for o in level.objectives()
+        if "listening" in o.skills
+        and (
+            o.listening_items
+            or any(c.skill == "listening" for c in o.checks)
+        )
+    ]
+
+
+def listening_curriculum(level: Level) -> dict:
+    """Alineación del listening curricular con el foco del nivel (V2.8).
+
+    Complementa la cobertura por unidad (`listening` en las 7 secciones) con
+    *qué* subskills de escucha entrena cada nivel (progresión CEFR). Un objetivo
+    está alineado si declara al menos un subskill del foco de su nivel.
+    """
+    focus = LISTENING_FOCUS_BY_LEVEL.get(level.level_id.lower(), ())
+    objs = _listening_objectives(level)
+    aligned = [
+        o
+        for o in objs
+        if any(ss in focus for ss in o.subskills)
+    ]
+    return {
+        "level_id": level.level_id,
+        "level": level.level,
+        "focus_subskills": list(focus),
+        "listening_objectives": len(objs),
+        "aligned_objectives": len(aligned),
+        "alignment_pct": round(len(aligned) / len(objs) * 100, 1) if objs else 100.0,
+        "missing_objectives": [
+            o.id for o in objs if not any(ss in focus for ss in o.subskills)
+        ],
+    }
+
+
+def listening_curriculum_report() -> dict:
+    """Informe agregado de progresión de listening (V2.8)."""
+    level_ids = COVERAGE_LEVEL_IDS[1:]
+    by_level = [listening_curriculum(load_level(lid)) for lid in level_ids]
+    aligned = sum(lv["aligned_objectives"] for lv in by_level)
+    total = sum(lv["listening_objectives"] for lv in by_level)
+    return {
+        "by_level": by_level,
+        "overall": {
+            "listening_objectives": total,
+            "aligned_objectives": aligned,
+            "alignment_pct": round(aligned / total * 100, 1) if total else 100.0,
+        },
+    }
+
+
 # --- CURRICULUM QUALITY DASHBOARD (V2.6) -------------------------------------
 
 def curriculum_quality_report() -> dict:
@@ -794,12 +856,15 @@ def curriculum_quality_report() -> dict:
         "by_level": loop_by_level,
     }
 
+    listening = listening_curriculum_report()
+
     return {
         "version": QUALITY_REPORT_VERSION,
         "overall": overall,
         "dimensions": dimensions,
         "by_level": by_level,
         "learning_loop": learning_loop,
+        "listening_curriculum": listening,
     }
 
 

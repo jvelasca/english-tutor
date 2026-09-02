@@ -14,15 +14,34 @@ from repositories import academy as academy_repo
 from repositories import conversations as conversations_repo
 from repositories import grammar as grammar_repo
 from repositories import listening as listening_repo
+from repositories import vocabulary as vocabulary_repo
 from schemas.academy import (
+    AssessmentV2InstrumentOut,
+    AssessmentV2ItemOut,
+    AssessmentV2LadderOut,
+    AssessmentV2MasteryGateOut,
+    AssessmentV2ReadinessOut,
+    AssessmentV2ResultOut,
+    AssessmentV2RetentionOut,
+    AssessmentV2RetentionSkillOut,
+    AssessmentV2SkillScoreOut,
+    AssessmentV2StateOut,
+    AssessmentV2StepOut,
     AttemptOut,
     CefrProfileOut,
     CourseMapOut,
     DashboardOut,
     EnrollmentOut,
+    EvidenceGraphNodeOut,
+    EvidenceGraphOut,
     ExamItemOut,
     ExamOut,
     ExamResultOut,
+    FsrsCardOut,
+    FsrsDueOut,
+    FsrsExplainOut,
+    FsrsReviewOut,
+    FsrsSummaryOut,
     LearningGoalIn,
     LearningGoalOut,
     LessonCompletedOut,
@@ -57,6 +76,12 @@ from schemas.academy import (
     SpeakingAssessmentResultOut,
     SpeakingAssessmentStartOut,
     SpeakingAssessmentStateOut,
+    SpeakingMissionAttemptOut,
+    SpeakingMissionDrillOut,
+    SpeakingMissionEvaluationOut,
+    SpeakingMissionImprovementOut,
+    SpeakingMissionOut,
+    SpeakingMissionStateOut,
     SpeakingResultOut,
     SpeakingTaskResultOut,
     StudentModelOut,
@@ -68,9 +93,14 @@ from schemas.academy import (
 from services import academy as academy_svc
 from services import (
     adaptive,
+    assessment_v2,
     cefr_descriptors,
+    evidence_graph,
+    fsrs,
+    lexicon,
     speaking_assessment,
     speaking_llm,
+    speaking_mission,
     speaking_scenarios,
     writing_llm,
 )
@@ -971,6 +1001,809 @@ async def get_speaking_assessment(
     )
 
 
+def _mission_state_out(session: dict) -> SpeakingMissionStateOut:
+    """Serializa una sesión de misión al schema de respuesta."""
+    mission = session["mission"]
+    evaluation = session.get("evaluation")
+    attempt = session.get("attempt")
+    retry = session.get("retry")
+    improvement = session.get("improvement")
+    return SpeakingMissionStateOut(
+        session_id=session["id"],
+        status=session["status"],
+        scenario_id=session["scenario_id"],
+        mission=SpeakingMissionOut(
+            scenario_id=mission.get("scenario_id", session["scenario_id"]),
+            title=mission.get("title", ""),
+            prompt=mission.get("prompt", ""),
+            communicative_objective=mission.get("communicative_objective", ""),
+            cefr_target=mission.get("cefr_target", "B1"),
+            task_type=mission.get("task_type", "role_play"),
+            metrics=list(mission.get("metrics") or []),
+            difficulty=mission.get("difficulty"),
+        ),
+        attempt=(
+            SpeakingMissionAttemptOut.model_validate(attempt) if attempt else None
+        ),
+        evaluation=(
+            SpeakingMissionEvaluationOut.model_validate(evaluation)
+            if evaluation
+            else None
+        ),
+        drills=[
+            SpeakingMissionDrillOut.model_validate(d)
+            for d in (session.get("drills") or [])
+        ],
+        retry=SpeakingMissionAttemptOut.model_validate(retry) if retry else None,
+        improvement=(
+            SpeakingMissionImprovementOut.model_validate(improvement)
+            if improvement
+            else None
+        ),
+    )
+
+
+async def start_speaking_mission(
+    user_id: str, scenario_id: str
+) -> SpeakingMissionStateOut | None:
+    """Abre una misión de speaking (V2.9) a partir de un escenario del catálogo.
+
+    Estado inicial: `mission` (el alumno aún no ha hablado). Devuelve None si el
+    escenario no existe o el usuario no es válido.
+    """
+    scenario = speaking_scenarios.get_scenario(scenario_id)
+    if scenario is None:
+        return None
+    mission = speaking_mission.mission_from_scenario(scenario)
+    session = await run_in_threadpool(
+        academy_repo.create_speaking_mission_session,
+        user_id,
+        scenario_id,
+        mission,
+    )
+    if session is None:
+        return None
+    return _mission_state_out(session)
+
+
+async def _score_mission_utterance(
+    user_id: str,
+    mission: dict,
+    heard: str,
+    duration_seconds: float | None,
+    model: str,
+    conversation_id: str | None,
+) -> dict | None:
+    """Extrae evidencia (LLM) + puntúa (scorer determinista) una producción oral."""
+    evidence = await speaking_llm.extract_speaking_evidence(
+        mission.get("prompt") or mission.get("communicative_objective") or "",
+        heard,
+        model,
+    )
+    if evidence is None:
+        return None
+    await _inject_interaction_objective(evidence, conversation_id, user_id)
+    result = speaking_svc.scores_from_evidence(
+        evidence,
+        heard,
+        duration_seconds,
+        mission.get("task_type") or "role_play",
+    )
+    lv = _levels_by_id.get(await _current_level_id(user_id)) or _levels_by_id["a1"]
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        speaking_svc.evidence_from_speaking(
+            result,
+            level_id=lv.level_id,
+            objective_id="",
+            curriculum_version=lv.version,
+            difficulty=mission.get("difficulty"),
+        ),
+    )
+    return result
+
+
+async def submit_speaking_mission_attempt(
+    user_id: str,
+    session_id: int,
+    heard: str,
+    duration_seconds: float | None = None,
+    model: str = DEFAULT_MODEL,
+    conversation_id: str | None = None,
+) -> SpeakingMissionStateOut | None:
+    """Primer intento de la misión: Evaluation + Targeted drills.
+
+    Avanza el status a `drill` (listo para practicar y luego hacer retry).
+    """
+    session = await run_in_threadpool(
+        academy_repo.get_speaking_mission_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    if session["status"] not in ("mission", "attempt"):
+        return None
+    result = await _score_mission_utterance(
+        user_id,
+        session["mission"],
+        heard,
+        duration_seconds,
+        model,
+        conversation_id,
+    )
+    if result is None:
+        return None
+    evaluation = speaking_mission.evaluate_attempt(
+        overall=result["overall"],
+        criteria=result["criteria"],
+        observed=result["observed"],
+    )
+    drills = speaking_mission.targeted_drills(evaluation["weak"])
+    attempt = {
+        "heard": heard,
+        "overall": result["overall"],
+        "criteria": result["criteria"],
+        "observed": result["observed"],
+        "duration_seconds": duration_seconds,
+    }
+    updated = await run_in_threadpool(
+        academy_repo.update_speaking_mission_session,
+        session_id,
+        status="drill",
+        attempt=attempt,
+        evaluation=evaluation,
+        drills=drills,
+    )
+    return _mission_state_out(updated) if updated else None
+
+
+async def submit_speaking_mission_retry(
+    user_id: str,
+    session_id: int,
+    heard: str,
+    duration_seconds: float | None = None,
+    model: str = DEFAULT_MODEL,
+    conversation_id: str | None = None,
+) -> SpeakingMissionStateOut | None:
+    """Retry tras el drill: calcula Improvement y cierra la sesión."""
+    session = await run_in_threadpool(
+        academy_repo.get_speaking_mission_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    if session["status"] not in ("drill", "retry", "evaluation"):
+        return None
+    if session.get("evaluation") is None:
+        return None
+    result = await _score_mission_utterance(
+        user_id,
+        session["mission"],
+        heard,
+        duration_seconds,
+        model,
+        conversation_id,
+    )
+    if result is None:
+        return None
+    retry_eval = speaking_mission.evaluate_attempt(
+        overall=result["overall"],
+        criteria=result["criteria"],
+        observed=result["observed"],
+    )
+    delta = speaking_mission.improvement(session["evaluation"], retry_eval)
+    retry = {
+        "heard": heard,
+        "overall": result["overall"],
+        "criteria": result["criteria"],
+        "observed": result["observed"],
+        "duration_seconds": duration_seconds,
+    }
+    updated = await run_in_threadpool(
+        academy_repo.update_speaking_mission_session,
+        session_id,
+        status="improvement",
+        retry=retry,
+        improvement=delta,
+    )
+    return _mission_state_out(updated) if updated else None
+
+
+async def get_speaking_mission(
+    user_id: str, session_id: int
+) -> SpeakingMissionStateOut | None:
+    """Estado completo de una sesión de misión (V2.9)."""
+    session = await run_in_threadpool(
+        academy_repo.get_speaking_mission_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    return _mission_state_out(session)
+
+
+# --- Assessment 2.0 (V2.10) -----------------------------------------------
+
+
+def _checks_index(level: Level) -> dict[str, object]:
+    """Mapa id → ObjectiveCheck del nivel (para puntuar sin filtrar correct_index)."""
+    return {c.id: c for o in level.objectives() for c in o.checks}
+
+
+def _assessment_v2_state_out(session: dict) -> AssessmentV2StateOut:
+    instrument = session["instrument"] or {}
+    result = session.get("result")
+    retention = session.get("retention")
+    items = [
+        AssessmentV2ItemOut.model_validate(it)
+        for it in instrument.get("items") or []
+    ]
+    skills_out: dict[str, AssessmentV2SkillScoreOut] = {}
+    result_out = None
+    if result:
+        for skill, block in (result.get("skills") or {}).items():
+            skills_out[skill] = AssessmentV2SkillScoreOut.model_validate(block)
+        result_out = AssessmentV2ResultOut(
+            kind=result["kind"],
+            overall=result["overall"],
+            threshold=result["threshold"],
+            passed=result["passed"],
+            correct=result["correct"],
+            total=result["total"],
+            skills=skills_out,
+            failed_skills=list(result.get("failed_skills") or []),
+            phase=result.get("phase") or "evaluation",
+        )
+    retention_out = None
+    if retention:
+        retention_out = AssessmentV2RetentionOut(
+            initial_overall=retention["initial_overall"],
+            delayed_overall=retention["delayed_overall"],
+            retention_rate=retention.get("retention_rate"),
+            stable=bool(retention.get("stable")),
+            by_skill=[
+                AssessmentV2RetentionSkillOut.model_validate(row)
+                for row in retention.get("by_skill") or []
+            ],
+            phase=retention.get("phase") or "retention",
+        )
+    return AssessmentV2StateOut(
+        session_id=session["id"],
+        status=session["status"],
+        kind=session["kind"],
+        level_id=session["level_id"],
+        unit_id=session.get("unit_id") or "",
+        objective_id=session.get("objective_id") or "",
+        assessment_version=session.get("assessment_version") or "",
+        instrument=AssessmentV2InstrumentOut(
+            kind=instrument.get("kind") or session["kind"],
+            title=instrument.get("title") or session["kind"],
+            objective_id=instrument.get("objective_id") or "",
+            unit_id=instrument.get("unit_id") or "",
+            unit_ids=list(instrument.get("unit_ids") or []),
+            items=items,
+            threshold=float(
+                instrument.get("threshold")
+                or assessment_v2.PASS_THRESHOLDS.get(session["kind"], 0.7)
+            ),
+            assessment_version=instrument.get("assessment_version")
+            or assessment_v2.ASSESSMENT_VERSION,
+            exam_id=instrument.get("exam_id"),
+            source_kind=instrument.get("source_kind"),
+            source_session_id=instrument.get("source_session_id"),
+        ),
+        result=result_out,
+        retention=retention_out,
+        source_session_id=session.get("source_session_id"),
+    )
+
+
+async def get_assessment_v2_ladder(
+    user_id: str, level_id: str | None = None
+) -> AssessmentV2LadderOut | None:
+    """Escalera Assessment 2.0 + readiness + mastery gate para el nivel actual."""
+    lid = level_id or await _current_level_id(user_id)
+    lv = _levels_by_id.get(lid)
+    if lv is None:
+        return None
+    sessions = await run_in_threadpool(
+        academy_repo.list_assessment_v2_sessions, user_id, level_id=lv.level_id
+    )
+    completed_kinds = {
+        s["kind"] for s in sessions if s.get("status") == "done" and s.get("result")
+    }
+    # Unidades "done" vía course engine (objetivos dominados).
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    sequence = course_svc.unit_sequence(lv, mastered, objective_attempts)
+    units_done = sum(1 for u in sequence if u.get("status") == "done")
+
+    data = load_assessments()
+    has_exam = lv.level_id in data.exams
+
+    formal = [
+        s
+        for s in sessions
+        if s.get("status") == "done"
+        and s.get("kind") in ("unit", "progress", "level")
+        and s.get("result")
+    ]
+    last_formal_at = formal[0]["created_at"] if formal else ""
+    now = datetime.now(timezone.utc).isoformat()
+    retention_ready = assessment_v2.retention_due(last_formal_at, now=now)
+
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, lv.level_id
+    )
+    by_kind: dict[str, int] = {
+        "familiar": 0,
+        "transfer": 0,
+        "novel": 0,
+        "delayed": 0,
+    }
+    for row in evidence_rows:
+        kind = row.get("evidence_kind") or "familiar"
+        if kind in by_kind:
+            by_kind[kind] += 1
+    gate = assessment_v2.mastery_evidence_gate(by_kind)
+    status = assessment_v2.ladder_status(
+        completed_kinds=completed_kinds,
+        units_done=units_done,
+        has_exam=has_exam,
+        retention_ready=retention_ready,
+        mastery_gate=gate,
+    )
+    recent = [_assessment_v2_state_out(s) for s in sessions[:5]]
+    return AssessmentV2LadderOut(
+        level_id=lv.level_id,
+        steps=[AssessmentV2StepOut.model_validate(s) for s in status["steps"]],
+        readiness=AssessmentV2ReadinessOut.model_validate(status["readiness"]),
+        mastery_gate=AssessmentV2MasteryGateOut.model_validate(gate),
+        assessment_version=assessment_v2.ASSESSMENT_VERSION,
+        recent=recent,
+    )
+
+
+async def start_assessment_v2(
+    user_id: str,
+    kind: str,
+    level_id: str,
+    *,
+    unit_id: str | None = None,
+    objective_id: str | None = None,
+    source_session_id: int | None = None,
+) -> AssessmentV2StateOut | None:
+    """Abre un peldaño de la escalera Assessment 2.0."""
+    if kind not in assessment_v2.ASSESSMENT_KINDS:
+        return None
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    if await enrollment_blocked(user_id, level_id):
+        return None
+
+    instrument: dict | None = None
+    source_id = source_session_id
+    obj_id = objective_id or ""
+    uid = unit_id or ""
+
+    if kind == "formative":
+        if not objective_id:
+            return None
+        obj = get_objective(lv, objective_id)
+        if obj is None or not obj.checks:
+            return None
+        instrument = assessment_v2.build_formative(obj)
+        obj_id = obj.id
+    elif kind == "unit":
+        if not unit_id:
+            units = assessment_v2.ordered_units(lv)
+            if not units:
+                return None
+            unit_id = units[0].id
+        instrument = assessment_v2.build_unit(lv, unit_id)
+        if instrument is None or not instrument["items"]:
+            return None
+        uid = unit_id
+    elif kind == "progress":
+        units = assessment_v2.ordered_units(lv)
+        if not units:
+            return None
+        anchor = unit_id or units[
+            min(len(units) - 1, assessment_v2.PROGRESS_UNIT_SPAN - 1)
+        ].id
+        instrument = assessment_v2.build_progress(lv, anchor)
+        if instrument is None or not instrument["items"]:
+            return None
+        uid = anchor
+    elif kind == "level":
+        data = load_assessments()
+        exam = data.exams.get(level_id)
+        if exam is None:
+            return None
+        instrument = assessment_v2.build_level(
+            exam.items, exam_id=exam.id, title=exam.title
+        )
+    elif kind == "retention":
+        if source_session_id is None:
+            sessions = await run_in_threadpool(
+                academy_repo.list_assessment_v2_sessions,
+                user_id,
+                level_id=level_id,
+                status="done",
+            )
+            formal = [
+                s
+                for s in sessions
+                if s.get("kind") in ("unit", "progress", "level") and s.get("result")
+            ]
+            if not formal:
+                return None
+            source = formal[0]
+            source_id = source["id"]
+        else:
+            source = await run_in_threadpool(
+                academy_repo.get_assessment_v2_session, source_session_id
+            )
+            if (
+                source is None
+                or source["user_id"] != user_id
+                or source.get("status") != "done"
+            ):
+                return None
+            source_id = source["id"]
+        previous = {
+            **(source.get("instrument") or {}),
+            "kind": source["kind"],
+            "session_id": source["id"],
+            "title": (source.get("instrument") or {}).get("title"),
+        }
+        instrument = assessment_v2.build_retention(previous)
+        uid = previous.get("unit_id") or ""
+        obj_id = previous.get("objective_id") or ""
+
+    if instrument is None or not instrument.get("items"):
+        return None
+
+    session = await run_in_threadpool(
+        academy_repo.create_assessment_v2_session,
+        user_id,
+        kind=kind,
+        level_id=level_id,
+        instrument=instrument,
+        unit_id=uid,
+        objective_id=obj_id,
+        assessment_version=assessment_v2.ASSESSMENT_VERSION,
+        source_session_id=source_id,
+    )
+    if session is None:
+        return None
+    return _assessment_v2_state_out(session)
+
+
+async def submit_assessment_v2(
+    user_id: str, session_id: int, answers: dict[str, int]
+) -> AssessmentV2StateOut | None:
+    """Puntúa y cierra un peldaño Assessment 2.0; registra evidencia."""
+    session = await run_in_threadpool(
+        academy_repo.get_assessment_v2_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    if session.get("status") != "open":
+        return None
+    lv = _levels_by_id.get(session["level_id"])
+    if lv is None:
+        return None
+
+    kind = session["kind"]
+    instrument = session["instrument"] or {}
+    raw_ids = instrument.get("item_ids") or [
+        i["id"] for i in instrument.get("items") or []
+    ]
+    item_ids = set(raw_ids)
+
+    # Resolver correct_index desde currículo / examen (nunca confiar en el cliente).
+    checks: list = []
+    min_per_skill = None
+    if kind == "level":
+        data = load_assessments()
+        exam = data.exams.get(session["level_id"])
+        if exam is None:
+            return None
+        checks = [it for it in exam.items if it.id in item_ids]
+        min_per_skill = exam.min_per_skill
+    else:
+        index = _checks_index(lv)
+        for iid in instrument.get("item_ids") or [
+            i["id"] for i in instrument.get("items") or []
+        ]:
+            check = index.get(iid)
+            if check is not None:
+                checks.append(check)
+
+    if not checks:
+        return None
+
+    scored = assessment_v2.score_answers(checks, answers)
+    result = assessment_v2.evaluate(kind, scored, min_per_skill=min_per_skill)
+
+    retention_payload = None
+    if kind == "retention" and session.get("source_session_id"):
+        source = await run_in_threadpool(
+            academy_repo.get_assessment_v2_session, session["source_session_id"]
+        )
+        if source and source.get("result"):
+            retention_payload = assessment_v2.retention_delta(
+                source["result"], result
+            )
+
+    evidence_kind = assessment_v2.evidence_kind_for(kind)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        academy_svc.evidence_from_items(
+            checks,
+            answers,
+            level_id=lv.level_id,
+            objective_id=session.get("objective_id") or "",
+            source="assessment_v2",
+            curriculum_version=lv.version,
+            assessment_version=assessment_v2.ASSESSMENT_VERSION,
+            evidence_kind=evidence_kind,
+        ),
+    )
+
+    # Actualiza mastery por destreza del instrumento (umbral del peldaño).
+    threshold = float(result["threshold"])
+    for skill, block in result["skills"].items():
+        if session.get("objective_id"):
+            row = await run_in_threadpool(
+                academy_repo.get_objective_row,
+                user_id,
+                lv.level_id,
+                session["objective_id"],
+                skill,
+            )
+            state = academy_svc.next_mastery_state(row, block["score"], threshold)
+            await run_in_threadpool(
+                academy_repo.apply_objective_evidence,
+                user_id,
+                lv.level_id,
+                session["objective_id"],
+                skill,
+                state,
+            )
+        else:
+            row = await run_in_threadpool(
+                academy_repo.get_skill_row, user_id, lv.level_id, skill
+            )
+            state = academy_svc.next_mastery_state(row, block["score"], threshold)
+            await run_in_threadpool(
+                academy_repo.apply_skill_evidence, user_id, lv.level_id, skill, state
+            )
+
+    await run_in_threadpool(
+        academy_repo.record_assessment_result,
+        user_id,
+        f"assessment-v2-{kind}",
+        lv.level_id,
+        result,
+        result["passed"],
+    )
+
+    updated = await run_in_threadpool(
+        academy_repo.update_assessment_v2_session,
+        session_id,
+        status="done",
+        answers=answers,
+        result=result,
+        retention=retention_payload,
+    )
+    return _assessment_v2_state_out(updated) if updated else None
+
+
+async def get_assessment_v2(
+    user_id: str, session_id: int
+) -> AssessmentV2StateOut | None:
+    session = await run_in_threadpool(
+        academy_repo.get_assessment_v2_session, session_id
+    )
+    if session is None or session["user_id"] != user_id:
+        return None
+    return _assessment_v2_state_out(session)
+
+
+# --- FSRS-lite (V2.11) ----------------------------------------------------
+
+
+def _fsrs_card_out(card: dict, *, now: str = "") -> FsrsCardOut:
+    explained = fsrs.explain(card, now=now)
+    return FsrsCardOut(
+        target_type=card["target_type"],
+        target_id=card["target_id"],
+        label=card.get("label") or card["target_id"],
+        state=card.get("state") or "new",
+        difficulty=float(card.get("difficulty") or 5.0),
+        stability=float(card.get("stability") or 0.1),
+        reps=int(card.get("reps") or 0),
+        lapses=int(card.get("lapses") or 0),
+        due_at=card.get("due_at") or "",
+        last_review_at=card.get("last_review_at") or "",
+        last_evidence_at=card.get("last_evidence_at") or "",
+        last_grade=card.get("last_grade"),
+        why=card.get("why") or "",
+        fsrs_version=card.get("fsrs_version") or fsrs.FSRS_VERSION,
+        explain=FsrsExplainOut.model_validate(explained),
+    )
+
+
+async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]:
+    """Siembra/actualiza cartas desde perfil CEFR + léxico débil/learning.
+
+    No pisa cartas ya revisadas (reps > 0): solo actualiza `why` y, si la carta
+    es nueva, la estabiliza desde la evidencia.
+    """
+    now_iso = now or datetime.now(timezone.utc).isoformat()
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    skills = await _annotated_profile(user_id, lv)
+
+    existing = {
+        (c["target_type"], c["target_id"]): c
+        for c in await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
+    }
+
+    for entry in skills:
+        if int(entry.get("evidence_count") or 0) <= 0:
+            continue
+        if not (
+            entry.get("review_due")
+            or float(entry.get("score") or 0.0) < 0.7
+            or int((entry.get("evidence_by_kind") or {}).get("delayed", 0)) == 0
+        ):
+            # Solo maintenance ocasional: si ya hay carta, déjala; si no, no crear.
+            key = ("skill", entry["skill"])
+            if key not in existing:
+                continue
+        why = fsrs.why_for_skill(entry)
+        key = ("skill", entry["skill"])
+        prev = existing.get(key)
+        if prev and int(prev.get("reps") or 0) > 0:
+            # Conserva scheduling; solo refresca la razón pedagógica.
+            updated = dict(prev)
+            updated["why"] = why
+            updated["label"] = entry["skill"]
+            await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
+            continue
+        card = fsrs.seed_card_from_evidence(
+            target_type="skill",
+            target_id=entry["skill"],
+            label=entry["skill"],
+            score=float(entry.get("score") or 0.0),
+            last_evidence_at=entry.get("last_evidence") or "",
+            why=why,
+            now=now_iso,
+        )
+        # Si review_due, forzar due ahora.
+        if entry.get("review_due"):
+            card["due_at"] = now_iso
+        await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, card)
+
+    vocab_rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    for row in vocab_rows:
+        status = lexicon.item_status(row, now_iso)
+        if status not in ("weak", "learning", "known"):
+            continue
+        if status == "known" and int(row.get("exposures") or 0) < 2:
+            continue
+        word = row.get("word") or ""
+        if not word:
+            continue
+        why = fsrs.why_for_lexicon(status)
+        key = ("lexicon", word)
+        prev = existing.get(key)
+        if prev and int(prev.get("reps") or 0) > 0:
+            updated = dict(prev)
+            updated["why"] = why
+            updated["label"] = word
+            await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
+            continue
+        score = lexicon.item_mastery(row)
+        card = fsrs.seed_card_from_evidence(
+            target_type="lexicon",
+            target_id=word,
+            label=word,
+            score=score,
+            last_evidence_at=row.get("last_seen") or row.get("last_exposed_at") or "",
+            why=why,
+            now=now_iso,
+        )
+        if status == "weak":
+            card["due_at"] = now_iso
+        await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, card)
+
+    return await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
+
+
+async def get_fsrs_due(user_id: str, limit: int = 20) -> FsrsDueOut:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cards = await sync_fsrs_cards(user_id, now=now_iso)
+    due = fsrs.due_queue(cards, now=now_iso, limit=limit)
+    return FsrsDueOut(
+        due_count=len(due),
+        cards=[_fsrs_card_out(c, now=now_iso) for c in due],
+        fsrs_version=fsrs.FSRS_VERSION,
+    )
+
+
+async def get_fsrs_summary(user_id: str) -> FsrsSummaryOut:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cards = await sync_fsrs_cards(user_id, now=now_iso)
+    by_state: dict[str, int] = {}
+    by_type: dict[str, int] = {}
+    due_count = 0
+    for card in cards:
+        state = card.get("state") or "new"
+        by_state[state] = by_state.get(state, 0) + 1
+        t = card.get("target_type") or "skill"
+        by_type[t] = by_type.get(t, 0) + 1
+        if fsrs.is_due(card, now=now_iso):
+            due_count += 1
+    return FsrsSummaryOut(
+        total=len(cards),
+        due_count=due_count,
+        by_state=by_state,
+        by_type=by_type,
+        fsrs_version=fsrs.FSRS_VERSION,
+    )
+
+
+async def review_fsrs_card(
+    user_id: str,
+    target_type: str,
+    target_id: str,
+    grade: int | None = None,
+    score: float | None = None,
+) -> FsrsReviewOut | None:
+    """Aplica un grade (o lo deriva de score) y reprograma la carta."""
+    if target_type not in fsrs.TARGET_TYPES:
+        return None
+    if grade is None:
+        if score is None:
+            return None
+        grade = fsrs.grade_from_score(score)
+    if grade not in fsrs.GRADES:
+        return None
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    card = await run_in_threadpool(
+        academy_repo.get_fsrs_card, user_id, target_type, target_id
+    )
+    if card is None:
+        # Siembra mínima al vuelo.
+        card = fsrs.empty_card(
+            target_type=target_type,
+            target_id=target_id,
+            label=target_id,
+            why="manual-review",
+            now=now_iso,
+        )
+
+    updated = fsrs.schedule(card, grade, now=now_iso)
+    saved = await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
+    if saved is None:
+        return None
+    explained = fsrs.explain(saved, now=now_iso)
+    return FsrsReviewOut(
+        card=_fsrs_card_out(saved, now=now_iso),
+        explain=FsrsExplainOut.model_validate(explained),
+    )
+
+
 async def get_today_plan(user_id: str) -> TodayPlanOut:
     """Plan de estudio de hoy: equilibrio weakness/review/new/easy_wins con minutos."""
     level_id = await _current_level_id(user_id)
@@ -1061,13 +1894,111 @@ async def get_next_best_activity(user_id: str) -> NextBestActivityOut | None:
     """Siguiente mejor actividad (Learning UX 2.0): proyección del primer paso de
     la sesión enriquecida con las señales del Priority Engine (`signals`), la
     prioridad compuesta (`priority`) y su explicación (`why`). La UI no decide
-    pedagógicamente; consume esta única acción."""
+    pedagógicamente; consume esta única acción.
+
+    V2.12: añade `because[]` + `limiting_factor` desde el Evidence Graph del
+    objetivo asociado (Adaptive Engine explicable).
+    """
     steps, skills = await _session_steps(user_id)
     now = datetime.now(timezone.utc).isoformat()
     best = adaptive.next_best_activity(steps, skills, now)
     if best is None:
         return None
+
+    node = None
+    oid = best.get("objective_id")
+    lid = best.get("level_id") or await _current_level_id(user_id)
+    lv = _levels_by_id.get(lid)
+    if oid and lv is not None:
+        obj = get_objective(lv, oid)
+        if obj is not None:
+            obj_mastery = await run_in_threadpool(
+                academy_repo.list_objective_mastery, user_id, lv.level_id
+            )
+            evidence_rows = await run_in_threadpool(
+                academy_repo.list_evidence, user_id, lv.level_id
+            )
+            objective_scores, _attempts = _split_objective_mastery(obj_mastery)
+            node = evidence_graph.objective_node(
+                obj,
+                level_id=lv.level_id,
+                level_label=lv.level,
+                objective_scores=objective_scores,
+                profile=skills,
+                evidence_rows=evidence_rows,
+            )
+            best = evidence_graph.enrich_next_best(best, node)
+    else:
+        best = evidence_graph.enrich_next_best(best, None)
     return NextBestActivityOut(**best)
+
+
+async def get_evidence_graph(
+    user_id: str, level_id: str | None = None
+) -> EvidenceGraphOut | None:
+    """Grafo can-do → dimensiones → limiting factor del nivel actual."""
+    lid = level_id or await _current_level_id(user_id)
+    lv = _levels_by_id.get(lid)
+    if lv is None:
+        return None
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, lv.level_id
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    profile = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows, now)
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    graph = evidence_graph.build_level_graph(
+        lv,
+        objective_scores=objective_scores,
+        profile=profile,
+        evidence_rows=evidence_rows,
+        mastered_ids=mastered,
+    )
+    return EvidenceGraphOut.model_validate(graph)
+
+
+async def get_evidence_graph_node(
+    user_id: str, objective_id: str, level_id: str | None = None
+) -> EvidenceGraphNodeOut | None:
+    """Nodo del Evidence Graph para un can-do concreto."""
+    lid = level_id or await _current_level_id(user_id)
+    lv = _levels_by_id.get(lid)
+    if lv is None:
+        return None
+    obj = get_objective(lv, objective_id)
+    if obj is None:
+        # Buscar el objetivo en cualquier nivel cargado.
+        for candidate in _levels_by_id.values():
+            obj = get_objective(candidate, objective_id)
+            if obj is not None:
+                lv = candidate
+                break
+    if obj is None or lv is None:
+        return None
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, lv.level_id
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    profile = academy_svc.build_skill_profile(lv, obj_mastery, evidence_rows, now)
+    objective_scores, _attempts = _split_objective_mastery(obj_mastery)
+    node = evidence_graph.objective_node(
+        obj,
+        level_id=lv.level_id,
+        level_label=lv.level,
+        objective_scores=objective_scores,
+        profile=profile,
+        evidence_rows=evidence_rows,
+    )
+    return EvidenceGraphNodeOut.model_validate(node)
 
 
 async def set_session_step_done(user_id: str, step_key: str) -> SessionOut | None:

@@ -639,6 +639,289 @@ class SpeakingScenariosOut(BaseModel):
     scenarios: list[SpeakingScenarioOut] = Field(default_factory=list)
 
 
+# --- Speaking Mission Performance (V2.9) ------------------------------------
+
+
+class SpeakingMissionStartRequest(BaseModel):
+    scenario_id: str
+
+
+class SpeakingMissionDrillOut(BaseModel):
+    criterion: str
+    title: str
+    instruction: str
+    prompt: str
+
+
+class SpeakingMissionCriterionDelta(BaseModel):
+    criterion: str
+    before: float
+    after: float
+    delta: float
+
+
+class SpeakingMissionImprovementOut(BaseModel):
+    before_overall: float | None = None
+    after_overall: float | None = None
+    delta: float | None = None
+    improved: bool = False
+    by_criterion: list[SpeakingMissionCriterionDelta] = Field(default_factory=list)
+    phase: str = "improvement"
+
+
+class SpeakingMissionEvaluationOut(BaseModel):
+    overall: float | None = None
+    criteria: dict[str, float | None] = Field(default_factory=dict)
+    observed: dict[str, bool] = Field(default_factory=dict)
+    weak: list[str] = Field(default_factory=list)
+    recommendation: str = ""
+    phase: str = "evaluation"
+
+
+class SpeakingMissionAttemptOut(BaseModel):
+    heard: str = ""
+    overall: float | None = None
+    criteria: dict[str, float | None] = Field(default_factory=dict)
+    observed: dict[str, bool] = Field(default_factory=dict)
+    duration_seconds: float | None = None
+
+
+class SpeakingMissionOut(BaseModel):
+    scenario_id: str
+    title: str
+    prompt: str
+    communicative_objective: str
+    cefr_target: str = "B1"
+    task_type: str = "role_play"
+    metrics: list[str] = Field(default_factory=list)
+    difficulty: int | None = None
+
+
+class SpeakingMissionStateOut(BaseModel):
+    session_id: int
+    status: str
+    scenario_id: str
+    mission: SpeakingMissionOut
+    attempt: SpeakingMissionAttemptOut | None = None
+    evaluation: SpeakingMissionEvaluationOut | None = None
+    drills: list[SpeakingMissionDrillOut] = Field(default_factory=list)
+    retry: SpeakingMissionAttemptOut | None = None
+    improvement: SpeakingMissionImprovementOut | None = None
+
+
+class SpeakingMissionAttemptSubmit(BaseModel):
+    session_id: int
+    heard: str
+    duration_seconds: float | None = None
+    model: str | None = None
+    conversation_id: str | None = None
+
+
+# --- Assessment 2.0 (V2.10) -----------------------------------------------
+
+
+class AssessmentV2ItemOut(BaseModel):
+    id: str
+    skill: str
+    prompt: str
+    options: list[str]
+
+
+class AssessmentV2SkillScoreOut(BaseModel):
+    correct: int
+    total: int
+    score: float
+
+
+class AssessmentV2ResultOut(BaseModel):
+    kind: str
+    overall: float
+    threshold: float
+    passed: bool
+    correct: int
+    total: int
+    skills: dict[str, AssessmentV2SkillScoreOut] = Field(default_factory=dict)
+    failed_skills: list[str] = Field(default_factory=list)
+    phase: str = "evaluation"
+
+
+class AssessmentV2RetentionSkillOut(BaseModel):
+    skill: str
+    initial: float | None = None
+    delayed: float | None = None
+    delta: float | None = None
+
+
+class AssessmentV2RetentionOut(BaseModel):
+    initial_overall: float
+    delayed_overall: float
+    retention_rate: float | None = None
+    stable: bool = False
+    by_skill: list[AssessmentV2RetentionSkillOut] = Field(default_factory=list)
+    phase: str = "retention"
+
+
+class AssessmentV2InstrumentOut(BaseModel):
+    kind: str
+    title: str
+    objective_id: str = ""
+    unit_id: str = ""
+    unit_ids: list[str] = Field(default_factory=list)
+    items: list[AssessmentV2ItemOut] = Field(default_factory=list)
+    threshold: float
+    assessment_version: str
+    exam_id: str | None = None
+    source_kind: str | None = None
+    source_session_id: int | None = None
+
+
+class AssessmentV2StateOut(BaseModel):
+    session_id: int
+    status: str
+    kind: str
+    level_id: str
+    unit_id: str = ""
+    objective_id: str = ""
+    assessment_version: str
+    instrument: AssessmentV2InstrumentOut
+    result: AssessmentV2ResultOut | None = None
+    retention: AssessmentV2RetentionOut | None = None
+    source_session_id: int | None = None
+
+
+class AssessmentV2StartRequest(BaseModel):
+    kind: str
+    level_id: str
+    unit_id: str | None = None
+    objective_id: str | None = None
+    source_session_id: int | None = None
+
+
+class AssessmentV2SubmitRequest(BaseModel):
+    session_id: int
+    answers: dict[str, int]
+
+
+class AssessmentV2StepOut(BaseModel):
+    kind: str
+    available: bool
+    completed: bool
+    reason: str
+
+
+class AssessmentV2ReadinessOut(BaseModel):
+    ladder_complete: bool
+    mastery_eligible: bool
+    mastery_missing: list[str] = Field(default_factory=list)
+    next_kind: str | None = None
+    retention_due: bool = False
+
+
+class AssessmentV2MasteryGateOut(BaseModel):
+    met: bool
+    checks: dict[str, bool] = Field(default_factory=dict)
+    missing: list[str] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
+class AssessmentV2LadderOut(BaseModel):
+    level_id: str
+    steps: list[AssessmentV2StepOut]
+    readiness: AssessmentV2ReadinessOut
+    mastery_gate: AssessmentV2MasteryGateOut
+    assessment_version: str
+    recent: list[AssessmentV2StateOut] = Field(default_factory=list)
+
+
+# --- FSRS-lite (V2.11) ----------------------------------------------------
+
+
+class FsrsWhatOut(BaseModel):
+    target_type: str
+    target_id: str
+    label: str
+
+
+class FsrsWhenOut(BaseModel):
+    due_at: str
+    due: bool
+    next_in_days: float
+
+
+class FsrsHowStrongOut(BaseModel):
+    stability: float
+    retrievability: float
+    difficulty: float
+    state: str
+    reps: int
+    lapses: int
+
+
+class FsrsLastEvidenceOut(BaseModel):
+    at: str | None = None
+    grade: int | None = None
+    grade_label: str | None = None
+
+
+class FsrsNextEvidenceOut(BaseModel):
+    due_at: str
+    suggested_interval_days: float
+
+
+class FsrsExplainOut(BaseModel):
+    what: FsrsWhatOut
+    why: str
+    when: FsrsWhenOut
+    how_strong: FsrsHowStrongOut
+    last_evidence: FsrsLastEvidenceOut
+    next_evidence: FsrsNextEvidenceOut
+    fsrs_version: str
+
+
+class FsrsCardOut(BaseModel):
+    target_type: str
+    target_id: str
+    label: str
+    state: str
+    difficulty: float
+    stability: float
+    reps: int
+    lapses: int
+    due_at: str
+    last_review_at: str = ""
+    last_evidence_at: str = ""
+    last_grade: int | None = None
+    why: str = ""
+    fsrs_version: str = ""
+    explain: FsrsExplainOut | None = None
+
+
+class FsrsDueOut(BaseModel):
+    due_count: int
+    cards: list[FsrsCardOut] = Field(default_factory=list)
+    fsrs_version: str
+
+
+class FsrsSummaryOut(BaseModel):
+    total: int
+    due_count: int
+    by_state: dict[str, int] = Field(default_factory=dict)
+    by_type: dict[str, int] = Field(default_factory=dict)
+    fsrs_version: str
+
+
+class FsrsReviewRequest(BaseModel):
+    target_type: str
+    target_id: str
+    grade: int
+    score: float | None = None
+
+
+class FsrsReviewOut(BaseModel):
+    card: FsrsCardOut
+    explain: FsrsExplainOut
+
+
 class SkillProfileOut(BaseModel):
     skill: str
     score: float
@@ -793,6 +1076,60 @@ class NextBestActivityOut(BaseModel):
     priority: float
     signals: dict = Field(default_factory=dict)
     why: str = ""
+    because: list[str] = Field(default_factory=list)
+    limiting_factor: dict | None = None
+    graph_mastery: float | None = None
+    can_do: str | None = None
+
+
+class EvidenceGraphDimensionOut(BaseModel):
+    id: str
+    kind: str
+    score: float
+    evidence_count: int = 0
+    missing: bool = False
+
+
+class EvidenceGraphLimitingOut(BaseModel):
+    id: str
+    score: float
+    missing: bool = False
+    kind: str = "skill"
+
+
+class EvidenceGraphFocusOut(BaseModel):
+    dimension: str | None = None
+    phase: str = "practice"
+    reason: str = ""
+
+
+class EvidenceGraphNodeOut(BaseModel):
+    objective_id: str
+    can_do: str
+    title: str
+    level_id: str
+    level: str
+    dimensions: list[EvidenceGraphDimensionOut] = Field(default_factory=list)
+    limiting_factor: EvidenceGraphLimitingOut | None = None
+    mastery: float = 0.0
+    recommended_focus: EvidenceGraphFocusOut
+    graph_version: str
+
+
+class EvidenceGraphTopLimitingOut(BaseModel):
+    id: str
+    count: int
+
+
+class EvidenceGraphOut(BaseModel):
+    level_id: str
+    level: str
+    nodes: list[EvidenceGraphNodeOut] = Field(default_factory=list)
+    open_count: int = 0
+    mastered_count: int = 0
+    average_mastery: float = 0.0
+    top_limiting_factor: EvidenceGraphTopLimitingOut | None = None
+    graph_version: str
 
 
 class RemediationSkillOut(BaseModel):

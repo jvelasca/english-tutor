@@ -31,6 +31,8 @@ from services.curriculum_coverage import (
     OBJECTIVE_VOLUME_TARGET,
     curriculum_quality_report,
     depth_score,
+    listening_curriculum,
+    listening_curriculum_report,
     loop_coverage,
     quality_report_delta,
     unit_coverage,
@@ -240,6 +242,37 @@ def test_quality_report_delta_identity_is_zero():
     assert delta["overall"]["delta"] == 0.0
     assert all(d["delta"] == 0.0 for d in delta["dimensions"].values())
     assert all(d["delta"] == 0.0 for d in delta["by_level"].values())
+
+
+def test_quality_report_includes_listening_curriculum_block():
+    report = curriculum_quality_report()
+    lc = report["listening_curriculum"]
+    assert lc["overall"]["alignment_pct"] == 100.0
+    assert len(lc["by_level"]) == len(COURSE_LEVELS)
+
+
+# --- LISTENING CURRICULUM (V2.8) --------------------------------------------
+
+def test_listening_curriculum_all_levels_aligned():
+    report = listening_curriculum_report()
+    assert report["overall"]["alignment_pct"] == 100.0
+    for lv in report["by_level"]:
+        assert lv["alignment_pct"] == 100.0
+        assert not lv["missing_objectives"]
+
+
+def test_listening_curriculum_focus_matches_level():
+    a1 = listening_curriculum(load_level("a1"))
+    assert "word_recognition" in a1["focus_subskills"]
+    b2 = listening_curriculum(load_level("b2"))
+    assert "inference" in b2["focus_subskills"]
+
+
+def test_every_unit_has_listen_phase_after_v28():
+    for level_id in COURSE_LEVELS:
+        lp = loop_coverage(load_level(level_id))
+        listen = next(p for p in lp["by_phase"] if p["phase"] == "listen")
+        assert listen["coverage_pct"] == 100.0
 
 
 # --- UNIT LEARNING LOOP -----------------------------------------------------

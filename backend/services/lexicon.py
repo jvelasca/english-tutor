@@ -10,8 +10,9 @@ entrada de la tabla `vocabulary` en un ítem léxico de primer nivel con:
 
 Puro y determinista: recibe filas ya agregadas (sin I/O ni base de datos).
 Reutiliza `services.forgetting` (curva de olvido) y `services.mastery`
-(scheduler de repaso). No se añade FSRS completo: solo se baja la granularidad
-del SRS que ya existe a nivel de destreza.
+(scheduler de repaso a nivel de destreza). El scheduler FSRS-lite de V2.11
+(`services.fsrs`) opera en paralelo sobre cartas skill/lexicon; este módulo
+sigue exponiendo `next_review_days` como estimación ligera del léxico.
 """
 
 from __future__ import annotations

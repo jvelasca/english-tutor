@@ -786,6 +786,240 @@ export interface SpeakingScenarios {
   scenarios: SpeakingScenario[];
 }
 
+// --- Speaking Mission Performance (V2.9) ---
+
+export interface SpeakingMissionDrill {
+  criterion: string;
+  title: string;
+  instruction: string;
+  prompt: string;
+}
+
+export interface SpeakingMissionCriterionDelta {
+  criterion: string;
+  before: number;
+  after: number;
+  delta: number;
+}
+
+export interface SpeakingMissionImprovement {
+  before_overall: number | null;
+  after_overall: number | null;
+  delta: number | null;
+  improved: boolean;
+  by_criterion: SpeakingMissionCriterionDelta[];
+  phase: string;
+}
+
+export interface SpeakingMissionEvaluation {
+  overall: number | null;
+  criteria: Record<string, number | null>;
+  observed: Record<string, boolean>;
+  weak: string[];
+  recommendation: string;
+  phase: string;
+}
+
+export interface SpeakingMissionAttempt {
+  heard: string;
+  overall: number | null;
+  criteria: Record<string, number | null>;
+  observed: Record<string, boolean>;
+  duration_seconds: number | null;
+}
+
+export interface SpeakingMissionInfo {
+  scenario_id: string;
+  title: string;
+  prompt: string;
+  communicative_objective: string;
+  cefr_target: string;
+  task_type: string;
+  metrics: string[];
+  difficulty: number | null;
+}
+
+export interface SpeakingMissionState {
+  session_id: number;
+  status: string;
+  scenario_id: string;
+  mission: SpeakingMissionInfo;
+  attempt: SpeakingMissionAttempt | null;
+  evaluation: SpeakingMissionEvaluation | null;
+  drills: SpeakingMissionDrill[];
+  retry: SpeakingMissionAttempt | null;
+  improvement: SpeakingMissionImprovement | null;
+}
+
+// --- Assessment 2.0 (V2.10) ---
+
+export type AssessmentV2Kind =
+  | "formative"
+  | "unit"
+  | "progress"
+  | "level"
+  | "retention";
+
+export interface AssessmentV2Item {
+  id: string;
+  skill: string;
+  prompt: string;
+  options: string[];
+}
+
+export interface AssessmentV2SkillScore {
+  correct: number;
+  total: number;
+  score: number;
+}
+
+export interface AssessmentV2Result {
+  kind: string;
+  overall: number;
+  threshold: number;
+  passed: boolean;
+  correct: number;
+  total: number;
+  skills: Record<string, AssessmentV2SkillScore>;
+  failed_skills: string[];
+  phase: string;
+}
+
+export interface AssessmentV2RetentionSkill {
+  skill: string;
+  initial: number | null;
+  delayed: number | null;
+  delta: number | null;
+}
+
+export interface AssessmentV2Retention {
+  initial_overall: number;
+  delayed_overall: number;
+  retention_rate: number | null;
+  stable: boolean;
+  by_skill: AssessmentV2RetentionSkill[];
+  phase: string;
+}
+
+export interface AssessmentV2Instrument {
+  kind: string;
+  title: string;
+  objective_id: string;
+  unit_id: string;
+  unit_ids: string[];
+  items: AssessmentV2Item[];
+  threshold: number;
+  assessment_version: string;
+  exam_id?: string | null;
+  source_kind?: string | null;
+  source_session_id?: number | null;
+}
+
+export interface AssessmentV2State {
+  session_id: number;
+  status: string;
+  kind: string;
+  level_id: string;
+  unit_id: string;
+  objective_id: string;
+  assessment_version: string;
+  instrument: AssessmentV2Instrument;
+  result: AssessmentV2Result | null;
+  retention: AssessmentV2Retention | null;
+  source_session_id: number | null;
+}
+
+export interface AssessmentV2Step {
+  kind: string;
+  available: boolean;
+  completed: boolean;
+  reason: string;
+}
+
+export interface AssessmentV2Readiness {
+  ladder_complete: boolean;
+  mastery_eligible: boolean;
+  mastery_missing: string[];
+  next_kind: string | null;
+  retention_due: boolean;
+}
+
+export interface AssessmentV2MasteryGate {
+  met: boolean;
+  checks: Record<string, boolean>;
+  missing: string[];
+  counts: Record<string, number>;
+}
+
+export interface AssessmentV2Ladder {
+  level_id: string;
+  steps: AssessmentV2Step[];
+  readiness: AssessmentV2Readiness;
+  mastery_gate: AssessmentV2MasteryGate;
+  assessment_version: string;
+  recent: AssessmentV2State[];
+}
+
+// --- FSRS-lite (V2.11) ---
+
+export interface FsrsExplain {
+  what: { target_type: string; target_id: string; label: string };
+  why: string;
+  when: { due_at: string; due: boolean; next_in_days: number };
+  how_strong: {
+    stability: number;
+    retrievability: number;
+    difficulty: number;
+    state: string;
+    reps: number;
+    lapses: number;
+  };
+  last_evidence: {
+    at: string | null;
+    grade: number | null;
+    grade_label: string | null;
+  };
+  next_evidence: { due_at: string; suggested_interval_days: number };
+  fsrs_version: string;
+}
+
+export interface FsrsCard {
+  target_type: string;
+  target_id: string;
+  label: string;
+  state: string;
+  difficulty: number;
+  stability: number;
+  reps: number;
+  lapses: number;
+  due_at: string;
+  last_review_at: string;
+  last_evidence_at: string;
+  last_grade: number | null;
+  why: string;
+  fsrs_version: string;
+  explain: FsrsExplain | null;
+}
+
+export interface FsrsDue {
+  due_count: number;
+  cards: FsrsCard[];
+  fsrs_version: string;
+}
+
+export interface FsrsSummary {
+  total: number;
+  due_count: number;
+  by_state: Record<string, number>;
+  by_type: Record<string, number>;
+  fsrs_version: string;
+}
+
+export interface FsrsReview {
+  card: FsrsCard;
+  explain: FsrsExplain;
+}
+
 // --- Academy (currículum CEFR, mastery, evaluación) ---
 
 export type AcademyObjectiveStatus =
@@ -1265,6 +1499,62 @@ export interface NextBestActivity {
   priority: number;
   signals?: Record<string, unknown>;
   why?: string;
+  because?: string[];
+  limiting_factor?: {
+    id: string;
+    score: number;
+    missing?: boolean;
+    kind?: string;
+  } | null;
+  graph_mastery?: number | null;
+  can_do?: string | null;
+}
+
+// --- Evidence Graph (V2.12) ---
+
+export interface EvidenceGraphDimension {
+  id: string;
+  kind: string;
+  score: number;
+  evidence_count: number;
+  missing: boolean;
+}
+
+export interface EvidenceGraphLimiting {
+  id: string;
+  score: number;
+  missing: boolean;
+  kind: string;
+}
+
+export interface EvidenceGraphFocus {
+  dimension: string | null;
+  phase: string;
+  reason: string;
+}
+
+export interface EvidenceGraphNode {
+  objective_id: string;
+  can_do: string;
+  title: string;
+  level_id: string;
+  level: string;
+  dimensions: EvidenceGraphDimension[];
+  limiting_factor: EvidenceGraphLimiting | null;
+  mastery: number;
+  recommended_focus: EvidenceGraphFocus;
+  graph_version: string;
+}
+
+export interface EvidenceGraph {
+  level_id: string;
+  level: string;
+  nodes: EvidenceGraphNode[];
+  open_count: number;
+  mastered_count: number;
+  average_mastery: number;
+  top_limiting_factor: { id: string; count: number } | null;
+  graph_version: string;
 }
 
 // --- Escalera CEFR (Curriculum 2.0) ---

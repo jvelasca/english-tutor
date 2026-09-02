@@ -48,6 +48,12 @@ const STRINGS: Record<string, Entry> = {
   "home.nextStep": { en: "Today's next step", es: "El siguiente paso de hoy" },
   "home.continue": { en: "Continue", es: "Continuar" },
   "home.whyThisActivity": { en: "Why?", es: "¿Por qué?" },
+  "home.because": { en: "Because:", es: "Porque:" },
+  "home.limitingFactor": {
+    en: "Limiting factor",
+    es: "Factor limitante",
+  },
+  "home.missing": { en: "missing", es: "falta" },
   "home.start": { en: "Start", es: "Empezar" },
   "home.review": { en: "Review", es: "Repasar" },
   "home.today": { en: "Today", es: "Hoy" },
@@ -767,6 +773,204 @@ const STRINGS: Record<string, Entry> = {
     es: "Tus turnos (duración y tiempo de respuesta) quedaron registrados y alimentarán tu diagnóstico oral.",
   },
   "scenarios.metric.task_completion": { en: "Task completion", es: "Cumplir la tarea" },
+
+  // Speaking Mission Performance (V2.9)
+  "mission.title": { en: "Speaking mission", es: "Misión de speaking" },
+  "mission.subtitle": {
+    en: "Attempt → evaluation → targeted drill → retry → see your improvement.",
+    es: "Intento → evaluación → drill dirigido → reintento → mira tu mejora.",
+  },
+  "mission.empty": {
+    en: "No scenarios available yet.",
+    es: "Aún no hay escenarios disponibles.",
+  },
+  "mission.reset": { en: "New mission", es: "Nueva misión" },
+  "mission.evaluation": { en: "Evaluation", es: "Evaluación" },
+  "mission.overall": { en: "Overall", es: "Global" },
+  "mission.weak": { en: "Focus", es: "Foco" },
+  "mission.drills": { en: "Targeted drills", es: "Drills dirigidos" },
+  "mission.improvement": { en: "Improvement", es: "Mejora" },
+  "mission.improved": {
+    en: "You improved on the retry. Keep that version.",
+    es: "Has mejorado en el reintento. Quédate con esa versión.",
+  },
+  "mission.notImproved": {
+    en: "No gain yet — try another mission or drill again.",
+    es: "Todavía sin ganancia — prueba otra misión o repite el drill.",
+  },
+  "mission.attempt": { en: "Submit attempt", es: "Enviar intento" },
+  "mission.retry": { en: "Submit retry", es: "Enviar reintento" },
+  "mission.attemptPlaceholder": {
+    en: "Type (or paste) what you would say…",
+    es: "Escribe (o pega) lo que dirías…",
+  },
+  "mission.retryPlaceholder": {
+    en: "Try again after the drills…",
+    es: "Inténtalo de nuevo tras los drills…",
+  },
+  "mission.errorStart": {
+    en: "Could not start the mission.",
+    es: "No se pudo iniciar la misión.",
+  },
+  "mission.errorAttempt": {
+    en: "Could not score the attempt.",
+    es: "No se pudo puntuar el intento.",
+  },
+  "mission.errorRetry": {
+    en: "Could not score the retry.",
+    es: "No se pudo puntuar el reintento.",
+  },
+  "panels.speakingMission": { en: "Mission loop", es: "Loop de misión" },
+  "panels.assessmentLadder": {
+    en: "Assessment ladder",
+    es: "Escalera de evaluación",
+  },
+
+  "assessmentV2.title": {
+    en: "Assessment 2.0",
+    es: "Assessment 2.0",
+  },
+  "assessmentV2.subtitle": {
+    en: "Formative → unit → progress → level → retention",
+    es: "Formative → unidad → progreso → nivel → retención",
+  },
+  "assessmentV2.kind.formative": { en: "Formative", es: "Formative" },
+  "assessmentV2.kind.unit": { en: "Unit", es: "Unidad" },
+  "assessmentV2.kind.progress": { en: "Progress", es: "Progreso" },
+  "assessmentV2.kind.level": { en: "Level", es: "Nivel" },
+  "assessmentV2.kind.retention": { en: "Retention", es: "Retención" },
+  "assessmentV2.next": { en: "Next recommended", es: "Siguiente recomendado" },
+  "assessmentV2.nextNone": {
+    en: "Ladder complete for now",
+    es: "Escalera completa por ahora",
+  },
+  "assessmentV2.mastery": { en: "Mastery gate", es: "Gate de dominio" },
+  "assessmentV2.masteryOk": {
+    en: "Eligible (full evidence ladder)",
+    es: "Elegible (escalera de evidencia completa)",
+  },
+  "assessmentV2.masteryMissing": {
+    en: "Still missing",
+    es: "Aún falta",
+  },
+  "assessmentV2.retentionDue": {
+    en: "Retention reassessment is due",
+    es: "Toca reevaluación de retención",
+  },
+  "assessmentV2.threshold": { en: "Pass at", es: "Aprobado desde" },
+  "assessmentV2.submit": { en: "Submit answers", es: "Enviar respuestas" },
+  "assessmentV2.passed": { en: "Passed", es: "Aprobado" },
+  "assessmentV2.failed": { en: "Not yet", es: "Aún no" },
+  "assessmentV2.failedSkills": {
+    en: "Weak skills",
+    es: "Destrezas débiles",
+  },
+  "assessmentV2.retentionTitle": {
+    en: "Retention delta",
+    es: "Delta de retención",
+  },
+  "assessmentV2.retentionStable": { en: "stable", es: "estable" },
+  "assessmentV2.back": { en: "Back to ladder", es: "Volver a la escalera" },
+  "assessmentV2.errorStart": {
+    en: "Could not start this assessment.",
+    es: "No se pudo iniciar este assessment.",
+  },
+  "assessmentV2.errorSubmit": {
+    en: "Could not score the assessment.",
+    es: "No se pudo puntuar el assessment.",
+  },
+
+  "panels.fsrsReview": { en: "Spaced review", es: "Repaso espaciado" },
+  "panels.evidenceGraph": {
+    en: "Evidence graph",
+    es: "Grafo de evidencia",
+  },
+
+  "evidenceGraph.title": {
+    en: "Evidence graph",
+    es: "Grafo de evidencia",
+  },
+  "evidenceGraph.subtitle": {
+    en: "Can-do → dimensions → limiting factor → mastery",
+    es: "Can-do → dimensiones → factor limitante → dominio",
+  },
+  "evidenceGraph.level": { en: "Level", es: "Nivel" },
+  "evidenceGraph.avgMastery": {
+    en: "avg mastery",
+    es: "dominio medio",
+  },
+  "evidenceGraph.open": { en: "Open", es: "Abiertos" },
+  "evidenceGraph.mastered": { en: "Mastered", es: "Dominados" },
+  "evidenceGraph.topLimiting": {
+    en: "Top limiting factor",
+    es: "Factor limitante principal",
+  },
+  "evidenceGraph.canDo": { en: "Can-do", es: "Can-do" },
+  "evidenceGraph.mastery": { en: "Mastery", es: "Dominio" },
+  "evidenceGraph.missing": { en: "missing", es: "falta" },
+  "evidenceGraph.limiting": { en: "limiting", es: "limitante" },
+  "evidenceGraph.focus": { en: "Recommended focus", es: "Foco recomendado" },
+  "evidenceGraph.empty": {
+    en: "No evidence graph yet.",
+    es: "Aún no hay grafo de evidencia.",
+  },
+  "fsrs.title": { en: "FSRS review", es: "Repaso FSRS" },
+  "fsrs.subtitle": {
+    en: "What · Why · When · How strong · Last · Next",
+    es: "Qué · Por qué · Cuándo · Fuerza · Última · Siguiente",
+  },
+  "fsrs.dueCount": { en: "Due now", es: "Pendientes" },
+  "fsrs.empty": {
+    en: "Nothing due right now.",
+    es: "Nada pendiente ahora.",
+  },
+  "fsrs.what": { en: "What", es: "Qué" },
+  "fsrs.why": { en: "Why", es: "Por qué" },
+  "fsrs.when": { en: "When", es: "Cuándo" },
+  "fsrs.howStrong": { en: "How strong", es: "Fuerza" },
+  "fsrs.lastEvidence": { en: "Last evidence", es: "Última evidencia" },
+  "fsrs.dueNow": { en: "due now", es: "ahora" },
+  "fsrs.never": { en: "never", es: "nunca" },
+  "fsrs.grade.again": { en: "Again", es: "Otra vez" },
+  "fsrs.grade.hard": { en: "Hard", es: "Difícil" },
+  "fsrs.grade.good": { en: "Good", es: "Bien" },
+  "fsrs.grade.easy": { en: "Easy", es: "Fácil" },
+  "fsrs.errorReview": {
+    en: "Could not record the review.",
+    es: "No se pudo registrar el repaso.",
+  },
+  "fsrs.whyReason.forgetting-curve": {
+    en: "forgetting curve",
+    es: "curva de olvido",
+  },
+  "fsrs.whyReason.weak-skill": { en: "weak skill", es: "destreza débil" },
+  "fsrs.whyReason.missing-delayed-evidence": {
+    en: "missing delayed evidence",
+    es: "falta evidencia retardada",
+  },
+  "fsrs.whyReason.maintenance": { en: "maintenance", es: "mantenimiento" },
+  "fsrs.whyReason.weak-lexicon": { en: "weak word", es: "palabra débil" },
+  "fsrs.whyReason.learning-lexicon": {
+    en: "learning word",
+    es: "palabra en aprendizaje",
+  },
+  "fsrs.whyReason.recognition-only": {
+    en: "recognized but not produced",
+    es: "reconocida sin producir",
+  },
+  "fsrs.whyReason.lexicon-maintenance": {
+    en: "lexicon maintenance",
+    es: "mantenimiento léxico",
+  },
+  "fsrs.whyReason.manual-review": {
+    en: "manual review",
+    es: "repaso manual",
+  },
+  "fsrs.whyReason.new": { en: "new card", es: "carta nueva" },
+  "fsrs.whyReason.evidence": { en: "from evidence", es: "desde evidencia" },
+  "fsrs.whyReason.scheduled": { en: "scheduled", es: "programado" },
+  "fsrs.whyReason.review": { en: "review", es: "repaso" },
+
   "scenarios.metric.interaction": { en: "Interaction", es: "Interacción" },
   "scenarios.metric.fluency": { en: "Fluency", es: "Fluidez" },
   "scenarios.metric.repair": { en: "Repair", es: "Reparación" },

@@ -40,6 +40,19 @@ se puede confirmar en hardware físico. Marca cada celda con:
 | iPhone | Chrome | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | iPad | Safari | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 
+## Checklist V3.0 Beta (pruebas reales)
+
+Además de la matriz, en la fase post-freeze (`docs/BETA_V3.md` §4.4) conviene
+ejercitar el stack pedagógico nuevo:
+
+1. **Speaking Mission**: un intento débil → drills → retry → ver improvement %.
+2. **Assessment 2.0**: formative de un objetivo + unit assessment.
+3. **FSRS**: abrir Today → Spaced review → grade Again/Good y ver nuevo due.
+4. **Evidence Graph**: Profile → can-do → comprobar limiting factor.
+5. **Next-best**: Home debe mostrar viñetas **Because:**.
+
+Marca la fila del dispositivo cuando esos cinco flujos pasen en LAN/HTTPS.
+
 ## Puntos de atención conocidos
 
 - **iPhone/iPad + Safari**: el acceso al micrófono exige HTTPS y, en algunos

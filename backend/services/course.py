@@ -161,8 +161,17 @@ def unit_sections(level: Level, unit) -> list[dict]:
     counts["interaction"] = sum(
         1 for o in objs if any(s in _INTERACTION_SUBSKILLS for s in o.subskills)
     )
-    counts["review"] = len(objs) if is_final else 0
-    counts["assessment"] = len(checks) if is_final else 0
+    # Review/assessment por unidad (V2.7): además del módulo Final, cuentan los
+    # marcadores de fase de cierre del Unit Learning Loop (consistente con
+    # `unit_learning_loop`). Así la sección refleja el contenido de cierre que ya
+    # etiquetan las unidades normales, no solo el módulo Final.
+    activities = [a for o in objs for a in o.activities]
+    counts["review"] = (len(objs) if is_final else 0) + sum(
+        1 for a in activities if a.phase == "review"
+    )
+    counts["assessment"] = (len(checks) if is_final else 0) + sum(
+        1 for a in activities if a.phase == "assess"
+    )
 
     return [
         {"section": section, "count": counts[section],

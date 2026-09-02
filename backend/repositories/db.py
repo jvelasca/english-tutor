@@ -366,6 +366,79 @@ def init_db() -> None:
             """
         )
 
+        # Speaking Mission Performance (V2.9): sesión trazable del loop
+        # Mission → Attempt → Evaluation → Drill → Retry → Improvement.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS speaking_mission_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'mission',
+                scenario_id TEXT NOT NULL DEFAULT '',
+                mission_json TEXT NOT NULL DEFAULT '{}',
+                attempt_json TEXT,
+                evaluation_json TEXT,
+                drill_json TEXT NOT NULL DEFAULT '[]',
+                retry_json TEXT,
+                improvement_json TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+        # Assessment 2.0 (V2.10): escalera formative/unit/progress/level/retention.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS assessment_v2_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                kind TEXT NOT NULL,
+                level_id TEXT NOT NULL DEFAULT '',
+                unit_id TEXT NOT NULL DEFAULT '',
+                objective_id TEXT NOT NULL DEFAULT '',
+                assessment_version TEXT NOT NULL DEFAULT '',
+                instrument_json TEXT NOT NULL DEFAULT '{}',
+                answers_json TEXT,
+                result_json TEXT,
+                retention_json TEXT,
+                source_session_id INTEGER,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+        # FSRS-lite (V2.11): estado de scheduling por target (skill/lexicon/objective).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS fsrs_cards (
+                user_id TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                label TEXT NOT NULL DEFAULT '',
+                state TEXT NOT NULL DEFAULT 'new',
+                difficulty REAL NOT NULL DEFAULT 5.0,
+                stability REAL NOT NULL DEFAULT 0.1,
+                reps INTEGER NOT NULL DEFAULT 0,
+                lapses INTEGER NOT NULL DEFAULT 0,
+                due_at TEXT NOT NULL DEFAULT '',
+                last_review_at TEXT NOT NULL DEFAULT '',
+                last_evidence_at TEXT NOT NULL DEFAULT '',
+                last_grade INTEGER,
+                why TEXT NOT NULL DEFAULT '',
+                fsrs_version TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, target_type, target_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Calibración observacional de ítems de placement (V1.7): contadores
         # poblacionales por ítem (no por usuario). Las columnas de estimación
         # (estimated_difficulty/standard_error/discrimination) las rellena un
@@ -661,6 +734,18 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_speaking_assessment_sessions_user_id "
             "ON speaking_assessment_sessions(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_speaking_mission_sessions_user_id "
+            "ON speaking_mission_sessions(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_assessment_v2_sessions_user_id "
+            "ON assessment_v2_sessions(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fsrs_cards_user_due "
+            "ON fsrs_cards(user_id, due_at)"
         )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).

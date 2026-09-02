@@ -127,6 +127,18 @@ SUBSKILLS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Foco pedagógico de listening por nivel (V2.8). Progresión CEFR auditada en
+# `listening_curriculum()`: cada objetivo de escucha debe entrenar subskills del
+# foco de su nivel, no solo referenciar ítems del banco.
+LISTENING_FOCUS_BY_LEVEL: dict[str, tuple[str, ...]] = {
+    "a1": ("word_recognition", "sound_recognition"),
+    "a2": ("gist", "detail", "word_recognition"),
+    "b1": ("connected_speech", "phrase_recognition", "fast_speech"),
+    "b2": ("inference", "speaker_intention", "attitude"),
+    "c1": ("inference", "attitude", "speaker_intention"),
+    "c2": ("inference", "attitude", "speaker_intention"),
+}
+
 # Fases canónicas del Unit Learning Loop (V2.6). Convierte una unidad en un bucle
 # pedagógico completo (introduce → practice → listen → speak → interact →
 # retrieve → transfer → assess → review) y no en una colección de contenidos.

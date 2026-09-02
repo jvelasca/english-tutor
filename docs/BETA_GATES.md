@@ -7,6 +7,10 @@ Fecha de evaluación: 2026-08-31. Versión: `2.0.0`.
 
 > **V2.1 CONTENT** (2026-08-31) amplió el contenido y añadió el Content Quality Gate
 > (umbrales de calidad, no solo integridad). Ver `CHANGELOG.md` [2.1.0].
+>
+> **V3.0 Beta freeze** (2026-09-02): tras V2.7–V2.12 el stack pedagógico está
+> cerrado. Gates pedagógicos G6–G9, checklist post-freeze y gate CI en
+> [`docs/BETA_V3.md`](BETA_V3.md) (`scripts/check_beta_v3.py`). Versión `3.0.0`.
 
 ---
 

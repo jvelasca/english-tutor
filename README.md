@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v2.5.0**.
+- Última versión estable: **v3.0.0**.
 
 ## Estructura
 
@@ -79,6 +79,31 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   (`listening_items`) y cada objetivo de speaking referencia un escenario (`scenario_ids`),
   cableando el curso secuencial a los bancos de destrezas (conteo y validación de integridad por
   nivel). Sin UI en este incremento.
+- **Curriculum Depth (V2.7)**: "cobertura ≠ profundidad" convertido en acción. Se alinea la medición
+  (review/assessment contados por marcador `phase` por unidad, no solo en el módulo Final), se pilota
+  **B1 como plantilla maestra de "Unit Architecture"** (10 → 18 objetivos reales) y se **escala a
+  A2 (11→17), B2 (9→13), C1 (7→14) y C2 (5→14)**, con el loop de aprendizaje cerrado y
+  listening/grammar/speaking/interaction por unidad en todos los niveles. Dashboard: Overall **94,5**,
+  depth media **84,0**, Listening **91,7**, Speaking/Interaction **100%**; todos los niveles con curso
+  superan depth 80. Referencia en `docs/UNIT_ARCHITECTURE.md`, briefings de escalado
+  `agentes/curriculum/v27-depth-*.md` y delta en `docs/CURRICULUM_COVERAGE.md`.
+- **Listening Curriculum (V2.8)**: cierre del listening en **todas las unidades** (A1
+  incluido), progresión CEFR por subskill (`word_recognition` → … → `inference`) y
+  métrica de alineación foco/subskill **100%**. Dashboard: Overall **95,7**, Listening
+  **100%**, Unit Learning Loop **100%**. Referencia en `docs/LISTENING_CURRICULUM.md`.
+- **Speaking Mission Performance (V2.9)**: loop
+  Mission → Attempt → Evaluation → Targeted drill → Retry → Improvement, con
+  drills por criterio débil y delta de mejora visible. Referencia en
+  `docs/SPEAKING_MISSION.md`.
+- **Assessment 2.0 (V2.10)**: escalera formative → unit → progress → level →
+  retention, con readiness derivado y mastery gate
+  (initial/practice/transfer/novel/delayed). Referencia en `docs/ASSESSMENT_2.md`.
+- **SRS / FSRS (V2.11)**: scheduler FSRS-lite (cartas skill/lexicon, cola due
+  auditable, grades 1..4). Referencia en `docs/FSRS.md`.
+- **Evidence Graph (V2.12)**: can-do → dimensiones → limiting factor, con
+  `because[]` en next-best. Referencia en `docs/EVIDENCE_GRAPH.md`.
+- **Beta V3.0 (freeze)**: stack pedagógico cerrado; trabajo permitido =
+  contenido / calibración / UX / pruebas reales. Ver `docs/BETA_V3.md`.
 
 ## Arranque rápido
 

@@ -24,11 +24,33 @@
                   "id": "b1-m01-u01-l01-o01",
                   "can_do": "I can talk about experiences using the present perfect and the past simple.",
                   "title": "Experiences: present perfect vs past simple",
-                  "skills": ["grammar", "vocabulary", "speaking", "writing", "pronunciation"],
-                  "subskills": ["tenses", "word_families", "fluency"],
-                  "scenario_ids": ["doctor"],
-                  "concepts": ["Present perfect for experience", "Past simple for finished time", "ever / never / already / yet"],
-                  "vocabulary": ["experience", "already", "yet", "ever", "never"],
+                  "skills": [
+                    "grammar",
+                    "vocabulary",
+                    "speaking",
+                    "writing",
+                    "pronunciation"
+                  ],
+                  "subskills": [
+                    "tenses",
+                    "word_families",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "doctor"
+                  ],
+                  "concepts": [
+                    "Present perfect for experience",
+                    "Past simple for finished time",
+                    "ever / never / already / yet"
+                  ],
+                  "vocabulary": [
+                    "experience",
+                    "already",
+                    "yet",
+                    "ever",
+                    "never"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m01-u01-l01-o01-a01",
@@ -70,21 +92,33 @@
                       "id": "b1-m01-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I have seen that film last week.", "I saw that film last week.", "I have saw that film last week."],
+                      "options": [
+                        "I have seen that film last week.",
+                        "I saw that film last week.",
+                        "I have saw that film last week."
+                      ],
                       "correct_index": 1
                     },
                     {
                       "id": "b1-m01-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["She has never been to London.", "She have never been to London.", "She never has been to London."],
+                      "options": [
+                        "She has never been to London.",
+                        "She have never been to London.",
+                        "She never has been to London."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m01-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'hasta ahora' in 'I have not finished it ___'?",
-                      "options": ["yet", "already", "ever"],
+                      "options": [
+                        "yet",
+                        "already",
+                        "ever"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -93,16 +127,58 @@
                   "id": "b1-m01-u01-l01-o02",
                   "can_do": "I can talk about unfinished time using 'yet' and 'already'.",
                   "title": "Yet and already",
-                  "skills": ["grammar", "vocabulary"],
-                  "subskills": ["tenses", "collocations"],
-                  "concepts": ["yet (negative / question)", "already (affirmative)"],
-                  "vocabulary": ["already", "yet", "just", "recently"],
+                  "skills": [
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "tenses",
+                    "collocations"
+                  ],
+                  "concepts": [
+                    "yet (negative / question)",
+                    "already (affirmative)"
+                  ],
+                  "vocabulary": [
+                    "already",
+                    "yet",
+                    "just",
+                    "recently"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m01-u01-l01-o02-a01",
                       "type": "dialogue",
                       "instruction": "Say two things you have already done today and one thing you have not done yet.",
                       "target": "I have already ... / I have not ... yet."
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say where 'yet' and 'already' go in a sentence.",
+                      "target": "already = affirmative / yet = negative and questions",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Talk about what a friend has already done or has not done yet today.",
+                      "target": "He/She has already ... / He/She has not ... yet.",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about unfinished time using 'yet' and 'already'.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m01-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, say two things you have already done and one thing you have not done yet.",
+                      "target": "I have already ... / I have not ... yet.",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -110,21 +186,33 @@
                       "id": "b1-m01-u01-l01-o02-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I have not finished my homework yet.", "I have not finished my homework already.", "I not have finished my homework yet."],
+                      "options": [
+                        "I have not finished my homework yet.",
+                        "I have not finished my homework already.",
+                        "I not have finished my homework yet."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m01-u01-l01-o02-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["He has already eaten lunch.", "He has eaten lunch yet.", "He already has ate lunch."],
+                      "options": [
+                        "He has already eaten lunch.",
+                        "He has eaten lunch yet.",
+                        "He already has ate lunch."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m01-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word is used in negative sentences and questions to mean 'todavía'?",
-                      "options": ["yet", "already", "just"],
+                      "options": [
+                        "yet",
+                        "already",
+                        "just"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -140,17 +228,65 @@
                   "id": "b1-m01-u01-l02-o03",
                   "can_do": "I can give and justify my opinions on everyday topics.",
                   "title": "Giving opinions",
-                  "skills": ["vocabulary", "speaking", "writing"],
-                  "subskills": ["collocations", "coherence", "fluency"],
-                  "scenario_ids": ["telephone"],
-                  "concepts": ["In my opinion", "I think / I believe", "From my point of view"],
-                  "vocabulary": ["opinion", "believe", "agree", "disagree", "point of view"],
+                  "skills": [
+                    "vocabulary",
+                    "speaking",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "collocations",
+                    "coherence",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "telephone"
+                  ],
+                  "concepts": [
+                    "In my opinion",
+                    "I think / I believe",
+                    "From my point of view"
+                  ],
+                  "vocabulary": [
+                    "opinion",
+                    "believe",
+                    "agree",
+                    "disagree",
+                    "point of view"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m01-u01-l02-o03-a01",
                       "type": "dialogue",
                       "instruction": "Give and justify your opinion about working from home.",
                       "target": "In my opinion ... because ..."
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three phrases that introduce a personal opinion.",
+                      "target": "In my opinion / I think / From my point of view",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Give and justify your opinion about a topic you have not discussed in this lesson.",
+                      "target": "In my opinion ... because ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can give and justify my opinions on everyday topics.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o03-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, give and justify your opinion about working from home.",
+                      "target": "In my opinion ... because ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -158,14 +294,22 @@
                       "id": "b1-m01-u01-l02-o03-c01",
                       "skill": "vocabulary",
                       "prompt": "Which phrase introduces a personal opinion?",
-                      "options": ["In my opinion", "At the end", "By the way"],
+                      "options": [
+                        "In my opinion",
+                        "At the end",
+                        "By the way"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m01-u01-l02-o03-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'tener la misma opinión'?",
-                      "options": ["agree", "argue", "avoid"],
+                      "options": [
+                        "agree",
+                        "argue",
+                        "avoid"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -174,17 +318,64 @@
                   "id": "b1-m01-u01-l02-o04",
                   "can_do": "I can agree and disagree politely in a conversation.",
                   "title": "Agreeing and disagreeing",
-                  "skills": ["vocabulary", "speaking"],
-                  "subskills": ["collocations", "interaction", "turn_taking"],
-                  "scenario_ids": ["housing"],
-                  "concepts": ["I agree with you", "I see your point, but", "That is a good point"],
-                  "vocabulary": ["agree", "disagree", "point", "perhaps", "however"],
+                  "skills": [
+                    "vocabulary",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "collocations",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "housing"
+                  ],
+                  "concepts": [
+                    "I agree with you",
+                    "I see your point, but",
+                    "That is a good point"
+                  ],
+                  "vocabulary": [
+                    "agree",
+                    "disagree",
+                    "point",
+                    "perhaps",
+                    "however"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m01-u01-l02-o04-a01",
                       "type": "dialogue",
                       "instruction": "Disagree politely with the tutor's opinion about social media.",
                       "target": "I see your point, but ..."
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two ways to disagree politely.",
+                      "target": "I see your point, but ... / That is a good point, however ...",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o04-a03",
+                      "type": "dialogue",
+                      "instruction": "Disagree politely with an opinion you have not discussed in this lesson.",
+                      "target": "I see your point, but ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can agree and disagree politely in a conversation.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o04-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, disagree politely with the tutor's opinion about social media.",
+                      "target": "I see your point, but ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -192,14 +383,226 @@
                       "id": "b1-m01-u01-l02-o04-c01",
                       "skill": "vocabulary",
                       "prompt": "Which phrase politely introduces a disagreement?",
-                      "options": ["I see your point, but", "You are wrong", "No way"],
+                      "options": [
+                        "I see your point, but",
+                        "You are wrong",
+                        "No way"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m01-u01-l02-o04-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'no estar de acuerdo'?",
-                      "options": ["disagree", "agree", "accept"],
+                      "options": [
+                        "disagree",
+                        "agree",
+                        "accept"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m01-u01-l02-o11",
+                  "can_do": "I can understand two people exchanging opinions and identify agreement and disagreement.",
+                  "title": "Listening to opinions",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "listening_items": [
+                    "c021",
+                    "c022",
+                    "c023",
+                    "c024"
+                  ],
+                  "concepts": [
+                    "identifying agreement",
+                    "identifying disagreement",
+                    "tone of voice"
+                  ],
+                  "vocabulary": [
+                    "agree",
+                    "disagree",
+                    "point",
+                    "opinion",
+                    "perhaps"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m01-u01-l02-o11-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a short conversation and say who agrees and who disagrees.",
+                      "target": "A agrees / B disagrees because ..."
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o11-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two phrases that show agreement and two that show disagreement.",
+                      "target": "I agree / that is a good point / I see your point, but / I am not sure",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o11-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a conversation where you agreed or disagreed with someone, outside this lesson.",
+                      "target": "I agreed because ... / I disagreed because ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o11-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand two people exchanging opinions.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o11-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and identify the speakers' opinions.",
+                      "target": "The first speaker thinks ... / the second disagrees because ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m01-u01-l02-o11-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'I think working from home is great, but I see what you mean about missing colleagues.' How does the speaker feel?",
+                      "options": [
+                        "Partly agrees",
+                        "Completely disagrees",
+                        "Has no opinion"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o11-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'That's a good point, actually.' What is the speaker doing?",
+                      "options": [
+                        "Agreeing",
+                        "Disagreeing",
+                        "Asking a question"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o11-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase shows polite disagreement?",
+                      "options": [
+                        "I see your point, but",
+                        "You are wrong",
+                        "No way"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m01-u01-l02-o12",
+                  "can_do": "I can link my opinions using discourse markers like 'firstly', 'however' and 'for example'.",
+                  "title": "Linking opinions with discourse markers",
+                  "skills": [
+                    "vocabulary",
+                    "writing",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "collocations",
+                    "coherence",
+                    "cohesion"
+                  ],
+                  "scenario_ids": [
+                    "storytelling"
+                  ],
+                  "concepts": [
+                    "firstly / secondly",
+                    "however",
+                    "for example",
+                    "on the other hand"
+                  ],
+                  "vocabulary": [
+                    "firstly",
+                    "however",
+                    "for example",
+                    "on the other hand",
+                    "in addition"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m01-u01-l02-o12-a01",
+                      "type": "writing",
+                      "instruction": "Write two opinions linked with 'firstly' and 'however'.",
+                      "target": "Firstly, I think ... / However, on the other hand ..."
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o12-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three discourse markers that link ideas.",
+                      "target": "firstly / however / for example",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o12-a03",
+                      "type": "dialogue",
+                      "instruction": "Give an opinion about a new topic using two discourse markers you have not practised.",
+                      "target": "On the other hand ... / for example ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o12-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can link my opinions using discourse markers.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o12-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write two opinions linked with discourse markers.",
+                      "target": "Firstly ... / However ... / for example ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m01-u01-l02-o12-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase introduces a contrast?",
+                      "options": [
+                        "however",
+                        "firstly",
+                        "for example"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o12-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase gives an example?",
+                      "options": [
+                        "for example",
+                        "on the other hand",
+                        "firstly"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m01-u01-l02-o12-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase adds a second point?",
+                      "options": [
+                        "in addition",
+                        "however",
+                        "for instance"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -229,11 +632,32 @@
                   "id": "b1-m02-u01-l01-o05",
                   "can_do": "I can talk about future plans and predictions.",
                   "title": "Future: will, going to, present continuous",
-                  "skills": ["grammar", "vocabulary", "speaking", "writing"],
-                  "subskills": ["tenses", "collocations", "fluency"],
-                  "scenario_ids": ["complaint"],
-                  "concepts": ["will for predictions", "going to for plans", "present continuous for arrangements"],
-                  "vocabulary": ["plan", "prediction", "arrangement", "probably", "definitely"],
+                  "skills": [
+                    "grammar",
+                    "vocabulary",
+                    "speaking",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "tenses",
+                    "collocations",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "complaint"
+                  ],
+                  "concepts": [
+                    "will for predictions",
+                    "going to for plans",
+                    "present continuous for arrangements"
+                  ],
+                  "vocabulary": [
+                    "plan",
+                    "prediction",
+                    "arrangement",
+                    "probably",
+                    "definitely"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m02-u01-l01-o05-a01",
@@ -275,21 +699,33 @@
                       "id": "b1-m02-u01-l01-o05-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence for a plan:",
-                      "options": ["I am going to visit my aunt.", "I will to visit my aunt.", "I am visit my aunt."],
+                      "options": [
+                        "I am going to visit my aunt.",
+                        "I will to visit my aunt.",
+                        "I am visit my aunt."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m02-u01-l01-o05-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence for a prediction:",
-                      "options": ["I think it will rain tomorrow.", "I think it is going rain tomorrow.", "I think it raining tomorrow."],
+                      "options": [
+                        "I think it will rain tomorrow.",
+                        "I think it is going rain tomorrow.",
+                        "I think it raining tomorrow."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m02-u01-l01-o05-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'un plan para el futuro'?",
-                      "options": ["arrangement", "argument", "answer"],
+                      "options": [
+                        "arrangement",
+                        "argument",
+                        "answer"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -298,16 +734,59 @@
                   "id": "b1-m02-u01-l01-o06",
                   "can_do": "I can use the first conditional to talk about possibilities.",
                   "title": "First conditional",
-                  "skills": ["grammar", "vocabulary"],
-                  "subskills": ["conditionals", "collocations"],
-                  "concepts": ["if + present simple", "will + infinitive", "unless"],
-                  "vocabulary": ["if", "unless", "result", "consequence"],
+                  "skills": [
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "conditionals",
+                    "collocations"
+                  ],
+                  "concepts": [
+                    "if + present simple",
+                    "will + infinitive",
+                    "unless"
+                  ],
+                  "vocabulary": [
+                    "if",
+                    "unless",
+                    "result",
+                    "consequence"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m02-u01-l01-o06-a01",
                       "type": "dialogue",
                       "instruction": "Say what you will do if it rains this weekend.",
                       "target": "If it rains, I will ..."
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o06-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the two parts of a first conditional sentence.",
+                      "target": "if + present simple / will + infinitive",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o06-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a friend will do in a situation you have not discussed.",
+                      "target": "If ..., he/she will ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o06-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use the first conditional to talk about possibilities.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o06-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, say what you will do if it rains this weekend.",
+                      "target": "If it rains, I will ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -315,21 +794,135 @@
                       "id": "b1-m02-u01-l01-o06-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["If it rains, I will stay at home.", "If it will rain, I stay at home.", "If it rained, I will stay at home."],
+                      "options": [
+                        "If it rains, I will stay at home.",
+                        "If it will rain, I stay at home.",
+                        "If it rained, I will stay at home."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m02-u01-l01-o06-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["Unless you hurry, you will miss the bus.", "Unless you will hurry, you miss the bus.", "Unless you hurry, you miss the bus."],
+                      "options": [
+                        "Unless you hurry, you will miss the bus.",
+                        "Unless you will hurry, you miss the bus.",
+                        "Unless you hurry, you miss the bus."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m02-u01-l01-o06-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'si no'?",
-                      "options": ["unless", "if", "although"],
+                      "options": [
+                        "unless",
+                        "if",
+                        "although"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m02-u01-l01-o13",
+                  "can_do": "I can understand people discussing future plans and arrangements.",
+                  "title": "Listening to plans",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "listening_items": [
+                    "c025",
+                    "c026",
+                    "c027",
+                    "c028"
+                  ],
+                  "concepts": [
+                    "plans and arrangements",
+                    "predictions",
+                    "key details"
+                  ],
+                  "vocabulary": [
+                    "plan",
+                    "arrangement",
+                    "prediction",
+                    "weekend",
+                    "probably"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m02-u01-l01-o13-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a conversation about plans and say what each person is going to do.",
+                      "target": "A is going to ... / B will probably ..."
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o13-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two ways people talk about future plans.",
+                      "target": "going to for plans / will for predictions",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o13-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe plans you heard about outside this lesson.",
+                      "target": "They are going to ... / They will probably ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o13-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand people discussing future plans.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o13-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and say what each person is going to do.",
+                      "target": "A is going to ... / B will probably ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m02-u01-l01-o13-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'I'm going to visit my aunt this weekend, and I'll probably stay until Sunday.' What is the speaker going to do?",
+                      "options": [
+                        "Visit their aunt",
+                        "Go to work",
+                        "Stay at home"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o13-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'We'll probably cancel the picnic if it rains.' What will they most likely do?",
+                      "options": [
+                        "Cancel the picnic",
+                        "Have the picnic",
+                        "Move the picnic indoors"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m02-u01-l01-o13-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'un plan para el futuro'?",
+                      "options": [
+                        "arrangement",
+                        "argument",
+                        "answer"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -345,17 +938,64 @@
                   "id": "b1-m02-u01-l02-o07",
                   "can_do": "I can talk about rules and obligations using 'have to' and 'must'.",
                   "title": "Obligation: have to / must",
-                  "skills": ["grammar", "vocabulary", "speaking"],
-                  "subskills": ["modals", "collocations", "fluency"],
-                  "scenario_ids": ["tech_support"],
-                  "concepts": ["have to (external rule)", "must (personal obligation)", "don't have to (no obligation)"],
-                  "vocabulary": ["rule", "obligation", "duty", "requirement"],
+                  "skills": [
+                    "grammar",
+                    "vocabulary",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "modals",
+                    "collocations",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "tech_support"
+                  ],
+                  "concepts": [
+                    "have to (external rule)",
+                    "must (personal obligation)",
+                    "don't have to (no obligation)"
+                  ],
+                  "vocabulary": [
+                    "rule",
+                    "obligation",
+                    "duty",
+                    "requirement"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m02-u01-l02-o07-a01",
                       "type": "dialogue",
                       "instruction": "Describe two rules at your job or school.",
                       "target": "At work I have to ... / I must ..."
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o07-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the difference between 'have to' and 'must'.",
+                      "target": "have to = external rule / must = personal obligation",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o07-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a rule in a place you have not talked about in this lesson.",
+                      "target": "You have to ... / You must ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o07-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about rules and obligations using 'have to' and 'must'.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o07-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, describe two rules at your job or school.",
+                      "target": "At work I have to ... / I must ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -363,21 +1003,134 @@
                       "id": "b1-m02-u01-l02-o07-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (external rule):",
-                      "options": ["You have to wear a uniform.", "You must to wear a uniform.", "You have wearing a uniform."],
+                      "options": [
+                        "You have to wear a uniform.",
+                        "You must to wear a uniform.",
+                        "You have wearing a uniform."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m02-u01-l02-o07-c02",
                       "skill": "grammar",
                       "prompt": "Choose the sentence that means there is NO obligation:",
-                      "options": ["You don't have to come early.", "You must come early.", "You have to come early."],
+                      "options": [
+                        "You don't have to come early.",
+                        "You must come early.",
+                        "You have to come early."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m02-u01-l02-o07-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'una norma'?",
-                      "options": ["rule", "rest", "reason"],
+                      "options": [
+                        "rule",
+                        "rest",
+                        "reason"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m02-u01-l02-o14",
+                  "can_do": "I can make suggestions and respond to plans in a conversation.",
+                  "title": "Making suggestions and responding",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "telephone"
+                  ],
+                  "concepts": [
+                    "Why don't we ...",
+                    "How about ...",
+                    "That sounds good",
+                    "I'd rather not"
+                  ],
+                  "vocabulary": [
+                    "suggest",
+                    "plan",
+                    "perhaps",
+                    "instead",
+                    "agree"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m02-u01-l02-o14-a01",
+                      "type": "dialogue",
+                      "instruction": "Suggest a plan for the weekend and respond to the tutor's idea.",
+                      "target": "Why don't we ... / That sounds good, but ..."
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o14-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two ways to make a suggestion and one polite way to refuse.",
+                      "target": "Why don't we ... / How about ... / I'd rather not ...",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o14-a03",
+                      "type": "dialogue",
+                      "instruction": "Make a suggestion about a plan you have not discussed in this lesson.",
+                      "target": "How about ... / Perhaps we could ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o14-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can make suggestions and respond to plans.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o14-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, suggest a plan and respond to the tutor's idea.",
+                      "target": "Why don't we ... / That sounds good, but ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m02-u01-l02-o14-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase makes a suggestion?",
+                      "options": [
+                        "Why don't we go out?",
+                        "I went out.",
+                        "We are out."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o14-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase politely refuses a suggestion?",
+                      "options": [
+                        "I'd rather not",
+                        "Of course",
+                        "Definitely"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m02-u01-l02-o14-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase accepts a suggestion?",
+                      "options": [
+                        "That sounds good",
+                        "I'd rather not",
+                        "Maybe not"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -407,11 +1160,32 @@
                   "id": "b1-m03-u01-l01-o08",
                   "can_do": "I can understand common connected speech forms like 'gonna' and 'wanna'.",
                   "title": "Connected speech: gonna / wanna / didja",
-                  "skills": ["listening", "vocabulary"],
-                  "subskills": ["connected_speech", "word_recognition"],
-                  "listening_items": ["l7", "l8", "l14", "l15"],
-                  "concepts": ["gonna = going to", "wanna = want to", "didja = did you"],
-                  "vocabulary": ["gonna", "wanna", "gotta", "didja", "couldja"],
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "listening_items": [
+                    "l7",
+                    "l8",
+                    "l14",
+                    "l15"
+                  ],
+                  "concepts": [
+                    "gonna = going to",
+                    "wanna = want to",
+                    "didja = did you"
+                  ],
+                  "vocabulary": [
+                    "gonna",
+                    "wanna",
+                    "gotta",
+                    "didja",
+                    "couldja"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m03-u01-l01-o08-a01",
@@ -453,21 +1227,33 @@
                       "id": "b1-m03-u01-l01-o08-c01",
                       "skill": "listening",
                       "prompt": "You hear: 'I'm gonna call you later.' What does 'gonna' mean?",
-                      "options": ["going to", "gone to", "go to"],
+                      "options": [
+                        "going to",
+                        "gone to",
+                        "go to"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m03-u01-l01-o08-c02",
                       "skill": "listening",
                       "prompt": "You hear: 'Didja see the match?' What does 'didja' mean?",
-                      "options": ["did you", "do you", "did he"],
+                      "options": [
+                        "did you",
+                        "do you",
+                        "did he"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m03-u01-l01-o08-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word is the informal contraction of 'want to'?",
-                      "options": ["wanna", "gonna", "gotta"],
+                      "options": [
+                        "wanna",
+                        "gonna",
+                        "gotta"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -476,17 +1262,66 @@
                   "id": "b1-m03-u01-l01-o09",
                   "can_do": "I can understand the main idea and key details of a short narrative.",
                   "title": "Narrative listening: gist and detail",
-                  "skills": ["listening", "reading", "vocabulary"],
-                  "subskills": ["gist", "detail", "skimming"],
-                  "listening_items": ["l18", "l19", "l22", "l23"],
-                  "concepts": ["main idea (gist)", "key details", "sequence of events"],
-                  "vocabulary": ["main idea", "detail", "event", "sequence"],
+                  "skills": [
+                    "listening",
+                    "reading",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "listening_items": [
+                    "l18",
+                    "l19",
+                    "l22",
+                    "l23"
+                  ],
+                  "concepts": [
+                    "main idea (gist)",
+                    "key details",
+                    "sequence of events"
+                  ],
+                  "vocabulary": [
+                    "main idea",
+                    "detail",
+                    "event",
+                    "sequence"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m03-u01-l01-o09-a01",
                       "type": "listening",
                       "instruction": "Listen to a short story and identify the main idea and two key details.",
                       "target": "The story is about ... / The key details are ..."
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o09-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the difference between the main idea and a detail.",
+                      "target": "main idea = what the story is about / detail = specific fact",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o09-a03",
+                      "type": "dialogue",
+                      "instruction": "Tell the main idea and two details of a story you heard outside this lesson.",
+                      "target": "The story is about ... / The details are ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o09-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand the main idea and key details of a short narrative.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o09-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen to a short story and identify the main idea and two key details.",
+                      "target": "The story is about ... / The key details are ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -494,21 +1329,312 @@
                       "id": "b1-m03-u01-l01-o09-c01",
                       "skill": "listening",
                       "prompt": "You hear: 'Last weekend we drove to the coast and, although it rained, we still had a great time.' What is the main idea?",
-                      "options": ["They enjoyed a trip to the coast.", "They stayed at home.", "They hated the coast."],
+                      "options": [
+                        "They enjoyed a trip to the coast.",
+                        "They stayed at home.",
+                        "They hated the coast."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m03-u01-l01-o09-c02",
                       "skill": "reading",
                       "prompt": "Read: 'Maria missed her train, but she caught the next one and arrived on time.' What happened?",
-                      "options": ["She arrived on time despite missing the first train.", "She arrived late.", "She never arrived."],
+                      "options": [
+                        "She arrived on time despite missing the first train.",
+                        "She arrived late.",
+                        "She never arrived."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m03-u01-l01-o09-c03",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'la idea principal'?",
-                      "options": ["main idea", "small detail", "side note"],
+                      "options": [
+                        "main idea",
+                        "small detail",
+                        "side note"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m03-u01-l01-o15",
+                  "can_do": "I can report what someone said using reported speech.",
+                  "title": "Reported speech",
+                  "skills": [
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "reported_speech",
+                    "tenses"
+                  ],
+                  "concepts": [
+                    "said that",
+                    "told me",
+                    "backshift: will → would"
+                  ],
+                  "vocabulary": [
+                    "say",
+                    "tell",
+                    "report",
+                    "mention",
+                    "promise"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m03-u01-l01-o15-a01",
+                      "type": "dialogue",
+                      "instruction": "Report what the tutor said in the previous exercise.",
+                      "target": "He/She said that ... / He/She told me that ..."
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o15-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how 'will' changes in reported speech.",
+                      "target": "will → would / said that / told me",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o15-a03",
+                      "type": "dialogue",
+                      "instruction": "Report something a friend said, outside this lesson.",
+                      "target": "He/She said that ... / He/She told me that ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o15-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can report what someone said using reported speech.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o15-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, report what the tutor said in the previous exercise.",
+                      "target": "He/She said that ... / He/She told me that ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m03-u01-l01-o15-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct reported speech:",
+                      "options": [
+                        "She said that she was tired.",
+                        "She said that she is tired.",
+                        "She said she tired."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o15-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct reported speech:",
+                      "options": [
+                        "He told me that he would call later.",
+                        "He told me that he will call later.",
+                        "He told that he would call later."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o15-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'decir a alguien'?",
+                      "options": [
+                        "tell",
+                        "say",
+                        "speak"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m03-u01-l01-o16",
+                  "can_do": "I can retell what I heard in my own words.",
+                  "title": "Retelling a narrative",
+                  "skills": [
+                    "speaking",
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "scenario_ids": [
+                    "storytelling"
+                  ],
+                  "listening_items": [
+                    "c029",
+                    "c030"
+                  ],
+                  "concepts": [
+                    "main events in order",
+                    "retelling in own words",
+                    "sequence"
+                  ],
+                  "vocabulary": [
+                    "first",
+                    "then",
+                    "after that",
+                    "finally",
+                    "happened"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m03-u01-l01-o16-a01",
+                      "type": "dialogue",
+                      "instruction": "Listen to a short story and retell it in your own words.",
+                      "target": "First ... / Then ... / Finally ..."
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o16-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three words that show the order of events.",
+                      "target": "first / then / finally",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o16-a03",
+                      "type": "dialogue",
+                      "instruction": "Retell a story you heard outside this lesson, using sequence words.",
+                      "target": "First ... / After that ... / Finally ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o16-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can retell what I heard in my own words.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o16-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, retell a short story in your own words.",
+                      "target": "First ... / Then ... / Finally ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m03-u01-l01-o16-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'First we boarded the train, then we found our seats, and finally we ordered lunch.' What happened right after boarding the train?",
+                      "options": [
+                        "They found their seats",
+                        "They ordered lunch",
+                        "They bought tickets"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o16-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word signals the last event in a sequence?",
+                      "options": [
+                        "finally",
+                        "first",
+                        "then"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m03-u01-l01-o17",
+                  "can_do": "I can react naturally to what someone says in a conversation.",
+                  "title": "Reacting in conversation",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "self_correction"
+                  ],
+                  "scenario_ids": [
+                    "small_talk_advanced"
+                  ],
+                  "concepts": [
+                    "Really?",
+                    "That's interesting",
+                    "I see",
+                    "What happened next?"
+                  ],
+                  "vocabulary": [
+                    "really",
+                    "interesting",
+                    "surprised",
+                    "react",
+                    "then"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m03-u01-l01-o17-a01",
+                      "type": "dialogue",
+                      "instruction": "Listen to the tutor's news and react naturally, then ask a follow-up question.",
+                      "target": "Really? / That's interesting. / What happened next?"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o17-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three natural reactions to someone's news.",
+                      "target": "Really? / That's interesting / I see",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o17-a03",
+                      "type": "dialogue",
+                      "instruction": "React to a piece of news you have not discussed in this lesson.",
+                      "target": "That's interesting. / What happened next?",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o17-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can react naturally to what someone says in a conversation.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o17-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, react naturally to the tutor's news and ask a follow-up question.",
+                      "target": "Really? / That's interesting. / What happened next?",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m03-u01-l01-o17-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word shows surprise at someone's news?",
+                      "options": [
+                        "Really?",
+                        "Anyway",
+                        "Perhaps"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m03-u01-l01-o17-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase asks someone to continue their story?",
+                      "options": [
+                        "What happened next?",
+                        "I see.",
+                        "That's it."
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -538,11 +1664,35 @@
                   "id": "b1-m04-u01-l01-o10",
                   "can_do": "I can express opinions, talk about the future and understand connected speech.",
                   "title": "Conversación final B1",
-                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
-                  "scenario_ids": ["small_talk_advanced"],
-                  "listening_items": ["c021", "c022", "c023", "c024"],
-                  "concepts": ["review: opinions, future, obligations, connected speech"],
-                  "vocabulary": ["review B1"],
+                  "skills": [
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "listening",
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "scenario_ids": [
+                    "small_talk_advanced"
+                  ],
+                  "listening_items": [
+                    "c021",
+                    "c022",
+                    "c023",
+                    "c024"
+                  ],
+                  "concepts": [
+                    "review: opinions, future, obligations, connected speech"
+                  ],
+                  "vocabulary": [
+                    "review B1"
+                  ],
                   "activities": [
                     {
                       "id": "b1-m04-u01-l01-o10-a01",
@@ -556,42 +1706,159 @@
                       "id": "b1-m04-u01-l01-o10-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["If I have time, I will call you.", "If I will have time, I call you.", "If I have time, I call you."],
+                      "options": [
+                        "If I have time, I will call you.",
+                        "If I will have time, I call you.",
+                        "If I have time, I call you."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["You don't have to stay if you're busy.", "You don't have stay if you're busy.", "You don't has to stay if you're busy."],
+                      "options": [
+                        "You don't have to stay if you're busy.",
+                        "You don't have stay if you're busy.",
+                        "You don't has to stay if you're busy."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c03",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'en mi opinión'?",
-                      "options": ["in my opinion", "by the way", "at least"],
+                      "options": [
+                        "in my opinion",
+                        "by the way",
+                        "at least"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word is the informal contraction of 'going to'?",
-                      "options": ["gonna", "wanna", "didja"],
+                      "options": [
+                        "gonna",
+                        "wanna",
+                        "didja"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c05",
                       "skill": "listening",
                       "prompt": "Listen: 'I'm gonna be a bit late, sorry.' What does the speaker mean?",
-                      "options": ["They will arrive late", "They will not come", "They are early"],
+                      "options": [
+                        "They will arrive late",
+                        "They will not come",
+                        "They are early"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c06",
                       "skill": "listening",
                       "prompt": "Listen: 'Unless we hurry, we'll miss the start of the film.' What do they need to do?",
-                      "options": ["Hurry", "Slow down", "Stay home"],
+                      "options": [
+                        "Hurry",
+                        "Slow down",
+                        "Stay home"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "b1-m04-u01-l01-o18",
+                  "can_do": "I can hold a natural B1 conversation using everything I have learned.",
+                  "title": "Conversación integrada B1",
+                  "skills": [
+                    "speaking",
+                    "listening",
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "connected_speech",
+                    "phrase_recognition"
+                  ],
+                  "scenario_ids": [
+                    "storytelling"
+                  ],
+                  "listening_items": [
+                    "c071",
+                    "c072",
+                    "c073",
+                    "c074"
+                  ],
+                  "concepts": [
+                    "review: opinions, future, obligations, connected speech, interaction"
+                  ],
+                  "vocabulary": [
+                    "review B1",
+                    "opinion",
+                    "plan",
+                    "react",
+                    "suggest"
+                  ],
+                  "activities": [
+                    {
+                      "id": "b1-m04-u01-l01-o18-a01",
+                      "type": "dialogue",
+                      "instruction": "Tell a short story and react to the tutor's questions and comments.",
+                      "target": "B1 level conversation with opinions, plans and reactions"
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o18-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, list three things you can now do in English at B1 level.",
+                      "target": "express opinions / talk about plans / understand connected speech",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o18-a03",
+                      "type": "dialogue",
+                      "instruction": "Use everything you have learned to talk about a completely new situation.",
+                      "target": "B1 level conversation in a new context",
+                      "phase": "transfer"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "b1-m04-u01-l01-o18-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": [
+                        "She told me that she would arrive soon.",
+                        "She told me that she will arrive soon.",
+                        "She told that she would arrive soon."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o18-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'That's a good point, but I see it differently.' What is the speaker doing?",
+                      "options": [
+                        "Politely disagreeing",
+                        "Completely agreeing",
+                        "Ending the conversation"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "b1-m04-u01-l01-o18-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase makes a suggestion?",
+                      "options": [
+                        "Why don't we try again?",
+                        "We tried again.",
+                        "Try again!"
+                      ],
                       "correct_index": 0
                     }
                   ]

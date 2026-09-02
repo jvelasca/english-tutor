@@ -24,11 +24,34 @@
                   "id": "a2-m01-u01-l01-o01",
                   "can_do": "I can describe past experiences and events.",
                   "title": "Experiencias pasadas",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["restaurant"],
-                  "concepts": ["Past Simple (irregular verbs)", "I went", "I saw", "I had"],
-                  "vocabulary": ["went", "saw", "had", "did", "last year", "ago"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "restaurant"
+                  ],
+                  "concepts": [
+                    "Past Simple (irregular verbs)",
+                    "I went",
+                    "I saw",
+                    "I had"
+                  ],
+                  "vocabulary": [
+                    "went",
+                    "saw",
+                    "had",
+                    "did",
+                    "last year",
+                    "ago"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m01-u01-l01-o01-a01",
@@ -70,28 +93,44 @@
                       "id": "a2-m01-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (Past Simple):",
-                      "options": ["Last year I went to France.", "Last year I go to France.", "Last year I going to France."],
+                      "options": [
+                        "Last year I went to France.",
+                        "Last year I go to France.",
+                        "Last year I going to France."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m01-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I saw a great film.", "I see a great film last night.", "I seeing a great film."],
+                      "options": [
+                        "I saw a great film.",
+                        "I see a great film last night.",
+                        "I seeing a great film."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m01-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word is the past of 'go'?",
-                      "options": ["went", "goed", "gone"],
+                      "options": [
+                        "went",
+                        "goed",
+                        "gone"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m01-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'hace un año'?",
-                      "options": ["last year", "next year", "this year"],
+                      "options": [
+                        "last year",
+                        "next year",
+                        "this year"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -100,17 +139,66 @@
                   "id": "a2-m01-u01-l01-o02",
                   "can_do": "I can talk about life experiences using the present perfect.",
                   "title": "Present Perfect (introducción)",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["travel"],
-                  "concepts": ["Present Perfect", "have/has + past participle", "ever", "never"],
-                  "vocabulary": ["ever", "never", "been", "seen", "done"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "travel"
+                  ],
+                  "concepts": [
+                    "Present Perfect",
+                    "have/has + past participle",
+                    "ever",
+                    "never"
+                  ],
+                  "vocabulary": [
+                    "ever",
+                    "never",
+                    "been",
+                    "seen",
+                    "done"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m01-u01-l01-o02-a01",
                       "type": "dialogue",
                       "instruction": "Say two places you have visited and one thing you have never done.",
                       "target": "I have been to ... / I have never ..."
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say when you use 'ever' and 'never'.",
+                      "target": "ever = questions / never = negatives",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a friend has done or has never done, not about you.",
+                      "target": "He/She has been to ... / He/She has never ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can talk about life experiences using the present perfect.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, say two places you have visited and one thing you have never done.",
+                      "target": "I have been to ... / I have never ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -118,14 +206,124 @@
                       "id": "a2-m01-u01-l01-o02-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (Present Perfect):",
-                      "options": ["I have been to Italy.", "I have be to Italy.", "I has been to Italy."],
+                      "options": [
+                        "I have been to Italy.",
+                        "I have be to Italy.",
+                        "I has been to Italy."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m01-u01-l01-o02-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["She has never seen the sea.", "She have never seen the sea.", "She has never saw the sea."],
+                      "options": [
+                        "She has never seen the sea.",
+                        "She have never seen the sea.",
+                        "She has never saw the sea."
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m01-u01-l01-o03",
+                  "can_do": "I can understand people talking about past experiences.",
+                  "title": "Listening: el pasado",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "gist",
+                    "detail"
+                  ],
+                  "listening_items": [
+                    "c013",
+                    "c014",
+                    "c015",
+                    "c016"
+                  ],
+                  "concepts": [
+                    "past time expressions",
+                    "key events",
+                    "sequence"
+                  ],
+                  "vocabulary": [
+                    "yesterday",
+                    "last week",
+                    "ago",
+                    "holiday",
+                    "trip"
+                  ],
+                  "activities": [
+                    {
+                      "id": "a2-m01-u01-l01-o03-a01",
+                      "type": "listening",
+                      "instruction": "Listen to someone describe a past holiday and say where they went.",
+                      "target": "They went to ... / They visited ..."
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three time expressions for the past.",
+                      "target": "yesterday / last week / ago",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a past experience you heard about outside this lesson.",
+                      "target": "They went to ... / They visited ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand people talking about past experiences.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o03-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and say where the speaker went and when.",
+                      "target": "They went to ... / They visited ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m01-u01-l01-o03-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'Last year I went to Italy on holiday.' Where did the speaker go?",
+                      "options": [
+                        "To Italy",
+                        "To Spain",
+                        "To France"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o03-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'I visited my grandmother two weeks ago.' When did the speaker visit their grandmother?",
+                      "options": [
+                        "Two weeks ago",
+                        "Two months ago",
+                        "Last year"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m01-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'el año pasado'?",
+                      "options": [
+                        "last year",
+                        "next year",
+                        "this year"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -155,11 +353,32 @@
                   "id": "a2-m02-u01-l01-o01",
                   "can_do": "I can compare people, places and things.",
                   "title": "Comparativos",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["small_talk"],
-                  "concepts": ["comparatives", "bigger than", "more interesting than"],
-                  "vocabulary": ["bigger", "smaller", "cheaper", "more", "than"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "small_talk"
+                  ],
+                  "concepts": [
+                    "comparatives",
+                    "bigger than",
+                    "more interesting than"
+                  ],
+                  "vocabulary": [
+                    "bigger",
+                    "smaller",
+                    "cheaper",
+                    "more",
+                    "than"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m02-u01-l01-o01-a01",
@@ -201,28 +420,44 @@
                       "id": "a2-m02-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["My city is bigger than yours.", "My city is big than yours.", "My city is more big than yours."],
+                      "options": [
+                        "My city is bigger than yours.",
+                        "My city is big than yours.",
+                        "My city is more big than yours."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m02-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["This film is more interesting than that one.", "This film is interestinger than that one.", "This film is more interesting that that one."],
+                      "options": [
+                        "This film is more interesting than that one.",
+                        "This film is interestinger than that one.",
+                        "This film is more interesting that that one."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m02-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'más grande'?",
-                      "options": ["bigger", "smaller", "cheaper"],
+                      "options": [
+                        "bigger",
+                        "smaller",
+                        "cheaper"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m02-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'más barato'?",
-                      "options": ["cheaper", "bigger", "more"],
+                      "options": [
+                        "cheaper",
+                        "bigger",
+                        "more"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -231,17 +466,65 @@
                   "id": "a2-m02-u01-l01-o02",
                   "can_do": "I can describe the best or worst of something.",
                   "title": "Superlativos",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation", "vocabulary"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["bank"],
-                  "concepts": ["superlatives", "the biggest", "the most beautiful"],
-                  "vocabulary": ["the best", "the worst", "the biggest", "the most"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "bank"
+                  ],
+                  "concepts": [
+                    "superlatives",
+                    "the biggest",
+                    "the most beautiful"
+                  ],
+                  "vocabulary": [
+                    "the best",
+                    "the worst",
+                    "the biggest",
+                    "the most"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m02-u01-l01-o02-a01",
                       "type": "dialogue",
                       "instruction": "Say the best and the worst thing about your city.",
                       "target": "The best thing is ... / The worst thing is ..."
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you form a superlative.",
+                      "target": "the + -est / the most + adjective",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Say the best and worst thing about a place you have not described before.",
+                      "target": "The best thing is ... / The worst thing is ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can describe the best or worst of something.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, say the best and the worst thing about your city.",
+                      "target": "The best thing is ... / The worst thing is ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -249,28 +532,146 @@
                       "id": "a2-m02-u01-l01-o02-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["This is the biggest city in the country.", "This is the most biggest city.", "This is bigger city in the country."],
+                      "options": [
+                        "This is the biggest city in the country.",
+                        "This is the most biggest city.",
+                        "This is bigger city in the country."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m02-u01-l01-o02-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["She is the most beautiful.", "She is the beautifulest.", "She is most beautiful the."],
+                      "options": [
+                        "She is the most beautiful.",
+                        "She is the beautifulest.",
+                        "She is most beautiful the."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m02-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'el mejor'?",
-                      "options": ["the best", "the worst", "the biggest"],
+                      "options": [
+                        "the best",
+                        "the worst",
+                        "the biggest"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m02-u01-l01-o02-c04",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'el peor'?",
-                      "options": ["the worst", "the best", "the most"],
+                      "options": [
+                        "the worst",
+                        "the best",
+                        "the most"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m02-u01-l01-o03",
+                  "can_do": "I can understand comparisons and opinions about people and places.",
+                  "title": "Listening: comparaciones",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "gist",
+                    "detail"
+                  ],
+                  "listening_items": [
+                    "c017",
+                    "c018",
+                    "c019",
+                    "c020"
+                  ],
+                  "concepts": [
+                    "comparative forms",
+                    "opinions",
+                    "agreement"
+                  ],
+                  "vocabulary": [
+                    "bigger",
+                    "more expensive",
+                    "better",
+                    "worse",
+                    "than"
+                  ],
+                  "activities": [
+                    {
+                      "id": "a2-m02-u01-l01-o03-a01",
+                      "type": "listening",
+                      "instruction": "Listen to two people compare two cities and say which one they prefer.",
+                      "target": "They prefer ... because ..."
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two comparative words you just heard.",
+                      "target": "bigger / more expensive / better / worse",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe a comparison you heard outside this lesson.",
+                      "target": "They said ... is ... than ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand comparisons and opinions about people and places.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o03-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and say which of two places the speaker prefers.",
+                      "target": "They prefer ... because ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m02-u01-l01-o03-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'Madrid is bigger than my city, but it is also more expensive.' Which city is bigger?",
+                      "options": [
+                        "Madrid",
+                        "The speaker's city",
+                        "Both"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o03-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'This is the best restaurant in town.' What does the speaker think?",
+                      "options": [
+                        "It is better than the others",
+                        "It is the worst",
+                        "It is closed"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m02-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'más caro'?",
+                      "options": [
+                        "more expensive",
+                        "cheaper",
+                        "bigger"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -300,11 +701,30 @@
                   "id": "a2-m03-u01-l01-o01",
                   "can_do": "I can talk about plans and intentions.",
                   "title": "Planes e intenciones",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["airport"],
-                  "concepts": ["going to + verb", "plan to", "hope to"],
-                  "vocabulary": ["plan", "hope", "intend", "next month"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "airport"
+                  ],
+                  "concepts": [
+                    "going to + verb",
+                    "plan to",
+                    "hope to"
+                  ],
+                  "vocabulary": [
+                    "plan",
+                    "hope",
+                    "intend",
+                    "next month"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m03-u01-l01-o01-a01",
@@ -346,14 +766,22 @@
                       "id": "a2-m03-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["Next month I am going to start a course.", "Next month I am going start a course.", "Next month I going to start a course."],
+                      "options": [
+                        "Next month I am going to start a course.",
+                        "Next month I am going start a course.",
+                        "Next month I going to start a course."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m03-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I plan to visit my family.", "I plan visit my family.", "I planning to visit my family."],
+                      "options": [
+                        "I plan to visit my family.",
+                        "I plan visit my family.",
+                        "I planning to visit my family."
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -362,17 +790,64 @@
                   "id": "a2-m03-u01-l01-o02",
                   "can_do": "I can make predictions and spontaneous decisions.",
                   "title": "Predicciones y decisiones",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["appointment"],
-                  "concepts": ["will + verb", "I think it will", "I will help"],
-                  "vocabulary": ["will", "probably", "maybe", "soon"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "appointment"
+                  ],
+                  "concepts": [
+                    "will + verb",
+                    "I think it will",
+                    "I will help"
+                  ],
+                  "vocabulary": [
+                    "will",
+                    "probably",
+                    "maybe",
+                    "soon"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m03-u01-l01-o02-a01",
                       "type": "dialogue",
                       "instruction": "Make one prediction about the weather and one spontaneous decision.",
                       "target": "I think it will ... / I will ..."
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you make a prediction with 'will'.",
+                      "target": "I think it will + verb",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Make a prediction about something you have not discussed in this unit.",
+                      "target": "I think it will ... / probably ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can make predictions and spontaneous decisions.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, make one prediction and one spontaneous decision.",
+                      "target": "I think it will ... / I will ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -380,14 +855,124 @@
                       "id": "a2-m03-u01-l01-o02-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I think it will rain.", "I think it will rains.", "I think it rains will."],
+                      "options": [
+                        "I think it will rain.",
+                        "I think it will rains.",
+                        "I think it rains will."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m03-u01-l01-o02-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I will help you.", "I will helps you.", "I helping will you."],
+                      "options": [
+                        "I will help you.",
+                        "I will helps you.",
+                        "I helping will you."
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m03-u01-l01-o03",
+                  "can_do": "I can understand people talking about future plans and predictions.",
+                  "title": "Listening: planes y predicciones",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "gist",
+                    "detail"
+                  ],
+                  "listening_items": [
+                    "c056",
+                    "c057",
+                    "c058",
+                    "c059"
+                  ],
+                  "concepts": [
+                    "going to for plans",
+                    "will for predictions",
+                    "key details"
+                  ],
+                  "vocabulary": [
+                    "plan",
+                    "prediction",
+                    "probably",
+                    "next month",
+                    "soon"
+                  ],
+                  "activities": [
+                    {
+                      "id": "a2-m03-u01-l01-o03-a01",
+                      "type": "listening",
+                      "instruction": "Listen to someone talk about their plans and say what they are going to do.",
+                      "target": "They are going to ... / They will probably ..."
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two ways to talk about the future.",
+                      "target": "going to / will",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Describe plans you heard about outside this lesson.",
+                      "target": "They are going to ... / They will probably ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand people talking about future plans and predictions.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o03-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and say what the speaker is going to do.",
+                      "target": "They are going to ... / They will probably ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m03-u01-l01-o03-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'I'm going to visit my family next month, and I think it will be great.' What is the speaker going to do next month?",
+                      "options": [
+                        "Visit their family",
+                        "Go to work",
+                        "Stay home"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o03-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'It will probably rain tomorrow.' What does the speaker predict?",
+                      "options": [
+                        "Rain tomorrow",
+                        "Snow tomorrow",
+                        "Sunshine tomorrow"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m03-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'probablemente'?",
+                      "options": [
+                        "probably",
+                        "maybe",
+                        "soon"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -417,12 +1002,39 @@
                   "id": "a2-m04-u01-l01-o01",
                   "can_do": "I can buy tickets and ask about transport.",
                   "title": "Comprar billetes",
-                  "skills": ["vocabulary", "speaking", "writing", "pronunciation", "listening"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["restaurant"],
-                  "listening_items": ["l4", "l5", "l6", "l10"],
-                  "concepts": ["Can I have ...?", "How much is a ticket to ...?"],
-                  "vocabulary": ["ticket", "train", "bus", "airport", "return"],
+                  "skills": [
+                    "vocabulary",
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "listening"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "gist",
+                    "detail"
+                  ],
+                  "scenario_ids": [
+                    "restaurant"
+                  ],
+                  "listening_items": [
+                    "l4",
+                    "l5",
+                    "l6",
+                    "l10"
+                  ],
+                  "concepts": [
+                    "Can I have ...?",
+                    "How much is a ticket to ...?"
+                  ],
+                  "vocabulary": [
+                    "ticket",
+                    "train",
+                    "bus",
+                    "airport",
+                    "return"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m04-u01-l01-o01-a01",
@@ -464,28 +1076,44 @@
                       "id": "a2-m04-u01-l01-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'billete'?",
-                      "options": ["ticket", "train", "bus"],
+                      "options": [
+                        "ticket",
+                        "train",
+                        "bus"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m04-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'aeropuerto'?",
-                      "options": ["airport", "station", "return"],
+                      "options": [
+                        "airport",
+                        "station",
+                        "return"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m04-u01-l01-o01-c03",
                       "skill": "listening",
                       "prompt": "Listen: 'How much is a return ticket to London?' What does he want?",
-                      "options": ["A return ticket", "A single ticket", "A bus"],
+                      "options": [
+                        "A return ticket",
+                        "A single ticket",
+                        "A bus"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m04-u01-l01-o01-c04",
                       "skill": "listening",
                       "prompt": "Listen: 'The train leaves at ten.' What time does the train leave?",
-                      "options": ["At ten", "At nine", "At eleven"],
+                      "options": [
+                        "At ten",
+                        "At nine",
+                        "At eleven"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -494,17 +1122,64 @@
                   "id": "a2-m04-u01-l01-o02",
                   "can_do": "I can describe what I have to do and what I must not do.",
                   "title": "Obligación",
-                  "skills": ["grammar", "speaking", "writing", "pronunciation"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["travel"],
-                  "concepts": ["have to", "must", "mustn't"],
-                  "vocabulary": ["have to", "must", "mustn't", "allowed"],
+                  "skills": [
+                    "grammar",
+                    "speaking",
+                    "writing",
+                    "pronunciation"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "travel"
+                  ],
+                  "concepts": [
+                    "have to",
+                    "must",
+                    "mustn't"
+                  ],
+                  "vocabulary": [
+                    "have to",
+                    "must",
+                    "mustn't",
+                    "allowed"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m04-u01-l01-o02-a01",
                       "type": "dialogue",
                       "instruction": "Say two things you have to do before a trip.",
                       "target": "I have to ... / I mustn't ..."
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the difference between 'have to' and 'mustn't'.",
+                      "target": "have to = obligation / mustn't = prohibition",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Say what a friend has to do or mustn't do before a trip, not about you.",
+                      "target": "He/She has to ... / He/She mustn't ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can describe what I have to do and what I must not do.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m04-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, say two things you have to do before a trip.",
+                      "target": "I have to ... / I mustn't ...",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -512,14 +1187,22 @@
                       "id": "a2-m04-u01-l01-o02-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I have to buy a ticket.", "I has to buy a ticket.", "I have buy a ticket."],
+                      "options": [
+                        "I have to buy a ticket.",
+                        "I has to buy a ticket.",
+                        "I have buy a ticket."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m04-u01-l01-o02-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["You mustn't smoke here.", "You mustn't to smoke here.", "You don't mustn't smoke here."],
+                      "options": [
+                        "You mustn't smoke here.",
+                        "You mustn't to smoke here.",
+                        "You don't mustn't smoke here."
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -549,11 +1232,32 @@
                   "id": "a2-m05-u01-l01-o01",
                   "can_do": "I can describe how I feel and give simple advice.",
                   "title": "Salud y consejos",
-                  "skills": ["vocabulary", "speaking", "writing", "pronunciation", "grammar"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["small_talk"],
-                  "concepts": ["should / shouldn't", "I feel", "I have a ..."],
-                  "vocabulary": ["headache", "cold", "tired", "should", "rest"],
+                  "skills": [
+                    "vocabulary",
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "grammar"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "small_talk"
+                  ],
+                  "concepts": [
+                    "should / shouldn't",
+                    "I feel",
+                    "I have a ..."
+                  ],
+                  "vocabulary": [
+                    "headache",
+                    "cold",
+                    "tired",
+                    "should",
+                    "rest"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m05-u01-l01-o01-a01",
@@ -595,28 +1299,235 @@
                       "id": "a2-m05-u01-l01-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'dolor de cabeza'?",
-                      "options": ["headache", "cold", "tired"],
+                      "options": [
+                        "headache",
+                        "cold",
+                        "tired"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m05-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'cansado'?",
-                      "options": ["tired", "rest", "cold"],
+                      "options": [
+                        "tired",
+                        "rest",
+                        "cold"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m05-u01-l01-o01-c03",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["You should rest.", "You should to rest.", "You should resting."],
+                      "options": [
+                        "You should rest.",
+                        "You should to rest.",
+                        "You should resting."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m05-u01-l01-o01-c04",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I have a cold.", "I has a cold.", "I am have a cold."],
+                      "options": [
+                        "I have a cold.",
+                        "I has a cold.",
+                        "I am have a cold."
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m05-u01-l01-o02",
+                  "can_do": "I can understand simple health advice.",
+                  "title": "Listening: consejos de salud",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "gist",
+                    "detail"
+                  ],
+                  "listening_items": [
+                    "c060",
+                    "c061",
+                    "c062",
+                    "c063"
+                  ],
+                  "concepts": [
+                    "should / shouldn't",
+                    "symptoms",
+                    "advice"
+                  ],
+                  "vocabulary": [
+                    "headache",
+                    "cold",
+                    "rest",
+                    "drink",
+                    "advice"
+                  ],
+                  "activities": [
+                    {
+                      "id": "a2-m05-u01-l01-o02-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a doctor give advice and say what the patient should do.",
+                      "target": "The patient should ... / The patient shouldn't ..."
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two health words from this unit.",
+                      "target": "headache / cold / rest",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Repeat health advice you heard outside this lesson.",
+                      "target": "You should ... / You shouldn't ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand simple health advice.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o02-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and say what the patient should do.",
+                      "target": "The patient should ... / The patient shouldn't ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m05-u01-l01-o02-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'You should rest and drink more water.' What advice does the speaker give?",
+                      "options": [
+                        "Rest and drink water",
+                        "Go to work",
+                        "Exercise more"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o02-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'I have a headache.' What is the problem?",
+                      "options": [
+                        "A headache",
+                        "A cold",
+                        "A broken leg"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'consejo'?",
+                      "options": [
+                        "advice",
+                        "health",
+                        "rest"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m05-u01-l01-o03",
+                  "can_do": "I can book an appointment and describe what I need.",
+                  "title": "Pedir cita",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "appointment"
+                  ],
+                  "concepts": [
+                    "I'd like to make an appointment",
+                    "What time is good?",
+                    "I need to see ..."
+                  ],
+                  "vocabulary": [
+                    "appointment",
+                    "book",
+                    "available",
+                    "time",
+                    "confirm"
+                  ],
+                  "activities": [
+                    {
+                      "id": "a2-m05-u01-l01-o03-a01",
+                      "type": "dialogue",
+                      "instruction": "Book an appointment with the tutor and say what you need.",
+                      "target": "I'd like to make an appointment ... / What time is good?"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two phrases to book an appointment.",
+                      "target": "I'd like to make an appointment / What time is good?",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Book an appointment for a different kind of service you have not practised.",
+                      "target": "I'd like to book ... / When is it available?",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can book an appointment and describe what I need.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o03-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, book an appointment with the tutor and say what you need.",
+                      "target": "I'd like to make an appointment ... / What time is good?",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m05-u01-l01-o03-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase books an appointment?",
+                      "options": [
+                        "I'd like to make an appointment, please.",
+                        "I made an appointment yesterday.",
+                        "The appointment is tomorrow."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m05-u01-l01-o03-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'cita'?",
+                      "options": [
+                        "appointment",
+                        "advice",
+                        "health"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -646,11 +1557,33 @@
                   "id": "a2-m06-u01-l01-o01",
                   "can_do": "I can tell a short story using linking words.",
                   "title": "Contar una historia",
-                  "skills": ["speaking", "writing", "pronunciation", "grammar", "vocabulary"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["bank"],
-                  "concepts": ["then", "after that", "suddenly", "finally"],
-                  "vocabulary": ["first", "then", "after that", "suddenly", "finally"],
+                  "skills": [
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "bank"
+                  ],
+                  "concepts": [
+                    "then",
+                    "after that",
+                    "suddenly",
+                    "finally"
+                  ],
+                  "vocabulary": [
+                    "first",
+                    "then",
+                    "after that",
+                    "suddenly",
+                    "finally"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m06-u01-l01-o01-a01",
@@ -692,28 +1625,146 @@
                       "id": "a2-m06-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct linking word: 'First, ___ after that, we went home.'",
-                      "options": ["then", "than", "that"],
+                      "options": [
+                        "then",
+                        "than",
+                        "that"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m06-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["We went to the beach and then we had lunch.", "We go to the beach and then we had lunch.", "We went to the beach and then we have lunch."],
+                      "options": [
+                        "We went to the beach and then we had lunch.",
+                        "We go to the beach and then we had lunch.",
+                        "We went to the beach and then we have lunch."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m06-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'de repente'?",
-                      "options": ["suddenly", "first", "finally"],
+                      "options": [
+                        "suddenly",
+                        "first",
+                        "finally"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m06-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'finalmente'?",
-                      "options": ["finally", "then", "after that"],
+                      "options": [
+                        "finally",
+                        "then",
+                        "after that"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "a2-m06-u01-l01-o02",
+                  "can_do": "I can follow a simple story when I listen to it.",
+                  "title": "Listening: una historia",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "gist",
+                    "detail"
+                  ],
+                  "listening_items": [
+                    "c064",
+                    "c065",
+                    "c066",
+                    "c067"
+                  ],
+                  "concepts": [
+                    "sequence words",
+                    "main events",
+                    "surprise"
+                  ],
+                  "vocabulary": [
+                    "first",
+                    "then",
+                    "finally",
+                    "suddenly",
+                    "happened"
+                  ],
+                  "activities": [
+                    {
+                      "id": "a2-m06-u01-l01-o02-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a short story and say what happened in order.",
+                      "target": "First ... / Then ... / Finally ..."
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three sequence words.",
+                      "target": "first / then / finally",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Retell a story you heard outside this lesson, using sequence words.",
+                      "target": "First ... / Then ... / Finally ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can follow a simple story when I listen to it.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o02-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen to a short story and say what happened in order.",
+                      "target": "First ... / Then ... / Finally ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "a2-m06-u01-l01-o02-c01",
+                      "skill": "listening",
+                      "prompt": "You hear: 'First we went to the beach, then we had lunch, and finally we went home.' What did they do first?",
+                      "options": [
+                        "Went to the beach",
+                        "Had lunch",
+                        "Went home"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o02-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'A dog followed me home yesterday.' What is the story about?",
+                      "options": [
+                        "A dog",
+                        "A cat",
+                        "A car"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "a2-m06-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'de repente'?",
+                      "options": [
+                        "suddenly",
+                        "first",
+                        "finally"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -743,18 +1794,55 @@
                   "id": "a2-m07-u01-l01-o01",
                   "can_do": "I can hold a natural conversation about my past, my plans and everyday situations.",
                   "title": "Conversación final A2",
-                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["airport"],
-                  "listening_items": ["l12", "l13", "c011", "c012"],
-                  "concepts": ["review: past, future, travel, health, stories"],
-                  "vocabulary": ["review A2"],
+                  "skills": [
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "listening",
+                    "grammar",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "gist",
+                    "detail"
+                  ],
+                  "scenario_ids": [
+                    "airport"
+                  ],
+                  "listening_items": [
+                    "l12",
+                    "l13",
+                    "c011",
+                    "c012"
+                  ],
+                  "concepts": [
+                    "review: past, future, travel, health, stories"
+                  ],
+                  "vocabulary": [
+                    "review A2"
+                  ],
                   "activities": [
                     {
                       "id": "a2-m07-u01-l01-o01-a01",
                       "type": "dialogue",
                       "instruction": "Have a conversation with the tutor about a past experience and a future plan.",
                       "target": "A2 level conversation"
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say three things you can now talk about at A2 level.",
+                      "target": "past experiences / future plans / everyday situations",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "a2-m07-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Talk about a completely new situation using everything you learned at A2.",
+                      "target": "A2 level conversation in a new context",
+                      "phase": "transfer"
                     }
                   ],
                   "checks": [
@@ -762,42 +1850,66 @@
                       "id": "a2-m07-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I went to London last year and I had a great time.", "I go to London last year and I had a great time.", "I went to London last year and I have a great time."],
+                      "options": [
+                        "I went to London last year and I had a great time.",
+                        "I go to London last year and I had a great time.",
+                        "I went to London last year and I have a great time."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
-                      "options": ["I am going to visit my family next week.", "I am visit my family next week.", "I going to visit my family next week."],
+                      "options": [
+                        "I am going to visit my family next week.",
+                        "I am visit my family next week.",
+                        "I going to visit my family next week."
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'billete'?",
-                      "options": ["ticket", "train", "station"],
+                      "options": [
+                        "ticket",
+                        "train",
+                        "station"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'consejo'?",
-                      "options": ["advice", "rest", "health"],
+                      "options": [
+                        "advice",
+                        "rest",
+                        "health"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c05",
                       "skill": "listening",
                       "prompt": "Listen: 'I had a headache, so I went to bed early.' What did she do?",
-                      "options": ["Went to bed early", "Went to the doctor", "Took a trip"],
+                      "options": [
+                        "Went to bed early",
+                        "Went to the doctor",
+                        "Took a trip"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c06",
                       "skill": "listening",
                       "prompt": "Listen: 'We're going to visit Rome next summer.' When are they going?",
-                      "options": ["Next summer", "Last summer", "This winter"],
+                      "options": [
+                        "Next summer",
+                        "Last summer",
+                        "This winter"
+                      ],
                       "correct_index": 0
                     }
                   ]

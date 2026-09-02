@@ -4,6 +4,31 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.0.0] — 2026-09-02
+
+**Beta V3.0 — feature freeze pedagógico.** Cierra el ciclo V2.7–V2.12 y congela
+funcionalidad nueva. La fase abierta es contenido + calibración + UX + pruebas
+reales (ver `docs/BETA_V3.md`).
+
+### Añadido (stack pedagógico V2.7–V2.12, consolidado en 3.0.0)
+- **Curriculum Depth (V2.7)**: Unit Architecture + profundidad A1–C2 (depth media ≥ 80,
+  loop 100%).
+- **Listening Curriculum (V2.8)**: foco CEFR por nivel + alineación 100%.
+- **Speaking Mission (V2.9)**: Mission → Attempt → Drill → Retry → Improvement.
+- **Assessment 2.0 (V2.10)**: formative → unit → progress → level → retention + mastery gate.
+- **FSRS-lite (V2.11)**: cola due auditable (What/Why/When/How strong/Last/Next).
+- **Evidence Graph (V2.12)**: can-do → limiting factor → `because[]` en next-best.
+- **Gate Beta V3**: `scripts/check_beta_v3.py` (módulos, rutas, docs, umbrales de calidad).
+
+### Congelado
+- No se abren features de producto nuevas hasta completar la checklist de
+  `docs/BETA_V3.md` (§4 contenido/calibración/UX/dispositivos).
+
+### Verificado
+- Backend pytest + ruff; frontend `tsc`; Curriculum Quality Overall **95,7**;
+  loop **100%**; listening alignment **100%**.
+- `python scripts/check_beta_v3.py` + `check_release_consistency.py` OK (3.0.0).
+
 ## [2.5.0] — 2026-09-01
 
 **Release de consolidación para auditoría externa.** Eleva a versión estable el trabajo

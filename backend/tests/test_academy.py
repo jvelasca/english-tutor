@@ -945,7 +945,12 @@ def test_build_skill_profile_includes_evidence_by_kind_and_generalized_score():
     ]
     profile = academy_svc.build_skill_profile(lv, {}, evidence_rows)
     entry = next(e for e in profile if e["skill"] == skill)
-    assert entry["evidence_by_kind"] == {"familiar": 1, "transfer": 0, "novel": 1}
+    assert entry["evidence_by_kind"] == {
+        "familiar": 1,
+        "transfer": 0,
+        "novel": 1,
+        "delayed": 0,
+    }
     # Pesos renormalizados: (0.2·1.0 + 0.5·0.5) / (0.2 + 0.5) = 0.45/0.7 ≈ 0.643.
     assert entry["generalized_score"] == 0.643
 
@@ -955,7 +960,12 @@ def test_build_skill_profile_generalized_score_none_without_evidence():
     skill = lv.objectives()[0].skills[0]
     profile = academy_svc.build_skill_profile(lv, {}, [])
     entry = next(e for e in profile if e["skill"] == skill)
-    assert entry["evidence_by_kind"] == {"familiar": 0, "transfer": 0, "novel": 0}
+    assert entry["evidence_by_kind"] == {
+        "familiar": 0,
+        "transfer": 0,
+        "novel": 0,
+        "delayed": 0,
+    }
     assert entry["generalized_score"] is None
 
 

@@ -1,4 +1,4 @@
-# Cobertura y calidad curricular (V2.4 → V2.6)
+# Cobertura y calidad curricular (V2.4 → V2.8)
 
 Este documento es el **mapa de cobertura y calidad** generado por la auditoría
 `services/curriculum_coverage.py`. Responde con datos a la pregunta:
@@ -11,167 +11,110 @@ emite `curriculum_coverage_report.json` (cobertura) y, con `--quality`, el
 Curriculum Quality Dashboard. Este documento lo resume; si el contenido cambia,
 vuelve a ejecutar el script y actualiza las cifras.
 
-## Tres métricas complementarias (V2.6)
+## Tres métricas complementarias (V2.6 → V2.8)
 
 La auditoría V2.6 descubrió que **"cobertura" y "profundidad" son cosas distintas**.
-`42/49 celdas` NO significa "curso terminado al 85,7%": una celda cuenta como
-poblada si *alguna* unidad tiene contenido en esa sección. Por eso conviven tres
-métricas, cada una con un grano distinto:
+V2.8 añade que **"listening cableado" ≠ "listening curricular"**: referenciar ítems
+del banco no basta; cada nivel debe entrenar subskills concretos (ver
+`docs/LISTENING_CURRICULUM.md`).
 
 | Métrica | Qué mide | Valor actual |
 |---|---|---|
 | `TOTAL VALIDATED LEARNING ITEMS` | Cuántos ejercicios fiables existen | **189** (163 listening + 26 speaking) |
 | `TOTAL CURRICULUM COVERAGE` | Celdas nivel×sección pobladas | **42/49 (85,7%)** |
-| `UNIT COVERAGE` | Secciones pobladas **por unidad** | media A1..C2 **61,7%** |
-| `CEFR DEPTH SCORE` | Densidad + tamaño + completitud por nivel | media **57,7** / 100 |
-
-La primera mide *volumen de contenido validado*; la segunda, *cobertura* de la
-matriz; la tercera, *completitud por unidad*; la cuarta, *profundidad* del curso
-por nivel. Pueden divergir: tener 140 ítems de listening no significa que cada
-unidad integre listening, ni que C2 sea un curso "serio".
+| `UNIT COVERAGE` | Secciones pobladas **por unidad** | media A1..C2 **100%** |
+| `CEFR DEPTH SCORE` | Densidad + tamaño + completitud por nivel | media **84,2** / 100 |
+| `LISTENING CURRICULUM` | Objetivos de escucha alineados al foco del nivel | **38/38 (100%)** |
 
 ## Mapa de cobertura (nivel × sección)
 
 Leyenda: **OK** = todas las unidades del nivel tienen contenido en la sección ·
-**~** = parcial (solo algunas unidades) · **—** = vacío. Entre paréntesis, para
-listening/speaking, el `count` (objetivos + checks + referencias cableadas al banco)
-y el `bank_count` (ítems disponibles en el banco separado). Desde V2.5-C4, `count`
-incluye las referencias `listening_items`/`scenario_ids`.
+**~** = parcial · **—** = vacío.
 
 | Nivel | Vocabulary | Grammar | Listening | Speaking | Interaction | Review | Assessment |
 |-------|-----------|---------|-----------|----------|-------------|--------|------------|
 | Pre-A1 | — | — | — | — | — | — | — |
-| A1 | OK (64) | OK (58) | ~ (40 · banco 30) | OK (44 · banco 1) | OK (18) | ~ (1) | ~ (6) |
-| A2 | ~ (21) | OK (30) | ~ (14 · banco 31) | OK (22 · banco 6) | OK (11) | ~ (1) | ~ (6) |
-| B1 | OK (23) | ~ (18) | ~ (20 · banco 33) | ~ (12 · banco 7) | ~ (1) | ~ (1) | ~ (6) |
-| B2 | OK (19) | ~ (11) | ~ (25 · banco 29) | ~ (6 · banco 5) | ~ (2) | ~ (1) | ~ (5) |
-| C1 | OK (18) | ~ (13) | ~ (7 · banco 20) | OK (10 · banco 1) | OK (5) | ~ (1) | ~ (6) |
-| C2 | OK (14) | ~ (4) | ~ (13 · banco 20) | ~ (6 · banco 6) | ~ (3) | ~ (1) | ~ (5) |
+| A1 | OK (74) | OK (58) | OK (75) | OK (44) | OK (18) | OK (15) | OK (20) |
+| A2 | OK (34) | OK (30) | OK (49) | OK (24) | OK (12) | OK (17) | OK (22) |
+| B1 | OK (44) | OK (23) | OK (44) | OK (22) | OK (5) | OK (18) | OK (25) |
+| B2 | OK (29) | OK (14) | OK (32) | OK (8) | OK (3) | OK (13) | OK (17) |
+| C1 | OK (34) | OK (18) | OK (28) | OK (16) | OK (8) | OK (14) | OK (19) |
+| C2 | OK (38) | OK (7) | OK (26) | OK (16) | OK (8) | OK (14) | OK (18) |
 
-**Cobertura por sección** (niveles poblados de 7):
+**Cobertura por sección** (niveles con curso, de 6): **6/6 en todas las secciones**.
 
-| Sección | Poblada |
-|---|---|
-| Vocabulary | 6/7 |
-| Grammar | 6/7 |
-| Listening | 6/7 |
-| Speaking | 6/7 |
-| Interaction | **6/7** |
-| Review | 6/7 |
-| Assessment | 6/7 |
-
-## Unit Coverage y CEFR Depth Score (V2.6)
-
-La tabla de arriba oculta un problema: `~` en Listening significa "alguna unidad lo
-tiene", pero no cuántas. La **UNIT COVERAGE** (por unidad) y el **CEFR DEPTH SCORE**
-(profundidad por nivel) lo hacen explícito.
+## Unit Coverage y CEFR Depth Score
 
 | Nivel | Unidades | Objetivos | Depth Score | Unit Coverage (media) |
 |---|---|---|---|---|
-| A1 | 10 | 23 | **74,2** | 67,1% |
-| A2 | 7 | 11 | 52,3 | 63,2% |
-| B1 | 4 | 10 | 55,7 | 53,6% |
-| B2 | 3 | 9 | 61,7 | 61,9% |
-| C1 | 4 | 7 | 48,0 | 64,3% |
-| C2 | 3 | 5 | **42,5** | 61,9% |
+| A1 | 10 | 28 | 89,5 | 100,0% |
+| A2 | 7 | 17 | 82,6 | 100,0% |
+| B1 | 4 | 18 | 90,4 | 100,0% |
+| B2 | 3 | 13 | 82,7 | 100,0% |
+| C1 | 4 | 14 | 82,6 | 100,0% |
+| C2 | 3 | 14 | 82,2 | 100,0% |
 
-**Hallazgo clave (V2.6):** el recuento real de objetivos es A1 23 → A2 11 → B1 10 →
-B2 9 → C1 7 → C2 5. La caída es **más abrupta de lo que parecía**: no solo C1/C2 son
-finos, también A2 (11) y B1/B2 (10/9). El *depth score* lo refleja: C2 es el nivel
-más superficial (42,5) y A1 el más denso (74,2).
-
-El *depth score* pondera 4 componentes (suman 1.0, auditables en
-`depth_score()`): densidad de objetivos/unidad (0.20), volumen total de objetivos
-(0.35), cobertura de secciones por unidad (0.35) y amplitud de subskills (0.10).
-El volumen pesa más que la densidad a propósito: la densidad sola premiaba a B2
-(3 unidades densas con 9 objetivos) por encima de A2 (7 unidades con 11), cuando un
-curso "serio" necesita volumen, no solo unidades llenas.
-
-## Curriculum Quality Dashboard (V2.6)
-
-Una única cifra por dimensión para dejar de desarrollar "a sensación":
+## Curriculum Quality Dashboard
 
 | Dimensión | Score |
 |---|---|
-| **Overall** | **56,8** |
+| **Overall** | **95,7** |
 | Coverage (matriz nivel×sección) | 85,7 |
-| Depth (CEFR Depth Score, media) | 55,7 |
-| Listening (por unidad) | 47,8 |
-| Speaking (por unidad) | 84,7 |
-| Interaction (por unidad) | 76,4 |
-| Assessment (por unidad) | 23,5 |
-| Review (por unidad) | 23,5 |
+| Depth (CEFR Depth Score, media) | 84,2 |
+| Listening (por unidad) | **100,0** |
+| Speaking (por unidad) | 100,0 |
+| Interaction (por unidad) | 100,0 |
+| Assessment (por unidad) | 100,0 |
+| Review (por unidad) | 100,0 |
 
-Los puntos débiles son claros: **Review y Assessment (23,5)** viven solo en los
-módulos "Final" y **Listening (47,8)** está integrado solo en parte de las unidades.
-Son las dimensiones a priorizar en V2.6+ (Unit Learning Loop + Listening
-Progression + Review/SRS). `quality_report_delta()` permite ver el antes/después de
-cada cambio de contenido.
+## Unit Learning Loop
 
-## Unit Learning Loop (V2.6)
-
-La auditoría fija como **PRIORIDAD Nº1** que cada unidad sea un bucle pedagógico
-completo (`introduce → practice → listen → speak → interact → retrieve → transfer →
-assess → review`), no una colección de contenidos. `unit_learning_loop()` mide, por
-unidad, qué fases están presentes (media **50,6%**):
+Media **100%** — las 9 fases presentes en las 31 unidades:
 
 | Fase | Unidades cubiertas |
 |---|---|
 | introduce | 100% (31/31) |
 | practice | 100% (31/31) |
-| listen | 45,2% (14/31) |
-| speak | 90,3% (28/31) |
-| interact | 83,9% (26/31) |
-| retrieve | **0% (0/31)** |
-| transfer | **0% (0/31)** |
-| assess | 19,4% (6/31, solo Final) |
-| review | 19,4% (6/31, solo Final) |
+| listen | **100% (31/31)** |
+| speak | 100% (31/31) |
+| interact | 100% (31/31) |
+| retrieve | 100% (31/31) |
+| transfer | 100% (31/31) |
+| assess | 100% (31/31) |
+| review | 100% (31/31) |
 
-El hueco es explícito: las fases de cierre del bucle (**retrieve**, **transfer**) no
-tienen marcador propio por unidad, y **assess/review** viven solo en el módulo Final.
+## Listening Curriculum (V2.8)
 
-**Marcador de fase (V2.6-C2):** para poder cerrar ese hueco sin inventar lógica, el
-modelo añade `Activity.phase` (default vacío = `practice`) con la taxonomía canónica
-`LEARNING_PHASES` en `services/curriculum.py`. `unit_learning_loop()` ahora lee
-`retrieve`/`transfer`/`review`/`assess` desde ese marcador. La tabla de arriba sigue
-igual porque **ningún JSON usa aún el marcador**: etiquetar las actividades de cierre
-por unidad es el trabajo de contenido del briefing `agentes/curriculum/c5-loop-phases.md`
-(no de este instrumento). Cuando se etiquete, `retrieve`/`transfer` dejarán de ser 0 y
-`assess`/`review` aparecerán en las unidades normales.
+Progresión por nivel y alineación de subskills (**100%** en 38 objetivos):
+
+| Nivel | Foco | Objetivos alineados |
+|---|---|---|
+| A1 | word/sound recognition | 11/11 |
+| A2 | gist, detail, information | 7/7 |
+| B1 | connected speech, natural pace | 7/7 |
+| B2 | inference, attitude | 5/5 |
+| C1 | nuance, speaker intention | 4/4 |
+| C2 | pragmatics, attitude | 4/4 |
+
+Detalle en `docs/LISTENING_CURRICULUM.md`.
+
+## Delta V2.7 → V2.8
+
+| Dimensión | Before | After | Delta |
+|---|---|---|---|
+| Overall | 94,5 | 95,7 | +1,2 |
+| Listening (por unidad) | 91,7 | **100,0** | +8,3 |
+| Loop `listen` | 83,9% | **100%** | +16,1 |
+| Listening curriculum alignment | — | **100%** | nuevo |
+
+**A1**: +5 objetivos de listening (Family, Food, Shopping, Past, Plans) + loop
+Final cerrado. **Todos los niveles**: subskills de escucha alineados al foco CEFR.
 
 ## Huecos priorizados
 
-Ordenados por impacto pedagógico (no por gravedad técnica):
-
-1. **Pre-A1 sin curso** — existe solo como banda de competencia (descriptores
-   Can-Do), no como curso. La escalera visual muestra un peldaño sin contenido
-   detrás. (Marcado, no completado en V2.4.)
-
-2. **Interaction ahora declarado en todo el curso (6/7)** — desde V2.5-C3, A1, A2,
-   B2, C1 y C2 declaran `interaction`/`turn_taking` (subskills en objetivos con
-   `speaking`). Solo Pre-A1 queda vacío, por ser banda sin curso. Desde V2.5-C4 esos
-   objetivos están cableados a escenarios concretos de speaking (`scenario_ids`).
-   Queda pendiente ampliar la oferta de escenarios en A1 y C1 (solo 1 cada uno).
-
-3. **Listening cableado pero fino en el curso** — desde V2.5-C4, los objetivos de
-   listening referencian ítems del banco por ID (`listening_items`; 18 objetivos
-   cableados, 4 ítems cada uno). El corpus de 140 ítems ya no está desconectado. La
-   sección sigue `~` (parcial) porque solo algunas unidades tienen objetivos de
-   listening, no por falta de cableado.
-
-4. **Speaking cableado pero sin evaluación en el curso** — desde V2.5-C4, los 50
-   objetivos que declaran `speaking` referencian un escenario (`scenario_ids`; 26
-   escenarios con `cefr_target`). Sigue habiendo 0 checks (es performance-skill), por
-   lo que la evaluación real de speaking vive en el instrumento de Speaking
-   Assessment, no en el curso secuencial.
-
-5. **Review y Assessment solo en módulos "Final"** — cada nivel tiene 1 módulo Final
-   con repaso/evaluación; las unidades normales no los integran (por eso son `~`).
-   No existe el "Unit Learning Loop" (introduce → practice → listen → speak →
-   retrieve → transfer → assess) dentro de cada unidad.
-
-6. **C1 y C2 muy finos** — 7 y 5 objetivos respectivamente, frente a 23 (A1) y 11
-   (A2). El volumen decae a medida que sube el nivel.
+1. **Pre-A1 sin curso** — banda Can-Do sin contenido propio.
+2. **Matriz A1 listening legacy** — la celda nivel×sección sigue siendo OK; el
+   curso A1 ya integra listening en todas sus unidades (V2.8).
 
 ## Regenerar
 
@@ -182,6 +125,5 @@ cd backend
 .venv\Scripts\python.exe -m scripts.curriculum_coverage --quality # + dashboard JSON
 ```
 
-Los tests de invariantes están en `backend/tests/test_curriculum_coverage.py`
-(cobertura) y `backend/tests/test_curriculum_quality.py` (unit coverage + depth +
-dashboard, V2.6).
+Tests: `backend/tests/test_curriculum_coverage.py` y
+`backend/tests/test_curriculum_quality.py`.

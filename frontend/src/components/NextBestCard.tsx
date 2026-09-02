@@ -73,6 +73,27 @@ export function NextBestCard({
               {next.why}
             </p>
           )}
+          {next.because && next.because.length > 0 && (
+            <div className="mt-2 text-sm text-foreground/90">
+              <p className="font-semibold">{t("home.because")}</p>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-muted-foreground">
+                {next.because.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ol>
+              {next.limiting_factor && (
+                <p className="mt-1 text-xs">
+                  {t("home.limitingFactor")}:{" "}
+                  <span className="font-medium text-foreground">
+                    {next.limiting_factor.id}
+                    {next.limiting_factor.missing
+                      ? ` (${t("home.missing")})`
+                      : ` · ${Math.round(next.limiting_factor.score * 100)}%`}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <Button size="lg" className="shrink-0 gap-2" onClick={onStart}>
           {t("home.continue")}

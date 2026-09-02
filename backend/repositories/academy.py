@@ -590,6 +590,112 @@ def get_speaking_assessment_session(session_id: int) -> dict | None:
     return d
 
 
+# --- Sesión trazable de Speaking Mission Performance (V2.9) ---------------
+
+
+def create_speaking_mission_session(
+    user_id: str,
+    scenario_id: str,
+    mission: dict,
+) -> dict | None:
+    """Crea una sesión de misión de speaking. None si el usuario no existe."""
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "INSERT INTO speaking_mission_sessions "
+            "(user_id, status, scenario_id, mission_json, created_at, updated_at) "
+            "VALUES (?, 'mission', ?, ?, ?, ?)",
+            (
+                user_id,
+                scenario_id,
+                json.dumps(mission, ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+    return get_speaking_mission_session(cur.lastrowid)
+
+
+def update_speaking_mission_session(
+    session_id: int,
+    *,
+    status: str | None = None,
+    attempt: dict | None = None,
+    evaluation: dict | None = None,
+    drills: list[dict] | None = None,
+    retry: dict | None = None,
+    improvement: dict | None = None,
+) -> dict | None:
+    """Actualiza la traza de una sesión de misión (fases del loop V2.9)."""
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        if status is not None:
+            conn.execute(
+                "UPDATE speaking_mission_sessions SET status = ? WHERE id = ?",
+                (status, session_id),
+            )
+        if attempt is not None:
+            conn.execute(
+                "UPDATE speaking_mission_sessions SET attempt_json = ? WHERE id = ?",
+                (json.dumps(attempt, ensure_ascii=False), session_id),
+            )
+        if evaluation is not None:
+            conn.execute(
+                "UPDATE speaking_mission_sessions SET evaluation_json = ? WHERE id = ?",
+                (json.dumps(evaluation, ensure_ascii=False), session_id),
+            )
+        if drills is not None:
+            conn.execute(
+                "UPDATE speaking_mission_sessions SET drill_json = ? WHERE id = ?",
+                (json.dumps(drills, ensure_ascii=False), session_id),
+            )
+        if retry is not None:
+            conn.execute(
+                "UPDATE speaking_mission_sessions SET retry_json = ? WHERE id = ?",
+                (json.dumps(retry, ensure_ascii=False), session_id),
+            )
+        if improvement is not None:
+            conn.execute(
+                "UPDATE speaking_mission_sessions "
+                "SET improvement_json = ? WHERE id = ?",
+                (json.dumps(improvement, ensure_ascii=False), session_id),
+            )
+        conn.execute(
+            "UPDATE speaking_mission_sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
+    return get_speaking_mission_session(session_id)
+
+
+def get_speaking_mission_session(session_id: int) -> dict | None:
+    """Lee una sesión de misión con sus columnas JSON ya parseadas."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT id, user_id, status, scenario_id, mission_json, attempt_json, "
+            "evaluation_json, drill_json, retry_json, improvement_json, "
+            "created_at, updated_at FROM speaking_mission_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    d["mission"] = json.loads(d.pop("mission_json") or "{}")
+    d["attempt"] = (
+        json.loads(d.pop("attempt_json")) if d.get("attempt_json") else None
+    )
+    d["evaluation"] = (
+        json.loads(d.pop("evaluation_json")) if d.get("evaluation_json") else None
+    )
+    d["drills"] = json.loads(d.pop("drill_json") or "[]")
+    d["retry"] = json.loads(d.pop("retry_json")) if d.get("retry_json") else None
+    d["improvement"] = (
+        json.loads(d.pop("improvement_json")) if d.get("improvement_json") else None
+    )
+    return d
+
+
 # --- Calibración observacional de ítems de placement (V1.7) ---------------
 
 
@@ -739,3 +845,220 @@ def list_session_steps(user_id: str, completed_on: str) -> set[str]:
             (user_id, completed_on),
         ).fetchall()
     return {r["step_key"] for r in rows}
+
+
+# --- Sesión trazable de Assessment 2.0 (V2.10) ----------------------------
+
+
+def create_assessment_v2_session(
+    user_id: str,
+    *,
+    kind: str,
+    level_id: str,
+    instrument: dict,
+    unit_id: str = "",
+    objective_id: str = "",
+    assessment_version: str = "",
+    source_session_id: int | None = None,
+) -> dict | None:
+    """Crea una sesión abierta de Assessment 2.0. None si el usuario no existe."""
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "INSERT INTO assessment_v2_sessions "
+            "(user_id, status, kind, level_id, unit_id, objective_id, "
+            "assessment_version, instrument_json, source_session_id, "
+            "created_at, updated_at) "
+            "VALUES (?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                kind,
+                level_id,
+                unit_id,
+                objective_id,
+                assessment_version,
+                json.dumps(instrument, ensure_ascii=False),
+                source_session_id,
+                now,
+                now,
+            ),
+        )
+    return get_assessment_v2_session(cur.lastrowid)
+
+
+def update_assessment_v2_session(
+    session_id: int,
+    *,
+    status: str | None = None,
+    answers: dict | None = None,
+    result: dict | None = None,
+    retention: dict | None = None,
+) -> dict | None:
+    """Cierra/actualiza una sesión Assessment 2.0."""
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        if status is not None:
+            conn.execute(
+                "UPDATE assessment_v2_sessions SET status = ? WHERE id = ?",
+                (status, session_id),
+            )
+        if answers is not None:
+            conn.execute(
+                "UPDATE assessment_v2_sessions SET answers_json = ? WHERE id = ?",
+                (json.dumps(answers, ensure_ascii=False), session_id),
+            )
+        if result is not None:
+            conn.execute(
+                "UPDATE assessment_v2_sessions SET result_json = ? WHERE id = ?",
+                (json.dumps(result, ensure_ascii=False), session_id),
+            )
+        if retention is not None:
+            conn.execute(
+                "UPDATE assessment_v2_sessions SET retention_json = ? WHERE id = ?",
+                (json.dumps(retention, ensure_ascii=False), session_id),
+            )
+        conn.execute(
+            "UPDATE assessment_v2_sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
+    return get_assessment_v2_session(session_id)
+
+
+def get_assessment_v2_session(session_id: int) -> dict | None:
+    """Lee una sesión Assessment 2.0 con JSON parseado."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT id, user_id, status, kind, level_id, unit_id, objective_id, "
+            "assessment_version, instrument_json, answers_json, result_json, "
+            "retention_json, source_session_id, created_at, updated_at "
+            "FROM assessment_v2_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    d["instrument"] = json.loads(d.pop("instrument_json") or "{}")
+    d["answers"] = json.loads(d.pop("answers_json")) if d.get("answers_json") else None
+    d["result"] = json.loads(d.pop("result_json")) if d.get("result_json") else None
+    d["retention"] = (
+        json.loads(d.pop("retention_json")) if d.get("retention_json") else None
+    )
+    return d
+
+
+def list_assessment_v2_sessions(
+    user_id: str, *, level_id: str | None = None, status: str | None = None
+) -> list[dict]:
+    """Lista sesiones Assessment 2.0 del usuario (más recientes primero)."""
+    sql = (
+        "SELECT id, user_id, status, kind, level_id, unit_id, objective_id, "
+        "assessment_version, instrument_json, answers_json, result_json, "
+        "retention_json, source_session_id, created_at, updated_at "
+        "FROM assessment_v2_sessions WHERE user_id = ?"
+    )
+    params: list = [user_id]
+    if level_id:
+        sql += " AND level_id = ?"
+        params.append(level_id)
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+    sql += " ORDER BY id DESC"
+    with closing(_conn()) as conn:
+        rows = conn.execute(sql, params).fetchall()
+    out = []
+    for row in rows:
+        d = dict(row)
+        d["instrument"] = json.loads(d.pop("instrument_json") or "{}")
+        d["answers"] = (
+            json.loads(d.pop("answers_json")) if d.get("answers_json") else None
+        )
+        d["result"] = (
+            json.loads(d.pop("result_json")) if d.get("result_json") else None
+        )
+        d["retention"] = (
+            json.loads(d.pop("retention_json")) if d.get("retention_json") else None
+        )
+        out.append(d)
+    return out
+
+
+# --- FSRS-lite cards (V2.11) ----------------------------------------------
+
+
+def upsert_fsrs_card(user_id: str, card: dict) -> dict | None:
+    """Inserta o actualiza una carta FSRS. None si el usuario no existe."""
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO fsrs_cards "
+            "(user_id, target_type, target_id, label, state, difficulty, "
+            "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
+            "last_grade, why, fsrs_version, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET "
+            "label = excluded.label, "
+            "state = excluded.state, "
+            "difficulty = excluded.difficulty, "
+            "stability = excluded.stability, "
+            "reps = excluded.reps, "
+            "lapses = excluded.lapses, "
+            "due_at = excluded.due_at, "
+            "last_review_at = excluded.last_review_at, "
+            "last_evidence_at = excluded.last_evidence_at, "
+            "last_grade = excluded.last_grade, "
+            "why = excluded.why, "
+            "fsrs_version = excluded.fsrs_version, "
+            "updated_at = excluded.updated_at",
+            (
+                user_id,
+                card["target_type"],
+                card["target_id"],
+                card.get("label") or card["target_id"],
+                card.get("state") or "new",
+                float(card.get("difficulty") or 5.0),
+                float(card.get("stability") or 0.1),
+                int(card.get("reps") or 0),
+                int(card.get("lapses") or 0),
+                card.get("due_at") or now,
+                card.get("last_review_at") or "",
+                card.get("last_evidence_at") or "",
+                card.get("last_grade"),
+                card.get("why") or "",
+                card.get("fsrs_version") or "",
+                now,
+                now,
+            ),
+        )
+    return get_fsrs_card(user_id, card["target_type"], card["target_id"])
+
+
+def get_fsrs_card(
+    user_id: str, target_type: str, target_id: str
+) -> dict | None:
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT user_id, target_type, target_id, label, state, difficulty, "
+            "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
+            "last_grade, why, fsrs_version, created_at, updated_at "
+            "FROM fsrs_cards WHERE user_id = ? AND target_type = ? "
+            "AND target_id = ?",
+            (user_id, target_type, target_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_fsrs_cards(user_id: str) -> list[dict]:
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT user_id, target_type, target_id, label, state, difficulty, "
+            "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
+            "last_grade, why, fsrs_version, created_at, updated_at "
+            "FROM fsrs_cards WHERE user_id = ? ORDER BY due_at ASC",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]

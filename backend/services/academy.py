@@ -448,7 +448,12 @@ def build_skill_profile(
         evidence_count = len(rows)
         last_evidence = max(r["created_at"] for r in rows) if rows else ""
         review_ts = last_seen or last_evidence
-        evidence_by_kind = {"familiar": 0, "transfer": 0, "novel": 0}
+        evidence_by_kind = {
+            "familiar": 0,
+            "transfer": 0,
+            "novel": 0,
+            "delayed": 0,
+        }
         for r in rows:
             kind = r.get("evidence_kind") or "familiar"
             if kind in evidence_by_kind:
@@ -676,20 +681,22 @@ EVIDENCE_SOURCES: tuple[str, ...] = (
     "speaking",
     "writing",
     "pronunciation",
+    "assessment_v2",
 )
 
 # Niveles de evidencia reconocidos (invariante): distinguen práctica del mismo
 # tipo de ejercicio (familiar), de transferencia (nuevo audio/ítem, misma
-# habilidad) y de novedad (nuevo audio + hablante + situación).
-EVIDENCE_KINDS: tuple[str, ...] = ("familiar", "transfer", "novel")
+# habilidad), de novedad (nuevo audio + hablante + situación) y de retención
+# retardada (delayed — Assessment 2.0).
+EVIDENCE_KINDS: tuple[str, ...] = ("familiar", "transfer", "novel", "delayed")
 
-# Pesos de dominio generalizado (novel > transfer > familiar). Solo la evidencia
-# novel pesa alto para confirmar dominio generalizado; se renormalizan sobre los
-# kinds presentes en cada perfil.
+# Pesos de dominio generalizado (novel/delayed > transfer > familiar). Se
+# renormalizan sobre los kinds presentes en cada perfil.
 EVIDENCE_KIND_WEIGHTS: dict[str, float] = {
     "familiar": 0.2,
     "transfer": 0.3,
     "novel": 0.5,
+    "delayed": 0.5,
 }
 
 

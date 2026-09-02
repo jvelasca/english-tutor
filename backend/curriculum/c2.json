@@ -24,11 +24,33 @@
                   "id": "c2-m01-u01-l01-o01",
                   "can_do": "I can recognise and use rhetorical devices to persuade.",
                   "title": "Recursos retóricos",
-                  "skills": ["vocabulary", "reading", "writing", "speaking"],
-                  "subskills": ["register", "structure", "interaction", "turn_taking"],
-                  "scenario_ids": ["persuasion"],
-                  "concepts": ["metaphor", "rhetorical question", "parallelism", "understatement"],
-                  "vocabulary": ["metaphor", "parallelism", "understatement", "hyperbole"],
+                  "skills": [
+                    "vocabulary",
+                    "reading",
+                    "writing",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "register",
+                    "structure",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "persuasion"
+                  ],
+                  "concepts": [
+                    "metaphor",
+                    "rhetorical question",
+                    "parallelism",
+                    "understatement"
+                  ],
+                  "vocabulary": [
+                    "metaphor",
+                    "parallelism",
+                    "understatement",
+                    "hyperbole"
+                  ],
                   "activities": [
                     {
                       "id": "c2-m01-u01-l01-o01-a01",
@@ -70,21 +92,33 @@
                       "id": "c2-m01-u01-l01-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "'The workload is a mountain' is an example of...",
-                      "options": ["a metaphor", "a simile with 'like'", "a statistic"],
+                      "options": [
+                        "a metaphor",
+                        "a simile with 'like'",
+                        "a statistic"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m01-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "A rhetorical question is asked...",
-                      "options": ["for effect, not for an answer", "to get information", "to list facts"],
+                      "options": [
+                        "for effect, not for an answer",
+                        "to get information",
+                        "to list facts"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m01-u01-l01-o01-c03",
                       "skill": "reading",
                       "prompt": "Read: 'It wasn't bad at all.' This is an example of...",
-                      "options": ["understatement", "hyperbole", "repetition"],
+                      "options": [
+                        "understatement",
+                        "hyperbole",
+                        "repetition"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -93,17 +127,65 @@
                   "id": "c2-m01-u01-l01-o02",
                   "can_do": "I can persuade subtly through implication and concession.",
                   "title": "Persuasión sutil",
-                  "skills": ["vocabulary", "writing", "speaking"],
-                  "subskills": ["register", "interaction", "turn_taking"],
-                  "scenario_ids": ["conflict_mediation"],
-                  "concepts": ["concession", "admittedly", "one might argue", "that said"],
-                  "vocabulary": ["admittedly", "that said", "nevertheless", "granted"],
+                  "skills": [
+                    "vocabulary",
+                    "writing",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "register",
+                    "interaction",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "conflict_mediation"
+                  ],
+                  "concepts": [
+                    "concession",
+                    "admittedly",
+                    "one might argue",
+                    "that said"
+                  ],
+                  "vocabulary": [
+                    "admittedly",
+                    "that said",
+                    "nevertheless",
+                    "granted"
+                  ],
                   "activities": [
                     {
                       "id": "c2-m01-u01-l01-o02-a01",
                       "type": "dialogue",
                       "instruction": "Persuade the tutor using concession followed by a counter-argument.",
                       "target": "Admittedly ... / that said ... / nevertheless"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two words that concede a point.",
+                      "target": "admittedly / granted",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Persuade about a topic you have not discussed, using concession and a counter-argument.",
+                      "target": "Admittedly ... / that said ... / nevertheless",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can persuade subtly through implication and concession.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, persuade the tutor using concession followed by a counter-argument.",
+                      "target": "Admittedly ... / that said ... / nevertheless",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -111,21 +193,412 @@
                       "id": "c2-m01-u01-l01-o02-c01",
                       "skill": "vocabulary",
                       "prompt": "Which word introduces a concession?",
-                      "options": ["admittedly", "therefore", "finally"],
+                      "options": [
+                        "admittedly",
+                        "therefore",
+                        "finally"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m01-u01-l01-o02-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'aun así'?",
-                      "options": ["that said", "for example", "in conclusion"],
+                      "options": [
+                        "that said",
+                        "for example",
+                        "in conclusion"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m01-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'no obstante'?",
-                      "options": ["nevertheless", "moreover", "hence"],
+                      "options": [
+                        "nevertheless",
+                        "moreover",
+                        "hence"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m01-u01-l01-o03",
+                  "can_do": "I can follow sophisticated rhetorical speech and identify its techniques.",
+                  "title": "Listening: rhetorical speech",
+                  "skills": [
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "attitude"
+                  ],
+                  "listening_items": [
+                    "c129",
+                    "c130",
+                    "c131",
+                    "c132"
+                  ],
+                  "concepts": [
+                    "rhetorical structure",
+                    "persuasive techniques",
+                    "cadence"
+                  ],
+                  "vocabulary": [
+                    "rhetoric",
+                    "persuade",
+                    "appeal",
+                    "cadence",
+                    "convince"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m01-u01-l01-o03-a01",
+                      "type": "listening",
+                      "instruction": "Listen to a persuasive speech and identify one rhetorical technique the speaker uses.",
+                      "target": "The speaker uses ... to ..."
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two rhetorical techniques.",
+                      "target": "parallelism / rhetorical question / metaphor",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Identify the rhetoric in a speech you have not heard before.",
+                      "target": "The speaker uses ... to ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can follow sophisticated rhetorical speech and identify its techniques.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o03-a05",
+                      "type": "listening",
+                      "instruction": "On your own, listen and identify one rhetorical technique the speaker uses.",
+                      "target": "The speaker uses ... to ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m01-u01-l01-o03-c01",
+                      "skill": "listening",
+                      "prompt": "You hear a speaker use a rhetorical question. What is its purpose?",
+                      "options": [
+                        "To make a point, not to get an answer",
+                        "To ask for information",
+                        "To end the speech"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o03-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'We have been patient; we have been generous; we have been ignored.' What device is this?",
+                      "options": [
+                        "Parallelism",
+                        "Hyperbole",
+                        "Irony"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'retórica'?",
+                      "options": [
+                        "rhetoric",
+                        "rhythm",
+                        "routine"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m01-u01-l01-o04",
+                  "can_do": "I can use advanced grammatical structures for rhetorical effect.",
+                  "title": "Advanced structures for rhetoric",
+                  "skills": [
+                    "grammar",
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "word_order",
+                    "passive",
+                    "register"
+                  ],
+                  "concepts": [
+                    "parallelism",
+                    "ellipsis",
+                    "inversion"
+                  ],
+                  "vocabulary": [
+                    "parallelism",
+                    "ellipsis",
+                    "inversion",
+                    "clause",
+                    "phrase"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m01-u01-l01-o04-a01",
+                      "type": "writing",
+                      "instruction": "Write a persuasive sentence using parallelism and one using ellipsis.",
+                      "target": "parallel structure / omitted words"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what parallelism and ellipsis are.",
+                      "target": "parallelism = same structure / ellipsis = omitted words",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o04-a03",
+                      "type": "writing",
+                      "instruction": "Use parallelism on a topic you have not written about.",
+                      "target": "parallel structure",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use advanced grammatical structures for rhetorical effect.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o04-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write a persuasive sentence using parallelism and one using ellipsis.",
+                      "target": "parallel structure / omitted words",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m01-u01-l01-o04-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (parallelism):",
+                      "options": [
+                        "She likes running, swimming and hiking.",
+                        "She likes running, swimming and to hike.",
+                        "She likes to run, swimming and hiking."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o04-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence (ellipsis):",
+                      "options": [
+                        "I can and will help you.",
+                        "I can and I will to help you.",
+                        "I can and will to help you."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o04-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'paralelismo'?",
+                      "options": [
+                        "parallelism",
+                        "parenthesis",
+                        "paraphrase"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m01-u01-l01-o05",
+                  "can_do": "I can persuade in a formal debate using rhetorical devices.",
+                  "title": "Persuasive debate",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency",
+                    "coherence"
+                  ],
+                  "scenario_ids": [
+                    "persuasion"
+                  ],
+                  "concepts": [
+                    "rhetorical question",
+                    "parallelism",
+                    "concession"
+                  ],
+                  "vocabulary": [
+                    "rhetorical question",
+                    "parallelism",
+                    "concession",
+                    "persuade",
+                    "argue"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m01-u01-l01-o05-a01",
+                      "type": "dialogue",
+                      "instruction": "Persuade the tutor in a formal debate using at least two rhetorical devices.",
+                      "target": "rhetorical question / parallelism / concession"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o05-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two devices you can use to persuade.",
+                      "target": "rhetorical question / parallelism / concession",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o05-a03",
+                      "type": "dialogue",
+                      "instruction": "Persuade about a topic you have not debated, using rhetorical devices.",
+                      "target": "rhetorical question / parallelism / concession",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o05-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can persuade in a formal debate using rhetorical devices.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o05-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, persuade the tutor in a formal debate using at least two rhetorical devices.",
+                      "target": "rhetorical question / parallelism / concession",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m01-u01-l01-o05-c01",
+                      "skill": "vocabulary",
+                      "prompt": "A rhetorical question is asked...",
+                      "options": [
+                        "for effect, not for an answer",
+                        "to get information",
+                        "to list facts"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o05-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'persuadir'?",
+                      "options": [
+                        "persuade",
+                        "pursue",
+                        "perceive"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m01-u01-l01-o06",
+                  "can_do": "I can use understatement and hyperbole for effect.",
+                  "title": "Understatement and hyperbole",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "abstract_conversation"
+                  ],
+                  "concepts": [
+                    "understatement",
+                    "hyperbole",
+                    "tone"
+                  ],
+                  "vocabulary": [
+                    "understatement",
+                    "hyperbole",
+                    "exaggeration",
+                    "downplay",
+                    "effect"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m01-u01-l01-o06-a01",
+                      "type": "dialogue",
+                      "instruction": "Describe an event using an understatement and then a hyperbole.",
+                      "target": "It wasn't bad ... / It was the greatest ..."
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o06-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the difference between understatement and hyperbole.",
+                      "target": "understatement = downplay / hyperbole = exaggerate",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o06-a03",
+                      "type": "dialogue",
+                      "instruction": "Use understatement or hyperbole about a topic you have not discussed.",
+                      "target": "It wasn't bad ... / It was the greatest ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o06-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use understatement and hyperbole for effect.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o06-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, describe an event using an understatement and then a hyperbole.",
+                      "target": "It wasn't bad ... / It was the greatest ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m01-u01-l01-o06-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'subestimación deliberada'?",
+                      "options": [
+                        "understatement",
+                        "exaggeration",
+                        "confusion"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m01-u01-l01-o06-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'exageración'?",
+                      "options": [
+                        "hyperbole",
+                        "understatement",
+                        "hypothesis"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -155,10 +628,26 @@
                   "id": "c2-m02-u01-l01-o01",
                   "can_do": "I can shift register fluently between formal and informal contexts.",
                   "title": "Cambios de registro",
-                  "skills": ["vocabulary", "grammar", "writing"],
-                  "subskills": ["register"],
-                  "concepts": ["formal vs informal", "passive voice", "hedging", "contractions"],
-                  "vocabulary": ["whereas", "therefore", "kindly", "aforesaid"],
+                  "skills": [
+                    "vocabulary",
+                    "grammar",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "register"
+                  ],
+                  "concepts": [
+                    "formal vs informal",
+                    "passive voice",
+                    "hedging",
+                    "contractions"
+                  ],
+                  "vocabulary": [
+                    "whereas",
+                    "therefore",
+                    "kindly",
+                    "aforesaid"
+                  ],
                   "activities": [
                     {
                       "id": "c2-m02-u01-l01-o01-a01",
@@ -200,21 +689,33 @@
                       "id": "c2-m02-u01-l01-o01-c01",
                       "skill": "vocabulary",
                       "prompt": "Which word is more formal?",
-                      "options": ["therefore", "so", "anyway"],
+                      "options": [
+                        "therefore",
+                        "so",
+                        "anyway"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m02-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "Which is the informal equivalent of 'to whom it may concern'?",
-                      "options": ["Hey there", "Dear Sir", "To the manager"],
+                      "options": [
+                        "Hey there",
+                        "Dear Sir",
+                        "To the manager"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m02-u01-l01-o01-c03",
                       "skill": "grammar",
                       "prompt": "Choose the more formal sentence:",
-                      "options": ["It is recommended that you arrive early.", "You should get there early.", "Get there early, okay?"],
+                      "options": [
+                        "It is recommended that you arrive early.",
+                        "You should get there early.",
+                        "Get there early, okay?"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -230,17 +731,67 @@
                   "id": "c2-m02-u01-l02-o01",
                   "can_do": "I can understand humour, irony and cultural references.",
                   "title": "Referencias culturales y humor",
-                  "skills": ["reading", "listening", "vocabulary"],
-                  "subskills": ["inference"],
-                  "listening_items": ["c121", "c122", "c123", "c124"],
-                  "concepts": ["irony", "sarcasm", "cultural reference", "double meaning"],
-                  "vocabulary": ["irony", "sarcasm", "pun", "tongue-in-cheek"],
+                  "skills": [
+                    "reading",
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "attitude"
+                  ],
+                  "listening_items": [
+                    "c121",
+                    "c122",
+                    "c123",
+                    "c124"
+                  ],
+                  "concepts": [
+                    "irony",
+                    "sarcasm",
+                    "cultural reference",
+                    "double meaning"
+                  ],
+                  "vocabulary": [
+                    "irony",
+                    "sarcasm",
+                    "pun",
+                    "tongue-in-cheek"
+                  ],
                   "activities": [
                     {
                       "id": "c2-m02-u01-l02-o01-a01",
                       "type": "dialogue",
                       "instruction": "Explain the irony or humour in a short joke or comment.",
                       "target": "irony / sarcasm / pun"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two signals of irony.",
+                      "target": "tone of voice / contrast with the words",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Explain the humour in a joke you have not heard before.",
+                      "target": "irony / sarcasm / pun",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand humour, irony and cultural references.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o01-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, explain the irony or humour in a short joke or comment.",
+                      "target": "irony / sarcasm / pun",
+                      "phase": "assess"
                     }
                   ],
                   "checks": [
@@ -248,21 +799,491 @@
                       "id": "c2-m02-u01-l02-o01-c01",
                       "skill": "reading",
                       "prompt": "Read: 'Oh great, another Monday.' The speaker is being...",
-                      "options": ["sarcastic", "sincere", "factual"],
+                      "options": [
+                        "sarcastic",
+                        "sincere",
+                        "factual"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m02-u01-l02-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "A 'pun' is...",
-                      "options": ["a play on words", "a long speech", "a serious argument"],
+                      "options": [
+                        "a play on words",
+                        "a long speech",
+                        "a serious argument"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m02-u01-l02-o01-c03",
                       "skill": "listening",
                       "prompt": "Listen: 'Well, that went well.' (said after a failure) What is the tone?",
-                      "options": ["Irony", "Genuine praise", "Excitement"],
+                      "options": [
+                        "Irony",
+                        "Genuine praise",
+                        "Excitement"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l02-o02",
+                  "can_do": "I can use diplomatic language in a nuanced conversation.",
+                  "title": "Diplomatic conversation",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency",
+                    "register"
+                  ],
+                  "scenario_ids": [
+                    "diplomatic_talk"
+                  ],
+                  "concepts": [
+                    "diplomatic phrasing",
+                    "softening",
+                    "politeness"
+                  ],
+                  "vocabulary": [
+                    "I'm afraid",
+                    "perhaps",
+                    "might I suggest",
+                    "diplomatic",
+                    "tactful"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l02-o02-a01",
+                      "type": "dialogue",
+                      "instruction": "Refuse or disagree diplomatically using softening language.",
+                      "target": "I'm afraid ... / Perhaps ... / Might I suggest ..."
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two phrases that soften a disagreement.",
+                      "target": "I'm afraid / perhaps / might I suggest",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Refuse diplomatically in a situation you have not practised.",
+                      "target": "I'm afraid ... / Perhaps ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use diplomatic language in a nuanced conversation.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o02-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, refuse or disagree diplomatically using softening language.",
+                      "target": "I'm afraid ... / Perhaps ... / Might I suggest ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l02-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase softens a refusal diplomatically?",
+                      "options": [
+                        "I'm afraid that won't be possible",
+                        "No way",
+                        "Absolutely not"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'diplomático'?",
+                      "options": [
+                        "diplomatic",
+                        "dramatic",
+                        "didactic"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l02-o03",
+                  "can_do": "I can mediate a conflict with subtle, precise language.",
+                  "title": "Conflict mediation",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency"
+                  ],
+                  "scenario_ids": [
+                    "conflict_mediation"
+                  ],
+                  "concepts": [
+                    "mediation",
+                    "neutral phrasing",
+                    "de-escalation"
+                  ],
+                  "vocabulary": [
+                    "mediate",
+                    "both sides",
+                    "compromise",
+                    "resolve",
+                    "common ground"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l02-o03-a01",
+                      "type": "dialogue",
+                      "instruction": "Mediate a disagreement, acknowledging both sides and finding common ground.",
+                      "target": "I see both sides ... / Perhaps we can find common ground ..."
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two phrases a mediator uses.",
+                      "target": "I see both sides / common ground",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Mediate a conflict you have not practised.",
+                      "target": "I see both sides ... / Perhaps we can find common ground ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can mediate a conflict with subtle, precise language.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o03-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, mediate a disagreement, acknowledging both sides and finding common ground.",
+                      "target": "I see both sides ... / Perhaps we can find common ground ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l02-o03-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'mediar'?",
+                      "options": [
+                        "mediate",
+                        "meditate",
+                        "medicate"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o03-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase looks for agreement?",
+                      "options": [
+                        "common ground",
+                        "final answer",
+                        "no compromise"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l02-o04",
+                  "can_do": "I can write with rhetorical and register precision.",
+                  "title": "Precision in writing",
+                  "skills": [
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "register",
+                    "cohesion",
+                    "coherence"
+                  ],
+                  "concepts": [
+                    "register shifts",
+                    "precision",
+                    "rhetorical structure"
+                  ],
+                  "vocabulary": [
+                    "precision",
+                    "register",
+                    "nuance",
+                    "compose",
+                    "draft"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l02-o04-a01",
+                      "type": "writing",
+                      "instruction": "Write a short text and then shift its register from formal to informal.",
+                      "target": "formal vs informal register"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two features that change with register.",
+                      "target": "contractions / lexis / sentence length",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o04-a03",
+                      "type": "writing",
+                      "instruction": "Write with register precision on a topic you have not written about.",
+                      "target": "formal vs informal register",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can write with rhetorical and register precision.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o04-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write a short text and then shift its register from formal to informal.",
+                      "target": "formal vs informal register",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l02-o04-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'precisión'?",
+                      "options": [
+                        "precision",
+                        "pressure",
+                        "presentation"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o04-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'matiz'?",
+                      "options": [
+                        "nuance",
+                        "nuisance",
+                        "nurture"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l02-o05",
+                  "can_do": "I can understand cultural references in media.",
+                  "title": "Cultural references in media",
+                  "skills": [
+                    "reading",
+                    "listening",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "inference",
+                    "attitude"
+                  ],
+                  "listening_items": [
+                    "c133",
+                    "c134",
+                    "c135",
+                    "c136"
+                  ],
+                  "concepts": [
+                    "cultural references",
+                    "allusion",
+                    "implied meaning"
+                  ],
+                  "vocabulary": [
+                    "allusion",
+                    "reference",
+                    "context",
+                    "implied",
+                    "heritage"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l02-o05-a01",
+                      "type": "listening",
+                      "instruction": "Identify the cultural reference in a short clip and explain its meaning.",
+                      "target": "The reference is to ... / It means ..."
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o05-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what an allusion is.",
+                      "target": "an indirect reference",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o05-a03",
+                      "type": "dialogue",
+                      "instruction": "Explain a cultural reference you have heard outside this lesson.",
+                      "target": "The reference is to ... / It means ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o05-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can understand cultural references in media.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o05-a05",
+                      "type": "listening",
+                      "instruction": "On your own, identify the cultural reference in a short clip and explain its meaning.",
+                      "target": "The reference is to ... / It means ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l02-o05-c01",
+                      "skill": "reading",
+                      "prompt": "Read: 'He pulled a Hamlet and couldn't decide.' What does 'pulled a Hamlet' refer to?",
+                      "options": [
+                        "A cultural reference to indecision",
+                        "A real person named Hamlet",
+                        "A physical action"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o05-c02",
+                      "skill": "listening",
+                      "prompt": "You hear: 'It's her Achilles' heel.' What does this mean?",
+                      "options": [
+                        "Her main weakness",
+                        "Her shoe",
+                        "Her strength"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o05-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'alusión'?",
+                      "options": [
+                        "allusion",
+                        "illusion",
+                        "elusion"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l02-o06",
+                  "can_do": "I can negotiate a high-stakes agreement with precision and tact.",
+                  "title": "High-stakes negotiation",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "fluency",
+                    "register"
+                  ],
+                  "scenario_ids": [
+                    "stakes_negotiation"
+                  ],
+                  "concepts": [
+                    "negotiation",
+                    "conditions",
+                    "concessions"
+                  ],
+                  "vocabulary": [
+                    "terms",
+                    "counter-offer",
+                    "concession",
+                    "in principle",
+                    "deadline"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l02-o06-a01",
+                      "type": "dialogue",
+                      "instruction": "Negotiate the terms of an agreement with the tutor, making one concession.",
+                      "target": "In principle I agree, but ... / I can offer ... if ..."
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o06-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two phrases that make a conditional offer.",
+                      "target": "I can offer ... if ... / In principle, but ...",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o06-a03",
+                      "type": "dialogue",
+                      "instruction": "Negotiate an agreement you have not practised, making a concession.",
+                      "target": "In principle I agree, but ... / I can offer ... if ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o06-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can negotiate a high-stakes agreement with precision and tact.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o06-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, negotiate the terms of an agreement with the tutor, making one concession.",
+                      "target": "In principle I agree, but ... / I can offer ... if ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l02-o06-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'condiciones (de un acuerdo)'?",
+                      "options": [
+                        "terms",
+                        "turns",
+                        "tones"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l02-o06-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'concesión'?",
+                      "options": [
+                        "concession",
+                        "confession",
+                        "conclusion"
+                      ],
                       "correct_index": 0
                     }
                   ]
@@ -292,18 +1313,56 @@
                   "id": "c2-m03-u01-l01-o01",
                   "can_do": "I can communicate with near-native precision, subtlety and rhetorical control.",
                   "title": "Repaso final C2",
-                  "skills": ["speaking", "writing", "pronunciation", "listening", "grammar", "vocabulary", "reading"],
-                  "subskills": ["interaction", "turn_taking"],
-                  "scenario_ids": ["academic_defence"],
-                  "listening_items": ["c125", "c126", "c127", "c128"],
-                  "concepts": ["review: rhetoric, persuasion, register, humour"],
-                  "vocabulary": ["review C2"],
+                  "skills": [
+                    "speaking",
+                    "writing",
+                    "pronunciation",
+                    "listening",
+                    "grammar",
+                    "vocabulary",
+                    "reading"
+                  ],
+                  "subskills": [
+                    "interaction",
+                    "turn_taking",
+                    "inference",
+                    "attitude"
+                  ],
+                  "scenario_ids": [
+                    "academic_defence"
+                  ],
+                  "listening_items": [
+                    "c125",
+                    "c126",
+                    "c127",
+                    "c128"
+                  ],
+                  "concepts": [
+                    "review: rhetoric, persuasion, register, humour"
+                  ],
+                  "vocabulary": [
+                    "review C2"
+                  ],
                   "activities": [
                     {
                       "id": "c2-m03-u01-l01-o01-a01",
                       "type": "dialogue",
                       "instruction": "Discuss a subtle or abstract topic with the tutor using precise, nuanced language.",
                       "target": "C2 level conversation"
+                    },
+                    {
+                      "id": "c2-m03-u01-l01-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, list three things you can now do at C2 level.",
+                      "target": "persuade subtly / shift register / mediate conflict",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m03-u01-l01-o01-a03",
+                      "type": "dialogue",
+                      "instruction": "Discuss a completely new subtle topic using precise, nuanced C2 language.",
+                      "target": "C2 level conversation in a new context",
+                      "phase": "transfer"
                     }
                   ],
                   "checks": [
@@ -311,35 +1370,55 @@
                       "id": "c2-m03-u01-l01-o01-c01",
                       "skill": "grammar",
                       "prompt": "Choose the more formal sentence:",
-                      "options": ["It is essential that the matter be addressed.", "You need to fix this now.", "Sort it out, will you?"],
+                      "options": [
+                        "It is essential that the matter be addressed.",
+                        "You need to fix this now.",
+                        "Sort it out, will you?"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'subestimación deliberada'?",
-                      "options": ["understatement", "exaggeration", "confusion"],
+                      "options": [
+                        "understatement",
+                        "exaggeration",
+                        "confusion"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c03",
                       "skill": "reading",
                       "prompt": "Read: 'Given the circumstances, the outcome was hardly a triumph.' What is the writer's view?",
-                      "options": ["Disappointed", "Celebratory", "Indifferent"],
+                      "options": [
+                        "Disappointed",
+                        "Celebratory",
+                        "Indifferent"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c04",
                       "skill": "listening",
                       "prompt": "Listen: 'That said, the results are promising.' What does 'that said' introduce?",
-                      "options": ["A contrast or caveat", "An example", "A summary"],
+                      "options": [
+                        "A contrast or caveat",
+                        "An example",
+                        "A summary"
+                      ],
                       "correct_index": 0
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c05",
                       "skill": "listening",
                       "prompt": "Listen: 'Frankly, I couldn't care less.' What is the speaker's attitude?",
-                      "options": ["Indifference", "Enthusiasm", "Confusion"],
+                      "options": [
+                        "Indifference",
+                        "Enthusiasm",
+                        "Confusion"
+                      ],
                       "correct_index": 0
                     }
                   ]

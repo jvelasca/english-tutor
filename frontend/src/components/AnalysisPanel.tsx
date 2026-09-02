@@ -15,15 +15,19 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 import { BucketToggle, ProgressDashboard } from "@/components/ProgressDashboard";
 import { TodayPlan } from "@/components/TodayPlan";
+import { FsrsReviewPanel } from "@/features/review/FsrsReviewPanel";
 import { LearningProfile } from "@/components/LearningProfile";
+import { EvidenceGraphPanel } from "@/features/evidence/EvidenceGraphPanel";
 import { TutorQualityPanel } from "@/components/TutorQualityPanel";
 import { SpeakingDiagnostic } from "@/features/speaking/SpeakingDiagnostic";
 import { SpeakingPanel } from "@/features/speaking/SpeakingPanel";
 import { SpeakingJourney } from "@/features/speaking/SpeakingJourney";
 import { SpeakingScenarios } from "@/features/speaking/SpeakingScenarios";
+import { SpeakingMission } from "@/features/speaking/SpeakingMission";
 import { WritingPanel } from "@/features/writing/WritingPanel";
 import { WritingJourney } from "@/features/writing/WritingJourney";
 import { SpeakingAssessment } from "@/features/speaking/SpeakingAssessment";
+import { AssessmentLadder } from "@/features/assessment/AssessmentLadder";
 import type {
   Bucket,
   LearningEvent,
@@ -101,14 +105,31 @@ export function AnalysisPanel({
           </div>
         );
       case "today":
-        return <TodayPlan userId={currentUserId} onStep={onStep} refreshKey={0} />;
+        return (
+          <div className="space-y-6">
+            <TodayPlan userId={currentUserId} onStep={onStep} refreshKey={0} />
+            <SubSection label={t("panels.fsrsReview")}>
+              <FsrsReviewPanel userId={currentUserId} />
+            </SubSection>
+          </div>
+        );
       case "profile":
-        return <LearningProfile profile={profile} />;
+        return (
+          <div className="space-y-6">
+            <LearningProfile profile={profile} />
+            <SubSection label={t("panels.evidenceGraph")}>
+              <EvidenceGraphPanel userId={currentUserId} />
+            </SubSection>
+          </div>
+        );
       case "speaking":
         return (
           <div className="space-y-6">
             <SubSection label={t("scenarios.title")}>
               <SpeakingScenarios userId={currentUserId} />
+            </SubSection>
+            <SubSection label={t("panels.speakingMission")}>
+              <SpeakingMission userId={currentUserId} />
             </SubSection>
             <SubSection label={t("panels.speaking")}>
               <SpeakingDiagnostic userId={currentUserId} />
@@ -132,11 +153,18 @@ export function AnalysisPanel({
         );
       case "assessment":
         return (
-          <SpeakingAssessment
-            userId={currentUserId}
-            onAttempt={onAttempt}
-            onNext={onNextBestStart}
-          />
+          <div className="space-y-6">
+            <SubSection label={t("panels.assessmentLadder")}>
+              <AssessmentLadder userId={currentUserId} />
+            </SubSection>
+            <SubSection label={t("panels.speakingAssessment")}>
+              <SpeakingAssessment
+                userId={currentUserId}
+                onAttempt={onAttempt}
+                onNext={onNextBestStart}
+              />
+            </SubSection>
+          </div>
         );
       case "tutor":
         return <TutorQualityPanel messages={messages} />;

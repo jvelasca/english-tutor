@@ -11,7 +11,10 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `2.5.0` — **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
+- ✅ Versión estable `3.0.0` — **V3.0 Beta freeze** tras el stack pedagógico
+  V2.7–V2.12 (Depth → Listening → Speaking Mission → Assessment 2.0 → FSRS →
+  Evidence Graph). Gates en `docs/BETA_V3.md` + `docs/BETA_GATES.md`. Base previa:
+  **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
   **V1.30** LAN + Mobile 100% (mDNS real, test de micrófono con medidor, QR de conexión,
   `/help/connect`), **V1.31** Adaptive Engine 2.0 (Priority Engine + "Why this activity?"),
   **V1.32** Curriculum 2.0 (escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones),
@@ -64,6 +67,47 @@
   Overall **56,8**; puntos débiles medidos: review/assessment 23,5, listening 47,8 y las fases de
   cierre del loop (retrieve/transfer 0%, assess/review 19,4%). Loop etiquetado por unidad (V2.6-C5:
   50,6% → 84,7%); queda ampliar C1/C2 depth y subir unit coverage.
+- ✅ **V2.7 Curriculum Depth (piloto B1)** (hecho). "Cobertura ≠ profundidad" convertido en acción
+  con dos hilos: **(1) alineación de medición** — `unit_sections()` cuenta review/assessment por
+  marcadores `phase` (consistente con `unit_learning_loop()`), no solo en el módulo Final — y
+  **(2) contenido B1 real** — de 10 a 18 objetivos (interaction, listening, speaking y discourse
+  markers por unidad, loop cerrado en todas las unidades). Dashboard: Overall **56,8 → 84,0**,
+  Depth media 55,7 → 68,0, review/assessment 23,5 → 100, loop 84,7 → 88,4%; **B1 depth 55,7 → 90,4**
+  (meta ≥82 cumplida). Plantilla maestra en `docs/UNIT_ARCHITECTURE.md` y briefings de escalado
+  `agentes/curriculum/v27-depth-{a2,b2,c1,c2}.md`. Delta en `docs/CURRICULUM_COVERAGE.md`.
+- ✅ **V2.7 Curriculum Depth (escalado A2–C2)** (hecho). La plantilla de "Unit Architecture"
+  se aplicó al resto de niveles: **A2 11→17 objetivos (depth 60,9→82,6), B2 9→13 (68,4→82,7),
+  C1 7→14 (55,5→82,6), C2 5→14 (49,2→82,2)**, cerrando el loop de aprendizaje y añadiendo
+  listening/grammar/speaking/interaction por unidad. Dashboard: Overall **84,0 → 94,5**,
+  Depth media 68,0 → 84,0, Listening 56,2 → 91,7, Speaking/Interaction 88,9 → 100, loop
+  88,4 → 98,7%. Todos los niveles con curso superan depth 80. Queda como hueco real
+  **Listening en A1** (5 unidades) → objetivo de V2.8.
+- ✅ **V2.8 Listening Curriculum** (hecho). Cierre del listening en **A1** (+5 objetivos,
+  loop Final) → **listening por unidad 100%** y **fase `listen` 100%** en todos los
+  niveles. Progresión CEFR por subskill (`LISTENING_FOCUS_BY_LEVEL` en
+  `services/curriculum.py`): A1 word recognition → A2 information → B1 natural speech
+  → B2 inference → C1/C2 nuance/pragmatics. Métrica `listening_curriculum()` (alineación
+  foco/subskill **100%** en 38 objetivos). Dashboard: Overall **95,7**, Listening **100%**,
+  loop **100%**. Referencia en `docs/LISTENING_CURRICULUM.md`.
+- ✅ **V2.9 Speaking Mission Performance** (hecho). Loop
+  **Mission → Attempt → Evaluation → Targeted drill → Retry → Improvement**:
+  motor puro (`speaking_mission.py`), sesión trazable, API Academy y panel UI.
+  Mejora visible (delta overall + por criterio). Referencia en
+  `docs/SPEAKING_MISSION.md`.
+- ✅ **V2.10 Assessment 2.0** (hecho). Escalera
+  **formative → unit → progress → level → retention** + readiness derivado
+  y mastery gate (initial/practice/transfer/novel/delayed). Motor
+  `assessment_v2.py`, sesiones, API y UI en pestaña Assessment.
+  Referencia en `docs/ASSESSMENT_2.md`.
+- ✅ **V2.11 SRS / FSRS** (hecho). Scheduler FSRS-lite sobre el Evidence Model:
+  cartas skill/lexicon, cola due auditable (What/Why/When/How strong/Last/Next),
+  grades Again/Hard/Good/Easy. Referencia en `docs/FSRS.md`.
+- ✅ **V2.12 Knowledge / Evidence Graph** (hecho). Can-do → dimensiones →
+  limiting factor → mastery; Adaptive Engine con `because[]` estructurado.
+  Referencia en `docs/EVIDENCE_GRAPH.md`.
+- ✅ **V3.0 Beta freeze** (hecho). Funcionalidad congelada tras V2.7–V2.12;
+  fase abierta: contenido + calibración + UX + pruebas reales.
+  Gate `scripts/check_beta_v3.py` + `docs/BETA_V3.md`.
 - ✅ Diálogo real probado con `qwen3.5:9b`.
 - ✅ Documentación (`docs/`, premisas, arquitectura, guía de desarrollo, relevo, changelog).
 
@@ -270,6 +314,17 @@
 | V1.19 Refresco UI profesional (frontend) | plan Cursor `refresco_ui_profesional` | ✔ hecho |
 | V1.21 UI Learning Home (HOME como centro) | plan Cursor `v1.21_ui_learning_home` | ✔ hecho |
 | V1.30–V1.34 FASE 1–5 auditoría (LAN/móvil → Speaking 2.0) | directo del gerente (sin briefings) | ✔ hecho |
+| V2.7 Depth B1 (piloto) | directo del gerente (plan Cursor `v2.7_curriculum_depth`) | ✔ hecho |
+| V2.7 Depth A2 | `agentes/curriculum/v27-depth-a2.md` | ✔ hecho |
+| V2.7 Depth B2 | `agentes/curriculum/v27-depth-b2.md` | ✔ hecho |
+| V2.7 Depth C1 | `agentes/curriculum/v27-depth-c1.md` | ✔ hecho |
+| V2.7 Depth C2 | `agentes/curriculum/v27-depth-c2.md` | ✔ hecho |
+| V2.8 Listening Curriculum | directo del gerente | ✔ hecho |
+| V2.9 Speaking Mission Performance | directo del gerente | ✔ hecho |
+| V2.10 Assessment 2.0 | directo del gerente | ✔ hecho |
+| V2.11 SRS / FSRS | directo del gerente | ✔ hecho |
+| V2.12 Evidence Graph | directo del gerente | ✔ hecho |
+| V3.0 Beta freeze | directo del gerente | ✔ hecho |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

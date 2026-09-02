@@ -61,6 +61,27 @@ jobs:
       - name: Check release consistency
         run: python scripts/check_release_consistency.py
 
+  beta-v3-gate:
+    name: Beta V3.0 gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Beta V3 pedagogical freeze gate
+        working-directory: .
+        run: python scripts/check_beta_v3.py
+
   content-validation:
     name: Content validation
     runs-on: ubuntu-latest

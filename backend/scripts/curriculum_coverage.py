@@ -69,6 +69,19 @@ def _human_quality(report: dict) -> None:
             f"({entry['covered_units']}/{entry['units']} unidades)"
         )
 
+    lc = report.get("listening_curriculum", {})
+    if lc:
+        overall = lc["overall"]
+        print(
+            f"\nLISTENING CURRICULUM (alineacion foco/subskill: "
+            f"{overall['alignment_pct']}%)"
+        )
+        for lv in lc["by_level"]:
+            print(
+                f"  {lv['level']:<6}{lv['alignment_pct']:>7} "
+                f"({lv['aligned_objectives']}/{lv['listening_objectives']} objs)"
+            )
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Auditoría de cobertura curricular.")
