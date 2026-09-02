@@ -27,8 +27,12 @@ test("móvil: la página de conexión de dispositivos se abre desde el header", 
     page.getByRole("heading", { name: "Connect a device" }),
   ).toBeVisible({ timeout: 15_000 });
 
-  // La tarjeta de conexión renderiza el título y el aviso de red local.
-  await expect(page.getByText("Local network only")).toBeVisible();
+  // Con backend: aviso "Local network only…". Sin backend (CI): estado degradado.
+  await expect(
+    page.getByText(
+      /Local network only|Start the app and connect to your local network/,
+    ),
+  ).toBeVisible();
 });
 
 test("móvil: el test de micrófono se renderiza en el estado del sistema", async ({
