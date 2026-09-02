@@ -100,6 +100,7 @@ export function Workspace({
         userId={currentUserId}
         profile={profile}
         onStartLesson={onStartLesson}
+        onOpenProgress={onOpenProgress}
       />
     );
   } else if (route === "progress") {
