@@ -1,9 +1,11 @@
 # UI V3.1 — Diseño de la reorganización de la navegación en 3 mundos
 
-> Estado: **propuesta de diseño para estudio conjunto**. Este documento NO cambia código.
-> Fase actual: arquitectura de información (IA) + mapa maestro de pantallas.
+> Estado: **propuesta de diseño para estudio conjunto, con acta de decisiones incorporada**.
+> Este documento NO cambia código.
+> Fase actual: arquitectura de información (IA) + mapa maestro de pantallas (decisiones cerradas,
+> sección 8); siguiente: wireframes visuales.
 > Rama de trabajo: `ui-rethink-v3.1` (desde `main`, que permanece en V3.0.0 sin tocar).
-> Fecha de creación: 2026-09-02.
+> Fecha de creación: 2026-09-02 · Acta de decisiones: 2026-09-02.
 
 ---
 
@@ -27,6 +29,8 @@ mapa de navegación esté acordado.
    hacer commit + push para que el auditor revise un artefacto real. (La auditoría externa no pudo
    crear rama por un 403 de su integración; la rama sí existe ahora en `origin/ui-rethink-v3.1`.)
 2. **MI PROGRESO va anidado** (no es una 4ª sección raíz): se abre desde INICIO y desde FORMACIÓN.
+3. **Las preguntas abiertas del estudio conjunto están resueltas**: el acta de decisiones vive en
+   la sección 8 y cada decisión está incorporada en el cuerpo del documento.
 
 ---
 
@@ -129,7 +133,7 @@ App (estado route)
 | Babbel / Busuu | Estructura pedagógica CEFR y árbol de niveles | Formación: escalera A1->C2, progreso por unidad con gating visible |
 | Busuu | Progresión por nivel CEFR | Indicador de nivel CEFR siempre visible (premisa #16) |
 | ELSA | Speaking/pronunciación con feedback inmediato | Pronunciation como práctica libre dentro de Aprender |
-| Anki | Repaso espaciado | Cola FSRS como tarjeta "Repaso" en Inicio y en Aprender |
+| Anki | Repaso espaciado | Cola FSRS como tarjeta "Repaso" en INICIO (decisión D2) |
 | LingQ | Aprendizaje libre por contenido | "Práctica libre" que no bloquea ni califica |
 | ChatGPT | Conversación fluida | Conversar es un modo dentro de Aprender (y el vehículo de las lecciones del curso) |
 
@@ -198,10 +202,11 @@ FORMACIÓN
 │     Unidad 1 dominada | Unidad 2 dominada | Unidad 3 dominada | Unidad 4 (actual) | Unidad 5 pendiente ...
 │     -> cada unidad abre su detalle
 │
-└── Evaluaciones
-      - Test de nivel (placement) si no hay nivel asignado
-      - Assessment de unidad/progreso/nivel (assessment/v2) cuando corresponde
-      - Examen final de nivel para desbloquear el siguiente (gating del backend)
+└── Evaluaciones  (bloque siempre visible, con estados: pendiente / disponible / bloqueado - D5)
+      - Test de nivel (placement): paso ineludible al empezar si aún no hay nivel asignado
+      - Assessment de unidad / progreso / nivel (assessment/v2): su estado se muestra siempre en
+        cada nivel/unidad aunque todavía no toque realizarlo
+      - Examen final de nivel: bloqueado hasta completar el nivel (gating del backend)
 ```
 
 Detalle de una unidad (B1 · Unidad 4):
@@ -221,9 +226,9 @@ Objetivos / actividades con estado:
 
 Reglas de FORMACIÓN:
 
-- **El curso manda sobre el workspace**: al lanzar una lección desde Formación se abre la práctica
-  con cabecera de contexto "B1 · Unidad 4 · Speaking — Expressing opinions" y al terminar vuelve al
-  árbol del curso.
+- **El curso manda sobre el workspace** (decisión D3): al lanzar una lección desde Formación se abre
+  la práctica en el mismo workspace con envoltura de contexto —cabecera "B1 · Unidad 4 · Speaking —
+  Expressing opinions", progreso del objetivo y vuelta al árbol del curso al terminar—.
 - Solo aquí existe gating, exámenes, dominios por objetivo y certificación interna.
 - Reutilización: `CourseScreen`, `JourneyNode`, `Milestone`, `AssessmentLadder`, endpoints
   `GET /api/academy/levels`, `/course/{level_id}`, `/cefr-ladder`, `/assessment/v2/ladder`.
@@ -235,13 +240,11 @@ Reglas de FORMACIÓN:
 ```text
 APRENDER
 │
-├── "¿Qué quieres practicar hoy?"  (hub de tarjetas grandes)
-│     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│     │ Listening    │  │ Speaking     │  │ Conversar    │
-│     └──────────────┘  └──────────────┘  └──────────────┘
-│     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│     │ Vocabulario  │  │ Gramática    │  │ Repaso       │
-│     └──────────────┘  └──────────────┘  └──────────────┘
+├── "¿Qué quieres practicar hoy?"  (hub de tarjetas grandes)   [C]
+│     6 tarjetas: 3x2 en escritorio, lista vertical en móvil.
+│       - Listening       - Speaking        - Pronunciación
+│       - Conversar       - Vocabulario     - Gramática
+│     (Repaso y Reading NO viven aquí: decisiones D2 y D4)
 │
 ├── RECOMENDADO PARA TI   (Adaptive Engine)
 │     (GET /api/academy/next-best) -> lanza práctica sugerida
@@ -256,10 +259,10 @@ Qué vive en cada tarjeta (todo reutiliza componentes existentes):
 |---|---|---|
 | Listening | Ejercicio por habilidad, sin anclar el curso | `ListeningPractice` + `/api/listening/*` |
 | Speaking | Práctica oral libre (misiones, escenarios, diagnóstico) | `SpeakingScenarios`/`SpeakingMission` + `/api/academy/speaking/*` |
+| Pronunciación | Drill guiado de pronunciación con feedback (estilo ELSA) | `PronunciationPractice` + `/api/pronunciation` |
 | Conversar | Chat con el tutor (modo conversación) | `PracticeView` + `/api/chat`, `/api/conversations` |
 | Vocabulario | Diccionario personal y práctica léxica | `PersonalDictionary` + `/api/vocabulary/*` |
 | Gramática | Análisis y errores recurrentes | `/api/grammar/*`, modo grammar de la conversación |
-| Repaso | Cola FSRS de tarjetas vencidas | `FsrsReviewPanel` + `/api/academy/fsrs/*` |
 
 Reglas de APRENDER:
 
@@ -270,13 +273,15 @@ Reglas de APRENDER:
   del curso (lanzada desde Formación) la cabecera muestra el contexto del curso; cuando se entra
   desde Aprender es práctica libre. Es el **mismo workspace con distinta envoltura**, nunca dos
   rutas.
-- Reading / Pronunciation: Reading se integra como práctica libre opcional (o se aparca); ver
-  preguntas abiertas (sección 8).
+- Reading / Pronunciation: Reading queda **aparcado en esta fase** (decisión D4): no aparece en
+  APRENDER ni como destreza navegable, hasta que exista contenido real de lectura. Pronunciación es
+  tarjeta propia del hub (motor dedicado, decisión D6).
+- El Repaso (FSRS) NO vive aquí: es la tarjeta diaria de INICIO (decisión D2).
 
 ### 4.4 MI PROGRESO (anidado)
 
 Se abre desde INICIO (tarjeta "Tu progreso") y desde FORMACIÓN ("Mi nivel"). No aparece en la
-navegación raíz.
+navegación raíz. En el modelo de URLs (decisión D7) tiene su propia ruta `#/progreso`.
 
 ```text
 MI PROGRESO
@@ -319,25 +324,21 @@ calidad del tutor solo son alcanzables abriendo el panel derecho del workspace. 
 
 ### 5.1 Escritorio (>=1024 px)
 
-```text
-Escritorio (>=1024 px)  -- esquema estructural, no a escala
-------------------------------------------------------------
-  [Cabecera: English Tutor | nivel CEFR · racha · voz · usuario]
-  +-----------------+-----------------------------------------+
-  |  INICIO         |                                         |
-  |  FORMACION      |             CONTENIDO                   |
-  |  APRENDER       |      (zona util amplia; contenedor      |
-  |  -------------- |       adaptativo, no max-w-3xl apretado |
-  |  Mini progreso  |       salvo pantallas de lectura)       |
-  |  Ajustes        |                                         |
-  +-----------------+-----------------------------------------+
-```
+Decisión D1: **píldoras en cabecera reducidas a 3 destinos** (Inicio · Formación · Aprender), el
+mismo patrón de `Header` + `Navigation` actual con solo 3 píldoras. La barra lateral izquierda se
+evaluó en el estudio conjunto y se descartó.
 
-Propuesta: **barra lateral de 3 destinos** (más ligera y clara que píldoras en cabecera) que deja
-la fila superior libre para el contexto del mundo actual (nivel CEFR, racha, micrófono, usuario) y
-maximiza la zona útil. Debajo de los 3 destinos: mini-resumen de progreso (nivel + barra) y, al
-final, Ajustes. Alternativa si se prefiere no introducir sidebar: píldoras en cabecera reducidas a
-3 destinos. **A decidir en el estudio conjunto** (sección 8).
+```text
+Escritorio (>=1024 px) -- esquema estructural, no a escala
+------------------------------------------------------------
+Cabecera: [EN] English Tutor | Inicio · Formación · Aprender |
+          · nivel CEFR · voz · ayuda · ajustes · usuario
+------------------------------------------------------------
+CONTENIDO
+  Contenedor adaptativo por tipo de pantalla (sin max-w-3xl
+  apretado en monitores grandes, salvo pantallas de lectura)
+------------------------------------------------------------
+```
 
 Reglas desktop:
 
@@ -376,8 +377,8 @@ Reglas móvil:
 
 ### 5.3 Tablet (768–1023 px)
 
-- Misma bottom-nav de 3 iconos o barra superior compacta según densidad (a decidir), sin llegar a
-  la sidebar de escritorio.
+- Tablet (>=768 px) usa las mismas píldoras de cabecera que escritorio; la bottom-nav de 3 iconos
+  se reserva para móvil (<768 px).
 - Contenido en 1–2 columnas según el tipo de pantalla; sin overflow horizontal.
 
 ---
@@ -418,8 +419,8 @@ Estas reglas se aplicarán al implementar y son **Definition of Done** (premisas
 | `AnalysisPanel` (7 pestañas) | MI PROGRESO + versión ligera contextual en práctica | Reubicar contenido por tab |
 | `PersonalDictionary` | APRENDER -> Vocabulario | Mover |
 | `ListeningPractice` | APRENDER -> Listening y lecciones del curso | Reutilizar igual |
-| `PronunciationPractice` | APRENDER -> (Speaking/Pronunciación) | Reubicar |
-| `ReadingPractice` | APRENDER (opcional) o aparcado | Decidir (sección 8) |
+| `PronunciationPractice` | APRENDER -> Pronunciación (tarjeta propia del hub, D6) | Reubicar |
+| `ReadingPractice` | Aparcado en esta fase (D4); sin tarjeta en APRENDER | Ocultar / archivar |
 | `HomeScreen`/`NextBestCard` | INICIO | Reorganizar |
 | `FsrsReviewPanel`, `TodayPlan`, `EvidenceGraphPanel` | INICIO (Repaso/Plan) y MI PROGRESO | Sacar de Analysis |
 | `JourneyNode`, `Milestone`, `ProgressRing` | FORMACIÓN y INICIO | Reutilizar |
@@ -428,48 +429,51 @@ Estas reglas se aplicarán al implementar y son **Definition of Done** (premisas
 
 Cambios estructurales de navegación:
 
-- `frontend/src/app/routes.ts`: pasar de 7+1 rutas a un modelo de **3 mundos con sub-vistas**
-  (tipo enum `World = home | formation | learn` + sub-route interna), o URLs si se decide en fase 2.
-- `frontend/src/app/AppShell.tsx` + `Navigation.tsx`: bottom-nav móvil de 3 iconos y cabecera/sidebar
-  desktop de 3 destinos; el estado `route` y los efectos laterales de `navigate` (App.tsx) se
-  simplifican al eliminar las duplicaciones chat/learn.
+- `frontend/src/app/routes.ts`: migrar a **URLs reales con HashRouter** (decisión D7): tres mundos
+  raíz (`#/inicio`, `#/formacion`, `#/aprender`) + sub-rutas por mundo (p. ej.
+  `#/formacion/b1/unidad-4`, `#/aprender/listening`) + `#/progreso` (anidado). HashRouter para que
+  las rutas profundas funcionen en local/LAN sin configuración de servidor.
+- `frontend/src/app/AppShell.tsx` + `Navigation.tsx`: bottom-nav móvil de 3 iconos (<768 px) y
+  píldoras de 3 destinos en cabecera (>=768 px, decisión D1); el estado `route` y los efectos
+  laterales de `navigate` (App.tsx) se simplifican al eliminar las duplicaciones chat/learn.
 - `frontend/src/utils/i18n.ts` (claves `nav.*`): renombrar a `nav.home/formation/learn` y limpiar
   las ~50 claves huérfanas detectadas en la auditoría F.
 
 ---
 
-## 8. Preguntas abiertas para el estudio conjunto
+## 8. Acta de decisiones (estudio conjunto, 2026-09-02)
 
-El documento fija la estructura; estos puntos conviene resolverlos juntos (y con la auditoría) antes
-de implementar:
+Resolución de las preguntas abiertas de esta fase por el propietario del proyecto. Cada decisión
+está incorporada en el cuerpo del documento.
 
-1. **Desktop**: ¿sidebar izquierda de 3 destinos o píldoras en cabecera reducidas a 3?
-2. **Repaso (FSRS)**: ¿card en INICIO y también tarjeta en APRENDER, o solo en INICIO? (El plan base
-   lo pone en ambos con la misma fuente de datos.)
-3. **Conversar dentro de Formación**: cuando el curso lanza una lección oral, ¿abrimos el mismo
-   workspace con cabecera de lección (recomendado) o un modo aislado sin distracciones?
-4. **Reading**: ¿entra en APRENDER como práctica libre (requiere darle contenido/objetivos reales)
-   o se aparca en esta reorganización?
-5. **Evaluaciones**: ¿el bloque "Evaluaciones" de FORMACIÓN incluye placement y assessment de
-   nivel/unidad siempre visibles, o solo aparecen cuando el motor las recomienda?
-6. **Ayuda**: confirmar que "Ayuda" enlace a `docs/` (premisa #17) y "Conectar dispositivo" pase a
-   un sub-apartado.
-7. **Rutas con URLs**: ¿se aprovecha la reorganización para introducir URLs reales (deep links,
-   botón atrás del navegador) o se mantiene navegación por estado?
+| # | Punto decidido | Acuerdo |
+|---|---|---|
+| D1 | Navegación de escritorio | Píldoras en cabecera reducidas a 3 destinos (Inicio · Formación · Aprender). Se descarta la barra lateral. Tablet >=768 px usa el mismo patrón; bottom-nav de 3 iconos solo en móvil (<768 px). |
+| D2 | Repaso (FSRS) | Vive solo en INICIO como tarjeta diaria con contador de pendientes. No se duplica en APRENDER. |
+| D3 | Lección del curso vs Conversar libre | Workspace único con envoltura de contexto: lección = cabecera del curso + vuelta al árbol; Conversar = historial y sin contexto de curso. Panel Analysis ligero bajo demanda en ambos. |
+| D4 | Reading | Aparcado en esta fase: sin tarjeta en APRENDER ni destreza navegable, hasta que exista contenido real de lectura. |
+| D5 | Evaluaciones en FORMACIÓN | Bloque siempre visible con estados (pendiente / disponible / bloqueado). Placement inicial ineludible si no hay nivel asignado. |
+| D6 | Pronunciación en APRENDER | Tarjeta propia del hub (motor dedicado). El hub queda con 6 tarjetas: Listening, Speaking, Pronunciación, Conversar, Vocabulario y Gramática (3x2 en escritorio). |
+| D7 | URLs reales | Sí, con HashRouter (`#/inicio`, `#/formacion/...`, `#/aprender/...`, `#/progreso`): funciona en local/LAN sin configuración de servidor; botón atrás y deep links. |
+| D8 | Ayuda y "Conectar dispositivo" | Separar conceptos: la ayuda general enlaza a `docs/` (premisa #17); "Conectar dispositivo" pasa a Ajustes/Sistema. Limpiar `HelpDialog` (código muerto). |
+
+Los detalles de disposición que no fija esta acta (densidad visual de las tarjetas del hub,
+jerarquía de cada tarjeta de INICIO, etc.) se resuelven en la fase de wireframes.
 
 ---
 
 ## 9. Fases siguientes (a ejecutar tras la pausa)
 
-1. **Pausa y auditoría**: este documento se estudia en conjunto y se envía a auditoría externa.
-2. **Cierre de preguntas abiertas** (sección 8) -> acta de decisiones en este mismo documento.
-3. **Wireframes visuales** por breakpoint (PC/tablet/móvil) de las pantallas maestras.
-4. **Implementación** (ramas cortas, subagentes autocontenidos según `docs/PREMISAS.md` #5):
-   rutas/Workspace, shell responsive, i18n, reubicación de pantallas, limpieza de código muerto.
-5. **Tests visuales Playwright** en 3 viewports (premisa #20) y **pruebas reales** en dispositivos
+1. **Auditoría externa**: este documento (con el acta de la sección 8) se envía a auditoría externa.
+2. **Wireframes visuales** por breakpoint (PC/tablet/móvil) de las pantallas maestras; aquí se
+   resuelven los detalles de disposición que no fija el acta.
+3. **Implementación** (ramas cortas, subagentes autocontenidos según `docs/PREMISAS.md` #5):
+   URLs/rutas y Workspace, shell responsive, i18n, reubicación de pantallas, limpieza de código
+   muerto.
+4. **Tests visuales Playwright** en 3 viewports (premisa #20) y **pruebas reales** en dispositivos
    (`docs/DEVICE_MATRIX.md`).
-6. **Bump de versión a V3.1.0** validado con `backend/scripts/check_release_consistency.py` (solo en
-   la fase de implementación, no ahora).
+5. **Bump de versión a V3.1.0** validado con `backend/scripts/check_release_consistency.py` (solo en
+   la fase de implementación).
 
 Fuera de alcance de esta fase: cambios de código de UI, cambios de versión, wireframes, tests.
 
@@ -479,13 +483,16 @@ Fuera de alcance de esta fase: cambios de código de UI, cambios de versión, wi
 
 Lista orientativa de toques para cuando se apruebe la implementación (no es un compromiso cerrado):
 
-- `frontend/src/app/routes.ts`: nuevo modelo de mundos; `Workspace.tsx`: nuevo mapa de vistas.
-- `frontend/src/app/AppShell.tsx` y `app/Navigation.tsx`: bottom-nav 3 iconos / nav desktop 3.
+- `frontend/src/app/routes.ts`: migrar a URLs HashRouter de 3 mundos + sub-rutas (D7);
+  `Workspace.tsx`: nuevo mapa de vistas.
+- `frontend/src/app/AppShell.tsx` y `app/Navigation.tsx`: bottom-nav 3 iconos (<768 px) / píldoras
+  de 3 destinos en cabecera (>=768 px, D1).
 - `frontend/src/App.tsx`: simplificar `navigate`/`handleStartLesson`/`handleSelectSection`; quitar
-  duplicación chat/learn; limpiar `helpOpen`/`HelpDialog` muerto.
+  duplicación chat/learn; limpiar `helpOpen`/`HelpDialog` muerto (D8).
 - `frontend/src/app/Header.tsx`: cabecera por mundo (nivel CEFR visible, micrófono, usuario).
 - `frontend/src/features/`: `home` (rediseño), `course` (envoltura), `journey` (fusión), `progress`
-  (consolidación por pestañas), `learn` (hub), `vocabulary` (reubicación), `help` (división).
+  (consolidación por pestañas), `learn` (hub de tarjetas), `vocabulary` (reubicación),
+  `reading` (ocultar/archivar, D4), `help` (división: docs/ vs Conectar dispositivo).
 - `frontend/src/components/PracticeView.tsx`: envoltura de contexto "lección del curso" vs "práctica
   libre"; análisis del panel Analysis en MI PROGRESO.
 - `frontend/src/utils/i18n.ts`: claves `nav.*` nuevas y limpieza de huérfanas.
