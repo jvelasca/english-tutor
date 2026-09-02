@@ -7,6 +7,8 @@ import { AppShell } from "./app/AppShell";
 import { Header } from "./app/Header";
 import { Workspace } from "./app/Workspace";
 import type { Route } from "./app/routes";
+import { navigateTo, useHashPath } from "./router/hash";
+import { pathToRoute, routeToPath } from "./router/routeMap";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { HelpDialog } from "./components/HelpDialog";
 import { completeSessionStep } from "./api/academy";
@@ -46,7 +48,11 @@ export default function App() {
   const handsFree = useHandsFree(chat.sendText);
   const { lang, setLang } = useLanguage(currentUserId);
 
-  const [route, setRoute] = useState<Route>("home");
+  const path = useHashPath();
+  const route = pathToRoute(path);
+  // Navega desde los handlers internos: la URL (hash) es la fuente de verdad
+  // de la ruta, así que "ir a una pantalla" es asignar su ruta canónica.
+  const go = useCallback((next: Route) => navigateTo(routeToPath(next)), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [sessionVersion, setSessionVersion] = useState(0);
@@ -54,13 +60,13 @@ export default function App() {
 
   const navigate = useCallback(
     (next: Route) => {
-      setRoute(next);
+      go(next);
       if (next === "chat") {
         selectSection("speaking");
         selectMode("conversation");
       }
     },
-    [selectSection, selectMode],
+    [go, selectSection, selectMode],
   );
 
   const handleSelectSection = useCallback(
@@ -70,9 +76,9 @@ export default function App() {
       else if (next === "speaking" || next === "writing") {
         selectMode("conversation");
       }
-      setRoute("learn");
+      go("learn");
     },
-    [selectSection, selectMode],
+    [go, selectSection, selectMode],
   );
 
   const handleStartLesson = useCallback(
@@ -85,9 +91,9 @@ export default function App() {
       startLesson(objectiveId, title, levelId, skills);
       selectSection("speaking");
       selectMode("conversation");
-      setRoute("learn");
+      go("learn");
     },
-    [startLesson, selectSection, selectMode],
+    [go, startLesson, selectSection, selectMode],
   );
 
   const handleSessionStep = useCallback(
@@ -102,9 +108,9 @@ export default function App() {
       }
       const next = step.skill ? SKILL_SECTION[step.skill] : undefined;
       if (next) handleSelectSection(next);
-      else setRoute("chat");
+      else go("chat");
     },
-    [handleSelectSection, handleStartLesson],
+    [go, handleSelectSection, handleStartLesson],
   );
 
   const handleNextBestStart = useCallback(
@@ -118,18 +124,18 @@ export default function App() {
         handleStartLesson(step.objective_id, step.title, step.level_id, []);
         return;
       }
-      setRoute("chat");
+      go("chat");
     },
-    [handleSelectSection, handleStartLesson],
+    [go, handleSelectSection, handleStartLesson],
   );
 
   const handleFinishLesson = useCallback(async () => {
     await completeLesson();
     setSessionVersion((v) => v + 1);
-    setRoute("course");
-  }, [completeLesson]);
+    go("course");
+  }, [completeLesson, go]);
 
-  const handleOpenCourse = useCallback(() => setRoute("course"), []);
+  const handleOpenCourse = useCallback(() => go("course"), [go]);
 
   const completeActiveStep = useCallback(() => {
     const key = activeStepKeyRef.current;
