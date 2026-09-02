@@ -91,6 +91,11 @@ Complementan los G1–G5 de `BETA_GATES.md`.
 
 ## 4. Fase post-freeze (trabajo permitido)
 
+> Dossieres de la fase en `docs/audit/` (A–G), consolidación en
+> `docs/AUDITORIA-V3.md` y temas aparcados en `docs/audit/PARKED.md`.
+> Estado (2026-09-02): UX §4.3 cerrado; contenido/calibración auditados con
+> evidencias doradas; pruebas reales §4.4 pendientes de ejecución física.
+
 ### 4.1 Contenido
 
 - [ ] Autoría fina de prompts/checks por unidad (sin inflar objetivos)
@@ -107,9 +112,13 @@ Complementan los G1–G5 de `BETA_GATES.md`.
 
 ### 4.3 UX
 
-- [ ] Home: “Where am I / How am I doing / What is weak / What should I do / Why”
-- [ ] Vaciar estados vacíos restantes; i18n de strings nuevas V2.9–V2.12
-- [ ] Revisar carga cognitiva de Assessment ladder + FSRS + Evidence Graph
+- [x] Home: “Where am I / How am I doing / What is weak / What should I do / Why”
+- [x] Vaciar estados vacíos restantes; i18n de strings nuevas V2.9–V2.12
+- [x] Revisar carga cognitiva de Assessment ladder + FSRS + Evidence Graph
+
+> Cerrados el 2026-09-02 por la auditoría F (`docs/audit/F-UX-JOURNEY.md`):
+> verificación formal de las 5 preguntas, fix del positivo falso «All done»
+> (`HomeScreen.tsx`) y checker i18n (`scripts/check_i18n_coverage.py`, 0 roturas).
 
 ### 4.4 Pruebas reales
 
@@ -122,6 +131,10 @@ Completar `docs/DEVICE_MATRIX.md` (hoy todo ⬜):
 - [ ] Recuperación de permiso de micrófono
 
 Protocolo: sección «Cómo probar» de la matriz de dispositivos.
+
+> Runbook por dispositivo listo en `docs/audit/G-DEVICES.md` (auditoría G,
+> 2026-09-02). La ejecución física es manual y volcará resultados aquí y en la
+> matriz.
 
 ---
 

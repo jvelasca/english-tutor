@@ -1,0 +1,54 @@
+{
+  "audit": "B-2026-09-02",
+  "description": "Bandas de calibración del corpus de listening fijadas en la auditoría B (docs/audit/B-LISTENING-CEFR.md). Un ítem o nivel que salga de estas bandas por una edición futura hará fallar test_golden_listening.py hasta que se re-audite.",
+  "levels": {
+    "A1": {
+      "n": 25,
+      "speech_rate": [115, 125],
+      "difficulty": [1, 2],
+      "words_per_script_max": 14,
+      "connected_speech": {"min": 0, "max": 0},
+      "accent_variety_min": 5
+    },
+    "A2": {
+      "n": 25,
+      "speech_rate": [130, 135],
+      "difficulty": [2, 3],
+      "words_per_script_max": 15,
+      "connected_speech": {"min": 0, "max": 0},
+      "accent_variety_min": 5
+    },
+    "B1": {
+      "n": 25,
+      "speech_rate": [130, 175],
+      "difficulty": [2, 3],
+      "words_per_script_max": 16,
+      "connected_speech": {"min": 4},
+      "accent_variety_min": 5
+    },
+    "B2": {
+      "n": 25,
+      "speech_rate": [150, 185],
+      "difficulty": [3, 5],
+      "words_per_script_max": 23,
+      "connected_speech": {"min": 11},
+      "accent_variety_min": 5
+    },
+    "C1": {
+      "n": 20,
+      "speech_rate": [150, 170],
+      "difficulty": [4, 4],
+      "words_per_script_max": 39,
+      "connected_speech": {"min": 14},
+      "accent_variety_min": 5
+    },
+    "C2": {
+      "n": 20,
+      "speech_rate": [159, 175],
+      "difficulty": [4, 5],
+      "words_per_script_max": 30,
+      "connected_speech": {"min": 20},
+      "accent_variety_min": 5
+    }
+  }
+}

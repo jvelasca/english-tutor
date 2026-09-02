@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_BACKEND = Path(__file__).resolve().parent.parent
+_TESTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(_BACKEND))
+# Permite `from golden import loader` en los tests de golden datasets.
+sys.path.insert(0, str(_TESTS))
 
 
 @pytest.fixture(autouse=True)

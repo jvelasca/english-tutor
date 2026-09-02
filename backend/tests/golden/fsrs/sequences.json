@@ -1,0 +1,70 @@
+{
+  "audit": "E-2026-09-02",
+  "description": "Historias de review doradas del scheduler FSRS-lite (docs/audit/E-FSRS-RETENTION.md). Verifican propiedades cualitativas del scheduling (crecimiento de estabilidad, lapse/recovery, intervalo dependiente de la historia y del grade, scheduler uniforme por tipo de memoria) sin reimplementar las fórmulas.",
+  "t0": "2026-09-02T10:00:00+00:00",
+  "sequences": [
+    {
+      "id": "good-x4-grows",
+      "target_type": "skill",
+      "target_id": "grammar",
+      "steps": [
+        {"grade": "good", "at_day": 0},
+        {"grade": "good", "at_day": 3},
+        {"grade": "good", "at_day": 10},
+        {"grade": "good", "at_day": 21}
+      ],
+      "expect": {
+        "final_reps": 4,
+        "final_lapses": 0,
+        "final_state": "review",
+        "monotonic_stability": true,
+        "monotonic_interval": true
+      }
+    },
+    {
+      "id": "good-then-lapse-then-recovery",
+      "target_type": "skill",
+      "target_id": "vocabulary",
+      "steps": [
+        {"grade": "good", "at_day": 0},
+        {"grade": "again", "at_day": 3},
+        {"grade": "good", "at_day": 4}
+      ],
+      "expect": {
+        "final_reps": 3,
+        "final_lapses": 1,
+        "final_state": "review",
+        "lapse_lowers_stability": true,
+        "recovery_raises_stability": true
+      }
+    },
+    {
+      "id": "easy-vs-hard-after-first-good",
+      "comment": "Partiendo del mismo primer review (good), una segunda review easy debe producir un intervalo bastante mayor que una hard.",
+      "target_type": "skill",
+      "target_id": "fluency",
+      "first_grade": "good",
+      "second_day": 3,
+      "compare": {"hard_interval_days_lt": "easy_interval_days"}
+    },
+    {
+      "id": "new-card-grade-transitions",
+      "comment": "Primer review: good desde new entra en review; again desde new entra en relearning.",
+      "target_type": "lexicon",
+      "target_id": "apple",
+      "new_good_state": "review",
+      "new_again_state": "relearning"
+    },
+    {
+      "id": "memory-type-uniformity",
+      "comment": "El scheduler es hoy uniforme: la misma historia de grades produce el mismo resultado para lexicon y skill (los target_types solo cambian el origen de la carta, no los parámetros). Se documenta, no se cambia en esta fase.",
+      "steps": [
+        {"grade": "good", "at_day": 0},
+        {"grade": "good", "at_day": 3},
+        {"grade": "again", "at_day": 9},
+        {"grade": "good", "at_day": 10}
+      ],
+      "expect": {"types_identical": ["skill", "lexicon"]}
+    }
+  ]
+}

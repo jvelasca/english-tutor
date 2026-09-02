@@ -1,0 +1,43 @@
+{
+  "audit": "B-2026-09-02",
+  "description": "Muestras representativas del corpus revisadas cualitativamente en la auditoría B, una por combinación de interés por nivel. Los tests golden verifican que estas muestras sigan existiendo con su nivel y destreza declarada (si se borra o se re-nivela un ítem auditado, hay que re-auditar).",
+  "levels": {
+    "A1": [
+      {"id": "c001", "note": "gist literal, distractores plausibles, velocidad 120 (por encima de banda de referencia 80-115, aceptado por ser TTS claro)"},
+      {"id": "c007", "note": "etiquetado speaker_intention aunque es deseo literal; etiqueta generosa a nivel A1"},
+      {"id": "c043", "note": "gist de mensaje breve, distractor opuesto (hot) y plausible (umbrella)"},
+      {"id": "c049", "note": "detail explícito de comida; distractores de la misma categoría"}
+    ],
+    "A2": [
+      {"id": "c011", "note": "inference mínima legítima (reunirse antes del cine); corresponde al techo A2"},
+      {"id": "c017", "note": "gist de noticia local; léxico ligeramente por encima de la media A2 (worried/fewer)"},
+      {"id": "c058", "note": "vocabulary meta (freezing/boiling); vocabulario más propio de B1 que de A2"},
+      {"id": "c064", "note": "inference directa (hurt knee); no exige matiz"}
+    ],
+    "B1": [
+      {"id": "c021", "note": "inference + connected speech real (gonna); alineado con foco B1"},
+      {"id": "c027", "note": "sequencing con marcadores; distractor correcto depende de orden"},
+      {"id": "c073", "note": "connected speech auténtico (whaddaya/dunno); excelente para B1"},
+      {"id": "c079", "note": "sequencing paralelo a c027 (instrucciones); riesgo de patrón repetido"}
+    ],
+    "B2": [
+      {"id": "c031", "note": "inference multihablante (falta de acuerdo); tres voces, distractores fuertes"},
+      {"id": "c037", "note": "attitude con registro idiomático (beyond a joke); bien B2"},
+      {"id": "c088", "note": "attitude dismissive; registro casi C1, aceptable en el techo B2"},
+      {"id": "c094", "note": "speaker_intention con cortesía indirecta; rozando C1"}
+    ],
+    "C1": [
+      {"id": "c101", "note": "inference sobre cultura laboral; exige combinar varias claves"},
+      {"id": "c106", "note": "connected speech narrativo con cadena causal; comprensión integradora"},
+      {"id": "c111", "note": "note_taking de briefing; requiere retener y comparar"},
+      {"id": "c116", "note": "inference con hedging académico; respuesta depende de matiz"}
+    ],
+    "C2": [
+      {"id": "c121", "note": "discurso abstracto; la respuesta exige interpretar una metáfora"},
+      {"id": "c123", "note": "ironía retórica explícita; pragmática genuina (prosody ironic)"},
+      {"id": "c126", "note": "narrativa idiomática; registro informal sofisticado, cuestionable como C2 puro"},
+      {"id": "c131", "note": "rechazo/advertencia velada; pragmática auténtica sin marca literal"},
+      {"id": "c136", "note": "priorización con lenguaje indirecto; exige inferir valores"}
+    ]
+  }
+}

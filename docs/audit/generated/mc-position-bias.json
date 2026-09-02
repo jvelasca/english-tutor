@@ -1,0 +1,76 @@
+{
+ "area": "mc-bias",
+ "groups": [
+  {
+   "name": "corpus listening (c*)",
+   "items": 140,
+   "counts": {
+    "0": 127,
+    "1": 10,
+    "2": 3
+   }
+  },
+  {
+   "name": "corpus A1",
+   "items": 25,
+   "counts": {
+    "0": 13,
+    "1": 10,
+    "2": 2
+   }
+  },
+  {
+   "name": "corpus A2",
+   "items": 25,
+   "counts": {
+    "0": 24,
+    "2": 1
+   }
+  },
+  {
+   "name": "corpus B1",
+   "items": 25,
+   "counts": {
+    "0": 25
+   }
+  },
+  {
+   "name": "corpus B2",
+   "items": 25,
+   "counts": {
+    "0": 25
+   }
+  },
+  {
+   "name": "corpus C1",
+   "items": 20,
+   "counts": {
+    "0": 20
+   }
+  },
+  {
+   "name": "corpus C2",
+   "items": 20,
+   "counts": {
+    "0": 20
+   }
+  },
+  {
+   "name": "checks currículo (niveles)",
+   "items": 331,
+   "counts": {
+    "0": 292,
+    "1": 37,
+    "2": 2
+   }
+  },
+  {
+   "name": "exámenes level/placement",
+   "items": 22,
+   "counts": {
+    "0": 14,
+    "1": 8
+   }
+  }
+ ]
+}

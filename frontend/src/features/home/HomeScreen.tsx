@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
-import { CheckCircle2, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { CheckCircle2, Loader2, Minus, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { getNextBestActivity } from "../../api/academy";
 import type {
   LearningProfile,
@@ -14,6 +14,7 @@ import { NextBestCard } from "../../components/NextBestCard";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
 import { TriadCard } from "../../components/TriadCard";
+import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { cn } from "../../lib/utils";
 
@@ -66,16 +67,30 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const { t } = useI18n();
   const [next, setNext] = useState<NextBestActivity | null>(null);
+  const [nextState, setNextState] = useState<"loading" | "error" | "done">(
+    "loading",
+  );
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setNext(null);
+      setNextState("error");
+      return;
+    }
     let cancelled = false;
+    setNextState("loading");
     void (async () => {
       try {
         const activity = await getNextBestActivity(userId);
-        if (!cancelled) setNext(activity);
+        if (!cancelled) {
+          setNext(activity);
+          setNextState("done");
+        }
       } catch {
-        /* backend no disponible */
+        if (!cancelled) {
+          setNext(null);
+          setNextState("error");
+        }
       }
     })();
     return () => {
@@ -194,7 +209,48 @@ export function HomeScreen({
 
         <motion.section variants={item} aria-label={t("home.nextStep")}>
           {next ? (
-            <NextBestCard next={next} onStart={() => onStart(sectionFor(next), next)} />
+            <NextBestCard
+              next={next}
+              onStart={() => onStart(sectionFor(next), next)}
+            />
+          ) : nextState === "loading" ? (
+            <Card
+              role="status"
+              aria-busy="true"
+              aria-live="polite"
+              className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground"
+            >
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              {t("common.loading")}
+            </Card>
+          ) : nextState === "error" ? (
+            <Card className="flex flex-col items-center gap-2 p-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                {t("home.unavailable")}
+              </p>
+              {userId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    setNextState("loading");
+                    void (async () => {
+                      try {
+                        const activity = await getNextBestActivity(userId);
+                        setNext(activity);
+                        setNextState("done");
+                      } catch {
+                        setNextState("error");
+                      }
+                    })();
+                  }}
+                >
+                  <RefreshCw className="size-4" />
+                  {t("home.retry")}
+                </Button>
+              )}
+            </Card>
           ) : (
             <Card className="flex flex-col items-center gap-2 p-6 text-center">
               <CheckCircle2 className="size-8 text-success" aria-hidden="true" />

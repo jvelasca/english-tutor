@@ -7,9 +7,15 @@ import type {
   ListeningStats,
 } from "../types/api";
 
-export function getListeningQuestion(userId: string): Promise<ListeningQuestion> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return getJson<ListeningQuestion>(`/api/listening/question?${query}`);
+export function getListeningQuestion(
+  userId: string,
+  level?: string | null,
+): Promise<ListeningQuestion> {
+  const params = new URLSearchParams({ user_id: userId });
+  // `level` entra en juego en el repaso de un nivel ya completado: el selector
+  // rota por las frases del nivel en lugar de seguir al Student Model.
+  if (level) params.set("level", level);
+  return getJson<ListeningQuestion>(`/api/listening/question?${params.toString()}`);
 }
 
 export function submitListeningAnswer(

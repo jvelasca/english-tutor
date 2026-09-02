@@ -5,6 +5,7 @@ import type { Section } from "../utils/sections";
 import { SKILL_LABELS } from "../utils/learningLabels";
 import { useI18n } from "../hooks/useI18n";
 import { nextBestTitle } from "./NextBestCard";
+import { Button } from "./ui/button";
 
 const SKILL_TO_SECTION: Record<string, Section> = {
   listening: "listening",
@@ -19,26 +20,45 @@ const SKILL_TO_SECTION: Record<string, Section> = {
  * Pie "Next" compartido del bucle Activity → Result → Feedback → Next.
  * Consulta el Adaptive Engine (`/api/academy/next-best`) y muestra una única
  * acción dominante con un CTA "Continuar"; el frontend no decide pedagogía.
+ *
+ * `fallback`: cuando el motor no tiene pasos pendientes (o el backend no
+ * responde), en lugar de no renderizar nada se muestra un único CTA con
+ * `label` que dispara `onClick` (p. ej. seguir practicando en la misma
+ * sección), evitando que el resultado quede sin salida.
  */
 export function NextStep({
   userId,
   onNext,
+  fallback,
 }: {
   userId: string | null;
   onNext: (section: Section | null, step: NextBestActivity) => void;
+  fallback?: { label: string; onClick: () => void };
 }) {
   const { t } = useI18n();
   const [next, setNext] = useState<NextBestActivity | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setLoaded(true);
+      return;
+    }
     let cancelled = false;
+    setLoaded(false);
+    setNext(null);
     void (async () => {
       try {
         const activity = await getNextBestActivity(userId);
-        if (!cancelled) setNext(activity);
+        if (!cancelled) {
+          setNext(activity);
+          setLoaded(true);
+        }
       } catch {
-        /* backend no disponible */
+        if (!cancelled) {
+          setNext(null);
+          setLoaded(true);
+        }
       }
     })();
     return () => {
@@ -46,7 +66,22 @@ export function NextStep({
     };
   }, [userId]);
 
-  if (!next) return null;
+  if (!loaded) return null;
+
+  if (!next) {
+    if (fallback) {
+      return (
+        <Button
+          type="button"
+          className="min-h-10 gap-2"
+          onClick={fallback.onClick}
+        >
+          {fallback.label}
+        </Button>
+      );
+    }
+    return null;
+  }
 
   const section = next.skill ? SKILL_TO_SECTION[next.skill] : null;
 

@@ -1,0 +1,25 @@
+{
+ "area": "speaking",
+ "total": 26,
+ "by_cefr": {
+  "A2": 6,
+  "B1": 7,
+  "B2": 5,
+  "A1": 1,
+  "C1": 1,
+  "C2": 6
+ },
+ "by_task_type": {
+  "role_play": 9,
+  "conversation": 7,
+  "discussion": 8,
+  "interview": 2
+ },
+ "metrics": [
+  "fluency",
+  "interaction",
+  "repair",
+  "task_completion",
+  "turn_taking"
+ ]
+}

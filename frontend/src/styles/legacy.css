@@ -226,6 +226,68 @@ body.is-resizing {
 }
 
 /* ==========================================================================
+   Aprender ("learn") — secciones de práctica: el análisis es un drawer
+   --------------------------------------------------------------------------
+   En las secciones de práctica de la ruta "learn" (listening/reading/
+   pronunciation, no conversación) el ejercicio ocupa todo el ancho; el panel
+   de análisis nunca se acopla a la derecha y se abre bajo demanda con el botón
+   flotante, como capa lateral sobre el contenido (igual que en ≤1024px, pero
+   aplicado también en desktop/tablet apaisada).
+   ========================================================================== */
+
+.workspace--learn .pane--insights {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  width: min(420px, 92vw) !important;
+  transform: translateX(100%);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.workspace--learn .pane--insights.open {
+  transform: translateX(0);
+  box-shadow: var(--shadow-lg);
+}
+
+.workspace--learn .pane-close {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-end;
+  margin: var(--space-3) var(--space-3) 0;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.workspace--learn .pane-close:hover {
+  color: var(--color-text);
+}
+
+.workspace--learn .pane-backdrop--insights {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.workspace--learn .pane-backdrop--insights.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ==========================================================================
    Sidebar
    ========================================================================== */
 

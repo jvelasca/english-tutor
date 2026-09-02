@@ -92,6 +92,10 @@ export function PracticeView({
   const isChat =
     section === "speaking" || section === "writing" || section === "grammar";
   const showSidebar = route === "chat";
+  // En Aprender, las secciones de práctica pura (no conversación) usan todo el
+  // ancho: el panel de análisis nunca se acopla y se abre como drawer con el
+  // botón flotante. Las secciones conversacionales conservan su layout.
+  const drawerAnalysis = route === "learn" && !isChat;
 
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -122,7 +126,7 @@ export function PracticeView({
   };
 
   return (
-    <div className="workspace">
+    <div className={`workspace${drawerAnalysis ? " workspace--learn" : ""}`}>
       {showSidebar && (
         <>
           <aside
@@ -285,13 +289,15 @@ export function PracticeView({
         )}
       </main>
 
-      <ResizeHandle
-        onDrag={handleDragRight}
-        label={t("chat.resizeInsights")}
-        value={layout.rightWidth}
-        min={RIGHT_MIN}
-        max={RIGHT_MAX}
-      />
+      {!drawerAnalysis && (
+        <ResizeHandle
+          onDrag={handleDragRight}
+          label={t("chat.resizeInsights")}
+          value={layout.rightWidth}
+          min={RIGHT_MIN}
+          max={RIGHT_MAX}
+        />
+      )}
 
       <aside
         className={`pane pane--insights${insightsOpen ? " open" : ""}`}

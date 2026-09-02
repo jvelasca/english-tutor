@@ -1239,6 +1239,33 @@ def current_level(correct_question_ids: set[str]) -> str:
     return LEVEL_ORDER[-1]
 
 
+def review_next_question(level: str, attempts_rows: list[dict]) -> dict:
+    """Siguiente frase de un nivel para repaso (rotación LRU).
+
+    Devuelve la frase del nivel cuyo último intento registrado es más antiguo
+    (o cualquier frase aún no intentada). Como cada respuesta registra una fila
+    nueva, el repaso recorre las frases del nivel sin repetir hasta completar
+    una vuelta completa. `attempts_rows` llega ordenado por id ASC.
+    """
+    candidates = questions_for_level(level)
+    if not candidates:
+        raise ValueError(f"nivel sin frases en el banco: {level}")
+    candidate_ids = {q["id"] for q in candidates}
+    last_index: dict[str, int] = {}
+    for i, row in enumerate(attempts_rows):
+        qid = row.get("question_id")
+        if qid in candidate_ids:
+            last_index[qid] = i
+    # Nunca intentadas primero (son las menos practicadas); entre las demás, la
+    # de intento más antiguo primero (LRU). Tras responder, la frase pasa al
+    # final y no se repite hasta completar la vuelta.
+    pool = sorted(
+        candidates,
+        key=lambda q: (q["id"] in last_index, last_index.get(q["id"], -1)),
+    )
+    return pool[0]
+
+
 def _realizes_subskill(question: dict, subskill: str) -> bool:
     """True si el audio del ítem realiza el factor que respalda la sub-destreza.
 

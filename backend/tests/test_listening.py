@@ -17,8 +17,10 @@ from services.listening import (
     level_status,
     listening_diagnostic,
     pick_next_question,
+    questions_for_level,
     recent_trend,
     recurrence_stats,
+    review_next_question,
     score_answer,
 )
 
@@ -75,6 +77,61 @@ def test_pick_next_completes_all_levels_and_rotates():
     # Todo dominado: rota sobre el banco en lugar de quedarse atascado.
     all_ids = {q["id"] for q in QUESTION_BANK}
     assert pick_next_question(set(), all_ids)["id"] == QUESTION_BANK[0]["id"]
+
+
+def test_review_next_serves_never_attempted_first():
+    # En repaso, una frase nunca intentada en el nivel se sirve antes que las
+    # ya practicadas (es la menos practicada).
+    a1 = questions_for_level("A1")
+    reviewed = a1[0]["id"]
+    attempts = [{"question_id": reviewed}]
+    got = review_next_question("A1", attempts)
+    assert got["id"] != reviewed
+    assert got["id"] in {q["id"] for q in a1}
+
+
+def test_review_next_rotates_by_oldest_attempt():
+    a1 = questions_for_level("A1")
+    ids = [q["id"] for q in a1]
+    # Una vuelta completa: cada frase intentada una vez, en orden.
+    attempts = [{"question_id": qid} for qid in ids]
+    assert review_next_question("A1", attempts)["id"] == ids[0]
+    # Tras "responderla", su intento pasa a ser el más reciente: la siguiente
+    # es la que ahora tiene el intento más antiguo.
+    attempts.append({"question_id": ids[0]})
+    assert review_next_question("A1", attempts)["id"] == ids[1]
+
+
+def test_review_question_endpoint_filters_by_level(monkeypatch, tmp_path):
+    """`GET /api/listening/question?level=...` sirve solo frases de ese nivel."""
+    uid = _setup(monkeypatch, tmp_path)
+    a1 = questions_for_level("A1")
+    a2 = questions_for_level("A2")
+    with TestClient(app) as client:
+        for q in a1:
+            r = client.post(
+                "/api/listening/answer",
+                params={"user_id": uid},
+                json={"question_id": q["id"], "answer_index": q["answer_index"]},
+            )
+            assert r.status_code == 200
+        r = client.get(
+            "/api/listening/question", params={"user_id": uid, "level": "A1"}
+        )
+        body = r.json()
+        # A1 ya está dominado: el repaso rota dentro de A1 (no salta a A2).
+        assert body["level"] == "A1"
+        assert body["id"] in {q["id"] for q in a1}
+
+        bad = client.get(
+            "/api/listening/question", params={"user_id": uid, "level": "XX"}
+        )
+        assert bad.status_code == 400
+
+        # Sin `level`, la progresión normal avanza a A2.
+        nxt = client.get("/api/listening/question", params={"user_id": uid}).json()
+        assert nxt["level"] == "A2"
+        assert nxt["id"] in {q["id"] for q in a2}
 
 
 def test_current_level_advances_with_mastery():

@@ -27,6 +27,7 @@ from services.listening import (
     production_score,
     realization_status,
     realized_difficulty,
+    review_next_question,
     score_answer,
     spoken_text,
     variant_length_scale,
@@ -79,13 +80,19 @@ def _public(question: dict) -> dict:
     return out
 
 
-async def next_question(user_id: str) -> dict:
+async def next_question(user_id: str, level: str | None = None) -> dict:
     """Siguiente pregunta consumiendo el Student Model (sub-destrezas débiles).
 
     El selector prioriza, dentro del nivel de trabajo del alumno, las sub-destrezas
     que el diagnóstico marca como débiles, con selección consciente de la
     realización auditiva (no entrena una sub-destreza con audio que no la respalda).
+
+    Con `level` (repaso de un nivel ya completado) se ignora el Student Model y se
+    rota por las frases de ese nivel sin repetirlas hasta completar una vuelta.
     """
+    if level is not None:
+        attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
+        return _public(review_next_question(level, attempts))
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
     correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)

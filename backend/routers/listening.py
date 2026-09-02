@@ -15,13 +15,19 @@ from schemas.listening import (
     ListeningQuestion,
     ListeningStats,
 )
+from services.listening import LEVEL_ORDER
 
 router = APIRouter()
 
 
 @router.get("/api/listening/question", response_model=ListeningQuestion)
-async def question(user: dict = Depends(current_user)) -> dict:
-    return await listening_service.next_question(user["id"])
+async def question(
+    level: str | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    if level is not None and level not in LEVEL_ORDER:
+        raise HTTPException(status_code=400, detail=f"Nivel no válido: {level}")
+    return await listening_service.next_question(user["id"], level=level)
 
 
 @router.get("/api/listening/audio/{question_id}")

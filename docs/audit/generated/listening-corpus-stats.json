@@ -1,0 +1,277 @@
+{
+ "area": "listening",
+ "levels": {
+  "A1": {
+   "n": 25,
+   "speech_rate": {
+    "mean": 119.0,
+    "min": 115.0,
+    "max": 125.0
+   },
+   "difficulty": {
+    "mean": 1.2,
+    "min": 1,
+    "max": 2
+   },
+   "words_per_script": {
+    "mean": 9.8,
+    "min": 6,
+    "max": 14
+   },
+   "duration_s": {
+    "mean": 5.48
+   },
+   "connected_speech_items": 0,
+   "skills": {
+    "gist": 4,
+    "detail": 8,
+    "numbers": 4,
+    "vocabulary": 4,
+    "attitude": 3,
+    "speaker_intention": 2
+   },
+   "accent_variety": 9,
+   "prosody": {
+    "neutral": 16,
+    "announcer": 2,
+    "expressive": 4,
+    "polite": 3
+   },
+   "speech_rate_out_of_reference_band": true
+  },
+  "A2": {
+   "n": 25,
+   "speech_rate": {
+    "mean": 130.6,
+    "min": 130.0,
+    "max": 135.0
+   },
+   "difficulty": {
+    "mean": 2.04,
+    "min": 2,
+    "max": 3
+   },
+   "words_per_script": {
+    "mean": 11.64,
+    "min": 9,
+    "max": 15
+   },
+   "duration_s": {
+    "mean": 6.36
+   },
+   "connected_speech_items": 0,
+   "skills": {
+    "inference": 5,
+    "detail": 5,
+    "vocabulary": 3,
+    "attitude": 3,
+    "numbers": 2,
+    "speaker_intention": 3,
+    "gist": 3,
+    "multiple_speakers": 1
+   },
+   "accent_variety": 9,
+   "prosody": {
+    "neutral": 15,
+    "announcer": 2,
+    "expressive": 3,
+    "reassuring": 2,
+    "newsreader": 2,
+    "helpful": 1
+   },
+   "speech_rate_out_of_reference_band": false
+  },
+  "B1": {
+   "n": 25,
+   "speech_rate": {
+    "mean": 143.4,
+    "min": 130.0,
+    "max": 175.0
+   },
+   "difficulty": {
+    "mean": 2.92,
+    "min": 2,
+    "max": 3
+   },
+   "words_per_script": {
+    "mean": 13.6,
+    "min": 9,
+    "max": 16
+   },
+   "duration_s": {
+    "mean": 6.96
+   },
+   "connected_speech_items": 4,
+   "skills": {
+    "inference": 3,
+    "attitude": 2,
+    "fast_speech": 2,
+    "speaker_intention": 3,
+    "detail": 3,
+    "prediction": 2,
+    "sequencing": 2,
+    "note_taking": 2,
+    "connected_speech": 3,
+    "gist": 1,
+    "dictation": 1,
+    "shadowing": 1
+   },
+   "accent_variety": 8,
+   "prosody": {
+    "apologetic": 1,
+    "skeptical": 2,
+    "neutral": 11,
+    "polite": 3,
+    "newsreader": 2,
+    "casual": 4,
+    "presentational": 1,
+    "suggestive": 1
+   },
+   "speech_rate_out_of_reference_band": true
+  },
+  "B2": {
+   "n": 25,
+   "speech_rate": {
+    "mean": 162.4,
+    "min": 150.0,
+    "max": 185.0
+   },
+   "difficulty": {
+    "mean": 4.04,
+    "min": 3,
+    "max": 5
+   },
+   "words_per_script": {
+    "mean": 14.84,
+    "min": 8,
+    "max": 23
+   },
+   "duration_s": {
+    "mean": 7.44
+   },
+   "connected_speech_items": 11,
+   "skills": {
+    "inference": 5,
+    "fast_speech": 3,
+    "multiple_speakers": 3,
+    "connected_speech": 3,
+    "speaker_intention": 2,
+    "note_taking": 2,
+    "attitude": 3,
+    "prediction": 2,
+    "sequencing": 2
+   },
+   "accent_variety": 8,
+   "prosody": {
+    "tentative": 3,
+    "newsreader": 2,
+    "lively": 2,
+    "casual": 3,
+    "cautious": 1,
+    "presentational": 2,
+    "frustrated": 1,
+    "empathetic": 1,
+    "neutral": 7,
+    "skeptical": 2,
+    "polite": 1
+   },
+   "speech_rate_out_of_reference_band": false
+  },
+  "C1": {
+   "n": 20,
+   "speech_rate": {
+    "mean": 156.15,
+    "min": 150.0,
+    "max": 170.0
+   },
+   "difficulty": {
+    "mean": 4.0,
+    "min": 4,
+    "max": 4
+   },
+   "words_per_script": {
+    "mean": 25.6,
+    "min": 17,
+    "max": 39
+   },
+   "duration_s": {
+    "mean": 10.45
+   },
+   "connected_speech_items": 14,
+   "skills": {
+    "inference": 3,
+    "speaker_intention": 2,
+    "attitude": 3,
+    "fast_speech": 2,
+    "multiple_speakers": 2,
+    "connected_speech": 2,
+    "gist": 1,
+    "detail": 2,
+    "note_taking": 1,
+    "prediction": 1,
+    "vocabulary": 1
+   },
+   "accent_variety": 10,
+   "prosody": {
+    "measured": 3,
+    "evasive": 1,
+    "sceptical": 1,
+    "neutral": 8,
+    "assertive": 3,
+    "ironic": 1,
+    "enthusiastic": 1,
+    "tentative": 1,
+    "irritated": 1
+   },
+   "speech_rate_out_of_reference_band": false
+  },
+  "C2": {
+   "n": 20,
+   "speech_rate": {
+    "mean": 164.35,
+    "min": 159.0,
+    "max": 175.0
+   },
+   "difficulty": {
+    "mean": 4.35,
+    "min": 4,
+    "max": 5
+   },
+   "words_per_script": {
+    "mean": 24.3,
+    "min": 16,
+    "max": 30
+   },
+   "duration_s": {
+    "mean": 10.45
+   },
+   "connected_speech_items": 20,
+   "skills": {
+    "inference": 3,
+    "speaker_intention": 2,
+    "attitude": 2,
+    "multiple_speakers": 3,
+    "fast_speech": 2,
+    "connected_speech": 2,
+    "gist": 2,
+    "detail": 1,
+    "note_taking": 1,
+    "prediction": 1,
+    "vocabulary": 1
+   },
+   "accent_variety": 10,
+   "prosody": {
+    "measured": 6,
+    "confident": 1,
+    "ironic": 1,
+    "assertive": 4,
+    "neutral": 4,
+    "concerned": 1,
+    "evasive": 1,
+    "sceptical": 1,
+    "urgent": 1
+   },
+   "speech_rate_out_of_reference_band": false
+  }
+ }
+}

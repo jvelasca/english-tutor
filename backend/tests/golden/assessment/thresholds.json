@@ -1,0 +1,65 @@
+{
+  "audit": "D-2026-09-02",
+  "description": "Comportamiento en frontera de la escalera Assessment 2.0 tal como se verificó en la auditoría D (docs/audit/D-ASSESSMENT-READINESS.md). PASS_THRESHOLDS vive en services/assessment_v2.py; este fixture fija la semántica (pass si overall >= umbral y, en level, todas las destrezas >= min_per_skill).",
+  "thresholds_source": "backend/services/assessment_v2.py",
+  "thresholds": {
+    "formative": 0.7,
+    "unit": 0.75,
+    "progress": 0.8,
+    "level": 0.8,
+    "retention": 0.7
+  },
+  "boundary_cases": [
+    {"id": "formative-barely-fails", "kind": "formative", "overall": 0.699, "skill_scores": {"vocabulary": 0.7}, "expect_passed": false},
+    {"id": "formative-passes-at-70", "kind": "formative", "overall": 0.7, "skill_scores": {"vocabulary": 0.7}, "expect_passed": true},
+    {"id": "unit-passes-at-75", "kind": "unit", "overall": 0.75, "skill_scores": {"vocabulary": 0.75, "grammar": 0.75}, "expect_passed": true},
+    {"id": "unit-fails-at-74", "kind": "unit", "overall": 0.74, "skill_scores": {"vocabulary": 0.74}, "expect_passed": false},
+    {"id": "progress-passes-at-80", "kind": "progress", "overall": 0.8, "skill_scores": {"vocabulary": 0.8}, "expect_passed": true},
+    {"id": "level-passes-at-80", "kind": "level", "overall": 0.8, "skill_scores": {"vocabulary": 0.8}, "expect_passed": true},
+    {"id": "retention-passes-at-70", "kind": "retention", "overall": 0.7, "skill_scores": {"vocabulary": 0.7}, "expect_passed": true}
+  ],
+  "level_min_per_skill_cases": [
+    {
+      "id": "level-blocks-weak-skill",
+      "kind": "level",
+      "overall": 0.9,
+      "min_per_skill": 0.75,
+      "skill_scores": {"vocabulary": 0.95, "grammar": 0.74},
+      "expect_passed": false,
+      "expect_failed_skills": ["grammar"]
+    },
+    {
+      "id": "level-passes-when-all-above-min",
+      "kind": "level",
+      "overall": 0.82,
+      "min_per_skill": 0.75,
+      "skill_scores": {"vocabulary": 0.8, "grammar": 0.76},
+      "expect_passed": true,
+      "expect_failed_skills": []
+    }
+  ],
+  "retention_delta_cases": [
+    {"id": "stable-at-90pct", "initial": 0.8, "delayed": 0.72, "expect_stable": true, "expect_rate": 0.9},
+    {"id": "unstable-below-90pct", "initial": 0.8, "delayed": 0.71, "expect_stable": false}
+  ],
+  "mastery_gate_cases": [
+    {
+      "id": "gate-met",
+      "counts": {"familiar": 2, "transfer": 1, "novel": 1, "delayed": 1},
+      "expect_met": true,
+      "expect_missing": []
+    },
+    {
+      "id": "gate-missing-novel",
+      "counts": {"familiar": 2, "transfer": 1, "novel": 0, "delayed": 1},
+      "expect_met": false,
+      "expect_missing": ["novel"]
+    },
+    {
+      "id": "gate-missing-all-but-formative",
+      "counts": {"familiar": 1, "transfer": 0, "novel": 0, "delayed": 0},
+      "expect_met": false,
+      "expect_missing": ["practice", "transfer", "novel", "delayed"]
+    }
+  ]
+}

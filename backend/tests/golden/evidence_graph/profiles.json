@@ -1,0 +1,91 @@
+{
+  "audit": "D-2026-09-02",
+  "description": "Perfiles sintéticos dorados del Evidence Graph (docs/audit/D-ASSESSMENT-READINESS.md). Verifican que el limiting factor se elige por la dimensión declarada más débil (o por evidencia transfer ausente) y nunca por la destreza más alta. Cada escenario construye un objetivo sintético + perfil + filas de evidencia.",
+  "default_level_id": "b1",
+  "default_level_label": "B1",
+  "scenarios": [
+    {
+      "id": "flagship-interaction",
+      "comment": "El ejemplo de la auditoría: listening 88, vocabulary 91, grammar 85, speaking 63, interaction 58. Con evidencia transfer presente, el limiting factor DEBE ser interaction (58) y no vocabulary (91).",
+      "objective": {
+        "id": "golden-flag-o01",
+        "title": "Hold a conversation",
+        "can_do": "I can hold a conversation and respond naturally.",
+        "skills": ["vocabulary", "grammar", "listening", "speaking", "interaction"],
+        "subskills": []
+      },
+      "objective_scores": {},
+      "profile": [
+        {"skill": "vocabulary", "score": 0.91, "evidence_count": 14},
+        {"skill": "grammar", "score": 0.85, "evidence_count": 10},
+        {"skill": "listening", "score": 0.88, "evidence_count": 9},
+        {"skill": "speaking", "score": 0.63, "evidence_count": 6},
+        {"skill": "interaction", "score": 0.58, "evidence_count": 4}
+      ],
+      "evidence_rows": [
+        {"evidence_kind": "transfer", "result": 0.6}
+      ],
+      "expect": {
+        "limiting_factor": "interaction",
+        "focus_dimension": "interaction",
+        "focus_phase": "interact",
+        "mastery_min": 0.7,
+        "because_mentions_weak": "interaction",
+        "because_mentions_strong_vocabulary": true
+      }
+    },
+    {
+      "id": "missing-transfer-wins",
+      "comment": "Sin evidencia transfer el limiting factor es transfer (missing), por encima de cualquier destreza débil: el grafo prioriza la cobertura de evidencia.",
+      "objective": {
+        "id": "golden-mt-o01",
+        "title": "Give an opinion",
+        "can_do": "I can give and justify opinions.",
+        "skills": ["vocabulary", "grammar", "listening", "speaking", "interaction"],
+        "subskills": []
+      },
+      "objective_scores": {},
+      "profile": [
+        {"skill": "vocabulary", "score": 0.91, "evidence_count": 14},
+        {"skill": "grammar", "score": 0.85, "evidence_count": 10},
+        {"skill": "listening", "score": 0.88, "evidence_count": 9},
+        {"skill": "speaking", "score": 0.6, "evidence_count": 6},
+        {"skill": "interaction", "score": 0.55, "evidence_count": 4}
+      ],
+      "evidence_rows": [],
+      "expect": {
+        "limiting_factor": "transfer",
+        "missing": true,
+        "focus_phase": "transfer",
+        "because_mentions_missing": true
+      }
+    },
+    {
+      "id": "vocabulary-weak-wins",
+      "comment": "Caso de control: cuando vocabulary es la dimensión más débil, el grafo DEBE señalar vocabulary.",
+      "objective": {
+        "id": "golden-vw-o01",
+        "title": "Talk about work",
+        "can_do": "I can talk about my job and responsibilities.",
+        "skills": ["vocabulary", "grammar", "listening", "speaking", "interaction"],
+        "subskills": []
+      },
+      "objective_scores": {},
+      "profile": [
+        {"skill": "vocabulary", "score": 0.55, "evidence_count": 3},
+        {"skill": "grammar", "score": 0.9, "evidence_count": 12},
+        {"skill": "listening", "score": 0.85, "evidence_count": 9},
+        {"skill": "speaking", "score": 0.75, "evidence_count": 8},
+        {"skill": "interaction", "score": 0.7, "evidence_count": 6}
+      ],
+      "evidence_rows": [
+        {"evidence_kind": "transfer", "result": 0.65}
+      ],
+      "expect": {
+        "limiting_factor": "vocabulary",
+        "focus_dimension": "vocabulary",
+        "focus_phase": "practice"
+      }
+    }
+  ]
+}

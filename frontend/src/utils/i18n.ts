@@ -79,6 +79,11 @@ const STRINGS: Record<string, Entry> = {
     en: "All done for today. Great work!",
     es: "Todo hecho por hoy. ¡Buen trabajo!",
   },
+  "home.unavailable": {
+    en: "Couldn't load your next step right now.",
+    es: "Ahora mismo no se ha podido cargar tu siguiente paso.",
+  },
+  "home.retry": { en: "Try again", es: "Reintentar" },
 
   // Categorías de sesión
   "kind.weakness": { en: "Weakness", es: "Debilidad" },
@@ -1108,8 +1113,14 @@ const STRINGS: Record<string, Entry> = {
   "listening.phoneticScore": { en: "Phonetic similarity", es: "Similitud fonética" },
   "listening.reference": { en: "Reference", es: "Referencia" },
   "listening.heard": { en: "Heard", es: "Oído" },
-  "listening.scoreOf": { en: "Correct", es: "Aciertos" },
+  "listening.accuracy": { en: "Accuracy", es: "Precisión" },
   "listening.currentLevel": { en: "Current level", es: "Nivel actual" },
+  "listening.diagnostic": {
+    en: "Your listening diagnostic",
+    es: "Tu diagnóstico de listening",
+  },
+  "listening.showAnalysis": { en: "Show analysis", es: "Ver análisis" },
+  "listening.hideAnalysis": { en: "Hide analysis", es: "Ocultar análisis" },
   "listening.accuracyByTopic": { en: "Accuracy by topic", es: "Precisión por tema" },
   "listening.accuracyByDifficulty": {
     en: "Accuracy by difficulty",
@@ -1127,6 +1138,30 @@ const STRINGS: Record<string, Entry> = {
   },
   "listening.next": { en: "Next", es: "Siguiente" },
   "listening.review": { en: "review", es: "revisar" },
+  "listening.speakQuestion": {
+    en: "Listen to the question",
+    es: "Escuchar la pregunta",
+  },
+  "listening.reviewStartLevel": {
+    en: "Review level {level}",
+    es: "Repasar nivel {level}",
+  },
+  "listening.reviewProgress": {
+    en: "Reviewing level {level} · {done}/{total}",
+    es: "Repasando nivel {level} · {done}/{total}",
+  },
+  "listening.reviewNext": {
+    en: "Next phrase of the level",
+    es: "Siguiente frase del nivel",
+  },
+  "listening.reviewFinish": {
+    en: "Finish review",
+    es: "Terminar repaso",
+  },
+  "listening.exitReview": {
+    en: "Exit review",
+    es: "Salir del repaso",
+  },
   "listening.audioGap": {
     en: "This audio realizes difficulty {realized} of the {declared} declared: part of the difficulty is not backed by the audio.",
     es: "Este audio realiza una dificultad {realized} de las {declared} declaradas: parte de la dificultad no está respaldada por el audio.",

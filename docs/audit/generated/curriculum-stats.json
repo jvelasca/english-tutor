@@ -1,0 +1,101 @@
+{
+ "area": "curriculum",
+ "levels": [
+  {
+   "level": "A1",
+   "objectives": 28,
+   "units": 10,
+   "checks_per_objective": 3.75,
+   "activities_per_objective": 3.07,
+   "objectives_with_listening": 11,
+   "objectives_with_scenario": 22,
+   "phases": {
+    "practice": 28,
+    "retrieve": 15,
+    "transfer": 15,
+    "review": 14,
+    "assess": 14
+   }
+  },
+  {
+   "level": "A2",
+   "objectives": 17,
+   "units": 7,
+   "checks_per_objective": 3.24,
+   "activities_per_objective": 4.88,
+   "objectives_with_listening": 7,
+   "objectives_with_scenario": 12,
+   "phases": {
+    "practice": 17,
+    "retrieve": 17,
+    "transfer": 17,
+    "review": 16,
+    "assess": 16
+   }
+  },
+  {
+   "level": "B1",
+   "objectives": 18,
+   "units": 4,
+   "checks_per_objective": 2.94,
+   "activities_per_objective": 4.67,
+   "objectives_with_listening": 7,
+   "objectives_with_scenario": 11,
+   "phases": {
+    "practice": 18,
+    "retrieve": 17,
+    "transfer": 17,
+    "review": 16,
+    "assess": 16
+   }
+  },
+  {
+   "level": "B2",
+   "objectives": 13,
+   "units": 3,
+   "checks_per_objective": 2.69,
+   "activities_per_objective": 4.85,
+   "objectives_with_listening": 5,
+   "objectives_with_scenario": 4,
+   "phases": {
+    "practice": 13,
+    "retrieve": 13,
+    "transfer": 13,
+    "review": 12,
+    "assess": 12
+   }
+  },
+  {
+   "level": "C1",
+   "objectives": 14,
+   "units": 4,
+   "checks_per_objective": 3.21,
+   "activities_per_objective": 4.86,
+   "objectives_with_listening": 4,
+   "objectives_with_scenario": 8,
+   "phases": {
+    "practice": 14,
+    "retrieve": 14,
+    "transfer": 14,
+    "review": 13,
+    "assess": 13
+   }
+  },
+  {
+   "level": "C2",
+   "objectives": 14,
+   "units": 3,
+   "checks_per_objective": 2.71,
+   "activities_per_objective": 4.86,
+   "objectives_with_listening": 4,
+   "objectives_with_scenario": 8,
+   "phases": {
+    "practice": 14,
+    "retrieve": 14,
+    "transfer": 14,
+    "review": 13,
+    "assess": 13
+   }
+  }
+ ]
+}

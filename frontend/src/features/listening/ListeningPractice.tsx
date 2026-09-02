@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   Mic,
   Play,
   RefreshCw,
   Send,
   Square,
-  AlertTriangle,
+  Volume2,
 } from "lucide-react";
 import {
   getListeningAudioUrl,
@@ -37,6 +41,7 @@ import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
 import { NextStep } from "../../components/NextStep";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
+import { ProgressRing } from "../../components/ProgressRing";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -165,8 +170,14 @@ export function ListeningPractice({
   const [replayCount, setReplayCount] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [variant, setVariant] = useState<string>("normal");
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [speakingQuestion, setSpeakingQuestion] = useState(false);
+  const [review, setReview] = useState<{ level: string; total: number } | null>(
+    null,
+  );
+  const [reviewDone, setReviewDone] = useState(0);
 
-  async function load() {
+  async function load(levelOverride?: string | null) {
     if (!userId) return;
     setError(null);
     setResult(null);
@@ -175,13 +186,59 @@ export function ListeningPractice({
     setDictationText("");
     setTranscribedText("");
     setVariant("normal");
+    // Sin override, respeta el nivel de la sesión de repaso en curso (si hay).
+    const level = levelOverride === undefined ? review?.level : levelOverride;
     try {
-      setQuestion(await getListeningQuestion(userId));
+      setQuestion(await getListeningQuestion(userId, level));
       setStartedAt(Date.now());
       setReplayCount(0);
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+
+  // Sesión de repaso de un nivel completado: todas sus frases, una vez.
+  function startReview(lv: { level: string; total: number }) {
+    if (review || !userId) return;
+    setReview(lv);
+    setReviewDone(0);
+    void load(lv.level);
+  }
+
+  function exitReview() {
+    setReview(null);
+    setReviewDone(0);
+    // Override explícito a null: el cierre aún conserva el `review` viejo y sin
+    // override `load()` seguiría pidiendo frases del nivel que se abandona.
+    void load(null);
+  }
+
+  // El contador del repaso avanza solo cuando se responde (no al saltar).
+  function markAnswered() {
+    if (review) setReviewDone((d) => d + 1);
+  }
+
+  async function speakQuestion() {
+    if (!question || speakingQuestion) return;
+    setSpeakingQuestion(true);
+    try {
+      await speak(question.question);
+    } catch {
+      // TTS de la pregunta no disponible: se ignora, no bloquea la práctica.
+    } finally {
+      setSpeakingQuestion(false);
+    }
+  }
+
+  // CTA del resultado: si el motor recomienda seguir escuchando, avanza a la
+  // siguiente frase en esta misma pantalla (la sección ya está activa y no se
+  // re-monta); en otro caso navega a la destreza/objetivo recomendado.
+  function handleResultNext(section: Section | null, step: NextBestActivity) {
+    if (step.skill === "listening" || section === "listening") {
+      void load();
+      return;
+    }
+    onNext(section, step);
   }
 
   async function refreshStats() {
@@ -246,6 +303,7 @@ export function ListeningPractice({
         ),
       );
       setReplayCount(0);
+      markAnswered();
       onAttempt();
       void refreshStats();
     } catch (e) {
@@ -263,6 +321,7 @@ export function ListeningPractice({
       setProductionResult(
         await submitListeningDictation(userId, question.id, text),
       );
+      markAnswered();
       onAttempt();
       void refreshStats();
     } catch (e) {
@@ -308,6 +367,7 @@ export function ListeningPractice({
           setProductionResult(
             await submitListeningShadowing(userId, question.id, text),
           );
+          markAnswered();
           onAttempt();
           void refreshStats();
         } catch (e) {
@@ -322,6 +382,37 @@ export function ListeningPractice({
     } catch (e) {
       setError(`${t("mic.accessError")}${(e as Error).message}`);
     }
+  }
+
+  // Resumen del encabezado del diagnóstico plegable: debilidad principal de
+  // resiliencia auditiva cuando existe; si no, la recomendación recortada.
+  const diagnosticSummary = diagnostic
+    ? (() => {
+        const main = diagnostic.resilience.dimensions.find(
+          (d) => d.dimension === diagnostic.resilience.main_weakness,
+        );
+        return main
+          ? `${t("listening.resilienceMainWeakness")}: ${t(
+              resilienceLabel(main.dimension),
+            )}${main.accuracy !== null ? ` · ${main.accuracy}%` : ""}`
+          : diagnostic.recommendation;
+      })()
+    : "";
+
+  const currentLevelStat = stats?.level
+    ? stats.levels.find((lv) => lv.level === stats.level) ?? null
+    : null;
+  const currentLevelPct =
+    currentLevelStat && currentLevelStat.total > 0
+      ? (currentLevelStat.mastered / currentLevelStat.total) * 100
+      : 0;
+
+  // Color del donut de precisión según el rendimiento global.
+  function ringTone(accuracy: number | null): string {
+    if (accuracy === null) return "text-muted-foreground";
+    if (accuracy >= 80) return "text-success";
+    if (accuracy >= 60) return "text-primary";
+    return "text-warning";
   }
 
   return (
@@ -346,6 +437,25 @@ export function ListeningPractice({
         </Card>
       ) : (
         <>
+          {review && (
+            <Card className="flex flex-row flex-wrap items-center justify-between gap-3 p-4">
+              <span className="text-sm text-muted-foreground">
+                {t("listening.reviewProgress")
+                  .replace("{level}", review.level)
+                  .replace("{done}", String(reviewDone))
+                  .replace("{total}", String(review.total))}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-9 gap-2"
+                onClick={exitReview}
+              >
+                {t("listening.exitReview")}
+              </Button>
+            </Card>
+          )}
+
           <Card className="gap-6 p-5 sm:p-6">
             <div className="flex flex-col items-center gap-4 text-center">
               <motion.button
@@ -442,9 +552,24 @@ export function ListeningPractice({
           </Card>
 
           <Card className="gap-4 p-5">
-            <p className="text-base font-semibold leading-snug">
-              {question.question}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-base font-semibold leading-snug">
+                {question.question}
+              </p>
+              <button
+                type="button"
+                onClick={() => void speakQuestion()}
+                disabled={speakingQuestion || !userId}
+                aria-label={t("listening.speakQuestion")}
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-border bg-secondary text-secondary-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60"
+              >
+                {speakingQuestion ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Volume2 className="size-4" aria-hidden="true" />
+                )}
+              </button>
+            </div>
 
             {question.skill === "dictation" && (
               <div className="flex flex-col gap-3">
@@ -565,7 +690,36 @@ export function ListeningPractice({
                     : t("listening.incorrect")
                   : `Dictation/Shadowing · ${productionResult?.score ?? 0}/100`
               }
-              footer={<NextStep userId={userId} onNext={onNext} />}
+              footer={
+                review ? (
+                  reviewDone >= review.total ? (
+                    <Button
+                      type="button"
+                      className="min-h-10 gap-2"
+                      onClick={exitReview}
+                    >
+                      {t("listening.reviewFinish")}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="min-h-10 gap-2"
+                      onClick={() => void load()}
+                    >
+                      {t("listening.reviewNext")}
+                    </Button>
+                  )
+                ) : (
+                  <NextStep
+                    userId={userId}
+                    onNext={handleResultNext}
+                    fallback={{
+                      label: t("listening.next"),
+                      onClick: () => void load(),
+                    }}
+                  />
+                )
+              }
             >
               {result && (
                 <span className="text-foreground">{question.script}</span>
@@ -609,46 +763,160 @@ export function ListeningPractice({
           )}
 
           {stats && (
-            <Card className="gap-3 p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">
-                  {t("listening.scoreOf")}:{" "}
-                  <span className="font-medium text-foreground">
-                    {stats.correct}
-                  </span>{" "}
-                  {t("assessment.of")}{" "}
-                  <span className="font-medium text-foreground">
-                    {stats.attempts}
+            <Card className="gap-4 p-5">
+              <div className="flex flex-wrap items-center justify-around gap-6">
+                <div className="flex flex-col items-center gap-1.5">
+                  <ProgressRing
+                    value={stats.accuracy ?? 0}
+                    size={72}
+                    strokeWidth={7}
+                    className={ringTone(stats.accuracy)}
+                    ariaLabel={`${t("listening.accuracy")}: ${
+                      stats.accuracy !== null ? `${stats.accuracy}%` : "—"
+                    }`}
+                  >
+                    <span className="text-lg font-bold tabular-nums text-foreground">
+                      {stats.accuracy !== null ? `${stats.accuracy}%` : "—"}
+                    </span>
+                  </ProgressRing>
+                  <span className="text-xs font-medium text-foreground">
+                    {t("listening.accuracy")}
                   </span>
-                  {stats.accuracy !== null ? ` (${stats.accuracy}%)` : ""}
-                </span>
-                <span className="text-muted-foreground">
-                  {t("listening.currentLevel")}:{" "}
-                  <span className="font-semibold text-foreground">
-                    {stats.level}
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {stats.correct} {t("assessment.of")} {stats.attempts}
                   </span>
-                </span>
+                </div>
+
+                <div className="flex flex-col items-center gap-1.5">
+                  <ProgressRing
+                    value={currentLevelPct}
+                    size={72}
+                    strokeWidth={7}
+                    className="text-primary"
+                    ariaLabel={`${t("listening.currentLevel")}: ${stats.level}`}
+                  >
+                    <span className="text-sm font-bold text-foreground">
+                      {stats.level}
+                    </span>
+                  </ProgressRing>
+                  <span className="text-xs font-medium text-foreground">
+                    {t("listening.currentLevel")}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {currentLevelStat
+                      ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
+                      : "—"}
+                  </span>
+                </div>
               </div>
-              <ul className="flex flex-wrap gap-2">
-                {stats.levels.map((lv) => (
-                  <li key={lv.level}>
-                    <Badge
-                      variant={lv.completed ? "default" : "outline"}
-                      className="gap-1.5"
+
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4">
+                {stats.levels.map((lv) => {
+                  const content = (
+                    <>
+                      <ProgressRing
+                        value={lv.total > 0 ? (lv.mastered / lv.total) * 100 : 0}
+                        size={44}
+                        strokeWidth={5}
+                        className={
+                          lv.completed ? "text-success" : "text-primary"
+                        }
+                        ariaLabel={`${lv.level}: ${lv.mastered}/${lv.total}`}
+                      >
+                        {lv.completed ? (
+                          <Check className="size-4" aria-hidden="true" />
+                        ) : (
+                          <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                            {lv.mastered}
+                          </span>
+                        )}
+                      </ProgressRing>
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        {lv.level}
+                      </span>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        {lv.mastered}/{lv.total}
+                      </span>
+                    </>
+                  );
+                  if (lv.completed) {
+                    return (
+                      <Tooltip
+                        key={lv.level}
+                        content={t("listening.reviewStartLevel").replace(
+                          "{level}",
+                          lv.level,
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => startReview(lv)}
+                          disabled={!!review}
+                          aria-label={t("listening.reviewStartLevel").replace(
+                            "{level}",
+                            lv.level,
+                          )}
+                          className="flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          {content}
+                        </button>
+                      </Tooltip>
+                    );
+                  }
+                  return (
+                    <div
+                      key={lv.level}
+                      className="flex flex-col items-center gap-1.5"
                     >
-                      {lv.level} · {lv.mastered}/{lv.total}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
+                      {content}
+                    </div>
+                  );
+                })}
+              </div>
             </Card>
           )}
 
           {diagnostic && (
-            <Card className="gap-4 p-5">
-              <p className="text-sm text-foreground">
-                {diagnostic.recommendation}
-              </p>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowAnalysis((s) => !s)}
+                aria-expanded={showAnalysis}
+                aria-label={
+                  showAnalysis
+                    ? t("listening.hideAnalysis")
+                    : t("listening.showAnalysis")
+                }
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4 text-left shadow-sm"
+              >
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-foreground">
+                    {t("listening.diagnostic")}
+                  </span>
+                  {diagnosticSummary && (
+                    <span className="truncate text-xs text-muted-foreground">
+                      {diagnosticSummary}
+                    </span>
+                  )}
+                </span>
+                {showAnalysis ? (
+                  <ChevronUp
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <ChevronDown
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+              <Card
+                className={cn("gap-4 p-5", !showAnalysis && "hidden")}
+              >
+                <p className="text-sm text-foreground">
+                  {diagnostic.recommendation}
+                </p>
 
               {diagnostic.resilience.dimensions.length > 0 && (
                 <div className="flex flex-col gap-2">
@@ -808,6 +1076,7 @@ export function ListeningPractice({
                 )}
               </div>
             </Card>
+            </>
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -816,15 +1085,17 @@ export function ListeningPractice({
                 {t("listening.completed")}
               </p>
             )}
-            <Button
-              variant="outline"
-              className="min-h-10 gap-2"
-              onClick={load}
-              disabled={!userId}
-            >
-              <RefreshCw className="size-4" aria-hidden="true" />
-              {t("listening.next")}
-            </Button>
+            {!(result || productionResult) && (
+              <Button
+                variant="outline"
+                className="min-h-10 gap-2"
+                onClick={() => void load()}
+                disabled={!userId}
+              >
+                <RefreshCw className="size-4" aria-hidden="true" />
+                {t("listening.next")}
+              </Button>
+            )}
           </div>
         </>
       )}

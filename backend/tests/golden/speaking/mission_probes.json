@@ -1,0 +1,88 @@
+{
+  "audit": "C-2026-09-02",
+  "description": "Probes doradas del motor de Speaking Mission y del scoring (docs/audit/C-SPEAKING-CALIBRATION.md). Cubren: clasificación de criterios débiles y su frontera (0.6), selección de drills (orden de rúbrica + tope 2), detección de mejora attempt→retry y determinismo del scoring dado el mismo evidence. La variabilidad del LLM no se puede fijar aquí: se mide con scripts/eval_speaking_variability.py.",
+  "probes": [
+    {
+      "id": "weak-fluency-single-drill",
+      "criteria": {
+        "task_achievement": 0.8, "grammatical_control": 0.75, "lexical_resource": 0.72,
+        "fluency": 0.55, "pronunciation": 0.7, "coherence": 0.78, "interaction": 0.76
+      },
+      "expect": {
+        "weak": ["fluency"],
+        "drill_count": 1,
+        "drill_criteria": ["fluency"]
+      }
+    },
+    {
+      "id": "weak-threshold-below-60",
+      "criteria": {
+        "task_achievement": 0.7, "grammatical_control": 0.7, "lexical_resource": 0.7,
+        "fluency": 0.599, "pronunciation": 0.7, "coherence": 0.7, "interaction": 0.7
+      },
+      "expect": {"weak": ["fluency"]}
+    },
+    {
+      "id": "weak-threshold-at-60",
+      "criteria": {
+        "task_achievement": 0.7, "grammatical_control": 0.7, "lexical_resource": 0.7,
+        "fluency": 0.6, "pronunciation": 0.7, "coherence": 0.7, "interaction": 0.7
+      },
+      "expect": {"weak": []}
+    },
+    {
+      "id": "two-weak-capped-at-two-drills",
+      "criteria": {
+        "task_achievement": 0.8, "grammatical_control": 0.8, "lexical_resource": 0.75,
+        "fluency": 0.5, "pronunciation": 0.75, "coherence": 0.8, "interaction": 0.55
+      },
+      "expect": {
+        "weak": ["fluency", "interaction"],
+        "drill_count": 2,
+        "drill_criteria": ["fluency", "interaction"]
+      }
+    },
+    {
+      "id": "improvement-positive",
+      "first": {
+        "overall": 0.55,
+        "criteria": {
+          "task_achievement": 0.6, "grammatical_control": 0.5, "lexical_resource": 0.55,
+          "fluency": 0.5, "pronunciation": 0.7, "coherence": 0.6, "interaction": 0.55
+        }
+      },
+      "retry": {
+        "overall": 0.64,
+        "criteria": {
+          "task_achievement": 0.7, "grammatical_control": 0.6, "lexical_resource": 0.6,
+          "fluency": 0.62, "pronunciation": 0.7, "coherence": 0.7, "interaction": 0.6
+        }
+      },
+      "expect": {"delta": 0.09, "improved": true}
+    },
+    {
+      "id": "no-improvement-not-improved",
+      "first": {"overall": 0.64, "criteria": {}},
+      "retry": {"overall": 0.64, "criteria": {}},
+      "expect": {"delta": 0.0, "improved": false}
+    }
+  ],
+  "evidence_determinism": [
+    {
+      "id": "b1-casual-opinion",
+      "level": "B1",
+      "heard": "I think it's a good idea because we can meet more people and practice our English every day.",
+      "duration_seconds": 12.4,
+      "task_type": "discussion",
+      "raw": "{\"task_achieved\": true, \"grammar_errors\": 1, \"lexical_tokens\": [\"think\", \"good\", \"idea\", \"meet\", \"people\", \"practice\", \"english\", \"every\", \"day\"], \"coherence\": 0.7, \"discourse_markers\": 2, \"self_corrections\": 0, \"hesitations\": 1, \"repetitions\": 0, \"interaction\": 0.6}"
+    },
+    {
+      "id": "b2-negotiated-view",
+      "level": "B2",
+      "heard": "Well, I take your point, but I'd argue the long-term costs outweigh the short-term benefits.",
+      "duration_seconds": 9.8,
+      "task_type": "discussion",
+      "raw": "{\"task_achieved\": true, \"grammar_errors\": 0, \"lexical_tokens\": [\"point\", \"argue\", \"long-term\", \"costs\", \"outweigh\", \"short-term\", \"benefits\"], \"coherence\": 0.85, \"discourse_markers\": 3, \"self_corrections\": 0, \"hesitations\": 0, \"repetitions\": 1, \"interaction\": 0.75}"
+    }
+  ]
+}
