@@ -14,6 +14,7 @@ type Entry = { en: string; es: string };
 const STRINGS: Record<string, Entry> = {
   // Navegación principal
   "nav.home": { en: "Home", es: "Inicio" },
+  "nav.formation": { en: "Course", es: "Formación" },
   "nav.learn": { en: "Learn", es: "Aprender" },
   "nav.course": { en: "Course", es: "Curso" },
   "nav.progress": { en: "Progress", es: "Progreso" },

@@ -60,11 +60,11 @@ export function Header({
         </button>
       </div>
 
-      <div className="hidden min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex">
+      <div className="hidden min-w-0 flex-1 md:flex">
         <Navigation route={route} onNavigate={onNavigate} layoutId="nav-pill" className="mx-auto" />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2">
         <HandsFreeToggle
           enabled={handsFreeEnabled}
           status={handsFreeStatus}
