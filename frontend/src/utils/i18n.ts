@@ -31,6 +31,49 @@ const STRINGS: Record<string, Entry> = {
   "skill.pronunciation": { en: "Pronunciation", es: "Pronunciación" },
   "skill.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
 
+  // Aprender (hub de práctica libre, V3.1)
+  "learn.title": { en: "Learn", es: "Aprender" },
+  "learn.subtitle": {
+    en: "Free practice that adapts to you — choose what you want to work on.",
+    es: "Práctica libre que se adapta a ti — elige en qué quieres trabajar.",
+  },
+  "learn.pickActivity": {
+    en: "What would you like to practice today?",
+    es: "¿Qué quieres practicar hoy?",
+  },
+  "learn.recommended": { en: "Recommended for you", es: "Recomendado para ti" },
+  "learn.back": { en: "Back to Learn", es: "Volver a Aprender" },
+  "learn.conversation": { en: "Conversation", es: "Conversar" },
+  "learn.desc.listening": {
+    en: "Level-by-level listening exercises with instant feedback.",
+    es: "Ejercicios de listening por niveles con feedback inmediato.",
+  },
+  "learn.desc.speaking": {
+    en: "Real-life scenarios and missions with structured feedback.",
+    es: "Escenarios reales y misiones con feedback estructurado.",
+  },
+  "learn.desc.pronunciation": {
+    en: "Read aloud and get instant feedback on your accent.",
+    es: "Lee en voz alta y recibe feedback inmediato sobre tu acento.",
+  },
+  "learn.desc.conversation": {
+    en: "Chat with the tutor and keep your conversation history.",
+    es: "Conversa con el tutor y conserva el historial de conversaciones.",
+  },
+  "learn.desc.vocabulary": {
+    en: "Your personal dictionary, word by word.",
+    es: "Tu diccionario personal, palabra a palabra.",
+  },
+  "learn.desc.grammar": {
+    en: "Write sentences and get grammar corrections and feedback.",
+    es: "Escribe frases y recibe correcciones y feedback de gramática.",
+  },
+  "learn.speakingSubtitle": {
+    en: "Free speaking practice: choose a scenario or run a mission.",
+    es: "Práctica oral libre: elige un escenario o lanza una misión.",
+  },
+  "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
+
   // Grupos de destrezas
   "group.primary": { en: "Primary skills", es: "Destrezas principales" },
   "group.support": { en: "Support", es: "Apoyo" },

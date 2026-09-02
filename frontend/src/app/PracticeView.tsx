@@ -10,7 +10,6 @@ import { ReadingPractice } from "../features/reading/ReadingPractice";
 import { ResizeHandle } from "../components/ResizeHandle";
 import { Sidebar } from "../components/Sidebar";
 import { MenuIcon, PanelIcon } from "../components/Icons";
-import { SectionNav } from "../components/SectionNav";
 import { clampRight, clampSidebar, RIGHT_MAX, RIGHT_MIN, SIDEBAR_MAX, SIDEBAR_MIN } from "../utils/layout";
 import type { Section } from "../utils/sections";
 import type { SessionStep } from "../types/api";
@@ -36,7 +35,6 @@ interface PracticeViewProps {
   route: "learn" | "chat";
   chat: ChatApi;
   onAttempt: () => void;
-  onSelectSection: (section: Section) => void;
   onNextBestStart: (section: Section | null, step: NextBestActivity) => void;
   onStep: (step: SessionStep) => void;
   onStartLesson: (
@@ -53,7 +51,6 @@ export function PracticeView({
   route,
   chat,
   onAttempt,
-  onSelectSection,
   onNextBestStart,
   onStep,
   onStartLesson,
@@ -91,7 +88,10 @@ export function PracticeView({
 
   const isChat =
     section === "speaking" || section === "writing" || section === "grammar";
-  const showSidebar = route === "chat";
+  // El historial de conversaciones vive solo en Conversar (ruta "chat") y sin
+  // una lección de curso activa: mientras la lección está en curso el workspace
+  // es el de la lección (sin historial; la envoltura de curso llega en WS7).
+  const showSidebar = route === "chat" && !activeObjective;
   // En Aprender, las secciones de práctica pura (no conversación) usan todo el
   // ancho: el panel de análisis nunca se acopla y se abre como drawer con el
   // botón flotante. Las secciones conversacionales conservan su layout.
@@ -167,12 +167,6 @@ export function PracticeView({
       )}
 
       <main className="pane pane--main">
-        {route === "learn" && (
-          <div className="pane__subnav">
-            <SectionNav section={section} onSelect={onSelectSection} />
-          </div>
-        )}
-
         {showSidebar && !sidebarOpen && (
           <button
             type="button"
