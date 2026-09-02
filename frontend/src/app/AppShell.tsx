@@ -38,7 +38,7 @@ export function AppShell({
       >
         {children}
       </main>
-      <StatusBar onOpenHelp={() => onNavigate("help")} />
+      <StatusBar />
       <div className="border-t border-border bg-background/95 backdrop-blur md:hidden">
         <Navigation
           route={route}

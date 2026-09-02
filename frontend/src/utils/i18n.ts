@@ -529,52 +529,49 @@ const STRINGS: Record<string, Entry> = {
 
   // Ayuda
   "help.title": { en: "Help", es: "Ayuda" },
+  "help.subtitle": {
+    en: "A short guide to the three areas. For the full technical documentation, visit the project docs.",
+    es: "Una guía breve de los tres mundos. Para la documentación técnica completa, consulta los docs del proyecto.",
+  },
   "help.viewDocs": { en: "View documentation", es: "Ver en la documentación" },
   "help.documentation": { en: "Documentation", es: "Documentación" },
-  "help.author": {
-    en: "Author: José Alberto Velasco · josealberto.vel@gmail.com",
-    es: "Autor: José Alberto Velasco · josealberto.vel@gmail.com",
-  },
   "help.what.title": { en: "What is English Tutor?", es: "¿Qué es English Tutor?" },
   "help.what.body": {
-    en: "An English tutor that converses with you by text or voice. It runs 100% on your computer, with no internet or accounts: your privacy is guaranteed.",
-    es: "Un profesor de inglés que conversa contigo por texto o voz. Funciona 100% en tu ordenador, sin Internet ni cuentas: tu privacidad está garantizada.",
+    en: "An English tutor that runs 100% on your computer — no internet, accounts or cloud. The app is organised into three areas: Inicio (daily plan and recommendations), Formación (guided CEFR course from A1 to C2) and Aprender (free practice).",
+    es: "Un profesor de inglés que funciona 100% en tu ordenador, sin Internet, cuentas ni nube. La app se organiza en tres mundos: INICIO (plan del día y recomendaciones), FORMACIÓN (curso CEFR guiado de A1 a C2) y APRENDER (práctica libre).",
   },
   "help.start.title": { en: "Getting started", es: "Cómo empezar" },
   "help.start.body": {
-    en: "Choose your profile in the top right and type or tap the microphone. You can change practice mode at any time.",
-    es: "Elige tu perfil arriba a la derecha y escribe o pulsa el micrófono. Puedes cambiar de modo de práctica en cualquier momento.",
+    en: "Choose a profile in the header and speak or type in any conversation. Use Formación to follow the course level by level, Aprender to practise a skill freely, and Inicio to pick up your daily goal and review.",
+    es: "Elige un perfil en la cabecera y habla o escribe en cualquier conversación. Usa FORMACIÓN para seguir el curso nivel a nivel, APRENDER para practicar una destreza libremente e INICIO para retomar tu objetivo del día y el repaso.",
   },
-  "help.modes.title": { en: "Practice modes", es: "Modos de práctica" },
+  "help.modes.title": { en: "The three areas", es: "Los tres mundos" },
   "help.modes.body": {
-    en: "Conversation (chat freely), Grammar (correct sentences), Exercises (guided practice) and Pronunciation (speak and measure your accent).",
-    es: "Conversación (charlar libre), Gramática (corregir frases), Ejercicios (práctica guiada) y Pronunciación (hablar y medir tu acento).",
+    en: "Inicio is your day-to-day command centre: today's goal, pending review and what to do next. Formación is the structured CEFR course with units and assessments. Aprender groups all free practice: listening, speaking, pronunciation, conversation, vocabulary, grammar and adaptive review.",
+    es: "INICIO es tu centro de mando diario: objetivo de hoy, repaso pendiente y siguiente paso recomendado. FORMACIÓN es el curso CEFR estructurado, con unidades y evaluaciones. APRENDER agrupa toda la práctica libre: listening, speaking, pronunciación, conversación, vocabulario, gramática y repaso adaptativo.",
   },
   "help.course.title": { en: "CEFR course", es: "Curso CEFR" },
   "help.course.body": {
-    en: "A journey through levels (A1, A2, B1…) with objectives, quick assessments and a final exam. You advance level by level at your own pace.",
-    es: "Un recorrido por niveles (A1, A2, B1…) con objetivos, evaluaciones rápidas y un examen final. Avanzas nivel a nivel a tu ritmo.",
+    en: "A guided path through the six CEFR levels (A1, A2, B1, B2, C1, C2). Each level is divided into units with objectives; you unlock units and take assessments as you progress, at your own pace.",
+    es: "Un camino guiado por los seis niveles CEFR (A1, A2, B1, B2, C1, C2). Cada nivel se divide en unidades con objetivos; desbloqueas unidades y superas evaluaciones a tu ritmo según avanzas.",
   },
   "help.listening.title": { en: "Listening comprehension", es: "Comprensión auditiva" },
   "help.listening.body": {
-    en: "Listen to a sentence, answer the question and pass each level. Your results are saved per profile and tell you when you advance.",
-    es: "Escucha una frase, responde la pregunta y supera cada nivel. Tus aciertos se guardan por perfil y te indican cuándo avanzas.",
+    en: "Listen to real sentences, answer the question and check your accuracy level by level. Practise it on its own in Aprender → Listening or inside your course units.",
+    es: "Escucha frases reales, responde la pregunta y comprueba tu precisión nivel a nivel. Practícalo por libre en APRENDER → Listening o dentro de las unidades del curso.",
   },
   "help.troubleshooting.title": { en: "Common issues", es: "Problemas frecuentes" },
   "help.troubleshooting.body": {
-    en: "If the tutor doesn't respond, make sure Ollama is running. Technical details and the full guide are in the documentation.",
-    es: "Si el profesor no responde, asegúrate de que Ollama esté arrancado. Los detalles técnicos y la guía completa están en la documentación.",
+    en: "If the tutor does not answer, check that Ollama is running. If the microphone or a connected device fails, see the full guide in the project documentation.",
+    es: "Si el profesor no responde, comprueba que Ollama esté arrancado. Si el micrófono o un dispositivo conectado falla, consulta la guía completa en la documentación del proyecto.",
+  },
+  "help.connectTitle": { en: "Use it on your phone or tablet", es: "Usarla en tu móvil o tableta" },
+  "help.connectBody": {
+    en: "To open the app from another device, go to Settings (gear icon at the top) → System → “Scan to connect”. There you will find the QR code and the steps for your platform.",
+    es: "Para abrir la app desde otro dispositivo ve a Ajustes (icono de engranaje, arriba) → Sistema → «Escanea para conectar». Allí encontrarás el código QR y los pasos de tu plataforma.",
   },
 
   // Conectar un dispositivo (LAN / móvil)
-  "connect.title": {
-    en: "Connect a device",
-    es: "Conectar un dispositivo",
-  },
-  "connect.subtitle": {
-    en: "Use English Tutor from your phone or tablet on the same local network.",
-    es: "Usa English Tutor desde tu móvil o tableta en la misma red local.",
-  },
   "connect.cardTitle": { en: "Connect a device", es: "Conectar un dispositivo" },
   "connect.cardSubtitle": {
     en: "Scan with your phone",
@@ -587,10 +584,6 @@ const STRINGS: Record<string, Entry> = {
   "connect.localOnly": {
     en: "Local network only. No internet required.",
     es: "Solo red local. No requiere Internet.",
-  },
-  "connect.trustHelp": {
-    en: "How to connect and trust the certificate",
-    es: "Cómo conectar y confiar el certificado",
   },
   "connect.trustTitle": {
     en: "First connection: trust the local certificate",

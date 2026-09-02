@@ -15,7 +15,6 @@ import {
   type LearnActivity,
 } from "./router/learnHub";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { HelpDialog } from "./components/HelpDialog";
 import { completeSessionStep } from "./api/academy";
 import type { Section } from "./utils/sections";
 import type { NextBestActivity, SessionStep, TutorMode } from "./types/api";
@@ -91,7 +90,6 @@ export default function App() {
   // de la ruta, así que "ir a una pantalla" es asignar su ruta canónica.
   const go = useCallback((next: Route) => navigateTo(routeToPath(next)), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [sessionVersion, setSessionVersion] = useState(0);
   const activeStepKeyRef = useRef<string | null>(null);
 
@@ -282,8 +280,6 @@ export default function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-
-      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
     </I18nProvider>
   );
 }

@@ -2,17 +2,13 @@ import { useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { getNetwork, type NetworkInfo } from "../api/network";
 import { useI18n } from "../hooks/useI18n";
-import { Button } from "./ui/button";
 
 /**
- * Tarjeta "Connect a device": QR para escanear con el móvil, URLs de acceso
- * (IP siempre, `.local` solo si mDNS resuelve) y enlace a la ayuda de conexión.
+ * Tarjeta "Connect a device": QR para escanear con el móvil y URLs de acceso
+ * (IP siempre, `.local` solo si mDNS resuelve). La guía de conexión y de
+ * confianza del certificado vive en SystemStatus (Ajustes → Sistema).
  */
-export function ConnectDeviceCard({
-  onOpenHelp,
-}: {
-  onOpenHelp?: () => void;
-}) {
+export function ConnectDeviceCard() {
   const { t } = useI18n();
   const [network, setNetwork] = useState<NetworkInfo | null>(null);
 
@@ -40,17 +36,6 @@ export function ConnectDeviceCard({
         <p className="mt-3 text-xs text-muted-foreground">
           {t("connect.noNetwork")}
         </p>
-        {onOpenHelp && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            onClick={onOpenHelp}
-          >
-            {t("connect.trustHelp")}
-          </Button>
-        )}
       </div>
     );
   }
@@ -92,18 +77,6 @@ export function ConnectDeviceCard({
       <p className="mt-3 text-xs text-muted-foreground">
         {t("connect.localOnly")}
       </p>
-
-      {onOpenHelp && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3"
-          onClick={onOpenHelp}
-        >
-          {t("connect.trustHelp")}
-        </Button>
-      )}
     </div>
   );
 }

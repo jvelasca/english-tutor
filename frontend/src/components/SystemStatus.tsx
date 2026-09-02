@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   getDependencies,
   getHealth,
@@ -39,6 +40,12 @@ const ITEMS: { key: keyof DependencyStatus; i18nKey: string }[] = [
   { key: "audio_library", i18nKey: "status.audioLibrary" },
 ];
 
+const CONNECT_PLATFORMS: { icon: string; titleKey: string; bodyKey: string }[] = [
+  { icon: "💻", titleKey: "connect.windows.title", bodyKey: "connect.windows.body" },
+  { icon: "🤖", titleKey: "connect.android.title", bodyKey: "connect.android.body" },
+  { icon: "📱", titleKey: "connect.ios.title", bodyKey: "connect.ios.body" },
+];
+
 function Check({ ok }: { ok: boolean }) {
   return (
     <span
@@ -48,11 +55,7 @@ function Check({ ok }: { ok: boolean }) {
   );
 }
 
-export function SystemStatus({
-  onOpenHelp,
-}: {
-  onOpenHelp?: () => void;
-}) {
+export function SystemStatus() {
   const { t } = useI18n();
   const { capabilities } = useAudioCapabilities();
   const [deps, setDeps] = useState<DependencyStatus | null>(null);
@@ -112,7 +115,38 @@ export function SystemStatus({
         <p className="system-status__section-title">
           {t("status.scanToConnect")}
         </p>
-        <ConnectDeviceCard onOpenHelp={onOpenHelp} />
+        <ConnectDeviceCard />
+        <details className="group mt-3 overflow-hidden rounded-xl border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+            <span>{t("connect.trustTitle")}</span>
+            <ChevronDown
+              className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="border-t border-border px-4 py-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t("connect.trustBody")}
+            </p>
+            <ul className="mt-3 flex list-none flex-col gap-3 p-0">
+              {CONNECT_PLATFORMS.map((platform) => (
+                <li key={platform.titleKey} className="flex items-start gap-2.5">
+                  <span className="text-base leading-snug" aria-hidden="true">
+                    {platform.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground">
+                      {t(platform.titleKey)}
+                    </p>
+                    <p className="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
+                      {t(platform.bodyKey)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
       </div>
 
       <div className="system-status__meta">

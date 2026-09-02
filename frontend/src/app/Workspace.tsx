@@ -32,8 +32,8 @@ const PersonalDictionary = lazy(() =>
     default: m.PersonalDictionary,
   })),
 );
-const ConnectHelp = lazy(() =>
-  import("../features/help/ConnectHelp").then((m) => ({ default: m.ConnectHelp })),
+const HelpScreen = lazy(() =>
+  import("../features/help/HelpScreen").then((m) => ({ default: m.HelpScreen })),
 );
 const PracticeView = lazy(() =>
   import("./PracticeView").then((m) => ({ default: m.PracticeView })),
@@ -187,7 +187,7 @@ export function Workspace({
       </div>
     );
   } else if (route === "help") {
-    content = <ConnectHelp />;
+    content = <HelpScreen />;
   } else if (route === "learn") {
     if (!learnActivity || learnActivity === SPEAKING_ACTIVITY) {
       content =
