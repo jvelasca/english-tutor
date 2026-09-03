@@ -241,9 +241,31 @@ export interface LexiconSummary {
   by_cefr: CefrBucket[];
 }
 
+// P1 (§3.1): Vocabulary Coverage Indicator receptivo/productivo por nivel.
+export interface LexiconCoverageLevel {
+  cefr: string;
+  total: number;
+  receptive: number;
+  productive: number;
+  mastered: number;
+  known: number;
+  learning: number;
+  weak: number;
+  receptive_pct: number | null;
+  productive_pct: number | null;
+}
+
+export interface LexiconCoverage {
+  receptive: number;
+  productive: number;
+  mastered: number;
+  by_level: LexiconCoverageLevel[];
+}
+
 export interface Lexicon {
   summary: LexiconSummary;
   items: LexicalItem[];
+  coverage?: LexiconCoverage | null;
 }
 
 export type Bucket = "day" | "week" | "month";

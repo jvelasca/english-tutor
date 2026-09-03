@@ -133,7 +133,8 @@ def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
                     "source = CASE WHEN source = 'user' THEN 'curriculum' "
                     "ELSE source END, "
                     "lemma = CASE WHEN lemma = '' THEN ? ELSE lemma END, "
-                    "kind = CASE WHEN kind = 'word' THEN ? ELSE kind END "
+                    "kind = CASE WHEN kind IN ('word', 'structure') THEN ? "
+                    "ELSE kind END "
                     "WHERE user_id = ? AND word = ?",
                     (
                         it.get("cefr", ""),

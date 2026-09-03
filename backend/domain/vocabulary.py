@@ -64,4 +64,10 @@ async def get_lexicon(user_id: str) -> dict:
         }
         for row in rows
     ]
-    return {"summary": lexicon.summary(rows), "items": items}
+    return {
+        "summary": lexicon.summary(rows),
+        "items": items,
+        # P1 (§3.1): Vocabulary Coverage Indicator receptivo/productivo por
+        # nivel. Es un indicador interno (no una puerta): informa, no certifica.
+        "coverage": lexicon.coverage_indicator(rows),
+    }

@@ -1,5 +1,7 @@
-"""Tests del servicio de léxico (V2.3): estado y recall por ítem léxico."""
+"""Tests del servicio de léxico (V2.3 → P1): estado, recall, kinds y cobertura."""
 from __future__ import annotations
+
+import pytest
 
 from repositories import db
 from repositories import users as users_repo
@@ -50,13 +52,52 @@ def test_items_from_objective_combines_vocabulary_and_concepts():
     assert by_word["name"]["cefr"] == "A1"
     assert by_word["name"]["level_id"] == "a1"
     assert by_word["name"]["objective_id"] == obj.id
-    assert by_word["i am"]["kind"] == "structure"
+    # P1 (§3.2): oraciones con sujeto explícito se siembran como functional chunk.
+    assert by_word["i am"]["kind"] == "functional_chunk"
+    assert by_word["my name is"]["kind"] == "functional_chunk"
 
 
 def test_items_from_objective_normalizes_and_dedupes():
     obj = _objective(vocabulary=["Name", "name"], concepts=["I am", "i am"])
     items = lexicon.items_from_objective(_level(), obj)
     assert len(items) == 2
+
+
+def test_classify_kind_lexical_unit_taxonomy():
+    """P1 (§3.2): la taxonomía de Lexical Unit va más allá de word/structure."""
+    assert set(lexicon.LEXICAL_KINDS) == {
+        "word",
+        "collocation",
+        "phrasal_verb",
+        "expression",
+        "sentence_frame",
+        "functional_chunk",
+        "structure",
+    }
+    # Palabra
+    assert lexicon.classify_kind("train") == "word"
+    # Verbo + partícula (dos tokens, partícula inequívoca)
+    assert lexicon.classify_kind("get up", source="vocabulary") == "phrasal_verb"
+    assert lexicon.classify_kind("wake up") == "phrasal_verb"
+    # Frase fija declarada como vocabulary → collocation
+    assert lexicon.classify_kind("living room", source="vocabulary") == "collocation"
+    assert (
+        lexicon.classify_kind("strong coffee", source="vocabulary") == "collocation"
+    )
+    # Huecos explícitos → sentence frame
+    assert lexicon.classify_kind("How much is ...?") == "sentence_frame"
+    assert lexicon.classify_kind("Where is …?") == "sentence_frame"
+    # Interrogativa cerrada → functional chunk
+    assert lexicon.classify_kind("How are you?") == "functional_chunk"
+    assert lexicon.classify_kind("What is your name?") == "functional_chunk"
+    # Petición funcional / oración con sujeto
+    assert lexicon.classify_kind("Can I have") == "functional_chunk"
+    assert lexicon.classify_kind("I would like") == "functional_chunk"
+    # Etiquetas gramaticales/temáticas → structure (no se inventa tipo)
+    assert lexicon.classify_kind("Present Simple") == "structure"
+    assert lexicon.classify_kind("countable / uncountable") == "structure"
+    assert lexicon.classify_kind("to be") == "structure"
+    assert lexicon.classify_kind("family words") == "structure"
 
 
 # --- seed_curriculum_items (repositorio) ------------------------------------
@@ -73,7 +114,7 @@ def test_seed_does_not_increment_appearances(monkeypatch, tmp_path):
     assert vocab["name"]["cefr"] == "A1"
     assert vocab["name"]["source"] == "curriculum"
     assert vocab["name"]["kind"] == "word"
-    assert vocab["i am"]["kind"] == "structure"
+    assert vocab["i am"]["kind"] == "functional_chunk"
 
 
 def test_seed_preserves_production_and_fills_context(monkeypatch, tmp_path):
@@ -189,3 +230,49 @@ def test_recognized_not_produced():
         {"word": "culture", "appearances": 0, "exposures": 0},
     ]
     assert lexicon.recognized_not_produced(rows) == ["travel"]
+
+
+def test_coverage_indicator_receptive_productive_by_level():
+    """P1 (§3.1): el Vocabulary Coverage Indicator distingue receptivo
+    (encontrado: input o producción) de productivo (producido ≥1 vez), por
+    nivel y frente a las bandas objetivo. Es indicador, no puerta."""
+    rows = [
+        {"cefr": "Pre-A1", "appearances": 0, "exposures": 0},
+        {"cefr": "Pre-A1", "appearances": 0, "exposures": 2},
+        {"cefr": "A1", "appearances": 3, "production_days": 2, "exposures": 0},
+        {"cefr": "A1", "appearances": 0, "exposures": 1},
+        {"cefr": "A2", "appearances": 0, "exposures": 0},
+        {"cefr": "C2", "appearances": 0, "exposures": 1},
+        {"cefr": "nivel-raro", "appearances": 5, "exposures": 0},  # sin banda
+    ]
+    cov = lexicon.coverage_indicator(rows)
+    # Totales: receptivo suma los niveles con banda declarada (no "nivel-raro").
+    assert cov["receptive"] == 4  # Pre-A1(1) + A1(2) + C2(1)
+    assert cov["productive"] == 1  # solo la fila mastered A1
+    assert cov["mastered"] == 1
+
+    by_level = {lvl["cefr"]: lvl for lvl in cov["by_level"]}
+    assert [lvl["cefr"] for lvl in cov["by_level"]] == [
+        "Pre-A1",
+        "A1",
+        "A2",
+        "C2",
+    ]
+    a1 = by_level["A1"]
+    assert a1["total"] == 2
+    assert a1["receptive"] == 2
+    assert a1["productive"] == 1
+    assert a1["mastered"] == 1
+    assert a1["known"] == 1
+    assert a1["learning"] == 0
+    # Ratio frente al extremo superior de la banda objetivo (A1 receptivo
+    # 700–1000; productivo 400–600).
+    assert a1["receptive_pct"] == pytest.approx(round(2 / 1000, 3), rel=1e-6)
+    assert a1["productive_pct"] == pytest.approx(round(1 / 600, 3), rel=1e-6)
+
+    assert by_level["Pre-A1"]["receptive"] == 1
+    # C2 no declara banda numérica: el ratio es None.
+    assert by_level["C2"]["receptive"] == 1
+    assert by_level["C2"]["receptive_pct"] is None
+    assert by_level["C2"]["productive_pct"] is None
+    assert "nivel-raro" not in by_level

@@ -223,12 +223,17 @@ function StatTile({
   );
 }
 
+function lexicalKindLabel(kind: string, t: (key: string) => string): string {
+  // P1 (§3.2): taxonomía ampliada de Lexical Unit. Fallback genérico para
+  // cualquier valor desconocido (nunca se etiqueta por defecto como "word").
+  const key = `dictionary.kind.${kind}`;
+  const label = t(key);
+  return label === key ? t("dictionary.kind.other") : label;
+}
+
 function LexicalRow({ lexical }: { lexical: LexicalItem }) {
   const { t } = useI18n();
-  const kindLabel =
-    lexical.kind === "structure"
-      ? t("dictionary.kind.structure")
-      : t("dictionary.kind.word");
+  const kindLabel = lexicalKindLabel(lexical.kind, t);
   const statusLabel = t(`dictionary.status.${lexical.status}`);
 
   return (

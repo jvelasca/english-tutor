@@ -38,7 +38,7 @@ class LexicalItemOut(BaseModel):
     word: str
     lemma: str
     cefr: str
-    kind: str  # "word" | "structure"
+    kind: str  # LEXICAL_KINDS: word/collocation/phrasal_verb/expression/sentence_frame/functional_chunk/structure (P1, §3.2)
     source: str  # "curriculum" | "user" | "imported"
     status: LexicalStatus
     recall: float
@@ -61,6 +61,31 @@ class LexiconSummary(BaseModel):
     by_cefr: list[CefrBucket]
 
 
+class LexiconCoverageLevel(BaseModel):
+    """Cobertura léxica de un nivel (Constitución §3.1): indicador, no puerta."""
+
+    cefr: str
+    total: int
+    receptive: int  # encontradas (input o producción)
+    productive: int  # con producción al menos una vez
+    mastered: int
+    known: int
+    learning: int
+    weak: int
+    # Ratio 0..1 frente al extremo superior de la banda objetivo; None si la
+    # banda no es numérica (p. ej. C2).
+    receptive_pct: float | None
+    productive_pct: float | None
+
+
+class LexiconCoverage(BaseModel):
+    receptive: int
+    productive: int
+    mastered: int
+    by_level: list[LexiconCoverageLevel] = Field(default_factory=list)
+
+
 class LexiconOut(BaseModel):
     summary: LexiconSummary
     items: list[LexicalItemOut]
+    coverage: LexiconCoverage | None = None

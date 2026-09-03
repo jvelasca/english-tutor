@@ -275,7 +275,19 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.status.learning": { en: "Learning", es: "Aprendiendo" },
   "dictionary.status.weak": { en: "Weak", es: "Débil" },
   "dictionary.kind.word": { en: "word", es: "palabra" },
+  "dictionary.kind.collocation": { en: "collocation", es: "colocación" },
+  "dictionary.kind.phrasal_verb": { en: "phrasal verb", es: "verbo frasal" },
+  "dictionary.kind.expression": { en: "expression", es: "expresión" },
+  "dictionary.kind.sentence_frame": {
+    en: "sentence frame",
+    es: "plantilla de frase",
+  },
+  "dictionary.kind.functional_chunk": {
+    en: "functional chunk",
+    es: "bloque funcional",
+  },
   "dictionary.kind.structure": { en: "structure", es: "estructura" },
+  "dictionary.kind.other": { en: "lexical unit", es: "unidad léxica" },
   "dictionary.recognizedNotProduced": {
     en: "Recognized but not produced",
     es: "Reconocidas pero no producidas",
