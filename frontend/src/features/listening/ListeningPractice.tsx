@@ -916,7 +916,12 @@ export function ListeningPractice({
                     </span>
                     <span className="text-[11px] tabular-nums text-muted-foreground">
                       {currentLevelStat
-                        ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
+                        ? t("listening.masteredOfTotal")
+                            .replace(
+                              "{mastered}",
+                              String(currentLevelStat.mastered),
+                            )
+                            .replace("{total}", String(currentLevelStat.total))
                         : "—"}
                     </span>
                     {currentLevelStat?.state === "demonstrated" && (
@@ -968,9 +973,15 @@ export function ListeningPractice({
               <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
                 {t("listening.routeNote").replace("{level}", stats.level)}
               </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {t("listening.routeCertNote")}
+              </p>
 
               <div className="flex flex-col border-t border-border pt-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {t("listening.routeRingHelp")}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
                   {stats.levels.map((lv) => {
                     const expanded = expandedLevel === lv.level;
                     return (
@@ -1002,7 +1013,9 @@ export function ListeningPractice({
                                 ? "text-warning"
                                 : "text-primary"
                           }
-                          ariaLabel={`${lv.level}: ${lv.mastered}/${lv.total}`}
+                          ariaLabel={t("listening.masteredOfTotal")
+                            .replace("{mastered}", String(lv.mastered))
+                            .replace("{total}", String(lv.total))}
                         >
                           {lv.completed ? (
                             <Check className="size-4" aria-hidden="true" />
@@ -1015,9 +1028,41 @@ export function ListeningPractice({
                         <span className="text-[11px] font-medium text-muted-foreground">
                           {t("listening.routeLabel").replace("{level}", lv.level)}
                         </span>
-                        <span className="text-[10px] tabular-nums text-muted-foreground">
-                          {lv.mastered}/{lv.total}
+                        <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                          {t("listening.masteredOfTotal")
+                            .replace("{mastered}", String(lv.mastered))
+                            .replace("{total}", String(lv.total))}
                         </span>
+                        {lv.total > 0 && (
+                          <span className="text-[10px] tabular-nums text-muted-foreground">
+                            {t("listening.coveragePct").replace(
+                              "{pct}",
+                              String(Math.round((lv.mastered / lv.total) * 100)),
+                            )}
+                          </span>
+                        )}
+                        {!lv.completed &&
+                          lv.mastered > 0 &&
+                          lv.gate &&
+                          lv.gate.coverage_required_pct > 0 && (
+                            <span className="max-w-[130px] text-center text-[9px] leading-tight text-warning">
+                              {t("listening.routeGateShort")
+                                .replace(
+                                  "{coverage}",
+                                  String(lv.gate.coverage_required_pct),
+                                )
+                                .replace(
+                                  "{min}",
+                                  String(
+                                    Math.ceil(
+                                      (lv.total * lv.gate.coverage_required_pct) /
+                                        100,
+                                    ),
+                                  ),
+                                )
+                                .replace("{total}", String(lv.total))}
+                            </span>
+                          )}
                       </button>
                     );
                   })}

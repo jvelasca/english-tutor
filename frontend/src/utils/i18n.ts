@@ -1248,6 +1248,29 @@ const STRINGS: Record<string, Entry> = {
     en: "Delayed retention so far: {rate} after {exposures} long re-exposure(s) (needs ≥{ratio}%).",
     es: "Retención retardada hasta ahora: {rate} tras {exposures} re-exposición(ones) larga(s) (se necesita ≥{ratio}%).",
   },
+  // Lectura de los anillos de ruta (P2/legibilidad): la cifra bajo cada nivel son
+  // frases dominadas sobre el banco completo de la ruta, no el tamaño de la ruta.
+  "listening.masteredOfTotal": {
+    en: "Mastered {mastered} of {total}",
+    es: "Dominadas {mastered} de {total}",
+  },
+  "listening.coveragePct": {
+    en: "{pct}% of the bank",
+    es: "{pct}% del banco",
+  },
+  // Requisito mínimo de la puerta (cobertura), en cada anillo con progreso.
+  "listening.routeGateShort": {
+    en: "Gate: master ≥{coverage}% (≥{min} of {total})",
+    es: "Puerta: dominar ≥{coverage}% (≥{min} de {total})",
+  },
+  "listening.routeRingHelp": {
+    en: "Each route trains its full bank. The number under a level is how many phrases you have mastered (e.g. \"30 of 205\"); passing the route is a practice milestone, not a CEFR level.",
+    es: "Cada ruta entrena su banco completo. El número bajo cada nivel son las frases que dominas (p. ej. «30 de 205»); superar la ruta es un hito de práctica, no un nivel CEFR.",
+  },
+  "listening.routeCertNote": {
+    en: "A CEFR level is certified separately from this route: level exam + evidence per skill + stable retention (≥7 days). This route only trains.",
+    es: "El nivel CEFR se certifica aparte de esta ruta: examen de nivel + evidencia por destreza + retención estable (≥7 días). Esta ruta solo entrena.",
+  },
   "listening.diagnostic": {
     en: "Your listening diagnostic",
     es: "Tu diagnóstico de listening",
