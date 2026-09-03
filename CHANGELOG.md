@@ -4,6 +4,58 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.4.0] — 2026-09-03
+
+**Segunda iteración de código de la Constitución pedagógica (P1).** Completa los
+P1 5–7 del roadmap (§9): la matriz CEFR deja de tener huecos (C1/C2 y las 8
+destrezas), la certificación de nivel incorpora la retención retardada como
+requisito (completado ≠ certificado) y el Personal Dictionary evoluciona a
+Lexical Units con el Vocabulary Coverage Indicator receptivo/productivo.
+
+### Cambiado (backend)
+- **Matriz CEFR completa (H4, P1-5)**: `backend/curriculum/cefr_matrix.json` 2.0.0
+  cubre A1–C2 × las 8 destrezas de la Constitución §7. Las 4 macro-destrezas
+  conservan su calibración A1–B2 y se extrapolan a C1/C2; vocabulary/grammar/
+  interaction/mediation declaran en la matriz el mismo suelo que su fallback
+  plano histórico (sin inventar escalados no calibrados) y `pronunciation` queda
+  por diseño como componente de Speaking. `services/cefr_matrix.py` documenta el
+  nuevo alcance y `services/adaptive.readiness` usa la matriz como fuente única
+  de requisitos por destreza (retrocompatible con perfiles legacy).
+- **Certificación con retención (H5, P1-6)**: nueva semántica *completado ≠
+  certificado*. Aprobar el examen sigue completando el nivel y desbloqueando el
+  siguiente, pero la certificación plena exige evidencia `delayed` por destreza
+  del examen (solo se escribe tras el retention reassessment ≥ 7 días con ratio
+  estable). Nuevo `certification_gate` en `services/assessment_v2.py`, expuesto
+  como `certification` en el resultado del examen y en el listado de completados
+  (`/api/academy/level-completions`). En la escalera, `readiness.level_certified`
+  exige el peldaño `level` + el retention reassessment: la retención entra como
+  requisito del nivel, no como evaluación aparte.
+- **Lexical Units + cobertura (P1-7)**: `services/lexicon.py` amplía `kind` a la
+  taxonomía `LEXICAL_KINDS` (§3.2) y tipa las semillas curriculares con
+  `classify_kind` (solo patrones inequívocos; lo ambiguo queda `structure`). El
+  repo refresca kinds heredados al resembrar. `/api/vocabulary/lexicon` expone el
+  **Vocabulary Coverage Indicator** receptivo/productivo por nivel
+  (`coverage`, §3.1, bandas de `LEXICAL_COVERAGE_TARGETS`): indicador interno,
+  no puerta.
+
+### Cambiado (frontend)
+- `PersonalDictionary` etiqueta toda la taxonomía de Lexical Unit con fallback
+  genérico (nunca "word" por defecto); i18n en `utils/i18n.ts` y tipos en
+  `src/types/api.ts` (`Certification`, `level_certified`, `LexiconCoverage`).
+
+### Tests
+- Nuevos: `certification_gate` y `level_certified` (`test_assessment_v2.py`),
+  clasificador `classify_kind` y `coverage_indicator` (`test_lexicon.py`),
+  "aprobado pero certificación pendiente" y "certificado con evidencia delayed"
+  (`test_academy.py`).
+- Actualizados: `test_lexicon.py` a la taxonomía ampliada; el resto de la suite
+  sin cambios de expectativa.
+
+### Documentación
+- `docs/CONSTITUCION-PEDAGOGICA.md` (§8 mapeo y §9 roadmap) y
+  `docs/audit/H-NIVELACION-PEDAGOGICA.md`: estado de los hallazgos tras la
+  ejecución de los P1 5–7 (H1–H5 cerrados; H6–H7 parciales, pendientes de P2).
+
 ## [3.3.0] — 2026-09-03
 
 **Primera iteración de código de la Constitución pedagógica (P0).** Separa el nivel

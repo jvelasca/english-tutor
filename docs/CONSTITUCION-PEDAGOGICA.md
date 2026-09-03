@@ -326,19 +326,19 @@ como "tengo B1 en todo".
 | `route_gate` + `level_status.completed` | Mastery Gate de la competencia Listening (FUNCTIONAL) | v3.3.0: gate de la competencia listening con retención retardada para DEMONSTRATED (P0-4) |
 | `MasteryRecord` (9 destrezas, `mastery_stage`) | Mastery transversal (DEVELOPING/FUNCTIONAL) | no decide "demostrado" |
 | `mastery_evidence_gate` (Assessment 2.0) | Gate DEMONSTRATED (evidencia por kind) | solo en la escalera, no por competencia libre |
-| `cefr_matrix.json` | Requisitos mínimos por nivel×destreza | solo A1–B2 × 4 destrezas (H4) |
-| examen MCQ `min_per_skill=0.75` | Instrumento de certificación de nivel de curso | único camino "certificatorio" hoy; no incluye retención (H5) |
+| `cefr_matrix.json` | Requisitos mínimos por nivel×destreza | v3.4.0: matriz a C1–C2 × las 8 destrezas de la sección 7 (P1-5); `pronunciation` es componente de Speaking y conserva su mínimo plano |
+| examen MCQ `min_per_skill=0.75` | Instrumento de certificación de nivel de curso | v3.4.0: *completado ≠ certificado*; la certificación exige retención retardada estable por destreza del examen (P1-6) |
 | tabla `academy_skill_mastery` + `student-model.mastery` | (duplicidad) | v3.3.0: endpoint legacy retirado; `student-model.mastery` es la fuente expuesta (P0-2) |
 | textos `routeNote`/`routePendingCert`/tooltip de bandas | Honestidad de práctica | solo en listening; badges de nivel estimado crudos (H7) |
 | `modeCefrLevel`/`modeCefrBand` (`frontend/src/utils/modes.ts`) | — | código muerto que mezcla modos de chat con bandas; a eliminar o resignificar (H7) |
-| `lexicon.item_status` y tabla `vocabulary` (`kind` word/structure) | Vocabulary Coverage Indicator + base de Lexical Units | falta taxonomía ampliada y cobertura receptivo/productivo |
+| `lexicon.item_status` y tabla `vocabulary` (`kind` word/structure) | Vocabulary Coverage Indicator + base de Lexical Units | v3.4.0: taxonomía `LEXICAL_KINDS` ampliada (§3.2, P1-7) y `coverage` receptivo/productivo en `/api/vocabulary/lexicon` (§3.1, P1-7) |
 
 ## 9. Roadmap de implementación (incrementos futuros)
 
-Los incrementos P0 (1–4) se ejecutaron en **v3.3.0** (código backend + tests);
-P1 y P2 quedan pendientes y se priorizan igual que la cola de `docs/RELEVO.md`
-§37. Cada incremento debe actualizar esta constitución si cambia umbrales o
-estructura.
+Los incrementos P0 (1–4) se ejecutaron en **v3.3.0** (código backend + tests) y
+los P1 (5–7) en **v3.4.0**; P2 queda pendiente. Los incrementos se priorizan
+igual que la cola de `docs/RELEVO.md` §37. Cada incremento debe actualizar esta
+constitución si cambia umbrales o estructura.
 
 ### P0 — Separación conceptual en backend
 
@@ -367,13 +367,34 @@ estructura.
 
 ### P1 — Requisitos y retención
 
-5. **Extender `cefr_matrix.json` a C1/C2 y a las 8 destrezas** (H4), declarando
-   subskills mínimos por nivel y evidencia por kind.
-6. **Definición formal de retención en la certificación** (H5): la ventana ≥ 7
-   días con ratio estable entra como requisito del examen de nivel / de la
-   escalera, no como evaluación aparte.
-7. **Lexical Units** (sección 3.2): ampliar `kind`, sembrar unidades funcionales
-   y exponer el Vocabulary Coverage Indicator receptivo/productivo.
+5. **Extender `cefr_matrix.json` a C1/C2 y a las 8 destrezas** (H4) — implementado
+   en v3.4.0: `cefr_matrix.json` 2.0.0 cubre los 6 niveles (A1–C2) × las 8
+   destrezas de la sección 7 (`services/cefr_matrix.py` los carga y valida).
+   Listening/speaking/reading/writing extrapolan su calibración V2.x; las
+   destrezas sin calibración per-nivel (vocabulary/grammar/interaction/mediation)
+   declaran en la matriz el mismo suelo que su fallback plano histórico, de modo
+   que ninguna destreza depende del fallback; `pronunciation` queda por diseño
+   como componente de Speaking con su mínimo plano. Los gates de transfer/novel
+   se aplican por destreza y la matriz sigue siendo retrocompatible con perfiles
+   legacy (`services/adaptive.readiness`).
+6. **Definición formal de retención en la certificación** (H5) — implementado en
+   v3.4.0 con la semántica **completado ≠ certificado**: aprobar el examen
+   completa el nivel y desbloquea el siguiente, pero la certificación plena exige
+   evidencia `delayed` por cada destreza del examen (escrita solo tras el
+   retention reassessment ≥ 7 días con ratio estable, `certification_gate` en
+   `services/assessment_v2.py`; expuesto como `certification` en el resultado del
+   examen y en el listado de completados). En la escalera, el nivel se certifica
+   solo cuando el peldaño `level` (examen) **y** el retention reassessment están
+   completos (`readiness.level_certified`). La retención ya no es evaluación
+   aparte: es requisito del nivel.
+7. **Lexical Units** (sección 3.2) — implementado en v3.4.0: la taxonomía de
+   `kind` pasa a `LEXICAL_KINDS` (`word`, `collocation`, `phrasal_verb`,
+   `expression`, `sentence_frame`, `functional_chunk`, `structure` genérico) y
+   las semillas curriculares se tipan con `classify_kind` (los `concepts`/
+   `vocabulary` no declaran tipo: se tipa solo lo inequívoco y lo ambiguo queda
+   `structure`). El `/api/vocabulary/lexicon` expone el **Vocabulary Coverage
+   Indicator** receptivo/productivo por nivel (`coverage`, sección 3.1): es un
+   indicador interno, no una puerta.
 
 ### P2 — UI y Demonstration Checkpoints
 
