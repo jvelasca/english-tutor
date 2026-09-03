@@ -150,12 +150,13 @@ def readiness(profile: list[dict], target_level: str) -> dict:
     """Preparación de cada destreza para el `target_level`.
 
     Una destreza está `ready` solo si supera simultáneamente su mínimo de score,
-    la confianza mínima y el mínimo de evidencias; en las 4 macro-destrezas
-    (`listening`, `speaking`, `reading`, `writing`) esos umbrales salen de la
-    matriz CEFR (`services.cefr_matrix`) para el `target_level`, y además exigen
-    evidencia de transferencia/novedad en B1/B2. El gate de transfer/novedad es
-    retrocompatible: solo se aplica si el perfil trae `evidence_by_kind`; un perfil
-    legacy sin esa clave no queda bloqueado por transferencia.
+    la confianza mínima y el mínimo de evidencias. Los umbrales salen de la
+    matriz CEFR (`services.cefr_matrix`) para el `target_level` (A1–C2 × las 8
+    destrezas de la Constitución §7); `pronunciation` y cualquier destreza fuera
+    de la matriz usan el fallback plano (`READINESS_MINIMUMS`). A partir de B1 la
+    matriz exige evidencia de transferencia/novedad. El gate de transfer/novedad
+    es retrocompatible: solo se aplica si el perfil trae `evidence_by_kind`; un
+    perfil legacy sin esa clave no queda bloqueado por transferencia.
 
     No se "pasa" de nivel por promedio: una destreza bloqueante deja `ready` en
     False aunque el resto estén altas. Devuelve per-skill, `overall` (% de destrezas
