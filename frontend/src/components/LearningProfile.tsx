@@ -60,6 +60,9 @@ export function LearningProfile({ profile }: LearningProfileProps) {
       </div>
 
       <div className="cefr-bands">
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          {t("profile.bandNote")}
+        </p>
         {BANDS.map((skill) => (
           <span
             key={skill}

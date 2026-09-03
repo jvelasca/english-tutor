@@ -21,7 +21,7 @@ import type { Section } from "../../utils/sections";
 import { SKILL_LABELS } from "../../utils/learningLabels";
 import { useI18n } from "../../hooks/useI18n";
 import { NextBestCard } from "../../components/NextBestCard";
-import { LevelBadge } from "../../components/LevelBadge";
+import { EstimatedLevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
 import { TodayPlan } from "../../components/TodayPlan";
 import { FsrsReviewPanel } from "../../features/review/FsrsReviewPanel";
@@ -201,7 +201,7 @@ export function HomeScreen({
           </h1>
           {(level || streak) && (
             <div className="flex flex-wrap items-center gap-2">
-              {level && <LevelBadge level={level} />}
+              {level && <EstimatedLevelBadge level={level} />}
               {streak && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                   <Flame className="size-3.5" aria-hidden="true" />

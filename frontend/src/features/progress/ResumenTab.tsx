@@ -14,7 +14,7 @@ import {
   BucketToggle,
   ProgressDashboard,
 } from "../../components/ProgressDashboard";
-import { LevelBadge } from "../../components/LevelBadge";
+import { EstimatedLevelBadge } from "../../components/LevelBadge";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { SkillBar } from "../../components/SkillBar";
@@ -110,7 +110,7 @@ export function ResumenTab({ userId, refreshKey }: ResumenTabProps) {
               {t("progress.overall")}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              {level && <LevelBadge level={level} />}
+              {level && <EstimatedLevelBadge level={level} />}
               <Badge variant="secondary">
                 {model.target_level} · {t(`readiness.${band}`)}
               </Badge>

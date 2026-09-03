@@ -11,7 +11,7 @@ import type { LucideIcon } from "lucide-react";
 import { getStudentModel } from "../../api/academy";
 import type { StudentModel } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
-import { LevelBadge } from "../../components/LevelBadge";
+import { EstimatedLevelBadge } from "../../components/LevelBadge";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
@@ -139,7 +139,7 @@ export function ProgressScreen({
           </div>
           {model && (
             <div className="flex flex-wrap items-center gap-2">
-              <LevelBadge level={model.estimated_level} />
+              <EstimatedLevelBadge level={model.estimated_level} />
               <Badge variant="secondary">
                 {model.target_level} · {t(`readiness.${band}`)}
               </Badge>

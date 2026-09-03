@@ -1,4 +1,5 @@
 import { cefrTone, cefrLabel, type CefrTone } from "@/utils/cefr";
+import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 
 const TONE_CLASS: Record<CefrTone, string> = {
@@ -34,6 +35,38 @@ export function LevelBadge({
       {showLabel && label !== level && (
         <span className="font-medium opacity-90">{label}</span>
       )}
+    </span>
+  );
+}
+
+/**
+ * Badge de nivel **estimado** (P2/H7): `LevelBadge` + el calificador
+ * "estimado · no certificado". "Demostrado" queda reservado para los gates
+ * (p. ej. el DEMONSTRATED del listening con retención ≥7 días); un nivel
+ * estimado nunca debe leerse como certificación.
+ */
+export function EstimatedLevelBadge({
+  level,
+  className,
+}: {
+  level: string;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <span
+      className={cn(
+        "inline-flex flex-wrap items-center gap-x-2 gap-y-1",
+        className,
+      )}
+    >
+      <LevelBadge level={level} />
+      <span
+        className="text-[11px] font-medium text-muted-foreground"
+        title={t("profile.estimatedQualifier")}
+      >
+        {t("profile.estimatedQualifier")}
+      </span>
     </span>
   );
 }
