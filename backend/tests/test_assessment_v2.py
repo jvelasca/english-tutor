@@ -94,6 +94,65 @@ def test_retention_delta_and_stable():
     assert len(delta["by_skill"]) == 2
 
 
+def test_certification_gate_requires_delayed_per_skill():
+    """P1/H5: completar (aprobar examen) no certifica; exige `delayed` por
+    destreza del examen. La evidencia delayed solo existe tras la ventana de
+    retención estable (≥ RETENTION_MIN_DAYS), luego no es evaluación aparte."""
+    skills = ["listening", "reading"]
+    familiar_rows = [
+        {"skill": "listening", "evidence_kind": "familiar"},
+        {"skill": "reading", "evidence_kind": "transfer"},
+    ]
+    gate = av2.certification_gate(skills, familiar_rows)
+    assert gate["certified"] is False
+    assert gate["required"] is True
+    assert gate["window_min_days"] == av2.RETENTION_MIN_DAYS
+    assert gate["pending_skills"] == ["listening", "reading"]
+
+    only_listening = familiar_rows + [
+        {"skill": "listening", "evidence_kind": "delayed"}
+    ]
+    gate = av2.certification_gate(skills, only_listening)
+    assert gate["certified"] is False
+    assert gate["delayed_by_skill"] == {"listening": 1, "reading": 0}
+    assert gate["pending_skills"] == ["reading"]
+
+    both = only_listening + [
+        {"skill": "reading", "evidence_kind": "delayed"}
+    ]
+    gate = av2.certification_gate(skills, both)
+    assert gate["certified"] is True
+    assert gate["pending_skills"] == []
+    assert gate["checks"] == {"listening": True, "reading": True}
+
+
+def test_certification_gate_empty_exam_never_certifies():
+    assert av2.certification_gate([], [])["certified"] is False
+
+
+def test_ladder_level_certified_requires_retention_step():
+    """H5/P1: el nivel se *certifica* solo con peldaño `level` + `retention`;
+    completar la escalera sin retention deja `ladder_complete` True (avance
+    desbloqueado) pero `level_certified` False."""
+    base = dict(
+        units_done=4,
+        has_exam=True,
+        retention_ready=True,
+    )
+    no_retention = av2.ladder_status(
+        completed_kinds={"formative", "unit", "progress", "level"}, **base
+    )
+    assert no_retention["readiness"]["ladder_complete"] is True
+    assert no_retention["readiness"]["level_certified"] is False
+
+    certified = av2.ladder_status(
+        completed_kinds={"formative", "unit", "progress", "level", "retention"},
+        **base,
+    )
+    assert certified["readiness"]["ladder_complete"] is True
+    assert certified["readiness"]["level_certified"] is True
+
+
 def test_mastery_evidence_gate_requires_full_ladder():
     incomplete = av2.mastery_evidence_gate({"familiar": 2, "transfer": 1})
     assert incomplete["met"] is False

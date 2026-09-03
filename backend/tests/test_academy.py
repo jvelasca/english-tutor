@@ -549,6 +549,76 @@ def test_endpoint_exam_fail_no_completion(monkeypatch, tmp_path):
     assert completions["completions"] == []
 
 
+def test_exam_pass_completed_but_certification_pending(monkeypatch, tmp_path):
+    """P1/H5: aprobar el examen *completa* el nivel (y desbloquea el siguiente)
+    pero no lo *certifica*: la certificación exige evidencia de retención
+    retardada (≥7 días, ratio estable) por cada destreza del examen."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    data = load_assessments()
+    exam = data.exams["a1"]
+    answers = {it.id: it.correct_index for it in exam.items}
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/exam/a1/submit",
+            params={"user_id": a},
+            json={"answers": answers},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["passed"] is True
+        cert = body["certification"]
+        assert cert is not None
+        assert cert["required"] is True
+        assert cert["certified"] is False
+        assert cert["window_min_days"] == 7
+        assert set(cert["pending_skills"]) == set(exam.skills)
+        assert all(n == 0 for n in cert["delayed_by_skill"].values())
+
+        completions = client.get(
+            "/api/academy/level-completions", params={"user_id": a}
+        ).json()
+        assert completions["completions"][0]["certification"]["certified"] is False
+
+
+def test_level_becomes_certified_with_delayed_evidence(monkeypatch, tmp_path):
+    """Tras registrar evidencia `delayed` en cada destreza del examen (la que
+    solo se escribe al superar el retention reassessment ≥7 días), el nivel
+    completado pasa a estar certificado."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    data = load_assessments()
+    exam = data.exams["a1"]
+    answers = {it.id: it.correct_index for it in exam.items}
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/exam/a1/submit",
+            params={"user_id": a},
+            json={"answers": answers},
+        )
+        assert r.json()["passed"] is True
+
+    # Retention reassessment superado: evidencia delayed por destreza del examen.
+    for skill in exam.skills:
+        assert academy_repo.record_evidence(
+            a,
+            level_id="a1",
+            objective_id="",
+            skill=skill,
+            item_id=f"delayed-{skill}",
+            result=1.0,
+            evidence_kind="delayed",
+        ) is True
+
+    with TestClient(app) as client:
+        completions = client.get(
+            "/api/academy/level-completions", params={"user_id": a}
+        ).json()
+    cert = completions["completions"][0]["certification"]
+    assert cert["certified"] is True
+    assert cert["pending_skills"] == []
+    assert set(cert["delayed_by_skill"]) == set(exam.skills)
+
+
+
 def test_endpoint_study_plan(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:

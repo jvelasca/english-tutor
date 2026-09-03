@@ -60,6 +60,14 @@ RETENTION_MIN_DAYS = 7
 # Ratio delayed/initial a partir del cual la retención se considera estable.
 RETENTION_STABLE_RATIO = 0.9
 
+# Certificación de nivel (H5): *completar ≠ certificar*. Completar el examen
+# desbloquea el siguiente nivel; la certificación plena exige además ≥ este nº
+# de evidencias `delayed` por cada destreza del examen. La evidencia `delayed`
+# solo se escribe tras un retention reassessment (≥ RETENTION_MIN_DAYS después
+# de la formal) con ratio estable (≥ RETENTION_STABLE_RATIO), de modo que su
+# presencia ya codifica la ventana de 7 días con retención estable.
+CERTIFICATION_REQUIRED_DELAYED = 1
+
 # Regla MASTERED (auditoría §16): no basta con terminar.
 MASTERY_EVIDENCE_REQUIREMENTS: dict[str, int] = {
     "initial": 1,  # familiar ≥ 1
@@ -359,6 +367,48 @@ def retention_delta(initial: dict, delayed: dict) -> dict:
     }
 
 
+def certification_gate(
+    exam_skills: list[str], evidence_rows: list[dict]
+) -> dict:
+    """Gate de certificación de un nivel (P1/H5): **completado ≠ certificado**.
+
+    Aprobar el examen completa el nivel y desbloquea el siguiente; la
+    certificación plena exige además evidencia de retención retardada por cada
+    destreza del examen. La evidencia `delayed` solo se escribe tras un
+    retention reassessment que supera la ventana `RETENTION_MIN_DAYS` con ratio
+    estable (`RETENTION_STABLE_RATIO`), así que su presencia en `evidence_rows`
+    (filas crudas de `academy_evidence`) ya codifica el requisito formal de la
+    ventana: no se trata de una evaluación aparte sino de un requisito del nivel.
+
+    Devuelve conformidad global, conteo `delayed` por destreza y las destrezas
+    pendientes de retención. Un nivel sin examen (sin destrezas exigidas) nunca
+    puede quedar certificado.
+    """
+    delayed_by_skill: dict[str, int] = {}
+    for row in evidence_rows:
+        if str(row.get("evidence_kind") or "").lower() != "delayed":
+            continue
+        skill = row.get("skill")
+        if not skill:
+            continue
+        delayed_by_skill[skill] = delayed_by_skill.get(skill, 0) + 1
+    checks = {
+        skill: delayed_by_skill.get(skill, 0) >= CERTIFICATION_REQUIRED_DELAYED
+        for skill in exam_skills
+    }
+    return {
+        "required": True,
+        "window_min_days": RETENTION_MIN_DAYS,
+        "min_delayed": CERTIFICATION_REQUIRED_DELAYED,
+        "certified": bool(exam_skills) and all(checks.values()),
+        "delayed_by_skill": {
+            skill: delayed_by_skill.get(skill, 0) for skill in exam_skills
+        },
+        "pending_skills": [s for s, ok in checks.items() if not ok],
+        "checks": checks,
+    }
+
+
 def mastery_evidence_gate(by_kind: dict | None) -> dict:
     """¿Se puede considerar MASTERED? (initial+practice+transfer+novel+delayed)."""
     kinds = by_kind or {}
@@ -411,7 +461,14 @@ def ladder_status(
     retention_ready: bool,
     mastery_gate: dict | None = None,
 ) -> dict:
-    """Estado de la escalera + siguiente peldaño recomendado."""
+    """Estado de la escalera + siguiente peldaño recomendado.
+
+    `readiness.ladder_complete` marca el nivel *completado* (avance desbloqueado,
+    la retención no bloquea el progreso); `readiness.level_certified` marca la
+    certificación plena: exige el peldaño `level` (examen aprobado) **y** el
+    retention reassessment (`retention`), porque la retención estable ≥7 días es
+    requisito de la certificación, no una evaluación aparte (P1/H5).
+    """
     steps = []
     for kind in ASSESSMENT_KINDS:
         available = True
@@ -469,6 +526,12 @@ def ladder_status(
         "mastery_missing": list(gate.get("missing") or []),
         "next_kind": next_kind,
         "retention_due": retention_ready,
+        # H5/P1: la retención no es un peldaño aparte que "suma puntos": el nivel
+        # queda *certificado* solo cuando el peldaño `level` (examen aprobado) se
+        # completa Y el retention reassessment (≥7 días, ratio estable) también.
+        "level_certified": (
+            "level" in completed_kinds and "retention" in completed_kinds
+        ),
     }
     return {
         "steps": steps,

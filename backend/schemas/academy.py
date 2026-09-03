@@ -298,12 +298,34 @@ class ExamSkillResultOut(BaseModel):
     passed: bool
 
 
+class CertificationOut(BaseModel):
+    """Estado de certificación de un nivel superado (P1/H5).
+
+    Aprobar el examen de nivel otorga la *completitud* del nivel; la
+    certificación plena exige además evidencia `delayed` por cada destreza del
+    examen (escrita solo tras un retention reassessment ≥ `window_min_days` con
+    ratio estable). `certified` es False hasta que todas las destrezas del examen
+    acumulan el mínimo de evidencias de retención.
+    """
+
+    required: bool = True
+    certified: bool
+    window_min_days: int
+    min_delayed: int
+    delayed_by_skill: dict[str, int] = Field(default_factory=dict)
+    pending_skills: list[str] = Field(default_factory=list)
+    checks: dict[str, bool] = Field(default_factory=dict)
+
+
 class ExamResultOut(BaseModel):
     overall: float
     passed: bool
     failed_skills: list[str]
     skills: dict[str, ExamSkillResultOut]
     remediation: dict[str, list[str]] = Field(default_factory=dict)
+    # H5/P1: aprobar completa el nivel (desbloquea el siguiente); certificar
+    # exige además retención retardada estable por destreza (ver CertificationOut).
+    certification: CertificationOut | None = None
 
 
 class LevelCompletionOut(BaseModel):
@@ -312,6 +334,8 @@ class LevelCompletionOut(BaseModel):
     level: str
     overall: float
     awarded_at: str
+    # H5/P1: distingue completado (examen aprobado) de certificado (retention).
+    certification: CertificationOut | None = None
 
 
 class LevelCompletionsOut(BaseModel):
@@ -806,6 +830,8 @@ class AssessmentV2ReadinessOut(BaseModel):
     mastery_missing: list[str] = Field(default_factory=list)
     next_kind: str | None = None
     retention_due: bool = False
+    # H5/P1: certificación plena = nivel (examen) + retention reassessment.
+    level_certified: bool = False
 
 
 class AssessmentV2MasteryGateOut(BaseModel):

@@ -2803,6 +2803,15 @@ async def submit_exam(
         nxt = next_level_id(lv.level)
         if nxt and nxt in _levels_by_id:
             await run_in_threadpool(academy_repo.enroll, user_id, nxt, nxt.upper())
+        # H5/P1: completado ≠ certificado. Aprobar desbloquea el siguiente nivel;
+        # la certificación exige retención retardada (≥7 días, ratio estable) por
+        # destreza del examen, reflejada aquí como gate explícito.
+        evidence_rows = await run_in_threadpool(
+            academy_repo.list_evidence, user_id, level_id
+        )
+        result["certification"] = assessment_v2.certification_gate(
+            list(exam.skills), evidence_rows
+        )
     else:
         # Remediation pack: objetivos del nivel dirigidos a cada destreza suspendida.
         result["remediation"] = {
@@ -2813,13 +2822,31 @@ async def submit_exam(
 
 async def list_level_completions(user_id: str) -> list[LevelCompletionOut]:
     rows = await run_in_threadpool(academy_repo.list_level_completions, user_id)
-    return [
-        LevelCompletionOut(
-            id=r["id"],
-            level_id=r["level_id"],
-            level=r["level"],
-            overall=r["overall"],
-            awarded_at=r["awarded_at"],
+    if not rows:
+        return []
+    data = load_assessments()
+    evidence = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    by_level: dict[str, list[dict]] = {}
+    for ev in evidence:
+        by_level.setdefault(ev.get("level_id") or "", []).append(ev)
+    out: list[LevelCompletionOut] = []
+    for r in rows:
+        exam = data.exams.get(r["level_id"])
+        certification = None
+        if exam is not None:
+            # H5/P1: el listado distingue completado (examen aprobado) de
+            # certificado (completado + retención retardada por destreza).
+            certification = assessment_v2.certification_gate(
+                list(exam.skills), by_level.get(r["level_id"], [])
+            )
+        out.append(
+            LevelCompletionOut(
+                id=r["id"],
+                level_id=r["level_id"],
+                level=r["level"],
+                overall=r["overall"],
+                awarded_at=r["awarded_at"],
+                certification=certification,
+            )
         )
-        for r in rows
-    ]
+    return out

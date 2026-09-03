@@ -1011,6 +1011,8 @@ export interface AssessmentV2Readiness {
   mastery_missing: string[];
   next_kind: string | null;
   retention_due: boolean;
+  // P1/H5: nivel certificado = peldaño level (examen) + retention reassessment.
+  level_certified?: boolean;
 }
 
 export interface AssessmentV2MasteryGate {
@@ -1359,6 +1361,16 @@ export interface Exam {
   items: ExamItem[];
 }
 
+export interface Certification {
+  required: boolean;
+  certified: boolean;
+  window_min_days: number;
+  min_delayed: number;
+  delayed_by_skill: Record<string, number>;
+  pending_skills: string[];
+  checks: Record<string, boolean>;
+}
+
 export interface ExamSkillResult {
   correct: number;
   total: number;
@@ -1372,6 +1384,8 @@ export interface ExamResult {
   failed_skills: string[];
   skills: Record<string, ExamSkillResult>;
   remediation: Record<string, string[]>;
+  // P1/H5: completado (examen aprobado) ≠ certificado (retention retardada).
+  certification?: Certification | null;
 }
 
 export interface LevelCompletion {
@@ -1380,6 +1394,7 @@ export interface LevelCompletion {
   level: string;
   overall: number;
   awarded_at: string;
+  certification?: Certification | null;
 }
 
 export interface LevelCompletionsResponse {
