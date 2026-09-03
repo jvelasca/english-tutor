@@ -4,6 +4,43 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.3.0] — 2026-09-03
+
+**Primera iteración de código de la Constitución pedagógica (P0).** Separa el nivel
+estimado del demostrado y elimina la lectura "palabras → nivel CEFR" que la auditoría
+(`docs/audit/H-NIVELACION-PEDAGOGICA.md`, H1) marcó como pedagógicamente inválida. Introduce
+los 4 estados por competencia (Constitución §2.1) en el perfil y convierte la práctica de
+listening en evidencia del Student Model con retención retardada (H3/H5).
+
+### Cambiado (backend)
+- **`services/cefr.py` sin interpretación palabras→nivel (H1)**: retirado el evaluador legacy
+  (`VOCABULARY_BAND_EDGES`, `vocabulary_band`, `evaluate_cefr`, `estimate_cefr`) y sus tests.
+  Queda como módulo de constantes compartidas, descriptores, `heuristic_band` (score de
+  destreza del Student Model) y recomendaciones; el volumen léxico es un indicador de cobertura
+  (`VOCAB_EXPANSION_HINT_WORDS`), nunca una banda CEFR.
+- **Registro por competencia Estimado/Demostrado (H2/H7)**: nuevo `services/competence.py` con
+  los 4 estados (`not_started`/`developing`/`functional`/`demonstrated`), gate y retención;
+  `/api/profile` lo expone como `competence_states`. Una destreza sin evidencia se muestra "—",
+  nunca "A1" por defecto.
+- **Fuente única de mastery (H6)**: retirado el endpoint `/api/academy/mastery` y su cadena
+  domain/schema/repo; la fuente expuesta es `student-model.mastery`.
+- **Listening al Student Model (H3/H5)**: nuevo `route_competence` en `services/listening.py`
+  que lee `listening_attempts` como estado por ruta (los 4 estados): `route_gate` superado →
+  FUNCTIONAL, y retención retardada estable (re-exposiciones ≥ 7 días con ratio ≥ 0.9) →
+  DEMONSTRATED. El Student Model expone las rutas de la destreza listening y
+  `/api/listening/stats` su estado y retención por ruta.
+
+### Tests
+- Nuevos: `backend/tests/test_competence.py` (estados por competencia y combinación
+  evidencia formal + ruta de práctica).
+- Eliminados: `backend/tests/test_cefr_evaluation.py` (fijaba el evaluador legacy retirado).
+- Actualizados: `test_profile.py`, `test_academy.py`, `test_listening.py`, `test_policy.py`.
+
+### Documentación
+- `docs/CONSTITUCION-PEDAGOGICA.md` (§8 mapeo y §9 roadmap) y
+  `docs/audit/H-NIVELACION-PEDAGOGICA.md`: estado de los hallazgos tras la ejecución de los P0
+  (H1–H3 cerrados; H5–H7 parciales; H4 abierto) con la foto V3.2.1 conservada como referencia.
+
 ## [3.2.1] — 2026-09-03
 
 **Auditoría pedagógica del modelo de nivelación (solo documentación).** Sin cambios de código.

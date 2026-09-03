@@ -321,43 +321,49 @@ como "tengo B1 en todo".
 | Componente actual | Concepto de la constitución | Brecha |
 |---|---|---|
 | `adaptive.estimated_level` + `estimated_numeric` | Estimated CEFR | le falta calificador UI y coherencia con `Pre-A1` por destreza |
-| `estimated_bands` (`heuristic_band(score)`) | Estimated CEFR (por destreza) | nunca emite `Pre-A1`; un perfil vacío muestra destrezas "A1" |
-| `VOCABULARY_BAND_EDGES`/`vocabulary_band`/`evaluate_cefr` | — (interpretación palabras→nivel) | **contradice** la constitución; a eliminar (H1) |
-| `route_gate` + `level_status.completed` | Mastery Gate de la competencia Listening (FUNCTIONAL) | aislado del Student Model y sin retención retardada (H3, H5) |
+| `estimated_bands` (`heuristic_band(score)`) | Estimated CEFR (por destreza) | v3.3.0: sin evidencia la banda es "—" (P0-3); el calificador UI queda en P2 |
+| `VOCABULARY_BAND_EDGES`/`vocabulary_band`/`evaluate_cefr` | — (interpretación palabras→nivel) | eliminado en v3.3.0 (P0-1) |
+| `route_gate` + `level_status.completed` | Mastery Gate de la competencia Listening (FUNCTIONAL) | v3.3.0: gate de la competencia listening con retención retardada para DEMONSTRATED (P0-4) |
 | `MasteryRecord` (9 destrezas, `mastery_stage`) | Mastery transversal (DEVELOPING/FUNCTIONAL) | no decide "demostrado" |
 | `mastery_evidence_gate` (Assessment 2.0) | Gate DEMONSTRATED (evidencia por kind) | solo en la escalera, no por competencia libre |
 | `cefr_matrix.json` | Requisitos mínimos por nivel×destreza | solo A1–B2 × 4 destrezas (H4) |
 | examen MCQ `min_per_skill=0.75` | Instrumento de certificación de nivel de curso | único camino "certificatorio" hoy; no incluye retención (H5) |
-| tabla `academy_skill_mastery` + `student-model.mastery` | (duplicidad) | unificar semántica (H6) |
+| tabla `academy_skill_mastery` + `student-model.mastery` | (duplicidad) | v3.3.0: endpoint legacy retirado; `student-model.mastery` es la fuente expuesta (P0-2) |
 | textos `routeNote`/`routePendingCert`/tooltip de bandas | Honestidad de práctica | solo en listening; badges de nivel estimado crudos (H7) |
 | `modeCefrLevel`/`modeCefrBand` (`frontend/src/utils/modes.ts`) | — | código muerto que mezcla modos de chat con bandas; a eliminar o resignificar (H7) |
 | `lexicon.item_status` y tabla `vocabulary` (`kind` word/structure) | Vocabulary Coverage Indicator + base de Lexical Units | falta taxonomía ampliada y cobertura receptivo/productivo |
 
 ## 9. Roadmap de implementación (incrementos futuros)
 
-Los incrementos NO se ejecutan en esta iteración (solo documentación). Se
-priorizan igual que la cola de `docs/RELEVO.md` §37. Cada incremento debe
-actualizar esta constitución si cambia umbrales o estructura.
+Los incrementos P0 (1–4) se ejecutaron en **v3.3.0** (código backend + tests);
+P1 y P2 quedan pendientes y se priorizan igual que la cola de `docs/RELEVO.md`
+§37. Cada incremento debe actualizar esta constitución si cambia umbrales o
+estructura.
 
 ### P0 — Separación conceptual en backend
 
-1. **Eliminar la interpretación palabras→nivel** (H1): retirar/archivar
-   `VOCABULARY_BAND_EDGES`, `vocabulary_band` y el uso de `vocab_size` como banda
-   en `services/cefr.py`, junto con sus tests que la fijan. Conservar solo
-   `PRE_A1`, descriptores y la recomendación de vocabulario como indicador.
-2. **Introducir el par Estimado/Demostrado por competencia** (H2): un registro
-   por competencia con los 4 estados (sección 2.1) y una única fuente de mastery
-   (dossier H, hallazgo H6). El nivel estimado global queda explícitamente como
-   hipótesis.
-3. **Coherencia Pre-A1 en bandas por destreza** (H7): una destreza sin evidencia
-   se muestra "—" o `Pre-A1`, nunca "A1".
+1. **Eliminar la interpretación palabras→nivel** (H1) — implementado en v3.3.0:
+   retirados `VOCABULARY_BAND_EDGES`, `vocabulary_band` y el resto del evaluador
+   legacy (`evaluate_cefr`/`estimate_cefr` y sus tests) de `services/cefr.py`; se
+   conservan `PRE_A1`, descriptores y la recomendación de vocabulario como
+   indicador de cobertura léxica (`VOCAB_EXPANSION_HINT_WORDS`), sin semántica CEFR.
+2. **Introducir el par Estimado/Demostrado por competencia** (H2) — implementado
+   en v3.3.0: `services/competence.py` expone un registro por competencia con los
+   4 estados (sección 2.1) en `/api/profile.competence_states`, y se retiró el
+   endpoint legacy `/api/academy/mastery` (`student-model.mastery` es la fuente
+   expuesta, H6). El nivel estimado global queda explícitamente como hipótesis.
+3. **Coherencia Pre-A1 en bandas por destreza** (H7) — implementado en v3.3.0:
+   una destreza sin evidencia se muestra "—", nunca "A1" por defecto.
 
 ### P0 — Listening como evidencia del Student Model
 
-4. **Cablear la práctica de listening al modelo de destreza** (H3): los intentos
-   (`listening_attempts`) generan evidencia de la destreza listening con su
-   subskill, y el `route_gate` pasa a ser el **gate de la competencia Listening**
-   (FUNCTIONAL), consolidado con la retención retardada para DEMONSTRATED (H5).
+4. **Cablear la práctica de listening al modelo de destreza** (H3) — implementado
+   en v3.3.0: `route_competence` convierte `listening_attempts` en un estado por
+   ruta (los 4 estados) y el `route_gate` pasa a ser el **gate de la competencia
+   Listening** (FUNCTIONAL), consolidado con la retención retardada estable
+   (≥ 7 días y ratio ≥ 0.9) para DEMONSTRATED (H5). El Student Model expone las
+   rutas de la destreza listening y `/api/listening/stats` su estado y retención
+   por ruta.
 
 ### P1 — Requisitos y retención
 

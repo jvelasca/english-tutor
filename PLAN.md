@@ -11,7 +11,10 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.2.1` — **Auditoría pedagógica del modelo de nivelación** (solo documentación; ver `docs/audit/H-NIVELACION-PEDAGOGICA.md` y `docs/CONSTITUCION-PEDAGOGICA.md`). Base: `3.2.0` — **Calibración pedagógica de niveles** (nivel
+- ✅ Versión estable `3.3.0` — **P0 de la Constitución pedagógica en código** (sin
+  interpretación palabras→nivel, registro por competencia Estimado/Demostrado con
+  `competence_states`, listening como evidencia del Student Model con retención; ver
+  `CHANGELOG.md` y Constitución §9). Base: `3.2.1` — **Auditoría pedagógica del modelo de nivelación** (solo documentación; ver `docs/audit/H-NIVELACION-PEDAGOGICA.md` y `docs/CONSTITUCION-PEDAGOGICA.md`). Base: `3.2.0` — **Calibración pedagógica de niveles** (nivel
   estimado global honesto con `Pre-A1`, Listening como rutas con puerta de
   evidencia y corpus A1/A2 → 200 ítems c/u). Sobre la base de **V3.1 UI**
   (release de interfaz y navegación; ver `docs/UI_V3.1.md`). El stack
