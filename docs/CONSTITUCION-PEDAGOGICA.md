@@ -320,8 +320,8 @@ como "tengo B1 en todo".
 
 | Componente actual | Concepto de la constitución | Brecha |
 |---|---|---|
-| `adaptive.estimated_level` + `estimated_numeric` | Estimated CEFR | le falta calificador UI y coherencia con `Pre-A1` por destreza |
-| `estimated_bands` (`heuristic_band(score)`) | Estimated CEFR (por destreza) | v3.3.0: sin evidencia la banda es "—" (P0-3); el calificador UI queda en P2 |
+| `adaptive.estimated_level` + `estimated_numeric` | Estimated CEFR | v3.5.0: todo badge de nivel estimado lleva "estimado · no certificado" (`EstimatedLevelBadge`, P2-9); coherencia `Pre-A1` por destreza en P0-3/P2-9 |
+| `estimated_bands` (`heuristic_band(score)`) | Estimated CEFR (por destreza) | v3.3.0: sin evidencia la banda es "—" (P0-3); v3.5.0: el perfil nota que las bandas son estimaciones, no certificaciones (P2-9) |
 | `VOCABULARY_BAND_EDGES`/`vocabulary_band`/`evaluate_cefr` | — (interpretación palabras→nivel) | eliminado en v3.3.0 (P0-1) |
 | `route_gate` + `level_status.completed` | Mastery Gate de la competencia Listening (FUNCTIONAL) | v3.3.0: gate de la competencia listening con retención retardada para DEMONSTRATED (P0-4) |
 | `MasteryRecord` (9 destrezas, `mastery_stage`) | Mastery transversal (DEVELOPING/FUNCTIONAL) | no decide "demostrado" |
@@ -329,14 +329,15 @@ como "tengo B1 en todo".
 | `cefr_matrix.json` | Requisitos mínimos por nivel×destreza | v3.4.0: matriz a C1–C2 × las 8 destrezas de la sección 7 (P1-5); `pronunciation` es componente de Speaking y conserva su mínimo plano |
 | examen MCQ `min_per_skill=0.75` | Instrumento de certificación de nivel de curso | v3.4.0: *completado ≠ certificado*; la certificación exige retención retardada estable por destreza del examen (P1-6) |
 | tabla `academy_skill_mastery` + `student-model.mastery` | (duplicidad) | v3.3.0: endpoint legacy retirado; `student-model.mastery` es la fuente expuesta (P0-2) |
-| textos `routeNote`/`routePendingCert`/tooltip de bandas | Honestidad de práctica | solo en listening; badges de nivel estimado crudos (H7) |
-| `modeCefrLevel`/`modeCefrBand` (`frontend/src/utils/modes.ts`) | — | código muerto que mezcla modos de chat con bandas; a eliminar o resignificar (H7) |
+| textos `routeNote`/`routePendingCert`/tooltip de bandas | Honestidad de práctica | v3.5.0: la UI tipa el estado por ruta (`functional` ≠ `demonstrated`) y lee "A1 Listening — not yet demonstrated" hasta la retención estable ≥7 días (P2-8) |
+| `modeCefrLevel`/`modeCefrBand` (`frontend/src/utils/modes.ts`) | — | eliminado en v3.5.0 (P2-10): código muerto sin uso en componentes |
 | `lexicon.item_status` y tabla `vocabulary` (`kind` word/structure) | Vocabulary Coverage Indicator + base de Lexical Units | v3.4.0: taxonomía `LEXICAL_KINDS` ampliada (§3.2, P1-7) y `coverage` receptivo/productivo en `/api/vocabulary/lexicon` (§3.1, P1-7) |
 
 ## 9. Roadmap de implementación (incrementos futuros)
 
-Los incrementos P0 (1–4) se ejecutaron en **v3.3.0** (código backend + tests) y
-los P1 (5–7) en **v3.4.0**; P2 queda pendiente. Los incrementos se priorizan
+Los incrementos P0 (1–4) se ejecutaron en **v3.3.0** (código backend + tests),
+los P1 (5–7) en **v3.4.0** y los P2 (8–10) en **v3.5.0**; la cola queda
+abierta a nuevos incrementos. Los incrementos se priorizan
 igual que la cola de `docs/RELEVO.md` §37. Cada incremento debe actualizar esta
 constitución si cambia umbrales o estructura.
 
@@ -398,14 +399,25 @@ constitución si cambia umbrales o estructura.
 
 ### P2 — UI y Demonstration Checkpoints
 
-8. **Pantallas honestas de entrenamiento** (H7): "LISTENING — ENTRENAMIENTO A1"
-   con competencias practicadas, y "A1 Listening demonstrated: not yet" hasta que
-   el gate se cumpla; pantalla final "A1 Listening — demonstrated" con el desglose
-   del gate cuando se cumpla.
-9. **Etiquetado del estimado**: todo `LevelBadge` de nivel estimado lleva el
-   calificador "estimado · no certificado" y el perfil global se muestra como
-   tupla (sección 7.2).
-10. **Eliminar `modeCefrLevel`/`modeCefrBand`** si no tienen uso previsto (H7).
+8. **Pantallas honestas de entrenamiento** (H7) — implementado en v3.5.0: la UI
+   tipa el estado pedagógico por ruta que ya expone el backend
+   (`ListeningLevelProgress.state`: `not_started`/`developing`/`functional`/
+   `demonstrated`) y lo lee sin engaño: `functional` se muestra como hito de
+   práctica ("A1 Listening — not yet demonstrated", con el requisito de retención
+   retardada estable ≥7 días), y solo `demonstrated` muestra la pantalla "A1
+   Listening — demonstrated" con el desglose del gate y la retención
+   (`ListeningPractice` y `ListeningRecorridoPanel`; `ListeningLevelPanel` expone
+   el estado y la retención actual por nivel desplegado).
+9. **Etiquetado del estimado** — implementado en v3.5.0: `EstimatedLevelBadge`
+   (`LevelBadge` + calificador "estimado · no certificado", clave i18n
+   `profile.estimatedQualifier`) sustituye a todo badge de **nivel estimado**
+   (Home, cabecera de Progreso y ResumenTab); el perfil global se muestra con su
+   distribución por destreza y la nota de que las bandas son estimaciones, no
+   certificaciones (`LearningProfile`, `profile.bandNote`).
+10. **Eliminar `modeCefrLevel`/`modeCefrBand`** (H7) — implementado en v3.5.0:
+    retirados `frontend/src/utils/modes.ts` y `modes.test.ts` (código muerto sin
+    uso en componentes; la fuente real de los modos de chat es `TUTOR_MODES` de
+    `hooks/useChat.ts`).
 
 ## Glosario mínimo
 

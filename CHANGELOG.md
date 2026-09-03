@@ -4,6 +4,43 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.0] — 2026-09-03
+
+**Tercera iteración de la Constitución pedagógica (P2, en la UI).** Cierra los
+P2 8–10 del roadmap (§9): pantallas honestas de entrenamiento (la práctica de
+listening se lee por estado de ruta, `functional` ≠ `demonstrated`), todo badge
+de nivel estimado lleva el calificador "estimado · no certificado", y se elimina
+el código muerto `modeCefrLevel`/`modeCefrBand`.
+
+### Cambiado (frontend)
+- **Pantallas honestas de entrenamiento (H7, P2-8)**: la UI tipa el estado
+  pedagógico por ruta que ya expone el backend (`ListeningLevelProgress.state`:
+  `not_started`/`developing`/`functional`/`demonstrated` + `retention`). La ruta
+  se lee sin engaño en `ListeningPractice`, `ListeningLevelPanel` y
+  `ListeningRecorridoPanel`:
+  - `functional` (puerta de ruta superada) se muestra como *hito de práctica*:
+    "A1 Listening — not yet demonstrated", con el requisito de demostración
+    (retención retardada estable: ≥90 % de la precisión inmediata en
+    re-exposiciones tras ≥7 días) y el estado de retención actual.
+  - `demonstrated` (puerta + retención estable ≥7 días) muestra la pantalla
+    "A1 Listening — demonstrated" con el desglose (gate y retención).
+  - Nueva sección "Competencia por ruta" en el Recorrido Listening con los 4
+    estados por nivel CEFR y la nota de que "Demostrado" es el único estado que
+    certifica.
+- **Etiquetado del estimado (H7, P2-9)**: nuevo `EstimatedLevelBadge`
+  (`LevelBadge` + calificador localizado "estimado · no certificado",
+  `profile.estimatedQualifier`) en los dos sitios que muestran el nivel estimado
+  global (Home y cabecera de Progreso) y en ResumenTab; el perfil
+  (`LearningProfile`) muestra la distribución por destreza con la nota de que las
+  bandas son estimaciones alineadas con el CEFR, no certificaciones
+  (`profile.bandNote`).
+- **Código muerto eliminado (H7, P2-10)**: retirados `frontend/src/utils/modes.ts`
+  y `modes.test.ts` (`modeCefrLevel`/`modeCefrBand` no tenían uso en componentes;
+  los modos de chat viven en `TUTOR_MODES` de `hooks/useChat.ts`).
+
+### Verificación
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (309 tests) en verde.
+
 ## [3.4.0] — 2026-09-03
 
 **Segunda iteración de código de la Constitución pedagógica (P1).** Completa los

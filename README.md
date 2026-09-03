@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.4.0**.
+- Última versión estable: **v3.5.0**.
 
 ## Estructura
 
@@ -79,6 +79,11 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   Demonstrated CEFR** (4 estados por competencia) y declara que el vocabulario es un indicador de
   cobertura, no un criterio de nivel: nunca "X palabras → nivel CEFR". Auditoría previa en
   `docs/audit/H-NIVELACION-PEDAGOGICA.md`; especificación en `docs/CONSTITUCION-PEDAGOGICA.md`.
+  Ejecución en código: P0 (v3.3.0, backend), P1 (v3.4.0, backend) y P2 (v3.5.0, UI): los badges de
+  nivel estimado llevan "estimado · no certificado", el perfil por destreza se marca como
+  estimación y la práctica de listening se lee por estado de ruta (`functional` = hito de práctica;
+  solo `demonstrated`, puerta + retención retardada estable ≥ 7 días, muestra "A1 Listening —
+  demonstrated").
 - **Speaking C2 (V2.5-C2)**: catálogo de escenarios comunicativos ampliado a 26 (A1→C2), con 6
   escenarios C2 (persuasión, mediación de conflicto, defensa académica, temas abstractos,
   negociación de alto riesgo y reunión diplomática).

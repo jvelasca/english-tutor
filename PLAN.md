@@ -11,11 +11,17 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.4.0` — **P1 de la Constitución pedagógica en código**
+- ✅ Versión estable `3.5.0` — **P2 de la Constitución pedagógica en UI**
+  (pantallas honestas: la práctica de listening se lee por estado de ruta
+  —`functional` es hito de práctica y solo `demonstrated` (puerta + retención
+  retardada estable ≥7 días) muestra «A1 Listening — demonstrated»—, todo badge
+  de nivel estimado lleva el calificador «estimado · no certificado» y se eliminó
+  el código muerto `modeCefrLevel`/`modeCefrBand`; ver `CHANGELOG.md` y
+  Constitución §9). Base: `3.4.0` — **P1 de la Constitución pedagógica en código**
   (matriz CEFR a C1/C2 × las 8 destrezas con evidencia por kind, certificación de
   nivel con retención —*completado ≠ certificado*— y Lexical Units con Vocabulary
-  Coverage Indicator receptivo/productivo; ver `CHANGELOG.md` y Constitución §9).
-  Base: `3.3.0` — **P0 de la Constitución pedagógica en código** (sin
+  Coverage Indicator receptivo/productivo). Base: `3.3.0` — **P0 de la
+  Constitución pedagógica en código** (sin
   interpretación palabras→nivel, registro por competencia Estimado/Demostrado con
   `competence_states`, listening como evidencia del Student Model con retención).
   Base: `3.2.1` — **Auditoría pedagógica del modelo de nivelación** (solo
