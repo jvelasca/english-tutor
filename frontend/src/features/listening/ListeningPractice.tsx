@@ -919,14 +919,41 @@ export function ListeningPractice({
                         ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
                         : "—"}
                     </span>
-                    {currentLevelStat?.completed && (
+                    {currentLevelStat?.state === "demonstrated" && (
                       <span className="text-[11px] font-semibold text-success">
-                        {t("listening.routeCompleted").replace(
+                        {t("listening.demoTitle").replace(
                           "{level}",
                           stats.level,
                         )}
                       </span>
                     )}
+                    {currentLevelStat?.completed &&
+                      currentLevelStat.state === "functional" && (
+                        <>
+                          <span className="text-[11px] font-semibold text-success">
+                            {t("listening.routeCompleted").replace(
+                              "{level}",
+                              stats.level,
+                            )}
+                          </span>
+                          <span className="text-[11px] font-medium text-warning">
+                            {t("listening.demoNotYet").replace(
+                              "{level}",
+                              stats.level,
+                            )}
+                          </span>
+                        </>
+                      )}
+                    {currentLevelStat?.completed &&
+                      currentLevelStat.state !== "demonstrated" &&
+                      currentLevelStat.state !== "functional" && (
+                        <span className="text-[11px] font-semibold text-success">
+                          {t("listening.routeCompleted").replace(
+                            "{level}",
+                            stats.level,
+                          )}
+                        </span>
+                      )}
                     {currentLevelStat &&
                       !currentLevelStat.completed &&
                       currentLevelStat.mastered === currentLevelStat.total && (
@@ -1003,6 +1030,13 @@ export function ListeningPractice({
                     <ListeningLevelPanel
                       userId={userId}
                       level={expandedLevel}
+                      routeState={
+                        stats.levels.find((lv) => lv.level === expandedLevel)?.state
+                      }
+                      routeRetention={
+                        stats.levels.find((lv) => lv.level === expandedLevel)
+                          ?.retention ?? null
+                      }
                       onPracticeLevel={startLevelSession}
                       onDrillFailed={startFailedDrill}
                     />

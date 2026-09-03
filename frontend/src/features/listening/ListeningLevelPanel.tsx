@@ -5,6 +5,8 @@ import type {
   ListeningItem,
   ListeningItemState,
   ListeningLevelItems,
+  ListeningRouteRetention,
+  ListeningRouteState,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { ListenButton } from "../../components/ListenButton";
@@ -14,6 +16,11 @@ import { cn } from "../../lib/utils";
 
 const GROUPS: ListeningItemState[] = ["failed", "mastered", "unseen"];
 
+// Umbrales de la retención retardada que decide DEMONSTRATED (Constitución §2.1
+// y P1/H5): re-exposiciones ≥ 7 días con ratio ≥ 90% de la precisión inmediata.
+const DEMO_MIN_RATIO_PCT = 90;
+const DEMO_MIN_DAYS = 7;
+
 function groupKey(state: ListeningItemState): string {
   return `listening.levelStates.${state}`;
 }
@@ -21,6 +28,9 @@ function groupKey(state: ListeningItemState): string {
 interface ListeningLevelPanelProps {
   userId: string | null;
   level: string;
+  /** Estado pedagógico de la ruta (functional ≠ demonstrated), si el backend lo expone. */
+  routeState?: ListeningRouteState;
+  routeRetention?: ListeningRouteRetention | null;
   /** Sesión de práctica activa: no se pueden iniciar más sesiones. */
   disabled?: boolean;
   onPracticeLevel: (level: string, total: number) => void;
@@ -37,6 +47,8 @@ interface ListeningLevelPanelProps {
 export function ListeningLevelPanel({
   userId,
   level,
+  routeState,
+  routeRetention,
   disabled,
   onPracticeLevel,
   onDrillFailed,
@@ -133,6 +145,46 @@ export function ListeningLevelPanel({
           )
         )}
       </div>
+
+      {data.completed && routeState === "functional" && (
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 text-xs">
+          <p className="font-medium text-warning">
+            {t("listening.demoNotYet").replace("{level}", level)}
+          </p>
+          <p className="mt-1 leading-relaxed text-muted-foreground">
+            {t("listening.demoRequires")
+              .replace("{level}", level)
+              .replace("{ratio}", String(DEMO_MIN_RATIO_PCT))
+              .replace("{days}", String(DEMO_MIN_DAYS))}
+          </p>
+          {routeRetention && (
+            <p className="mt-1 leading-relaxed text-muted-foreground">
+              {t("listening.demoRetentionStatus")
+                .replace(
+                  "{rate}",
+                  routeRetention.retention_rate !== null
+                    ? `${Math.round(routeRetention.retention_rate * 100)}%`
+                    : "—",
+                )
+                .replace(
+                  "{exposures}",
+                  String(routeRetention.long_delayed_exposures),
+                )
+                .replace("{ratio}", String(DEMO_MIN_RATIO_PCT))}
+            </p>
+          )}
+        </div>
+      )}
+      {routeState === "demonstrated" && (
+        <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2.5 text-xs">
+          <p className="font-medium text-success">
+            {t("listening.demoTitle").replace("{level}", level)}
+          </p>
+          <p className="mt-1 leading-relaxed text-muted-foreground">
+            {t("listening.demoMet").replace("{days}", String(DEMO_MIN_DAYS))}
+          </p>
+        </div>
+      )}
 
       {showGate && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 text-xs">

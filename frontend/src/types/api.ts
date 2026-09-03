@@ -410,6 +410,21 @@ export interface ListeningRouteGate {
   blockers: string[];
 }
 
+// Estado pedagógico de una ruta de listening (Constitución §2.1): la puerta de
+// ruta decide `functional` y la retención retardada estable (≥7 días, ratio
+// ≥90%) decide `demonstrated`. El backend los expone en cada fila de `levels`.
+export type ListeningRouteState =
+  | "not_started"
+  | "developing"
+  | "functional"
+  | "demonstrated";
+
+export interface ListeningRouteRetention {
+  retention_rate: number | null;
+  stable: boolean;
+  long_delayed_exposures: number;
+}
+
 export interface ListeningLevelProgress {
   level: string;
   total: number;
@@ -419,6 +434,10 @@ export interface ListeningLevelProgress {
   accuracy: number | null;
   // Puerta de ruta: qué evidencia falta para certificar el nivel (backend 2.x).
   gate?: ListeningRouteGate | null;
+  // Competencia por ruta (P2/H7): functional ≠ demonstrated. Solo `demonstrated`
+  // habilita leer "A1 Listening — demonstrated".
+  state?: ListeningRouteState;
+  retention?: ListeningRouteRetention | null;
 }
 
 export interface ListeningStats {

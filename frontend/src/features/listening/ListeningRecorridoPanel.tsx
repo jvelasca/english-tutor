@@ -60,6 +60,25 @@ function subskillLabel(skill: string): string {
   return SUBSKILL_LABELS[skill] ?? skill.replace(/_/g, " ");
 }
 
+// Lectura honesta por ruta (P2/H7): el estado llega del backend con la puerta de
+// ruta (functional) y la retención retardada estable ≥7 días (demonstrated).
+function routeStateKey(state: string): string {
+  return `listening.routeState.${state}`;
+}
+
+function routeStateClass(state: string): string {
+  switch (state) {
+    case "demonstrated":
+      return "text-success";
+    case "functional":
+      return "text-warning";
+    case "developing":
+      return "text-muted-foreground";
+    default:
+      return "text-muted-foreground/60";
+  }
+}
+
 /**
  * Recorrido Listening (MI PROGRESO · Recorridos): vista read-only con los datos
  * reales de `getListeningStats` + `getListeningDiagnostic` (nivel, precisión,
@@ -158,14 +177,24 @@ export function ListeningRecorridoPanel({
                   ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
                   : "—"}
               </span>
-              {currentLevelStat?.completed && (
-                <span className="text-[11px] font-semibold text-success">
-                  {t("listening.routeCompleted").replace(
-                    "{level}",
-                    stats.level,
-                  )}
-                </span>
-              )}
+              {currentLevelStat?.completed &&
+                currentLevelStat.state === "demonstrated" && (
+                  <span className="text-[11px] font-semibold text-success">
+                    {t("listening.demoTitle").replace(
+                      "{level}",
+                      stats.level,
+                    )}
+                  </span>
+                )}
+              {currentLevelStat?.completed &&
+                currentLevelStat.state !== "demonstrated" && (
+                  <span className="text-[11px] font-semibold text-success">
+                    {t("listening.routeCompleted").replace(
+                      "{level}",
+                      stats.level,
+                    )}
+                  </span>
+                )}
               {currentLevelStat &&
                 !currentLevelStat.completed &&
                 currentLevelStat.mastered === currentLevelStat.total && (
@@ -182,6 +211,50 @@ export function ListeningRecorridoPanel({
           )}
           <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
             {t("listening.routeNote").replace("{level}", stats.level)}
+          </p>
+        </Card>
+      )}
+
+      {stats && stats.levels.length > 0 && (
+        <Card className="gap-3 p-5">
+          <p className="text-sm font-semibold text-foreground">
+            {t("listening.routeCompetenceTitle")}
+          </p>
+          <ul className="flex flex-col gap-2">
+            {stats.levels.map((lv) => {
+              const state = lv.state ?? "not_started";
+              return (
+                <li
+                  key={lv.level}
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs"
+                >
+                  <span className="flex items-center gap-2">
+                    <LevelBadge level={lv.level} />
+                    <span className="tabular-nums text-muted-foreground">
+                      {lv.mastered}/{lv.total}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      routeStateClass(state),
+                    )}
+                    title={
+                      state === "demonstrated"
+                        ? t("listening.demoMet").replace("{days}", "7")
+                        : state === "functional"
+                          ? t("listening.demoNotYet").replace("{level}", lv.level)
+                          : undefined
+                    }
+                  >
+                    {t(routeStateKey(state))}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="border-t border-border pt-2 text-xs leading-relaxed text-muted-foreground">
+            {t("listening.routeCompetenceNote")}
           </p>
         </Card>
       )}

@@ -1201,6 +1201,53 @@ const STRINGS: Record<string, Entry> = {
     en: "{coverage}% of the bank mastered (≥{coverageRequired}%) · accuracy ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} topics · {checkpoint}/{checkpointRequired} first-try answers",
     es: "{coverage}% del banco dominado (≥{coverageRequired}%) · precisión ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} temas · {checkpoint}/{checkpointRequired} aciertos a la primera",
   },
+  // P2 (H7): lectura honesta por ruta. La puerta otorga `functional` (hito de
+  // práctica); la retención retardada estable (≥7 días, ratio ≥90%) decide
+  // `demonstrated`. Hasta entonces la ruta se lee "aún no demostrado".
+  "listening.routeState.not_started": {
+    en: "Not started yet",
+    es: "Sin empezar aún",
+  },
+  "listening.routeState.developing": {
+    en: "Training — route not passed yet",
+    es: "Entrenando — ruta aún sin superar",
+  },
+  "listening.routeState.functional": {
+    en: "Route passed — practice milestone, not demonstrated",
+    es: "Ruta superada — hito de práctica, sin demostrar",
+  },
+  "listening.routeState.demonstrated": {
+    en: "Demonstrated",
+    es: "Demostrado",
+  },
+  "listening.demoTitle": {
+    en: "{level} Listening — demonstrated",
+    es: "{level} Listening — demostrado",
+  },
+  "listening.demoNotYet": {
+    en: "{level} Listening — not yet demonstrated",
+    es: "{level} Listening — aún no demostrado",
+  },
+  "listening.demoRequires": {
+    en: "Demonstrating {level} Listening also requires stable delayed retention: ≥{ratio}% of your immediate accuracy on re-exposures after ≥{days} days. Keep reviewing — until then this route is a practice milestone, not a certificate.",
+    es: "Demostrar {level} Listening exige además retención retardada estable: ≥{ratio}% de tu precisión inmediata en re-exposiciones tras ≥{days} días. Sigue repasando: hasta entonces esta ruta es un hito de práctica, no un certificado.",
+  },
+  "listening.demoMet": {
+    en: "Stable delayed retention over ≥{days} days — certificate-level evidence met for this route.",
+    es: "Retención retardada estable durante ≥{days} días: la evidencia de nivel certificable de esta ruta está superada.",
+  },
+  "listening.routeCompetenceTitle": {
+    en: "Competence by route (per CEFR level)",
+    es: "Competencia por ruta (por nivel CEFR)",
+  },
+  "listening.routeCompetenceNote": {
+    en: "\"Functional\" means the route gate is passed: a practice milestone, not a CEFR certificate. Only \"Demonstrated\" — route gate plus stable delayed retention (≥90%) over ≥7 days — reads as \"Listening — demonstrated\".",
+    es: "«Funcional» significa que la puerta de la ruta está superada: un hito de práctica, no un certificado CEFR. Solo «Demostrado» —puerta de ruta + retención retardada estable (≥90%) durante ≥7 días— se lee como «Listening — demostrado».",
+  },
+  "listening.demoRetentionStatus": {
+    en: "Delayed retention so far: {rate} after {exposures} long re-exposure(s) (needs ≥{ratio}%).",
+    es: "Retención retardada hasta ahora: {rate} tras {exposures} re-exposición(ones) larga(s) (se necesita ≥{ratio}%).",
+  },
   "listening.diagnostic": {
     en: "Your listening diagnostic",
     es: "Tu diagnóstico de listening",
@@ -1365,6 +1412,16 @@ const STRINGS: Record<string, Entry> = {
   "profile.bandTitle": {
     en: "Heuristic band aligned with CEFR (not an official certification)",
     es: "Banda heurística alineada con CEFR (no es una certificación oficial)",
+  },
+  // P2 (H7): cualquier badge del nivel *estimado* lleva el calificador explícito
+  // "estimado · no certificado"; "demostrado" se reserva para los gates.
+  "profile.estimatedQualifier": {
+    en: "estimated · not certified",
+    es: "estimado · no certificado",
+  },
+  "profile.bandNote": {
+    en: "Per-skill bands are estimates aligned with CEFR — they are not certifications.",
+    es: "Las bandas por destreza son estimaciones alineadas con el CEFR: no son certificaciones.",
   },
   "profile.readyFor": { en: "Ready for", es: "Preparado para" },
   "profile.workOn": { en: "Work on:", es: "Trabaja en:" },
