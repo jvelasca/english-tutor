@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { motion, type Variants } from "motion/react";
-import { CheckCircle2, Loader2, Minus, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
-import { getNextBestActivity } from "../../api/academy";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
+  Flame,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
+import { getFsrsSummary, getNextBestActivity } from "../../api/academy";
 import type {
+  FsrsSummary,
   LearningProfile,
   NextBestActivity,
   ProgressHistory,
+  SessionStep,
 } from "../../types/api";
 import type { Section } from "../../utils/sections";
 import { SKILL_LABELS } from "../../utils/learningLabels";
@@ -13,10 +23,10 @@ import { useI18n } from "../../hooks/useI18n";
 import { NextBestCard } from "../../components/NextBestCard";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
-import { TriadCard } from "../../components/TriadCard";
+import { TodayPlan } from "../../components/TodayPlan";
+import { FsrsReviewPanel } from "../../features/review/FsrsReviewPanel";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
-import { cn } from "../../lib/utils";
 
 const SKILL_TO_SECTION: Record<string, Section> = {
   listening: "listening",
@@ -47,6 +57,10 @@ interface HomeScreenProps {
   history: ProgressHistory | null;
   userName?: string;
   onStart: (section: Section | null, step: NextBestActivity) => void;
+  /** Lanza la primera actividad del plan del día (TodayPlan → [Start]). */
+  onStep?: (step: SessionStep) => void;
+  /** Navega a MI PROGRESO (#/progreso). */
+  onOpenProgress?: () => void;
   refreshKey?: number;
 }
 
@@ -57,12 +71,28 @@ function sectionFor(step: NextBestActivity | null): Section | null {
   return null;
 }
 
+/** Etiqueta de sección del panel de mando (dashboard, no tablero de stats). */
+function SectionHeading({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </h2>
+  );
+}
+
+/**
+ * INICIO V3.1 — panel de mando de acción diaria.
+ * Una única acción protagonista por tarjeta; el resto son resúmenes con
+ * llamadas secundarias/compactas (reglas de zona útil, docs/UI_V3.1.md §6).
+ */
 export function HomeScreen({
   userId,
   profile,
   history,
   userName,
   onStart,
+  onStep,
+  onOpenProgress,
   refreshKey = 0,
 }: HomeScreenProps) {
   const { t } = useI18n();
@@ -70,6 +100,7 @@ export function HomeScreen({
   const [nextState, setNextState] = useState<"loading" | "error" | "done">(
     "loading",
   );
+  const [nextTick, setNextTick] = useState(0);
 
   useEffect(() => {
     if (!userId) {
@@ -96,22 +127,50 @@ export function HomeScreen({
     return () => {
       cancelled = true;
     };
-  }, [userId, refreshKey]);
+  }, [userId, refreshKey, nextTick]);
+
+  const [summary, setSummary] = useState<FsrsSummary | null>(null);
+  const [fsrsState, setFsrsState] = useState<"loading" | "error" | "done">(
+    "loading",
+  );
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [fsrsTick, setFsrsTick] = useState(0);
+
+  useEffect(() => {
+    if (!userId) {
+      setSummary(null);
+      setFsrsState("error");
+      return;
+    }
+    let cancelled = false;
+    setFsrsState("loading");
+    void (async () => {
+      try {
+        const data = await getFsrsSummary(userId);
+        if (!cancelled) {
+          setSummary(data);
+          setFsrsState("done");
+        }
+      } catch {
+        if (!cancelled) {
+          setSummary(null);
+          setFsrsState("error");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, refreshKey, fsrsTick]);
+
+  /** Cierra el repaso y refresca el contador de pendientes al volver. */
+  function closeReview() {
+    setReviewOpen(false);
+    setFsrsTick((n) => n + 1);
+  }
 
   const level = profile?.estimated_level ?? null;
-  const readiness = Math.round(profile?.readiness.overall ?? 0);
-  const band = profile?.readiness.band ?? "developing";
-  const trend = profile ? overallTrend(profile) : null;
-  const nextFocus = profile?.readiness.blocking_skills[0] ?? null;
-
   const streak = history?.streak;
-  const activityTotal = history
-    ? history.series.reduce(
-        (acc, p) =>
-          acc + p.messages + p.exercises + p.corrections + p.pronunciation,
-        0,
-      )
-    : 0;
 
   const hour = new Date().getHours();
   const greetingKey =
@@ -120,94 +179,54 @@ export function HomeScreen({
     ? `${t(greetingKey)}, ${userName}`
     : t(greetingKey);
 
-  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
-  const trendLabel =
-    trend === "up"
-      ? t("home.improving")
-      : trend === "down"
-        ? t("home.needsReview")
-        : t("home.stable");
-  const trendClass =
-    trend === "up"
-      ? "text-success"
-      : trend === "down"
-        ? "text-destructive"
-        : "text-muted-foreground";
+  const visibleSkills = profile
+    ? profile.skills.filter((s) => SKILL_TO_SECTION[s.skill])
+    : [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:py-10">
       <motion.div
         variants={container}
         initial="hidden"
         animate="show"
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-6"
       >
-        <motion.header variants={item}>
+        {/* 1. Cabecera de bienvenida: saludo + nivel CEFR y racha compactos. */}
+        <motion.header
+          variants={item}
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3"
+        >
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {greeting}
           </h1>
-          <p className="mt-1 text-muted-foreground">{t("home.subtitle")}</p>
-        </motion.header>
-
-        <motion.section variants={item}>
-          <TriadCard userId={userId} refreshKey={refreshKey} />
-        </motion.section>
-
-        <motion.section variants={item} aria-label={t("home.yourProgress")}>
-          <Card className="gap-5 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <LevelBadge level={level ?? "—"} showLabel={Boolean(level)} />
-              {trend && (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 text-sm font-medium",
-                    trendClass,
-                  )}
-                >
-                  <TrendIcon className="size-4" />
-                  {trendLabel}
+          {(level || streak) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {level && <LevelBadge level={level} />}
+              {streak && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <Flame className="size-3.5" aria-hidden="true" />
+                  {streak.current_days} {t("home.streak")}
                 </span>
               )}
             </div>
-            <div>
-              <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">
-                  {t("home.readyFor")} {profile?.target_level ?? "…"}
-                </span>
-                <span className="flex items-baseline gap-1.5">
-                  <span className="text-lg font-bold">
-                    {t(`readiness.${band}`)}
-                  </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {readiness}%
-                  </span>
-                </span>
-              </div>
-              <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-primary/15">
-                <motion.div
-                  className="h-full rounded-full bg-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${readiness}%` }}
-                  transition={{
-                    duration: 0.9,
-                    ease: [0.22, 1, 0.36, 1],
-                    delay: 0.2,
-                  }}
-                />
-              </div>
-            </div>
-            {nextFocus && (
-              <p className="text-sm text-muted-foreground">
-                {t("home.nextFocus")}:{" "}
-                <span className="font-medium text-foreground">
-                  {SKILL_LABELS[nextFocus] ?? nextFocus}
-                </span>
-              </p>
-            )}
+          )}
+        </motion.header>
+
+        {/* 2. TU OBJETIVO DE HOY */}
+        <motion.section variants={item} aria-label={t("home.todayGoal")}>
+          <SectionHeading>{t("home.todayGoal")}</SectionHeading>
+          <Card className="p-5">
+            <TodayPlan
+              userId={userId}
+              onStep={onStep}
+              refreshKey={refreshKey}
+            />
           </Card>
         </motion.section>
 
-        <motion.section variants={item} aria-label={t("home.nextStep")}>
+        {/* 3. RECOMENDADO PARA TI */}
+        <motion.section variants={item} aria-label={t("home.recommended")}>
+          <SectionHeading>{t("home.recommended")}</SectionHeading>
           {next ? (
             <NextBestCard
               next={next}
@@ -233,18 +252,7 @@ export function HomeScreen({
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => {
-                    setNextState("loading");
-                    void (async () => {
-                      try {
-                        const activity = await getNextBestActivity(userId);
-                        setNext(activity);
-                        setNextState("done");
-                      } catch {
-                        setNextState("error");
-                      }
-                    })();
-                  }}
+                  onClick={() => setNextTick((n) => n + 1)}
                 >
                   <RefreshCw className="size-4" />
                   {t("home.retry")}
@@ -259,14 +267,108 @@ export function HomeScreen({
           )}
         </motion.section>
 
-        {profile && profile.skills.length > 0 && (
-          <motion.section variants={item} aria-label={t("home.yourSkills")}>
+        {/* 4. REPASO (FSRS) — decisión D2: tarjeta diaria en INICIO. */}
+        <motion.section variants={item} aria-label={t("fsrs.title")}>
+          <Card className="gap-0 overflow-hidden">
+            {reviewOpen ? (
+              <>
+                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold">{t("fsrs.title")}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-expanded={true}
+                    aria-controls="home-fsrs-panel"
+                    onClick={closeReview}
+                  >
+                    {t("common.close")}
+                  </Button>
+                </div>
+                <div id="home-fsrs-panel" className="p-4">
+                  <FsrsReviewPanel userId={userId} />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <BookOpenCheck className="size-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold leading-tight">
+                      {t("fsrs.title")}
+                    </h2>
+                    {fsrsState === "loading" && !summary && (
+                      <p
+                        role="status"
+                        className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground"
+                      >
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                        {t("common.loading")}
+                      </p>
+                    )}
+                    {fsrsState === "error" && !summary && (
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {t("home.reviewUnavailable")}
+                      </p>
+                    )}
+                    {summary &&
+                      (summary.due_count > 0 ? (
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {t("fsrs.dueCount")}:{" "}
+                          <span className="font-semibold tabular-nums text-foreground">
+                            {summary.due_count}
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {t("fsrs.empty")}
+                        </p>
+                      ))}
+                  </div>
+                </div>
+                {userId &&
+                  fsrsState === "done" &&
+                  summary &&
+                  summary.due_count > 0 && (
+                    <Button
+                      className="shrink-0 gap-2"
+                      aria-expanded={false}
+                      aria-controls="home-fsrs-panel"
+                      onClick={() => setReviewOpen(true)}
+                    >
+                      {t("mastery.reviewNow")}
+                      <ArrowRight className="size-4" aria-hidden="true" />
+                    </Button>
+                  )}
+              </div>
+            )}
+          </Card>
+        </motion.section>
+
+        {/* 5. TU PROGRESO — mini-barras + acceso a MI PROGRESO. */}
+        {(onOpenProgress || visibleSkills.length > 0) && (
+          <motion.section variants={item} aria-label={t("home.yourProgress")}>
             <Card className="gap-4 p-5">
-              <h2 className="text-base font-semibold">{t("home.yourSkills")}</h2>
-              <div className="flex flex-col gap-4">
-                {profile.skills
-                  .filter((s) => SKILL_TO_SECTION[s.skill])
-                  .map((skill) => (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">
+                  {t("home.yourProgress")}
+                </h2>
+                {onOpenProgress && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={onOpenProgress}
+                  >
+                    {t("home.seeProgress")}
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                  </Button>
+                )}
+              </div>
+              {visibleSkills.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  {visibleSkills.map((skill) => (
                     <SkillBar
                       key={skill.skill}
                       label={SKILL_LABELS[skill.skill] ?? skill.skill}
@@ -274,19 +376,8 @@ export function HomeScreen({
                       hint={masteryLabel(skill.score, t)}
                     />
                   ))}
-              </div>
-            </Card>
-          </motion.section>
-        )}
-
-        {streak && (
-          <motion.section variants={item}>
-            <Card className="gap-0 p-0">
-              <div className="grid grid-cols-3 divide-x divide-border">
-                <Stat value={streak.current_days} label={t("home.streak")} />
-                <Stat value={streak.best_days} label={t("home.bestStreak")} />
-                <Stat value={activityTotal} label={t("home.activity")} />
-              </div>
+                </div>
+              )}
             </Card>
           </motion.section>
         )}
@@ -295,28 +386,8 @@ export function HomeScreen({
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1 px-3 py-4">
-      <span className="text-2xl font-bold tabular-nums">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
 function masteryLabel(score: number, t: (k: string) => string): string {
   if (score >= 0.75) return t("mastery.strong");
   if (score >= 0.5) return t("mastery.developing");
   return t("mastery.needsPractice");
-}
-
-function overallTrend(profile: LearningProfile): "up" | "down" | "flat" | null {
-  const trends = profile.skills
-    .map((s) => s.trend)
-    .filter((t): t is number => t !== null);
-  if (trends.length === 0) return null;
-  const sum = trends.reduce((a, b) => a + b, 0);
-  if (sum > 0.5) return "up";
-  if (sum < -0.5) return "down";
-  return "flat";
 }

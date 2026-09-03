@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.0.0**.
+- Última versión estable: **v3.2.0**.
 
 ## Estructura
 
@@ -69,6 +69,11 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 - **Listening C1/C2 (V2.5-C1)**: corpus de listening ampliado a 140 ítems (A1→C2), con 20 ítems C1
   y 20 C2 de registro avanzado (inferencia, intención del hablante, actitud, hablantes múltiples,
   habla rápida y connected speech).
+- **Calibración pedagógica de niveles (V2.9)**: nivel estimado global honesto (se introduce `Pre-A1` y
+  se recalibran los umbrales de vocabulario), los donuts de Listening se releen como **rutas de práctica**
+  con puerta de validación (cobertura ≥ 80 %, precisión ≥ 70 %, variedad y checkpoint) y el corpus de
+  listening se **expande por pipeline reproducible a 490 ítems** (A1 y A2 → 200 c/u), con opciones
+  rebalanceadas por posición (auditoría B, mc-bias, cerrado).
 - **Speaking C2 (V2.5-C2)**: catálogo de escenarios comunicativos ampliado a 26 (A1→C2), con 6
   escenarios C2 (persuasión, mediación de conflicto, defensa académica, temas abstractos,
   negociación de alto riesgo y reunión diplomática).

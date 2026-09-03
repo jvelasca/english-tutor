@@ -117,7 +117,7 @@ export interface ProgressSummary {
   pronunciation: PronunciationStats;
 }
 
-export type EstimatedLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+export type EstimatedLevel = "Pre-A1" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
 export interface EstimatedBands {
   vocabulary: string;
@@ -348,11 +348,32 @@ export interface ListeningProductionResult {
   skill: string;
 }
 
+export interface ListeningRouteGate {
+  passed: boolean;
+  total: number;
+  mastered: number;
+  coverage_pct: number;
+  coverage_required_pct: number;
+  accuracy: number | null;
+  accuracy_required: number;
+  topics: number;
+  topics_required: number;
+  subskills: number;
+  subskills_required: number;
+  checkpoint: number;
+  checkpoint_required: number;
+  blockers: string[];
+}
+
 export interface ListeningLevelProgress {
   level: string;
   total: number;
   mastered: number;
   completed: boolean;
+  coverage_pct: number | null;
+  accuracy: number | null;
+  // Puerta de ruta: qué evidencia falta para certificar el nivel (backend 2.x).
+  gate?: ListeningRouteGate | null;
 }
 
 export interface ListeningStats {
@@ -362,6 +383,31 @@ export interface ListeningStats {
   level: string;
   completed: boolean;
   levels: ListeningLevelProgress[];
+}
+
+export type ListeningItemState = "unseen" | "failed" | "mastered";
+
+export interface ListeningItem {
+  question_id: string;
+  level: string;
+  script: string;
+  topic: string;
+  skill: string;
+  difficulty: number;
+  attempts: number;
+  state: ListeningItemState;
+}
+
+export interface ListeningLevelItems {
+  level: string;
+  total: number;
+  mastered: number;
+  failed: number;
+  unseen: number;
+  completed: boolean;
+  items: ListeningItem[];
+  // Puerta de ruta del nivel (backend 2.x); `completed` la refleja.
+  gate?: ListeningRouteGate | null;
 }
 
 export interface ListeningSubskillProgress {

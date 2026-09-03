@@ -12,6 +12,7 @@ import {
   type MicUnavailableReason,
 } from "../utils/browserCapabilities";
 import { ActivityResult } from "./ActivityResult";
+import { ListenButton } from "./ListenButton";
 import { NextStep } from "./NextStep";
 import { MicUnavailableNotice } from "./MicUnavailableNotice";
 import { Card } from "./ui/card";
@@ -177,9 +178,12 @@ export function PronunciationPractice({
           footer={<NextStep userId={userId} onNext={onNext} />}
         >
           <div className="flex flex-col gap-1 text-sm">
-            <div>
-              <span className="text-muted-foreground">{t("pron.expected")}:</span>{" "}
-              {result.expected}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-muted-foreground">{t("pron.expected")}:</span>{" "}
+                <span className="text-foreground">{result.expected}</span>
+              </div>
+              <ListenButton text={result.expected} label={t("speak.phrase")} />
             </div>
             <div>
               <span className="text-muted-foreground">{t("pron.heard")}:</span>{" "}

@@ -4,6 +4,11 @@ from __future__ import annotations
 # Guía por nivel CEFR que se añade al system prompt del tutor (en inglés,
 # coherente con MODE_PROMPTS).
 CORRECTNESS_GUIDANCE: dict[str, str] = {
+    "Pre-A1": (
+        "The learner is a pre-beginner (below CEFR A1). Keep everything very "
+        "short and simple; praise effort, correct gently and provide model "
+        "sentences to repeat."
+    ),
     "A1": (
         "The learner is a beginner (CEFR A1). Correct every error gently and in "
         "simple language; explain in Spanish when helpful."

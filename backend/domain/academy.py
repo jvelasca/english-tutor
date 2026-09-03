@@ -108,6 +108,7 @@ from services import course as course_svc
 from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
 from services import writing as writing_svc
+from services.cefr import PRE_A1
 from services.context import build_lesson_prompt
 from services.curriculum import (
     ASSESSMENT_VERSION,
@@ -627,7 +628,13 @@ async def get_cefr_ladder(user_id: str) -> dict:
     fw = cefr_descriptors.load_framework()
     sm = await build_student_model(user_id)
     numeric = float(sm["estimated_numeric"])
-    estimated_band = cefr_descriptors.band_for_numeric(numeric)
+    # Sin evidencia el nivel estimado es `Pre-A1`: la escalera lo marca como banda
+    # actual aunque `numeric` se mantenga en el suelo (1.0) de la escala continua.
+    estimated_band = (
+        "pre-a1"
+        if sm["estimated_level"] == PRE_A1
+        else cefr_descriptors.band_for_numeric(numeric)
+    )
     dims = cefr_descriptors.dimensions()
     mastery = [m.model_dump() for m in sm["mastery"]]
     return {

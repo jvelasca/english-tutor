@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { bandLabel, cefrLabel, cefrTone } from "./cefr";
 
 describe("cefrTone", () => {
-  it("maps A1/A2 to basic", () => {
+  it("maps Pre-A1/A1/A2 to basic", () => {
+    expect(cefrTone("Pre-A1")).toBe("basic");
     expect(cefrTone("A1")).toBe("basic");
     expect(cefrTone("A2")).toBe("basic");
   });
@@ -24,6 +25,7 @@ describe("cefrTone", () => {
 
 describe("cefrLabel", () => {
   it("maps each level to an English label", () => {
+    expect(cefrLabel("Pre-A1")).toBe("Pre-beginner");
     expect(cefrLabel("A1")).toBe("Beginner");
     expect(cefrLabel("A2")).toBe("Elementary");
     expect(cefrLabel("B1")).toBe("Intermediate");

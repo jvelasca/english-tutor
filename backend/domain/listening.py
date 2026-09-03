@@ -13,11 +13,11 @@ from services.audio_library import is_recorded, recorded_audio_path
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
     AUDIO_VARIANTS,
+    LEVEL_ORDER,
     PRODUCTION_PASS_SCORE,
     audio_digest,
     audio_text,
     audio_variants,
-    current_level,
     difficulty_from_vector,
     get_question,
     level_status,
@@ -28,9 +28,13 @@ from services.listening import (
     realization_status,
     realized_difficulty,
     review_next_question,
+    route_gate,
     score_answer,
     spoken_text,
     variant_length_scale,
+)
+from services.listening import (
+    level_items as motor_level_items,
 )
 
 
@@ -80,25 +84,56 @@ def _public(question: dict) -> dict:
     return out
 
 
-async def next_question(user_id: str, level: str | None = None) -> dict:
+async def next_question(
+    user_id: str, level: str | None = None, mode: str = "all"
+) -> dict:
     """Siguiente pregunta consumiendo el Student Model (sub-destrezas débiles).
 
     El selector prioriza, dentro del nivel de trabajo del alumno, las sub-destrezas
     que el diagnóstico marca como débiles, con selección consciente de la
     realización auditiva (no entrena una sub-destreza con audio que no la respalda).
 
-    Con `level` (repaso de un nivel ya completado) se ignora el Student Model y se
-    rota por las frases de ese nivel sin repetirlas hasta completar una vuelta.
+    Con `level` (repaso de un nivel) se ignora el Student Model y se rota por las
+    frases de ese nivel sin repetirlas hasta completar una vuelta. `mode="failed"`
+    (drill) restringe la rotación a las frases del nivel intentadas pero nunca
+    acertadas; si no quedan, `review_next_question` lanza `ValueError`.
     """
     if level is not None:
         attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
-        return _public(review_next_question(level, attempts))
+        return _public(
+            review_next_question(level, attempts, only_failed=mode == "failed")
+        )
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
     correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
     weak = listening_diagnostic(attempts)["weak"]
     question = pick_next_question(seen, correct, weak_subskills=weak)
     return _public(question)
+
+
+async def level_items(user_id: str, level: str) -> dict:
+    """Estado por frase de un nivel (panel del alumno) + contadores resumen.
+
+    `mastered`/`failed`/`unseen` reflejan la práctica por frase; `completed` ya no
+    es "todo dominado": es la puerta de ruta del nivel (`route_gate`), de modo que
+    el panel distingue dominar frases de superar la ruta."""
+    attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
+    items = motor_level_items(level, attempts)
+    mastered = sum(1 for i in items if i["state"] == "mastered")
+    failed = sum(1 for i in items if i["state"] == "failed")
+    unseen = sum(1 for i in items if i["state"] == "unseen")
+    total = len(items)
+    gate = route_gate(level, attempts)
+    return {
+        "level": level,
+        "total": total,
+        "mastered": mastered,
+        "failed": failed,
+        "unseen": unseen,
+        "completed": gate["passed"],
+        "items": items,
+        "gate": gate,
+    }
 
 
 async def submit_answer(
@@ -195,9 +230,13 @@ async def submit_production(
 
 async def get_stats(user_id: str) -> dict:
     stats = await run_in_threadpool(listening_repo.get_stats, user_id)
-    correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
-    levels = level_status(correct)
-    stats["level"] = current_level(correct)
+    attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
+    levels = level_status(attempts)
+    # La ruta actual es la primera aún no superada por la puerta (certificación
+    # honesta), no la primera con ítems sin acertar: cubrir el banco no basta.
+    stats["level"] = next(
+        (s["level"] for s in levels if not s["completed"]), LEVEL_ORDER[-1]
+    )
     stats["completed"] = all(s["completed"] for s in levels)
     stats["levels"] = levels
     return stats

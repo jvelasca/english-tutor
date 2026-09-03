@@ -8,6 +8,7 @@ from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
 from services.cefr import (
     MIN_SAMPLES,
+    PRE_A1,
     TRACKED_SKILLS,
     estimate_cefr,
     evaluate_cefr,
@@ -25,18 +26,19 @@ def _setup(monkeypatch, tmp_path):
     return users_repo.create_user("A")["id"], users_repo.create_user("B")["id"]
 
 
-def test_evaluate_cefr_no_evidence_is_a1():
+def test_evaluate_cefr_no_evidence_is_pre_a1():
+    # Sin ninguna destreza con muestras suficientes el nivel honesto es Pre-A1.
     result = evaluate_cefr({"vocab_size": 0, "pronunciation_avg": None})
-    assert result["level"] == "A1"
+    assert result["level"] == PRE_A1
     assert result["confidence"] == 0.0
 
 
 def test_evaluate_cefr_level_is_binding_weakest_evidenced():
-    # vocabulario B1 (200 ≥ 50) y fluidez B2 (60 ≥ 5) son la única evidencia;
-    # la banda más baja de las evidenciadas (B1) limita el nivel.
+    # vocabulario B1 (1000 >= 50 muestras) y fluidez B2 (60 >= 5) son la única
+    # evidencia; la banda más baja de las evidenciadas (B1) limita el nivel.
     result = evaluate_cefr(
         {
-            "vocab_size": 200,
+            "vocab_size": 1000,
             "pronunciation_avg": 75,
             "pronunciation_attempts": 0,
             "grammar_error_rate": 0.02,
@@ -50,11 +52,21 @@ def test_evaluate_cefr_level_is_binding_weakest_evidenced():
     assert result["bands"]["vocabulary"] == "B1"
 
 
+def test_evaluate_cefr_vocab_below_a1_is_pre_a1_evidenced():
+    # 80 palabras producidas superan el mínimo de muestras (50) pero no llegan al
+    # umbral de A1 (150): la banda evidenciada es Pre-A1 y limita el nivel, con
+    # confianza parcial > 0.
+    result = evaluate_cefr({"vocab_size": 80})
+    assert result["level"] == PRE_A1
+    assert result["bands"]["vocabulary"] == PRE_A1
+    assert 0.0 < result["confidence"] < 1.0
+
+
 def test_evaluate_cefr_all_evidenced_uses_weakest_band():
     # Todas las destrezas con muestras suficientes: el nivel es la banda más baja.
     result = evaluate_cefr(
         {
-            "vocab_size": 1000,  # C1
+            "vocab_size": 1000,  # B1
             "pronunciation_avg": 95,  # B2
             "pronunciation_attempts": 3,
             "grammar_error_rate": 0.02,  # B2
@@ -64,13 +76,13 @@ def test_evaluate_cefr_all_evidenced_uses_weakest_band():
             "listening_attempts": 5,
         }
     )
-    assert result["level"] == "B2"
+    assert result["level"] == "B1"
     assert result["confidence"] == 1.0
 
 
 def test_evaluate_cefr_partial_confidence_below_one():
     result = evaluate_cefr({"vocab_size": 1000, "pronunciation_avg": None})
-    assert result["level"] == "C1"  # solo vocabulario evidenciado (C1)
+    assert result["level"] == "B1"  # solo vocabulario evidenciado (B1)
     assert 0.0 < result["confidence"] < 1.0
 
 
@@ -94,13 +106,22 @@ def test_evaluate_cefr_bands_and_descriptor():
     assert result["descriptor"]
 
 
+def test_evaluate_cefr_pre_a1_has_descriptor():
+    assert evaluate_cefr({"vocab_size": 0})["descriptor"]
+
+
 def test_vocabulary_band_thresholds():
-    assert vocabulary_band(0) == "A1"
-    assert vocabulary_band(60) == "A2"
-    assert vocabulary_band(200) == "B1"
-    assert vocabulary_band(500) == "B2"
-    assert vocabulary_band(1000) == "C1"
-    assert vocabulary_band(2500) == "C2"
+    # A1 ya no se alcanza con un puñado de palabras: por debajo de 150 la banda
+    # evidenciada es Pre-A1.
+    assert vocabulary_band(0) == PRE_A1
+    assert vocabulary_band(149) == PRE_A1
+    assert vocabulary_band(150) == "A1"
+    assert vocabulary_band(300) == "A1"
+    assert vocabulary_band(400) == "A2"
+    assert vocabulary_band(900) == "B1"
+    assert vocabulary_band(1900) == "B2"
+    assert vocabulary_band(3000) == "C1"
+    assert vocabulary_band(5000) == "C2"
 
 
 def test_grammar_band_unknown():

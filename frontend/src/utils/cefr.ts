@@ -8,6 +8,8 @@ export function cefrTone(level: string): CefrTone {
 
 export function cefrLabel(level: string): string {
   switch (level) {
+    case "Pre-A1":
+      return "Pre-beginner";
     case "A1":
       return "Beginner";
     case "A2":

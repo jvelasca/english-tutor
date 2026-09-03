@@ -184,7 +184,22 @@ PLACEMENT_VERSION = "2.0.0"  # motor de placement adaptativo (IRT-lite/1PL multi
 RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
 SPEAKING_SCENARIOS_VERSION = "3.0.0"  # escenarios comunicativos (26 escenarios)
-LISTENING_BANK_VERSION = "6.0.0"  # listening: TTS 8D + corpus de audio (140)
+LISTENING_BANK_VERSION = "7.0.0"  # listening: TTS 8D + corpus (A1/A2 → 200)
+
+# Objetivos de expansión del corpus de listening por nivel (Fase 3 — calibración
+# pedagógica). Son la *configuración* del pipeline
+# `scripts/generate_listening_corpus.py`:
+# valores iniciales orientativos según CEFR/Cambridge (cientos de ítems por nivel).
+# Cada nivel se completa por tranches (A1/A2 primero); un nivel cuyo target no se
+# haya alcanzado aún queda pendiente de su siguiente tranche.
+LISTENING_CORPUS_TARGETS: dict[str, int] = {
+    "A1": 200,
+    "A2": 200,
+    "B1": 180,
+    "B2": 160,
+    "C1": 120,
+    "C2": 100,
+}
 
 CURRICULUM_DIR = Path(__file__).resolve().parent.parent / "curriculum"
 

@@ -1,10 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Speaking 2.0 (V1.34): verifica que el diagnóstico de speaking renderiza la
- * insignia "proxy" de pronunciación, el desglose de Interaction Quality y los
- * hitos de Conversation Endurance. Se mockea la API con `page.route` para
- * obtener datos deterministas sin depender de evidencia real en la BD.
+ * Speaking 2.0 en MI PROGRESO (V3.1): el contenido que vivía en la pestaña
+ * "Speaking" del antiguo panel Analysis ahora se muestra en `#/progreso` →
+ * pestaña "Tracks" (Recorridos) → sub-pestaña "Speaking". Verifica que el
+ * diagnóstico renderiza la insignia "proxy" de pronunciación, el desglose de
+ * Interaction Quality y los hitos de Conversation Endurance. Se mockea la API
+ * con `page.route` para obtener datos deterministas sin depender de evidencia
+ * real en la BD (el resto de llamadas degradan sin romper la pantalla).
  */
 
 const DIAGNOSTIC = {
@@ -60,8 +63,8 @@ const ENDURANCE = {
 };
 
 async function mockApi(page: import("@playwright/test").Page) {
-  // Un único usuario para que la app lo auto-seleccione y el diagnóstico
-  // (dependiente de `user_id`) se dispare.
+  // Un único usuario para que la app lo auto-seleccione y el shell de pestañas
+  // de MI PROGRESO se renderice aunque el resto de llamadas falle.
   await page.route("**/api/users", (route) =>
     route.fulfill({
       json: [{ id: "u1", name: "Test", created_at: "2026-01-01T00:00:00Z" }],
@@ -75,20 +78,30 @@ async function mockApi(page: import("@playwright/test").Page) {
   );
 }
 
-async function openSpeakingTab(page: import("@playwright/test").Page) {
-  await page.goto("/");
-  await expect(page.getByRole("navigation")).toBeVisible({ timeout: 15_000 });
-  await page.waitForTimeout(800);
-  await page
-    .getByRole("navigation")
-    .getByRole("button", { name: "Learn", exact: true })
+/** Abre MI PROGRESO → pestaña "Tracks" → sub-pestaña "Speaking". */
+async function openSpeakingTrack(
+  page: import("@playwright/test").Page,
+): Promise<import("@playwright/test").Locator> {
+  await page.goto("/#/progreso");
+
+  // Pestaña de progreso "Tracks" (progress.tracksTab = en "Tracks").
+  const progressTabs = page.getByRole("tablist", {
+    name: "Progress sections",
+  });
+  await expect(progressTabs).toBeVisible({ timeout: 15_000 });
+  await progressTabs
+    .getByRole("tab", { name: "Tracks", exact: true })
     .click();
 
-  const tablist = page.getByRole("tablist", { name: "Analysis" });
-  await expect(tablist).toBeVisible({ timeout: 15_000 });
-  await tablist
-    .getByRole("tab", { name: "Speaking", exact: true })
-    .click();
+  // Sub-pestañas de Recorridos: "Speaking" (skill.speaking = en "Speaking").
+  const tracks = page.getByRole("tablist", { name: "Tracks" });
+  await expect(tracks).toBeVisible({ timeout: 15_000 });
+  await tracks.getByRole("tab", { name: "Speaking", exact: true }).click();
+
+  // Sección que agrupa SpeakingDiagnostic + SpeakingPanel (panels.speaking).
+  const section = page.getByRole("region", { name: "Speaking", exact: true });
+  await expect(section).toBeVisible({ timeout: 15_000 });
+  return section;
 }
 
 test("desktop: Speaking 2.0 muestra proxy, Interaction Quality y Endurance", async ({
@@ -97,22 +110,22 @@ test("desktop: Speaking 2.0 muestra proxy, Interaction Quality y Endurance", asy
   test.skip(page.viewportSize()!.width < 1024, "Solo desktop");
 
   await mockApi(page);
-  await openSpeakingTab(page);
+  const section = await openSpeakingTrack(page);
 
-  // Insignia "proxy" en el criterio de pronunciación.
-  await expect(page.getByText("proxy", { exact: true })).toBeVisible({
+  // Insignia "proxy" en el criterio de pronunciación (diag.proxy).
+  await expect(section.getByText("proxy", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
 
   // Desglose de Interaction Quality (título + sub-dimensiones).
-  await expect(page.getByText("Interaction quality")).toBeVisible();
-  await expect(page.getByText("Initiation")).toBeVisible();
-  await expect(page.getByText("Follow-up")).toBeVisible();
-  await expect(page.getByText("Turn-taking")).toBeVisible();
+  await expect(section.getByText("Interaction quality")).toBeVisible();
+  await expect(section.getByText("Initiation")).toBeVisible();
+  await expect(section.getByText("Follow-up")).toBeVisible();
+  await expect(section.getByText("Turn-taking")).toBeVisible();
 
   // Conversation Endurance (título + turnos + hitos).
-  await expect(page.getByText("Conversation endurance")).toBeVisible();
-  await expect(page.getByText(/spoken turns/)).toBeVisible();
-  await expect(page.getByText("30s", { exact: true })).toBeVisible();
-  await expect(page.getByText("3m 0s", { exact: true })).toBeVisible();
+  await expect(section.getByText("Conversation endurance")).toBeVisible();
+  await expect(section.getByText(/spoken turns/)).toBeVisible();
+  await expect(section.getByText("30s", { exact: true })).toBeVisible();
+  await expect(section.getByText("3m 0s", { exact: true })).toBeVisible();
 });

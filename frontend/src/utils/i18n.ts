@@ -14,12 +14,8 @@ type Entry = { en: string; es: string };
 const STRINGS: Record<string, Entry> = {
   // Navegación principal
   "nav.home": { en: "Home", es: "Inicio" },
+  "nav.formation": { en: "Course", es: "Formación" },
   "nav.learn": { en: "Learn", es: "Aprender" },
-  "nav.course": { en: "Course", es: "Curso" },
-  "nav.progress": { en: "Progress", es: "Progreso" },
-  "nav.journey": { en: "Journey", es: "Trayecto" },
-  "nav.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
-  "nav.chat": { en: "Chat", es: "Chat" },
 
   // Destrezas
   "skill.listening": { en: "Listening", es: "Listening" },
@@ -29,6 +25,49 @@ const STRINGS: Record<string, Entry> = {
   "skill.grammar": { en: "Grammar", es: "Gramática" },
   "skill.pronunciation": { en: "Pronunciation", es: "Pronunciación" },
   "skill.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
+
+  // Aprender (hub de práctica libre, V3.1)
+  "learn.title": { en: "Learn", es: "Aprender" },
+  "learn.subtitle": {
+    en: "Free practice that adapts to you — choose what you want to work on.",
+    es: "Práctica libre que se adapta a ti — elige en qué quieres trabajar.",
+  },
+  "learn.pickActivity": {
+    en: "What would you like to practice today?",
+    es: "¿Qué quieres practicar hoy?",
+  },
+  "learn.recommended": { en: "Recommended for you", es: "Recomendado para ti" },
+  "learn.back": { en: "Back to Learn", es: "Volver a Aprender" },
+  "learn.conversation": { en: "Conversation", es: "Conversar" },
+  "learn.desc.listening": {
+    en: "Level-by-level listening exercises with instant feedback.",
+    es: "Ejercicios de listening por niveles con feedback inmediato.",
+  },
+  "learn.desc.speaking": {
+    en: "Real-life scenarios and missions with structured feedback.",
+    es: "Escenarios reales y misiones con feedback estructurado.",
+  },
+  "learn.desc.pronunciation": {
+    en: "Read aloud and get instant feedback on your accent.",
+    es: "Lee en voz alta y recibe feedback inmediato sobre tu acento.",
+  },
+  "learn.desc.conversation": {
+    en: "Chat with the tutor and keep your conversation history.",
+    es: "Conversa con el tutor y conserva el historial de conversaciones.",
+  },
+  "learn.desc.vocabulary": {
+    en: "Your personal dictionary, word by word.",
+    es: "Tu diccionario personal, palabra a palabra.",
+  },
+  "learn.desc.grammar": {
+    en: "Write sentences and get grammar corrections and feedback.",
+    es: "Escribe frases y recibe correcciones y feedback de gramática.",
+  },
+  "learn.speakingSubtitle": {
+    en: "Free speaking practice: choose a scenario or run a mission.",
+    es: "Práctica oral libre: elige un escenario o lanza una misión.",
+  },
+  "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
 
   // Grupos de destrezas
   "group.primary": { en: "Primary skills", es: "Destrezas principales" },
@@ -41,10 +80,6 @@ const STRINGS: Record<string, Entry> = {
   "home.morning": { en: "Good morning", es: "Buenos días" },
   "home.afternoon": { en: "Good afternoon", es: "Buenas tardes" },
   "home.evening": { en: "Good evening", es: "Buenas noches" },
-  "home.subtitle": {
-    en: "Continue your English journey.",
-    es: "Continúa tu camino con el inglés.",
-  },
   "home.nextStep": { en: "Today's next step", es: "El siguiente paso de hoy" },
   "home.continue": { en: "Continue", es: "Continuar" },
   "home.whyThisActivity": { en: "Why?", es: "¿Por qué?" },
@@ -54,27 +89,11 @@ const STRINGS: Record<string, Entry> = {
     es: "Factor limitante",
   },
   "home.missing": { en: "missing", es: "falta" },
-  "home.start": { en: "Start", es: "Empezar" },
-  "home.review": { en: "Review", es: "Repasar" },
-  "home.today": { en: "Today", es: "Hoy" },
   "home.yourProgress": { en: "Your progress", es: "Tu progreso" },
-  "home.readyFor": {
-    en: "Ready for the next level",
-    es: "Preparación para el siguiente nivel",
-  },
   "home.nextFocus": { en: "Next focus", es: "Siguiente foco" },
   "home.practiceNow": { en: "Practice now", es: "Practicar ahora" },
-  "home.yourSkills": { en: "Your skills", es: "Tus destrezas" },
   "home.streak": { en: "day streak", es: "días de racha" },
-  "home.bestStreak": { en: "best streak", es: "mejor racha" },
-  "home.activity": { en: "recent activity", es: "actividad reciente" },
-  "home.improving": { en: "Improving", es: "Mejorando" },
-  "home.stable": { en: "Stable", es: "Estable" },
-  "home.needsReview": { en: "Needs review", es: "Repasar" },
   "home.min": { en: "min", es: "min" },
-  "home.reviewN": { en: "review", es: "repasa" },
-  "home.practiceN": { en: "practice", es: "practica" },
-  "home.youAreHere": { en: "You are here", es: "Estás aquí" },
   "home.allDone": {
     en: "All done for today. Great work!",
     es: "Todo hecho por hoy. ¡Buen trabajo!",
@@ -84,13 +103,22 @@ const STRINGS: Record<string, Entry> = {
     es: "Ahora mismo no se ha podido cargar tu siguiente paso.",
   },
   "home.retry": { en: "Try again", es: "Reintentar" },
-
-  // Categorías de sesión
-  "kind.weakness": { en: "Weakness", es: "Debilidad" },
-  "kind.review": { en: "Review", es: "Repaso" },
-  "kind.listening": { en: "Listening", es: "Listening" },
-  "kind.new": { en: "New", es: "Nuevo" },
-  "kind.easyWins": { en: "Boost", es: "Refuerzo" },
+  "home.todayGoal": {
+    en: "Your goal today",
+    es: "Tu objetivo de hoy",
+  },
+  "home.recommended": {
+    en: "Recommended for you",
+    es: "Recomendado para ti",
+  },
+  "home.seeProgress": {
+    en: "See my progress",
+    es: "Ver mi progreso",
+  },
+  "home.reviewUnavailable": {
+    en: "Review isn't available right now.",
+    es: "El repaso no está disponible ahora.",
+  },
 
   // Razones de la siguiente actividad
   "reason.due_for_review": { en: "Due for review", es: "Repaso pendiente" },
@@ -100,13 +128,57 @@ const STRINGS: Record<string, Entry> = {
   "reason.confidence_boost": { en: "Confidence boost", es: "Refuerzo de confianza" },
 
   // Progress
-  "progress.title": { en: "Your progress", es: "Tu progreso" },
+  "progress.title": { en: "My progress", es: "Mi progreso" },
   "progress.overall": { en: "Overall", es: "General" },
-  "progress.mainFocus": { en: "Main focus", es: "Foco principal" },
-  "progress.seeDetails": { en: "See details", es: "Ver detalles" },
-  "progress.improving": { en: "Improving", es: "Mejorando" },
-  "progress.stable": { en: "Stable", es: "Estable" },
-  "progress.needsReview": { en: "Needs review", es: "Repasar" },
+
+  // MI PROGRESO V3.1 — pantalla de 5 pestañas (docs/UI_V3.1.md §4.4)
+  "progress.subtitle": {
+    en: "How you're learning English, at a glance.",
+    es: "Cómo estás aprendiendo inglés, de un vistazo.",
+  },
+  "progress.overviewTab": { en: "Overview", es: "Resumen" },
+  "progress.courseTab": { en: "Course", es: "Curso" },
+  "progress.skillsTab": { en: "Skills", es: "Habilidades" },
+  "progress.journeyTab": { en: "Journey", es: "Trayectoria" },
+  "progress.tracksTab": { en: "Tracks", es: "Recorridos" },
+  "progress.tabAria": {
+    en: "Progress sections",
+    es: "Secciones de mi progreso",
+  },
+  "progress.continueFormation": {
+    en: "Continue in Course",
+    es: "Continuar en Formación",
+  },
+  "progress.currentCourseLevel": {
+    en: "Current course level",
+    es: "Nivel actual del curso",
+  },
+  "progress.unitsCompleted": {
+    en: "Units completed",
+    es: "Unidades completadas",
+  },
+  "progress.nextUp": { en: "Next up", es: "Lo que sigue" },
+  "progress.levelComplete": {
+    en: "This level is complete.",
+    es: "Este nivel está completo.",
+  },
+  "progress.limitingSkill": {
+    en: "Limiting skill",
+    es: "Destreza limitante",
+  },
+  "progress.skillsHint": {
+    en: "All your skills, from your latest model. Expand a skill for its detail.",
+    es: "Todas tus destrezas, según tu modelo más reciente. Expande una para ver su detalle.",
+  },
+  "progress.tracksIntro": {
+    en: "Your evolution across each practice route.",
+    es: "Tu evolución en cada recorrido de práctica.",
+  },
+  "progress.assessmentTab": { en: "Assessment", es: "Evaluación" },
+  "progress.activityTitle": {
+    en: "Recent activity",
+    es: "Actividad reciente",
+  },
   "mastery.strong": { en: "Strong", es: "Fuerte" },
   "mastery.developing": { en: "Developing", es: "En desarrollo" },
   "mastery.needsPractice": { en: "Needs practice", es: "Necesita práctica" },
@@ -128,30 +200,20 @@ const STRINGS: Record<string, Entry> = {
     en: "of practiced skills",
     es: "de destrezas practicadas",
   },
-  "triad.readinessHint": { en: "to next level", es: "hacia el siguiente nivel" },
 
   // Course
   "course.title": { en: "Your English journey", es: "Tu viaje en inglés" },
   "course.subtitle": { en: "CEFR curriculum", es: "Currículum CEFR" },
   "course.mastered": { en: "mastered", es: "dominados" },
   "course.continue": { en: "Continue", es: "Continuar" },
-  "course.placementTest": { en: "Placement test", es: "Test de nivel" },
-  "course.finalExam": { en: "Final exam", es: "Examen final" },
-  "course.back": { en: "Back", es: "Volver" },
   "course.you": { en: "You", es: "Tú" },
   "course.milestones": { en: "milestones", es: "hitos" },
   "course.completed": { en: "Completed", es: "Completado" },
   "course.inProgress": { en: "In progress", es: "En curso" },
-  "course.notStarted": { en: "Not started", es: "Sin empezar" },
   "course.locked": { en: "Locked", es: "Bloqueado" },
   "course.cefrLevel": { en: "CEFR level", es: "Nivel CEFR" },
-  "course.canDo": { en: "What you can do", es: "Qué puedes hacer" },
-  "course.youAreHere": { en: "You are here", es: "Estás aquí" },
-  "course.whereAmI": { en: "Where am I?", es: "¿Dónde estoy?" },
   "course.unit": { en: "Unit", es: "Unidad" },
-  "course.lesson": { en: "Lesson", es: "Lección" },
   "course.currentLesson": { en: "Current lesson", es: "Lección actual" },
-  "course.review": { en: "Review", es: "Repasar" },
   "course.byTheEnd": {
     en: "By the end of this unit you will be able to…",
     es: "Al terminar esta unidad serás capaz de…",
@@ -161,6 +223,15 @@ const STRINGS: Record<string, Entry> = {
   "course.unitMastered": { en: "Unit mastered", es: "Unidad dominada" },
   "course.masteryGate": { en: "Mastery gate", es: "Puerta de dominio" },
   "course.gates": { en: "gates met", es: "requisitos cumplidos" },
+  "course.myLevel": { en: "My level", es: "Mi nivel" },
+  "course.continueCourse": { en: "Continue course", es: "Continuar curso" },
+  "course.levelComplete": { en: "Level completed", es: "Nivel completado" },
+  "course.lockedHint": {
+    en: "Complete the previous level to unlock it.",
+    es: "Completa el nivel anterior para desbloquearlo.",
+  },
+  "course.units": { en: "Units", es: "Unidades" },
+  "course.evaluations": { en: "Evaluations", es: "Evaluaciones" },
   "section.interaction": { en: "Interaction", es: "Interacción" },
   "section.review": { en: "Review", es: "Repaso" },
   "section.assessment": { en: "Assessment", es: "Evaluación" },
@@ -172,19 +243,10 @@ const STRINGS: Record<string, Entry> = {
     es: "Tu recorrido por los niveles CEFR",
   },
   "journey.you": { en: "You", es: "Tú" },
-  "journey.currentLevel": { en: "Current level", es: "Nivel actual" },
   "journey.unitsMastered": { en: "Units mastered", es: "Unidades dominadas" },
   "journey.skillsReady": { en: "Skills ready", es: "Destrezas listas" },
   "journey.retention": { en: "Retention", es: "Retención" },
   "journey.nextMilestone": { en: "Next milestone", es: "Próximo hito" },
-  "journey.nextMilestoneHint": {
-    en: "What you reach next",
-    es: "Lo que alcanzas después",
-  },
-  "journey.dimensions": {
-    en: "Communicative dimensions",
-    es: "Dimensiones comunicativas",
-  },
   "journey.empty": {
     en: "Complete a few activities to start your journey.",
     es: "Completa algunas actividades para iniciar tu trayecto.",
@@ -232,16 +294,12 @@ const STRINGS: Record<string, Entry> = {
   "settings.appearance": { en: "Appearance", es: "Apariencia" },
   "settings.audio": { en: "Audio", es: "Audio" },
   "settings.ai": { en: "AI model", es: "Modelo IA" },
-  "settings.advanced": { en: "Advanced", es: "Avanzado" },
   "settings.system": { en: "System", es: "Sistema" },
   "settings.interfaceLanguage": {
     en: "Interface language",
     es: "Idioma de la interfaz",
   },
   "settings.model": { en: "AI model", es: "Modelo IA" },
-  "settings.back": { en: "Back", es: "Volver" },
-  "settings.version": { en: "Version", es: "Versión" },
-  "settings.lanUrl": { en: "LAN URL", es: "URL LAN" },
 
   // Estado del sistema
   "status.ready": { en: "Ready", es: "Listo" },
@@ -268,7 +326,6 @@ const STRINGS: Record<string, Entry> = {
   "backup.list": { en: "Stored backups", es: "Copias guardadas" },
   "backup.empty": { en: "No backups yet", es: "Aún no hay copias" },
   "backup.restoreTitle": { en: "Restore from file", es: "Restaurar desde archivo" },
-  "backup.restore": { en: "Restore", es: "Restaurar" },
   "backup.chooseFile": { en: "Choose backup (.zip)", es: "Elegir copia (.zip)" },
   "backup.created": { en: "Backup created", es: "Copia creada" },
   "backup.restored": { en: "Backup restored", es: "Copia restaurada" },
@@ -335,7 +392,6 @@ const STRINGS: Record<string, Entry> = {
     es: "PIN de administración incorrecto.",
   },
   "audio.qa.title": { en: "AUDIO QUALITY", es: "CALIDAD DEL AUDIO" },
-  "audio.qa.grade": { en: "Grade", es: "Dictamen" },
   "audio.qa.duration": { en: "Duration", es: "Duración" },
   "audio.qa.sampleRate": { en: "Sample rate", es: "Frecuencia" },
   "audio.qa.channels": { en: "Channels", es: "Canales" },
@@ -344,7 +400,6 @@ const STRINGS: Record<string, Entry> = {
   "audio.qa.silence": { en: "Silence", es: "Silencio" },
   "audio.qa.dc": { en: "DC offset", es: "Offset DC" },
   "audio.audit.title": { en: "CONTENT INTEGRITY CHECK", es: "CHEQUEO DE INTEGRIDAD DEL CONTENIDO" },
-  "audio.audit.ok": { en: "All checks passed.", es: "Todas las comprobaciones pasaron." },
   "audio.audit.fail": { en: "Issues found.", es: "Se encontraron problemas." },
   "audio.audit.items": { en: "Items", es: "Ítems" },
   "audio.audit.recorded": { en: "Recorded", es: "Grabados" },
@@ -371,11 +426,7 @@ const STRINGS: Record<string, Entry> = {
   // Común
   "common.loading": { en: "Loading…", es: "Cargando…" },
   "common.close": { en: "Close", es: "Cerrar" },
-  "common.back": { en: "Back", es: "Volver" },
   "common.done": { en: "Done", es: "Hecho" },
-  "common.next": { en: "Next", es: "Siguiente" },
-  "common.completed": { en: "Completed", es: "Completado" },
-  "common.great": { en: "Great.", es: "Genial." },
   "common.cancel": { en: "Cancel", es: "Cancelar" },
   "common.save": { en: "Save", es: "Guardar" },
   "common.saving": { en: "Saving…", es: "Guardando…" },
@@ -411,52 +462,49 @@ const STRINGS: Record<string, Entry> = {
 
   // Ayuda
   "help.title": { en: "Help", es: "Ayuda" },
+  "help.subtitle": {
+    en: "A short guide to the three areas. For the full technical documentation, visit the project docs.",
+    es: "Una guía breve de los tres mundos. Para la documentación técnica completa, consulta los docs del proyecto.",
+  },
   "help.viewDocs": { en: "View documentation", es: "Ver en la documentación" },
   "help.documentation": { en: "Documentation", es: "Documentación" },
-  "help.author": {
-    en: "Author: José Alberto Velasco · josealberto.vel@gmail.com",
-    es: "Autor: José Alberto Velasco · josealberto.vel@gmail.com",
-  },
   "help.what.title": { en: "What is English Tutor?", es: "¿Qué es English Tutor?" },
   "help.what.body": {
-    en: "An English tutor that converses with you by text or voice. It runs 100% on your computer, with no internet or accounts: your privacy is guaranteed.",
-    es: "Un profesor de inglés que conversa contigo por texto o voz. Funciona 100% en tu ordenador, sin Internet ni cuentas: tu privacidad está garantizada.",
+    en: "An English tutor that runs 100% on your computer — no internet, accounts or cloud. The app is organised into three areas: Inicio (daily plan and recommendations), Formación (guided CEFR course from A1 to C2) and Aprender (free practice).",
+    es: "Un profesor de inglés que funciona 100% en tu ordenador, sin Internet, cuentas ni nube. La app se organiza en tres mundos: INICIO (plan del día y recomendaciones), FORMACIÓN (curso CEFR guiado de A1 a C2) y APRENDER (práctica libre).",
   },
   "help.start.title": { en: "Getting started", es: "Cómo empezar" },
   "help.start.body": {
-    en: "Choose your profile in the top right and type or tap the microphone. You can change practice mode at any time.",
-    es: "Elige tu perfil arriba a la derecha y escribe o pulsa el micrófono. Puedes cambiar de modo de práctica en cualquier momento.",
+    en: "Choose a profile in the header and speak or type in any conversation. Use Formación to follow the course level by level, Aprender to practise a skill freely, and Inicio to pick up your daily goal and review.",
+    es: "Elige un perfil en la cabecera y habla o escribe en cualquier conversación. Usa FORMACIÓN para seguir el curso nivel a nivel, APRENDER para practicar una destreza libremente e INICIO para retomar tu objetivo del día y el repaso.",
   },
-  "help.modes.title": { en: "Practice modes", es: "Modos de práctica" },
+  "help.modes.title": { en: "The three areas", es: "Los tres mundos" },
   "help.modes.body": {
-    en: "Conversation (chat freely), Grammar (correct sentences), Exercises (guided practice) and Pronunciation (speak and measure your accent).",
-    es: "Conversación (charlar libre), Gramática (corregir frases), Ejercicios (práctica guiada) y Pronunciación (hablar y medir tu acento).",
+    en: "Inicio is your day-to-day command centre: today's goal, pending review and what to do next. Formación is the structured CEFR course with units and assessments. Aprender groups all free practice: listening, speaking, pronunciation, conversation, vocabulary, grammar and adaptive review.",
+    es: "INICIO es tu centro de mando diario: objetivo de hoy, repaso pendiente y siguiente paso recomendado. FORMACIÓN es el curso CEFR estructurado, con unidades y evaluaciones. APRENDER agrupa toda la práctica libre: listening, speaking, pronunciación, conversación, vocabulario, gramática y repaso adaptativo.",
   },
   "help.course.title": { en: "CEFR course", es: "Curso CEFR" },
   "help.course.body": {
-    en: "A journey through levels (A1, A2, B1…) with objectives, quick assessments and a final exam. You advance level by level at your own pace.",
-    es: "Un recorrido por niveles (A1, A2, B1…) con objetivos, evaluaciones rápidas y un examen final. Avanzas nivel a nivel a tu ritmo.",
+    en: "A guided path through the six CEFR levels (A1, A2, B1, B2, C1, C2). Each level is divided into units with objectives; you unlock units and take assessments as you progress, at your own pace.",
+    es: "Un camino guiado por los seis niveles CEFR (A1, A2, B1, B2, C1, C2). Cada nivel se divide en unidades con objetivos; desbloqueas unidades y superas evaluaciones a tu ritmo según avanzas.",
   },
   "help.listening.title": { en: "Listening comprehension", es: "Comprensión auditiva" },
   "help.listening.body": {
-    en: "Listen to a sentence, answer the question and pass each level. Your results are saved per profile and tell you when you advance.",
-    es: "Escucha una frase, responde la pregunta y supera cada nivel. Tus aciertos se guardan por perfil y te indican cuándo avanzas.",
+    en: "Listen to real sentences, answer the question and check your accuracy level by level. Practise it on its own in Aprender → Listening or inside your course units.",
+    es: "Escucha frases reales, responde la pregunta y comprueba tu precisión nivel a nivel. Practícalo por libre en APRENDER → Listening o dentro de las unidades del curso.",
   },
   "help.troubleshooting.title": { en: "Common issues", es: "Problemas frecuentes" },
   "help.troubleshooting.body": {
-    en: "If the tutor doesn't respond, make sure Ollama is running. Technical details and the full guide are in the documentation.",
-    es: "Si el profesor no responde, asegúrate de que Ollama esté arrancado. Los detalles técnicos y la guía completa están en la documentación.",
+    en: "If the tutor does not answer, check that Ollama is running. If the microphone or a connected device fails, see the full guide in the project documentation.",
+    es: "Si el profesor no responde, comprueba que Ollama esté arrancado. Si el micrófono o un dispositivo conectado falla, consulta la guía completa en la documentación del proyecto.",
+  },
+  "help.connectTitle": { en: "Use it on your phone or tablet", es: "Usarla en tu móvil o tableta" },
+  "help.connectBody": {
+    en: "To open the app from another device, go to Settings (gear icon at the top) → System → “Scan to connect”. There you will find the QR code and the steps for your platform.",
+    es: "Para abrir la app desde otro dispositivo ve a Ajustes (icono de engranaje, arriba) → Sistema → «Escanea para conectar». Allí encontrarás el código QR y los pasos de tu plataforma.",
   },
 
   // Conectar un dispositivo (LAN / móvil)
-  "connect.title": {
-    en: "Connect a device",
-    es: "Conectar un dispositivo",
-  },
-  "connect.subtitle": {
-    en: "Use English Tutor from your phone or tablet on the same local network.",
-    es: "Usa English Tutor desde tu móvil o tableta en la misma red local.",
-  },
   "connect.cardTitle": { en: "Connect a device", es: "Conectar un dispositivo" },
   "connect.cardSubtitle": {
     en: "Scan with your phone",
@@ -469,10 +517,6 @@ const STRINGS: Record<string, Entry> = {
   "connect.localOnly": {
     en: "Local network only. No internet required.",
     es: "Solo red local. No requiere Internet.",
-  },
-  "connect.trustHelp": {
-    en: "How to connect and trust the certificate",
-    es: "Cómo conectar y confiar el certificado",
   },
   "connect.trustTitle": {
     en: "First connection: trust the local certificate",
@@ -611,6 +655,8 @@ const STRINGS: Record<string, Entry> = {
 
   // Voz / reproducción
   "speak.listen": { en: "Listen to reply", es: "Escuchar respuesta" },
+  "speak.phrase": { en: "Listen to the phrase", es: "Escuchar la frase" },
+  "speak.answer": { en: "Listen to the answer", es: "Escuchar la respuesta" },
   "speak.error": { en: "Error playing: ", es: "Error al reproducir: " },
 
   // Chat / barra lateral
@@ -644,8 +690,6 @@ const STRINGS: Record<string, Entry> = {
   "panels.analysis": { en: "Analysis", es: "Análisis" },
   "panels.closeAnalysis": { en: "Close analysis panel", es: "Cerrar panel de análisis" },
   "panels.openAnalysis": { en: "Open analysis panel", es: "Abrir panel de análisis" },
-  "panels.yourProgress": { en: "Your progress", es: "Tu progreso" },
-  "panels.todayPlan": { en: "Today's plan", es: "Plan de hoy" },
   "panels.yourProfile": { en: "Your profile", es: "Tu perfil" },
   "panels.speaking": { en: "Speaking", es: "Expresión oral" },
   "panels.writing": { en: "Writing", es: "Escritura" },
@@ -885,7 +929,6 @@ const STRINGS: Record<string, Entry> = {
     es: "No se pudo puntuar el assessment.",
   },
 
-  "panels.fsrsReview": { en: "Spaced review", es: "Repaso espaciado" },
   "panels.evidenceGraph": {
     en: "Evidence graph",
     es: "Grafo de evidencia",
@@ -1093,6 +1136,10 @@ const STRINGS: Record<string, Entry> = {
   "listening.loading": { en: "Loading exercise…", es: "Cargando ejercicio…" },
   "listening.playing": { en: "Playing…", es: "Reproduciendo…" },
   "listening.play": { en: "Listen to audio", es: "Escuchar audio" },
+  "listening.audioSettings": {
+    en: "Audio settings",
+    es: "Ajustes de audio",
+  },
   "listening.speed": { en: "Speed:", es: "Velocidad:" },
   "listening.audioUnavailable": {
     en: "Reference audio not available; using live generated voice.",
@@ -1114,7 +1161,34 @@ const STRINGS: Record<string, Entry> = {
   "listening.reference": { en: "Reference", es: "Referencia" },
   "listening.heard": { en: "Heard", es: "Oído" },
   "listening.accuracy": { en: "Accuracy", es: "Precisión" },
-  "listening.currentLevel": { en: "Current level", es: "Nivel actual" },
+  "listening.currentLevel": { en: "Current route", es: "Ruta actual" },
+  "listening.routeLabel": { en: "Route {level}", es: "Ruta {level}" },
+  "listening.routeCompleted": {
+    en: "{level} route completed",
+    es: "Ruta {level} completada",
+  },
+  // Lectura honesta del progreso: completar la ruta de un nivel es un hito de
+  // práctica, no un certificado CEFR. Un nivel CEFR real exige cientos de
+  // palabras y decenas de horas guiadas.
+  "listening.routeNote": {
+    en: "A real CEFR {level} means hundreds of known words and dozens of guided hours. This route trains step by step: finishing it is a practice milestone, not a CEFR certificate.",
+    es: "Un nivel CEFR {level} real implica cientos de palabras y decenas de horas guiadas. Esta ruta entrena paso a paso: completarla es un hito de práctica, no un certificado CEFR.",
+  },
+  // La cobertura completa del banco no certifica la ruta: aún falta la puerta
+  // (precisión y aciertos a la primera).
+  "listening.routePendingCert": {
+    en: "Covered, not certified yet",
+    es: "Cubierta, aún sin certificar",
+  },
+  // Detalle de la puerta de ruta (listening.levelPanelGateIntro + línea numérica).
+  "listening.routeGateIntro": {
+    en: "Mastering the phrases isn't enough to pass this route. To certify {level} you need:",
+    es: "Dominar las frases no basta para superar la ruta. Para certificar {level} necesitas:",
+  },
+  "listening.routeGateLine": {
+    en: "{coverage}% of the bank mastered (≥{coverageRequired}%) · accuracy ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} topics · {checkpoint}/{checkpointRequired} first-try answers",
+    es: "{coverage}% del banco dominado (≥{coverageRequired}%) · precisión ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} temas · {checkpoint}/{checkpointRequired} aciertos a la primera",
+  },
   "listening.diagnostic": {
     en: "Your listening diagnostic",
     es: "Tu diagnóstico de listening",
@@ -1127,25 +1201,24 @@ const STRINGS: Record<string, Entry> = {
     es: "Precisión por dificultad",
   },
   "listening.retries": { en: "Retries", es: "Reintentos" },
-  "listening.seen": { en: "seen", es: "vistos" },
   "listening.recovered": { en: "recovered", es: "recuperados" },
   "listening.retention": { en: "Retention", es: "Retención" },
   "listening.immediate": { en: "immediate", es: "inmediata" },
   "listening.delayed": { en: "delayed", es: "retardada" },
   "listening.completed": {
-    en: "You've completed all listening comprehension levels!",
-    es: "¡Has completado todos los niveles de comprensión auditiva!",
+    en: "You've completed every listening route!",
+    es: "¡Has completado todas las rutas de listening!",
   },
   "listening.next": { en: "Next", es: "Siguiente" },
-  "listening.review": { en: "review", es: "revisar" },
   "listening.speakQuestion": {
     en: "Listen to the question",
     es: "Escuchar la pregunta",
   },
-  "listening.reviewStartLevel": {
-    en: "Review level {level}",
-    es: "Repasar nivel {level}",
+  "listening.levelHistoryTitle": {
+    en: "Level {level} history",
+    es: "Historial del nivel {level}",
   },
+  "listening.skip": { en: "Skip", es: "Saltar" },
   "listening.reviewProgress": {
     en: "Reviewing level {level} · {done}/{total}",
     es: "Repasando nivel {level} · {done}/{total}",
@@ -1161,6 +1234,74 @@ const STRINGS: Record<string, Entry> = {
   "listening.exitReview": {
     en: "Exit review",
     es: "Salir del repaso",
+  },
+  "listening.exitSession": {
+    en: "Exit session",
+    es: "Salir de la sesión",
+  },
+  "listening.drillProgress": {
+    en: "Failed drill · level {level} · {done}/{total} mastered",
+    es: "Drill de falladas · nivel {level} · {done}/{total} dominadas",
+  },
+  "listening.drillDone": {
+    en: "You mastered all {total} failed phrases of level {level}!",
+    es: "¡Has dominado las {total} frases falladas del nivel {level}!",
+  },
+  "listening.drillFinish": {
+    en: "Finish practice",
+    es: "Terminar práctica",
+  },
+  "listening.levelStates.failed": {
+    en: "Failed ({count})",
+    es: "Falladas ({count})",
+  },
+  "listening.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominadas ({count})",
+  },
+  "listening.levelStates.unseen": {
+    en: "Not seen ({count})",
+    es: "Sin ver ({count})",
+  },
+  "listening.levelItemsPhrases": {
+    en: "phrases",
+    es: "frases",
+  },
+  "listening.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} failed · {unseen} unseen",
+    es: "{mastered} dominadas · {failed} falladas · {unseen} sin ver",
+  },
+  "listening.completedShort": {
+    en: "Route completed",
+    es: "Ruta completada",
+  },
+  "listening.levelItemsEmpty": {
+    en: "No phrases in this group yet.",
+    es: "Aún no hay frases en este grupo.",
+  },
+  "listening.repeatFailed": {
+    en: "Repeat failed ({count})",
+    es: "Repetir falladas ({count})",
+  },
+  "listening.practiceLevel": {
+    en: "Practice level {level}",
+    es: "Practicar nivel {level}",
+  },
+  "listening.reviewLevel": {
+    en: "Review level {level}",
+    es: "Repasar nivel {level}",
+  },
+  "listening.levelItemsError": {
+    en: "Could not load the level history.",
+    es: "No se pudo cargar el historial del nivel.",
+  },
+  "listening.levelItemsDifficulty": {
+    en: "difficulty",
+    es: "dificultad",
+  },
+  "listening.levelItemsAttempts": {
+    en: "attempts",
+    es: "intentos",
   },
   "listening.audioGap": {
     en: "This audio realizes difficulty {realized} of the {declared} declared: part of the difficulty is not backed by the audio.",

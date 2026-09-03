@@ -1,7 +1,7 @@
 # B — Listening CEFR Calibration (auditoría V3.0)
 
 - **Fecha:** 2026-09-02
-- **Alcance:** `backend/curriculum/listening_corpus.json` (140 ítems `c001`–`c140`) contra la tabla de referencia `docs/audit/CEFR-REFERENCE.md`. Banco legacy (`l1`–`l23`) fuera de alcance salvo nota.
+- **Alcance:** `backend/curriculum/listening_corpus.json` (490 ítems `c001`–`c490`; A1/A2 → 200 c/u tras la expansión V3.2.0) contra la tabla de referencia `docs/audit/CEFR-REFERENCE.md`. Banco legacy (`l1`–`l23`) fuera de alcance salvo nota.
 - **Relación con freeze:** contenido + calibración (`BETA_V3.md` §4.1/§4.2). Sin features nuevas.
 - **Golden:** `tests/golden/listening/level_bands.json`, `tests/golden/listening/samples.json`, `backend/tests/test_golden_listening.py`.
 
@@ -15,8 +15,8 @@
 
 | Nivel | N | wpm (min–max) | dificultad (min–max) | palabras (min–max) | connected | acentos |
 |---|---|---|---|---|---|---|
-| A1 | 25 | 115–125 | 1–2 | 6–14 | 0 | 9 |
-| A2 | 25 | 130–135 | 2–3 | 9–15 | 0 | 9 |
+| A1 | 200 | 115–125 | 1–2 | 5–14 | 0 | 11 |
+| A2 | 200 | 130–135 | 2–3 | 5–15 | 0 | 11 |
 | B1 | 25 | 130–175 | 2–3 | 9–16 | 4 | 8 |
 | B2 | 25 | 150–185 | 3–5 | 8–23 | 11 | 8 |
 | C1 | 20 | 150–170 | 4 (plano) | 17–39 | 14 | 10 |
@@ -31,11 +31,13 @@ Veredicto por nivel (detalle cualitativo en el golden `samples.json`):
 - **C1 — Bien pero dificultad plana.** Los 20 ítems tienen `difficulty` 4: el vector no discrimina dentro del nivel. Léxico/registro y longitud excelentes. La velocidad máxima (170) queda por debajo del techo B2 (185).
 - **C2 — Bien.** Pragmática genuina (ironía `c123`, advertencia velada `c131`, lenguaje indirecto `c136`), 100% connected speech, 10 acentos. `c126` es registro informal sofisticado más que C2 estructural; aceptable.
 
+**Actualización V3.2.0 (expansión pedagógica A1/A2).** El corpus pasa de 140 a 490 ítems mediante un pipeline reproducible (`scripts/generate_listening_corpus.py`): A1/A2 alcanzan 200 ítems cada uno dentro de las bandas auditadas (velocidad 115–125 / 130–135, dificultad 1–2 / 2–3, ≤ 14 / 15 palabras, 0 connected) y con **rotación posicional uniforme de opciones** (123/122/122/123 en los 490). Los ítems nuevos se validan por invariantes (`validate_listening_bank` + guardas de banda del pipeline y de los frames); la revisión cualitativa muestral de los nuevos ítems queda anotada para la próxima auditoría.
+
 ## Hallazgos
 
 | # | Sev. | Hallazgo | Evidencia | Recomendación | Estado |
 |---|---|---|---|---|---|
-| B1 | **alta** | **Sesgo posicional extremo:** B1–C2 tienen el 100 % de las respuestas en la opción 0 (corpus global 90,7 %; 127/140 en índice 0). Un alumno puede aprobar por posición, no por comprensión. | `mc-bias` | Rebalancear opciones (rotación determinista por ítem) hasta ~25 % por posición, con script + golden de guarda. **Fix de contenido pendiente de tu aprobación** (no aplicado en esta sesión). | abierto |
+| B1 | **alta** | **Sesgo posicional extremo:** B1–C2 tenían el 100 % de las respuestas en la opción 0 (corpus global 90,7 %; 127/140 en índice 0). Un alumno podía aprobar por posición, no por comprensión. | `mc-bias` | Rebalancear opciones (rotación determinista por ítem) hasta ~25 % por posición. **Aplicado en V3.2.0** por el pipeline (`rebalance_option_positions`, `crc32(id) % n`): distribución final 123/122/122/123 en 490. | **resuelto** |
 | B2 | media | A2 concentra `inference` (5) y vocabulario de registro B1; A1 tiene `attitude`/`speaker_intention` (5) que son deseos/actitudes literales. | muestras | No crecer estas cuotas por debajo de B2; en la próxima autoría reetiquetar a `detail`/`gist`. | abierto |
 | B3 | media | C1/C2 más lentos que B2 (techo 170/175 vs 185) y C2 sin ítems ≥ 180 wpm de discurso rápido real. | corpus-stats | Añadir en C2 un bloque `fast_speech` 180–200 (autoría nueva). El ítem más rápido del nivel debe vivir donde el nivel lo exige. | abierto |
 | B4 | baja | C1 con `difficulty` plana (4/4): el escalar no discrimina. | corpus-stats | Diversificar vector dentro de C1 (4–5) al editar; el `difficulty_from_vector` ya soporta la banda. | abierto |
@@ -51,7 +53,7 @@ Veredicto por nivel (detalle cualitativo en el golden `samples.json`):
 
 ## Veredicto
 
-**Calibración escrita CEFR buena en el eje de contenido (B1–C2 destacan en connected speech, acentos y pragmática).** El defecto que impide declarar la banda "auditable" es el sesgo posicional (B1), que degrada la validez de cualquier medición de listening; su corrección es mecánica y de bajo riesgo y queda a tu aprobación. Sin audio humano real, la capa acústica (prosodia/ironía) es un proxy documentado, no un defecto del contenido escrito.
+**Calibración escrita CEFR buena en el eje de contenido (B1–C2 destacan en connected speech, acentos y pragmática), y con el sesgo posicional corregido en V3.2.0 la banda ya es auditable** (ver hallazgo B1 → resuelto). La expansión A1/A2 a 200 ítems por nivel se entrega con los invariantes de banda y de banco verdes; la revisión cualitativa muestral de esos ítems nuevos y el resto de hallazgos abiertos (B2–B4) quedan para la siguiente iteración de auditoría. Sin audio humano real, la capa acústica (prosodia/ironía) es un proxy documentado, no un defecto del contenido escrito.
 
 ## Regenerar / Verificar
 

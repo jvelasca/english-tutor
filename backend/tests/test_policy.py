@@ -1,5 +1,5 @@
 """Tests de la política de corrección según CEFR y de la política formal de feedback."""
-from services.cefr import CEFR_LEVELS
+from services.cefr import CEFR_LEVELS, PRE_A1
 from services.policy import (
     CORRECTNESS_GUIDANCE,
     FEEDBACK_CATEGORIES,
@@ -9,11 +9,13 @@ from services.policy import (
 
 
 def test_all_cefr_levels_have_guidance():
-    assert set(CORRECTNESS_GUIDANCE.keys()) == set(CEFR_LEVELS)
+    # Todo nivel de curso (A1..C2) más el tramo Pre-A1 tienen guía de corrección.
+    assert set(CORRECTNESS_GUIDANCE.keys()) == set(CEFR_LEVELS) | {PRE_A1}
 
 
 def test_guidance_varies_by_level():
     assert correctness_guidance("A1") != correctness_guidance("C2")
+    assert correctness_guidance(PRE_A1) != correctness_guidance("A1")
 
 
 def test_guidance_known_level():

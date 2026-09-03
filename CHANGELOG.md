@@ -4,6 +4,52 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.2.0] — 2026-09-03
+
+**Calibración pedagógica de niveles.** Nadie "alcanza A1" con 30 audios o 30
+palabras: se recalibra el nivel estimado global, los donuts de Listening pasan a
+ser rutas de práctica con puerta de evidencia y el corpus A1/A2 se expande a
+cientos de ítems por nivel con un pipeline reproducible (ver `PLAN.md`).
+
+### Cambiado
+- **Nivel estimado global honesto (Fase 1)**: tramo `Pre-A1` (sin evidencia suficiente
+  ya no es "A1") y recalibración logarítmica de los umbrales de vocabulario
+  (`services/cefr.py` 2.1.0: A1 ≈ 150–399 palabras). Soportado en frontend
+  (`cefrLabel`/`cefrTone`/badges) y en el tutor (`policy`, escalera de la Academy).
+- **Listening como rutas de práctica (Fase 2)**: la UI relee los donuts como
+  "Ruta A1…" con nota de qué significa un nivel CEFR real; `level_status` informa
+  `{mastered, total, gate}` y la **puerta de ruta** exige cobertura ≥ 80 %,
+  precisión ≥ 70 %, variedad de temas/sub-destrezas y un checkpoint de aciertos a
+  la primera sin replays (`services/listening.py`, `ROUTE_*`).
+
+### Añadido
+- **Pipeline de expansión del corpus (Fase 3)**: `scripts/generate_listening_corpus.py`
+  reproducible, idempotente y validado (frames autorados en
+  `scripts/_corpus_frames_a1a2.py`). Tranche A1/A2 aplicado: corpus de **140 → 490
+  ítems** (A1 200, A2 200; B1→C2 pendientes de siguiente tranche), respetando las
+  bandas auditadas y `validate_listening_bank`.
+- **Cierre del sesgo posicional (auditoría B, mc-bias)**: rotación determinista de
+  opciones por id (`crc32 % n`); la posición de la respuesta queda ~uniforme
+  (123/122/122/123 en 490) en vez de 90,7 % en la opción 0.
+- **Objetivos de contenido** `LISTENING_CORPUS_TARGETS` en `services/curriculum.py`
+  (A1 200, A2 200, B1 180, B2 160, C1 120, C2 100) y bump `LISTENING_BANK_VERSION`
+  a 7.0.0 (audio TTS cacheados por versión de banco).
+
+## [3.1.0] — 2026-09-02
+
+**UI V3.1 — Reorganización en 3 mundos.** Rediseño de la interfaz y la navegación
+(ver `docs/UI_V3.1.md`). Sin cambios en el stack pedagógico (sigue congelado en 3.0.0).
+
+### Añadido / Cambiado
+- Navegación raíz reducida a 3 mundos (INICIO · FORMACIÓN · APRENDER) con URLs reales mediante hash-router propio, deep links y botón atrás.
+- INICIO: dashboard de acción con objetivo de hoy, recomendación, repaso FSRS y acceso a MI PROGRESO.
+- FORMACIÓN: escalera CEFR A1–C2, listado de unidades con gating, hero "Continuar curso" y bloque de evaluaciones.
+- APRENDER: hub de 6 tarjetas (Listening, Speaking, Pronunciación, Conversar, Vocabulario, Gramática) con sub-rutas propias y pantalla de Speaking libre.
+- MI PROGRESO: pantalla consolidada por pestañas (Resumen · Curso · Habilidades · Trayectoria · Recorridos); el antiguo panel Analysis queda como contexto ligero.
+- Workspace único con barra de contexto lección vs. práctica libre.
+- AYUDA real en la ruta de ayuda (enlaza a la documentación) y "Conectar dispositivo" movido a Ajustes → Sistema.
+- Limpieza de claves i18n huérfanas y navegación EN/ES coherente.
+
 ## [3.0.0] — 2026-09-02
 
 **Beta V3.0 — feature freeze pedagógico.** Cierra el ciclo V2.7–V2.12 y congela

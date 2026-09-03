@@ -5,3 +5,10 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B"]
 ignore = ["B008"]  # Query/Form/File/Depends de FastAPI son llamadas en default args
+
+[tool.ruff.lint.per-file-ignores]
+# Tranches de contenido autorado: tablas densas de ítems (script/pregunta/opciones
+# en una fila), más legibles como contenido que partidas a 88 columnas.
+"scripts/_corpus_frames_a1.py" = ["E501"]
+"scripts/_corpus_frames_a2.py" = ["E501"]
+

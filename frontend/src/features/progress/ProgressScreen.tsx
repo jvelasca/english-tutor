@@ -1,34 +1,59 @@
 import { useEffect, useState } from "react";
-import { motion, type Variants } from "motion/react";
-import { ChevronDown } from "lucide-react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
+import {
+  BarChart3,
+  GraduationCap,
+  LayoutDashboard,
+  Layers,
+  Route,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { getStudentModel } from "../../api/academy";
-import type {
-  MasteryRecord,
-  SkillProfile,
-  StudentModel,
-} from "../../types/api";
-import { SKILL_LABELS } from "../../utils/learningLabels";
+import type { StudentModel } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
-import { SpeakingDiagnostic } from "../speaking/SpeakingDiagnostic";
-import { WritingJourney } from "../writing/WritingJourney";
 import { LevelBadge } from "../../components/LevelBadge";
-import { SkillBar } from "../../components/SkillBar";
-import { TriadCard } from "../../components/TriadCard";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
-import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
+import { ResumenTab } from "./ResumenTab";
+import { CursoTab } from "./CursoTab";
+import { HabilidadesTab } from "./HabilidadesTab";
+import { TrayectoriaTab } from "./TrayectoriaTab";
+import { RecorridosTab } from "./RecorridosTab";
 
-const PRIMARY = ["listening", "speaking", "reading", "writing"] as const;
-type PrimarySkill = (typeof PRIMARY)[number];
+/** Pestañas de MI PROGRESO (UI_V3.1 §4.4). */
+export type ProgressTab =
+  | "overview"
+  | "course"
+  | "skills"
+  | "journey"
+  | "tracks";
+
+interface TabDef {
+  id: ProgressTab;
+  labelKey: string;
+  Icon: LucideIcon;
+}
+
+const TABS: TabDef[] = [
+  { id: "overview", labelKey: "progress.overviewTab", Icon: LayoutDashboard },
+  { id: "course", labelKey: "progress.courseTab", Icon: GraduationCap },
+  { id: "skills", labelKey: "progress.skillsTab", Icon: BarChart3 },
+  { id: "journey", labelKey: "progress.journeyTab", Icon: Route },
+  { id: "tracks", labelKey: "progress.tracksTab", Icon: Layers },
+];
+
+function isProgressTab(value: string | undefined): value is ProgressTab {
+  return TABS.some((tab) => tab.id === value);
+}
 
 const container: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
+  show: { transition: { staggerChildren: 0.05 } },
 };
 
 const item: Variants = {
-  hidden: { opacity: 0, y: 14 },
+  hidden: { opacity: 0, y: 12 },
   show: {
     opacity: 1,
     y: 0,
@@ -36,61 +61,64 @@ const item: Variants = {
   },
 };
 
-const MASTERY_TONE: Record<string, string> = {
-  strong: "border-transparent bg-success/15 text-success",
-  developing: "border-transparent bg-warning/15 text-warning",
-  needs: "border-transparent bg-destructive/10 text-destructive",
-};
-
 interface ProgressScreenProps {
   userId: string | null;
+  refreshKey?: number;
+  /** Pestaña inicial. Workspace la fija a "journey" en la sub-ruta legada #/progreso/trayectoria. */
+  initialTab?: ProgressTab;
 }
 
-function masteryLabel(score: number, t: (k: string) => string): string {
-  if (score >= 0.75) return t("mastery.strong");
-  if (score >= 0.5) return t("mastery.developing");
-  return t("mastery.needsPractice");
-}
-
-function masteryClass(score: number): string {
-  if (score >= 0.75) return "strong";
-  if (score >= 0.5) return "developing";
-  return "needs";
-}
-
-export function ProgressScreen({ userId }: ProgressScreenProps) {
+/**
+ * MI PROGRESO (V3.1): pantalla de 5 pestañas accesibles que consolida
+ * ProgressScreen, la escalera de JourneyScreen y los paneles de perfil que
+ * vivían ocultos en el panel Analysis (UI_V3.1 §4.4 y §4.5).
+ *
+ * Cada pestaña es autónoma (fetches propios); la pantalla solo consulta el
+ * modelo del alumno para la cabecera (nivel estimado + banda de readiness).
+ */
+export function ProgressScreen({
+  userId,
+  refreshKey = 0,
+  initialTab,
+}: ProgressScreenProps) {
   const { t } = useI18n();
+  const [activeTab, setActiveTab] = useState<ProgressTab>(() =>
+    isProgressTab(initialTab) ? initialTab : "overview",
+  );
   const [model, setModel] = useState<StudentModel | null>(null);
-  const [selected, setSelected] = useState<PrimarySkill | null>(null);
 
+  // La sub-ruta legada #/progreso/trayectoria (route "journey") pide abrir la
+  // pestaña Trayectoria; volver a #/progreso restaura Resumen.
   useEffect(() => {
-    if (!userId) return;
+    if (isProgressTab(initialTab)) setActiveTab(initialTab);
+    else setActiveTab("overview");
+  }, [initialTab]);
+
+  // El modelo del alumno alimenta las insignias de la cabecera (nivel
+  // estimado + readiness); cada pestaña hace sus propios fetches al activarse.
+  useEffect(() => {
+    if (!userId) {
+      setModel(null);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
         const m = await getStudentModel(userId);
         if (!cancelled) setModel(m);
       } catch {
-        /* backend no disponible */
+        if (!cancelled) setModel(null);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, refreshKey]);
 
-  const level = model?.estimated_level ?? null;
-  const overall = Math.round(model?.readiness.overall ?? 0);
   const band = model?.readiness.band ?? "developing";
 
-  const skills = model?.skills ?? [];
-  const bySkill = new Map(skills.map((s) => [s.skill, s]));
-  const masteryBySkill = new Map(
-    (model?.mastery ?? []).map((m) => [m.skill, m]),
-  );
-
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">
       <motion.div
         variants={container}
         initial="hidden"
@@ -99,156 +127,118 @@ export function ProgressScreen({ userId }: ProgressScreenProps) {
       >
         <motion.header
           variants={item}
-          className="flex flex-wrap items-center justify-between gap-3"
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3"
         >
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            {t("progress.title")}
-          </h1>
-          <div className="flex items-center gap-2">
-            <LevelBadge level={level ?? "—"} showLabel={Boolean(level)} />
-            {model && (
-              <Badge variant="secondary" className="gap-1.5">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              {t("progress.title")}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("progress.subtitle")}
+            </p>
+          </div>
+          {model && (
+            <div className="flex flex-wrap items-center gap-2">
+              <LevelBadge level={model.estimated_level} />
+              <Badge variant="secondary">
                 {model.target_level} · {t(`readiness.${band}`)}
               </Badge>
-            )}
-          </div>
+            </div>
+          )}
         </motion.header>
 
-        <motion.section variants={item} aria-label={t("progress.overall")}>
-          <TriadCard userId={userId} />
-        </motion.section>
-
-        <motion.section variants={item} aria-label={t("progress.overall")}>
-          <Card className="gap-2 p-5">
-            <SkillBar
-              label={t("progress.overall")}
-              value={overall / 100}
-              hint={`${overall}%`}
-            />
-          </Card>
-        </motion.section>
-
-        <motion.section variants={item} aria-label={t("progress.title")}>
-          <Card className="gap-2 p-3 sm:p-4">
-            <ul className="flex flex-col gap-2">
-              {PRIMARY.map((skill) => {
-                const p = bySkill.get(skill);
-                if (!p) return null;
-                const open = selected === skill;
-                return (
-                  <li
-                    key={skill}
-                    className="overflow-hidden rounded-lg border border-border/60"
-                  >
+        {!userId ? (
+          <motion.div variants={item}>
+            <Card className="p-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                {t("empty.noProfile")}
+              </p>
+            </Card>
+          </motion.div>
+        ) : (
+          <>
+            <motion.nav variants={item} aria-label={t("progress.tabAria")}>
+              <div
+                role="tablist"
+                aria-label={t("progress.tabAria")}
+                className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm"
+              >
+                {TABS.map((tab) => {
+                  const selected = activeTab === tab.id;
+                  return (
                     <button
+                      key={tab.id}
                       type="button"
-                      className="flex min-h-10 w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-accent/50"
-                      onClick={() =>
-                        setSelected((cur) => (cur === skill ? null : skill))
-                      }
-                      aria-expanded={open}
+                      role="tab"
+                      id={`progress-tab-${tab.id}`}
+                      aria-selected={selected}
+                      aria-controls={`progress-panel-${tab.id}`}
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        "relative flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-colors sm:px-4",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                        selected
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
                     >
-                      <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">
-                        {SKILL_LABELS[skill] ?? skill}
-                      </span>
-                      <Badge
-                        className={cn(
-                          "shrink-0",
-                          MASTERY_TONE[masteryClass(p.score)],
-                        )}
-                      >
-                        {masteryLabel(p.score, t)}
-                      </Badge>
-                      <Progress
-                        value={Math.round(p.score * 100)}
-                        className="hidden h-1.5 w-24 sm:block"
-                      />
-                      <ChevronDown
-                        className={cn(
-                          "size-4 shrink-0 text-muted-foreground transition-transform",
-                          open && "rotate-180",
-                        )}
+                      {selected && (
+                        <motion.span
+                          layoutId="progress-tab-pill"
+                          className="absolute inset-0 rounded-lg bg-accent"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 40,
+                          }}
+                        />
+                      )}
+                      <tab.Icon
+                        className="relative z-10 size-4 shrink-0"
                         aria-hidden="true"
                       />
+                      <span className="relative z-10">{t(tab.labelKey)}</span>
                     </button>
+                  );
+                })}
+              </div>
+            </motion.nav>
 
-                    {open && (
-                      <div className="border-t border-dashed border-border p-3">
-                        {skill === "speaking" ? (
-                          <SpeakingDiagnostic userId={userId} />
-                        ) : skill === "writing" ? (
-                          <WritingJourney userId={userId} />
-                        ) : (
-                          <SkillDetail
-                            profile={p}
-                            mastery={masteryBySkill.get(skill)}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-        </motion.section>
+            <div
+              role="tabpanel"
+              id={`progress-panel-${activeTab}`}
+              aria-labelledby={`progress-tab-${activeTab}`}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                >
+                  {activeTab === "overview" && (
+                    <ResumenTab userId={userId} refreshKey={refreshKey} />
+                  )}
+                  {activeTab === "course" && (
+                    <CursoTab userId={userId} refreshKey={refreshKey} />
+                  )}
+                  {activeTab === "skills" && (
+                    <HabilidadesTab userId={userId} refreshKey={refreshKey} />
+                  )}
+                  {activeTab === "journey" && (
+                    <TrayectoriaTab userId={userId} refreshKey={refreshKey} />
+                  )}
+                  {activeTab === "tracks" && (
+                    <RecorridosTab userId={userId} refreshKey={refreshKey} />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </>
+        )}
       </motion.div>
-    </div>
-  );
-}
-
-function SkillDetail({
-  profile,
-  mastery,
-}: {
-  profile: SkillProfile;
-  mastery?: MasteryRecord;
-}) {
-  const { t } = useI18n();
-  const reviewIn = mastery?.review_due ? mastery.review_in_days : null;
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">
-            {t("progress.score")}
-          </span>
-          <strong className="text-base text-foreground">
-            {Math.round(profile.score * 100)}%
-          </strong>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">
-            {t("progress.confidence")}
-          </span>
-          <strong className="text-base text-foreground">
-            {Math.round(profile.confidence * 100)}%
-          </strong>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">
-            {t("progress.evidence")}
-          </span>
-          <strong className="text-base text-foreground">
-            {profile.evidence_count}
-          </strong>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">
-            {t("progress.stability")}
-          </span>
-          <strong className="text-base text-foreground">
-            {Math.round(profile.stability * 100)}%
-          </strong>
-        </div>
-      </div>
-      {profile.review_due && (
-        <Badge className="w-fit border-transparent bg-warning/15 text-warning">
-          {reviewIn != null && reviewIn > 1
-            ? t("mastery.reviewIn").replace("{days}", String(reviewIn))
-            : t("mastery.reviewNow")}
-        </Badge>
-      )}
     </div>
   );
 }
