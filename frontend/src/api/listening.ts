@@ -2,6 +2,7 @@ import { getJson, postJson } from "./client";
 import type {
   ListeningAnswerResponse,
   ListeningDiagnostic,
+  ListeningLevelItems,
   ListeningProductionResult,
   ListeningQuestion,
   ListeningStats,
@@ -10,12 +11,24 @@ import type {
 export function getListeningQuestion(
   userId: string,
   level?: string | null,
+  mode?: "all" | "failed",
 ): Promise<ListeningQuestion> {
   const params = new URLSearchParams({ user_id: userId });
   // `level` entra en juego en el repaso de un nivel ya completado: el selector
   // rota por las frases del nivel en lugar de seguir al Student Model.
   if (level) params.set("level", level);
+  // `mode="failed"` (drill) restringe el selector a las frases del nivel que se
+  // han intentado pero nunca acertado. Solo se envía cuando se indica.
+  if (mode && mode !== "all") params.set("mode", mode);
   return getJson<ListeningQuestion>(`/api/listening/question?${params.toString()}`);
+}
+
+export function getListeningLevelItems(
+  userId: string,
+  level: string,
+): Promise<ListeningLevelItems> {
+  const params = new URLSearchParams({ user_id: userId, level });
+  return getJson<ListeningLevelItems>(`/api/listening/items?${params.toString()}`);
 }
 
 export function submitListeningAnswer(

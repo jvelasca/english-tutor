@@ -655,6 +655,8 @@ const STRINGS: Record<string, Entry> = {
 
   // Voz / reproducción
   "speak.listen": { en: "Listen to reply", es: "Escuchar respuesta" },
+  "speak.phrase": { en: "Listen to the phrase", es: "Escuchar la frase" },
+  "speak.answer": { en: "Listen to the answer", es: "Escuchar la respuesta" },
   "speak.error": { en: "Error playing: ", es: "Error al reproducir: " },
 
   // Chat / barra lateral
@@ -1134,6 +1136,10 @@ const STRINGS: Record<string, Entry> = {
   "listening.loading": { en: "Loading exercise…", es: "Cargando ejercicio…" },
   "listening.playing": { en: "Playing…", es: "Reproduciendo…" },
   "listening.play": { en: "Listen to audio", es: "Escuchar audio" },
+  "listening.audioSettings": {
+    en: "Audio settings",
+    es: "Ajustes de audio",
+  },
   "listening.speed": { en: "Speed:", es: "Velocidad:" },
   "listening.audioUnavailable": {
     en: "Reference audio not available; using live generated voice.",
@@ -1155,7 +1161,34 @@ const STRINGS: Record<string, Entry> = {
   "listening.reference": { en: "Reference", es: "Referencia" },
   "listening.heard": { en: "Heard", es: "Oído" },
   "listening.accuracy": { en: "Accuracy", es: "Precisión" },
-  "listening.currentLevel": { en: "Current level", es: "Nivel actual" },
+  "listening.currentLevel": { en: "Current route", es: "Ruta actual" },
+  "listening.routeLabel": { en: "Route {level}", es: "Ruta {level}" },
+  "listening.routeCompleted": {
+    en: "{level} route completed",
+    es: "Ruta {level} completada",
+  },
+  // Lectura honesta del progreso: completar la ruta de un nivel es un hito de
+  // práctica, no un certificado CEFR. Un nivel CEFR real exige cientos de
+  // palabras y decenas de horas guiadas.
+  "listening.routeNote": {
+    en: "A real CEFR {level} means hundreds of known words and dozens of guided hours. This route trains step by step: finishing it is a practice milestone, not a CEFR certificate.",
+    es: "Un nivel CEFR {level} real implica cientos de palabras y decenas de horas guiadas. Esta ruta entrena paso a paso: completarla es un hito de práctica, no un certificado CEFR.",
+  },
+  // La cobertura completa del banco no certifica la ruta: aún falta la puerta
+  // (precisión y aciertos a la primera).
+  "listening.routePendingCert": {
+    en: "Covered, not certified yet",
+    es: "Cubierta, aún sin certificar",
+  },
+  // Detalle de la puerta de ruta (listening.levelPanelGateIntro + línea numérica).
+  "listening.routeGateIntro": {
+    en: "Mastering the phrases isn't enough to pass this route. To certify {level} you need:",
+    es: "Dominar las frases no basta para superar la ruta. Para certificar {level} necesitas:",
+  },
+  "listening.routeGateLine": {
+    en: "{coverage}% of the bank mastered (≥{coverageRequired}%) · accuracy ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} topics · {checkpoint}/{checkpointRequired} first-try answers",
+    es: "{coverage}% del banco dominado (≥{coverageRequired}%) · precisión ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} temas · {checkpoint}/{checkpointRequired} aciertos a la primera",
+  },
   "listening.diagnostic": {
     en: "Your listening diagnostic",
     es: "Tu diagnóstico de listening",
@@ -1173,18 +1206,19 @@ const STRINGS: Record<string, Entry> = {
   "listening.immediate": { en: "immediate", es: "inmediata" },
   "listening.delayed": { en: "delayed", es: "retardada" },
   "listening.completed": {
-    en: "You've completed all listening comprehension levels!",
-    es: "¡Has completado todos los niveles de comprensión auditiva!",
+    en: "You've completed every listening route!",
+    es: "¡Has completado todas las rutas de listening!",
   },
   "listening.next": { en: "Next", es: "Siguiente" },
   "listening.speakQuestion": {
     en: "Listen to the question",
     es: "Escuchar la pregunta",
   },
-  "listening.reviewStartLevel": {
-    en: "Review level {level}",
-    es: "Repasar nivel {level}",
+  "listening.levelHistoryTitle": {
+    en: "Level {level} history",
+    es: "Historial del nivel {level}",
   },
+  "listening.skip": { en: "Skip", es: "Saltar" },
   "listening.reviewProgress": {
     en: "Reviewing level {level} · {done}/{total}",
     es: "Repasando nivel {level} · {done}/{total}",
@@ -1200,6 +1234,74 @@ const STRINGS: Record<string, Entry> = {
   "listening.exitReview": {
     en: "Exit review",
     es: "Salir del repaso",
+  },
+  "listening.exitSession": {
+    en: "Exit session",
+    es: "Salir de la sesión",
+  },
+  "listening.drillProgress": {
+    en: "Failed drill · level {level} · {done}/{total} mastered",
+    es: "Drill de falladas · nivel {level} · {done}/{total} dominadas",
+  },
+  "listening.drillDone": {
+    en: "You mastered all {total} failed phrases of level {level}!",
+    es: "¡Has dominado las {total} frases falladas del nivel {level}!",
+  },
+  "listening.drillFinish": {
+    en: "Finish practice",
+    es: "Terminar práctica",
+  },
+  "listening.levelStates.failed": {
+    en: "Failed ({count})",
+    es: "Falladas ({count})",
+  },
+  "listening.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominadas ({count})",
+  },
+  "listening.levelStates.unseen": {
+    en: "Not seen ({count})",
+    es: "Sin ver ({count})",
+  },
+  "listening.levelItemsPhrases": {
+    en: "phrases",
+    es: "frases",
+  },
+  "listening.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} failed · {unseen} unseen",
+    es: "{mastered} dominadas · {failed} falladas · {unseen} sin ver",
+  },
+  "listening.completedShort": {
+    en: "Route completed",
+    es: "Ruta completada",
+  },
+  "listening.levelItemsEmpty": {
+    en: "No phrases in this group yet.",
+    es: "Aún no hay frases en este grupo.",
+  },
+  "listening.repeatFailed": {
+    en: "Repeat failed ({count})",
+    es: "Repetir falladas ({count})",
+  },
+  "listening.practiceLevel": {
+    en: "Practice level {level}",
+    es: "Practicar nivel {level}",
+  },
+  "listening.reviewLevel": {
+    en: "Review level {level}",
+    es: "Repasar nivel {level}",
+  },
+  "listening.levelItemsError": {
+    en: "Could not load the level history.",
+    es: "No se pudo cargar el historial del nivel.",
+  },
+  "listening.levelItemsDifficulty": {
+    en: "difficulty",
+    es: "dificultad",
+  },
+  "listening.levelItemsAttempts": {
+    en: "attempts",
+    es: "intentos",
   },
   "listening.audioGap": {
     en: "This audio realizes difficulty {realized} of the {declared} declared: part of the difficulty is not backed by the audio.",

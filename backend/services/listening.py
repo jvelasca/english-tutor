@@ -921,6 +921,32 @@ QUESTION_BANK: list[dict] = _LEGACY_BANK + _load_corpus_items()
 
 LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
+# ---------------------------------------------------------------------------
+# Puerta de ruta (Fase 2 — calibración pedagógica): qué evidencia certifica que
+# una ruta de listening está superada.
+#
+# Acertar una vez cada ítem del banco deja de bastar para leer el anillo como
+# "nivel CEFR alcanzado": un nivel real exige cientos de palabras y decenas de
+# horas. El anillo mide práctica (cobertura de ítems dominados); la puerta decide
+# cuándo esa práctica es evidencia suficiente para dar la ruta por superada.
+# ---------------------------------------------------------------------------
+
+# Fracción mínima de ítems del banco del nivel dominada para certificar la ruta.
+ROUTE_MIN_COVERAGE = 0.8
+# Precisión global mínima (0..100) sobre los intentos del nivel.
+ROUTE_MIN_ACCURACY = 70.0
+# Variedad mínima de temas y de sub-destrezas entre los ítems dominados (la
+# cobertura no debe lograrse en un solo rincón temático o de tarea).
+ROUTE_MIN_TOPICS = 3
+ROUTE_MIN_SUBSKILLS = 3
+# Checkpoint: subconjunto reservado del nivel respondido correctamente a la
+# primera, sin replays y en ítems no vistos antes de ese intento. El subconjunto
+# es una fracción del banco del nivel (cada ítem entra en el checkpoint en su
+# primera exposición), con suelo y techo para bancos pequeños/grandes.
+ROUTE_CHECKPOINT_FRACTION = 0.1
+ROUTE_CHECKPOINT_MIN = 5
+ROUTE_CHECKPOINT_MAX = 25
+
 # Velocidad de referencia (wpm) de la voz Piper por defecto. `length_scale_for_rate`
 # la usa para mapear `speech_rate` (wpm) de un ítem a `length_scale` de Piper.
 DEFAULT_SPEECH_RATE = 140.0
@@ -1202,33 +1228,198 @@ def validate_listening_bank(
     return errors
 
 
-def level_status(correct_question_ids: set[str]) -> list[dict]:
-    """Progreso por nivel CEFR.
+def level_items(level: str, attempts_rows: list[dict]) -> list[dict]:
+    """Estado por frase de un nivel CEFR (puro).
 
-    Un nivel se considera completado cuando el usuario ha respondido
-    correctamente (al menos una vez) todas sus preguntas. Devuelve una lista con
-    `{level, total, mastered, completed}` en orden CEFR."""
-    status = []
-    for level in LEVEL_ORDER:
-        questions = questions_for_level(level)
-        total = len(questions)
-        mastered = sum(1 for q in questions if q["id"] in correct_question_ids)
-        status.append(
+    Para cada frase del nivel devuelve `{question_id, level, script, topic,
+    skill, difficulty, attempts, state}` donde `state` es:
+    - "unseen": nunca intentada;
+    - "failed": vista alguna vez pero nunca acertada;
+    - "mastered": acertada al menos una vez (mismo criterio que `level_status`).
+
+    El número de `attempts` es el total de filas registradas de esa frase. No
+    requiere migración: se deriva en vivo de las filas de `listening_attempts`.
+    """
+    seen: set[str] = set()
+    correct: set[str] = set()
+    counts: dict[str, int] = {}
+    for row in attempts_rows:
+        qid = row.get("question_id")
+        if not qid:
+            continue
+        seen.add(qid)
+        counts[qid] = counts.get(qid, 0) + 1
+        if row.get("correct"):
+            correct.add(qid)
+    items = []
+    for q in questions_for_level(level):
+        qid = q["id"]
+        if qid in correct:
+            state = "mastered"
+        elif qid in seen:
+            state = "failed"
+        else:
+            state = "unseen"
+        items.append(
             {
+                "question_id": qid,
                 "level": level,
-                "total": total,
-                "mastered": mastered,
-                "completed": total > 0 and mastered == total,
+                "script": q.get("script", ""),
+                "topic": q.get("topic", ""),
+                "skill": q.get("skill", ""),
+                "difficulty": difficulty_from_vector(
+                    q.get("difficulty_vector", {})
+                ),
+                "attempts": counts.get(qid, 0),
+                "state": state,
             }
         )
-    return status
+    return items
+
+
+def _checkpoint_pass_ids(attempts_rows: list[dict]) -> set[str]:
+    """Ítems cuyo checkpoint está superado.
+
+    Un ítem supera su checkpoint si su **primera** exposición (la fila más
+    antigua de ese `question_id`, ya que `attempts_rows` llega ordenada por id
+    ASC) fue respondida correctamente y sin replays (`replay_count == 0`). Por
+    construcción ese intento es sobre un ítem que el usuario no había visto
+    antes: la primera fila de cada pregunta es su primera vez.
+    """
+    passed: set[str] = set()
+    seen: set[str] = set()
+    for row in attempts_rows:
+        qid = row.get("question_id")
+        if not qid or qid in seen:
+            continue
+        seen.add(qid)
+        if row.get("correct") and row.get("replay_count", 0) == 0:
+            passed.add(qid)
+    return passed
+
+
+def _effective_checkpoint_required(total: int) -> int:
+    """Ítems del nivel exigidos en el checkpoint (fracción del banco, acotada)."""
+    if total <= 0:
+        return 0
+    target = round(total * ROUTE_CHECKPOINT_FRACTION)
+    return max(ROUTE_CHECKPOINT_MIN, min(ROUTE_CHECKPOINT_MAX, target, total))
+
+
+def route_gate(level: str, attempts_rows: list[dict]) -> dict:
+    """Estado de la puerta de ruta de un nivel (puro, derivado de la evidencia).
+
+    Devuelve qué exige la ruta para darse por superada y qué valores alcanza la
+    evidencia actual. Ningún campo requiere migración: se deriva en vivo de las
+    filas de `listening_attempts` + el banco del nivel. `blockers` lista los
+    requisitos aún no cumplidos (vacío ⇒ `passed`).
+
+    Criterios (ver constantes `ROUTE_*`): cobertura del banco dominada, precisión
+    global, variedad de temas/sub-destrezas entre lo dominado y un checkpoint de
+    respuestas a la primera. Los mínimos de variedad se degradan al contenido
+    real del banco (un nivel con menos temas no puede exigir más de los que
+    tiene).
+    """
+    questions = questions_for_level(level)
+    total = len(questions)
+    if total == 0:
+        return {
+            "passed": False,
+            "total": 0,
+            "mastered": 0,
+            "coverage_pct": 0.0,
+            "coverage_required_pct": round(ROUTE_MIN_COVERAGE * 100),
+            "accuracy": None,
+            "accuracy_required": ROUTE_MIN_ACCURACY,
+            "topics": 0,
+            "topics_required": 0,
+            "subskills": 0,
+            "subskills_required": 0,
+            "checkpoint": 0,
+            "checkpoint_required": 0,
+            "blockers": [],
+        }
+    level_ids = {q["id"] for q in questions}
+    level_rows = [row for row in attempts_rows if row.get("question_id") in level_ids]
+    correct_ids = {
+        row["question_id"] for row in level_rows if row.get("correct")
+    }
+    mastered = len(correct_ids)
+    coverage_pct = round(mastered / total * 100, 1)
+    coverage_required_pct = round(ROUTE_MIN_COVERAGE * 100)
+
+    accuracy = _accuracy(level_rows)
+    mastered_questions = [q for q in questions if q["id"] in correct_ids]
+    bank_topics = {q.get("topic") for q in questions if q.get("topic")}
+    bank_skills = {q.get("skill") for q in questions if q.get("skill")}
+    topics = len({q.get("topic") for q in mastered_questions if q.get("topic")})
+    subskills = len({q.get("skill") for q in mastered_questions if q.get("skill")})
+    topics_required = min(ROUTE_MIN_TOPICS, len(bank_topics))
+    subskills_required = min(ROUTE_MIN_SUBSKILLS, len(bank_skills))
+
+    checkpoint = len(_checkpoint_pass_ids(level_rows))
+    checkpoint_required = _effective_checkpoint_required(total)
+
+    blockers: list[str] = []
+    if coverage_pct < coverage_required_pct:
+        blockers.append("coverage")
+    if accuracy is None or accuracy < ROUTE_MIN_ACCURACY:
+        blockers.append("accuracy")
+    if topics < topics_required:
+        blockers.append("topics")
+    if subskills < subskills_required:
+        blockers.append("subskills")
+    if checkpoint < checkpoint_required:
+        blockers.append("checkpoint")
+
+    return {
+        "passed": not blockers,
+        "total": total,
+        "mastered": mastered,
+        "coverage_pct": coverage_pct,
+        "coverage_required_pct": coverage_required_pct,
+        "accuracy": accuracy,
+        "accuracy_required": ROUTE_MIN_ACCURACY,
+        "topics": topics,
+        "topics_required": topics_required,
+        "subskills": subskills,
+        "subskills_required": subskills_required,
+        "checkpoint": checkpoint,
+        "checkpoint_required": checkpoint_required,
+        "blockers": blockers,
+    }
+
+
+def level_status(attempts_rows: list[dict]) -> list[dict]:
+    """Progreso por ruta de nivel CEFR con puerta de ruta.
+
+    Cada entrada es `{level, total, mastered, coverage_pct, accuracy, completed,
+    gate}`. `mastered`/`coverage_pct` miden práctica (ítems acertados alguna vez
+    sobre el banco del nivel); `completed` ya no es "todo acertado una vez": exige
+    la puerta de ruta (ver `route_gate`), de modo que dominar el banco sin
+    precisión/checkpoint no certifica la ruta. Listado en orden CEFR."""
+    return [
+        {
+            "level": level,
+            "total": gate["total"],
+            "mastered": gate["mastered"],
+            "coverage_pct": gate["coverage_pct"],
+            "accuracy": gate["accuracy"],
+            "completed": gate["passed"],
+            "gate": gate,
+        }
+        for level in LEVEL_ORDER
+        for gate in [route_gate(level, attempts_rows)]
+    ]
 
 
 def current_level(correct_question_ids: set[str]) -> str:
-    """Nivel CEFR en el que el usuario está trabajando.
+    """Nivel CEFR cuyo contenido se está practicando (routing por cobertura).
 
-    Es el primer nivel aún no completado; si todos están completados, devuelve el
-    último nivel para permitir seguir practicando sin quedarse atascado."""
+    Es el primer nivel aún no cubierto por completo (todos sus ítems acertados al
+    menos una vez); si todos están cubiertos, devuelve el último nivel para seguir
+    practicando sin quedarse atascado. La cobertura mueve el *contenido*; la
+    certificación de cada ruta la decide `route_gate`/`level_status`."""
     for level in LEVEL_ORDER:
         questions = questions_for_level(level)
         if not questions:
@@ -1239,17 +1430,35 @@ def current_level(correct_question_ids: set[str]) -> str:
     return LEVEL_ORDER[-1]
 
 
-def review_next_question(level: str, attempts_rows: list[dict]) -> dict:
+def review_next_question(
+    level: str,
+    attempts_rows: list[dict],
+    *,
+    only_failed: bool = False,
+) -> dict:
     """Siguiente frase de un nivel para repaso (rotación LRU).
 
     Devuelve la frase del nivel cuyo último intento registrado es más antiguo
     (o cualquier frase aún no intentada). Como cada respuesta registra una fila
     nueva, el repaso recorre las frases del nivel sin repetir hasta completar
     una vuelta completa. `attempts_rows` llega ordenado por id ASC.
+
+    Con `only_failed=True` restringe el repaso a las frases del nivel que se han
+    intentado pero nunca acertado (estado "failed"); si no queda ninguna, lanza
+    `ValueError("listening.no_failed")`.
     """
     candidates = questions_for_level(level)
     if not candidates:
         raise ValueError(f"nivel sin frases en el banco: {level}")
+    if only_failed:
+        failed_ids = {
+            item["question_id"]
+            for item in level_items(level, attempts_rows)
+            if item["state"] == "failed"
+        }
+        candidates = [q for q in candidates if q["id"] in failed_ids]
+        if not candidates:
+            raise ValueError("listening.no_failed")
     candidate_ids = {q["id"] for q in candidates}
     last_index: dict[str, int] = {}
     for i, row in enumerate(attempts_rows):

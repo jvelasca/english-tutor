@@ -4,6 +4,7 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/tests/visual/.artifacts/
 frontend/tests/visual/screenshots/
+frontend/capture/
 .venv/
 __pycache__/
 *.pyc

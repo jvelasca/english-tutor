@@ -22,7 +22,7 @@ acciones abiertas, no como defectos no detectados.
 | Auditoría | Estado | Evidencia principal | Entregable |
 |---|---|---|---|
 | A · Contenido (A1–C2) | **Aprobado con matices** | Quality Dashboard Overall 95.7; 104 objetivos, 331 checks MC muestreados y cruzados con bancos. A1: sesgo posicional en checks del currículo pendiente de aprobación. | `docs/audit/A-CONTENT.md` |
-| B · Listening CEFR | **Aprobado con matices** | 140+ ítems calibrados contra `docs/audit/CEFR-REFERENCE.md`; calibración escrita buena B1–C2. B1: sesgo posicional extremo del corpus pendiente de aprobación. Audio humano real: `manifest.json` vacío (TTS), anotado como proxy. | `docs/audit/B-LISTENING-CEFR.md` + `level_bands.json` + `samples.json` |
+| B · Listening CEFR | **Aprobado con matices** | 490+ ítems calibrados contra `docs/audit/CEFR-REFERENCE.md` (A1/A2 → 200 c/u en V3.2.0); calibración escrita buena B1–C2. B1 sesgo posicional **resuelto** (rotación determinista: 123/122/122/123 en 490). Audio humano real: `manifest.json` vacío (TTS), anotado como proxy. | `docs/audit/B-LISTENING-CEFR.md` + `level_bands.json` + `samples.json` |
 | C · Speaking calibration | **Aprobado (lógica)** | Scorer determinista verificado (22 golden); variabilidad LLM no medible en CI, harness listo (`eval_speaking_variability`) pendiente de Ollama real. | `docs/audit/C-SPEAKING-CALIBRATION.md` + `mission_probes.json` |
 | D · Assessment/Readiness | **Aprobado con matices** | Justificación de umbrales por peldaño y gates de mastery verificada con perfiles sintéticos (caso 88/91/85/63/58 → interaction limitante). Calibración con alumnos reales: protocolo. | `docs/audit/D-ASSESSMENT-READINESS.md` + `thresholds.json` + `profiles.json` |
 | E · FSRS/Retention | **Aprobado con matices** | Simulaciones doradas de historias Again/Hard/Good/Easy verifican scheduler; retención ≥7d y cola por retrievability. Uniformidad por tipo de memoria: medida y documentada; sin cambio de modelo. | `docs/audit/E-FSRS-RETENTION.md` + `sequences.json` |
@@ -34,8 +34,9 @@ acciones abiertas, no como defectos no detectados.
 ### Alta (acción recomendada)
 
 - **B1 — Sesgo posicional en el corpus de listening** (B1–C2 100 % en opción 0;
-  127/140 global). Degrada la validez de cualquier medición de listening.
-  Fix mecánico preparado (rotación determinista) **pendiente de tu aprobación**.
+  127/140 global). Degradaba la validez de cualquier medición de listening.
+  **Resuelto en V3.2.0**: rotación determinista por ítem en el pipeline de
+  expansión (`crc32(id) % n`) → posiciones 123/122/122/123 sobre 490.
   → comando: `.venv\Scripts\python.exe -m scripts.audit_dossier mc-bias`.
 - **A1 — Sesgo posicional en checks del currículo** (292/331 en opción 0).
   Mismo origen, misma corrección propuesta, **pendiente de tu aprobación**.

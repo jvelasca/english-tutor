@@ -1259,7 +1259,8 @@ def test_endpoint_student_model_empty(monkeypatch, tmp_path):
     body = r.json()
     assert body["level_id"] == "a1"
     assert body["current_level"] == "A1"
-    assert body["estimated_level"] == "A1"
+    # Sin evidencia, el nivel estimado es Pre-A1 (no hay base para A1 aún).
+    assert body["estimated_level"] == "Pre-A1"
     assert body["target_level"] == "A2"
     assert body["confidence"] == 0.0
     assert body["skills"], "el perfil incluye las destrezas de A1"
@@ -1300,11 +1301,11 @@ def test_endpoint_cefr_ladder_empty_user(monkeypatch, tmp_path):
         "interaction",
         "mediation",
     }
-    # Sin evidencia, la estimación es A1 (numeric 1.0) → banda `a1` marcada.
+    # Sin evidencia, la estimación es Pre-A1 → banda `pre-a1` marcada.
     assert body["estimated_numeric"] == 1.0
-    assert body["estimated_band"] == "a1"
+    assert body["estimated_band"] == "pre-a1"
     current = [b for b in body["bands"] if b["is_current"]]
-    assert [b["id"] for b in current] == ["a1"]
+    assert [b["id"] for b in current] == ["pre-a1"]
     for band in body["bands"]:
         assert band["can_do"]["mediation"], band["id"]
 

@@ -29,6 +29,7 @@ import {
 } from "../../utils/speaking";
 import { SpeakingRolePlay } from "./SpeakingRolePlay";
 import { ActivityResult } from "../../components/ActivityResult";
+import { ListenButton } from "../../components/ListenButton";
 import { NextStep } from "../../components/NextStep";
 import { LevelBadge } from "../../components/LevelBadge";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
@@ -341,9 +342,12 @@ export function SpeakingAssessment({
       {part && (
         <>
           <p className="text-base font-semibold leading-snug">{part.title}</p>
-          <p className="rounded-md border border-border bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">
-            {part.prompt}
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="min-w-0 flex-1 rounded-md border border-border bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">
+              {part.prompt}
+            </p>
+            <ListenButton text={part.prompt} label={t("speak.phrase")} />
+          </div>
         </>
       )}
 

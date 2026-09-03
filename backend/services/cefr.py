@@ -9,11 +9,22 @@ UI (`estimated_bands` → "banda heurística").
 """
 from __future__ import annotations
 
+# Tramo por debajo de A1: alumnos sin evidencia consolidada aún. No tiene curso
+# propio (la progresión curricular sigue siendo A1..C2), pero sí es la banda más
+# baja de la escalera de competencia (ver `services.cefr_descriptors`).
+PRE_A1 = "Pre-A1"
+
 CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+
+# Orden completo de bandas que pueden emitir las funciones de estimación de este
+# módulo. `Pre-A1` es la banda más débil (rank 0), por delante de A1.
+ESTIMATED_BANDS: tuple[str, ...] = (PRE_A1, "A1", "A2", "B1", "B2", "C1", "C2")
 
 # Versión del modelo unificado de estimación CEFR del Student Model (snapshot
 # reproducible: cada snapshot de evaluación guarda esta versión como instrumento).
-CEFR_MODEL_VERSION = "2.0.0"
+# 2.1.0: recalibración pedagógica — se introduce `Pre-A1` y se endurecen los
+# umbrales de vocabulario (A1 ya no se alcanza con unas decenas de palabras).
+CEFR_MODEL_VERSION = "2.1.0"
 
 # Mínimo de muestras por destreza para que su banda cuente como evidencia (P5).
 # Una destreza sin muestras suficientes no limita el nivel, pero reduce la confianza.
@@ -35,24 +46,45 @@ TRACKED_SKILLS: tuple[str, ...] = (
 
 
 def _band_rank(level: str) -> int:
-    """Posición de una banda CEFR; `"—"` (sin señal) vale -1."""
-    if level in CEFR_LEVELS:
-        return CEFR_LEVELS.index(level)
+    """Posición de una banda estimada; `"—"` (sin señal) vale -1.
+
+    El orden incluye `Pre-A1` como banda más débil (rank 0), de modo que un
+    `Pre-A1` evidenciado (p. ej. por vocabulario) limite el nivel global por
+    debajo de cualquier A1..C2.
+    """
+    if level in ESTIMATED_BANDS:
+        return ESTIMATED_BANDS.index(level)
     return -1
 
 
+# Umbrales de la banda heurística de vocabulario (proxy = palabras distintas
+# producidas por el alumno). Recalibrados según la evidencia pedagógica: el
+# English Vocabulary Profile (Milton & Alexiou) sitúa A1 en cientos de familias de
+# palabras y Cambridge/Busuu en ~90-100 h guiadas, así que "acertar un puñado de
+# ítems" ya no puede leer como A1. Escala logarítmica orientativa:
+# Pre-A1 < 150 · A1 150-399 · A2 400-899 · B1 900-1899 · B2 1900-2999 ·
+# C1 3000-4999 · C2 >= 5000. Valores configurables (constantes) a ajustar con los
+# datos reales de los perfiles.
+VOCABULARY_BAND_EDGES: tuple[tuple[int, str], ...] = (
+    (5000, "C2"),
+    (3000, "C1"),
+    (1900, "B2"),
+    (900, "B1"),
+    (400, "A2"),
+    (150, "A1"),
+)
+
+
 def vocabulary_band(vocab: int) -> str:
-    if vocab >= 2000:
-        return "C2"
-    if vocab >= 900:
-        return "C1"
-    if vocab >= 400:
-        return "B2"
-    if vocab >= 150:
-        return "B1"
-    if vocab >= 50:
-        return "A2"
-    return "A1"
+    """Banda heurística de vocabulario según las palabras distintas producidas.
+
+    NO es una equivalencia oficial CEFR: es un proxy de visualización. Un alumno
+    por debajo del umbral mínimo de A1 queda en `Pre-A1`.
+    """
+    for floor, level in VOCABULARY_BAND_EDGES:
+        if vocab >= floor:
+            return level
+    return PRE_A1
 
 
 def grammar_band(error_rate: float | None) -> str:
@@ -104,6 +136,10 @@ def listening_band(accuracy: float | None) -> str:
 
 
 _LEVEL_DESCRIPTORS = {
+    "Pre-A1": (
+        "Pre-beginner: primeras palabras y frases memorizadas; sin dominio "
+        "consolidado aún."
+    ),
     "A1": "Principiante: frases muy básicas y vocabulario esencial.",
     "A2": "Básico: comunicación en rutinas y temas cotidianos.",
     "B1": "Intermedio: desenvoltura en situaciones familiares y opiniones simples.",
@@ -147,7 +183,8 @@ def evaluate_cefr(signals: dict) -> dict:
     Sustituye al antiguo "punto-sum": cada destreza aporta una banda y un número de
     muestras; una destreza solo cuenta como evidencia si alcanza su mínimo
     (`MIN_SAMPLES`). El nivel global es la banda más baja entre las destrezas con
-    evidencia suficiente; si ninguna la tiene, se devuelve "A1" con confianza 0.
+    evidencia suficiente; si ninguna la tiene, se devuelve `Pre-A1` con confianza 0
+    (un alumno sin evidencia consolidada aún no puede leerse como A1).
 
     Señales: vocab_size, pronunciation_avg, pronunciation_attempts,
     grammar_error_rate, messages, user_messages, listening_accuracy y
@@ -197,7 +234,9 @@ def evaluate_cefr(signals: dict) -> dict:
     if evidenced:
         level = min(evidenced, key=lambda e: _band_rank(e["band"]))["band"]
     else:
-        level = "A1"
+        # Sin ninguna destreza con muestras suficientes no hay nivel que sostener:
+        # la lectura honesta es `Pre-A1`, no "A1 por defecto".
+        level = PRE_A1
 
     overall_confidence = round(
         sum(e["confidence"] for e in evidence) / len(evidence), 2
@@ -226,7 +265,9 @@ def recommendations(profile: dict) -> list[str]:
     pron = profile.get("pronunciation_avg")
     if pron is not None and pron < 70:
         recs.append("Practica pronunciación con la tarjeta de pronunciación.")
-    if profile.get("vocab_size", 0) < 50:
+    # Bajo el umbral de A1 (150 palabras producidas) el foco sigue siendo ampliar
+    # vocabulario básico.
+    if profile.get("vocab_size", 0) < VOCABULARY_BAND_EDGES[-1][0]:
         recs.append("Amplía vocabulario: lee y describe imágenes o rutinas.")
     if not recs:
         recs.append("¡Buen trabajo! Sigue practicando conversación.")

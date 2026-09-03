@@ -3,7 +3,7 @@
   "description": "Bandas de calibración del corpus de listening fijadas en la auditoría B (docs/audit/B-LISTENING-CEFR.md). Un ítem o nivel que salga de estas bandas por una edición futura hará fallar test_golden_listening.py hasta que se re-audite.",
   "levels": {
     "A1": {
-      "n": 25,
+      "n": 200,
       "speech_rate": [115, 125],
       "difficulty": [1, 2],
       "words_per_script_max": 14,
@@ -11,7 +11,7 @@
       "accent_variety_min": 5
     },
     "A2": {
-      "n": 25,
+      "n": 200,
       "speech_rate": [130, 135],
       "difficulty": [2, 3],
       "words_per_script_max": 15,

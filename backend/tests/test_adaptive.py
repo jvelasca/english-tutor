@@ -34,10 +34,21 @@ def test_numeric_to_level_frontiers():
     assert adaptive.numeric_to_level(6.0) == "C2"
 
 
-def test_estimated_level_empty_profile_is_a1_no_confidence():
+def test_estimated_level_empty_profile_is_pre_a1_no_confidence():
+    # Sin evidencia no hay base para afirmar A1: la estimación es Pre-A1.
     est = adaptive.estimated_level([])
-    assert est["level"] == "A1"
+    assert est["level"] == "Pre-A1"
     assert est["numeric"] == 1.0
+    assert est["confidence"] == 0.0
+
+
+def test_estimated_level_all_zero_scores_is_pre_a1():
+    profile = [
+        _entry("grammar", score=0.0, confidence=0.0, evidence_count=1),
+        _entry("vocabulary", score=0.0, confidence=0.0, evidence_count=2),
+    ]
+    est = adaptive.estimated_level(profile)
+    assert est["level"] == "Pre-A1"
     assert est["confidence"] == 0.0
 
 
@@ -48,6 +59,7 @@ def test_estimated_level_scales_with_overall():
     ]
     est = adaptive.estimated_level(high)
     assert est["numeric"] > 3.0
+    assert est["level"] != "Pre-A1"
     assert est["confidence"] > 0.0
 
 

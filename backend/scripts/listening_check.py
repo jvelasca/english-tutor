@@ -41,19 +41,21 @@ def main() -> int:
 
     # 2) Responder correctamente cada pregunta avanza el nivel y no se atasca.
     visited_levels: list[str] = []
+    rows: list[dict] = []
     for _ in range(len(QUESTION_BANK)):
         q = pick_next_question(seen, correct)
         visited_levels.append(q["level"])
         seen.add(q["id"])
         correct.add(q["id"])  # respuesta correcta simulada
+        rows.append({"question_id": q["id"], "correct": True, "replay_count": 0})
 
-    status = level_status(correct)
+    status = level_status(rows)
     completed = [s["level"] for s in status if s["completed"]]
     if completed != LEVEL_ORDER:
         failures.append(
             f"Esperaba niveles completados {LEVEL_ORDER}, obtuve {completed}"
         )
-    if current_level(correct) != "B2":
+    if current_level(correct) != "C2":
         failures.append(f"Tras completar todo, nivel actual = {current_level(correct)}")
 
     # 3) La secuencia de niveles visitados debe ser monótona (nunca retrocede).

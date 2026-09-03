@@ -1,4 +1,5 @@
 """Tests de listening: banco, puntuación, dominio, repositorio y endpoints."""
+import pytest
 from fastapi.testclient import TestClient
 
 from main import app
@@ -14,6 +15,7 @@ from services.listening import (
     current_level,
     difficulty_from_vector,
     get_question,
+    level_items,
     level_status,
     listening_diagnostic,
     pick_next_question,
@@ -152,12 +154,72 @@ def test_current_level_advances_with_mastery():
 
 def test_level_status_marks_completed():
     a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
-    status = level_status(a1_ids)
+    # Todo el banco A1 acertado a la primera y sin replays: cobertura, precisión,
+    # variedad y checkpoint cumplidos → la ruta queda certificada.
+    rows = [{"question_id": qid, "correct": True, "replay_count": 0} for qid in a1_ids]
+    status = level_status(rows)
     by_level = {s["level"]: s for s in status}
     assert [s["level"] for s in status] == LEVEL_ORDER
     assert by_level["A1"]["completed"] is True
     assert by_level["A1"]["mastered"] == by_level["A1"]["total"]
+    assert by_level["A1"]["gate"]["passed"] is True
+    assert by_level["A1"]["gate"]["blockers"] == []
     assert by_level["A2"]["completed"] is False
+    assert by_level["A2"]["gate"]["passed"] is False
+
+
+def test_level_status_full_coverage_low_accuracy_not_certified():
+    """Dominar todos los ítems tras fallarlos una vez deja precisión < 70 %:
+    la cobertura está completa pero la ruta no se certifica."""
+    a1 = questions_for_level("A1")
+    rows = []
+    for q in a1:
+        rows.append({"question_id": q["id"], "correct": False, "replay_count": 0})
+        rows.append({"question_id": q["id"], "correct": True, "replay_count": 1})
+    status = level_status(rows)
+    by_level = {s["level"]: s for s in status}
+    entry = by_level["A1"]
+    assert entry["mastered"] == entry["total"]  # cobertura completa
+    assert entry["completed"] is False  # pero la puerta no se abre
+    assert entry["gate"]["accuracy"] is not None
+    assert entry["gate"]["accuracy"] < entry["gate"]["accuracy_required"]
+    assert "accuracy" in entry["gate"]["blockers"]
+
+
+def test_level_status_checkpoint_needs_clean_first_try():
+    """El checkpoint exige aciertos a la primera sin replays: dominar el banco con
+    un replay en cada primera exposición no aporta ni un ítem al checkpoint."""
+    a1 = questions_for_level("A1")
+    rows = [{"question_id": q["id"], "correct": True, "replay_count": 1} for q in a1]
+    gate = next(
+        s["gate"] for s in level_status(rows) if s["level"] == "A1"
+    )
+    assert gate["checkpoint"] == 0
+    assert gate["checkpoint_required"] > 0
+    assert gate["passed"] is False
+    assert gate["blockers"] == ["checkpoint"]
+
+
+def test_level_status_checkpoint_met_with_clean_majority():
+    """Con cobertura y precisión altas basta un puñado de aciertos a la primera
+    (≥ checkpoint_required) para que la ruta se certifique aunque el resto se
+    dominase con replays."""
+    a1 = questions_for_level("A1")
+    rows = []
+    for i, q in enumerate(a1):
+        clean = i % 2 == 0
+        rows.append(
+            {
+                "question_id": q["id"],
+                "correct": True,
+                "replay_count": 0 if clean else 1,
+            }
+        )
+    entry = next(s for s in level_status(rows) if s["level"] == "A1")
+    assert entry["mastered"] == entry["total"]
+    assert entry["completed"] is True
+    assert entry["gate"]["passed"] is True
+    assert entry["gate"]["checkpoint"] >= entry["gate"]["checkpoint_required"]
 
 
 def test_bank_shape_valid():
@@ -556,3 +618,138 @@ def test_diagnostic_endpoint_exposes_competence(monkeypatch, tmp_path):
         for d in body["by_difficulty"]
     )
     assert any(t["topic"] == q["topic"] for t in body["by_topic"])
+
+
+# --- Control del alumno por nivel: items por frase + drill de falladas --------
+
+
+def test_level_items_states():
+    a1 = questions_for_level("A1")
+    assert len(a1) >= 3, "el banco A1 debe tener al menos 3 frases para este test"
+    q0, q1, q2 = a1[0], a1[1], a1[2]
+    rows = [
+        {"question_id": q0["id"], "correct": False},
+        {"question_id": q1["id"], "correct": True},
+    ]
+    items = level_items("A1", rows)
+    by_id = {i["question_id"]: i for i in items}
+    assert len(items) == len(a1)
+    assert by_id[q0["id"]]["state"] == "failed"
+    assert by_id[q0["id"]]["attempts"] == 1
+    assert by_id[q1["id"]]["state"] == "mastered"
+    assert by_id[q2["id"]]["state"] == "unseen"
+    assert by_id[q2["id"]]["attempts"] == 0
+    # Frase fallada y luego acertada pasa a mastered (no failed).
+    rows.append({"question_id": q0["id"], "correct": True})
+    items2 = level_items("A1", rows)
+    by_id2 = {i["question_id"]: i for i in items2}
+    assert by_id2[q0["id"]]["state"] == "mastered"
+    assert by_id2[q0["id"]]["attempts"] == 2
+
+
+def test_level_items_exposes_script_and_metadata():
+    a1 = questions_for_level("A1")
+    first = level_items("A1", [])[0]
+    assert first["question_id"] == a1[0]["id"]
+    assert first["script"]
+    assert first["level"] == "A1"
+    assert first["difficulty"] == difficulty_from_vector(
+        a1[0]["difficulty_vector"]
+    )
+
+
+def test_review_next_only_failed_filters():
+    a1 = questions_for_level("A1")
+    ids = [q["id"] for q in a1]
+    rows = [
+        {"question_id": ids[0], "correct": False},
+        {"question_id": ids[1], "correct": True},
+    ]
+    got = review_next_question("A1", rows, only_failed=True)
+    assert got["id"] == ids[0]
+
+
+def test_review_next_only_failed_empty_pool_raises():
+    a1 = questions_for_level("A1")
+    rows = [{"question_id": q["id"], "correct": True} for q in a1]
+    with pytest.raises(ValueError):
+        review_next_question("A1", rows, only_failed=True)
+
+
+def test_level_items_endpoint(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    a1 = questions_for_level("A1")
+    q0 = a1[0]
+    with TestClient(app) as client:
+        wrong = (q0["answer_index"] + 1) % len(q0["options"])
+        client.post(
+            "/api/listening/answer",
+            params={"user_id": uid},
+            json={"question_id": q0["id"], "answer_index": wrong},
+        )
+        r = client.get(
+            "/api/listening/items", params={"user_id": uid, "level": "A1"}
+        )
+        bad_level = client.get(
+            "/api/listening/items", params={"user_id": uid, "level": "XX"}
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["level"] == "A1"
+    assert body["total"] == len(a1)
+    assert body["mastered"] == 0
+    assert body["failed"] == 1
+    assert body["unseen"] == len(a1) - 1
+    assert body["completed"] is False
+    item = next(i for i in body["items"] if i["question_id"] == q0["id"])
+    assert item["state"] == "failed"
+    assert item["attempts"] == 1
+    assert item["script"]
+    assert bad_level.status_code == 400
+
+
+def test_drill_question_mode_failed(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    a1 = questions_for_level("A1")
+    q0, q1 = a1[0], a1[1]
+    with TestClient(app) as client:
+        wrong0 = (q0["answer_index"] + 1) % len(q0["options"])
+        client.post(
+            "/api/listening/answer",
+            params={"user_id": uid},
+            json={"question_id": q0["id"], "answer_index": wrong0},
+        )
+        client.post(
+            "/api/listening/answer",
+            params={"user_id": uid},
+            json={"question_id": q1["id"], "answer_index": q1["answer_index"]},
+        )
+        got = client.get(
+            "/api/listening/question",
+            params={"user_id": uid, "level": "A1", "mode": "failed"},
+        )
+    assert got.status_code == 200
+    assert got.json()["id"] == q0["id"]
+
+
+def test_drill_question_mode_failed_no_failed_404(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    a1 = questions_for_level("A1")
+    with TestClient(app) as client:
+        for q in a1:
+            client.post(
+                "/api/listening/answer",
+                params={"user_id": uid},
+                json={"question_id": q["id"], "answer_index": q["answer_index"]},
+            )
+        r = client.get(
+            "/api/listening/question",
+            params={"user_id": uid, "level": "A1", "mode": "failed"},
+        )
+        bad = client.get(
+            "/api/listening/question",
+            params={"user_id": uid, "level": "A1", "mode": "bogus"},
+        )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "listening.no_failed"
+    assert bad.status_code == 400

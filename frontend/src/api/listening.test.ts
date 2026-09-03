@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getListeningAudioUrl,
   getListeningDiagnostic,
+  getListeningLevelItems,
   getListeningQuestion,
   getListeningStats,
   submitListeningAnswer,
@@ -66,6 +67,35 @@ describe("listening api", () => {
     await getListeningDiagnostic("u1");
     const [url] = fn.mock.calls[0];
     expect(url).toBe("/api/listening/diagnostic?user_id=u1");
+  });
+
+  it("getListeningQuestion añade mode=failed solo cuando se pide", async () => {
+    const fn = mockFetch(true, { id: "l1", level: "A1", script: "Hi" });
+    await getListeningQuestion("u1", "A1", "failed");
+    const [url] = fn.mock.calls[0];
+    expect(url).toBe("/api/listening/question?user_id=u1&level=A1&mode=failed");
+  });
+
+  it("getListeningQuestion con level y sin mode no añade mode (retrocompatible)", async () => {
+    const fn = mockFetch(true, { id: "l1", level: "A1", script: "Hi" });
+    await getListeningQuestion("u1", "A1");
+    const [url] = fn.mock.calls[0];
+    expect(url).toBe("/api/listening/question?user_id=u1&level=A1");
+  });
+
+  it("getListeningLevelItems llama a /items con user_id y level", async () => {
+    const fn = mockFetch(true, {
+      level: "A1",
+      total: 2,
+      mastered: 0,
+      failed: 1,
+      unseen: 1,
+      completed: false,
+      items: [],
+    });
+    await getListeningLevelItems("u1", "A1");
+    const [url] = fn.mock.calls[0];
+    expect(url).toBe("/api/listening/items?user_id=u1&level=A1");
   });
 
   it("getListeningAudioUrl construye la URL del audio con user_id", () => {

@@ -158,6 +158,21 @@ export function ListeningRecorridoPanel({
                   ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
                   : "—"}
               </span>
+              {currentLevelStat?.completed && (
+                <span className="text-[11px] font-semibold text-success">
+                  {t("listening.routeCompleted").replace(
+                    "{level}",
+                    stats.level,
+                  )}
+                </span>
+              )}
+              {currentLevelStat &&
+                !currentLevelStat.completed &&
+                currentLevelStat.mastered === currentLevelStat.total && (
+                  <span className="text-[11px] font-semibold text-warning">
+                    {t("listening.routePendingCert")}
+                  </span>
+                )}
             </div>
           </div>
           {stats.completed && (
@@ -165,6 +180,9 @@ export function ListeningRecorridoPanel({
               {t("listening.completed")}
             </p>
           )}
+          <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+            {t("listening.routeNote").replace("{level}", stats.level)}
+          </p>
         </Card>
       )}
 

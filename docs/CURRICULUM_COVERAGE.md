@@ -20,7 +20,7 @@ del banco no basta; cada nivel debe entrenar subskills concretos (ver
 
 | Métrica | Qué mide | Valor actual |
 |---|---|---|
-| `TOTAL VALIDATED LEARNING ITEMS` | Cuántos ejercicios fiables existen | **189** (163 listening + 26 speaking) |
+| `TOTAL VALIDATED LEARNING ITEMS` | Cuántos ejercicios fiables existen | **539** (513 listening + 26 speaking) |
 | `TOTAL CURRICULUM COVERAGE` | Celdas nivel×sección pobladas | **42/49 (85,7%)** |
 | `UNIT COVERAGE` | Secciones pobladas **por unidad** | media A1..C2 **100%** |
 | `CEFR DEPTH SCORE` | Densidad + tamaño + completitud por nivel | media **84,2** / 100 |

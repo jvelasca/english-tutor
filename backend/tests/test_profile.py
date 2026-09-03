@@ -10,7 +10,7 @@ from repositories import grammar as grammar_repo
 from repositories import profile as profile_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services.cefr import estimate_cefr, recommendations
+from services.cefr import PRE_A1, estimate_cefr, recommendations
 from services.grammar import find_errors
 
 
@@ -35,29 +35,30 @@ def test_learning_profile_table_has_user_fk(monkeypatch, tmp_path):
     assert ("users", "user_id") in _fk_targets("learning_profile")
 
 
-def test_estimate_cefr_low_is_a1(monkeypatch, tmp_path):
+def test_estimate_cefr_no_evidence_is_pre_a1(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     assert (
         estimate_cefr({"vocab_size": 0, "pronunciation_avg": None, "exercises": 0})
-        == "A1"
+        == PRE_A1
     )
 
 
-def test_estimate_cefr_medium_is_b1(monkeypatch, tmp_path):
+def test_estimate_cefr_vocab_a1_is_a1(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
-    # Sin intentos de pronunciación, solo el vocabulario (B1) cuenta como evidencia.
+    # Sin intentos de pronunciación, solo el vocabulario (A1: 150-399 palabras)
+    # cuenta como evidencia; es la banda más baja y limita el nivel a A1.
     assert (
         estimate_cefr({"vocab_size": 200, "pronunciation_avg": 75, "exercises": 10})
-        == "B1"
+        == "A1"
     )
 
 
 def test_estimate_cefr_high_is_c1(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
-    # Vocabulario C1 evidenciado; pronunciación sin muestras no limita el nivel.
+    # Vocabulario C1 evidenciado (3000-4999); pronunciación sin muestras no limita.
     assert (
         estimate_cefr(
-            {"vocab_size": 1000, "pronunciation_avg": 95, "exercises": 100}
+            {"vocab_size": 3000, "pronunciation_avg": 95, "exercises": 100}
         )
         == "C1"
     )
@@ -71,7 +72,7 @@ def test_recommendations_grammar_error(monkeypatch, tmp_path):
                 {"rule": "he_she_it_s", "message": "Falta la -s.", "count": 5}
             ],
             "pronunciation_avg": 80,
-            "vocab_size": 100,
+            "vocab_size": 200,
         }
     )
     assert len(recs) == 1
@@ -81,7 +82,7 @@ def test_recommendations_grammar_error(monkeypatch, tmp_path):
 def test_recommendations_pronunciation(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     recs = recommendations(
-        {"recurring_errors": [], "pronunciation_avg": 60, "vocab_size": 100}
+        {"recurring_errors": [], "pronunciation_avg": 60, "vocab_size": 200}
     )
     assert len(recs) == 1
     assert "pronunciación" in recs[0]
@@ -99,7 +100,7 @@ def test_recommendations_vocabulary(monkeypatch, tmp_path):
 def test_recommendations_default(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     recs = recommendations(
-        {"recurring_errors": [], "pronunciation_avg": None, "vocab_size": 100}
+        {"recurring_errors": [], "pronunciation_avg": None, "vocab_size": 200}
     )
     assert len(recs) == 1
     assert "¡Buen trabajo!" in recs[0]
@@ -126,7 +127,8 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         assert r.status_code == 200
         body = r.json()
         assert body["user_id"] == a
-        assert body["estimated_level"] in ("A1", "A2")
+        # Sin evidencia de Academy, la estimación no llega a A1: es Pre-A1.
+        assert body["estimated_level"] == PRE_A1
         assert 0.0 <= body["estimated_confidence"] < 0.1
         assert 1.0 <= body["overall_ability"] <= 6.0
         assert set(body["estimated_bands"].keys()) == {
@@ -164,7 +166,7 @@ def test_profile_records_cefr_snapshot_once(monkeypatch, tmp_path):
     assert len(r1.json()["cefr_history"]) == 1
     assert len(r2.json()["cefr_history"]) == 1
     snap = r1.json()["cefr_history"][0]
-    assert snap["level"] == "A1"
+    assert snap["level"] == PRE_A1
     assert snap["instrument_version"]
     assert snap["curriculum_version"]
     # El snapshot conserva el desglose por destreza (reproducibilidad completa).

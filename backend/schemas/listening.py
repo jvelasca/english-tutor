@@ -90,11 +90,67 @@ class ListeningProductionResult(BaseModel):
     skill: str
 
 
+class ListeningGate(BaseModel):
+    """Puerta de ruta de un nivel de listening: qué exige la evidencia para
+    declarar la ruta superada y qué valores alcanza hoy.
+
+    `passed` es cierto solo si `blockers` está vacío. Los `*_required` codifican
+    los umbrales pedagógicos (cobertura, precisión, variedad y checkpoint);
+    el resto de campos son los valores alcanzados con la evidencia actual."""
+
+    passed: bool = False
+    total: int = 0
+    mastered: int = 0
+    coverage_pct: float = 0.0
+    coverage_required_pct: float = 80.0
+    accuracy: float | None = None
+    accuracy_required: float = 70.0
+    topics: int = 0
+    topics_required: int = 0
+    subskills: int = 0
+    subskills_required: int = 0
+    checkpoint: int = 0
+    checkpoint_required: int = 0
+    blockers: list[str] = Field(default_factory=list)
+
+
 class ListeningLevelOut(BaseModel):
     level: str
     total: int
     mastered: int
     completed: bool
+    coverage_pct: float | None = None
+    accuracy: float | None = None
+    # Estado de la puerta de ruta (None en respuestas de versiones antiguas).
+    gate: ListeningGate | None = None
+
+
+class ListeningItemOut(BaseModel):
+    """Una frase del banco con su estado para un usuario (panel del alumno)."""
+
+    question_id: str
+    level: str
+    script: str
+    topic: str = ""
+    skill: str = ""
+    difficulty: int = 1
+    attempts: int = 0
+    state: str
+
+
+class ListeningLevelItemsOut(BaseModel):
+    """Estado por frase de un nivel CEFR + resumen de contadores."""
+
+    level: str
+    total: int
+    mastered: int
+    failed: int
+    unseen: int
+    completed: bool
+    items: list[ListeningItemOut]
+    # Puerta de ruta del nivel: `completed` la refleja y `gate` permite al panel
+    # explicar por qué dominar frases aún no certifica la ruta.
+    gate: ListeningGate | None = None
 
 
 class ListeningStats(BaseModel):

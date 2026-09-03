@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Loader2,
   Mic,
+  MoreHorizontal,
   Play,
   RefreshCw,
   Send,
@@ -22,6 +23,13 @@ import {
   submitListeningDictation,
   submitListeningShadowing,
 } from "../../api/listening";
+import {
+  drillAnswered,
+  isSessionFinished,
+  sessionDone,
+  type ListeningSession,
+} from "./listeningSession";
+import { ListeningLevelPanel } from "./ListeningLevelPanel";
 import { speak, transcribe } from "../../api/voz";
 import {
   getMicrophoneStream,
@@ -39,6 +47,7 @@ import type {
 } from "../../types/api";
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
+import { ListenButton } from "../../components/ListenButton";
 import { NextStep } from "../../components/NextStep";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { ProgressRing } from "../../components/ProgressRing";
@@ -170,14 +179,16 @@ export function ListeningPractice({
   const [replayCount, setReplayCount] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [variant, setVariant] = useState<string>("normal");
+  const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
-  const [review, setReview] = useState<{ level: string; total: number } | null>(
-    null,
-  );
-  const [reviewDone, setReviewDone] = useState(0);
+  const [session, setSession] = useState<ListeningSession | null>(null);
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
 
-  async function load(levelOverride?: string | null) {
+  async function load(
+    levelOverride?: string | null,
+    modeOverride?: "all" | "failed",
+  ) {
     if (!userId) return;
     setError(null);
     setResult(null);
@@ -186,10 +197,12 @@ export function ListeningPractice({
     setDictationText("");
     setTranscribedText("");
     setVariant("normal");
-    // Sin override, respeta el nivel de la sesión de repaso en curso (si hay).
-    const level = levelOverride === undefined ? review?.level : levelOverride;
+    // Sin override, respeta el nivel y modo de la sesión en curso (si hay).
+    const level = levelOverride === undefined ? session?.level : levelOverride;
+    const mode =
+      modeOverride ?? (session?.mode === "drill" ? "failed" : "all");
     try {
-      setQuestion(await getListeningQuestion(userId, level));
+      setQuestion(await getListeningQuestion(userId, level, mode));
       setStartedAt(Date.now());
       setReplayCount(0);
     } catch (e) {
@@ -197,25 +210,53 @@ export function ListeningPractice({
     }
   }
 
-  // Sesión de repaso de un nivel completado: todas sus frases, una vez.
-  function startReview(lv: { level: string; total: number }) {
-    if (review || !userId) return;
-    setReview(lv);
-    setReviewDone(0);
-    void load(lv.level);
+  /** Sesión focalizada: practicar/repasar un nivel completo (rotación LRU). */
+  function startLevelSession(level: string, total: number) {
+    if (session || !userId) return;
+    setSession({ mode: "level", level, total, done: 0 });
+    setExpandedLevel(null);
+    void load(level);
   }
 
-  function exitReview() {
-    setReview(null);
-    setReviewDone(0);
-    // Override explícito a null: el cierre aún conserva el `review` viejo y sin
+  /** Sesión drill: repetir las frases falladas del nivel hasta dominarlas. */
+  function startFailedDrill(level: string, failedIds: string[]) {
+    if (session || !userId || failedIds.length === 0) return;
+    setSession({ mode: "drill", level, total: failedIds.length, remaining: failedIds });
+    setExpandedLevel(null);
+    void load(level, "failed");
+  }
+
+  /** Cierra la sesión actual y vuelve al modo adaptativo (sin override de nivel). */
+  function exitSession() {
+    setSession(null);
+    setExpandedLevel(null);
+    // Override explícito a null: el cierre aún conserva la `session` vieja y sin
     // override `load()` seguiría pidiendo frases del nivel que se abandona.
-    void load(null);
+    void load(null, "all");
   }
 
-  // El contador del repaso avanza solo cuando se responde (no al saltar).
-  function markAnswered() {
-    if (review) setReviewDone((d) => d + 1);
+  /** Abre/cierra el historial desplegable de un nivel (uno a la vez). */
+  function toggleLevel(level: string) {
+    if (session) return;
+    setExpandedLevel((cur) => (cur === level ? null : level));
+  }
+
+  // Tras responder: avanza el progreso de la sesión (el contador solo avanza
+  // cuando se responde, no al saltar). En drill se elimina la frase del pool
+  // pendiente solo si se acertó.
+  function applySessionOutcome(questionId: string, correct: boolean) {
+    if (!session) return;
+    if (session.mode === "level") {
+      setSession((s) =>
+        s && s.mode === "level" ? { ...s, done: s.done + 1 } : s,
+      );
+    } else if (correct) {
+      setSession((s) =>
+        s && s.mode === "drill"
+          ? { ...s, remaining: drillAnswered(s.remaining, questionId, true) }
+          : s,
+      );
+    }
   }
 
   async function speakQuestion() {
@@ -293,17 +334,16 @@ export function ListeningPractice({
     if (!userId || !question || result) return;
     setSelected(index);
     try {
-      setResult(
-        await submitListeningAnswer(
-          userId,
-          question.id,
-          index,
-          Date.now() - startedAt,
-          replayCount,
-        ),
+      const res = await submitListeningAnswer(
+        userId,
+        question.id,
+        index,
+        Date.now() - startedAt,
+        replayCount,
       );
+      setResult(res);
       setReplayCount(0);
-      markAnswered();
+      applySessionOutcome(question.id, res.correct);
       onAttempt();
       void refreshStats();
     } catch (e) {
@@ -318,10 +358,9 @@ export function ListeningPractice({
     setProcessing(true);
     setError(null);
     try {
-      setProductionResult(
-        await submitListeningDictation(userId, question.id, text),
-      );
-      markAnswered();
+      const res = await submitListeningDictation(userId, question.id, text);
+      setProductionResult(res);
+      applySessionOutcome(question.id, res.correct);
       onAttempt();
       void refreshStats();
     } catch (e) {
@@ -364,10 +403,13 @@ export function ListeningPractice({
         try {
           const text = await transcribe(blob);
           setTranscribedText(text);
-          setProductionResult(
-            await submitListeningShadowing(userId, question.id, text),
+          const res = await submitListeningShadowing(
+            userId,
+            question.id,
+            text,
           );
-          markAnswered();
+          setProductionResult(res);
+          applySessionOutcome(question.id, res.correct);
           onAttempt();
           void refreshStats();
         } catch (e) {
@@ -437,26 +479,49 @@ export function ListeningPractice({
         </Card>
       ) : (
         <>
-          {review && (
+          {session && (
             <Card className="flex flex-row flex-wrap items-center justify-between gap-3 p-4">
               <span className="text-sm text-muted-foreground">
-                {t("listening.reviewProgress")
-                  .replace("{level}", review.level)
-                  .replace("{done}", String(reviewDone))
-                  .replace("{total}", String(review.total))}
+                {session.mode === "drill"
+                  ? t("listening.drillProgress")
+                      .replace("{level}", session.level)
+                      .replace("{done}", String(sessionDone(session)))
+                      .replace("{total}", String(session.total))
+                  : t("listening.reviewProgress")
+                      .replace("{level}", session.level)
+                      .replace("{done}", String(session.done))
+                      .replace("{total}", String(session.total))}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 className="min-h-9 gap-2"
-                onClick={exitReview}
+                onClick={exitSession}
               >
-                {t("listening.exitReview")}
+                {session.mode === "drill"
+                  ? t("listening.exitSession")
+                  : t("listening.exitReview")}
               </Button>
             </Card>
           )}
 
-          <Card className="gap-6 p-5 sm:p-6">
+          <Card className="relative gap-5 p-5 sm:p-6">
+            <button
+              type="button"
+              onClick={() => setShowAudioSettings((s) => !s)}
+              aria-expanded={showAudioSettings}
+              aria-controls="listening-audio-settings"
+              aria-label={t("listening.audioSettings")}
+              className={cn(
+                "absolute top-3 right-3 z-10 grid size-9 place-items-center rounded-full border transition-colors",
+                showAudioSettings
+                  ? "border-transparent bg-primary text-primary-foreground"
+                  : "border-border bg-secondary text-secondary-foreground hover:border-primary/50 hover:text-foreground",
+              )}
+            >
+              <MoreHorizontal className="size-4" aria-hidden="true" />
+            </button>
+
             <div className="flex flex-col items-center gap-4 text-center">
               <motion.button
                 type="button"
@@ -482,73 +547,80 @@ export function ListeningPractice({
               )}
             </div>
 
-            {question.audio_ready &&
-              question.audio_type === "tts" &&
-              question.variants.length > 1 && (
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {t("listening.speed")}
-                </span>
-                {question.variants.map((v: ListeningAudioVariant) => (
-                  <button
-                    key={v.variant}
-                    type="button"
-                    className={cn(
-                      "min-h-10 rounded-full border px-3 text-xs font-medium transition-colors",
-                      v.variant === variant
-                        ? "border-transparent bg-primary text-primary-foreground"
-                        : "border-border bg-secondary text-secondary-foreground hover:border-primary/50",
-                      "disabled:opacity-60",
+            {showAudioSettings && (
+              <div
+                id="listening-audio-settings"
+                className="flex flex-col items-center gap-4"
+              >
+                {question.audio_ready &&
+                  question.audio_type === "tts" &&
+                  question.variants.length > 1 && (
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("listening.speed")}
+                      </span>
+                      {question.variants.map((v: ListeningAudioVariant) => (
+                        <button
+                          key={v.variant}
+                          type="button"
+                          className={cn(
+                            "min-h-10 rounded-full border px-3 text-xs font-medium transition-colors",
+                            v.variant === variant
+                              ? "border-transparent bg-primary text-primary-foreground"
+                              : "border-border bg-secondary text-secondary-foreground hover:border-primary/50",
+                            "disabled:opacity-60",
+                          )}
+                          onClick={() => setVariant(v.variant)}
+                          disabled={playing || !userId}
+                        >
+                          {v.label}
+                        </button>
+                      ))}
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {Math.round(
+                          question.variants.find((v) => v.variant === variant)
+                            ?.speech_rate ?? question.speech_rate,
+                        )}{" "}
+                        wpm
+                      </span>
+                    </div>
+                  )}
+
+                <div className="flex flex-col items-center gap-1.5 text-center">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      {audioTypeLabel(question.audio_type)}
+                    </p>
+                    {question.realized_difficulty < question.difficulty && (
+                      <Tooltip
+                        content={t("listening.audioGap")
+                          .replace("{realized}", String(question.realized_difficulty))
+                          .replace("{declared}", String(question.difficulty))}
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex text-warning"
+                          aria-label={t("listening.audioGapTitle")}
+                        >
+                          <AlertTriangle className="size-3.5" aria-hidden="true" />
+                        </button>
+                      </Tooltip>
                     )}
-                    onClick={() => setVariant(v.variant)}
-                    disabled={playing || !userId}
-                  >
-                    {v.label}
-                  </button>
-                ))}
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {Math.round(
-                    question.variants.find((v) => v.variant === variant)
-                      ?.speech_rate ?? question.speech_rate,
-                  )}{" "}
-                  wpm
-                </span>
+                  </div>
+                  {!question.audio_ready && (
+                    <p className="text-xs text-muted-foreground">
+                      {t("listening.audioUnavailable")}
+                    </p>
+                  )}
+                  {question.speech_rate > 0 && (
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}
+                      {question.duration.toFixed(1)}s
+                    </p>
+                  )}
+                </div>
               </div>
             )}
-
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs text-muted-foreground">
-                  {audioTypeLabel(question.audio_type)}
-                </p>
-                {question.realized_difficulty < question.difficulty && (
-                  <Tooltip
-                    content={t("listening.audioGap")
-                      .replace("{realized}", String(question.realized_difficulty))
-                      .replace("{declared}", String(question.difficulty))}
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex text-warning"
-                      aria-label={t("listening.audioGapTitle")}
-                    >
-                      <AlertTriangle className="size-3.5" aria-hidden="true" />
-                    </button>
-                  </Tooltip>
-                )}
-              </div>
-              {!question.audio_ready && (
-                <p className="text-xs text-muted-foreground">
-                  {t("listening.audioUnavailable")}
-                </p>
-              )}
-              {question.speech_rate > 0 && (
-                <p className="text-xs tabular-nums text-muted-foreground">
-                  {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}
-                  {question.duration.toFixed(1)}s
-                </p>
-              )}
-            </div>
           </Card>
 
           <Card className="gap-4 p-5">
@@ -691,14 +763,16 @@ export function ListeningPractice({
                   : `Dictation/Shadowing · ${productionResult?.score ?? 0}/100`
               }
               footer={
-                review ? (
-                  reviewDone >= review.total ? (
+                session ? (
+                  isSessionFinished(session) ? (
                     <Button
                       type="button"
                       className="min-h-10 gap-2"
-                      onClick={exitReview}
+                      onClick={exitSession}
                     >
-                      {t("listening.reviewFinish")}
+                      {session.mode === "drill"
+                        ? t("listening.drillFinish")
+                        : t("listening.reviewFinish")}
                     </Button>
                   ) : (
                     <Button
@@ -721,8 +795,22 @@ export function ListeningPractice({
                 )
               }
             >
+              {session?.mode === "drill" &&
+                session.remaining.length === 0 && (
+                  <p className="text-sm font-medium text-primary">
+                    {t("listening.drillDone")
+                      .replace("{total}", String(session.total))
+                      .replace("{level}", session.level)}
+                  </p>
+                )}
               {result && (
-                <span className="text-foreground">{question.script}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-foreground">{question.script}</span>
+                  <ListenButton
+                    text={question.script}
+                    label={t("speak.answer")}
+                  />
+                </div>
               )}
               {productionResult && (
                 <>
@@ -739,11 +827,19 @@ export function ListeningPractice({
                       </span>{" "}
                       {productionResult.phonetic_score}%
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">
-                        {t("listening.reference")}:
-                      </span>{" "}
-                      {productionResult.reference}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-muted-foreground">
+                          {t("listening.reference")}:
+                        </span>{" "}
+                        <span className="text-foreground">
+                          {productionResult.reference}
+                        </span>
+                      </div>
+                      <ListenButton
+                        text={productionResult.reference}
+                        label={t("speak.phrase")}
+                      />
                     </div>
                     {transcribedText && (
                       <div>
@@ -788,90 +884,130 @@ export function ListeningPractice({
                 </div>
 
                 <div className="flex flex-col items-center gap-1.5">
-                  <ProgressRing
-                    value={currentLevelPct}
-                    size={72}
-                    strokeWidth={7}
-                    className="text-primary"
-                    ariaLabel={`${t("listening.currentLevel")}: ${stats.level}`}
+                  <button
+                    type="button"
+                    onClick={() => toggleLevel(stats.level)}
+                    aria-expanded={expandedLevel === stats.level}
+                    aria-controls="listening-level-items"
+                    aria-label={t("listening.levelHistoryTitle").replace(
+                      "{level}",
+                      stats.level,
+                    )}
+                    disabled={!!session}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      expandedLevel === stats.level && "bg-accent",
+                      session && "cursor-not-allowed opacity-60",
+                    )}
                   >
-                    <span className="text-sm font-bold text-foreground">
-                      {stats.level}
+                    <ProgressRing
+                      value={currentLevelPct}
+                      size={72}
+                      strokeWidth={7}
+                      className="text-primary"
+                      ariaLabel={`${t("listening.currentLevel")}: ${stats.level}`}
+                    >
+                      <span className="text-sm font-bold text-foreground">
+                        {stats.level}
+                      </span>
+                    </ProgressRing>
+                    <span className="text-xs font-medium text-foreground">
+                      {t("listening.currentLevel")}
                     </span>
-                  </ProgressRing>
-                  <span className="text-xs font-medium text-foreground">
-                    {t("listening.currentLevel")}
-                  </span>
-                  <span className="text-[11px] tabular-nums text-muted-foreground">
-                    {currentLevelStat
-                      ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
-                      : "—"}
-                  </span>
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      {currentLevelStat
+                        ? `${currentLevelStat.mastered}/${currentLevelStat.total}`
+                        : "—"}
+                    </span>
+                    {currentLevelStat?.completed && (
+                      <span className="text-[11px] font-semibold text-success">
+                        {t("listening.routeCompleted").replace(
+                          "{level}",
+                          stats.level,
+                        )}
+                      </span>
+                    )}
+                    {currentLevelStat &&
+                      !currentLevelStat.completed &&
+                      currentLevelStat.mastered === currentLevelStat.total && (
+                        <span className="text-[11px] font-semibold text-warning">
+                          {t("listening.routePendingCert")}
+                        </span>
+                      )}
+                  </button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4">
-                {stats.levels.map((lv) => {
-                  const content = (
-                    <>
-                      <ProgressRing
-                        value={lv.total > 0 ? (lv.mastered / lv.total) * 100 : 0}
-                        size={44}
-                        strokeWidth={5}
-                        className={
-                          lv.completed ? "text-success" : "text-primary"
-                        }
-                        ariaLabel={`${lv.level}: ${lv.mastered}/${lv.total}`}
-                      >
-                        {lv.completed ? (
-                          <Check className="size-4" aria-hidden="true" />
-                        ) : (
-                          <span className="text-[10px] font-semibold tabular-nums text-foreground">
-                            {lv.mastered}
-                          </span>
-                        )}
-                      </ProgressRing>
-                      <span className="text-[11px] font-medium text-muted-foreground">
-                        {lv.level}
-                      </span>
-                      <span className="text-[10px] tabular-nums text-muted-foreground">
-                        {lv.mastered}/{lv.total}
-                      </span>
-                    </>
-                  );
-                  if (lv.completed) {
+              <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+                {t("listening.routeNote").replace("{level}", stats.level)}
+              </p>
+
+              <div className="flex flex-col border-t border-border pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  {stats.levels.map((lv) => {
+                    const expanded = expandedLevel === lv.level;
                     return (
-                      <Tooltip
+                      <button
                         key={lv.level}
-                        content={t("listening.reviewStartLevel").replace(
+                        type="button"
+                        onClick={() => toggleLevel(lv.level)}
+                        aria-expanded={expanded}
+                        aria-controls="listening-level-items"
+                        aria-label={t("listening.levelHistoryTitle").replace(
                           "{level}",
                           lv.level,
                         )}
+                        disabled={!!session}
+                        className={cn(
+                          "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                          expanded && "bg-accent",
+                          session && "cursor-not-allowed opacity-60",
+                        )}
                       >
-                        <button
-                          type="button"
-                          onClick={() => startReview(lv)}
-                          disabled={!!review}
-                          aria-label={t("listening.reviewStartLevel").replace(
-                            "{level}",
-                            lv.level,
-                          )}
-                          className="flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        <ProgressRing
+                          value={lv.total > 0 ? (lv.mastered / lv.total) * 100 : 0}
+                          size={44}
+                          strokeWidth={5}
+                          className={
+                            lv.completed
+                              ? "text-success"
+                              : lv.mastered === lv.total
+                                ? "text-warning"
+                                : "text-primary"
+                          }
+                          ariaLabel={`${lv.level}: ${lv.mastered}/${lv.total}`}
                         >
-                          {content}
-                        </button>
-                      </Tooltip>
+                          {lv.completed ? (
+                            <Check className="size-4" aria-hidden="true" />
+                          ) : (
+                            <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                              {lv.mastered}
+                            </span>
+                          )}
+                        </ProgressRing>
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                          {t("listening.routeLabel").replace("{level}", lv.level)}
+                        </span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">
+                          {lv.mastered}/{lv.total}
+                        </span>
+                      </button>
                     );
-                  }
-                  return (
-                    <div
-                      key={lv.level}
-                      className="flex flex-col items-center gap-1.5"
-                    >
-                      {content}
-                    </div>
-                  );
-                })}
+                  })}
+                </div>
+                {expandedLevel !== null && !session && (
+                  <div
+                    id="listening-level-items"
+                    className="mt-4 border-t border-border pt-4"
+                  >
+                    <ListeningLevelPanel
+                      userId={userId}
+                      level={expandedLevel}
+                      onPracticeLevel={startLevelSession}
+                      onDrillFailed={startFailedDrill}
+                    />
+                  </div>
+                )}
               </div>
             </Card>
           )}
@@ -1085,7 +1221,7 @@ export function ListeningPractice({
                 {t("listening.completed")}
               </p>
             )}
-            {!(result || productionResult) && (
+            {!(result || productionResult) && session?.mode !== "drill" && (
               <Button
                 variant="outline"
                 className="min-h-10 gap-2"
@@ -1093,7 +1229,7 @@ export function ListeningPractice({
                 disabled={!userId}
               >
                 <RefreshCw className="size-4" aria-hidden="true" />
-                {t("listening.next")}
+                {t("listening.skip")}
               </Button>
             )}
           </div>

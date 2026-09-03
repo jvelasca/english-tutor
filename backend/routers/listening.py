@@ -10,6 +10,7 @@ from schemas.listening import (
     ListeningAnswerRequest,
     ListeningAnswerResponse,
     ListeningDiagnostic,
+    ListeningLevelItemsOut,
     ListeningProductionRequest,
     ListeningProductionResult,
     ListeningQuestion,
@@ -19,15 +20,39 @@ from services.listening import LEVEL_ORDER
 
 router = APIRouter()
 
+VALID_MODES = ("all", "failed")
+
 
 @router.get("/api/listening/question", response_model=ListeningQuestion)
 async def question(
     level: str | None = None,
+    mode: str = "all",
     user: dict = Depends(current_user),
 ) -> dict:
     if level is not None and level not in LEVEL_ORDER:
         raise HTTPException(status_code=400, detail=f"Nivel no válido: {level}")
-    return await listening_service.next_question(user["id"], level=level)
+    if mode not in VALID_MODES:
+        raise HTTPException(status_code=400, detail=f"Modo no válido: {mode}")
+    try:
+        return await listening_service.next_question(
+            user["id"], level=level, mode=mode
+        )
+    except ValueError as exc:
+        if str(exc) == "listening.no_failed":
+            raise HTTPException(
+                status_code=404, detail="listening.no_failed"
+            ) from None
+        raise
+
+
+@router.get("/api/listening/items", response_model=ListeningLevelItemsOut)
+async def level_items(
+    level: str,
+    user: dict = Depends(current_user),
+) -> dict:
+    if level not in LEVEL_ORDER:
+        raise HTTPException(status_code=400, detail=f"Nivel no válido: {level}")
+    return await listening_service.level_items(user["id"], level)
 
 
 @router.get("/api/listening/audio/{question_id}")

@@ -22,6 +22,7 @@ from __future__ import annotations
 import math
 
 from services.academy import overall_cefr_score
+from services.cefr import PRE_A1
 from services.cefr_matrix import requirements_for
 from services.curriculum import get_objective
 from services.forgetting import days_since, retrieval_probability
@@ -61,6 +62,11 @@ def estimated_level(profile: list[dict]) -> dict:
     Convierte el `overall_cefr_score` ponderado (0..1) a una escala continua
     A1=1.0 … C2=6.0 y devuelve `{level, numeric, confidence}`, donde `confidence`
     es la confianza media de las destrezas con evidencia (0.0 si no hay ninguna).
+
+    Sin ninguna destreza con evidencia (perfil nuevo o sin actividad) el nivel es
+    `Pre-A1`: aún no hay base para afirmar A1. El `numeric` se mantiene en 1.0
+    (suelo de la escala continua), de modo que `overall_ability` no cambia de
+    rango para el resto del dominio.
     """
     overall = overall_cefr_score(profile)
     numeric = round(1.0 + 5.0 * overall, 2)
@@ -70,8 +76,12 @@ def estimated_level(profile: list[dict]) -> dict:
     confidence = (
         round(sum(confidences) / len(confidences), 2) if confidences else 0.0
     )
+    if not confidences or overall <= 0.0:
+        level = PRE_A1
+    else:
+        level = numeric_to_level(numeric)
     return {
-        "level": numeric_to_level(numeric),
+        "level": level,
         "numeric": numeric,
         "confidence": confidence,
     }
