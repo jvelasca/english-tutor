@@ -166,6 +166,28 @@ export interface GrammarRecurringError {
   mastered: boolean;
 }
 
+export interface CompetenceGate {
+  score_ok: boolean;
+  confidence_ok: boolean;
+  evidence_ok: boolean;
+  review_due: boolean;
+  retention_ok: boolean;
+}
+
+/** Estado de competencia de una destreza en el nivel actual (Constitución §2.1):
+ *  not_started | developing | functional | demonstrated. */
+export interface CompetenceState {
+  skill: string;
+  level: string;
+  state: string;
+  demonstrated: boolean;
+  estimated_band: string;
+  score: number;
+  confidence: number;
+  evidence_count: number;
+  gate: CompetenceGate;
+}
+
 export interface LearningProfile {
   user_id: string;
   current_level: string;
@@ -176,6 +198,7 @@ export interface LearningProfile {
   overall_ability: number;
   target_level: string;
   skills: SkillState[];
+  competence_states: CompetenceState[];
   readiness: Readiness;
   cefr_history: CefrSnapshot[];
   vocabulary_size: number;
@@ -1275,15 +1298,6 @@ export interface Enrollment {
 
 export interface EnrollmentsResponse {
   enrollments: Enrollment[];
-}
-
-export interface MasteryLevel {
-  level_id: string;
-  skills: Record<string, number>;
-}
-
-export interface MasteryResponse {
-  mastery: MasteryLevel[];
 }
 
 export interface NextObjective {

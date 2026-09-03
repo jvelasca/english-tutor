@@ -10,6 +10,7 @@ from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
+from services.competence import competence_states
 from services.cefr import (
     CEFR_MODEL_VERSION,
     heuristic_band,
@@ -60,11 +61,23 @@ async def _activity_stats(user_id: str) -> dict:
     }
 
 
+def _skill_band(entry: dict | None) -> str:
+    """Banda heurística por destreza con coherencia Pre-A1 (H7).
+
+    Una destreza SIN evidencia consolidada se muestra "—" (sin señal), nunca "A1"
+    por defecto: solo un score apoyado en evidencia del Student Model produce una
+    banda heurística.
+    """
+    if entry is None or int(entry.get("evidence_count", 0) or 0) == 0:
+        return "—"
+    return heuristic_band(entry.get("score"))
+
+
 def _bands_from_skills(skills: list[dict]) -> dict[str, str]:
     """Banda heurística por destreza canónica (score continuo → banda)."""
     by_skill = {entry["skill"]: entry for entry in skills}
     return {
-        skill: heuristic_band(by_skill[skill]["score"] if skill in by_skill else 0.0)
+        skill: _skill_band(by_skill.get(skill))
         for skill in (
             "vocabulary",
             "grammar",
@@ -84,7 +97,7 @@ def _skill_states(skills: list[dict]) -> list[dict]:
         result.append(
             {
                 "skill": entry["skill"],
-                "band": heuristic_band(entry["score"]),
+                "band": _skill_band(entry),
                 "score": round(float(entry.get("score", 0.0)), 3),
                 "confidence": round(float(entry.get("confidence", 0.0)), 3),
                 "samples": int(entry.get("evidence_count", 0)),
@@ -131,6 +144,9 @@ async def _compute_profile(user_id: str) -> dict | None:
         "overall_ability": student_model["estimated_numeric"],
         "target_level": student_model["target_level"],
         "skills": skills,
+        "competence_states": competence_states(
+            student_model["skills"], student_model["current_level"]
+        ),
         "readiness": student_model["readiness"],
         "vocabulary_size": len(stats["produced"]),
         "vocabulary_exposed": stats["exposed_only"],

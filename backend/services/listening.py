@@ -946,6 +946,10 @@ ROUTE_MIN_SUBSKILLS = 3
 ROUTE_CHECKPOINT_FRACTION = 0.1
 ROUTE_CHECKPOINT_MIN = 5
 ROUTE_CHECKPOINT_MAX = 25
+# Retención retardada estable para DEMONSTRATED (Constitución §6.3): la
+# re-evaluación retardada (≥ 7 días) mantiene al menos este ratio respecto a la
+# precisión inmediata (`delayed_retention`).
+ROUTE_RETENTION_STABLE_RATIO = 0.9
 
 # Velocidad de referencia (wpm) de la voz Piper por defecto. `length_scale_for_rate`
 # la usa para mapear `speech_rate` (wpm) de un ítem a `length_scale` de Piper.
@@ -1788,6 +1792,70 @@ def delayed_retention(attempt_rows: list[dict], now: str = "") -> dict:
         "retention_rate": retention_rate,
         "by_bucket": by_bucket,
     }
+
+
+def route_competence(attempt_rows: list[dict]) -> list[dict]:
+    """Competencia de listening por ruta de nivel CEFR (Constitución §2.1/§6).
+
+    Para cada ruta devuelve `{level, state, gate, retention}` donde `state` es uno
+    de los 4 estados pedagógicos:
+
+    - `not_started`  → sin intentos en la ruta.
+    - `developing`   → hay práctica pero la puerta de ruta aún no se supera.
+    - `functional`   → ruta superada (`route_gate` pasa).
+    - `demonstrated` → functional + retención retardada estable (re-exposiciones
+      ≥ 7 días que mantienen ≥ `ROUTE_RETENTION_STABLE_RATIO` de la precisión
+      inmediata).
+
+    Es la lectura de práctica de listening que se combina con la evidencia formal
+    en el registro por competencia (`services.competence`). `retention` resume el
+    estado de la retención retardada de la ruta (ratio y nº de re-exposiciones
+    largas); se conserva el desglose completo en `delayed_retention`.
+    """
+    by_level_rows: dict[str, list[dict]] = {}
+    for level in LEVEL_ORDER:
+        level_ids = {q["id"] for q in questions_for_level(level)}
+        by_level_rows[level] = [
+            row for row in attempt_rows if row.get("question_id") in level_ids
+        ]
+
+    result: list[dict] = []
+    for level in LEVEL_ORDER:
+        rows = by_level_rows[level]
+        gate = route_gate(level, attempt_rows)
+        retention = delayed_retention(rows)
+        ratio = retention["retention_rate"]
+        long_delayed = sum(
+            b["attempts"]
+            for b in retention["by_bucket"]
+            if b["bucket"] in ("7-30", "30+")
+        )
+        stable = (
+            ratio is not None
+            and ratio >= ROUTE_RETENTION_STABLE_RATIO
+            and long_delayed > 0
+        )
+        if not rows:
+            state = "not_started"
+        elif gate["passed"] and stable:
+            state = "demonstrated"
+        elif gate["passed"]:
+            state = "functional"
+        else:
+            state = "developing"
+        result.append(
+            {
+                "level": level,
+                "state": state,
+                "gate": gate,
+                "retention": {
+                    "retention_rate": ratio,
+                    "stable": stable,
+                    "long_delayed_exposures": long_delayed,
+                },
+            }
+        )
+    return result
 
 
 def resilience_dimensions(question: dict) -> list[str]:

@@ -646,10 +646,11 @@ def test_endpoint_attempts_do_not_grant_mastery(monkeypatch, tmp_path):
 
     with TestClient(app) as client:
         detail = client.get("/api/academy/levels/a1", params={"user_id": a}).json()
-        mastery = client.get("/api/academy/mastery", params={"user_id": a}).json()
-    # Los intentos binarios solo alimentan contadores, no conceden dominio.
+        model = client.get("/api/academy/student-model", params={"user_id": a}).json()
+    # Los intentos binarios solo alimentan contadores, no conceden dominio:
+    # el Student Model (fuente única de mastery) no registra evidencia.
     assert detail["objectives"][0]["status"] == "review"
-    assert mastery["mastery"] == []
+    assert all(m["evidence_count"] == 0 for m in model["mastery"])
 
 
 def test_endpoint_objective_assessment_updates_mastery(monkeypatch, tmp_path):

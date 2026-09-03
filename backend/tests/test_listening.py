@@ -23,6 +23,7 @@ from services.listening import (
     recent_trend,
     recurrence_stats,
     review_next_question,
+    route_competence,
     score_answer,
 )
 
@@ -753,3 +754,23 @@ def test_drill_question_mode_failed_no_failed_404(monkeypatch, tmp_path):
     assert r.status_code == 404
     assert r.json()["detail"] == "listening.no_failed"
     assert bad.status_code == 400
+
+
+def test_route_competence_empty_all_not_started():
+    """Sin intentos, toda ruta está en NOT_STARTED y sin retención estable."""
+    rows = route_competence([])
+    assert [r["level"] for r in rows] == LEVEL_ORDER
+    assert all(r["state"] == "not_started" for r in rows)
+    assert all(r["gate"]["passed"] is False for r in rows)
+    assert all(r["retention"]["stable"] is False for r in rows)
+
+
+def test_route_competence_full_bank_functional_but_not_demonstrated():
+    """Todo el banco A1 acertado a la primera (gate superado) sin re-exposiciones
+    retardadas: la ruta queda FUNCTIONAL, nunca DEMONSTRATED (falta retención)."""
+    a1_ids = {q["id"] for q in QUESTION_BANK if q["level"] == "A1"}
+    rows = [{"question_id": qid, "correct": True, "replay_count": 0} for qid in a1_ids]
+    by_level = {r["level"]: r for r in route_competence(rows)}
+    assert by_level["A1"]["state"] == "functional"
+    assert by_level["A1"]["retention"]["stable"] is False
+    assert by_level["A1"]["retention"]["retention_rate"] is None

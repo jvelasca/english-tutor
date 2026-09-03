@@ -49,7 +49,6 @@ from schemas.academy import (
     LevelDetailOut,
     LevelProgressOut,
     LevelSummaryOut,
-    MasteryOut,
     MasteryRecordOut,
     ModuleProgressOut,
     NextBestActivityOut,
@@ -123,7 +122,7 @@ from services.curriculum import (
     next_level_id,
 )
 from services.interaction import interaction_evidence
-from services.listening import listening_diagnostic
+from services.listening import listening_diagnostic, route_competence
 from services.mastery import mastery_records
 
 logger = logging.getLogger(__name__)
@@ -454,14 +453,6 @@ async def list_enrollments(user_id: str) -> list[EnrollmentOut]:
     return [EnrollmentOut(**r) for r in rows]
 
 
-async def get_mastery(user_id: str) -> list[MasteryOut]:
-    rows = await run_in_threadpool(academy_repo.list_skill_mastery, user_id)
-    by_level: dict[str, dict[str, float]] = {}
-    for r in rows:
-        by_level.setdefault(r["level_id"], {})[r["skill"]] = r["score"]
-    return [MasteryOut(level_id=k, skills=v) for k, v in by_level.items()]
-
-
 async def _skill_trends(user_id: str) -> dict[str, float | None]:
     """Tendencia por destreza (% de variación de accuracy, últimos 7d vs anterior).
 
@@ -518,6 +509,10 @@ async def _annotated_profile(user_id: str, lv: Level) -> list[dict]:
     for entry in skills:
         if entry["skill"] == "listening":
             entry["subskills"] = subskills
+            # Competencia de listening por ruta de práctica (H3/H5): la puerta de
+            # ruta pasa a ser el gate FUNCTIONAL de la destreza y se consolida con
+            # la retención retardada para DEMONSTRATED (ver `route_competence`).
+            entry["routes"] = route_competence(listening_attempts)
         elif entry["skill"] == "speaking":
             entry["subskills"] = speaking_subskills
         entry["stability"] = adaptive.skill_stability(

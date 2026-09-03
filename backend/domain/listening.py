@@ -28,6 +28,7 @@ from services.listening import (
     realization_status,
     realized_difficulty,
     review_next_question,
+    route_competence,
     route_gate,
     score_answer,
     spoken_text,
@@ -238,6 +239,14 @@ async def get_stats(user_id: str) -> dict:
         (s["level"] for s in levels if not s["completed"]), LEVEL_ORDER[-1]
     )
     stats["completed"] = all(s["completed"] for s in levels)
+    # Estado pedagógico por ruta (Constitución §2.1): la puerta de ruta decide
+    # FUNCTIONAL y la retención retardada estable DEMONSTRATED (H3/H5).
+    by_route = {c["level"]: c for c in route_competence(attempts)}
+    for row in levels:
+        route = by_route.get(row["level"])
+        if route:
+            row["state"] = route["state"]
+            row["retention"] = route["retention"]
     stats["levels"] = levels
     return stats
 

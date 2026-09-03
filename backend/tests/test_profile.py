@@ -10,7 +10,7 @@ from repositories import grammar as grammar_repo
 from repositories import profile as profile_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services.cefr import PRE_A1, estimate_cefr, recommendations
+from services.cefr import PRE_A1, recommendations
 from services.grammar import find_errors
 
 
@@ -33,35 +33,6 @@ def _fk_targets(table: str) -> set[tuple[str, str]]:
 def test_learning_profile_table_has_user_fk(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     assert ("users", "user_id") in _fk_targets("learning_profile")
-
-
-def test_estimate_cefr_no_evidence_is_pre_a1(monkeypatch, tmp_path):
-    _setup(monkeypatch, tmp_path)
-    assert (
-        estimate_cefr({"vocab_size": 0, "pronunciation_avg": None, "exercises": 0})
-        == PRE_A1
-    )
-
-
-def test_estimate_cefr_vocab_a1_is_a1(monkeypatch, tmp_path):
-    _setup(monkeypatch, tmp_path)
-    # Sin intentos de pronunciación, solo el vocabulario (A1: 150-399 palabras)
-    # cuenta como evidencia; es la banda más baja y limita el nivel a A1.
-    assert (
-        estimate_cefr({"vocab_size": 200, "pronunciation_avg": 75, "exercises": 10})
-        == "A1"
-    )
-
-
-def test_estimate_cefr_high_is_c1(monkeypatch, tmp_path):
-    _setup(monkeypatch, tmp_path)
-    # Vocabulario C1 evidenciado (3000-4999); pronunciación sin muestras no limita.
-    assert (
-        estimate_cefr(
-            {"vocab_size": 3000, "pronunciation_avg": 95, "exercises": 100}
-        )
-        == "C1"
-    )
 
 
 def test_recommendations_grammar_error(monkeypatch, tmp_path):
@@ -129,6 +100,7 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         assert body["user_id"] == a
         # Sin evidencia de Academy, la estimación no llega a A1: es Pre-A1.
         assert body["estimated_level"] == PRE_A1
+        assert body["estimated_descriptor"]
         assert 0.0 <= body["estimated_confidence"] < 0.1
         assert 1.0 <= body["overall_ability"] <= 6.0
         assert set(body["estimated_bands"].keys()) == {
@@ -148,6 +120,11 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         )
         assert body["readiness"]["target_level"]
         assert body["cefr_history"]  # primer snapshot registrado
+        # Registro por competencia (Constitución §2.1): sin evidencia de Academy
+        # las 9 destrezas están en NOT_STARTED, nunca "A1" por defecto.
+        assert len(body["competence_states"]) == 9
+        assert all(s["state"] == "not_started" for s in body["competence_states"])
+        assert all(s["estimated_band"] == "—" for s in body["competence_states"])
         assert body["vocabulary_size"] == 2
         assert set(body["top_words"]) == {"cat", "dog"}
         assert body["recurring_errors"][0]["rule"] == "he_she_it_s"
@@ -234,7 +211,7 @@ def test_profile_vocabulary_mastered(monkeypatch, tmp_path):
     assert body["vocabulary_exposed"] == 0
 
 
-def test_profile_grammar_band_defaults_to_a1_without_academy_evidence(
+def test_profile_grammar_band_is_dash_without_academy_evidence(
     monkeypatch, tmp_path
 ):
     a, _b = _setup(monkeypatch, tmp_path)
@@ -255,5 +232,6 @@ def test_profile_grammar_band_defaults_to_a1_without_academy_evidence(
     with TestClient(app) as client:
         r = client.get("/api/profile", params={"user_id": a})
         assert r.status_code == 200
-        # Sin evidencia de Academy, la banda de gramática es la heurística A1.
-        assert r.json()["estimated_bands"]["grammar"] == "A1"
+        # Sin evidencia de Academy, la banda de gramática es "—" (sin señal):
+        # nunca "A1" por defecto (H7).
+        assert r.json()["estimated_bands"]["grammar"] == "—"

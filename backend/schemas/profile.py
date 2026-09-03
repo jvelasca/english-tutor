@@ -46,6 +46,35 @@ class CefrSnapshot(BaseModel):
     skills: list[SkillState] = Field(default_factory=list)
 
 
+class CompetenceGate(BaseModel):
+    """Criterios del gate de competencia (Constitución §6): dominio, confianza,
+    volumen de evidencia, repaso pendiente y retención retardada."""
+
+    score_ok: bool
+    confidence_ok: bool
+    evidence_ok: bool
+    review_due: bool
+    retention_ok: bool
+
+
+class CompetenceState(BaseModel):
+    """Estado de competencia de UNA destreza en el nivel actual del Student Model.
+
+    Los 4 estados (Constitución §2.1): not_started / developing / functional /
+    demonstrated. `estimated_band` es la hipótesis heurística de visualización
+    ("—" sin evidencia); `demonstrated` solo se concede con retención."""
+
+    skill: str
+    level: str
+    state: str
+    demonstrated: bool
+    estimated_band: str
+    score: float
+    confidence: float
+    evidence_count: int
+    gate: CompetenceGate
+
+
 class LearningProfile(BaseModel):
     user_id: str
     current_level: str
@@ -56,6 +85,7 @@ class LearningProfile(BaseModel):
     overall_ability: float
     target_level: str
     skills: list[SkillState]
+    competence_states: list[CompetenceState] = Field(default_factory=list)
     readiness: ReadinessOut
     cefr_history: list[CefrSnapshot] = Field(default_factory=list)
     vocabulary_size: int

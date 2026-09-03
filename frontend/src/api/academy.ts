@@ -16,7 +16,6 @@ import type {
   LevelCompletion,
   LevelDetail,
   LevelsResponse,
-  MasteryLevel,
   NextBestActivity,
   NextObjective,
   ObjectiveAssessmentResult,
@@ -75,12 +74,6 @@ export function enroll(userId: string, levelId: string): Promise<Enrollment> {
   return postJson<Enrollment>(`/api/academy/enroll${userQuery(userId)}`, {
     level_id: levelId,
   });
-}
-
-export function getMastery(userId: string): Promise<MasteryLevel[]> {
-  return getJson<{ mastery: MasteryLevel[] }>(
-    `/api/academy/mastery${userQuery(userId)}`,
-  ).then((r) => r.mastery);
 }
 
 export function getNextObjective(

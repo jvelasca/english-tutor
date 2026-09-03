@@ -114,6 +114,17 @@ class ListeningGate(BaseModel):
     blockers: list[str] = Field(default_factory=list)
 
 
+class ListeningRouteRetention(BaseModel):
+    """Resumen de retención retardada estable de una ruta (Constitución §6.3).
+
+    `retention_rate` es delayed/immediate (None sin datos); `stable` exige ratio ≥
+    `ROUTE_RETENTION_STABLE_RATIO` y al menos una re-exposición ≥ 7 días."""
+
+    retention_rate: float | None = None
+    stable: bool = False
+    long_delayed_exposures: int = 0
+
+
 class ListeningLevelOut(BaseModel):
     level: str
     total: int
@@ -123,6 +134,10 @@ class ListeningLevelOut(BaseModel):
     accuracy: float | None = None
     # Estado de la puerta de ruta (None en respuestas de versiones antiguas).
     gate: ListeningGate | None = None
+    # Estado pedagógico de la ruta (Constitución §2.1): not_started /
+    # developing / functional / demonstrated; y resumen de su retención.
+    state: str = "not_started"
+    retention: ListeningRouteRetention | None = None
 
 
 class ListeningItemOut(BaseModel):

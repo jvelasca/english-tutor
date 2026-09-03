@@ -35,7 +35,6 @@ from schemas.academy import (
     LessonCompleteRequest,
     LevelDetailOut,
     LevelsOut,
-    MasteryListOut,
     NextBestActivityOut,
     NextObjectiveOut,
     ObjectiveAssessmentOut,
@@ -130,11 +129,6 @@ async def enroll(body: EnrollRequest, user: dict = Depends(current_user)) -> dic
 @router.get("/api/academy/enrollment", response_model=EnrollmentsOut)
 async def enrollment_list(user: dict = Depends(current_user)) -> dict:
     return {"enrollments": await academy_service.list_enrollments(user["id"])}
-
-
-@router.get("/api/academy/mastery", response_model=MasteryListOut)
-async def mastery(user: dict = Depends(current_user)) -> dict:
-    return {"mastery": await academy_service.get_mastery(user["id"])}
 
 
 @router.get("/api/academy/next", response_model=NextObjectiveOut)

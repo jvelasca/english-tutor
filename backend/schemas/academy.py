@@ -197,15 +197,6 @@ class CourseMapOut(BaseModel):
     progress: CourseProgressOut
 
 
-class MasteryOut(BaseModel):
-    level_id: str
-    skills: dict[str, float]
-
-
-class MasteryListOut(BaseModel):
-    mastery: list[MasteryOut]
-
-
 class NextObjectiveOut(BaseModel):
     objective_id: str | None
     level_id: str

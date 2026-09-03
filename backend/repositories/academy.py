@@ -118,16 +118,6 @@ def get_skill_mastery(user_id: str, level_id: str) -> dict[str, float]:
     return {r["skill"]: r["score"] for r in rows}
 
 
-def list_skill_mastery(user_id: str) -> list[dict]:
-    with closing(_conn()) as conn:
-        rows = conn.execute(
-            "SELECT level_id, skill, score, updated_at FROM academy_skill_mastery "
-            "WHERE user_id = ? ORDER BY level_id ASC, skill ASC",
-            (user_id,),
-        ).fetchall()
-    return [dict(r) for r in rows]
-
-
 # --- Mastery por objetivo (fuente de verdad del progreso curricular) -------
 
 
