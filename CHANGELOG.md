@@ -4,6 +4,29 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.2.1] — 2026-09-03
+
+**Auditoría pedagógica del modelo de nivelación (solo documentación).** Sin cambios de código.
+Corrige el concepto antes de seguir con la UI: se audita cómo decide la app el nivel de un alumno
+(`docs/audit/H-NIVELACION-PEDAGOGICA.md`) y se publica la especificación normativa
+**`docs/CONSTITUCION-PEDAGOGICA.md`** que separa *Practice Level / Mastery / Estimated CEFR /
+Demonstrated CEFR* y prohíbe leer "cantidad de palabras → nivel CEFR".
+
+### Añadido (documentación)
+- **Dossier `docs/audit/H-NIVELACION-PEDAGOGICA.md`** (desk, plantilla TEMPLATE): inventario de las
+  dos fuentes de nivel (heurístico legacy `services/cefr.py` vs Student Model), hallazgos H1–H7 y
+  veredicto: el modelo es honesto en la superficie pero no responde "qué ha demostrado el alumno".
+- **`docs/CONSTITUCION-PEDAGOGICA.md`**: principios, 4 conceptos + 4 estados por competencia
+  (NOT STARTED → DEVELOPING → FUNCTIONAL → DEMONSTRATED), cobertura léxica receptiva/productiva
+  como indicador (no puerta), taxonomía de **Lexical Units**, progresión de listening por fases y
+  **Mastery Gate** general (coverage + accuracy + subskills + retención ≥ 7 días + checkpoint) con
+  mapeo de los bloques que ya existen (`route_gate`, evidence kinds, `mastery_evidence_gate`,
+  `cefr_matrix.json`).
+- **Roadmap de implementación derivado** (P0/P1/P2, sección 9 de la constitución): eliminar la
+  interpretación palabras→nivel, estados Estimado/Demostrado por competencia, listening conectado
+  al Student Model, matriz CEFR a C1/C2 y 8 destrezas, retención en la certificación, Lexical
+  Units, y UI "Entrenamiento A1" vs "A1 — demonstrated".
+
 ## [3.2.0] — 2026-09-03
 
 **Calibración pedagógica de niveles.** Nadie "alcanza A1" con 30 audios o 30

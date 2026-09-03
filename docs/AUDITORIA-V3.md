@@ -1,4 +1,4 @@
-# Auditoría V3.0 — fase post-freeze (A–G)
+# Auditoría V3.0 — fase post-freeze (A–H)
 
 > Realizada el 2026-09-02 como fase post-freeze de V3.0 Beta. Complementa los
 > gates automáticos (`check_beta_v3.py`, `pytest`, `ruff`, `tsc`, `vitest`,
@@ -17,7 +17,7 @@ dorados sintéticos y protocolos, y las tareas que exigen hardware o personas
 fix del sesgo posicional pendiente de aprobación) quedan listadas como
 acciones abiertas, no como defectos no detectados.
 
-## 2. Resultado por auditoría (A–G)
+## 2. Resultado por auditoría (A–H)
 
 | Auditoría | Estado | Evidencia principal | Entregable |
 |---|---|---|---|
@@ -28,6 +28,7 @@ acciones abiertas, no como defectos no detectados.
 | E · FSRS/Retention | **Aprobado con matices** | Simulaciones doradas de historias Again/Hard/Good/Easy verifican scheduler; retención ≥7d y cola por retrievability. Uniformidad por tipo de memoria: medida y documentada; sin cambio de modelo. | `docs/audit/E-FSRS-RETENTION.md` + `sequences.json` |
 | F · UX/Learning Journey | **Aprobado** | Home responde formalmente a las 5 preguntas; fix del positivo falso «All done» aplicado y validado; i18n: 660 claves, 0 roturas, 50 huérfanas no bloqueantes. §4.3 de `BETA_V3.md` cerrado. | `docs/audit/F-UX-JOURNEY.md` + `scripts/check_i18n_coverage.py` |
 | G · LAN + dispositivos | **Protocolo listo** | Runbook por dispositivo + checklist V3.0. Ejecución física pendiente (hardware humano). | `docs/audit/G-DEVICES.md` + `DEVICE_MATRIX.md` (rellenar con resultados) |
+| H · Nivelación pedagógica (2026-09-03) | **Nuevo dossier (desk, documental)** | Diagnóstico del modelo de nivelación frente al modelo conceptual Practice/Mastery/Estimado/Demostrado; hallazgos H1–H7. Especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md`; sin artefactos generados. | `docs/audit/H-NIVELACION-PEDAGOGICA.md` |
 
 ## 3. Hallazgos por severidad
 

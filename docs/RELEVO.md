@@ -4,6 +4,13 @@
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-08-31 17:15 (UTC+2).
+>
+> **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
+> La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
+> roadmap actual vive en `PLAN.md` (+ `README.md`, `CHANGELOG.md`,
+> `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
+> de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
+> especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
 
 ## 0. START HERE — para el gerente que retoma ahora
 
@@ -2202,6 +2209,25 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `test_loop_assess_and_review_cover_every_unit` (covered_units == total_units).
 - Verificado: `curriculum_coverage --strict` exit 0, `validate_level` vacío para los 6 niveles, backend
   **1005 tests** + `ruff` limpio. Sin bump de versión y **sin UI** (solo contenido + invariantes).
+
+### 37.29 NUEVO (V3.2.x, docs) — Auditoría pedagógica del modelo de nivelación + Constitución CEFR
+- **Dossier desk** `docs/audit/H-NIVELACION-PEDAGOGICA.md` (2026-09-03): inventario del
+  modelo de nivelación (modelo heurístico legacy `services/cefr.py` vs Student Model vivo),
+  hallazgos H1–H7 y veredicto ("el modelo no sabe responder qué ha demostrado el alumno").
+- **Constitución pedagógica** `docs/CONSTITUCION-PEDAGOGICA.md`: especificación normativa
+  Pre-A1→C2. Separa **Practice Level / Mastery / Estimated CEFR / Demonstrated CEFR** con 4
+  estados por competencia (NOT STARTED → DEVELOPING → FUNCTIONAL → DEMONSTRATED), define
+  cobertura léxica como indicador (no puerta), Lexical Units, la progresión de listening y el
+  Mastery Gate general (coverage + accuracy + subskills + retención ≥7d + checkpoint).
+- **Incrementos de código siguientes** (solo documentados; no ejecutados en esta iteración):
+  - P0: eliminar la interpretación palabras→nivel y sus tests; estados Estimado/Demostrado por
+    competencia con una sola fuente de mastery; coherencia Pre-A1 en bandas por destreza.
+  - P0: cablear la práctica de listening al Student Model y consolidar `route_gate` como gate de
+    la competencia Listening (con retención retardada).
+  - P1: extender `cefr_matrix.json` a C1/C2 y 8 destrezas; retención en la certificación;
+    Lexical Units en el Personal Dictionary.
+  - P2: UI de "Entrenamiento A1" vs "A1 — demonstrated"; etiquetado del nivel estimado;
+    eliminar `modeCefrLevel`/`modeCefrBand`.
 
 ### Próximo (V2.6+)
 Orden de prioridades fijado por la auditoría externa:

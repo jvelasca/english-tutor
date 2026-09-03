@@ -11,7 +11,7 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.2.0` — **Calibración pedagógica de niveles** (nivel
+- ✅ Versión estable `3.2.1` — **Auditoría pedagógica del modelo de nivelación** (solo documentación; ver `docs/audit/H-NIVELACION-PEDAGOGICA.md` y `docs/CONSTITUCION-PEDAGOGICA.md`). Base: `3.2.0` — **Calibración pedagógica de niveles** (nivel
   estimado global honesto con `Pre-A1`, Listening como rutas con puerta de
   evidencia y corpus A1/A2 → 200 ítems c/u). Sobre la base de **V3.1 UI**
   (release de interfaz y navegación; ver `docs/UI_V3.1.md`). El stack
@@ -48,6 +48,16 @@
   con barra de estado y navegación por destrezas, más el **Learning Home** como pantalla central)
   y **V1.20** (pronunciación fonémica P6, turn-taking real e infraestructura de biblioteca de
   audio humano).
+- **V3.2.x (2026-09-03) — Auditoría pedagógica del modelo de nivelación (solo documentación)**:
+  dossier desk `docs/audit/H-NIVELACION-PEDAGOGICA.md` (hallazgos H1–H7: palabras→nivel aún en el
+  modelo legacy, sin par Estimado/Demostrado, listening sin evidencia en el Student Model, matriz
+  CEFR solo hasta B2, retención fuera de la certificación, mastery duplicado, estimado crudo en la
+  UI) y especificación normativa **`docs/CONSTITUCION-PEDAGOGICA.md`**: separa Practice Level /
+  Mastery / Estimated CEFR / Demonstrated CEFR con 4 estados por competencia
+  (NOT STARTED → DEVELOPING → FUNCTIONAL → DEMONSTRATED), define cobertura léxica como indicador
+  (no puerta), Lexical Units, progresión de listening y el Mastery Gate general (coverage +
+  accuracy + subskills + retención ≥ 7 días + checkpoint). Los incrementos de código derivados
+  (P0/P1/P2) quedan priorizados en la sección 9 de la constitución; no se ejecutan en esta iteración.
 - ✅ **V2.0 Beta 1.0** (5 gates de salida 10/10), **V2.1 Content** (Content Quality Gate + corpus de
   listening 40→100 + escenarios de speaking 8→20 + niveles C1/C2), **V2.2 Academy/Course Engine**
   (métrica única "TOTAL VALIDATED LEARNING ITEMS" = 143, plantilla fija de 7 secciones por unidad,

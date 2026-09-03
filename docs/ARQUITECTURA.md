@@ -188,6 +188,13 @@ de mastery determinista que decide el dominio sin LLM-juez.
 
 Principio rector: **la IA genera evidencia; el Mastery Engine determinista decide el dominio.**
 
+**Modelo conceptual de nivel (V3.2.x):** la especificación normativa de qué significa
+"estar en un nivel" y cómo se demuestra por competencia vive en
+`docs/CONSTITUCION-PEDAGOGICA.md` (Practice Level / Mastery / Estimated CEFR /
+Demonstrated CEFR, 4 estados por competencia, Mastery Gate general). Ninguna capa
+debe leer "cantidad de ítems o palabras → nivel CEFR" (auditoría en
+`docs/audit/H-NIVELACION-PEDAGOGICA.md`, hallazgos H1–H7).
+
 ## Frontend (`frontend/src/`)
 
 ```
