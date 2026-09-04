@@ -278,7 +278,10 @@ export function SpeakingAssessment({
     return (
       <ActivityResult
         outcome="neutral"
-        title={`Speaking Assessment · ${formatScorePct(result.score)}`}
+        title={t("assessment.titleScore").replace(
+          "{score}",
+          formatScorePct(result.score),
+        )}
         footer={<NextStep userId={userId} onNext={onNext} />}
       >
         <header className="flex flex-wrap items-center gap-2">

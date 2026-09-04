@@ -32,6 +32,7 @@ import {
   sessionDone,
   type ListeningSession,
 } from "./listeningSession";
+import { audioTypeKey, retentionBucketKey } from "../../utils/listeningLabels";
 import { ListeningLevelPanel } from "./ListeningLevelPanel";
 import { speak, transcribe } from "../../api/voz";
 import { getVoices } from "../../api/voices";
@@ -90,48 +91,15 @@ function trendLabel(direction: string): string {
   }
 }
 
-// Etiqueta legible de los buckets de retención retardada (días desde la primera
-// exposición): "0-2" → "0–2 days", etc.
-function retentionBucketLabel(bucket: string): string {
-  switch (bucket) {
-    case "0-2":
-      return "0–2 days";
-    case "2-7":
-      return "2–7 days";
-    case "7-30":
-      return "7–30 days";
-    case "30+":
-      return "over 30 days";
-    default:
-      return bucket;
-  }
+// Etiqueta legible de los buckets de retención retardada y del tipo de audio:
+// los textos viven ahora en `utils/listeningLabels.ts` como claves i18n (V3.6.1).
+function retentionBucketLabel(bucket: string, t: (k: string) => string): string {
+  const key = retentionBucketKey(bucket);
+  return key ? t(key) : bucket;
 }
 
-// Etiqueta honesta del tipo de audio (P0-1): no llamamos "audio real" a la voz
-// sintética local; cada tipo se presenta por lo que realmente es.
-function audioTypeLabel(audioType: string): string {
-  switch (audioType) {
-    case "recorded":
-      return "Real recording";
-    case "mixed":
-      return "Mix of recorded + synthetic";
-    case "synthetic_multispeaker":
-      return "Several synthetic voices";
-    case "real_world":
-      return "Real-world audio (natural environment)";
-    case "tts":
-    default:
-      return "Local synthetic voice (TTS)";
-  }
-}
-
-// Resumen legible del `breakdown` de una tarea de producción (dictado/shadowing):
-// cuántas palabras se acertaron, cuántas faltaron y cuántas sobraron.
-function breakdownLabel(breakdown: Record<string, unknown>): string {
-  const correct = Array.isArray(breakdown.correct) ? breakdown.correct.length : 0;
-  const missing = Array.isArray(breakdown.missing) ? breakdown.missing.length : 0;
-  const extra = Array.isArray(breakdown.extra) ? breakdown.extra.length : 0;
-  return `Correct words: ${correct} · missing: ${missing} · extra: ${extra}`;
+function audioTypeLabel(audioType: string, t: (k: string) => string): string {
+  return t(audioTypeKey(audioType));
 }
 
 const WAVE_BARS = [0.45, 0.8, 0.55, 1, 0.65, 0.9, 0.5, 0.75, 0.4, 0.85, 0.6, 1, 0.7, 0.5, 0.9, 0.65];
@@ -767,7 +735,7 @@ export function ListeningPractice({
                 <div className="flex flex-col items-center gap-1.5 text-center">
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs text-muted-foreground">
-                      {audioTypeLabel(question.audio_type)}
+                      {audioTypeLabel(question.audio_type, t)}
                     </p>
                     {question.realized_difficulty < question.difficulty && (
                       <Tooltip
@@ -967,7 +935,10 @@ export function ListeningPractice({
                   ? result.correct
                     ? t("listening.correct")
                     : t("listening.incorrect")
-                  : `Dictation/Shadowing · ${productionResult?.score ?? 0}/100`
+                  : t("listening.dictationTitle").replace(
+                      "{score}",
+                      String(productionResult?.score ?? 0),
+                    )
               }
               footer={
                 session ? (
@@ -1072,7 +1043,31 @@ export function ListeningPractice({
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {breakdownLabel(productionResult.breakdown)}
+                    {t("listening.breakdownWords")
+                      .replace(
+                        "{correct}",
+                        String(
+                          Array.isArray(productionResult.breakdown.correct)
+                            ? productionResult.breakdown.correct.length
+                            : 0,
+                        ),
+                      )
+                      .replace(
+                        "{missing}",
+                        String(
+                          Array.isArray(productionResult.breakdown.missing)
+                            ? productionResult.breakdown.missing.length
+                            : 0,
+                        ),
+                      )
+                      .replace(
+                        "{extra}",
+                        String(
+                          Array.isArray(productionResult.breakdown.extra)
+                            ? productionResult.breakdown.extra.length
+                            : 0,
+                        ),
+                      )}
                   </p>
                 </>
               )}
@@ -1417,11 +1412,21 @@ export function ListeningPractice({
                     {s.skill} · {s.attempts} ·{" "}
                     {s.accuracy !== null ? `${s.accuracy}%` : "—"}
                     {s.automaticity !== null
-                      ? ` · auto ${Math.round(s.automaticity * 100)}%`
+                      ? ` · ${t("listening.diagAuto").replace(
+                          "{pct}",
+                          String(Math.round(s.automaticity * 100)),
+                        )}`
                       : ""}
-                    {s.mean_score !== null ? ` · mean ${s.mean_score}%` : ""}
+                    {s.mean_score !== null
+                      ? ` · ${t("listening.diagMean").replace(
+                          "{pct}",
+                          String(Math.round(s.mean_score)),
+                        )}`
+                      : ""}
                     {s.review_due ? ` · ${t("diag.review")}` : ""}
-                    {s.realization_gap ? " · audio not backed" : ""}
+                    {s.realization_gap
+                      ? ` · ${t("listening.diagAudioGap")}`
+                      : ""}
                   </li>
                 ))}
               </ul>
@@ -1523,7 +1528,7 @@ export function ListeningPractice({
                     {diagnostic.retention.by_bucket.map((b) => (
                       <li key={b.bucket}>
                         <Badge variant="outline" className="gap-1.5">
-                          {retentionBucketLabel(b.bucket)} ·{" "}
+                          {retentionBucketLabel(b.bucket, t)} ·{" "}
                           {b.accuracy !== null ? `${b.accuracy}%` : "—"}
                         </Badge>
                       </li>

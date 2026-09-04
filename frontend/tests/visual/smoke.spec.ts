@@ -55,29 +55,19 @@ test("capturar rutas principales", async ({ page }, testInfo) => {
     // V3.6: APRENDER/LISTENING muestra ahora el panel de ruta ("Repasar lo
     // aprendido", "Añadir práctica") al desplegar un nivel; capturamos también
     // esa vista si el backend responde y hay niveles que desplegar.
+    // V3.6.1: las prácticas de APRENDER muestran un atajo de actividades en la
+    // franja superior; pulsar otro atajo navega a su hoja (la activa queda
+    // resaltada). Solo en listening (pantalla de práctica de Aprender).
     if (route.id === "listening") {
-      const historyBtn = page
-        .getByRole("button", { name: /Level .* history/i })
-        .first();
-      const visible = await historyBtn.isVisible().catch(() => false);
-      if (visible) {
-        await historyBtn.click();
-        await page
-          .getByText(/Review learned|Repasar lo aprendido/i)
-          .first()
-          .waitFor({ timeout: 10_000 })
-          .catch(() => {
-            /* backend ausente o perfil sin ítems: se omite la captura */
-          });
-        await page
-          .getByText(/Review learned|Repasar lo aprendido/i)
-          .first()
-          .scrollIntoViewIfNeeded()
-          .catch(() => {
-            /* no aplicable */
-          });
-        await page.waitForTimeout(700);
-        await page.screenshot({ path: shot("listening-route") });
+      const switcher = page.getByRole("group", { name: "Switch activity" });
+      if (await switcher.isVisible().catch(() => false)) {
+        await switcher.getByRole("button", { name: "Vocabulary" }).click();
+        await expect(page).toHaveURL(/#\/aprender\/vocabulario/, {
+          timeout: 10_000,
+        });
+        // Vuelve a la ruta original para que el recorrido siga estable.
+        await page.goto(route.url);
+        await expect(nav()).toBeVisible({ timeout: 15_000 });
       }
     }
   }

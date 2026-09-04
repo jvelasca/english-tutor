@@ -598,8 +598,8 @@ export function CourseScreen({
                           ? `${g.value}/${g.required}`
                           : g.section === "retention"
                             ? g.met
-                              ? "PASS"
-                              : "DUE"
+                              ? t("course.gatePass")
+                              : t("course.gateDue")
                             : `${Math.round(g.value * 100)}% / ${Math.round(g.required * 100)}%`;
                       return (
                         <li

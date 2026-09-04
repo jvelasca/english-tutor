@@ -16,6 +16,8 @@ import type { Section } from "../utils/sections";
 import type { SessionStep } from "../types/api";
 import { navigateTo } from "../router/hash";
 import { FORMATION_PATH, LEARN_PATH } from "../router/paths";
+import type { LearnActivity } from "../router/learnHub";
+import { LearnActivitySwitcher } from "../components/LearnActivitySwitcher";
 import { useI18n } from "../hooks/useI18n";
 
 const AnalysisPanel = lazy(() =>
@@ -34,24 +36,11 @@ const SECTION_KICKER: Partial<Record<Section, string>> = {
   grammar: "kicker.grammar",
 };
 
-/**
- * Título de la barra de contexto en práctica libre (route "learn"): sigue la
- * destreza que se está ejercitando en el workspace. En route "chat" la barra
- * anuncia siempre Conversar (la conversación se sirve solo en /aprender/conversar),
- * aunque la sección momentánea del chat sea otra.
- */
-const FREE_ACTIVITY_TITLE: Partial<Record<Section, string>> = {
-  listening: "skill.listening",
-  speaking: "skill.speaking",
-  reading: "skill.reading",
-  writing: "skill.writing",
-  grammar: "skill.grammar",
-  pronunciation: "skill.pronunciation",
-};
-
 interface PracticeViewProps {
   route: "learn" | "chat";
   chat: ChatApi;
+  /** Actividad de APRENDER activa (para el atajo de la franja superior). */
+  activeActivity: LearnActivity | null;
   onAttempt: () => void;
   onNextBestStart: (section: Section | null, step: NextBestActivity) => void;
   onStep: (step: SessionStep) => void;
@@ -68,6 +57,7 @@ interface PracticeViewProps {
 export function PracticeView({
   route,
   chat,
+  activeActivity,
   onAttempt,
   onNextBestStart,
   onStartLesson,
@@ -113,10 +103,6 @@ export function PracticeView({
   // ruta es "chat" (Conversar) y hay un objetivo activo (las lecciones se
   // lanzan siempre desde Formación). Sin objetivo activo la práctica es libre.
   const inLesson = route === "chat" && activeObjective !== null;
-  const freeTitleKey =
-    route === "chat"
-      ? "learn.conversation"
-      : (FREE_ACTIVITY_TITLE[section] ?? "learn.conversation");
   const contextBackPath = inLesson ? FORMATION_PATH : LEARN_PATH;
   const contextBackLabel = inLesson ? t("nav.formation") : t("learn.back");
 
@@ -162,7 +148,7 @@ export function PracticeView({
           <span className="max-w-[45vw] truncate">{contextBackLabel}</span>
         </Button>
 
-        {inLesson && activeObjective && (
+        {inLesson && activeObjective ? (
           <>
             <span className="inline-flex shrink-0 items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
               {activeObjective.levelId}
@@ -170,37 +156,36 @@ export function PracticeView({
             <span className="hidden shrink-0 text-xs font-semibold tracking-wide text-muted-foreground uppercase sm:inline">
               {t("chat.activeLesson")}
             </span>
+            <span
+              className="min-w-0 grow basis-36 truncate text-sm font-semibold text-foreground md:basis-auto"
+              title={activeObjective.title}
+            >
+              {activeObjective.title}
+            </span>
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                onClick={onFinishLesson}
+                className="min-h-11 md:min-h-9"
+              >
+                {t("chat.finishLesson")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearLesson}
+                className="min-h-11 text-muted-foreground md:min-h-9"
+              >
+                {t("chat.exit")}
+              </Button>
+            </span>
           </>
-        )}
-
-        <span className="min-w-0 grow basis-36 truncate text-sm font-semibold text-foreground md:basis-auto"
-          title={inLesson && activeObjective ? activeObjective.title : t(freeTitleKey)}
-        >
-          {inLesson && activeObjective
-            ? activeObjective.title
-            : t(freeTitleKey)}
-        </span>
-
-        {inLesson && (
-          <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            <Button
-              type="button"
-              size="sm"
-              onClick={onFinishLesson}
-              className="min-h-11 md:min-h-9"
-            >
-              {t("chat.finishLesson")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={clearLesson}
-              className="min-h-11 text-muted-foreground md:min-h-9"
-            >
-              {t("chat.exit")}
-            </Button>
-          </span>
+        ) : (
+          // Práctica libre: atajo directo entre las actividades de APRENDER
+          // (la activa queda resaltada y hace de título de la barra).
+          <LearnActivitySwitcher active={activeActivity} />
         )}
       </div>
 

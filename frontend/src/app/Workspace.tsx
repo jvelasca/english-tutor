@@ -9,9 +9,11 @@ import {
   LISTENING_ACTIVITY,
   PRONUNCIATION_ACTIVITY,
   SPEAKING_ACTIVITY,
+  VOCABULARY_ACTIVITY,
   type LearnActivity,
 } from "../router/learnHub";
 import { Button } from "../components/ui/button";
+import { LearnActivitySwitcher } from "../components/LearnActivitySwitcher";
 import type { ChatApi } from "../hooks/useChat";
 import type { NextBestActivity, SessionStep } from "../types/api";
 import type { Section } from "../utils/sections";
@@ -177,10 +179,13 @@ export function Workspace({
       />
     );
   } else if (route === "vocabulary") {
-    // Vocabulario es una hoja de APRENDER: barra de vuelta fija + diccionario.
+    // Vocabulario es una hoja de APRENDER: barra de vuelta fija + atajo de
+    // actividades + diccionario.
     content = (
       <div className="flex min-h-0 flex-1 flex-col">
-        <SubpageHeader label={t("learn.back")} onBack={backToHub} />
+        <SubpageHeader label={t("learn.back")} onBack={backToHub}>
+          <LearnActivitySwitcher active={VOCABULARY_ACTIVITY} />
+        </SubpageHeader>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <PersonalDictionary userId={currentUserId} />
         </div>
@@ -192,7 +197,11 @@ export function Workspace({
     if (!learnActivity || learnActivity === SPEAKING_ACTIVITY) {
       content =
         learnActivity === SPEAKING_ACTIVITY ? (
-          <SpeakingFreePractice userId={currentUserId} onBack={backToHub} />
+          <SpeakingFreePractice
+            userId={currentUserId}
+            active={learnActivity}
+            onBack={backToHub}
+          />
         ) : (
           <LearnHub
             userId={currentUserId}
@@ -207,6 +216,7 @@ export function Workspace({
         <PracticeView
           route="learn"
           chat={chat}
+          activeActivity={learnActivity}
           onAttempt={onAttempt}
           onNextBestStart={onNextBestStart}
           onStep={onStep}
@@ -234,6 +244,7 @@ export function Workspace({
       <PracticeView
         route="chat"
         chat={chat}
+        activeActivity={learnActivity}
         onAttempt={onAttempt}
         onNextBestStart={onNextBestStart}
         onStep={onStep}

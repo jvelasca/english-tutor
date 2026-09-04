@@ -23,8 +23,12 @@ function trendLabel(direction: string): string {
 }
 
 /** Puntos porcentuales con signo (la delta del diagnóstico es una media 0..1). */
-function formatDelta(delta: number): string {
-  return `${delta > 0 ? "+" : ""}${Math.round(delta * 100)} pts`;
+function formatDelta(delta: number, t: (k: string) => string): string {
+  const sign = delta > 0 ? "+" : "";
+  return t("speaking.deltaPts").replace(
+    "{delta}",
+    `${sign}${Math.round(delta * 100)}`,
+  );
 }
 
 /** Etiqueta i18n de cada sub-dimensión de Interaction Quality. */
@@ -226,7 +230,7 @@ export function SpeakingDiagnostic({ userId }: SpeakingDiagnosticProps) {
                 {t(trendLabel(diagnostic.trend.direction))}
               </strong>
               {diagnostic.trend.delta !== null
-                ? ` (${formatDelta(diagnostic.trend.delta)})`
+                ? ` (${formatDelta(diagnostic.trend.delta, t)})`
                 : ""}
             </p>
           )}

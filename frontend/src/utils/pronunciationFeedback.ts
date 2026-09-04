@@ -1,4 +1,5 @@
 import type { PronunciationBreakdown } from "../types/api";
+import type { Translate } from "./fluency";
 
 /** Une palabras en inglés: "a", "a and b", "a, b and c". */
 export function joinWords(words: string[]): string {
@@ -8,22 +9,36 @@ export function joinWords(words: string[]): string {
 }
 
 /** Avisos de pronunciación: una frase por categoría con errores (sin errores → []). */
-export function feedbackHints(breakdown: PronunciationBreakdown): string[] {
+export function feedbackHints(
+  breakdown: PronunciationBreakdown,
+  t: Translate,
+): string[] {
   const hints: string[] = [];
   if (breakdown.missing.length > 0) {
-    hints.push(`You missed: ${joinWords(breakdown.missing)}`);
+    hints.push(
+      t("pron.hint.missing").replace("{words}", joinWords(breakdown.missing)),
+    );
   }
   if (breakdown.substituted.length > 0) {
     const subs = breakdown.substituted.map((s) => `${s.expected} → ${s.heard}`);
-    hints.push(`You substituted: ${subs.join(", ")}`);
+    hints.push(
+      t("pron.hint.substituted").replace("{items}", subs.join(", ")),
+    );
   }
   if (breakdown.extra.length > 0) {
-    hints.push(`You added extra: ${joinWords(breakdown.extra)}`);
+    hints.push(
+      t("pron.hint.extra").replace("{words}", joinWords(breakdown.extra)),
+    );
   }
   return hints;
 }
 
 /** Resumen de aciertos: "4 of 5 words correct". */
-export function wordsCorrectLabel(breakdown: PronunciationBreakdown): string {
-  return `${breakdown.correct.length} of ${breakdown.total} words correct`;
+export function wordsCorrectLabel(
+  breakdown: PronunciationBreakdown,
+  t: Translate,
+): string {
+  return t("pron.wordsCorrect")
+    .replace("{correct}", String(breakdown.correct.length))
+    .replace("{total}", String(breakdown.total));
 }

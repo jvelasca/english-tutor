@@ -77,7 +77,7 @@ export function WritingJourney({ userId }: WritingJourneyProps) {
             />
           ))}
           <span className="journey-marker" style={{ left: `${pct}%` }}>
-            YOU
+            {t("writing.you")}
           </span>
         </div>
         <div className="journey-labels">

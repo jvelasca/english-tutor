@@ -6,6 +6,11 @@ import {
   formatScore,
   pronunciationLevelLabel,
 } from "./progress";
+import { translate } from "./i18n";
+
+// El segundo argumento de bucketLabel/eventLabel es el traductor de la UI;
+// en tests usamos el idioma EN.
+const t = (k: string) => translate("en", k);
 
 describe("formatScore", () => {
   it("rounds to an integer", () => {
@@ -49,18 +54,18 @@ describe("pronunciationLevelLabel", () => {
 
 describe("bucketLabel", () => {
   it("maps each bucket to an English label", () => {
-    expect(bucketLabel("day")).toBe("Day");
-    expect(bucketLabel("week")).toBe("Week");
-    expect(bucketLabel("month")).toBe("Month");
+    expect(bucketLabel("day", t)).toBe("Day");
+    expect(bucketLabel("week", t)).toBe("Week");
+    expect(bucketLabel("month", t)).toBe("Month");
   });
 });
 
 describe("eventLabel", () => {
   it("maps each event type to an English label", () => {
-    expect(eventLabel("message")).toBe("Message");
-    expect(eventLabel("exercise")).toBe("Exercise");
-    expect(eventLabel("correction")).toBe("Correction");
-    expect(eventLabel("pronunciation")).toBe("Pronunciation");
-    expect(eventLabel("conversation")).toBe("Conversation");
+    expect(eventLabel("message", t)).toBe("Message");
+    expect(eventLabel("exercise", t)).toBe("Exercise");
+    expect(eventLabel("correction", t)).toBe("Correction");
+    expect(eventLabel("pronunciation", t)).toBe("Pronunciation");
+    expect(eventLabel("conversation", t)).toBe("Conversation");
   });
 });

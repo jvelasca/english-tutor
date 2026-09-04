@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { StatusBar } from "../components/StatusBar";
 import { Navigation } from "./Navigation";
+import { useI18n } from "../hooks/useI18n";
 import type { Route } from "./routes";
 
 export function AppShell({
@@ -14,6 +15,7 @@ export function AppShell({
   onNavigate: (route: Route) => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="relative flex h-full flex-col">
       <a
@@ -28,7 +30,7 @@ export function AppShell({
           }
         }}
       >
-        Skip to content
+        {t("common.skipToContent")}
       </a>
       {header}
       <main

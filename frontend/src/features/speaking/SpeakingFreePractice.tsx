@@ -2,6 +2,8 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
+import { LearnActivitySwitcher } from "../../components/LearnActivitySwitcher";
+import type { LearnActivity } from "../../router/learnHub";
 import { SpeakingScenarios } from "./SpeakingScenarios";
 import { SpeakingMission } from "./SpeakingMission";
 
@@ -15,6 +17,8 @@ function SectionHeading({ children }: { children: ReactNode }) {
 
 interface SpeakingFreePracticeProps {
   userId: string | null;
+  /** Actividad activa (Speaking) para el atajo de la franja superior. */
+  active: LearnActivity;
   /** Navega de vuelta al hub de APRENDER (`#/aprender`). */
   onBack: () => void;
 }
@@ -25,7 +29,11 @@ interface SpeakingFreePracticeProps {
  * pantalla con scroll. No depende del workspace conversacional: cada bloque
  * gestiona sus propios estados y fetches (`props: { userId }`).
  */
-export function SpeakingFreePractice({ userId, onBack }: SpeakingFreePracticeProps) {
+export function SpeakingFreePractice({
+  userId,
+  active,
+  onBack,
+}: SpeakingFreePracticeProps) {
   const { t } = useI18n();
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -33,12 +41,13 @@ export function SpeakingFreePractice({ userId, onBack }: SpeakingFreePracticePro
         <Button
           variant="ghost"
           size="sm"
-          className="min-h-9 gap-1 px-2 text-sm font-medium"
+          className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
           onClick={onBack}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           {t("learn.back")}
         </Button>
+        <LearnActivitySwitcher active={active} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

@@ -26,28 +26,36 @@ export function pronunciationLevelLabel(level: PronunciationLevel | null): strin
   }
 }
 
-export function bucketLabel(bucket: Bucket): string {
+/** Traduce el bucket de agrupación ("day" → "Day"/"Día"). */
+export function bucketLabel(
+  bucket: Bucket,
+  t: (key: string) => string,
+): string {
   switch (bucket) {
     case "day":
-      return "Day";
+      return t("progress.bucket.day");
     case "week":
-      return "Week";
+      return t("progress.bucket.week");
     case "month":
-      return "Month";
+      return t("progress.bucket.month");
   }
 }
 
-export function eventLabel(type: LearningEventType): string {
+/** Traduce el tipo de evento de actividad ("message" → "Message"/"Mensaje"). */
+export function eventLabel(
+  type: LearningEventType,
+  t: (key: string) => string,
+): string {
   switch (type) {
     case "message":
-      return "Message";
+      return t("progress.event.message");
     case "exercise":
-      return "Exercise";
+      return t("progress.event.exercise");
     case "correction":
-      return "Correction";
+      return t("progress.event.correction");
     case "pronunciation":
-      return "Pronunciation";
+      return t("progress.event.pronunciation");
     case "conversation":
-      return "Conversation";
+      return t("progress.event.conversation");
   }
 }

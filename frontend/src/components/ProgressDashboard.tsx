@@ -153,7 +153,7 @@ export function ProgressDashboard({
           <ul className="pd-timeline">
             {events.slice(0, 8).map((e) => (
               <li key={e.id} className="pd-event">
-                <span className={`pd-event-type ${e.type}`}>{eventLabel(e.type)}</span>
+                <span className={`pd-event-type ${e.type}`}>{eventLabel(e.type, t)}</span>
                 <span className="pd-event-detail">{e.detail || "—"}</span>
                 <span className="pd-event-date">{e.created_at.slice(0, 10)}</span>
               </li>
@@ -183,7 +183,7 @@ export function BucketToggle({
           onClick={() => onChange(b)}
           aria-pressed={b === value}
         >
-          {bucketLabel(b)}
+          {bucketLabel(b, t)}
         </button>
       ))}
     </div>

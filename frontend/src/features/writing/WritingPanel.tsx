@@ -124,7 +124,7 @@ export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
       {focus.length > 0 && (
         <div className="writing-focus">
           <div className="writing-focus__head">
-            <span className="writing-focus__label">NEXT FOCUS</span>
+            <span className="writing-focus__label">{t("writing.nextFocus")}</span>
             <span className="writing-focus__criteria">
               {focus.map(writingCriterionLabel).join(" + ")}
             </span>
@@ -134,7 +134,7 @@ export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
             className="writing-focus__action"
             onClick={() => onPractice?.()}
           >
-            PRACTICE NOW
+            {t("writing.practiceNow")}
           </button>
         </div>
       )}

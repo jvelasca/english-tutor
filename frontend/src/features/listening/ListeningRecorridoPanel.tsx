@@ -5,6 +5,7 @@ import type {
   ListeningStats,
 } from "../../types/api";
 import { SUBSKILL_LABELS } from "../../utils/learningLabels";
+import { retentionBucketKey } from "../../utils/listeningLabels";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
 import { Card } from "../../components/ui/card";
@@ -41,19 +42,10 @@ function topicLabel(topic: string): string {
   return topic.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
-function retentionBucketLabel(bucket: string): string {
-  switch (bucket) {
-    case "0-2":
-      return "0–2 days";
-    case "2-7":
-      return "2–7 days";
-    case "7-30":
-      return "7–30 days";
-    case "30+":
-      return "over 30 days";
-    default:
-      return bucket;
-  }
+// Buckets de retención retardada: texto localizado vía `retentionBucketKey`.
+function retentionBucketLabel(bucket: string, t: (k: string) => string): string {
+  const key = retentionBucketKey(bucket);
+  return key ? t(key) : bucket;
 }
 
 function subskillLabel(skill: string): string {
@@ -409,7 +401,7 @@ export function ListeningRecorridoPanel({
                 {diagnostic.retention.by_bucket.map((b) => (
                   <li key={b.bucket}>
                     <Badge variant="outline" className="gap-1.5">
-                      {retentionBucketLabel(b.bucket)} ·{" "}
+                      {retentionBucketLabel(b.bucket, t)} ·{" "}
                       {b.accuracy !== null ? `${b.accuracy}%` : "—"}
                     </Badge>
                   </li>

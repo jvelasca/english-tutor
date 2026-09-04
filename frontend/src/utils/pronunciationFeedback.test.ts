@@ -4,7 +4,11 @@ import {
   joinWords,
   wordsCorrectLabel,
 } from "./pronunciationFeedback";
+import { translate } from "./i18n";
 import type { PronunciationBreakdown } from "../types/api";
+
+// El segundo argumento es el traductor de la UI; en tests usamos el idioma EN.
+const t = (k: string) => translate("en", k);
 
 function breakdown(partial: Partial<PronunciationBreakdown>): PronunciationBreakdown {
   return {
@@ -37,32 +41,38 @@ describe("joinWords", () => {
 
 describe("feedbackHints", () => {
   it("detecta palabras omitidas", () => {
-    expect(feedbackHints(breakdown({ missing: ["world"] }))).toEqual([
+    expect(feedbackHints(breakdown({ missing: ["world"] }), t)).toEqual([
       "You missed: world",
     ]);
   });
 
   it("detecta sustituciones", () => {
     expect(
-      feedbackHints(breakdown({ substituted: [{ expected: "have", heard: "am" }] })),
+      feedbackHints(
+        breakdown({ substituted: [{ expected: "have", heard: "am" }] }),
+        t,
+      ),
     ).toEqual(["You substituted: have → am"]);
   });
 
   it("detecta palabras de más", () => {
-    expect(feedbackHints(breakdown({ extra: ["world"] }))).toEqual([
+    expect(feedbackHints(breakdown({ extra: ["world"] }), t)).toEqual([
       "You added extra: world",
     ]);
   });
 
   it("sin errores devuelve vacío", () => {
-    expect(feedbackHints(breakdown({}))).toEqual([]);
+    expect(feedbackHints(breakdown({}), t)).toEqual([]);
   });
 });
 
 describe("wordsCorrectLabel", () => {
   it("resume aciertos", () => {
     expect(
-      wordsCorrectLabel(breakdown({ correct: ["a", "b", "c", "d"], total: 5 })),
+      wordsCorrectLabel(
+        breakdown({ correct: ["a", "b", "c", "d"], total: 5 }),
+        t,
+      ),
     ).toBe("4 of 5 words correct");
   });
 });

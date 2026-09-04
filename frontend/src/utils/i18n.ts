@@ -17,14 +17,17 @@ const STRINGS: Record<string, Entry> = {
   "nav.formation": { en: "Course", es: "Formación" },
   "nav.learn": { en: "Learn", es: "Aprender" },
 
-  // Destrezas
+  // Destrezas. Nombres de destreza/actividad en inglés también para la UI en
+  // español (decisión V3.6.1): "Grammar/Pronunciation/Vocabulary/…" mantienen
+  // su nombre en inglés como es habitual en apps de idiomas; el resto de la
+  // interfaz sí se traduce al español.
   "skill.listening": { en: "Listening", es: "Listening" },
   "skill.speaking": { en: "Speaking", es: "Speaking" },
   "skill.reading": { en: "Reading", es: "Reading" },
   "skill.writing": { en: "Writing", es: "Writing" },
-  "skill.grammar": { en: "Grammar", es: "Gramática" },
-  "skill.pronunciation": { en: "Pronunciation", es: "Pronunciación" },
-  "skill.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
+  "skill.grammar": { en: "Grammar", es: "Grammar" },
+  "skill.pronunciation": { en: "Pronunciation", es: "Pronunciation" },
+  "skill.vocabulary": { en: "Vocabulary", es: "Vocabulary" },
 
   // Aprender (hub de práctica libre, V3.1)
   "learn.title": { en: "Learn", es: "Aprender" },
@@ -38,7 +41,11 @@ const STRINGS: Record<string, Entry> = {
   },
   "learn.recommended": { en: "Recommended for you", es: "Recomendado para ti" },
   "learn.back": { en: "Back to Learn", es: "Volver a Aprender" },
-  "learn.conversation": { en: "Conversation", es: "Conversar" },
+  "learn.conversation": { en: "Conversation", es: "Conversation" },
+  "learn.switchActivity": {
+    en: "Switch activity",
+    es: "Cambiar de actividad",
+  },
   "learn.desc.listening": {
     en: "Level-by-level listening exercises with instant feedback.",
     es: "Ejercicios de listening por niveles con feedback inmediato.",
@@ -1634,6 +1641,138 @@ const STRINGS: Record<string, Entry> = {
     en: "Translation unavailable: is the local AI model active?",
     es: "Traducción no disponible: ¿está activo el modelo local?",
   },
+
+  // Barrido V3.6.1: textos de interfaz que antes se pintaban en inglés fijo.
+  // Los nombres de actividad (skill.*, learn.conversation) quedan en inglés
+  // en ambos idiomas por decisión de coherencia; el resto de chrome se traduce.
+  "common.skipToContent": { en: "Skip to content", es: "Saltar al contenido" },
+
+  // 429 del rate limiter local (V3.6.2): mensaje accionable en la lengua de la
+  // UI, coherente con el `code: RATE_LIMITED` que devuelve el backend.
+  "errors.rateLimited": {
+    en: "The local server is busy: wait a few seconds and try again",
+    es: "El servidor local está saturado: espera unos segundos e inténtalo de nuevo",
+  },
+
+  // Listening: tipo de audio (etiqueta honesta), buckets de retención, resumen
+  // de producción y fila de sub-destrezas del diagnóstico.
+  "listening.audioType.recorded": {
+    en: "Real recording",
+    es: "Grabación real",
+  },
+  "listening.audioType.mixed": {
+    en: "Mix of recorded + synthetic",
+    es: "Mezcla de grabación + sintética",
+  },
+  "listening.audioType.synthetic_multispeaker": {
+    en: "Several synthetic voices",
+    es: "Varias voces sintéticas",
+  },
+  "listening.audioType.real_world": {
+    en: "Real-world audio (natural environment)",
+    es: "Audio real (entorno natural)",
+  },
+  "listening.audioType.tts": {
+    en: "Local synthetic voice (TTS)",
+    es: "Voz sintética local (TTS)",
+  },
+  "listening.retentionBucket.0-2": { en: "0–2 days", es: "0–2 días" },
+  "listening.retentionBucket.2-7": { en: "2–7 days", es: "2–7 días" },
+  "listening.retentionBucket.7-30": { en: "7–30 days", es: "7–30 días" },
+  "listening.retentionBucket.30plus": {
+    en: "over 30 days",
+    es: "más de 30 días",
+  },
+  "listening.breakdownWords": {
+    en: "Correct words: {correct} · missing: {missing} · extra: {extra}",
+    es: "Palabras correctas: {correct} · faltan: {missing} · sobran: {extra}",
+  },
+  "listening.dictationTitle": {
+    en: "Dictation/Shadowing · {score}/100",
+    es: "Dictado/Shadowing · {score}/100",
+  },
+  "listening.diagAuto": {
+    en: "auto {pct}%",
+    es: "auto {pct}%",
+  },
+  "listening.diagMean": {
+    en: "mean {pct}%",
+    es: "media {pct}%",
+  },
+  "listening.diagAudioGap": {
+    en: "audio not backed",
+    es: "audio sin respaldo",
+  },
+
+  // Pronunciación: fluidez, palabras por minuto y avisos por palabra.
+  "pron.wpm": { en: "{count} words/min", es: "{count} palabras/min" },
+  "pron.fluencyLevel.fluent": { en: "Fluent", es: "Fluido" },
+  "pron.fluencyLevel.good": { en: "Good pace", es: "Buen ritmo" },
+  "pron.fluencyLevel.slow": { en: "Slow", es: "Lento" },
+  "pron.hint.missing": {
+    en: "You missed: {words}",
+    es: "Te faltaron: {words}",
+  },
+  "pron.hint.substituted": {
+    en: "You substituted: {items}",
+    es: "Sustituiste: {items}",
+  },
+  "pron.hint.extra": {
+    en: "You added extra: {words}",
+    es: "Añadiste de más: {words}",
+  },
+  "pron.wordsCorrect": {
+    en: "{correct} of {total} words correct",
+    es: "{correct} de {total} palabras correctas",
+  },
+
+  // Progreso: buckets de agrupación y tipos de evento.
+  "progress.bucket.day": { en: "Day", es: "Día" },
+  "progress.bucket.week": { en: "Week", es: "Semana" },
+  "progress.bucket.month": { en: "Month", es: "Mes" },
+  "progress.event.message": { en: "Message", es: "Mensaje" },
+  "progress.event.exercise": { en: "Exercise", es: "Ejercicio" },
+  "progress.event.correction": { en: "Correction", es: "Corrección" },
+  "progress.event.pronunciation": {
+    en: "Pronunciation",
+    es: "Pronunciation",
+  },
+  "progress.event.conversation": {
+    en: "Conversation",
+    es: "Conversation",
+  },
+
+  // Plan del día (TodayPlan): píldoras de tipo, frase de repaso/refuerzo y
+  // estabilidad. La destreza se muestra en inglés vía skill.*.
+  "today.kind.weakness": { en: "Weakness", es: "Debilidad" },
+  "today.kind.review": { en: "Review", es: "Repaso" },
+  "today.kind.new": { en: "New", es: "Nuevo" },
+  "today.kind.easy_wins": { en: "Boost", es: "Refuerzo" },
+  "today.kindPhrase.review": { en: "Review", es: "Repasar" },
+  "today.kindPhrase.easy_wins": { en: "Boost", es: "Refuerzo" },
+  "today.stability": {
+    en: "stability {pct}%",
+    es: "estabilidad {pct}%",
+  },
+
+  // Writing: foco y botón del panel, marcador del recorrido.
+  "writing.nextFocus": { en: "NEXT FOCUS", es: "PRÓXIMO FOCO" },
+  "writing.practiceNow": { en: "PRACTICE NOW", es: "PRACTICAR AHORA" },
+  "writing.you": { en: "YOU", es: "TÚ" },
+
+  // Speaking: título del assessment y delta en puntos del diagnóstico.
+  "assessment.titleScore": {
+    en: "Speaking Assessment · {score}",
+    es: "Evaluación de Speaking · {score}",
+  },
+  "speaking.deltaPts": {
+    en: "{delta} pts",
+    es: "{delta} puntos",
+  },
+
+  // Curso: marcadores de puerta de dominio superada/pendiente.
+  "course.gatePass": { en: "PASS", es: "SUPERADO" },
+  "course.gateDue": { en: "DUE", es: "PENDIENTE" },
 };
 
 export function translate(lang: Lang, key: string): string {

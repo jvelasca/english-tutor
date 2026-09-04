@@ -60,7 +60,7 @@ export function PronunciationPractice({
     attemptKey ? `pron:${attemptKey}:${sentence}` : undefined,
   );
 
-  const hints = result ? feedbackHints(result.breakdown) : [];
+  const hints = result ? feedbackHints(result.breakdown, t) : [];
 
   async function toggle() {
     if (recording) {
@@ -259,12 +259,12 @@ export function PronunciationPractice({
             </div>
             <div>
               <span className="text-muted-foreground">{t("pron.fluency")}:</span>{" "}
-              {fluencyLevelLabel(result.fluency.level)} ·{" "}
-              {wpmLabel(result.fluency.wpm)}
+              {fluencyLevelLabel(result.fluency.level, t)} ·{" "}
+              {wpmLabel(result.fluency.wpm, t)}
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            {wordsCorrectLabel(result.breakdown)}
+            {wordsCorrectLabel(result.breakdown, t)}
           </p>
           {hints.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm text-foreground">

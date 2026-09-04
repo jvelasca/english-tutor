@@ -10,9 +10,9 @@ import type {
 } from "../types/api";
 import { cefrLabel, cefrTone } from "../utils/cefr";
 import {
-  KIND_LABELS,
   SKILL_LABELS,
   SUBSKILL_LABELS,
+  kindKey,
   stepTitle,
 } from "../utils/learningLabels";
 import { useI18n } from "../hooks/useI18n";
@@ -323,7 +323,8 @@ function SessionStepRow({
   onClick?: (step: SessionStep) => void;
 }) {
   const { t } = useI18n();
-  const label = KIND_LABELS[item.kind] ?? item.kind;
+  const kindKeyLabel = kindKey(item.kind);
+  const label = kindKeyLabel ? t(kindKeyLabel) : item.kind;
   const reason =
     item.kind === "listening" && item.subskill
       ? `${t("today.subskill")} ${SUBSKILL_LABELS[item.subskill] ?? item.subskill}`
@@ -338,7 +339,7 @@ function SessionStepRow({
       >
         <span className={`today-dot kind-${item.kind}`} aria-hidden="true" />
         <span className="today-item-body">
-          <span className="today-item-title">{stepTitle(item)}</span>
+          <span className="today-item-title">{stepTitle(item, t)}</span>
           <span className="today-item-reason">{reason}</span>
         </span>
         <span className="today-item-kind">{label}</span>
@@ -349,6 +350,7 @@ function SessionStepRow({
 }
 
 function SkillBar({ skill }: { skill: SkillProfile }) {
+  const { t } = useI18n();
   const label = SKILL_LABELS[skill.skill] ?? skill.skill;
   const scorePct = Math.round(skill.score * 100);
   const stabilityPct = Math.round(skill.stability * 100);
@@ -363,7 +365,9 @@ function SkillBar({ skill }: { skill: SkillProfile }) {
               {trend >= 0 ? "↗" : "↘"} {Math.abs(trend)}%
             </span>
           )}
-          <span className="today-skill-stability">stability {stabilityPct}%</span>
+          <span className="today-skill-stability">
+            {t("today.stability").replace("{pct}", String(stabilityPct))}
+          </span>
         </span>
       </div>
       <div className="today-bar">
