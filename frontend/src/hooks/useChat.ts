@@ -59,6 +59,9 @@ export function useChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // true cuando la lista de perfiles ya se ha cargado del backend (permite al
+  // App distinguir "cargando" de "no hay ningún perfil seleccionado").
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [history, setHistory] = useState<ProgressHistory | null>(null);
   const [events, setEvents] = useState<LearningEvent[]>([]);
   const [bucket, setBucket] = useState<Bucket>("week");
@@ -162,19 +165,16 @@ export function useChat() {
       try {
         const existing = await listUsers();
         if (cancelled) return;
-        if (existing.length === 0) {
-          const created = await createUser(nextDefaultUserName([]));
-          if (cancelled) return;
-          setUsers([created]);
-          setCurrentUserId(created.id);
-        } else {
-          setUsers(existing);
-          // Se recuerda el último perfil usado (cookie); si no existe, con un
-          // único usuario se auto-selecciona y si hay varios el usuario elige.
-          setCurrentUserId(resolveInitialUserId(existing, readUserIdCookie()));
-        }
+        setUsers(existing);
+        // Resolución del perfil inicial: cookie recordada → único perfil → si
+        // no, null (el usuario elige). Ya no se crea un perfil por defecto en
+        // silencio: si no hay ninguno, el App muestra el selector "Selecciona
+        // un usuario o crea uno nuevo".
+        setCurrentUserId(resolveInitialUserId(existing, readUserIdCookie()));
       } catch {
-        /* backend no disponible */
+        /* backend no disponible: se queda sin perfiles cargados */
+      } finally {
+        if (!cancelled) setUsersLoaded(true);
       }
     })();
     return () => {
@@ -404,15 +404,17 @@ export function useChat() {
   );
 
   const addUser = useCallback(
-    async (name: string) => {
+    async (name: string): Promise<boolean> => {
       const trimmed = name.trim();
       const finalName = trimmed || nextDefaultUserName(users.map((u) => u.name));
       try {
         const created = await createUser(finalName);
         setUsers((prev) => [...prev, created]);
         setCurrentUserId(created.id);
+        return true;
       } catch {
         /* backend no disponible */
+        return false;
       }
     },
     [users],
@@ -567,6 +569,7 @@ export function useChat() {
     conversationId,
     users,
     currentUserId,
+    usersLoaded,
     bottomRef,
     send,
     sendText,

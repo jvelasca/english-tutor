@@ -4,6 +4,33 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.7] — 2026-09-04
+
+**Selector de perfil al arrancar.** Si la app se abre en un navegador nuevo y
+no hay ningún usuario definido (sin cookie recordada y con varios perfiles, o
+todavía sin perfiles creados), en lugar de quedarse con un usuario sin
+seleccionar o crear uno en silencio, ahora muestra la puerta **"Selecciona un
+usuario o crea uno nuevo"** con la lista de perfiles y el campo para crear uno.
+Hasta que no se elige un perfil la app no se puede usar (todo cuelga de
+`userId`), así que la puerta no se puede cerrar sin elegir.
+
+### Cambiado (frontend)
+- `hooks/useChat.ts`: ya **no se crea un perfil por defecto en silencio** cuando
+  no hay ninguno; nuevo estado `usersLoaded` para distinguir "cargando" de "sin
+  perfil seleccionado". `addUser` ahora devuelve si el backend respondió.
+- `components/ProfileGate.tsx` (nuevo): diálogo no cerrable con la lista de
+  perfiles existentes (avatar + nombre) y el formulario "Nuevo perfil"; si el
+  backend no responde al crear, muestra un aviso en vez de fallar en silencio.
+- `App.tsx`: muestra `ProfileGate` cuando `usersLoaded && !currentUserId`.
+- Claves i18n `user.choose*`, `user.noProfilesYet`, `user.createProfile` y
+  `user.createError`.
+
+Nota: el comportamiento de un solo perfil se conserva (al ser único se
+auto-selecciona al abrir cualquier navegador, sin preguntar).
+
+### Verificación
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (318 tests) en verde.
+
 ## [3.5.6] — 2026-09-04
 
 **Modelos no utilizables fuera de la app.** `qwen3.5:9b` quedó diagnosticado como

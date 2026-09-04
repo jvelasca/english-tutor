@@ -15,6 +15,7 @@ import {
   type LearnActivity,
 } from "./router/learnHub";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { ProfileGate } from "./components/ProfileGate";
 import { completeSessionStep } from "./api/academy";
 import type { Section } from "./utils/sections";
 import type { NextBestActivity, SessionStep, TutorMode } from "./types/api";
@@ -69,6 +70,7 @@ export default function App() {
     selectSection,
     users,
     currentUserId,
+    usersLoaded,
     selectUser,
     addUser,
     editUser,
@@ -264,6 +266,13 @@ export default function App() {
           refreshKey={sessionVersion}
         />
       </AppShell>
+
+      {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
+          cookie recordada y varios perfiles, o todavía sin perfiles), se pide
+          elegir o crear uno antes de usar la app. */}
+      {usersLoaded && !currentUserId && (
+        <ProfileGate users={users} onSelect={selectUser} onCreate={addUser} />
+      )}
 
       {settingsOpen && (
         <SettingsDialog

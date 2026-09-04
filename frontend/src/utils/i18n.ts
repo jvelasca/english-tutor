@@ -608,6 +608,21 @@ const STRINGS: Record<string, Entry> = {
   "user.editProfile": { en: "Edit profile", es: "Editar perfil" },
   "user.name": { en: "Name", es: "Nombre" },
   "user.add": { en: "Add", es: "Añadir" },
+  // Puerta de perfil al arrancar en un navegador sin usuario definido.
+  "user.chooseTitle": { en: "Choose your profile", es: "Elige tu perfil" },
+  "user.choosePrompt": {
+    en: "Select a user or create a new one to start.",
+    es: "Selecciona un usuario o crea uno nuevo para empezar.",
+  },
+  "user.noProfilesYet": {
+    en: "There are no profiles yet. Create the first one below.",
+    es: "Todavía no hay perfiles. Crea el primero abajo.",
+  },
+  "user.createProfile": { en: "Create profile", es: "Crear perfil" },
+  "user.createError": {
+    en: "Could not create the profile. Is the server running?",
+    es: "No se pudo crear el perfil. ¿Está activo el servidor?",
+  },
 
   // Diálogo de perfil
   "profile.editTitle": { en: "Edit profile", es: "Editar perfil" },
