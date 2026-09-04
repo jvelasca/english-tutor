@@ -10,6 +10,10 @@ import type {
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { ListenButton } from "../../components/ListenButton";
+import {
+  PhraseTranslateButton,
+  usePhraseTranslation,
+} from "../../components/PhraseTranslate";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
@@ -289,10 +293,16 @@ export function ListeningLevelPanel({
 
 function ListeningItemRow({ item }: { item: ListeningItem }) {
   const { t } = useI18n();
+  const phrase = usePhraseTranslation(item.script);
   return (
     <li className="flex items-start justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-accent/60">
       <div className="min-w-0 flex-1">
-        <p className="text-xs leading-relaxed text-foreground">{item.script}</p>
+        <p
+          className="text-xs leading-relaxed text-foreground"
+          lang={phrase.isSpanish ? "es" : "en"}
+        >
+          {phrase.display}
+        </p>
         <p className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] uppercase tracking-wide text-muted-foreground">
           {item.topic && <span>{item.topic.replace(/_/g, " ")}</span>}
           {item.difficulty > 0 && (
@@ -307,7 +317,10 @@ function ListeningItemRow({ item }: { item: ListeningItem }) {
           )}
         </p>
       </div>
-      <ListenButton text={item.script} label={t("speak.phrase")} />
+      <div className="flex shrink-0 items-center gap-1.5">
+        <PhraseTranslateButton state={phrase} />
+        <ListenButton text={item.script} label={t("speak.phrase")} />
+      </div>
     </li>
   );
 }

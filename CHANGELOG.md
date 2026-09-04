@@ -4,6 +4,43 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.4] — 2026-09-04
+
+**Traducción de apoyo EN→ES en listening.** Un botón nuevo junto al altavoz de
+los textos de práctica traduce al español la frase que el alumno no entiende y,
+al pulsarlo de nuevo, vuelve al inglés. Es una *ayuda a demanda*: nunca aparece
+automáticamente, se reinicia en inglés en cada pregunta y **no cuenta como
+intento ni afecta a evidencia, puertas o métricas** (coherente con la
+Constitución: la comprensión en inglés sigue siendo la vía principal).
+
+### Añadido (backend)
+- `POST /api/translate` (`{text, model?}`) → `{translation}`: traduce con el
+  modelo local (Ollama) y mantiene una caché en memoria por frase
+  (`services/translate.py`): la primera vez paga la latencia del modelo y las
+  siguientes son instantáneas. 422 si el texto está vacío; 502 con mensaje
+  legible si el modelo local no está disponible. No registra ninguna actividad.
+- Tests en `tests/test_translate.py` (servicio con caché + endpoint).
+
+### Añadido (frontend)
+- `api/translate.ts`: cliente con caché por frase y timeout de 45 s (el modelo
+  local en CPU tarda en la primera traducción).
+- `components/PhraseTranslate.tsx`: hook `usePhraseTranslation(text, resetKey)`
+  (estado por frase, se reinicia al cambiar de pregunta) y botón circular "ES"
+  junto al altavoz: activo (relleno) mientras muestra español, spinner durante
+  la llamada y aviso transitorio si el modelo local no responde.
+- **`ListeningPractice`**: botón de traducción en (1) el enunciado de la
+  pregunta, (2) el texto oído del resultado MCQ y (3) la referencia de
+  dictado/shadowing. Las opciones de respuesta **no** se traducen: hacerlo
+  trivializaría el MCQ (emparejar traducciones en vez de escuchar).
+- **`ListeningLevelPanel`**: botón en cada frase del historial/repaso por nivel.
+- Claves i18n `translate.*` en `utils/i18n.ts`.
+
+### Verificación
+- `pytest tests/test_translate.py tests/test_voices.py tests/test_health.py
+  tests/test_cors.py` en `backend/` (35 tests) en verde.
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (318 tests, incl.
+  `api/translate.test.ts` para la caché por frase) en verde.
+
 ## [3.5.3] — 2026-09-04
 
 **Fix: el botón "Continuar" de listening ya no desaparece.** En iPad (por WiFi

@@ -49,6 +49,10 @@ import type {
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
 import { ListenButton } from "../../components/ListenButton";
+import {
+  PhraseTranslateButton,
+  usePhraseTranslation,
+} from "../../components/PhraseTranslate";
 import { NextStep } from "../../components/NextStep";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { ProgressRing } from "../../components/ProgressRing";
@@ -194,6 +198,22 @@ export function ListeningPractice({
   // (que para TTS no es real). Se refresca al cambiar de usuario y al abrir la
   // tarjeta de ajustes de audio.
   const [ttsVoiceName, setTtsVoiceName] = useState<string | null>(null);
+
+  // Traducción de apoyo EN→ES de los tres textos de la pregunta (enunciado,
+  // texto oído en el resultado y referencia de dictado/shadowing). Cada una es
+  // un toggle independiente que se reinicia cuando cambia la pregunta.
+  const questionPhrase = usePhraseTranslation(
+    question?.question ?? "",
+    question?.id,
+  );
+  const scriptPhrase = usePhraseTranslation(
+    question?.script ?? "",
+    question?.id ? `${question.id}:script` : undefined,
+  );
+  const referencePhrase = usePhraseTranslation(
+    productionResult?.reference ?? "",
+    question?.id ? `${question.id}:reference` : undefined,
+  );
 
   async function load(
     levelOverride?: string | null,
@@ -687,22 +707,31 @@ export function ListeningPractice({
 
           <Card className="gap-4 p-5">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-base font-semibold leading-snug">
-                {question.question}
-              </p>
-              <button
-                type="button"
-                onClick={() => void speakQuestion()}
-                disabled={speakingQuestion || !userId}
-                aria-label={t("listening.speakQuestion")}
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-border bg-secondary text-secondary-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60"
+              <p
+                className="text-base font-semibold leading-snug"
+                lang={questionPhrase.isSpanish ? "es" : "en"}
               >
-                {speakingQuestion ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Volume2 className="size-4" aria-hidden="true" />
-                )}
-              </button>
+                {questionPhrase.display}
+              </p>
+              <div className="flex shrink-0 items-center gap-2">
+                <PhraseTranslateButton
+                  state={questionPhrase}
+                  className="size-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => void speakQuestion()}
+                  disabled={speakingQuestion || !userId}
+                  aria-label={t("listening.speakQuestion")}
+                  className="grid size-9 shrink-0 place-items-center rounded-full border border-border bg-secondary text-secondary-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-60"
+                >
+                  {speakingQuestion ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Volume2 className="size-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {question.skill === "dictation" && (
@@ -878,11 +907,19 @@ export function ListeningPractice({
                 )}
               {result && (
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-foreground">{question.script}</span>
-                  <ListenButton
-                    text={question.script}
-                    label={t("speak.answer")}
-                  />
+                  <span
+                    className="text-foreground"
+                    lang={scriptPhrase.isSpanish ? "es" : "en"}
+                  >
+                    {scriptPhrase.display}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <PhraseTranslateButton state={scriptPhrase} />
+                    <ListenButton
+                      text={question.script}
+                      label={t("speak.answer")}
+                    />
+                  </div>
                 </div>
               )}
               {productionResult && (
@@ -905,14 +942,20 @@ export function ListeningPractice({
                         <span className="text-muted-foreground">
                           {t("listening.reference")}:
                         </span>{" "}
-                        <span className="text-foreground">
-                          {productionResult.reference}
+                        <span
+                          className="text-foreground"
+                          lang={referencePhrase.isSpanish ? "es" : "en"}
+                        >
+                          {referencePhrase.display}
                         </span>
                       </div>
-                      <ListenButton
-                        text={productionResult.reference}
-                        label={t("speak.phrase")}
-                      />
+                      <div className="flex shrink-0 items-center gap-2">
+                        <PhraseTranslateButton state={referencePhrase} />
+                        <ListenButton
+                          text={productionResult.reference}
+                          label={t("speak.phrase")}
+                        />
+                      </div>
                     </div>
                     {transcribedText && (
                       <div>

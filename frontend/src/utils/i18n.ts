@@ -1558,6 +1558,21 @@ const STRINGS: Record<string, Entry> = {
   "tutor.conciseness": { en: "Conciseness", es: "Concisión" },
   "tutor.engagement": { en: "Engagement", es: "Engagement" },
   "tutor.aria": { en: "Tutor quality", es: "Calidad del tutor" },
+
+  // Traducción de apoyo EN→ES (listening): ayuda a demanda que no cuenta como
+  // intento ni afecta a las métricas. El alumno la pulsa solo cuando duda.
+  "translate.showEs": {
+    en: "Show Spanish translation (support aid)",
+    es: "Mostrar traducción al español (ayuda)",
+  },
+  "translate.showEn": {
+    en: "Back to English",
+    es: "Volver al inglés",
+  },
+  "translate.unavailable": {
+    en: "Translation unavailable: is the local AI model active?",
+    es: "Traducción no disponible: ¿está activo el modelo local?",
+  },
 };
 
 export function translate(lang: Lang, key: string): string {
