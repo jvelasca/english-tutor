@@ -13,6 +13,10 @@ import {
 } from "../utils/browserCapabilities";
 import { ActivityResult } from "./ActivityResult";
 import { ListenButton } from "./ListenButton";
+import {
+  PhraseTranslateButton,
+  usePhraseTranslation,
+} from "./PhraseTranslate";
 import { NextStep } from "./NextStep";
 import { MicUnavailableNotice } from "./MicUnavailableNotice";
 import { Card } from "./ui/card";
@@ -42,8 +46,19 @@ export function PronunciationPractice({
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<PronunciationResponse | null>(null);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
+  // Conmutador para que la traducción de la frase esperada se reinicie en cada
+  // intento (un mismo `sentence` puede evaluarse varias veces).
+  const [attemptKey, setAttemptKey] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // Traducción de apoyo EN→ES de la frase elegida y de la esperada en el
+  // resultado (respuesta modelo). Cada una es un toggle independiente.
+  const sentencePhrase = usePhraseTranslation(sentence);
+  const expectedPhrase = usePhraseTranslation(
+    result?.expected ?? "",
+    attemptKey ? `pron:${attemptKey}:${sentence}` : undefined,
+  );
 
   const hints = result ? feedbackHints(result.breakdown) : [];
 
@@ -76,7 +91,9 @@ export function PronunciationPractice({
         if (!userId) return;
         setProcessing(true);
         try {
-          setResult(await checkPronunciation(blob, sentence, userId));
+          const evaluated = await checkPronunciation(blob, sentence, userId);
+          setAttemptKey((k) => k + 1);
+          setResult(evaluated);
           onAttempt();
         } catch (e) {
           alert(`${t("pron.evalError")}${(e as Error).message}`);
@@ -117,6 +134,19 @@ export function PronunciationPractice({
               {s}
             </button>
           ))}
+        </div>
+
+        <div className="flex items-start justify-between gap-3">
+          <p
+            className="text-base font-semibold leading-snug"
+            lang={sentencePhrase.isSpanish ? "es" : "en"}
+          >
+            {sentencePhrase.display}
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <PhraseTranslateButton state={sentencePhrase} />
+            <ListenButton text={sentence} label={t("speak.phrase")} />
+          </div>
         </div>
 
         <div className="flex flex-col items-center gap-3 border-t border-border pt-5">
@@ -181,9 +211,17 @@ export function PronunciationPractice({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-muted-foreground">{t("pron.expected")}:</span>{" "}
-                <span className="text-foreground">{result.expected}</span>
+                <span
+                  className="text-foreground"
+                  lang={expectedPhrase.isSpanish ? "es" : "en"}
+                >
+                  {expectedPhrase.display}
+                </span>
               </div>
-              <ListenButton text={result.expected} label={t("speak.phrase")} />
+              <div className="flex shrink-0 items-center gap-2">
+                <PhraseTranslateButton state={expectedPhrase} />
+                <ListenButton text={result.expected} label={t("speak.phrase")} />
+              </div>
             </div>
             <div>
               <span className="text-muted-foreground">{t("pron.heard")}:</span>{" "}

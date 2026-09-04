@@ -30,6 +30,10 @@ import {
 import { SpeakingRolePlay } from "./SpeakingRolePlay";
 import { ActivityResult } from "../../components/ActivityResult";
 import { ListenButton } from "../../components/ListenButton";
+import {
+  PhraseTranslateButton,
+  usePhraseTranslation,
+} from "../../components/PhraseTranslate";
 import { NextStep } from "../../components/NextStep";
 import { LevelBadge } from "../../components/LevelBadge";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
@@ -87,6 +91,9 @@ export function SpeakingAssessment({
   const [error, setError] = useState<string | null>(null);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const [manualText, setManualText] = useState("");
+
+  // Traducción de apoyo del prompt de la parte actual (se reinicia en cada parte).
+  const promptPhrase = usePhraseTranslation(part?.prompt ?? "", part?.id);
 
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -343,10 +350,16 @@ export function SpeakingAssessment({
         <>
           <p className="text-base font-semibold leading-snug">{part.title}</p>
           <div className="flex items-start justify-between gap-3">
-            <p className="min-w-0 flex-1 rounded-md border border-border bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">
-              {part.prompt}
+            <p
+              className="min-w-0 flex-1 rounded-md border border-border bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground"
+              lang={promptPhrase.isSpanish ? "es" : "en"}
+            >
+              {promptPhrase.display}
             </p>
-            <ListenButton text={part.prompt} label={t("speak.phrase")} />
+            <div className="flex shrink-0 items-center gap-2">
+              <PhraseTranslateButton state={promptPhrase} />
+              <ListenButton text={part.prompt} label={t("speak.phrase")} />
+            </div>
           </div>
         </>
       )}

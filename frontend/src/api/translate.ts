@@ -24,8 +24,9 @@ export async function translateText(text: string): Promise<string> {
 
   const data = await withTimeout(
     postJson<TranslateResponse>("/api/translate", { text: key }),
-    // El modelo local en CPU puede tardar varios segundos en la primera frase.
-    45_000,
+    // La primera traducción de una frase carga el modelo local en CPU (puede
+    // tardar ~5–15 s); las siguientes salen de la caché y son instantáneas.
+    60_000,
     "translate",
   );
   const translation = data?.translation?.trim();

@@ -4,6 +4,41 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.5] — 2026-09-04
+
+**Fix: la traducción de apoyo no respondía y ampliación al resto de pantallas.**
+La traducción de la v3.5.4 usaba el modelo por defecto del chat (`qwen3.5:9b`),
+que en CPU tarda **10–64 s por frase** (se descarga y recarga entre llamadas) y
+superaba el timeout del cliente: el botón se quedaba dando vueltas y acababa en
+"Traducción no disponible". Ahora el servidor **elige automáticamente el modelo
+rápido instalado** para traducir y el botón cubre también Speaking y
+Pronunciación.
+
+### Cambiado (backend)
+- `services/translate.py`: selección de modelo por latencia. Orden de
+  preferencia `llama3.1:8b` → `qwen2.5-coder:1.5b` (con caché de la lista de
+  modelos instalados de 5 min); si ninguno está instalado, se cae al modelo por
+  defecto. Medido en este equipo: llama3.1 traduce en **~0,3–5 s** frente a
+  10–64 s del modelo por defecto. La petición puede forzar un modelo concreto
+  (`model`), ahora opcional en `schemas/translate.py`.
+- Tests ampliados en `tests/test_translate.py` (13): preferencia de modelo,
+  fallback, Ollama caído y endpoint herméticos (sin consultar a Ollama real).
+
+### Cambiado (frontend)
+- `api/translate.ts`: timeout de 45 → **60 s** (la primera frase de una sesión
+  puede cargar el modelo ligero en CPU; después es instantánea gracias a la
+  caché por frase del cliente y del servidor).
+- El botón de traducción ya no está solo en listening: ahora también en
+  **Speaking Assessment** (junto al prompt de la parte) y en
+  **Pronunciación** (junto a la frase elegida y a la frase esperada del
+  resultado). Cada uno se reinicia en inglés al cambiar de frase/intento.
+
+### Verificación
+- `pytest` (subset 41 tests, incluidos 13 de `test_translate.py`) en verde.
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (318 tests) en verde.
+- Prueba real end-to-end contra Ollama: traducción automática con `llama3.1:8b`
+  en 0,6 s y 0,3 s para dos frases.
+
 ## [3.5.4] — 2026-09-04
 
 **Traducción de apoyo EN→ES en listening.** Un botón nuevo junto al altavoz de
