@@ -16,6 +16,9 @@ export const PROGRESS_PATH: Path = "/progreso";
 /** Ruta raíz de Ayuda: "/ayuda". */
 export const HELP_PATH: Path = "/ayuda";
 
+/** Ruta canónica del chat libre con el tutor: "/chat" (V3.10). */
+export const CHAT_PATH: Path = "/chat";
+
 /**
  * Ruta canónica de un nivel dentro de Formación para deep links, por ejemplo
  * formationLevelPath("b1") -> "/formacion/b1". El `levelId` se percent-codifica.
@@ -41,7 +44,7 @@ export function learnActivityPath(activity: string): Path {
  */
 export const LEGACY_LEARN_ALIAS = LEARN_PATH;
 
-/** Actividad legada "chat" reubicada como "/aprender/conversar". */
+/** Actividad legada "chat" ahora es una página de rutas guiadas. */
 export const LEGACY_CHAT_ACTIVITY = "conversar";
 
 /** Actividad legada "vocabulary" reubicada como "/aprender/vocabulario". */

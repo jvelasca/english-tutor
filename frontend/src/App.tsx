@@ -9,8 +9,9 @@ import { Workspace } from "./app/Workspace";
 import type { Route } from "./app/routes";
 import { navigateTo, useHashPath } from "./router/hash";
 import { pathToRoute, routeToPath } from "./router/routeMap";
-import { learnActivityPath } from "./router/paths";
+import { CHAT_PATH, learnActivityPath } from "./router/paths";
 import {
+  SPEAKING_ACTIVITY,
   learnActivityFromPath,
   type LearnActivity,
 } from "./router/learnHub";
@@ -30,17 +31,20 @@ const SKILL_SECTION: Record<string, Section> = {
 };
 
 // Actividad canónica de APRENDER que abre cada sección de destreza. Las
-// destrezas sin tarjeta propia en el hub (writing, reading — D4) caen en
-// Conversar, la práctica conversacional con el tutor, para no romper los
-// flujos que llegan desde INICIO (plan del día / next-best).
-const SECTION_ACTIVITY: Record<Section, LearnActivity> = {
+// destrezas sin tarjeta propia en el hub (writing, reading — D4) caen en el
+// chat libre (rutas "chat"), al que `handleSelectSection` navega directo por
+// su raíz `/chat`; para las que sí tienen tarjeta, la tabla apunta a su
+// sub-ruta bajo APRENDER.
+const SECTION_ACTIVITY: Partial<Record<Section, LearnActivity>> = {
   listening: "listening",
-  speaking: "conversar",
-  reading: "conversar",
-  writing: "conversar",
+  speaking: SPEAKING_ACTIVITY,
   grammar: "gramatica",
   pronunciation: "pronunciacion",
 };
+
+// Secciones sin tarjeta propia en el hub (reading, writing — D4): su destino
+// es el chat libre con el tutor (raíz `/chat` desde V3.10).
+const FREE_CHAT_SECTIONS: readonly Section[] = ["reading", "writing"];
 
 // Estado (sección/modo) que cada sub-ruta de práctica impone como fuente de
 // verdad (deep-links: recargar `/aprender/listening` fuerza la sección aunque
@@ -109,9 +113,15 @@ export default function App() {
   // La URL manda sobre la preferencia persistida: al entrar (por navegación o
   // deep-link) en una sub-ruta de práctica, alinea sección/modo con la
   // actividad. Al volver al hub (actividad null) no toca las preferencias.
+  // El chat libre tiene raíz propia `/chat` (V3.10): siempre conversación.
   // useLayoutEffect para que el primer paint de la sub-ruta ya muestre la
   // práctica correcta (sin parpadeo de otra sección persistida).
   useLayoutEffect(() => {
+    if (route === "chat") {
+      if (chat.section !== "speaking") selectSection("speaking");
+      if (chat.mode !== "conversation") selectMode("conversation");
+      return;
+    }
     if (!learnActivity) return;
     const section = ACTIVITY_SECTION[learnActivity];
     const mode = ACTIVITY_MODE[learnActivity];
@@ -122,6 +132,7 @@ export default function App() {
       selectMode(mode);
     }
   }, [
+    route,
     learnActivity,
     chat.section,
     chat.mode,
@@ -133,10 +144,17 @@ export default function App() {
     (next: Section) => {
       selectSection(next);
       if (next === "grammar") selectMode("grammar");
-      else if (next === "speaking" || next === "writing") {
+      else if (next === "speaking" || next === "writing" || next === "reading") {
         selectMode("conversation");
       }
-      navigateTo(learnActivityPath(SECTION_ACTIVITY[next]));
+      // Sin tarjeta propia en el hub (reading/writing — D4): el chat libre
+      // vive en su raíz `/chat` desde V3.10.
+      if (FREE_CHAT_SECTIONS.includes(next)) {
+        navigateTo(CHAT_PATH);
+        return;
+      }
+      const activity = SECTION_ACTIVITY[next];
+      if (activity) navigateTo(learnActivityPath(activity));
     },
     [selectSection, selectMode],
   );

@@ -734,6 +734,96 @@ export interface PronunciationAttempt {
   difficulty: number;
 }
 
+// V3.10 — Conversation por rutas: mini-diálogos guiados multi-turno A1-C2. Misma
+// filosofía: la ruta mide práctica (diálogos dominados sobre el banco oficial) y
+// su estado `functional` es el techo; demostrar el nivel exige el Speaking
+// Assessment y evidencia formal, no la ruta.
+
+export type ConversationRouteState = "not_started" | "developing" | "functional";
+
+export interface ConversationRouteGate {
+  passed: boolean;
+  total: number;
+  mastered: number;
+  coverage_pct: number;
+  coverage_required_pct: number;
+  accuracy: number | null;
+  accuracy_required: number;
+  topics: number;
+  topics_required: number;
+  checkpoint: number;
+  checkpoint_required: number;
+  blockers: string[];
+}
+
+export interface ConversationLevelProgress {
+  level: string;
+  total: number;
+  mastered: number;
+  completed: boolean;
+  coverage_pct: number | null;
+  accuracy: number | null;
+  gate?: ConversationRouteGate | null;
+  state?: ConversationRouteState;
+}
+
+export interface ConversationStats {
+  attempts: number;
+  passed: number;
+  accuracy: number | null;
+  level: string;
+  completed: boolean;
+  levels: ConversationLevelProgress[];
+}
+
+export type ConversationItemState = "unseen" | "failed" | "mastered";
+
+export interface ConversationItem {
+  dialogue_id: string;
+  level: string;
+  opening_line: string;
+  topic: string;
+  attempts: number;
+  state: ConversationItemState;
+}
+
+export interface ConversationLevelItems {
+  level: string;
+  total: number;
+  mastered: number;
+  failed: number;
+  unseen: number;
+  completed: boolean;
+  items: ConversationItem[];
+  gate?: ConversationRouteGate | null;
+}
+
+/** Mini-diálogo guiado multi-turno servido para practicar una ruta. */
+export interface ConversationDialogue {
+  id: string;
+  level: string;
+  topic: string;
+  context: string;
+  student_role: string;
+  tutor_role: string;
+  opening_line: string;
+  communicative_goals: string[];
+}
+
+export interface ConversationAttempt {
+  dialogue_id: string;
+  level: string;
+  opening_line: string;
+  heard: string;
+  overall: number;
+  passed: boolean;
+  criteria: Record<string, number | null>;
+  observed: Record<string, boolean>;
+  interaction_quality?: Record<string, number | null>;
+  topic: string;
+  communicative_goals: string[];
+}
+
 export interface ListeningSubskillProgress {
   skill: string;
   attempts: number;

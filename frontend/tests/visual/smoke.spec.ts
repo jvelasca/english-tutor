@@ -41,7 +41,10 @@ test("capturar rutas principales", async ({ page }, testInfo) => {
   // Pantallas que ya no son destino raíz: se navegan directamente por URL hash.
   const deepRoutes = [
     { id: "listening", url: "/#/aprender/listening" },
-    { id: "conversar", url: "/#/aprender/conversar" },
+    // V3.10: el chat libre tiene raíz propia /#/chat; las rutas guiadas de
+    // Conversation viven en /#/aprender/conversar (se revisan en
+    // conversationRoutesReview.spec.ts con mocks).
+    { id: "chat", url: "/#/chat" },
     { id: "progress", url: "/#/progreso" },
     { id: "help", url: "/#/ayuda" },
   ] as const;

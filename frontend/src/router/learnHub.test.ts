@@ -84,10 +84,12 @@ describe("learnActivityFromPath", () => {
 });
 
 describe("coherencia con routeToPath/pathToRoute del mapa actual", () => {
-  it("las hojas conversar y vocabulario siguen siendo rutas Route propias", async () => {
-    // La URL no cambia: solo se añade la forma de alcanzarlas desde el hub.
+  it("conversar es una sub-ruta de aprender y el chat libre tiene raíz /chat", async () => {
+    // V3.10: /aprender/conversar son rutas guiadas (sub-ruta "learn"); el chat
+    // libre con el tutor es la Route "chat" con raíz propia /chat.
     const { pathToRoute } = await import("./routeMap");
-    expect(pathToRoute("/aprender/conversar")).toBe("chat");
+    expect(pathToRoute("/aprender/conversar")).toBe("learn");
+    expect(pathToRoute("/chat")).toBe("chat");
     expect(pathToRoute("/aprender/vocabulario")).toBe("vocabulary");
     expect(
       learnActivityFromPath("/aprender/conversar"),

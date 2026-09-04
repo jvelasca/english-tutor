@@ -18,6 +18,7 @@ from routers.academy import router as academy_router
 from routers.assessment import router as assessment_router
 from routers.audio_library import router as audio_library_router
 from routers.chat import router as chat_router
+from routers.conversation_routes import router as conversation_routes_router
 from routers.conversations import router as conversations_router
 from routers.grammar import router as grammar_router
 from routers.health import router as health_router
@@ -105,6 +106,7 @@ app.include_router(profile_router)
 app.include_router(voz_router)
 app.include_router(pronunciation_router)
 app.include_router(pronunciation_routes_router)
+app.include_router(conversation_routes_router)
 app.include_router(progress_router)
 app.include_router(conversations_router)
 app.include_router(settings_router)

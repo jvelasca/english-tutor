@@ -28,6 +28,7 @@ const STRINGS: Record<string, Entry> = {
   "skill.grammar": { en: "Grammar", es: "Grammar" },
   "skill.pronunciation": { en: "Pronunciation", es: "Pronunciation" },
   "skill.vocabulary": { en: "Vocabulary", es: "Vocabulary" },
+  "skill.conversation": { en: "Conversation", es: "Conversation" },
 
   // Aprender (hub de práctica libre, V3.1)
   "learn.title": { en: "Learn", es: "Aprender" },
@@ -59,8 +60,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Lee en voz alta y recibe feedback inmediato sobre tu acento.",
   },
   "learn.desc.conversation": {
-    en: "Chat with the tutor and keep your conversation history.",
-    es: "Conversa con el tutor y conserva el historial de conversaciones.",
+    en: "Guided mini-dialogues level by level; free chat is one tap away.",
+    es: "Mini-diálogos guiados nivel a nivel; el chat libre está a un toque.",
   },
   "learn.desc.vocabulary": {
     en: "Your personal dictionary, word by word.",
@@ -77,6 +78,10 @@ const STRINGS: Record<string, Entry> = {
   "learn.pronunciationSubtitle": {
     en: "Read model phrases aloud level by level and get phonetic feedback.",
     es: "Lee frases modelo en voz alta nivel a nivel con feedback fonético.",
+  },
+  "learn.conversationSubtitle": {
+    en: "Guided multi-turn mini-dialogues, level by level, with criteria feedback.",
+    es: "Mini-diálogos guiados multi-turno, nivel a nivel, con feedback por criterios.",
   },
   "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
 
@@ -1984,6 +1989,248 @@ const STRINGS: Record<string, Entry> = {
   "pronRoutes.reviewLevel": {
     en: "Review route {level}",
     es: "Repasar la ruta {level}",
+  },
+
+  // Rutas de Conversation (V3.10): mini-diálogos guiados multi-turno por nivel
+  // CEFR. El alumno conversa con el tutor siguiendo una situación y unas metas
+  // comunicativas; al terminar se evalúa el transcripto completo por criterios
+  // (LLM + señal objetiva de interacción). Superar una ruta es un hito de
+  // PRÁCTICA (techo `functional`); demostrar el nivel exige el Speaking
+  // Assessment + evidencia oral sostenida + retención, no la ruta. El chat
+  // libre con el tutor queda accesible desde su raíz `/chat`.
+  "convRoutes.loading": { en: "Loading…", es: "Cargando…" },
+  "convRoutes.loadError": {
+    en: "Couldn't load your conversation routes. Please try again.",
+    es: "No se pudieron cargar tus rutas de conversación. Inténtalo de nuevo.",
+  },
+  "convRoutes.retry": { en: "Try again", es: "Reintentar" },
+  "convRoutes.backRoutes": {
+    en: "Back to routes",
+    es: "Volver a las rutas",
+  },
+  "convRoutes.routesSubtitle": {
+    en: "Each level is a route of guided mini-dialogues: read the situation, play your role and converse with the tutor until you reach the communicative goals. When you finish, the whole transcript is scored by criteria (content, fluency, interaction…). Passing a route is a practice milestone — demonstrating the level needs the oral exam and retention, not the route.",
+    es: "Cada nivel es una ruta de mini-diálogos guiados: lees la situación, interpretas tu papel y conversas con el tutor hasta cumplir las metas comunicativas. Al terminar, se puntúa el transcripto completo por criterios (contenido, fluidez, interacción…). Superar una ruta es un hito de práctica: demostrar el nivel exige el examen oral y la retención, no la ruta.",
+  },
+  "convRoutes.routesMapTitle": { en: "Routes", es: "Rutas" },
+  "convRoutes.routesMapHint": {
+    en: "Tap a level to open its dialogues",
+    es: "Toca un nivel para abrir sus diálogos",
+  },
+  "convRoutes.accuracy": { en: "Pass rate", es: "Aciertos" },
+  "convRoutes.masteredOfTotal": {
+    en: "Mastered {mastered} of {total}",
+    es: "Dominados {mastered} de {total}",
+  },
+  "convRoutes.coveragePct": {
+    en: "{pct}% of the level",
+    es: "{pct}% del nivel",
+  },
+  "convRoutes.assessedLevel": {
+    en: "Oral level demonstrated: {level}",
+    es: "Nivel oral demostrado: {level}",
+  },
+  "convRoutes.assessedLevelNone": {
+    en: "No oral exam taken yet",
+    es: "Aún no has hecho el examen oral",
+  },
+  "convRoutes.routeNote": {
+    en: "Current route: {level}. The app always recommends the level whose official bank you haven't mastered yet.",
+    es: "Ruta actual: {level}. La app recomienda siempre el nivel cuyo banco oficial aún no dominas.",
+  },
+  "convRoutes.routeCertNote": {
+    en: "Conducting a guided dialogue trains conversation and feeds the interaction evidence, but it never certifies by itself: demonstrating a level comes from the oral exam (Speaking Assessment) plus retention.",
+    es: "Mantener un diálogo guiado entrena la conversación y alimenta la evidencia de interacción, pero nunca certifica por sí solo: demostrar un nivel viene del examen oral (Speaking Assessment) más la retención.",
+  },
+  "convRoutes.routeRingHelp": {
+    en: "Dialogues mastered count toward the route; the ring shows your coverage of each official bank.",
+    es: "Los diálogos dominados cuentan para la ruta; el anillo muestra tu cobertura de cada banco oficial.",
+  },
+  "convRoutes.levelHistoryTitle": {
+    en: "Route {level} dialogues",
+    es: "Diálogos de la ruta {level}",
+  },
+  "convRoutes.sessionEnded": {
+    en: "Practice session completed",
+    es: "Sesión de práctica completada",
+  },
+  "convRoutes.doneDrillLine": {
+    en: "You have mastered all {total} failed dialogues of route {level}.",
+    es: "Has dominado los {total} diálogos fallados de la ruta {level}.",
+  },
+  "convRoutes.doneReviewLine": {
+    en: "Review of route {level} finished: you re-conversed the {total} mastered dialogues.",
+    es: "Repaso de la ruta {level} terminado: has reconversado los {total} diálogos dominados.",
+  },
+  "convRoutes.doneLevelLine": {
+    en: "Route {level} round finished: {total} dialogues practiced.",
+    es: "Vuelta de la ruta {level} terminada: {total} diálogos practicados.",
+  },
+  "convRoutes.modeLevel": {
+    en: "Practicing route {level}",
+    es: "Practicando la ruta {level}",
+  },
+  "convRoutes.modeDrill": { en: "Repeating failed dialogues", es: "Repitiendo fallados" },
+  "convRoutes.modeReview": {
+    en: "Reviewing route {level}",
+    es: "Repasando la ruta {level}",
+  },
+  "convRoutes.exitSession": {
+    en: "Exit session",
+    es: "Salir de la sesión",
+  },
+  "convRoutes.drillHint": {
+    en: "Converse each dialogue until you master it — passing removes it from the queue.",
+    es: "Conversa cada diálogo hasta dominarlo: superarlo lo quita de la cola.",
+  },
+  "convRoutes.sessionHint": {
+    en: "Converse each dialogue and check your result.",
+    es: "Conversa cada diálogo y comprueba tu resultado.",
+  },
+  "convRoutes.continue": { en: "Continue", es: "Continuar" },
+  "convRoutes.skip": {
+    en: "Skip to another dialogue",
+    es: "Saltar a otro diálogo",
+  },
+  "convRoutes.evaluating": {
+    en: "Scoring your conversation by criteria…",
+    es: "Puntuando tu conversación por criterios…",
+  },
+  "convRoutes.resultTitle": { en: "Conversation scored", es: "Conversación puntuada" },
+  "convRoutes.resultPassed": { en: "Goals reached", es: "Metas cumplidas" },
+  "convRoutes.resultNotPassed": {
+    en: "Keep practicing this dialogue",
+    es: "Sigue practicando este diálogo",
+  },
+  "convRoutes.resultHonestNote": {
+    en: "This score measures today's guided conversation against the communicative goals. Mastering the route is practice: demonstrating the level needs the oral exam and retention.",
+    es: "Esta puntuación mide la conversación guiada de hoy frente a las metas comunicativas. Dominar la ruta es práctica: demostrar el nivel exige el examen oral y la retención.",
+  },
+  "convRoutes.practiceHint": {
+    en: "Converse with the tutor to reach the goals, then finish.",
+    es: "Conversa con el tutor hasta cumplir las metas y termina.",
+  },
+  "convRoutes.criteriaTitle": { en: "Criteria", es: "Criterios" },
+  "convRoutes.transcriptLabel": { en: "Your side of the conversation", es: "Tu parte de la conversación" },
+  "convRoutes.goalsLabel": { en: "Communicative goals", es: "Metas comunicativas" },
+  "convRoutes.completedShort": {
+    en: "Route passed",
+    es: "Ruta superada",
+  },
+  "convRoutes.routePendingCert": {
+    en: "Covered, not certified yet",
+    es: "Cubierto, aún sin certificar",
+  },
+  "convRoutes.routeGateIntro": {
+    en: "Mastering the dialogues isn't enough to pass {level}:",
+    es: "Dominar los diálogos no basta para superar {level}:",
+  },
+  "convRoutes.routeGateLine": {
+    en: "{coverage}% of the official dialogues mastered (≥{coverageRequired}%) · pass rate ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} topics · {checkpoint}/{checkpointRequired} passed on first try",
+    es: "{coverage}% del banco oficial de diálogos dominado (≥{coverageRequired}%) · aciertos ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} temas · {checkpoint}/{checkpointRequired} superados a la primera",
+  },
+  "convRoutes.demoNotYet": {
+    en: "{level} — not yet demonstrated",
+    es: "{level} — aún no demostrado",
+  },
+  "convRoutes.demoRequires": {
+    en: "Demonstrating {level} comes from the oral exam (Speaking Assessment) plus sustained evidence and retention — not from this route. The route only trains; open the assessment to get certified.",
+    es: "Demostrar {level} viene del examen oral (Speaking Assessment) más evidencia sostenida y retención, no de esta ruta. La ruta solo entrena; abre el examen para certificar.",
+  },
+  "convRoutes.demoTitle": {
+    en: "{level} — demonstrated",
+    es: "{level} — demostrado",
+  },
+  "convRoutes.demoMet": {
+    en: "You have demonstrated this oral level with the assessment and sustained evidence.",
+    es: "Has demostrado este nivel oral con el examen y evidencia sostenida.",
+  },
+  "convRoutes.demonstrateTitle": {
+    en: "Demonstrate {level}",
+    es: "Demostrar {level}",
+  },
+  "convRoutes.demonstrateNote": {
+    en: "The route does not certify: {level} is demonstrated with the Speaking Assessment (oral exam) plus sustained evidence and retention.",
+    es: "La ruta no certifica: {level} se demuestra con el Speaking Assessment (examen oral) más evidencia sostenida y retención.",
+  },
+  "convRoutes.demonstrateCta": {
+    en: "Take the Speaking Assessment",
+    es: "Hacer el Speaking Assessment",
+  },
+  "convRoutes.levelItemsError": {
+    en: "Couldn't load this level's dialogues.",
+    es: "No se pudieron cargar los diálogos de este nivel.",
+  },
+  "convRoutes.levelItemsDialogues": { en: "dialogues", es: "diálogos" },
+  "convRoutes.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} failed · {unseen} unseen",
+    es: "{mastered} dominados · {failed} fallados · {unseen} sin ver",
+  },
+  "convRoutes.levelItemsEmpty": {
+    en: "No dialogues here yet.",
+    es: "Aún no hay diálogos aquí.",
+  },
+  "convRoutes.levelStates.failed": {
+    en: "Failed ({count})",
+    es: "Fallados ({count})",
+  },
+  "convRoutes.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominados ({count})",
+  },
+  "convRoutes.levelStates.unseen": {
+    en: "Unseen ({count})",
+    es: "Sin ver ({count})",
+  },
+  "convRoutes.levelItemsAttempts": { en: "attempts", es: "intentos" },
+  "convRoutes.repeatFailed": {
+    en: "Repeat failed ({count})",
+    es: "Repetir fallados ({count})",
+  },
+  "convRoutes.reviewLearned": {
+    en: "Review learned ({count})",
+    es: "Repasar aprendidos ({count})",
+  },
+  "convRoutes.practiceLevel": {
+    en: "Practice route {level}",
+    es: "Practicar la ruta {level}",
+  },
+  "convRoutes.reviewLevel": {
+    en: "Review route {level}",
+    es: "Repasar la ruta {level}",
+  },
+  "convRoutes.youPlay": { en: "You play:", es: "Tú interpretas:" },
+  "convRoutes.chatCreateError": {
+    en: "Couldn't start the guided conversation. Please try again.",
+    es: "No se pudo iniciar la conversación guiada. Inténtalo de nuevo.",
+  },
+  "convRoutes.moreTurns": {
+    en: "{done}/{min} turns — keep talking to reach the goals",
+    es: "{done}/{min} turnos — sigue conversando para cumplir las metas",
+  },
+  "convRoutes.chatPlaceholder": {
+    en: "Write your answer…",
+    es: "Escribe tu respuesta…",
+  },
+  "convRoutes.chatAria": { en: "Your answer", es: "Tu respuesta" },
+  "convRoutes.send": { en: "Send", es: "Enviar" },
+  "convRoutes.voiceHint": {
+    en: "You can also answer with your voice.",
+    es: "También puedes responder con tu voz.",
+  },
+  "convRoutes.finish": { en: "Finish and score", es: "Terminar y puntuar" },
+  "convRoutes.listenOpening": { en: "Listen to the opening line", es: "Escuchar la frase inicial" },
+  "convRoutes.freeChatTitle": {
+    en: "Free conversation",
+    es: "Conversación libre",
+  },
+  "convRoutes.freeChatNote": {
+    en: "These routes guide you level by level. If you prefer an open conversation with the tutor, with no scenario and no scoring, use the free chat.",
+    es: "Estas rutas te guían nivel a nivel. Si prefieres conversar libremente con el tutor, sin guion ni puntuación, usa el chat libre.",
+  },
+  "convRoutes.freeChatCta": {
+    en: "Open free chat",
+    es: "Abrir el chat libre",
   },
 
   "speaking.routesSubtitle": {

@@ -1,0 +1,935 @@
+{
+  "version": "1.0.0",
+  "description": "Banco oficial de mini-diálogos guiados multi-turno para las rutas A1-C2 de Conversation. Cada ítem plantea una conversación dirigida: un contexto, el rol del alumno, el rol del tutor (que interpreta al otro hablante siguiendo la situación), una línea de apertura y unas metas comunicativas que el alumno debe cumplir conversando varios turnos. Al terminar, se evalúa el transcripto completo con el pipeline LLM de evidencia (task_type conversation) fusionado con la señal objetiva de interacción. Alineado con los can_do y el léxico de backend/curriculum/<level>.json.",
+  "items": [
+    {
+      "id": "cv-A1-0001",
+      "level": "A1",
+      "topic": "Introductions",
+      "context": "You arrive at your first English lesson and sit next to a student you do not know.",
+      "student_role": "A new student in an English class.",
+      "tutor_role": "A friendly classmate sitting next to you.",
+      "opening_line": "Hi! I am Tom. What is your name?",
+      "communicative_goals": [
+        "Say hello and give your name",
+        "Say where you are from",
+        "Ask his name again politely if you do not hear it"
+      ]
+    },
+    {
+      "id": "cv-A1-0002",
+      "level": "A1",
+      "topic": "Greetings",
+      "context": "You meet your neighbour in the lift one morning.",
+      "student_role": "A neighbour going to work.",
+      "tutor_role": "A friendly neighbour.",
+      "opening_line": "Good morning! How are you today?",
+      "communicative_goals": [
+        "Greet him and answer 'How are you?'",
+        "Ask how he is",
+        "Say goodbye politely when you leave"
+      ]
+    },
+    {
+      "id": "cv-A1-0003",
+      "level": "A1",
+      "topic": "Classroom",
+      "context": "It is your first day at a language school and you need a few things for the lesson.",
+      "student_role": "A new student.",
+      "tutor_role": "The teacher, who wants to help you.",
+      "opening_line": "Hello! Welcome. Do you have everything for today's lesson?",
+      "communicative_goals": [
+        "Ask politely for a pen and a notebook",
+        "Answer if the teacher asks if you have your book",
+        "Say thank you"
+      ]
+    },
+    {
+      "id": "cv-A1-0004",
+      "level": "A1",
+      "topic": "Food and drink",
+      "context": "You are at a small café and you want something to eat and drink.",
+      "student_role": "A customer at a café.",
+      "tutor_role": "The waiter.",
+      "opening_line": "Good afternoon. What would you like?",
+      "communicative_goals": [
+        "Order a drink and something to eat",
+        "Ask how much it is",
+        "Say thank you"
+      ]
+    },
+    {
+      "id": "cv-A1-0005",
+      "level": "A1",
+      "topic": "Shopping",
+      "context": "You are in a clothes shop and you want to buy a T-shirt.",
+      "student_role": "A customer.",
+      "tutor_role": "A shop assistant.",
+      "opening_line": "Hello! Can I help you?",
+      "communicative_goals": [
+        "Say what you want to buy",
+        "Ask the price",
+        "Say if you want it or not"
+      ]
+    },
+    {
+      "id": "cv-A1-0006",
+      "level": "A1",
+      "topic": "Family",
+      "context": "A new friend asks you about your family.",
+      "student_role": "You, talking about your family.",
+      "tutor_role": "A new friend.",
+      "opening_line": "Do you have a big family?",
+      "communicative_goals": [
+        "Answer about your brothers and sisters",
+        "Say something about one person in your family",
+        "Ask about his or her family"
+      ]
+    },
+    {
+      "id": "cv-A1-0007",
+      "level": "A1",
+      "topic": "Time and routine",
+      "context": "Your teacher wants to know about your English class times.",
+      "student_role": "A student.",
+      "tutor_role": "The teacher.",
+      "opening_line": "What time is your English class?",
+      "communicative_goals": [
+        "Say the time of your English class",
+        "Say what day you have class",
+        "Ask what time the next class is"
+      ]
+    },
+    {
+      "id": "cv-A1-0008",
+      "level": "A1",
+      "topic": "Weather",
+      "context": "A friend phones you before going out and talks about the weather.",
+      "student_role": "You, ready to go out.",
+      "tutor_role": "A friend.",
+      "opening_line": "It is very cold today, is not it?",
+      "communicative_goals": [
+        "Agree or disagree about the weather",
+        "Say what you wear when it is cold",
+        "Ask what the weather is like tomorrow"
+      ]
+    },
+    {
+      "id": "cv-A1-0009",
+      "level": "A1",
+      "topic": "Likes and dislikes",
+      "context": "You and a classmate are talking about the food you like.",
+      "student_role": "A student talking about food.",
+      "tutor_role": "A classmate.",
+      "opening_line": "Do you like pizza?",
+      "communicative_goals": [
+        "Say yes or no",
+        "Name one food you like and one you do not like",
+        "Ask what food your classmate likes"
+      ]
+    },
+    {
+      "id": "cv-A1-0010",
+      "level": "A1",
+      "topic": "Daily routine",
+      "context": "A classmate asks what you do every day.",
+      "student_role": "A student describing their daily routine.",
+      "tutor_role": "A curious classmate.",
+      "opening_line": "What do you do every morning?",
+      "communicative_goals": [
+        "Say two things you do every day",
+        "Say what time you get up",
+        "Ask what your classmate does on Sunday"
+      ]
+    },
+    {
+      "id": "cv-A1-0011",
+      "level": "A1",
+      "topic": "Places and directions",
+      "context": "You are in a new building and you cannot find the bathroom.",
+      "student_role": "A visitor in a new building.",
+      "tutor_role": "Someone who works there.",
+      "opening_line": "Hello. Do you need any help?",
+      "communicative_goals": [
+        "Ask where the bathroom is",
+        "Answer when he asks if it is your first day",
+        "Say thank you"
+      ]
+    },
+
+    {
+      "id": "cv-A2-0001",
+      "level": "A2",
+      "topic": "Shopping for clothes",
+      "context": "You want to buy a jacket but you are not sure about the size and colour.",
+      "student_role": "A customer in a clothes shop.",
+      "tutor_role": "A helpful shop assistant.",
+      "opening_line": "Good morning! Are you looking for something special?",
+      "communicative_goals": [
+        "Say you are looking for a jacket and ask your size",
+        "Ask to try it on",
+        "Ask about the price and if you can pay by card"
+      ]
+    },
+    {
+      "id": "cv-A2-0002",
+      "level": "A2",
+      "topic": "At a restaurant",
+      "context": "You are having lunch in a restaurant, but your dish is not what you ordered.",
+      "student_role": "A customer at a restaurant.",
+      "tutor_role": "The waiter.",
+      "opening_line": "Here you are. Enjoy your meal!",
+      "communicative_goals": [
+        "Explain politely that this is not what you ordered",
+        "Say what dish you actually ordered",
+        "Thank the waiter when he fixes the problem"
+      ]
+    },
+    {
+      "id": "cv-A2-0003",
+      "level": "A2",
+      "topic": "Getting around",
+      "context": "You are in a new city and you need to get to the train station.",
+      "student_role": "A visitor asking for directions.",
+      "tutor_role": "A local person.",
+      "opening_line": "Excuse me, are you looking for something?",
+      "communicative_goals": [
+        "Ask how to get to the train station",
+        "Ask if it is far and how long it takes",
+        "Repeat the instructions to confirm you understood"
+      ]
+    },
+    {
+      "id": "cv-A2-0004",
+      "level": "A2",
+      "topic": "Making plans",
+      "context": "You want to invite a friend to the cinema this weekend.",
+      "student_role": "You, making a plan with a friend.",
+      "tutor_role": "A friend who is not sure yet.",
+      "opening_line": "Hi! Are you doing anything this weekend?",
+      "communicative_goals": [
+        "Invite your friend to the cinema",
+        "Suggest a day and a time",
+        "Agree on the plan when your friend answers"
+      ]
+    },
+    {
+      "id": "cv-A2-0005",
+      "level": "A2",
+      "topic": "A past holiday",
+      "context": "You are back from a short holiday and a colleague asks about it.",
+      "student_role": "You, telling someone about your holiday.",
+      "tutor_role": "A colleague.",
+      "opening_line": "How was your holiday? Did you have a good time?",
+      "communicative_goals": [
+        "Say where you went and who you went with",
+        "Say two things you did there",
+        "Answer follow-up questions about the weather or the food"
+      ]
+    },
+    {
+      "id": "cv-A2-0006",
+      "level": "A2",
+      "topic": "Booking a hotel",
+      "context": "You are phoning a small hotel to book a room for two nights.",
+      "student_role": "A guest booking a room by phone.",
+      "tutor_role": "A hotel receptionist.",
+      "opening_line": "Good morning, City Hotel. How can I help you?",
+      "communicative_goals": [
+        "Say you want a single room for two nights",
+        "Ask the price per night and if breakfast is included",
+        "Confirm your name and the dates"
+      ]
+    },
+    {
+      "id": "cv-A2-0007",
+      "level": "A2",
+      "topic": "Lost property",
+      "context": "You left your bag on the bus this morning and you are asking at the lost property office.",
+      "student_role": "A passenger who lost a bag.",
+      "tutor_role": "The lost property assistant.",
+      "opening_line": "Good afternoon. Can I help you?",
+      "communicative_goals": [
+        "Explain that you lost your bag on the bus",
+        "Describe the bag and what is inside",
+        "Ask when and how you can collect it"
+      ]
+    },
+    {
+      "id": "cv-A2-0008",
+      "level": "A2",
+      "topic": "Health",
+      "context": "You have a sore throat and a headache, and you go to the pharmacy.",
+      "student_role": "A customer at the pharmacy.",
+      "tutor_role": "The pharmacist.",
+      "opening_line": "Hello. What can I do for you?",
+      "communicative_goals": [
+        "Describe your problem simply",
+        "Ask for something for a sore throat",
+        "Answer questions about how long you have felt ill"
+      ]
+    },
+    {
+      "id": "cv-A2-0009",
+      "level": "A2",
+      "topic": "Invitations",
+      "context": "A friend invites you to her birthday party next Saturday.",
+      "student_role": "A friend who is invited to a party.",
+      "tutor_role": "The friend who is organising the party.",
+      "opening_line": "I am having a birthday party next Saturday. Would you like to come?",
+      "communicative_goals": [
+        "Accept the invitation happily",
+        "Ask what time the party starts and where it is",
+        "Ask if you should bring anything"
+      ]
+    },
+    {
+      "id": "cv-A2-0010",
+      "level": "A2",
+      "topic": "Comparing places",
+      "context": "You are talking to a friend about two cities you both know.",
+      "student_role": "You, comparing two cities.",
+      "tutor_role": "A friend with a different opinion.",
+      "opening_line": "I think Barcelona is nicer than Madrid, is not it?",
+      "communicative_goals": [
+        "Give your opinion about the two cities",
+        "Compare them using words like bigger, cheaper or busier",
+        "Agree or disagree politely with your friend"
+      ]
+    },
+    {
+      "id": "cv-A2-0011",
+      "level": "A2",
+      "topic": "Daily life and frequency",
+      "context": "A classmate asks you about how often you do things in your daily life.",
+      "student_role": "A student talking about habits.",
+      "tutor_role": "A classmate.",
+      "opening_line": "How often do you go to the supermarket?",
+      "communicative_goals": [
+        "Answer using words like always, usually or never",
+        "Say what you do at the weekend",
+        "Ask your classmate about one of his or her habits"
+      ]
+    },
+
+    {
+      "id": "cv-B1-0001",
+      "level": "B1",
+      "topic": "Changing an appointment",
+      "context": "You have a dentist appointment tomorrow but you cannot go, so you call to change it.",
+      "student_role": "A patient calling the dentist's office.",
+      "tutor_role": "The receptionist at the dentist's office.",
+      "opening_line": "Good morning, Green Dental Clinic. How can I help you?",
+      "communicative_goals": [
+        "Explain that you need to change your appointment and why",
+        "Suggest a new day and time that works for you",
+        "Confirm the new appointment details before ending the call"
+      ]
+    },
+    {
+      "id": "cv-B1-0002",
+      "level": "B1",
+      "topic": "Complaining about a product",
+      "context": "The headphones you bought last week stopped working. You are back at the shop.",
+      "student_role": "A customer returning a faulty product.",
+      "tutor_role": "A shop assistant.",
+      "opening_line": "Hello. Is everything okay with your headphones?",
+      "communicative_goals": [
+        "Explain the problem with the headphones",
+        "Say when you bought them and show that you have the receipt",
+        "Ask for a replacement or a refund and respond to the assistant's offer"
+      ]
+    },
+    {
+      "id": "cv-B1-0003",
+      "level": "B1",
+      "topic": "Travel information",
+      "context": "You are at a tourist information office planning a day trip for tomorrow.",
+      "student_role": "A tourist asking for information.",
+      "tutor_role": "A tourist information assistant.",
+      "opening_line": "Good morning! What would you like to know?",
+      "communicative_goals": [
+        "Ask about the best way to visit the old town",
+        "Ask about opening times and ticket prices",
+        "Ask for a recommendation for somewhere to eat nearby"
+      ]
+    },
+    {
+      "id": "cv-B1-0004",
+      "level": "B1",
+      "topic": "Health and advice",
+      "context": "You have been feeling tired all week and you are at the doctor's surgery.",
+      "student_role": "A patient at the doctor's.",
+      "tutor_role": "The doctor.",
+      "opening_line": "Come in and sit down. So, what can I do for you?",
+      "communicative_goals": [
+        "Describe how you have been feeling and for how long",
+        "Answer the doctor's questions about your sleep and routine",
+        "Ask what you should do and repeat the advice to confirm you understood"
+      ]
+    },
+    {
+      "id": "cv-B1-0005",
+      "level": "B1",
+      "topic": "Planning a trip",
+      "context": "You and a friend are planning a three-day trip together and need to decide some things.",
+      "student_role": "You, planning a trip with a friend.",
+      "tutor_role": "A friend who has some ideas.",
+      "opening_line": "So, where should we stay for the trip?",
+      "communicative_goals": [
+        "Give your opinion about where to stay",
+        "Make a suggestion about what to do one of the days",
+        "Reach an agreement with your friend about the plan"
+      ]
+    },
+    {
+      "id": "cv-B1-0006",
+      "level": "B1",
+      "topic": "Asking for clarification",
+      "context": "Your teacher gives you homework instructions, but you did not understand part of them.",
+      "student_role": "A student in a language class.",
+      "tutor_role": "The teacher.",
+      "opening_line": "Any questions about the homework?",
+      "communicative_goals": [
+        "Ask the teacher to repeat the part you did not understand",
+        "Paraphrase what you understood to check it is right",
+        "Ask for an example of what you have to do"
+      ]
+    },
+    {
+      "id": "cv-B1-0007",
+      "level": "B1",
+      "topic": "Small talk at a work event",
+      "context": "You are at a company party and you start talking to a colleague from another department.",
+      "student_role": "An employee making small talk.",
+      "tutor_role": "A colleague you have not met before.",
+      "opening_line": "Hi! Are you enjoying the party?",
+      "communicative_goals": [
+        "Answer and ask what department he or she works in",
+        "Talk a little about what you do at work",
+        "Find something you both have in common"
+      ]
+    },
+    {
+      "id": "cv-B1-0008",
+      "level": "B1",
+      "topic": "Renting a flat",
+      "context": "You are viewing a small flat and you ask the landlord some questions before deciding.",
+      "student_role": "Someone looking for a flat to rent.",
+      "tutor_role": "The landlord showing you the flat.",
+      "opening_line": "So, what do you think of the flat so far?",
+      "communicative_goals": [
+        "Give your first impression of the flat",
+        "Ask about the monthly rent and bills",
+        "Ask about the neighbours or the area and when you could move in"
+      ]
+    },
+    {
+      "id": "cv-B1-0009",
+      "level": "B1",
+      "topic": "Recommending",
+      "context": "A friend asks you to recommend a film to watch tonight.",
+      "student_role": "You, recommending a film.",
+      "tutor_role": "A friend who wants a recommendation.",
+      "opening_line": "I cannot decide what to watch tonight. Any ideas?",
+      "communicative_goals": [
+        "Recommend a film you enjoyed",
+        "Explain why it is good and what it is about",
+        "Answer your friend's questions about the film"
+      ]
+    },
+    {
+      "id": "cv-B1-0010",
+      "level": "B1",
+      "topic": "Rules and permissions",
+      "context": "You have just joined a gym and you want to know how things work there.",
+      "student_role": "A new gym member.",
+      "tutor_role": "A member of staff at the gym.",
+      "opening_line": "Welcome to the gym! Do you have any questions?",
+      "communicative_goals": [
+        "Ask about the opening hours at the weekend",
+        "Ask if you can bring a guest",
+        "Ask about the rules for canceling your membership"
+      ]
+    },
+    {
+      "id": "cv-B1-0011",
+      "level": "B1",
+      "topic": "New at work",
+      "context": "It is your first week in a new job and you need some help from a colleague.",
+      "student_role": "A new employee.",
+      "tutor_role": "A colleague who is happy to help.",
+      "opening_line": "Hi! How is your first week going?",
+      "communicative_goals": [
+        "Say how your first week is going and mention one difficulty",
+        "Ask a practical question about how the office works",
+        "Thank the colleague and ask who else you should talk to"
+      ]
+    },
+
+    {
+      "id": "cv-B2-0001",
+      "level": "B2",
+      "topic": "Resolving a complaint",
+      "context": "Your internet has been down for three days and you are talking to a customer service manager after several calls.",
+      "student_role": "A customer who has had a serious problem.",
+      "tutor_role": "A customer service manager.",
+      "opening_line": "I understand you have had some trouble with your service. Tell me what happened.",
+      "communicative_goals": [
+        "Explain the situation clearly, including how long the problem has lasted",
+        "Describe the impact the problem has had on you",
+        "Propose a fair solution and confirm what the manager offers"
+      ]
+    },
+    {
+      "id": "cv-B2-0002",
+      "level": "B2",
+      "topic": "Discussion and opinions",
+      "context": "A colleague thinks working from the office is better than working from home. You disagree.",
+      "student_role": "You, defending your point of view.",
+      "tutor_role": "A colleague with a different opinion.",
+      "opening_line": "Honestly, I think working from the office is much more productive.",
+      "communicative_goals": [
+        "Give your opinion with two clear reasons",
+        "Respond to your colleague's arguments without repeating yourself",
+        "Concede one good point and keep the discussion constructive"
+      ]
+    },
+    {
+      "id": "cv-B2-0003",
+      "level": "B2",
+      "topic": "Negotiating deadlines",
+      "context": "Your project manager wants the report by Friday, but you think that is unrealistic.",
+      "student_role": "An employee who needs more time.",
+      "tutor_role": "Your project manager.",
+      "opening_line": "So, can we count on the full report by Friday?",
+      "communicative_goals": [
+        "Explain honestly why Friday is difficult",
+        "Propose a realistic alternative with reasons",
+        "Reach an agreement that both of you accept"
+      ]
+    },
+    {
+      "id": "cv-B2-0004",
+      "level": "B2",
+      "topic": "A job interview",
+      "context": "You are in a job interview for a position that interests you a lot.",
+      "student_role": "A candidate in a job interview.",
+      "tutor_role": "The interviewer.",
+      "opening_line": "Tell me a little about yourself and why you applied for this role.",
+      "communicative_goals": [
+        "Introduce yourself and explain why you are interested in the role",
+        "Describe one relevant experience and what you learned from it",
+        "Answer a question about your weaknesses honestly and positively"
+      ]
+    },
+    {
+      "id": "cv-B2-0005",
+      "level": "B2",
+      "topic": "Banking",
+      "context": "You are at the bank asking about opening an account and getting a small credit card.",
+      "student_role": "A customer at the bank.",
+      "tutor_role": "A bank advisor.",
+      "opening_line": "Good morning. What can we help you with today?",
+      "communicative_goals": [
+        "Explain that you want to open an account",
+        "Ask about the conditions and monthly fees",
+        "Ask what documents you need to bring"
+      ]
+    },
+    {
+      "id": "cv-B2-0006",
+      "level": "B2",
+      "topic": "Travel planning",
+      "context": "You and a friend are planning a two-week trip and disagree about how many cities to visit.",
+      "student_role": "You, planning a trip with a friend.",
+      "tutor_role": "A friend who wants to visit many places quickly.",
+      "opening_line": "I think we should visit five cities in two weeks. That sounds exciting!",
+      "communicative_goals": [
+        "Explain why travelling too quickly can be a problem",
+        "Suggest an itinerary that balances sightseeing and rest",
+        "Persuade your friend to try your approach"
+      ]
+    },
+    {
+      "id": "cv-B2-0007",
+      "level": "B2",
+      "topic": "Technical support",
+      "context": "You are on the phone with IT support because your laptop will not start after an update.",
+      "student_role": "An employee with a technical problem.",
+      "tutor_role": "An IT support technician.",
+      "opening_line": "Thanks for waiting. Can you describe exactly what happens when you turn it on?",
+      "communicative_goals": [
+        "Describe the problem step by step",
+        "Answer the technician's questions about what you tried",
+        "Follow the instructions and confirm whether the problem is solved"
+      ]
+    },
+    {
+      "id": "cv-B2-0008",
+      "level": "B2",
+      "topic": "In a meeting",
+      "context": "In a team meeting, a colleague proposes an idea that you think has a serious weakness.",
+      "student_role": "A team member in a meeting.",
+      "tutor_role": "A colleague who proposed the idea.",
+      "opening_line": "I really believe this new idea will save us time and money.",
+      "communicative_goals": [
+        "Acknowledge the strengths of the idea first",
+        "Raise your concern politely and explain why it matters",
+        "Suggest how the idea could be improved so the team can move forward"
+      ]
+    },
+    {
+      "id": "cv-B2-0009",
+      "level": "B2",
+      "topic": "Renting and negotiating",
+      "context": "You love a flat but the rent is higher than you wanted to pay.",
+      "student_role": "A person negotiating the rent of a flat.",
+      "tutor_role": "The landlord.",
+      "opening_line": "So, are you interested in renting the flat?",
+      "communicative_goals": [
+        "Say you like the flat but the rent is too high for you",
+        "Propose a lower price and justify it",
+        "Negotiate until you reach an arrangement both can accept"
+      ]
+    },
+    {
+      "id": "cv-B2-0010",
+      "level": "B2",
+      "topic": "Public debate",
+      "context": "You are discussing with a friend whether the city should close its centre to private cars.",
+      "student_role": "You, defending your position in a debate.",
+      "tutor_role": "A friend with strong arguments on the other side.",
+      "opening_line": "Closing the centre to cars would be terrible for the shops.",
+      "communicative_goals": [
+        "State your position clearly with reasons",
+        "Challenge one of your friend's arguments with a counterexample",
+        "Use a conditional structure to describe the consequences of each option"
+      ]
+    },
+    {
+      "id": "cv-B2-0011",
+      "level": "B2",
+      "topic": "Persuading someone",
+      "context": "A friend is hesitating about signing up for a charity run with you.",
+      "student_role": "You, persuading a friend to join you.",
+      "tutor_role": "A friend who is not sure.",
+      "opening_line": "I signed us up for the charity run. You are coming too, right?",
+      "communicative_goals": [
+        "Explain why the run is a good idea and who it helps",
+        "Address your friend's worries about fitness or time",
+        "Offer practical help so your friend feels ready to join"
+      ]
+    },
+
+    {
+      "id": "cv-C1-0001",
+      "level": "C1",
+      "topic": "Academic discussion",
+      "context": "In an academic tutorial, your tutor challenges one of the conclusions of your essay.",
+      "student_role": "A student discussing their essay.",
+      "tutor_role": "A demanding academic tutor.",
+      "opening_line": "Your conclusion is interesting, but do you think your evidence really supports it?",
+      "communicative_goals": [
+        "Defend your conclusion while acknowledging its limitations",
+        "Clarify which evidence is strongest and why",
+        "Engage with the tutor's counterargument and refine your position"
+      ]
+    },
+    {
+      "id": "cv-C1-0002",
+      "level": "C1",
+      "topic": "Professional negotiation",
+      "context": "A client is asking for extra work that was not in the contract, within the original deadline.",
+      "student_role": "A professional managing a client relationship.",
+      "tutor_role": "A client who wants more than was agreed.",
+      "opening_line": "We need you to add these three features by the same date. That should not be a problem, right?",
+      "communicative_goals": [
+        "Explain the impact of the new request on the agreed scope",
+        "Propose a realistic alternative, such as a revised date or a phased delivery",
+        "Protect the relationship while keeping the agreement sustainable"
+      ]
+    },
+    {
+      "id": "cv-C1-0003",
+      "level": "C1",
+      "topic": "Debating a social issue",
+      "context": "At a dinner party, someone argues that social media does more harm than good to society.",
+      "student_role": "You, participating in a nuanced debate.",
+      "tutor_role": "A guest with strong opinions on social media.",
+      "opening_line": "I honestly think social media has destroyed real conversation.",
+      "communicative_goals": [
+        "Give a balanced response that acknowledges both harms and benefits",
+        "Introduce a distinction that reframes the discussion",
+        "Challenge an overgeneralisation politely and keep the tone respectful"
+      ]
+    },
+    {
+      "id": "cv-C1-0004",
+      "level": "C1",
+      "topic": "Explaining complex ideas",
+      "context": "You have to explain how your company's recommendation system works to a non-technical audience.",
+      "student_role": "An expert explaining a technical concept.",
+      "tutor_role": "An intelligent listener without technical background.",
+      "opening_line": "I have heard your system uses artificial intelligence. How does it actually decide what to show me?",
+      "communicative_goals": [
+        "Explain the concept using a clear analogy",
+        "Simplify technical terms without losing accuracy",
+        "Check that the listener has understood and answer follow-up questions"
+      ]
+    },
+    {
+      "id": "cv-C1-0005",
+      "level": "C1",
+      "topic": "Giving feedback",
+      "context": "You need to give constructive feedback to a colleague whose recent presentation was disorganised.",
+      "student_role": "A senior colleague giving feedback.",
+      "tutor_role": "A colleague who feels defensive about their work.",
+      "opening_line": "So, what did you think of my presentation the other day?",
+      "communicative_goals": [
+        "Start with what worked well and be specific",
+        "Raise the area that needs improvement without causing defensiveness",
+        "Agree with your colleague on one concrete action for next time"
+      ]
+    },
+    {
+      "id": "cv-C1-0006",
+      "level": "C1",
+      "topic": "Leading a meeting",
+      "context": "You are leading a retrospective after a project that finished late, and the team is blaming each other.",
+      "student_role": "The team lead running the retrospective.",
+      "tutor_role": "A frustrated team member.",
+      "opening_line": "I just want to say, the delay was not our fault. The requirements kept changing.",
+      "communicative_goals": [
+        "Acknowledge the frustration and steer the conversation away from blame",
+        "Ask questions that focus on process rather than people",
+        "Summarise the discussion into two concrete actions for the next project"
+      ]
+    },
+    {
+      "id": "cv-C1-0007",
+      "level": "C1",
+      "topic": "Handling an external partner",
+      "context": "An external partner is unhappy about the quality of a recent delivery and is threatening to end the contract.",
+      "student_role": "A manager responding to a partner's concerns.",
+      "tutor_role": "A frustrated business partner.",
+      "opening_line": "Frankly, we are not satisfied. This delivery was below the standard we agreed on.",
+      "communicative_goals": [
+        "Acknowledge the concern without admitting fault prematurely",
+        "Ask clarifying questions to understand the specific problem",
+        "Propose a concrete recovery plan and agree on how to verify it"
+      ]
+    },
+    {
+      "id": "cv-C1-0008",
+      "level": "C1",
+      "topic": "Persuading a manager",
+      "context": "You want your manager to invest in a new training programme for your team, but the budget is tight.",
+      "student_role": "An employee presenting a business case.",
+      "tutor_role": "A cautious manager who controls the budget.",
+      "opening_line": "I have seen your proposal for training. The problem is the budget this year.",
+      "communicative_goals": [
+        "Present the long-term value of the investment with concrete examples",
+        "Anticipate the manager's objections and respond to them",
+        "Offer a compromise, such as a pilot programme, to get approval"
+      ]
+    },
+    {
+      "id": "cv-C1-0009",
+      "level": "C1",
+      "topic": "Summarising decisions",
+      "context": "At the end of a long meeting, you want to make sure everyone agrees on what was decided.",
+      "student_role": "A participant summarising the meeting.",
+      "tutor_role": "A colleague who is not sure the summary is accurate.",
+      "opening_line": "I am not sure we all left the meeting with the same understanding.",
+      "communicative_goals": [
+        "Summarise the key decisions in your own words",
+        "Identify one point where there is still ambiguity",
+        "Propose who does what and by when, and confirm agreement"
+      ]
+    },
+    {
+      "id": "cv-C1-0010",
+      "level": "C1",
+      "topic": "Ethics at work",
+      "context": "A colleague suggests presenting some reused work as new to impress a client.",
+      "student_role": "You, handling an ethical dilemma with tact.",
+      "tutor_role": "A colleague suggesting a questionable shortcut.",
+      "opening_line": "Listen, we could easily present last year's framework as a new solution. Nobody would know.",
+      "communicative_goals": [
+        "Express your discomfort without accusing your colleague",
+        "Explain the risks of the shortcut for the client and the team",
+        "Suggest an honest alternative that still meets the client's needs"
+      ]
+    },
+    {
+      "id": "cv-C1-0011",
+      "level": "C1",
+      "topic": "Media and persuasion",
+      "context": "A friend is convinced by a persuasive online article that you think is misleading.",
+      "student_role": "You, discussing media critically.",
+      "tutor_role": "A friend who trusts the article completely.",
+      "opening_line": "Have you seen this article? It explains everything perfectly. It must be true.",
+      "communicative_goals": [
+        "Question the article's reliability without dismissing your friend",
+        "Point out specific techniques of persuasion it uses",
+        "Suggest how your friend could verify the claims themselves"
+      ]
+    },
+
+    {
+      "id": "cv-C2-0001",
+      "level": "C2",
+      "topic": "Negotiating a contract",
+      "context": "You are in the final round of negotiating a commercial contract, and one clause is still blocking the agreement.",
+      "student_role": "A senior negotiator.",
+      "tutor_role": "A counterpart who is equally skilled at negotiating.",
+      "opening_line": "We cannot accept clause 14 as it stands. It exposes us to unlimited liability.",
+      "communicative_goals": [
+        "Acknowledge the concern and separate the issue from the relationship",
+        "Propose a reformulation of the clause that protects both parties",
+        "Trade concessions deliberately and reach a balanced final agreement"
+      ]
+    },
+    {
+      "id": "cv-C2-0002",
+      "level": "C2",
+      "topic": "Defending an argument",
+      "context": "In a viva or public defence, an examiner questions the theoretical foundation of your work.",
+      "student_role": "A researcher defending their thesis.",
+      "tutor_role": "A rigorous examiner.",
+      "opening_line": "Your framework rests on an assumption that, frankly, many in the field would contest.",
+      "communicative_goals": [
+        "Restate the examiner's objection precisely to show you understood it",
+        "Defend the assumption while acknowledging its scope and limits",
+        "Situate your contribution within the broader scholarly debate"
+      ]
+    },
+    {
+      "id": "cv-C2-0003",
+      "level": "C2",
+      "topic": "Leading to consensus",
+      "context": "You are chairing a meeting between two departments that have reached a public impasse over priorities.",
+      "student_role": "The chair of a difficult meeting.",
+      "tutor_role": "A department head who is unwilling to compromise.",
+      "opening_line": "I will be direct: my department will not postpone our release for your project.",
+      "communicative_goals": [
+        "Acknowledge each side's legitimate constraints",
+        "Reframe the conflict around shared organisational goals",
+        "Guide the participants toward a concrete compromise they can both claim as a win"
+      ]
+    },
+    {
+      "id": "cv-C2-0004",
+      "level": "C2",
+      "topic": "Coaching a colleague",
+      "context": "A talented junior colleague is struggling with a difficult client and asks for your advice.",
+      "student_role": "A senior professional coaching a colleague.",
+      "tutor_role": "A junior colleague who is losing confidence.",
+      "opening_line": "To be honest, that client makes me anxious and I do not know how to handle the last conversation.",
+      "communicative_goals": [
+        "Help the colleague reframe the situation without minimising their feelings",
+        "Ask questions that lead them to their own solution",
+        "Agree on concrete next steps and a way to review progress"
+      ]
+    },
+    {
+      "id": "cv-C2-0005",
+      "level": "C2",
+      "topic": "Critical analysis",
+      "context": "A colleague publishes a report full of impressive data, and you suspect the conclusions overreach.",
+      "student_role": "A peer offering a critical analysis.",
+      "tutor_role": "The author of the report.",
+      "opening_line": "I would love your feedback on my report before I send it to the board.",
+      "communicative_goals": [
+        "Praise what is genuinely strong in the report",
+        "Question the link between the data and the conclusions with precision",
+        "Suggest how the analysis could be made more rigorous while preserving its impact"
+      ]
+    },
+    {
+      "id": "cv-C2-0006",
+      "level": "C2",
+      "topic": "Diplomatic communication",
+      "context": "During an international call, a partner makes an ambiguous comment that could be an accusation or a joke.",
+      "student_role": "A professional navigating ambiguity diplomatically.",
+      "tutor_role": "An international partner speaking indirectly.",
+      "opening_line": "Of course, we all know how these things tend to go in your country, do we not?",
+      "communicative_goals": [
+        "Respond without assuming bad faith or confirming the stereotype",
+        "Ask a clarifying question that invites the partner to be explicit",
+        "Redirect the conversation toward the shared objective tactfully"
+      ]
+    },
+    {
+      "id": "cv-C2-0007",
+      "level": "C2",
+      "topic": "Formal address",
+      "context": "After giving a keynote address, you face a difficult question from the audience about a sensitive statistic.",
+      "student_role": "A speaker fielding questions.",
+      "tutor_role": "A well-informed audience member.",
+      "opening_line": "Your statistic about unemployment seems to contradict what the government published last month.",
+      "communicative_goals": [
+        "Thank the questioner and validate the quality of the question",
+        "Clarify the methodological difference behind the two figures",
+        "Concede uncertainty where it exists and offer to share sources"
+      ]
+    },
+    {
+      "id": "cv-C2-0008",
+      "level": "C2",
+      "topic": "Challenging an analysis",
+      "context": "In a strategy meeting, a consultant presents an elegant analysis whose recommendation you find risky.",
+      "student_role": "A senior decision-maker challenging a recommendation.",
+      "tutor_role": "A confident external consultant.",
+      "opening_line": "Our recommendation is clear: enter the new market this year. The analysis leaves little room for doubt.",
+      "communicative_goals": [
+        "Acknowledge the elegance of the analysis and its strengths",
+        "Probe the assumptions that, if wrong, would change the recommendation",
+        "Press for a clear account of the downside risk before a decision is taken"
+      ]
+    },
+    {
+      "id": "cv-C2-0009",
+      "level": "C2",
+      "topic": "Ethical dilemma",
+      "context": "A close friend in a position of power offers you an advantage that crosses an ethical line, framed as a favour.",
+      "student_role": "You, navigating a personal ethical dilemma.",
+      "tutor_role": "A friend who does not see the problem.",
+      "opening_line": "Do not worry, I will make sure you get the contract. Consider it a favour between friends.",
+      "communicative_goals": [
+        "Make clear the boundary without destroying the friendship",
+        "Explain the consequences for both of you if the favour became known",
+        "Offer an honest way forward that protects your integrity"
+      ]
+    },
+    {
+      "id": "cv-C2-0010",
+      "level": "C2",
+      "topic": "Expert consultation",
+      "context": "A peer from another discipline asks you to explain a subtle technical concept in your field that affects their work.",
+      "student_role": "An expert consulted by a peer.",
+      "tutor_role": "A brilliant peer from another field.",
+      "opening_line": "I have read your papers, but I need to understand the practical implications of your model for my research.",
+      "communicative_goals": [
+        "Explain the concept at the level of precision your peer needs",
+        "Draw the connections to your peer's field to make the implications concrete",
+        "Probe your peer's assumptions to sharpen the shared understanding"
+      ]
+    },
+    {
+      "id": "cv-C2-0011",
+      "level": "C2",
+      "topic": "Repairing misunderstanding",
+      "context": "A cultural misunderstanding has made a new colleague think you were rude in a meeting. You want to repair it.",
+      "student_role": "You, repairing a cross-cultural misunderstanding.",
+      "tutor_role": "A colleague who felt offended.",
+      "opening_line": "I want to be honest: your comment in the meeting felt quite dismissive to me.",
+      "communicative_goals": [
+        "Listen to the colleague's account without becoming defensive",
+        "Explain your intention while taking responsibility for the effect",
+        "Agree on how you will communicate with each other from now on"
+      ]
+    }
+  ]
+}

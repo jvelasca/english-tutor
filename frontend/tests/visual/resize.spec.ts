@@ -7,9 +7,9 @@ import { ensureProfile } from "./gateHelper";
  * y determinista): ArrowLeft/ArrowRight sobre el asa enfocada. Solo corre en
  * desktop; en móvil/tablet los paneles son drawers y las asas se ocultan.
  *
- * V3.1: la píldora raíz "Chat" ya no existe; el workspace conversacional vive
- * en `#/aprender/conversar` y conserva la misma estructura de paneles
- * (sidebar + zona central + Analysis acoplado).
+ * V3.1: la píldora raíz "Chat" ya no existe. V3.10: el workspace conversacional
+ * libre vive en su raíz `/chat` (las rutas guiadas ocupan `/aprender/conversar`)
+ * y conserva la misma estructura de paneles (sidebar + zona central + Analysis).
  */
 test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ page }) => {
   test.skip(page.viewportSize()!.width < 1024, "Solo desktop");
@@ -24,8 +24,8 @@ test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ 
   // Da tiempo a que se seleccione el perfil antes de persistir.
   await page.waitForTimeout(800);
 
-  // Navega a Conversar (sidebar + zona central + Analysis).
-  await page.goto("/#/aprender/conversar");
+  // Navega al chat libre (sidebar + zona central + Analysis).
+  await page.goto("/#/chat");
   await expect(nav).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(500);
 
@@ -57,8 +57,8 @@ test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ 
     .toBeGreaterThan(before + 50);
 
   // Persistencia: espera el debounce (400ms) + PUT y recarga. Tras la recarga
-  // la URL sigue siendo #/aprender/conversar y el layout guardado se restaura
-  // junto con los paneles del workspace.
+  // la URL sigue siendo #/chat y el layout guardado se restaura junto con los
+  // paneles del workspace.
   await page.waitForTimeout(900);
   await page.reload();
   await expect(nav).toBeVisible({ timeout: 15_000 });

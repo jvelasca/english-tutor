@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { navigateTo } from "../router/hash";
 import { LEARN_PATH } from "../router/paths";
 import {
+  CONVERSATION_ACTIVITY,
   GRAMMAR_ACTIVITY,
   LISTENING_ACTIVITY,
   PRONUNCIATION_ACTIVITY,
@@ -51,6 +52,11 @@ const SpeakingRoutesPractice = lazy(() =>
 const PronunciationRoutesPractice = lazy(() =>
   import("../features/pronunciation/PronunciationRoutesPractice").then((m) => ({
     default: m.PronunciationRoutesPractice,
+  })),
+);
+const ConversationRoutesPractice = lazy(() =>
+  import("../features/conversation/ConversationRoutesPractice").then((m) => ({
+    default: m.ConversationRoutesPractice,
   })),
 );
 
@@ -225,6 +231,18 @@ export function Workspace({
           onNext={onNextBestStart}
         />
       );
+    } else if (learnActivity === CONVERSATION_ACTIVITY) {
+      // Conversar por rutas guiadas (V3.10): mini-diálogos multi-turno + mapa
+      // A1-C2. El chat libre con el tutor vive ahora en su raíz `/chat`.
+      content = (
+        <ConversationRoutesPractice
+          userId={currentUserId}
+          active={learnActivity}
+          onBack={backToHub}
+          onAttempt={onAttempt}
+          onNext={onNextBestStart}
+        />
+      );
     } else if (WORKSPACE_ACTIVITIES.includes(learnActivity)) {
       // La barra de contexto (lección del curso vs práctica libre) vive dentro
       // de PracticeView (WS7): las prácticas del hub se sirven aquí directas.
@@ -252,15 +270,17 @@ export function Workspace({
       );
     }
   } else {
-    // route === "chat": Conversar (práctica libre) o una lección del curso
-    // retomada desde Formación. El workspace oculta el historial mientras la
-    // lección está activa y la propia barra de contexto de PracticeView
-    // distingue el modo lección del modo libre (WS7).
+    // route === "chat": práctica libre con el tutor (raíz `/chat` desde
+    // V3.10) o una lección del curso retomada desde Formación. El workspace
+    // oculta el historial mientras la lección está activa y la propia barra de
+    // contexto de PracticeView distingue el modo lección del modo libre (WS7).
+    // Al llegar por URL el chat libre no trae sub-actividad: se marca Conversar
+    // en el atajo de actividades de la franja superior.
     content = (
       <PracticeView
         route="chat"
         chat={chat}
-        activeActivity={learnActivity}
+        activeActivity={learnActivity ?? CONVERSATION_ACTIVITY}
         onAttempt={onAttempt}
         onNextBestStart={onNextBestStart}
         onStep={onStep}

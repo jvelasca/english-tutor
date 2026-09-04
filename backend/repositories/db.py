@@ -908,6 +908,33 @@ def init_db() -> None:
             "ON pronunciation_route_attempts(user_id)"
         )
 
+        # Conversation por rutas (V3.10): mini-diálogos guiados multi-turno A1-C2.
+        # `conversation_route_attempts` guarda cada conversación terminada contra
+        # un diálogo del banco (`dialogue_id`): `overall` (0..1 del scorer de
+        # criterios sobre el transcripto), `passed`, y los criterios completos en
+        # `criteria_json`. El estado por diálogo (unseen/failed/mastered) se
+        # deriva en vivo igual que en las demás rutas.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_route_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                dialogue_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                overall REAL NOT NULL,
+                passed INTEGER NOT NULL,
+                criteria_json TEXT NOT NULL DEFAULT '{}',
+                topic TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversation_route_attempts_user_id "
+            "ON conversation_route_attempts(user_id)"
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:

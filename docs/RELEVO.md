@@ -12,6 +12,23 @@
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
 >
+> **Nota (2026-09-04):** posición vigente **v3.10.0** — **Conversation por rutas
+> CEFR (página única de mini-diálogos guiados multi-turno)**. APRENDER →
+> Conversation deja el chat libre (que vive en su propia raíz `/chat` desde esta
+> versión, siempre accesible) y pasa a página única como Speaking: arriba el
+> mini-diálogo guiado con el tutor (contexto, roles, metas comunicativas y línea
+> de apertura; se conversa por texto o micrófono) y debajo el mapa de rutas
+> A1–C2 con anillos y el panel del nivel (Repetir fallidos / Repasar aprendidos
+> + bloque «Demostrar el nivel» → Speaking Assessment). Banco oficial
+> `backend/curriculum/conversation_corpus.json` (v1.0.0: 11 mini-diálogos por
+> nivel). El intento se evalúa sobre el transcripto completo de la conversación
+> (`domain/conversation_routes.py::submit_attempt` →
+> `speaking_llm.extract_speaking_evidence` con task_type conversation + señal
+> objetiva de interacción) y se persiste por diálogo. Ruta = práctica
+> (`functional`, nunca certifica); demostrar exige Speaking Assessment +
+> evidencia + retención. Siguiente: Vocabulary (v3.11) y Grammar (v3.12) con la
+> misma filosofía.
+>
 > **Nota (2026-09-04):** posición vigente **v3.9.0** — **Pronunciation por rutas
 > CEFR (página única read-aloud)**. APRENDER → Pronunciation es ahora una página
 > única como Speaking/Listening: arriba la frase modelo (escucha con TTS local +

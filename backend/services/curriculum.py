@@ -187,6 +187,7 @@ SPEAKING_SCENARIOS_VERSION = "3.0.0"  # escenarios comunicativos (26 escenarios)
 LISTENING_BANK_VERSION = "7.0.0"  # listening: TTS 8D + corpus (A1/A2 → 200)
 SPEAKING_CORPUS_VERSION = "2.0.0"  # speaking por rutas: tarjetas de micro-conversación guiada
 PRONUNCIATION_CORPUS_VERSION = "1.0.0"  # pronunciation por rutas: frases modelo read-aloud
+CONVERSATION_CORPUS_VERSION = "1.0.0"  # conversation por rutas: mini-diálogos guiados multi-turno
 
 # Objetivos de expansión del corpus de listening por nivel (Fase 3 — calibración
 # pedagógica). Son la *configuración* del pipeline
@@ -213,6 +214,7 @@ _NON_LEVEL_FILES = frozenset(
         "speaking_scenarios.json",
         "speaking_corpus.json",
         "pronunciation_corpus.json",
+        "conversation_corpus.json",
         "cefr_matrix.json",
         "cefr_descriptors.json",
         "listening_corpus.json",

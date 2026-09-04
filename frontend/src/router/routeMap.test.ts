@@ -21,7 +21,7 @@ describe("routeToPath", () => {
     expect(routeToPath("progress")).toBe("/progreso");
     expect(routeToPath("journey")).toBe("/progreso/trayectoria");
     expect(routeToPath("vocabulary")).toBe("/aprender/vocabulario");
-    expect(routeToPath("chat")).toBe("/aprender/conversar");
+    expect(routeToPath("chat")).toBe("/chat");
     expect(routeToPath("help")).toBe("/ayuda");
   });
 });
@@ -42,8 +42,11 @@ describe("pathToRoute: hoja antes que prefijo", () => {
     expect(pathToRoute("/progreso/trayectoria/detalle")).toBe("progress");
   });
 
-  it("resuelve las hojas de conversar y vocabulario antes que aprender", () => {
-    expect(pathToRoute("/aprender/conversar")).toBe("chat");
+  it("resuelve las sub-rutas de aprender y la raíz del chat libre", () => {
+    // V3.10: /aprender/conversar es una sub-ruta más (rutas guiadas); el chat
+    // libre tiene raíz propia /chat.
+    expect(pathToRoute("/aprender/conversar")).toBe("learn");
+    expect(pathToRoute("/chat")).toBe("chat");
     expect(pathToRoute("/aprender/vocabulario")).toBe("vocabulary");
     expect(pathToRoute("/aprender")).toBe("learn");
     expect(pathToRoute("/aprender/otra")).toBe("learn");
@@ -93,7 +96,7 @@ describe("pathToRoute: normalización de la entrada", () => {
 
   it("tolera valores con '#' del hash de la URL", () => {
     expect(pathToRoute("#/progreso")).toBe("progress");
-    expect(pathToRoute("#/aprender/conversar/")).toBe("chat");
+    expect(pathToRoute("#/chat/")).toBe("chat");
     expect(pathToRoute("#/")).toBe("home");
   });
 });

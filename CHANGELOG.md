@@ -4,6 +4,31 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.10.0] — 2026-09-04
+
+**Conversation por rutas CEFR: página única de mini-diálogos guiados multi-turno.**
+
+APRENDER → Conversation deja de ser el chat libre (que ahora vive en su propia
+raíz `/chat`, siempre accesible desde la página) y pasa a una **página única con
+scroll** (espejo de Speaking/Listening/Pronunciation): arriba vive el escenario
+de práctica —un **mini-diálogo guiado multi-turno** con el tutor: situación,
+roles y metas comunicativas, línea de apertura, y se conversa por texto o con el
+micrófono hasta cumplir las metas— y debajo el mapa de rutas A1–C2 con anillos
+y, al abrir un nivel, sus modos (Practicar el nivel / Repetir fallidos / Repasar
+aprendidos) y el bloque «Demostrar el nivel» que abre el Speaking Assessment.
+
+El contenido es un banco oficial versionado y auditable
+`curriculum/conversation_corpus.json` (v1.0.0: **11 mini-diálogos por nivel**,
+A1–C2, con contexto, roles, apertura y metas comunicativas alineadas con el
+currículo). Al terminar una conversación (mínimo de turnos y palabras), se
+**evalúa el transcripto completo** con el pipeline de evidencia LLM existente
+(`extract_speaking_evidence`, task_type conversation) fusionado con la señal
+objetiva de interacción, y se persiste el intento por diálogo. La ruta mide
+práctica sobre el banco oficial (puerta de cobertura/precisión/checkpoint) con
+techo `functional`. Honestidad pedagógica intacta: la ruta **nunca certifica** —
+demostrar el nivel solo puede venir del Speaking Assessment + evidencia +
+retención—, con nota honesta del nivel oral demostrado.
+
 ## [3.9.0] — 2026-09-04
 
 **Pronunciation por rutas CEFR: página única read-aloud con operativa tipo Listening/Speaking.**
