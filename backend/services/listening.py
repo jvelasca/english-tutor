@@ -1187,6 +1187,34 @@ def questions_for_level(level: str) -> list[dict]:
     return [q for q in QUESTION_BANK if q["level"] == level]
 
 
+# Prefijo de los ids de los ítems de práctica extra generados (V3.6). Los ids del
+# banco curado usan `l` (legacy) y `c` (corpus); `g-` identifica contenido
+# generado con IA local y permite resolverlo en el dominio cuando el banco puro
+# no lo conoce (submit_answer/get_audio/level_items).
+GENERATED_ID_PREFIX = "g-"
+
+
+def route_questions(level: str, extra_questions: list[dict] | None = None) -> list[dict]:
+    """Frases practicables de una ruta de listening (banco curado + extra).
+
+    El pool de práctica de una ruta es el banco curado del nivel más los ítems
+    extra (generados con IA) que el alumno ha activado en esa ruta. Los extra
+    nunca entran en el banco curado (`questions_for_level`) ni en la puerta de
+    ruta: son práctica adicional voluntaria.
+
+    `extra_questions` son dicts de ítem ya cargados (p. ej. desde el catálogo
+    `listening_generated`). Los ids duplicados con el banco se descartan.
+    """
+    base = questions_for_level(level)
+    ids = {q["id"] for q in base}
+    extras = [
+        q
+        for q in (extra_questions or [])
+        if q.get("level") == level and q["id"] not in ids
+    ]
+    return base + extras
+
+
 def validate_listening_bank(
     bank: list[dict] | None = None,
     *,
@@ -1232,18 +1260,29 @@ def validate_listening_bank(
     return errors
 
 
-def level_items(level: str, attempts_rows: list[dict]) -> list[dict]:
-    """Estado por frase de un nivel CEFR (puro).
+def level_items(
+    level: str,
+    attempts_rows: list[dict],
+    *,
+    extra_questions: list[dict] | None = None,
+) -> list[dict]:
+    """Estado por frase del pool de un nivel CEFR (puro).
 
-    Para cada frase del nivel devuelve `{question_id, level, script, topic,
-    skill, difficulty, attempts, state}` donde `state` es:
+    Para cada frase del pool de la ruta (banco curado + `extra_questions`
+    generados activados) devuelve `{question_id, level, script, topic, skill,
+    difficulty, attempts, state, source}` donde `state` es:
     - "unseen": nunca intentada;
     - "failed": vista alguna vez pero nunca acertada;
     - "mastered": acertada al menos una vez (mismo criterio que `level_status`).
 
+    `source` es "base" para el banco curado y "generated" para los ítems extra
+    añadidos por el alumno (la UI los etiqueta como práctica generada).
+
     El número de `attempts` es el total de filas registradas de esa frase. No
     requiere migración: se deriva en vivo de las filas de `listening_attempts`.
     """
+    pool = route_questions(level, extra_questions)
+    base_ids = {q["id"] for q in questions_for_level(level)}
     seen: set[str] = set()
     correct: set[str] = set()
     counts: dict[str, int] = {}
@@ -1256,7 +1295,7 @@ def level_items(level: str, attempts_rows: list[dict]) -> list[dict]:
         if row.get("correct"):
             correct.add(qid)
     items = []
-    for q in questions_for_level(level):
+    for q in pool:
         qid = q["id"]
         if qid in correct:
             state = "mastered"
@@ -1276,6 +1315,7 @@ def level_items(level: str, attempts_rows: list[dict]) -> list[dict]:
                 ),
                 "attempts": counts.get(qid, 0),
                 "state": state,
+                "source": "base" if qid in base_ids else "generated",
             }
         )
     return items
@@ -1439,30 +1479,38 @@ def review_next_question(
     attempts_rows: list[dict],
     *,
     only_failed: bool = False,
+    only_mastered: bool = False,
+    extra_questions: list[dict] | None = None,
 ) -> dict:
-    """Siguiente frase de un nivel para repaso (rotación LRU).
+    """Siguiente frase del pool de un nivel para repaso (rotación LRU).
 
-    Devuelve la frase del nivel cuyo último intento registrado es más antiguo
-    (o cualquier frase aún no intentada). Como cada respuesta registra una fila
-    nueva, el repaso recorre las frases del nivel sin repetir hasta completar
-    una vuelta completa. `attempts_rows` llega ordenado por id ASC.
+    Devuelve la frase del pool de la ruta (banco curado + `extra_questions`)
+    cuyo último intento registrado es más antiguo (o cualquier frase aún no
+    intentada). Como cada respuesta registra una fila nueva, el repaso recorre
+    las frases del nivel sin repetir hasta completar una vuelta completa.
+    `attempts_rows` llega ordenado por id ASC.
 
     Con `only_failed=True` restringe el repaso a las frases del nivel que se han
-    intentado pero nunca acertado (estado "failed"); si no queda ninguna, lanza
-    `ValueError("listening.no_failed")`.
+    intentado pero nunca acertado (estado "failed"); con `only_mastered=True`, a
+    las que se han acertado alguna vez ("mastered", repasar lo aprendido). Si no
+    queda ninguna del grupo pedido, lanza `ValueError("listening.no_failed")`.
     """
-    candidates = questions_for_level(level)
-    if not candidates:
+    pool = route_questions(level, extra_questions)
+    if not pool:
         raise ValueError(f"nivel sin frases en el banco: {level}")
-    if only_failed:
-        failed_ids = {
+    candidates: list[dict]
+    if only_failed or only_mastered:
+        wanted = "failed" if only_failed else "mastered"
+        keep = {
             item["question_id"]
-            for item in level_items(level, attempts_rows)
-            if item["state"] == "failed"
+            for item in level_items(level, attempts_rows, extra_questions=extra_questions)
+            if item["state"] == wanted
         }
-        candidates = [q for q in candidates if q["id"] in failed_ids]
+        candidates = [q for q in pool if q["id"] in keep]
         if not candidates:
             raise ValueError("listening.no_failed")
+    else:
+        candidates = pool
     candidate_ids = {q["id"] for q in candidates}
     last_index: dict[str, int] = {}
     for i, row in enumerate(attempts_rows):
@@ -1472,11 +1520,11 @@ def review_next_question(
     # Nunca intentadas primero (son las menos practicadas); entre las demás, la
     # de intento más antiguo primero (LRU). Tras responder, la frase pasa al
     # final y no se repite hasta completar la vuelta.
-    pool = sorted(
+    ordered = sorted(
         candidates,
         key=lambda q: (q["id"] in last_index, last_index.get(q["id"], -1)),
     )
-    return pool[0]
+    return ordered[0]
 
 
 def _realizes_subskill(question: dict, subskill: str) -> bool:

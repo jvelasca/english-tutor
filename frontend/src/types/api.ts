@@ -459,6 +459,14 @@ export interface ListeningLevelProgress {
   // habilita leer "A1 Listening — demonstrated".
   state?: ListeningRouteState;
   retention?: ListeningRouteRetention | null;
+  // Práctica extra generada (V3.6): `total`/`mastered` del anillo incluyen los
+  // ítems extra activados; `base_total`/`base_mastered` son el banco curado
+  // oficial (el único que decide la puerta, `completed` y `state`). `extras`
+  // son los ítems generados activados y `extras_mastered` los ya acertados.
+  base_total?: number;
+  base_mastered?: number;
+  extras?: number;
+  extras_mastered?: number;
 }
 
 export interface ListeningStats {
@@ -481,6 +489,8 @@ export interface ListeningItem {
   difficulty: number;
   attempts: number;
   state: ListeningItemState;
+  // "base" = banco curado oficial; "generated" = práctica extra generada.
+  source?: "base" | "generated";
 }
 
 export interface ListeningLevelItems {
@@ -493,6 +503,23 @@ export interface ListeningLevelItems {
   items: ListeningItem[];
   // Puerta de ruta del nivel (backend 2.x); `completed` la refleja.
   gate?: ListeningRouteGate | null;
+}
+
+/** Trabajo de generación de práctica extra en segundo plano (V3.6). */
+export interface ListeningExtrasJob {
+  job_id: string;
+  status: "running" | "done" | "error";
+  level: string;
+  requested: number;
+  added: string[];
+  error: string;
+}
+
+/** Ítems extra activados en una ruta (V3.6). */
+export interface ListeningRouteExtras {
+  level: string;
+  total: number;
+  question_ids: string[];
 }
 
 export interface ListeningSubskillProgress {

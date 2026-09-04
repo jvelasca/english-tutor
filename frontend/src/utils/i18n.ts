@@ -1329,8 +1329,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Puerta: dominar ≥{coverage}% (≥{min} de {total})",
   },
   "listening.routeRingHelp": {
-    en: "Each route trains its full bank. The number under a level is how many phrases you have mastered (e.g. \"30 of 205\"); passing the route is a practice milestone, not a CEFR level.",
-    es: "Cada ruta entrena su banco completo. El número bajo cada nivel son las frases que dominas (p. ej. «30 de 205»); superar la ruta es un hito de práctica, no un nivel CEFR.",
+    en: "Each route trains its full bank. The number under a level is how many phrases you have mastered (e.g. \"30 of 205\"); passing the route is a practice milestone, not a CEFR level. Once the official bank of a route is mastered you can add generated extra practice from that route: the ring grows (e.g. \"205 of 260\") but the route gate and certification never change.",
+    es: "Cada ruta entrena su banco completo. El número bajo cada nivel son las frases que dominas (p. ej. «30 de 205»); superar la ruta es un hito de práctica, no un nivel CEFR. Cuando dominas el banco oficial de una ruta puedes añadir práctica extra generada desde esa ruta: el anillo crece (p. ej. «205 de 260») pero la puerta de ruta y la certificación no cambian.",
   },
   "listening.routeCertNote": {
     en: "A CEFR level is certified separately from this route: level exam + evidence per skill + stable retention (≥7 days). This route only trains.",
@@ -1441,6 +1441,52 @@ const STRINGS: Record<string, Entry> = {
   "listening.reviewLevel": {
     en: "Review level {level}",
     es: "Repasar nivel {level}",
+  },
+  // Repaso de lo aprendido (V3.6): rotación solo por las frases ya dominadas.
+  "listening.reviewLearned": {
+    en: "Review learned ({count})",
+    es: "Repasar lo aprendido ({count})",
+  },
+  "listening.reviewLearnedProgress": {
+    en: "Reviewing what you learned · level {level} · {done}/{total}",
+    es: "Repasando lo aprendido · nivel {level} · {done}/{total}",
+  },
+  // Práctica extra generada (V3.6): práctica ilimitada sobre ítems generados.
+  "listening.generatedTag": {
+    en: "generated practice",
+    es: "práctica generada",
+  },
+  "listening.extraAddTitle": {
+    en: "Add more practice to {level}",
+    es: "Añadir más práctica a {level}",
+  },
+  "listening.extraAddLabel": {
+    en: "Add",
+    es: "Añadir",
+  },
+  "listening.extraAddCta": {
+    en: "{count} more",
+    es: "{count} más",
+  },
+  "listening.extraBreakdown": {
+    en: "{base} official · +{extras} extra",
+    es: "{base} oficiales · +{extras} extra",
+  },
+  "listening.extraHonestNote": {
+    en: "These phrases are generated practice (local AI + synthetic voice), not official content. The route gate and your functional/demonstrated status are always calculated only over the official bank: adding extra practice never revokes a completed route or changes your certification.",
+    es: "Estas frases son práctica generada (IA local + voz sintética), no contenido oficial. La puerta de ruta y tu estado funcional/demostrado se calculan siempre solo sobre el banco oficial: añadir práctica extra nunca revoca una ruta superada ni cambia tu certificación.",
+  },
+  "listening.extraGenerating": {
+    en: "Generating extra practice… the local AI model is working and may take a few minutes. This tab can stay open.",
+    es: "Generando práctica extra… el modelo de IA local está trabajando y puede tardar unos minutos. Puedes dejar esta pestaña abierta.",
+  },
+  "listening.extraDone": {
+    en: "Added {added} extra phrase(s) to {level}.",
+    es: "Se añadieron {added} frase(s) extra a {level}.",
+  },
+  "listening.extraError": {
+    en: "Couldn't generate extra practice: {error}",
+    es: "No se pudo generar la práctica extra: {error}",
   },
   "listening.levelItemsError": {
     en: "Could not load the level history.",

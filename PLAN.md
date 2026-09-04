@@ -11,7 +11,13 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.5.8` — **Auditoría de UI: contraste claro/oscuro + QR**
+- ✅ Versión estable `3.6.0` — **Listening: práctica ilimitada + repaso por ruta**
+  (cada ruta A1..C2 se puede ampliar con práctica generada por IA local —nunca
+  contenido oficial: la puerta, el estado functional/demonstrated y el routing
+  adaptativo siguen anclados al banco curado, así que añadir extras no revoca ni
+  encarece certificar—; el anillo crece con el desglose "oficiales + extra" y
+  cada ruta permite "Repasar lo aprendido", no solo las falladas). Base: `3.5.8`
+  — **Auditoría de UI: contraste claro/oscuro + QR**
   (QR visible en modo oscuro sobre tarjeta blanca fija, contraste WCAG corregido
   en insignias CEFR, avisos ámbar, fechas/texto tenue y avatar "?" sin perfil; la
   ProfileGate de V3.5.7 se estabiliza en tests visuales con perfil de test

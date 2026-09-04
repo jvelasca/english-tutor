@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, Plus } from "lucide-react";
 import { getListeningLevelItems } from "../../api/listening";
 import type {
+  ListeningExtrasJob,
   ListeningItem,
   ListeningItemState,
   ListeningLevelItems,
@@ -19,6 +20,8 @@ import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 
 const GROUPS: ListeningItemState[] = ["failed", "mastered", "unseen"];
+// Cantidades de práctica extra que se pueden añadir a una ruta (V3.6).
+const EXTRAS_AMOUNTS = [10, 25, 50];
 
 // Umbrales de la retención retardada que decide DEMONSTRATED (Constitución §2.1
 // y P1/H5): re-exposiciones ≥ 7 días con ratio ≥ 90% de la precisión inmediata.
@@ -39,14 +42,24 @@ interface ListeningLevelPanelProps {
   disabled?: boolean;
   onPracticeLevel: (level: string, total: number) => void;
   onDrillFailed: (level: string, failedIds: string[]) => void;
+  /** Repasar lo aprendido: rotación solo por las frases ya dominadas (V3.6). */
+  onReviewLearned: (level: string, total: number) => void;
+  /** Añadir práctica extra generada a la ruta (V3.6). */
+  onAddExtras: (level: string, count: number) => void;
+  /** Estado del trabajo de generación de la ruta (para mostrar progreso/error). */
+  extrasJob?: ListeningExtrasJob | null;
+  /** Contador que fuerza a recargar el panel (tras terminar una generación). */
+  refreshNonce?: number;
 }
 
 /**
  * Historial por frase de un nivel (control del alumno). Al desplegar el donut de
  * un nivel muestra sus frases agrupadas en falladas / dominadas / sin ver, cada
- * una con su altavoz TTS, y ofrece repetir las falladas hasta dominarlas o
- * practicar/repasar el nivel completo. Solo lectura + acciones: la práctica en
- * sí la hace `ListeningPractice`.
+ * una con su altavoz TTS, y ofrece repetir las falladas hasta dominarlas,
+ * repasar lo aprendido (solo dominadas) o practicar/repasar el nivel completo.
+ * Cuando el banco oficial de la ruta está dominado ofrece añadir práctica extra
+ * generada (IA local) para consolidar sin tocar la certificación. Solo lectura
+ * + acciones: la práctica en sí la hace `ListeningPractice`.
  */
 export function ListeningLevelPanel({
   userId,
@@ -56,6 +69,10 @@ export function ListeningLevelPanel({
   disabled,
   onPracticeLevel,
   onDrillFailed,
+  onReviewLearned,
+  onAddExtras,
+  extrasJob,
+  refreshNonce,
 }: ListeningLevelPanelProps) {
   const { t } = useI18n();
   const [data, setData] = useState<ListeningLevelItems | null>(null);
@@ -79,7 +96,7 @@ export function ListeningLevelPanel({
     return () => {
       cancelled = true;
     };
-  }, [userId, level]);
+  }, [userId, level, refreshNonce]);
 
   if (error) {
     return (
@@ -120,6 +137,22 @@ export function ListeningLevelPanel({
   const gate = data.gate;
   const showGate =
     !!gate && !gate.passed && gate.total > 0 && gate.mastered > 0;
+  // Banco curado oficial: puerta y `completed` se calculan solo sobre él, así
+  // que los ítems extra (source "generated") no alteran estos contadores.
+  const baseTotal = gate?.total ?? data.total;
+  const extras = gate && gate.total > 0 ? Math.max(0, data.total - gate.total) : 0;
+  // La ruta está "cubierta" (banco oficial dominado) aunque la puerta siga
+  // bloqueada por precisión/variedad/checkpoint: es el momento de la práctica
+  // extra ilimitada.
+  const baseCovered =
+    !!gate && gate.total > 0 && gate.mastered >= gate.total;
+  const pendingCert =
+    gate && gate.total > 0
+      ? !gate.passed && gate.mastered >= gate.total
+      : data.mastered === data.total && data.total > 0;
+  const jobRunning = extrasJob?.status === "running";
+  const jobDone = extrasJob?.status === "done";
+  const jobError = extrasJob?.status === "error" ? extrasJob.error : "";
 
   return (
     <div className="flex flex-col gap-3">
@@ -138,8 +171,7 @@ export function ListeningLevelPanel({
         {data.completed ? (
           <Badge className="gap-1">{t("listening.completedShort")}</Badge>
         ) : (
-          data.mastered === data.total &&
-          data.total > 0 && (
+          pendingCert && (
             <Badge
               variant="outline"
               className="border-warning/40 text-warning"
@@ -221,6 +253,70 @@ export function ListeningLevelPanel({
         </div>
       )}
 
+      {baseCovered && (
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold text-foreground">
+                {t("listening.extraAddTitle").replace("{level}", level)}
+              </p>
+              {extras > 0 && (
+                <span className="tabular-nums text-muted-foreground">
+                  {t("listening.extraBreakdown")
+                    .replace("{base}", String(baseTotal))
+                    .replace("{extras}", String(extras))}
+                </span>
+              )}
+            </div>
+            <p className="leading-relaxed text-muted-foreground">
+              {t("listening.extraHonestNote")}
+            </p>
+            {jobRunning ? (
+              <p
+                role="status"
+                aria-live="polite"
+                className="flex items-center gap-2 text-warning"
+              >
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                {t("listening.extraGenerating")}
+              </p>
+            ) : jobDone ? (
+              <p className="text-success">
+                {t("listening.extraDone")
+                  .replace("{added}", String(extrasJob.added.length))
+                  .replace("{level}", level)}
+              </p>
+            ) : jobError ? (
+              <p className="text-destructive">
+                {t("listening.extraError").replace("{error}", jobError)}
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground">
+                  {t("listening.extraAddLabel")}
+                </span>
+                {EXTRAS_AMOUNTS.map((amount) => (
+                  <Button
+                    key={amount}
+                    type="button"
+                    variant="outline"
+                    className="min-h-8 gap-1 px-2.5 text-xs"
+                    onClick={() => onAddExtras(level, amount)}
+                    disabled={disabled}
+                  >
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    {t("listening.extraAddCta").replace(
+                      "{count}",
+                      String(amount),
+                    )}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {groups.map((group) => {
         const isOpen = open === group.state;
         return (
@@ -279,6 +375,18 @@ export function ListeningLevelPanel({
           type="button"
           variant="outline"
           className="min-h-9"
+          onClick={() => onReviewLearned(level, data.mastered)}
+          disabled={disabled || data.mastered === 0}
+        >
+          {t("listening.reviewLearned").replace(
+            "{count}",
+            String(data.mastered),
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-9"
           onClick={() => onPracticeLevel(level, data.total)}
           disabled={disabled}
         >
@@ -304,6 +412,11 @@ function ListeningItemRow({ item }: { item: ListeningItem }) {
           {phrase.display}
         </p>
         <p className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+          {item.source === "generated" && (
+            <span className="font-semibold normal-case tracking-normal text-warning">
+              {t("listening.generatedTag")}
+            </span>
+          )}
           {item.topic && <span>{item.topic.replace(/_/g, " ")}</span>}
           {item.difficulty > 0 && (
             <span>

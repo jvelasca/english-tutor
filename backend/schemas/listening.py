@@ -138,10 +138,18 @@ class ListeningLevelOut(BaseModel):
     # developing / functional / demonstrated; y resumen de su retención.
     state: str = "not_started"
     retention: ListeningRouteRetention | None = None
+    # Práctica extra generada (V3.6): `total`/`mastered` incluyen los ítems
+    # extra activados; `base_total`/`base_mastered` son el banco curado oficial
+    # (el único que decide la puerta y el estado). `extras` es el nº de ítems
+    # generados activados y `extras_mastered` los ya acertados.
+    base_total: int = 0
+    base_mastered: int = 0
+    extras: int = 0
+    extras_mastered: int = 0
 
 
 class ListeningItemOut(BaseModel):
-    """Una frase del banco con su estado para un usuario (panel del alumno)."""
+    """Una frase del pool de una ruta con su estado para un usuario (panel)."""
 
     question_id: str
     level: str
@@ -151,6 +159,8 @@ class ListeningItemOut(BaseModel):
     difficulty: int = 1
     attempts: int = 0
     state: str
+    # "base" = banco curado oficial; "generated" = práctica extra generada.
+    source: str = "base"
 
 
 class ListeningLevelItemsOut(BaseModel):
@@ -256,6 +266,38 @@ class ListeningResilience(BaseModel):
     dimensions: list[ListeningResilienceDimension] = Field(default_factory=list)
     main_weakness: str | None = None
     recommendation: str = ""
+
+
+# --- Práctica extra generada (V3.6) ------------------------------------------
+
+
+class ListeningAddExtrasRequest(BaseModel):
+    """Cuerpo del POST que pide añadir `count` ítems extra a una ruta."""
+
+    count: int = Field(default=10, ge=1, le=100)
+
+
+class ListeningExtrasJobOut(BaseModel):
+    """Estado de un trabajo de generación en segundo plano.
+
+    `status` ∈ {running, done, error}. Mientras corre, el frontend hace polling;
+    al terminar, `added` son los ids activados en la ruta del usuario.
+    """
+
+    job_id: str
+    status: str = "running"
+    level: str = ""
+    requested: int = 0
+    added: list[str] = Field(default_factory=list)
+    error: str = ""
+
+
+class ListeningRouteExtrasOut(BaseModel):
+    """Ítems extra activados en una ruta (V3.6)."""
+
+    level: str
+    total: int = 0
+    question_ids: list[str] = Field(default_factory=list)
 
 
 class ListeningDiagnostic(BaseModel):

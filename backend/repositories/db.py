@@ -748,6 +748,64 @@ def init_db() -> None:
             "ON fsrs_cards(user_id, due_at)"
         )
 
+        # Listening extra generado (V3.6): catálogo global de ítems de práctica
+        # generados con IA local (LLM + Piper). Es contenido complementario de una
+        # ruta: nunca forma parte del banco curado oficial ni de la puerta de ruta.
+        # `payload_json` guarda el dict completo del ítem (mismas claves que el
+        # banco: script, question, options, answer_index, skill, topic,
+        # difficulty_vector…). `generator_version` versiona el prompt/validador.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS listening_generated (
+                id TEXT PRIMARY KEY,
+                level TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                generator_version TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                UNIQUE (level, payload_json)
+            )
+            """
+        )
+
+        # Activación por usuario de los ítems extra en una ruta (V3.6): un ítem
+        # generado entra en la ruta de un alumno solo cuando este lo activa, y la
+        # activación se puede revertir (el contenido generado queda en el catálogo
+        # global para otros perfiles o para reactivarlo después).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS listening_route_extras (
+                user_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                added_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, level, question_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (question_id) REFERENCES listening_generated(id)
+            )
+            """
+        )
+
+        # Trabajos de generación en segundo plano (V3.6). Generar 10-50 ítems con
+        # el modelo local tarda minutos; el POST de extras crea un trabajo y el
+        # frontend hace polling hasta `done`. `added_ids_json` lista los ids
+        # activados en la ruta al terminar.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS listening_generation_jobs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                requested INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'running',
+                added_ids_json TEXT NOT NULL DEFAULT '[]',
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:

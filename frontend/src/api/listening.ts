@@ -1,10 +1,12 @@
-import { getJson, postJson, withTimeout } from "./client";
+import { deleteJson, getJson, postJson, withTimeout } from "./client";
 import type {
   ListeningAnswerResponse,
   ListeningDiagnostic,
+  ListeningExtrasJob,
   ListeningLevelItems,
   ListeningProductionResult,
   ListeningQuestion,
+  ListeningRouteExtras,
   ListeningStats,
 } from "../types/api";
 
@@ -16,17 +18,20 @@ const TIMEOUT_SUBMIT_MS = 20000;
 const TIMEOUT_QUESTION_MS = 15000;
 const TIMEOUT_READ_MS = 10000;
 
+export type ListeningQuestionMode = "all" | "failed" | "mastered";
+
 export function getListeningQuestion(
   userId: string,
   level?: string | null,
-  mode?: "all" | "failed",
+  mode?: ListeningQuestionMode,
 ): Promise<ListeningQuestion> {
   const params = new URLSearchParams({ user_id: userId });
   // `level` entra en juego en el repaso de un nivel ya completado: el selector
   // rota por las frases del nivel en lugar de seguir al Student Model.
   if (level) params.set("level", level);
   // `mode="failed"` (drill) restringe el selector a las frases del nivel que se
-  // han intentado pero nunca acertado. Solo se envía cuando se indica.
+  // han intentado pero nunca acertado. `mode="mastered"` (repasar lo aprendido)
+  // lo restringe a las acertadas alguna vez. Solo se envían cuando se indica.
   if (mode && mode !== "all") params.set("mode", mode);
   return withTimeout(
     getJson<ListeningQuestion>(`/api/listening/question?${params.toString()}`),
@@ -126,4 +131,57 @@ export function getListeningAudioUrl(
     params.set("variant", variant);
   }
   return `/api/listening/audio/${questionId}?${params.toString()}`;
+}
+
+// --- Práctica extra generada (V3.6) ------------------------------------------
+// La generación corre en un trabajo en segundo plano del backend (el modelo
+// local tarda minutos): `addRouteExtras` devuelve el trabajo y `getRouteExtrasJob`
+// permite hacer polling hasta `done`/`error`.
+
+export function addRouteExtras(
+  userId: string,
+  level: string,
+  count: number,
+): Promise<ListeningExtrasJob> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<ListeningExtrasJob>(
+    `/api/listening/routes/${level}/extras?${query}`,
+    { count },
+  );
+}
+
+export function getRouteExtrasJob(
+  userId: string,
+  level: string,
+  jobId: string,
+): Promise<ListeningExtrasJob> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return withTimeout(
+    getJson<ListeningExtrasJob>(
+      `/api/listening/routes/${level}/extras/jobs/${jobId}?${query}`,
+    ),
+    TIMEOUT_READ_MS,
+    "extras job",
+  );
+}
+
+export function listRouteExtras(
+  userId: string,
+  level: string,
+): Promise<ListeningRouteExtras> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return getJson<ListeningRouteExtras>(
+    `/api/listening/routes/${level}/extras?${query}`,
+  );
+}
+
+export function removeRouteExtra(
+  userId: string,
+  level: string,
+  questionId: string,
+): Promise<ListeningRouteExtras> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return deleteJson<ListeningRouteExtras>(
+    `/api/listening/routes/${level}/extras/${questionId}?${query}`,
+  );
 }

@@ -15,13 +15,16 @@ import {
   Volume2,
 } from "lucide-react";
 import {
+  addRouteExtras,
   getListeningAudioUrl,
   getListeningDiagnostic,
   getListeningQuestion,
   getListeningStats,
+  getRouteExtrasJob,
   submitListeningAnswer,
   submitListeningDictation,
   submitListeningShadowing,
+  type ListeningQuestionMode,
 } from "../../api/listening";
 import {
   drillAnswered,
@@ -41,6 +44,7 @@ import type {
   ListeningAnswerResponse,
   ListeningAudioVariant,
   ListeningDiagnostic,
+  ListeningExtrasJob,
   ListeningProductionResult,
   ListeningQuestion,
   ListeningStats,
@@ -199,6 +203,23 @@ export function ListeningPractice({
   // tarjeta de ajustes de audio.
   const [ttsVoiceName, setTtsVoiceName] = useState<string | null>(null);
 
+  // Trabajos de generación de práctica extra por ruta (V3.6). El POST crea el
+  // trabajo y `pollExtrasJob` hace polling hasta `done`/`error`; al terminar se
+  // refrescan stats y el panel del nivel (extrasNonce).
+  const [extrasJobs, setExtrasJobs] = useState<Record<string, ListeningExtrasJob>>(
+    {},
+  );
+  const [extrasNonce, setExtrasNonce] = useState(0);
+  const pollTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Limpia los temporizadores de polling al desmontar la pantalla.
+  useEffect(() => {
+    const timers = pollTimersRef.current;
+    return () => {
+      Object.values(timers).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
+
   // Traducción de apoyo EN→ES de los tres textos de la pregunta (enunciado,
   // texto oído en el resultado y referencia de dictado/shadowing). Cada una es
   // un toggle independiente que se reinicia cuando cambia la pregunta.
@@ -217,7 +238,7 @@ export function ListeningPractice({
 
   async function load(
     levelOverride?: string | null,
-    modeOverride?: "all" | "failed",
+    modeOverride?: ListeningQuestionMode,
   ) {
     if (!userId) return;
     setError(null);
@@ -230,7 +251,12 @@ export function ListeningPractice({
     // Sin override, respeta el nivel y modo de la sesión en curso (si hay).
     const level = levelOverride === undefined ? session?.level : levelOverride;
     const mode =
-      modeOverride ?? (session?.mode === "drill" ? "failed" : "all");
+      modeOverride ??
+      (session?.mode === "drill"
+        ? "failed"
+        : session?.mode === "mastered"
+          ? "mastered"
+          : "all");
     try {
       setQuestion(await getListeningQuestion(userId, level, mode));
       setStartedAt(Date.now());
@@ -240,7 +266,7 @@ export function ListeningPractice({
     }
   }
 
-  /** Sesión focalizada: practicar/repasar un nivel completo (rotación LRU). */
+  /** Sesión focalizada: practicar/repasar una ruta completa (rotación LRU). */
   function startLevelSession(level: string, total: number) {
     if (session || !userId) return;
     setSession({ mode: "level", level, total, done: 0 });
@@ -254,6 +280,15 @@ export function ListeningPractice({
     setSession({ mode: "drill", level, total: failedIds.length, remaining: failedIds });
     setExpandedLevel(null);
     void load(level, "failed");
+  }
+
+  /** Sesión de repaso de lo aprendido: rotación solo por las frases dominadas
+   * de la ruta (consolidación y re-exposición, V3.6). */
+  function startMasteredSession(level: string, total: number) {
+    if (session || !userId || total === 0) return;
+    setSession({ mode: "mastered", level, total, done: 0 });
+    setExpandedLevel(null);
+    void load(level, "mastered");
   }
 
   /** Cierra la sesión actual y vuelve al modo adaptativo (sin override de nivel). */
@@ -276,17 +311,82 @@ export function ListeningPractice({
   // pendiente solo si se acertó.
   function applySessionOutcome(questionId: string, correct: boolean) {
     if (!session) return;
-    if (session.mode === "level") {
-      setSession((s) =>
-        s && s.mode === "level" ? { ...s, done: s.done + 1 } : s,
-      );
-    } else if (correct) {
-      setSession((s) =>
-        s && s.mode === "drill"
-          ? { ...s, remaining: drillAnswered(s.remaining, questionId, true) }
-          : s,
-      );
+    if (session.mode === "drill") {
+      if (correct) {
+        setSession((s) =>
+          s && s.mode === "drill"
+            ? { ...s, remaining: drillAnswered(s.remaining, questionId, true) }
+            : s,
+        );
+      }
+      return;
     }
+    // level y mastered (repaso de lo aprendido) rotan una vuelta completa.
+    setSession((s) =>
+      s && (s.mode === "level" || s.mode === "mastered")
+        ? { ...s, done: s.done + 1 }
+        : s,
+    );
+  }
+
+  // --- Práctica extra generada (V3.6) ----------------------------------------
+  // Añadir "X más" de práctica a una ruta crea un trabajo en el backend (la
+  // generación con el modelo local tarda). `pollExtrasJob` consulta el estado
+  // hasta `done`/`error` y refresca las métricas y el panel del nivel.
+  async function startAddPractice(level: string, count: number) {
+    if (!userId) return;
+    if (extrasJobs[level]?.status === "running") return;
+    setError(null);
+    try {
+      const job = await addRouteExtras(userId, level, count);
+      setExtrasJobs((prev) => ({ ...prev, [level]: job }));
+      pollExtrasJob(level, job.job_id);
+    } catch (e) {
+      // Fallo del POST (backend caído, petición rechazada…): se muestra como un
+      // trabajo en error para que el bloque del nivel lo explique.
+      setExtrasJobs((prev) => ({
+        ...prev,
+        [level]: {
+          job_id: "",
+          status: "error",
+          level,
+          requested: count,
+          added: [],
+          error: (e as Error).message,
+        },
+      }));
+    }
+  }
+
+  function pollExtrasJob(level: string, jobId: string) {
+    if (!userId) return;
+    const timer = setTimeout(() => {
+      void (async () => {
+        let job: ListeningExtrasJob | null = null;
+        try {
+          job = await getRouteExtrasJob(userId, level, jobId);
+        } catch {
+          // Error de red transitorio: se reintenta en la siguiente ronda.
+        }
+        if (!job) {
+          pollExtrasJob(level, jobId);
+          return;
+        }
+        setExtrasJobs((prev) =>
+          prev[level]?.job_id === jobId
+            ? { ...prev, [level]: job }
+            : prev,
+        );
+        if (job.status === "running") {
+          pollExtrasJob(level, jobId);
+          return;
+        }
+        delete pollTimersRef.current[level];
+        setExtrasNonce((n) => n + 1);
+        void refreshStats();
+      })();
+    }, 2500);
+    pollTimersRef.current[level] = timer;
   }
 
   async function speakQuestion() {
@@ -560,10 +660,15 @@ export function ListeningPractice({
                       .replace("{level}", session.level)
                       .replace("{done}", String(sessionDone(session)))
                       .replace("{total}", String(session.total))
-                  : t("listening.reviewProgress")
-                      .replace("{level}", session.level)
-                      .replace("{done}", String(session.done))
-                      .replace("{total}", String(session.total))}
+                  : session.mode === "mastered"
+                    ? t("listening.reviewLearnedProgress")
+                        .replace("{level}", session.level)
+                        .replace("{done}", String(session.done))
+                        .replace("{total}", String(session.total))
+                    : t("listening.reviewProgress")
+                        .replace("{level}", session.level)
+                        .replace("{done}", String(session.done))
+                        .replace("{total}", String(session.total))}
               </span>
               <Button
                 type="button"
@@ -1077,7 +1182,10 @@ export function ListeningPractice({
                       )}
                     {currentLevelStat &&
                       !currentLevelStat.completed &&
-                      currentLevelStat.mastered === currentLevelStat.total && (
+                      currentLevelStat.gate &&
+                      currentLevelStat.gate.total > 0 &&
+                      currentLevelStat.gate.mastered >=
+                        currentLevelStat.gate.total && (
                         <span className="text-[11px] font-semibold text-warning">
                           {t("listening.routePendingCert")}
                         </span>
@@ -1157,6 +1265,16 @@ export function ListeningPractice({
                             )}
                           </span>
                         )}
+                        {(lv.extras ?? 0) > 0 && (
+                          <span className="max-w-[140px] text-center text-[9px] leading-tight tabular-nums text-muted-foreground">
+                            {t("listening.extraBreakdown")
+                              .replace(
+                                "{base}",
+                                String(lv.base_total ?? lv.total - (lv.extras ?? 0)),
+                              )
+                              .replace("{extras}", String(lv.extras))}
+                          </span>
+                        )}
                         {!lv.completed &&
                           lv.mastered > 0 &&
                           lv.gate &&
@@ -1171,12 +1289,13 @@ export function ListeningPractice({
                                   "{min}",
                                   String(
                                     Math.ceil(
-                                      (lv.total * lv.gate.coverage_required_pct) /
+                                      (lv.gate.total *
+                                        lv.gate.coverage_required_pct) /
                                         100,
                                     ),
                                   ),
                                 )
-                                .replace("{total}", String(lv.total))}
+                                .replace("{total}", String(lv.gate.total))}
                             </span>
                           )}
                       </button>
@@ -1200,6 +1319,12 @@ export function ListeningPractice({
                       }
                       onPracticeLevel={startLevelSession}
                       onDrillFailed={startFailedDrill}
+                      onReviewLearned={startMasteredSession}
+                      onAddExtras={(level, count) =>
+                        void startAddPractice(level, count)
+                      }
+                      extrasJob={extrasJobs[expandedLevel] ?? null}
+                      refreshNonce={extrasNonce}
                     />
                   </div>
                 )}

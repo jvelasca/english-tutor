@@ -1,6 +1,7 @@
 """Servicio de dominio de listening (comprensión auditiva)."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
@@ -13,6 +14,7 @@ from services.audio_library import is_recorded, recorded_audio_path
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
     AUDIO_VARIANTS,
+    GENERATED_ID_PREFIX,
     LEVEL_ORDER,
     PRODUCTION_PASS_SCORE,
     audio_digest,
@@ -37,6 +39,59 @@ from services.listening import (
 from services.listening import (
     level_items as motor_level_items,
 )
+
+
+def _generated_payload(row: dict) -> dict | None:
+    """Payload completo del ítem generado desde una fila del catálogo global.
+
+    El `payload_json` guarda el contenido sin `id` (para deduplicar por texto);
+    aquí se reconstruye el dict con el id de la fila, con las mismas claves que
+    el banco curado para que el motor lo trate igual.
+    """
+    if not row:
+        return None
+    try:
+        payload = json.loads(row.get("payload_json") or "")
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload["id"] = row.get("id", "")
+    return payload
+
+
+async def _extra_questions(user_id: str, level: str) -> list[dict]:
+    """Ítems extra activados por el usuario en una ruta (dicts completos).
+
+    Los ítems viven en el catálogo global `listening_generated`; solo se sirven
+    en el pool de la ruta si el usuario los ha activado en `listening_route_extras`.
+    """
+    rows = await run_in_threadpool(
+        listening_repo.list_route_extras, user_id, level
+    )
+    if not rows:
+        return []
+    ids = [r["question_id"] for r in rows]
+    catalog = await run_in_threadpool(listening_repo.list_generated_by_ids, ids)
+    by_id = {row["id"]: row for row in catalog}
+    questions: list[dict] = []
+    for qid in ids:
+        payload = _generated_payload(by_id.get(qid))
+        if payload:
+            questions.append(payload)
+    return questions
+
+
+async def _resolve_question(question_id: str) -> dict | None:
+    """Resuelve un ítem del banco curado o, si es de práctica extra (id `g-`),
+    del catálogo global de ítems generados."""
+    question = get_question(question_id)
+    if question is not None:
+        return question
+    if question_id.startswith(GENERATED_ID_PREFIX):
+        row = await run_in_threadpool(listening_repo.get_generated, question_id)
+        return _generated_payload(row)
+    return None
 
 
 def _audio_cache_dir(voice: str) -> Path:
@@ -96,15 +151,24 @@ async def next_question(
     que el diagnóstico marca como débiles, con selección consciente de la
     realización auditiva (no entrena una sub-destreza con audio que no la respalda).
 
-    Con `level` (repaso de un nivel) se ignora el Student Model y se rota por las
-    frases de ese nivel sin repetirlas hasta completar una vuelta. `mode="failed"`
-    (drill) restringe la rotación a las frases del nivel intentadas pero nunca
-    acertadas; si no quedan, `review_next_question` lanza `ValueError`.
+    Con `level` (repaso de un nivel o de su ruta) se ignora el Student Model y se
+    rota por las frases de esa ruta (banco curado + práctica extra activada por el
+    alumno) sin repetirlas hasta completar una vuelta. `mode="failed"` (drill)
+    restringe la rotación a las frases intentadas pero nunca acertadas; `mode=
+    "mastered"` (repasar lo aprendido) a las acertadas alguna vez. Si no quedan,
+    `review_next_question` lanza `ValueError`.
     """
     if level is not None:
         attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
+        extra = await _extra_questions(user_id, level)
         return _public(
-            review_next_question(level, attempts, only_failed=mode == "failed")
+            review_next_question(
+                level,
+                attempts,
+                only_failed=mode == "failed",
+                only_mastered=mode == "mastered",
+                extra_questions=extra,
+            )
         )
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
     correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
@@ -115,13 +179,16 @@ async def next_question(
 
 
 async def level_items(user_id: str, level: str) -> dict:
-    """Estado por frase de un nivel (panel del alumno) + contadores resumen.
+    """Estado por frase del pool de una ruta (panel del alumno) + resumen.
 
-    `mastered`/`failed`/`unseen` reflejan la práctica por frase; `completed` ya no
-    es "todo dominado": es la puerta de ruta del nivel (`route_gate`), de modo que
-    el panel distingue dominar frases de superar la ruta."""
+    `mastered`/`failed`/`unseen` reflejan la práctica por frase sobre el pool de
+    la ruta (banco curado + práctica extra activada); `completed` ya no es "todo
+    dominado": es la puerta de ruta del nivel (`route_gate`, calculada solo sobre
+    el banco curado), de modo que el panel distingue dominar frases de superar la
+    ruta. Cada ítem expone `source` ("base"/"generated")."""
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
-    items = motor_level_items(level, attempts)
+    extra = await _extra_questions(user_id, level)
+    items = motor_level_items(level, attempts, extra_questions=extra)
     mastered = sum(1 for i in items if i["state"] == "mastered")
     failed = sum(1 for i in items if i["state"] == "failed")
     unseen = sum(1 for i in items if i["state"] == "unseen")
@@ -147,7 +214,7 @@ async def submit_answer(
     replay_count: int = 0,
 ) -> dict | None:
     """Evalúa y persiste la respuesta. Devuelve None si la pregunta no existe."""
-    question = get_question(question_id)
+    question = await _resolve_question(question_id)
     if question is None:
         return None
     correct = score_answer(answer_index, question["answer_index"])
@@ -249,6 +316,29 @@ async def get_stats(user_id: str) -> dict:
         if route:
             row["state"] = route["state"]
             row["retention"] = route["retention"]
+    # Práctica extra generada (V3.6): `total`/`mastered` del anillo crecen con
+    # los ítems extra activados, pero la puerta, `completed` y `state` siguen
+    # anclados al banco curado (certificación honesta). El desglose se expone en
+    # `base_total`/`base_mastered`/`extras`/`extras_mastered`.
+    extra_rows = await run_in_threadpool(listening_repo.list_route_extras, user_id)
+    extras_by_level: dict[str, list[str]] = {}
+    for r in extra_rows:
+        extras_by_level.setdefault(r["level"], []).append(r["question_id"])
+    all_ids = [qid for ids in extras_by_level.values() for qid in ids]
+    catalog = await run_in_threadpool(listening_repo.list_generated_by_ids, all_ids)
+    catalog_ids = {row["id"] for row in catalog}
+    correct_ids = {row["question_id"] for row in attempts if row.get("correct")}
+    for row in levels:
+        extra_ids = [
+            qid for qid in extras_by_level.get(row["level"], []) if qid in catalog_ids
+        ]
+        extras_mastered = sum(1 for qid in extra_ids if qid in correct_ids)
+        row["base_total"] = row["total"]
+        row["base_mastered"] = row["mastered"]
+        row["extras"] = len(extra_ids)
+        row["extras_mastered"] = extras_mastered
+        row["total"] = row["base_total"] + len(extra_ids)
+        row["mastered"] = row["base_mastered"] + extras_mastered
     stats["levels"] = levels
     return stats
 
@@ -276,7 +366,7 @@ async def get_audio(
     (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`), con digest
     distinto por variante (la variante `normal` preserva el digest/cache actual).
     """
-    question = get_question(question_id)
+    question = await _resolve_question(question_id)
     if question is None:
         return None, 404
     if is_recorded(question):

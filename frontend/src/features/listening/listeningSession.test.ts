@@ -37,6 +37,17 @@ describe("listeningSession", () => {
     ).toBe(2);
   });
 
+  it("mastered (repasar lo aprendido) se comporta como rotación de nivel", () => {
+    const mastered = { mode: "mastered" as const, level: "A1", total: 12, done: 0 };
+    expect(sessionDone(mastered)).toBe(0);
+    expect(isSessionFinished(mastered)).toBe(false);
+    const finished = { ...mastered, done: 12 };
+    expect(sessionDone(finished)).toBe(12);
+    expect(isSessionFinished(finished)).toBe(true);
+    const partial = { ...mastered, done: 7 };
+    expect(isSessionFinished(partial)).toBe(false);
+  });
+
   it("isSessionFinished respeta el objetivo de cada modo", () => {
     expect(
       isSessionFinished({ mode: "level", level: "A1", total: 4, done: 4 }),

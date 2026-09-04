@@ -4,6 +4,69 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.6.0] — 2026-09-04
+
+**Listening: práctica ilimitada con ítems generados + repaso de lo aprendido.**
+Cada ruta (A1..C2) era un banco curado finito: al dominarlo no quedaban frases
+nuevas que practicar en ese nivel. Ahora el alumno puede pedir más práctica
+dentro de la ruta y el backend genera ítems completos
+(`{script, question, options, …}`) con el modelo local *utilizable* (nunca los
+`UNUSABLE_MODELS`), validados de forma determinista antes de publicarse —la
+opción correcta debe ser un fragmento literal del guion normalizado, así la
+respuesta siempre es verificable por audio— y con el audio sintetizado por Piper
+bajo demanda con la caché existente.
+
+La práctica generada es **contenido complementario, no oficial**: la puerta de
+ruta, `completed`, el estado `functional`/`demonstrated` y el routing adaptativo
+se calculan siempre solo sobre el banco curado, así que añadir extras nunca
+revoca una ruta superada ni encarece certificarla. El anillo de la ruta muestra
+el desglose «205 oficiales · +55 extra» y el denominador crece («Dominadas 205
+de 260»), y desde cada ruta se puede **repasar lo aprendido** (rotación solo
+sobre las frases ya dominadas, además del drill de falladas y de la ruta
+completa).
+
+### Añadido (backend)
+- `repositories/db.py`: tablas `listening_generated` (catálogo global de ítems
+  generados), `listening_route_extras` (activación por usuario, reversible) y
+  `listening_generation_jobs` (trabajos de generación en segundo plano).
+- `services/listening_generate.py` (nuevo): generador con prompt CEFR por nivel
+  (tema/sub-destreza), parseo estricto del JSON, validación determinista
+  (opción correcta literal en el guion, distractores sin colisión) y
+  `GENERATOR_VERSION`.
+- `services/listening.py`: `route_questions`/`resolve_question` con extras
+  (dedupe por id), selector de repaso `only_mastered`; `route_gate`,
+  `level_status` y `current_level` siguen sobre el banco curado sin recibir
+  extras.
+- `domain/listening_extras.py` (nuevo): orquestación del trabajo de generación
+  (lotes, dedupe por script contra banco curado y catálogo, activación en la
+  ruta al terminar).
+- `domain/listening.py` + `schemas/listening.py` + `routers/listening.py`:
+  `POST/GET/DELETE /api/listening/routes/{level}/extras[…]`; stats por ruta con
+  `base_total`/`extras`/`extras_mastered`; ítems con `source` `"base"`/`"generated"`;
+  ids `g-*` resueltos en `submit_answer`/`get_audio`; modo de sesión `mastered`.
+
+### Añadido (frontend)
+- `api/listening.ts` + `types/api.ts`: clientes y tipos de extras (trabajo,
+  activación por ruta) y de los nuevos campos de stats/ítems.
+- `features/listening/ListeningPractice.tsx`: anillo base+extras con desglose
+  «oficiales + extra», estado del trabajo de generación (en marcha / hecho /
+  error) y aviso honesto de que los ítems generados no alteran la certificación.
+- `features/listening/ListeningLevelPanel.tsx`: botón **«Repasar lo aprendido
+  (N)»**, etiqueta «práctica generada» en las filas generadas y bloque **«Añadir
+  más práctica a {level}»** (cantidades 10/25/50), visible al dominar el banco
+  oficial.
+- `features/listening/listeningSession.ts`: nueva variante de sesión
+  `mode: "mastered"` (misma vuelta LRU que `level` pero solo dominadas).
+- `utils/i18n.ts`: claves `listening.reviewLearned*`, `listening.extra*`,
+  `listening.generatedTag` y el aviso honesto, en ES y EN.
+
+### Verificación
+- Backend: tests del generador con cliente Ollama simulado, no-regresión de la
+  puerta al añadir extras, repaso solo-dominadas y endpoints.
+- Frontend: `npx tsc --noEmit` y `npx vitest run` (319 tests) en verde; smoke
+  visual de Playwright ampliado con la captura `listening-route` (panel de ruta
+  desplegado), en verde.
+
 ## [3.5.8] — 2026-09-04
 
 **Auditoría de UI (contraste claro/oscuro + QR).** El código QR de
