@@ -45,9 +45,17 @@ export interface VoiceInfo {
   name: string;
 }
 
-/** Catálogo de voces instaladas y la selección actual (Configuración → Voces). */
+/** Voz del catálogo curado que se puede descargar desde la UI. */
+export interface DownloadableVoice {
+  id: string;
+  name: string;
+  size_mb: number;
+}
+
+/** Catálogo de voces instaladas/descargables y la selección actual. */
 export interface VoicesResponse {
   voices: VoiceInfo[];
+  downloadable: DownloadableVoice[];
   default: string;
   selected: string;
 }

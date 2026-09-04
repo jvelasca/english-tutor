@@ -4,6 +4,36 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.2] — 2026-09-04
+
+**Descarga de voces desde la propia UI.** La pestaña "Voces" de Ajustes ahora
+ofrece un catálogo curado de voces Piper de inglés (calidad `medium`, ~63 MB)
+con botón "Descargar": la voz se baja del repositorio oficial a
+`backend/models/piper/` y aparece al momento en la lista de instaladas. También
+se instaló el set inicial de acentos (británico Alan, escocés Cori, norteño
+Alba y americano Amy) además del default.
+
+### Añadido (backend)
+- `services/voice_downloads.py`: catálogo curado de voces Piper de inglés
+  (id/etiqueta/ruta en HF), `available_to_download(installed)` y
+  `download_voice(voice_id)` con descarga atómica (`.part` → `rename`, nunca se
+  sirve un modelo a medio bajar) y bloqueo por voz.
+- `POST /api/voices/download` (`{voice_id}`): descarga en threadpool; 400 para
+  ids fuera del catálogo, 502 con mensaje legible si falla la red/escritura.
+- `GET /api/voices` ahora expone también `downloadable` (catálogo no instalado,
+  con `size_mb`).
+
+### Añadido (frontend)
+- `VoicesPanel` con sección "Añadir una voz": cada voz del catálogo con su
+  tamaño y botón Descargar (estado de descarga en curso y error legible); al
+  terminar refresca el catálogo. `api/voices.ts::downloadVoice` y tipo
+  `DownloadableVoice`.
+
+### Verificación
+- `pytest` en `backend/` (tests de catálogo/descarga añadidos en
+  `tests/test_voices.py`) en verde.
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (309 tests) en verde.
+
 ## [3.5.1] — 2026-09-04
 
 **Voces TTS configurables por perfil.** Nuevo selector "Voces" en Ajustes

@@ -325,6 +325,30 @@ const STRINGS: Record<string, Entry> = {
     en: "The app currently uses its default Piper voice.\n\nTo add voices, place a Piper voice pair (<voice>.onnx and <voice>.onnx.json) in the backend/models/piper folder and reopen Settings. Voice files are ~60 MB each.\n\nExamples: en_GB-alan-medium (British, male), en_GB-cori-medium (Scottish), en_US-amy-medium (American, female).",
     es: "La aplicación usa ahora su voz Piper por defecto.\n\nPara añadir voces, coloca el par de una voz Piper (<voz>.onnx y <voz>.onnx.json) en la carpeta backend/models/piper y vuelve a abrir Ajustes. Cada voz pesa ~60 MB.\n\nEjemplos: en_GB-alan-medium (británico, masculina), en_GB-cori-medium (escocesa), en_US-amy-medium (estadounidense, femenina).",
   },
+  "voices.download.title": {
+    en: "Add a voice",
+    es: "Añadir una voz",
+  },
+  "voices.download.hint": {
+    en: "Download a Piper voice from the official catalog. It is stored in backend/models/piper (one time only) and appears in the list above once downloaded.",
+    es: "Descarga una voz Piper del catálogo oficial. Se guarda en backend/models/piper (una sola vez) y aparece en la lista superior al terminar.",
+  },
+  "voices.download.button": {
+    en: "Download",
+    es: "Descargar",
+  },
+  "voices.download.loading": {
+    en: "Downloading…",
+    es: "Descargando…",
+  },
+  "voices.download.size": {
+    en: "~{mb} MB",
+    es: "~{mb} MB",
+  },
+  "voices.download.allInstalled": {
+    en: "All curated voices are installed. To add another, drop its .onnx and .onnx.json into backend/models/piper.",
+    es: "Todas las voces del catálogo están instaladas. Para añadir otra, coloca su .onnx y .onnx.json en backend/models/piper.",
+  },
   "voices.note": {
     en: "Current voice for this profile: {voice}. Changing the voice also affects listening practice: items without a human recording are regenerated with the new voice on first playback and then cached.",
     es: "Voz actual de este perfil: {voice}. Cambiar la voz afecta también a la práctica de listening: los ítems sin grabación humana se regeneran con la nueva voz en la primera reproducción y quedan en caché.",
