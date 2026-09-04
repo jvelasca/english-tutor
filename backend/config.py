@@ -17,7 +17,7 @@ DEFAULT_MODEL = "llama3.1:8b"
 # ser utilizable.
 UNUSABLE_MODELS = frozenset({"qwen3.5:9b"})
 
-VERSION = "3.5.7"
+VERSION = "3.5.8"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]

@@ -72,7 +72,11 @@ export function UserMenu({
         {current ? (
           <UserAvatar user={current} size={44} />
         ) : (
-          <span className="user-avatar" style={{ width: 44, height: 44 }}>
+          <span
+            className="user-avatar user-avatar--placeholder"
+            style={{ width: 44, height: 44 }}
+            aria-label={t("user.profile")}
+          >
             ?
           </span>
         )}

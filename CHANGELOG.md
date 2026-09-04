@@ -4,6 +4,43 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.8] — 2026-09-04
+
+**Auditoría de UI (contraste claro/oscuro + QR).** El código QR de
+"Conectar un dispositivo" (Ajustes → Sistema y popover "Ready" del footer) se
+pintaba con módulos negros sobre el fondo de tarjeta, que en modo oscuro es casi
+negro: el QR quedaba invisible. Ahora el QR vive siempre sobre una tarjeta
+blanca independiente del tema, así que se escanea igual en claro y en oscuro.
+
+Además se hizo una pasada de auditoría por contraste (ratio WCAG calculado por
+elemento con texto en todas las pantallas, en ambos temas) que corrigió los
+puntos de legibilidad más claros.
+
+### Cambiado (frontend)
+- `components/ConnectDeviceCard.tsx`: el QR se muestra sobre tarjeta blanca fija
+  (`bg-white`, módulos `#000`), sin depender de `bg-background`.
+- `styles/legacy.css`: nuevos tokens de acento para texto (`--color-accent-soft`;
+  índigo claro en oscuro, índigo oscuro en claro) usados por
+  `.cefr-badge.intermediate` (la insignia "B1" era ilegible en oscuro, ratio 2.65);
+  `--color-warning` en claro más oscuro (`#b45309`) para el texto ámbar sobre
+  blanco (A1/A2, etiquetas de estado); `--color-text-faint` más legible en ambos
+  temas (fechas, ejes y subtítulos de la línea de tiempo).
+- `components/UserMenu.tsx` + `.user-avatar--placeholder`: el avatar provisional
+  "?" sin perfil tenía texto blanco sobre fondo blanco en modo claro; ahora lleva
+  fondo neutro y borde visibles.
+- Tests visuales estables (`tests/visual/`): con la ProfileGate (V3.5.7), un
+  navegador con varios perfiles y sin cookie mostraba la puerta y bloqueaba la
+  interacción. Nuevo helper `gateHelper.ts` que crea/recupera el perfil de test
+  "Visual Tester" vía API y mockea `GET /api/users` con un único perfil para que
+  la app lo auto-seleccione; aplicado a `smoke`, `mobile` y `resize`.
+
+### Verificación
+- Sonda de contraste en 9 pantallas × 2 temas: insignia B1 oscuro 2.65 → ≥4.5;
+  ámbar claro 3.19 → 4.43–4.98; faint oscuro 3.76 → ≥4.9, claro 2.70 → 3.74.
+- Suite visual Playwright completa (desktop/tablet/mobile): 24 tests en verde
+  (14 ejecutados, 10 skips de breakpoint previstos).
+- `npx tsc --noEmit` y `npx vitest run` (318 tests) en verde.
+
 ## [3.5.7] — 2026-09-04
 
 **Selector de perfil al arrancar.** Si la app se abre en un navegador nuevo y

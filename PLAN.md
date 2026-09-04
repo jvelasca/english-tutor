@@ -11,7 +11,11 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.5.0` — **P2 de la Constitución pedagógica en UI**
+- ✅ Versión estable `3.5.8` — **Auditoría de UI: contraste claro/oscuro + QR**
+  (QR visible en modo oscuro sobre tarjeta blanca fija, contraste WCAG corregido
+  en insignias CEFR, avisos ámbar, fechas/texto tenue y avatar "?" sin perfil; la
+  ProfileGate de V3.5.7 se estabiliza en tests visuales con perfil de test
+  mockeado). Base: `3.5.0` — **P2 de la Constitución pedagógica en UI**
   (pantallas honestas: la práctica de listening se lee por estado de ruta
   —`functional` es hito de práctica y solo `demonstrated` (puerta + retención
   retardada estable ≥7 días) muestra «A1 Listening — demonstrated»—, todo badge

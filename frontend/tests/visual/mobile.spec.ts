@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ensureProfile } from "./gateHelper";
 
 /**
  * Flujo LAN/móvil (V1.30 → V3.1): verifica que la ayuda general se abre desde
@@ -11,6 +12,9 @@ import { test, expect } from "@playwright/test";
 
 async function gotoApp(page: import("@playwright/test").Page) {
   await page.goto("/");
+  // Si la ProfileGate aparece (varios perfiles sin cookie), entra con el perfil
+  // de test estable (V3.5.7).
+  await ensureProfile(page);
   await expect(page.getByRole("navigation")).toBeVisible({ timeout: 15_000 });
 }
 

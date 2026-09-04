@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ensureProfile } from "./gateHelper";
 
 /**
  * Verifica que los paneles del workspace de Conversar son redimensionables y
@@ -16,8 +17,11 @@ test("redimensiona el panel Analysis y persiste el ancho por usuario", async ({ 
   const nav = page.getByRole("navigation", { name: "Main navigation" });
 
   await page.goto("/");
+  // Si la ProfileGate aparece (varios perfiles sin cookie), entra con el perfil
+  // de test estable para que la persistencia por usuario funcione (V3.5.7).
+  await ensureProfile(page);
   await expect(nav).toBeVisible({ timeout: 15_000 });
-  // Da tiempo a que se cree/auto-seleccione el usuario antes de persistir.
+  // Da tiempo a que se seleccione el perfil antes de persistir.
   await page.waitForTimeout(800);
 
   // Navega a Conversar (sidebar + zona central + Analysis).

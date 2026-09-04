@@ -49,8 +49,11 @@ export function ConnectDeviceCard() {
         {t("connect.cardSubtitle")}
       </p>
 
-      <div className="mt-3 flex justify-center rounded-lg bg-background p-3">
-        <QRCode value={network.url} size={128} bgColor="transparent" />
+      <div className="mt-3 flex justify-center rounded-xl bg-white p-3 ring-1 ring-black/10">
+        {/* QR siempre sobre fondo blanco (independiente del tema): los módulos
+            negros de `react-qr-code` necesitan contraste claro para escanearse
+            y en modo oscuro el fondo de la tarjeta es casi negro. */}
+        <QRCode value={network.url} size={128} bgColor="#ffffff" fgColor="#000000" />
       </div>
 
       <div className="mt-3 space-y-1.5 text-xs">

@@ -19,13 +19,17 @@
   /* Text */
   --color-text: #e7ebf2;
   --color-text-dim: #9aa5b6;
-  --color-text-faint: #6b7688;
+  --color-text-faint: #8a94a6;
 
   /* Accent & status */
   --color-accent: #6366f1;
   --color-accent-2: #a855f7;
   --color-accent-hover: #7c7ff7;
   --color-accent-ring: rgba(99, 102, 241, 0.28);
+  /* Texto de acento legible sobre superficies oscuras (insignias CEFR, etc.).
+     El acento sólido (#6366f1) funciona como fondo con texto blanco, pero es
+     demasiado oscuro como color de texto en modo oscuro. */
+  --color-accent-soft: #a5b4fc;
   --color-on-accent: #ffffff;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
@@ -89,15 +93,16 @@
 
   --color-text: #1c2433;
   --color-text-dim: #5a6678;
-  --color-text-faint: #8a94a6;
+  --color-text-faint: #6f7c90;
 
   --color-accent: #4f46e5;
   --color-accent-2: #9333ea;
   --color-accent-hover: #4338ca;
   --color-accent-ring: rgba(79, 70, 229, 0.18);
+  --color-accent-soft: #4338ca;
   --color-on-accent: #ffffff;
   --color-success: #16a34a;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
   --color-error: #dc2626;
   --color-error-soft: rgba(220, 38, 38, 0.08);
 
@@ -1071,7 +1076,7 @@ body.is-resizing {
 }
 
 .cefr-badge.intermediate {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   background: var(--color-accent-ring);
 }
 
@@ -2026,6 +2031,14 @@ body.is-resizing {
 .user-avatar--image {
   object-fit: cover;
   border-radius: 50%;
+}
+
+/* Placeholder (sin usuario seleccionado): fondo neutro visible en claro y en
+   oscuro para que el "?" nunca quede blanco-sobre-blanco. */
+.user-avatar--placeholder {
+  background: var(--color-surface-2);
+  color: var(--color-text-dim);
+  border: 1px solid var(--color-border-strong);
 }
 
 .user-menu-pop {

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
+import { ensureProfile } from "./gateHelper";
 
 /**
  * Smoke visual V3.1: recorre las rutas principales y captura un screenshot por
@@ -21,8 +22,9 @@ test("capturar rutas principales", async ({ page }, testInfo) => {
 
   // Home es la ruta inicial.
   await page.goto("/");
+  // Selecciona un perfil si la ProfileGate aparece (V3.5.7).
+  await ensureProfile(page);
   await expect(nav()).toBeVisible({ timeout: 15_000 });
-
   await page.waitForTimeout(600);
   await page.screenshot({ path: shot("home"), fullPage: true });
 
@@ -44,6 +46,7 @@ test("capturar rutas principales", async ({ page }, testInfo) => {
     { id: "help", url: "/#/ayuda" },
   ] as const;
   for (const route of deepRoutes) {
+    // Tras la entrada inicial el perfil queda en cookie: la puerta no reaparece.
     await page.goto(route.url);
     await expect(nav()).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(600);
