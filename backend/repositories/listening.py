@@ -259,6 +259,23 @@ def get_generation_job(job_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def list_running_generation_jobs() -> list[dict]:
+    """Todos los trabajos de generación en curso (status='running').
+
+    Se usa en `/api/system/status` para que el launcher indique cuándo el
+    servidor está generando práctica extra (el backend puede tener varios
+    trabajos vivos si se lanzaron desde perfiles/niveles distintos).
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT id, user_id, level, requested, status, added_ids_json, error, "
+            "created_at, updated_at FROM listening_generation_jobs "
+            "WHERE status = 'running' ORDER BY created_at ASC",
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+
 def finish_generation_job(job_id: str, added_ids: list[str], error: str = "") -> None:
     """Cierra un trabajo: `done` con los ids activados o `error` con el mensaje."""
     status = "error" if error else "done"

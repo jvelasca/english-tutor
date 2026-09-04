@@ -146,6 +146,27 @@ def test_fetch_version_unreachable(monkeypatch):
     assert status.fetch_version() == ""
 
 
+def test_fetch_server_status_ok(monkeypatch):
+    monkeypatch.setattr(
+        "status.urllib.request.urlopen",
+        lambda url, timeout: _FakeResp(
+            b'{"generation":{"running":1,"jobs":[{"level":"A1"}]},'
+            b'"rate_limited":{"rejected_last_minute":2}}'
+        ),
+    )
+    data = status.fetch_server_status()
+    assert data["generation"]["running"] == 1
+    assert data["rate_limited"]["rejected_last_minute"] == 2
+
+
+def test_fetch_server_status_unreachable(monkeypatch):
+    def boom(url, timeout):
+        raise OSError("refused")
+
+    monkeypatch.setattr("status.urllib.request.urlopen", boom)
+    assert status.fetch_server_status() is None
+
+
 def test_human_size():
     assert status._human_size(0) == "0 B"
     assert status._human_size(512) == "512 B"

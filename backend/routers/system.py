@@ -11,12 +11,44 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
 import config
+import security
 from dependencies import require_admin
+from repositories import listening as listening_repo
 from services import backup
 
 router = APIRouter()
 
 _BACKUP_MIME = "application/zip"
+
+
+@router.get("/api/system/status")
+async def server_status() -> dict:
+    """Estado operativo del servidor, sin candado admin (como /api/health).
+
+    Devuelve si el backend está generando práctica extra de listening (trabajos
+    `running`) y cuántas peticiones se han rechazado por rate limit en el último
+    minuto. Lo usa el launcher para mostrar cuándo el servidor «está trabajando»
+    en vez de solo «activo/detenido».
+    """
+    jobs = await run_in_threadpool(listening_repo.list_running_generation_jobs)
+    return {
+        "generation": {
+            "running": len(jobs),
+            "jobs": [
+                {
+                    "id": j["id"],
+                    "level": j["level"],
+                    "requested": int(j["requested"]),
+                    "created_at": j["created_at"],
+                }
+                for j in jobs
+            ],
+        },
+        "rate_limited": {
+            "rejected_last_minute": security.rate_limit_snapshot(60.0),
+        },
+    }
+
 
 
 @router.get("/api/system/backup/status")

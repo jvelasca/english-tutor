@@ -45,6 +45,7 @@ from state_store import load_state, save_state
 from status import (
     fetch_frontend,
     fetch_health,
+    fetch_server_status,
     fetch_version,
     read_db_counts,
     read_db_details,
@@ -57,6 +58,7 @@ from ui import (
     SECTION_ICONS,
     SERVICE_ICONS,
     read_log_tail,
+    server_activity,
     status_color,
     status_dot,
 )
@@ -419,6 +421,7 @@ class LauncherApp:
         self._col_right.bind("<Configure>", lambda e: self._update_detail_wrap())
 
         self._build_services(self._col_left)
+        self._build_activity(self._col_left)
         self._build_access(self._col_left)
         self._build_database(self._col_left)
         self._build_users(self._col_right)
@@ -473,6 +476,27 @@ class LauncherApp:
             val.grid(row=i, column=2, sticky="e", padx=(20, 0), pady=3)
             self._svc_value_labels[name] = val
             grid.columnconfigure(1, weight=1)
+
+    def _build_activity(self, parent: tk.Misc) -> None:
+        """Sección «Actividad del servidor»: generación en curso y rechazos 429.
+
+        Muestra si el backend está trabajando (p. ej. generando práctica extra
+        de listening con IA local) y si está rechazando peticiones por
+        saturación. El texto se colorea según el estado (V3.6.2).
+        """
+        sec = self._section(parent, "Actividad del servidor")
+        body = ttk.Frame(sec.body, style="Card.TFrame")
+        body.pack(fill="x", padx=14, pady=(4, 12))
+        self._activity_var = tk.StringVar(value="…")
+        self._activity_label = ttk.Label(
+            body, textvariable=self._activity_var, style="Service.TLabel"
+        )
+        self._activity_label.pack(anchor="w")
+        self._reject_var = tk.StringVar(value="")
+        self._reject_label = ttk.Label(
+            body, textvariable=self._reject_var, style="Service.TLabel"
+        )
+        self._reject_label.pack(anchor="w", pady=(2, 0))
 
     def _build_access(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Acceso a la app")
@@ -698,6 +722,7 @@ class LauncherApp:
                 health = fetch_health()
                 frontend_up = fetch_frontend()
                 version = fetch_version()
+                server_status = fetch_server_status()
                 counts = read_db_counts(str(DB_PATH))
                 details = read_db_details(str(DB_PATH))
                 db_info = read_db_info(str(DB_PATH))
@@ -715,6 +740,7 @@ class LauncherApp:
                         health,
                         frontend_up,
                         version,
+                        server_status,
                         counts,
                         details,
                         db_info,
@@ -734,6 +760,7 @@ class LauncherApp:
         health,
         frontend_up,
         version,
+        server_status,
         counts,
         details,
         db_info,
@@ -766,15 +793,47 @@ class LauncherApp:
         self._color_service("Base de datos", svc["database"])
 
         running = backend_up and frontend_on
+        activity_line, rejected = server_activity(server_status)
+        generating = bool(
+            server_status
+            and int((server_status.get("generation") or {}).get("running", 0) or 0)
+            > 0
+        )
+        busy = running and (generating or rejected > 0)
         if not self._action_running:
             self._stop_spinner()
-            self._status.set("En marcha" if running else "Detenida")
-            self._status_dot.set(status_dot("ok" if running else "off"))
-            self._status_label.configure(
-                foreground=COLORS["success"] if running else COLORS["error"]
-            )
+            if running and busy:
+                label = "generando…" if generating else "saturado"
+                self._status.set(f"En marcha · {label}")
+                self._status_dot.set(status_dot("unavailable"))
+                self._status_label.configure(foreground=COLORS["warning"])
+            else:
+                self._status.set("En marcha" if running else "Detenida")
+                self._status_dot.set(status_dot("ok" if running else "off"))
+                self._status_label.configure(
+                    foreground=COLORS["success"] if running else COLORS["error"]
+                )
         self._version.set(f"v{version}" if version else "Launcher de escritorio")
         self._apply_action_buttons(running)
+
+        # Sección «Actividad del servidor» (V3.6.2): qué hace el backend ahora.
+        if running:
+            self._activity_var.set(activity_line)
+            self._activity_label.configure(
+                foreground=(
+                    COLORS["warning"] if busy else COLORS["success"]
+                )
+            )
+            self._reject_var.set(
+                f"Rechazos por saturación (último minuto): {rejected}"
+            )
+            self._reject_label.configure(
+                foreground=COLORS["warning"] if rejected else COLORS["text_dim"]
+            )
+        else:
+            self._activity_var.set("Detenida")
+            self._activity_label.configure(foreground=COLORS["error"])
+            self._reject_var.set("")
 
         c = db_summary(counts)
         self._db_var.set(

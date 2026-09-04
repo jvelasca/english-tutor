@@ -1,6 +1,31 @@
+import { translate, type Lang } from "../utils/i18n";
+
+/** Idioma de la UI persistido (localStorage, igual que `useI18n`). */
+function currentLang(): Lang {
+  try {
+    const v = window.localStorage.getItem("english-tutor.lang");
+    return v === "es" ? "es" : "en";
+  } catch {
+    return "en";
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
+    // El rate limiter del backend devuelve un 429 con `code: RATE_LIMITED`
+    // cuando el servidor local está saturado: se traduce a la lengua de la UI
+    // en vez de pintar el texto interno del backend.
+    if (res.status === 429) {
+      const err = (await res.json().catch(() => ({}))) as {
+        detail?: string;
+        code?: string;
+      };
+      if (err.code === "RATE_LIMITED") {
+        throw new Error(translate(currentLang(), "errors.rateLimited"));
+      }
+      throw new Error(err.detail ?? `HTTP ${res.status}`);
+    }
     const err = (await res.json().catch(() => ({}))) as { detail?: string };
     throw new Error(err.detail ?? `HTTP ${res.status}`);
   }

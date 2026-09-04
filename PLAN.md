@@ -11,7 +11,27 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
-- ✅ Versión estable `3.6.0` — **Listening: práctica ilimitada + repaso por ruta**
+- ✅ Versión estable `3.6.2` — **Estado del servidor en el lanzador + corrección del 429 espurio**
+  (el «Demasiadas peticiones» lo devolvía el rate limiter propio
+  (`SecurityMiddleware`), no Ollama, cuando el servidor local se saturaba:
+  las sondas `/api/health` quedan exentas de cupo y de 429, los topes suben
+  para el uso local razonable, cada rechazo queda registrado y visible en el
+  nuevo `GET /api/system/status` —generación de práctica extra en curso por
+  nivel + rechazos del último minuto—, el mensaje de error 429 se localiza en
+  la lengua de la UI (`errors.rateLimited`) y el launcher gana la sección
+  «Actividad del servidor» con la píldora de cabecera en ámbar
+  («En marcha · generando…» / «saturado») cuando el backend trabaja o
+  rechaza). Base: `3.6.1`
+- ✅ Versión estable `3.6.1` — **Atajos de APRENDER + coherencia de idioma**
+  (la franja superior de cada práctica de APRENDER conserva la flecha al hub y
+  añade un atajo directo entre las 6 actividades —Listening/Speaking/
+  Pronunciation/Conversation/Vocabulary/Grammar—; los nombres de actividad se
+  unifican en inglés en ambos idiomas y se localiza el chrome que se pintaba en
+  inglés con la UI en español: tipos de audio y buckets de retención en
+  listening, fluidez y avisos de pronunciación, píldoras y estabilidad del plan
+  del día, foco/acción de Writing, título/pts de Speaking, PASS/DUE del curso y
+  skip-link). Base: `3.6.0`
+  — **Listening: práctica ilimitada + repaso por ruta**
   (cada ruta A1..C2 se puede ampliar con práctica generada por IA local —nunca
   contenido oficial: la puerta, el estado functional/demonstrated y el routing
   adaptativo siguen anclados al banco curado, así que añadir extras no revoca ni

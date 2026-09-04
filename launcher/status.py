@@ -33,6 +33,12 @@ def fetch_version() -> str:
     return str(data.get("version", ""))
 
 
+def fetch_server_status() -> dict | None:
+    """Estado operativo del backend (/api/system/status): generación en curso y
+    rechazos 429 del último minuto. None si el backend no responde."""
+    return _get_json(backend_url() + "/api/system/status")
+
+
 def _frontend_ssl_context() -> ssl.SSLContext:
     """Contexto SSL que acepta el certificado autofirmado del frontend local."""
     ctx = ssl.create_default_context()

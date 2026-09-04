@@ -4,6 +4,105 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.6.2] — 2026-09-04
+
+**Estado del servidor en el lanzador + corrección del 429 espurio.**
+El 429 «Demasiadas peticiones» que aparecía en la app cuando el servidor local
+estaba saturado lo devolvía el rate limiter propio (`SecurityMiddleware`), no
+Ollama: cuenta peticiones por IP en ventanas de 60 s y, al saturarse el
+servidor (generación de práctica extra con IA local, TTS Piper), las ráfagas
+de pollers, reintentos del usuario y sondas del lanzador superaban los topes y
+se rechazaban en cascada. Además, el launcher solo mostraba «Activo/Detenido» y
+no permitía ver cuándo el backend estaba trabajando. En esta versión se
+endurece el rate limiter para uso local (topes holgados, `/api/health` exento
+de cupo y de 429), se telemetrifican los rechazos y el launcher muestra la
+«Actividad del servidor».
+
+### Cambiado (backend)
+- `security.py`: las peticiones GET/HEAD a `/api/health` quedan exentas del rate
+  limit (nunca consumen cupo ni pueden recibir 429, así el health-check y el
+  launcher siguen vivos aunque el servidor esté saturado); topes subidos para
+  uso local razonable (`_DEFAULT_LIMIT` 600 → 1200; `/api/chat` 120 → 240,
+  `/api/voz/transcribe` 60 → 180, `upload`/`backup` 30 → 60, `restore`
+  10 → 20); el 429 ahora responde con `{"detail", "code": "RATE_LIMITED"}` y
+  `Retry-After: 5`, con mensaje accionable y `logger.warning` al rechazar.
+- `security.py`: nuevo `rate_limit_snapshot(window_seconds)` que cuenta los
+  rechazos del último minuto, y `is_exempt(path)` (V3.6.2).
+
+### Añadido (backend)
+- `GET /api/system/status` (sin candado admin, como `/api/health`): devuelve
+  `generation.running/jobs` (trabajos de práctica extra en curso, por nivel) y
+  `rate_limited.rejected_last_minute` desde `security.rate_limit_snapshot()`.
+- `repositories/listening.py`: `list_running_generation_jobs()`.
+
+### Cambiado (launcher)
+- Nueva sección desplegable **«Actividad del servidor»**: línea de trabajo
+  («En reposo» / «Generando práctica extra (A1)…») y rechazos por saturación
+  del último minuto; verde en reposo y ámbar al trabajar o rechazar. Cuando el
+  backend está generando o rechazando, la píldora de cabecera pasa a
+  «En marcha · generando…» / «En marcha · saturado» en ámbar.
+- `status.py`: `fetch_server_status()`; `ui.py`: helper puro `server_activity`.
+
+### Cambiado (frontend)
+- `api/client.ts`: ante un 429 con `code: RATE_LIMITED`, el mensaje de error se
+  traduce a la lengua activa (`errors.rateLimited`) en vez de mostrar el texto
+  interno del backend. `utils/i18n.ts`: clave `errors.rateLimited` (EN/ES).
+
+### Verificación
+- Backend: `pytest tests/test_security.py tests/test_system_status.py` en verde
+  (exención de `/api/health`, payload `code`/`Retry-After`, `rate_limit_snapshot`,
+  endpoint `/api/system/status` con/sin trabajos y rechazos).
+- Launcher: `pytest tests` (74 tests) en verde (helpers puros de la nueva
+  sección y `fetch_server_status` con mock).
+- Frontend: `npx tsc --noEmit` y `npx vitest run src/api/client.test.ts` en verde
+  (429 localizado en ES/EN y `detail` conservado para otros errores).
+
+## [3.6.1] — 2026-09-04
+
+**Atajos de APRENDER + coherencia de idioma.**
+La franja superior de cada práctica de APRENDER (Listening, Speaking,
+Pronunciation, Conversation, Vocabulary, Grammar) deja de ser solo una flecha de
+vuelta al hub: ahora muestra un **selector con las 6 actividades** (icono +
+nombre; solo iconos en pantallas estrechas, con `title`/aria) que navega por
+hash y resalta la activa. Los **nombres de actividad se unifican en inglés en
+ambos idiomas** (Grammar/Pronunciation/Vocabulary/Conversation, igual que ya
+estaban Listening/Speaking/Reading/Writing) y se barre el chrome que se pintaba
+en inglés fijo aunque la UI estuviera en español.
+
+### Añadido (frontend)
+- `components/LearnActivitySwitcher.tsx` (nuevo): atajo entre actividades,
+  reutiliza los iconos del hub y `learnActivityPath`; integrado en la franja de
+  `PracticeView` (práctica libre de Listening/Pronunciación/Gramática y de
+  Conversar, oculto durante una lección del curso), en `SpeakingFreePractice` y
+  en el `SubpageHeader` de Vocabulario.
+
+### Cambiado
+- `utils/i18n.ts`: `skill.grammar/pronunciation/vocabulary` y
+  `learn.conversation` con el mismo valor en `en` y `es` (nombres en inglés).
+- Chrome localizado con la UI en español: tipo de audio y buckets de retención
+  de listening (`listening.audioType.*`, `listening.retentionBucket.*`,
+  `utils/listeningLabels.ts`), resumen del dictado y fila de sub-destrezas del
+  diagnóstico (`auto/mean/audio not backed`), fluidez/palabras por minuto y
+  avisos por palabra de pronunciación (`pron.*`), píldoras y estabilidad del
+  plan del día (`today.kind.*`, `today.stability`), foco y botón de Writing
+  (`writing.nextFocus/practiceNow`), marcador del recorrido (`writing.you`),
+  título del Speaking Assessment y delta en puntos (`assessment.titleScore`,
+  `speaking.deltaPts`), marcadores de puerta del curso (`course.gatePass/Due`)
+  y skip-link (`common.skipToContent`).
+
+### Sin traducir (a propósito)
+Se mantienen intencionalmente en inglés y se anotan aquí para no reabrirlos:
+nombres de *topic* del banco y sub-destrezas de listening (datos), frases de
+ejemplo conversacionales y nombres de criterios de rúbrica de speaking/writing
+("Task achievement", "Grammatical control", … — jerga de assessment).
+
+### Verificación
+- Frontend: `npx tsc --noEmit` y `npx vitest run` (320 tests) en verde;
+  Playwright en verde (smoke ampliado: el atajo de actividades es visible en
+  APRENDER/LISTENING y pulsar Vocabulario navega a su hoja).
+- Comprobación manual con la UI en español: nombres de actividad en inglés y
+  resto de la interfaz en español en el hub de APRENDER y sus 6 prácticas.
+
 ## [3.6.0] — 2026-09-04
 
 **Listening: práctica ilimitada con ítems generados + repaso de lo aprendido.**

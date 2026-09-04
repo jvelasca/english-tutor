@@ -18,6 +18,8 @@ def _reset_rate_limiter():
     import security
 
     security._clients.clear()
+    security._rejections.clear()
     yield
     security._clients.clear()
+    security._rejections.clear()
 

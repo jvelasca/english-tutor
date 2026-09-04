@@ -31,9 +31,49 @@ def test_icons_have_expected_keys():
     assert ui.SERVICE_ICONS["Backend"] == "🖥️"
     assert ui.SERVICE_ICONS["Ollama"] == "🦙"
     assert ui.SECTION_ICONS["Servicios"] == "🛠️"
+    assert ui.SECTION_ICONS["Actividad del servidor"] == "📊"
     assert ui.SECTION_ICONS["Cookies navegador"] == "🍪"
     assert ui.ACTION_ICONS["start"] == "▶️"
     assert ui.ACTION_ICONS["restart"] == "🔁"
+
+
+def test_server_activity_idle():
+    line, rejected = ui.server_activity(
+        {"generation": {"running": 0, "jobs": []}, "rate_limited": {"rejected_last_minute": 0}}
+    )
+    assert line == "En reposo"
+    assert rejected == 0
+
+
+def test_server_activity_generating():
+    line, rejected = ui.server_activity(
+        {
+            "generation": {
+                "running": 2,
+                "jobs": [
+                    {"level": "A1", "requested": 20},
+                    {"level": "B1", "requested": 10},
+                ],
+            },
+            "rate_limited": {"rejected_last_minute": 0},
+        }
+    )
+    assert line == "Generando práctica extra (A1, B1)…"
+    assert rejected == 0
+
+
+def test_server_activity_with_rejections():
+    line, rejected = ui.server_activity(
+        {"generation": {"running": 0, "jobs": []}, "rate_limited": {"rejected_last_minute": 7}}
+    )
+    assert line == "En reposo"
+    assert rejected == 7
+
+
+def test_server_activity_none_backend_down():
+    line, rejected = ui.server_activity(None)
+    assert line == "No disponible (backend apagado)"
+    assert rejected == 0
 
 
 def test_read_log_tail_returns_last_lines(monkeypatch, tmp_path):

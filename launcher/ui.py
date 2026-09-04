@@ -39,6 +39,7 @@ SERVICE_ICONS = {
 
 SECTION_ICONS = {
     "Servicios": "🛠️",
+    "Actividad del servidor": "📊",
     "Acceso a la app": "📡",
     "Base de datos": "💾",
     "Usuarios": "👥",
@@ -84,9 +85,34 @@ def status_color(value: str) -> str:
         "error": COLORS["error"],
         "off": COLORS["error"],
         "unavailable": COLORS["warning"],
+        "busy": COLORS["warning"],
         "unknown": COLORS["neutral"],
     }
     return mapping.get(value, COLORS["neutral"])
+
+
+def server_activity(status: dict | None) -> tuple[str, int]:
+    """Resumen de la «Actividad del servidor» a partir de /api/system/status.
+
+    Devuelve (línea de actividad, rechazos_429_último_minuto). Si `status` es
+    None (backend caído) la línea lo indica y los rechazos son 0. Función pura
+    para poder testearla sin abrir ventanas.
+    """
+    if not status:
+        return ("No disponible (backend apagado)", 0)
+    gen = status.get("generation") or {}
+    jobs = gen.get("jobs") or []
+    running = int(gen.get("running", 0) or 0)
+    if running:
+        levels = ", ".join(j.get("level", "") for j in jobs)
+        line = f"Generando práctica extra ({levels})…" if levels else "Generando práctica extra…"
+    else:
+        line = "En reposo"
+    rejected = int(
+        (status.get("rate_limited") or {}).get("rejected_last_minute", 0) or 0
+    )
+    return line, rejected
+
 
 
 def read_log_tail(name: str, max_lines: int = TAIL_LINES) -> str:
