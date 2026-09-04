@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { getNextBestActivity } from "../api/academy";
 import type { NextBestActivity } from "../types/api";
 import type { Section } from "../utils/sections";
@@ -15,6 +16,12 @@ const SKILL_TO_SECTION: Record<string, Section> = {
   grammar: "grammar",
   pronunciation: "pronunciation",
 };
+
+// Máxima espera por la recomendación del Adaptive Engine. Si el endpoint no
+// responde (backend ocupado o conexión caída, p. ej. iPad por WiFi), se muestra
+// igualmente el CTA de salida (fallback) para que el resultado nunca se quede
+// sin botón "Continuar".
+const NEXT_BEST_TIMEOUT_MS = 8000;
 
 /**
  * Pie "Next" compartido del bucle Activity → Result → Feedback → Next.
@@ -45,17 +52,32 @@ export function NextStep({
       return;
     }
     let cancelled = false;
+    // `settled` garantiza que solo la primera respuesta (fetch o timeout) pinta
+    // el pie: si el endpoint se cuelga, el timeout muestra el CTA de salida y la
+    // resolución tardía del fetch se descarta.
+    let settled = false;
     setLoaded(false);
     setNext(null);
+    const timer = setTimeout(() => {
+      if (!cancelled && !settled) {
+        settled = true;
+        setNext(null);
+        setLoaded(true);
+      }
+    }, NEXT_BEST_TIMEOUT_MS);
     void (async () => {
       try {
         const activity = await getNextBestActivity(userId);
-        if (!cancelled) {
+        if (!cancelled && !settled) {
+          settled = true;
+          clearTimeout(timer);
           setNext(activity);
           setLoaded(true);
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !settled) {
+          settled = true;
+          clearTimeout(timer);
           setNext(null);
           setLoaded(true);
         }
@@ -63,10 +85,23 @@ export function NextStep({
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [userId]);
 
-  if (!loaded) return null;
+  if (!loaded) {
+    // Mientras el Adaptive Engine calcula, se muestra un placeholder visible:
+    // nunca un vacío que parezca un fallo (el resultado nunca se queda sin pie).
+    return (
+      <div className="next-step">
+        <span className="next-step__label">{t("home.nextStep")}</span>
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          {t("common.loading")}
+        </p>
+      </div>
+    );
+  }
 
   if (!next) {
     if (fallback) {

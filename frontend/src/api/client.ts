@@ -7,6 +7,35 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/**
+ * Limita una petición a `ms` milisegundos. Si se excede, rechaza con un error
+ * legible en vez de dejar la promesa colgada para siempre (una petición que no
+ * termina dejaba pantallas sin salida, p. ej. el botón "Continuar" de listening
+ * cuando el backend tarda o la conexión se cae a medias).
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Timeout (${label}): no response after ${ms / 1000}s`)),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export function getJson<T>(
   url: string,
   headers?: Record<string, string>,

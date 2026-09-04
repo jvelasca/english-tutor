@@ -4,6 +4,32 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.3] — 2026-09-04
+
+**Fix: el botón "Continuar" de listening ya no desaparece.** En iPad (por WiFi
+hacia el backend del PC, sobre todo con otra sesión abierta en el PC) una
+petición que no terminaba dejaba la pantalla sin salida tras responder: el CTA
+dependía de una respuesta de red que podía quedarse colgada y solo se arreglaba
+refrescando. Ahora el bucle de práctica nunca se queda sin salida.
+
+### Cambiado (frontend)
+- **Timeouts de red en el bucle de listening** (`api/client.ts::withTimeout`,
+  aplicado en `api/listening.ts` a pregunta, respuesta, dictado, shadowing,
+  stats y diagnóstico): si una llamada no responde en 10–20 s, falla con un
+  error legible en vez de esperar para siempre.
+- **`ListeningPractice`**: al pulsar una opción MCQ se muestra "Evaluando…"
+  (estado `submitting`, opciones deshabilitadas para evitar dobles envíos); si el
+  envío falla o expira, la alerta de error ofrece **"Saltar a la siguiente
+  pregunta"** para avanzar sin refrescar.
+- **`NextStep`**: mientras el Adaptive Engine calcula la recomendación se muestra
+  un placeholder visible (antes devolvía `null`, parecía un fallo) y, si el
+  endpoint no responde en 8 s, aparece igualmente el CTA de salida (fallback).
+  Con esto el resultado siempre tiene un botón "Continuar"/"Siguiente".
+
+### Verificación
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (312 tests, incl.
+  `client.test.ts` para `withTimeout`) en verde. Sin cambios en backend.
+
 ## [3.5.2] — 2026-09-04
 
 **Descarga de voces desde la propia UI.** La pestaña "Voces" de Ajustes ahora

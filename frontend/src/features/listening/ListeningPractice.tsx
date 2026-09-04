@@ -170,6 +170,10 @@ export function ListeningPractice({
   const [transcribedText, setTranscribedText] = useState("");
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
+  // Envío de una respuesta MCQ en curso: evita dobles taps y muestra el estado
+  // "Evaluando…" para que la pantalla nunca parezca congelada mientras se espera
+  // la respuesta del backend.
+  const [submitting, setSubmitting] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const [stats, setStats] = useState<ListeningStats | null>(null);
@@ -363,8 +367,10 @@ export function ListeningPractice({
   }
 
   async function choose(index: number) {
-    if (!userId || !question || result) return;
+    if (!userId || !question || result || submitting) return;
     setSelected(index);
+    setError(null);
+    setSubmitting(true);
     try {
       const res = await submitListeningAnswer(
         userId,
@@ -379,7 +385,11 @@ export function ListeningPractice({
       onAttempt();
       void refreshStats();
     } catch (e) {
+      // Fallo de red o timeout: se muestra el error y la opción de saltar a la
+      // siguiente, para que la pantalla nunca se quede sin salida.
       setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -494,10 +504,21 @@ export function ListeningPractice({
       {error && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 break-words">{error}</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <span className="min-w-0 break-words">{error}</span>
+            {question && !(result || productionResult) && (
+              <button
+                type="button"
+                className="self-start rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/15"
+                onClick={() => void load()}
+              >
+                {t("listening.errorSkip")}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -772,10 +793,10 @@ export function ListeningPractice({
                             : isWrong
                               ? "border-destructive bg-destructive/10 text-foreground"
                               : "border-border bg-secondary text-secondary-foreground hover:border-primary/50",
-                          "disabled:cursor-default",
+                          "disabled:cursor-default disabled:opacity-70",
                         )}
                         onClick={() => choose(i)}
-                        disabled={!!result}
+                        disabled={!!result || submitting}
                       >
                         {opt}
                       </button>
@@ -783,6 +804,17 @@ export function ListeningPractice({
                   })}
                 </div>
               )}
+
+            {submitting && (
+              <p
+                role="status"
+                aria-live="polite"
+                className="flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground"
+              >
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                {t("listening.evaluating")}
+              </p>
+            )}
           </Card>
 
           {(result || productionResult) && (

@@ -1342,6 +1342,10 @@ const STRINGS: Record<string, Entry> = {
     es: "¡Has completado todas las rutas de listening!",
   },
   "listening.next": { en: "Next", es: "Siguiente" },
+  "listening.errorSkip": {
+    en: "Skip to next question",
+    es: "Saltar a la siguiente pregunta",
+  },
   "listening.speakQuestion": {
     en: "Listen to the question",
     es: "Escuchar la pregunta",
