@@ -134,11 +134,11 @@ def test_audio_endpoint_variant_invalid_400(monkeypatch, tmp_path):
 def test_audio_endpoint_variant_fast_200(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     q = QUESTION_BANK[0]
-    monkeypatch.setattr("services.tts.is_ready", lambda: True)
+    monkeypatch.setattr("services.tts.is_ready", lambda voice=None: True)
 
     calls = []
 
-    def fake_synthesize(text, length_scale=1.0):
+    def fake_synthesize(text, length_scale=1.0, voice=None):
         calls.append((text, length_scale))
         return b"RIFF-fake-wav-bytes"
 
@@ -163,11 +163,11 @@ def test_audio_endpoint_variant_normal_same_cache_path(monkeypatch, tmp_path):
     # segunda petición (sin variante) sirve del cache de la primera (sin síntesis).
     uid = _setup(monkeypatch, tmp_path)
     q = QUESTION_BANK[0]
-    monkeypatch.setattr("services.tts.is_ready", lambda: True)
+    monkeypatch.setattr("services.tts.is_ready", lambda voice=None: True)
 
     calls = []
 
-    def fake_synthesize(text, length_scale=1.0):
+    def fake_synthesize(text, length_scale=1.0, voice=None):
         calls.append((text, length_scale))
         return b"RIFF-fake-wav-bytes"
 

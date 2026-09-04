@@ -31,6 +31,7 @@ import {
 } from "./listeningSession";
 import { ListeningLevelPanel } from "./ListeningLevelPanel";
 import { speak, transcribe } from "../../api/voz";
+import { getVoices } from "../../api/voices";
 import {
   getMicrophoneStream,
   MicUnavailableError,
@@ -184,6 +185,11 @@ export function ListeningPractice({
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
   const [session, setSession] = useState<ListeningSession | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  // Voz TTS real del perfil (Configuración → Voces): nombre amigable de la voz
+  // seleccionada. Se muestra en ítems sintéticos en lugar del acento declarado
+  // (que para TTS no es real). Se refresca al cambiar de usuario y al abrir la
+  // tarjeta de ajustes de audio.
+  const [ttsVoiceName, setTtsVoiceName] = useState<string | null>(null);
 
   async function load(
     levelOverride?: string | null,
@@ -263,7 +269,7 @@ export function ListeningPractice({
     if (!question || speakingQuestion) return;
     setSpeakingQuestion(true);
     try {
-      await speak(question.question);
+      await speak(question.question, userId);
     } catch {
       // TTS de la pregunta no disponible: se ignora, no bloquea la práctica.
     } finally {
@@ -302,6 +308,32 @@ export function ListeningPractice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // Voz TTS seleccionada del perfil (nombre amigable) para la etiqueta honesta de
+  // los ítems sintéticos. `showAudioSettings` fuerza un refresco cada vez que se
+  // abre la tarjeta de audio (p. ej. tras cambiar la voz en Configuración).
+  useEffect(() => {
+    if (!userId) {
+      setTtsVoiceName(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await getVoices(userId);
+        if (!cancelled) {
+          setTtsVoiceName(
+            res.voices.find((v) => v.id === res.selected)?.name ?? res.selected,
+          );
+        }
+      } catch {
+        /* backend no disponible: la etiqueta omite la voz */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, showAudioSettings]);
+
   function playAudioUrl(url: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const audio = new Audio(url);
@@ -321,7 +353,7 @@ export function ListeningPractice({
         await playAudioUrl(getListeningAudioUrl(question.id, userId, variant));
       } else {
         // Degradación: TTS en vivo con el script del ítem.
-        await speak(question.script);
+        await speak(question.script, userId);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -614,7 +646,16 @@ export function ListeningPractice({
                   )}
                   {question.speech_rate > 0 && (
                     <p className="text-xs tabular-nums text-muted-foreground">
-                      {question.accent} · {Math.round(question.speech_rate)} wpm ·{" "}
+                      {question.audio_type === "tts" ? (
+                        ttsVoiceName ? (
+                          <span title={t("listening.ttsRealVoice")}>
+                            {ttsVoiceName} ·{" "}
+                          </span>
+                        ) : null
+                      ) : (
+                        <span>{question.accent} · </span>
+                      )}
+                      {Math.round(question.speech_rate)} wpm ·{" "}
                       {question.duration.toFixed(1)}s
                     </p>
                   )}

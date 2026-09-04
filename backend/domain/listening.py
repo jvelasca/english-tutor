@@ -5,9 +5,9 @@ from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
 
-from config import PIPER_VOICE
 from repositories import db
 from repositories import listening as listening_repo
+from repositories import settings as settings_repo
 from services import tts
 from services.audio_library import is_recorded, recorded_audio_path
 from services.curriculum import LISTENING_BANK_VERSION
@@ -39,19 +39,21 @@ from services.listening import (
 )
 
 
-def _audio_cache_dir() -> Path:
+def _audio_cache_dir(voice: str) -> Path:
     """Carpeta de audio pre-renderizado, versionada por banco y voz.
 
-    El versionado (`LISTENING_BANK_VERSION` + `PIPER_VOICE`) y el digest del
-    contenido garantizan que un cambio de script/velocidad/voz/modelo invalide el
-    WAV antiguo en lugar de seguir sirviéndolo (P1.1).
+    El versionado (`LISTENING_BANK_VERSION` + la voz elegida por el usuario) y el
+    digest del contenido garantizan que un cambio de script/velocidad/voz/modelo
+    invalide el WAV antiguo en lugar de seguir sirviéndolo (P1.1). Cada voz usa su
+    propia carpeta: cambiar de voz no rompe la caché de la voz anterior, solo
+    regenera bajo demanda la nueva (Configuración → Voces).
     """
-    return db.DATA_DIR / "listening" / LISTENING_BANK_VERSION / PIPER_VOICE
+    return db.DATA_DIR / "listening" / LISTENING_BANK_VERSION / voice
 
 
-def _audio_path(question: dict, variant: str = "normal") -> Path:
+def _audio_path(question: dict, variant: str, voice: str) -> Path:
     digest = audio_digest(question, variant)
-    return _audio_cache_dir() / f"{question['id']}-{digest}.wav"
+    return _audio_cache_dir(voice) / f"{question['id']}-{digest}.wav"
 
 
 def audio_ready(question: dict) -> bool:
@@ -258,18 +260,19 @@ async def get_diagnostic(user_id: str) -> dict:
 
 
 async def get_audio(
-    question_id: str, variant: str = "normal"
+    user_id: str, question_id: str, variant: str = "normal"
 ) -> tuple[bytes | None, int | None]:
     """Devuelve el audio WAV del ítem (grabado o sintetizado), o un código de error.
 
     Si el ítem es `recorded` (biblioteca de audio humano), sirve el WAV referenciado
     en el manifest; si está referenciado pero ausente, devuelve 404 (no cae a TTS).
     Si es `tts`, `variant` selecciona la variante de velocidad de la escalera
-    (`AUDIO_VARIANTS`). Retorna `(bytes, None)` con el audio en caso de éxito, o
-    `(None, status)` donde `status` es 400 (variante no válida), 404 (ítem
-    inexistente o audio grabado ausente) o 503 (Piper no disponible). El audio TTS
-    se sintetiza en la primera petición de cada variante y se cachea en un path
-    versionado
+    (`AUDIO_VARIANTS`) y la voz es la preferida del usuario (Configuración → Voces;
+    default si no ha elegido o su voz no está instalada). Retorna `(bytes, None)`
+    con el audio en caso de éxito, o `(None, status)` donde `status` es 400
+    (variante no válida), 404 (ítem inexistente o audio grabado ausente) o 503
+    (Piper no disponible). El audio TTS se sintetiza en la primera petición de cada
+    variante y voz, y se cachea en un path versionado
     (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`), con digest
     distinto por variante (la variante `normal` preserva el digest/cache actual).
     """
@@ -283,13 +286,17 @@ async def get_audio(
         return None, 404
     if variant not in AUDIO_VARIANTS:
         return None, 400
-    if not tts.is_ready():
+    prefs = await run_in_threadpool(settings_repo.get_settings, user_id)
+    voice = tts.resolve_voice(prefs)
+    if not tts.is_ready(voice):
         return None, 503
-    path = _audio_path(question, variant)
+    path = _audio_path(question, variant, voice)
     if path.exists():
         return path.read_bytes(), None
     length_scale = variant_length_scale(question, variant)
-    data = await run_in_threadpool(tts.synthesize, spoken_text(question), length_scale)
+    data = await run_in_threadpool(
+        tts.synthesize, spoken_text(question), length_scale, voice
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".wav.tmp")
     tmp.write_bytes(data)

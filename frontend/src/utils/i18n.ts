@@ -307,6 +307,28 @@ const STRINGS: Record<string, Entry> = {
   "settings.audio": { en: "Audio", es: "Audio" },
   "settings.ai": { en: "AI model", es: "Modelo IA" },
   "settings.system": { en: "System", es: "Sistema" },
+  "settings.voices": { en: "Voices", es: "Voces" },
+  "voices.defaultBadge": { en: "Default", es: "Por defecto" },
+  "voices.selectProfile": {
+    en: "Select a profile to save its preferred voice.",
+    es: "Selecciona un perfil para guardar su voz preferida.",
+  },
+  "voices.saveError": {
+    en: "Could not save the voice. Try again.",
+    es: "No se pudo guardar la voz. Inténtalo de nuevo.",
+  },
+  "voices.empty.title": {
+    en: "No additional Piper voices installed",
+    es: "No hay voces Piper adicionales instaladas",
+  },
+  "voices.empty.hint": {
+    en: "The app currently uses its default Piper voice.\n\nTo add voices, place a Piper voice pair (<voice>.onnx and <voice>.onnx.json) in the backend/models/piper folder and reopen Settings. Voice files are ~60 MB each.\n\nExamples: en_GB-alan-medium (British, male), en_GB-cori-medium (Scottish), en_US-amy-medium (American, female).",
+    es: "La aplicación usa ahora su voz Piper por defecto.\n\nPara añadir voces, coloca el par de una voz Piper (<voz>.onnx y <voz>.onnx.json) en la carpeta backend/models/piper y vuelve a abrir Ajustes. Cada voz pesa ~60 MB.\n\nEjemplos: en_GB-alan-medium (británico, masculina), en_GB-cori-medium (escocesa), en_US-amy-medium (estadounidense, femenina).",
+  },
+  "voices.note": {
+    en: "Current voice for this profile: {voice}. Changing the voice also affects listening practice: items without a human recording are regenerated with the new voice on first playback and then cached.",
+    es: "Voz actual de este perfil: {voice}. Cambiar la voz afecta también a la práctica de listening: los ítems sin grabación humana se regeneran con la nueva voz en la primera reproducción y quedan en caché.",
+  },
   "settings.interfaceLanguage": {
     en: "Interface language",
     es: "Idioma de la interfaz",
@@ -1156,6 +1178,10 @@ const STRINGS: Record<string, Entry> = {
   "listening.audioUnavailable": {
     en: "Reference audio not available; using live generated voice.",
     es: "Audio de referencia no disponible; usando voz generada en vivo.",
+  },
+  "listening.ttsRealVoice": {
+    en: "Actual local synthetic voice of your profile (Settings → Voices). Synthetic items have no real accent.",
+    es: "Voz local sintética real de tu perfil (Ajustes → Voces). Los ítems sintéticos no tienen un acento real.",
   },
   "listening.dictationPlaceholder": {
     en: "Write what you hear…",

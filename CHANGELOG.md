@@ -4,6 +4,55 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.1] — 2026-09-04
+
+**Voces TTS configurables por perfil.** Nuevo selector "Voces" en Ajustes
+(Configuración → Voces) que ofrece las voces Piper instaladas en
+`backend/models/piper/`, guarda la preferencia por usuario (`tts_voice`) y la
+aplica al TTS en vivo y a la síntesis de los ítems de listening sin audio
+humano. Además, la etiqueta del "modelo vocal" del ejercicio de listening deja de
+mostrar el acento *declarado* del corpus ("… : AUSTRALIAN") en los ítems
+sintetizados y muestra la voz real del perfil.
+
+### Añadido (backend)
+- `services/tts.py` con soporte multi-voz: `list_voices()` (scan de
+  `models/piper/*.onnx.json` + `.onnx`, default primero), `resolve_voice(prefs)`
+  (función pura: preferencia del usuario si está instalada; si no, default o
+  primera voz disponible), `synthesize(..., voice=None)` e `is_ready(voice=None)`
+  con instancias `PiperVoice` cacheadas por id (thread-safe). Catálogo amigable
+  `VOICE_LABELS` para las voces oficiales de inglés (fallback: nombre derivado
+  del id).
+- `GET /api/voices?user_id=` (`routers/voices.py` + `schemas/voices.py`) que
+  devuelve `{voices, default, selected}` resolviendo la preferencia del perfil
+  contra lo instalado (`user_id` opcional → sin perfil, `selected` es el
+  default).
+
+### Cambiado (backend)
+- La síntesis de listening es por voz y por usuario: `get_audio(user_id, …)`
+  resuelve la voz preferida y cachea en
+  `DATA_DIR/listening/{bank}/{voice}/{id}-{digest}.wav` (cada voz en su propia
+  carpeta: cambiar de voz no invalida la caché anterior; la nueva se regenera
+  bajo demanda en la primera reproducción y queda cacheada).
+- `/api/tts` acepta `user_id` opcional (voz del perfil; sin perfil, la default).
+
+### Añadido (frontend)
+- Pestaña **Voces** en Ajustes (`VoicesPanel`): lista de voces instaladas con
+  etiqueta amigable + id, insignia "por defecto", estado de guardado, y texto de
+  ayuda para instalar más voces (colocar `<voz>.onnx` + `<voz>.onnx.json` en
+  `backend/models/piper/`) y aviso de regeneración del audio de listening.
+- `api/voices.ts` (`getVoices`) y tipos `VoiceInfo`/`VoicesResponse`.
+
+### Cambiado (frontend)
+- `speak(text, userId?)` pasa `user_id` a `/api/tts` para usar la voz del perfil.
+- `ListeningPractice`: la tarjeta de audio de ítems sintéticos muestra la **voz
+  real** del perfil (Ajustes → Voces) en vez del acento declarado del corpus; los
+  ítems con audio humano conservan su acento declarado. La voz se refresca al
+  abrir la tarjeta de audio (así refleja cambios hechos en Ajustes sin recargar).
+
+### Verificación
+- `pytest` en `backend/` (1108 tests, incl. `tests/test_voices.py`) en verde.
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` (309 tests) en verde.
+
 ## [3.5.0] — 2026-09-03
 
 **Tercera iteración de la Constitución pedagógica (P2, en la UI).** Cierra los

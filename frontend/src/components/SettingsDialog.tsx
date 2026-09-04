@@ -13,8 +13,9 @@ import { ModelSelect } from "./ModelSelect";
 import { SystemStatus } from "./SystemStatus";
 import { AudioLibrary } from "./AudioLibrary";
 import { BackupPanel } from "./BackupPanel";
+import { VoicesPanel } from "./VoicesPanel";
 
-type Tab = "appearance" | "language" | "ai" | "audio" | "system";
+type Tab = "appearance" | "language" | "ai" | "audio" | "voices" | "system";
 
 const THEME_OPTIONS: { id: Theme; labelKey: string }[] = [
   { id: "light", labelKey: "settings.theme.light" },
@@ -32,6 +33,7 @@ interface SettingsDialogProps {
   favoriteModel: string | null;
   onSelectModel: (model: string) => void;
   onFavoriteModel: (model: string) => void;
+  userId: string | null;
   onClose: () => void;
 }
 
@@ -46,6 +48,7 @@ export function SettingsDialog({
   favoriteModel,
   onSelectModel,
   onFavoriteModel,
+  userId,
   onClose,
 }: SettingsDialogProps) {
   const { t } = useI18n();
@@ -64,6 +67,7 @@ export function SettingsDialog({
     { id: "language", label: t("settings.interfaceLanguage") },
     { id: "ai", label: t("settings.ai") },
     { id: "audio", label: t("settings.audio") },
+    { id: "voices", label: t("settings.voices") },
     { id: "system", label: t("settings.system") },
   ];
 
@@ -222,6 +226,7 @@ export function SettingsDialog({
             </>
           )}
           {tab === "audio" && <AudioLibrary />}
+          {tab === "voices" && <VoicesPanel userId={userId} />}
         </div>
 
         <footer className="dialog-footer">

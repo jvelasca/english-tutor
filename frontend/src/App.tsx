@@ -277,6 +277,7 @@ export default function App() {
           favoriteModel={favoriteModel}
           onSelectModel={selectModel}
           onFavoriteModel={makeFavorite}
+          userId={currentUserId}
           onClose={() => setSettingsOpen(false)}
         />
       )}

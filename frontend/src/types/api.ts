@@ -39,6 +39,19 @@ export interface SettingsResponse {
   settings: Settings;
 }
 
+/** Una voz Piper instalada (id técnico + etiqueta amigable). */
+export interface VoiceInfo {
+  id: string;
+  name: string;
+}
+
+/** Catálogo de voces instaladas y la selección actual (Configuración → Voces). */
+export interface VoicesResponse {
+  voices: VoiceInfo[];
+  default: string;
+  selected: string;
+}
+
 export interface ConversationMeta {
   id: string;
   title: string;

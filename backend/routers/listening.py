@@ -61,7 +61,9 @@ async def audio(
     variant: str = "normal",
     user: dict = Depends(current_user),
 ) -> Response:
-    data, status = await listening_service.get_audio(question_id, variant)
+    data, status = await listening_service.get_audio(
+        user["id"], question_id, variant
+    )
     if status is not None:
         detail = (
             "Variante no válida"

@@ -62,7 +62,7 @@ def test_audio_endpoint_404_unknown_question(monkeypatch, tmp_path):
 
 def test_audio_endpoint_503_when_tts_not_ready(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
-    monkeypatch.setattr("services.tts.is_ready", lambda: False)
+    monkeypatch.setattr("services.tts.is_ready", lambda voice=None: False)
     q = QUESTION_BANK[0]
     with TestClient(app) as client:
         r = client.get(f"/api/listening/audio/{q['id']}", params={"user_id": uid})
@@ -72,11 +72,11 @@ def test_audio_endpoint_503_when_tts_not_ready(monkeypatch, tmp_path):
 def test_audio_endpoint_synthesizes_and_caches(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     q = QUESTION_BANK[0]
-    monkeypatch.setattr("services.tts.is_ready", lambda: True)
+    monkeypatch.setattr("services.tts.is_ready", lambda voice=None: True)
 
     calls = []
 
-    def fake_synthesize(text, length_scale=1.0):
+    def fake_synthesize(text, length_scale=1.0, voice=None):
         calls.append((text, length_scale))
         return b"RIFF-fake-wav-bytes"
 

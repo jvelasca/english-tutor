@@ -12,8 +12,11 @@ export async function transcribe(blob: Blob): Promise<string> {
   return data.text;
 }
 
-export async function speak(text: string): Promise<void> {
-  const res = await fetch("/api/tts", {
+export async function speak(text: string, userId?: string | null): Promise<void> {
+  const query = userId
+    ? `?${new URLSearchParams({ user_id: userId }).toString()}`
+    : "";
+  const res = await fetch(`/api/tts${query}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
