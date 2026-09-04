@@ -11,6 +11,17 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.9.0` — **Pronunciation por rutas CEFR: página única read-aloud con operativa tipo Listening/Speaking**
+  (APRENDER → Pronunciation deja la práctica libre de 3 frases hardcodeadas y
+  pasa a una página única como Speaking/Listening: la frase modelo a leer en voz
+  alta vive arriba —la escuchas con TTS local y te grabas leyéndola— y debajo el
+  mapa de rutas A1–C2 con anillos y el panel del nivel (Repetir fallidas /
+  Repasar aprendidas / Practicar o repasar el nivel). Banco oficial nuevo y
+  auditable `curriculum/pronunciation_corpus.json` (v1.0.0: 20 frases por nivel)
+  y la evaluación es determinista y barata: Whisper + `score_pronunciation`
+  (score ≥80 = superada), sin LLM por intento. La ruta es un hito de práctica —
+  `functional` como techo, nunca certifica—; demostrar el nivel sigue siendo del
+  Speaking Assessment + evidencia + retención). Base: `3.8.0`
 - ✅ Versión estable `3.8.0` — **Speaking por micro-conversaciones guiadas, con operativa tipo Listening**
   (APRENDER → Speaking es ahora una página única con scroll como Listening: el
   escenario de práctica —tarjeta de micro-conversación guiada con situación, rol

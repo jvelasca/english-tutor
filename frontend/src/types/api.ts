@@ -639,6 +639,101 @@ export interface SpeakingRouteExtras {
   phrase_ids: string[];
 }
 
+// --- Rutas de Pronunciation (V3.9) -------------------------------------------
+// Misma filosofía que speaking/listening: la ruta mide práctica (read-aloud
+// determinista sobre el banco oficial) y su estado `functional` es el techo;
+// demostrar el nivel exige el Speaking Assessment y evidencia formal, no la ruta.
+
+export type PronunciationRouteState = "not_started" | "developing" | "functional";
+
+export interface PronunciationRouteGate {
+  passed: boolean;
+  total: number;
+  mastered: number;
+  coverage_pct: number;
+  coverage_required_pct: number;
+  accuracy: number | null;
+  accuracy_required: number;
+  topics: number;
+  topics_required: number;
+  checkpoint: number;
+  checkpoint_required: number;
+  blockers: string[];
+}
+
+export interface PronunciationLevelProgress {
+  level: string;
+  total: number;
+  mastered: number;
+  completed: boolean;
+  coverage_pct: number | null;
+  accuracy: number | null;
+  gate?: PronunciationRouteGate | null;
+  state?: PronunciationRouteState;
+}
+
+export interface PronunciationStats {
+  attempts: number;
+  passed: number;
+  accuracy: number | null;
+  level: string;
+  completed: boolean;
+  levels: PronunciationLevelProgress[];
+}
+
+export type PronunciationItemState = "unseen" | "failed" | "mastered";
+
+export interface PronunciationItem {
+  phrase_id: string;
+  level: string;
+  script: string;
+  topic: string;
+  difficulty: number;
+  attempts: number;
+  state: PronunciationItemState;
+}
+
+export interface PronunciationLevelItems {
+  level: string;
+  total: number;
+  mastered: number;
+  failed: number;
+  unseen: number;
+  completed: boolean;
+  items: PronunciationItem[];
+  gate?: PronunciationRouteGate | null;
+}
+
+/** Frase modelo de read-aloud de una ruta de pronunciation. */
+export interface PronunciationPhrase {
+  id: string;
+  level: string;
+  script: string;
+  topic: string;
+  difficulty: number;
+  difficulty_vector?: Record<string, number>;
+}
+
+export interface PronunciationAttempt {
+  phrase_id: string;
+  level: string;
+  script: string;
+  heard: string;
+  score: number;
+  grade: PronunciationLevel;
+  passed: boolean;
+  word_accuracy: number;
+  phonetic_score: number;
+  phoneme_accuracy_proxy: number;
+  prosody_proxy: number;
+  pronunciation_source: string;
+  breakdown: PronunciationBreakdown;
+  phoneme_breakdown: PhonemeBreakdown;
+  fluency: FluencyStats;
+  topic: string;
+  difficulty: number;
+}
+
 export interface ListeningSubskillProgress {
   skill: string;
   attempts: number;

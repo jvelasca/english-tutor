@@ -12,6 +12,19 @@
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
 >
+> **Nota (2026-09-04):** posición vigente **v3.9.0** — **Pronunciation por rutas
+> CEFR (página única read-aloud)**. APRENDER → Pronunciation es ahora una página
+> única como Speaking/Listening: arriba la frase modelo (escucha con TTS local +
+> grabación) y debajo el mapa de rutas A1–C2 con anillos y el panel del nivel
+> (Repetir fallidas / Repasar aprendidas / Practicar o repasar el nivel + bloque
+> «Demostrar el nivel» que abre el Speaking Assessment). Banco oficial
+> `backend/curriculum/pronunciation_corpus.json` (v1.0.0: 20 frases por nivel);
+> intento determinista `domain/pronunciation_routes.py::submit_attempt` →
+> `services/pronunciation.py::score_pronunciation` (Whisper, sin LLM). Ruta =
+> práctica (`functional`, nunca certifica); demostrar exige Speaking Assessment +
+> evidencia + retención. Siguiente: Conversation (v3.10), Vocabulary (v3.11) y
+> Grammar (v3.12) con la misma filosofía.
+>
 > **Nota (2026-09-04):** posición vigente **v3.8.0** — **Speaking por
 > micro-conversaciones guiadas con operativa tipo Listening**. El roadmap y los
 > cambios viven en `PLAN.md`, `CHANGELOG.md` y `README.md`. Para retomar Speaking:

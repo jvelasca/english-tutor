@@ -74,6 +74,10 @@ const STRINGS: Record<string, Entry> = {
     en: "Free speaking practice: choose a scenario or run a mission.",
     es: "Práctica oral libre: elige un escenario o lanza una misión.",
   },
+  "learn.pronunciationSubtitle": {
+    en: "Read model phrases aloud level by level and get phonetic feedback.",
+    es: "Lee frases modelo en voz alta nivel a nivel con feedback fonético.",
+  },
   "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
 
   // Grupos de destrezas
@@ -1781,6 +1785,207 @@ const STRINGS: Record<string, Entry> = {
   // ruta es un hito de PRÁCTICA (estado techo `functional`); demostrar el nivel
   // exige el Speaking Assessment + evidencia de escenarios/misiones + retención,
   // no la ruta. Lectura honesta siempre: "rutas", nunca "certificado".
+  // Rutas de Pronunciation (V3.9): read-aloud por nivel CEFR.
+  "pronRoutes.loading": { en: "Loading…", es: "Cargando…" },
+  "pronRoutes.loadError": {
+    en: "Couldn't load your pronunciation routes. Please try again.",
+    es: "No se pudieron cargar tus rutas de pronunciación. Inténtalo de nuevo.",
+  },
+  "pronRoutes.retry": { en: "Try again", es: "Reintentar" },
+  "pronRoutes.backRoutes": {
+    en: "Back to routes",
+    es: "Volver a las rutas",
+  },
+  "pronRoutes.routesSubtitle": {
+    en: "Each level is a route of model phrases to read aloud: listen to the phrase and record yourself saying it. Feedback is instant and phonetic (words, sounds, rhythm and pace). Passing a route is a practice milestone — demonstrating the level needs the oral exam and retention, not the route.",
+    es: "Cada nivel es una ruta de frases modelo para leer en voz alta: escuchas la frase y te grabas diciéndola. El feedback es inmediato y fonético (palabras, sonidos, ritmo y fluidez). Superar una ruta es un hito de práctica: demostrar el nivel exige el examen oral y la retención, no la ruta.",
+  },
+  "pronRoutes.routesMapTitle": { en: "Routes", es: "Rutas" },
+  "pronRoutes.routesMapHint": {
+    en: "Tap a level to open its phrases",
+    es: "Toca un nivel para abrir sus frases",
+  },
+  "pronRoutes.accuracy": { en: "Pass rate", es: "Aciertos" },
+  "pronRoutes.masteredOfTotal": {
+    en: "Mastered {mastered} of {total}",
+    es: "Dominadas {mastered} de {total}",
+  },
+  "pronRoutes.coveragePct": {
+    en: "{pct}% of the level",
+    es: "{pct}% del nivel",
+  },
+  "pronRoutes.assessedLevel": {
+    en: "Oral level demonstrated: {level}",
+    es: "Nivel oral demostrado: {level}",
+  },
+  "pronRoutes.assessedLevelNone": {
+    en: "No oral exam taken yet",
+    es: "Aún no has hecho el examen oral",
+  },
+  "pronRoutes.routeNote": {
+    en: "Current route: {level}. The app always recommends the level whose official bank you haven't mastered yet.",
+    es: "Ruta actual: {level}. La app recomienda siempre el nivel cuyo banco oficial aún no dominas.",
+  },
+  "pronRoutes.routeCertNote": {
+    en: "Reading aloud trains pronunciation and feeds objective evidence where the course records it, but it never certifies by itself: demonstrating a level comes from the oral exam (Speaking Assessment) plus retention.",
+    es: "Leer en voz alta entrena la pronunciación y alimenta evidencia objetiva donde el curso la registra, pero nunca certifica por sí solo: demostrar un nivel viene del examen oral (Speaking Assessment) más la retención.",
+  },
+  "pronRoutes.routeRingHelp": {
+    en: "Phrases mastered on the first attempt count toward the route; the ring shows your coverage of each official bank.",
+    es: "Las frases dominadas cuentan para la ruta; el anillo muestra tu cobertura de cada banco oficial.",
+  },
+  "pronRoutes.levelHistoryTitle": {
+    en: "Route {level} phrases",
+    es: "Frases de la ruta {level}",
+  },
+  "pronRoutes.sessionEnded": {
+    en: "Practice session completed",
+    es: "Sesión de práctica completada",
+  },
+  "pronRoutes.doneDrillLine": {
+    en: "You have mastered all {total} failed phrases of route {level}.",
+    es: "Has dominado las {total} frases falladas de la ruta {level}.",
+  },
+  "pronRoutes.doneReviewLine": {
+    en: "Review of route {level} finished: you re-read the {total} mastered phrases.",
+    es: "Repaso de la ruta {level} terminado: has releído las {total} frases dominadas.",
+  },
+  "pronRoutes.doneLevelLine": {
+    en: "Route {level} round finished: {total} phrases practiced.",
+    es: "Vuelta de la ruta {level} terminada: {total} frases practicadas.",
+  },
+  "pronRoutes.modeLevel": {
+    en: "Practicing route {level}",
+    es: "Practicando la ruta {level}",
+  },
+  "pronRoutes.modeDrill": { en: "Repeating failed phrases", es: "Repitiendo falladas" },
+  "pronRoutes.modeReview": {
+    en: "Reviewing route {level}",
+    es: "Repasando la ruta {level}",
+  },
+  "pronRoutes.exitSession": {
+    en: "Exit session",
+    es: "Salir de la sesión",
+  },
+  "pronRoutes.drillHint": {
+    en: "Read each phrase until you master it — passing removes it from the queue.",
+    es: "Lee cada frase hasta dominarla: superarla la quita de la cola.",
+  },
+  "pronRoutes.sessionHint": {
+    en: "Read each phrase aloud and check your result.",
+    es: "Lee cada frase en voz alta y comprueba tu resultado.",
+  },
+  "pronRoutes.continue": { en: "Continue", es: "Continuar" },
+  "pronRoutes.skip": { en: "Skip to another phrase", es: "Saltar a otra frase" },
+  "pronRoutes.resultPassed": { en: "Well read", es: "Bien leída" },
+  "pronRoutes.resultNotPassed": {
+    en: "Keep practicing this phrase",
+    es: "Sigue practicando esta frase",
+  },
+  "pronRoutes.resultHonestNote": {
+    en: "This score measures today's reading against the model phrase. Mastering the route is practice: demonstrating the level needs the oral exam and retention.",
+    es: "Esta puntuación mide tu lectura de hoy frente a la frase modelo. Dominar la ruta es práctica: demostrar el nivel exige el examen oral y la retención.",
+  },
+  "pronRoutes.phraseHint": {
+    en: "Listen to the phrase and read it aloud",
+    es: "Escucha la frase y léela en voz alta",
+  },
+  "pronRoutes.scriptLabel": {
+    en: "Read this phrase aloud",
+    es: "Lee esta frase en voz alta",
+  },
+  "pronRoutes.recordHint": {
+    en: "Record yourself reading the phrase",
+    es: "Grábate leyendo la frase",
+  },
+  "pronRoutes.completedShort": {
+    en: "Route passed",
+    es: "Ruta superada",
+  },
+  "pronRoutes.routePendingCert": {
+    en: "Covered, not certified yet",
+    es: "Cubierta, aún sin certificar",
+  },
+  "pronRoutes.routeGateIntro": {
+    en: "Mastering the phrases isn't enough to pass {level}:",
+    es: "Dominar las frases no basta para superar {level}:",
+  },
+  "pronRoutes.routeGateLine": {
+    en: "{coverage}% of the official phrases mastered (≥{coverageRequired}%) · pass rate ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} topics · {checkpoint}/{checkpointRequired} passed on first try",
+    es: "{coverage}% del banco oficial de frases dominado (≥{coverageRequired}%) · aciertos ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} temas · {checkpoint}/{checkpointRequired} superadas a la primera",
+  },
+  "pronRoutes.demoNotYet": {
+    en: "{level} — not yet demonstrated",
+    es: "{level} — aún no demostrado",
+  },
+  "pronRoutes.demoRequires": {
+    en: "Demonstrating {level} comes from the oral exam (Speaking Assessment) plus sustained evidence and retention — not from this route. The route only trains; open the assessment to get certified.",
+    es: "Demostrar {level} viene del examen oral (Speaking Assessment) más evidencia sostenida y retención, no de esta ruta. La ruta solo entrena; abre el examen para certificar.",
+  },
+  "pronRoutes.demoTitle": {
+    en: "{level} — demonstrated",
+    es: "{level} — demostrado",
+  },
+  "pronRoutes.demoMet": {
+    en: "You have demonstrated this oral level with the assessment and sustained evidence.",
+    es: "Has demostrado este nivel oral con el examen y evidencia sostenida.",
+  },
+  "pronRoutes.demonstrateTitle": {
+    en: "Demonstrate {level}",
+    es: "Demostrar {level}",
+  },
+  "pronRoutes.demonstrateNote": {
+    en: "The route does not certify: {level} is demonstrated with the Speaking Assessment (oral exam) plus sustained evidence and retention.",
+    es: "La ruta no certifica: {level} se demuestra con el Speaking Assessment (examen oral) más evidencia sostenida y retención.",
+  },
+  "pronRoutes.demonstrateCta": {
+    en: "Take the Speaking Assessment",
+    es: "Hacer el Speaking Assessment",
+  },
+  "pronRoutes.levelItemsError": {
+    en: "Couldn't load this level's phrases.",
+    es: "No se pudieron cargar las frases de este nivel.",
+  },
+  "pronRoutes.levelItemsPhrases": { en: "phrases", es: "frases" },
+  "pronRoutes.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} failed · {unseen} unseen",
+    es: "{mastered} dominadas · {failed} falladas · {unseen} sin ver",
+  },
+  "pronRoutes.levelItemsEmpty": {
+    en: "No phrases here yet.",
+    es: "Aún no hay frases aquí.",
+  },
+  "pronRoutes.levelStates.failed": {
+    en: "Failed ({count})",
+    es: "Falladas ({count})",
+  },
+  "pronRoutes.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominadas ({count})",
+  },
+  "pronRoutes.levelStates.unseen": {
+    en: "Unseen ({count})",
+    es: "Sin ver ({count})",
+  },
+  "pronRoutes.levelItemsDifficulty": { en: "level", es: "nivel" },
+  "pronRoutes.levelItemsAttempts": { en: "attempts", es: "intentos" },
+  "pronRoutes.repeatFailed": {
+    en: "Repeat failed ({count})",
+    es: "Repetir falladas ({count})",
+  },
+  "pronRoutes.reviewLearned": {
+    en: "Review learned ({count})",
+    es: "Repasar aprendidas ({count})",
+  },
+  "pronRoutes.practiceLevel": {
+    en: "Practice route {level}",
+    es: "Practicar la ruta {level}",
+  },
+  "pronRoutes.reviewLevel": {
+    en: "Review route {level}",
+    es: "Repasar la ruta {level}",
+  },
+
   "speaking.routesSubtitle": {
     en: "Each level is a route of guided micro-conversations: read the situation, listen to your interlocutor and answer out loud. After each answer you get feedback by criteria and a model response to compare. Passing a route is a practice milestone — demonstrating the level needs the oral exam, missions and retention, not the route.",
     es: "Cada nivel es una ruta de micro-conversaciones guiadas: lees la situación, oyes a tu interlocutor y respondes en voz alta. Tras cada respuesta recibes feedback por criterios y una respuesta modelo con la que compararte. Superar una ruta es un hito de práctica: demostrar el nivel exige el examen oral, las misiones y la retención, no la ruta.",

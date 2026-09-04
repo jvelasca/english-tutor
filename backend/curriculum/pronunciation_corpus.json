@@ -1,0 +1,846 @@
+{
+  "version": "1.0.0",
+  "description": "Banco oficial de frases modelo de pronunciación para las rutas A1-C2. Cada frase es un read-aloud corto y progresivo: el alumno la escucha y la lee en voz alta, y la evaluación es determinista (score_pronunciation sobre transcripción Whisper). Alineado con el léxico, los conceptos y los can_do de backend/curriculum/<level>.json.",
+  "items": [
+    {
+      "id": "pr-A1-0001",
+      "level": "A1",
+      "topic": "Greetings",
+      "script": "Hello, nice to meet you.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0002",
+      "level": "A1",
+      "topic": "Introductions",
+      "script": "My name is Lisa and I am a student.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0003",
+      "level": "A1",
+      "topic": "Family",
+      "script": "I have two brothers and one sister.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0004",
+      "level": "A1",
+      "topic": "Numbers",
+      "script": "My phone number is four five six eight.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0005",
+      "level": "A1",
+      "topic": "Food",
+      "script": "I would like a cup of coffee, please.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0006",
+      "level": "A1",
+      "topic": "School",
+      "script": "The classroom is small but very clean.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0007",
+      "level": "A1",
+      "topic": "Daily routine",
+      "script": "I get up at seven o'clock every day.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0008",
+      "level": "A1",
+      "topic": "Weather",
+      "script": "It is cold and rainy today.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0009",
+      "level": "A1",
+      "topic": "Colours",
+      "script": "My favourite colour is blue.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0010",
+      "level": "A1",
+      "topic": "Objects",
+      "script": "This is my new phone.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0011",
+      "level": "A1",
+      "topic": "Home",
+      "script": "I live in a small flat in the city.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0012",
+      "level": "A1",
+      "topic": "Shopping",
+      "script": "How much is this T-shirt?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0013",
+      "level": "A1",
+      "topic": "Feelings",
+      "script": "I am tired but I am happy.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0014",
+      "level": "A1",
+      "topic": "Animals",
+      "script": "The cat is under the table.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0015",
+      "level": "A1",
+      "topic": "Time",
+      "script": "It is half past three in the afternoon.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0016",
+      "level": "A1",
+      "topic": "Days",
+      "script": "We have English lessons on Monday and Friday.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0017",
+      "level": "A1",
+      "topic": "Food",
+      "script": "I like bread with cheese and tomato.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0018",
+      "level": "A1",
+      "topic": "Directions",
+      "script": "The bank is next to the post office.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0019",
+      "level": "A1",
+      "topic": "Daily life",
+      "script": "She goes to work by bus.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A1-0020",
+      "level": "A1",
+      "topic": "Friends",
+      "script": "Do you want to play football with me?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0001",
+      "level": "A2",
+      "topic": "Plans",
+      "script": "I am going to visit my aunt next weekend.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0002",
+      "level": "A2",
+      "topic": "Past",
+      "script": "We watched a film and then we ate pizza.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0003",
+      "level": "A2",
+      "topic": "Town",
+      "script": "There is a big park near my house where I run.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0004",
+      "level": "A2",
+      "topic": "Plans",
+      "script": "I am meeting my friends at six at the cinema.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0005",
+      "level": "A2",
+      "topic": "Health",
+      "script": "You should drink more water and rest.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 1, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0006",
+      "level": "A2",
+      "topic": "Shopping",
+      "script": "This jacket is too expensive for me.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0007",
+      "level": "A2",
+      "topic": "Weather",
+      "script": "It often rains in April in my country.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0008",
+      "level": "A2",
+      "topic": "Holiday",
+      "script": "Last summer we went to the beach every day.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0009",
+      "level": "A2",
+      "topic": "Opinions",
+      "script": "I think reading is more interesting than watching TV.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0010",
+      "level": "A2",
+      "topic": "Daily routine",
+      "script": "My brother usually cooks dinner on Sundays.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0011",
+      "level": "A2",
+      "topic": "Asking for help",
+      "script": "Could you tell me where the train station is?",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0012",
+      "level": "A2",
+      "topic": "Past",
+      "script": "I did not sleep well because it was very hot.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0013",
+      "level": "A2",
+      "topic": "Home",
+      "script": "We are moving to a bigger house next month.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0014",
+      "level": "A2",
+      "topic": "Abilities",
+      "script": "She can speak three languages very well.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0015",
+      "level": "A2",
+      "topic": "Directions",
+      "script": "Turn left at the bank and walk straight ahead.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0016",
+      "level": "A2",
+      "topic": "Work",
+      "script": "He works in a hospital and starts at eight.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0017",
+      "level": "A2",
+      "topic": "Free time",
+      "script": "I enjoy playing tennis when I have free time.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 1 }
+    },
+    {
+      "id": "pr-A2-0018",
+      "level": "A2",
+      "topic": "Comparing",
+      "script": "This restaurant is better than the one near my office.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0019",
+      "level": "A2",
+      "topic": "Plans",
+      "script": "Are you going to come to the party on Saturday?",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-A2-0020",
+      "level": "A2",
+      "topic": "Feelings",
+      "script": "I felt nervous before the exam, but I passed it.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "prosody": 2 }
+    },
+    {
+      "id": "pr-B1-0001",
+      "level": "B1",
+      "topic": "Experience",
+      "script": "I have never travelled abroad, but I would love to visit Japan.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 2 }
+    },
+    {
+      "id": "pr-B1-0002",
+      "level": "B1",
+      "topic": "Technology",
+      "script": "Although smartphones are useful, they can also distract us from real conversations.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0003",
+      "level": "B1",
+      "topic": "Environment",
+      "script": "If we recycle more plastic, we will reduce a lot of pollution.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0004",
+      "level": "B1",
+      "topic": "Work",
+      "script": "I have been working at this company for three years now.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 2 }
+    },
+    {
+      "id": "pr-B1-0005",
+      "level": "B1",
+      "topic": "Education",
+      "script": "Students should be allowed to choose some of the subjects they study.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0006",
+      "level": "B1",
+      "topic": "Health",
+      "script": "Regular exercise is essential if you want to stay healthy as you get older.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0007",
+      "level": "B1",
+      "topic": "Travel",
+      "script": "When we arrived in Rome, we realised we had booked the wrong hotel.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0008",
+      "level": "B1",
+      "topic": "Opinions",
+      "script": "In my opinion, online shopping saves time but you cannot check the quality.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0009",
+      "level": "B1",
+      "topic": "Relationships",
+      "script": "We used to argue a lot, but now we understand each other better.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0010",
+      "level": "B1",
+      "topic": "News",
+      "script": "The government has announced new measures to help small businesses.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "prosody": 2 }
+    },
+    {
+      "id": "pr-B1-0011",
+      "level": "B1",
+      "topic": "Habits",
+      "script": "I try to read for twenty minutes every night before I go to sleep.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0012",
+      "level": "B1",
+      "topic": "Advice",
+      "script": "You ought to apologise to her if you want to stay friends.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0013",
+      "level": "B1",
+      "topic": "Storytelling",
+      "script": "The film was so boring that we left before it ended.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0014",
+      "level": "B1",
+      "topic": "Future",
+      "script": "By the time I retire, I hope I will have seen most of the world.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0015",
+      "level": "B1",
+      "topic": "Food",
+      "script": "This dish is typical of my region and it is made with fresh fish and herbs.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0016",
+      "level": "B1",
+      "topic": "City",
+      "script": "The old town is crowded during summer, so I prefer to visit it in autumn.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0017",
+      "level": "B1",
+      "topic": "Work",
+      "script": "My manager asked me to finish the report before the meeting on Friday.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0018",
+      "level": "B1",
+      "topic": "Comparing",
+      "script": "Living in the countryside is quieter, but finding a job is easier in the city.",
+      "difficulty_vector": { "lexical": 2, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0019",
+      "level": "B1",
+      "topic": "Sport",
+      "script": "Despite the heavy rain, the players continued the match until the end.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B1-0020",
+      "level": "B1",
+      "topic": "Books",
+      "script": "The author describes the characters so vividly that you feel you know them.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "prosody": 3 }
+    },
+    {
+      "id": "pr-B2-0001",
+      "level": "B2",
+      "topic": "Hypothetical past",
+      "script": "Had we known about the traffic, we would have taken the train instead.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0002",
+      "level": "B2",
+      "topic": "Society",
+      "script": "The proposal was rejected because it failed to address the main concerns of the residents.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0003",
+      "level": "B2",
+      "topic": "Science",
+      "script": "Scientists believe that the new vaccine could dramatically reduce the spread of the disease.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0004",
+      "level": "B2",
+      "topic": "Work",
+      "script": "Although she had been working for hours, she refused to take a break.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0005",
+      "level": "B2",
+      "topic": "Opinions",
+      "script": "What strikes me most about the book is the way it challenges traditional views of history.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0006",
+      "level": "B2",
+      "topic": "Business",
+      "script": "The company's decision to expand overseas was influenced by growing demand in Asia.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0007",
+      "level": "B2",
+      "topic": "Hypothetical",
+      "script": "If I were in your position, I would negotiate the terms before signing anything.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0008",
+      "level": "B2",
+      "topic": "Culture",
+      "script": "Having lived abroad for several years, she found it easy to adapt to the new culture.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0009",
+      "level": "B2",
+      "topic": "Environment",
+      "script": "The government has promised to invest heavily in renewable energy over the next decade.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0010",
+      "level": "B2",
+      "topic": "Opinions",
+      "script": "You could hardly call the meeting productive, given that no concrete decisions were made.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0011",
+      "level": "B2",
+      "topic": "Economy",
+      "script": "The evidence suggests that the economic crisis was caused by a combination of factors.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0012",
+      "level": "B2",
+      "topic": "Media",
+      "script": "It is widely acknowledged that social media has transformed the way we communicate.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0013",
+      "level": "B2",
+      "topic": "Problem solving",
+      "script": "Rather than complaining about the situation, we should focus on finding practical solutions.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0014",
+      "level": "B2",
+      "topic": "Work",
+      "script": "The report highlights a number of issues that need to be addressed without delay.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 3 }
+    },
+    {
+      "id": "pr-B2-0015",
+      "level": "B2",
+      "topic": "Personality",
+      "script": "He tends to exaggerate his achievements, which sometimes annoys his colleagues.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0016",
+      "level": "B2",
+      "topic": "Environment",
+      "script": "Unless we take immediate action, the damage to the environment will be irreversible.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0017",
+      "level": "B2",
+      "topic": "Opinions",
+      "script": "What impressed the jury most was the originality of her final project.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 3, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0018",
+      "level": "B2",
+      "topic": "Education",
+      "script": "The lecture was fascinating, although I must admit I struggled to follow parts of it.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-B2-0019",
+      "level": "B2",
+      "topic": "Future",
+      "script": "By this time next year, the new metro line should be fully operational.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 4, "prosody": 3 }
+    },
+    {
+      "id": "pr-B2-0020",
+      "level": "B2",
+      "topic": "Conversation",
+      "script": "I would rather not discuss the matter further until we have all the facts.",
+      "difficulty_vector": { "lexical": 3, "grammar": 4, "length": 4, "prosody": 4 }
+    },
+    {
+      "id": "pr-C1-0001",
+      "level": "C1",
+      "topic": "Science",
+      "script": "Not only did the research reveal unexpected results, but it also challenged long-held assumptions.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0002",
+      "level": "C1",
+      "topic": "Technology",
+      "script": "The extent to which technology influences our behaviour is a matter of ongoing debate.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0003",
+      "level": "C1",
+      "topic": "Hypothetical past",
+      "script": "Had the authorities reacted sooner, the crisis could have been contained far more effectively.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0004",
+      "level": "C1",
+      "topic": "Leadership",
+      "script": "What distinguishes a great leader is not merely vision, but the ability to inspire others.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0005",
+      "level": "C1",
+      "topic": "Politics",
+      "script": "Given the complexity of the issue, it is hardly surprising that the negotiations have stalled.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0006",
+      "level": "C1",
+      "topic": "History",
+      "script": "The author argues, somewhat controversially, that the empire's decline was largely self-inflicted.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0007",
+      "level": "C1",
+      "topic": "Formal",
+      "script": "Should any unforeseen complications arise, we will notify you at the earliest opportunity.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0008",
+      "level": "C1",
+      "topic": "Personality",
+      "script": "Her articulate response to the criticism demonstrated both confidence and intellectual maturity.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0009",
+      "level": "C1",
+      "topic": "Environment",
+      "script": "It is imperative that we strike a balance between economic growth and environmental protection.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0010",
+      "level": "C1",
+      "topic": "Opinions",
+      "script": "The committee's recommendations, though well-intentioned, proved difficult to implement in practice.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0011",
+      "level": "C1",
+      "topic": "Debate",
+      "script": "Scarcely had the conference begun when a heated dispute broke out among the delegates.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0012",
+      "level": "C1",
+      "topic": "Analysis",
+      "script": "The findings cast doubt on the prevailing assumption that higher spending guarantees better outcomes.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0013",
+      "level": "C1",
+      "topic": "Politics",
+      "script": "Whatever the outcome of the election, the political landscape is unlikely to return to normal.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0014",
+      "level": "C1",
+      "topic": "Urban planning",
+      "script": "There is a growing consensus that the current approach to urban planning is no longer sustainable.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0015",
+      "level": "C1",
+      "topic": "Business",
+      "script": "The proposal was met with considerable scepticism, largely owing to its prohibitive cost.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0016",
+      "level": "C1",
+      "topic": "Audit",
+      "script": "Far from being a mere formality, the audit uncovered several irregularities that required urgent attention.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0017",
+      "level": "C1",
+      "topic": "Science",
+      "script": "One cannot overstate the significance of this discovery for the future of medical research.",
+      "difficulty_vector": { "lexical": 4, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0018",
+      "level": "C1",
+      "topic": "Literature",
+      "script": "The narrative skilfully interweaves personal memoir with historical analysis.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0019",
+      "level": "C1",
+      "topic": "Business",
+      "script": "Were the company to adopt these measures, it would substantially reduce its carbon footprint.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C1-0020",
+      "level": "C1",
+      "topic": "Society",
+      "script": "Critics contend that the policy, however well-designed, fails to address the root causes of inequality.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0001",
+      "level": "C2",
+      "topic": "Law",
+      "script": "The ramifications of the ruling will reverberate far beyond the courtroom.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0002",
+      "level": "C2",
+      "topic": "Literature",
+      "script": "Her discourse was replete with subtle allusions that only a discerning audience would appreciate.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0003",
+      "level": "C2",
+      "topic": "Analysis",
+      "script": "To attribute the phenomenon solely to economic factors would be a gross oversimplification.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0004",
+      "level": "C2",
+      "topic": "Analysis",
+      "script": "The two interpretations are not mutually exclusive; indeed, they are complementary in many respects.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0005",
+      "level": "C2",
+      "topic": "Innovation",
+      "script": "Scarcely a decade ago such innovations would have been dismissed as the stuff of science fiction.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0006",
+      "level": "C2",
+      "topic": "Politics",
+      "script": "The administration's stance, while ostensibly conciliatory, betrays an underlying intransigence.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0007",
+      "level": "C2",
+      "topic": "Academia",
+      "script": "It would be remiss of us not to acknowledge the seminal contributions of earlier scholars.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 5 }
+    },
+    {
+      "id": "pr-C2-0008",
+      "level": "C2",
+      "topic": "Literature",
+      "script": "The novel's narrative structure, with its labyrinthine digressions, defies conventional literary classification.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0009",
+      "level": "C2",
+      "topic": "Science",
+      "script": "Although the evidence is circumstantial, its cumulative weight renders the hypothesis increasingly tenable.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0010",
+      "level": "C2",
+      "topic": "Diplomacy",
+      "script": "The negotiations foundered on the perennial question of sovereignty, a stumbling block that has bedevilled talks for decades.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0011",
+      "level": "C2",
+      "topic": "Literature",
+      "script": "Her oeuvre, though modest in volume, is remarkable for its stylistic versatility and intellectual rigour.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0012",
+      "level": "C2",
+      "topic": "Politics",
+      "script": "In the final analysis, the reform's efficacy will hinge on the extent to which it garners grassroots support.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0013",
+      "level": "C2",
+      "topic": "Debate",
+      "script": "The discourse was characterised by a conspicuous absence of any substantive engagement with opposing viewpoints.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0014",
+      "level": "C2",
+      "topic": "Communication",
+      "script": "To construe the remark as a mere pleasantry would be to overlook its pointed subtext.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 5, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0015",
+      "level": "C2",
+      "topic": "Policy",
+      "script": "The policy's unintended consequences have proven far more pernicious than its architects ever anticipated.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0016",
+      "level": "C2",
+      "topic": "Academia",
+      "script": "What distinguishes this treatise is its meticulous synthesis of disparate strands of empirical research.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0017",
+      "level": "C2",
+      "topic": "Rhetoric",
+      "script": "However compelling the rhetoric, it cannot obscure the paucity of tangible results.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 5, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0018",
+      "level": "C2",
+      "topic": "International affairs",
+      "script": "The issue is further compounded by the intractable nature of the underlying geopolitical tensions.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0019",
+      "level": "C2",
+      "topic": "Rhetoric",
+      "script": "One might be forgiven for concluding that the entire affair was little more than an elaborate charade.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 6 }
+    },
+    {
+      "id": "pr-C2-0020",
+      "level": "C2",
+      "topic": "Academia",
+      "script": "The author's thesis, while elegantly argued, rests on a premise that many would contest.",
+      "difficulty_vector": { "lexical": 6, "grammar": 5, "length": 6, "prosody": 6 }
+    }
+  ]
+}

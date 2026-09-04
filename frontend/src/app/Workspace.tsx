@@ -48,6 +48,11 @@ const SpeakingRoutesPractice = lazy(() =>
     default: m.SpeakingRoutesPractice,
   })),
 );
+const PronunciationRoutesPractice = lazy(() =>
+  import("../features/pronunciation/PronunciationRoutesPractice").then((m) => ({
+    default: m.PronunciationRoutesPractice,
+  })),
+);
 
 interface WorkspaceProps {
   route: Route;
@@ -115,10 +120,9 @@ function SubpageHeader({
   );
 }
 
-/** Prácticas del hub que se sirven desde el workspace (Listening, Pronunciación, Gramática). */
+/** Prácticas del hub que se sirven desde el workspace vía PracticeView. */
 const WORKSPACE_ACTIVITIES: readonly LearnActivity[] = [
   LISTENING_ACTIVITY,
-  PRONUNCIATION_ACTIVITY,
   GRAMMAR_ACTIVITY,
 ];
 
@@ -211,6 +215,16 @@ export function Workspace({
             refreshKey={refreshKey}
           />
         );
+    } else if (learnActivity === PRONUNCIATION_ACTIVITY) {
+      content = (
+        <PronunciationRoutesPractice
+          userId={currentUserId}
+          active={learnActivity}
+          onBack={backToHub}
+          onAttempt={onAttempt}
+          onNext={onNextBestStart}
+        />
+      );
     } else if (WORKSPACE_ACTIVITIES.includes(learnActivity)) {
       // La barra de contexto (lección del curso vs práctica libre) vive dentro
       // de PracticeView (WS7): las prácticas del hub se sirven aquí directas.

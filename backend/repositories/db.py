@@ -881,6 +881,33 @@ def init_db() -> None:
             """
         )
 
+        # Pronunciation por rutas (V3.9): práctica read-aloud por nivel CEFR.
+        # `pronunciation_route_attempts` guarda cada grabación puntuada contra
+        # una frase modelo del banco (`phrase_id`) con `score` (0..100 del
+        # composite fonético determinista), `passed` (score >= 80) y
+        # `difficulty`/`topic` para la puerta de ruta. El estado por frase
+        # (unseen/failed/mastered) se deriva en vivo igual que en listening.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pronunciation_route_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                phrase_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                passed INTEGER NOT NULL,
+                difficulty INTEGER NOT NULL DEFAULT 1,
+                topic TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pronunciation_route_attempts_user_id "
+            "ON pronunciation_route_attempts(user_id)"
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:

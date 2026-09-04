@@ -4,6 +4,33 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.9.0] — 2026-09-04
+
+**Pronunciation por rutas CEFR: página única read-aloud con operativa tipo Listening/Speaking.**
+
+APRENDER → Pronunciation deja la práctica libre de 3 frases fijas y pasa a una
+**página única con scroll** (espejo de Speaking/Listening): arriba vive el
+escenario de práctica —una **frase modelo** que escuchas (TTS local) y lees en
+voz alta grabándote— y debajo el mapa de rutas A1–C2 con anillos y, al abrir un
+nivel, sus modos (Practicar el nivel / Repetir fallidas / Repasar aprendidas) y
+el bloque «Demostrar el nivel» que abre el Speaking Assessment (instrumento
+formal oral que ya cubre la banda). Todo en la misma página, con control total
+del alumno.
+
+El contenido y la evaluación son nuevos: banco oficial versionado y auditable
+`curriculum/pronunciation_corpus.json` (v1.0.0: **20 frases por nivel**, A1–C2,
+progresivas) y cada lectura se puntúa de forma **determinista y barata**:
+Whisper transcribe la grabación y `score_pronunciation` calcula el composite
+fonético (score ≥80 = superada; desglose de palabras, fonética, fonemas, prosodia
+y fluidez), sin LLM por intento. La ruta mide práctica sobre el banco oficial
+(puerta de cobertura/precisión/checkpoint) con techo `functional`.
+
+Honestidad pedagógica intacta: la ruta **nunca certifica** — «demostrar el
+nivel» solo puede venir del Speaking Assessment + evidencia + retención, y la
+app lo refleja con la nota honesta del nivel oral demostrado. El read-aloud
+clásico sigue disponible como sección de las lecciones del curso; el hub abre la
+nueva página de rutas.
+
 ## [3.8.0] — 2026-09-04
 
 **Speaking por micro-conversaciones guiadas, con operativa tipo Listening.**
