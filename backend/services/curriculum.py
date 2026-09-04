@@ -185,6 +185,7 @@ RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
 SPEAKING_SCENARIOS_VERSION = "3.0.0"  # escenarios comunicativos (26 escenarios)
 LISTENING_BANK_VERSION = "7.0.0"  # listening: TTS 8D + corpus (A1/A2 → 200)
+SPEAKING_CORPUS_VERSION = "2.0.0"  # speaking por rutas: tarjetas de micro-conversación guiada
 
 # Objetivos de expansión del corpus de listening por nivel (Fase 3 — calibración
 # pedagógica). Son la *configuración* del pipeline
@@ -209,6 +210,7 @@ _NON_LEVEL_FILES = frozenset(
         "assessments.json",
         "speaking_assessment.json",
         "speaking_scenarios.json",
+        "speaking_corpus.json",
         "cefr_matrix.json",
         "cefr_descriptors.json",
         "listening_corpus.json",

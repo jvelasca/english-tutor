@@ -11,6 +11,30 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.8.0` — **Speaking por micro-conversaciones guiadas, con operativa tipo Listening**
+  (APRENDER → Speaking es ahora una página única con scroll como Listening: el
+  escenario de práctica —tarjeta de micro-conversación guiada con situación, rol
+  y línea del interlocutor con voz, a la que respondes hablando— vive arriba y,
+  bajo él, el mapa de rutas A1–C2 con anillos y sus modos (practicar el nivel,
+  repetir fallidas, repasar aprendidas, añadir práctica extra) más el acceso al
+  Speaking Assessment. El banco oficial `speaking_corpus.json` se regenera como
+  tarjetas `{setup, you, app_line, model_response}` (v2.0.0: A1 36 / A2 32 / B1
+  28 / B2 22 / C1 16 / C2 14) y el intento deja de ser read-aloud: cada respuesta
+  se evalúa como respuesta abierta con el pipeline LLM+evidencia existente
+  (`extract_speaking_evidence` + `scores_from_evidence`), con error transitorio
+  503 si el extractor falla (nunca se puntúa en falso). El audio TTS se sirve por
+  tipo con caché (`?kind=opening|model`). La ruta sigue siendo un hito de
+  práctica —`functional` como techo, nunca certifica—; demostrar el nivel sigue
+  siendo del Speaking Assessment + escenarios/misiones + retención). Base: `3.7.0`
+- ✅ Versión estable `3.7.0` — **Speaking por rutas CEFR + fuente compacta en logs del lanzador**
+  (APRENDER → Speaking es ahora un mapa de rutas A1–C2 con frases modelo
+  read-aloud y banco curado oficial nuevo (`speaking_corpus.json`): practicar el
+  nivel, repetir fallidas, repasar aprendidas y añadir práctica extra generada,
+  todo puntuado en local sin LLM por intento. La ruta es un hito de práctica —
+  `functional` como techo, puerta con cobertura/precisión/checkpoint sobre el
+  banco oficial—; demostrar el nivel sigue siendo del Speaking Assessment +
+  escenarios/misiones + retención, nunca de la ruta. El lanzador muestra los
+  logs con fuente compacta monospace). Base: `3.6.2`
 - ✅ Versión estable `3.6.2` — **Estado del servidor en el lanzador + corrección del 429 espurio**
   (el «Demasiadas peticiones» lo devolvía el rate limiter propio
   (`SecurityMiddleware`), no Ollama, cuando el servidor local se saturaba:

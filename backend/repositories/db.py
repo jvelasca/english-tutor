@@ -806,6 +806,81 @@ def init_db() -> None:
             """
         )
 
+        # Speaking por rutas (V3.7): práctica oral read-aloud por nivel CEFR.
+        # `speaking_attempts` guarda cada grabación puntuada contra una frase
+        # modelo del banco (`phrase_id`), con `result` (overall 0..1), `passed`
+        # (result >= umbral) y `difficulty`/`topic` para la puerta de ruta.
+        # El estado por frase (unseen/failed/mastered) se deriva en vivo igual
+        # que en listening; la ruta es práctica, no certifica el nivel.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS speaking_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                phrase_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                result REAL NOT NULL,
+                passed INTEGER NOT NULL,
+                difficulty INTEGER NOT NULL DEFAULT 1,
+                topic TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_speaking_attempts_user_id "
+            "ON speaking_attempts(user_id)"
+        )
+
+        # Catálogo global de frases extra generadas con IA local (LLM + TTS):
+        # práctica complementaria de una ruta, nunca parte del banco curado ni
+        # de la puerta de ruta. `payload_json` guarda el dict de la frase
+        # (id, level, phrase, topic, difficulty_vector), sin su `id` propio.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS speaking_generated (
+                id TEXT PRIMARY KEY,
+                level TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                generator_version TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                UNIQUE (level, payload_json)
+            )
+            """
+        )
+        # Activación por usuario de frases extra en una ruta (reversible).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS speaking_route_extras (
+                user_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                phrase_id TEXT NOT NULL,
+                added_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, level, phrase_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (phrase_id) REFERENCES speaking_generated(id)
+            )
+            """
+        )
+        # Trabajos de generación en segundo plano (igual que listening).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS speaking_generation_jobs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                requested INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'running',
+                added_ids_json TEXT NOT NULL DEFAULT '[]',
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:

@@ -43,9 +43,9 @@ const PracticeView = lazy(() =>
 const LearnHub = lazy(() =>
   import("../features/learn/LearnHub").then((m) => ({ default: m.LearnHub })),
 );
-const SpeakingFreePractice = lazy(() =>
-  import("../features/speaking/SpeakingFreePractice").then((m) => ({
-    default: m.SpeakingFreePractice,
+const SpeakingRoutesPractice = lazy(() =>
+  import("../features/speaking/SpeakingRoutesPractice").then((m) => ({
+    default: m.SpeakingRoutesPractice,
   })),
 );
 
@@ -197,10 +197,12 @@ export function Workspace({
     if (!learnActivity || learnActivity === SPEAKING_ACTIVITY) {
       content =
         learnActivity === SPEAKING_ACTIVITY ? (
-          <SpeakingFreePractice
+          <SpeakingRoutesPractice
             userId={currentUserId}
             active={learnActivity}
             onBack={backToHub}
+            onAttempt={onAttempt}
+            onNext={onNextBestStart}
           />
         ) : (
           <LearnHub

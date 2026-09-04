@@ -4,6 +4,127 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.8.0] — 2026-09-04
+
+**Speaking por micro-conversaciones guiadas, con operativa tipo Listening.**
+
+APRENDER → Speaking deja la sesión a pantalla completa y pasa a una **página
+única con scroll** (espejo de Listening): arriba vive el escenario de práctica
+—una tarjeta de micro-conversación guiada: situación + tu rol + la línea del
+interlocutor (con voz modelo), a la que respondes **hablando con tus
+palabras**— y debajo el mapa de rutas A1–C2 con anillos y, al abrir un nivel,
+sus modos (Practicar el nivel / Repetir fallidas / Repasar aprendidas / Añadir
+práctica extra) y el bloque «Demostrar el nivel» que abre el Speaking
+Assessment. Todo en la misma página, con control total del alumno en cualquier
+momento (cambiar de ruta o modo sin encerrarse en una pantalla).
+
+El contenido y la evaluación cambian a fondo: el banco oficial
+`curriculum/speaking_corpus.json` se regenera como **tarjetas de intercambio**
+(v2.0.0: A1 36 · A2 32 · B1 28 · B2 22 · C1 16 · C2 14) con
+`{id, level, topic, setup, you, app_line, model_response, difficulty_vector}`,
+y cada intento se puntúa como **respuesta abierta** con el pipeline LLM +
+evidencia que ya usan misiones/assessment (`extract_speaking_evidence` +
+`scores_from_evidence`, overall ≥0.6 = superada); la respuesta modelo se revela
+tras hablar. Si el extractor local falla se responde 503 transitorio para
+reintentar — nunca se puntúa en falso. La práctica extra generada produce
+tarjetas del mismo tipo (prompt, validación determinista y dedupe por
+intercambio). El TTS modelo se sirve con caché por tipo de audio
+(`GET /api/speaking/audio/{id}?kind=opening|model`).
+
+Honestidad pedagógica intacta: la ruta sigue siendo un **hito de práctica**
+(estado techo `functional`, puerta de cobertura/precisión/checkpoint sobre el
+banco oficial); «demostrar el nivel» solo puede venir del Speaking Assessment +
+escenarios/misiones + retención, nunca de la ruta. El read-aloud de V3.7 queda
+cubierto por Pronunciation; Speaking pasa a producción guiada, coherente con
+Listening (comprensión por rutas) y Conversation (libre).
+
+### Añadido
+- `backend/curriculum/speaking_corpus.json` v2.0.0: banco curado de tarjetas de
+  micro-conversación guiada por nivel y tema (auditado: campos, niveles,
+  longitudes producibles).
+- `GET /api/speaking/audio/{phrase_id}?kind=opening|model`: voz TTS cacheada de
+  la línea del interlocutor (`opening`, por defecto) y de la respuesta modelo
+  (`model`); `kind` inválido o tarjeta inexistente → 404.
+- Frontend: escenario superior con tarjeta de intercambio (situación/rol/línea
+  del interlocutor con traducción y altavoz, botón «Oír al interlocutor»,
+  grabación, evaluación «Evaluando…», `ActivityResult` con barras por criterios
+  y revelado de la **respuesta modelo** con voz y traducción), barra de sesión
+  compacta, mapa de rutas con anillos y panel del nivel bajo el escenario, y
+  sesión sin pantalla separada (practicar/repetir fallidas/repasar aprendidas/
+  práctica extra). Escenarios y misiones quedan como secciones plegables.
+
+### Cambiado
+- El intento de speaking evalúa la respuesta abierta (LLM local extrae evidencia
+  desde la tarjeta + `scores_from_evidence`), no la lectura contra una frase.
+- Schemas y tipos (`SpeakingPhrase`, `SpeakingAttemptResponse`, `SpeakingItemOut`
+  y espejo en `types/api.ts`) con `setup/you/app_line/model_response`.
+- `speaking_generate.py` v2.0.0: prompt, bandas de longitud, validación y
+  dedupe por intercambio (`canonical_card`) para tarjetas extra.
+- i18n EN/ES de la operativa nueva; textos honestos (ruta = hito de práctica;
+  demostrar = examen + evidencia + retención).
+- Tests adaptados: backend (corpus, motor, intento con extractor mock, 503 al
+  fallar el extractor, audio por kind), frontend (`tsc`, `vitest`) y spec visual
+  Playwright de la página única con mocks deterministas.
+
+## [3.7.0] — 2026-09-04
+
+**Speaking por rutas CEFR (A1→C2) + fuente compacta en los logs del lanzador.**
+
+APRENDER → Speaking deja de ser una sola tarjeta de práctica libre y pasa a ser
+un mapa de **rutas CEFR**, replicando las mecánicas que ya tenía Listening: cada
+nivel es una ruta de frases modelo del nivel (banco curado oficial nuevo,
+`curriculum/speaking_corpus.json`) que se practican en voz alta (read-aloud): se
+ve la frase escrita, se puede oír la voz modelo (TTS) y se graba. La puntuación
+es determinista y local (`score_speaking`, sin LLM por intento). Por ruta se
+puede practicar el nivel completo, repetir las falladas hasta dominarlas, repasar
+las aprendidas y añadir práctica extra generada por IA local cuando el banco
+oficial se domina.
+
+Honestidad pedagógica: la ruta es un **hito de práctica** (estado techo
+`functional` con puerta de cobertura/precisión/checkpoint); el nivel
+«demostrado» solo puede venir del Speaking Assessment + escenarios/misiones +
+retención, nunca de superar la ruta. El examen, escenarios y misiones siguen
+accesibles desde el mapa/panel de nivel.
+
+### Añadido (backend)
+- `curriculum/speaking_corpus.json`: banco oficial curado de frases modelo por
+  nivel (A1 65, A2 60, B1 50, B2 40, C1 32, C2 30) con `{id, level, phrase,
+  topic, difficulty_vector}`.
+- Tablas SQLite `speaking_attempts`, `speaking_generated`,
+  `speaking_route_extras` y `speaking_generation_jobs` (+ repositorio
+  `repositories/speaking_routes.py`).
+- Motor `services/speaking_routes.py` (pool por ruta, estados por frase, puerta
+  de ruta anclada al banco oficial, `route_competence` que nunca emite
+  `demonstrated`).
+- `services/speaking_generate.py` (frases extra con IA local) y orquestación en
+  `domain/speaking_routes.py` (trabajos en segundo plano, audio modelo TTS con
+  caché versionada por voz).
+- Endpoints `/api/speaking/{question,items,stats,audio/{id},attempt}` y
+  `/api/speaking/routes/{level}/extras` (+jobs y DELETE).
+- `GET /api/system/status`: agrega los trabajos de generación de speaking en
+  curso al estado que consume el lanzador.
+
+### Añadido (frontend)
+- APRENDER → Speaking es ahora `SpeakingRoutesPractice`: mapa A1–C2 con anillos,
+  cabecera de precisión y nivel oral demostrado, panel por nivel
+  (`SpeakingLevelPanel`) con historial de frases falladas/dominadas/sin ver,
+  Repetir fallidas, Repasar aprendidas, añadir práctica extra (+10/+25/+50) y el
+  bloque «Demostrar el nivel» que abre el Speaking Assessment.
+- Sesión de práctica read-aloud con voz modelo, grabación de micrófono y
+  resultado con barras de criterios honestas (la puntuación es retroalimentación
+  de la ruta, no certificado).
+- `api/speakingRoutes.ts` + tipos `Speaking*`; i18n EN/ES de toda la zona.
+
+### Cambiado (launcher)
+- Los logs (`backend.log`/`frontend.log`) se muestran en fuente compacta
+  monospace (Consolas 8, sin espaciado, wrap por carácter), como una terminal
+  pequeña y densa.
+
+### Corregido
+- `domain/speaking_routes.get_stats`: el cálculo de `completed` leía `passed`
+  fuera del `gate` (KeyError al consultar `/api/speaking/stats`); ahora usa
+  `g["gate"]["passed"]`.
+
 ## [3.6.2] — 2026-09-04
 
 **Estado del servidor en el lanzador + corrección del 429 espurio.**

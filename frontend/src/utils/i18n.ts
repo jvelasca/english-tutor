@@ -1773,6 +1773,287 @@ const STRINGS: Record<string, Entry> = {
   // Curso: marcadores de puerta de dominio superada/pendiente.
   "course.gatePass": { en: "PASS", es: "SUPERADO" },
   "course.gateDue": { en: "DUE", es: "PENDIENTE" },
+
+  // --- Speaking por rutas de micro-conversación (V3.8) -----------------------
+  // Cada nivel CEFR es una ruta de tarjetas de micro-conversación guiada
+  // (situación + rol + línea del interlocutor con voz; el alumno responde
+  // hablando y, tras la evaluación, se revela una respuesta modelo). Superar la
+  // ruta es un hito de PRÁCTICA (estado techo `functional`); demostrar el nivel
+  // exige el Speaking Assessment + evidencia de escenarios/misiones + retención,
+  // no la ruta. Lectura honesta siempre: "rutas", nunca "certificado".
+  "speaking.routesSubtitle": {
+    en: "Each level is a route of guided micro-conversations: read the situation, listen to your interlocutor and answer out loud. After each answer you get feedback by criteria and a model response to compare. Passing a route is a practice milestone — demonstrating the level needs the oral exam, missions and retention, not the route.",
+    es: "Cada nivel es una ruta de micro-conversaciones guiadas: lees la situación, oyes a tu interlocutor y respondes en voz alta. Tras cada respuesta recibes feedback por criterios y una respuesta modelo con la que compararte. Superar una ruta es un hito de práctica: demostrar el nivel exige el examen oral, las misiones y la retención, no la ruta.",
+  },
+  "speaking.loading": { en: "Loading…", es: "Cargando…" },
+  "speaking.loadError": {
+    en: "Couldn't load your speaking routes. Please try again.",
+    es: "No se pudieron cargar tus rutas de speaking. Inténtalo de nuevo.",
+  },
+  "speaking.retry": { en: "Try again", es: "Reintentar" },
+  "speaking.accuracy": { en: "Pass rate", es: "Aciertos" },
+  "speaking.masteredOfTotal": {
+    en: "Mastered {mastered} of {total}",
+    es: "Dominadas {mastered} de {total}",
+  },
+  "speaking.routeFunctional": {
+    en: "Practice milestone",
+    es: "Hito de práctica",
+  },
+  "speaking.demoTitle": {
+    en: "{level} Speaking — demonstrated",
+    es: "{level} Speaking — demostrado",
+  },
+  "speaking.assessedLevel": {
+    en: "Oral level demonstrated: {level}",
+    es: "Nivel oral demostrado: {level}",
+  },
+  "speaking.assessedLevelNone": {
+    en: "No oral exam taken yet",
+    es: "Aún no has hecho el examen oral",
+  },
+  "speaking.completedShort": {
+    en: "Route passed",
+    es: "Ruta superada",
+  },
+  "speaking.routePendingCert": {
+    en: "Covered, not certified yet",
+    es: "Cubierta, aún sin certificar",
+  },
+  "speaking.routeGateIntro": {
+    en: "Mastering the phrases isn't enough to pass {level}:",
+    es: "Dominar las frases no basta para superar {level}:",
+  },
+  "speaking.routeGateLine": {
+    en: "{coverage}% of the official cards mastered (≥{coverageRequired}%) · pass rate ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} topics · {checkpoint}/{checkpointRequired} passed on first try",
+    es: "{coverage}% del banco oficial de tarjetas dominado (≥{coverageRequired}%) · aciertos ≥{accuracyRequired}% ({accuracy}) · {topics}/{topicsRequired} temas · {checkpoint}/{checkpointRequired} superadas a la primera",
+  },
+  "speaking.demoNotYet": {
+    en: "{level} Speaking — not yet demonstrated",
+    es: "{level} Speaking — aún no demostrado",
+  },
+  "speaking.demoRequires": {
+    en: "Demonstrating {level} Speaking comes from the oral exam (Speaking Assessment) plus evidence from scenarios and missions and stable retention — not from this route. The route only trains; open the assessment to get certified.",
+    es: "Demostrar {level} Speaking viene del examen oral (Speaking Assessment) más evidencia de escenarios y misiones y retención estable, no de esta ruta. La ruta solo entrena; abre el examen para certificar.",
+  },
+  "speaking.demoMet": {
+    en: "You have demonstrated this oral level with the assessment and sustained evidence.",
+    es: "Has demostrado este nivel oral con el examen y evidencia sostenida.",
+  },
+  // Bloques "demostrar el nivel" del panel de ruta.
+  "speaking.demonstrateTitle": {
+    en: "Demonstrate {level}",
+    es: "Demostrar {level}",
+  },
+  "speaking.demonstrateNote": {
+    en: "The route does not certify: {level} is demonstrated with the Speaking Assessment (oral exam) plus scenarios/missions and retention evidence.",
+    es: "La ruta no certifica: {level} se demuestra con el Speaking Assessment (examen oral) más escenarios/misiones y evidencia de retención.",
+  },
+  "speaking.demonstrateCta": {
+    en: "Take the Speaking Assessment",
+    es: "Hacer el Speaking Assessment",
+  },
+  "speaking.backRoutes": {
+    en: "Back to routes",
+    es: "Volver a las rutas",
+  },
+
+  // Práctica extra generada (V3.7) por ruta.
+  "speaking.extraAddTitle": {
+    en: "Add more practice to route {level}",
+    es: "Añadir más práctica a la ruta {level}",
+  },
+  "speaking.extraBreakdown": {
+    en: "{base} official + {extras} generated",
+    es: "{base} oficiales + {extras} generadas",
+  },
+  "speaking.extraHonestNote": {
+    en: "You have mastered the official bank. Extra micro-conversation cards are generated locally by AI to keep training and consolidating. The route gate and certification never change: this practice extends the route, it doesn't raise it.",
+    es: "Has dominado el banco oficial. Las tarjetas de micro-conversación extra se generan en local con IA para seguir entrenando y consolidando. La puerta de la ruta y la certificación no cambian: esta práctica amplía la ruta, no la sube de nivel.",
+  },
+  "speaking.extraGenerating": {
+    en: "Generating conversation cards… this can take a minute.",
+    es: "Generando tarjetas de conversación… puede tardar un minuto.",
+  },
+  "speaking.extraDone": {
+    en: "{added} new cards added to route {level}.",
+    es: "{added} tarjetas nuevas añadidas a la ruta {level}.",
+  },
+  "speaking.extraError": {
+    en: "Couldn't add extra practice: {error}",
+    es: "No se pudo añadir práctica extra: {error}",
+  },
+  "speaking.extraAddLabel": { en: "Add:", es: "Añadir:" },
+  "speaking.extraAddCta": {
+    en: "+{count} cards",
+    es: "+{count} tarjetas",
+  },
+  "speaking.generatedTag": { en: "Generated", es: "Generada" },
+
+  // Historial por tarjeta del panel de nivel.
+  "speaking.levelItemsError": {
+    en: "Couldn't load this route's cards.",
+    es: "No se pudieron cargar las tarjetas de esta ruta.",
+  },
+  "speaking.levelItemsPhrases": { en: "cards", es: "tarjetas" },
+  "speaking.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} failed · {unseen} unseen",
+    es: "{mastered} dominadas · {failed} falladas · {unseen} sin intentar",
+  },
+  "speaking.levelItemsEmpty": {
+    en: "Nothing here yet.",
+    es: "Nada por aquí todavía.",
+  },
+  "speaking.levelStates.failed": {
+    en: "Failed ({count})",
+    es: "Falladas ({count})",
+  },
+  "speaking.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominadas ({count})",
+  },
+  "speaking.levelStates.unseen": {
+    en: "Unseen ({count})",
+    es: "Sin intentar ({count})",
+  },
+  "speaking.levelItemsDifficulty": { en: "level", es: "nivel" },
+  "speaking.levelItemsAttempts": { en: "attempts", es: "intentos" },
+  "speaking.repeatFailed": {
+    en: "Repeat failed ({count})",
+    es: "Repetir fallidas ({count})",
+  },
+  "speaking.reviewLearned": {
+    en: "Review learned ({count})",
+    es: "Repasar aprendidas ({count})",
+  },
+  "speaking.practiceLevel": {
+    en: "Practice {level}",
+    es: "Practicar {level}",
+  },
+  "speaking.reviewLevel": {
+    en: "Review {level}",
+    es: "Repasar {level}",
+  },
+
+  // Sesión read-aloud.
+  "speaking.modeLevel": {
+    en: "Practice {level}",
+    es: "Practicar {level}",
+  },
+  "speaking.modeDrill": {
+    en: "Repeating failed cards",
+    es: "Repitiendo fallidas",
+  },
+  "speaking.modeReview": {
+    en: "Reviewing {level}",
+    es: "Repasando {level}",
+  },
+  "speaking.exitSession": {
+    en: "Exit this practice",
+    es: "Salir de esta práctica",
+  },
+  "speaking.sessionEnded": {
+    en: "Practice session completed",
+    es: "Sesión de práctica completada",
+  },
+  "speaking.doneDrillLine": {
+    en: "You have mastered the {total} pending cards of {level}. Great work!",
+    es: "Has dominado las {total} tarjetas pendientes de {level}. ¡Buen trabajo!",
+  },
+  "speaking.doneReviewLine": {
+    en: "You reviewed {total} mastered cards of {level}.",
+    es: "Has repasado {total} tarjetas dominadas de {level}.",
+  },
+  "speaking.doneLevelLine": {
+    en: "You completed a full round over the {total} cards of {level}.",
+    es: "Has completado una vuelta por las {total} tarjetas de {level}.",
+  },
+  "speaking.record": { en: "Record your answer", es: "Grabar respuesta" },
+  "speaking.stop": { en: "Stop", es: "Parar" },
+  "speaking.evaluating": { en: "Evaluating…", es: "Evaluando…" },
+  "speaking.recordHint": {
+    en: "Answer out loud in English, in a quiet place",
+    es: "Responde en voz alta en inglés, en un sitio tranquilo",
+  },
+  "speaking.attemptError": {
+    en: "Couldn't evaluate your answer: ",
+    es: "No se pudo evaluar tu respuesta: ",
+  },
+  "speaking.skip": { en: "Skip to another card", es: "Saltar a otra tarjeta" },
+  "speaking.continue": { en: "Continue", es: "Continuar" },
+  "speaking.passedTitle": { en: "Nice answer!", es: "¡Bien respondido!" },
+  "speaking.notPassedTitle": {
+    en: "Not quite — compare with the model answer",
+    es: "Casi — compara con la respuesta modelo",
+  },
+  "speaking.resultPassed": { en: "Passed", es: "Superada" },
+  "speaking.resultNotPassed": { en: "Not passed", es: "No superada" },
+  "speaking.overallShort": { en: "overall", es: "global" },
+  "speaking.youSaidLabel": { en: "What you said", es: "Lo que has dicho" },
+  "speaking.criteriaIntro": {
+    en: "Feedback by criteria",
+    es: "Feedback por criterios",
+  },
+  "speaking.resultHonestNote": {
+    en: "This scores your spoken answer to the situation on the spot. It is training feedback for the route — it doesn't certify a CEFR level by itself.",
+    es: "Esto puntúa tu respuesta hablada a la situación al momento. Es retroalimentación de entrenamiento de la ruta: no certifica por sí solo un nivel CEFR.",
+  },
+
+  // Escenario superior de micro-conversación (tarjeta de intercambio).
+  "speaking.exchangeHint": {
+    en: "Answer out loud",
+    es: "Responde en voz alta",
+  },
+  "speaking.setupLabel": { en: "Situation", es: "Situación" },
+  "speaking.roleLabel": { en: "You", es: "Tú" },
+  "speaking.interlocutorLabel": { en: "Interlocutor", es: "Interlocutor" },
+  "speaking.playOpening": {
+    en: "Hear your interlocutor",
+    es: "Oír al interlocutor",
+  },
+  "speaking.playModel": {
+    en: "Hear the model answer",
+    es: "Oír la respuesta modelo",
+  },
+  "speaking.modelResponseTitle": {
+    en: "Model answer",
+    es: "Respuesta modelo",
+  },
+  "speaking.drillHint": {
+    en: "Repeat until you master the failed cards",
+    es: "Repite hasta dominar las tarjetas fallidas",
+  },
+  "speaking.sessionHint": {
+    en: "Answer out loud — each response is scored.",
+    es: "Responde en voz alta — cada respuesta se puntúa.",
+  },
+
+  // Mapa de rutas bajo el escenario (tira de anillos + panel del nivel).
+  "speaking.routesMapTitle": { en: "Routes", es: "Rutas" },
+  "speaking.routesMapHint": {
+    en: "Open a route to practice, drill or review",
+    es: "Abre una ruta para practicar, repasar o añadir práctica",
+  },
+  "speaking.routeNote": {
+    en: "{level} is your current route — practice it here whenever you want.",
+    es: "{level} es tu ruta actual — practícala aquí cuando quieras.",
+  },
+  "speaking.routeCertNote": {
+    en: "Passing a route is a practice milestone. Demonstrating the level requires the oral exam (Speaking Assessment) plus evidence from scenarios, missions and stable retention — never the route by itself.",
+    es: "Superar una ruta es un hito de práctica. Demostrar el nivel exige el examen oral (Speaking Assessment) más evidencia de escenarios, misiones y retención estable — nunca la ruta por sí sola.",
+  },
+  "speaking.routeRingHelp": {
+    en: "Tap a level to open its practice panel below.",
+    es: "Toca un nivel para abrir su panel de práctica.",
+  },
+  "speaking.levelHistoryTitle": {
+    en: "{level} route — open its practice panel",
+    es: "Ruta {level} — abrir su panel de práctica",
+  },
+  "speaking.coveragePct": {
+    en: "{pct}% covered",
+    es: "{pct}% cubierto",
+  },
 };
 
 export function translate(lang: Lang, key: string): string {

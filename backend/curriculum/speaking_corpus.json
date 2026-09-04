@@ -1,0 +1,1486 @@
+{
+  "version": "2.0.0",
+  "description": "Banco oficial de micro-conversaciones guiadas para las rutas A1-C2 de Speaking. Cada tarjeta es un intercambio breve: una situacion (setup), el rol del alumno (you), la linea del interlocutor (app_line) y una respuesta modelo abierta (model_response). El alumno escucha la linea, responde hablando con sus palabras y tras la evaluacion se revela la respuesta modelo. Alineado con los can_do y el lexico de backend/curriculum/<level>.json.",
+  "items": [
+    {
+      "id": "mc-A1-0001",
+      "level": "A1",
+      "topic": "Introductions",
+      "setup": "A new classmate introduces herself at the first lesson.",
+      "you": "Say hello, give your name and say you are happy to meet her.",
+      "app_line": "Hello! I am Sara. Nice to meet you.",
+      "model_response": "Hello Sara, my name is Mark. Nice to meet you too.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0002",
+      "level": "A1",
+      "topic": "Introductions",
+      "setup": "You meet a friend at a party and she asks about your day.",
+      "you": "Say hello and tell her you are fine.",
+      "app_line": "Hi Mark! How are you today?",
+      "model_response": "Hi! I am fine, thank you. And you?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0003",
+      "level": "A1",
+      "topic": "Introductions",
+      "setup": "Your teacher asks where you come from.",
+      "you": "Say which country you are from and that you speak Spanish.",
+      "app_line": "Tell me a little about you. Where are you from?",
+      "model_response": "I am from Mexico. I speak Spanish.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0004",
+      "level": "A1",
+      "topic": "Introductions",
+      "setup": "A colleague wants to know your family.",
+      "you": "Say that you have one brother and one sister.",
+      "app_line": "Do you have brothers or sisters?",
+      "model_response": "Yes, I have one brother and one sister.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0005",
+      "level": "A1",
+      "topic": "Introductions",
+      "setup": "Someone asks what you do at school.",
+      "you": "Say that you are a student.",
+      "app_line": "And what do you do? Are you a student?",
+      "model_response": "Yes, I am a student. I study English.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0006",
+      "level": "A1",
+      "topic": "Introductions",
+      "setup": "A friend asks where you live now.",
+      "you": "Say that you live in a small flat in the city.",
+      "app_line": "Where do you live now?",
+      "model_response": "I live in a small flat in the city.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0007",
+      "level": "A1",
+      "topic": "Personal information",
+      "setup": "A form asks about your age at a language school.",
+      "you": "Tell the receptionist how old you are.",
+      "app_line": "Can I have your age, please?",
+      "model_response": "I am twenty-six years old.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0008",
+      "level": "A1",
+      "topic": "Personal information",
+      "setup": "A new friend wants your telephone number.",
+      "you": "Say you can give it and share the number.",
+      "app_line": "Can you give me your phone number?",
+      "model_response": "Yes, of course. My number is 555 12 34 56.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0009",
+      "level": "A1",
+      "topic": "Personal information",
+      "setup": "Someone asks when your birthday is.",
+      "you": "Say the month of your birthday.",
+      "app_line": "When is your birthday?",
+      "model_response": "My birthday is in March.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0010",
+      "level": "A1",
+      "topic": "Personal information",
+      "setup": "The hotel receptionist asks for your name.",
+      "you": "Say your name and spell it slowly.",
+      "app_line": "What is your name, please?",
+      "model_response": "My name is Laura. L-A-U-R-A.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0011",
+      "level": "A1",
+      "topic": "Personal information",
+      "setup": "A classmate asks what languages you speak.",
+      "you": "Say you speak Spanish and a little English.",
+      "app_line": "What languages do you speak?",
+      "model_response": "I speak Spanish and a little English.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0012",
+      "level": "A1",
+      "topic": "Personal information",
+      "setup": "A friend asks what your favourite colour is.",
+      "you": "Answer and ask about her favourite colour.",
+      "app_line": "What is your favourite colour?",
+      "model_response": "My favourite colour is blue. What about you?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 2 }
+    },
+    {
+      "id": "mc-A1-0013",
+      "level": "A1",
+      "topic": "Daily routines",
+      "setup": "Your host family asks what time you get up.",
+      "you": "Say what time you get up in the morning.",
+      "app_line": "What time do you get up?",
+      "model_response": "I get up at seven in the morning.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0014",
+      "level": "A1",
+      "topic": "Daily routines",
+      "setup": "A friend asks what you have for breakfast.",
+      "you": "Say you have bread and coffee.",
+      "app_line": "What do you have for breakfast?",
+      "model_response": "I have bread and coffee for breakfast.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0015",
+      "level": "A1",
+      "topic": "Daily routines",
+      "setup": "Your flatmate asks how you go to work.",
+      "you": "Say you go to work by bus.",
+      "app_line": "How do you go to work?",
+      "model_response": "I go to work by bus every day.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0016",
+      "level": "A1",
+      "topic": "Daily routines",
+      "setup": "A colleague asks what you do after work.",
+      "you": "Say you watch TV at home.",
+      "app_line": "What do you do after work?",
+      "model_response": "After work I go home and watch TV.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0017",
+      "level": "A1",
+      "topic": "Daily routines",
+      "setup": "A friend asks what you do on Sundays.",
+      "you": "Say you visit your family on Sundays.",
+      "app_line": "What do you do on Sundays?",
+      "model_response": "On Sundays I visit my family.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0018",
+      "level": "A1",
+      "topic": "Daily routines",
+      "setup": "Your teacher asks when you do your homework.",
+      "you": "Say you do your homework in the evening.",
+      "app_line": "When do you do your homework?",
+      "model_response": "I do my homework in the evening.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0019",
+      "level": "A1",
+      "topic": "Food & drink",
+      "setup": "A waiter asks what you want to drink.",
+      "you": "Order a glass of water, please.",
+      "app_line": "What would you like to drink?",
+      "model_response": "A glass of water, please.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0020",
+      "level": "A1",
+      "topic": "Food & drink",
+      "setup": "Your friend asks if you like tea.",
+      "you": "Say no, you prefer coffee.",
+      "app_line": "Do you like tea?",
+      "model_response": "No, I do not like tea. I prefer coffee.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0021",
+      "level": "A1",
+      "topic": "Food & drink",
+      "setup": "A friend asks about your favourite food.",
+      "you": "Say your favourite food is pizza.",
+      "app_line": "What is your favourite food?",
+      "model_response": "My favourite food is pizza.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0022",
+      "level": "A1",
+      "topic": "Food & drink",
+      "setup": "You are at a cafe and want to pay.",
+      "you": "Ask for the bill, please.",
+      "app_line": "Is everything OK with your order?",
+      "model_response": "Yes, thank you. Can I have the bill, please?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0023",
+      "level": "A1",
+      "topic": "Food & drink",
+      "setup": "A friend asks if you like fruit.",
+      "you": "Say yes, you eat an apple every day.",
+      "app_line": "Do you like fruit?",
+      "model_response": "Yes, I like fruit. I eat an apple every day.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0024",
+      "level": "A1",
+      "topic": "Food & drink",
+      "setup": "A waiter asks if you want dessert.",
+      "you": "Say yes, you want an ice cream.",
+      "app_line": "Do you want a dessert?",
+      "model_response": "Yes, please. I want an ice cream.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0025",
+      "level": "A1",
+      "topic": "Home & family",
+      "setup": "A friend asks if you live with your family.",
+      "you": "Say yes, you live with your parents.",
+      "app_line": "Do you live with your family?",
+      "model_response": "Yes, I live with my parents.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0026",
+      "level": "A1",
+      "topic": "Home & family",
+      "setup": "Someone asks about your grandmother.",
+      "you": "Say she is seventy years old.",
+      "app_line": "How old is your grandmother?",
+      "model_response": "My grandmother is seventy years old.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0027",
+      "level": "A1",
+      "topic": "Home & family",
+      "setup": "A classmate asks if you have pets.",
+      "you": "Say you have a dog called Max.",
+      "app_line": "Do you have any pets?",
+      "model_response": "Yes, I have a dog. His name is Max.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0028",
+      "level": "A1",
+      "topic": "Home & family",
+      "setup": "Your new neighbour asks about your house.",
+      "you": "Say your house has three rooms.",
+      "app_line": "How big is your house?",
+      "model_response": "It is small. It has three rooms.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0029",
+      "level": "A1",
+      "topic": "Home & family",
+      "setup": "A friend asks what your parents do.",
+      "you": "Say your mother is a doctor.",
+      "app_line": "What does your mother do?",
+      "model_response": "My mother is a doctor. My father is a teacher.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0030",
+      "level": "A1",
+      "topic": "Home & family",
+      "setup": "Someone asks if you have a brother.",
+      "you": "Say no, but you have two sisters.",
+      "app_line": "Is that your brother in the photo?",
+      "model_response": "No, I do not have a brother. I have two sisters.",
+      "difficulty_vector": { "lexical": 1, "grammar": 2, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0031",
+      "level": "A1",
+      "topic": "Shopping & places",
+      "setup": "A shop assistant asks if she can help you.",
+      "you": "Say you want to buy a T-shirt.",
+      "app_line": "Can I help you?",
+      "model_response": "Yes, I want to buy a T-shirt.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0032",
+      "level": "A1",
+      "topic": "Shopping & places",
+      "setup": "A shop assistant tells you the price.",
+      "you": "Say thank you and ask where to pay.",
+      "app_line": "That is fifteen euros.",
+      "model_response": "OK, thank you. Where can I pay?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0033",
+      "level": "A1",
+      "topic": "Shopping & places",
+      "setup": "A tourist asks where the station is.",
+      "you": "Say it is next to the bank.",
+      "app_line": "Excuse me, where is the station?",
+      "model_response": "It is next to the bank.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0034",
+      "level": "A1",
+      "topic": "Shopping & places",
+      "setup": "You are in a shoe shop and a size is too big.",
+      "you": "Ask for a smaller size.",
+      "app_line": "How is the size?",
+      "model_response": "It is too big. Can I have a smaller size?",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0035",
+      "level": "A1",
+      "topic": "Shopping & places",
+      "setup": "A friend asks where the supermarket is.",
+      "you": "Say it is near the park, on the left.",
+      "app_line": "Do you know where the supermarket is?",
+      "model_response": "Yes, it is near the park on the left.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 2, "discourse": 1 }
+    },
+    {
+      "id": "mc-A1-0036",
+      "level": "A1",
+      "topic": "Shopping & places",
+      "setup": "A cashier asks if you want a bag.",
+      "you": "Say yes, please.",
+      "app_line": "Do you want a bag?",
+      "model_response": "Yes, please. Thank you.",
+      "difficulty_vector": { "lexical": 1, "grammar": 1, "length": 1, "discourse": 1 }
+    },
+    {
+      "id": "mc-A2-0001",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "You arrive late to a class and the teacher looks at you.",
+      "you": "Apologise and explain you missed the bus.",
+      "app_line": "You are late again today.",
+      "model_response": "I am sorry. I missed the bus this morning.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0002",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "Your phone rings during a meeting.",
+      "you": "Apologise and turn it off.",
+      "app_line": "Is that your phone? We are in the meeting.",
+      "model_response": "Sorry, I forgot to turn it off. It will not happen again.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0003",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "Your friend invites you to dinner tonight.",
+      "you": "Accept the invitation happily.",
+      "app_line": "Would you like to come to dinner tonight?",
+      "model_response": "Yes, I would love to. What time shall I come?",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0004",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "Your friend asks for help moving house.",
+      "you": "Agree and say when you are free.",
+      "app_line": "Could you help me move house on Saturday?",
+      "model_response": "Of course. I am free on Saturday morning.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0005",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "A waiter brings you the wrong dish.",
+      "you": "Explain the problem politely and ask for the correct dish.",
+      "app_line": "Here is your chicken with rice.",
+      "model_response": "I am sorry, but I ordered fish, not chicken.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0006",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "Your neighbour complains about the music.",
+      "you": "Apologise and say you will make it quieter.",
+      "app_line": "Could you please turn the music down?",
+      "model_response": "I am really sorry. I will turn it down now.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0007",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "Your friend wants to know if the shop is open now.",
+      "you": "Say you do not know and suggest checking online.",
+      "app_line": "Do you know if the supermarket is open now?",
+      "model_response": "I am not sure. We can check online.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0008",
+      "level": "A2",
+      "topic": "Everyday situations",
+      "setup": "Your boss asks you to work on Saturday.",
+      "you": "Say you cannot because you have other plans.",
+      "app_line": "Can you come to the office on Saturday?",
+      "model_response": "I am sorry, I cannot. I already have plans.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0009",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "A friend asks about your last holiday.",
+      "you": "Say you went to the beach and it was great.",
+      "app_line": "Where did you go on your last holiday?",
+      "model_response": "I went to the beach with my family. It was great.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0010",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "A colleague asks what you did at the weekend.",
+      "you": "Say you watched a film and visited friends.",
+      "app_line": "What did you do last weekend?",
+      "model_response": "I watched a film and I visited some friends.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0011",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "Your friend asks if you have been to London.",
+      "you": "Say yes, you went there two years ago.",
+      "app_line": "Have you ever been to London?",
+      "model_response": "Yes, I went there two years ago.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0012",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "A friend asks how your exams went.",
+      "you": "Say they went well and you are happy.",
+      "app_line": "How were your exams?",
+      "model_response": "They went very well, thanks. I am really happy.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0013",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "Your teacher asks about your first day at school.",
+      "you": "Say you were nervous but the people were nice.",
+      "app_line": "Tell me about your first day at school.",
+      "model_response": "I was a little nervous, but the people were very nice.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0014",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "A friend asks about the film you saw last night.",
+      "you": "Say it was funny and recommend it.",
+      "app_line": "How was the film last night?",
+      "model_response": "It was really funny. You should watch it too.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0015",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "Your flatmate asks why you were late yesterday.",
+      "you": "Say you woke up late because your alarm did not work.",
+      "app_line": "Why were you late yesterday?",
+      "model_response": "I woke up late because my alarm did not work.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0016",
+      "level": "A2",
+      "topic": "Past experiences",
+      "setup": "A classmate asks if you enjoyed the party.",
+      "you": "Say yes, and mention the music was good.",
+      "app_line": "Did you enjoy the party last night?",
+      "model_response": "Yes, I loved it. The music was really good.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0017",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "You are at a train station ticket office.",
+      "you": "Ask for a ticket to the city centre.",
+      "app_line": "Good morning, how can I help you?",
+      "model_response": "Hello, I would like a ticket to the city centre, please.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0018",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "You are on a bus and you are not sure about the stop.",
+      "you": "Ask the driver to tell you when to get off.",
+      "app_line": "Next stop, Central Avenue.",
+      "model_response": "Excuse me, can you tell me when to get off for the museum?",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0019",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "You arrive at a hotel without a reservation.",
+      "you": "Ask if they have a free room for two nights.",
+      "app_line": "Welcome to the Grand Hotel. How can I help?",
+      "model_response": "Do you have a free room for two nights, please?",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0020",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "A friend asks how long the journey takes.",
+      "you": "Say it takes about two hours by car.",
+      "app_line": "How long is the journey to the coast?",
+      "model_response": "It takes about two hours by car.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0021",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "Your colleague asks how you usually travel to work.",
+      "you": "Say you usually take the underground.",
+      "app_line": "How do you usually get to work?",
+      "model_response": "I usually take the underground, it is faster.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0022",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "A tourist asks you for directions to the square.",
+      "you": "Say it is a ten-minute walk from here.",
+      "app_line": "How far is the main square from here?",
+      "model_response": "It is about a ten-minute walk from here.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0023",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "Your friend asks about your favourite place to visit.",
+      "you": "Say you love the mountains and go there every summer.",
+      "app_line": "Do you have a favourite place to visit?",
+      "model_response": "Yes, I love the mountains. I go there every summer.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0024",
+      "level": "A2",
+      "topic": "Travel & transport",
+      "setup": "The bus does not arrive and you are in a hurry.",
+      "you": "Ask a stranger when the next bus comes.",
+      "app_line": "Are you waiting for the number 12 bus too?",
+      "model_response": "Yes. Do you know when the next one comes?",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0025",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "You feel tired all the time and talk to a friend.",
+      "you": "Say you feel tired and ask for advice.",
+      "app_line": "You look really tired lately.",
+      "model_response": "I feel tired all the time. What do you think I should do?",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0026",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "A friend has a headache at work.",
+      "you": "Suggest resting and drinking water.",
+      "app_line": "I have a terrible headache.",
+      "model_response": "You should rest for a while and drink some water.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0027",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "Your friend asks how you stay healthy.",
+      "you": "Say you walk every day and sleep well.",
+      "app_line": "How do you stay healthy?",
+      "model_response": "I walk every day and I try to sleep well.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0028",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "You are at the doctor and she asks what is wrong.",
+      "you": "Say you have a sore throat since yesterday.",
+      "app_line": "What seems to be the problem?",
+      "model_response": "I have a sore throat since yesterday.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0029",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "A friend says she feels stressed before exams.",
+      "you": "Suggest doing sport to relax.",
+      "app_line": "I feel so stressed about my exams.",
+      "model_response": "Why do not you do some sport? It helps me relax.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0030",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "You want to start eating better.",
+      "you": "Tell a friend you want to eat more vegetables.",
+      "app_line": "Do you want to share a salad for lunch?",
+      "model_response": "Good idea. I want to eat more vegetables this month.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0031",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "Your flatmate cannot sleep.",
+      "you": "Advise turning off the phone before bed.",
+      "app_line": "I cannot sleep at night these days.",
+      "model_response": "You should turn off your phone before you go to bed.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-A2-0032",
+      "level": "A2",
+      "topic": "Health & advice",
+      "setup": "A friend asks how you feel today.",
+      "you": "Say you are much better than yesterday.",
+      "app_line": "How are you feeling today?",
+      "model_response": "Much better than yesterday, thank you for asking.",
+      "difficulty_vector": { "lexical": 2, "grammar": 2, "length": 2, "discourse": 2 }
+    },
+    {
+      "id": "mc-B1-0001",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "A colleague asks what you think about working from home.",
+      "you": "Give your opinion and one reason.",
+      "app_line": "So, do you think working from home is a good idea?",
+      "model_response": "I think it is a good idea because it saves time on travelling.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0002",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "A friend asks if you agree that breakfast is important.",
+      "you": "Agree and give a short reason.",
+      "app_line": "Do you agree that breakfast is the most important meal?",
+      "model_response": "Yes, I agree, because it gives you energy for the whole morning.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0003",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "Someone says cities are better than the countryside.",
+      "you": "Disagree politely and say why.",
+      "app_line": "I honestly think cities are better than the countryside.",
+      "model_response": "I am not sure I agree. In the countryside the air is cleaner and it is quieter.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0004",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "Your friend asks which language you find easiest to learn.",
+      "you": "Say which and justify your choice.",
+      "app_line": "Which language do you think is the easiest to learn?",
+      "model_response": "I think English is the easiest for me because I hear it everywhere.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0005",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "A friend asks what you think of online shopping.",
+      "you": "Say it is convenient but can be expensive.",
+      "app_line": "What do you think about online shopping?",
+      "model_response": "It is very convenient, but I think you can spend too much money easily.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0006",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "Your family argues about watching TV at dinner.",
+      "you": "Say you think dinner should be without screens.",
+      "app_line": "But dinner is so boring without the TV!",
+      "model_response": "I think we should eat without screens so we can talk to each other.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0007",
+      "level": "B1",
+      "topic": "Opinions",
+      "setup": "A classmate thinks money makes people happy.",
+      "you": "Partially agree and add your own view.",
+      "app_line": "I believe money is the key to happiness.",
+      "model_response": "Money helps, of course, but I think friends and health matter more.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0008",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "A friend asks about a place that surprised you.",
+      "you": "Describe a visit and what surprised you.",
+      "app_line": "Tell me about a place that really surprised you.",
+      "model_response": "I visited Valencia last year and I was surprised by how beautiful the city was.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0009",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "A colleague asks about a mistake you learned from.",
+      "you": "Narrate briefly what happened and the lesson.",
+      "app_line": "Have you ever made a mistake you learned a lot from?",
+      "model_response": "Once I forgot an important appointment. Now I always check my calendar twice.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0010",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "A friend asks about the best meal you ever had.",
+      "you": "Describe the meal and the occasion.",
+      "app_line": "What is the best meal you have ever had?",
+      "model_response": "The best meal I ever had was fresh seafood on holiday in Galicia.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0011",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "Your teacher asks about a challenge you overcame.",
+      "you": "Explain the challenge and how you solved it.",
+      "app_line": "Can you tell us about a challenge you overcame?",
+      "model_response": "I was afraid of speaking in public, so I joined a club to practise and now I enjoy it.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 4, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0012",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "A friend asks if you have ever lived abroad.",
+      "you": "Say whether you have and describe the experience briefly.",
+      "app_line": "Have you ever lived in another country?",
+      "model_response": "Yes, I lived in Ireland for six months and it was a fantastic experience.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0013",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "Your flatmate asks how you met your best friend.",
+      "you": "Tell the story briefly.",
+      "app_line": "How did you and your best friend meet?",
+      "model_response": "We met at university during our first class and we sat next to each other.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0014",
+      "level": "B1",
+      "topic": "Experiences",
+      "setup": "A friend asks about a concert or event you attended.",
+      "you": "Describe it and how you felt.",
+      "app_line": "Did you go to the concert last month?",
+      "model_response": "Yes, I did. The atmosphere was amazing and I sang the whole night.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0015",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "An interviewer asks where you see yourself in five years.",
+      "you": "Say you want to grow in your profession.",
+      "app_line": "Where do you see yourself in five years?",
+      "model_response": "I see myself growing in this profession and leading my own projects.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0016",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "Your friend asks what job you dream about.",
+      "you": "Describe your dream job and why.",
+      "app_line": "If you could do any job, what would it be?",
+      "model_response": "I would love to be a travel photographer because I could see the world.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0017",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "Your manager asks if you can finish a report by Friday.",
+      "you": "Accept and mention a plan to do it.",
+      "app_line": "Could you have the report ready by Friday?",
+      "model_response": "Yes, I can. I will finish the analysis tomorrow and write it on Thursday.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0018",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "A friend asks if you are going to do a course this year.",
+      "you": "Say you are planning to study English abroad.",
+      "app_line": "Do you have any plans for a course this year?",
+      "model_response": "I am planning to study English abroad next summer.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0019",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "Your colleague worries about an important presentation.",
+      "you": "Reassure them and offer to help.",
+      "app_line": "I am so nervous about tomorrow's presentation.",
+      "model_response": "Do not worry, you know the topic very well. I can help you rehearse if you want.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 4, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0020",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "A friend asks whether you would accept a job far from home.",
+      "you": "Give your opinion with a condition.",
+      "app_line": "Would you take a good job far from your city?",
+      "model_response": "I would accept it if the salary and the conditions were really good.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0021",
+      "level": "B1",
+      "topic": "Future & work",
+      "setup": "Your manager suggests an early meeting tomorrow.",
+      "you": "Agree and confirm the time.",
+      "app_line": "Shall we have the meeting at eight tomorrow?",
+      "model_response": "That works for me. I will see you at eight then.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0022",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "You and a friend cannot decide what to do tonight.",
+      "you": "Suggest going to the new cinema.",
+      "app_line": "What shall we do tonight?",
+      "model_response": "Why do not we go to the new cinema in the centre?",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0023",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "Your team wants a cheaper team-building activity.",
+      "you": "Suggest a picnic in the park.",
+      "app_line": "Do you have any ideas for the team activity?",
+      "model_response": "We could have a picnic in the park, it is cheap and fun.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0024",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "A friend wants to improve her English.",
+      "you": "Suggest watching series with subtitles.",
+      "app_line": "How can I improve my English quickly?",
+      "model_response": "I suggest you watch series in English with English subtitles.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0025",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "Your partner wants a quick dinner.",
+      "you": "Suggest making pasta together.",
+      "app_line": "I do not want to cook anything complicated tonight.",
+      "model_response": "Let us make pasta, it is quick and easy.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0026",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "A friend asks for a good way to relax.",
+      "you": "Suggest doing yoga or going for a walk.",
+      "app_line": "What do you do when you need to relax?",
+      "model_response": "You should try yoga, or simply go for a long walk in the park.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0027",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "You want to surprise a friend for her birthday.",
+      "you": "Suggest organising a small party.",
+      "app_line": "How should we celebrate Ana's birthday?",
+      "model_response": "Why do not we organise a small party at my place?",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B1-0028",
+      "level": "B1",
+      "topic": "Suggestions",
+      "setup": "Your group needs to decide where to study for exams.",
+      "you": "Suggest the library because it is quiet.",
+      "app_line": "Where shall we study this weekend?",
+      "model_response": "How about the library? It is quiet and we can concentrate.",
+      "difficulty_vector": { "lexical": 3, "grammar": 3, "length": 3, "discourse": 3 }
+    },
+    {
+      "id": "mc-B2-0001",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "A colleague argues that social media does more harm than good.",
+      "you": "Argue the opposite side with two clear points.",
+      "app_line": "I am convinced that social media has a negative effect on society.",
+      "model_response": "I would argue it depends on how you use it. It connects people and gives small businesses a voice.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0002",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "Your friend thinks exams are the best way to assess students.",
+      "you": "Challenge that idea and propose an alternative.",
+      "app_line": "Exams are the only fair way to assess what students know.",
+      "model_response": "I see your point, but exams only measure memory under pressure. Continuous projects show real understanding.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0003",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "A debate about electric cars is happening at work.",
+      "you": "Present the case for electric cars with evidence.",
+      "app_line": "Electric cars are still not a real solution.",
+      "model_response": "They are not perfect, but they reduce emissions in cities and the technology improves every year.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0004",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "A friend claims that money can buy happiness.",
+      "you": "Counter with psychological research or experience.",
+      "app_line": "In my experience, money really does buy happiness.",
+      "model_response": "Studies show that after a certain point, more money does not make people happier. Experiences and relationships do.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0005",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "Your manager wants to ban remote work.",
+      "you": "Disagree and give reasons based on productivity.",
+      "app_line": "I think we should all come back to the office full-time.",
+      "model_response": "I respectfully disagree. Many of us are more productive at home, and flexibility reduces staff turnover.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0006",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "A relative thinks tourism ruins local culture.",
+      "you": "Argue that tourism can also preserve culture.",
+      "app_line": "Tourism only destroys local traditions.",
+      "model_response": "That is true in some cases, but tourism can also fund the preservation of traditions and create jobs that keep communities alive.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0007",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "A debate about homework for young children.",
+      "you": "Argue that young children should not have homework.",
+      "app_line": "Children need homework from an early age to build discipline.",
+      "model_response": "At a young age, play is how children learn best. Homework can wait until secondary school.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0008",
+      "level": "B2",
+      "topic": "Argumentation",
+      "setup": "Someone says reading is obsolete in the digital age.",
+      "you": "Defend reading with strong arguments.",
+      "app_line": "Who reads books anymore? Everything is online now.",
+      "model_response": "Reading is far from obsolete. It develops deep thinking that short videos simply cannot provide.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0009",
+      "level": "B2",
+      "topic": "Hypotheticals",
+      "setup": "A friend wonders what you would change in your town.",
+      "you": "Explain the change you would make and why.",
+      "app_line": "If you could change one thing in our town, what would it be?",
+      "model_response": "If I could change one thing, I would build more cycle lanes, because the traffic is getting worse every year.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0010",
+      "level": "B2",
+      "topic": "Hypotheticals",
+      "setup": "A colleague asks what you would do with a year off.",
+      "you": "Describe your ideal plan for the year.",
+      "app_line": "If you had a year off with money, what would you do?",
+      "model_response": "I would travel across Asia for a few months and then volunteer teaching English somewhere.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0011",
+      "level": "B2",
+      "topic": "Hypotheticals",
+      "setup": "Your friend asks how your life would be different without the internet.",
+      "you": "Speculate about the main differences.",
+      "app_line": "Imagine life without the internet. How would yours change?",
+      "model_response": "Without the internet, I would probably meet friends more often, but studying languages would be much harder.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0012",
+      "level": "B2",
+      "topic": "Hypotheticals",
+      "setup": "A friend says she would never live in a big city.",
+      "you": "Explain under what conditions you would live in one.",
+      "app_line": "I could never live in a huge city like London.",
+      "model_response": "I would live in a big city if my job required it, but I would choose a quiet neighbourhood.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0013",
+      "level": "B2",
+      "topic": "Hypotheticals",
+      "setup": "Your teacher asks how you would handle a difficult client.",
+      "you": "Explain your strategy calmly.",
+      "app_line": "How would you deal with a client who is never satisfied?",
+      "model_response": "I would listen carefully, take notes, and then propose a clear plan to solve each issue step by step.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0014",
+      "level": "B2",
+      "topic": "Hypotheticals",
+      "setup": "A friend wonders what you would take to a desert island.",
+      "you": "Choose one object and justify it.",
+      "app_line": "If you were alone on an island, what one object would you take?",
+      "model_response": "I would take a solar-powered radio, because staying informed and connected would keep me sane.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0015",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "A meeting is deciding the launch date for a product.",
+      "you": "Propose a realistic date and justify it.",
+      "app_line": "When should we launch the new version?",
+      "model_response": "I would suggest launching in early March. That gives us time to test everything properly before summer.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0016",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "Your team is choosing a new software tool.",
+      "you": "Recommend one option and compare it briefly.",
+      "app_line": "Which tool do you recommend for our team?",
+      "model_response": "I recommend Tool A. It has better reporting and the team already knows its interface, so training would be faster.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0017",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "A colleague suggests cutting the feedback meeting.",
+      "you": "Argue for keeping it with a shorter format.",
+      "app_line": "I think we can skip the weekly feedback meeting.",
+      "model_response": "I understand, but feedback keeps us aligned. We could shorten it to fifteen minutes instead of cancelling it.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0018",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "Your manager asks your opinion on a risky investment.",
+      "you": "Express measured concern and suggest a safer route.",
+      "app_line": "I am thinking of investing heavily in that start-up. What is your view?",
+      "model_response": "I would be cautious. The idea is promising, but I would start with a smaller amount until they prove the model.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0019",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "A teammate missed a deadline and is making excuses.",
+      "you": "Address the issue directly but constructively.",
+      "app_line": "Sorry the report is late, I had a lot on my plate.",
+      "model_response": "I understand you are busy, but the deadline matters. Next time, let us know earlier so we can redistribute the work.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0020",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "The team cannot agree on who leads the new project.",
+      "you": "Propose a fair solution.",
+      "app_line": "We cannot agree on a project leader.",
+      "model_response": "Why do not we rotate the leadership each phase? That way everyone contributes and no one is overloaded.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0021",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "A client asks you to work at the weekend.",
+      "you": "Decline politely and offer an alternative.",
+      "app_line": "Could you finish this by Monday morning? It would mean working this weekend.",
+      "model_response": "I am afraid I cannot work this weekend, but I can deliver it first thing Tuesday if that helps.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-B2-0022",
+      "level": "B2",
+      "topic": "Workplace discussion",
+      "setup": "A junior asks for feedback on her presentation.",
+      "you": "Give balanced, specific feedback.",
+      "app_line": "Could you give me some honest feedback on my presentation?",
+      "model_response": "Your content was excellent. I would just slow down a little and make more eye contact with the audience.",
+      "difficulty_vector": { "lexical": 4, "grammar": 4, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0001",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "A seminar discusses whether AI will reduce human creativity.",
+      "you": "Develop a nuanced position on the question.",
+      "app_line": "Some argue that AI will make human creativity irrelevant.",
+      "model_response": "I would argue the opposite: AI automates the routine parts, which actually frees people to focus on genuinely original thinking.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0002",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "A colleague questions the value of philosophy in modern education.",
+      "you": "Defend its relevance with an abstract argument.",
+      "app_line": "Honestly, philosophy has little practical value these days.",
+      "model_response": "On the contrary, philosophy trains exactly the critical thinking that an automated world demands more than ever.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 5, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0003",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "In a debate about globalisation, you are asked to take a side.",
+      "you": "Weigh benefits and drawbacks with precision.",
+      "app_line": "Do you believe globalisation has ultimately done more harm than good?",
+      "model_response": "It is a mixed picture. Globalisation has lifted millions out of poverty, yet it has also concentrated wealth and eroded local industries.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0004",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "Someone claims happiness is a choice.",
+      "you": "Complicate that claim with nuance.",
+      "app_line": "I believe happiness is simply a matter of choice.",
+      "model_response": "That is only partially true. Attitude plays a role, but circumstances such as health and security are not simply matters of willpower.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0005",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "A friend believes cities should ban private cars completely.",
+      "you": "Respond with a sophisticated counter-argument.",
+      "app_line": "The only real solution is banning private cars from cities entirely.",
+      "model_response": "A total ban would be disruptive without solving accessibility. A more effective approach combines congestion charges with radically better public transport.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0006",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "The conversation turns to whether failure builds character.",
+      "you": "Reflect on the idea with a balanced view.",
+      "app_line": "Do you think failure really builds character?",
+      "model_response": "It can, provided there is time to reflect on it. Unprocessed failure tends to breed fear rather than resilience.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0007",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "A colleague argues that data always tells the truth.",
+      "you": "Challenge the assumption about data.",
+      "app_line": "The numbers never lie, that is why I trust data.",
+      "model_response": "Numbers do not lie, but interpretations frequently do. The choice of metrics and framing shapes what the data appears to say.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0008",
+      "level": "C1",
+      "topic": "Discussion & abstraction",
+      "setup": "You are asked whether art should always be beautiful.",
+      "you": "Articulate a considered opinion.",
+      "app_line": "Do you think art should always be beautiful?",
+      "model_response": "I would say art should be meaningful rather than beautiful. Some of the most powerful works are deliberately unsettling.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0009",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "Your manager proposes an idea you have reservations about.",
+      "you": "Express measured disagreement politely.",
+      "app_line": "So we are all agreed on moving the team overseas?",
+      "model_response": "I would tend to agree with the overall direction, though I do have some reservations about the timing and the cost of relocation.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0010",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "A friend asks whether you think their plan will succeed.",
+      "you": "Answer honestly with careful hedging.",
+      "app_line": "So you think my business plan will actually work?",
+      "model_response": "I think it stands a reasonable chance, provided the market research is as solid as you suggest, but nothing is guaranteed.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0011",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "Someone makes a strong claim about a politician.",
+      "you": "Respond without taking an absolute position.",
+      "app_line": "That politician is completely incompetent, everybody knows that.",
+      "model_response": "I would be careful about sweeping judgements. Some of their policies are questionable, but they have also delivered on a few promises.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0012",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "A client is over-optimistic about delivery times.",
+      "you": "Set expectations realistically without sounding negative.",
+      "app_line": "I expect the full project in three weeks, as we discussed.",
+      "model_response": "I am afraid three weeks is somewhat optimistic. Realistically, with testing, we are looking at closer to five.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0013",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "A friend claims their new diet is perfect.",
+      "you": "Acknowledge the benefits but add nuance.",
+      "app_line": "This diet is perfect, I have never felt better.",
+      "model_response": "It clearly suits you, and that is great, though what works for one person does not always translate to another.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0014",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "A colleague asserts that their approach is the only valid one.",
+      "you": "Suggest openness to alternatives diplomatically.",
+      "app_line": "My method is the only one that gets real results.",
+      "model_response": "Your results certainly speak for themselves, although I wonder whether other approaches might work just as well in different contexts.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0015",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "A friend asks for your honest view of their new partner.",
+      "you": "Give a diplomatic yet sincere answer.",
+      "app_line": "So what do you really think of my new partner?",
+      "model_response": "They seem warm and genuinely good for you. I was a little unsure at first, but first impressions can be misleading.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C1-0016",
+      "level": "C1",
+      "topic": "Hedging & nuance",
+      "setup": "Your team debates whether to adopt a risky new technology.",
+      "you": "Give a balanced recommendation with conditions.",
+      "app_line": "Should we adopt the new system now or wait?",
+      "model_response": "I would lean towards adopting it, but only after a controlled pilot, because the potential upside is high and the risk is manageable.",
+      "difficulty_vector": { "lexical": 5, "grammar": 5, "length": 6, "discourse": 5 }
+    },
+    {
+      "id": "mc-C2-0001",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "A sponsor is hesitating to renew their funding.",
+      "you": "Persuade them subtly by reframing the value.",
+      "app_line": "I am still not convinced the sponsorship is worth renewing.",
+      "model_response": "I understand the hesitation, yet the visibility your brand gains here reaches precisely the audience your campaign has struggled to capture elsewhere.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 7, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0002",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "A reluctant friend needs convincing to join your project.",
+      "you": "Persuade them by appealing to shared ambitions.",
+      "app_line": "I am not sure this project is for me.",
+      "model_response": "Perhaps, but it offers exactly the challenge you have been telling me you want, and you would be leading it, not following.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 7, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0003",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "A client wants a discount you cannot offer.",
+      "you": "Decline while preserving the relationship and future business.",
+      "app_line": "Unless you can match that price, we will have to look elsewhere.",
+      "model_response": "I completely respect that, and I would hate to lose you over a few points. What I can offer instead is a longer support term that will save you more in the long run.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0004",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "Your team resists a change you believe is essential.",
+      "you": "Win them over by acknowledging the cost first.",
+      "app_line": "We have heard change proposals before, and nothing ever improved.",
+      "model_response": "You are right to be sceptical, and I will not pretend this is painless. What has changed is the market, and our option is to adapt deliberately or react chaotically later.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0005",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "A talented colleague wants to resign.",
+      "you": "Persuade them to stay without applying pressure.",
+      "app_line": "I have decided to hand in my resignation.",
+      "model_response": "That is a significant decision. Before you do, tell me what would need to change here for you to reconsider, because losing you would be our loss, not yours.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0006",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "A neighbour opposes a community project you lead.",
+      "you": "Turn their objection into an asset.",
+      "app_line": "This project will only bring noise and strangers to our street.",
+      "model_response": "I can see why that worries you. Ironically, the project includes the noise barrier and the community space that would give neighbours more say over who uses the street.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0007",
+      "level": "C2",
+      "topic": "Subtle persuasion",
+      "setup": "A committee is split on your proposal.",
+      "you": "Build consensus by finding common ground.",
+      "app_line": "Half of us support your proposal, the other half strongly opposes it.",
+      "model_response": "That divide tells me the proposal is touching something real. Perhaps we can agree on a trial period with clear review criteria, which gives both sides evidence rather than assumptions.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0008",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "An international partner misunderstands your position.",
+      "you": "Clarify your view without causing offence.",
+      "app_line": "So your company is simply refusing to cooperate with us.",
+      "model_response": "I apologise if that is how it came across. Our position is the opposite: we are eager to cooperate, though we must first align on the regulatory constraints.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0009",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "A colleague takes credit for your work in a meeting.",
+      "you": "Reclaim credit diplomatically in front of the group.",
+      "app_line": "And I led the analysis that produced these results.",
+      "model_response": "I am glad the analysis is valued. To be precise about the record, the methodology was developed jointly, and I handled the data modelling phase.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0010",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "A partner demands an unreasonable concession.",
+      "you": "Refuse while keeping negotiations constructive.",
+      "app_line": "We expect full ownership of the intellectual property as a condition.",
+      "model_response": "I appreciate the clarity of your position. That particular term is not something we can concede, though we remain open to a licensing arrangement that protects both parties.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0011",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "A dignitary asks an intrusive personal question.",
+      "you": "Deflect with grace while keeping the conversation warm.",
+      "app_line": "Tell me, how much do you earn in your position?",
+      "model_response": "I tend to keep such figures private, but I can tell you the role is both demanding and deeply rewarding, which is what I value most.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0012",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "Your counterpart makes an accusation based on a rumour.",
+      "you": "Address it with composure and evidence.",
+      "app_line": "We have heard you are planning to poach our clients.",
+      "model_response": "That rumour is simply unfounded. Our policy is strictly non-solicitation, and I would welcome the chance to address any specific concerns directly.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0013",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "A delicate negotiation has reached an impasse.",
+      "you": "Suggest a face-saving path forward.",
+      "app_line": "If you cannot improve your offer, there is nothing left to discuss.",
+      "model_response": "I would rather not leave value on the table for either side. What if we pause the commercial terms and revisit them once the technical scope is settled?",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    },
+    {
+      "id": "mc-C2-0014",
+      "level": "C2",
+      "topic": "Diplomatic register",
+      "setup": "A junior employee criticises your decision publicly.",
+      "you": "Respond in a way that preserves their dignity and your authority.",
+      "app_line": "With respect, your decision seems unfair to the whole team.",
+      "model_response": "I welcome the candour, and I would ask you to bring such concerns to me directly, where they will always receive a full hearing.",
+      "difficulty_vector": { "lexical": 6, "grammar": 6, "length": 8, "discourse": 6 }
+    }
+  ]
+}

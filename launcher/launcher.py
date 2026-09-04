@@ -631,12 +631,19 @@ class LauncherApp:
             tab = ttk.Frame(nb, style="Card.TFrame")
             text = tk.Text(
                 tab,
-                wrap="word",
+                wrap="char",
                 height=14,
                 bg=COLORS["surface"],
                 fg=COLORS["text"],
                 relief="flat",
-                font=("Consolas", 9),
+                # Terminal compacta: fuente mono pequeña e interlineado mínimo
+                # para que backend.log/frontend.log se lean densos (V3.7.0).
+                font=("Consolas", 8),
+                spacing1=0,
+                spacing2=0,
+                spacing3=0,
+                padx=2,
+                pady=1,
                 state="disabled",
             )
             scroll = ttk.Scrollbar(tab, orient="vertical", command=text.yview)

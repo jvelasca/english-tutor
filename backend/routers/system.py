@@ -14,6 +14,7 @@ import config
 import security
 from dependencies import require_admin
 from repositories import listening as listening_repo
+from repositories import speaking_routes as speaking_repo
 from services import backup
 
 router = APIRouter()
@@ -25,18 +26,31 @@ _BACKUP_MIME = "application/zip"
 async def server_status() -> dict:
     """Estado operativo del servidor, sin candado admin (como /api/health).
 
-    Devuelve si el backend está generando práctica extra de listening (trabajos
-    `running`) y cuántas peticiones se han rechazado por rate limit en el último
-    minuto. Lo usa el launcher para mostrar cuándo el servidor «está trabajando»
-    en vez de solo «activo/detenido».
+    Devuelve si el backend está generando práctica extra (listening o speaking;
+    trabajos `running`) y cuántas peticiones se han rechazado por rate limit en
+    el último minuto. Lo usa el launcher para mostrar cuándo el servidor «está
+    trabajando» en vez de solo «activo/detenido».
     """
-    jobs = await run_in_threadpool(listening_repo.list_running_generation_jobs)
+    listening_jobs = await run_in_threadpool(
+        listening_repo.list_running_generation_jobs
+    )
+    speaking_jobs = await run_in_threadpool(
+        speaking_repo.list_running_generation_jobs
+    )
+    jobs = [
+        {**j, "kind": "listening"}
+        for j in listening_jobs
+    ] + [
+        {**j, "kind": "speaking"}
+        for j in speaking_jobs
+    ]
     return {
         "generation": {
             "running": len(jobs),
             "jobs": [
                 {
                     "id": j["id"],
+                    "kind": j["kind"],
                     "level": j["level"],
                     "requested": int(j["requested"]),
                     "created_at": j["created_at"],

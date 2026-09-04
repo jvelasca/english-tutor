@@ -26,6 +26,21 @@ del banco no basta; cada nivel debe entrenar subskills concretos (ver
 | `CEFR DEPTH SCORE` | Densidad + tamaño + completitud por nivel | media **84,2** / 100 |
 | `LISTENING CURRICULUM` | Objetivos de escucha alineados al foco del nivel | **38/38 (100%)** |
 
+## Speaking por rutas (V3.8)
+
+La **práctica oral por rutas CEFR** (APRENDER → Speaking) no se mide con las
+celdas de la matriz de esta auditoría (la columna *Speaking* de abajo cuenta el
+bucle *speak* de las unidades del curso). Desde V3.8 usa su **propio banco
+curado de micro-conversaciones guiadas**
+(`backend/curriculum/speaking_corpus.json`, v2.0.0): cada tarjeta es un
+intercambio `{setup, you, app_line, model_response}` y el progreso se mide con
+la puerta de ruta de `backend/services/speaking_routes.py` (cobertura del banco
+oficial, precisión, temas y checkpoint). Banco por nivel: A1 36 · A2 32 · B1 28 ·
+B2 22 · C1 16 · C2 14 (148 tarjetas). La ruta es un hito de práctica (`functional`
+como techo); demostrar el nivel viene del Speaking Assessment + escenarios/
+misiones + retención, nunca de la ruta. Validación de la forma del banco en
+`backend/tests/test_speaking_routes.py`.
+
 ## Mapa de cobertura (nivel × sección)
 
 Leyenda: **OK** = todas las unidades del nivel tienen contenido en la sección ·

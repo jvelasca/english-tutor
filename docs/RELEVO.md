@@ -11,6 +11,19 @@
 > `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
+>
+> **Nota (2026-09-04):** posición vigente **v3.8.0** — **Speaking por
+> micro-conversaciones guiadas con operativa tipo Listening**. El roadmap y los
+> cambios viven en `PLAN.md`, `CHANGELOG.md` y `README.md`. Para retomar Speaking:
+> APRENDER → Speaking es una página única con scroll (escenario de práctica con
+> tarjetas de intercambio `{setup, you, app_line, model_response}` arriba y mapa
+> de rutas A1–C2 con anillos bajo él); el banco curado es
+> `backend/curriculum/speaking_corpus.json` (v2.0.0, 148 tarjetas) y cada intento
+> se evalúa como respuesta abierta (`domain/speaking_routes.py::submit_attempt`
+> → `speaking_llm.extract_speaking_evidence` + `speaking.scores_from_evidence`),
+> con audio TTS cacheado por tipo (`?kind=opening|model`). La ruta sigue siendo un
+> hito de práctica (`functional`, nunca certifica); demostrar el nivel exige el
+> Speaking Assessment + escenarios/misiones + retención.
 
 ## 0. START HERE — para el gerente que retoma ahora
 

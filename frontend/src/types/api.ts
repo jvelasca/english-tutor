@@ -522,6 +522,123 @@ export interface ListeningRouteExtras {
   question_ids: string[];
 }
 
+// --- Speaking por rutas (V3.8) ----------------------------------------------
+// Mismas mecánicas que listening (mapa CEFR con anillos, repaso de falladas/
+// aprendidas, práctica extra generada) pero con tarjetas de micro-conversación
+// guiada: situación + rol + línea del interlocutor (con voz modelo); el alumno
+// responde hablando y tras la evaluación se revela la respuesta modelo. El
+// estado `functional` es el techo de la ruta (práctica); demostrar el nivel
+// exige el Speaking Assessment y evidencia formal, no la ruta.
+
+export type SpeakingRouteState = "not_started" | "developing" | "functional";
+
+export interface SpeakingRouteGate {
+  passed: boolean;
+  total: number;
+  mastered: number;
+  coverage_pct: number;
+  coverage_required_pct: number;
+  accuracy: number | null;
+  accuracy_required: number;
+  topics: number;
+  topics_required: number;
+  checkpoint: number;
+  checkpoint_required: number;
+  blockers: string[];
+}
+
+export interface SpeakingLevelProgress {
+  level: string;
+  total: number;
+  mastered: number;
+  completed: boolean;
+  coverage_pct: number | null;
+  accuracy: number | null;
+  gate?: SpeakingRouteGate | null;
+  state?: SpeakingRouteState;
+  base_total?: number;
+  base_mastered?: number;
+  extras?: number;
+  extras_mastered?: number;
+}
+
+export interface SpeakingStats {
+  attempts: number;
+  passed: number;
+  accuracy: number | null;
+  level: string;
+  completed: boolean;
+  levels: SpeakingLevelProgress[];
+}
+
+export type SpeakingItemState = "unseen" | "failed" | "mastered";
+
+export interface SpeakingItem {
+  phrase_id: string;
+  level: string;
+  app_line: string;
+  topic: string;
+  difficulty: number;
+  attempts: number;
+  state: SpeakingItemState;
+  source?: "base" | "generated";
+}
+
+export interface SpeakingLevelItems {
+  level: string;
+  total: number;
+  mastered: number;
+  failed: number;
+  unseen: number;
+  completed: boolean;
+  items: SpeakingItem[];
+  gate?: SpeakingRouteGate | null;
+}
+
+/** Tarjeta de micro-conversación: contexto + rol + línea del interlocutor. */
+export interface SpeakingPhrase {
+  id: string;
+  level: string;
+  setup: string;
+  you: string;
+  app_line: string;
+  topic: string;
+  difficulty: number;
+  difficulty_vector?: Record<string, number>;
+  audio_ready: boolean;
+}
+
+export interface SpeakingAttempt {
+  phrase_id: string;
+  level: string;
+  app_line: string;
+  heard: string;
+  model_response: string;
+  overall: number;
+  passed: boolean;
+  criteria: Record<string, number | null>;
+  observed: Record<string, boolean>;
+  topic: string;
+  difficulty: number;
+}
+
+/** Trabajo de generación de práctica extra de speaking en segundo plano (V3.7). */
+export interface SpeakingExtrasJob {
+  job_id: string;
+  status: "running" | "done" | "error";
+  level: string;
+  requested: number;
+  added: string[];
+  error: string;
+}
+
+/** Frases extra activadas en una ruta de speaking (V3.7). */
+export interface SpeakingRouteExtras {
+  level: string;
+  total: number;
+  phrase_ids: string[];
+}
+
 export interface ListeningSubskillProgress {
   skill: string;
   attempts: number;
