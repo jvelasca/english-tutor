@@ -33,7 +33,11 @@ import type {
   User,
 } from "../types/api";
 
-const DEFAULT_MODEL = "qwen3.5:9b";
+// Modelo por defecto mientras no llega la lista real del backend (Ajustes → IA).
+// Debe ser un modelo utilizable en este equipo y no aparecer en la lista de no
+// utilizables del backend; si no está instalado, se cae al primer modelo
+// disponible de Ollama.
+const DEFAULT_MODEL = "llama3.1:8b";
 
 const TUTOR_MODES: TutorMode[] = [
   "conversation",
@@ -68,6 +72,9 @@ export function useChat() {
   } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<string>(DEFAULT_MODEL);
+  // Lista de modelos ofertados por el backend (ref para lecturas no reactivas,
+  // p. ej. al restaurar preferencias guardadas).
+  const modelsRef = useRef<string[]>([]);
   const composeStartedAt = useRef<number | null>(null);
   const lastAssistantAt = useRef<number | null>(null);
   const layoutPersistTimer = useRef<number | null>(null);
@@ -75,6 +82,10 @@ export function useChat() {
   useEffect(() => {
     modelRef.current = model;
   }, [model]);
+
+  useEffect(() => {
+    modelsRef.current = models;
+  }, [models]);
 
   // Marca el instante en que el alumno empieza a componer un mensaje (input de
   // vacío a no-vacío) para medir la duración de su turno.
@@ -134,6 +145,17 @@ export function useChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // El backend excluye de la lista los modelos marcados como no utilizables en
+  // config.UNUSABLE_MODELS (instalados pero demasiado lentos). Si el modelo
+  // activo o el favorito guardado apuntan a uno excluido (p. ej. una
+  // preferencia persistida antes de que dejara de ofertarse), se cae al primer
+  // modelo disponible para que el chat nunca use un modelo lento.
+  useEffect(() => {
+    if (models.length === 0) return;
+    if (!models.includes(model)) setModel(models[0]);
+    if (favoriteModel && !models.includes(favoriteModel)) setFavoriteModel(null);
+  }, [models, model, favoriteModel]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -169,11 +191,21 @@ export function useChat() {
         const res = await getSettings(currentUserId);
         if (cancelled) return;
         const s = res.settings ?? {};
-        if (typeof s.favorite_model === "string" && s.favorite_model) {
-          setFavoriteModel(s.favorite_model);
-          setModel(s.favorite_model);
-        } else if (typeof s.model === "string" && s.model) {
-          setModel(s.model);
+        const fav =
+          typeof s.favorite_model === "string" && s.favorite_model
+            ? s.favorite_model
+            : "";
+        const saved = typeof s.model === "string" ? s.model : "";
+        const available = modelsRef.current;
+        // Solo se restaura un modelo si sigue ofertándose por el backend. Una
+        // preferencia que apunte a un modelo excluido (config.UNUSABLE_MODELS:
+        // instalado pero no utilizable) se ignora; el efecto de saneo cae al
+        // primer modelo disponible.
+        if (fav && (available.length === 0 || available.includes(fav))) {
+          setFavoriteModel(fav);
+          setModel(fav);
+        } else if (saved && (available.length === 0 || available.includes(saved))) {
+          setModel(saved);
         }
         if (typeof s.mode === "string" && (TUTOR_MODES as string[]).includes(s.mode)) {
           setMode(s.mode as TutorMode);

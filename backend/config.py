@@ -3,9 +3,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
-DEFAULT_MODEL = "qwen3.5:9b"
+# Modelo por defecto del chat y de las tareas de IA. Debe ser *utilizable* en
+# este equipo (respuesta interactiva en pocos segundos) y no pertenecer a
+# UNUSABLE_MODELS. Si no está instalado, el frontend cae al primer modelo
+# disponible de Ollama.
+DEFAULT_MODEL = "llama3.1:8b"
 
-VERSION = "3.5.5"
+# Modelos instalados en Ollama pero NO utilizables en este equipo (p. ej.
+# demasiado lentos en CPU: tardan decenas de segundos por turno y se
+# descargan/recargan entre llamadas). Se excluyen del selector de modelos de la
+# app (GET /api/models → Ajustes → IA), no se usan como modelo por defecto y la
+# traducción a demanda no los elige. Ampliar esta lista si otro modelo deja de
+# ser utilizable.
+UNUSABLE_MODELS = frozenset({"qwen3.5:9b"})
+
+VERSION = "3.5.6"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]

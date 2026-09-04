@@ -7,9 +7,11 @@ dominio.
 
 Elección de modelo: la traducción es interactiva y debe responder en pocos
 segundos, así que se prefiere un modelo ligero e instalado (llama3.1:8b o
-qwen2.5-coder:1.5b) al modelo por defecto del chat (qwen3.5:9b), que en CPU
-tarda decenas de segundos por frase y se descarga/recarga entre llamadas. Si no
-hay ningún modelo rápido instalado, se cae al modelo por defecto.
+qwen2.5-coder:1.5b) al modelo por defecto del chat, que en CPU puede tardar
+decenas de segundos por frase. Nunca se eligen modelos marcados como no
+utilizables en `config.UNUSABLE_MODELS`. Si no hay ningún modelo rápido
+instalado, se usa el primero utilizable o, en último caso, el modelo por
+defecto.
 
 Caché: en memoria, por frase. Los textos de práctica se repiten mucho (repaso,
 rutas, dictados) y la primera traducción de una frase es la única que paga la
@@ -20,7 +22,7 @@ from __future__ import annotations
 
 import time
 
-from config import DEFAULT_MODEL
+from config import DEFAULT_MODEL, UNUSABLE_MODELS
 from schemas.chat import ChatMessage
 from services import llm
 from services.llm import chat_once
@@ -28,7 +30,8 @@ from services.llm import chat_once
 MAX_SOURCE_CHARS = 800
 
 # Modelos candidatos para la traducción interactiva, en orden de preferencia.
-# Deben estar instalados en Ollama; si ninguno lo está se usa DEFAULT_MODEL.
+# Deben estar instalados en Ollama; si ninguno lo está se elige el primero
+# utilizable instalado.
 PREFERRED_TRANSLATION_MODELS = (
     "llama3.1:8b",
     "qwen2.5-coder:1.5b",
@@ -69,12 +72,21 @@ async def installed_models() -> set[str]:
 
 
 async def pick_model(explicit: str | None) -> str:
-    """Elige el modelo: el explícito si se aporta, si no el más rápido instalado."""
+    """Elige el modelo: el explícito si se aporta, si no el más rápido instalado.
+
+    Se descartan los modelos no utilizables (config.UNUSABLE_MODELS). Si no hay
+    ningún preferido instalado, se usa el primer modelo utilizable que haya o,
+    en último caso, el modelo por defecto.
+    """
     if explicit:
         return explicit
+    installed = await installed_models()
     for candidate in PREFERRED_TRANSLATION_MODELS:
-        if candidate in await installed_models():
+        if candidate in installed:
             return candidate
+    usable = sorted(installed - UNUSABLE_MODELS)
+    if usable:
+        return usable[0]
     return DEFAULT_MODEL
 
 

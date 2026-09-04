@@ -1,14 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from config import MAX_CHAT_MESSAGES, MAX_CONTENT_CHARS, MAX_TTS_CHARS
+from config import DEFAULT_MODEL, MAX_CHAT_MESSAGES, MAX_CONTENT_CHARS, MAX_TTS_CHARS
 from schemas.chat import ChatRequest
 from schemas.voz import TTSRequest
 
 
 def test_chat_request_uses_default_model():
     req = ChatRequest(messages=[{"role": "user", "content": "Hi"}])
-    assert req.model == "qwen3.5:9b"
+    assert req.model == DEFAULT_MODEL
     assert req.temperature == 0.7
 
 

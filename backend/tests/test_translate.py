@@ -9,6 +9,7 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
+import config
 import services.translate as translate_service
 from main import app
 from schemas.chat import ChatResponse
@@ -64,20 +65,36 @@ def test_pick_model_prefers_fastest_installed(monkeypatch):
     assert asyncio.run(translate_service.pick_model(None)) == "llama3.1:8b"
 
 
-def test_pick_model_falls_back_to_default(monkeypatch):
-    # Sin modelos rápidos instalados → modelo por defecto del chat.
+def test_pick_model_never_picks_unusable_when_only_that_installed(monkeypatch):
+    # qwen3.5:9b está marcado como no utilizable (config.UNUSABLE_MODELS):
+    # aunque sea lo único instalado, la traducción no lo elige → default.
     monkeypatch.setattr(
         translate_service.llm, "list_models", _fake_list_models("qwen3.5:9b"),
     )
-    assert asyncio.run(translate_service.pick_model(None)) == "qwen3.5:9b"
+    assert asyncio.run(translate_service.pick_model(None)) == config.DEFAULT_MODEL
 
 
-def test_pick_model_ollama_down_keeps_last(monkeypatch):
+def test_pick_model_picks_first_usable_installed(monkeypatch):
+    # Sin modelos preferidos, usa el primer modelo instalado y utilizable.
+    monkeypatch.setattr(
+        translate_service.llm, "list_models", _fake_list_models("qwen3-coder:30b"),
+    )
+    assert asyncio.run(translate_service.pick_model(None)) == "qwen3-coder:30b"
+
+
+def test_pick_model_no_models_returns_default(monkeypatch):
+    monkeypatch.setattr(
+        translate_service.llm, "list_models", _fake_list_models(),
+    )
+    assert asyncio.run(translate_service.pick_model(None)) == config.DEFAULT_MODEL
+
+
+def test_pick_model_ollama_down_returns_default(monkeypatch):
     async def broken():
         raise RuntimeError("ollama caído")
 
     monkeypatch.setattr(translate_service.llm, "list_models", broken)
-    assert asyncio.run(translate_service.pick_model(None)) == "qwen3.5:9b"
+    assert asyncio.run(translate_service.pick_model(None)) == config.DEFAULT_MODEL
 
 
 # --- Servicio -----------------------------------------------------------------

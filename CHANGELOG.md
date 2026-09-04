@@ -4,6 +4,42 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.5.6] — 2026-09-04
+
+**Modelos no utilizables fuera de la app.** `qwen3.5:9b` quedó diagnosticado como
+inutilizable en este equipo (en CPU tarda 10–64 s por turno y se descarga/recarga
+entre llamadas). Ya no aparece en las opciones de configuración (Ajustes → IA) ni
+se usa como modelo por defecto en ningún flujo; la app trabaja con `llama3.1:8b`
+(instalado y rápido). La lista de excluidos es configurable en
+`config.UNUSABLE_MODELS`.
+
+### Cambiado (backend)
+- `config.py`: nuevo `UNUSABLE_MODELS = {"qwen3.5:9b"}` (instalados en Ollama
+  pero no utilizables) y `DEFAULT_MODEL = "llama3.1:8b"` (el defecto ya no puede
+  estar bloqueado).
+- `GET /api/models` (`routers/models.py`): excluye los modelos de
+  `UNUSABLE_MODELS`. El selector de Ajustes → IA deja de ofrecerlos.
+- `services/translate.py`: la traducción a demanda nunca elige un modelo no
+  utilizable; si no hay ninguno preferido, usa el primer modelo utilizable
+  instalado y solo en último caso el defecto.
+- Tests: `tests/test_models.py` (el endpoint filtra y el default no está
+  bloqueado) y `tests/test_translate.py` ampliado (no elige no utilizables,
+  primero utilizable, sin modelos → default).
+
+### Cambiado (frontend)
+- `hooks/useChat.ts`: modelo por defecto `llama3.1:8b`; al restaurar
+  preferencias guardadas solo aplica un modelo si sigue ofertándose; nuevo efecto
+  de saneo: si el modelo activo o el favorito persistido quedan excluidos por el
+  backend, cae al primer modelo disponible y olvida el favorito inalcanzable
+  (así una preferencia vieja con `qwen3.5:9b` no vuelve a ralentizar el chat).
+- `features/speaking/SpeakingRolePlay.tsx`: el role-play conversacional usa el
+  modelo utilizable por defecto.
+
+### Verificación
+- `pytest` (subset 30 tests, incluidos `test_models.py` y `test_translate.py`)
+  en verde.
+- `npx tsc --noEmit` y `npx vitest run` en `frontend/` en verde.
+
 ## [3.5.5] — 2026-09-04
 
 **Fix: la traducción de apoyo no respondía y ampliación al resto de pantallas.**

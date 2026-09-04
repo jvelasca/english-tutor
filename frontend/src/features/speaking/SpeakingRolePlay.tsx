@@ -10,7 +10,9 @@ import { deriveTitle } from "../../utils/title";
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 
-const DEFAULT_MODEL = "qwen3.5:9b";
+// Modelo del role-play conversacional. Usa el modelo utilizable por defecto de
+// la app (ver config.py / backend): nunca un modelo marcado como no utilizable.
+const DEFAULT_MODEL = "llama3.1:8b";
 const ROLEPLAY_MODE: TutorMode = "conversation";
 
 interface SpeakingRolePlayProps {
