@@ -3,7 +3,8 @@
 > Especificación normativa del modelo de nivelación de English Tutor.
 > Estado: **borrador normativo aprobado por el gerente (2026-09-03)**; sección 9
 > ampliada en **V3.13 (2026-09-05)** con la calibración de evidencia pedagógica
-> (reglas inmutables R1–R7, §6.4 evidence depth, modalidades por destreza).
+> (reglas inmutables R1–R7, §6.4 evidence depth, modalidades por destreza) e
+> **implementada en v3.13.0** (incrementos P0–P2, ver §9).
 > No impone
 > cambios de código por sí misma; define QUÉ debe demostrar un alumno para que se
 > le considere en un nivel y CÓMO debe mostrarse eso en la UI. Los cambios de
@@ -489,55 +490,67 @@ constitución si cambia umbrales o estructura.
     uso en componentes; la fuente real de los modos de chat es `TUTOR_MODES` de
     `hooks/useChat.ts`).
 
-### V3.13 — Calibración de evidencia pedagógica (cola abierta)
+### V3.13 — Calibración de evidencia pedagógica (implementada en v3.13.0)
 
 Incrementos de la iteración V3.13, que priorizan la pregunta *"¿la evidencia que
 genera esta actividad demuestra que el alumno sabe hacer algo?"* frente a
-"¿está implementada la actividad?". Estado al final de la iteración en las
-marcas `implementado en v3.13.0`.
+"¿está implementada la actividad?". Todos los incrementos P0/P1/P2 quedaron
+**implementados en v3.13.0** con backend `3.12.0 → 3.13.0` (marcas
+"implementado en v3.13.0" por ítem).
 
 **P0 — Motor de evidencia y honestidad de claims**
 
-11. **Evidence depth por destreza/nivel** (R7, §6.4) — `services/evidence_depth.py`
+11. **Evidence depth por destreza/nivel** (R7, §6.4) — implementado en v3.13.0:
+    `services/evidence_depth.py`
     nuevo y puro: por destreza/nivel devuelve `{samples, by_kind, depth
     (LOW/MEDIUM/HIGH), meets_matrix}` contra `cefr_matrix.json`. La evidencia de
     `academy_evidence` se atribuye a un nivel (columna `level` en filas nuevas,
     retrocompatible) y se expone junto a `competence_states`.
-12. **Claims de ruta honestos para bancos cortos** (R7) — las rutas quiz ya techan
+12. **Claims de ruta honestos para bancos cortos** (R7) — implementado en v3.13.0:
+    las rutas quiz ya techan
     en `functional`; añaden a `stats` `bank_size` y `evidence_depth` para que la
     UI muestre "practice coverage · evidence depth LOW" en bancos cortos (B2=8,
     C2=4 de grammar) y nunca invite a leer competencia fuerte.
-13. **Suelo de "demostrado" por destreza** (R1/R2/R5/R6) — `demonstrated` exige
+13. **Suelo de "demostrado" por destreza** (R1/R2/R5/R6) — implementado en
+    v3.13.0: `demonstrated` exige
     gate funcional + `minimum_evidence` de la matriz + retención retardada
     estable ≥ 7 días; las destrezas productivas (grammar/speaking/writing)
     exigen además muestras de producción (REC solo nunca demuestra).
-14. **`current_level` como sugerencia de material** — deja de ser "primer nivel
+14. **`current_level` como sugerencia de material** — implementado en v3.13.0:
+    deja de ser "primer nivel
     cuyo banco no está 100% dominado"; con todo dominado elige por repaso
     pendiente (`review_due`), y la UI nunca lo lee como banda del alumno.
-15. **Suite de invariantes pedagógicas** — `test_pedagogical_invariants.py`
+15. **Suite de invariantes pedagógicas** — implementado en v3.13.0:
+    `test_pedagogical_invariants.py`
     (4 preguntas C2 no prueban C2, vocabulario solo no prueba CEFR, MC de
     reconocimiento solo no demuestra, la práctica no certifica, el dominio exige
     evidencia mínima).
 
 **P1 — Producción de Grammar y evidencia cross-skill**
 
-16. **Grammar en 3 niveles** (R5) — ítems `controlled_production` (hueco +
+16. **Grammar en 3 niveles** (R5) — implementado en v3.13.0: ítems
+    `controlled_production` (hueco +
     respuestas aceptadas, corrección determinista) en el currículo y en el motor
     compartido de rutas; la producción libre se conecta a Speaking/Writing vía
     cross-skill.
-17. **Cross-skill evidence** (R4) — registro de estructuras por nivel que cruza
+17. **Cross-skill evidence** (R4) — implementado en v3.13.0 (prototipo B1):
+    registro de estructuras por nivel que cruza
     grammar/speaking/listening/writing por objetivo; matriz por estructura y
     panel (prototipo B1).
-18. **Golden pedagogical dataset** — `backend/tests/golden/pedagogy/` con casos
+18. **Golden pedagogical dataset** — implementado en v3.13.0:
+    `backend/tests/golden/pedagogy/` con casos
     A1–C2 de evidence depth y de "demostrado".
 
 **P2 — UI y consistencia**
 
-19. **LearnRoutePage compartido** — shell único de las 6 rutas de APRENDER
-    (header, ejercicio, mapa CEFR, panel de nivel, modos, gate, assessment
-    formal) parametrizado por skill para eliminar la duplicación de las páginas
-    y paneles espejo.
-20. **Parity i18n automática** — test que garantiza claves `en`/`es` no vacías,
+19. **LearnRoutePage compartido** — implementado en v3.13.0: shell único
+    (`frontend/src/features/routes/QuizRoutePage.tsx` + `routeSession.ts`) que
+    parametriza por skill la página de rutas (ejercicio, mapa CEFR, panel de
+    nivel, modos, gate y assessment formal). Migradas Grammar, Vocabulary,
+    Pronunciation, Conversation y Speaking; Listening no migra por diseño: es
+    la única práctica del hub servida dentro del runner `PracticeView` del
+    workspace, no una página de ruta standalone.
+20. **Parity i18n automática** — implementado en v3.13.0: test que garantiza claves `en`/`es` no vacías,
     sin duplicados y sin claves usadas no resueltas.
 
 ## Glosario mínimo

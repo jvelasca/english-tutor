@@ -4,6 +4,22 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.13.0] — 2026-09-05
+
+**Calibración de evidencia pedagógica: del "¿está implementada la actividad?" al "¿la evidencia demuestra competencia?".**
+
+La iteración V3.13 no añade actividades nuevas: **recalibra el modelo pedagógico** que cerró la auditoría de V3.8 y lo convierte en un único documento normativo con reglas inmutables R1–R7 (`docs/CONSTITUCION-PEDAGOGICA.md`: Practice≠Mastery, Mastery≠Certificación, Vocabulary≠nivel, One skill≠Overall, Recognition≠Production, Éxito≠Retención, Muestra pequeña≠Competencia). Backend `3.12.0 → 3.13.0`.
+
+- **Evidence depth por destreza/nivel** (nuevo `backend/services/evidence_depth.py`): cada competencia clasifica su evidencia formal en bandas **LOW/MEDIUM/HIGH** contra los mínimos de `backend/curriculum/cefr_matrix.json` (`minimum_evidence`, transfer/novel, retardada) y lo expone en `/api/profile` junto a `competence_states`. La evidencia de `academy_evidence` se atribuye a nivel desde ahora (retrocompatible).
+- **Claims honestos para bancos cortos**: `stats` por nivel incluyen `bank_size` y `evidence_depth`; los bancos ≤ 12 checks (Grammar B2 y C2) muestran la etiqueta **"practice coverage · evidence depth LOW"** en lugar de invitar a leer competencia, y el techo `functional` de la ruta se mantiene.
+- **Suelo de "demostrado" por destreza**: `demonstrated` exige ahora gate funcional **y** `minimum_evidence` de la matriz **y** retención retardada estable ≥ 7 días; en destrezas productivas (grammar/speaking/writing) exige además **muestras de producción** (solo MC de reconocimiento jamás demuestra). Vocabulary es condición de apoyo y queda techado en `functional`.
+- **`current_level` como sugerencia de material**: deja de ser "primer nivel no dominado"; con todo dominado elige por repaso pendiente (`review_due`), y la UI no lo lee como banda CEFR del alumno.
+- **Grammar en 3 niveles (R5)**: nuevos ítems **`controlled_production`** en el currículo (A2–C1, ~6-10 por nivel) — prompt con hueco + respuestas aceptadas, corrección determinista por normalización, sin LLM — sobre el motor compartido de rutas quiz. La UI los sirve como "type the answer" con feedback y revelación de lo esperado.
+- **Cross-skill evidence (prototipo B1)**: registro de estructuras que cruza recognition/production/listening/speaking/transfer por objetivo; nueva matriz por estructura con endpoint `/api/cross-skill` y panel en Grammar B1 (`CrossSkillMatrix`).
+- **Golden pedagogical dataset**: `backend/tests/golden/pedagogy/evidence_depth_cases.json` + `test_golden_pedagogy.py` congelan la calibración auditada (LOW/MEDIUM/HIGH, minimum evidence, producción) para que los invariantes pedagógicos no regresionen.
+- **LearnRoutePage compartido (V3.13 P2.1)**: `frontend/src/features/routes/QuizRoutePage.tsx` unifica las páginas de ruta de Grammar, Vocabulary, Pronunciation, Conversation y Speaking (mapa A1–C2, panel de nivel, máquina de sesión, gate, assessment formal) en un shell config-driven: cada skill aporta config (API, i18n, panel, escena personalizada y bloques contextuales). Se consolidan las máquinas de sesión espejo (`routeSession.ts`) y se eliminan ~1.600 líneas duplicadas. Listening no migra por diseño: es la única práctica del hub servida dentro del runner `PracticeView` del workspace.
+- **Parity i18n automática**: `frontend/src/utils/i18n.parity.test.ts` garantiza claves `en`/`es` no vacías, sin duplicados y sin claves usadas sin resolver.
+
 ## [3.12.0] — 2026-09-05
 
 **Grammar por rutas CEFR: página única de checks MC del currículo.**

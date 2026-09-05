@@ -11,6 +11,22 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.13.0` — **Calibración de evidencia pedagógica: del "¿está implementada la actividad?" al "¿la evidencia demuestra competencia?"**
+  (iteración que recalibra el modelo pedagógico en un único documento normativo
+  (`docs/CONSTITUCION-PEDAGOGICA.md`) con reglas inmutables R1–R7 y §6.4
+  evidence depth. **P0**: `services/evidence_depth.py` clasifica la evidencia en
+  LOW/MEDIUM/HIGH contra `cefr_matrix.json` y se expone en `/api/profile`;
+  claims honestos —bancos cortos ≤12 checks (Grammar B2/C2) muestran "practice
+  coverage · evidence depth LOW" con techo `functional`—; suelo de "demostrado"
+  con mínimo de muestras + retención ≥7d + producción en destrezas productivas
+  (vocabulary techado en `functional`); `current_level` como sugerencia de
+  material con fallback por `review_due`; suite de invariantes pedagógicas.
+  **P1**: Grammar en 3 niveles con ítems `controlled_production` (typed answers
+  deterministas, A2–C1); cross-skill evidence B1 (matriz por estructura +
+  endpoint + panel); golden pedagogical dataset. **P2**: LearnRoutePage
+  compartido (QuizRoutePage + routeSession: Grammar/Vocabulary/Pronunciation/
+  Conversation/Speaking migradas, ~1.600 líneas menos) y parity i18n
+  automática). Base: `3.12.0`
 - ✅ Versión estable `3.12.0` — **Grammar por rutas CEFR: página única de checks MC del currículo**
   (APRENDER → Grammar deja el chat del tutor (que sigue en `/chat`) y pasa a una
   página única como el resto: arriba el escenario de práctica —un check MC de

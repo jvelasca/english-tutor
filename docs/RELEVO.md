@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-08-31 17:15 (UTC+2).
+> Actualizado por última vez: 2026-09-05 19:55 (UTC+2).
 >
 > **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
 > La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
@@ -11,6 +11,31 @@
 > `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
+>
+> **Nota (2026-09-05):** posición vigente **v3.13.0** — **Calibración de
+> evidencia pedagógica** (backend `3.12.0 → 3.13.0`). La iteración recalibra el
+> modelo pedagógico sin añadir actividades: `docs/CONSTITUCION-PEDAGOGICA.md`
+> pasa a ser el documento normativo único con **Reglas inmutables R1–R7**, §6.4
+> **evidence depth** (LOW/MEDIUM/HIGH contra `cefr_matrix.json`) y §7 por
+> modalidades. **P0 (motor)**: nuevo `backend/services/evidence_depth.py`
+> (expuesto en `/api/profile`), claims honestos —`stats` por nivel con
+> `bank_size` + `evidence_depth`; bancos cortos (Grammar B2/C2 ≤12 checks)
+> muestran "practice coverage · evidence depth LOW" y nunca invitan a competencia
+> fuerte—, suelo de "demostrado" = gate funcional + mínimo de muestras +
+> retención ≥7d + **producción** en destrezas productivas (solo MC no demuestra;
+> vocabulary techado en `functional`), `current_level` redefinido como sugerencia
+> de material con fallback `review_due`, e invariantes pedagógicas en
+> `test_pedagogical_invariants.py`. **P1 (producción/cross-skill)**: ítems
+> `controlled_production` de grammar en el currículo (typed answers
+> deterministas, A2–C1) sobre el motor compartido de rutas; cross-skill evidence
+> B1 (registro de estructuras, `/api/cross-skill`, panel `CrossSkillMatrix`);
+> golden pedagogical dataset (`tests/golden/pedagogy/`). **P2 (UI)**: shell
+> compartido `frontend/src/features/routes/QuizRoutePage.tsx` + máquina de sesión
+> consolidada `routeSession.ts`; migradas Grammar, Vocabulary, Pronunciation,
+> Conversation y Speaking (~1.600 líneas eliminadas; Listening no migra: es la
+> única práctica servida dentro del runner `PracticeView` del workspace);
+> parity i18n automática (`i18n.parity.test.ts`). Tests en verde: **pytest 1290**,
+> **vitest 382**, Playwright desktop con las 5 review specs de rutas.
 >
 > **Nota (2026-09-05):** posición vigente **v3.12.0** — **Grammar por rutas CEFR
 > (página única de checks MC del currículo)**. APRENDER → Grammar deja el chat
@@ -2330,6 +2355,46 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   mínimo de muestras y producción, `current_level` como sugerencia de material, invariantes
   pedagógicas) · P1 (Grammar en 3 niveles con producción controlada, cross-skill evidence B1,
   golden pedagogical dataset) · P2 (LearnRoutePage compartido, parity i18n automática).
+
+### 37.31 HECHO (V3.13) — Calibración de evidencia pedagógica (implementación)
+- **P0 — Motor de evidencia + claims honestos** (`v3.13.0`): nuevo
+  `backend/services/evidence_depth.py` (pure, depth LOW/MEDIUM/HIGH vs
+  `cefr_matrix.json`, expuesto en `/api/profile` vía `domain/profile.py`);
+  evidencia `academy_evidence` con columna `level` en filas nuevas
+  (retrocompatible). Rutas quiz: `stats` por nivel con `bank_size` y
+  `evidence_depth`; UI Grammar/Vocabulary muestra "practice coverage · evidence
+  depth LOW" en bancos cortos (claves i18n nuevas). `services/competence.py`:
+  `demonstrated` = gate funcional + `minimum_evidence` + retención retardada
+  estable ≥7d + producción en grammar/speaking/writing (solo MC nunca
+  demuestra); vocabulary es `SUPPORT_SKILL`, techado en `functional`.
+  `current_level` = sugerencia de material con fallback `review_due`.
+  `backend/tests/test_pedagogical_invariants.py` (R1–R7).
+- **P1 — Producción de Grammar + cross-skill + golden**: ítems
+  `controlled_production` (prompt + `accepted_answers`, corrección determinista
+  `normalize_typed`/`typed_matches`) en currículo A2–C1 y motor `quiz_routes.py`
+  (submit con `typed_answer`); UI "type the answer". Cross-skill B1:
+  `backend/services/cross_skill.py` (registro por estructura, canales
+  recognition/production/listening/speaking/transfer), `/api/cross-skill`,
+  `frontend/src/features/evidence/CrossSkillMatrix.tsx` en Grammar B1. Golden
+  `backend/tests/golden/pedagogy/evidence_depth_cases.json` +
+  `test_golden_pedagogy.py`.
+- **P2 — LearnRoutePage compartido + parity i18n**: shell
+  `frontend/src/features/routes/QuizRoutePage.tsx` (config por skill: API,
+  i18n, LevelPanel, `scene` personalizada, `trailing`, assessment ladder o
+  speaking) + máquina consolidada `features/routes/routeSession.ts` + tipos
+  `quizRouteTypes.ts`. Migradas por oleadas Grammar+Vocabulary (1),
+  Pronunciation+Conversation (2), Speaking con extras y bloques contextuales
+  (3); cada oleada validada con `tsc --noEmit`, vitest y su spec Playwright
+  desktop. Listening (4) **no migra por diseño**: es la única práctica del hub
+  servida dentro del runner `PracticeView` del workspace (línea
+  `WORKSPACE_ACTIVITIES` de `Workspace.tsx`), no una página de ruta standalone.
+  `frontend/src/utils/i18n.parity.test.ts` (claves en/es no vacías, sin
+  duplicados, usadas resueltas).
+- **Cierre**: bump único `3.13.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.31 en `docs/RELEVO.md`, `release-notes-v3.13.0.md`.
+  §9 de la constitución marcada "implementado en v3.13.0". Tests: **pytest
+  1290**, **vitest 382** y Playwright desktop verde.
 
 ### Próximo (V2.6+)
 Orden de prioridades fijado por la auditoría externa:
