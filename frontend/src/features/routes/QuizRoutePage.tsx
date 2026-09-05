@@ -148,7 +148,7 @@ export interface RouteQuizConfig {
       por defecto) o `speaking` (Speaking Assessment completo). */
   assessment?: "ladder" | "speaking";
   /** Tarjeta extra tras el mapa de rutas (p. ej. conversación libre). */
-  trailing?: ComponentType;
+  trailing?: ComponentType<{ userId: string | null }>;
   /** Sin perfil activo: solo spinner (p. ej. conversation). */
   requireUser?: boolean;
 }
@@ -668,7 +668,7 @@ export function QuizRoutePage({
                 }
               />
 
-              {config.trailing && <config.trailing />}
+              {config.trailing && <config.trailing userId={userId} />}
             </div>
           )}
         </div>
