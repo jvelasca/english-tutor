@@ -31,9 +31,11 @@ export function drillAnswered(
   return remaining.filter((id) => id !== itemId);
 }
 
-/** Ítems del drill ya acertados (progreso de la sesión). */
+/** Ítems del drill ya acertados (progreso de la sesión). En las rotaciones
+ * (level/mastered), el progreso se cuenta desde `done` del propio estado. */
 export function drillDone(session: RouteSession): number {
-  return session.mode === "drill" ? session.total - session.remaining.length : 0;
+  if (session.mode !== "drill") return session.done;
+  return session.total - session.remaining.length;
 }
 
 /** Ítems respondidos en los modos de rotación (nivel / repasar lo aprendido). */

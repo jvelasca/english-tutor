@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import {
   ArrowLeft,
+  Award,
   BookOpen,
   Check,
   ChevronRight,
@@ -36,6 +37,7 @@ import type { NextBestActivity } from "../../types/api";
 import type { Section } from "../../utils/sections";
 import { cn } from "../../lib/utils";
 import { AssessmentLadder } from "../assessment/AssessmentLadder";
+import { SpeakingAssessment } from "../speaking/SpeakingAssessment";
 import {
   drillAnswered,
   isSessionFinished,
@@ -60,6 +62,10 @@ export interface RouteLevelPanelProps {
   disabled?: boolean;
   /** Contador que fuerza a recargar el panel (tras un intento). */
   refreshNonce?: number;
+  /** Estado de la ruta del nivel (paneles de destrezas orales). */
+  routeState?: "not_started" | "developing" | "functional";
+  /** Nivel oral demostrado con el Speaking Assessment (destrezas orales). */
+  assessedLevel?: string | null;
   onPracticeLevel: (level: string, total: number) => void;
   onDrillFailed: (level: string, failedIds: string[]) => void;
   /** Repasar lo aprendido: rotación solo por los checks ya acertados. */
@@ -76,13 +82,41 @@ export interface RouteDictionaryConfig {
   View: ComponentType<{ userId: string | null }>;
 }
 
+/**
+ * Contexto que recibe la escena de práctica de una destreza (V3.13 P2.1).
+ *
+ * La página compartida posee el marco: cabecera, estadísticas y anillos, la
+ * máquina de sesión (level/drill/mastered), el panel del nivel y las vistas
+ * formales. La escena (tarjeta del ejercicio: MC, producción controlada,
+ * read-aloud, chat guiado…) vive en la página de la destreza, se remonta por
+ * cada ítem (`key` del padre) y reporta a la página solo lo esencial.
+ */
+export interface LearnSceneProps {
+  userId: string | null;
+  ns: string;
+  t: TranslateFn;
+  /** Ítem activo del escenario (pregunta / frase / diálogo), opaco aquí. */
+  item: unknown;
+  itemLoading: boolean;
+  itemError: boolean;
+  /** La sesión ha terminado (banner de cierre sustituye a la escena). */
+  finished: boolean;
+  sessionActive: boolean;
+  /** Ha habido un intento puntuado: refresca anillos y avisa al padre. */
+  onReport: () => void;
+  /** Avanza tras un resultado (o acaba la sesión) con el id del ítem. */
+  onAnswered: (itemId: string, passed: boolean) => void;
+  /** Salta al siguiente ítem del mismo bucket (práctica libre). */
+  onSkip: () => void;
+}
+
 export interface RouteQuizApi {
   getStats: (userId: string) => Promise<RouteStats>;
   getQuestion: (
     userId: string,
     level: string,
     mode: RouteQuestionMode,
-  ) => Promise<RouteQuestion>;
+  ) => Promise<unknown>;
   submitAttempt: (
     userId: string,
     checkId: string,
@@ -104,6 +138,19 @@ export interface RouteQuizConfig {
   api: RouteQuizApi;
   /** Vista extra (diccionario personal en Vocabulary). */
   dictionary?: RouteDictionaryConfig;
+  /** Escena de práctica personalizada (read-aloud, chat guiado…). Sin ella, la
+      página usa la escena de quiz MC / producción controlada. */
+  scene?: ComponentType<LearnSceneProps>;
+  /** Carga el nivel oral demostrado (`/api/academy/speaking/level`) para
+      mostrarlo en el mapa y en los paneles (destrezas orales). */
+  loadAssessed?: (userId: string) => Promise<string | null>;
+  /** Instrumento formal para "demostrar el nivel": `ladder` (AssessmentLadder,
+      por defecto) o `speaking` (Speaking Assessment completo). */
+  assessment?: "ladder" | "speaking";
+  /** Tarjeta extra tras el mapa de rutas (p. ej. conversación libre). */
+  trailing?: ComponentType;
+  /** Sin perfil activo: solo spinner (p. ej. conversation). */
+  requireUser?: boolean;
 }
 
 interface QuizRoutePageProps {
@@ -129,7 +176,7 @@ function routeMode(session: RouteSession | null): RouteQuestionMode {
       : "all";
 }
 
-type TranslateFn = (k: string) => string;
+export type TranslateFn = (k: string) => string;
 
 /* ------------------------------------------------------------------ */
 /* Página compartida                                                    */
@@ -140,6 +187,7 @@ export function QuizRoutePage({
   active,
   onBack,
   onAttempt,
+  onNext,
   config,
 }: QuizRoutePageProps) {
   const { t } = useI18n();
@@ -148,13 +196,17 @@ export function QuizRoutePage({
 
   const [view, setView] = useState<RouteView>({ kind: "routes" });
   const [stats, setStats] = useState<RouteStats | null>(null);
+  // Nivel oral demostrado (Speaking Assessment) en destrezas orales.
+  const [assessedLevel, setAssessedLevel] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   // Sesión focalizada activa (drill / repaso / vuelta del nivel). Sin sesión, el
   // escenario practica la ruta recomendada (stats.level) en modo libre.
   const [session, setSession] = useState<RouteSession | null>(null);
-  const [question, setQuestion] = useState<RouteQuestion | null>(null);
+  // Ítem activo del escenario superior (pregunta / frase / diálogo): opaco para
+  // la página, la escena de la destreza lo interpreta.
+  const [question, setQuestion] = useState<unknown>(null);
   const [cardLoading, setCardLoading] = useState(false);
   const [cardError, setCardError] = useState(false);
   const [result, setResult] = useState<RouteAttempt | null>(null);
@@ -163,7 +215,7 @@ export function QuizRoutePage({
   // Seq de "siguiente pregunta": avanzar tras responder o saltar.
   const [seq, setSeq] = useState(0);
 
-  // --- Carga inicial de estadísticas ------------------------------------------
+  // --- Carga inicial de estadísticas y nivel oral demostrado ------------------
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -171,9 +223,15 @@ export function QuizRoutePage({
     const uid = userId;
     void (async () => {
       try {
-        const s = await config.api.getStats(uid);
+        const [s, lvl] = await Promise.all([
+          config.api.getStats(uid),
+          config.loadAssessed
+            ? config.loadAssessed(uid)
+            : Promise.resolve(null),
+        ]);
         if (cancelled) return;
         setStats(s);
+        if (lvl !== null) setAssessedLevel(lvl);
         // Despliega por defecto el nivel en el que está el alumno.
         setExpandedLevel((cur) => cur ?? s.level ?? null);
       } catch {
@@ -251,7 +309,7 @@ export function QuizRoutePage({
   }
 
   /** Avanza tras ver el resultado de una pregunta (o acaba la sesión). */
-  function advance(passed: boolean) {
+  function advance(passed: boolean, answeredItemId?: string) {
     if (!session) {
       // Práctica libre (sin sesión): simplemente siguiente pregunta.
       onAttempt();
@@ -264,7 +322,9 @@ export function QuizRoutePage({
         ...session,
         remaining: drillAnswered(
           session.remaining,
-          question?.check_id ?? "",
+          answeredItemId ??
+            (question as RouteQuestion | null)?.check_id ??
+            "",
           passed,
         ),
       };
@@ -285,13 +345,15 @@ export function QuizRoutePage({
   /** Envía la respuesta (MC o producción controlada) y muestra el feedback. */
   async function submit(answer: { optionIndex: number; typed?: string }) {
     if (!userId || !question || busy) return;
-    if (question.type === "controlled_production" && !answer.typed?.trim()) return;
+    const q = question as RouteQuestion | null;
+    if (!q) return;
+    if (q.type === "controlled_production" && !answer.typed?.trim()) return;
     setBusy(true);
     setAttemptError(null);
     try {
       const attempt = await config.api.submitAttempt(
         userId,
-        question.check_id,
+        q.check_id,
         answer.optionIndex,
         answer.typed?.trim() ?? "",
       );
@@ -329,6 +391,15 @@ export function QuizRoutePage({
     );
   }
 
+  if (config.requireUser && !userId) {
+    return (
+      <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        {t(nk("loading"))}
+      </div>
+    );
+  }
+
   if (view.kind === "dictionary" && config.dictionary) {
     const DictView = config.dictionary.View;
     return (
@@ -350,6 +421,32 @@ export function QuizRoutePage({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DictView userId={userId} />
+        </div>
+      </div>
+    );
+  }
+
+  if (view.kind === "assessment" && config.assessment === "speaking") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background/90 px-2 py-1.5 backdrop-blur">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
+            onClick={() => setView({ kind: "routes" })}
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            {t(nk("backRoutes"))}
+          </Button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <SpeakingAssessment
+            userId={userId}
+            onAttempt={onAttempt}
+            onNext={onNext}
+          />
         </div>
       </div>
     );
@@ -500,28 +597,55 @@ export function QuizRoutePage({
                     </Card>
                   )}
 
-                  <PracticeCard
-                    key={question?.check_id ?? "none"}
-                    ns={ns}
-                    question={question}
-                    cardLoading={cardLoading}
-                    cardError={cardError}
-                    result={result}
-                    busy={busy}
-                    attemptError={attemptError}
-                    onPick={pick}
-                    onSubmitTyped={pickTyped}
-                    onAdvance={() => {
-                      if (!session && !result) {
-                        nextCard();
-                        return;
-                      }
-                      if (result) advance(result.passed);
-                    }}
-                    onSkip={nextCard}
-                    sessionActive={session !== null}
-                    t={t}
-                  />
+                  {config.scene ? (
+                    (() => {
+                      const LearnScene = config.scene;
+                      return (
+                        <LearnScene
+                          key={`scene-${seq}`}
+                          userId={userId}
+                          ns={ns}
+                          t={t}
+                          item={question}
+                          itemLoading={cardLoading}
+                          itemError={cardError}
+                          finished={finished}
+                          sessionActive={session !== null}
+                          onReport={() => {
+                            refreshAfterAttempt();
+                            onAttempt();
+                          }}
+                          onAnswered={(itemId, passed) =>
+                            advance(passed, itemId)
+                          }
+                          onSkip={nextCard}
+                        />
+                      );
+                    })()
+                  ) : (
+                    <PracticeCard
+                      key={(question as RouteQuestion | null)?.check_id ?? "none"}
+                      ns={ns}
+                      question={question as RouteQuestion | null}
+                      cardLoading={cardLoading}
+                      cardError={cardError}
+                      result={result}
+                      busy={busy}
+                      attemptError={attemptError}
+                      onPick={pick}
+                      onSubmitTyped={pickTyped}
+                      onAdvance={() => {
+                        if (!session && !result) {
+                          nextCard();
+                          return;
+                        }
+                        if (result) advance(result.passed);
+                      }}
+                      onSkip={nextCard}
+                      sessionActive={session !== null}
+                      t={t}
+                    />
+                  )}
                 </>
               )}
 
@@ -532,6 +656,8 @@ export function QuizRoutePage({
                 LevelPanel={config.LevelPanel}
                 userId={userId}
                 stats={stats}
+                showAssessed={config.loadAssessed !== undefined}
+                assessedLevel={assessedLevel}
                 expandedLevel={expandedLevel}
                 setExpandedLevel={setExpandedLevel}
                 disabled={session !== null}
@@ -541,6 +667,8 @@ export function QuizRoutePage({
                   setView({ kind: "assessment", level })
                 }
               />
+
+              {config.trailing && <config.trailing />}
             </div>
           )}
         </div>
@@ -559,6 +687,9 @@ interface QuizRoutesSectionProps {
   LevelPanel: ComponentType<RouteLevelPanelProps>;
   userId: string | null;
   stats: RouteStats;
+  /** Muestra el nivel oral demostrado (destrezas orales). */
+  showAssessed: boolean;
+  assessedLevel: string | null;
   expandedLevel: string | null;
   setExpandedLevel: (level: string | null) => void;
   disabled: boolean;
@@ -574,6 +705,8 @@ function QuizRoutesSection({
   LevelPanel,
   userId,
   stats,
+  showAssessed,
+  assessedLevel,
   expandedLevel,
   setExpandedLevel,
   disabled,
@@ -615,6 +748,20 @@ function QuizRoutesSection({
             <span className="tabular-nums text-muted-foreground">
               {stats.passed} {t("assessment.of")} {stats.attempts}
             </span>
+            {showAssessed &&
+              (assessedLevel ? (
+                <Badge variant="outline" className="mt-1 w-fit gap-1">
+                  <Award className="size-3.5" aria-hidden="true" />
+                  {t(nk("assessedLevel")).replace(
+                    "{level}",
+                    assessedLevel,
+                  )}
+                </Badge>
+              ) : (
+                <span className="mt-0.5 text-muted-foreground">
+                  {t(nk("assessedLevelNone"))}
+                </span>
+              ))}
           </div>
         </div>
       </div>
@@ -708,6 +855,14 @@ function QuizRoutesSection({
             <LevelPanel
               userId={userId}
               level={expandedLevel}
+              routeState={
+                (
+                  stats.levels.find((lv) => lv.level === expandedLevel) as
+                    | { state?: "not_started" | "developing" | "functional" }
+                    | undefined
+                )?.state
+              }
+              assessedLevel={showAssessed ? assessedLevel : null}
               disabled={disabled}
               refreshNonce={refreshNonce}
               onPracticeLevel={(level, total) =>
