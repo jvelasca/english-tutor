@@ -55,6 +55,11 @@ const VocabularyRoutesPractice = lazy(() =>
     default: m.VocabularyRoutesPractice,
   })),
 );
+const GrammarRoutesPractice = lazy(() =>
+  import("../features/grammar/GrammarRoutesPractice").then((m) => ({
+    default: m.GrammarRoutesPractice,
+  })),
+);
 
 interface WorkspaceProps {
   route: Route;
@@ -94,7 +99,6 @@ function RouteFallback() {
 /** Prácticas del hub que se sirven desde el workspace vía PracticeView. */
 const WORKSPACE_ACTIVITIES: readonly LearnActivity[] = [
   LISTENING_ACTIVITY,
-  GRAMMAR_ACTIVITY,
 ];
 
 export function Workspace({
@@ -200,6 +204,18 @@ export function Workspace({
       // A1-C2. El chat libre con el tutor vive ahora en su raíz `/chat`.
       content = (
         <ConversationRoutesPractice
+          userId={currentUserId}
+          active={learnActivity}
+          onBack={backToHub}
+          onAttempt={onAttempt}
+          onNext={onNextBestStart}
+        />
+      );
+    } else if (learnActivity === GRAMMAR_ACTIVITY) {
+      // Grammar por rutas (V3.12): página única de checks MC del currículo con
+      // mapa A1-C2 y el bloque «Demostrar el nivel» (evaluaciones del curso).
+      content = (
+        <GrammarRoutesPractice
           userId={currentUserId}
           active={learnActivity}
           onBack={backToHub}

@@ -37,6 +37,7 @@ from routers.translate import router as translate_router
 from routers.users import router as users_router
 from routers.voices import router as voices_router
 from routers.vocabulary import router as vocabulary_router
+from routers.grammar_routes import router as grammar_routes_router
 from routers.vocabulary_routes import router as vocabulary_routes_router
 from routers.voz import router as voz_router
 from security import SecurityMiddleware
@@ -109,6 +110,7 @@ app.include_router(pronunciation_router)
 app.include_router(pronunciation_routes_router)
 app.include_router(conversation_routes_router)
 app.include_router(vocabulary_routes_router)
+app.include_router(grammar_routes_router)
 app.include_router(progress_router)
 app.include_router(conversations_router)
 app.include_router(settings_router)

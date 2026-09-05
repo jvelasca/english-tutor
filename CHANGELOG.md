@@ -4,6 +4,32 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.12.0] — 2026-09-05
+
+**Grammar por rutas CEFR: página única de checks MC del currículo.**
+
+APRENDER → Grammar deja el chat del tutor (que sigue en `/chat`) y pasa a una
+**página única con scroll** (espejo de Speaking/Listening/Pronunciation/
+Conversation/Vocabulary): arriba vive el escenario de práctica —un **check MC de
+grammar del currículo** del nivel recomendado, con feedback inmediato y
+respuesta correcta revelada al fallar— y debajo el mapa de rutas A1–C2 con
+anillos y, al abrir un nivel, sus modos (Practicar el nivel / Repetir fallidas /
+Repasar aprendidas) y el bloque «Demostrar el nivel» que abre los instrumentos
+formales del curso (exámenes y escalera de evaluaciones) como vía honesta para
+demostrar el nivel.
+
+El banco **no se inventa**: cada nivel reutiliza los **checks MC de la destreza
+grammar del currículo oficial** (`backend/curriculum/a1.json`…`c2.json`, 97
+checks en total), sin contenido nuevo. Grammar monta sobre el **motor compartido
+de rutas quiz** (`backend/services/quiz_routes.py`, estrenado por Vocabulary)
+con su propia tabla (`grammar_route_attempts`), endpoints
+`/api/grammar/routes/*` y namespace de errores; los **bancos cortos** (B2 = 8 y
+C2 = 4) adaptan la puerta automáticamente. Cada intento es determinista y se
+persiste. La ruta es un hito de práctica (`functional`, nunca certifica);
+demostrar el nivel exige los exámenes y evaluaciones del curso. Con Grammar,
+**las 6 actividades de APRENDER comparten la misma página única de rutas CEFR**
+(Listening, Speaking, Pronunciation, Conversation, Vocabulary y Grammar).
+
 ## [3.11.0] — 2026-09-05
 
 **Vocabulary por rutas CEFR: página única de checks MC del currículo + diccionario a mano.**

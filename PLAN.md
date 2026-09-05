@@ -11,6 +11,22 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.12.0` — **Grammar por rutas CEFR: página única de checks MC del currículo**
+  (APRENDER → Grammar deja el chat del tutor (que sigue en `/chat`) y pasa a una
+  página única como el resto: arriba el escenario de práctica —un check MC de
+  grammar del currículo del nivel recomendado, con feedback inmediato y la
+  respuesta correcta revelada al fallar— y debajo el mapa de rutas A1–C2 con
+  anillos y el panel del nivel (Practicar el nivel / Repetir fallidas / Repasar
+  aprendidas + «Demostrar el nivel» → exámenes y escalera de evaluaciones del
+  curso). El banco son los checks MC de la destreza grammar del currículo
+  oficial (97 checks; sin contenido nuevo) sobre el motor compartido
+  `backend/services/quiz_routes.py`; los bancos cortos (B2 = 8 y C2 = 4)
+  adaptan la puerta automáticamente. Intento determinista persistido en
+  `grammar_route_attempts`; endpoints `/api/grammar/routes/*`. La ruta es un
+  hito de práctica —`functional` como techo, nunca certifica—; demostrar el
+  nivel exige los instrumentos formales del curso. Con Grammar, las 6
+  actividades de APRENDER comparten la misma página única de rutas CEFR).
+  Base: `3.11.0`
 - ✅ Versión estable `3.11.0` — **Vocabulary por rutas CEFR: página única de checks MC del currículo + diccionario a mano**
   (APRENDER → Vocabulary deja de ser solo el diccionario personal y pasa a una
   página única como el resto: arriba el escenario de práctica —un check MC de

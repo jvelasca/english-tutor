@@ -961,6 +961,31 @@ def init_db() -> None:
             "ON vocabulary_route_attempts(user_id)"
         )
 
+        # Grammar por rutas (V3.12): checks de opción múltiple con skill
+        # "grammar" del currículo A1-C2 (`objectives[].checks`), misma estructura
+        # y semántica que vocabulary: cada intento es una respuesta MC
+        # determinista contra un check (`check_id`) y el estado por check se
+        # deriva en vivo desde esta tabla.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS grammar_route_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                check_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                score REAL NOT NULL DEFAULT 0,
+                passed INTEGER NOT NULL,
+                topic TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_grammar_route_attempts_user_id "
+            "ON grammar_route_attempts(user_id)"
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:

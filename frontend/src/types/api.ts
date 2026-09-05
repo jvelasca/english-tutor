@@ -916,6 +916,22 @@ export interface VocabularyAttempt {
   score: number;
 }
 
+// --- Rutas de Grammar (V3.12) ------------------------------------------------
+// Misma filosofía y mismas formas que Vocabulary: los checks MC del currículo
+// con skill "grammar" se sirven con el mismo motor quiz y el mismo contrato de
+// red, así que los tipos se reutilizan por alias para nombrarlos por destreza
+// en los componentes de Grammar.
+
+export type GrammarRouteState = VocabularyRouteState;
+export type GrammarRouteGate = VocabularyRouteGate;
+export type GrammarLevelProgress = VocabularyLevelProgress;
+export type GrammarStats = VocabularyStats;
+export type GrammarItemState = VocabularyItemState;
+export type GrammarItem = VocabularyItem;
+export type GrammarLevelItems = VocabularyLevelItems;
+export type GrammarQuestion = VocabularyQuestion;
+export type GrammarAttempt = VocabularyAttempt;
+
 export interface ListeningSubskillProgress {
   skill: string;
   attempts: number;

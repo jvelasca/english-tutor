@@ -68,8 +68,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Rutas A1–C2 de checks de palabras, con tu diccionario personal a mano.",
   },
   "learn.desc.grammar": {
-    en: "Write sentences and get grammar corrections and feedback.",
-    es: "Escribe frases y recibe correcciones y feedback de gramática.",
+    en: "Routes A1–C2 of grammar structure checks with instant feedback.",
+    es: "Rutas A1–C2 de checks de estructuras gramaticales con feedback inmediato.",
   },
   "learn.speakingSubtitle": {
     en: "Free speaking practice: choose a scenario or run a mission.",
@@ -86,6 +86,10 @@ const STRINGS: Record<string, Entry> = {
   "learn.vocabularySubtitle": {
     en: "Word checks level by level from your course curriculum, with your personal dictionary at hand.",
     es: "Checks de palabras nivel a nivel desde tu currículo del curso, con tu diccionario personal a mano.",
+  },
+  "learn.grammarSubtitle": {
+    en: "Grammar structure checks level by level from your course curriculum, with the formal assessments at hand.",
+    es: "Checks de estructuras gramaticales nivel a nivel desde tu currículo del curso, con las evaluaciones formales a mano.",
   },
   "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
 
@@ -2438,6 +2442,206 @@ const STRINGS: Record<string, Entry> = {
     es: "Evaluaciones formales · Nivel {level}",
   },
   "vocRoutes.formalNote": {
+    en: "This is the official Formación instrument for the level: it requires progress and retention, and only it can demonstrate the level. Everything you pass here is real evidence.",
+    es: "Este es el instrumento oficial de Formación del nivel: exige progreso y retención, y solo él puede demostrar el nivel. Todo lo que superes aquí es evidencia real.",
+  },
+
+  // --- Grammar por rutas (V3.12) ---
+  "gramRoutes.routesSubtitle": {
+    en: "Each level is a route of quick multiple-choice checks built from the grammar structures of your course curriculum. Pick the correct option, get instant feedback and the correct answer if you miss. Passing a route is a practice milestone — demonstrating the level needs the course exams and assessments, not the route.",
+    es: "Cada nivel es una ruta de checks de opción múltiple construidos con las estructuras gramaticales de tu currículo del curso. Elige la opción correcta, recibe feedback inmediato y la respuesta correcta si fallas. Superar una ruta es un hito de práctica: demostrar el nivel exige los exámenes y evaluaciones del curso, no la ruta.",
+  },
+  "gramRoutes.loading": { en: "Loading…", es: "Cargando…" },
+  "gramRoutes.loadError": {
+    en: "Couldn't load your grammar routes. Please try again.",
+    es: "No se pudieron cargar tus rutas de gramática. Inténtalo de nuevo.",
+  },
+  "gramRoutes.retry": { en: "Try again", es: "Reintentar" },
+  "gramRoutes.backRoutes": { en: "Back to routes", es: "Volver a las rutas" },
+  "gramRoutes.routesMapTitle": { en: "Routes", es: "Rutas" },
+  "gramRoutes.routesMapHint": {
+    en: "A1–C2 practice routes built from the curriculum checks.",
+    es: "Rutas de práctica A1–C2 construidas con los checks del currículo.",
+  },
+  "gramRoutes.accuracy": { en: "Pass rate", es: "Aciertos" },
+  "gramRoutes.masteredOfTotal": {
+    en: "{mastered} of {total}",
+    es: "{mastered} de {total}",
+  },
+  "gramRoutes.coveragePct": {
+    en: "{pct}% of the route",
+    es: "{pct}% de la ruta",
+  },
+  "gramRoutes.routeNote": {
+    en: "You're practising level {level}. Open any ring to drill that level, repeat what you missed or review what you've already mastered.",
+    es: "Estás practicando el nivel {level}. Abre cualquier anillo para practicar ese nivel, repetir lo fallado o repasar lo ya dominado.",
+  },
+  "gramRoutes.routeCertNote": {
+    en: "Routes measure practice, never certification. Only formal course evidence demonstrates a level.",
+    es: "Las rutas miden práctica, nunca certifican. Solo la evidencia formal del curso demuestra un nivel.",
+  },
+  "gramRoutes.routeRingHelp": {
+    en: "Tap a ring to open or close that level's panel.",
+    es: "Toca un anillo para abrir o cerrar el panel de ese nivel.",
+  },
+  "gramRoutes.levelHistoryTitle": {
+    en: "Level {level} history",
+    es: "Historial del nivel {level}",
+  },
+  "gramRoutes.sessionEnded": {
+    en: "Session finished",
+    es: "Sesión terminada",
+  },
+  "gramRoutes.doneDrillLine": {
+    en: "You drilled the {total} checks you had missed at level {level} until you mastered them.",
+    es: "Repetiste los {total} checks que habías fallado del nivel {level} hasta dominarlos.",
+  },
+  "gramRoutes.doneReviewLine": {
+    en: "You reviewed the {total} mastered checks of level {level}.",
+    es: "Repasaste los {total} checks dominados del nivel {level}.",
+  },
+  "gramRoutes.doneLevelLine": {
+    en: "You completed a full round of the {total} checks of level {level}.",
+    es: "Completaste una vuelta completa por los {total} checks del nivel {level}.",
+  },
+  "gramRoutes.modeLevel": {
+    en: "Level {level} · full round",
+    es: "Nivel {level} · vuelta completa",
+  },
+  "gramRoutes.modeDrill": {
+    en: "Repeating missed checks",
+    es: "Repitiendo checks fallados",
+  },
+  "gramRoutes.modeReview": {
+    en: "Reviewing level {level}",
+    es: "Repasando el nivel {level}",
+  },
+  "gramRoutes.exitSession": {
+    en: "Exit session",
+    es: "Salir de la sesión",
+  },
+  "gramRoutes.drillHint": {
+    en: "Answer until every missed check is mastered.",
+    es: "Responde hasta dominar todos los checks fallados.",
+  },
+  "gramRoutes.sessionHint": {
+    en: "Answer to move forward through the round.",
+    es: "Responde para avanzar en la vuelta.",
+  },
+  "gramRoutes.continue": { en: "Continue", es: "Continuar" },
+  "gramRoutes.skip": { en: "Skip", es: "Saltar" },
+  "gramRoutes.evaluating": {
+    en: "Scoring your answer…",
+    es: "Puntuando tu respuesta…",
+  },
+  "gramRoutes.questionLabel": { en: "Question", es: "Pregunta" },
+  "gramRoutes.answerLabel": { en: "Answers", es: "Respuestas" },
+  "gramRoutes.resultPassed": { en: "Correct", es: "Correcto" },
+  "gramRoutes.resultNotPassed": {
+    en: "Not this time",
+    es: "Esta vez no",
+  },
+  "gramRoutes.resultScore": {
+    en: "Score: {score}/100",
+    es: "Puntuación: {score}/100",
+  },
+  "gramRoutes.resultHonestNote": {
+    en: "One correct answer is practice, not proof. Your route only completes when you show retention and formal evidence.",
+    es: "Un acierto es práctica, no prueba. Tu ruta solo se completa cuando demuestras retención y evidencia formal.",
+  },
+  "gramRoutes.pickHint": {
+    en: "Choose the correct option.",
+    es: "Elige la opción correcta.",
+  },
+  "gramRoutes.pickNote": {
+    en: "Deterministic check from your course curriculum — instant feedback, no extra content invented.",
+    es: "Check determinista de tu currículo del curso: feedback inmediato, sin contenido inventado.",
+  },
+  "gramRoutes.levelStates.failed": {
+    en: "Missed ({count})",
+    es: "Falladas ({count})",
+  },
+  "gramRoutes.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominadas ({count})",
+  },
+  "gramRoutes.levelStates.unseen": {
+    en: "Not seen yet ({count})",
+    es: "Sin ver ({count})",
+  },
+  "gramRoutes.levelItemsError": {
+    en: "Couldn't load the level items.",
+    es: "No se pudieron cargar los ítems del nivel.",
+  },
+  "gramRoutes.levelItemsChecks": { en: "checks", es: "checks" },
+  "gramRoutes.shortBank": { en: "Short bank", es: "Banco corto" },
+  "gramRoutes.shortBankTitle": {
+    en: "This level has a small bank",
+    es: "Este nivel tiene un banco pequeño",
+  },
+  "gramRoutes.shortBankNote": {
+    en: "Level {level} only has {total} checks in the curriculum, so its route gate adapts and the level is short to complete.",
+    es: "El nivel {level} solo tiene {total} checks en el currículo, así que su puerta se adapta y el nivel se completa pronto.",
+  },
+  "gramRoutes.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} missed · {unseen} unseen",
+    es: "{mastered} dominadas · {failed} falladas · {unseen} sin ver",
+  },
+  "gramRoutes.completedShort": { en: "Route completed", es: "Ruta completada" },
+  "gramRoutes.routePendingCert": {
+    en: "Route mastered — practice ceiling reached",
+    es: "Ruta dominada — techo de práctica alcanzado",
+  },
+  "gramRoutes.routeGateIntro": {
+    en: "Route gate of {level}:",
+    es: "Puerta de ruta de {level}:",
+  },
+  "gramRoutes.routeGateLine": {
+    en: "You've mastered {coverage}% of the bank (target {coverageRequired}%), pass rate {accuracy} (target {accuracyRequired}%), {topics}/{topicsRequired} topics and {checkpoint}/{checkpointRequired} checks mastered on first try.",
+    es: "Has dominado el {coverage}% del banco (objetivo {coverageRequired}%), aciertos {accuracy} (objetivo {accuracyRequired}%), {topics}/{topicsRequired} temas y {checkpoint}/{checkpointRequired} checks dominados a la primera.",
+  },
+  "gramRoutes.levelItemsEmpty": {
+    en: "No checks here.",
+    es: "No hay checks aquí.",
+  },
+  "gramRoutes.levelItemsAttempts": { en: "attempts", es: "intentos" },
+  "gramRoutes.repeatFailed": {
+    en: "Repeat missed ({count})",
+    es: "Repetir falladas ({count})",
+  },
+  "gramRoutes.reviewLearned": {
+    en: "Review learned ({count})",
+    es: "Repasar aprendidas ({count})",
+  },
+  "gramRoutes.practiceLevel": {
+    en: "Practise level {level}",
+    es: "Practicar nivel {level}",
+  },
+  "gramRoutes.reviewLevel": {
+    en: "Review level {level}",
+    es: "Repasar nivel {level}",
+  },
+  "gramRoutes.demonstrateTitle": {
+    en: "Demonstrate level {level}",
+    es: "Demostrar el nivel {level}",
+  },
+  "gramRoutes.demonstrateNote": {
+    en: "This route only proves practice. To demonstrate {level} you need the formal assessments of your course.",
+    es: "Esta ruta solo demuestra práctica. Para demostrar {level} necesitas las evaluaciones formales de tu curso.",
+  },
+  "gramRoutes.demonstrateFormal": {
+    en: "The course has level exams for A1 and B1 and the Formación assessment ladder (formative → level exam → retention) for every level. Levels without a dedicated exam (B2–C2) can still show evidence through the ladder.",
+    es: "El curso tiene examen de nivel para A1 y B1 y la escalera de evaluaciones de Formación (formativa → examen de nivel → retención) para cada nivel. Los niveles sin examen dedicado (B2–C2) pueden demostrar evidencia a través de la escalera.",
+  },
+  "gramRoutes.demonstrateCta": {
+    en: "Open formal assessments",
+    es: "Abrir evaluaciones formales",
+  },
+  "gramRoutes.formalTitle": {
+    en: "Formal assessments · Level {level}",
+    es: "Evaluaciones formales · Nivel {level}",
+  },
+  "gramRoutes.formalNote": {
     en: "This is the official Formación instrument for the level: it requires progress and retention, and only it can demonstrate the level. Everything you pass here is real evidence.",
     es: "Este es el instrumento oficial de Formación del nivel: exige progreso y retención, y solo él puede demostrar el nivel. Todo lo que superes aquí es evidencia real.",
   },
