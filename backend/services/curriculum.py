@@ -244,6 +244,30 @@ class ObjectiveCheck(BaseModel):
     correct_index: int
 
 
+class ProductionCheck(BaseModel):
+    """Ítem de producción controlada de grammar (V3.13, P1).
+
+    Es un hermano de `ObjectiveCheck` que NO vive en `objectives[].checks`: vive
+    en el array de nivel `production_checks` (solo grammar). Por eso los
+    instrumentos MC que recorren objetivos (lecciones, escalera de evaluaciones)
+    jamás lo ven y no hay que filtrarlo en ellos.
+
+    A diferencia del MC (reconocimiento), exige ESCRIBIR la respuesta
+    (`prompt` con hueco + `accepted_answers`): la corrección es determinista por
+    normalización de texto (sin LLM) y solo ella produce evidencia de
+    producción para la destreza (Constitución §7, R5: Recognition ≠ Production).
+    El banco de las rutas de grammar se construye con ambos: checks MC de los
+    objetivos + estos ítems de producción controlada.
+    """
+
+    id: str
+    type: str = "controlled_production"
+    skill: str = "grammar"
+    topic: str = ""
+    prompt: str
+    accepted_answers: list[str]
+
+
 class Objective(BaseModel):
     id: str
     can_do: str
@@ -299,6 +323,10 @@ class Level(BaseModel):
     description: str = ""
     version: str = CURRICULUM_VERSION
     modules: list[Module]
+    # Ítems de producción controlada de grammar del nivel (V3.13 P1). Son parte
+    # del banco oficial de la ruta de grammar, pero no de ningún objetivo, para
+    # no filtrarse en los instrumentos MC que recorren `objectives[].checks`.
+    production_checks: list[ProductionCheck] = Field(default_factory=list)
 
     def objectives(self) -> list[Objective]:
         return [
@@ -429,7 +457,11 @@ def validate_level(level: Level) -> list[str]:
     # IDs únicos globales (objetivos, actividades, checks).
     _dupes([o.id for o in objectives], "objetivo")
     _dupes([a.id for o in objectives for a in o.activities], "actividad")
-    _dupes([c.id for o in objectives for c in o.checks], "check")
+    _dupes(
+        [c.id for o in objectives for c in o.checks]
+        + [c.id for c in level.production_checks],
+        "check",
+    )
 
     # Módulos: id y orden únicos en todo el nivel.
     _dupes([m.id for m in level.modules], "módulo")
@@ -511,6 +543,32 @@ def validate_level(level: Level) -> list[str]:
                 errors.append(
                     f"{lid}: actividad {activity.id} phase "
                     f"'{activity.phase}' no canónica"
+                )
+
+    # Ítems de producción controlada de grammar (V3.13 P1): solo grammar, con
+    # prompt y respuestas aceptadas no vacías, y un id que no colisione con el
+    # de ningún check de objetivo (ambos son parte del banco de la ruta).
+    for check in level.production_checks:
+        if check.skill != "grammar":
+            errors.append(
+                f"{lid}: production_check {check.id} skill "
+                f"'{check.skill}' (solo se admite 'grammar')"
+            )
+        if check.type != "controlled_production":
+            errors.append(
+                f"{lid}: production_check {check.id} type "
+                f"'{check.type}' (solo se admite 'controlled_production')"
+            )
+        if not check.prompt.strip():
+            errors.append(f"{lid}: production_check {check.id} sin prompt")
+        if not check.accepted_answers:
+            errors.append(
+                f"{lid}: production_check {check.id} sin accepted_answers"
+            )
+        for answer in check.accepted_answers:
+            if not str(answer).strip():
+                errors.append(
+                    f"{lid}: production_check {check.id} con accepted_answer vacía"
                 )
 
     # Wiring curso↔bancos (V2.5-C4): cada referencia por ID debe existir y

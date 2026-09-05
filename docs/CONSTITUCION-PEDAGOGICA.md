@@ -1,7 +1,10 @@
 # Constitución pedagógica CEFR (Pre-A1 → C2)
 
 > Especificación normativa del modelo de nivelación de English Tutor.
-> Estado: **borrador normativo aprobado por el gerente (2026-09-03)**. No impone
+> Estado: **borrador normativo aprobado por el gerente (2026-09-03)**; sección 9
+> ampliada en **V3.13 (2026-09-05)** con la calibración de evidencia pedagógica
+> (reglas inmutables R1–R7, §6.4 evidence depth, modalidades por destreza).
+> No impone
 > cambios de código por sí misma; define QUÉ debe demostrar un alumno para que se
 > le considere en un nivel y CÓMO debe mostrarse eso en la UI. Los cambios de
 > implementación se listan en la sección 9 como incrementos priorizados.
@@ -33,6 +36,28 @@
    UI nunca presenta una hipótesis como una conclusión.
 6. **Nada de esto se traduce en una fórmula única para toda la app.** Cada
    competencia declara sus propios gates y sus propios instrumentos.
+
+### 1.1 Reglas inmutables (R1–R7)
+
+Reglas no negociables en ninguna capa (motor, currículo, UI, contenidos). Un
+cambio futuro que las toque exige revisar primero esta constitución. Cuando una
+pantalla o un motor acopla dos conceptos separados por estas reglas sin pasar
+por el gate correspondiente, se considera un **bug pedagógico** de prioridad
+máxima, no una mejora.
+
+| Regla | Enunciado | Garantía actual en esta constitución | Violación típica |
+|---|---|---|---|
+| **R1** | Practice ≠ Mastery | §2.1 (FUNCTIONAL es hito de práctica, nunca certifica) y premisa 21 | "Has conseguido A1" por terminar una ruta |
+| **R2** | Mastery ≠ CEFR certification | §2.1 y §6 (DEMONSTRATED exige el gate completo) | badge "demostrado" sin retención |
+| **R3** | Vocabulary ≠ CEFR level | §3.1 (Vocabulary Coverage Indicator, indicador, no puerta) | palabras → banda CEFR (H1, eliminado en v3.3.0) |
+| **R4** | One skill ≠ Overall CEFR | §7.2 (el perfil se expresa como tupla por destreza) | un único nivel global sin distribución |
+| **R5** | Recognition ≠ Production | §7 (modalidades de evidencia por destreza) | MC aprobado → estructura "dominada" |
+| **R6** | Immediate success ≠ Retention | §6.3 (ventana ≥ 7 días y ratio estable) | un acierto puntual → demostrado |
+| **R7** | Small sample ≠ Demonstrated competence | §6.4 (mínimo de muestras y evidence depth) | 4 checks de C2 → lectura de competencia C2 |
+
+La columna "Garantía actual" referencia secciones normativas; cuando una de
+estas reglas se haga cumplible en código se anota en la sección 8 y en el
+roadmap de la sección 9.
 
 ## 2. Modelo conceptual (regla arquitectónica)
 
@@ -260,6 +285,30 @@ equivale a demostrado (los mínimos actuales por destreza están en
 - El `checkpoint` de listening (primera exposición correcta sin replay) NO es
   retención: es condición de no-memorización y se suma, no se sustituye.
 
+### 6.4 Evidence depth y mínimo de muestras (especificación)
+
+La evidencia de una destreza en un nivel se clasifica por **profundidad**, no
+solo por conteo (V3.13). La profundidad se mide contra los mínimos de
+`backend/curriculum/cefr_matrix.json` (`minimum_evidence`,
+`transfer_required`, `novel_required`; carga en `services/cefr_matrix.py`) y
+los kinds de `academy_evidence`
+(`familiar`/`transfer`/`novel`/`delayed`, `services/academy.py`).
+
+| Banda | Condición | Lectura permitida |
+|---|---|---|
+| **LOW** | muestras < `minimum_evidence` del nivel, **o** el banco oficial de práctica del nivel es corto (< `QUIZ_SHORT_BANK` = 12 checks) | a lo sumo "practice coverage · evidence depth LOW" |
+| **MEDIUM** | muestras ≥ `minimum_evidence` con kinds variados (`familiar` + al menos uno de `transfer`/`novel`) | apoya el estado FUNCTIONAL |
+| **HIGH** | muestras ≥ `minimum_evidence`, kinds completos y retención retardada estable (≥ 1 `delayed` o ruta DEMONSTRATED de listening) | sustenta el estado DEMONSTRATED |
+
+**Regla anti-bombeo (R7):** un nivel cuyo banco oficial de práctica tenga menos
+de `QUIZ_SHORT_BANK` checks —p. ej. Grammar B2 = 8 y C2 = 4— solo puede
+declarar evidencia de profundidad **LOW** para esa práctica. Aunque la puerta de
+la ruta pase (la cobertura se mide sobre el banco disponible y el checkpoint se
+adapta al banco corto), la lectura pedagógica nunca supera *practice coverage*:
+reconocer 4 checks no es evidencia suficiente de competencia C2. Demostrar un
+nivel con banco corto exige instrumentos fuera de la ruta (producción,
+transferencia, retención) que aporten muestras a la matriz del nivel.
+
 ## 7. Especificación por destreza (Pre-A1 → C2)
 
 Para cada destreza se define QUÉ cuenta como demostración. El contenido can-do
@@ -268,16 +317,33 @@ contenido de práctica en `backend/curriculum/<nivel>.json` (módulos/unidades/
 objetivos con `can_do`, `skills`, `subskills`, `checks`). Esta constitución NO
 duplica ese contenido: fija la **estructura de demostración** y las fuentes.
 
-| Destreza | Fuente can-do por banda | Evidencia que demuestra | Instrumentos actuales | Estado de los gates |
-|---|---|---|---|---|
-| Vocabulary | `cefr_descriptors.json` | producción espaciada y reconocimiento de unidades léxicas del nivel | `services/lexicon.py`, siembra por objetivo | parcial (por objetivo, sin gate de nivel) |
-| Grammar | `cefr_descriptors.json` | uso correcto de las estructuras del nivel en producción | checks deterministas + análisis de chat | gate por objetivo/unidad |
-| Listening | `cefr_descriptors.json` | subskills del foco del nivel + retención | `route_gate` + corpus | **gate completo aislado** (H3) |
-| Speaking | `cefr_descriptors.json` | tareas comunicativas del nivel (misión) | Speaking Mission/Assessment, scenarios | gate por misión (calibración C) |
-| Interaction | `cefr_descriptors.json` | turnos reales en conversación | `services/interaction.py` | sin gate formal |
-| Reading | `cefr_descriptors.json` | comprensión de textos del nivel | checks deterministas | gate por objetivo/unidad |
-| Writing | `cefr_descriptors.json` | tareas escritas del nivel | `services/writing.py` | sin gate formal |
-| Mediation | `cefr_descriptors.json` | transmisión/mediación en tareas | sin instrumento propio | sin gate formal |
+### Modalidades de evidencia (R5: Recognition ≠ Production)
+
+Toda evidencia se clasifica por la modalidad cognitiva que exige (V3.13):
+
+| Modalidad | Qué demuestra | Instrumentos típicos |
+|---|---|---|
+| **Recognition (REC)** | reconocer la forma correcta entre distractores | checks MC (rutas quiz, listening audio-MCQ, examen MCQ) |
+| **Controlled production (CP)** | producir la forma guiada (hueco / transformación), sin elegirla | ítems de producción controlada (completar, reescribir), dictado |
+| **Free production (FP)** | usar la forma espontáneamente en una tarea comunicativa | speaking cards, conversación, writing, misiones |
+
+Regla de lectura: aprobar solo REC no demuestra la destreza productiva
+asociada. Una destreza se considera "demostrada" cuando el mínimo de la matriz
+se cumple en las modalidades que le corresponden (ver tabla por destreza y
+sección 6.4).
+
+### Estructura de demostración por nivel
+
+| Destreza | Modalidades que aportan | Instrumentos actuales | "Demostrado A1–C2" exige (mínimos de `cefr_matrix.json`) |
+|---|---|---|---|
+| Vocabulary | REC + CP (lexical units) | rutas quiz MC, diccionario/lexicon | es **condición de apoyo** (§3), nunca puerta de nivel por sí sola; no produce "demostrado" |
+| Grammar | REC + CP (A2+) + FP vía Speaking/Writing | rutas quiz (MC hoy; CP en V3.13), examen, análisis de chat | REC sola **nunca** demuestra: exige muestras de producción (CP o FP) del nivel + `minimum_evidence` + retención |
+| Listening | REC (audio-MCQ) + CP (dictado) | `route_gate` + corpus | subskills del foco + retención (gate completo H3); la ruta con retención estable puede demostrar |
+| Speaking | FP | Speaking Mission/Assessment, scenarios, rutas | tareas comunicativas del nivel (misión) + `minimum_evidence` + retención |
+| Interaction | FP (turnos) | `services/interaction.py`, Conversation routes | turnos reales en conversación del nivel |
+| Reading | REC (comprensión) | checks deterministas | comprensión de textos del nivel |
+| Writing | FP | `services/writing.py` | tareas escritas del nivel |
+| Mediation | FP | sin instrumento propio | transmisión/mediación en tareas |
 
 Estructura de demostración por nivel (todas las destrezas):
 
@@ -332,6 +398,10 @@ como "tengo B1 en todo".
 | textos `routeNote`/`routePendingCert`/tooltip de bandas | Honestidad de práctica | v3.5.0: la UI tipa el estado por ruta (`functional` ≠ `demonstrated`) y lee "A1 Listening — not yet demonstrated" hasta la retención estable ≥7 días (P2-8) |
 | `modeCefrLevel`/`modeCefrBand` (`frontend/src/utils/modes.ts`) | — | eliminado en v3.5.0 (P2-10): código muerto sin uso en componentes |
 | `lexicon.item_status` y tabla `vocabulary` (`kind` word/structure) | Vocabulary Coverage Indicator + base de Lexical Units | v3.4.0: taxonomía `LEXICAL_KINDS` ampliada (§3.2, P1-7) y `coverage` receptivo/productivo en `/api/vocabulary/lexicon` (§3.1, P1-7) |
+| `quiz_routes.current_level` (primer nivel cuyo banco no está dominado) | Practice Level (material a practicar) | v3.13.0: pasa a sugerencia de material con fallback por `review_due` (V3.13-P0 #14) |
+| ruta quiz con banco corto (B2=8, C2=4 de grammar) | Practice Level con depth LOW (§6.4, R7) | v3.13.0: `stats` expone `bank_size` y `evidence_depth`; la UI lee "practice coverage · evidence depth LOW" (V3.13-P0 #12) |
+| `competence_state` (`demonstrated` = functional + retención) | Demonstrated CEFR (§2.1) | v3.13.0: exige además `minimum_evidence` de la matriz y producción donde la destreza la requiere (V3.13-P0 #13) |
+| evidencia `academy_evidence` sin atribución de nivel | Evidencia (glosario) | v3.13.0: filas nuevas con `level` para medir evidence depth por nivel (V3.13-P0 #11) |
 
 ## 9. Roadmap de implementación (incrementos futuros)
 
@@ -418,6 +488,57 @@ constitución si cambia umbrales o estructura.
     retirados `frontend/src/utils/modes.ts` y `modes.test.ts` (código muerto sin
     uso en componentes; la fuente real de los modos de chat es `TUTOR_MODES` de
     `hooks/useChat.ts`).
+
+### V3.13 — Calibración de evidencia pedagógica (cola abierta)
+
+Incrementos de la iteración V3.13, que priorizan la pregunta *"¿la evidencia que
+genera esta actividad demuestra que el alumno sabe hacer algo?"* frente a
+"¿está implementada la actividad?". Estado al final de la iteración en las
+marcas `implementado en v3.13.0`.
+
+**P0 — Motor de evidencia y honestidad de claims**
+
+11. **Evidence depth por destreza/nivel** (R7, §6.4) — `services/evidence_depth.py`
+    nuevo y puro: por destreza/nivel devuelve `{samples, by_kind, depth
+    (LOW/MEDIUM/HIGH), meets_matrix}` contra `cefr_matrix.json`. La evidencia de
+    `academy_evidence` se atribuye a un nivel (columna `level` en filas nuevas,
+    retrocompatible) y se expone junto a `competence_states`.
+12. **Claims de ruta honestos para bancos cortos** (R7) — las rutas quiz ya techan
+    en `functional`; añaden a `stats` `bank_size` y `evidence_depth` para que la
+    UI muestre "practice coverage · evidence depth LOW" en bancos cortos (B2=8,
+    C2=4 de grammar) y nunca invite a leer competencia fuerte.
+13. **Suelo de "demostrado" por destreza** (R1/R2/R5/R6) — `demonstrated` exige
+    gate funcional + `minimum_evidence` de la matriz + retención retardada
+    estable ≥ 7 días; las destrezas productivas (grammar/speaking/writing)
+    exigen además muestras de producción (REC solo nunca demuestra).
+14. **`current_level` como sugerencia de material** — deja de ser "primer nivel
+    cuyo banco no está 100% dominado"; con todo dominado elige por repaso
+    pendiente (`review_due`), y la UI nunca lo lee como banda del alumno.
+15. **Suite de invariantes pedagógicas** — `test_pedagogical_invariants.py`
+    (4 preguntas C2 no prueban C2, vocabulario solo no prueba CEFR, MC de
+    reconocimiento solo no demuestra, la práctica no certifica, el dominio exige
+    evidencia mínima).
+
+**P1 — Producción de Grammar y evidencia cross-skill**
+
+16. **Grammar en 3 niveles** (R5) — ítems `controlled_production` (hueco +
+    respuestas aceptadas, corrección determinista) en el currículo y en el motor
+    compartido de rutas; la producción libre se conecta a Speaking/Writing vía
+    cross-skill.
+17. **Cross-skill evidence** (R4) — registro de estructuras por nivel que cruza
+    grammar/speaking/listening/writing por objetivo; matriz por estructura y
+    panel (prototipo B1).
+18. **Golden pedagogical dataset** — `backend/tests/golden/pedagogy/` con casos
+    A1–C2 de evidence depth y de "demostrado".
+
+**P2 — UI y consistencia**
+
+19. **LearnRoutePage compartido** — shell único de las 6 rutas de APRENDER
+    (header, ejercicio, mapa CEFR, panel de nivel, modos, gate, assessment
+    formal) parametrizado por skill para eliminar la duplicación de las páginas
+    y paneles espejo.
+20. **Parity i18n automática** — test que garantiza claves `en`/`es` no vacías,
+    sin duplicados y sin claves usadas no resueltas.
 
 ## Glosario mínimo
 

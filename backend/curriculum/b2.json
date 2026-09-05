@@ -1334,5 +1334,56 @@
         }
       ]
     }
+  ],
+
+  "production_checks": [
+    {
+      "id": "b2-cp-01",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Argumentation & Complexity",
+      "prompt": "Complete with a contrast or concession linker. ___ it was raining, we went for a walk.",
+      "accepted_answers": ["although", "even though", "though"]
+    },
+    {
+      "id": "b2-cp-02",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Argumentation & Complexity",
+      "prompt": "Complete with a linker of consequence. She studied hard; ___, she passed the exam.",
+      "accepted_answers": ["therefore", "consequently", "as a result"]
+    },
+    {
+      "id": "b2-cp-03",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Argumentation & Complexity",
+      "prompt": "Complete the second conditional with the verb in brackets. If I ___ (have) more money, I would travel more.",
+      "accepted_answers": ["had"]
+    },
+    {
+      "id": "b2-cp-04",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Argumentation & Complexity",
+      "prompt": "Complete the third conditional with the verb in brackets. If she had left earlier, she ___ (not miss) the train.",
+      "accepted_answers": ["wouldn't have missed", "would not have missed"]
+    },
+    {
+      "id": "b2-cp-05",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Argumentation & Complexity",
+      "prompt": "Report with a reporting verb. 'You should rest,' the doctor told me. The doctor advised me ___ rest.",
+      "accepted_answers": ["to"]
+    },
+    {
+      "id": "b2-cp-06",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Nuance & Real-world Listening",
+      "prompt": "Complete with a modal of deduction. That noise? It ___ be the cat. (I am quite sure it is the cat.)",
+      "accepted_answers": ["must"]
+    }
   ]
 }

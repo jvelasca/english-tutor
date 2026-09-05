@@ -105,9 +105,20 @@ def test_review_next_only_failed_raises_when_empty():
 
 def test_current_level_advances_by_coverage():
     a1 = engine.checks_for_level(SKILL, "A1")
-    passed_all_a1 = {c["check_id"] for c in a1}
-    assert engine.current_level(SKILL, passed_all_a1) == "A2"
-    assert engine.current_level(SKILL, set()) == "A1"
+    rows_a1 = [{"check_id": c["check_id"], "passed": True} for c in a1]
+    assert engine.current_level(SKILL, rows_a1) == "A2"
+    assert engine.current_level(SKILL, []) == "A1"
+
+
+def test_current_level_all_mastered_picks_due_review_level():
+    """Con todos los bancos dominados, la sugerencia de material elige el nivel
+    con el repaso más pendiente (intento más antiguo), no el último fijo."""
+    all_rows: list[dict] = []
+    for level in engine.LEVEL_ORDER:
+        for c in engine.checks_for_level(SKILL, level):
+            all_rows.append({"check_id": c["check_id"], "passed": True})
+    # Último intento: C2 (más reciente) ⇒ el repaso más pendiente es A1.
+    assert engine.current_level(SKILL, all_rows) == "A1"
 
 
 # --- Puerta de ruta -----------------------------------------------------------
@@ -149,6 +160,8 @@ def test_route_gate_flags_short_banks():
     gate = engine.route_gate("grammar", "C2", rows)
     assert gate["passed"] is True
     assert 1 <= gate["checkpoint_required"] <= len(c2)
+    # Claim honesto: banco corto ⇒ práctica con evidence depth LOW (R7).
+    assert gate["practice_depth"] == "low"
 
 
 def test_route_competence_never_demonstrated(monkeypatch, tmp_path):

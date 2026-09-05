@@ -22,6 +22,9 @@ tests/golden/
     sequences.json          historias de review → propiedades del scheduling
   speaking/
     mission_probes.json     criterios débiles, drills, mejora, determinismo
+  pedagogy/
+    evidence_depth_cases.json  bandas de evidencia por destreza/nivel + suelos
+                               de "demostrado" (calibración V3.13, P0.1/P0.3)
 ```
 
 ## Convención
@@ -42,6 +45,7 @@ tests/golden/
 - `test_golden_evidence_graph.py` — limiting factor (incl. caso 88/91/85/63/58).
 - `test_golden_fsrs.py` — propiedades del scheduler.
 - `test_golden_speaking.py` — misión, frontera 0.6, determinismo del scoring.
+- `test_golden_pedagogy.py` — profundidad de evidencia + suelos de "demostrado".
 
 ## Regenerar las métricas de los dossieres
 

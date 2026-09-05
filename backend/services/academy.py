@@ -29,6 +29,7 @@ from services.curriculum import (
     Objective,
     next_level_id,
 )
+from services.evidence_depth import PRODUCTION_ITEM_TYPES
 from services.forgetting import review_due as forgetting_review_due
 
 # --- Modelo de mastery determinista (recencia + racha + confianza) ---------
@@ -454,10 +455,15 @@ def build_skill_profile(
             "novel": 0,
             "delayed": 0,
         }
+        production_count = 0
         for r in rows:
             kind = r.get("evidence_kind") or "familiar"
             if kind in evidence_by_kind:
                 evidence_by_kind[kind] += 1
+            # Evidencia de PRODUCCIÓN (R5): speaking/writing/pronunciation/
+            # controlled_production exigen producir, no reconocer.
+            if (r.get("item_type") or "mcq") in PRODUCTION_ITEM_TYPES:
+                production_count += 1
         profile.append(
             {
                 "skill": skill,
@@ -470,6 +476,7 @@ def build_skill_profile(
                 ),
                 "subskills": [],
                 "evidence_by_kind": evidence_by_kind,
+                "production_count": production_count,
                 "generalized_score": generalized_mastery_score(rows),
             }
         )

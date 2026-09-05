@@ -1,0 +1,115 @@
+{
+  "audit": "C-2026-09-05",
+  "area": "pedagogy",
+  "version": "1.0.0",
+  "description": "Calibración de evidencia pedagógica V3.13 (P0.1/P0.3). Fija las bandas de profundidad de la evidencia (low/medium/high) y los suelos de 'demostrado' por destreza contra la matriz CEFR: mínimo de muestras, retención retardada y producción en destrezas productivas (R5/R7 de la Constitución). Un cambio de motor o de matriz que altere estos veredictos exige re-auditar (dossier en docs/audit/) antes de editar este fixture.",
+  "evidence_depth_cases": [
+    {
+      "id": "ed-01-a1-grammar-low",
+      "case": "muestra por debajo del mínimo de la matriz (A1 grammar = 3)",
+      "skill": "grammar",
+      "level": "A1",
+      "samples": 1,
+      "evidence_by_kind": { "familiar": 1 },
+      "production_count": 0,
+      "expect": { "depth": "low", "meets_matrix": false, "minimum_evidence": 3, "delayed": 0, "production_count": 0 }
+    },
+    {
+      "id": "ed-02-a2-vocab-medium",
+      "case": "muestras suficientes sin retención retardada (soporte, no puerta)",
+      "skill": "vocabulary",
+      "level": "A2",
+      "samples": 4,
+      "evidence_by_kind": { "familiar": 4 },
+      "production_count": 0,
+      "expect": { "depth": "medium", "meets_matrix": true, "minimum_evidence": 3, "delayed": 0, "production_count": 0 }
+    },
+    {
+      "id": "ed-03-b1-grammar-high-production",
+      "case": "grammar B1 con retención retardada + muestras de producción → evidencia fuerte",
+      "skill": "grammar",
+      "level": "B1",
+      "samples": 6,
+      "evidence_by_kind": { "familiar": 3, "transfer": 2, "delayed": 1 },
+      "production_count": 2,
+      "expect": { "depth": "high", "meets_matrix": true, "minimum_evidence": 3, "delayed": 1, "production_count": 2 }
+    },
+    {
+      "id": "ed-04-b1-speaking-no-transfer",
+      "case": "B1 speaking exige ≥1 transfer: volumen familiar sin transferencia no cumple la matriz",
+      "skill": "speaking",
+      "level": "B1",
+      "samples": 3,
+      "evidence_by_kind": { "familiar": 3 },
+      "production_count": 1,
+      "expect": { "depth": "medium", "meets_matrix": false, "minimum_evidence": 3, "delayed": 0, "production_count": 1 }
+    },
+    {
+      "id": "ed-05-c2-listening-delayed-high",
+      "case": "C2 listening con mínimo (6) + transfer/novel exigidos + retención → high",
+      "skill": "listening",
+      "level": "C2",
+      "samples": 9,
+      "evidence_by_kind": { "familiar": 1, "transfer": 4, "novel": 3, "delayed": 1 },
+      "production_count": 0,
+      "expect": { "depth": "high", "meets_matrix": true, "minimum_evidence": 6, "delayed": 1, "production_count": 0 }
+    },
+    {
+      "id": "ed-06-c1-grammar-recognition-only",
+      "case": "R5: solo reconocimiento (MC) nunca demuestra grammar aunque la profundidad sea alta",
+      "skill": "grammar",
+      "level": "C1",
+      "samples": 6,
+      "evidence_by_kind": { "familiar": 5, "delayed": 1 },
+      "production_count": 0,
+      "expect": { "depth": "high", "meets_matrix": true, "minimum_evidence": 3, "delayed": 1, "production_count": 0 }
+    }
+  ],
+  "demonstrated_floor_cases": [
+    {
+      "id": "floor-a2-grammar-production-required",
+      "case": "R5: grammar con retención y mínimo de muestras pero sin producción → como mucho FUNCTIONAL",
+      "skill": "grammar",
+      "level": "A2",
+      "entry": {
+        "score": 0.9,
+        "confidence": 0.8,
+        "evidence_count": 5,
+        "evidence_by_kind": { "familiar": 4, "delayed": 1 },
+        "review_due": false,
+        "production_count": 0
+      },
+      "expect": { "state": "functional", "demonstrated": false, "evidence_depth": "high", "gate": { "retention_ok": true, "matrix_min_ok": true, "production_ok": false } }
+    },
+    {
+      "id": "floor-c2-speaking-matrix-minimum",
+      "case": "R7: speaking C2 por debajo del mínimo de muestras (6) no alcanza DEMONSTRATED",
+      "skill": "speaking",
+      "level": "C2",
+      "entry": {
+        "score": 0.85,
+        "confidence": 0.8,
+        "evidence_count": 5,
+        "evidence_by_kind": { "familiar": 3, "delayed": 1 },
+        "review_due": false,
+        "production_count": 1
+      },
+      "expect": { "state": "functional", "demonstrated": false, "evidence_depth": "low", "gate": { "retention_ok": true, "matrix_min_ok": false, "production_ok": true } }
+    },
+    {
+      "id": "floor-b1-grammar-demonstrated",
+      "case": "grammar B1 con mínimo + retención + producción → DEMONSTRATED (calibración completa)",
+      "skill": "grammar",
+      "level": "B1",
+      "entry": {
+        "score": 0.9,
+        "confidence": 0.8,
+        "evidence_count": 6,
+        "evidence_by_kind": { "familiar": 2, "transfer": 2, "delayed": 1, "novel": 1 },
+        "review_due": false,
+        "production_count": 2
+      },
+      "expect": { "state": "demonstrated", "demonstrated": true, "evidence_depth": "high", "gate": { "retention_ok": true, "matrix_min_ok": true, "production_ok": true } }
+    }
+  ]
+}

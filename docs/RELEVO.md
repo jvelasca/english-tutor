@@ -2317,6 +2317,20 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   - P2: UI de "Entrenamiento A1" vs "A1 — demonstrated"; etiquetado del nivel estimado;
     eliminar `modeCefrLevel`/`modeCefrBand`.
 
+### 37.30 NUEVO (V3.13, docs) — Calibración de evidencia pedagógica (normativa)
+- **Constitución pedagógica ampliada** (`docs/CONSTITUCION-PEDAGOGICA.md`): nuevas **Reglas
+  inmutables R1–R7** (Practice≠Mastery, Mastery≠CEFR certification, Vocabulary≠nivel,
+  One skill≠Overall, Recognition≠Production, Éxito inmediato≠Retención, Small sample≠
+  Competencia demostrada), **§6.4 Evidence depth** (LOW/MEDIUM/HIGH contra `cefr_matrix.json`;
+  bancos cortos ≤ 12 checks solo declaran "practice coverage · evidence depth LOW") y **§7**
+  reescrita por modalidades (recognition / controlled production / free production) con lo que
+  exige "demostrado" por destreza.
+- **Incrementos de código de la iteración V3.13** (ver §9 de la constitución): P0 (evidence
+  depth por destreza/nivel, claims honestos para bancos cortos, suelo de "demostrado" con
+  mínimo de muestras y producción, `current_level` como sugerencia de material, invariantes
+  pedagógicas) · P1 (Grammar en 3 niveles con producción controlada, cross-skill evidence B1,
+  golden pedagogical dataset) · P2 (LearnRoutePage compartido, parity i18n automática).
+
 ### Próximo (V2.6+)
 Orden de prioridades fijado por la auditoría externa:
 - ~~**🔴 P0 — Unit Learning Loop (contenido)**~~ ✅ hecho (37.28): marcador `phase` implementado

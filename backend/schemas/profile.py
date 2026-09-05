@@ -31,6 +31,10 @@ class SkillState(BaseModel):
     stability: float
     trend: float | None = None
     subskills: list[dict] = Field(default_factory=list)
+    # Profundidad de la evidencia formal de la destreza en el nivel actual
+    # (Constitución §6.4; V3.13): low/medium/high contra los mínimos de la matriz.
+    evidence_depth: str = "low"
+    minimum_evidence: int = 0
 
 
 class CefrSnapshot(BaseModel):
@@ -55,6 +59,10 @@ class CompetenceGate(BaseModel):
     evidence_ok: bool
     review_due: bool
     retention_ok: bool
+    # V3.13: mínimo de muestras de la matriz y —destreza productiva— evidencia de
+    # producción para alcanzar DEMONSTRATED.
+    matrix_min_ok: bool = False
+    production_ok: bool = False
 
 
 class CompetenceState(BaseModel):
@@ -62,7 +70,8 @@ class CompetenceState(BaseModel):
 
     Los 4 estados (Constitución §2.1): not_started / developing / functional /
     demonstrated. `estimated_band` es la hipótesis heurística de visualización
-    ("—" sin evidencia); `demonstrated` solo se concede con retención."""
+    ("—" sin evidencia); `demonstrated` solo se concede con retención, el mínimo
+    de muestras de la matriz y producción donde la destreza la exige."""
 
     skill: str
     level: str
@@ -72,7 +81,25 @@ class CompetenceState(BaseModel):
     score: float
     confidence: float
     evidence_count: int
+    evidence_depth: str = "low"
     gate: CompetenceGate
+
+
+class EvidenceDepthOut(BaseModel):
+    """Profundidad de la evidencia de una destreza en el nivel actual (V3.13).
+
+    Mismo contrato que `services.evidence_depth.evidence_depth_report`: muestra
+    real vs `minimum_evidence` de la matriz, retención retardada (`delayed`),
+    muestras de producción y `meets_matrix` (cantidad + transferencia/novedad)."""
+
+    skill: str
+    level: str
+    samples: int
+    minimum_evidence: int
+    delayed: int
+    production_count: int = 0
+    depth: str
+    meets_matrix: bool
 
 
 class LearningProfile(BaseModel):
@@ -86,6 +113,7 @@ class LearningProfile(BaseModel):
     target_level: str
     skills: list[SkillState]
     competence_states: list[CompetenceState] = Field(default_factory=list)
+    evidence_depth: list[EvidenceDepthOut] = Field(default_factory=list)
     readiness: ReadinessOut
     cefr_history: list[CefrSnapshot] = Field(default_factory=list)
     vocabulary_size: int

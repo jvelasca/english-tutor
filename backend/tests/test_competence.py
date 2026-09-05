@@ -10,6 +10,7 @@ def _entry(
     evidence_count: int = 0,
     evidence_by_kind: dict | None = None,
     review_due: bool = False,
+    production_count: int = 0,
 ) -> dict:
     return {
         "skill": "grammar",
@@ -18,6 +19,7 @@ def _entry(
         "evidence_count": evidence_count,
         "evidence_by_kind": evidence_by_kind or {},
         "review_due": review_due,
+        "production_count": production_count,
     }
 
 
@@ -59,6 +61,30 @@ def test_gate_met_is_functional_but_not_demonstrated():
 
 
 def test_delayed_evidence_grants_demonstrated():
+    # Retención retardada + mínimo de muestras de la matriz (A1 grammar = 3) y
+    # producción (V3.13): DEMONSTRATED.
+    record = competence_state(
+        _entry(
+            score=0.85,
+            confidence=0.8,
+            evidence_count=5,
+            evidence_by_kind={"familiar": 4, "delayed": 1},
+            production_count=2,
+        ),
+        "grammar",
+        "A1",
+    )
+    assert record["state"] == "demonstrated"
+    assert record["demonstrated"] is True
+    assert record["gate"]["retention_ok"] is True
+    assert record["gate"]["matrix_min_ok"] is True
+    assert record["gate"]["production_ok"] is True
+    assert record["evidence_depth"] == "high"
+
+
+def test_recognition_only_never_demonstrates_grammar():
+    # R5: solo reconocimiento (MC, sin muestras de producción) jamás alcanza
+    # DEMONSTRATED aunque haya retención retardada (calibración V3.13).
     record = competence_state(
         _entry(
             score=0.85,
@@ -69,8 +95,29 @@ def test_delayed_evidence_grants_demonstrated():
         "grammar",
         "A1",
     )
-    assert record["state"] == "demonstrated"
-    assert record["demonstrated"] is True
+    assert record["state"] == "functional"
+    assert record["demonstrated"] is False
+    assert record["gate"]["production_ok"] is False
+    assert record["evidence_depth"] == "high"
+
+
+def test_below_matrix_minimum_never_demonstrates():
+    # R7/R6: muestras por debajo del mínimo de la matriz (C2 listening = 6)
+    # bloquean DEMONSTRATED aunque haya `delayed`.
+    record = competence_state(
+        _entry(
+            score=0.9,
+            confidence=0.8,
+            evidence_count=3,
+            evidence_by_kind={"familiar": 2, "delayed": 1},
+            production_count=1,
+        ),
+        "listening",
+        "C2",
+    )
+    assert record["state"] == "functional"
+    assert record["demonstrated"] is False
+    assert record["gate"]["matrix_min_ok"] is False
 
 
 def test_review_due_blocks_functional_even_with_delayed():

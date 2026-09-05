@@ -59,6 +59,7 @@ class VocabularyGate(BaseModel):
 
     passed: bool = False
     total: int = 0
+    bank_size: int = 0
     mastered: int = 0
     coverage_pct: float = 0.0
     coverage_required_pct: float = 80.0
@@ -69,6 +70,7 @@ class VocabularyGate(BaseModel):
     checkpoint: int = 0
     checkpoint_required: int = 0
     short_bank: bool = False
+    practice_depth: str = "low"
     blockers: list[str] = Field(default_factory=list)
 
 
@@ -76,16 +78,21 @@ class VocabularyLevelOut(BaseModel):
     """Progreso de una ruta de vocabulary para el mapa de niveles.
 
     `state` ∈ {not_started, developing, functional}: la ruta es práctica y nunca
-    informa `demonstrated` (demostrar exige examen/escalera del curso + evidencia)."""
+    informa `demonstrated` (demostrar exige examen/escalera del curso + evidencia).
+    `bank_size` y `evidence_depth` exponen el claim honesto de V3.13: un banco
+    corto (< 12 ítems) solo lee "practice coverage · evidence depth LOW" aunque
+    la puerta pase."""
 
     level: str
     total: int
+    bank_size: int = 0
     mastered: int
     completed: bool
     coverage_pct: float | None = None
     accuracy: float | None = None
     gate: VocabularyGate | None = None
     state: str = "not_started"
+    evidence_depth: str = "low"
 
 
 class VocabularyItemOut(BaseModel):

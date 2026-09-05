@@ -1059,6 +1059,46 @@ const STRINGS: Record<string, Entry> = {
     en: "No evidence graph yet.",
     es: "Aún no hay grafo de evidencia.",
   },
+  "crossSkill.title": {
+    en: "Cross-skill evidence · B1 structures",
+    es: "Evidencia cross-skill · estructuras B1",
+  },
+  "crossSkill.note": {
+    en: "For each grammar structure of B1, the evidence you already have in the skills the curriculum exposes it to. ✓ = correct evidence, ✗ = instrument offered but no evidence yet, – = this skill does not expose the structure.",
+    es: "Por cada estructura gramatical de B1, la evidencia que ya tienes en las destrezas a las que el currículo la expone. ✓ = evidencia correcta, ✗ = instrumento ofrecido pero aún sin evidencia, – = esa destreza no expone la estructura.",
+  },
+  "crossSkill.channel.recognition": {
+    en: "Recognition (MC)",
+    es: "Reconocimiento (MC)",
+  },
+  "crossSkill.channel.production": {
+    en: "Production (typed)",
+    es: "Producción (escrita)",
+  },
+  "crossSkill.channel.listening": { en: "Listening", es: "Listening" },
+  "crossSkill.channel.speaking": { en: "Speaking", es: "Speaking" },
+  "crossSkill.channel.transfer": {
+    en: "Transfer / retention",
+    es: "Transferencia / retención",
+  },
+  "crossSkill.structure": { en: "Structure", es: "Estructura" },
+  "crossSkill.evidenceCount": {
+    en: "{n} correct sample(s)",
+    es: "{n} muestra(s) correcta(s)",
+  },
+  "crossSkill.protoNote": {
+    en: "Read-only prototype: B1 only.",
+    es: "Prototipo de solo lectura: únicamente B1.",
+  },
+  "crossSkill.empty": {
+    en: "No cross-skill structures yet.",
+    es: "Aún no hay estructuras cross-skill.",
+  },
+  "crossSkill.error": {
+    en: "Couldn't load the cross-skill evidence.",
+    es: "No se pudo cargar la evidencia cross-skill.",
+  },
+  "crossSkill.loading": { en: "Loading…", es: "Cargando…" },
   "fsrs.title": { en: "FSRS review", es: "Repaso FSRS" },
   "fsrs.subtitle": {
     en: "What · Why · When · How strong · Last · Next",
@@ -2352,6 +2392,14 @@ const STRINGS: Record<string, Entry> = {
     en: "Deterministic check from your course curriculum — instant feedback, no extra content invented.",
     es: "Check determinista de tu currículo del curso: feedback inmediato, sin contenido inventado.",
   },
+  "vocRoutes.practiceCoverageLow": {
+    en: "Practice coverage · evidence depth LOW",
+    es: "Práctica cubierta · profundidad de evidencia BAJA",
+  },
+  "vocRoutes.practiceCoverageMedium": {
+    en: "Practice coverage · evidence depth MEDIUM",
+    es: "Práctica cubierta · profundidad de evidencia MEDIA",
+  },
   "vocRoutes.dictionaryCta": { en: "My dictionary", es: "Mi diccionario" },
   "vocRoutes.dictionaryHint": {
     en: "Personal dictionary of the words you've met.",
@@ -2556,6 +2604,42 @@ const STRINGS: Record<string, Entry> = {
   "gramRoutes.pickNote": {
     en: "Deterministic check from your course curriculum — instant feedback, no extra content invented.",
     es: "Check determinista de tu currículo del curso: feedback inmediato, sin contenido inventado.",
+  },
+  "gramRoutes.practiceCoverageLow": {
+    en: "Practice coverage · evidence depth LOW",
+    es: "Práctica cubierta · profundidad de evidencia BAJA",
+  },
+  "gramRoutes.practiceCoverageMedium": {
+    en: "Practice coverage · evidence depth MEDIUM",
+    es: "Práctica cubierta · profundidad de evidencia MEDIA",
+  },
+  "gramRoutes.typeIn": {
+    en: "Type the answer",
+    es: "Escribe la respuesta",
+  },
+  "gramRoutes.typedHint": {
+    en: "Type the missing words — spelling counts.",
+    es: "Escribe las palabras que faltan: la ortografía cuenta.",
+  },
+  "gramRoutes.typedAnswerLabel": {
+    en: "Your answer",
+    es: "Tu respuesta",
+  },
+  "gramRoutes.typedPlaceholder": {
+    en: "Write here…",
+    es: "Escribe aquí…",
+  },
+  "gramRoutes.typedSubmit": {
+    en: "Check answer",
+    es: "Comprobar",
+  },
+  "gramRoutes.typedYourAnswer": {
+    en: "You wrote",
+    es: "Has escrito",
+  },
+  "gramRoutes.typedExpected": {
+    en: "Expected answer(s)",
+    es: "Respuesta(s) esperada(s)",
   },
   "gramRoutes.levelStates.failed": {
     en: "Missed ({count})",
@@ -2920,6 +3004,9 @@ const STRINGS: Record<string, Entry> = {
     es: "{pct}% cubierto",
   },
 };
+
+/** Diccionario completo (solo lectura para tests de paridad i18n, V3.13 P2.2). */
+export const I18N_ENTRIES: Record<string, { en: string; es: string }> = STRINGS;
 
 export function translate(lang: Lang, key: string): string {
   const entry = STRINGS[key];

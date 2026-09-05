@@ -125,6 +125,29 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         assert len(body["competence_states"]) == 9
         assert all(s["state"] == "not_started" for s in body["competence_states"])
         assert all(s["estimated_band"] == "—" for s in body["competence_states"])
+        # Evidencia por profundidad (V3.13, Constitución §6.4): expuesta junto a
+        # competence_states y por destreza en `skills`.
+        assert body["evidence_depth"]
+        assert all(
+            {
+                "skill",
+                "level",
+                "samples",
+                "minimum_evidence",
+                "delayed",
+                "production_count",
+                "depth",
+                "meets_matrix",
+            }
+            <= set(entry)
+            for entry in body["evidence_depth"]
+        )
+        assert all(
+            {"skill", "band", "score", "confidence", "samples", "stability"}
+            <= set(s)
+            for s in body["skills"]
+        )
+        assert body["skills"][0]["evidence_depth"] in ("low", "medium", "high")
         assert body["vocabulary_size"] == 2
         assert set(body["top_words"]) == {"cat", "dog"}
         assert body["recurring_errors"][0]["rule"] == "he_she_it_s"

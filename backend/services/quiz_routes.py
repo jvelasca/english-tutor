@@ -1,11 +1,13 @@
-"""Motor compartido de rutas quiz MC sobre los checks del currículo (V3.11+).
+"""Motor compartido de rutas quiz sobre los checks del currículo (V3.11+).
 
 Vocabulary (v3.11) y Grammar (v3.12) comparten el mismo diseño de ruta: el banco
-de un nivel son los `checks` de opción múltiple del currículo oficial
-(`curriculum/<level>.json` → `objectives[].checks`) con la skill pedida. Cada
-"ítem" de una ruta es un check `{check_id, level, topic, prompt, options,
-correct_index}` y la evaluación es determinista (acierto = superado), sin LLM y
-sin corpus propio: el pool se lee del currículo en caliente.
+de un nivel son los ítems deterministas del currículo oficial
+(`curriculum/<level>.json` → `objectives[].checks` para MC + `production_checks`
+para producción controlada de grammar desde V3.13 P1) con la skill pedida. Cada
+"ítem" de una ruta es `{check_id, level, topic, prompt, type, ...}` y la
+evaluación es determinista (sin LLM y sin corpus propio): MC por índice
+(`correct_index`) o producción controlada escrita por normalización
+(`accepted_answers`); el pool se lee del currículo en caliente.
 
 Este módulo es el motor puro común, parametrizado por `skill`. Vocabulary y
 Grammar montan sobre él sus repositorios/dominios/routers particulares (tabla de
@@ -20,6 +22,7 @@ superar la ruta.
 from __future__ import annotations
 
 import json
+import unicodedata
 from functools import lru_cache
 
 from services.curriculum import CURRICULUM_DIR, CEFR_ORDER
@@ -70,10 +73,18 @@ def _level_data(level: str) -> dict:
 
 @lru_cache(maxsize=4)
 def quiz_checks(skill: str) -> tuple[dict, ...]:
-    """Pool oficial de checks MC con `skill` de todo el currículo (A1-C2).
+    """Pool oficial de ítems con `skill` de todo el currículo (A1-C2).
 
-    Cada ítem es `{check_id, level, topic, prompt, options, correct_index}` donde
-    `check_id` es el id del check (único en el currículo) y `topic` es el módulo
+    Cada ítem es `{check_id, level, topic, prompt, type, ...}` donde `type`
+    determina el resto de campos:
+
+    - `mcq`: checks de opción múltiple de `objectives[].checks`
+      `{options, correct_index}` — reconocimiento;
+    - `controlled_production`: ítems de escritura de grammar
+      (`level.production_checks`, V3.13 P1) `{accepted_answers}` — producción
+      controlada, corregida por normalización determinista (sin LLM).
+
+    `check_id` es el id del ítem (único en el currículo) y `topic` es el módulo
     del currículo que lo contiene (agrupación temática para la puerta y la UI).
     """
     checks: list[dict] = []
@@ -93,10 +104,29 @@ def quiz_checks(skill: str) -> tuple[dict, ...]:
                                     "level": level,
                                     "topic": module_title,
                                     "prompt": check.get("prompt", ""),
+                                    "type": "mcq",
                                     "options": list(check.get("options", [])),
-                                    "correct_index": int(check.get("correct_index", -1)),
+                                    "correct_index": int(
+                                        check.get("correct_index", -1)
+                                    ),
+                                    "accepted_answers": [],
                                 }
                             )
+        # Ítems de producción controlada de grammar del nivel (V3.13 P1).
+        for check in data.get("production_checks", []):
+            if check.get("skill") != skill:
+                continue
+            checks.append(
+                {
+                    "check_id": check.get("id", ""),
+                    "level": level,
+                    "topic": check.get("topic", ""),
+                    "prompt": check.get("prompt", ""),
+                    "type": "controlled_production",
+                    "options": [],
+                    "accepted_answers": list(check.get("accepted_answers", [])),
+                }
+            )
     return tuple(checks)
 
 
@@ -132,6 +162,21 @@ def is_short_bank(total: int) -> bool:
     return 0 < total < QUIZ_SHORT_BANK
 
 
+def practice_depth(gate: dict) -> str:
+    """Profundidad de la práctica de una ruta (Constitución §6.4, V3.13).
+
+    La práctica de una ruta quiz NUNCA produce evidencia formal de nivel: su
+    lectura de profundidad es a lo sumo 'medium'. Un banco corto (< 12 ítems,
+    p. ej. grammar C2 = 4) o una puerta aún no superada dejan la
+    práctica en 'low' (etiqueta "practice coverage · evidence depth LOW").
+    """
+    if not gate.get("passed"):
+        return "low"
+    if gate.get("short_bank"):
+        return "low"
+    return "medium"
+
+
 def _accuracy(rows: list[dict]) -> float | None:
     """Precisión (0..100) como % de intentos superados sobre los del nivel."""
     if not rows:
@@ -143,13 +188,15 @@ def _accuracy(rows: list[dict]) -> float | None:
 def level_items(skill: str, level: str, attempts_rows: list[dict]) -> list[dict]:
     """Estado por check del banco de un nivel CEFR (puro).
 
-    Para cada check de la ruta devuelve `{check_id, level, topic, prompt,
+    Para cada check de la ruta devuelve `{check_id, level, topic, prompt, type,
     attempts, state}` donde `state` es:
     - "unseen": nunca respondido;
     - "failed": respondido alguna vez pero nunca acertado;
     - "mastered": acertado al menos una vez.
 
-    El estado se deriva en vivo de la tabla de intentos (sin migración).
+    `type` ("mcq" | "controlled_production") permite a la UI distinguir los
+    ítems de producción controlada de los de reconocimiento. El estado se deriva
+    en vivo de la tabla de intentos (sin migración).
     """
     pool = route_items(skill, level)
     seen: set[str] = set()
@@ -178,6 +225,7 @@ def level_items(skill: str, level: str, attempts_rows: list[dict]) -> list[dict]
                 "level": level,
                 "topic": c.get("topic", ""),
                 "prompt": c.get("prompt", ""),
+                "type": c.get("type", "mcq"),
                 "attempts": counts.get(qid, 0),
                 "state": state,
             }
@@ -233,6 +281,7 @@ def route_gate(skill: str, level: str, attempts_rows: list[dict]) -> dict:
         return {
             "passed": False,
             "total": 0,
+            "bank_size": 0,
             "mastered": 0,
             "coverage_pct": 0.0,
             "coverage_required_pct": round(ROUTE_MIN_COVERAGE * 100),
@@ -244,6 +293,7 @@ def route_gate(skill: str, level: str, attempts_rows: list[dict]) -> dict:
             "checkpoint_required": 0,
             "blockers": ["coverage", "accuracy", "topics", "checkpoint"],
             "short_bank": False,
+            "practice_depth": "low",
         }
     official_ids = {c["check_id"] for c in official}
     level_rows = [row for row in attempts_rows if row.get("check_id") in official_ids]
@@ -274,6 +324,7 @@ def route_gate(skill: str, level: str, attempts_rows: list[dict]) -> dict:
     return {
         "passed": not blockers,
         "total": total,
+        "bank_size": total,
         "mastered": mastered,
         "coverage_pct": coverage_pct,
         "coverage_required_pct": coverage_required_pct,
@@ -285,6 +336,12 @@ def route_gate(skill: str, level: str, attempts_rows: list[dict]) -> dict:
         "checkpoint_required": checkpoint_required,
         "blockers": blockers,
         "short_bank": is_short_bank(total),
+        # La profundidad de la práctica (Constitución §6.4) es LOW mientras la
+        # puerta no pasa o el banco es corto; solo un banco representativo
+        # dominado lee MEDIUM. Espejo de `practice_depth()` (fuente única).
+        "practice_depth": (
+            "low" if blockers or is_short_bank(total) else "medium"
+        ),
     }
 
 
@@ -310,20 +367,38 @@ def level_status(skill: str, attempts_rows: list[dict]) -> list[dict]:
     ]
 
 
-def current_level(skill: str, passed_check_ids: set[str]) -> str:
-    """Nivel CEFR cuyo contenido se está practicando (routing por cobertura).
+def current_level(skill: str, attempts_rows: list[dict]) -> str:
+    """Nivel CEFR del MATERIAL que se sugiere practicar ahora (V3.13).
 
-    Primer nivel cuyo banco oficial aún no está dominado por completo; si todos
-    lo están, devuelve el último para poder seguir practicando.
+    Lee la cobertura de los bancos oficiales desde los intentos: el primer nivel
+    cuyo banco aún no está dominado por completo es el material a practicar. Si
+    todos los bancos están dominados, en lugar de quedarse fijo en el último
+    nivel, elige el nivel con el repaso más pendiente (intento más antiguo),
+    para que la sugerencia siga reflejando la curva de olvido.
+
+    Es una SUGERENCIA DE MATERIAL de práctica, nunca una afirmación sobre el
+    nivel del alumno (regla R4): la UI no debe leerlo como banda CEFR.
     """
+    passed_ids = {r["check_id"] for r in attempts_rows if r.get("passed")}
     for level in LEVEL_ORDER:
         official = checks_for_level(skill, level)
         if not official:
             continue
-        mastered = sum(1 for c in official if c["check_id"] in passed_check_ids)
+        mastered = sum(1 for c in official if c["check_id"] in passed_ids)
         if mastered < len(official):
             return level
-    return LEVEL_ORDER[-1]
+
+    # Todos los bancos dominados: repaso del nivel con intento más antiguo.
+    level_of = {c["check_id"]: c["level"] for c in quiz_checks(skill)}
+    last_index: dict[str, int] = {}
+    for i, row in enumerate(attempts_rows):
+        lvl = level_of.get(row.get("check_id"))
+        if lvl is not None:
+            last_index[lvl] = i
+    with_rows = [lvl for lvl in LEVEL_ORDER if lvl in last_index]
+    if not with_rows:
+        return LEVEL_ORDER[-1]
+    return min(with_rows, key=lambda lvl: last_index[lvl])
 
 
 def review_next_question(
@@ -396,3 +471,39 @@ def route_competence(skill: str, attempt_rows: list[dict]) -> list[dict]:
             state = "developing"
         result.append({"level": level, "state": state, "gate": gate})
     return result
+
+
+# --- Evaluación de producción controlada (V3.13 P1) --------------------------
+# Ítems `type: "controlled_production"` de grammar: el alumno ESCRIBE la
+# respuesta. La corrección es determinista por normalización de texto (sin LLM,
+# sin IA generativa): minúsculas, sin acentos ni puntuación significativa, y con
+# espacios colapsados. `typed_matches` decide el acierto contra las variantes
+# aceptadas del currículo.
+
+def normalize_typed(text: str) -> str:
+    """Normaliza una respuesta escrita para comparación determinista.
+
+    Aplica, en orden: minúsculas, descomposición Unicode y borrado de marcas
+    (acentos/ñ se comparan sin tilde pero conservando la letra base), borrado de
+    puntuación (conservando apóstrofos y guiones intra-palabra) y colapso de
+    espacios. Ejemplos: "  HAVE   been " → "have been"; "can't" → "can't".
+    """
+    value = (text or "").strip().lower()
+    value = "".join(
+        ch for ch in unicodedata.normalize("NFKD", value) if not unicodedata.combining(ch)
+    )
+    value = "".join(
+        ch
+        if ch.isalnum() or ch in {"'", "-", "’"}
+        else " "
+        for ch in value
+    )
+    return " ".join(value.split())
+
+
+def typed_matches(typed: str, accepted_answers: list[str]) -> bool:
+    """True si la respuesta escrita coincide con alguna variante aceptada."""
+    clean = normalize_typed(typed)
+    if not clean:
+        return False
+    return any(normalize_typed(answer) == clean for answer in accepted_answers)

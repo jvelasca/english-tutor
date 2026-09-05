@@ -1512,5 +1512,56 @@
         }
       ]
     }
+  ],
+
+  "production_checks": [
+    {
+      "id": "c1-cp-01",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Advanced Grammar & Precision",
+      "prompt": "Rewrite with inversion. I have never seen such a mess. Never ___ I seen such a mess.",
+      "accepted_answers": ["have"]
+    },
+    {
+      "id": "c1-cp-02",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Advanced Grammar & Precision",
+      "prompt": "Complete the cleft sentence. I love coffee. What I love ___ coffee.",
+      "accepted_answers": ["is"]
+    },
+    {
+      "id": "c1-cp-03",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Advanced Grammar & Precision",
+      "prompt": "Complete with an emphatic structure. ___ was the CEO who made the decision.",
+      "accepted_answers": ["it"]
+    },
+    {
+      "id": "c1-cp-04",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Idioms & Collocations",
+      "prompt": "Complete the collocation with the missing preposition. We must abide ___ the rules.",
+      "accepted_answers": ["by"]
+    },
+    {
+      "id": "c1-cp-05",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Abstract & Academic Discourse",
+      "prompt": "Rewrite in the passive. They will announce the results tomorrow. The results ___ tomorrow.",
+      "accepted_answers": ["will be announced"]
+    },
+    {
+      "id": "c1-cp-06",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Abstract & Academic Discourse",
+      "prompt": "Rewrite in the passive. Someone stole the painting. The painting ___ .",
+      "accepted_answers": ["was stolen"]
+    }
   ]
 }

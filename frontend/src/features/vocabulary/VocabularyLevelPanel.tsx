@@ -139,7 +139,19 @@ export function VocabularyLevelPanel({
           </span>
         </div>
         {data.completed ? (
-          <Badge className="gap-1">{t("vocRoutes.completedShort")}</Badge>
+          <Badge
+            variant="outline"
+            className={cn(
+              "gap-1",
+              gate?.practice_depth === "medium"
+                ? "border-success/50 text-success"
+                : "border-warning/40 text-warning",
+            )}
+          >
+            {gate?.practice_depth === "medium"
+              ? t("vocRoutes.practiceCoverageMedium")
+              : t("vocRoutes.practiceCoverageLow")}
+          </Badge>
         ) : (
           pendingCert && (
             <Badge variant="outline" className="border-warning/40 text-warning">

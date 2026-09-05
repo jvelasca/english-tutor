@@ -17,6 +17,7 @@ from services.cefr import (
     level_descriptor,
     recommendations,
 )
+from services.evidence_depth import evidence_depth_report
 from services.curriculum import CURRICULUM_VERSION
 from services.vocabulary import classify
 
@@ -109,6 +110,24 @@ def _skill_states(skills: list[dict]) -> list[dict]:
     return result
 
 
+def _evidence_depth_out(skills: list[dict], level: str) -> dict[str, dict]:
+    """Mapa destreza → profundidad de evidencia en `level` (Constitución §6.4).
+
+    Calcula la profundidad de la evidencia formal de cada destreza del Student
+    Model en el nivel actual con `services.evidence_depth` (mínimos de la matriz
+    CEFR, retención retardada y muestras de producción)."""
+    return {
+        entry["skill"]: evidence_depth_report(
+            entry["skill"],
+            level,
+            int(entry.get("evidence_count", 0) or 0),
+            entry.get("evidence_by_kind"),
+            production_count=int(entry.get("production_count", 0) or 0),
+        )
+        for entry in skills
+    }
+
+
 async def _compute_profile(user_id: str) -> dict | None:
     """Calcula el perfil del alumno sin persistir nada. Devuelve None si el
     usuario no existe.
@@ -125,6 +144,16 @@ async def _compute_profile(user_id: str) -> dict | None:
     skills = _skill_states(student_model["skills"])
     bands = _bands_from_skills(student_model["skills"])
     level = student_model["estimated_level"]
+    current_level = student_model["current_level"]
+    # La profundidad se mide en el nivel del Student Model actual (el mismo de
+    # `competence_states` y de las muestras por destreza del perfil).
+    depth_by_skill = _evidence_depth_out(student_model["skills"], current_level)
+    # La profundidad de evidencia también se expone por destreza en `skills`.
+    for skill_state in skills:
+        report = depth_by_skill.get(skill_state["skill"])
+        if report is not None:
+            skill_state["evidence_depth"] = report["depth"]
+            skill_state["minimum_evidence"] = report["minimum_evidence"]
 
     recs = recommendations(
         {
@@ -144,6 +173,7 @@ async def _compute_profile(user_id: str) -> dict | None:
         "overall_ability": student_model["estimated_numeric"],
         "target_level": student_model["target_level"],
         "skills": skills,
+        "evidence_depth": list(depth_by_skill.values()),
         "competence_states": competence_states(
             student_model["skills"], student_model["current_level"]
         ),

@@ -47,8 +47,7 @@ async def next_question(
     """
     attempts_rows = await run_in_threadpool(vocab_repo.list_attempts, user_id)
     if level is None:
-        passed = await run_in_threadpool(vocab_repo.passed_check_ids, user_id)
-        level = engine.current_level(SKILL, passed)
+        level = engine.current_level(SKILL, attempts_rows)
     only_failed = mode == "failed"
     only_mastered = mode == "mastered"
     check = engine.review_next_question(
@@ -140,11 +139,15 @@ async def get_stats(user_id: str) -> dict:
             {
                 "level": level,
                 "total": len(items),
+                "bank_size": len(items),
                 "mastered": mastered,
                 "completed": gate["passed"],
                 "coverage_pct": gate["coverage_pct"],
                 "accuracy": gate["accuracy"],
                 "gate": gate,
+                # Claim honesto (V3.13): bancos cortos solo leen práctica con
+                # evidencia de profundidad LOW (Constitución §6.4, R7).
+                "evidence_depth": engine.practice_depth(gate),
                 "state": next(
                     (
                         c["state"]
@@ -155,12 +158,7 @@ async def get_stats(user_id: str) -> dict:
                 ),
             }
         )
-    passed_official: set[str] = set()
-    for row in attempts_rows:
-        cid = row.get("check_id")
-        if cid and engine.get_check(SKILL, cid) is not None and row.get("passed"):
-            passed_official.add(cid)
-    level = engine.current_level(SKILL, passed_official)
+    level = engine.current_level(SKILL, attempts_rows)
     completed = all(g["gate"]["passed"] for g in levels if g["total"] > 0)
     return {
         "attempts": len(attempts_rows),

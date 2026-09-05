@@ -31,12 +31,17 @@ def is_valid_level(level: str) -> bool:
 
 
 def _question_public(check: dict) -> dict:
-    """Forma pública de un check: NUNCA incluye `correct_index`."""
+    """Forma pública de un ítem: NUNCA incluye la respuesta correcta.
+
+    Para MC se oculta `correct_index`; para producción controlada (V3.13 P1) se
+    ocultan `accepted_answers` y se expone `type` para que el cliente pinte el
+    formato correcto (elegir opción vs escribir la respuesta)."""
     return {
         "check_id": check["check_id"],
         "level": check.get("level", ""),
         "topic": check.get("topic", ""),
         "prompt": check.get("prompt", ""),
+        "type": check.get("type", "mcq"),
         "options": check.get("options", []),
     }
 
@@ -46,13 +51,13 @@ async def next_question(
 ) -> dict:
     """Siguiente check del banco de una ruta (nuevo/failed/mastered).
 
-    Sin `level`, elige el nivel por cobertura del banco oficial. Lanza
+    Sin `level`, elige el nivel por cobertura del banco oficial (`current_level`
+    es sugerencia de material, V3.13). Lanza
     `ValueError("grammar.no_failed")` si no queda nada en el bucket pedido.
     """
     attempts_rows = await run_in_threadpool(grammar_repo.list_attempts, user_id)
     if level is None:
-        passed = await run_in_threadpool(grammar_repo.passed_check_ids, user_id)
-        level = engine.current_level(SKILL, passed)
+        level = engine.current_level(SKILL, attempts_rows)
     only_failed = mode == "failed"
     only_mastered = mode == "mastered"
     try:
@@ -91,24 +96,60 @@ async def items_for_level_out(user_id: str, level: str) -> dict:
 
 
 async def submit_attempt(
-    user_id: str, check_id: str, selected_index: int
+    user_id: str,
+    check_id: str,
+    selected_index: int = -1,
+    typed_answer: str = "",
 ) -> dict | None:
-    """Puntúa una respuesta MC (determinista) y persiste el intento.
+    """Puntúa una respuesta (determinista) y persiste el intento.
 
-    `passed = selected_index == correct_index` y `score` es 100.0/0.0. Lanza
-    `ValueError("grammar.bad_option")` si `selected_index` está fuera de rango
-    de las opciones del check. None si el check no existe.
+    MC: `passed = selected_index == correct_index`. Producción controlada
+    (V3.13 P1): `passed = typed_matches(typed_answer, accepted_answers)` por
+    normalización, sin LLM. `score` es 100.0/0.0. Lanza
+    `ValueError("grammar.bad_option")` si `selected_index` está fuera de rango de
+    las opciones del check, o `ValueError("grammar.typed_answer_required")` si un
+    ítem de producción se envía sin respuesta escrita. None si el check no existe.
     """
     check = engine.get_check(SKILL, check_id)
     if check is None:
         return None
+    topic = check.get("topic", "")
+    if check.get("type") == "controlled_production":
+        if not typed_answer.strip():
+            raise ValueError("grammar.typed_answer_required")
+        passed = engine.typed_matches(
+            typed_answer, check.get("accepted_answers", [])
+        )
+        score = 100.0 if passed else 0.0
+        await run_in_threadpool(
+            grammar_repo.record_attempt,
+            user_id,
+            check_id,
+            check.get("level", ""),
+            score,
+            passed,
+            topic,
+        )
+        return {
+            "check_id": check_id,
+            "level": check.get("level", ""),
+            "topic": topic,
+            "prompt": check.get("prompt", ""),
+            "type": "controlled_production",
+            "options": [],
+            "correct_index": -1,
+            "selected_index": -1,
+            "typed_answer": typed_answer,
+            "expected_answers": list(check.get("accepted_answers", [])),
+            "passed": passed,
+            "score": score,
+        }
     options = check.get("options", [])
     if not 0 <= selected_index < len(options):
         raise ValueError("grammar.bad_option")
     correct = bool(selected_index == check.get("correct_index", -1))
     score = 100.0 if correct else 0.0
     passed = correct
-    topic = check.get("topic", "")
     await run_in_threadpool(
         grammar_repo.record_attempt,
         user_id,
@@ -123,9 +164,12 @@ async def submit_attempt(
         "level": check.get("level", ""),
         "topic": topic,
         "prompt": check.get("prompt", ""),
+        "type": "mcq",
         "options": options,
         "correct_index": int(check.get("correct_index", -1)),
         "selected_index": selected_index,
+        "typed_answer": "",
+        "expected_answers": [],
         "passed": passed,
         "score": score,
     }
@@ -149,11 +193,15 @@ async def get_stats(user_id: str) -> dict:
             {
                 "level": level,
                 "total": len(items),
+                "bank_size": len(items),
                 "mastered": mastered,
                 "completed": gate["passed"],
                 "coverage_pct": gate["coverage_pct"],
                 "accuracy": gate["accuracy"],
                 "gate": gate,
+                # Claim honesto (V3.13): bancos cortos solo leen práctica con
+                # evidencia de profundidad LOW (Constitución §6.4, R7).
+                "evidence_depth": engine.practice_depth(gate),
                 "state": next(
                     (
                         c["state"]
@@ -164,12 +212,7 @@ async def get_stats(user_id: str) -> dict:
                 ),
             }
         )
-    passed_official: set[str] = set()
-    for row in attempts_rows:
-        cid = row.get("check_id")
-        if cid and engine.get_check(SKILL, cid) is not None and row.get("passed"):
-            passed_official.add(cid)
-    level = engine.current_level(SKILL, passed_official)
+    level = engine.current_level(SKILL, attempts_rows)
     completed = all(g["gate"]["passed"] for g in levels if g["total"] > 0)
     return {
         "attempts": len(attempts_rows),

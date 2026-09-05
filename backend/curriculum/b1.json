@@ -1869,5 +1869,56 @@
         }
       ]
     }
+  ],
+
+  "production_checks": [
+    {
+      "id": "b1-cp-01",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Everyday Life & Opinions",
+      "prompt": "Complete with the present perfect of the verb in brackets. I ___ (never eat) sushi before.",
+      "accepted_answers": ["have never eaten"]
+    },
+    {
+      "id": "b1-cp-02",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Everyday Life & Opinions",
+      "prompt": "Complete with yet or already. I've ___ finished my homework, so I can go out.",
+      "accepted_answers": ["already"]
+    },
+    {
+      "id": "b1-cp-03",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Work & Future",
+      "prompt": "Complete with will or going to. Look at those clouds! It ___ (rain).",
+      "accepted_answers": ["is going to rain"]
+    },
+    {
+      "id": "b1-cp-04",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Work & Future",
+      "prompt": "Complete the first conditional with the verb in brackets. If it ___ (rain), we'll stay at home.",
+      "accepted_answers": ["rains"]
+    },
+    {
+      "id": "b1-cp-05",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Work & Future",
+      "prompt": "Complete with have to, has to, must or mustn't. I ___ wear a uniform at work; my boss requires it.",
+      "accepted_answers": ["have to", "must"]
+    },
+    {
+      "id": "b1-cp-06",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Connected Speech & Listening",
+      "prompt": "Report the sentence. 'I am tired,' she said. She said she ___ tired.",
+      "accepted_answers": ["was"]
+    }
   ]
 }

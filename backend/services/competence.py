@@ -31,10 +31,20 @@ from services.adaptive import (
     READINESS_MINIMUMS,
 )
 from services.cefr import heuristic_band
+from services.evidence_depth import evidence_depth_report
 from services.mastery import MASTERY_SKILLS
 
 # Orden creciente de los 4 estados (para combinar formal + ruta).
 STATE_ORDER = ("not_started", "developing", "functional", "demonstrated")
+
+# Destrezas productivas (R5): "demostrado" exige al menos una muestra de
+# producción en la evidencia formal; el reconocimiento (MC) solo nunca demuestra.
+PRODUCTION_SKILLS: tuple[str, ...] = ("grammar", "speaking", "writing")
+
+# Destrezas de apoyo (Constitución §3 y §7): Vocabulary es condición de apoyo,
+# NUNCA puerta de nivel; su competencia se capa en FUNCTIONAL (no produce
+# "demostrado" por sí sola).
+SUPPORT_SKILLS: tuple[str, ...] = ("vocabulary",)
 
 
 def _rank(state: str) -> int:
@@ -83,6 +93,7 @@ def competence_state(
     by_kind = (entry or {}).get("evidence_by_kind") or {}
     review_due = bool((entry or {}).get("review_due", False))
     delayed_count = int(by_kind.get("delayed", 0) or 0)
+    production_count = int((entry or {}).get("production_count", 0) or 0)
 
     floor = _score_floor(skill)
     score_ok = evidence_count > 0 and score >= floor
@@ -91,6 +102,15 @@ def competence_state(
     # Retención retardada estable: evidencia `delayed` formal o ruta DEMONSTRATED.
     route_demonstrated = route is not None and route.get("state") == "demonstrated"
     retention_ok = delayed_count > 0 or route_demonstrated
+
+    # Suelo de "demostrado" de V3.13 (Constitución §6.4 y reglas R5/R7): además de
+    # retención, el estado DEMONSTRATED exige el mínimo de muestras de la matriz
+    # CEFR del nivel y —en destrezas productivas— evidencia de producción.
+    depth = evidence_depth_report(
+        skill, level, evidence_count, by_kind, production_count=production_count
+    )
+    matrix_min_ok = depth["samples"] >= depth["minimum_evidence"]
+    production_ok = skill not in PRODUCTION_SKILLS or production_count > 0
 
     formal_functional = (
         score_ok and evidence_ok and confidence_ok and not review_due
@@ -109,10 +129,23 @@ def competence_state(
     else:
         merged = STATE_ORDER[max(_rank(formal_state), _rank(route_state))]
 
-    # "Demostrado" solo se alcanza con retención; sin ella, como mucho FUNCTIONAL.
-    if merged == "functional" and retention_ok:
+    # "Demostrado" solo se alcanza con: ruta ya demostrada con su retención (caso
+    # listening) o retención retardada + mínimo de muestras de la matriz +
+    # producción donde la destreza la exige. Sin ello, como mucho FUNCTIONAL.
+    demonstrated_eligible = bool(
+        retention_ok and matrix_min_ok and production_ok and not review_due
+    )
+    if route_state == "demonstrated":
+        # La ruta de listening DEMONSTRATED ya trae su retención retardada estable:
+        # no se vuelve a exigir evidencia formal.
         merged = "demonstrated"
-    elif merged == "demonstrated" and not retention_ok:
+    elif merged == "functional" and demonstrated_eligible:
+        merged = "demonstrated"
+    elif merged == "demonstrated" and not demonstrated_eligible:
+        merged = "functional"
+    # Las destrezas de apoyo (vocabulary, §3) nunca emiten "demostrado": son
+    # condición de apoyo, no puerta de nivel.
+    if skill in SUPPORT_SKILLS and merged == "demonstrated":
         merged = "functional"
 
     return {
@@ -124,12 +157,15 @@ def competence_state(
         "score": round(score, 3),
         "confidence": round(confidence, 3),
         "evidence_count": evidence_count,
+        "evidence_depth": depth["depth"],
         "gate": {
             "score_ok": score_ok,
             "confidence_ok": confidence_ok,
             "evidence_ok": evidence_ok,
             "review_due": review_due,
             "retention_ok": retention_ok,
+            "matrix_min_ok": matrix_min_ok,
+            "production_ok": production_ok,
         },
     }
 

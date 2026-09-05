@@ -72,21 +72,27 @@ async def attempt(
     body: GrammarAttemptRequest,
     user: dict = Depends(current_user),
 ) -> dict:
-    """Evalúa la opción elegida de un check (determinista) y persiste el intento.
+    """Evalúa la respuesta de un ítem (determinista) y persiste el intento.
 
-    La evaluación es instantánea y sin LLM: acierto si `selected_index` coincide
-    con la respuesta del currículo. Tras responder se revela la respuesta
-    correcta para el feedback.
+    La evaluación es instantánea y sin LLM: MC acierta si `selected_index`
+    coincide con la respuesta del currículo; producción controlada (V3.13 P1) si
+    `typed_answer` coincide por normalización con las respuestas aceptadas. Tras
+    responder se revela la respuesta correcta para el feedback.
     """
     try:
         result = await grammar_routes_service.submit_attempt(
-            user["id"], body.check_id, body.selected_index
+            user["id"], body.check_id, body.selected_index, body.typed_answer
         )
     except ValueError as exc:
         if str(exc) == "grammar.bad_option":
             raise HTTPException(
                 status_code=400,
                 detail="grammar.bad_option",
+            ) from None
+        if str(exc) == "grammar.typed_answer_required":
+            raise HTTPException(
+                status_code=400,
+                detail="grammar.typed_answer_required",
             ) from None
         raise
     if result is None:

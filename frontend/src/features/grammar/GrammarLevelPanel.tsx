@@ -9,6 +9,7 @@ import type {
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { CrossSkillMatrix } from "../evidence/CrossSkillMatrix";
 import { cn } from "../../lib/utils";
 
 const GROUPS: GrammarItemState[] = ["failed", "mastered", "unseen"];
@@ -139,7 +140,19 @@ export function GrammarLevelPanel({
           </span>
         </div>
         {data.completed ? (
-          <Badge className="gap-1">{t("gramRoutes.completedShort")}</Badge>
+          <Badge
+            variant="outline"
+            className={cn(
+              "gap-1",
+              gate?.practice_depth === "medium"
+                ? "border-success/50 text-success"
+                : "border-warning/40 text-warning",
+            )}
+          >
+            {gate?.practice_depth === "medium"
+              ? t("gramRoutes.practiceCoverageMedium")
+              : t("gramRoutes.practiceCoverageLow")}
+          </Badge>
         ) : (
           pendingCert && (
             <Badge variant="outline" className="border-warning/40 text-warning">
@@ -294,6 +307,11 @@ export function GrammarLevelPanel({
           </Button>
         </div>
       </div>
+
+      {/* Registro cross-skill (V3.13 P1.2): prototipo B1, solo lectura. */}
+      {level.toUpperCase() === "B1" && userId && (
+        <CrossSkillMatrix userId={userId} level={level} />
+      )}
     </div>
   );
 }
@@ -308,6 +326,11 @@ function GrammarItemRow({ item }: { item: GrammarItem }) {
         </p>
         <p className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] uppercase tracking-wide text-muted-foreground">
           {item.topic && <span>{item.topic.replace(/_/g, " ")}</span>}
+          {item.type === "controlled_production" && (
+            <span className="font-semibold normal-case text-primary">
+              {t("gramRoutes.typeIn")}
+            </span>
+          )}
           {item.attempts > 0 && (
             <span>
               {t("gramRoutes.levelItemsAttempts")}: {item.attempts}

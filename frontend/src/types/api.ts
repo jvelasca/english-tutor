@@ -846,6 +846,8 @@ export interface VocabularyRouteGate {
   checkpoint_required: number;
   /** Banco corto (< 12 ítems): la puerta adapta el checkpoint (nota honesta). */
   short_bank: boolean;
+  /** Claim honesto de V3.13: profundidad de la práctica (low/medium). */
+  practice_depth?: string;
   blockers: string[];
 }
 
@@ -858,6 +860,10 @@ export interface VocabularyLevelProgress {
   accuracy: number | null;
   gate?: VocabularyRouteGate | null;
   state?: VocabularyRouteState;
+  /** Tamaño del banco oficial del nivel (claim honesto V3.13). */
+  bank_size?: number;
+  /** Lectura honesta de la práctica: "low" para bancos cortos (V3.13). */
+  evidence_depth?: string;
 }
 
 export interface VocabularyStats {
@@ -927,10 +933,33 @@ export type GrammarRouteGate = VocabularyRouteGate;
 export type GrammarLevelProgress = VocabularyLevelProgress;
 export type GrammarStats = VocabularyStats;
 export type GrammarItemState = VocabularyItemState;
-export type GrammarItem = VocabularyItem;
+
+/** Tipo de ítem del banco de grammar (V3.13 P1). */
+export type GrammarItemType = "mcq" | "controlled_production";
+
+/** ítem de grammar (MC o producción controlada). */
+export interface GrammarItem extends VocabularyItem {
+  type?: GrammarItemType;
+}
+
 export type GrammarLevelItems = VocabularyLevelItems;
-export type GrammarQuestion = VocabularyQuestion;
-export type GrammarAttempt = VocabularyAttempt;
+
+/**
+ * ítem de grammar servido para practicar (sin la respuesta correcta). `type`
+ * distingue el formato: "mcq" pide elegir una opción; "controlled_production"
+ * (V3.13 P1) pide escribir la respuesta (las `accepted_answers` se ocultan).
+ */
+export interface GrammarQuestion extends VocabularyQuestion {
+  type?: GrammarItemType;
+}
+
+export interface GrammarAttempt extends VocabularyAttempt {
+  type?: GrammarItemType;
+  /** En producción controlada: la respuesta escrita por el alumno. */
+  typed_answer?: string;
+  /** En producción controlada: respuestas esperadas reveladas en el feedback. */
+  expected_answers?: string[];
+}
 
 export interface ListeningSubskillProgress {
   skill: string;
@@ -1916,6 +1945,37 @@ export interface AttemptEntry {
   skill: string;
   result: AttemptResult;
 }
+
+// --- Registro cross-skill por estructura (V3.13, P1.2) ----------------------
+// Prototipo B1 (solo lectura): por cada estructura gramatical del nivel, la
+// matriz de instrumentos ofrecidos por destreza y la evidencia real del usuario.
+
+export type CrossSkillChannelKey =
+  | "recognition"
+  | "production"
+  | "listening"
+  | "speaking"
+  | "transfer";
+
+export interface CrossSkillChannel {
+  offered: boolean;
+  evidence: number;
+}
+
+export interface CrossSkillStructure {
+  structure_id: string;
+  name: string;
+  can_do: string;
+  channels: Record<CrossSkillChannelKey, CrossSkillChannel>;
+}
+
+export interface CrossSkillMatrix {
+  level_id: string;
+  level: string;
+  proto: boolean;
+  structures: CrossSkillStructure[];
+}
+
 
 export interface AttemptResponse {
   recorded: number;

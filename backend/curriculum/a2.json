@@ -1920,5 +1920,56 @@
         }
       ]
     }
+  ],
+
+  "production_checks": [
+    {
+      "id": "a2-cp-01",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Past Experiences",
+      "prompt": "Complete with the past simple of the verb in brackets. Last year I ___ (go) to France.",
+      "accepted_answers": ["went"]
+    },
+    {
+      "id": "a2-cp-02",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Past Experiences",
+      "prompt": "Complete with the present perfect of the verb in brackets. She ___ (visit) three countries.",
+      "accepted_answers": ["has visited"]
+    },
+    {
+      "id": "a2-cp-03",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "People & Places",
+      "prompt": "Complete with the comparative of the adjective in brackets. My city is ___ (big) than my village.",
+      "accepted_answers": ["bigger"]
+    },
+    {
+      "id": "a2-cp-04",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "People & Places",
+      "prompt": "Complete with the superlative of the adjective in brackets. This is ___ (good) restaurant in town.",
+      "accepted_answers": ["the best"]
+    },
+    {
+      "id": "a2-cp-05",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Future Plans",
+      "prompt": "Complete with be going to + the verb in brackets. Next summer they ___ (travel) to Italy.",
+      "accepted_answers": ["are going to travel"]
+    },
+    {
+      "id": "a2-cp-06",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Travel & Transport",
+      "prompt": "Complete with must or mustn't. You ___ smoke here; it is not allowed.",
+      "accepted_answers": ["mustn't", "must not"]
+    }
   ]
 }
