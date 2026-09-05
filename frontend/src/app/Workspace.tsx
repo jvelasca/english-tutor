@@ -1,7 +1,5 @@
 import { lazy, Suspense } from "react";
-import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { ArrowLeft } from "lucide-react";
 import { navigateTo } from "../router/hash";
 import { LEARN_PATH } from "../router/paths";
 import {
@@ -13,8 +11,6 @@ import {
   VOCABULARY_ACTIVITY,
   type LearnActivity,
 } from "../router/learnHub";
-import { Button } from "../components/ui/button";
-import { LearnActivitySwitcher } from "../components/LearnActivitySwitcher";
 import type { ChatApi } from "../hooks/useChat";
 import type { NextBestActivity, SessionStep } from "../types/api";
 import type { Section } from "../utils/sections";
@@ -29,11 +25,6 @@ const CourseScreen = lazy(() =>
 );
 const ProgressScreen = lazy(() =>
   import("../features/progress/ProgressScreen").then((m) => ({ default: m.ProgressScreen })),
-);
-const PersonalDictionary = lazy(() =>
-  import("../features/vocabulary/PersonalDictionary").then((m) => ({
-    default: m.PersonalDictionary,
-  })),
 );
 const HelpScreen = lazy(() =>
   import("../features/help/HelpScreen").then((m) => ({ default: m.HelpScreen })),
@@ -57,6 +48,11 @@ const PronunciationRoutesPractice = lazy(() =>
 const ConversationRoutesPractice = lazy(() =>
   import("../features/conversation/ConversationRoutesPractice").then((m) => ({
     default: m.ConversationRoutesPractice,
+  })),
+);
+const VocabularyRoutesPractice = lazy(() =>
+  import("../features/vocabulary/VocabularyRoutesPractice").then((m) => ({
+    default: m.VocabularyRoutesPractice,
   })),
 );
 
@@ -95,37 +91,6 @@ function RouteFallback() {
   );
 }
 
-/**
- * Barra superior compacta de las sub-páginas de APRENDER: botón de vuelta
- * siempre visible (móvil y escritorio), encima del contenido que hace scroll.
- */
-function SubpageHeader({
-  label,
-  onBack,
-  children,
-}: {
-  label: string;
-  onBack: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="relative">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background/90 px-2 py-1.5 backdrop-blur">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="min-h-9 gap-1 px-2 text-sm font-medium"
-          onClick={onBack}
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          {label}
-        </Button>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 /** Prácticas del hub que se sirven desde el workspace vía PracticeView. */
 const WORKSPACE_ACTIVITIES: readonly LearnActivity[] = [
   LISTENING_ACTIVITY,
@@ -145,7 +110,6 @@ export function Workspace({
   onOpenProgress,
   refreshKey,
 }: WorkspaceProps) {
-  const { t } = useI18n();
   const { currentUserId } = chat;
   const userName = chat.users.find((u) => u.id === currentUserId)?.name;
 
@@ -189,17 +153,17 @@ export function Workspace({
       />
     );
   } else if (route === "vocabulary") {
-    // Vocabulario es una hoja de APRENDER: barra de vuelta fija + atajo de
-    // actividades + diccionario.
+    // Vocabulario (V3.11) es una hoja de APRENDER: página única de rutas A1-C2
+    // (checks MC del currículo) con el diccionario personal accesible desde la
+    // propia página y el acceso a los instrumentos formales del curso.
     content = (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <SubpageHeader label={t("learn.back")} onBack={backToHub}>
-          <LearnActivitySwitcher active={VOCABULARY_ACTIVITY} />
-        </SubpageHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <PersonalDictionary userId={currentUserId} />
-        </div>
-      </div>
+      <VocabularyRoutesPractice
+        userId={currentUserId}
+        active={VOCABULARY_ACTIVITY}
+        onBack={backToHub}
+        onAttempt={onAttempt}
+        onNext={onNextBestStart}
+      />
     );
   } else if (route === "help") {
     content = <HelpScreen />;

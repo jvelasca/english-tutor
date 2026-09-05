@@ -64,8 +64,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Mini-diálogos guiados nivel a nivel; el chat libre está a un toque.",
   },
   "learn.desc.vocabulary": {
-    en: "Your personal dictionary, word by word.",
-    es: "Tu diccionario personal, palabra a palabra.",
+    en: "Routes A1–C2 of word checks, with your personal dictionary close at hand.",
+    es: "Rutas A1–C2 de checks de palabras, con tu diccionario personal a mano.",
   },
   "learn.desc.grammar": {
     en: "Write sentences and get grammar corrections and feedback.",
@@ -82,6 +82,10 @@ const STRINGS: Record<string, Entry> = {
   "learn.conversationSubtitle": {
     en: "Guided multi-turn mini-dialogues, level by level, with criteria feedback.",
     es: "Mini-diálogos guiados multi-turno, nivel a nivel, con feedback por criterios.",
+  },
+  "learn.vocabularySubtitle": {
+    en: "Word checks level by level from your course curriculum, with your personal dictionary at hand.",
+    es: "Checks de palabras nivel a nivel desde tu currículo del curso, con tu diccionario personal a mano.",
   },
   "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
 
@@ -2231,6 +2235,211 @@ const STRINGS: Record<string, Entry> = {
   "convRoutes.freeChatCta": {
     en: "Open free chat",
     es: "Abrir el chat libre",
+  },
+
+  // --- Vocabulary por rutas (V3.11) ---
+  "vocRoutes.routesSubtitle": {
+    en: "Each level is a route of quick multiple-choice checks built from the words of your course curriculum. Pick the right word, get instant feedback and the correct answer if you miss. Passing a route is a practice milestone — demonstrating the level needs the course exams and assessments, not the route.",
+    es: "Cada nivel es una ruta de checks de opción múltiple construidos con las palabras de tu currículo del curso. Elige la palabra correcta, recibe feedback inmediato y la respuesta correcta si fallas. Superar una ruta es un hito de práctica: demostrar el nivel exige los exámenes y evaluaciones del curso, no la ruta.",
+  },
+  "vocRoutes.loading": { en: "Loading…", es: "Cargando…" },
+  "vocRoutes.loadError": {
+    en: "Couldn't load your vocabulary routes. Please try again.",
+    es: "No se pudieron cargar tus rutas de vocabulario. Inténtalo de nuevo.",
+  },
+  "vocRoutes.retry": { en: "Try again", es: "Reintentar" },
+  "vocRoutes.backRoutes": { en: "Back to routes", es: "Volver a las rutas" },
+  "vocRoutes.routesMapTitle": { en: "Routes", es: "Rutas" },
+  "vocRoutes.routesMapHint": {
+    en: "A1–C2 practice routes built from the curriculum checks.",
+    es: "Rutas de práctica A1–C2 construidas con los checks del currículo.",
+  },
+  "vocRoutes.accuracy": { en: "Pass rate", es: "Aciertos" },
+  "vocRoutes.masteredOfTotal": {
+    en: "{mastered} of {total}",
+    es: "{mastered} de {total}",
+  },
+  "vocRoutes.coveragePct": {
+    en: "{pct}% of the route",
+    es: "{pct}% de la ruta",
+  },
+  "vocRoutes.routeNote": {
+    en: "You're practising level {level}. Open any ring to drill that level, repeat what you missed or review what you've already mastered.",
+    es: "Estás practicando el nivel {level}. Abre cualquier anillo para practicar ese nivel, repetir lo fallado o repasar lo ya dominado.",
+  },
+  "vocRoutes.routeCertNote": {
+    en: "Routes measure practice, never certification. Only formal course evidence demonstrates a level.",
+    es: "Las rutas miden práctica, nunca certifican. Solo la evidencia formal del curso demuestra un nivel.",
+  },
+  "vocRoutes.routeRingHelp": {
+    en: "Tap a ring to open or close that level's panel.",
+    es: "Toca un anillo para abrir o cerrar el panel de ese nivel.",
+  },
+  "vocRoutes.levelHistoryTitle": {
+    en: "Level {level} history",
+    es: "Historial del nivel {level}",
+  },
+  "vocRoutes.sessionEnded": {
+    en: "Session finished",
+    es: "Sesión terminada",
+  },
+  "vocRoutes.doneDrillLine": {
+    en: "You drilled the {total} checks you had missed at level {level} until you mastered them.",
+    es: "Repetiste los {total} checks que habías fallado del nivel {level} hasta dominarlos.",
+  },
+  "vocRoutes.doneReviewLine": {
+    en: "You reviewed the {total} mastered checks of level {level}.",
+    es: "Repasaste los {total} checks dominados del nivel {level}.",
+  },
+  "vocRoutes.doneLevelLine": {
+    en: "You completed a full round of the {total} checks of level {level}.",
+    es: "Completaste una vuelta completa por los {total} checks del nivel {level}.",
+  },
+  "vocRoutes.modeLevel": {
+    en: "Level {level} · full round",
+    es: "Nivel {level} · vuelta completa",
+  },
+  "vocRoutes.modeDrill": {
+    en: "Repeating missed checks",
+    es: "Repitiendo checks fallados",
+  },
+  "vocRoutes.modeReview": {
+    en: "Reviewing level {level}",
+    es: "Repasando el nivel {level}",
+  },
+  "vocRoutes.exitSession": {
+    en: "Exit session",
+    es: "Salir de la sesión",
+  },
+  "vocRoutes.drillHint": {
+    en: "Answer until every missed check is mastered.",
+    es: "Responde hasta dominar todos los checks fallados.",
+  },
+  "vocRoutes.sessionHint": {
+    en: "Answer to move forward through the round.",
+    es: "Responde para avanzar en la vuelta.",
+  },
+  "vocRoutes.continue": { en: "Continue", es: "Continuar" },
+  "vocRoutes.skip": { en: "Skip", es: "Saltar" },
+  "vocRoutes.evaluating": {
+    en: "Scoring your answer…",
+    es: "Puntuando tu respuesta…",
+  },
+  "vocRoutes.questionLabel": { en: "Question", es: "Pregunta" },
+  "vocRoutes.answerLabel": { en: "Answers", es: "Respuestas" },
+  "vocRoutes.resultPassed": { en: "Correct", es: "Correcto" },
+  "vocRoutes.resultNotPassed": {
+    en: "Not this time",
+    es: "Esta vez no",
+  },
+  "vocRoutes.resultScore": {
+    en: "Score: {score}/100",
+    es: "Puntuación: {score}/100",
+  },
+  "vocRoutes.resultHonestNote": {
+    en: "One correct answer is practice, not proof. Your route only completes when you show retention and formal evidence.",
+    es: "Un acierto es práctica, no prueba. Tu ruta solo se completa cuando demuestras retención y evidencia formal.",
+  },
+  "vocRoutes.pickHint": {
+    en: "Choose the word that fits.",
+    es: "Elige la palabra que corresponde.",
+  },
+  "vocRoutes.pickNote": {
+    en: "Deterministic check from your course curriculum — instant feedback, no extra content invented.",
+    es: "Check determinista de tu currículo del curso: feedback inmediato, sin contenido inventado.",
+  },
+  "vocRoutes.dictionaryCta": { en: "My dictionary", es: "Mi diccionario" },
+  "vocRoutes.dictionaryHint": {
+    en: "Personal dictionary of the words you've met.",
+    es: "Diccionario personal de las palabras que has conocido.",
+  },
+  "vocRoutes.levelStates.failed": {
+    en: "Missed ({count})",
+    es: "Falladas ({count})",
+  },
+  "vocRoutes.levelStates.mastered": {
+    en: "Mastered ({count})",
+    es: "Dominadas ({count})",
+  },
+  "vocRoutes.levelStates.unseen": {
+    en: "Not seen yet ({count})",
+    es: "Sin ver ({count})",
+  },
+  "vocRoutes.levelItemsError": {
+    en: "Couldn't load the level items.",
+    es: "No se pudieron cargar los ítems del nivel.",
+  },
+  "vocRoutes.levelItemsChecks": { en: "checks", es: "checks" },
+  "vocRoutes.shortBank": { en: "Short bank", es: "Banco corto" },
+  "vocRoutes.shortBankTitle": {
+    en: "This level has a small bank",
+    es: "Este nivel tiene un banco pequeño",
+  },
+  "vocRoutes.shortBankNote": {
+    en: "Level {level} only has {total} checks in the curriculum, so its route gate adapts and the level is short to complete.",
+    es: "El nivel {level} solo tiene {total} checks en el currículo, así que su puerta se adapta y el nivel se completa pronto.",
+  },
+  "vocRoutes.levelItemsSummary": {
+    en: "{mastered} mastered · {failed} missed · {unseen} unseen",
+    es: "{mastered} dominadas · {failed} falladas · {unseen} sin ver",
+  },
+  "vocRoutes.completedShort": { en: "Route completed", es: "Ruta completada" },
+  "vocRoutes.routePendingCert": {
+    en: "Route mastered — practice ceiling reached",
+    es: "Ruta dominada — techo de práctica alcanzado",
+  },
+  "vocRoutes.routeGateIntro": {
+    en: "Route gate of {level}:",
+    es: "Puerta de ruta de {level}:",
+  },
+  "vocRoutes.routeGateLine": {
+    en: "You've mastered {coverage}% of the bank (target {coverageRequired}%), pass rate {accuracy} (target {accuracyRequired}%), {topics}/{topicsRequired} topics and {checkpoint}/{checkpointRequired} checks mastered on first try.",
+    es: "Has dominado el {coverage}% del banco (objetivo {coverageRequired}%), aciertos {accuracy} (objetivo {accuracyRequired}%), {topics}/{topicsRequired} temas y {checkpoint}/{checkpointRequired} checks dominados a la primera.",
+  },
+  "vocRoutes.levelItemsEmpty": {
+    en: "No checks here.",
+    es: "No hay checks aquí.",
+  },
+  "vocRoutes.levelItemsAttempts": { en: "attempts", es: "intentos" },
+  "vocRoutes.repeatFailed": {
+    en: "Repeat missed ({count})",
+    es: "Repetir falladas ({count})",
+  },
+  "vocRoutes.reviewLearned": {
+    en: "Review learned ({count})",
+    es: "Repasar aprendidas ({count})",
+  },
+  "vocRoutes.practiceLevel": {
+    en: "Practise level {level}",
+    es: "Practicar nivel {level}",
+  },
+  "vocRoutes.reviewLevel": {
+    en: "Review level {level}",
+    es: "Repasar nivel {level}",
+  },
+  "vocRoutes.demonstrateTitle": {
+    en: "Demonstrate level {level}",
+    es: "Demostrar el nivel {level}",
+  },
+  "vocRoutes.demonstrateNote": {
+    en: "This route only proves practice. To demonstrate {level} you need the formal assessments of your course.",
+    es: "Esta ruta solo demuestra práctica. Para demostrar {level} necesitas las evaluaciones formales de tu curso.",
+  },
+  "vocRoutes.demonstrateFormal": {
+    en: "The course has level exams for A1 and B1 and the Formación assessment ladder (formative → level exam → retention) for every level. Levels without a dedicated exam (B2–C2) can still show evidence through the ladder.",
+    es: "El curso tiene examen de nivel para A1 y B1 y la escalera de evaluaciones de Formación (formativa → examen de nivel → retención) para cada nivel. Los niveles sin examen dedicado (B2–C2) pueden demostrar evidencia a través de la escalera.",
+  },
+  "vocRoutes.demonstrateCta": {
+    en: "Open formal assessments",
+    es: "Abrir evaluaciones formales",
+  },
+  "vocRoutes.formalTitle": {
+    en: "Formal assessments · Level {level}",
+    es: "Evaluaciones formales · Nivel {level}",
+  },
+  "vocRoutes.formalNote": {
+    en: "This is the official Formación instrument for the level: it requires progress and retention, and only it can demonstrate the level. Everything you pass here is real evidence.",
+    es: "Este es el instrumento oficial de Formación del nivel: exige progreso y retención, y solo él puede demostrar el nivel. Todo lo que superes aquí es evidencia real.",
   },
 
   "speaking.routesSubtitle": {

@@ -824,6 +824,98 @@ export interface ConversationAttempt {
   communicative_goals: string[];
 }
 
+// --- Rutas de Vocabulary (V3.11) ---------------------------------------------
+// Misma filosofía que speaking/listening/pronunciation/conversation: la ruta
+// mide práctica (checks MC de vocabulary del currículo, evaluación determinista)
+// y su estado `functional` es el techo; demostrar el nivel exige los exámenes y
+// la escalera de evaluaciones formales del curso, nunca la ruta.
+
+export type VocabularyRouteState = "not_started" | "developing" | "functional";
+
+export interface VocabularyRouteGate {
+  passed: boolean;
+  total: number;
+  mastered: number;
+  coverage_pct: number;
+  coverage_required_pct: number;
+  accuracy: number | null;
+  accuracy_required: number;
+  topics: number;
+  topics_required: number;
+  checkpoint: number;
+  checkpoint_required: number;
+  /** Banco corto (< 12 ítems): la puerta adapta el checkpoint (nota honesta). */
+  short_bank: boolean;
+  blockers: string[];
+}
+
+export interface VocabularyLevelProgress {
+  level: string;
+  total: number;
+  mastered: number;
+  completed: boolean;
+  coverage_pct: number | null;
+  accuracy: number | null;
+  gate?: VocabularyRouteGate | null;
+  state?: VocabularyRouteState;
+}
+
+export interface VocabularyStats {
+  attempts: number;
+  passed: number;
+  accuracy: number | null;
+  level: string;
+  completed: boolean;
+  levels: VocabularyLevelProgress[];
+}
+
+export type VocabularyItemState = "unseen" | "failed" | "mastered";
+
+export interface VocabularyItem {
+  check_id: string;
+  level: string;
+  topic: string;
+  prompt: string;
+  attempts: number;
+  state: VocabularyItemState;
+}
+
+export interface VocabularyLevelItems {
+  level: string;
+  total: number;
+  mastered: number;
+  failed: number;
+  unseen: number;
+  completed: boolean;
+  items: VocabularyItem[];
+  gate?: VocabularyRouteGate | null;
+}
+
+/**
+ * Un check MC servido para practicar (sin la respuesta correcta: se oculta
+ * hasta el POST /attempt para que el alumno elija sin pistas).
+ */
+export interface VocabularyQuestion {
+  check_id: string;
+  level: string;
+  topic: string;
+  prompt: string;
+  options: string[];
+}
+
+export interface VocabularyAttempt {
+  check_id: string;
+  level: string;
+  topic: string;
+  prompt: string;
+  options: string[];
+  /** Respuesta correcta revelada solo tras responder (feedback). */
+  correct_index: number;
+  selected_index: number;
+  passed: boolean;
+  score: number;
+}
+
 export interface ListeningSubskillProgress {
   skill: string;
   attempts: number;

@@ -11,6 +11,20 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.11.0` — **Vocabulary por rutas CEFR: página única de checks MC del currículo + diccionario a mano**
+  (APRENDER → Vocabulary deja de ser solo el diccionario personal y pasa a una
+  página única como el resto: arriba el escenario de práctica —un check MC de
+  vocabulary del currículo del nivel recomendado, con feedback inmediato y la
+  respuesta correcta revelada al fallar— y debajo el mapa de rutas A1–C2 con
+  anillos y el panel del nivel (Practicar el nivel / Repetir fallidas / Repasar
+  aprendidas + «Demostrar el nivel» → exámenes y escalera de evaluaciones del
+  curso). El banco son los checks MC de la destreza vocabulary del currículo
+  oficial (sin contenido nuevo) sobre el motor compartido de rutas quiz
+  `backend/services/quiz_routes.py` (lo reutilizará Grammar, v3.12); el intento
+  es determinista y se persiste en `vocabulary_route_attempts`. La ruta es un
+  hito de práctica —`functional` como techo, nunca certifica—; demostrar el
+  nivel exige los instrumentos formales del curso. El diccionario personal se
+  integra en la página). Base: `3.10.0`
 - ✅ Versión estable `3.10.0` — **Conversation por rutas CEFR: página única de mini-diálogos guiados multi-turno**
   (APRENDER → Conversation deja el chat libre (ahora en su propia raíz `/chat`,
   accesible desde la propia página) y pasa a una página única como Speaking:

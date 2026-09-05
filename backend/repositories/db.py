@@ -935,6 +935,32 @@ def init_db() -> None:
             "ON conversation_route_attempts(user_id)"
         )
 
+        # Vocabulary por rutas (V3.11): checks de opción múltiple con skill
+        # "vocabulary" del currículo A1-C2 (`objectives[].checks`). Cada intento
+        # es una respuesta MC determinista contra un check (`check_id`): `score`
+        # (0..100) y `passed` = acierto. El estado por check (unseen/failed/
+        # mastered) se deriva en vivo igual que en las demás rutas; el pool no
+        # tiene corpus propio (se lee de `curriculum/<level>.json` en caliente).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vocabulary_route_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                check_id TEXT NOT NULL,
+                level TEXT NOT NULL,
+                score REAL NOT NULL DEFAULT 0,
+                passed INTEGER NOT NULL,
+                topic TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vocabulary_route_attempts_user_id "
+            "ON vocabulary_route_attempts(user_id)"
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:

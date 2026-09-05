@@ -12,6 +12,29 @@
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
 >
+> **Nota (2026-09-05):** posición vigente **v3.11.0** — **Vocabulary por rutas
+> CEFR (página única de checks MC del currículo)**. APRENDER → Vocabulary deja de
+> ser solo el diccionario personal y pasa a página única como el resto: arriba
+> el escenario de práctica —un check MC de vocabulary del currículo del nivel
+> recomendado, con feedback inmediato y la respuesta correcta revelada al
+> fallar— y debajo el mapa de rutas A1–C2 con anillos y el panel del nivel
+> (Practicar el nivel / Repetir fallidas / Repasar aprendidas + bloque
+> «Demostrar el nivel» que abre los instrumentos formales del curso: exámenes y
+> escalera de evaluaciones). El banco **no se inventa**: cada nivel reutiliza los
+> checks MC de la destreza vocabulary del currículo oficial
+> (`backend/curriculum/a1.json`…`c2.json`) sobre el **motor compartido de rutas
+> quiz** `backend/services/quiz_routes.py` (cobertura/precisión/checkpoint
+> adaptada a bancos cortos; lo reutilizará Grammar v3.12). Intento determinista
+> `domain/vocabulary_routes.py::submit_attempt` → `services/quiz_routes.py`,
+> persistido en `vocabulary_route_attempts` (repo
+> `repositories/vocabulary_routes.py`); endpoints
+> `/api/vocabulary/routes/stats|question|items` y `POST /attempt`. Frontend:
+> página única `VocabularyRoutesPractice` (con el diccionario personal integrado
+> bajo el botón «Mi diccionario») + `VocabularyLevelPanel` + `vocabularySession`.
+> Ruta = práctica (`functional`, nunca certifica); demostrar exige exámenes +
+> evaluaciones formales del curso. Siguiente: Grammar (v3.12) con la misma
+> filosofía.
+>
 > **Nota (2026-09-04):** posición vigente **v3.10.0** — **Conversation por rutas
 > CEFR (página única de mini-diálogos guiados multi-turno)**. APRENDER →
 > Conversation deja el chat libre (que vive en su propia raíz `/chat` desde esta

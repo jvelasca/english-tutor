@@ -4,6 +4,29 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.11.0] — 2026-09-05
+
+**Vocabulary por rutas CEFR: página única de checks MC del currículo + diccionario a mano.**
+
+APRENDER → Vocabulary pasa de ser solo el diccionario personal a una **página
+única con scroll** (espejo de Speaking/Listening/Pronunciation/Conversation):
+arriba vive el escenario de práctica —un **check MC de vocabulary del
+currículo** del nivel recomendado, con feedback inmediato y respuesta correcta
+revelada al fallar— y debajo el mapa de rutas A1–C2 con anillos y, al abrir un
+nivel, sus modos (Practicar el nivel / Repetir fallidas / Repasar aprendidas) y
+el bloque «Demostrar el nivel» que abre los instrumentos formales del curso
+(exámenes y escalera de evaluaciones) como vía honesta para demostrar el nivel.
+
+El banco **no se inventa**: cada nivel reutiliza los **checks MC de la destreza
+vocabulary del currículo oficial** (`backend/curriculum/a1.json`…`c2.json`), sin
+contenido nuevo. La lógica de rutas sobre checks MC vive en un **motor
+compartido** (`backend/services/quiz_routes.py`) que Grammar (v3.12) reutilizará:
+puerta de cobertura/precisión/checkpoint adaptada a bancos cortos. Cada intento
+es determinista y se persiste en `vocabulary_route_attempts`. La ruta es un
+hito de práctica (`functional`, nunca certifica); demostrar el nivel exige los
+exámenes y evaluaciones del curso. El **diccionario personal** se integra en la
+propia página (botón «Mi diccionario»), conservando su función completa.
+
 ## [3.10.0] — 2026-09-04
 
 **Conversation por rutas CEFR: página única de mini-diálogos guiados multi-turno.**
