@@ -51,22 +51,31 @@ export function getGrammarStats(userId: string): Promise<GrammarStats> {
 }
 
 /**
- * Envía la opción elegida de un check MC.
+ * Envía la respuesta de un ítem: la opción elegida (MC) o el texto escrito
+ * (producción controlada, V3.13 P1).
  *
- * El backend puntúa al instante (determinista, sin LLM): acierto si
- * `selected_index` coincide con la respuesta del currículo, y en la respuesta
- * se revela la correcta para el feedback.
+ * El backend puntúa al instante (determinista, sin LLM): MC acierta si
+ * `selected_index` coincide con la respuesta del currículo; producción
+ * controlada si `typed_answer` coincide por normalización con las respuestas
+ * aceptadas. En la respuesta se revela la correcta para el feedback.
  */
 export function submitGrammarAttempt(
   userId: string,
   checkId: string,
   selectedIndex: number,
+  typedAnswer?: string,
 ): Promise<GrammarAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
     postJson<GrammarAttempt>(
       `/api/grammar/routes/attempt?${query}`,
-      { check_id: checkId, selected_index: selectedIndex },
+      typedAnswer
+        ? {
+            check_id: checkId,
+            selected_index: selectedIndex,
+            typed_answer: typedAnswer,
+          }
+        : { check_id: checkId, selected_index: selectedIndex },
     ),
     TIMEOUT_SUBMIT_MS,
     "submit grammar attempt",
