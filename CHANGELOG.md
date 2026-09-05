@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.14.0] — 2026-09-05
+
+**Registro cross-skill de B1 a los 6 niveles (A1–C2): el canal de producción se ofrece en todos los niveles y el panel deja de ser prototipo.**
+
+La iteración escala el registro cross-skill por estructura (V3.13 P1.2) del prototipo B1 a los seis niveles A1–C2: cada nivel declara qué instrumentos ofrece su currículo por destreza y qué evidencia real tiene el usuario, con producción controlada enlazada (normativa, sin CP huérfanos). Backend `3.13.0 → 3.14.0`.
+
+- **Contenido: ítems `controlled_production` en A1 y C2**: 6 ítems nuevos en A1 (`a1-cp-01..06`: verb `to be`, present simple 3.ª persona, adverbios de frecuencia, `have/has got`, preposiciones de lugar, past simple) y 4 en C2 (`c2-cp-01..04`: inversión enfática, cleft sentence, mixed conditional y pasiva formal de registro). Siguen la convención V3.13 (prompt con hueco + `accepted_answers` deterministas). El banco de la ruta Grammar crece (A1 38→44, C2 4→8); C2 sigue en banco corto (≤12), así que su etiqueta "practice coverage · evidence depth LOW" se conserva sin claims falsos.
+- **Registro cross-skill generalizado (A1–C2)**: `backend/services/cross_skill.py` deja de ser prototipo B1. `CROSS_SKILL_LEVELS = (a1..c2)`; `structure_registry(level)` devuelve las estructuras de cualquier nivel (objetivos con checks MC de grammar); `PRODUCTION_BINDINGS_BY_LEVEL` declara el binding normativo CP → estructura en los seis niveles (A2/B2/C1 validados contra `can_do`/topic; A1 y C2 nuevos). Un mismo objetivo puede agrupar varios CP y `production.evidence` cuenta CP superados, no filas.
+- **Esquema y endpoint sin marca de prototipo**: se elimina `proto` de `CrossSkillMatrixOut` (backend y `frontend/src/types/api.ts`); `/api/cross-skill` acepta `a1..c2`, valida el nivel (400 `cross_skill.level_unknown` para ids desconocidos) y mantiene `"b1"` como default inofensivo.
+- **Panel cross-skill en todos los niveles**: `CrossSkillMatrix` se monta en el panel del nivel Grammar para cualquier nivel (no solo B1); se retira el pie "prototipo B1", el título/nota se generalizan y la clave `crossSkill.protoNote` desaparece de i18n (`en`/`es`).
+- **Tests e invariantes**: `backend/tests/test_cross_skill.py` reescrito con invariantes por nivel (registro == objetivos con MC de grammar, bindings normativos sin CP huérfanos, semántica de matriz y endpoint para los 6 niveles); nuevo invariante de contenido que protege la producción enlazada de A1/C2. Test `test_grammar_routes.py` actualizado (todos los niveles aportan CP al banco) y docstrings de los invariantes pedagógicos de C2 (4 MC → 4 MC + 4 CP) sincronizados. Playwright `grammarRoutesReview` mockea `/api/cross-skill` (determinista sin backend).
+
 ## [3.13.0] — 2026-09-05
 
 **Calibración de evidencia pedagógica: del "¿está implementada la actividad?" al "¿la evidencia demuestra competencia?".**

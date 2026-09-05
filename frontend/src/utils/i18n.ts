@@ -1060,12 +1060,12 @@ const STRINGS: Record<string, Entry> = {
     es: "Aún no hay grafo de evidencia.",
   },
   "crossSkill.title": {
-    en: "Cross-skill evidence · B1 structures",
-    es: "Evidencia cross-skill · estructuras B1",
+    en: "Cross-skill evidence by structure",
+    es: "Evidencia cross-skill por estructura",
   },
   "crossSkill.note": {
-    en: "For each grammar structure of B1, the evidence you already have in the skills the curriculum exposes it to. ✓ = correct evidence, ✗ = instrument offered but no evidence yet, – = this skill does not expose the structure.",
-    es: "Por cada estructura gramatical de B1, la evidencia que ya tienes en las destrezas a las que el currículo la expone. ✓ = evidencia correcta, ✗ = instrumento ofrecido pero aún sin evidencia, – = esa destreza no expone la estructura.",
+    en: "For each grammar structure of this level, the evidence you already have in the skills the curriculum exposes it to. ✓ = correct evidence, ✗ = instrument offered but no evidence yet, – = this skill does not expose the structure.",
+    es: "Por cada estructura gramatical de este nivel, la evidencia que ya tienes en las destrezas a las que el currículo la expone. ✓ = evidencia correcta, ✗ = instrumento ofrecido pero aún sin evidencia, – = esa destreza no expone la estructura.",
   },
   "crossSkill.channel.recognition": {
     en: "Recognition (MC)",
@@ -1085,10 +1085,6 @@ const STRINGS: Record<string, Entry> = {
   "crossSkill.evidenceCount": {
     en: "{n} correct sample(s)",
     es: "{n} muestra(s) correcta(s)",
-  },
-  "crossSkill.protoNote": {
-    en: "Read-only prototype: B1 only.",
-    es: "Prototipo de solo lectura: únicamente B1.",
   },
   "crossSkill.empty": {
     en: "No cross-skill structures yet.",

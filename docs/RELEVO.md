@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-05 19:55 (UTC+2).
+> Actualizado por última vez: 2026-09-05 20:35 (UTC+2).
 >
 > **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
 > La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
@@ -11,6 +11,24 @@
 > `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
+>
+> **Nota (2026-09-05):** posición vigente **v3.14.0** — **Registro cross-skill
+> de B1 a los 6 niveles (A1–C2)** (backend `3.13.0 → 3.14.0`). Escala el registro
+> por estructura (V3.13 P1.2) del prototipo B1 a `a1..c2` con datos reales por
+> nivel y sin marca de prototipo. **Contenido**: ítems `controlled_production`
+> nuevos en A1 (`a1-cp-01..06`: `to be`, present simple 3.ª, adverbios de
+> frecuencia, `have/has got`, preposiciones, past simple) y C2 (`c2-cp-01..04`:
+> inversión enfática, cleft, mixed conditional, pasiva formal); el banco Grammar
+> crece (A1 38→44, C2 4→8) y C2 conserva "evidence depth LOW" (banco ≤12) sin
+> claims falsos. **Motor**: `backend/services/cross_skill.py` generalizado
+> (`CROSS_SKILL_LEVELS = a1..c2`), `PRODUCTION_BINDINGS_BY_LEVEL` normativo en
+> los seis niveles (test: sin CP huérfanos y toda estructura con binding ofrece
+> producción); se elimina `proto` del esquema (`schemas/cross_skill.py`) y de los
+> tipos frontend; `/api/cross-skill` valida `a1..c2` (400
+> `cross_skill.level_unknown`). **UI**: `CrossSkillMatrix` en el panel Grammar de
+> cualquier nivel, copia generalizada y clave `crossSkill.protoNote` retirada de
+> i18n. Tests: **pytest 1293**, **vitest 382**, Playwright desktop verde
+> (grammarRoutesReview mockea `/api/cross-skill`).
 >
 > **Nota (2026-09-05):** posición vigente **v3.13.0** — **Calibración de
 > evidencia pedagógica** (backend `3.12.0 → 3.13.0`). La iteración recalibra el
@@ -2396,23 +2414,69 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   §9 de la constitución marcada "implementado en v3.13.0". Tests: **pytest
   1290**, **vitest 382** y Playwright desktop verde.
 
-### Próximo (V2.6+)
-Orden de prioridades fijado por la auditoría externa:
-- ~~**🔴 P0 — Unit Learning Loop (contenido)**~~ ✅ hecho (37.28): marcador `phase` implementado
-  (37.27) y fases de cierre etiquetadas por unidad (retrieve/transfer/assess/review). Loop por unidad
-  50,6% → 84,7%.
-- **🔴 P0 — Unit Coverage 100%**: no conformarse con 42/49; subir `unit_coverage` hasta que cada unidad
-  obligatoria integre sus secciones.
-- **🔴 P0 — C1/C2 depth**: ampliar la densidad curricular avanzada (pragmatics, discourse, register,
-  nuance, argumentation) — hoy C1=7 y C2=5 objetivos.
-- **🟠 P1 — Speaking Performance Evidence**: attempt → evaluation → weakness → targeted drill → attempt
-  again → improvement.
-- **🟠 P1 — Listening Progression**: A1 word recognition → … → C2 pragmatic interpretation.
-- **🟠 P1 — Review/SRS integrado** por unidad (micro-review + 7/30/90 días).
-- **🟡 P2 — Knowledge Graph + Daily Adaptive Plan**: conectar Can-Do ↔ destrezas ↔ dominio.
+### 37.32 HECHO (V3.14) — Registro cross-skill A1–C2 (implementación)
+- **Contenido — ítems CP en A1 y C2** (`backend/curriculum/a1.json`,
+  `c2.json`): A1 gana `a1-cp-01..06` (`to be`, present simple 3.ª persona,
+  adverbios de frecuencia, `have/has got`, preposiciones de lugar, past simple;
+  dianas `a1-m01-u01-l01-o01`, `a1-m02-u01-l01-o01/-o03`, `a1-m03-u01-l01-o01`,
+  `a1-m04-u01-l01-o02`, `a1-m08-u01-l01-o02`) y C2 gana `c2-cp-01..04`
+  (inversión enfática + cleft en `c2-m01-u01-l01-o04`, mixed conditional en
+  `c2-m03-u01-l01-o01`, pasiva formal de registro en `c2-m02-u01-l01-o01`),
+  con `accepted_answers` deterministas. El banco Grammar crece (A1 38→44, C2
+  4→8); C2 sigue en banco corto ≤12 → su claim "evidence depth LOW" se
+  conserva (tests pedagógicos actualizados: docstrings 4 MC → 4 MC + 4 CP).
+- **Motor — registro generalizado** (`backend/services/cross_skill.py`):
+  `CROSS_SKILL_LEVELS = ("a1".."c2")`; `structure_registry(level)` sirve
+  cualquier nivel (objetivos con checks MC de grammar); constantes
+  `A1..C2_PRODUCTION_BINDINGS` + `PRODUCTION_BINDINGS_BY_LEVEL` completos
+  (A2/B2/C1 validados contra `can_do`; B1 intacto). Un objetivo agrupa varios
+  CP y `production.evidence` cuenta CP superados. Sin `proto`.
+- **API/schema** (`backend/schemas/cross_skill.py`,
+  `backend/routers/cross_skill.py`): `proto` eliminado de `CrossSkillMatrixOut`;
+  endpoint valida `level ∈ CROSS_SKILL_LEVELS` (400
+  `cross_skill.level_unknown`); default `"b1"` inofensivo se mantiene.
+- **Tests backend** (`backend/tests/test_cross_skill.py` reescrito):
+  invariantes por nivel (registro == objetivos grammar con MC; bindings
+  normativos sin CP huérfanos; oferta de listening/speaking según wiring del
+  currículo; matriz cuenta recognition/transfer/listening/speaking por
+  objetivo y producción por CP superado); invariante de contenido A1/C2;
+  endpoint 200 en los seis niveles + 400 en nivel inválido.
+  `test_grammar_routes.py::test_production_pool_items_present_in_every_level`
+  (todos los niveles aportan CP).
+- **UI** (`frontend`): `GrammarLevelPanel.tsx` monta `CrossSkillMatrix` para
+  cualquier nivel (fuera el gate `B1`); `CrossSkillMatrix.tsx` sin pie de
+  prototipo y copia generalizada; `types/api.ts` sin `proto`; `api/crossSkill.ts`
+  con `level` requerido; `i18n.ts` sin `crossSkill.protoNote`, título/nota
+  genéricos. Playwright `grammarRoutesReview.spec.ts` mockea `/api/cross-skill`
+  (respuesta vacía determinista para el panel A1).
+- **Cierre**: bump único `3.14.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.32 en `docs/RELEVO.md`,
+  `release-notes-v3.14.0.md`. Tests: **pytest 1293**, **vitest 382** y
+  Playwright desktop verde.
 
-Pendiente heredado de V2.3: generación automática del speaking micro-drill
-(`recognized_not_produced`), desglose speaking-vs-writing por palabra y FSRS completo (parámetros por
-usuario).
+### Próximos incrementos (candidatos abiertos)
+
+> Lista de candidatos que siguen abiertos tras V3.14, sin los números de era
+> antigua (los incrementos cerrados se consolidan en esta sección 37 y el
+> roadmap vigente vive en `PLAN.md`). La regla sigue siendo la premisa 6
+> (poco a poco, un incremento a la vez).
+
+- **🔴 P0 — Unit Coverage 100%**: cerrar las unidades que aún no integran todas
+  sus secciones (no conformarse con la cobertura parcial).
+- **🔴 P0 — C1/C2 depth**: ampliar la densidad curricular avanzada (pragmatics,
+  discourse, register, nuance, argumentation) — V3.14 ya suma producción
+  controlada en C2, pero su banco de grammar sigue corto y la profundidad
+  avanzada es el frente abierto.
+- **🟠 P1 — Speaking Performance Evidence**: attempt → evaluation → weakness →
+  targeted drill → attempt again → improvement.
+- **🟠 P1 — Listening Progression**: A1 word recognition → … → C2 pragmatic
+  interpretation.
+- **🟠 P1 — Review/SRS por unidad**: micro-review + ventanas 7/30/90 días sobre
+  la base FSRS ya operativa (`backend/services/fsrs.py`).
+- **🟡 P2 — Knowledge Graph + Daily Adaptive Plan**: conectar Can-Do ↔ destrezas
+  ↔ dominio.
+- **Pendiente heredado**: generación automática del speaking micro-drill
+  (`recognized_not_produced`) y desglose speaking-vs-writing por palabra.
 
 

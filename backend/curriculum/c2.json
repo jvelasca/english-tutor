@@ -1429,5 +1429,39 @@
         }
       ]
     }
+  ],
+  "production_checks": [
+    {
+      "id": "c2-cp-01",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Rhetoric & Persuasion",
+      "prompt": "Complete the inversion. She had never seen such a mess. Never ___ she seen such a mess.",
+      "accepted_answers": ["had"]
+    },
+    {
+      "id": "c2-cp-02",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Rhetoric & Persuasion",
+      "prompt": "Complete the cleft sentence. I love this city. What I love most about it ___ its people.",
+      "accepted_answers": ["is"]
+    },
+    {
+      "id": "c2-cp-03",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "C2 Final",
+      "prompt": "Complete the mixed conditional with the verb in brackets. If you had taken my advice, you ___ (not be) in this situation now.",
+      "accepted_answers": ["wouldn't be", "would not be"]
+    },
+    {
+      "id": "c2-cp-04",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Register & Cultural Fluency",
+      "prompt": "Rewrite in the passive. They will announce the winners tomorrow. The winners ___ tomorrow.",
+      "accepted_answers": ["will be announced"]
+    }
   ]
 }

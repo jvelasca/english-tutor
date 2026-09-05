@@ -1,4 +1,4 @@
-"""Esquemas del registro cross-skill por estructura (V3.13, P1.2).
+"""Esquemas del registro cross-skill por estructura (V3.13 P1.2 → v3.14 A1–C2).
 
 Endpoint SOLO LECTURA `/api/cross-skill`: por cada estructura gramatical del
 nivel (objetivo con checks MC de grammar) devuelve la matriz de instrumentos
@@ -32,5 +32,4 @@ class StructureRowOut(BaseModel):
 class CrossSkillMatrixOut(BaseModel):
     level_id: str
     level: str
-    proto: bool
     structures: list[StructureRowOut]

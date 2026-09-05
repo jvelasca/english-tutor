@@ -64,9 +64,9 @@ def test_practice_route_never_returns_demonstrated():
 
 
 def test_four_c2_questions_cannot_prove_c2():
-    """Dominar el banco corto de grammar C2 (4 checks) pasa la puerta de la
-    ruta (mide práctica sobre el banco disponible) pero queda en evidence depth
-    LOW: la práctica no produce evidencia de competencia C2."""
+    """Dominar el banco corto de grammar C2 (4 MC + 4 CP = 8) pasa la puerta de
+    la ruta (mide práctica sobre el banco disponible) pero queda en evidence
+    depth LOW: la práctica no produce evidencia de competencia C2."""
     c2 = engine.checks_for_level("grammar", "C2")
     assert 0 < len(c2) < engine.QUIZ_SHORT_BANK
     rows = [{"check_id": c["check_id"], "passed": True} for c in c2]
@@ -83,8 +83,8 @@ def test_four_c2_questions_cannot_prove_c2():
 def test_short_bank_coverage_does_not_lift_to_medium():
     """Un banco corto dominado declara practice coverage con evidence depth LOW;
     la profundidad media exige un banco representativo (normal). C2 es hoy el
-    único banco corto de grammar (4 MC): B2 se normalizó en V3.13 P1 al añadir
-    la producción controlada al banco."""
+    único banco corto de grammar (4 MC + 4 CP = 8): B2 se normalizó en V3.13 P1
+    al añadir la producción controlada al banco."""
     for level in ("C2",):
         bank = engine.checks_for_level("grammar", level)
         rows = [{"check_id": c["check_id"], "passed": True} for c in bank]

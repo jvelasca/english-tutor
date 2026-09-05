@@ -3004,5 +3004,55 @@
         }
       ]
     }
+  ],
+  "production_checks": [
+    {
+      "id": "a1-cp-01",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Introductions",
+      "prompt": "Complete with am, is or are. I ___ from Spain.",
+      "accepted_answers": ["am"]
+    },
+    {
+      "id": "a1-cp-02",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Everyday Life",
+      "prompt": "Complete with the present simple of the verb in brackets. She ___ (get) up at seven every day.",
+      "accepted_answers": ["gets"]
+    },
+    {
+      "id": "a1-cp-03",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Everyday Life",
+      "prompt": "Complete with always, sometimes or never. I ___ eat meat; I am vegetarian.",
+      "accepted_answers": ["never"]
+    },
+    {
+      "id": "a1-cp-04",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Family & People",
+      "prompt": "Complete with have got or has got. My sister ___ two children.",
+      "accepted_answers": ["has got"]
+    },
+    {
+      "id": "a1-cp-05",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Home",
+      "prompt": "Complete with on, in or under. The keys are ___ the table.",
+      "accepted_answers": ["on"]
+    },
+    {
+      "id": "a1-cp-06",
+      "type": "controlled_production",
+      "skill": "grammar",
+      "topic": "Past",
+      "prompt": "Complete with the past simple of the verb in brackets. Yesterday we ___ (play) football.",
+      "accepted_answers": ["played"]
+    }
   ]
 }

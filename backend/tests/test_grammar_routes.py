@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from domain import grammar_routes as grammar_domain
-from domain.grammar_routes import SKILL, is_valid_level
+from domain.grammar_routes import SKILL
 from main import app
 from repositories import db
 from repositories import grammar_routes as grammar_repo
@@ -204,8 +204,9 @@ def test_route_gate_flags_short_banks():
 
 
 def test_short_bank_practice_depth_low_but_never_proof_of_level():
-    """R7: dominar 4 checks C2 es práctica con evidencia LOW, nunca competencia
-    demostrada. La ruta declara functional (techo de práctica) sin certificar."""
+    """R7: dominar el banco corto de C2 (4 MC + 4 CP = 8 < 12) es práctica con
+    evidencia LOW, nunca competencia demostrada. La ruta declara functional
+    (techo de práctica) sin certificar."""
     c2 = engine.checks_for_level(SKILL, "C2")
     rows = [{"check_id": c["check_id"], "passed": True} for c in c2]
     gate = engine.route_gate(SKILL, "C2", rows)
@@ -425,20 +426,18 @@ def test_attempt_endpoint_unknown_check_is_404(monkeypatch, tmp_path):
         assert r.status_code == 404
 
 
-def test_production_pool_items_present_in_a2_to_c1():
-    """Producción controlada (V3.13 P1): cada nivel A2–C1 aporta ítems CP al
-    banco de grammar; C2 no (sigue siendo 4 MC, banco corto honesto)."""
-    for level in ("A2", "B1", "B2", "C1"):
+def test_production_pool_items_present_in_every_level():
+    """Producción controlada (V3.13 P1 → v3.14): cada nivel A1–C2 aporta ítems
+    CP al banco de grammar. C2 (4 MC + 4 CP) y A1 (38 MC + 6 CP) se incorporaron
+    en v3.14 para que el canal de producción del registro cross-skill se ofrezca
+    en todos los niveles; C2 sigue siendo banco corto honesto."""
+    for level in ("A1", "A2", "B1", "B2", "C1", "C2"):
         pool = engine.checks_for_level(SKILL, level)
         cps = [c for c in pool if c.get("type") == "controlled_production"]
-        assert 6 <= len(cps) <= 10, f"{level}: {len(cps)} CP"
+        assert 3 <= len(cps) <= 10, f"{level}: {len(cps)} CP"
         for c in cps:
             assert c["accepted_answers"], c["check_id"]
             assert not c["options"]
-    assert all(
-        c.get("type") == "mcq"
-        for c in engine.checks_for_level(SKILL, "C2")
-    )
 
 
 def test_submit_controlled_production_correct_and_wrong(monkeypatch, tmp_path):
@@ -490,15 +489,7 @@ def test_question_endpoint_serves_controlled_production_without_answers(
     """La pregunta de un ítem CP expone `type` y un prompt con hueco, pero NUNCA
     filtra `accepted_answers` ni `correct_index` (sería hacer trampa)."""
     uid = _setup(monkeypatch, tmp_path)
-    cp = next(
-        c for c in engine.checks_for_level(SKILL, "B2")
-        if c.get("type") == "controlled_production"
-    )
     with TestClient(app) as client:
-        r = client.get(
-            "/api/grammar/routes/question",
-            params={"user_id": uid, "level": "B2"},
-        )
         # La ruta sirve el pool completo (MC + CP): localizamos un CP con una
         # rotación que recorre el banco de B2 (LRU), así que forzamos recorrer
         # preguntando hasta encontrarlo.

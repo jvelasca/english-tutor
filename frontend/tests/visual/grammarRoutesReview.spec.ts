@@ -17,6 +17,8 @@ import { ensureProfile } from "./gateHelper";
  *  - GET /api/grammar/routes/items → coherente con las stats.
  *  - GET /api/grammar/routes/question → un check MC de A1.
  *  - POST /api/grammar/routes/attempt → resultado determinista.
+ *  - GET /api/cross-skill → vacío (v3.14: el panel del nivel A1 también pide
+ *    el registro cross-skill; respuesta determinista sin depender del backend).
  * Solo se ejecuta en desktop.
  */
 
@@ -167,6 +169,17 @@ async function installMocks(page: import("@playwright/test").Page) {
       route.continue();
     }
   });
+  // Registro cross-skill (V3.13 P1.2 → v3.14): el panel del nivel A1 también lo
+  // pide; respuesta vacía determinista para no depender del backend.
+  await page.route("**/api/cross-skill*", (route) =>
+    route.fulfill({
+      json: {
+        level_id: "a1",
+        level: "A1",
+        structures: [],
+      },
+    }),
+  );
 }
 
 test("capturar Grammar: página única MC + feedback (mock)", async ({

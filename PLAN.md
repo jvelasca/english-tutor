@@ -11,6 +11,22 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.14.0` — **Registro cross-skill de B1 a los 6 niveles (A1–C2): producción controlada en todos los niveles y panel sin marca de prototipo**
+  (escala el registro cross-skill por estructura de V3.13 P1.2 del prototipo B1 a
+  `a1..c2`: **P0-contenido**: ítems `controlled_production` nuevos en A1 (6:
+  `to be`, present simple 3.ª persona, adverbios de frecuencia, `have/has got`,
+  preposiciones de lugar, past simple) y C2 (4: inversión enfática, cleft,
+  mixed conditional, pasiva formal); el banco Grammar crece (A1 38→44, C2 4→8)
+  y C2 conserva su etiqueta honesta de banco corto (≤12) · **P0-motor**:
+  `cross_skill.py` generalizado (`CROSS_SKILL_LEVELS = a1..c2`), bindings
+  normativos CP → estructura en los seis niveles (`PRODUCTION_BINDINGS_BY_LEVEL`,
+  verificado por test: sin CP huérfanos), producción por objetivo agrupando CP ·
+  **P1-API**: sin `proto` en esquema/tipos, `/api/cross-skill` valida `a1..c2`
+  (400 `cross_skill.level_unknown`) · **P2-UI**: `CrossSkillMatrix` en el panel
+  Grammar de cualquier nivel, copia generalizada sin "prototipo B1" y clave
+  `crossSkill.protoNote` eliminada de i18n · tests backend por nivel +
+  invariantes de contenido A1/C2 + Playwright `grammarRoutesReview` con mock
+  determinista). Base: `3.13.0`
 - ✅ Versión estable `3.13.0` — **Calibración de evidencia pedagógica: del "¿está implementada la actividad?" al "¿la evidencia demuestra competencia?"**
   (iteración que recalibra el modelo pedagógico en un único documento normativo
   (`docs/CONSTITUCION-PEDAGOGICA.md`) con reglas inmutables R1–R7 y §6.4

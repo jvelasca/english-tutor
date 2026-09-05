@@ -308,10 +308,8 @@ export function GrammarLevelPanel({
         </div>
       </div>
 
-      {/* Registro cross-skill (V3.13 P1.2): prototipo B1, solo lectura. */}
-      {level.toUpperCase() === "B1" && userId && (
-        <CrossSkillMatrix userId={userId} level={level} />
-      )}
+      {/* Registro cross-skill (V3.13 P1.2 → v3.14): A1–C2, solo lectura. */}
+      {userId && <CrossSkillMatrix userId={userId} level={level} />}
     </div>
   );
 }

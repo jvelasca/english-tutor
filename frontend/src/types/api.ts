@@ -1946,9 +1946,9 @@ export interface AttemptEntry {
   result: AttemptResult;
 }
 
-// --- Registro cross-skill por estructura (V3.13, P1.2) ----------------------
-// Prototipo B1 (solo lectura): por cada estructura gramatical del nivel, la
-// matriz de instrumentos ofrecidos por destreza y la evidencia real del usuario.
+// --- Registro cross-skill por estructura (V3.13 P1.2 → v3.14 A1–C2) ----------
+// Solo lectura: por cada estructura gramatical del nivel, la matriz de
+// instrumentos ofrecidos por destreza y la evidencia real del usuario.
 
 export type CrossSkillChannelKey =
   | "recognition"
@@ -1972,7 +1972,6 @@ export interface CrossSkillStructure {
 export interface CrossSkillMatrix {
   level_id: string;
   level: string;
-  proto: boolean;
   structures: CrossSkillStructure[];
 }
 

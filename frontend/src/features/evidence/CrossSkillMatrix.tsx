@@ -90,9 +90,9 @@ function StructureRow({ structure }: { structure: CrossSkillStructure }) {
 }
 
 /**
- * Matriz cross-skill por estructura (V3.13, P1.2, solo lectura).
+ * Matriz cross-skill por estructura (V3.13 P1.2 → v3.14 A1–C2, solo lectura).
  *
- * Por cada estructura gramatical de B1 muestra qué instrumentos ofrece el
+ * Por cada estructura gramatical del nivel muestra qué instrumentos ofrece el
  * currículo por destreza y qué evidencia correcta acumula el usuario:
  *   ✓ n → evidencia correcta; ✗ → instrumento ofrecido, aún sin evidencia;
  *   –   → el currículo no expone la estructura a esa destreza.
@@ -193,9 +193,6 @@ export function CrossSkillMatrix({
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {t("crossSkill.protoNote")}
-          </p>
         </>
       )}
     </section>

@@ -528,15 +528,18 @@ genera esta actividad demuestra que el alumno sabe hacer algo?"* frente a
 
 **P1 — Producción de Grammar y evidencia cross-skill**
 
-16. **Grammar en 3 niveles** (R5) — implementado en v3.13.0: ítems
-    `controlled_production` (hueco +
+16. **Grammar con producción controlada en todos los niveles** (R5) —
+    implementado en v3.13.0 (A2–C1) y completado en v3.14.0 (A1 y C2):
+    ítems `controlled_production` (hueco +
     respuestas aceptadas, corrección determinista) en el currículo y en el motor
     compartido de rutas; la producción libre se conecta a Speaking/Writing vía
     cross-skill.
-17. **Cross-skill evidence** (R4) — implementado en v3.13.0 (prototipo B1):
+17. **Cross-skill evidence** (R4) — implementado en v3.13.0 (prototipo B1) y
+    **escalado a A1–C2 en v3.14.0** (sin marca de prototipo):
     registro de estructuras por nivel que cruza
     grammar/speaking/listening/writing por objetivo; matriz por estructura y
-    panel (prototipo B1).
+    panel por nivel de Grammar. El binding de los ítems `controlled_production`
+    a su estructura es normativo (tests: sin CP huérfanos).
 18. **Golden pedagogical dataset** — implementado en v3.13.0:
     `backend/tests/golden/pedagogy/` con casos
     A1–C2 de evidence depth y de "demostrado".

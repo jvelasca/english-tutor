@@ -1,8 +1,8 @@
-"""Registro cross-skill por estructura (V3.13, P1.2).
+"""Registro cross-skill por estructura (V3.13 P1.2 → v3.14: escalado A1–C2).
 
-Prototipo B1: para cada estructura gramatical del nivel (un `Objective` del
-currículo con checks MC de grammar) cruza las EVIDENCIAS del mismo usuario a
-través de las destrezas que el currículo ofrece para esa estructura:
+Para cada estructura gramatical del nivel (un `Objective` del currículo con
+checks MC de grammar) cruza las EVIDENCIAS del mismo usuario a través de las
+destrezas que el currículo ofrece para esa estructura:
 
     recognition  → checks MC de grammar del objetivo (academy_evidence)
     production   → ítems `controlled_production` del nivel enlazados al objetivo
@@ -18,8 +18,10 @@ en esta destreza" (p. ej. se reconoce la estructura en MC pero no se ha
 evidenciado al hablar). Un "–" (ofrecido = False) significa que el currículo no
 expone esa estructura a esa destreza.
 
-El prototipo es SOLO LECTURA y se acota a B1 (P1.2). El etiquetado fino de más
-niveles queda como decisión posterior; este módulo es puro y determinista.
+El registro es SOLO LECTURA y cubre los seis niveles A1–C2. El binding de los
+ítems `controlled_production` a su estructura gramatical es normativo (los
+tests verifican que cada id existe en el currículo y que su objetivo tiene
+checks MC de grammar). Este módulo es puro y determinista.
 """
 from __future__ import annotations
 
@@ -28,15 +30,39 @@ from collections import defaultdict
 from services.curriculum import load_level
 
 # Destrezas (canales) de la matriz, en orden de lectura.
-CHANNELS: tuple[str, ...] = ("recognition", "production", "listening", "speaking", "transfer")
+CHANNELS: tuple[str, ...] = (
+    "recognition",
+    "production",
+    "listening",
+    "speaking",
+    "transfer",
+)
 
-# Nivel(es) con registro cross-skill completo (prototipo B1).
-CROSS_SKILL_LEVELS: tuple[str, ...] = ("b1",)
+# Niveles con registro cross-skill (A1–C2).
+CROSS_SKILL_LEVELS: tuple[str, ...] = ("a1", "a2", "b1", "b2", "c1", "c2")
 
-# Enlace producción controlada → estructura (prototipo B1). Un ítem CP del
-# nivel se atribuye al objetivo gramatical que ejercita. Es normativo: el test
-# `test_cross_skill.py` verifica que cada `check_id` existe en el currículo y
-# que su objetivo tiene checks MC de grammar.
+# Enlace producción controlada → estructura por nivel. Un ítem CP del nivel se
+# atribuye al objetivo gramatical que ejercita. Es normativo: los tests
+# verifican que cada id existe en el currículo, que su objetivo tiene checks MC
+# de grammar y que no quedan CP huérfanos.
+A1_PRODUCTION_BINDINGS: dict[str, str] = {
+    "a1-cp-01": "a1-m01-u01-l01-o01",  # verb to be
+    "a1-cp-02": "a1-m02-u01-l01-o01",  # present simple (3rd person)
+    "a1-cp-03": "a1-m02-u01-l01-o03",  # adverbs of frequency
+    "a1-cp-04": "a1-m03-u01-l01-o01",  # have got / has got
+    "a1-cp-05": "a1-m04-u01-l01-o02",  # prepositions of place
+    "a1-cp-06": "a1-m08-u01-l01-o02",  # past simple
+}
+
+A2_PRODUCTION_BINDINGS: dict[str, str] = {
+    "a2-cp-01": "a2-m01-u01-l01-o01",  # past simple
+    "a2-cp-02": "a2-m01-u01-l01-o02",  # present perfect
+    "a2-cp-03": "a2-m02-u01-l01-o01",  # comparatives
+    "a2-cp-04": "a2-m02-u01-l01-o02",  # superlatives
+    "a2-cp-05": "a2-m03-u01-l01-o01",  # be going to
+    "a2-cp-06": "a2-m04-u01-l01-o02",  # have to / must
+}
+
 B1_PRODUCTION_BINDINGS: dict[str, str] = {
     "b1-cp-01": "b1-m01-u01-l01-o01",  # present perfect for experience
     "b1-cp-02": "b1-m01-u01-l01-o02",  # yet / already
@@ -46,9 +72,39 @@ B1_PRODUCTION_BINDINGS: dict[str, str] = {
     "b1-cp-06": "b1-m03-u01-l01-o15",  # reported speech
 }
 
-# Binding por nivel (extensible cuando se escale el etiquetado fino).
+B2_PRODUCTION_BINDINGS: dict[str, str] = {
+    "b2-cp-01": "b2-m01-u01-l01-o01",  # discourse markers
+    "b2-cp-02": "b2-m01-u01-l01-o02",  # linkers of consequence
+    "b2-cp-03": "b2-m01-u01-l02-o03",  # second conditional
+    "b2-cp-04": "b2-m01-u01-l02-o03",  # third conditional
+    "b2-cp-05": "b2-m01-u01-l02-o04",  # reported speech
+    "b2-cp-06": "b2-m02-u01-l02-o11",  # modals of deduction
+}
+
+C1_PRODUCTION_BINDINGS: dict[str, str] = {
+    "c1-cp-01": "c1-m01-u01-l01-o01",  # inversion for emphasis
+    "c1-cp-02": "c1-m01-u01-l01-o02",  # cleft sentences
+    "c1-cp-03": "c1-m01-u01-l01-o04",  # inversion in discussion
+    "c1-cp-04": "c1-m02-u01-l02-o01",  # collocations
+    "c1-cp-05": "c1-m03-u01-l01-o04",  # passive (formal writing)
+    "c1-cp-06": "c1-m03-u01-l01-o04",  # passive (formal writing)
+}
+
+C2_PRODUCTION_BINDINGS: dict[str, str] = {
+    "c2-cp-01": "c2-m01-u01-l01-o04",  # inversion for rhetorical effect
+    "c2-cp-02": "c2-m01-u01-l01-o04",  # cleft sentences
+    "c2-cp-03": "c2-m03-u01-l01-o01",  # mixed conditional (precision)
+    "c2-cp-04": "c2-m02-u01-l01-o01",  # passive (formal register)
+}
+
+# Binding por nivel.
 PRODUCTION_BINDINGS_BY_LEVEL: dict[str, dict[str, str]] = {
+    "a1": A1_PRODUCTION_BINDINGS,
+    "a2": A2_PRODUCTION_BINDINGS,
     "b1": B1_PRODUCTION_BINDINGS,
+    "b2": B2_PRODUCTION_BINDINGS,
+    "c1": C1_PRODUCTION_BINDINGS,
+    "c2": C2_PRODUCTION_BINDINGS,
 }
 
 # Kinds de evidencia que cuentan como TRANSFERENCIA en la matriz (superan la
@@ -67,10 +123,6 @@ def structure_registry(level_id: str) -> list[dict]:
     Cada estructura es un objetivo con checks MC de grammar: es el ancla del
     currículo que ya agrupa can-dos, concepts, `scenario_ids` (speaking) y
     `listening_items` (V2.5-C4).
-
-    Solo los niveles con registro cross-skill declarado (prototipo B1) producen
-    filas; el resto devuelve la lista vacía (el escalado de etiquetado a más
-    niveles es una decisión posterior explícita).
     """
     if level_id not in CROSS_SKILL_LEVELS:
         return []
@@ -133,7 +185,7 @@ def cross_skill_matrix(
     """
     rows = structure_registry(level_id)
     if not rows:
-        return {"level_id": level_id, "level": level_id.upper(), "proto": False, "structures": []}
+        return {"level_id": level_id, "level": level_id.upper(), "structures": []}
 
     evidence_by_objective: dict[str, list[dict]] = defaultdict(list)
     for row in evidence_rows or []:
@@ -167,6 +219,5 @@ def cross_skill_matrix(
     return {
         "level_id": level_id,
         "level": level_id.upper(),
-        "proto": True,
         "structures": rows,
     }
