@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-06 13:30 (UTC+2).
+> Actualizado por última vez: 2026-09-06 20:20 (UTC+2).
 >
 > **Nota (2026-09-06):** posición vigente **v3.17.0** — **Knowledge Graph +
 > Daily Adaptive Plan** (backend `3.16.0 → 3.17.0`). Cierra el candidato P2:
@@ -29,6 +29,16 @@
 > nunca se bloquea). Tests: **pytest 1333**, **vitest 398**, ruff limpio,
 > `tsc`/`vite build` OK y `check_release_consistency` exit 0; CONSTITUCIÓN sin
 > cambios.
+>
+> Auditoría externa v3.17 (2026-09-06, read-only): **APROBADO CON
+> OBSERVACIONES** — D1b/D2c/D3a/D4b/D5a/D6a/D7a ✅ reproducidos en vivo.
+> Hotfix aplicado (commit en `main` tras `989658e`): **H1** — 2 tests de
+> integración del camino REAL de remediación D1b (paso `weakness` de examen
+> suspendido enriquecido con el can-do real + paridad `/next-best`==`/session`
+> con primer paso CON nodo) → **pytest 1335**; **H2** — panel de Habilidades
+> sin recorte a 12 nodos (criterio 5 de D2); **H3** — `Milestone` no expande
+> objetivos `locked`; **H4** — typo docs («10 puros» → «9»). Deuda menor
+> **H5**/**H6** + observaciones del informe → candidato v3.18 (37.35).
 >
 > **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
 > La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
@@ -2694,14 +2704,15 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `/session` los pasos sin `objective_id` (p. ej. listening) no ganan campos y
   el esquema los serializa `null`/`[]` (`SessionStepOut` ampliado con campos
   opcionales); el ranking nunca bloquea (sin nodo → orden original al final).
-- **Tests**: `test_graph_plan.py` (10 puros de `rank_weakness_objectives`/
+- **Tests**: `test_graph_plan.py` (9 puros de `rank_weakness_objectives`/
   `enrich_item`, incl. fallback D7 y paridad con `enrich_next_best`),
-  `test_session_graph.py` (3 endpoint: campos del grafo en `/session`
+  `test_session_graph.py` (5 endpoint: campos del grafo en `/session`
   coherentes con el can-do real del currículo, silencio en pasos sin objetivo,
-  paridad `/next-best`==`/session`); migrados `test_academy.py`,
-  `test_academy_goal.py`, `test_adaptive.py`; M2/O2 en
+  paridad `/next-best`==`/session`, y los 2 de la auditoría v3.17 — camino REAL
+  de remediación enriquecido y paridad con el primer paso CON nodo); migrados
+  `test_academy.py`, `test_academy_goal.py`, `test_adaptive.py`; M2/O2 en
   `test_unit_review.py`/`test_unit_review_endpoints.py`. Backend **pytest
-  1333** + ruff limpio; frontend **vitest 398** (392 + 6 DOM) +
+  1335** + ruff limpio; frontend **vitest 398** (392 + 6 DOM) +
   `tsc`/`vite build` OK; `check_release_consistency` exit 0.
 - **Cierre**: bump único `3.17.0` (backend `config.py` fuente única) +
   `frontend/package.json`/`package-lock.json` (bump + devDeps DOM de M1),
@@ -2709,6 +2720,18 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `docs/RELEVO.md`, `release-notes-v3.17.0.md` (untracked). Sin cambios de
   CONSTITUCIÓN (v3.17 conecta el grafo existente al plan: motor + UI, no
   norma) ni de launcher.
+- **Auditoría externa (2026-09-06, read-only sobre `989658e`)**: veredicto
+  **APROBADO CON OBSERVACIONES** — D1b/D2c/D3a/D4b/D5a/D6a/D7a cumplidos y
+  reproducidos en vivo (pytest 1333, vitest 398, ruff, tsc, consistencia).
+  Fix aplicados tras el veredicto: **H1** — 2 tests de endpoint que fijan el
+  camino REAL de remediación de D1b (paso `weakness` de un examen suspendido
+  enriquecido con el can-do real del currículo, y paridad
+  `/next-best`==`/session` cuando el primer paso CON nodo — antes solo se
+  cubría el null==null de usuario nuevo); **H2** — el panel de Habilidades ya
+  no recorta a 12 nodos (listado completo, criterio 5 de D2); **H3** — el
+  `Milestone` no expande objetivos `locked`; **H4** — typo docs («10 puros» →
+  «9»). Deuda menor (sin fix, decidida por el gerente) → candidato v3.18:
+  **H5** y **H6**.
 
 ### Próximos incrementos (candidatos abiertos, auditados)
 
@@ -2769,8 +2792,16 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   **M4** — decidir si las cartas `objective` aparecen en el `FsrsReviewPanel`
   autograduable (doble escritor) o se siembran solo en ventana due; **O1** —
   cadena 7→30→90 (qué ocurre si la ventana 30 ya pasó cuando se resuelve la 7);
-  **O3** — plan de repaso más allá del nivel actual (D2(b)); y la deuda que
-  deje la auditoría externa v3.17 (pendiente de ejecutar).
+  **O3** — plan de repaso más allá del nivel actual (D2(b)); más la deuda de la
+  auditoría externa v3.17 (37.35): **H5** — chip del factor limitante con
+  etiqueta cruda para dimensiones no-skill (`transfer`/`discourse`/
+  `interaction` caen al `id` en crudo, sin localizar); **H6** — coste por
+  petición de `/session` y `/next-best` (se construyen nodos de todos los
+  candidatos de remediación de cada destreza débil y `list_evidence` se lee
+  incluso sin pasos que enriquecer); y las observaciones del informe de la
+  auditoría v3.17 (copia error/404 vs sin-datos del `ObjectiveNodeCard`,
+  cobertura Playwright de la región nueva, `float()` asumido en
+  `rank_weakness_objectives`).
 - **Pendiente heredado** (ABIERTO, v3.18): generación automática del speaking
   micro-drill (`recognized_not_produced`, hoy solo señal sin consumidor) y
   desglose speaking-vs-writing por palabra (hoy `record_words` solo lo llama el

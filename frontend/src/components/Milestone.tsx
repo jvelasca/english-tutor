@@ -35,7 +35,10 @@ export function Milestone({ objective, userId, levelId }: MilestoneProps) {
       ? t("course.inProgress")
       : t("course.locked");
 
-  const expandable = Boolean(userId);
+  // El detalle de can-do (D2) solo se ofrece en estados practicables
+  // (available/review/mastered): un objetivo locked aún no tiene contenido que
+  // desplegar y la fila se renderiza como div inerte (V3.17/H3, auditoría).
+  const expandable = Boolean(userId && objective.status !== "locked");
   const row = (
     <>
       <span

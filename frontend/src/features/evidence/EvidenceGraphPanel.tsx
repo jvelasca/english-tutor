@@ -81,7 +81,10 @@ export function EvidenceGraphPanel({
 
       {graph && graph.nodes.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {graph.nodes.slice(0, 12).map((node) => (
+          {/* V3.17/H2 (auditoría externa): listado COMPLETO de nodos del nivel,
+              sin recorte a 12 — con niveles de 20 objetivos todos deben ser
+              accesibles desde el perfil (criterio 5 de D2). */}
+          {graph.nodes.map((node) => (
             <button
               key={node.objective_id}
               type="button"

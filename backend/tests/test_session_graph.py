@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from main import app
 from repositories import db
 from repositories import users as users_repo
-from services.curriculum import load_level
+from services.curriculum import load_assessments, load_level
 
 
 def _setup(monkeypatch, tmp_path) -> str:
@@ -96,4 +96,92 @@ def test_next_best_graph_fields_never_diverge_from_session(monkeypatch, tmp_path
     for field in ("can_do", "limiting_factor", "graph_mastery", "because"):
         assert best[field] == first[field], (
             f"el campo {field} de next-best divergió del primer paso de la sesión"
+        )
+
+
+def _fail_level_exam(
+    monkeypatch, tmp_path, level_id: str = "a1"
+) -> tuple[str, list[str]]:
+    """Usuario nuevo que suspende el examen del nivel vía endpoint.
+
+    Fallar deliberadamente todas las respuestas escribe evidencia mala sobre las
+    destrezas del examen → `remediation_plan` real con debilidades (el camino
+    que D1b declara reordenar y enriquecer con el nodo)."""
+    uid = _setup(monkeypatch, tmp_path)
+    data = load_assessments()
+    exam = data.exams[level_id]
+    answers = {it.id: (it.correct_index + 1) % len(it.options) for it in exam.items}
+    with TestClient(app) as client:
+        r = client.post(
+            f"/api/academy/exam/{level_id}/submit",
+            params={"user_id": uid},
+            json={"answers": answers},
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["passed"] is False
+    assert body["failed_skills"]
+    return uid, body["failed_skills"]
+
+
+def test_session_weakness_step_is_enriched_with_real_remediation(
+    monkeypatch, tmp_path
+):
+    """H1 (auditoría externa v3.17): camino REAL de remediación de D1b.
+
+    Un usuario que suspende el examen A1 obtiene un paso `weakness` cuya
+    destreza es una de las falladas y que está enriquecido con el nodo de su
+    objetivo: `can_do` == can-do real del currículo, `graph_mastery` numérico y
+    `because[]` no vacío (no solo el camino feliz de un usuario nuevo)."""
+    uid, failed = _fail_level_exam(monkeypatch, tmp_path)
+    lv = load_level("a1")
+    body = _session(TestClient(app), uid)
+    weak = [s for s in body["items"] if s["kind"] == "weakness"]
+    assert weak, "la sesión de un examen suspendido tiene un paso `weakness`"
+    step = weak[0]
+    assert step["skill"] in failed, (
+        f"la destreza del paso weakness ({step['skill']}) es una destreza fallada"
+    )
+    assert step["objective_id"]
+    objective = _objective_by_id(lv, step["objective_id"])
+    assert objective is not None
+    assert step["can_do"] == objective.can_do
+    assert isinstance(step["graph_mastery"], float)
+    assert step["because"], "el nodo del objetivo explica la debilidad (because[])"
+
+
+def test_next_best_never_diverges_when_first_step_has_node(monkeypatch, tmp_path):
+    """H1 (auditoría externa v3.17): la no-divergencia `/next-best`==`/session`
+    se fija también en el caso CON nodo (remediación real), no solo en el caso
+    de usuario nuevo (listening sin objetivo → null==null).
+
+    Se completan los pasos previos sin objetivo (repaso/listening) hasta que el
+    primer paso de la sesión trae nodo, y se verifica que `/next-best` copia
+    exactamente los campos del grafo."""
+    uid, _failed = _fail_level_exam(monkeypatch, tmp_path)
+    client = TestClient(app)
+    body = _session(client, uid)
+    first = body["items"][0]
+    guard = 0
+    while not (first.get("objective_id") and first.get("can_do")):
+        r = client.post(
+            "/api/academy/session/complete",
+            params={"user_id": uid},
+            json={"step_key": first["step_key"]},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["items"], "la sesión conserva pasos enriquecibles"
+        first = body["items"][0]
+        guard += 1
+        assert guard < 12, "no se alcanzó un primer paso con nodo en la sesión"
+
+    assert first["can_do"], "el primer paso de la sesión está enriquecido (nodo)"
+    nb = client.get("/api/academy/next-best", params={"user_id": uid})
+    assert nb.status_code == 200, nb.text
+    best = nb.json()
+    assert best is not None
+    for field in ("can_do", "limiting_factor", "graph_mastery", "because"):
+        assert best[field] == first[field], (
+            f"el campo {field} de next-best divergió del primer paso enriquecido"
         )
