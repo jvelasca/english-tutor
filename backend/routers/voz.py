@@ -10,7 +10,8 @@ from dependencies import current_user_optional, read_audio_limited
 from domain import settings as settings_service
 from schemas.voz import TranscribeResponse, TTSRequest
 from services.stt import transcribe as transcribe_audio
-from services.tts import resolve_voice, synthesize as synthesize_speech
+from services.tts import resolve_voice
+from services.tts import synthesize as synthesize_speech
 
 logger = logging.getLogger(__name__)
 

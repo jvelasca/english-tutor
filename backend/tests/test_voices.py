@@ -88,7 +88,10 @@ def test_catalog_has_english_medium_voices():
     # El catálogo solo ofrece voces de inglés; el set inicial está cubierto.
     ids = {s.id for s in voice_downloads.CATALOG}
     assert {"en_GB-alan-medium", "en_US-amy-medium"} <= ids
-    assert all(s.id.startswith("en_") and s.id.endswith("-medium") for s in voice_downloads.CATALOG)
+    assert all(
+        s.id.startswith("en_") and s.id.endswith("-medium")
+        for s in voice_downloads.CATALOG
+    )
 
 
 def test_available_to_download_excludes_installed():

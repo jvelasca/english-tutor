@@ -220,7 +220,7 @@ def test_route_gate_needs_accuracy_and_checkpoint():
 def test_route_competence_never_demonstrated(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     a1 = phrases_for_level("A1")
-    for i, q in enumerate(a1):
+    for q in a1:
         speaking_repo.record_attempt(uid, q["id"], "A1", 0.9, True)
     rows = speaking_repo.list_attempts(uid)
     comp = speaking_domain.route_competence(rows)
@@ -615,7 +615,9 @@ def test_audio_endpoint_kind_with_mocked_tts(monkeypatch, tmp_path):
         return b"RIFFfakewavdata"
 
     monkeypatch.setattr("services.tts.is_ready", lambda voice=None: True)
-    monkeypatch.setattr("services.tts.resolve_voice", lambda prefs=None: "en_GB-alan-medium")
+    monkeypatch.setattr(
+        "services.tts.resolve_voice", lambda prefs=None: "en_GB-alan-medium"
+    )
     monkeypatch.setattr("services.tts.synthesize", fake_synthesize)
 
     with TestClient(app) as client:

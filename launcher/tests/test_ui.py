@@ -38,9 +38,11 @@ def test_icons_have_expected_keys():
 
 
 def test_server_activity_idle():
-    line, rejected = ui.server_activity(
-        {"generation": {"running": 0, "jobs": []}, "rate_limited": {"rejected_last_minute": 0}}
-    )
+    status = {
+        "generation": {"running": 0, "jobs": []},
+        "rate_limited": {"rejected_last_minute": 0},
+    }
+    line, rejected = ui.server_activity(status)
     assert line == "En reposo"
     assert rejected == 0
 
@@ -63,9 +65,11 @@ def test_server_activity_generating():
 
 
 def test_server_activity_with_rejections():
-    line, rejected = ui.server_activity(
-        {"generation": {"running": 0, "jobs": []}, "rate_limited": {"rejected_last_minute": 7}}
-    )
+    status = {
+        "generation": {"running": 0, "jobs": []},
+        "rate_limited": {"rejected_last_minute": 7},
+    }
+    line, rejected = ui.server_activity(status)
     assert line == "En reposo"
     assert rejected == 7
 

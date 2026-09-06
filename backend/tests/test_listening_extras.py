@@ -20,8 +20,8 @@ from services import listening_generate as gen
 from services.listening import (
     GENERATED_ID_PREFIX,
     LISTENING_SUBSKILLS,
-    level_status,
     level_items,
+    level_status,
     questions_for_level,
     review_next_question,
     route_gate,
@@ -580,7 +580,8 @@ def test_extras_endpoint_question_modes(monkeypatch, tmp_path):
             params={"user_id": uid, "level": "A1", "mode": "mastered"},
         )
         assert mastered.status_code == 200
-        assert mastered.json()["id"] in {q["id"] for q in questions_for_level("A1")} | {qid}
+        allowed_ids = {q["id"] for q in questions_for_level("A1")} | {qid}
+        assert mastered.json()["id"] in allowed_ids
 
         # Los items del nivel marcan el origen del extra.
         items = client.get(

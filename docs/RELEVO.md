@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-05 20:35 (UTC+2).
+> Actualizado por última vez: 2026-09-06 11:05 (UTC+2).
 >
 > **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
 > La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
@@ -11,6 +11,32 @@
 > `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
+>
+> **Nota (2026-09-06):** posición vigente **v3.15.0** — **Profundidad avanzada
+> C1/C2: densidad, taxonomía avanzada y banco grammar C2 normalizado**
+> (backend `3.14.0 → 3.15.0`). Cierra el candidato P0 "C1/C2 depth" (auditado
+> abierto 2026-09-05). **Contenido**: C1 y C2 pasan de 14 a 20 objetivos con
+> evidencia completa (checks MC + activities con fases; +30 activities y
+> +18/+19 checks por nivel) en `c1-m02-u01`/`c1-m03-u01` y `c2-m02-u01` (+2 en
+> `c2-m02-u01-l01` "Register shifts" + lección nueva `c2-m02-u01-l03` con
+> elipsis/gramática formal y cohesion discursiva); módulos Final intactos
+> (`c1-m04`, `c2-m03`). **Taxonomía**: `SUBSKILLS` (`services/curriculum.py`)
+> gana la capa avanzada `register`/`pragmatics`/`discourse`/`nuance`/
+> `argumentation` en speaking/listening/writing/grammar/reading/vocabulary y los
+> objetivos C1/C2 se re-etiquetan donde su contenido lo justifica (C1 3→16 y C2
+> 7→20 con subskill avanzada; A1–B2 intactos). **Banco grammar C2**:
+> normalizado 8 → 15 ítems (11 MC + 4 CP en 3 temas); C2 deja de ser el único
+> banco corto real y su práctica deja de leer `low`; la regla R7 sigue
+> verificada con un **banco corto sintético** construido en los tests.
+> **Tests**: snapshot depth V2.6 reformulado
+> (`test_depth_c1_c2_reach_deep_target_after_v315`), R7 re-apuntada y conteos
+> C2 actualizados (8 → 15); textos "C2 = 4" retirados de
+> `quiz_routes.py`/`grammar_routes.py`. Métricas de cierre: `depth(C1) 93.1`,
+> `depth(C2) 92.5` (≥ 90, por encima del resto), unit coverage 100 % (31/31) y
+> Unit Learning Loop 100 % en 9 fases, `validate_level` vacío en 6 niveles y
+> CLI `--strict --quality` exit 0. Tests: **pytest 1293**, **vitest 382** y
+> build frontend OK (sin cambios de frontend/launcher; CONSTITUCIÓN sin cambios:
+> iteración de contenido, no normativa).
 >
 > **Nota (2026-09-05):** posición vigente **v3.14.0** — **Registro cross-skill
 > de B1 a los 6 niveles (A1–C2)** (backend `3.13.0 → 3.14.0`). Escala el registro
@@ -2455,28 +2481,90 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `release-notes-v3.14.0.md`. Tests: **pytest 1293**, **vitest 382** y
   Playwright desktop verde.
 
-### Próximos incrementos (candidatos abiertos)
+### 37.33 HECHO (V3.15) — C1/C2 depth avanzado (implementación)
+- **Contenido — volumen a 20 objetivos en C1 y C2** (`backend/curriculum/c1.json`,
+  `c2.json`): +6 objetivos por nivel con evidencia completa (checks MC + 5
+  activities con fases y wiring conservado). C1: `c1-m02-u01-l01` +2 (matiz e
+  idioms de registro), `c1-m02-u01-l02` +1 y `c1-m03-u01-l01` +3
+  (argumentación: concesión y discourse markers). C2: `c2-m02-u01-l01` +2
+  (Register shifts formal/informal) y lección nueva `c2-m02-u01-l03` +4
+  (elipsis, gramática formal, cohesion discursiva). Módulos Final intactos
+  (`c1-m04` y `c2-m03` con su único objetivo). Activities 68→98 en ambos
+  niveles; checks C1 45→63 y C2 38→57.
+- **Motor — taxonomía avanzada** (`backend/services/curriculum.py`): `SUBSKILLS`
+  añade la capa C1/C2 `register`/`pragmatics`/`discourse`/`nuance`/
+  `argumentation` a speaking, listening, writing, grammar, reading y vocabulary
+  (pronunciation intacta; orden alfabético conservado). Re-etiquetado de
+  objetivos C1/C2 solo donde el contenido lo justifica (C1 3→16 y C2 7→20
+  objetivos con subskill avanzada); A1–B2 sin tocar. `validate_level` vacío en
+  los 6 niveles.
+- **Banco grammar C2 normalizado**: 8 → 15 ítems (11 MC + 4 CP en 3 temas:
+  Register & Cultural Fluency, Rhetoric & Persuasion, C2 Final). Ningún banco
+  real es ya corto (< `QUIZ_SHORT_BANK` 12) y `practice_depth` real deja de
+  leer `low`. La regla R7 (muestra pequeña ≠ competencia) se mantiene
+  verificada con un banco corto **sintético** construido en los propios tests,
+  sin contenido artificial.
+- **Tests**: `test_curriculum_quality.py` reformula el snapshot V2.6
+  (`test_depth_c1_c2_reach_deep_target_after_v315`: depth(C1/C2) ≥ 90 y >
+  depth(A1)); `test_pedagogical_invariants.py` re-apunta R7 a banco sintético
+  (`test_synthetic_short_bank_cannot_prove_level`,
+  `test_short_bank_coverage_does_not_lift_to_medium`); `test_grammar_routes.py`
+  actualiza conteos (8 → 15) con helpers `_synthetic_short_bank`; textos
+  "C2 = 4" retirados de `quiz_routes.py` y `schemas/grammar_routes.py`.
+- **Métricas** (CLI `python -m scripts.curriculum_coverage --strict --quality`,
+  exit 0): `depth(C1) = 93.1`, `depth(C2) = 92.5` (A1 89.4, A2 81.9, B1 89.0,
+  B2 81.0; overall 96.2); unit coverage 100 % (31/31) y Unit Learning Loop
+  100 % en las 9 fases; sin huecos `empty`.
+- **Cierre**: bump único `3.15.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.33 en `docs/RELEVO.md`,
+  `release-notes-v3.15.0.md`. Tests: **pytest 1293**, **vitest 382** y build
+  frontend OK (sin cambios de frontend/launcher ni de la CONSTITUCIÓN).
 
-> Lista de candidatos que siguen abiertos tras V3.14, sin los números de era
-> antigua (los incrementos cerrados se consolidan en esta sección 37 y el
-> roadmap vigente vive en `PLAN.md`). La regla sigue siendo la premisa 6
-> (poco a poco, un incremento a la vez).
+### Próximos incrementos (candidatos abiertos, auditados)
 
-- **🔴 P0 — Unit Coverage 100%**: cerrar las unidades que aún no integran todas
-  sus secciones (no conformarse con la cobertura parcial).
-- **🔴 P0 — C1/C2 depth**: ampliar la densidad curricular avanzada (pragmatics,
-  discourse, register, nuance, argumentation) — V3.14 ya suma producción
-  controlada en C2, pero su banco de grammar sigue corto y la profundidad
-  avanzada es el frente abierto.
-- **🟠 P1 — Speaking Performance Evidence**: attempt → evaluation → weakness →
-  targeted drill → attempt again → improvement.
-- **🟠 P1 — Listening Progression**: A1 word recognition → … → C2 pragmatic
-  interpretation.
-- **🟠 P1 — Review/SRS por unidad**: micro-review + ventanas 7/30/90 días sobre
-  la base FSRS ya operativa (`backend/services/fsrs.py`).
-- **🟡 P2 — Knowledge Graph + Daily Adaptive Plan**: conectar Can-Do ↔ destrezas
-  ↔ dominio.
-- **Pendiente heredado**: generación automática del speaking micro-drill
-  (`recognized_not_produced`) y desglose speaking-vs-writing por palabra.
+> Lista de candidatos con su estado REAL auditado (2026-09-05, subagentes
+> read-only sobre el código y las métricas en vivo). Los que ya se entregaron en
+> V2.7–V2.9 se marcan cerrados abajo; los abiertos se ejecutan en orden con un
+> subagente y un release cada uno (premisa 6: un incremento a la vez).
+
+- ~~**🔴 P0 — Unit Coverage 100%**~~ ✅ **cerrado (V2.7/V2.8)**: las 31 unidades
+  A1–C2 integran hoy las 7 secciones (unit coverage 100 %, Unit Learning Loop
+  100 % 31/31, CLI `--strict --quality` exit 0). Candidato remanente de la era
+  V2.6 pre-V2.7. Caveat: ningún test fija el 100 %; un futuro contenido
+  incompleto lo bajaría sin fallar (`--strict` solo aborta en `empty`).
+- ~~**🔴 P0 — C1/C2 depth avanzado**~~ ✅ **cerrado (V3.15, entrada 37.33)**:
+  densidad avanzada entregada — C1/C2 a 20 objetivos con evidencia completa,
+  `SUBSKILLS` con capa avanzada (`register`/`pragmatics`/`discourse`/`nuance`/
+  `argumentation`) y re-etiquetado honesto de C1/C2, banco grammar C2
+  normalizado a 15 ítems (≥ 12; deja de leer `low`) y `depth(C1) 93.1` /
+  `depth(C2) 92.5` (CLI `--strict --quality` exit 0, unit coverage y loop
+  100 %). La profundidad *estructural* (≥80, V2.7) ya estaba cerrada.
+- ~~**🟠 P1 — Speaking Performance Evidence**~~ ✅ **cerrado (V2.9)**: el bucle
+  attempt → evaluation → weakness → targeted drill → retry → improvement está
+  completo, persistido y testeado como Speaking Mission Performance
+  (`docs/SPEAKING_MISSION.md`, endpoints `/api/academy/speaking/mission/*`).
+  Matices no imprescindibles: audio dentro de la misión (hoy texto), drills
+  dinámicos (hoy plantillas por criterio), puente criterio-débil → plan.
+- ~~**🟠 P1 — Listening Progression**~~ ✅ **cerrado (V2.8)**: progresión
+  A1 recognition → C2 pragmatic interpretation definida
+  (`docs/LISTENING_CURRICULUM.md`), alineación 38/38, operativa por rutas +
+  diagnóstico + UI. Residuo de contenido abierto (B2/B3 de
+  `docs/audit/B-LISTENING-CEFR.md`): re-etiquetar ítems corpus A1/A2
+  (`attitude`/`speaker_intention` vs foco recognition) y techo `fast_speech`
+  180–200 wpm en C2.
+- **🟠 P1 — Review/SRS por unidad** (ABIERTO, v3.16): micro-review + ventanas
+  7/30/90 días sobre la base FSRS ya operativa (`backend/services/fsrs.py`,
+  tabla `fsrs_cards`, panel INICIO). El motor ya soporta `target_type="objective"`
+  pero no se siembra; no hay plan de repaso por unidad ni ventanas fijas.
+- **🟡 P2 — Knowledge Graph + Daily Adaptive Plan** (ABIERTO, v3.17): conectar
+  Can-Do ↔ destrezas ↔ dominio. Infra existente (`evidence_graph.py` v2.12 +
+  `adaptive.py`) pero el plan diario NO deriva del grafo; ítems sin
+  `can_do`/`limiting_factor`; `/api/academy/today` sin consumidor; sin vista de
+  grafo real.
+- **Pendiente heredado** (ABIERTO, v3.18): generación automática del speaking
+  micro-drill (`recognized_not_produced`, hoy solo señal sin consumidor) y
+  desglose speaking-vs-writing por palabra (hoy `record_words` solo lo llama el
+  chat; speaking/writing no vuelcan al léxico por destreza).
 
 

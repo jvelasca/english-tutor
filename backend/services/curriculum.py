@@ -52,70 +52,95 @@ PERFORMANCE_SKILLS: tuple[str, ...] = (
 # "can-do" CEFR: cada objetivo puede declarar a qué subdestrezas entrena. La
 # validación exige que cada subdestreza pertenezca a la tupla de su destreza.
 SUBSKILLS: dict[str, tuple[str, ...]] = {
+    # Capa avanzada (V3.15): register/pragmatics/discourse/nuance/argumentation
+    # son competencias C1/C2 que ya entrenan los objetivos avanzados por temas
+    # pero eran invisibles a `subskill_breadth`. Cada tupla se mantiene en orden
+    # alfabético.
     "listening": (
-        "sound_recognition",
-        "word_recognition",
-        "phrase_recognition",
-        "connected_speech",
-        "gist",
-        "detail",
-        "inference",
-        "speaker_intention",
-        "attitude",
-        "multiple_speakers",
-        "fast_speech",
         "accents",
+        "attitude",
+        "connected_speech",
+        "detail",
         "dictation",
-        "shadowing",
+        "discourse",
+        "fast_speech",
+        "gist",
+        "inference",
+        "multiple_speakers",
+        "nuance",
+        "phrase_recognition",
+        "pragmatics",
         "real_world",
+        "register",
+        "shadowing",
+        "sound_recognition",
+        "speaker_intention",
+        "word_recognition",
     ),
     "speaking": (
-        "pronunciation",
+        "argumentation",
+        "coherence",
+        "discourse",
         "fluency",
         "grammar",
-        "vocabulary",
-        "interaction",
-        "coherence",
         "intelligibility",
+        "interaction",
         "lexical_retrieval",
+        "nuance",
+        "pragmatics",
+        "pronunciation",
+        "register",
         "self_correction",
         "turn_taking",
+        "vocabulary",
     ),
     "reading": (
-        "skimming",
-        "scanning",
         "detail",
+        "discourse",
         "inference",
-        "vocabulary",
+        "nuance",
+        "pragmatics",
+        "register",
+        "scanning",
+        "skimming",
         "structure",
+        "vocabulary",
     ),
     "writing": (
-        "grammar",
-        "vocabulary",
+        "argumentation",
         "coherence",
         "cohesion",
+        "discourse",
+        "grammar",
+        "nuance",
+        "pragmatics",
+        "punctuation",
         "register",
         "spelling",
-        "punctuation",
+        "vocabulary",
     ),
     "grammar": (
-        "tenses",
-        "modals",
         "articles",
-        "prepositions",
         "conditionals",
+        "discourse",
+        "modals",
         "passive",
-        "reported_speech",
+        "prepositions",
+        "register",
         "relative_clauses",
+        "reported_speech",
+        "tenses",
         "word_order",
     ),
     "vocabulary": (
         "collocations",
-        "phrasal_verbs",
-        "word_families",
+        "discourse",
         "idioms",
+        "nuance",
+        "phrasal_verbs",
         "register",
         "spelling",
+        "word_families",
     ),
     "pronunciation": (
         "sounds",
@@ -185,9 +210,9 @@ RUBRIC_VERSION = "1.0.0"  # rubrics de scoring (speaking/writing/pronunciation)
 SPEAKING_ASSESSMENT_VERSION = "1.0.0"  # instrumento de Speaking Assessment 1.0
 SPEAKING_SCENARIOS_VERSION = "3.0.0"  # escenarios comunicativos (26 escenarios)
 LISTENING_BANK_VERSION = "7.0.0"  # listening: TTS 8D + corpus (A1/A2 → 200)
-SPEAKING_CORPUS_VERSION = "2.0.0"  # speaking por rutas: tarjetas de micro-conversación guiada
-PRONUNCIATION_CORPUS_VERSION = "1.0.0"  # pronunciation por rutas: frases modelo read-aloud
-CONVERSATION_CORPUS_VERSION = "1.0.0"  # conversation por rutas: mini-diálogos guiados multi-turno
+SPEAKING_CORPUS_VERSION = "2.0.0"  # speaking por rutas: micro-conversación guiada
+PRONUNCIATION_CORPUS_VERSION = "1.0.0"  # pronunciation: frases modelo read-aloud
+CONVERSATION_CORPUS_VERSION = "1.0.0"  # conversation: diálogos guiados multi-turno
 
 # Objetivos de expansión del corpus de listening por nivel (Fase 3 — calibración
 # pedagógica). Son la *configuración* del pipeline

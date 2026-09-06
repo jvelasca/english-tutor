@@ -27,8 +27,7 @@ from repositories import settings as settings_repo
 from repositories import speaking_routes as speaking_repo
 from schemas.chat import ChatMessage
 from services import speaking_generate as gen
-from services import speaking_llm
-from services import tts
+from services import speaking_llm, tts
 from services.curriculum import SPEAKING_CORPUS_VERSION
 from services.llm import chat_once
 from services.speaking import scores_from_evidence
@@ -40,12 +39,14 @@ from services.speaking_routes import (
     current_level,
     difficulty_from_vector,
     get_phrase,
-    level_items as motor_level_items,
     phrases_for_level,
     review_next_phrase,
     route_competence,
     route_gate,
     topics_for_level,
+)
+from services.speaking_routes import (
+    level_items as motor_level_items,
 )
 from services.translate import pick_model
 
@@ -163,7 +164,11 @@ def _audio_path(phrase: dict, voice: str, kind: str) -> Path:
 
 def audio_ready(phrase: dict) -> bool:
     """True si la tarjeta puede servir voz modelo reproducible (Piper disponible)."""
-    return bool(phrase.get("app_line")) and bool(phrase.get("model_response")) and tts.is_ready()
+    return (
+        bool(phrase.get("app_line"))
+        and bool(phrase.get("model_response"))
+        and tts.is_ready()
+    )
 
 
 def _phrase_public(phrase: dict) -> dict:
@@ -191,8 +196,8 @@ async def get_audio(
     """Audio WAV modelo (línea del interlocutor o respuesta modelo) con caché.
 
     Devuelve `(bytes, None)` en éxito, o `(None, status)`: 404 tarjeta inexistente
-    o `kind` no válido, 503 Piper no disponible. Se sintetiza a la primera petición
-    y se cachea en `DATA_DIR/speaking/{corpus_version}/{voice}/{id}-{kind}-{digest}.wav`.
+    o `kind` no válido, 503 Piper no disponible. Se sintetiza a la primera petición y
+    se cachea en `DATA_DIR/speaking/{corpus_version}/{voice}/{id}-{kind}-{digest}.wav`.
     """
     if kind not in AUDIO_KINDS:
         return None, 404
@@ -353,7 +358,11 @@ async def get_stats(user_id: str) -> dict:
                 "accuracy": gate["accuracy"],
                 "gate": gate,
                 "state": next(
-                    (c["state"] for c in route_competence(attempts_rows) if c["level"] == level),
+                    (
+                        c["state"]
+                        for c in route_competence(attempts_rows)
+                        if c["level"] == level
+                    ),
                     "not_started",
                 ),
                 "base_total": gate["total"],

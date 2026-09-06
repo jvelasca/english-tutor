@@ -173,13 +173,17 @@ def test_depth_density_and_volume_values_are_derived():
         )
 
 
-def test_depth_flags_c1_c2_as_shallower_than_a1():
-    # Snapshot intencionadamente frágil: codifica el hallazgo de la auditoría V2.6
-    # (C1=7 y C2=5 objetivos frente a A1=23). Se actualiza/elimina cuando V2.7
-    # amplíe C1/C2.
+def test_depth_c1_c2_reach_deep_target_after_v315():
+    # Snapshot del incremento V3.15 (C1/C2 depth avanzado): C1 y C2 pasan de 14
+    # objetivos (depth ~82) a 20 objetivos con taxonomía avanzada y depth ≥ 90,
+    # por encima del resto de niveles (el mejor era A1 ~89.5). El snapshot V2.6
+    # que exigía depth(c1/c2) < depth(a1) cumplió su ciclo y se retira aquí: su
+    # propio docstring lo preveía "cuando V2.7 amplíe C1/C2".
     a1_depth = depth_score(load_level("a1"))["score"]
     for level_id in ("c1", "c2"):
-        assert depth_score(load_level(level_id))["score"] < a1_depth
+        score = depth_score(load_level(level_id))["score"]
+        assert score >= 90.0
+        assert score > a1_depth
 
 
 # --- DRILL-DOWN -------------------------------------------------------------

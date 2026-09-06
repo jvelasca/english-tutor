@@ -125,7 +125,13 @@ def classify_kind(text: str, source: str = "concepts") -> str:
         return "phrasal_verb"
     if raw.endswith("?"):
         return "functional_chunk"
-    if tokens[0] in _REQUEST_STARTERS and tokens[1] in {"i", "you", "we", "it", "there"}:
+    if tokens[0] in _REQUEST_STARTERS and tokens[1] in {
+        "i",
+        "you",
+        "we",
+        "it",
+        "there",
+    }:
         return "functional_chunk"
     if tokens[0] in _SUBJECT_STARTERS:
         return "functional_chunk"

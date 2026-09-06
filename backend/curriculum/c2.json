@@ -34,7 +34,9 @@
                     "register",
                     "structure",
                     "interaction",
-                    "turn_taking"
+                    "turn_taking",
+                    "discourse",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "persuasion"
@@ -135,7 +137,9 @@
                   "subskills": [
                     "register",
                     "interaction",
-                    "turn_taking"
+                    "turn_taking",
+                    "discourse",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "conflict_mediation"
@@ -234,7 +238,9 @@
                   ],
                   "subskills": [
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "register",
+                    "discourse"
                   ],
                   "listening_items": [
                     "c129",
@@ -338,7 +344,8 @@
                   "subskills": [
                     "word_order",
                     "passive",
-                    "register"
+                    "register",
+                    "discourse"
                   ],
                   "concepts": [
                     "parallelism",
@@ -436,7 +443,9 @@
                     "interaction",
                     "turn_taking",
                     "fluency",
-                    "coherence"
+                    "coherence",
+                    "register",
+                    "discourse"
                   ],
                   "scenario_ids": [
                     "persuasion"
@@ -525,7 +534,8 @@
                   "subskills": [
                     "interaction",
                     "turn_taking",
-                    "fluency"
+                    "fluency",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "abstract_conversation"
@@ -634,7 +644,9 @@
                     "writing"
                   ],
                   "subskills": [
-                    "register"
+                    "register",
+                    "pragmatics",
+                    "discourse"
                   ],
                   "concepts": [
                     "formal vs informal",
@@ -719,6 +731,211 @@
                       "correct_index": 0
                     }
                   ]
+                },
+                {
+                  "id": "c2-m02-u01-l01-o02",
+                  "can_do": "I can use ellipsis and formal grammar to write precisely in the right register.",
+                  "title": "Elipsis y gramática formal",
+                  "skills": [
+                    "vocabulary",
+                    "grammar",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "register",
+                    "discourse"
+                  ],
+                  "concepts": [
+                    "ellipsis",
+                    "formal verb patterns",
+                    "register"
+                  ],
+                  "vocabulary": [
+                    "ellipsis",
+                    "omit",
+                    "whereas",
+                    "furthermore"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l01-o02-a01",
+                      "type": "writing",
+                      "instruction": "Rewrite an informal email as a formal one, using ellipsis and formal patterns.",
+                      "target": "formal register / ellipsis"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what ellipsis is and give one formal example.",
+                      "target": "omitting words that the context supplies",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-a03",
+                      "type": "writing",
+                      "instruction": "Rewrite a message about a topic you have not practised in a formal register.",
+                      "target": "formal register / ellipsis",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use ellipsis and formal grammar to write precisely in the right register.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-a05",
+                      "type": "writing",
+                      "instruction": "On your own, rewrite an informal email as a formal one, using ellipsis and formal patterns.",
+                      "target": "formal register / ellipsis",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l01-o02-c01",
+                      "skill": "grammar",
+                      "prompt": "Which sentence uses ellipsis correctly?",
+                      "options": [
+                        "The report was reviewed and approved.",
+                        "The report was reviewed and was approved.",
+                        "The report reviewed and approved."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the most formal sentence:",
+                      "options": [
+                        "Were the committee to object, we would reconsider.",
+                        "If the committee objects, we will reconsider.",
+                        "If they object, forget it."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-c03",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct formal sentence:",
+                      "options": [
+                        "It is the methodology that requires scrutiny.",
+                        "It is the methodology what requires scrutiny.",
+                        "The methodology it is that requires scrutiny."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o02-c04",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'omisión (de palabras)'?",
+                      "options": [
+                        "ellipsis",
+                        "ellipse",
+                        "eclipse"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l01-o03",
+                  "can_do": "I can connect ideas with discourse markers that fit the register.",
+                  "title": "Marcadores del discurso",
+                  "skills": [
+                    "vocabulary",
+                    "writing",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "register",
+                    "discourse",
+                    "coherence",
+                    "cohesion"
+                  ],
+                  "concepts": [
+                    "discourse markers",
+                    "signposting",
+                    "register-appropriate linking"
+                  ],
+                  "vocabulary": [
+                    "whereas",
+                    "in light of",
+                    "that said",
+                    "consequently"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l01-o03-a01",
+                      "type": "speaking",
+                      "instruction": "Connect two ideas about a work topic using a discourse marker suited to the situation.",
+                      "target": "whereas / that said / consequently"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two formal markers that add a point.",
+                      "target": "moreover / furthermore / in addition",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o03-a03",
+                      "type": "writing",
+                      "instruction": "Write two sentences about a new topic linking them with a formal marker.",
+                      "target": "consequently / whereas / in light of",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can connect ideas with discourse markers that fit the register.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o03-a05",
+                      "type": "speaking",
+                      "instruction": "On your own, connect two ideas using a discourse marker suited to the situation.",
+                      "target": "whereas / that said / consequently",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l01-o03-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which marker introduces a contrast in formal writing?",
+                      "options": [
+                        "whereas",
+                        "and then",
+                        "besides"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o03-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'en vista de'?",
+                      "options": [
+                        "in light of",
+                        "in spite of",
+                        "in terms of"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which marker is informal?",
+                      "options": [
+                        "plus",
+                        "moreover",
+                        "in addition"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
                 }
               ]
             },
@@ -738,7 +955,9 @@
                   ],
                   "subskills": [
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "register",
+                    "nuance"
                   ],
                   "listening_items": [
                     "c121",
@@ -842,7 +1061,9 @@
                     "interaction",
                     "turn_taking",
                     "fluency",
-                    "register"
+                    "register",
+                    "pragmatics",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "diplomatic_talk"
@@ -931,7 +1152,9 @@
                   "subskills": [
                     "interaction",
                     "turn_taking",
-                    "fluency"
+                    "fluency",
+                    "register",
+                    "pragmatics"
                   ],
                   "scenario_ids": [
                     "conflict_mediation"
@@ -1020,7 +1243,9 @@
                   "subskills": [
                     "register",
                     "cohesion",
-                    "coherence"
+                    "coherence",
+                    "discourse",
+                    "pragmatics"
                   ],
                   "concepts": [
                     "register shifts",
@@ -1106,7 +1331,9 @@
                   ],
                   "subskills": [
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "register",
+                    "nuance"
                   ],
                   "listening_items": [
                     "c133",
@@ -1210,7 +1437,9 @@
                     "interaction",
                     "turn_taking",
                     "fluency",
-                    "register"
+                    "register",
+                    "pragmatics",
+                    "discourse"
                   ],
                   "scenario_ids": [
                     "stakes_negotiation"
@@ -1289,6 +1518,405 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "c2-m02-u01-l03",
+              "title": "Matiz y gramática del registro",
+              "order": 3,
+              "objectives": [
+                {
+                  "id": "c2-m02-u01-l03-o01",
+                  "can_do": "I can use cleft sentences and nominalisation to write with formal nuance.",
+                  "title": "Cleft y nominalización formales",
+                  "skills": [
+                    "vocabulary",
+                    "grammar",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "register",
+                    "discourse"
+                  ],
+                  "concepts": [
+                    "cleft sentences",
+                    "nominalisation",
+                    "formal emphasis"
+                  ],
+                  "vocabulary": [
+                    "the fact that",
+                    "it is ... that",
+                    "implementation",
+                    "what matters"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l03-o01-a01",
+                      "type": "writing",
+                      "instruction": "Rewrite two sentences using a cleft structure and one nominalisation in a formal text.",
+                      "target": "It is ... that ... / the ...tion of ..."
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o01-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you form a cleft with 'it' and how you nominalise a verb.",
+                      "target": "It is + X + that ... / verb to noun",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o01-a03",
+                      "type": "writing",
+                      "instruction": "Apply cleft and nominalisation to a formal topic you have not written about.",
+                      "target": "It is ... that ... / nominalisation",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o01-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use cleft sentences and nominalisation to write with formal nuance.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o01-a05",
+                      "type": "writing",
+                      "instruction": "On your own, rewrite two sentences using a cleft and one nominalisation in a formal text.",
+                      "target": "It is ... that ... / the ...tion of ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l03-o01-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct cleft sentence:",
+                      "options": [
+                        "It was the funding that the project lacked.",
+                        "It was the funding what the project lacked.",
+                        "The funding it was that the project lacked."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o01-c02",
+                      "skill": "grammar",
+                      "prompt": "Which sentence uses nominalisation correctly?",
+                      "options": [
+                        "The implementation of the policy was delayed.",
+                        "The policy implement was delayed.",
+                        "They delayed the policy was implementation."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o01-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'aplicación (de una medida)'?",
+                      "options": [
+                        "implementation",
+                        "implication",
+                        "impression"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l03-o02",
+                  "can_do": "I can detect and use irony and litotes to convey tone and understatement.",
+                  "title": "Ironía y litotes",
+                  "skills": [
+                    "reading",
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "nuance",
+                    "register",
+                    "pragmatics"
+                  ],
+                  "concepts": [
+                    "irony",
+                    "litotes",
+                    "understatement",
+                    "implied tone"
+                  ],
+                  "vocabulary": [
+                    "not bad",
+                    "no small feat",
+                    "hardly a",
+                    "ironic"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l03-o02-a01",
+                      "type": "reading",
+                      "instruction": "Read two short texts and identify where irony or litotes appears.",
+                      "target": "irony = opposite meaning / litotes = double negative"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say the difference between irony and litotes.",
+                      "target": "irony says the opposite / litotes negates the opposite",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o02-a03",
+                      "type": "writing",
+                      "instruction": "Write one ironic sentence and one litotes about a topic you have not discussed.",
+                      "target": "What a great idea ... / not bad at all",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can detect and use irony and litotes to convey tone and understatement.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o02-a05",
+                      "type": "reading",
+                      "instruction": "On your own, read a short text and identify its irony or litotes.",
+                      "target": "The writer uses ... to ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l03-o02-c01",
+                      "skill": "reading",
+                      "prompt": "Read: 'The meeting was, shall we say, productive.' What does the writer imply?",
+                      "options": [
+                        "It was not productive",
+                        "It was very productive",
+                        "It was cancelled"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o02-c02",
+                      "skill": "reading",
+                      "prompt": "Read: 'Finishing on time is no small feat.' 'No small feat' is an example of...",
+                      "options": [
+                        "litotes",
+                        "hyperbole",
+                        "a metaphor"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'nada despreciable'?",
+                      "options": [
+                        "no small feat",
+                        "no big deal",
+                        "not at all"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l03-o03",
+                  "can_do": "I can soften delicate messages with euphemism and indirect language.",
+                  "title": "Eufemismo y lenguaje indirecto",
+                  "skills": [
+                    "vocabulary",
+                    "speaking",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "register",
+                    "pragmatics",
+                    "nuance"
+                  ],
+                  "scenario_ids": [
+                    "diplomatic_talk"
+                  ],
+                  "concepts": [
+                    "euphemism",
+                    "indirectness",
+                    "face-saving",
+                    "softening"
+                  ],
+                  "vocabulary": [
+                    "between jobs",
+                    "downsize",
+                    "passed away",
+                    "not quite right"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l03-o03-a01",
+                      "type": "dialogue",
+                      "instruction": "Deliver a delicate message using a euphemism instead of a blunt word.",
+                      "target": "between jobs / downsize / not quite right"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two euphemisms and what they replace.",
+                      "target": "between jobs = unemployed / downsize = make redundant",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Soften a different delicate message you have not practised.",
+                      "target": "I'm afraid ... / not quite right",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can soften delicate messages with euphemism and indirect language.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o03-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, deliver a delicate message using a euphemism instead of a blunt word.",
+                      "target": "between jobs / downsize / not quite right",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l03-o03-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which is a euphemism for despedir empleados?",
+                      "options": [
+                        "downsize",
+                        "dismiss",
+                        "fire"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o03-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which is the most indirect way to tell someone they are wrong?",
+                      "options": [
+                        "I'm not sure that's quite right",
+                        "You are wrong",
+                        "That is false"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'eufemismo'?",
+                      "options": [
+                        "euphemism",
+                        "emphasis",
+                        "euphoria"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c2-m02-u01-l03-o04",
+                  "can_do": "I can use stance adverbs and comment clauses to express attitude precisely.",
+                  "title": "Adverbios disjuntos y actitud",
+                  "skills": [
+                    "vocabulary",
+                    "grammar",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "register",
+                    "discourse",
+                    "pragmatics"
+                  ],
+                  "concepts": [
+                    "stance adverbs",
+                    "disjuncts",
+                    "comment clauses"
+                  ],
+                  "vocabulary": [
+                    "frankly",
+                    "regrettably",
+                    "surprisingly",
+                    "strictly speaking"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c2-m02-u01-l03-o04-a01",
+                      "type": "writing",
+                      "instruction": "Rewrite a statement adding a stance adverb that expresses your attitude.",
+                      "target": "Frankly ... / Regrettably ... / Surprisingly ..."
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say what a stance adverb does.",
+                      "target": "it comments on the whole clause / shows the speaker's attitude",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o04-a03",
+                      "type": "writing",
+                      "instruction": "Add stance adverbs to a text about a topic you have not discussed.",
+                      "target": "strictly speaking / regrettably / frankly",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can use stance adverbs and comment clauses to express attitude precisely.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o04-a05",
+                      "type": "writing",
+                      "instruction": "On your own, rewrite a statement adding a stance adverb that expresses your attitude.",
+                      "target": "Frankly ... / Regrettably ... / Surprisingly ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c2-m02-u01-l03-o04-c01",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": [
+                        "Frankly, the proposal is weak.",
+                        "Frankly the proposal is weak?",
+                        "The proposal frankly is weak."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o04-c02",
+                      "skill": "grammar",
+                      "prompt": "Choose the correct sentence:",
+                      "options": [
+                        "Surprisingly, the results were positive.",
+                        "The results were surprisingly.",
+                        "Surprisingly the results."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c2-m02-u01-l03-o04-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'francamente'?",
+                      "options": [
+                        "frankly",
+                        "fairly",
+                        "firmly"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }
@@ -1326,7 +1954,10 @@
                     "interaction",
                     "turn_taking",
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "register",
+                    "discourse",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "academic_defence"

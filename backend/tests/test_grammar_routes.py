@@ -46,6 +46,42 @@ def _curriculum_check_ids(level: str) -> set[str]:
     return ids
 
 
+def _synthetic_short_bank(pool: list[dict], size: int = 8) -> list[dict]:
+    """Banco grammar corto sintético (V3.15): `size` ítems reales del pool
+    repartidos en ≥3 temas, para que quede < QUIZ_SHORT_BANK (12). Ningún banco
+    real es ya corto desde V3.15, así que la mecánica de bancos cortos se prueba
+    con datos artificiales construidos en el propio test."""
+    by_topic: dict[str, list[dict]] = {}
+    for c in pool:
+        by_topic.setdefault(c["topic"], []).append(c)
+    topics = list(by_topic)
+    assert len(topics) >= 3, "el pool real perdió variedad de temas"
+    bank: list[dict] = []
+    # Ronda 1: un ítem de cada tema (garantiza la variedad de topics).
+    for topic in topics:
+        if len(bank) < size and by_topic[topic]:
+            bank.append(by_topic[topic].pop(0))
+    # Ronda 2: completa `size` con el resto del pool sin repetir ítems.
+    for topic in topics:
+        for c in by_topic[topic]:
+            if len(bank) < size:
+                bank.append(c)
+    assert len(bank) == size, "pool insuficiente para el banco sintético"
+    assert len({c["topic"] for c in bank}) == len(topics) >= 3
+    return bank
+
+
+def _with_short_c2(original_checks, bank):
+    """Reemplazo de `checks_for_level` que sirve `bank` como pool de grammar C2."""
+
+    def _checks_for_level(skill: str, level: str):
+        if (skill, level) == (SKILL, "C2"):
+            return bank
+        return original_checks(skill, level)
+
+    return _checks_for_level
+
+
 # --- Motor: pool desde el currículo -------------------------------------------
 
 
@@ -173,42 +209,55 @@ def test_route_gate_needs_accuracy_and_checkpoint():
     assert "accuracy" in gate["blockers"]
 
 
-def test_route_gate_flags_short_banks():
-    """Los bancos cortos de grammar (C2 = 4) marcan short_bank y adaptan el
-    checkpoint para no pedir '3 a la primera' sobre un banco diminuto. El gate
-    interno sigue midiendo práctica (pasa al dominar el banco), pero el claim
-    pedagógico queda en evidence depth LOW (R7)."""
-    for level in ("C2",):
-        bank = engine.checks_for_level(SKILL, level)
-        assert bank and len(bank) < engine.QUIZ_SHORT_BANK
-        gate = engine.route_gate(SKILL, level, [])
-        assert gate["short_bank"] is True
-        # Con todo dominado limpio, el gate pasa aunque el banco sea corto.
-        rows = [{"check_id": c["check_id"], "passed": True} for c in bank]
-        gate = engine.route_gate(SKILL, level, rows)
-        assert gate["passed"] is True
-        assert 1 <= gate["checkpoint_required"] <= len(bank)
-        assert gate["practice_depth"] == "low"
-    # Un banco normal (A1 = 38) no se marca como corto.
+def test_route_gate_flags_short_banks(monkeypatch):
+    """Los bancos cortos de grammar marcan short_bank y adaptan el checkpoint
+    para no pedir '3 a la primera' sobre un banco diminuto. Ningún banco real es
+    ya corto desde V3.15 (C2 se normalizó de 8 a 15 ítems), así que se ejercita
+    con un banco sintético de 8 ítems reales de C2. El gate interno sigue
+    midiendo práctica (pasa al dominar el banco), pero el claim pedagógico queda
+    en evidence depth LOW (R7)."""
+    original_checks = engine.checks_for_level
+    assert len(original_checks(SKILL, "C2")) >= engine.QUIZ_SHORT_BANK
+    short = _synthetic_short_bank(original_checks(SKILL, "C2"))
+    monkeypatch.setattr(
+        engine, "checks_for_level", _with_short_c2(original_checks, short)
+    )
+    gate = engine.route_gate(SKILL, "C2", [])
+    assert gate["short_bank"] is True
+    # Con todo dominado limpio, el gate pasa aunque el banco sea corto.
+    rows = [{"check_id": c["check_id"], "passed": True} for c in short]
+    gate = engine.route_gate(SKILL, "C2", rows)
+    assert gate["passed"] is True
+    assert 1 <= gate["checkpoint_required"] <= len(short)
+    assert gate["practice_depth"] == "low"
+    # Un banco normal (A1 = 44) no se marca como corto.
     assert engine.route_gate(SKILL, "A1", [])["short_bank"] is False
-    # B2 dejó de ser banco corto con la producción controlada de V3.13 P1:
-    # sus 8 checks MC + 6 ítems CP superan QUIZ_SHORT_BANK (12), así que la
-    # puerta se normaliza y deja de marcar short_bank.
-    b2 = engine.checks_for_level(SKILL, "B2")
-    assert len(b2) >= engine.QUIZ_SHORT_BANK
-    assert engine.route_gate(SKILL, "B2", [])["short_bank"] is False
-    rows = [{"check_id": c["check_id"], "passed": True} for c in b2]
+    # B2 y C2 reales (≥ QUIZ_SHORT_BANK) normalizaron su puerta: sin short_bank.
+    monkeypatch.setattr(engine, "checks_for_level", original_checks)
+    for level in ("B2", "C2"):
+        bank = original_checks(SKILL, level)
+        assert len(bank) >= engine.QUIZ_SHORT_BANK
+        assert engine.route_gate(SKILL, level, [])["short_bank"] is False
+    rows = [
+        {"check_id": c["check_id"], "passed": True}
+        for c in original_checks(SKILL, "B2")
+    ]
     gate = engine.route_gate(SKILL, "B2", rows)
     assert gate["passed"] is True
     assert gate["practice_depth"] == "medium"
 
 
-def test_short_bank_practice_depth_low_but_never_proof_of_level():
-    """R7: dominar el banco corto de C2 (4 MC + 4 CP = 8 < 12) es práctica con
+def test_short_bank_practice_depth_low_but_never_proof_of_level(monkeypatch):
+    """R7: dominar un banco corto (8 ítems sintéticos < 12) es práctica con
     evidencia LOW, nunca competencia demostrada. La ruta declara functional
-    (techo de práctica) sin certificar."""
-    c2 = engine.checks_for_level(SKILL, "C2")
-    rows = [{"check_id": c["check_id"], "passed": True} for c in c2]
+    (techo de práctica) sin certificar. V3.15 normalizó el banco real de C2 a
+    15 ítems; el caso corto se ejercita con datos artificiales."""
+    original_checks = engine.checks_for_level
+    short = _synthetic_short_bank(original_checks(SKILL, "C2"))
+    monkeypatch.setattr(
+        engine, "checks_for_level", _with_short_c2(original_checks, short)
+    )
+    rows = [{"check_id": c["check_id"], "passed": True} for c in short]
     gate = engine.route_gate(SKILL, "C2", rows)
     assert gate["passed"] is True
     assert gate["practice_depth"] == "low"
@@ -370,7 +419,10 @@ def test_level_items_endpoint(monkeypatch, tmp_path):
         assert body["gate"]["short_bank"] is False
 
 
-def test_level_items_endpoint_flags_short_bank(monkeypatch, tmp_path):
+def test_level_items_endpoint_grammar_c2_bank_normalized(monkeypatch, tmp_path):
+    """V3.15 normalizó el único banco corto real (grammar C2: 8 → 15 ítems ≥ 12):
+    el endpoint ya no marca short_bank en ningún nivel real. La mecánica de
+    bancos cortos se cubre a nivel de motor con bancos sintéticos."""
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
         r = client.get(
@@ -379,7 +431,8 @@ def test_level_items_endpoint_flags_short_bank(monkeypatch, tmp_path):
         )
         assert r.status_code == 200
         body = r.json()
-        assert body["gate"]["short_bank"] is True
+        assert body["total"] >= engine.QUIZ_SHORT_BANK
+        assert body["gate"]["short_bank"] is False
 
 
 def test_attempt_endpoint_scores_and_reveals_answer(monkeypatch, tmp_path):
@@ -427,10 +480,10 @@ def test_attempt_endpoint_unknown_check_is_404(monkeypatch, tmp_path):
 
 
 def test_production_pool_items_present_in_every_level():
-    """Producción controlada (V3.13 P1 → v3.14): cada nivel A1–C2 aporta ítems
-    CP al banco de grammar. C2 (4 MC + 4 CP) y A1 (38 MC + 6 CP) se incorporaron
-    en v3.14 para que el canal de producción del registro cross-skill se ofrezca
-    en todos los niveles; C2 sigue siendo banco corto honesto."""
+    """Producción controlada (V3.13 P1 → v3.14 → V3.15): cada nivel A1–C2 aporta
+    ítems CP al banco de grammar. C2 (11 MC + 4 CP = 15) se normalizó en V3.15 a
+    un banco ≥ QUIZ_SHORT_BANK y deja de ser banco corto; el canal de producción
+    del registro cross-skill se ofrece en todos los niveles."""
     for level in ("A1", "A2", "B1", "B2", "C1", "C2"):
         pool = engine.checks_for_level(SKILL, level)
         cps = [c for c in pool if c.get("type") == "controlled_production"]

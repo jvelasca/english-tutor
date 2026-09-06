@@ -10,15 +10,15 @@ from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services.competence import competence_states
 from services.cefr import (
     CEFR_MODEL_VERSION,
     heuristic_band,
     level_descriptor,
     recommendations,
 )
-from services.evidence_depth import evidence_depth_report
+from services.competence import competence_states
 from services.curriculum import CURRICULUM_VERSION
+from services.evidence_depth import evidence_depth_report
 from services.vocabulary import classify
 
 # Cambio de confianza (en puntos, 0..1) por debajo del cual NO se guarda un nuevo

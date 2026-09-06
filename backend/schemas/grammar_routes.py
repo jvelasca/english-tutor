@@ -70,8 +70,9 @@ class GrammarGate(BaseModel):
     ruta superada (práctica) y qué valores alcanza hoy.
 
     `passed` solo es cierto si `blockers` está vacío. `short_bank` marca los
-    bancos cortos (< 12 ítems, p. ej. B2 = 8 o C2 = 4), cuya puerta adapta el
-    checkpoint (nota honesta)."""
+    bancos cortos (menos de QUIZ_SHORT_BANK ítems) cuya puerta adapta el
+    checkpoint (nota honesta: dominar un banco diminuto lee evidence depth
+    LOW)."""
 
     passed: bool = False
     total: int = 0
@@ -96,8 +97,8 @@ class GrammarLevelOut(BaseModel):
     `state` ∈ {not_started, developing, functional}: la ruta es práctica y nunca
     informa `demonstrated` (demostrar exige examen/escalera del curso + evidencia).
     `bank_size` y `evidence_depth` exponen el claim honesto de V3.13: un banco
-    corto (< 12 ítems, p. ej. C2 = 4) solo lee "practice coverage · evidence
-    depth LOW" aunque la puerta pase."""
+    corto (menos de QUIZ_SHORT_BANK ítems) solo lee "practice coverage ·
+    evidence depth LOW" aunque la puerta pase."""
 
     level: str
     total: int

@@ -128,7 +128,7 @@ def build_user_prompt(level: str, skills: list[str], topics: list[str]) -> str:
     """
     pairs = ", ".join(
         f'item {i + 1}: skill "{s}" on topic "{_TOPIC_HINT.get(t, t)}"'
-        for i, (s, t) in enumerate(zip(skills, topics))
+        for i, (s, t) in enumerate(zip(skills, topics, strict=False))
     )
     allowed_skills = ", ".join(GENERATED_SUBSKILLS)
     allowed_topics = ", ".join(LISTENING_TOPICS)
@@ -149,7 +149,8 @@ def _norm(text: str) -> str:
     "o'clock" no rompa la búsqueda de la opción en el script.
     """
     text = unicodedata.normalize("NFKD", text).lower()
-    text = re.sub(r"[\W_]+", " ", text)  # \W ya no incluye '_' con re.UNICODE? se quita aparte
+    # \W ya no incluye '_' con re.UNICODE: se quita aparte.
+    text = re.sub(r"[\W_]+", " ", text)
     text = text.replace("_", " ")
     return re.sub(r"\s+", " ", text).strip()
 

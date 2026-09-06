@@ -11,6 +11,23 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.15.0` — **Profundidad avanzada C1/C2: densidad, taxonomía avanzada y banco grammar C2 normalizado**
+  (cierra el candidato P0 "C1/C2 depth" auditado como abierto 2026-09-05:
+  **P0-contenido**: C1 y C2 pasan de 14 a 20 objetivos con evidencia completa
+  (checks MC + activities con fases; +30 activities y +18/+19 checks por nivel),
+  en `c1-m02-u01`/`c1-m03-u01` y `c2-m02-u01` (+2 en `l01` "Register shifts" y
+  lección nueva `l03` con elipsis/gramática formal), dejando intactos los
+  módulos Final · **P0-taxonomía**: `SUBSKILLS` gana la capa avanzada
+  (`register`/`pragmatics`/`discourse`/`nuance`/`argumentation`) en speaking/
+  listening/writing/grammar/reading/vocabulary y los objetivos C1/C2 se
+  re-etiquetan solo donde el contenido lo justifica (C1 3→16 y C2 7→20 con
+  subskill avanzada) · **P0-banco**: grammar C2 normalizado a 15 ítems (11 MC +
+  4 CP en 3 temas) — deja de ser el único banco corto real y su práctica deja
+  de leer `low`; la regla R7 se verifica con banco corto sintético en los tests
+  · **tests**: snapshot depth V2.6 reformulado (`depth(C1) 93.1`, `depth(C2)
+  92.5` ≥ 90), R7 re-apuntada, conteos C2 actualizados, textos "C2 = 4"
+  retirados; `validate_level` vacío en 6 niveles y CLI `--strict --quality`
+  exit 0 con unit coverage y loop 100 %). Base: `3.14.0`
 - ✅ Versión estable `3.14.0` — **Registro cross-skill de B1 a los 6 niveles (A1–C2): producción controlada en todos los niveles y panel sin marca de prototipo**
   (escala el registro cross-skill por estructura de V3.13 P1.2 del prototipo B1 a
   `a1..c2`: **P0-contenido**: ítems `controlled_production` nuevos en A1 (6:

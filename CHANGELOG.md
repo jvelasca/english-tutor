@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.15.0] — 2026-09-06
+
+**Profundidad avanzada C1/C2: densidad, taxonomía avanzada y banco de grammar C2 normalizado.**
+
+El candidato P0 "C1/C2 depth" auditado como abierto en 2026-09-05 (banco grammar C2 = 8 <12, volumen 14/20, taxonomía avanzada invisible a `subskill_breadth`) se cierra con contenido y motor honestos. Backend `3.14.0 → 3.15.0`.
+
+- **Volumen: C1 y C2 a 20 objetivos** (desde 14). +6 objetivos por nivel con evidencia completa (checks MC + 5 activities con fases, wiring conservado): C1 en `c1-m02-u01-l01` (+2), `c1-m02-u01-l02` (+1) y `c1-m03-u01-l01` (+3); C2 en `c2-m02-u01-l01` (+2, "Register shifts") y en la lección nueva `c2-m02-u01-l03` (+4, elipsis/gramática formal y cohesion discursiva). Módulos Final intactos (`c1-m04`, `c2-m03`). +30 activities por nivel (68→98) y +18/+19 checks (C1 45→63, C2 38→57).
+- **Taxonomía avanzada visible**: `SUBSKILLS` (`backend/services/curriculum.py`) incorpora la capa C1/C2 —`register`, `pragmatics`, `discourse`, `nuance`, `argumentation`— en speaking, listening, writing, grammar, reading y vocabulary (pronunciation intacta). Objetivos C1/C2 re-etiquetados solo donde su contenido lo justifica (C1: 3→16 objetivos con subskill avanzada; C2: 7→20), sin inflado y sin tocar niveles A1–B2.
+- **Banco grammar C2 normalizado a 15 ítems** (11 MC + 4 CP en 3 temas, desde 4 MC + 4 CP): C2 deja de ser el único banco corto real y `practice_depth` real deja de leer `"low"`. La regla R7 ("muestra pequeña ≠ competencia") se conserva verificada con un **banco corto sintético** construido en los tests (`_synthetic_short_bank`), no con contenido artificial.
+- **Tests e higiene**: `test_curriculum_quality.py` reformula el snapshot V2.6 (`test_depth_c1_c2_reach_deep_target_after_v315`); `test_pedagogical_invariants.py` y `test_grammar_routes.py` re-apuntan la mecánica de banco corto a datos sintéticos y fijan el nuevo conteo C2 (8 → 15); textos "C2 = 4" eliminados de `quiz_routes.py`/`schemas/grammar_routes.py`. Sin cambios de norma pedagógica (la CONSTITUCIÓN no se modifica).
+- **Métricas de cierre** (CLI `scripts/curriculum_coverage.py --strict --quality`, exit 0): `depth(C1) = 93.1` y `depth(C2) = 92.5` (≥ 90 y por encima del resto; A1 89.4), unit coverage 100 % (31/31) y Unit Learning Loop 100 % en las 9 fases; `validate_level` vacío en los 6 niveles.
+
 ## [3.14.0] — 2026-09-05
 
 **Registro cross-skill de B1 a los 6 niveles (A1–C2): el canal de producción se ofrece en todos los niveles y el panel deja de ser prototipo.**

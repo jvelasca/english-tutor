@@ -9,9 +9,9 @@ from starlette.concurrency import run_in_threadpool
 from dependencies import current_user_optional
 from domain import settings as settings_service
 from schemas.voices import (
-    VoicesResponse,
     VoiceDownloadRequest,
     VoiceDownloadStatus,
+    VoicesResponse,
 )
 from services import voice_downloads
 from services.tts import DEFAULT_VOICE, list_voices, resolve_voice, voice_name

@@ -199,7 +199,7 @@ def test_route_gate_needs_accuracy_and_checkpoint():
 def test_route_competence_never_demonstrated(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     a1 = dialogues_for_level("A1")
-    for i, d in enumerate(a1):
+    for d in a1:
         conv_repo.record_attempt(uid, d["id"], "A1", 0.8, True)
     rows = conv_repo.list_attempts(uid)
     comp = conv_domain.route_competence(rows)

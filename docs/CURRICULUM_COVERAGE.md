@@ -23,7 +23,7 @@ del banco no basta; cada nivel debe entrenar subskills concretos (ver
 | `TOTAL VALIDATED LEARNING ITEMS` | Cuántos ejercicios fiables existen | **539** (513 listening + 26 speaking) |
 | `TOTAL CURRICULUM COVERAGE` | Celdas nivel×sección pobladas | **42/49 (85,7%)** |
 | `UNIT COVERAGE` | Secciones pobladas **por unidad** | media A1..C2 **100%** |
-| `CEFR DEPTH SCORE` | Densidad + tamaño + completitud por nivel | media **84,2** / 100 |
+| `CEFR DEPTH SCORE` | Densidad + tamaño + completitud por nivel | media **87,8** / 100 |
 | `LISTENING CURRICULUM` | Objetivos de escucha alineados al foco del nivel | **38/38 (100%)** |
 
 ## Speaking por rutas (V3.8)
@@ -53,8 +53,8 @@ Leyenda: **OK** = todas las unidades del nivel tienen contenido en la sección �
 | A2 | OK (34) | OK (30) | OK (49) | OK (24) | OK (12) | OK (17) | OK (22) |
 | B1 | OK (44) | OK (23) | OK (44) | OK (22) | OK (5) | OK (18) | OK (25) |
 | B2 | OK (29) | OK (14) | OK (32) | OK (8) | OK (3) | OK (13) | OK (17) |
-| C1 | OK (34) | OK (18) | OK (28) | OK (16) | OK (8) | OK (14) | OK (19) |
-| C2 | OK (38) | OK (7) | OK (26) | OK (16) | OK (8) | OK (14) | OK (18) |
+| C1 | OK (55) | OK (18) | OK (28) | OK (21) | OK (9) | OK (20) | OK (25) |
+| C2 | OK (54) | OK (17) | OK (26) | OK (19) | OK (8) | OK (20) | OK (24) |
 
 **Cobertura por sección** (niveles con curso, de 6): **6/6 en todas las secciones**.
 
@@ -62,20 +62,20 @@ Leyenda: **OK** = todas las unidades del nivel tienen contenido en la sección �
 
 | Nivel | Unidades | Objetivos | Depth Score | Unit Coverage (media) |
 |---|---|---|---|---|
-| A1 | 10 | 28 | 89,5 | 100,0% |
-| A2 | 7 | 17 | 82,6 | 100,0% |
-| B1 | 4 | 18 | 90,4 | 100,0% |
-| B2 | 3 | 13 | 82,7 | 100,0% |
-| C1 | 4 | 14 | 82,6 | 100,0% |
-| C2 | 3 | 14 | 82,2 | 100,0% |
+| A1 | 10 | 28 | 89,4 | 100,0% |
+| A2 | 7 | 17 | 81,9 | 100,0% |
+| B1 | 4 | 18 | 89,0 | 100,0% |
+| B2 | 3 | 13 | 81,0 | 100,0% |
+| C1 | 4 | 20 | 93,1 | 100,0% |
+| C2 | 3 | 20 | 92,5 | 100,0% |
 
 ## Curriculum Quality Dashboard
 
 | Dimensión | Score |
 |---|---|
-| **Overall** | **95,7** |
+| **Overall** | **96,2** |
 | Coverage (matriz nivel×sección) | 85,7 |
-| Depth (CEFR Depth Score, media) | 84,2 |
+| Depth (CEFR Depth Score, media) | 87,8 |
 | Listening (por unidad) | **100,0** |
 | Speaking (por unidad) | 100,0 |
 | Interaction (por unidad) | 100,0 |

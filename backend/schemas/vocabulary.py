@@ -38,7 +38,9 @@ class LexicalItemOut(BaseModel):
     word: str
     lemma: str
     cefr: str
-    kind: str  # LEXICAL_KINDS: word/collocation/phrasal_verb/expression/sentence_frame/functional_chunk/structure (P1, §3.2)
+    # LEXICAL_KINDS: word/collocation/phrasal_verb/expression/sentence_frame/
+    # functional_chunk/structure (P1, §3.2)
+    kind: str
     source: str  # "curriculum" | "user" | "imported"
     status: LexicalStatus
     recall: float

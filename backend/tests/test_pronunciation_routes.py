@@ -155,7 +155,7 @@ def test_route_gate_checkpoint_needs_first_pass():
 def test_route_competence_never_demonstrated(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     a1 = phrases_for_level("A1")
-    for i, q in enumerate(a1):
+    for q in a1:
         pron_repo.record_attempt(uid, q["id"], "A1", 95, True)
     rows = pron_repo.list_attempts(uid)
     comp = pron_domain.route_competence(rows)

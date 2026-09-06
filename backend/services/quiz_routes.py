@@ -25,7 +25,7 @@ import json
 import unicodedata
 from functools import lru_cache
 
-from services.curriculum import CURRICULUM_DIR, CEFR_ORDER
+from services.curriculum import CEFR_ORDER, CURRICULUM_DIR
 
 # Orden CEFR de las rutas quiz (mismo orden que el currículum).
 LEVEL_ORDER: list[str] = list(CEFR_ORDER)
@@ -44,8 +44,9 @@ ROUTE_CHECKPOINT_MIN = 3
 ROUTE_CHECKPOINT_MAX = 25
 
 # Banco corto: por debajo de este número de ítems la puerta adapta su checkpoint
-# (los bancos de niveles altos de grammar son muy pequeños, p. ej. C2 = 4 ítems)
-# para que superar la ruta no exija "dominar 3 a la primera" un banco entero.
+# para que superar una ruta con un banco diminuto no exija "dominar 3 a la
+# primera" un banco entero (hoy ningún banco de grammar real es corto: V3.15
+# normalizó C2 a ≥ 12 ítems).
 QUIZ_SHORT_BANK = 12
 _QUIZ_SHORT_CHECKPOINT_FRACTION = 0.25
 
@@ -166,9 +167,9 @@ def practice_depth(gate: dict) -> str:
     """Profundidad de la práctica de una ruta (Constitución §6.4, V3.13).
 
     La práctica de una ruta quiz NUNCA produce evidencia formal de nivel: su
-    lectura de profundidad es a lo sumo 'medium'. Un banco corto (< 12 ítems,
-    p. ej. grammar C2 = 4) o una puerta aún no superada dejan la
-    práctica en 'low' (etiqueta "practice coverage · evidence depth LOW").
+    lectura de profundidad es a lo sumo 'medium'. Un banco corto (menos de
+    QUIZ_SHORT_BANK ítems) o una puerta aún no superada dejan la práctica en
+    'low' (etiqueta "practice coverage · evidence depth LOW").
     """
     if not gate.get("passed"):
         return "low"
@@ -490,7 +491,9 @@ def normalize_typed(text: str) -> str:
     """
     value = (text or "").strip().lower()
     value = "".join(
-        ch for ch in unicodedata.normalize("NFKD", value) if not unicodedata.combining(ch)
+        ch
+        for ch in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(ch)
     )
     value = "".join(
         ch

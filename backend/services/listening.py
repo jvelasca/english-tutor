@@ -1194,7 +1194,9 @@ def questions_for_level(level: str) -> list[dict]:
 GENERATED_ID_PREFIX = "g-"
 
 
-def route_questions(level: str, extra_questions: list[dict] | None = None) -> list[dict]:
+def route_questions(
+    level: str, extra_questions: list[dict] | None = None
+) -> list[dict]:
     """Frases practicables de una ruta de listening (banco curado + extra).
 
     El pool de práctica de una ruta es el banco curado del nivel más los ítems
@@ -1503,7 +1505,9 @@ def review_next_question(
         wanted = "failed" if only_failed else "mastered"
         keep = {
             item["question_id"]
-            for item in level_items(level, attempts_rows, extra_questions=extra_questions)
+            for item in level_items(
+                level, attempts_rows, extra_questions=extra_questions
+            )
             if item["state"] == wanted
         }
         candidates = [q for q in pool if q["id"] in keep]

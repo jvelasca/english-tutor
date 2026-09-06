@@ -26,12 +26,13 @@ from services.conversation_routes import (
     CONVERSATION_PASS_THRESHOLD,
     LEVEL_ORDER,
     current_level,
-    dialogues_for_level,
     get_dialogue,
-    level_items as motor_level_items,
     review_next_dialogue,
     route_competence,
     route_gate,
+)
+from services.conversation_routes import (
+    level_items as motor_level_items,
 )
 from services.interaction import interaction_evidence
 from services.speaking import scores_from_evidence
@@ -100,7 +101,8 @@ async def _student_turns(conversation_id: str, user_id: str) -> list[dict] | Non
     return [
         m
         for m in conv.get("messages", [])
-        if (m.get("role") or "").lower() in _STUDENT_ROLES and (m.get("content") or "").strip()
+        if (m.get("role") or "").lower() in _STUDENT_ROLES
+        and (m.get("content") or "").strip()
     ]
 
 

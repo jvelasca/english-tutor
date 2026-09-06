@@ -106,7 +106,10 @@ def _header(headers: list[tuple[bytes, bytes]], name: bytes) -> bytes | None:
 
 
 async def _json(
-    send, status: int, payload: dict, extra_headers: list[tuple[bytes, bytes]] | None = None
+    send,
+    status: int,
+    payload: dict,
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
 ) -> None:
     body = json.dumps(payload).encode("utf-8")
     headers = [(b"content-type", b"application/json")]

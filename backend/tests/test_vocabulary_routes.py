@@ -147,19 +147,28 @@ def test_route_gate_needs_accuracy_and_checkpoint():
     assert "accuracy" in gate["blockers"]
 
 
-def test_route_gate_flags_short_banks():
-    """Los bancos cortos (p. ej. grammar C2 = 4) marcan short_bank y adaptan el
-    checkpoint para no pedir '3 a la primera' sobre un banco diminuto."""
-    grammar = engine.quiz_checks("grammar")
-    c2 = [c for c in grammar if c["level"] == "C2"]
-    assert len(c2) < engine.QUIZ_SHORT_BANK
+def test_route_gate_flags_short_banks(monkeypatch):
+    """Los bancos cortos marcan short_bank y adaptan el checkpoint para no pedir
+    '3 a la primera' sobre un banco diminuto. Ningún banco real es ya corto desde
+    V3.15 (grammar C2 se normalizó de 8 a 15 ítems), así que la mecánica se
+    ejercita con un banco grammar sintético de 8 ítems reales de C2 (< 12)."""
+    original_checks = engine.checks_for_level
+    c2 = [c for c in engine.quiz_checks("grammar") if c["level"] == "C2"]
+    assert len(c2) >= engine.QUIZ_SHORT_BANK
+
+    def _short_c2(skill, level):
+        if (skill, level) == ("grammar", "C2"):
+            return c2[:8]
+        return original_checks(skill, level)
+
+    monkeypatch.setattr(engine, "checks_for_level", _short_c2)
     gate = engine.route_gate("grammar", "C2", [])
     assert gate["short_bank"] is True
     # Con todo dominado limpio, el gate pasa aunque el banco sea corto.
-    rows = [{"check_id": c["check_id"], "passed": True} for c in c2]
+    rows = [{"check_id": c["check_id"], "passed": True} for c in c2[:8]]
     gate = engine.route_gate("grammar", "C2", rows)
     assert gate["passed"] is True
-    assert 1 <= gate["checkpoint_required"] <= len(c2)
+    assert 1 <= gate["checkpoint_required"] <= 8
     # Claim honesto: banco corto ⇒ práctica con evidence depth LOW (R7).
     assert gate["practice_depth"] == "low"
 

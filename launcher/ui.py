@@ -105,7 +105,11 @@ def server_activity(status: dict | None) -> tuple[str, int]:
     running = int(gen.get("running", 0) or 0)
     if running:
         levels = ", ".join(j.get("level", "") for j in jobs)
-        line = f"Generando práctica extra ({levels})…" if levels else "Generando práctica extra…"
+        if levels:
+            detail = f"Generando práctica extra ({levels})…"
+        else:
+            detail = "Generando práctica extra…"
+        line = detail
     else:
         line = "En reposo"
     rejected = int(

@@ -9,6 +9,7 @@ altere un veredicto es una regresión de calibración: se re-audita (dossier en
 from __future__ import annotations
 
 from golden import loader
+
 from services.competence import competence_state
 from services.evidence_depth import evidence_depth_report
 

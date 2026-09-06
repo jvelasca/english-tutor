@@ -463,7 +463,9 @@
                   "subskills": [
                     "idioms",
                     "interaction",
-                    "turn_taking"
+                    "turn_taking",
+                    "register",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "debate"
@@ -557,6 +559,200 @@
                         "Her analysis was exactly right",
                         "Her analysis was wrong",
                         "She made a mistake"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m02-u01-l01-o02",
+                  "can_do": "I can choose idioms that match the register of the situation.",
+                  "title": "Idioms y registro",
+                  "skills": [
+                    "vocabulary",
+                    "speaking",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "idioms",
+                    "register"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "register-appropriate idioms",
+                    "formal and informal idioms"
+                  ],
+                  "vocabulary": [
+                    "to all intents and purposes",
+                    "bear in mind",
+                    "on the whole",
+                    "in the pipeline"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m02-u01-l01-o02-a01",
+                      "type": "writing",
+                      "instruction": "Write the same message twice: once informal with casual idioms, once formal with neutral expressions.",
+                      "target": "informal vs formal idiom choice"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o02-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say why an idiom may not fit a formal text.",
+                      "target": "register / collocation / audience",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o02-a03",
+                      "type": "dialogue",
+                      "instruction": "Choose idioms suited to a formal situation you have not practised.",
+                      "target": "to all intents and purposes / on the whole",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o02-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can choose idioms that match the register of the situation.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o02-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write the same message twice: once informal with casual idioms, once formal with neutral expressions.",
+                      "target": "informal vs formal idiom choice",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m02-u01-l01-o02-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which idiom is appropriate in a formal business report?",
+                      "options": [
+                        "to all intents and purposes",
+                        "to hit the sack",
+                        "to shoot the breeze"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o02-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'ten en cuenta'?",
+                      "options": [
+                        "bear in mind",
+                        "keep an eye out",
+                        "run it by"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o02-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which idiom suits an informal chat?",
+                      "options": [
+                        "to be over the moon",
+                        "in the pipeline",
+                        "on balance"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m02-u01-l01-o03",
+                  "can_do": "I can infer the meaning and connotation of unfamiliar idioms from context.",
+                  "title": "Matiz idiomático",
+                  "skills": [
+                    "reading",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "idioms",
+                    "nuance",
+                    "inference"
+                  ],
+                  "concepts": [
+                    "context clues",
+                    "connotation",
+                    "figurative meaning"
+                  ],
+                  "vocabulary": [
+                    "to bite the bullet",
+                    "to pull strings",
+                    "a double-edged sword",
+                    "to water down"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m02-u01-l01-o03-a01",
+                      "type": "reading",
+                      "instruction": "Read two sentences with unfamiliar idioms and infer their meaning from context.",
+                      "target": "It probably means ... / the tone is ..."
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o03-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two clues that reveal an idiom's meaning.",
+                      "target": "situation / contrast / speaker's attitude",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o03-a03",
+                      "type": "dialogue",
+                      "instruction": "Explain the connotation of an idiom you infer from a new context.",
+                      "target": "It suggests ... / it has a positive/negative tone",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o03-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can infer the meaning and connotation of unfamiliar idioms from context.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o03-a05",
+                      "type": "reading",
+                      "instruction": "On your own, read a new text and infer the meaning of its unfamiliar idioms.",
+                      "target": "It probably means ... / the tone is ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m02-u01-l01-o03-c01",
+                      "skill": "reading",
+                      "prompt": "Read: 'After months of delay, she bit the bullet and resigned.' 'Bite the bullet' means...",
+                      "options": [
+                        "to face something unpleasant bravely",
+                        "to be injured",
+                        "to lose patience completely"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o03-c02",
+                      "skill": "reading",
+                      "prompt": "Read: 'His promotion was a double-edged sword.' The idiom suggests the promotion...",
+                      "options": [
+                        "has both advantages and disadvantages",
+                        "was certain",
+                        "was undeserved"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l01-o03-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which idiom means 'aceptar lo inevitable con valor'?",
+                      "options": [
+                        "to bite the bullet",
+                        "to pull strings",
+                        "to water down"
                       ],
                       "correct_index": 0
                     }
@@ -676,7 +872,9 @@
                   ],
                   "subskills": [
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "register",
+                    "nuance"
                   ],
                   "listening_items": [
                     "c109",
@@ -778,7 +976,8 @@
                   "subskills": [
                     "interaction",
                     "turn_taking",
-                    "fluency"
+                    "fluency",
+                    "register"
                   ],
                   "scenario_ids": [
                     "debate"
@@ -854,6 +1053,101 @@
                       "correct_index": 0
                     }
                   ]
+                },
+                {
+                  "id": "c1-m02-u01-l02-o04",
+                  "can_do": "I can choose formal and informal collocations that fit the register of a text.",
+                  "title": "Colocaciones de registro",
+                  "skills": [
+                    "vocabulary",
+                    "writing"
+                  ],
+                  "subskills": [
+                    "collocations",
+                    "register"
+                  ],
+                  "concepts": [
+                    "formal collocations",
+                    "informal collocations",
+                    "register fit"
+                  ],
+                  "vocabulary": [
+                    "to award a contract",
+                    "to reach an agreement",
+                    "to get the go-ahead",
+                    "to do a deal"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m02-u01-l02-o04-a01",
+                      "type": "writing",
+                      "instruction": "Rewrite an informal sentence choosing formal collocations.",
+                      "target": "to award a contract / to reach an agreement"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o04-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, give one formal and one informal collocation for the same idea.",
+                      "target": "to grant approval / to get the go-ahead",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o04-a03",
+                      "type": "writing",
+                      "instruction": "Write a formal version of an informal text on a topic you have not practised.",
+                      "target": "formal collocations",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o04-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can choose formal and informal collocations that fit the register of a text.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o04-a05",
+                      "type": "writing",
+                      "instruction": "On your own, rewrite an informal sentence choosing formal collocations.",
+                      "target": "to award a contract / to reach an agreement",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m02-u01-l02-o04-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which is the formal collocation?",
+                      "options": [
+                        "to award a contract",
+                        "to hand over a deal",
+                        "to give the job"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o04-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase is informal?",
+                      "options": [
+                        "to get the go-ahead",
+                        "to grant approval",
+                        "to authorise the plan"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m02-u01-l02-o04-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which collocation is correct in formal writing?",
+                      "options": [
+                        "to reach an agreement",
+                        "to arrive an agreement",
+                        "to do an agreement"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
                 }
               ]
             }
@@ -888,7 +1182,8 @@
                   "subskills": [
                     "register",
                     "interaction",
-                    "turn_taking"
+                    "turn_taking",
+                    "pragmatics"
                   ],
                   "scenario_ids": [
                     "debate"
@@ -988,7 +1283,9 @@
                   ],
                   "subskills": [
                     "inference",
-                    "structure"
+                    "structure",
+                    "argumentation",
+                    "discourse"
                   ],
                   "concepts": [
                     "firstly",
@@ -1084,7 +1381,9 @@
                   ],
                   "subskills": [
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "register",
+                    "discourse"
                   ],
                   "listening_items": [
                     "c113",
@@ -1187,7 +1486,8 @@
                   "subskills": [
                     "passive",
                     "register",
-                    "word_families"
+                    "word_families",
+                    "discourse"
                   ],
                   "concepts": [
                     "passive voice",
@@ -1283,7 +1583,10 @@
                   "subskills": [
                     "interaction",
                     "turn_taking",
-                    "fluency"
+                    "fluency",
+                    "argumentation",
+                    "pragmatics",
+                    "register"
                   ],
                   "scenario_ids": [
                     "debate"
@@ -1359,6 +1662,301 @@
                       "correct_index": 0
                     }
                   ]
+                },
+                {
+                  "id": "c1-m03-u01-l01-o06",
+                  "can_do": "I can grade the strength of a claim, from tentative to firm, to match the evidence.",
+                  "title": "Grados de certeza",
+                  "skills": [
+                    "vocabulary",
+                    "writing",
+                    "speaking"
+                  ],
+                  "subskills": [
+                    "register",
+                    "pragmatics",
+                    "nuance"
+                  ],
+                  "concepts": [
+                    "claim grading",
+                    "tentative to firm",
+                    "evidence-based claims"
+                  ],
+                  "vocabulary": [
+                    "it is doubtful that",
+                    "there is strong evidence that",
+                    "it is widely accepted that",
+                    "one cannot rule out"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m03-u01-l01-o06-a01",
+                      "type": "writing",
+                      "instruction": "Write three claims about the same fact with three different levels of certainty.",
+                      "target": "It is doubtful that ... / There is strong evidence that ..."
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o06-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say how you make a claim more cautious or more firm.",
+                      "target": "hedging vs boosting language",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o06-a03",
+                      "type": "dialogue",
+                      "instruction": "Grade your claims about a new topic to match the evidence you have.",
+                      "target": "One cannot rule out ... / It is widely accepted that ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o06-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can grade the strength of a claim, from tentative to firm, to match the evidence.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o06-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write three claims about a new fact with different levels of certainty.",
+                      "target": "It is doubtful that ... / There is strong evidence that ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m03-u01-l01-o06-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase is the most tentative?",
+                      "options": [
+                        "It is doubtful that...",
+                        "It is certain that...",
+                        "There is no question that..."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o06-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase expresses strong evidence?",
+                      "options": [
+                        "There is strong evidence that...",
+                        "It might be the case that...",
+                        "One could argue that..."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o06-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'dudoso'?",
+                      "options": [
+                        "doubtful",
+                        "doubtless",
+                        "double"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m03-u01-l01-o07",
+                  "can_do": "I can rebut an argument in writing, first conceding its strongest point.",
+                  "title": "Refutación matizada",
+                  "skills": [
+                    "reading",
+                    "writing",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "argumentation",
+                    "discourse",
+                    "register"
+                  ],
+                  "concepts": [
+                    "rebuttal",
+                    "concession",
+                    "balanced argument",
+                    "strongest point first"
+                  ],
+                  "vocabulary": [
+                    "to be fair",
+                    "even granting that",
+                    "nonetheless",
+                    "on balance"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m03-u01-l01-o07-a01",
+                      "type": "writing",
+                      "instruction": "Write a rebuttal that first concedes the strongest point of the opposing view.",
+                      "target": "To be fair ... / even granting that ... / nonetheless ..."
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o07-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say why you concede the strongest point before rebutting it.",
+                      "target": "it makes the argument more balanced and credible",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o07-a03",
+                      "type": "writing",
+                      "instruction": "Write a rebuttal on a topic you have not discussed, conceding before countering.",
+                      "target": "even granting that ... / nonetheless ...",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o07-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can rebut an argument in writing, first conceding its strongest point.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o07-a05",
+                      "type": "writing",
+                      "instruction": "On your own, write a rebuttal that first concedes the strongest point of the opposing view.",
+                      "target": "To be fair ... / even granting that ... / nonetheless ...",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m03-u01-l01-o07-c01",
+                      "skill": "reading",
+                      "prompt": "Read: 'To be fair, the proposal is well costed; nonetheless, it is unworkable.' What does the writer do first?",
+                      "options": [
+                        "Concedes a point",
+                        "Presents new evidence",
+                        "Asks a question"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o07-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'hay que admitir que'?",
+                      "options": [
+                        "to be fair",
+                        "on balance",
+                        "at first glance"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o07-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which word means 'no obstante'?",
+                      "options": [
+                        "nonetheless",
+                        "moreover",
+                        "firstly"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "c1-m03-u01-l01-o08",
+                  "can_do": "I can signpost the stages of a complex spoken argument so listeners can follow.",
+                  "title": "Señalizar un argumento oral",
+                  "skills": [
+                    "speaking",
+                    "vocabulary"
+                  ],
+                  "subskills": [
+                    "argumentation",
+                    "discourse",
+                    "coherence",
+                    "turn_taking"
+                  ],
+                  "scenario_ids": [
+                    "debate"
+                  ],
+                  "concepts": [
+                    "signposting",
+                    "spoken structure",
+                    "stage markers"
+                  ],
+                  "vocabulary": [
+                    "first, let me",
+                    "having said that",
+                    "the point is",
+                    "to sum up"
+                  ],
+                  "activities": [
+                    {
+                      "id": "c1-m03-u01-l01-o08-a01",
+                      "type": "dialogue",
+                      "instruction": "Give a short spoken argument using signposting to mark each stage.",
+                      "target": "First, let me ... / having said that / to sum up"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o08-a02",
+                      "type": "recall",
+                      "instruction": "Without looking, say two phrases that signpost a new stage.",
+                      "target": "Next, let me turn to ... / having said that",
+                      "phase": "retrieve"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o08-a03",
+                      "type": "dialogue",
+                      "instruction": "Signpost an argument on a topic you have not discussed.",
+                      "target": "The point is ... / to sum up",
+                      "phase": "transfer"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o08-a04",
+                      "type": "recall",
+                      "instruction": "In one sentence, say what you learned to do in this unit.",
+                      "target": "I can signpost the stages of a complex spoken argument so listeners can follow.",
+                      "phase": "review"
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o08-a05",
+                      "type": "dialogue",
+                      "instruction": "On your own, give a spoken argument using signposting to mark each stage.",
+                      "target": "First, let me ... / having said that / to sum up",
+                      "phase": "assess"
+                    }
+                  ],
+                  "checks": [
+                    {
+                      "id": "c1-m03-u01-l01-o08-c01",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase signals you are moving to a new stage?",
+                      "options": [
+                        "Next, let me turn to...",
+                        "To be honest...",
+                        "By the way..."
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o08-c02",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase means 'dicho esto'?",
+                      "options": [
+                        "having said that",
+                        "in the long run",
+                        "as a rule"
+                      ],
+                      "correct_index": 0
+                    },
+                    {
+                      "id": "c1-m03-u01-l01-o08-c03",
+                      "skill": "vocabulary",
+                      "prompt": "Which phrase introduces the conclusion?",
+                      "options": [
+                        "to sum up",
+                        "to begin with",
+                        "for instance"
+                      ],
+                      "correct_index": 0
+                    }
+                  ]
                 }
               ]
             }
@@ -1398,7 +1996,9 @@
                     "interaction",
                     "turn_taking",
                     "inference",
-                    "attitude"
+                    "attitude",
+                    "discourse",
+                    "nuance"
                   ],
                   "scenario_ids": [
                     "debate"

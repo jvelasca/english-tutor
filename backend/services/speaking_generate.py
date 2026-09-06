@@ -238,7 +238,8 @@ def validate_payload_shape(payload: dict) -> bool:
     model_min, model_max = _BAND_MODEL[level]
     if not app_min <= len(_norm(payload.get("app_line") or "").split()) <= app_max:
         return False
-    if not model_min <= len(_norm(payload.get("model_response") or "").split()) <= model_max:
+    model_len = len(_norm(payload.get("model_response") or "").split())
+    if not model_min <= model_len <= model_max:
         return False
     for field in ("setup", "you", "app_line", "model_response"):
         if not (payload.get(field) or "").strip():

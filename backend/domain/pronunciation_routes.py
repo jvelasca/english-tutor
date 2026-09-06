@@ -21,11 +21,12 @@ from services.pronunciation_routes import (
     LEVEL_ORDER,
     current_level,
     get_phrase,
-    level_items as motor_level_items,
-    phrases_for_level,
     review_next_phrase,
     route_competence,
     route_gate,
+)
+from services.pronunciation_routes import (
+    level_items as motor_level_items,
 )
 
 

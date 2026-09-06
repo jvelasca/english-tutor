@@ -13,8 +13,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from dependencies import current_user
-from domain import learning as learning_service
 from domain import conversation_routes as conversation_routes_service
+from domain import learning as learning_service
 from domain.conversation_routes import is_valid_level
 from domain.speaking_routes import EvidenceExtractionError
 from schemas.conversation_routes import (

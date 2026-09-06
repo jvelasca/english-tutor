@@ -4,7 +4,7 @@ Suite que fija las reglas inmutables R1–R7 de la Constitución §1.1 y la lect
 honesta de los claims en verde:
 
 - `practice_route_never_returns_demonstrated`  (R1/R2: práctica ≠ demostrado)
-- `four_c2_questions_cannot_prove_c2`          (R7: muestra pequeña ≠ competencia)
+- `synthetic_short_bank_cannot_prove_level`    (R7: muestra pequeña ≠ competencia)
 - `vocab_alone_cannot_prove_cefr`              (R3: vocabulary ≠ nivel)
 - `listening_practice_does_not_certify_level`  (R2: práctica no certifica)
 - `mastery_requires_minimum_evidence`          (§6.4: suelo de muestras)
@@ -60,16 +60,58 @@ def test_practice_route_never_returns_demonstrated():
         assert all(s in ("functional",) for s in states.values())
 
 
-# --- R7: 4 preguntas de C2 no prueban C2 -------------------------------------
+# --- R7: muestra pequeña ≠ competencia ----------------------------------------
 
 
-def test_four_c2_questions_cannot_prove_c2():
-    """Dominar el banco corto de grammar C2 (4 MC + 4 CP = 8) pasa la puerta de
-    la ruta (mide práctica sobre el banco disponible) pero queda en evidence
-    depth LOW: la práctica no produce evidencia de competencia C2."""
-    c2 = engine.checks_for_level("grammar", "C2")
-    assert 0 < len(c2) < engine.QUIZ_SHORT_BANK
-    rows = [{"check_id": c["check_id"], "passed": True} for c in c2]
+def _synthetic_short_bank(size: int = 8) -> list[dict]:
+    """Banco grammar corto sintético (V3.15): `size` ítems REALES del pool de C2
+    (hoy 15) repartidos en sus 3 temas, para que quede < QUIZ_SHORT_BANK (12).
+    V3.15 normalizó el único banco corto real del sistema (C2 pasó de 8 a 15),
+    así que R7 se ejercita con datos artificiales construidos en el propio test.
+    """
+    pool = engine.checks_for_level("grammar", "C2")
+    by_topic: dict[str, list[dict]] = {}
+    for c in pool:
+        by_topic.setdefault(c["topic"], []).append(c)
+    topics = list(by_topic)
+    assert len(topics) >= 3, "el pool real de C2 perdió variedad de temas"
+    bank: list[dict] = []
+    # Ronda 1: un ítem de cada tema (garantiza la variedad de topics).
+    for topic in topics:
+        if len(bank) < size and by_topic[topic]:
+            bank.append(by_topic[topic].pop(0))
+    # Ronda 2: completa `size` con el resto del pool sin repetir ítems.
+    for topic in topics:
+        for c in by_topic[topic]:
+            if len(bank) < size:
+                bank.append(c)
+    assert len(bank) == size
+    assert len({c["topic"] for c in bank}) == len(topics) >= 3
+    return bank
+
+
+def _with_short_c2(original_checks, bank):
+    """Reemplazo de `checks_for_level` que sirve `bank` como pool de grammar C2."""
+
+    def _checks_for_level(skill: str, level: str):
+        if (skill, level) == ("grammar", "C2"):
+            return bank
+        return original_checks(skill, level)
+
+    return _checks_for_level
+
+
+def test_synthetic_short_bank_cannot_prove_level(monkeypatch):
+    """Dominar un banco corto (8 ítems < 12) pasa la puerta de la ruta (mide
+    práctica sobre el banco disponible) pero queda en evidence depth LOW: la
+    práctica no produce evidencia de competencia C2."""
+    bank = _synthetic_short_bank()
+    monkeypatch.setattr(
+        engine,
+        "checks_for_level",
+        _with_short_c2(engine.checks_for_level, bank),
+    )
+    rows = [{"check_id": c["check_id"], "passed": True} for c in bank]
     gate = engine.route_gate("grammar", "C2", rows)
     assert gate["passed"] is True
     assert gate["practice_depth"] == "low"
@@ -80,25 +122,35 @@ def test_four_c2_questions_cannot_prove_c2():
     assert record["demonstrated"] is False
 
 
-def test_short_bank_coverage_does_not_lift_to_medium():
+def test_short_bank_coverage_does_not_lift_to_medium(monkeypatch):
     """Un banco corto dominado declara practice coverage con evidence depth LOW;
-    la profundidad media exige un banco representativo (normal). C2 es hoy el
-    único banco corto de grammar (4 MC + 4 CP = 8): B2 se normalizó en V3.13 P1
-    al añadir la producción controlada al banco."""
-    for level in ("C2",):
-        bank = engine.checks_for_level("grammar", level)
-        rows = [{"check_id": c["check_id"], "passed": True} for c in bank]
-        gate = engine.route_gate("grammar", level, rows)
-        assert gate["short_bank"] is True
-        assert gate["passed"] is True
-        assert gate["practice_depth"] == "low"
-    # B2 ya no es corto: su banco (8 MC + 6 CP ≥ 12) alcanza la profundidad
-    # media al dominarse, pero nunca demuestra el nivel (la ruta es práctica).
-    b2 = engine.checks_for_level("grammar", "B2")
-    rows = [{"check_id": c["check_id"], "passed": True} for c in b2]
-    gate = engine.route_gate("grammar", "B2", rows)
-    assert gate["short_bank"] is False
-    assert gate["practice_depth"] == "medium"
+    la profundidad media exige un banco representativo (normal). V3.15 normalizó
+    el único banco corto real (grammar C2: 8 → 15); la invariante se verifica con
+    un banco corto sintético y con los bancos reales C2/B2 (≥ 12), que leen
+    MEDIUM al dominarse sin demostrar nunca el nivel (la ruta es práctica)."""
+    original_checks = engine.checks_for_level
+    assert len(original_checks("grammar", "C2")) >= engine.QUIZ_SHORT_BANK
+    bank = _synthetic_short_bank()
+    monkeypatch.setattr(
+        engine,
+        "checks_for_level",
+        _with_short_c2(original_checks, bank),
+    )
+    rows = [{"check_id": c["check_id"], "passed": True} for c in bank]
+    gate = engine.route_gate("grammar", "C2", rows)
+    assert gate["short_bank"] is True
+    assert gate["passed"] is True
+    assert gate["practice_depth"] == "low"
+    # Bancos reales representativos: C2 y B2 (≥ 12) leen MEDIUM al dominarse.
+    monkeypatch.setattr(engine, "checks_for_level", original_checks)
+    for level in ("C2", "B2"):
+        bank_rows = [
+            {"check_id": c["check_id"], "passed": True}
+            for c in original_checks("grammar", level)
+        ]
+        gate = engine.route_gate("grammar", level, bank_rows)
+        assert gate["short_bank"] is False
+        assert gate["practice_depth"] == "medium"
 
 
 # --- R3: Vocabulary no prueba CEFR -------------------------------------------
@@ -218,8 +270,8 @@ def test_current_level_is_material_not_student_level():
             rows.append({"check_id": c["check_id"], "passed": True})
     suggested = engine.current_level("grammar", rows)
     assert suggested in engine.LEVEL_ORDER
-    # Nunca un nivel de alumno: dominar solo el banco corto de C2 no sugiere
-    # "seguir en C2" — el material pendiente (A1) vuelve a ser el primero.
+    # Nunca un nivel de alumno: dominar solo el banco de C2 no sugiere "seguir en
+    # C2" — el material pendiente (A1) vuelve a ser el primero.
     c2 = engine.checks_for_level("grammar", "C2")
     rows_c2 = [{"check_id": c["check_id"], "passed": True} for c in c2]
     assert engine.current_level("grammar", rows_c2) == "A1"

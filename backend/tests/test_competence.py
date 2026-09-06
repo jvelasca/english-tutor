@@ -39,7 +39,9 @@ def test_no_entry_is_not_started_without_band():
 
 
 def test_partial_evidence_is_developing():
-    record = competence_state(_entry(score=0.5, confidence=0.8, evidence_count=2), "grammar", "A1")
+    record = competence_state(
+        _entry(score=0.5, confidence=0.8, evidence_count=2), "grammar", "A1"
+    )
     assert record["state"] == "developing"
     # La banda heurística por destreza es la del Student Model (proxy interno).
     assert record["estimated_band"] != "—"
@@ -137,7 +139,9 @@ def test_review_due_blocks_functional_even_with_delayed():
 
 
 def test_interaction_uses_default_floor():
-    record = competence_state(_entry(score=0.75, confidence=0.8, evidence_count=4), "interaction", "A1")
+    record = competence_state(
+        _entry(score=0.75, confidence=0.8, evidence_count=4), "interaction", "A1"
+    )
     assert record["state"] == "functional"
 
 
@@ -149,13 +153,17 @@ def _listening_entry(routes: list[dict]) -> dict:
 
 
 def test_listening_route_functional_elevates_without_formal_evidence():
-    records = competence_states([_listening_entry([{"level": "A1", "state": "functional"}])], "A1")
+    records = competence_states(
+        [_listening_entry([{"level": "A1", "state": "functional"}])], "A1"
+    )
     record = next(r for r in records if r["skill"] == "listening")
     assert record["state"] == "functional"
 
 
 def test_listening_route_demonstrated_only_with_retention():
-    records = competence_states([_listening_entry([{"level": "A1", "state": "demonstrated"}])], "A1")
+    records = competence_states(
+        [_listening_entry([{"level": "A1", "state": "demonstrated"}])], "A1"
+    )
     record = next(r for r in records if r["skill"] == "listening")
     assert record["state"] == "demonstrated"
     assert record["demonstrated"] is True
@@ -165,6 +173,8 @@ def test_listening_route_demonstrated_only_with_retention():
 def test_listening_route_other_level_ignored():
     # El estado se calcula para el nivel actual del Student Model (A1): la ruta
     # de otro nivel no eleva esta competencia.
-    records = competence_states([_listening_entry([{"level": "A2", "state": "demonstrated"}])], "A1")
+    records = competence_states(
+        [_listening_entry([{"level": "A2", "state": "demonstrated"}])], "A1"
+    )
     record = next(r for r in records if r["skill"] == "listening")
     assert record["state"] == "not_started"
