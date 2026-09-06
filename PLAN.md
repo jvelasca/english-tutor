@@ -11,6 +11,25 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.17.0` — **Knowledge Graph + Daily Adaptive Plan**
+  (cierra el candidato P2: el plan diario ahora deriva del Evidence Graph.
+  **P0-grafo→plan (D1b)**: `rank_weakness_objectives` + `enrich_item` en
+  `services/evidence_graph.py` (puros); `_session_steps` reordena los candidatos
+  de cada destreza débil por su nodo y enriquece los pasos con
+  `can_do`/`limiting_factor`/`graph_mastery`/`because[]` (una única lectura de
+  evidencia; `/session` y `/next-best` nunca divergen) · **P0-vista (D2)**:
+  `ObjectiveNodeCard` consume `getEvidenceGraphNode` en el curso (hitos
+  expansibles) y en el perfil (Habilidades); sin endpoint nuevo · **P0-muerte
+  de `/today` (D3)**: endpoint, `get_today_plan`, schemas, `adaptive.today_plan`
+  + `TODAY_MIX`, cliente y tipos frontend eliminados; la Home consume solo
+  `/session`; tests migrados con rationale · **P0-deuda v3.16 (D4b)**: M2/M3/O2
+  ✅ con test y M1 ✅ en el cierre (devDeps DOM `jsdom` + `@testing-library/react`,
+  vitest a `*.test.tsx` y 6 vitest de componente de `UnitReviewPanel`/`TodayPlan`)
+  · **P0-UI (D6)**: micro-líneas del can-do/factor limitante en las filas de la
+  sesión · **P0-fallback (D7)**: sin nodo la práctica nunca se bloquea
+  · **tests**: `test_graph_plan.py` + `test_session_graph.py` nuevos y suites
+  migradas; backend pytest 1333 + ruff, frontend vitest 398 + build OK).
+  Base: `3.16.0`
 - ✅ Versión estable `3.16.0` — **Review/SRS por unidad: micro-review + ventanas de retención fijas 7/30/90 días sobre la base FSRS**
   (cierra el candidato P1 "Review/SRS por unidad" auditado como abierto 2026-09-05:
   el motor FSRS ya soportaba `target_type="objective"` pero no se sembraba; no

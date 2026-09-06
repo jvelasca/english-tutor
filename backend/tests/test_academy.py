@@ -1392,13 +1392,18 @@ def test_endpoint_readiness_default_b1(monkeypatch, tmp_path):
     assert body["blocking_skills"] == []
 
 
-def test_endpoint_today_empty_returns_next_objective(monkeypatch, tmp_path):
+def test_endpoint_session_empty_returns_next_objective(monkeypatch, tmp_path):
+    """Migración de `test_endpoint_today_empty_returns_next_objective` (V3.17, D3).
+
+    `/api/academy/today` se eliminó (sin consumidor); su invariante — un usuario
+    nuevo recibe un plan no vacío con material nuevo — vive en el Session Engine
+    (`/api/academy/session`), que es el motor real de la Home."""
     a, _b = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.get("/api/academy/today", params={"user_id": a})
+        r = client.get("/api/academy/session", params={"user_id": a})
     assert r.status_code == 200
     body = r.json()
-    assert body["items"], "el plan no está vacío para un usuario nuevo"
+    assert body["items"], "la sesión no está vacía para un usuario nuevo"
     assert body["total_minutes"] == sum(i["minutes"] for i in body["items"])
     assert any(i["kind"] == "new" for i in body["items"])
 

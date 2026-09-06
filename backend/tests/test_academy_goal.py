@@ -115,22 +115,11 @@ def test_endpoint_goal_rejects_invalid_target_level(monkeypatch, tmp_path):
     assert r.status_code == 422
 
 
-def test_today_plan_uses_goal_budget(monkeypatch, tmp_path):
-    a = _setup(monkeypatch, tmp_path)
-    with TestClient(app) as client:
-        client.put(
-            "/api/academy/goal",
-            params={"user_id": a},
-            json={
-                "goal_type": "general",
-                "minutes_per_day": 45,
-                "days_per_week": 5,
-                "target_level": "B1",
-            },
-        )
-        r = client.get("/api/academy/today", params={"user_id": a})
-    assert r.status_code == 200
-    assert r.json()["total_minutes"] == 45
+# V3.17 (D3): `test_today_plan_uses_goal_budget` (GET /api/academy/today) se
+# eliminó con el endpoint sin consumidor. Su invariante — el presupuesto del
+# objetivo (45 min) debe reflejarse en `total_minutes` del plan — vive en el
+# Session Engine y ya lo cubre `test_endpoint_session_uses_goal_budget`
+# (mismo presupuesto del objetivo, motor real de la Home).
 
 
 def test_student_model_uses_goal_target(monkeypatch, tmp_path):

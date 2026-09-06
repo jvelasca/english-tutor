@@ -32,6 +32,12 @@ const DYNAMIC_KEY_PREFIXES: string[] = [
   "crossSkill.channel.", // t(`crossSkill.channel.${key}`)
   "gramRoutes.levelStates.", // helper groupKey(state)
   "vocabRoutes.levelStates.", // helper groupKey(state)
+  // V3.17 (M3): prefijos dinámicos del Review/SRS y del curso que el escáner
+  // estático no puede resolver porque la clave se construye con interpolación.
+  "unitReview.window.", // UnitReviewPanel: t(`unitReview.window.${window_days}`)
+  "unitReview.state.", // UnitReviewPanel: t(`unitReview.state.${state}`)
+  "skill.", // CourseScreen/UnitReviewPanel: t(`skill.${section|skill}`)
+  "fsrs.whyReason.", // FsrsReviewPanel: t(`fsrs.whyReason.${explain.why}`)
 ];
 
 function walkTsFiles(dir: string): string[] {

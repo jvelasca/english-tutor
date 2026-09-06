@@ -3116,6 +3116,33 @@ body.is-resizing {
   color: var(--color-text-dim);
 }
 
+/* V3.17 (D6): micro-líneas del can-do con su nodo del grafo dentro de la fila.
+   Can-do en itálica (texto del currículo) y chip del factor limitante con el
+   pct o `missing`, con los tokens warning del EvidenceGraphPanel. */
+.today-item-graph {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.today-item-can-do {
+  font-style: italic;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.today-item-limit {
+  align-self: flex-start;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  white-space: nowrap;
+}
+
 .today-item-kind {
   margin-left: auto;
   font-size: var(--text-xs);

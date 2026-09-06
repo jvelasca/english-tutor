@@ -43,7 +43,6 @@ import type {
   SpeakingScenarios,
   StudentModel,
   StudyPlanStep,
-  TodayPlan,
   UnitReviewPlan,
   WritingDiagnostic,
   WritingJourneyOut,
@@ -507,10 +506,6 @@ export function getReadiness(
 /** Tríada Progress / Mastery / Readiness (V2.2). */
 export function getDashboard(userId: string): Promise<Dashboard> {
   return getJson<Dashboard>(`/api/academy/dashboard${userQuery(userId)}`);
-}
-
-export function getTodayPlan(userId: string): Promise<TodayPlan> {
-  return getJson<TodayPlan>(`/api/academy/today${userQuery(userId)}`);
 }
 
 export function getSession(userId: string): Promise<Session> {

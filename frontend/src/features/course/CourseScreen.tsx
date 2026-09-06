@@ -639,7 +639,12 @@ export function CourseScreen({
                   </p>
                   <div className="flex flex-col gap-1.5">
                     {unitObjectives.map((o) => (
-                      <Milestone key={o.id} objective={o} />
+                      <Milestone
+                        key={o.id}
+                        objective={o}
+                        userId={userId}
+                        levelId={detail?.level_id}
+                      />
                     ))}
                   </div>
                 </div>

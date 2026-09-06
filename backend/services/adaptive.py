@@ -5,7 +5,7 @@ Casa del "qué hacer ahora": convierte el perfil CEFR por destreza (derivado por
 pedagógicas reproducibles:
 
     perfil CEFR → stability → estimated_level → readiness → reevaluación
-                → Today's Plan
+                → sesión diaria (Session Engine)
 
 No decide el progreso el LLM: el LLM genera evidencia; este motor decide. No
 importa FastAPI ni toca la base de datos (recibe datos ya agregados).
@@ -395,18 +395,12 @@ def reassessment_due(
     }
 
 
-# --- Today's Plan ---------------------------------------------------------
+# --- Presupuesto por defecto ---------------------------------------------
 
-# Presupuesto por defecto de la sesión diaria (minutos).
+# Presupuesto por defecto de la sesión diaria (minutos). El antiguo motor
+# `today_plan` (con `TODAY_MIX`) se eliminó en V3.17 (D3): el plan diario vive
+# solo en el Session Engine (`session_plan`), que comparte este presupuesto.
 TODAY_BUDGET = 30
-# Reparto del presupuesto entre categorías (weakness / review / new / easy_wins).
-# Ajustable; la suma ideal es 1. Se renormaliza sobre las categorías presentes.
-TODAY_MIX: dict[str, float] = {
-    "weakness": 0.40,
-    "review": 0.30,
-    "new": 0.20,
-    "easy_wins": 0.10,
-}
 
 
 def _objective_title(level, objective_id: str | None) -> str:
@@ -437,11 +431,10 @@ def _largest_remainder(minutes_float: list[float], total: int) -> list[int]:
 
 
 def _assign_minutes(
-    items: list[dict], budget: int, mix: dict[str, float] | None = None
+    items: list[dict], budget: int, mix: dict[str, float]
 ) -> list[dict]:
     """Asigna minutos a los ítems según el `mix` por kind (compartido a partes
     iguales dentro del mismo kind), sumando exactamente `budget`."""
-    mix = mix if mix is not None else TODAY_MIX
     if not items:
         return items
     weights = [mix.get(it["kind"], 0.0) for it in items]
@@ -459,90 +452,6 @@ def _assign_minutes(
     for it, m in zip(items, minutes, strict=False):
         it["minutes"] = m
     return items
-
-
-def today_plan(
-    profile: list[dict],
-    level=None,
-    remediation: list[dict] | None = None,
-    mastered_ids: set[str] | None = None,
-    next_objective_id: str | None = None,
-    budget_minutes: int = TODAY_BUDGET,
-) -> list[dict]:
-    """Construye el plan de estudio de hoy, equilibrando weakness/review/new/easy.
-
-    Combina el perfil por destreza, el plan de remediación, las destrezas "a
-    repasar" (olvido), el siguiente objetivo del currículo y un "quick win" para
-    motivación. Devuelve una lista de ítems `{kind, skill, objective_id, title,
-    reason, minutes}` con minutos que suman `budget_minutes`. Es determinista
-    dados los mismos inputs.
-
-    Se evita un 100% de debilidades: la mezcla `TODAY_MIX` garantiza material
-    nuevo y un refuerzo de confianza.
-    """
-    remediation = remediation or []
-    mastered_ids = mastered_ids or set()
-    items: list[dict] = []
-
-    # Weakness: destrezas débiles del plan de remediación (más débil primero).
-    for r in remediation:
-        oid = r["objective_ids"][0] if r.get("objective_ids") else None
-        items.append(
-            {
-                "kind": "weakness",
-                "skill": r["skill"],
-                "objective_id": oid,
-                "title": _objective_title(level, oid) or f"Practice {r['skill']}",
-                "reason": f"weakest skill: {r['skill']}",
-            }
-        )
-
-    # Review: destrezas con repaso pendiente (curva de olvido).
-    for e in profile:
-        if e.get("review_due"):
-            items.append(
-                {
-                    "kind": "review",
-                    "skill": e["skill"],
-                    "objective_id": None,
-                    "title": f"Review {e['skill']}",
-                    "reason": "due for review",
-                }
-            )
-
-    # New: siguiente material del currículo (progresión).
-    if next_objective_id:
-        items.append(
-            {
-                "kind": "new",
-                "skill": None,
-                "objective_id": next_objective_id,
-                "title": _objective_title(level, next_objective_id)
-                or "Next objective",
-                "reason": "next in path",
-            }
-        )
-
-    # Easy wins: refuerzo de confianza con una destreza fuerte reciente.
-    strong = [
-        e
-        for e in profile
-        if e.get("evidence_count", 0) > 0 and not e.get("review_due")
-    ]
-    strong.sort(key=lambda e: -e["score"])
-    if strong:
-        e = strong[0]
-        items.append(
-            {
-                "kind": "easy_wins",
-                "skill": e["skill"],
-                "objective_id": None,
-                "title": f"Quick win: {e['skill']}",
-                "reason": "confidence boost",
-            }
-        )
-
-    return _assign_minutes(items, budget_minutes)
 
 
 # --- Session Engine -------------------------------------------------------

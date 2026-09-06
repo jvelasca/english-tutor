@@ -265,11 +265,17 @@ def test_reassessment_due_requires_confidence():
     assert adaptive.reassessment_due(profile, [], NOW) is None
 
 
-# --- Today's Plan ---------------------------------------------------------
+# --- Sesión diaria: plan de hoy (V3.17 D3) --------------------------------
 
 
-def test_today_plan_empty_profile_gives_next_objective_only():
-    plan = adaptive.today_plan(
+# Los tests que ejercían `adaptive.today_plan` (motor `/today`, eliminado por
+# D3 al quedarse sin consumidor) se migran al Session Engine (`session_plan`),
+# que es el motor real del plan diario en `/api/academy/session`.
+
+
+def test_session_plan_empty_profile_gives_next_objective_only():
+    """Migración de `test_today_plan_empty_profile_gives_next_objective_only`."""
+    plan = adaptive.session_plan(
         [], level=load_level("a1"), next_objective_id="a1-m01-u01-l01-o01"
     )
     kinds = {i["kind"] for i in plan}
@@ -277,7 +283,11 @@ def test_today_plan_empty_profile_gives_next_objective_only():
     assert "weakness" not in kinds
 
 
-def test_today_plan_mixes_categories_and_sums_budget():
+def test_session_plan_mixes_categories_and_sums_budget():
+    """Migración de `test_today_plan_mixes_categories_and_sums_budget`.
+
+    El Session Engine incluye también `step_key`/`subskill`/`level_id`/`skills`
+    por paso (claves del contrato `/session`)."""
     level = load_level("a1")
     objs = level.objectives()
     target = objs[1]
@@ -301,7 +311,7 @@ def test_today_plan_mixes_categories_and_sums_budget():
             review_due=False,
         ),
     ]
-    plan = adaptive.today_plan(
+    plan = adaptive.session_plan(
         profile,
         level=level,
         remediation=remediation,
@@ -316,12 +326,27 @@ def test_today_plan_mixes_categories_and_sums_budget():
     assert "new" in kinds
     assert "easy_wins" in kinds
     assert sum(i["minutes"] for i in plan) == 30
-    expected_keys = {"kind", "skill", "objective_id", "title", "reason", "minutes"}
+    expected_keys = {
+        "kind",
+        "step_key",
+        "skill",
+        "subskill",
+        "objective_id",
+        "level_id",
+        "skills",
+        "title",
+        "reason",
+        "minutes",
+    }
     for item in plan:
         assert set(item) == expected_keys
 
 
-def test_today_plan_weakness_gets_most_minutes():
+def test_session_plan_weakness_keeps_at_least_review_minutes():
+    """Migración de `test_today_plan_weakness_gets_most_minutes`.
+
+    En `SESSION_MIX` review y weakness comparten el mayor peso (0.30): con una
+    destreza débil vencida, la debilidad iguala (no supera) al repaso."""
     profile = [
         _entry(
             "grammar",
@@ -340,7 +365,7 @@ def test_today_plan_weakness_gets_most_minutes():
             review_due=False,
         ),
     ]
-    plan = adaptive.today_plan(
+    plan = adaptive.session_plan(
         profile,
         level=load_level("a1"),
         remediation=[{"skill": "grammar", "score": 0.3, "objective_ids": ["o1"]}],
@@ -354,8 +379,9 @@ def test_today_plan_weakness_gets_most_minutes():
     assert sum(minutes.values()) == 30
 
 
-def test_today_plan_handles_zero_budget():
-    plan = adaptive.today_plan([], next_objective_id="o1", budget_minutes=0)
+def test_session_plan_handles_zero_budget():
+    """Migración de `test_today_plan_handles_zero_budget`."""
+    plan = adaptive.session_plan([], next_objective_id="o1", budget_minutes=0)
     for item in plan:
         assert item["minutes"] == 0
 

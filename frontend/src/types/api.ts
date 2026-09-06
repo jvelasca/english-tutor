@@ -2168,22 +2168,6 @@ export interface StudentModel {
   mastery: MasteryRecord[];
 }
 
-export interface TodayItem {
-  kind: string;
-  skill: string | null;
-  objective_id: string | null;
-  title: string;
-  reason: string;
-  minutes: number;
-}
-
-export interface TodayPlan {
-  items: TodayItem[];
-  total_minutes: number;
-}
-
-// --- Session Engine (sesión diaria accionable) ---
-
 export interface SessionStep {
   kind: string;
   step_key: string;
@@ -2195,6 +2179,17 @@ export interface SessionStep {
   title: string;
   reason: string;
   minutes: number;
+  // V3.17 (D1b): pasos con objetivo y nodo del Evidence Graph. Opcionales:
+  // un paso sin objetivo o sin nodo (D7) los trae null/vacíos.
+  can_do?: string | null;
+  limiting_factor?: {
+    id: string;
+    score: number;
+    missing?: boolean;
+    kind?: string;
+  } | null;
+  graph_mastery?: number | null;
+  because?: string[];
 }
 
 export interface Session {

@@ -329,6 +329,7 @@ function SessionStepRow({
     item.kind === "listening" && item.subskill
       ? `${t("today.subskill")} ${SUBSKILL_LABELS[item.subskill] ?? item.subskill}`
       : item.reason;
+  const limit = item.limiting_factor;
   return (
     <li className="today-item">
       <button
@@ -341,6 +342,21 @@ function SessionStepRow({
         <span className="today-item-body">
           <span className="today-item-title">{stepTitle(item, t)}</span>
           <span className="today-item-reason">{reason}</span>
+          {/* V3.17 (D6): micro-líneas del can-do con su nodo del grafo. Son
+              informativas (estáticas) dentro de la fila-botón: can-do en
+              itálica y chip del factor limitante; el because[] completo solo
+              vive en NextBestCard. Sin can_do o sin nodo (D7) no se dibujan. */}
+          {item.can_do && limit && (
+            <span className="today-item-graph">
+              <span className="today-item-can-do">{item.can_do}</span>
+              <span className="today-item-limit" role="note">
+                {SKILL_LABELS[limit.id] ?? limit.id}
+                {limit.missing
+                  ? ` · ${t("home.missing")}`
+                  : ` · ${Math.round(limit.score * 100)}%`}
+              </span>
+            </span>
+          )}
         </span>
         <span className="today-item-kind">{label}</span>
         <span className="today-item-minutes">{item.minutes} min</span>

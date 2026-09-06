@@ -88,8 +88,6 @@ from schemas.academy import (
     SpeakingResultOut,
     SpeakingTaskResultOut,
     StudentModelOut,
-    TodayItemOut,
-    TodayPlanOut,
     UnitReviewObjectiveResultOut,
     UnitReviewPlanOut,
     UnitReviewPlanUnitOut,
@@ -1986,7 +1984,7 @@ async def get_unit_review_plan(
 ) -> UnitReviewPlanOut | None:
     """Plan de repaso por unidad (V3.16) del nivel actual (o del pedido, D2).
 
-    Sigue el patrón de `get_today_plan`: `lv` → `list_objective_mastery` →
+    Sigue el patrón de `get_session`: `lv` → `list_objective_mastery` →
     `_split_objective_mastery` → `mastered_objective_ids`; agrupa por unidad y
     solo incluye unidades **completadas** o con **plan activo** (al menos un
     intento de micro-review, para que una ventana fallida siga visible aunque la
@@ -2277,30 +2275,38 @@ async def submit_unit_micro_review(
     )
 
 
-async def get_today_plan(user_id: str) -> TodayPlanOut:
-    """Plan de estudio de hoy: equilibrio weakness/review/new/easy_wins con minutos."""
-    level_id = await _current_level_id(user_id)
-    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
-    skills = await _annotated_profile(user_id, lv)
-    obj_mastery = await run_in_threadpool(
-        academy_repo.list_objective_mastery, user_id, lv.level_id
-    )
-    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
-    mastered = academy_svc.mastered_objective_ids(
-        lv, objective_scores, objective_attempts
-    )
-    remediation = academy_svc.remediation_plan(
-        lv, skills, objective_scores, mastered
-    )
-    oid, _reason = academy_svc.recommend_next(lv, mastered, objective_scores)
-    goal = await get_learning_goal(user_id)
-    items = adaptive.today_plan(
-        skills, lv, remediation, mastered, oid, budget_minutes=goal.minutes_per_day
-    )
-    return TodayPlanOut(
-        items=[TodayItemOut(**i) for i in items],
-        total_minutes=sum(i["minutes"] for i in items),
-    )
+def _objective_nodes_for(
+    lv,
+    objective_ids: list[str],
+    *,
+    skills: list[dict],
+    objective_scores: dict[str, dict[str, float]],
+    evidence_rows: list[dict],
+) -> dict[str, dict]:
+    """Nodos del Evidence Graph para los objetivos pedidos de un nivel.
+
+    Construye `objective_node` con el MISMO perfil y la MISMA evidencia que el
+    resto del flujo (`skills` anotado y `evidence_rows` del nivel), de modo que
+    `/session` y `/next-best` nunca divergen (D1b). Devuelve un mapa
+    `{objective_id: node}` solo para objetivos existentes en el currículo; los
+    ids ajenos se omiten (quien llama aplica el fallback D7). Pura: recibe datos
+    ya leídos y no toca la BD."""
+    nodes: dict[str, dict] = {}
+    for oid in objective_ids:
+        if oid in nodes:
+            continue
+        obj = get_objective(lv, oid)
+        if obj is None:
+            continue
+        nodes[oid] = evidence_graph.objective_node(
+            obj,
+            level_id=lv.level_id,
+            level_label=lv.level,
+            objective_scores=objective_scores,
+            profile=skills,
+            evidence_rows=evidence_rows,
+        )
+    return nodes
 
 
 async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
@@ -2309,9 +2315,15 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
     Repaso vencido → listening → debilidad → nuevo → refuerzo, unificando las
     señales CEFR y de listening en una secuencia accionable con presupuesto del
     objetivo personal. Los pasos ya completados hoy se omiten (filtro por
-    `step_key`). Devuelve `(steps, skills)`: el perfil anotado se reutiliza para
-    alimentar el Priority Engine en `get_next_best_activity`. Compartida por
-    `get_session` y `get_next_best_activity`.
+    `step_key`).
+
+    V3.17 (D1b): la sesión deriva del Evidence Graph — (1) el objetivo concreto
+    de cada destreza débil se reordena con `rank_weakness_objectives` (primero
+    los objetivos cuyo nodo declara esa destreza como factor limitante) y
+    (2) los pasos con objetivo y nodo ganan `can_do`/`limiting_factor`/
+    `graph_mastery`/`because[]`. Sin nodos (D7) el plan se comporta como antes.
+    Devuelve `(steps, skills)`: `steps` ya enriquecidos y `skills` para el
+    Priority Engine. Compartida por `get_session` y `get_next_best_activity`.
     """
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
@@ -2335,6 +2347,33 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
     done = await run_in_threadpool(
         academy_repo.list_session_steps, user_id, _today()
     )
+
+    # D1b: nodos del grafo con una única lectura de evidencia, compartidos por
+    # el ranking de debilidad y el enriquecimiento de pasos.
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, lv.level_id
+    )
+    remediation_ids = [
+        oid for r in remediation for oid in (r.get("objective_ids") or [])
+    ]
+    nodes = _objective_nodes_for(
+        lv,
+        remediation_ids,
+        skills=skills,
+        objective_scores=objective_scores,
+        evidence_rows=evidence_rows,
+    )
+    if nodes:
+        for r in remediation:
+            candidate_ids = r.get("objective_ids") or []
+            if not candidate_ids:
+                continue
+            r["objective_ids"] = evidence_graph.rank_weakness_objectives(
+                objective_ids=candidate_ids,
+                nodes_by_objective=nodes,
+                skill=r["skill"],
+            )
+
     steps = adaptive.session_plan(
         skills,
         lv,
@@ -2345,14 +2384,34 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
         budget_minutes=goal.minutes_per_day,
         exclude_keys=done,
     )
-    return steps, skills
+
+    # Enriquecimiento aditivo de los pasos con objetivo (D1b; D7 si no hay nodo).
+    step_nodes = _objective_nodes_for(
+        lv,
+        [s["objective_id"] for s in steps if s.get("objective_id")],
+        skills=skills,
+        objective_scores=objective_scores,
+        evidence_rows=evidence_rows,
+    )
+    for oid_node, node in step_nodes.items():
+        nodes.setdefault(oid_node, node)
+    enriched: list[dict] = []
+    for step in steps:
+        oid_step = step.get("objective_id")
+        node = nodes.get(oid_step) if oid_step else None
+        enriched.append(
+            evidence_graph.enrich_item(step, node) if node is not None else step
+        )
+    return enriched, skills
 
 
 async def get_session(user_id: str) -> SessionOut:
-    """Sesión diaria (Session Engine): repaso vencido → listening → debilidad →
-    nuevo → refuerzo, unificando las señales CEFR y de listening en una secuencia
-    accionable con presupuesto del objetivo personal. Los pasos ya completados hoy
-    se omiten (filtro por `step_key`)."""
+    """Sesión diaria (Session Engine) enriquecida con el Evidence Graph.
+
+    Repaso vencido → listening → debilidad → nuevo → refuerzo, con presupuesto
+    del objetivo personal. V3.17 (D1b): los pasos con objetivo y nodo incluyen
+    `can_do`/`limiting_factor`/`graph_mastery`/`because[]`; los pasos ya
+    completados hoy se omiten (filtro por `step_key`)."""
     steps, _ = await _session_steps(user_id)
     summary = adaptive.session_summary(steps)
     return SessionOut(
@@ -2369,40 +2428,19 @@ async def get_next_best_activity(user_id: str) -> NextBestActivityOut | None:
     prioridad compuesta (`priority`) y su explicación (`why`). La UI no decide
     pedagógicamente; consume esta única acción.
 
-    V2.12: añade `because[]` + `limiting_factor` desde el Evidence Graph del
-    objetivo asociado (Adaptive Engine explicable).
-    """
+    V3.17 (D1b): el primer paso ya viene enriquecido con el Evidence Graph desde
+    `_session_steps` (`because[]`/`limiting_factor`/`graph_mastery`/`can_do`)
+    con el MISMO nodo que `/session` (mismo perfil, mismas filas → nunca
+    divergen)."""
     steps, skills = await _session_steps(user_id)
     now = datetime.now(timezone.utc).isoformat()
     best = adaptive.next_best_activity(steps, skills, now)
     if best is None:
         return None
-
-    node = None
-    oid = best.get("objective_id")
-    lid = best.get("level_id") or await _current_level_id(user_id)
-    lv = _levels_by_id.get(lid)
-    if oid and lv is not None:
-        obj = get_objective(lv, oid)
-        if obj is not None:
-            obj_mastery = await run_in_threadpool(
-                academy_repo.list_objective_mastery, user_id, lv.level_id
-            )
-            evidence_rows = await run_in_threadpool(
-                academy_repo.list_evidence, user_id, lv.level_id
-            )
-            objective_scores, _attempts = _split_objective_mastery(obj_mastery)
-            node = evidence_graph.objective_node(
-                obj,
-                level_id=lv.level_id,
-                level_label=lv.level,
-                objective_scores=objective_scores,
-                profile=skills,
-                evidence_rows=evidence_rows,
-            )
-            best = evidence_graph.enrich_next_best(best, node)
-    else:
-        best = evidence_graph.enrich_next_best(best, None)
+    first = steps[0]
+    for field in ("because", "limiting_factor", "graph_mastery", "can_do"):
+        if field in first:
+            best[field] = first[field]
     return NextBestActivityOut(**best)
 
 

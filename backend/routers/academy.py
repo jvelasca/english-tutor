@@ -68,7 +68,6 @@ from schemas.academy import (
     StudentModelOut,
     StudyPlanOut,
     StudyPlanRequest,
-    TodayPlanOut,
     UnitReviewPlanOut,
     WritingDiagnostic,
     WritingJourneyOut,
@@ -191,13 +190,12 @@ async def dashboard(user: dict = Depends(current_user)) -> dict:
     return await academy_service.get_dashboard(user["id"])
 
 
-@router.get("/api/academy/today", response_model=TodayPlanOut)
-async def today(user: dict = Depends(current_user)) -> dict:
-    return await academy_service.get_today_plan(user["id"])
-
-
 @router.get("/api/academy/session", response_model=SessionOut)
 async def session(user: dict = Depends(current_user)) -> dict:
+    """Sesión diaria (Session Engine) enriquecida con el Evidence Graph (V3.17).
+
+    El plan diario deriva del grafo (D1b): los pasos con objetivo ganan
+    `can_do`/`limiting_factor`/`graph_mastery`/`because[]` cuando hay nodo."""
     return await academy_service.get_session(user["id"])
 
 

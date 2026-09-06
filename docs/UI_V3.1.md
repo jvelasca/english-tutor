@@ -157,7 +157,7 @@ INICIO
 ├── Cabecera de bienvenida: "Buenos días, Alberto"  [N] sobre HomeScreen actual
 │     - Nivel CEFR + progreso compacto  (GET /api/academy/student-model)
 │
-├── TU OBJETIVO DE HOY            (GET /api/academy/today + goal)
+├── TU OBJETIVO DE HOY            (GET /api/academy/session + goal; V3.17: /today eliminado)
 │     Actividad propuesta (duración + porqué) -> [EMPEZAR] lanza la actividad
 │
 ├── TU FORMACIÓN

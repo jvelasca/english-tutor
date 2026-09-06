@@ -1159,21 +1159,14 @@ class StudentModelOut(BaseModel):
     mastery: list[MasteryRecordOut] = Field(default_factory=list)
 
 
-class TodayItemOut(BaseModel):
-    kind: str
-    skill: str | None = None
-    objective_id: str | None = None
-    title: str
-    reason: str
-    minutes: int
-
-
-class TodayPlanOut(BaseModel):
-    items: list[TodayItemOut]
-    total_minutes: int
-
-
 class SessionStepOut(BaseModel):
+    """Paso de la sesión diaria (Session Engine).
+
+    V3.17 (D1b): los pasos con objetivo y nodo del Evidence Graph ganan campos
+    opcionales que conectan el can-do con su dominio — `can_do`, el
+    `limiting_factor` del nodo, `graph_mastery` y las viñetas `because[]`.
+    Un paso sin objetivo o sin nodo (D7) simplemente no los trae."""
+
     kind: str
     step_key: str
     skill: str | None = None
@@ -1184,6 +1177,10 @@ class SessionStepOut(BaseModel):
     title: str
     reason: str
     minutes: int
+    can_do: str | None = None
+    limiting_factor: dict | None = None
+    graph_mastery: float | None = None
+    because: list[str] = Field(default_factory=list)
 
 
 class SessionCompleteRequest(BaseModel):

@@ -359,6 +359,123 @@ def test_micro_review_audit_keeps_index_zero(monkeypatch, tmp_path):
         assert audit["selected_index"] == 0, audit["item_id"]
 
 
+def test_micro_review_rejects_answers_outside_sample_or_index_range(
+    monkeypatch, tmp_path
+):
+    """M2 (auditoría v3.16): el POST valida que las claves de `answers` ⊆ ids
+    de la muestra y que cada índice elegido esté en rango → 400."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, LEVEL_ID, "A1")
+    unit = _unit()
+    _master_unit(uid, unit)
+    _backdate_unit(uid, unit)
+    correct = _correct_index_map(unit)
+    client = TestClient(app)
+
+    session = client.get(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review"
+        f"?user_id={uid}&window_days=7"
+    )
+    assert session.status_code == 200
+    items = session.json()["items"]
+    answers = {i["item_id"]: correct[i["item_id"]] for i in items}
+
+    # Clave ajena a la muestra (stale/forjada) → 400 sin persistir nada.
+    forged = dict(answers)
+    forged["ghost-item"] = 0
+    bad = client.post(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review?user_id={uid}",
+        json={"window_days": 7, "answers": forged},
+    )
+    assert bad.status_code == 400
+    assert bad.json()["detail"] == "unit_review.invalid_answers"
+
+    # Índice fuera de rango (>= nº de opciones) → 400.
+    first = items[0]
+    out_of_range = dict(answers)
+    out_of_range[first["item_id"]] = len(first["options"])  # inválido
+    bad2 = client.post(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review?user_id={uid}",
+        json={"window_days": 7, "answers": out_of_range},
+    )
+    assert bad2.status_code == 400
+    assert bad2.json()["detail"] == "unit_review.invalid_answers"
+
+    # Nada se persistió y la ventana sigue repasable.
+    assert academy_repo.list_unit_review_attempts(uid, LEVEL_ID, UNIT_ID, 7) == []
+    still = client.get(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review"
+        f"?user_id={uid}&window_days=7"
+    )
+    assert still.status_code == 200
+
+
+def test_micro_review_partial_retry_get_equals_post(monkeypatch, tmp_path):
+    """O2 (auditoría v3.16): reintento parcial GET==POST — tras fallar una
+    parte, la muestra del reintento es idéntica y determinista entre llamadas
+    GET y prioriza los ítems fallados; con ella el POST acierta y pasa."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, LEVEL_ID, "A1")
+    unit = _unit()
+    _master_unit(uid, unit)
+    _backdate_unit(uid, unit)
+    correct = _correct_index_map(unit)
+    client = TestClient(app)
+
+    session = client.get(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review"
+        f"?user_id={uid}&window_days=7"
+    )
+    assert session.status_code == 200
+    first_items = session.json()["items"]
+    first_ids = [i["item_id"] for i in first_items]
+    assert len(first_ids) >= 3
+
+    # Fallamos deliberadamente los dos primeros ítems; el resto correcto.
+    failed_ids = first_ids[:2]
+    answers = {i["item_id"]: correct[i["item_id"]] for i in first_items}
+    for iid in failed_ids:
+        opt_count = len(next(i for i in first_items if i["item_id"] == iid)["options"])
+        answers[iid] = (answers[iid] + 1) % opt_count
+    partial = client.post(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review?user_id={uid}",
+        json={"window_days": 7, "answers": answers},
+    )
+    assert partial.status_code == 200
+    out = partial.json()
+    assert out["passed"] is False
+    failed_in_audit = [
+        a["item_id"] for a in out["items"] if a["correct"] is False
+    ]
+    assert sorted(failed_in_audit) == sorted(failed_ids)
+
+    # Reintento parcial por GET: misma muestra determinista y fallidos primero.
+    retry_a = client.get(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review"
+        f"?user_id={uid}&window_days=7"
+    )
+    retry_b = client.get(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review"
+        f"?user_id={uid}&window_days=7"
+    )
+    assert retry_a.status_code == 200 and retry_b.status_code == 200
+    items_a = retry_a.json()["items"]
+    items_b = retry_b.json()["items"]
+    assert items_a == items_b  # GET es idéntico entre llamadas
+    retry_ids = [i["item_id"] for i in items_a]
+    assert set(retry_ids[: len(failed_ids)]) == set(failed_ids)
+
+    # El POST sobre ESA muestra (GET==POST) acierta y pasa la ventana.
+    good = {i["item_id"]: correct[i["item_id"]] for i in items_a}
+    passed = client.post(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review?user_id={uid}",
+        json={"window_days": 7, "answers": good},
+    )
+    assert passed.status_code == 200
+    assert passed.json()["passed"] is True
+    assert passed.json()["plan"]["windows"][0]["state"] == "passed"
+
+
 def test_micro_review_404_unit_not_in_level_and_bad_window(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     client = TestClient(app)

@@ -3,7 +3,32 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-06 12:00 (UTC+2).
+> Actualizado por última vez: 2026-09-06 13:30 (UTC+2).
+>
+> **Nota (2026-09-06):** posición vigente **v3.17.0** — **Knowledge Graph +
+> Daily Adaptive Plan** (backend `3.16.0 → 3.17.0`). Cierra el candidato P2:
+> el plan diario ahora **deriva del Evidence Graph** — la destreza débil se
+> practica sobre el objetivo que su nodo señala (D1b) y los pasos de la sesión
+> traen `can_do`/`limiting_factor`/`graph_mastery`/`because[]` (enriquecidos
+> por dominio con una única lectura de evidencia; `/session` y `/next-best`
+> nunca divergen). **D2**: vista de grafo real — nuevo componente
+> `ObjectiveNodeCard` (consume `getEvidenceGraphNode`) montado en el curso
+> (hitos de unidad expansibles bajo demanda) y en el perfil (Habilidades);
+> sin claims de dominio: solo refleja lo que el servidor puntúa. **D3**:
+> `/api/academy/today` eliminado de extremo a extremo (endpoint,
+> `get_today_plan`, `TodayPlanOut`/`TodayItemOut`, `adaptive.today_plan` +
+> `TODAY_MIX`, cliente y tipos frontend); la Home consume solo `/session`
+> (Session Engine); tests migrados con rationale honesto. **Deuda v3.16
+> (D4b)**: M2 ✅ (`validate_micro_review_answers`: claves ⊆ muestra e índices
+> en rango → 400), M3 ✅ (prefijos dinámicos en `DYNAMIC_KEY_PREFIXES`) y O2 ✅
+> (test GET==POST con reintento parcial); M1 ✅ en el cierre (devDeps DOM
+> `jsdom` + `@testing-library/react` + `*.test.tsx` en vitest + 6 vitest de
+> componente de `UnitReviewPanel`/`TodayPlan`). **D5**: `GRAPH_VERSION` sigue
+> `2.12.0` (cambio aditivo). **D6**: micro-líneas del can-do/factor limitante
+> en las filas de la sesión. **D7**: fallback silencioso sin nodo (la práctica
+> nunca se bloquea). Tests: **pytest 1333**, **vitest 398**, ruff limpio,
+> `tsc`/`vite build` OK y `check_release_consistency` exit 0; CONSTITUCIÓN sin
+> cambios.
 >
 > **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
 > La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
@@ -2611,6 +2636,80 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   -1)` + test de regresión `test_micro_review_audit_keeps_index_zero`). El
   resto queda como deuda priorizada para v3.17 (ver candidato abierto abajo).
 
+### 37.35 HECHO (V3.17) — Knowledge Graph + Daily Adaptive Plan
+- **D1b — el plan diario deriva del grafo**: `services/evidence_graph.py`
+  gana dos funciones puras — `rank_weakness_objectives` (reordena los
+  candidatos de cada destreza débil: primero los objetivos cuyo nodo declara
+  esa destreza como factor limitante o con la dimensión `missing`, después por
+  `mastery` ascendente, empates estables, ids sin nodo al final) y
+  `enrich_item` (aditivo: copia del ítem que gana
+  `can_do`/`limiting_factor`/`graph_mastery`/`because[]` solo si hay nodo). En
+  `domain/academy.py::_session_steps` se construye el mapa de nodos con la
+  MISMA lectura de perfil/evidencia que el resto del flujo
+  (`_objective_nodes_for` + una única `list_evidence`) y se reordena cada
+  `remediation[].objective_ids` antes de `session_plan`; los pasos con objetivo
+  y nodo se enriquecen. `get_next_best_activity` ya no re-enriquece aparte:
+  copia los campos del primer paso enriquecido → `/session` y `/next-best`
+  nunca divergen (test `test_next_best_graph_fields_never_diverge_from_session`).
+- **D2 — vista de grafo real**: nuevo componente reutilizable
+  `ObjectiveNodeCard.tsx` que consume `getEvidenceGraphNode(userId,
+  objectiveId, levelId?)` con estados loading/error/vacío y sin declarar
+  dominio (refleja la puntuación del servidor). Montado en el **curso**
+  (`Milestone` expansible bajo demanda, con el `level_id` real del detalle de
+  la unidad) y en el **perfil** (Habilidades: el detalle del nodo seleccionado
+  del `EvidenceGraphPanel` pasa por `ObjectiveNodeCard`). Sin endpoint nuevo
+  (D2 backend no añade API). i18n reutilizada de `evidenceGraph.*`.
+- **D3 — `/api/academy/today` eliminado**: endpoint, `get_today_plan`,
+  `TodayPlanOut`/`TodayItemOut`, `adaptive.today_plan` + `TODAY_MIX` y cliente
+  `getTodayPlan` + tipos `TodayPlan`/`TodayItem` fuera; la Home consume solo
+  `/session`. Tests migrados con rationale honesto:
+  `test_endpoint_today_empty…` → `test_endpoint_session_empty…`; los 4 tests
+  puros de `today_plan` pasaron a `session_plan` (ajuste honesto de claves y de
+  la aserción weakness ≥ review, ahora ambos 0.30 en `SESSION_MIX`);
+  `test_today_plan_uses_goal_budget` se retiró porque su invariante ya lo
+  cubre `test_endpoint_session_uses_goal_budget`. Referencia stale en
+  `docs/UI_V3.1.md:160` corregida en el cierre.
+- **Deuda v3.16 (D4b)**: M2 ✅ — `validate_micro_review_answers`
+  (`unit_review.py`) valida claves ⊆ muestra e índices en rango antes de
+  puntuar (`ValueError unit_review.invalid_answers` → 400, sin persistir); M3 ✅
+  — prefijos dinámicos `unitReview.window.`/`unitReview.state.`/`skill.`/
+  `fsrs.whyReason.` registrados en `DYNAMIC_KEY_PREFIXES`; O2 ✅ — test de
+  reintento parcial GET==POST (muestra idéntica entre llamadas y fallidos
+  primero). M1 ✅ **en el cierre** — infraestructura DOM aprobada por el
+  gerente: devDeps `jsdom` + `@testing-library/react` (+`@testing-library/dom`)
+  en `frontend/package.json`, `vitest.config.ts` ampliado a `*.test.tsx` (con
+  alias `@` → `src`; jsdom por archivo vía `// @vitest-environment jsdom`) y 6
+  vitest de componente nuevos: `UnitReviewPanel.test.tsx` (4: vacío, ventana
+  due, submit+refresh con plan mutable, error de red) y `TodayPlan.test.tsx`
+  (2: micro-línea D6 con can-do + chip `%`, y silencio D7 sin nodo).
+- **D5 — versionado**: `GRAPH_VERSION` permanece `"2.12.0"` (helpers nuevos +
+  contrato opcional; no se altera la salida de `objective_node`/
+  `build_level_graph`).
+- **D6 — UI del plan**: `TodayPlan.tsx` pinta en cada fila de sesión con
+  `can_do` + `limiting_factor` dos micro-líneas estáticas informativas dentro
+  de la fila-botón (can-do en itálica + chip del factor limitante con `%` o
+  `missing` vía tokens warning); el `because[]` completo sigue solo en
+  `NextBestCard`. CSS en `legacy.css` (`.today-item-graph`).
+- **D7 — ítems sin nodo**: `enrich_item(nodo=None)` devuelve copia intacta; en
+  `/session` los pasos sin `objective_id` (p. ej. listening) no ganan campos y
+  el esquema los serializa `null`/`[]` (`SessionStepOut` ampliado con campos
+  opcionales); el ranking nunca bloquea (sin nodo → orden original al final).
+- **Tests**: `test_graph_plan.py` (10 puros de `rank_weakness_objectives`/
+  `enrich_item`, incl. fallback D7 y paridad con `enrich_next_best`),
+  `test_session_graph.py` (3 endpoint: campos del grafo en `/session`
+  coherentes con el can-do real del currículo, silencio en pasos sin objetivo,
+  paridad `/next-best`==`/session`); migrados `test_academy.py`,
+  `test_academy_goal.py`, `test_adaptive.py`; M2/O2 en
+  `test_unit_review.py`/`test_unit_review_endpoints.py`. Backend **pytest
+  1333** + ruff limpio; frontend **vitest 398** (392 + 6 DOM) +
+  `tsc`/`vite build` OK; `check_release_consistency` exit 0.
+- **Cierre**: bump único `3.17.0` (backend `config.py` fuente única) +
+  `frontend/package.json`/`package-lock.json` (bump + devDeps DOM de M1),
+  `README`, `CHANGELOG`, `PLAN`, Nota superior + entrada 37.35 en
+  `docs/RELEVO.md`, `release-notes-v3.17.0.md` (untracked). Sin cambios de
+  CONSTITUCIÓN (v3.17 conecta el grafo existente al plan: motor + UI, no
+  norma) ni de launcher.
+
 ### Próximos incrementos (candidatos abiertos, auditados)
 
 > Lista de candidatos con su estado REAL auditado (2026-09-05, subagentes
@@ -2654,21 +2753,24 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `micro-review` GET/POST con gating; `UnitReviewPanel` en INICIO con i18n
   es/en. El micro-review no declara dominio ni crea evidencia (D5, E3).
   Tests: pytest 1318, vitest 392, build OK.
-- **🟡 P2 — Knowledge Graph + Daily Adaptive Plan** (ABIERTO, v3.17): conectar
-  Can-Do ↔ destrezas ↔ dominio. Infra existente (`evidence_graph.py` v2.12 +
-  `adaptive.py`) pero el plan diario NO deriva del grafo; ítems sin
-  `can_do`/`limiting_factor`; `/api/academy/today` sin consumidor; sin vista de
-  grafo real. **Deuda heredada de la auditoría externa v3.16** (37.34): I2 —
+- ~~**🟡 P2 — Knowledge Graph + Daily Adaptive Plan**~~ ✅ **cerrado (V3.17,
+  entrada 37.35)**: el plan diario deriva del grafo (D1b), vista de grafo real
+  en curso y perfil (`ObjectiveNodeCard`, D2), `/api/academy/today` eliminado
+  de extremo a extremo (D3), deuda v3.16 M2/M3/O2 ✅ y M1 ✅ en el cierre
+  (infra DOM + 6 vitest de componente), D6 micro-líneas en la fila de sesión y
+  D7 fallback silencioso sin nodo. Tests: pytest 1333, vitest 398, ruff/build/
+  consistencia OK. Deuda restante del grafo + auditoría v3.17 → candidato
+  abierto v3.18 abajo.
+- **🟡 P3 — Knowledge Graph remainder + deuda del grafo** (ABIERTO, v3.18):
+  resto del candidato P2 + deuda de la auditoría externa v3.16 (37.34): **I2** —
   congelar el ancla de la unidad al alcanzar la completitud (hoy
   `max(updated_at)` de filas vivas; refuerzos/decay post-completitud
   desplazan las ventanas 7/30/90 y erosionan la fijeza de D3) y test del caso;
-  M1 — vitest de componente de `UnitReviewPanel`; M2 — validar `answers` del
-  POST (claves ⊆ muestra, 400); M3 — registrar prefijos dinámicos
-  (`unitReview.window.`, `unitReview.state.`, `skill.`) en `DYNAMIC_KEY_PREFIXES`;
-  M4 — decidir si las cartas `objective` aparecen en el `FsrsReviewPanel`
-  autograduable (doble escritor) o se siembran solo en ventana due; O1 —
-  cadena 7→30→90; O2 — test GET==POST con reintento parcial; O3 — plan de
-  repaso más allá del nivel actual (D2(b)).
+  **M4** — decidir si las cartas `objective` aparecen en el `FsrsReviewPanel`
+  autograduable (doble escritor) o se siembran solo en ventana due; **O1** —
+  cadena 7→30→90 (qué ocurre si la ventana 30 ya pasó cuando se resuelve la 7);
+  **O3** — plan de repaso más allá del nivel actual (D2(b)); y la deuda que
+  deje la auditoría externa v3.17 (pendiente de ejecutar).
 - **Pendiente heredado** (ABIERTO, v3.18): generación automática del speaking
   micro-drill (`recognized_not_produced`, hoy solo señal sin consumidor) y
   desglose speaking-vs-writing por palabra (hoy `record_words` solo lo llama el

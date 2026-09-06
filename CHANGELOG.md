@@ -4,6 +4,19 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.17.0] — 2026-09-06
+
+**Knowledge Graph + Daily Adaptive Plan: el plan diario deriva del grafo de evidencia y la vista de grafo llega al curso y al perfil.**
+
+El candidato P2 se cierra: la infraestructura (`evidence_graph.py` v2.12 + `adaptive.py`) existía pero el plan diario no derivaba del grafo, `/api/academy/today` era un motor muerto y no había vista de grafo real. Esta iteración conecta el Can-Do ↔ destrezas ↔ dominio en el plan y en la UI. Backend `3.16.0 → 3.17.0`.
+
+- **El plan diario deriva del Evidence Graph (D1b)**: funciones puras nuevas en `services/evidence_graph.py` — `rank_weakness_objectives` (practica primero el objetivo cuyo nodo declara la destreza débil como factor limitante, después por mastery ascendente, empates estables, ids sin nodo al final) y `enrich_item` (aditivo; solo con nodo). En `domain/academy.py::_session_steps` los candidatos de remediación se reordenan con el nodo antes de `session_plan`, y los pasos con objetivo ganan `can_do`/`limiting_factor`/`graph_mastery`/`because[]` — con una única lectura de evidencia, de modo que `/session` y `/next-best` nunca divergen (test dedicado).
+- **Vista de grafo real (D2)**: nuevo componente reutilizable `ObjectiveNodeCard` que consume `getEvidenceGraphNode` (con `levelId` opcional) y pinta can-do/nivel/dimensiones con el factor limitante resaltado y el foco recomendado. Montado en el **curso** (`Milestone` expansible bajo demanda) y en el **perfil** (Habilidades: el detalle del `EvidenceGraphPanel` pasa por la tarjeta). Sin endpoint nuevo; la UI refleja la puntuación del servidor, sin declarar dominio.
+- **`/api/academy/today` eliminado (D3)**: endpoint, `get_today_plan`, `TodayPlanOut`/`TodayItemOut`, `adaptive.today_plan` + `TODAY_MIX`, cliente `getTodayPlan` y tipos `TodayPlan`/`TodayItem` desaparecen; la Home consume solo `/session`. Los tests se migran con rationale honesto (los 4 puros a `session_plan`; el del presupuesto del objetivo lo cubre ya el test de `/session`).
+- **Deuda de la auditoría v3.16 (D4b)**: M2 ✅ (`validate_micro_review_answers`: claves ⊆ muestra e índices en rango → 400 sin persistir), M3 ✅ (prefijos dinámicos `unitReview.window.`/`unitReview.state.`/`skill.`/`fsrs.whyReason.` en `DYNAMIC_KEY_PREFIXES`), O2 ✅ (test GET==POST con reintento parcial: muestra idéntica entre llamadas y fallidos primero). M1 ✅ en el cierre: infraestructura DOM (devDeps `jsdom` + `@testing-library/react`, vitest ampliado a `*.test.tsx` con alias `@` y jsdom por archivo) y 6 vitest de componente nuevos de `UnitReviewPanel` (vacío, ventana due, submit+refresh con plan mutable, error de red) y de la fila enriquecida de `TodayPlan` (D6 y D7).
+- **UI del plan y fallback (D6/D7)**: micro-líneas informativas del can-do (itálica) y del factor limitante (chip con `%`/`missing`) en las filas de sesión; sin nodo o sin objetivo el paso se queda igual (silencio, nunca bloquea la práctica). `GRAPH_VERSION` permanece `2.12.0` (cambio aditivo).
+- **Tests**: `test_graph_plan.py` (10 puros del ranking/enriquecimiento), `test_session_graph.py` (3 endpoint: campos del grafo coherentes con el currículo, silencio D7, paridad `/next-best`==`/session`), migraciones y M2/O2. Backend **1333 passed** + ruff limpio; frontend **398 passed** (392 + 6 DOM) + `tsc`/`vite build` OK; `scripts/check_release_consistency.py` exit 0.
+
 ## [3.16.0] — 2026-09-06
 
 **Review/SRS por unidad: micro-review + ventanas de retención fijas 7/30/90 días sobre la base FSRS.**

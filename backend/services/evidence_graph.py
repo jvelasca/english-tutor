@@ -17,6 +17,9 @@ Y alimenta el Adaptive Engine con un "Why this activity?" estructurado:
     3. Transfer evidence is missing.
     4. This activity directly targets transfer.
 
+V3.17 (D1b): el grafo también elige el objetivo concreto de la destreza débil
+del plan diario (`rank_weakness_objectives`) y enriquece los pasos de la sesión
+con `can_do`/`limiting_factor`/`graph_mastery`/`because[]` (`enrich_item`).
 Puro y determinista: sin FastAPI ni BD.
 """
 
@@ -431,3 +434,62 @@ def enrich_next_best(
     out["graph_mastery"] = node.get("mastery")
     out["can_do"] = node.get("can_do")
     return out
+
+
+def rank_weakness_objectives(
+    *,
+    objective_ids: list[str],
+    nodes_by_objective: dict[str, dict],
+    skill: str,
+) -> list[str]:
+    """Ordena los candidatos de remediación de una destreza débil usando su nodo.
+
+    Regla D1(b): se practica antes el objetivo cuyo nodo declara `skill` como
+    factor limitante (o cuya dimensión `skill` está `missing`) que el que no;
+    dentro de cada grupo se ordena por `mastery` ascendente (primero lo más
+    débil) y los empates se mantienen en el orden recibido (ordenación estable).
+
+    `nodes_by_objective` puede ser parcial (fallback D7): los ids sin nodo se
+    dejan al final en su orden original y nunca bloquean la práctica. Puro y
+    determinista dados los mismos inputs.
+    """
+
+    def _related(node: dict) -> bool:
+        """True si la destreza débil es el limiting factor del nodo o su
+        dimensión está sin evidencia (`missing`)."""
+        limit = node.get("limiting_factor") or {}
+        if limit.get("id") == skill:
+            return True
+        for dim in node.get("dimensions") or []:
+            if dim.get("id") == skill and bool(dim.get("missing")):
+                return True
+        return False
+
+    with_node: list[tuple[str, dict]] = []
+    without_node: list[str] = []
+    for oid in objective_ids:
+        node = nodes_by_objective.get(oid)
+        if node is None:
+            without_node.append(oid)
+        else:
+            with_node.append((oid, node))
+    with_node.sort(
+        key=lambda pair: (
+            0 if _related(pair[1]) else 1,
+            float(pair[1].get("mastery") or 0.0),
+        )
+    )
+    return [oid for oid, _node in with_node] + without_node
+
+
+def enrich_item(item: dict, node: dict | None) -> dict:
+    """Enriquece un ítem del plan con los campos del nodo (D1b, aditivo).
+
+    Comparte la lógica de `enrich_next_best` (mismo nodo → mismo resultado en
+    `/session` y `/next-best`). Con nodo, el ítem gana `because[]`,
+    `limiting_factor`, `graph_mastery` y `can_do`; sin nodo (D7) devuelve una
+    copia del ítem sin tocar, para que la práctica nunca se bloquee por falta de
+    datos de grafo."""
+    if node is None:
+        return dict(item)
+    return enrich_next_best(item, node)

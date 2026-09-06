@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.16.0**.
+- Última versión estable: **v3.17.0**.
 
 ## Estructura
 
@@ -46,6 +46,10 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   confiar el certificado en Windows, Android e iPhone/iPad.
 - **Adaptive Engine 2.0**: siguiente mejor actividad con prioridad explicable y "¿por qué?"
   (recencia, retención, confianza, evidencia, transferencia/novedad) en la tarjeta de inicio.
+  **Knowledge Graph + Daily Adaptive Plan (V3.17)**: el plan diario deriva del Evidence Graph —
+  la destreza débil se practica sobre el objetivo que su nodo señala, los pasos de la sesión
+  traen `can_do`/`limiting_factor`/`graph_mastery` y el detalle del can-do con su nodo se ve
+  en el curso (hitos expansibles) y en el perfil (Habilidades).
 - **Currículum CEFR 2.0**: escalera completa Pre-A1 → C2 (con bandas "plus" A2+/B1+/B2+) y
   descriptores Can-Do por dimensión (listening, speaking, reading, writing, grammar, vocabulary,
   pronunciation, interaction, mediation) en el Course.

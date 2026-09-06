@@ -3,6 +3,7 @@ import { getEvidenceGraph } from "../../api/academy";
 import type { EvidenceGraph, EvidenceGraphNode } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { Card } from "../../components/ui/card";
+import { ObjectiveNodeCard } from "../../components/ObjectiveNodeCard";
 import { cn } from "../../lib/utils";
 
 interface EvidenceGraphPanelProps {
@@ -99,49 +100,11 @@ export function EvidenceGraphPanel({
       )}
 
       {selected && (
-        <Card className="space-y-3 p-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {t("evidenceGraph.canDo")}
-            </p>
-            <p className="font-medium">{selected.can_do}</p>
-            <p className="text-xs text-muted-foreground">
-              {t("evidenceGraph.mastery")}: {pct(selected.mastery)}
-            </p>
-          </div>
-
-          <ul className="space-y-1.5">
-            {selected.dimensions.map((dim) => {
-              const isLimit = selected.limiting_factor?.id === dim.id;
-              return (
-                <li
-                  key={dim.id}
-                  className={cn(
-                    "flex items-center justify-between text-sm",
-                    isLimit && "font-semibold text-amber-700 dark:text-amber-400",
-                  )}
-                >
-                  <span>
-                    {dim.id}
-                    {dim.missing ? ` · ${t("evidenceGraph.missing")}` : ""}
-                    {isLimit ? ` · ${t("evidenceGraph.limiting")}` : ""}
-                  </span>
-                  <span>{pct(dim.score)}</span>
-                </li>
-              );
-            })}
-          </ul>
-
-          {selected.recommended_focus.dimension && (
-            <p className="text-sm text-muted-foreground">
-              {t("evidenceGraph.focus")}:{" "}
-              <span className="font-medium text-foreground">
-                {selected.recommended_focus.dimension} →{" "}
-                {selected.recommended_focus.phase}
-              </span>
-            </p>
-          )}
-        </Card>
+        <ObjectiveNodeCard
+          userId={userId}
+          objectiveId={selected.objective_id}
+          levelId={graph?.level_id ?? levelId}
+        />
       )}
 
       {!graph && (

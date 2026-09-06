@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from services import fsrs, unit_review
 from services.curriculum import Lesson, Objective, ObjectiveCheck, Unit
 
@@ -432,6 +434,42 @@ def test_score_micro_review_fails_below_threshold_and_missing_counts_wrong():
     assert result["accuracy"] == 0.5
     assert result["passed"] is False
     assert [b["correct"] for b in result["per_objective"]] == [1]
+
+
+def test_score_micro_review_rejects_unknown_or_out_of_range_answers():
+    """M2 (puro): `score_micro_review` valida `answers` contra la muestra — clave
+    ajena o índice fuera de rango lanzan `unit_review.invalid_answers`."""
+    unit = _unit(
+        "u-m2",
+        [
+            _objective(
+                "om2",
+                title="Only",
+                checks=(_check("cm2", correct=1), _check("cm3", correct=0)),
+            )
+        ],
+    )
+    sample = unit_review.sample_micro_review(
+        unit=unit, user_id="u1", window_days=7, previous_failed_ids=[], now=NOW
+    )
+    assert {i["item_id"] for i in sample} == {"cm2", "cm3"}
+
+    # Clave que no está en la muestra.
+    with pytest.raises(ValueError, match="unit_review.invalid_answers"):
+        unit_review.score_micro_review(
+            answers={"cm2": 1, "cm9": 0}, unit=unit, sample=sample
+        )
+    # Índice igual al nº de opciones (fuera de rango).
+    cm2 = next(i for i in sample if i["item_id"] == "cm2")
+    with pytest.raises(ValueError, match="unit_review.invalid_answers"):
+        unit_review.score_micro_review(
+            answers={"cm2": len(cm2["options"])}, unit=unit, sample=sample
+        )
+    # Índice negativo.
+    with pytest.raises(ValueError, match="unit_review.invalid_answers"):
+        unit_review.score_micro_review(
+            answers={"cm2": -1}, unit=unit, sample=sample
+        )
 
 
 def test_grade_for_accuracy_delegates_to_fsrs():

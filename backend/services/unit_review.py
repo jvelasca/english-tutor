@@ -275,16 +275,43 @@ def sample_micro_review(
     ]
 
 
+def validate_micro_review_answers(
+    *, answers: dict[str, int], sample: list[dict]
+) -> None:
+    """Valida las respuestas del micro-review contra la muestra servida (M2).
+
+    Endurecimiento de la auditoría v3.16: cada clave de `answers` debe ser un
+    `item_id` DE la muestra (nunca un ítem ajeno o stale) y cada índice elegido
+    debe estar dentro del rango de opciones del ítem. Un ítem de la muestra SIN
+    respuesta sigue contando como fallo (cobertura parcial permitida). Levanta
+    `ValueError("unit_review.invalid_answers")` si algo no es coherente; el
+    router lo convierte en 400."""
+    sample_ids = {item["item_id"] for item in sample}
+    unknown = [key for key in answers if key not in sample_ids]
+    if unknown:
+        raise ValueError("unit_review.invalid_answers")
+    for item in sample:
+        selected = answers.get(item["item_id"])
+        if selected is None:
+            continue
+        option_count = len(item.get("options") or [])
+        if not isinstance(selected, int) or not (0 <= selected < option_count):
+            raise ValueError("unit_review.invalid_answers")
+
+
 def score_micro_review(*, answers: dict[str, int], unit, sample: list[dict]) -> dict:
     """Puntúa un micro-review contra los checks oficiales del currículo.
 
     El cliente envía SOLO índices (`answers`: item_id → índice elegido); el
     servidor compara con `correct_index` de cada check (premisa 21). Un ítem sin
-    respuesta cuenta como fallo. Devuelve `{correct, total, accuracy, passed,
-    per_objective, items}` donde `per_objective` agrega por objetivo
-    (`{objective_id, correct, total}`), `passed` = `accuracy >= 0.7` (D6) e
-    `items` audita cada ítem (`{item_id, objective_id, selected_index,
-    correct_index, correct}`) para que la UI revele la respuesta al terminar."""
+    respuesta cuenta como fallo. Antes de puntuar valida las respuestas contra
+    la muestra (M2: claves ⊆ muestra e índices en rango). Devuelve `{correct,
+    total, accuracy, passed, per_objective, items}` donde `per_objective`
+    agrega por objetivo (`{objective_id, correct, total}`), `passed` =
+    `accuracy >= 0.7` (D6) e `items` audita cada ítem (`{item_id, objective_id,
+    selected_index, correct_index, correct}`) para que la UI revele la
+    respuesta al terminar."""
+    validate_micro_review_answers(answers=answers, sample=sample)
     checks: dict[str, tuple[Any, Any]] = {}
     for objective, check in _unit_checks(unit):
         checks[check.id] = (objective, check)
