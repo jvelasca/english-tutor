@@ -2256,7 +2256,7 @@ async def submit_unit_micro_review(
                 "skill": meta.get("skill") or "",
                 "prompt": meta.get("prompt") or "",
                 "options": list(meta.get("options") or []),
-                "selected_index": int(item.get("selected_index") or -1),
+                "selected_index": int(item.get("selected_index", -1)),
                 "correct_index": int(item.get("correct_index") or 0),
                 "correct": bool(item.get("correct")),
             }

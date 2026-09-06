@@ -328,6 +328,37 @@ def test_micro_review_failed_then_retry_and_window_gating(monkeypatch, tmp_path)
     assert still_due.status_code == 200
 
 
+def test_micro_review_audit_keeps_index_zero(monkeypatch, tmp_path):
+    """Regresión auditoría externa v3.16 (I1): elegir la opción A (índice 0)
+    no debe serializarse como `selected_index = -1` en el audit del POST."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, LEVEL_ID, "A1")
+    unit = _unit()
+    _master_unit(uid, unit)
+    _backdate_unit(uid, unit)
+    client = TestClient(app)
+
+    session = client.get(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review"
+        f"?user_id={uid}&window_days=7"
+    )
+    assert session.status_code == 200
+    items = session.json()["items"]
+    assert items
+
+    # Respondemos TODOS los ítems con la opción A (índice 0), acierte o no.
+    answers = {i["item_id"]: 0 for i in items}
+    result = client.post(
+        f"/api/academy/review/unit/{UNIT_ID}/micro-review?user_id={uid}",
+        json={"window_days": 7, "answers": answers},
+    )
+    assert result.status_code == 200
+    out = result.json()
+    assert len(out["items"]) == len(items)
+    for audit in out["items"]:
+        assert audit["selected_index"] == 0, audit["item_id"]
+
+
 def test_micro_review_404_unit_not_in_level_and_bad_window(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     client = TestClient(app)

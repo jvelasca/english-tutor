@@ -36,7 +36,9 @@
 > por tarjetas y nota honesta "no cuenta como demostración de dominio"; lógica
 > pura `unitReviewLogic.ts`; i18n es/en con parity. **Tests**: `pytest 1318`,
 > `vitest 392` y build frontend OK; CONSTITUCIÓN sin cambios (mecanismo, no
-> norma).
+> norma). **Auditoría externa (read-only)**: APROBADO CON OBSERVACIONES; fix
+> aplicado del hallazgo I1 (bug `selected_index` con opción A) + test de
+> regresión; deuda I2/M1–M4/O1–O3 registrada en el candidato v3.17 (37.34).
 >
 > **Nota (2026-09-06):** posición vigente **v3.15.0** — **Profundidad avanzada
 > C1/C2: densidad, taxonomía avanzada y banco grammar C2 normalizado**
@@ -2601,6 +2603,13 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   Nota superior + entrada 37.34 en `docs/RELEVO.md`,
   `release-notes-v3.16.0.md` (untracked). Sin cambios de CONSTITUCIÓN (v3.16 es
   mecanismo, no norma) ni de launcher.
+- **Auditoría externa (2026-09-06, read-only)**: veredicto **APROBADO CON
+  OBSERVACIONES** — D1–D8 y criterios 1–8 cumplidos (pytest 1318, ruff,
+  consistencia de release verificados en vivo). Fix aplicado del hallazgo
+  **I1** (bug real: `selected_index` serializaba `-1` al elegir la opción A,
+  índice 0, en `domain/academy.py`; corregido con `item.get("selected_index",
+  -1)` + test de regresión `test_micro_review_audit_keeps_index_zero`). El
+  resto queda como deuda priorizada para v3.17 (ver candidato abierto abajo).
 
 ### Próximos incrementos (candidatos abiertos, auditados)
 
@@ -2649,7 +2658,17 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   Can-Do ↔ destrezas ↔ dominio. Infra existente (`evidence_graph.py` v2.12 +
   `adaptive.py`) pero el plan diario NO deriva del grafo; ítems sin
   `can_do`/`limiting_factor`; `/api/academy/today` sin consumidor; sin vista de
-  grafo real.
+  grafo real. **Deuda heredada de la auditoría externa v3.16** (37.34): I2 —
+  congelar el ancla de la unidad al alcanzar la completitud (hoy
+  `max(updated_at)` de filas vivas; refuerzos/decay post-completitud
+  desplazan las ventanas 7/30/90 y erosionan la fijeza de D3) y test del caso;
+  M1 — vitest de componente de `UnitReviewPanel`; M2 — validar `answers` del
+  POST (claves ⊆ muestra, 400); M3 — registrar prefijos dinámicos
+  (`unitReview.window.`, `unitReview.state.`, `skill.`) en `DYNAMIC_KEY_PREFIXES`;
+  M4 — decidir si las cartas `objective` aparecen en el `FsrsReviewPanel`
+  autograduable (doble escritor) o se siembran solo en ventana due; O1 —
+  cadena 7→30→90; O2 — test GET==POST con reintento parcial; O3 — plan de
+  repaso más allá del nivel actual (D2(b)).
 - **Pendiente heredado** (ABIERTO, v3.18): generación automática del speaking
   micro-drill (`recognized_not_produced`, hoy solo señal sin consumidor) y
   desglose speaking-vs-writing por palabra (hoy `record_words` solo lo llama el
