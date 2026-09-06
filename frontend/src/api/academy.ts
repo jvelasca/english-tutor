@@ -38,10 +38,13 @@ import type {
   FsrsDue,
   FsrsReview,
   FsrsSummary,
+  MicroReviewResult,
+  MicroReviewSession,
   SpeakingScenarios,
   StudentModel,
   StudyPlanStep,
   TodayPlan,
+  UnitReviewPlan,
   WritingDiagnostic,
   WritingJourneyOut,
   WritingLevelOut,
@@ -376,6 +379,43 @@ export function reviewFsrsCard(
   return postJson<FsrsReview>(
     `/api/academy/fsrs/review${userQuery(userId)}`,
     { target_type: targetType, target_id: targetId, grade },
+  );
+}
+
+// --- Review/SRS por unidad (V3.16) ---
+
+/** Plan de repaso por unidad del nivel actual: unidades y ventanas 7/30/90. */
+export function getUnitReviewPlan(userId: string): Promise<UnitReviewPlan> {
+  return getJson<UnitReviewPlan>(
+    `/api/academy/review/unit-plan${userQuery(userId)}`,
+  );
+}
+
+/** Sesión de micro-review (checks MC oficiales, sin correct_index). */
+export function getUnitMicroReview(
+  userId: string,
+  unitId: string,
+  windowDays: number,
+): Promise<MicroReviewSession> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    window_days: String(windowDays),
+  });
+  return getJson<MicroReviewSession>(
+    `/api/academy/review/unit/${encodeURIComponent(unitId)}/micro-review?${params.toString()}`,
+  );
+}
+
+/** Envía las respuestas del micro-review; el servidor puntúa (premisa 21). */
+export function submitUnitMicroReview(
+  userId: string,
+  unitId: string,
+  windowDays: number,
+  answers: Record<string, number>,
+): Promise<MicroReviewResult> {
+  return postJson<MicroReviewResult>(
+    `/api/academy/review/unit/${encodeURIComponent(unitId)}/micro-review${userQuery(userId)}`,
+    { window_days: windowDays, answers },
   );
 }
 

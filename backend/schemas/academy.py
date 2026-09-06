@@ -939,6 +939,131 @@ class FsrsReviewOut(BaseModel):
     explain: FsrsExplainOut
 
 
+# --- Review/SRS por unidad (V3.16) -----------------------------------------
+
+
+class UnitReviewWindowOut(BaseModel):
+    """Estado de una ventana de retención fija (7/30/90) de una unidad.
+
+    `state` ∈ upcoming / due_now / passed / failed (D3/D6): la ventana es un
+    hito fijo desde el ancla de la unidad, nunca se recalendariza por un grade.
+    """
+
+    window_days: int
+    due_at: str
+    state: str
+
+
+class UnitReviewPlanUnitOut(BaseModel):
+    """Plan de repaso de una unidad: progreso, ancla y ventanas 7/30/90."""
+
+    level_id: str
+    unit_id: str
+    module_id: str
+    module_title: str
+    title: str
+    objectives_total: int
+    objectives_mastered: int
+    completed: bool
+    anchor: str | None = None
+    windows: list[UnitReviewWindowOut] = Field(default_factory=list)
+
+
+class UnitReviewPlanOut(BaseModel):
+    """Plan de repaso por unidad del nivel actual (D2): unidades completadas o
+    con plan activo y cuántas tienen ventana repasable (due_now/failed)."""
+
+    level_id: str
+    level: str
+    due_count: int
+    units: list[UnitReviewPlanUnitOut] = Field(default_factory=list)
+
+
+class MicroReviewItemOut(BaseModel):
+    """Check MC oficial del currículo para el micro-review (D8).
+
+    Nunca incluye `correct_index` antes de responder (premisa 21): el servidor
+    puntúa con la respuesta en el POST."""
+
+    item_id: str
+    objective_id: str
+    objective_title: str
+    skill: str
+    prompt: str
+    options: list[str]
+
+
+class MicroReviewSessionOut(BaseModel):
+    """Sesión de micro-review lista para responder (ítems SIN correct_index)."""
+
+    level_id: str
+    unit_id: str
+    unit_title: str
+    window_days: int
+    items: list[MicroReviewItemOut] = Field(default_factory=list)
+
+
+class MicroReviewSubmitIn(BaseModel):
+    """Respuestas del micro-review: índice elegido por cada `item_id` (D6).
+
+    El cliente envía SOLO respuestas, nunca puntuaciones; el servidor compara
+    cada índice con `correct_index` del check oficial (premisa 21)."""
+
+    window_days: int
+    answers: dict[str, int] = Field(default_factory=dict)
+
+
+class UnitReviewObjectiveResultOut(BaseModel):
+    """Resultado por objetivo: precisión + grade FSRS aplicado a su carta.
+
+    `grade` ∈ 1..4 (derivado de la precisión por objetivo en servidor) y
+    `next_due_at` es el `due_at` que deja `fsrs.schedule` tras aplicarlo."""
+
+    objective_id: str
+    title: str
+    correct: int
+    total: int
+    accuracy: float
+    grade: int
+    next_due_at: str
+
+
+class MicroReviewItemAuditOut(BaseModel):
+    """Auditoría post-submit de un ítem (solo tras responder).
+
+    Revela al alumno qué marcó y cuál era la respuesta correcta; `correct` es la
+    señal que la UI usa para el feedback honesto (D5: práctica, no dominio)."""
+
+    item_id: str
+    objective_id: str
+    objective_title: str
+    skill: str
+    prompt: str
+    options: list[str]
+    selected_index: int
+    correct_index: int
+    correct: bool
+
+
+class MicroReviewResultOut(BaseModel):
+    """Resultado de enviar un micro-review (D5/D6).
+
+    Persiste el intento en `unit_review_attempts`, reprograma las cartas FSRS
+    `objective` implicadas y NO crea evidencia de mastery/currículo."""
+
+    unit_id: str
+    window_days: int
+    correct: int
+    total: int
+    accuracy: float
+    passed: bool
+    per_objective: list[UnitReviewObjectiveResultOut] = Field(
+        default_factory=list
+    )
+    items: list[MicroReviewItemAuditOut] = Field(default_factory=list)
+    plan: UnitReviewPlanUnitOut | None = None
+
+
 class SkillProfileOut(BaseModel):
     skill: str
     score: float

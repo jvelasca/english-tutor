@@ -4,6 +4,19 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.16.0] — 2026-09-06
+
+**Review/SRS por unidad: micro-review + ventanas de retención fijas 7/30/90 días sobre la base FSRS.**
+
+El candidato P1 "Review/SRS por unidad" auditado como ABIERTO en 2026-09-05 se cierra: el motor FSRS ya soportaba `target_type="objective"` pero nada lo sembraba, no existía plan de repaso por unidad ni ventanas fijas de retención. Esta iteración convierte el cierre de una unidad en un calendario de repaso de recuperación (práctica, nunca declaración de dominio). Backend `3.15.0 → 3.16.0`.
+
+- **Servicio puro `services/unit_review.py`** (V3.16, determinista, sin BD): ventanas fijas `(7, 30, 90)` días desde el ancla de la unidad (unidad completada = todos sus objetivos `mastered`; ancla = `max(updated_at)` de sus filas de mastery); estados de ventana `upcoming / due_now / passed / failed` con `now` inyectable; muestreo de micro-review **balanceado por objetivo** de los checks MC **oficiales** del currículo (cero contenido artificial; reintento prioriza los ítems fallados del último intento con semilla determinista `user+unit+window`); puntuación en servidor contra `correct_index` (el cliente solo envía respuestas, premisa 21).
+- **Siembra FSRS `objective`**: `sync_fsrs_cards` siembra/refresca cartas `target_type="objective"` para los objetivos de las **unidades completadas del nivel actual** (D1/D2), sin pisar cartas con `reps > 0` (solo refresca `why`/`label`) y sin tocar `fsrs.TARGET_TYPES`. Nueva razón pedagógica `why_for_objective` en `fsrs.py` (`unit-window-7/30/90` / `unit-maintenance`).
+- **Persistencia e intentos**: tabla idempotente `unit_review_attempts` (con `per_objective` y `failed_items` en JSON, índice de lookup por `user/level/unit/window`) + repos `insert/list/latest_unit_review_attempt`. El micro-review **no crea evidencia de mastery/currículo ni declara dominio** (D5): es práctica de retención separada del scheduler y del Mastery Engine (coherente con el hallazgo E3 de `docs/audit/E-FSRS-RETENTION.md`).
+- **API**: `GET /api/academy/review/unit-plan` (plan del nivel actual: unidades completadas o con plan activo + `due_count`), `GET/POST /api/academy/review/unit/{unit_id}/micro-review` (sesión sin `correct_index` / puntúa, persiste y reprograma las cartas FSRS `objective` con el grade derivado de la precisión por objetivo). Gating: 400 si la ventana no está `due_now`/`failed` o el `window_days` es inválido; 404 si la unidad no pertenece al nivel.
+- **UI (INICIO)**: `UnitReviewPanel` junto a `FsrsReviewPanel` en HomeScreen: lista de unidades con sus ventanas 7/30/90 (chips de estado con color), contador de unidades por repasar, micro-review por tarjetas (un check a la vez con feedback inmediato y respuesta correcta revelada al terminar) y nota honesta "Repaso de retención · no cuenta como demostración de dominio". Lógica pura extraída a `unitReviewLogic.ts` (testeable sin DOM). i18n `en`/`es` completa con parity.
+- **Tests**: `test_unit_review.py` (servicio puro), `test_unit_review_endpoints.py` (siembra solo en unidades completadas, idempotencia, sin `correct_index`, D5 sin evidencia nueva, gating de ventanas, aislamiento entre usuarios); `unitReviewLogic.test.ts` y tests del cliente API. Backend **1318 passed** + ruff limpio; frontend **392 passed** + `tsc`/`vite build` OK.
+
 ## [3.15.0] — 2026-09-06
 
 **Profundidad avanzada C1/C2: densidad, taxonomía avanzada y banco de grammar C2 normalizado.**

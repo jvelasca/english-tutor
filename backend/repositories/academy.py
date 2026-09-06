@@ -197,7 +197,7 @@ def list_objective_mastery(
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT objective_id, skill, score, recent_score, confidence, streak, "
-            "attempts, last_seen_at FROM academy_objective_mastery "
+            "attempts, last_seen_at, updated_at FROM academy_objective_mastery "
             "WHERE user_id = ? AND level_id = ?",
             (user_id, level_id),
         ).fetchall()
@@ -1052,3 +1052,111 @@ def list_fsrs_cards(user_id: str) -> list[dict]:
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# --- Unit review attempts (V3.16) -------------------------------------------
+
+
+def insert_unit_review_attempt(
+    user_id: str,
+    level_id: str,
+    unit_id: str,
+    window_days: int,
+    *,
+    correct: int,
+    total: int,
+    accuracy: float,
+    passed: bool,
+    per_objective: list[dict] | None = None,
+    failed_items: list[str] | None = None,
+    created_at: str = "",
+) -> dict | None:
+    """Persiste un intento de micro-review de una ventana. None si no hay usuario.
+
+    `per_objective` se serializa como JSON `[{objective_id, correct, total}]` y
+    `failed_items` como `[item_id...]` (prioridad de reintento de la misma
+    ventana). Sin lógica de negocio: la decisión de superado ya la tomó el
+    servicio puro."""
+    if get_user(user_id) is None:
+        return None
+    now = created_at or _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "INSERT INTO unit_review_attempts "
+            "(user_id, level_id, unit_id, window_days, correct, total, accuracy, "
+            "passed, per_objective, failed_items, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                level_id,
+                unit_id,
+                window_days,
+                int(correct),
+                int(total),
+                float(accuracy),
+                1 if passed else 0,
+                json.dumps(per_objective or [], ensure_ascii=False),
+                json.dumps(failed_items or [], ensure_ascii=False),
+                now,
+            ),
+        )
+        attempt_id = cur.lastrowid
+    return {
+        "id": attempt_id,
+        "user_id": user_id,
+        "level_id": level_id,
+        "unit_id": unit_id,
+        "window_days": window_days,
+        "correct": int(correct),
+        "total": int(total),
+        "accuracy": float(accuracy),
+        "passed": bool(passed),
+        "per_objective": list(per_objective or []),
+        "failed_items": list(failed_items or []),
+        "created_at": now,
+    }
+
+
+def list_unit_review_attempts(
+    user_id: str,
+    level_id: str,
+    unit_id: str | None = None,
+    window_days: int | None = None,
+) -> list[dict]:
+    """Lista intentos de micro-review del usuario (más antiguos primero).
+
+    `unit_id` y `window_days` opcionales acotan la consulta; sin ellos devuelve
+    todos los intentos del nivel (para construir el plan de unidades)."""
+    sql = (
+        "SELECT id, user_id, level_id, unit_id, window_days, correct, total, "
+        "accuracy, passed, per_objective, failed_items, created_at "
+        "FROM unit_review_attempts WHERE user_id = ? AND level_id = ?"
+    )
+    params: list = [user_id, level_id]
+    if unit_id is not None:
+        sql += " AND unit_id = ?"
+        params.append(unit_id)
+    if window_days is not None:
+        sql += " AND window_days = ?"
+        params.append(int(window_days))
+    sql += " ORDER BY id ASC"
+    with closing(_conn()) as conn:
+        rows = conn.execute(sql, params).fetchall()
+    out = []
+    for row in rows:
+        d = dict(row)
+        d["passed"] = bool(d["passed"])
+        d["per_objective"] = json.loads(d.pop("per_objective") or "[]")
+        d["failed_items"] = json.loads(d.pop("failed_items") or "[]")
+        out.append(d)
+    return out
+
+
+def latest_unit_review_attempt(
+    user_id: str, level_id: str, unit_id: str, window_days: int
+) -> dict | None:
+    """Último intento de una ventana concreta (None si no hay ninguno)."""
+    attempts = list_unit_review_attempts(
+        user_id, level_id, unit_id, window_days
+    )
+    return attempts[-1] if attempts else None

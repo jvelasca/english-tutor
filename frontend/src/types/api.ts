@@ -1619,6 +1619,91 @@ export interface FsrsReview {
   explain: FsrsExplain;
 }
 
+// --- Review/SRS por unidad (V3.16) ---
+
+export type UnitReviewWindowState =
+  | "upcoming"
+  | "due_now"
+  | "passed"
+  | "failed";
+
+export interface UnitReviewWindow {
+  window_days: number;
+  due_at: string;
+  state: UnitReviewWindowState;
+}
+
+export interface UnitReviewPlanUnit {
+  level_id: string;
+  unit_id: string;
+  module_id: string;
+  module_title: string;
+  title: string;
+  objectives_total: number;
+  objectives_mastered: number;
+  completed: boolean;
+  anchor: string | null;
+  windows: UnitReviewWindow[];
+}
+
+export interface UnitReviewPlan {
+  level_id: string;
+  level: string;
+  due_count: number;
+  units: UnitReviewPlanUnit[];
+}
+
+export interface MicroReviewItem {
+  item_id: string;
+  objective_id: string;
+  objective_title: string;
+  skill: string;
+  prompt: string;
+  options: string[];
+}
+
+export interface MicroReviewSession {
+  level_id: string;
+  unit_id: string;
+  unit_title: string;
+  window_days: number;
+  items: MicroReviewItem[];
+}
+
+export interface UnitReviewObjectiveResult {
+  objective_id: string;
+  title: string;
+  correct: number;
+  total: number;
+  accuracy: number;
+  grade: number;
+  next_due_at: string;
+}
+
+export interface MicroReviewItemAudit {
+  item_id: string;
+  objective_id: string;
+  objective_title: string;
+  skill: string;
+  prompt: string;
+  options: string[];
+  selected_index: number;
+  correct_index: number;
+  correct: boolean;
+}
+
+export interface MicroReviewResult {
+  unit_id: string;
+  window_days: number;
+  correct: number;
+  total: number;
+  accuracy: number;
+  passed: boolean;
+  per_objective: UnitReviewObjectiveResult[];
+  items: MicroReviewItemAudit[];
+  plan: UnitReviewPlanUnit | null;
+}
+
 // --- Academy (currículum CEFR, mastery, evaluación) ---
 
 export type AcademyObjectiveStatus =

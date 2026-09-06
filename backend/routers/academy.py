@@ -35,6 +35,9 @@ from schemas.academy import (
     LessonCompleteRequest,
     LevelDetailOut,
     LevelsOut,
+    MicroReviewResultOut,
+    MicroReviewSessionOut,
+    MicroReviewSubmitIn,
     NextBestActivityOut,
     NextObjectiveOut,
     ObjectiveAssessmentOut,
@@ -66,6 +69,7 @@ from schemas.academy import (
     StudyPlanOut,
     StudyPlanRequest,
     TodayPlanOut,
+    UnitReviewPlanOut,
     WritingDiagnostic,
     WritingJourneyOut,
     WritingLevelOut,
@@ -74,6 +78,7 @@ from schemas.academy import (
     WritingTaskResultOut,
     WritingTaskSubmitRequest,
 )
+from services import unit_review
 from services.academy import study_plan
 from services.stt import transcribe_with_timing
 
@@ -615,6 +620,84 @@ async def fsrs_review(
     )
     if result is None:
         raise HTTPException(status_code=400, detail="Review FSRS no válido")
+    return result
+
+
+# --- Review/SRS por unidad (V3.16) ---------------------------------------
+
+
+@router.get(
+    "/api/academy/review/unit-plan", response_model=UnitReviewPlanOut
+)
+async def unit_review_plan(
+    level_id: str | None = None, user: dict = Depends(current_user)
+) -> dict:
+    """Plan de repaso por unidad del nivel actual (o el pedido): unidades
+    completadas o con plan activo y sus ventanas 7/30/90."""
+    result = await academy_service.get_unit_review_plan(
+        user["id"], level_id=level_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Nivel no encontrado")
+    return result
+
+
+@router.get(
+    "/api/academy/review/unit/{unit_id}/micro-review",
+    response_model=MicroReviewSessionOut,
+)
+async def unit_micro_review(
+    unit_id: str,
+    window_days: int,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Sesión de micro-review (checks MC oficiales, sin `correct_index`).
+
+    Solo se repasa una ventana `due_now` o `failed`; en el reintento se
+    priorizan los ítems fallados del último intento."""
+    if window_days not in unit_review.UNIT_REVIEW_WINDOWS_DAYS:
+        raise HTTPException(
+            status_code=400, detail="window_days inválido (7/30/90)"
+        )
+    try:
+        result = await academy_service.get_unit_micro_review(
+            user["id"], unit_id, window_days
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="Unidad no encontrada en tu nivel"
+        )
+    return result
+
+
+@router.post(
+    "/api/academy/review/unit/{unit_id}/micro-review",
+    response_model=MicroReviewResultOut,
+)
+async def unit_micro_review_submit(
+    unit_id: str,
+    body: MicroReviewSubmitIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Puntúa y persiste un micro-review (D5/D6): respuestas → aciertos →
+    intento en `unit_review_attempts` + cartas FSRS de los objetivos. Nunca
+    crea evidencia de mastery/currículo."""
+    if body.window_days not in unit_review.UNIT_REVIEW_WINDOWS_DAYS:
+        raise HTTPException(
+            status_code=400, detail="window_days inválido (7/30/90)"
+        )
+    try:
+        result = await academy_service.submit_unit_micro_review(
+            user["id"], unit_id, body.window_days, body.answers
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="Unidad no encontrada en tu nivel"
+        )
     return result
 
 

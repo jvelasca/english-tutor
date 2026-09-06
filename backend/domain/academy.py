@@ -50,6 +50,10 @@ from schemas.academy import (
     LevelProgressOut,
     LevelSummaryOut,
     MasteryRecordOut,
+    MicroReviewItemAuditOut,
+    MicroReviewItemOut,
+    MicroReviewResultOut,
+    MicroReviewSessionOut,
     ModuleProgressOut,
     NextBestActivityOut,
     NextObjectiveOut,
@@ -86,6 +90,9 @@ from schemas.academy import (
     StudentModelOut,
     TodayItemOut,
     TodayPlanOut,
+    UnitReviewObjectiveResultOut,
+    UnitReviewPlanOut,
+    UnitReviewPlanUnitOut,
     WritingResultOut,
     WritingTaskResultOut,
 )
@@ -101,6 +108,7 @@ from services import (
     speaking_llm,
     speaking_mission,
     speaking_scenarios,
+    unit_review,
     writing_llm,
 )
 from services import course as course_svc
@@ -1646,8 +1654,11 @@ def _fsrs_card_out(card: dict, *, now: str = "") -> FsrsCardOut:
 async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]:
     """Siembra/actualiza cartas desde perfil CEFR + léxico débil/learning.
 
-    No pisa cartas ya revisadas (reps > 0): solo actualiza `why` y, si la carta
-    es nueva, la estabiliza desde la evidencia.
+    Desde V3.16 siembra además cartas `target_type="objective"` para los
+    objetivos de las unidades COMPLETADAS del nivel actual (D1/D2): la carta
+    acompaña a la ventana de retención de la unidad (`why` = unit-window-N o
+    unit-maintenance). No pisa cartas ya revisadas (reps > 0): solo actualiza
+    `why` y, si la carta es nueva, la estabiliza desde la evidencia.
     """
     now_iso = now or datetime.now(timezone.utc).isoformat()
     level_id = await _current_level_id(user_id)
@@ -1728,6 +1739,99 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
             card["due_at"] = now_iso
         await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, card)
 
+    # V3.16: cartas `objective` para los objetivos de las unidades COMPLETADAS
+    # del nivel actual (D1/D2). La carta acompaña la ventana de retención de su
+    # unidad (why = fsrs.why_for_objective); no pisa cartas con reps > 0 (solo
+    # refresca why/label) y no toca `fsrs.TARGET_TYPES`.
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    attempt_rows = await run_in_threadpool(
+        academy_repo.list_unit_review_attempts, user_id, lv.level_id
+    )
+    for mod in lv.modules:
+        for unit in mod.units:
+            unit_ids = {
+                obj.id for les in unit.lessons for obj in les.objectives
+            }
+            if not unit_ids or not unit_ids.issubset(mastered):
+                continue
+            unit_rows = [
+                {"objective_id": obj.id, **row}
+                for les in unit.lessons
+                for obj in les.objectives
+                for row in (obj_mastery.get(obj.id) or {}).values()
+                if row.get("updated_at")
+            ]
+            anchor = unit_review.unit_anchor(unit_rows)
+            if anchor is None:
+                continue
+            unit_attempts = [a for a in attempt_rows if a["unit_id"] == unit.id]
+            windows = [
+                unit_review.window_due_at(
+                    anchor,
+                    wd,
+                    now=now_iso,
+                    attempts=[
+                        a
+                        for a in unit_attempts
+                        if int(a.get("window_days") or -1) == wd
+                    ],
+                )
+                for wd in unit_review.UNIT_REVIEW_WINDOWS_DAYS
+            ]
+            nearest = next(
+                (w for w in windows if w["state"] != "passed"), None
+            )
+            due_now = bool(
+                nearest and nearest["state"] in ("due_now", "failed")
+            )
+            why = fsrs.why_for_objective(unit, {"windows": windows})
+            for les in unit.lessons:
+                for obj in les.objectives:
+                    key = ("objective", obj.id)
+                    prev = existing.get(key)
+                    if prev and int(prev.get("reps") or 0) > 0:
+                        updated = dict(prev)
+                        updated["why"] = why
+                        updated["label"] = obj.title or obj.id
+                        await run_in_threadpool(
+                            academy_repo.upsert_fsrs_card, user_id, updated
+                        )
+                        continue
+                    rows_obj = [
+                        row
+                        for row in unit_rows
+                        if row.get("objective_id") == obj.id
+                    ]
+                    states = obj_mastery.get(obj.id) or {}
+                    scores = [
+                        float(states[s]["score"])
+                        for s in obj.assessable_skills()
+                        if s in states
+                    ]
+                    if not scores:
+                        continue
+                    card = fsrs.seed_card_from_evidence(
+                        target_type="objective",
+                        target_id=obj.id,
+                        label=obj.title or obj.id,
+                        score=sum(scores) / len(scores),
+                        last_evidence_at=unit_review.unit_anchor(rows_obj)
+                        or "",
+                        why=why,
+                        now=now_iso,
+                    )
+                    if due_now:
+                        card["due_at"] = now_iso
+                    await run_in_threadpool(
+                        academy_repo.upsert_fsrs_card, user_id, card
+                    )
+
     return await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
 
 
@@ -1803,6 +1907,373 @@ async def review_fsrs_card(
     return FsrsReviewOut(
         card=_fsrs_card_out(saved, now=now_iso),
         explain=FsrsExplainOut.model_validate(explained),
+    )
+
+
+# --- Review/SRS por unidad (V3.16) -----------------------------------------
+
+
+def _unit_review_mastery_rows(unit, obj_mastery: dict) -> list[dict]:
+    """Filas de mastery (con `updated_at`) de los objetivos de una unidad.
+
+    `obj_mastery` es el mapa `{objective_id: {skill: estado}}` del repositorio;
+    cada fila se etiqueta con su `objective_id` para poder re-anclar por
+    objetivo al actualizar cartas FSRS."""
+    return [
+        {"objective_id": obj.id, **row}
+        for les in unit.lessons
+        for obj in les.objectives
+        for row in (obj_mastery.get(obj.id) or {}).values()
+        if row.get("updated_at")
+    ]
+
+
+def _find_review_unit(level, unit_id: str) -> tuple | None:
+    """Devuelve `(module, unit)` de la unidad en el nivel, o None si no existe."""
+    for mod in level.modules:
+        for unit in mod.units:
+            if unit.id == unit_id:
+                return mod, unit
+    return None
+
+
+def _unit_review_plan_dict(
+    *,
+    lv,
+    module,
+    unit,
+    obj_mastery: dict,
+    mastered_ids: set[str],
+    attempts: list[dict],
+    now: str,
+) -> dict:
+    """Plan de repaso de una unidad (delegando en `services.unit_review`)."""
+    rows = _unit_review_mastery_rows(unit, obj_mastery)
+    unit_attempts = [a for a in attempts if a.get("unit_id") == unit.id]
+    return unit_review.build_unit_review_plan(
+        unit=unit,
+        unit_mastery_rows=rows,
+        mastered_ids=mastered_ids,
+        now=now,
+        level_id=lv.level_id,
+        module_id=module.id,
+        module_title=module.title,
+        attempts=unit_attempts,
+    )
+
+
+def _reviewable_unit_window(
+    plan: dict, window_days: int
+) -> dict | None:
+    """Devuelve la ventana del plan si es repasable (due_now/failed), si no None.
+
+    Una ventana `upcoming`/`passed` no se puede repasar: `upcoming` aún no ha
+    llegado y `passed` ya superó su hito fijo (D3); solo un intento fallido
+    (`failed`) se puede reintentar."""
+    for window in plan.get("windows") or []:
+        if int(window.get("window_days") or -1) == window_days:
+            if window.get("state") in (
+                unit_review.WINDOW_DUE_NOW,
+                unit_review.WINDOW_FAILED,
+            ):
+                return window
+            return None
+    return None
+
+
+async def get_unit_review_plan(
+    user_id: str, level_id: str | None = None
+) -> UnitReviewPlanOut | None:
+    """Plan de repaso por unidad (V3.16) del nivel actual (o del pedido, D2).
+
+    Sigue el patrón de `get_today_plan`: `lv` → `list_objective_mastery` →
+    `_split_objective_mastery` → `mastered_objective_ids`; agrupa por unidad y
+    solo incluye unidades **completadas** o con **plan activo** (al menos un
+    intento de micro-review, para que una ventana fallida siga visible aunque la
+    unidad deje de estar completa). `due_count` cuenta las unidades con una
+    ventana repasable (due_now/failed)."""
+    if level_id is None:
+        level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id)
+    if lv is None:
+        return None
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    attempts = await run_in_threadpool(
+        academy_repo.list_unit_review_attempts, user_id, lv.level_id
+    )
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    units_out: list[dict] = []
+    due_count = 0
+    for module in lv.modules:
+        for unit in module.units:
+            plan = _unit_review_plan_dict(
+                lv=lv,
+                module=module,
+                unit=unit,
+                obj_mastery=obj_mastery,
+                mastered_ids=mastered,
+                attempts=attempts,
+                now=now_iso,
+            )
+            unit_attempts = [a for a in attempts if a.get("unit_id") == unit.id]
+            if not plan["completed"] and not unit_attempts:
+                continue
+            if any(
+                w["state"] in (unit_review.WINDOW_DUE_NOW, unit_review.WINDOW_FAILED)
+                for w in plan["windows"]
+            ):
+                due_count += 1
+            units_out.append(plan)
+    return UnitReviewPlanOut(
+        level_id=lv.level_id,
+        level=lv.level,
+        due_count=due_count,
+        units=[UnitReviewPlanUnitOut(**u) for u in units_out],
+    )
+
+
+async def _unit_review_context(
+    user_id: str, lv
+) -> tuple[dict, set[str], list[dict], str]:
+    """Contexto compartido por las operaciones de review de unidad del nivel `lv`.
+
+    Devuelve `(obj_mastery, mastered_ids, attempts, now_iso)`. Aislamiento por
+    usuario: todas las consultas se filtran por `user_id` (premisa 13)."""
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    attempts = await run_in_threadpool(
+        academy_repo.list_unit_review_attempts, user_id, lv.level_id
+    )
+    return obj_mastery, mastered, attempts, datetime.now(timezone.utc).isoformat()
+
+
+async def get_unit_micro_review(
+    user_id: str, unit_id: str, window_days: int
+) -> MicroReviewSessionOut | None:
+    """Sesión de micro-review de una unidad del nivel actual (D2/D8).
+
+    Valida que la unidad exista en el nivel actual y que su ventana esté
+    repasable (due_now/failed); los ítems son checks MC oficiales del currículo
+    (muestreo determinista) SIN `correct_index`. En un reintento (ventana
+    `failed`) se priorizan los ítems fallados del último intento."""
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    found = _find_review_unit(lv, unit_id)
+    if found is None:
+        return None
+    module, unit = found
+    obj_mastery, mastered, attempts, now_iso = await _unit_review_context(
+        user_id, lv
+    )
+    plan = _unit_review_plan_dict(
+        lv=lv,
+        module=module,
+        unit=unit,
+        obj_mastery=obj_mastery,
+        mastered_ids=mastered,
+        attempts=attempts,
+        now=now_iso,
+    )
+    if _reviewable_unit_window(plan, window_days) is None:
+        raise ValueError("unit_review.not_due")
+    latest = await run_in_threadpool(
+        academy_repo.latest_unit_review_attempt,
+        user_id,
+        level_id,
+        unit.id,
+        window_days,
+    )
+    failed_ids = list(latest["failed_items"]) if latest else []
+    sample = unit_review.sample_micro_review(
+        unit=unit,
+        user_id=user_id,
+        window_days=window_days,
+        previous_failed_ids=failed_ids,
+        now=now_iso,
+    )
+    return MicroReviewSessionOut(
+        level_id=lv.level_id,
+        unit_id=unit.id,
+        unit_title=unit.title,
+        window_days=window_days,
+        items=[MicroReviewItemOut(**i) for i in sample],
+    )
+
+
+async def submit_unit_micro_review(
+    user_id: str, unit_id: str, window_days: int, answers: dict[str, int]
+) -> MicroReviewResultOut | None:
+    """Puntúa y persiste un micro-review de una ventana de unidad (V3.16).
+
+    El servidor puntúa las respuestas contra los checks oficiales (premisa 21),
+    persiste el intento en `unit_review_attempts` y reprograma la carta FSRS de
+    cada objetivo implicado con el grade derivado de su precisión por objetivo.
+    NUNCA crea evidencia de mastery/currículo ni declara dominio (D5)."""
+    level_id = await _current_level_id(user_id)
+    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    found = _find_review_unit(lv, unit_id)
+    if found is None:
+        return None
+    module, unit = found
+    obj_mastery, mastered, attempts, now_iso = await _unit_review_context(
+        user_id, lv
+    )
+    plan = _unit_review_plan_dict(
+        lv=lv,
+        module=module,
+        unit=unit,
+        obj_mastery=obj_mastery,
+        mastered_ids=mastered,
+        attempts=attempts,
+        now=now_iso,
+    )
+    if _reviewable_unit_window(plan, window_days) is None:
+        raise ValueError("unit_review.not_due")
+
+    latest = await run_in_threadpool(
+        academy_repo.latest_unit_review_attempt,
+        user_id,
+        level_id,
+        unit.id,
+        window_days,
+    )
+    failed_ids = list(latest["failed_items"]) if latest else []
+    sample = unit_review.sample_micro_review(
+        unit=unit,
+        user_id=user_id,
+        window_days=window_days,
+        previous_failed_ids=failed_ids,
+        now=now_iso,
+    )
+    if not sample:
+        raise ValueError("unit_review.empty")
+
+    result = unit_review.score_micro_review(
+        answers=answers, unit=unit, sample=sample
+    )
+
+    objectives_by_id = {
+        o.id: o
+        for les in unit.lessons
+        for o in les.objectives
+    }
+    windows = plan.get("windows") or []
+    per_out: list[dict] = []
+    per_storage: list[dict] = []
+    for bucket in result["per_objective"]:
+        oid = bucket["objective_id"]
+        objective = objectives_by_id.get(oid)
+        title = objective.title if objective is not None else oid
+        total = int(bucket.get("total") or 0)
+        correct = int(bucket.get("correct") or 0)
+        accuracy = round(correct / total, 3) if total else 0.0
+        grade = unit_review.grade_for_accuracy(accuracy)
+        card = await run_in_threadpool(
+            academy_repo.get_fsrs_card, user_id, "objective", oid
+        )
+        if card is None:
+            why = fsrs.why_for_objective(unit, {"windows": windows})
+            card = fsrs.empty_card(
+                target_type="objective",
+                target_id=oid,
+                label=title,
+                why=why,
+                now=now_iso,
+            )
+        updated = fsrs.schedule(card, grade, now=now_iso)
+        updated["label"] = updated.get("label") or title
+        await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
+        per_out.append(
+            {
+                "objective_id": oid,
+                "title": title,
+                "correct": correct,
+                "total": total,
+                "accuracy": accuracy,
+                "grade": grade,
+                "next_due_at": updated.get("due_at") or "",
+            }
+        )
+        per_storage.append(
+            {"objective_id": oid, "correct": correct, "total": total}
+        )
+
+    failed_items = [
+        item["item_id"] for item in result["items"] if not item["correct"]
+    ]
+    await run_in_threadpool(
+        academy_repo.insert_unit_review_attempt,
+        user_id,
+        level_id,
+        unit.id,
+        window_days,
+        correct=result["correct"],
+        total=result["total"],
+        accuracy=result["accuracy"],
+        passed=result["passed"],
+        per_objective=per_storage,
+        failed_items=failed_items,
+        created_at=now_iso,
+    )
+
+    # Plan actualizado tras persistir el intento (refleja passed/failed).
+    obj_mastery, mastered, attempts, now_iso = await _unit_review_context(
+        user_id, lv
+    )
+    updated_plan = _unit_review_plan_dict(
+        lv=lv,
+        module=module,
+        unit=unit,
+        obj_mastery=obj_mastery,
+        mastered_ids=mastered,
+        attempts=attempts,
+        now=now_iso,
+    )
+
+    by_item = {i["item_id"]: i for i in sample}
+    audit: list[dict] = []
+    for item in result["items"]:
+        meta = by_item.get(item["item_id"]) or {}
+        audit.append(
+            {
+                "item_id": item["item_id"],
+                "objective_id": item.get("objective_id") or meta.get(
+                    "objective_id", ""
+                ),
+                "objective_title": meta.get("objective_title") or "",
+                "skill": meta.get("skill") or "",
+                "prompt": meta.get("prompt") or "",
+                "options": list(meta.get("options") or []),
+                "selected_index": int(item.get("selected_index") or -1),
+                "correct_index": int(item.get("correct_index") or 0),
+                "correct": bool(item.get("correct")),
+            }
+        )
+
+    return MicroReviewResultOut(
+        unit_id=unit.id,
+        window_days=window_days,
+        correct=result["correct"],
+        total=result["total"],
+        accuracy=result["accuracy"],
+        passed=result["passed"],
+        per_objective=[
+            UnitReviewObjectiveResultOut(**p) for p in per_out
+        ],
+        items=[MicroReviewItemAuditOut(**a) for a in audit],
+        plan=UnitReviewPlanUnitOut(**updated_plan),
     )
 
 

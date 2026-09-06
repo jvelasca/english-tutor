@@ -10,6 +10,8 @@ import {
   getSpeakingDiagnostic,
   getSpeakingJourney,
   getSpeakingLevel,
+  getUnitMicroReview,
+  getUnitReviewPlan,
   getWritingDiagnostic,
   getWritingJourney,
   getWritingLevel,
@@ -22,6 +24,7 @@ import {
   submitObjectiveAssessment,
   submitPlacement,
   submitSpeakingAssessmentPart,
+  submitUnitMicroReview,
 } from "./academy";
 
 function mockJsonFetch(data: unknown) {
@@ -394,5 +397,71 @@ describe("academy api", () => {
       objective_id: "o1",
       answers: { c1: 1, c2: 0 },
     });
+  });
+
+  it("getUnitReviewPlan llama a review/unit-plan con user_id", async () => {
+    const fn = mockJsonFetch({
+      level_id: "a1",
+      level: "A1",
+      due_count: 0,
+      units: [],
+    });
+    await getUnitReviewPlan("u1");
+    expect(fn.mock.calls[0][0]).toBe(
+      "/api/academy/review/unit-plan?user_id=u1",
+    );
+  });
+
+  it("getUnitMicroReview usa unidad en la ruta y ventana en la query", async () => {
+    const fn = mockJsonFetch({
+      level_id: "a1",
+      unit_id: "a1-u1",
+      unit_title: "Greetings",
+      window_days: 7,
+      items: [],
+    });
+    await getUnitMicroReview("u1", "a1-u1", 7);
+    const url = fn.mock.calls[0][0] as string;
+    expect(url).toBe(
+      "/api/academy/review/unit/a1-u1/micro-review?user_id=u1&window_days=7",
+    );
+  });
+
+  it("getUnitMicroReview escapa el id de unidad en la URL", async () => {
+    const fn = mockJsonFetch({
+      level_id: "a1",
+      unit_id: "u/1",
+      unit_title: "U",
+      window_days: 30,
+      items: [],
+    });
+    await getUnitMicroReview("u1", "u/1", 30);
+    const url = fn.mock.calls[0][0] as string;
+    expect(url).toBe(
+      "/api/academy/review/unit/u%2F1/micro-review?user_id=u1&window_days=30",
+    );
+  });
+
+  it("submitUnitMicroReview envía respuestas, no puntuaciones", async () => {
+    const fn = mockJsonFetch({
+      unit_id: "a1-u1",
+      window_days: 7,
+      correct: 1,
+      total: 2,
+      accuracy: 0.5,
+      passed: false,
+      per_objective: [],
+      items: [],
+      plan: null,
+    });
+    await submitUnitMicroReview("u1", "a1-u1", 7, { c1: 0, c2: 3 });
+    const url = fn.mock.calls[0][0] as string;
+    const method = fn.mock.calls[0][1].method;
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(url).toBe(
+      "/api/academy/review/unit/a1-u1/micro-review?user_id=u1",
+    );
+    expect(method).toBe("POST");
+    expect(body).toEqual({ window_days: 7, answers: { c1: 0, c2: 3 } });
   });
 });

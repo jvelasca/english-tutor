@@ -25,6 +25,7 @@ import { EstimatedLevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
 import { TodayPlan } from "../../components/TodayPlan";
 import { FsrsReviewPanel } from "../../features/review/FsrsReviewPanel";
+import { UnitReviewPanel } from "../../features/review/UnitReviewPanel";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 
@@ -343,6 +344,17 @@ export function HomeScreen({
                   )}
               </div>
             )}
+          </Card>
+        </motion.section>
+
+        {/* 4b. REPASO POR UNIDAD (V3.16) — ventanas 7/30/90 + micro-review. */}
+        <motion.section
+          variants={item}
+          aria-label={t("unitReview.title")}
+          className="scroll-mt-4"
+        >
+          <Card className="p-4">
+            <UnitReviewPanel userId={userId} />
           </Card>
         </motion.section>
 

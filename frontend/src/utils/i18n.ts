@@ -1151,6 +1151,91 @@ const STRINGS: Record<string, Entry> = {
   "fsrs.whyReason.evidence": { en: "from evidence", es: "desde evidencia" },
   "fsrs.whyReason.scheduled": { en: "scheduled", es: "programado" },
   "fsrs.whyReason.review": { en: "review", es: "repaso" },
+  // Razones de cartas `objective` (V3.16): acompañan la ventana de la unidad.
+  "fsrs.whyReason.unit-window-7": {
+    en: "unit · 7-day window",
+    es: "unidad · ventana de 7 días",
+  },
+  "fsrs.whyReason.unit-window-30": {
+    en: "unit · 30-day window",
+    es: "unidad · ventana de 30 días",
+  },
+  "fsrs.whyReason.unit-window-90": {
+    en: "unit · 90-day window",
+    es: "unidad · ventana de 90 días",
+  },
+  "fsrs.whyReason.unit-maintenance": {
+    en: "unit maintenance",
+    es: "mantenimiento de unidad",
+  },
+
+  // --- Repaso por unidad (V3.16) ---
+  "unitReview.title": { en: "Unit review", es: "Repaso por unidad" },
+  "unitReview.subtitle": {
+    en: "Fixed retention windows (7/30/90 days) after finishing a unit.",
+    es: "Ventanas de retención fijas (7/30/90 días) tras completar una unidad.",
+  },
+  "unitReview.loading": { en: "Loading units…", es: "Cargando unidades…" },
+  "unitReview.unavailable": {
+    en: "Unit review is not available right now.",
+    es: "El repaso por unidad no está disponible ahora.",
+  },
+  "unitReview.empty": {
+    en: "No finished units yet — finish a unit to start its retention windows.",
+    es: "Aún no hay unidades terminadas — completa una unidad para abrir sus ventanas de retención.",
+  },
+  "unitReview.retry": { en: "Try again", es: "Reintentar" },
+  "unitReview.dueCount": {
+    en: "Units to review",
+    es: "Unidades por repasar",
+  },
+  "unitReview.noneDue": {
+    en: "No windows to review right now.",
+    es: "Ninguna ventana que repasar ahora.",
+  },
+  "unitReview.back": { en: "Back to units", es: "Volver a unidades" },
+  "unitReview.window.7": { en: "7 days", es: "7 días" },
+  "unitReview.window.30": { en: "30 days", es: "30 días" },
+  "unitReview.window.90": { en: "90 days", es: "90 días" },
+  "unitReview.state.upcoming": { en: "Upcoming", es: "Pendiente" },
+  "unitReview.state.due_now": { en: "Due now", es: "Para hoy" },
+  "unitReview.state.passed": { en: "Passed", es: "Superada" },
+  "unitReview.state.failed": { en: "Failed", es: "Fallida" },
+  "unitReview.objectives": {
+    en: "objectives",
+    es: "objetivos",
+  },
+  "microReview.honestNote": {
+    en: "Retention review · it does not count as a demonstration of mastery.",
+    es: "Repaso de retención · no cuenta como demostración de dominio.",
+  },
+  "microReview.progress": { en: "question", es: "pregunta" },
+  "microReview.of": { en: "of", es: "de" },
+  "microReview.next": { en: "Next", es: "Siguiente" },
+  "microReview.finish": { en: "Finish review", es: "Terminar repaso" },
+  "microReview.resultPassed": {
+    en: "Window passed",
+    es: "Ventana superada",
+  },
+  "microReview.resultFailed": {
+    en: "Window not passed — try again to keep it fresh.",
+    es: "Ventana no superada — vuelve a intentarlo para mantenerla fresca.",
+  },
+  "microReview.accuracy": { en: "Accuracy", es: "Precisión" },
+  "microReview.yourAnswer": { en: "Your answer", es: "Tu respuesta" },
+  "microReview.correctAnswer": {
+    en: "Correct answer",
+    es: "Respuesta correcta",
+  },
+  "microReview.answered": { en: "answered", es: "respondida" },
+  "microReview.retryHint": {
+    en: "Retry prioritizes the questions you missed last time.",
+    es: "El reintento prioriza las preguntas que fallaste la última vez.",
+  },
+  "microReview.submitError": {
+    en: "Could not submit the review.",
+    es: "No se pudo enviar el repaso.",
+  },
 
   "scenarios.metric.interaction": { en: "Interaction", es: "Interacción" },
   "scenarios.metric.fluency": { en: "Fluency", es: "Fluidez" },

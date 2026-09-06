@@ -388,3 +388,24 @@ def why_for_lexicon(status: str) -> str:
     if status == "known":
         return "recognition-only"
     return "lexicon-maintenance"
+
+
+def why_for_objective(unit, entry: dict) -> str:
+    """Razón pedagógica al sembrar la carta de un objetivo de unidad completada.
+
+    El objetivo se siembra porque su **unidad** tiene un calendario de retención
+    por ventanas (7/30/90, V3.16): la carta acompaña a la ventana más próxima aún
+    no superada. `entry` debe incluir `windows` (lista de
+    `{window_days, state}` ascendente por días, con `state` en
+    upcoming/due_now/passed/failed). Devuelve `unit-window-{días}` para la
+    primera ventana cuyo estado no sea `passed`, o `unit-maintenance` cuando las
+    tres están superadas. `unit` se recibe por contexto (la etiqueta describe la
+    unidad) y no condiciona la salida."""
+    windows = entry.get("windows") or []
+    ordered = sorted(
+        windows, key=lambda w: int(w.get("window_days") or 0)
+    )
+    for window in ordered:
+        if window.get("state") != "passed":
+            return f"unit-window-{int(window.get('window_days') or 0)}"
+    return "unit-maintenance"

@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-06 11:05 (UTC+2).
+> Actualizado por última vez: 2026-09-06 12:00 (UTC+2).
 >
 > **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
 > La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
@@ -11,6 +11,32 @@
 > `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
 > de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
 > especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
+>
+> **Nota (2026-09-06):** posición vigente **v3.16.0** — **Review/SRS por
+> unidad: micro-review + ventanas de retención fijas 7/30/90 días**
+> (backend `3.15.0 → 3.16.0`). Cierra el candidato P1 "Review/SRS por unidad"
+> (auditado abierto 2026-09-05): el motor FSRS ya soportaba
+> `target_type="objective"` pero no se sembraba; no había plan de repaso por
+> unidad ni ventanas fijas. **Motor**: nuevo `backend/services/unit_review.py`
+> puro y determinista — ventanas `(7, 30, 90)` desde el ancla de la unidad
+> (completada = todos sus objetivos `mastered`; ancla = `max(updated_at)`),
+> estados `upcoming/due_now/passed/failed`, micro-review con muestreo
+> balanceado de los checks MC **oficiales** del currículo (cero contenido
+> artificial; reintento prioriza fallidos) y puntuación en servidor (premisa
+> 21). **Siembra**: `sync_fsrs_cards` siembra/refresca cartas `objective` solo
+> para objetivos de unidades completadas del nivel actual, sin pisar `reps > 0`
+> y sin tocar `fsrs.TARGET_TYPES`; `why_for_objective` en `fsrs.py`
+> (`unit-window-N` / `unit-maintenance`). **Datos**: tabla idempotente
+> `unit_review_attempts` (`per_objective` + `failed_items` JSON) + repos; el
+> micro-review **no** crea evidencia de mastery/currículo ni declara dominio
+> (D5; mecanismos separados, E3). **API**: `GET /api/academy/review/unit-plan`
+> y `GET/POST /api/academy/review/unit/{unit_id}/micro-review` con gating
+> (400 ventana no repasable / 404 unidad ajena). **UI**: `UnitReviewPanel` en
+> INICIO (junto a `FsrsReviewPanel`) con chips de ventana 7/30/90, micro-review
+> por tarjetas y nota honesta "no cuenta como demostración de dominio"; lógica
+> pura `unitReviewLogic.ts`; i18n es/en con parity. **Tests**: `pytest 1318`,
+> `vitest 392` y build frontend OK; CONSTITUCIÓN sin cambios (mecanismo, no
+> norma).
 >
 > **Nota (2026-09-06):** posición vigente **v3.15.0** — **Profundidad avanzada
 > C1/C2: densidad, taxonomía avanzada y banco grammar C2 normalizado**
@@ -2521,6 +2547,61 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `release-notes-v3.15.0.md`. Tests: **pytest 1293**, **vitest 382** y build
   frontend OK (sin cambios de frontend/launcher ni de la CONSTITUCIÓN).
 
+### 37.34 HECHO (V3.16) — Review/SRS por unidad (micro-review + ventanas 7/30/90)
+- **Motor puro** `backend/services/unit_review.py` (determinista, sin BD/FastAPI):
+  ventanas fijas `UNIT_REVIEW_WINDOWS_DAYS = (7, 30, 90)` desde el ancla de la
+  unidad (D4: completada = todos sus objetivos `mastered`; ancla =
+  `max(updated_at)` de sus filas de mastery); estados
+  `upcoming/due_now/passed/failed` con `now` inyectable (D3: la ventana es un
+  hito fijo, el grade no la recalendariza); `sample_micro_review` determinista
+  y balanceado (semilla `user|unit|window`; máx. 2 ítems/objetivo; target 8;
+  reintento prioriza `failed_items` del último intento); `score_micro_review`
+  puntúa en servidor contra `correct_index` (el cliente solo envía respuestas,
+  premisa 21) y `passed = accuracy ≥ 0.7` (D6). Contenido: checks MC
+  **oficiales** del currículo (D8, cero contenido artificial).
+- **Siembra FSRS `objective`** (`sync_fsrs_cards`, `backend/domain/academy.py`):
+  cartas `target_type="objective"` para los objetivos de las unidades
+  completadas del nivel actual (`_current_level_id`, D2); cartas con `reps > 0`
+  solo refrescan `why`/`label`; nuevas se siembran desde el mastery del objetivo
+  (`fsrs.seed_card_from_evidence`) y se fuerzan a due si su ventana más próxima
+  está `due_now`/`failed`. `fsrs.why_for_objective` añadido (puro):
+  `unit-window-N` / `unit-maintenance`. `TARGET_TYPES` intacto.
+- **Persistencia**: tabla idempotente `unit_review_attempts`
+  (`backend/repositories/db.py`; PK autoincrement, índice de lookup
+  `user/level/unit/window/created_at`) con `per_objective` + `failed_items` en
+  JSON, y repos `insert/list/latest_unit_review_attempt`
+  (`backend/repositories/academy.py`); `list_objective_mastery` ahora expone
+  `updated_at`. El micro-review **no** crea evidencia de mastery/currículo ni
+  declara dominio (D5, E3).
+- **API** (`backend/routers/academy.py` + `backend/domain/academy.py` +
+  schemas en `backend/schemas/academy.py`): `GET /api/academy/review/unit-plan`
+  (unidades completadas o con plan activo + `due_count`), `GET
+  /api/academy/review/unit/{unit_id}/micro-review` (ítems SIN `correct_index`;
+  400 si la ventana no está `due_now`/`failed`, 404 si la unidad es ajena al
+  nivel) y `POST /api/academy/review/unit/{unit_id}/micro-review` (puntúa,
+  persiste el intento y reprograma las cartas FSRS `objective` con el grade por
+  objetivo derivado de su precisión).
+- **UI (INICIO)**: `UnitReviewPanel` (`frontend/src/features/review/`) montado
+  en `HomeScreen.tsx` junto a `FsrsReviewPanel`: lista de unidades con chips de
+  ventana 7/30/90 y color por estado, contador de unidades por repasar, y
+  micro-review por tarjetas (una pregunta a la vez, feedback inmediato y
+  respuesta correcta revelada al terminar) con la nota honesta "Repaso de
+  retención · no cuenta como demostración de dominio". Lógica pura extraída a
+  `unitReviewLogic.ts` (testeable sin DOM); tipos espejo en `types/api.ts`,
+  cliente en `api/academy.ts`, i18n `en`/`es` completa con parity.
+- **Tests**: `backend/tests/test_unit_review.py` (servicio puro: 18 tests),
+  `backend/tests/test_unit_review_endpoints.py` (siembra solo en unidades
+  completadas + idempotencia, sin `correct_index` en GET, D5 sin evidencia
+  nueva, gating passed/upcoming → 400 y failed → reintento, aislamiento entre
+  usuarios); `frontend/src/features/review/unitReviewLogic.test.ts` y tests del
+  cliente API. Backend **pytest 1318** + ruff limpio; frontend **vitest 392** +
+  `tsc`/`vite build` OK.
+- **Cierre**: bump único `3.16.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.34 en `docs/RELEVO.md`,
+  `release-notes-v3.16.0.md` (untracked). Sin cambios de CONSTITUCIÓN (v3.16 es
+  mecanismo, no norma) ni de launcher.
+
 ### Próximos incrementos (candidatos abiertos, auditados)
 
 > Lista de candidatos con su estado REAL auditado (2026-09-05, subagentes
@@ -2553,10 +2634,17 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   `docs/audit/B-LISTENING-CEFR.md`): re-etiquetar ítems corpus A1/A2
   (`attitude`/`speaker_intention` vs foco recognition) y techo `fast_speech`
   180–200 wpm en C2.
-- **🟠 P1 — Review/SRS por unidad** (ABIERTO, v3.16): micro-review + ventanas
-  7/30/90 días sobre la base FSRS ya operativa (`backend/services/fsrs.py`,
-  tabla `fsrs_cards`, panel INICIO). El motor ya soporta `target_type="objective"`
-  pero no se siembra; no hay plan de repaso por unidad ni ventanas fijas.
+- ~~**🟠 P1 — Review/SRS por unidad**~~ ✅ **cerrado (V3.16, entrada 37.34)**:
+  micro-review + ventanas 7/30/90 días sobre la base FSRS ya operativa. Nuevo
+  `services/unit_review.py` puro (ventanas fijas desde el ancla de la unidad,
+  estados upcoming/due_now/passed/failed, muestreo determinista de checks MC
+  oficiales con reintento priorizando fallidos, puntuación en servidor);
+  `sync_fsrs_cards` siembra/refresca cartas `objective` solo para objetivos de
+  unidades completadas del nivel actual (sin pisar `reps > 0`); tabla
+  `unit_review_attempts` + repos; `/api/academy/review/unit-plan` y
+  `micro-review` GET/POST con gating; `UnitReviewPanel` en INICIO con i18n
+  es/en. El micro-review no declara dominio ni crea evidencia (D5, E3).
+  Tests: pytest 1318, vitest 392, build OK.
 - **🟡 P2 — Knowledge Graph + Daily Adaptive Plan** (ABIERTO, v3.17): conectar
   Can-Do ↔ destrezas ↔ dominio. Infra existente (`evidence_graph.py` v2.12 +
   `adaptive.py`) pero el plan diario NO deriva del grafo; ítems sin

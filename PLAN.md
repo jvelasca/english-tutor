@@ -11,6 +11,29 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.16.0` — **Review/SRS por unidad: micro-review + ventanas de retención fijas 7/30/90 días sobre la base FSRS**
+  (cierra el candidato P1 "Review/SRS por unidad" auditado como abierto 2026-09-05:
+  el motor FSRS ya soportaba `target_type="objective"` pero no se sembraba; no
+  había plan de repaso por unidad ni ventanas fijas. **P0-motor**: nuevo
+  `backend/services/unit_review.py` puro y determinista — ventanas `(7, 30, 90)`
+  desde el ancla de la unidad (completada = todos sus objetivos `mastered`),
+  estados `upcoming/due_now/passed/failed`, micro-review con muestreo
+  balanceado de los checks MC **oficiales** del currículo (cero contenido
+  artificial; reintento prioriza fallidos) y puntuación en servidor (premisa 21)
+  · **P1-siembra**: `sync_fsrs_cards` siembra/refresca cartas `objective` solo
+  para objetivos de unidades completadas del nivel actual, sin pisar `reps > 0`
+  y sin tocar `TARGET_TYPES`; `why_for_objective` en `fsrs.py` · **P1-datos**:
+  tabla idempotente `unit_review_attempts` (`per_objective` + `failed_items`) y
+  repos; el micro-review NO crea evidencia de mastery ni declara dominio (D5,
+  mecanismos separados E3) · **P2-API**: `GET /api/academy/review/unit-plan` y
+  `GET/POST /api/academy/review/unit/{unit_id}/micro-review` con gating de
+  ventanas (400/404) · **P2-UI**: `UnitReviewPanel` en INICIO con chips de
+  ventana 7/30/90, micro-review por tarjetas y nota honesta "no cuenta como
+  demostración de dominio"; lógica pura en `unitReviewLogic.ts` e i18n es/en con
+  parity · **tests**: `test_unit_review.py` + `test_unit_review_endpoints.py`
+  (siembra, idempotencia, sin `correct_index`, aislamiento entre usuarios),
+  vitest de lógica y API; backend pytest 1318 + ruff, frontend vitest 392 +
+  build OK). Base: `3.15.0`
 - ✅ Versión estable `3.15.0` — **Profundidad avanzada C1/C2: densidad, taxonomía avanzada y banco grammar C2 normalizado**
   (cierra el candidato P0 "C1/C2 depth" auditado como abierto 2026-09-05:
   **P0-contenido**: C1 y C2 pasan de 14 a 20 objetivos con evidencia completa

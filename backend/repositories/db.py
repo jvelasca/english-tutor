@@ -439,6 +439,31 @@ def init_db() -> None:
             """
         )
 
+        # Review por unidad (V3.16): intentos de micro-review de una ventana de
+        # retención (7/30/90). `per_objective` guarda el JSON agregado por
+        # objetivo y `failed_items` los ids de los checks fallados (para priorizar
+        # el reintento de la misma ventana). Mecanismo separado del currículo
+        # (D5/E3): estos intentos NO son evidencia de mastery ni de dominio.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS unit_review_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                window_days INTEGER NOT NULL,
+                correct INTEGER NOT NULL,
+                total INTEGER NOT NULL,
+                accuracy REAL NOT NULL,
+                passed INTEGER NOT NULL,
+                per_objective TEXT NOT NULL DEFAULT '[]',
+                failed_items TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Calibración observacional de ítems de placement (V1.7): contadores
         # poblacionales por ítem (no por usuario). Las columnas de estimación
         # (estimated_difficulty/standard_error/discrimination) las rellena un
@@ -746,6 +771,11 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_fsrs_cards_user_due "
             "ON fsrs_cards(user_id, due_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_unit_review_attempts_lookup "
+            "ON unit_review_attempts(user_id, level_id, unit_id, window_days, "
+            "created_at)"
         )
 
         # Listening extra generado (V3.6): catálogo global de ítems de práctica
