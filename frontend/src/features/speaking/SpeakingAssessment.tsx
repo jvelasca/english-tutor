@@ -42,6 +42,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { useI18n } from "../../hooks/useI18n";
+import { useRecordingSession } from "../../hooks/useRecordingSession";
 import { cn } from "../../lib/utils";
 
 type Phase = "idle" | "part" | "result";
@@ -100,6 +101,16 @@ export function SpeakingAssessment({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef(0);
+  // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
+  const recordingSession = useRecordingSession(recording, {
+    onAutoStop: () => {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+        setRecording(false);
+      }
+    },
+  });
 
   async function handleStart() {
     if (!userId) return;
@@ -431,7 +442,7 @@ export function SpeakingAssessment({
                 {processing
                   ? t("assessment.transcribing")
                   : recording
-                    ? t("assessment.stop")
+                    ? `${t("assessment.stop")} · ${recordingSession.formatted}`
                     : t("assessment.record")}
               </span>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { MessageSquareText, Send } from "lucide-react";
 import { streamChat } from "../../api/chat";
+import { resolveDefaultChatModel } from "../../utils/models";
 import { createConversation, saveConversation } from "../../api/conversations";
 import type { ConversationDialogue, Message, TutorMode } from "../../types/api";
 import { turnTelemetry } from "../../utils/telemetry";
@@ -11,9 +12,6 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { ConversationVoiceButton } from "./ConversationVoiceButton";
 
-// Modelo del tutor guiado: el mismo que usa el role-play conversacional (nunca
-// un modelo marcado como no utilizable; ver config.py).
-const DEFAULT_MODEL = "llama3.1:8b";
 const GUIDED_MODE: TutorMode = "conversation";
 
 // Turnos mínimos del alumno antes de poder terminar la conversación. Es un
@@ -178,9 +176,11 @@ export function ConversationGuidedChat({
     ];
 
     try {
+      // V3.21 (V20-05): el modelo por defecto se resuelve desde el backend
+      // (`/api/models` → `default_model`), no desde una constante local.
       await streamChat(
         requestMessages,
-        DEFAULT_MODEL,
+        await resolveDefaultChatModel(),
         GUIDED_MODE,
         {
           onDelta: (content) => {

@@ -279,6 +279,8 @@ async def submit_attempt(
     phrase_id: str,
     heard: str,
     duration_seconds: float | None = None,
+    asr_status: str = "ok",
+    asr_confidence: float | None = None,
 ) -> dict | None:
     """Puntúa un turno abierto de micro-conversación y persiste el intento.
 
@@ -287,10 +289,33 @@ async def submit_attempt(
     tarjeta y el scorer determinista calcula criterios y overall. Si el extractor
     no produce evidencia válida se lanza `EvidenceExtractionError` (transitorio)
     para que el frontend ofrezca reintentar. None si la tarjeta no existe.
+
+    V3.21 (V20-14/V20-15): si el ASR no reconoció el audio con fiabilidad
+    (`asr_status != "ok"`), se devuelve un resultado NO evaluado (overall 0.0,
+    passed False, criterios vacíos) SIN llamar al extractor LLM ni persistir un
+    fallo lingüístico: un silencio no es "respondiste mal".
     """
     phrase = await _resolve_phrase(phrase_id)
     if phrase is None:
         return None
+    if asr_status != "ok":
+        return {
+            "phrase_id": phrase_id,
+            "level": phrase.get("level", ""),
+            "app_line": phrase.get("app_line", ""),
+            "heard": heard,
+            "model_response": "",
+            "overall": 0.0,
+            "passed": False,
+            "criteria": {},
+            "observed": {},
+            "topic": phrase.get("topic", ""),
+            "difficulty": difficulty_from_vector(
+                phrase.get("difficulty_vector", {})
+            ),
+            "asr_status": asr_status,
+            "asr_confidence": asr_confidence,
+        }
     model = await pick_model(None)
     task = _card_task(phrase)
     evidence = await speaking_llm.extract_speaking_evidence(task, heard, model)
@@ -332,6 +357,8 @@ async def submit_attempt(
         "observed": scored["observed"],
         "topic": topic,
         "difficulty": difficulty,
+        "asr_status": asr_status,
+        "asr_confidence": asr_confidence,
     }
 
 

@@ -22,6 +22,7 @@ from fastapi import (
 )
 from starlette.concurrency import run_in_threadpool
 
+import config
 from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import speaking_routes as speaking_routes_service
@@ -36,7 +37,7 @@ from schemas.speaking import (
     SpeakingStats,
 )
 from services.speaking_routes import LEVEL_ORDER
-from services.stt import transcribe_with_timing
+from services.stt import exceeds_max_duration, transcribe_with_timing
 
 logger = logging.getLogger(__name__)
 
@@ -143,11 +144,25 @@ async def attempt(
         raise HTTPException(
             status_code=500, detail="No se pudo transcribir el audio"
         ) from None
+    # V3.21 (V20-13): red de seguridad de duración (audio demasiado largo).
+    if exceeds_max_duration(timed.get("duration")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El audio dura {timed['duration']:.1f}s y supera el máximo de "
+            f"{config.MAX_AUDIO_DURATION_SECONDS:.0f}s permitido. Grábalo de nuevo.",
+        )
     heard = timed["text"]
     duration = timed.get("duration")
+    asr_status = timed.get("asr_status", "ok")
+    asr_confidence = timed.get("confidence")
     try:
         result = await speaking_routes_service.submit_attempt(
-            user["id"], phrase_id, heard, duration
+            user["id"],
+            phrase_id,
+            heard,
+            duration,
+            asr_status=asr_status,
+            asr_confidence=asr_confidence,
         )
     except EvidenceExtractionError:
         logger.warning("Intento de speaking sin evidencia válida del LLM; 503")
@@ -156,11 +171,14 @@ async def attempt(
         ) from None
     if result is None:
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
-    await learning_service.record_event(
-        user["id"],
-        "exercise",
-        f"speaking:{phrase_id}:{'ok' if result['passed'] else 'ko'}",
-    )
+    # V3.21 (V20-14/15): audio no reconocido -> el dominio no puntúa; no se
+    # registra ni ok ni ko (un silencio no es "respondiste mal").
+    if asr_status == "ok":
+        await learning_service.record_event(
+            user["id"],
+            "exercise",
+            f"speaking:{phrase_id}:{'ok' if result['passed'] else 'ko'}",
+        )
     return result
 
 

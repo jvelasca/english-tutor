@@ -18,11 +18,14 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
+  // V3.21 (V20-14): aviso cuando la transcripción no detectó habla.
+  const [noSpeech, setNoSpeech] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   async function start() {
     setMicError(null);
+    setNoSpeech(false);
     let stream: MediaStream;
     try {
       stream = await getMicrophoneStream();
@@ -47,7 +50,13 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
         setProcessing(true);
         try {
           const text = await transcribe(blob);
-          if (text) onTranscribed(text);
+          if (text) {
+            setNoSpeech(false);
+            onTranscribed(text);
+          } else {
+            // V3.21 (V20-14): silencio/audio ininteligible: avisar, no callar.
+            setNoSpeech(true);
+          }
         } catch (e) {
           alert(`${t("mic.transcribeError")}${(e as Error).message}`);
         } finally {
@@ -74,6 +83,14 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
         <div className="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[80vw]">
           <MicUnavailableNotice reason={micError} />
         </div>
+      )}
+      {noSpeech && (
+        <p
+          role="status"
+          className="absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[60vw] -translate-x-1/2 rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground shadow-sm"
+        >
+          {t("mic.noSpeech")}
+        </p>
       )}
       <button
         type="button"

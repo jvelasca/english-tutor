@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Send } from "lucide-react";
 import { streamChat } from "../../api/chat";
+import { resolveDefaultChatModel } from "../../utils/models";
 import { createConversation, saveConversation } from "../../api/conversations";
 import type { Message, TutorMode } from "../../types/api";
 import { rolePlaySetup } from "../../utils/speaking";
@@ -10,9 +11,6 @@ import { deriveTitle } from "../../utils/title";
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 
-// Modelo del role-play conversacional. Usa el modelo utilizable por defecto de
-// la app (ver config.py / backend): nunca un modelo marcado como no utilizable.
-const DEFAULT_MODEL = "llama3.1:8b";
 const ROLEPLAY_MODE: TutorMode = "conversation";
 
 interface SpeakingRolePlayProps {
@@ -117,7 +115,7 @@ export function SpeakingRolePlay({
     try {
       await streamChat(
         requestMessages,
-        DEFAULT_MODEL,
+        await resolveDefaultChatModel(),
         ROLEPLAY_MODE,
         {
           onDelta: (content) => {

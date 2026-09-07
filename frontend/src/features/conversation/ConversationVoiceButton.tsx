@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Loader2, Square } from "lucide-react";
 import { transcribe } from "../../api/voz";
 import { useI18n } from "../../hooks/useI18n";
+import { useRecordingSession } from "../../hooks/useRecordingSession";
 import {
   getMicrophoneStream,
   MicUnavailableError,
@@ -53,13 +54,23 @@ export function ConversationVoiceButton({
   const [processing, setProcessing] = useState(false);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
+  // V3.21 (V20-14): aviso cuando el ASR no detectó habla en el turno.
+  const [noSpeech, setNoSpeech] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef<number>(0);
+  // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
+  const recordingSession = useRecordingSession(recording, {
+    onAutoStop: () => {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") stop();
+    },
+  });
 
   async function start() {
     setMicError(null);
     setTranscribeError(null);
+    setNoSpeech(false);
     let stream: MediaStream;
     try {
       stream = await getMicrophoneStream();
@@ -88,7 +99,13 @@ export function ConversationVoiceButton({
           const fallbackMs = performance.now() - startedAtRef.current;
           const durationMs = realMs ?? fallbackMs;
           const text = await transcribe(blob);
-          if (text) onSpoken(text, Math.max(1, Math.round(durationMs)));
+          if (text) {
+            setNoSpeech(false);
+            onSpoken(text, Math.max(1, Math.round(durationMs)));
+          } else {
+            // V3.21 (V20-14): silencio/audio ininteligible: avisar, no callar.
+            setNoSpeech(true);
+          }
         } catch (e) {
           setTranscribeError(`${t("mic.transcribeError")}${(e as Error).message}`);
         } finally {
@@ -122,6 +139,22 @@ export function ConversationVoiceButton({
         >
           {transcribeError}
         </div>
+      )}
+      {noSpeech && (
+        <p
+          role="status"
+          className="absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[60vw] -translate-x-1/2 rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground shadow-sm"
+        >
+          {t("mic.noSpeech")}
+        </p>
+      )}
+      {recording && (
+        <p
+          role="status"
+          className="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground shadow-sm"
+        >
+          {recordingSession.formatted}
+        </p>
       )}
       <button
         type="button"

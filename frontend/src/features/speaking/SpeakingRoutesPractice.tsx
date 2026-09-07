@@ -24,6 +24,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
+import { useRecordingSession } from "../../hooks/useRecordingSession";
 import { navigateTo, useHashPath } from "../../router/hash";
 import {
   type LearnActivity,
@@ -86,8 +87,9 @@ import { SpeakingMission } from "./SpeakingMission";
 
 const SPEAKING_ROUTE_CONFIG: RouteQuizConfig = {
   ns: "speaking",
-  skillTitleKey: "skill.speaking",
+  skillTitleKey: "speaking.surfaceTitleMicro",
   subtitleKey: "learn.speakingSubtitle",
+  statsCompetenceKey: "speaking.competenceMicro",
   ariaLevelItemsId: "speaking-level-items",
   assessment: "speaking",
   loadAssessed: (userId) =>
@@ -136,16 +138,31 @@ const SPEAKING_MODES: readonly RouteModeTab[] = [
  * Config del modo oral activo. Micro-conversación usa la config original de
  * Speaking; Acento y Diálogo guiado reutilizan las configs de las antiguas
  * tarjetas Pronunciación y Conversation (mismos motores, escenas, paneles y
- * API) con el título de superficie unificado a "Speaking".
+ * API). V3.21 (V20-03/04): cada modo lleva SU título de superficie con la
+ * competencia real que trabaja (`speaking.surfaceTitle*`), en vez de un
+ * "Speaking" genérico que ocultaba si se practicaba pronunciación,
+ * conversación o micro-diálogo.
  */
-function speakingConfigFor(mode: SpeakingMode): RouteQuizConfig {
+export function speakingConfigFor(mode: SpeakingMode): RouteQuizConfig {
   switch (mode) {
     case "accent":
-      return { ...PRONUNCIATION_ROUTE_CONFIG, skillTitleKey: "skill.speaking" };
+      return {
+        ...PRONUNCIATION_ROUTE_CONFIG,
+        skillTitleKey: "speaking.surfaceTitleAccent",
+        statsCompetenceKey: "speaking.competenceAccent",
+      };
     case "dialogue":
-      return { ...CONVERSATION_ROUTE_CONFIG, skillTitleKey: "skill.speaking" };
+      return {
+        ...CONVERSATION_ROUTE_CONFIG,
+        skillTitleKey: "speaking.surfaceTitleDialogue",
+        statsCompetenceKey: "speaking.competenceDialogue",
+      };
     default:
-      return SPEAKING_ROUTE_CONFIG;
+      return {
+        ...SPEAKING_ROUTE_CONFIG,
+        skillTitleKey: "speaking.surfaceTitleMicro",
+        statsCompetenceKey: "speaking.competenceMicro",
+      };
   }
 }
 
@@ -386,6 +403,7 @@ export function SpeakingScene({
         onSkip={onSkip}
         onRetry={() => {
           setAttemptError(null);
+          setResult(null);
           processedRef.current = false;
         }}
       />
@@ -432,6 +450,14 @@ function PracticeExchangeCard({
   const { t } = useI18n();
   const appLine = usePhraseTranslation(card?.app_line ?? "");
   const modelText = usePhraseTranslation(result?.model_response ?? "");
+  // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
+  const recordingRef = useRef(recording);
+  recordingRef.current = recording;
+  const recordingSession = useRecordingSession(recording, {
+    onAutoStop: () => {
+      if (recordingRef.current) onToggleRecording();
+    },
+  });
 
   if (cardLoading || !card) {
     return (
@@ -458,6 +484,26 @@ function PracticeExchangeCard({
   return (
     <Card className="gap-4 p-5 sm:p-6">
       {result ? (
+        result.asr_status && result.asr_status !== "ok" ? (
+          /* V3.21 (V20-14/15): el ASR no reconoció el audio. El backend NO
+             puntuó este turno (overall 0, sin persistir fallo): se avisa y se
+             pide repetir, sin feedback de colores. */
+          <ActivityResult
+            outcome="neutral"
+            title={t("asr.title")}
+            footer={
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" onClick={onRetry}>
+                  {t("asr.tryAgain")}
+                </Button>
+              </div>
+            }
+          >
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t(`asr.message.${result.asr_status}`)}
+            </p>
+          </ActivityResult>
+        ) : (
         <ActivityResult
           outcome={result.passed ? "ok" : "ko"}
           title={result.passed ? t("speaking.passedTitle") : t("speaking.notPassedTitle")}
@@ -552,6 +598,7 @@ function PracticeExchangeCard({
             </div>
           )}
         </ActivityResult>
+        )
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -662,7 +709,9 @@ function PracticeExchangeCard({
                   : t("speaking.record")}
             </Button>
             <span className="text-xs text-muted-foreground">
-              {t("speaking.recordHint")}
+              {recording
+                ? t("speaking.recordHint") + " · " + recordingSession.formatted
+                : t("speaking.recordHint")}
             </span>
           </div>
 

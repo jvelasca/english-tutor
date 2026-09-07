@@ -52,6 +52,47 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.21.0` — **Speaking & Evidence Calibration**
+  (cierra el plan V3.21 del dossier de la auditoría externa V3.20.0, calibrando
+  la verdad del micro-drill y el feedback ASR honesto: **F1 P0 — verdad del
+  drill** — la producción se decide por **alineación secuencial**
+  (`unit_produced` en `services/phonetics.py`, misma normalización
+  `tokenize`, nunca `.split()`): palabra alineada `equal`, frase multi-palabra
+  contigua — "get it up" NO es "get up", "my living room is nice" sí produce
+  "living room" · las unidades multi-palabra se acreditan a SÍ MISMAS
+  (`record_production_text(as_unit=True)`, invariante
+  `sum(channel_prod)==appearances` por fila) · **F2 P1 — feedback honesto +
+  ASR** — `transcribe_with_timing` captura `no_speech_prob`/`avg_logprob`/
+  `language_probability` y clasifica `asr_status ∈ {ok, no_speech,
+  unintelligible, low_confidence}`; gating de NO-penalización en drill/
+  read-aloud/speaking/pronunciación (`asr_status != ok` → ni KO ni fallo,
+  evento `unclear`); chips re-etiquetados ("Reconocida correctamente" no "Bien
+  dicha"), mensajes por `asr_status` en las escenas y estado `unclear` en
+  manos-libres · **F3 quick wins** — `DEFAULT_MODEL` fuente única
+  (`GET /api/models` → `default_model` + `utils/models.ts`
+  `resolveDefaultChatModel`, sustituye las 3 constantes), comentario
+  `ADMIN_PIN` fail-closed, hook `useRecordingSession` (cronómetro + auto-stop
+  120 s) y red de seguridad backend de duración (400), aviso de audio no
+  reconocido · **F4 — semántica de superficie Speaking** — títulos por modo
+  (Micro-práctica/Acento/Diálogo) y pies de stats con la competencia real
+  (Pronunciación/Conversación/Producción oral) · **F5 — matriz de competencia
+  léxica** — `item_competence_matrix` pura
+  (Recognition/Production/Transfer/Retention/gap por ítem, sin migrar
+  columnas), expuesta en el léxico y el diccionario, y **Transfer Gap para
+  FSRS** (razón `transfer-gap` en el "why" de cartas lexicon de objetivos con
+  producción, `recognition-only` si no) · **F6 — drill escalera MVP** — paso
+  **Sentence determinista sin LLM** (`sentence_context_for`: frase del banco de
+  read-aloud del nivel que contiene la unidad o plantilla neutra; endpoints
+  `GET/POST /api/vocabulary/drill/sentence(-context|-attempt)`, `passed =
+  produced AND phrase_ok`) con la UI Recall → Sentence en la misma tarjeta de
+  `WordDrill`, y **graduación espaciada** (V20-06: una producción del día no
+  elimina de la lista "pendiente"; se sale con 2 días de éxito de drill —
+  eventos `drill:<word>[:sentence]:ok` — u otra señal de speaking espaciada;
+  sin declarar dominio D5/E3) · F6.3 (Contexto/Transfer libre) queda APLAZADO
+  a la auditoría pedagógica de Speaking/Listening · **tests**: backend pytest
+  **1424** + ruff limpio; frontend vitest **450** (57 archivos) + `tsc` limpio;
+  `check_release_consistency` 3.21.0 exit 0; CONSTITUCIÓN sin cambios). Base:
+  `3.20.0`
 - ✅ Versión estable `3.20.0` — **Speaking único + feedback oral**
   (cierra el candidato V3.20, definido 2026-09-07 frontend-only, F1 de
   `docs/DISENO-SPEAKING-UNICO.md` + feedback oral: **F1** — consolidación de la

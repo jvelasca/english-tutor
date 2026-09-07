@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+import config
 from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import pronunciation as pronunciation_service
@@ -13,7 +14,7 @@ from domain import vocabulary as vocabulary_service
 from schemas.pronunciation import PronunciationResponse
 from services.fluency import compute_fluency
 from services.pronunciation import score_pronunciation
-from services.stt import transcribe_with_timing
+from services.stt import exceeds_max_duration, transcribe_with_timing
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +37,37 @@ async def pronunciation(
         raise HTTPException(
             status_code=500, detail="No se pudo transcribir el audio"
         ) from None
+    # V3.21 (V20-13): red de seguridad de duración (audio demasiado largo).
+    if exceeds_max_duration(timed.get("duration")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El audio dura {timed['duration']:.1f}s y supera el máximo de "
+            f"{config.MAX_AUDIO_DURATION_SECONDS:.0f}s permitido. Grábalo de nuevo.",
+        )
     heard = timed["text"]
     result = score_pronunciation(expected, heard)
     result["fluency"] = compute_fluency(heard, timed.get("duration"))
-    await pronunciation_service.record_pronunciation(
-        user_id, result["expected"], result["heard"], result["score"], result["level"]
-    )
-    await learning_service.record_event(user_id, "pronunciation", result["expected"])
-    # V3.19: la lectura en voz alta es producción oral; volcarla al léxico por
-    # destreza (canal speaking). No bloquea la respuesta (nunca lanza).
-    await vocabulary_service.record_production_text(
-        user_id, result["heard"], "speaking"
-    )
+    asr_status = timed.get("asr_status", "ok")
+    asr_confidence = timed.get("confidence")
+    result["asr_status"] = asr_status
+    result["asr_confidence"] = asr_confidence
+    if asr_status == "ok":
+        # Solo con ASR fiable se registra el intento y se vuelca al léxico: un
+        # fallo de reconocimiento no es un fallo lingüístico del alumno (V3.21,
+        # V20-14/15).
+        await pronunciation_service.record_pronunciation(
+            user_id,
+            result["expected"],
+            result["heard"],
+            result["score"],
+            result["level"],
+        )
+        await learning_service.record_event(
+            user_id, "pronunciation", result["expected"]
+        )
+        # V3.19: la lectura en voz alta es producción oral; volcarla al léxico
+        # por destreza (canal speaking). No bloquea la respuesta (nunca lanza).
+        await vocabulary_service.record_production_text(
+            user_id, result["heard"], "speaking"
+        )
     return PronunciationResponse(**result)

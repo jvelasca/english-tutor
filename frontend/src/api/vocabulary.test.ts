@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDrillCandidates, getLexicon, submitDrillAttempt } from "./vocabulary";
+import {
+  getDrillCandidates,
+  getDrillSentenceContext,
+  getLexicon,
+  submitDrillAttempt,
+  submitDrillSentenceAttempt,
+} from "./vocabulary";
 
 function mockFetch(data: unknown) {
   const fn = vi.fn().mockResolvedValue({ ok: true, json: async () => data });
@@ -37,6 +43,27 @@ describe("vocabulary api", () => {
     expect(url).toBe("/api/vocabulary/drill/attempt?user_id=u1");
     expect(init.method).toBe("POST");
     expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    expect(form.get("word")).toBe("travel");
+    expect(form.get("file")).not.toBeNull();
+  });
+
+  it("getDrillSentenceContext llama con user_id y word", async () => {
+    const fn = mockFetch({ word: "travel", phrase: "x", source: "template" });
+    await getDrillSentenceContext("u1", "travel");
+    const [url] = fn.mock.calls[0];
+    expect(url).toBe(
+      "/api/vocabulary/drill/sentence-context?user_id=u1&word=travel",
+    );
+  });
+
+  it("submitDrillSentenceAttempt sube word + audio en multipart", async () => {
+    const fn = mockFetch({ word: "travel", passed: true });
+    const blob = new Blob(["fake"], { type: "audio/webm" });
+    await submitDrillSentenceAttempt("u1", "travel", blob);
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/drill/sentence-attempt?user_id=u1");
+    expect(init.method).toBe("POST");
     const form = init.body as FormData;
     expect(form.get("word")).toBe("travel");
     expect(form.get("file")).not.toBeNull();

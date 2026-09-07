@@ -2,6 +2,8 @@ import { getJson } from "./client";
 import type {
   DrillAttempt,
   DrillCandidates,
+  DrillSentenceAttempt,
+  DrillSentenceContext,
   Lexicon,
 } from "../types/api";
 
@@ -46,4 +48,44 @@ export async function submitDrillAttempt(
     throw new Error(err.detail ?? `HTTP ${res.status}`);
   }
   return (await res.json()) as DrillAttempt;
+}
+
+/** Contexto del paso Sentence del micro-drill (V3.21/F6.1): frase determinista
+ * que contiene la palabra objetivo. El servidor la deriva del banco oficial de
+ * read-aloud del nivel (o plantilla simple). */
+export function getDrillSentenceContext(
+  userId: string,
+  word: string,
+): Promise<DrillSentenceContext> {
+  const query = new URLSearchParams({
+    user_id: userId,
+    word,
+  }).toString();
+  return getJson<DrillSentenceContext>(
+    `/api/vocabulary/drill/sentence-context?${query}`,
+  );
+}
+
+/** Intento del paso Sentence del drill (V3.21/F6.1): sube el audio de la frase.
+ * Acredita la palabra solo si quedó alineada dentro de una frase superada
+ * (`passed`). */
+export async function submitDrillSentenceAttempt(
+  userId: string,
+  word: string,
+  audio: Blob,
+): Promise<DrillSentenceAttempt> {
+  const form = new FormData();
+  form.append("file", audio, "audio.webm");
+  form.append("word", word);
+
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  const res = await fetch(`/api/vocabulary/drill/sentence-attempt?${query}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(err.detail ?? `HTTP ${res.status}`);
+  }
+  return (await res.json()) as DrillSentenceAttempt;
 }

@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<HandsFreeStatus, string> = {
   transcribing: "Transcribiendo…",
   thinking: "Pensando…",
   speaking: "Hablando…",
+  unclear: "No te he oído…",
 };
 
 export function HandsFreeToggle({

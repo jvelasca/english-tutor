@@ -292,6 +292,23 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.learning": { en: "Learning", es: "Aprendiendo" },
   "dictionary.weak": { en: "Weak", es: "Débiles" },
   "dictionary.mastered": { en: "Mastered", es: "Dominadas" },
+  // V3.21 (V20-16): matriz Recognition/Production/Transfer/Retention.
+  "dictionary.competenceTitle": {
+    en: "Competence matrix",
+    es: "Matriz de competencia",
+  },
+  "dictionary.competenceHint": {
+    en: "Recognition (met it), production (used it), transfer (used in 2+ contexts or on spaced days), retention (spaced) and the transfer gap the drill closes.",
+    es: "Reconocimiento (la has visto), producción (la has usado), transferencia (usada en 2+ contextos o en días separados), retención (espaciada) y el gap de transferencia que cierra el drill.",
+  },
+  "dictionary.competenceRecognized": { en: "Recognized", es: "Reconocidas" },
+  "dictionary.competenceProduced": { en: "Produced", es: "Producidas" },
+  "dictionary.competenceTransfer": {
+    en: "Transfer",
+    es: "Transferidas",
+  },
+  "dictionary.competenceRetention": { en: "Retention", es: "Retención" },
+  "dictionary.competenceGap": { en: "Transfer gap", es: "Gap de transferencia" },
   "dictionary.byCefr": { en: "Vocabulary by CEFR", es: "Vocabulario por CEFR" },
   "dictionary.items": { en: "Lexical items", es: "Ítems léxicos" },
   "dictionary.recall": { en: "Recall", es: "Recuerdo" },
@@ -318,12 +335,12 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.kind.structure": { en: "structure", es: "estructura" },
   "dictionary.kind.other": { en: "lexical unit", es: "unidad léxica" },
   "dictionary.recognizedNotProduced": {
-    en: "Recognized but not yet said",
-    es: "Reconocidas pero aún no dichas",
+    en: "Pending speaking drill",
+    es: "Pendientes de práctica oral",
   },
   "dictionary.recognizedNotProducedHint": {
-    en: "Words you meet in reading or listening that you haven't produced in speaking practice yet — tap one and say it aloud.",
-    es: "Palabras que encuentras al leer u oír y que aún no has producido en la práctica de speaking — tócala y dila en voz alta.",
+    en: "Words you have met that still need spaced speaking practice — tap one, say it aloud, then repeat it inside a sentence.",
+    es: "Palabras que has encontrado y que aún necesitan práctica oral espaciada — tócala, dila en voz alta y luego repítela dentro de una frase.",
   },
   "dictionary.loadError": {
     en: "Could not load your dictionary. ",
@@ -333,13 +350,49 @@ const STRINGS: Record<string, Entry> = {
     en: "Say {word}",
     es: "Di {word}",
   },
+  "dictionary.drill.steps": {
+    en: "Drill steps",
+    es: "Pasos de la práctica",
+  },
+  "dictionary.drill.stepRecall": {
+    en: "1 · Word",
+    es: "1 · Palabra",
+  },
+  "dictionary.drill.stepSentence": {
+    en: "2 · Sentence",
+    es: "2 · Frase",
+  },
   "dictionary.drill.prompt": {
     en: "Listen to the word, then record yourself saying it aloud.",
     es: "Escucha la palabra y luego grábate diciéndola en voz alta.",
   },
+  "dictionary.drill.sentencePrompt": {
+    en: "Listen to the sentence, then record yourself repeating it aloud.",
+    es: "Escucha la frase y luego grábate repitiéndola en voz alta.",
+  },
+  "dictionary.drill.sentenceListen": {
+    en: "Listen to the sentence",
+    es: "Escuchar la frase",
+  },
+  "dictionary.drill.sentenceTemplateNote": {
+    en: "There is no curated example with this word yet, so we use a neutral carrier sentence to place it in context.",
+    es: "Aún no hay una frase curada con esta palabra; usamos una frase portadora neutra para ponerla en contexto.",
+  },
   "dictionary.drill.produced": {
-    en: "Great! You produced it aloud — it left the speaking-drill list.",
-    es: "¡Bien! La has dicho en voz alta — ya salió de la lista de práctica de speaking.",
+    en: "Great! You said it aloud — repeat it on another day to consolidate it and leave the pending list.",
+    es: "¡Bien! La has dicho en voz alta — repítela otro día para consolidarla y salir de la lista pendiente.",
+  },
+  "dictionary.drill.sentencePassed": {
+    en: "Great! You said the word inside the sentence — repeat it on another day to consolidate it.",
+    es: "¡Bien! Has dicho la palabra dentro de la frase — repítela otro día para consolidarla.",
+  },
+  "dictionary.drill.sentenceWordOnly": {
+    en: "We heard the word, but repeat the whole sentence to complete this step.",
+    es: "Hemos oído la palabra, pero repite la frase completa para superar este paso.",
+  },
+  "dictionary.drill.sentenceNotPassed": {
+    en: "We heard “{heard}” (score {score}/100). Listen to the sentence again and try once more.",
+    es: "Hemos oído “{heard}” (puntuación {score}/100). Vuelve a escuchar la frase e inténtalo otra vez.",
   },
   "dictionary.drill.notProduced": {
     en: "We heard “{heard}” (score {score}/100). Listen again and try once more.",
@@ -706,6 +759,32 @@ const STRINGS: Record<string, Entry> = {
   "mic.stop": { en: "Stop recording", es: "Detener grabación" },
   "mic.record": { en: "Record message", es: "Grabar mensaje" },
   "mic.transcribeError": { en: "Error transcribing: ", es: "Error al transcribir: " },
+  // V3.21 (V20-14): aviso en flujos directos (dictado, turno hablado) cuando el
+  // ASR no detectó habla clara en la grabación.
+  "mic.noSpeech": {
+    en: "No speech recognized. Try again.",
+    es: "No se ha reconocido audio. Vuelve a intentarlo.",
+  },
+  // V3.21 (V20-14/15): avisos cuando el ASR no reconoció el audio. La UI nunca
+  // debe interpretarlos como un fallo lingüístico del alumno (no es "lo dijo mal",
+  // es "no te he oído / no he entendido el audio").
+  "asr.title": {
+    en: "The audio wasn't recognized",
+    es: "No se ha podido reconocer el audio",
+  },
+  "asr.tryAgain": { en: "Record again", es: "Volver a grabar" },
+  "asr.message.no_speech": {
+    en: "I couldn't hear your voice. Check the microphone and record again.",
+    es: "No te he oído. Revisa el micrófono y vuelve a grabar.",
+  },
+  "asr.message.unintelligible": {
+    en: "I couldn't make out what you said. Please record again.",
+    es: "No he podido entender qué has dicho. Vuelve a grabarlo.",
+  },
+  "asr.message.low_confidence": {
+    en: "The audio wasn't clear enough. Please record again.",
+    es: "El audio no se ha captado con claridad. Vuelve a grabarlo.",
+  },
   "mic.accessError": {
     en: "Could not access the microphone: ",
     es: "No se pudo acceder al micrófono: ",
@@ -1905,16 +1984,29 @@ const STRINGS: Record<string, Entry> = {
     en: "Word by word",
     es: "Palabra a palabra",
   },
-  "pron.chip.ok": { en: "Read well", es: "Bien dicha" },
-  "pron.chip.miss": { en: "Not said", es: "No dicha" },
+  // V3.21 (V20-02): los chips comparan la transcripción (ASR) con la frase
+  // esperada. La etiqueta es honesta: dice si la palabra fue RECONOCIDA en la
+  // transcripción, no cómo sonó acústicamente (eso sería el scorer fonético).
+  "pron.chip.ok": {
+    en: "Recognized correctly",
+    es: "Reconocida correctamente",
+  },
+  "pron.chip.miss": {
+    en: "Not recognized",
+    es: "No reconocida",
+  },
   "pron.chip.sub": {
-    en: "You said “{heard}” instead",
-    es: "Dijiste «{heard}» en su lugar",
+    en: "Transcribed as “{heard}”",
+    es: "Transcrita como «{heard}»",
   },
   "pron.chip.extra": { en: "Extra word", es: "Palabra de más" },
   "pron.chip.extraHint": {
     en: "Words you added that are not in the phrase (they also make the score drop).",
     es: "Palabras que añadiste y no están en la frase (también bajan la puntuación).",
+  },
+  "pron.chipsNote": {
+    en: "Word-by-word feedback is based on the audio transcription (what the speech recognizer heard), not on an acoustic analysis of your pronunciation.",
+    es: "El feedback palabra a palabra se basa en la transcripción del audio (lo que el reconocedor de voz ha oído), no en un análisis acústico de tu pronunciación.",
   },
 
   // Progreso: buckets de agrupación y tipos de evento.
@@ -3032,6 +3124,25 @@ const STRINGS: Record<string, Entry> = {
     en: "Guided dialogue",
     es: "Diálogo guiado",
   },
+
+  // V3.21 (V20-03/04): títulos de la superficie Speaking por modo. El h1 expresa
+  // qué competencia real se trabaja en cada modo (no un "Speaking" genérico) y
+  // cada modo añade su etiqueta de competencia para los pies de stats.
+  "speaking.surfaceTitleMicro": {
+    en: "Speaking · Micro-conversation",
+    es: "Speaking · Micro-práctica",
+  },
+  "speaking.surfaceTitleAccent": {
+    en: "Speaking · Accent (Pronunciation)",
+    es: "Speaking · Acento (Pronunciación)",
+  },
+  "speaking.surfaceTitleDialogue": {
+    en: "Speaking · Guided dialogue (Conversation)",
+    es: "Speaking · Diálogo (Conversación guiada)",
+  },
+  "speaking.competenceMicro": { en: "Oral production", es: "Producción oral" },
+  "speaking.competenceAccent": { en: "Pronunciation", es: "Pronunciación" },
+  "speaking.competenceDialogue": { en: "Conversation", es: "Conversación" },
 
   // Sesión read-aloud.
   "speaking.modeLevel": {

@@ -502,6 +502,12 @@ body.is-resizing {
   color: var(--color-accent);
 }
 
+/* V3.21 (V20-14): el ASR no entendió el último tramo; se avisa y se sigue
+   escuchando automáticamente (no es un fallo del alumno). */
+.hands-free-status--unclear {
+  color: var(--color-warning);
+}
+
 .hands-free-status--idle {
   color: var(--color-text-dim);
 }

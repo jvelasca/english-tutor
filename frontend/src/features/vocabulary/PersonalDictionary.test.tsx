@@ -36,6 +36,12 @@ const LEXICON: Lexicon = {
     weak: 0,
     mastered: 0,
     by_cefr: [],
+    // V3.21 (V20-16): contadores de la matriz de competencia.
+    recognized: 0,
+    produced: 0,
+    transfer: 0,
+    retention: 0,
+    transfer_gap: 0,
   },
   items: [
     {
@@ -184,10 +190,63 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     // Detener la grabación dispara submitDrillAttempt → produced.
     fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
 
-    expect(
-      await screen.findByText(/it left the speaking-drill list/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/another day to consolidate it/)).toBeTruthy();
     // El chip desaparece (refresh tras producir).
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Say travel" })).toBeNull(),
+    );
+  });
+
+  it("ofrece el paso Sentence (F6.1) y pasa al decir la palabra dentro de la frase", async () => {
+    // Estado mutable: tras el POST de frase (passed), ya no es candidata hoy.
+    const candidates: { words: string[] } = { words: ["travel"] };
+    routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: candidates },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      {
+        url: "/api/vocabulary/drill/sentence-context",
+        data: {
+          word: "travel",
+          phrase: 'Say the word "travel".',
+          source: "template",
+          level: "A1",
+        },
+      },
+      {
+        url: "/api/vocabulary/drill/sentence-attempt",
+        data: () => {
+          candidates.words = [];
+          return {
+            word: "travel",
+            phrase: 'Say the word "travel".',
+            source: "template",
+            produced: true,
+            phrase_ok: true,
+            passed: true,
+            heard: 'say the word "travel"',
+            score: 100,
+            level: "good",
+            fluency: null,
+            asr_status: "ok",
+          };
+        },
+      },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    const chip = await screen.findByRole("button", { name: "Say travel" });
+    fireEvent.click(chip);
+
+    // Escalera Recall -> Sentence en la misma tarjeta.
+    fireEvent.click(screen.getByRole("button", { name: "2 · Sentence" }));
+    expect(await screen.findByText('Say the word "travel".')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Record" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+
+    expect(
+      await screen.findByText(/inside the sentence/),
+    ).toBeTruthy();
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Say travel" })).toBeNull(),
     );

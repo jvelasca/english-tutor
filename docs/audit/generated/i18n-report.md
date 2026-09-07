@@ -5,13 +5,14 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1182,
- "literal_uses": 824,
- "referenced_keys": 924,
+ "defined": 1231,
+ "literal_uses": 861,
+ "referenced_keys": 967,
  "dynamic_prefixes": [
   "appearance.accent.",
   "appearance.density.",
   "appearance.font.",
+  "asr.message.",
   "assessmentV2.kind.",
   "audio.state.",
   "crossSkill.channel.",
@@ -104,6 +105,9 @@
   "gramRoutes.typedPlaceholder",
   "gramRoutes.typedSubmit",
   "gramRoutes.typedYourAnswer",
+  "learn.conversation",
+  "learn.desc.conversation",
+  "learn.desc.pronunciation",
   "listening.levelStates.failed",
   "listening.levelStates.mastered",
   "listening.levelStates.unseen",

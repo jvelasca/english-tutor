@@ -113,6 +113,33 @@ def test_vocabulary_endpoint_shape(monkeypatch, tmp_path):
         assert {v["word"] for v in got.json()} == {"cat", "mat", "sat"}
 
 
+def test_lexicon_endpoint_exposes_competence_matrix(monkeypatch, tmp_path):
+    """V3.21 (V20-16): el léxico expone la matriz de competencia por ítem y los
+    contadores de gap en el summary."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    # Producida por chat (pero nunca expuesta por input).
+    vocabulary_repo.record_words(a, ["hello"])
+    # Reconocida (input) pero nunca producida: transfer gap.
+    vocabulary_repo.record_exposures(a, ["world"])
+
+    with TestClient(app) as client:
+        got = client.get("/api/vocabulary/lexicon", params={"user_id": a})
+        assert got.status_code == 200
+        body = got.json()
+        by_word = {i["word"]: i for i in body["items"]}
+        assert by_word["hello"]["competence"]["recognition"] is False
+        assert by_word["hello"]["competence"]["production"] is True
+        assert by_word["hello"]["competence"]["gap"] is False
+        assert by_word["world"]["competence"]["recognition"] is True
+        assert by_word["world"]["competence"]["production"] is False
+        assert by_word["world"]["competence"]["gap"] is True
+        s = body["summary"]
+        assert s["recognized"] == 1
+        assert s["produced"] == 1
+        assert s["transfer"] == 0
+        assert s["transfer_gap"] == 1
+
+
 def test_vocabulary_endpoint_404(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
@@ -395,8 +422,9 @@ def _fake_transcribe(text):
 
 def test_drill_candidates_endpoint_exposes_signal(monkeypatch, tmp_path):
     """La señal de candidatas al drill es determinista en servidor (premisa 21):
-    expuestas y nunca dichas; las tecleadas en el chat (chat_prod) siguen siendo
-    candidatas; las ya dichas salen."""
+    expuestas y pendientes de consolidar la producción oral ESPACIADA (V3.21,
+    V20-06). Las tecleadas en el chat (chat_prod) siguen siendo candidatas; una
+    única producción oral del día no saca a la palabra (sigue pendiente)."""
     a, _b = _setup(monkeypatch, tmp_path)
     vocabulary_repo.record_exposures(a, ["travel", "culture", "music"])
     vocabulary_repo.record_production(a, ["culture"], channel="chat")
@@ -406,7 +434,8 @@ def test_drill_candidates_endpoint_exposes_signal(monkeypatch, tmp_path):
             "/api/vocabulary/drill/candidates", params={"user_id": a}
         )
     assert got.status_code == 200
-    assert got.json()["words"] == ["travel", "culture"]
+    # music se produjo una sola vez (sin espaciar): sigue pendiente de drill.
+    assert set(got.json()["words"]) == {"travel", "culture", "music"}
 
 
 def test_drill_candidates_endpoint_limit(monkeypatch, tmp_path):

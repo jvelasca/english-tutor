@@ -19,6 +19,7 @@ import json
 
 from services.curriculum import CURRICULUM_DIR
 from services.listening import difficulty_from_vector  # reutiliza el mismo criterio
+from services.phonetics import unit_produced
 
 # Banco curado de frases: contenido versionado fuera del código (espejo de la
 # convención de `services.curriculum`). Se carga al importar; un nivel con 0
@@ -80,6 +81,46 @@ def get_phrase(phrase_id: str) -> dict | None:
         if q.get("id") == phrase_id:
             return q
     return None
+
+
+def sentence_context_for(
+    word: str,
+    level: str | None = None,
+    phrase_pool: list[dict] | None = None,
+) -> dict:
+    """Frase de contexto determinista para el paso Sentence del drill léxico
+    (V3.21/F6.1): repetir la palabra DENTRO de una frase.
+
+    Fuente sin LLM:
+    - Banco oficial de read-aloud del nivel (`phrases_for_level`): devuelve la
+      primera frase del banco que CONTIENE la unidad léxica (misma alineación
+      `unit_produced` que acredita la producción del drill, V20-01). Si `level`
+      es None (ítem sin nivel CEFR), busca en todo el banco.
+    - Plantilla simple si ninguna frase del banco contiene la unidad: `Say the
+      word "<unidad>".` No inventa significado ni contexto falso.
+
+    Pura y determinista: el endpoint de contexto y el de intento la vuelven a
+    derivar por separado y obtienen exactamente la misma frase.
+    """
+    word = word.strip()
+    pool = phrase_pool
+    if pool is None:
+        pool = phrases_for_level(level) if level else PRONUNCIATION_CORPUS
+    for q in pool:
+        script = (q.get("script") or "").strip()
+        if script and unit_produced(word, script):
+            return {
+                "word": word,
+                "phrase": script,
+                "source": "route",
+                "level": q.get("level", "") if not level else level,
+            }
+    return {
+        "word": word,
+        "phrase": f'Say the word "{word}".',
+        "source": "template",
+        "level": level or "",
+    }
 
 
 def route_questions(level: str) -> list[dict]:

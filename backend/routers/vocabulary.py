@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+import config
 from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import vocabulary as vocabulary_service
@@ -13,11 +14,13 @@ from schemas.vocabulary import (
     DrillAttemptOut,
     DrillCandidatesOut,
     LexiconOut,
+    SentenceAttemptOut,
+    SentenceContextOut,
     VocabularyAnalyzeRequest,
     VocabularyAnalyzeResponse,
     VocabularyItem,
 )
-from services.stt import transcribe_with_timing
+from services.stt import exceeds_max_duration, transcribe_with_timing
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +63,10 @@ async def drill_attempt(
     user: dict = Depends(current_user),
 ) -> dict:
     """Intento de speaking micro-drill: transcribe el audio (Whisper) y puntúa la
-    palabra con `score_pronunciation`. Si el alumno la dijo (aparece alineada en
-    `breakdown.correct`) se registra `speaking_prod += 1` y sale de la lista de
-    candidatas. No crea evidencia curricular ni FSRS (D5/E3)."""
+    palabra/frase con `score_pronunciation`. Si el alumno la produjo (alineación
+    secuencial `unit_produced`, V3.21/V20-01) se registra la unidad atómica
+    (`speaking_prod += 1`) y sale de la lista de candidatas. No crea evidencia
+    curricular ni FSRS (D5/E3)."""
     audio = await read_audio_limited(file)
     try:
         timed = await run_in_threadpool(transcribe_with_timing, audio, "en")
@@ -71,13 +75,94 @@ async def drill_attempt(
         raise HTTPException(
             status_code=500, detail="No se pudo transcribir el audio"
         ) from None
+    # V3.21 (V20-13): red de seguridad de duración (audio demasiado largo).
+    if exceeds_max_duration(timed.get("duration")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El audio dura {timed['duration']:.1f}s y supera el máximo de "
+            f"{config.MAX_AUDIO_DURATION_SECONDS:.0f}s permitido. Grábalo de nuevo.",
+        )
     heard = timed["text"]
+    asr_status = timed.get("asr_status", "ok")
+    asr_confidence = timed.get("confidence")
     result = await vocabulary_service.submit_drill_attempt(
-        user["id"], word, heard, duration_seconds=timed.get("duration")
+        user["id"],
+        word,
+        heard,
+        duration_seconds=timed.get("duration"),
+        asr_status=asr_status,
+        asr_confidence=asr_confidence,
+    )
+    # V3.21 (V20-14/15): si el ASR no reconoció el audio, el intento es "unclear"
+    # (ni ok ni ko): no se penaliza un fallo que pudo ser del reconocimiento.
+    outcome = (
+        "unclear"
+        if asr_status != "ok"
+        else ("ok" if result["produced"] else "ko")
     )
     await learning_service.record_event(
+        user["id"], "exercise", f"drill:{word}:{outcome}"
+    )
+    return result
+
+
+@router.get("/api/vocabulary/drill/sentence-context", response_model=SentenceContextOut)
+async def drill_sentence_context(
+    word: str = Query(..., min_length=1, max_length=120),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Frase de contexto del paso Sentence del drill (V3.21/F6.1): determinista,
+    sin LLM (banco de frases de pronunciación del nivel o plantilla simple)."""
+    return await vocabulary_service.get_sentence_context(user["id"], word)
+
+
+@router.post(
+    "/api/vocabulary/drill/sentence-attempt",
+    response_model=SentenceAttemptOut,
+)
+async def drill_sentence_attempt(
+    word: str = Form(..., max_length=120),
+    file: UploadFile = File(...),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Intento del paso Sentence del drill (V3.21/F6.1): repite la frase de
+    contexto que contiene la palabra objetivo. Acredita producción de la unidad
+    solo si la palabra quedó alineada DENTRO de una frase que supera el umbral
+    (`passed`). El servidor vuelve a derivar la frase (misma fuente determinista
+    que el contexto) para no fiarse del cliente."""
+    audio = await read_audio_limited(file)
+    try:
+        timed = await run_in_threadpool(transcribe_with_timing, audio, "en")
+    except Exception:  # noqa: BLE001
+        logger.exception("Error transcribiendo el audio del drill de frase")
+        raise HTTPException(
+            status_code=500, detail="No se pudo transcribir el audio"
+        ) from None
+    # V3.21 (V20-13): red de seguridad de duración.
+    if exceeds_max_duration(timed.get("duration")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El audio dura {timed['duration']:.1f}s y supera el máximo de "
+            f"{config.MAX_AUDIO_DURATION_SECONDS:.0f}s permitido. Grábalo de nuevo.",
+        )
+    heard = timed["text"]
+    asr_status = timed.get("asr_status", "ok")
+    asr_confidence = timed.get("confidence")
+    result = await vocabulary_service.submit_sentence_attempt(
         user["id"],
-        "exercise",
-        f"drill:{word}:{'ok' if result['produced'] else 'ko'}",
+        word,
+        heard,
+        duration_seconds=timed.get("duration"),
+        asr_status=asr_status,
+        asr_confidence=asr_confidence,
+    )
+    # V3.21 (V20-14/15): intento "unclear" si el ASR no reconoció el audio.
+    outcome = (
+        "unclear"
+        if asr_status != "ok"
+        else ("ok" if result["passed"] else "ko")
+    )
+    await learning_service.record_event(
+        user["id"], "exercise", f"drill:{word}:sentence:{outcome}"
     )
     return result

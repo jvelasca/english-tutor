@@ -56,6 +56,12 @@ class PronunciationAttemptResponse(BaseModel):
     fluency: FluencyStats | None = None
     topic: str = ""
     difficulty: int = 1
+    # V3.21 (V20-14/V20-15): metadatos ASR del intento. Cuando `asr_status !=
+    # "ok"` el audio no se reconoció con fiabilidad: el intento NO se persiste
+    # como fallo lingüístico y la UI muestra un aviso de "no te he oído" en vez
+    # de feedback palabra a palabra en rojo.
+    asr_status: str = "ok"  # ok | no_speech | unintelligible | low_confidence
+    asr_confidence: float | None = None
 
 
 class PronunciationGate(BaseModel):

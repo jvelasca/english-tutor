@@ -7,6 +7,8 @@ de primer nivel con:
 - `item_mastery`  — dominio 0..1 combinando producción (espaciada) y reconocimiento.
 - `item_recall`   — probabilidad de recuerdo actual (curva de olvido existente).
 - `item_status`   — `mastered`/`known`/`learning`/`weak` (determinista).
+- `item_competence_matrix` — matriz Recognition/Production/Transfer/Retention
+  con el "transfer gap" por ítem (V3.21, V20-16/V20-17).
 - `next_review_days` — siguiente repaso (mismo scheduler que las destrezas).
 
 P1 (§3.2 de la Constitución): el ítem pasa de `word`/`structure` a **Lexical
@@ -24,6 +26,8 @@ sigue exponiendo `next_review_days` como estimación ligera del léxico.
 """
 
 from __future__ import annotations
+
+from datetime import date, datetime
 
 from services import forgetting, mastery
 from services.curriculum import CEFR_ORDER
@@ -238,6 +242,92 @@ def next_review_days(row: dict) -> int:
     return mastery.review_interval_days(item_mastery(row), item_confidence(row))
 
 
+# Canales de producción registrados en columnas `<channel>_prod` de la tabla
+# `vocabulary` (V3.19). El orden importa para el desglose de `competence`.
+PRODUCTION_CHANNELS: tuple[str, ...] = (
+    "speaking_prod",
+    "writing_prod",
+    "conversation_prod",
+    "chat_prod",
+)
+
+
+def production_channels(row: dict) -> list[str]:
+    """Canales con producción > 0 (p. ej. ["speaking", "writing"]). V3.21."""
+    channels: list[str] = []
+    for column in PRODUCTION_CHANNELS:
+        if _int(row.get(column)) > 0:
+            channels.append(column.removesuffix("_prod"))
+    return channels
+
+
+def _day_or_none(value: object) -> date | None:
+    """Extrae la fecha 'YYYY-MM-DD' de un valor ISO (datetime o date). V3.21."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return dt.date()
+    except ValueError:
+        try:
+            return date.fromisoformat(text[:10])
+        except ValueError:
+            return None
+
+
+def _spaced_production(row: dict) -> bool:
+    """Producción espaciada: ocurrió en >= 2 días distintos y con un hueco de
+    >= 1 día natural entre la primera y la última señal. V3.21 (V20-17)."""
+    if _int(row.get("production_days")) < 2:
+        return False
+    first = _day_or_none(row.get("first_seen"))
+    last = _day_or_none(row.get("last_seen"))
+    if first is None or last is None:
+        return False
+    return (last - first).days >= 1
+
+
+def item_competence_matrix(row: dict) -> dict:
+    """Matriz de competencia por ítem léxico (V3.21, V20-16/V20-17).
+
+    Derivada SIN migrar columnas (se mantiene el invariante por fila
+    `sum(channel_prod) == appearances`). Pura y determinista:
+
+    - `recognition`   — el ítem se ha expuesto (leído/oído): `exposures > 0`.
+    - `production`    — se ha producido en algún canal (`sum(channel_prod) > 0`),
+      con desglose `production_channels`.
+    - `transfer`      — la palabra se usa fuera del contexto de aprendizaje:
+      producción en >= 2 canales O producción espaciada (en >= 2 días y con
+      hueco >= 1 día). Señal de que el ítem no quedó anclado a un solo canal.
+    - `retention`     — señal espaciada previa: producción en días distintos
+      (mismo criterio que `transfer`, porque no existe aún `exposure_days`
+      para reconocimiento repetido en días distintos; ver deuda de modelo).
+    - `gap`           — el "transfer gap" real: reconocida pero NUNCA producida
+      (`recognition && !production`). Es lo que explota el speaking micro-drill.
+
+    Deuda de modelo (V20-17, sin migrar ahora): renombrar conceptualmente
+    `appearances` -> `production_count` y separar `exposure_count`; añadir una
+    columna `exposure_days` (ALTER idempotente, patrón existente) para poder
+    acreditar reconocimiento repetido en días distintos como retención
+    receptiva. Hasta entonces `retention` solo refleja la producción espaciada.
+    """
+    exposure_total = _int(row.get("exposures"))
+    recognition = exposure_total > 0
+    channels = production_channels(row)
+    production = len(channels) > 0
+    spaced = _spaced_production(row)
+    transfer = len(channels) >= 2 or spaced
+    return {
+        "recognition": recognition,
+        "production": production,
+        "production_channels": channels,
+        "transfer": transfer,
+        "retention": transfer,
+        "gap": recognition and not production,
+    }
+
+
 def cefr_distribution(rows: list[dict]) -> list[dict]:
     """Distribución de ítems por nivel CEFR, ordenada por la escalera canónica.
 
@@ -256,10 +346,29 @@ def cefr_distribution(rows: list[dict]) -> list[dict]:
 
 
 def summary(rows: list[dict], now: str = "") -> dict:
-    """Resumen del léxico: totales por estado y distribución CEFR."""
+    """Resumen del léxico: totales por estado, distribución CEFR y contadores de
+    la matriz de competencia (V3.21, V20-16): `recognized`, `produced`,
+    `transfer`, `retention` y `transfer_gap` (reconocidas-nunca-producidas)."""
     statuses = {"mastered": 0, "learning": 0, "known": 0, "weak": 0}
+    competence = {
+        "recognized": 0,
+        "produced": 0,
+        "transfer": 0,
+        "retention": 0,
+        "transfer_gap": 0,
+    }
     for row in rows:
         statuses[item_status(row, now)] += 1
+        matrix = item_competence_matrix(row)
+        if matrix["recognition"]:
+            competence["recognized"] += 1
+        if matrix["production"]:
+            competence["produced"] += 1
+        if matrix["transfer"]:
+            competence["transfer"] += 1
+            competence["retention"] += 1
+        if matrix["gap"]:
+            competence["transfer_gap"] += 1
     return {
         "total": len(rows),
         "known": statuses["known"],
@@ -267,6 +376,7 @@ def summary(rows: list[dict], now: str = "") -> dict:
         "weak": statuses["weak"],
         "mastered": statuses["mastered"],
         "by_cefr": cefr_distribution(rows),
+        **competence,
     }
 
 
@@ -280,25 +390,107 @@ def _speaking_prod(row: dict) -> int:
     return _int(row.get("speaking_prod"))
 
 
-def drill_candidates(rows: list[dict], limit: int = 8, now: str = "") -> list[str]:
-    """Candidatos a speaking micro-drill (V3.19): reconocidas pero nunca
-    producidas *hablando*.
+# V3.21 (V20-06): nº de días distintos con éxito de drill (`drill:<word>:ok` o
+# `drill:<word>:sentence:ok`) exigidos para considerar "consolidada" la palabra
+# en el micro-drill y sacarla de la lista de candidatas. No declara dominio
+# (D5/E3): es solo el criterio de salida de la lista "pendiente".
+DRILL_SPACED_OK_DAYS = 2
 
-    Filtra ítems con `exposures > 0` (las ha leído/oído del tutor) y
-    `speaking_prod == 0` (nunca las ha dicho en una superficie oral), ordenados
-    por recuerdo actual ascendente (primero las más olvidadas) y acotados a
-    `limit`. El micro-drill no declara dominio ni crea evidencia curricular
-    (D5/E3): al superarlo, la palabra pasa a `speaking_prod > 0` y sale de la
-    lista (cierra el bucle exposición → producción oral)."""
-    candidates = sorted(
-        (row for row in rows if _is_drill_candidate(row)),
-        key=lambda row: item_recall(row, now),
+
+def drill_ok_days(events: list[dict]) -> dict[str, set[str]]:
+    """Días (YYYY-MM-DD) con éxito de speaking micro-drill por palabra.
+
+    V3.21 (V20-06): el micro-drill registra eventos `learning_events` del tipo
+    `drill:<word>:ok` (paso palabra) y `drill:<word>:sentence:ok` (paso frase).
+    Devuelve `{word: {día, ...}}` para exigir éxito ESPACIADO (>= 2 días) antes
+    de dejar de ofrecer la palabra en la lista de candidatas. Ignora el resto de
+    eventos. Pura y determinista.
+    """
+    days_by_word: dict[str, set[str]] = {}
+    for event in events:
+        detail = (event.get("detail") or "").strip()
+        if not detail.startswith("drill:"):
+            continue
+        created = event.get("created_at") or ""
+        day = created[:10] if created else ""
+        word, outcome = _drill_event_word_outcome(detail)
+        if word and outcome == "ok" and day:
+            days_by_word.setdefault(word, set()).add(day)
+    return days_by_word
+
+
+def _drill_event_word_outcome(detail: str) -> tuple[str, str]:
+    """Extrae `(word, outcome)` de un detalle `drill:<word>[:sentence]:<outcome>`.
+
+    El propio `word` puede contener espacios o dos puntos, por eso se descompone
+    desde el final: el último segmento es el outcome y el penúltimo, si existe,
+    es la marca `sentence` del paso frase (V3.21, F6.1).
+    """
+    body = detail[len("drill:") :]
+    parts = body.split(":")
+    if not parts or parts[-1] not in {"ok", "ko", "unclear"}:
+        return "", ""
+    outcome = parts[-1]
+    if len(parts) >= 2 and parts[-2] == "sentence":
+        return ":".join(parts[:-2]), outcome
+    return ":".join(parts[:-1]), outcome
+
+
+def drill_candidates(
+    rows: list[dict],
+    limit: int = 8,
+    now: str = "",
+    *,
+    ok_days: dict[str, set[str]] | None = None,
+    today: str = "",
+) -> list[str]:
+    """Candidatos a speaking micro-drill escalera (V3.21, F6/V20-06).
+
+    Filtra ítems con `exposures > 0` (leídos/oídos del tutor) que aún no han
+    consolidado la producción oral espaciada, ordenados por recuerdo actual
+    ascendente (primero los más olvidados) y acotados a `limit`.
+
+    Criterio de salida de la lista "pendiente" (no declara dominio, D5/E3):
+    - nunca dichas (`speaking_prod == 0`) → siempre candidatas;
+    - ya dichas pero sin éxito espaciado → siguen pendientes:
+      - salen con 2 días de éxito de drill (`ok_days`, V3.21/F6.2); o
+      - salen si hay señal de speaking espaciada sin eventos de drill
+        (`speaking_prod >= 2` y `production_days >= 2`, aproximación);
+    - `today` (YYYY-MM-DD): si la palabra ya se superó HOY en el drill y aún no
+      está consolidada, se oculta hasta mañana (una producción del día no la
+      elimina, pero tampoco se repite el mismo día)."""
+    pending = (
+        row
+        for row in rows
+        if _is_pending_drill_candidate(row, ok_days=ok_days, today=today)
     )
+    candidates = sorted(pending, key=lambda row: item_recall(row, now))
     return [row["word"] for row in candidates[: max(0, limit)]]
 
 
-def _is_drill_candidate(row: dict) -> bool:
-    return _int(row.get("exposures")) > 0 and _speaking_prod(row) == 0
+def _is_pending_drill_candidate(
+    row: dict,
+    *,
+    ok_days: dict[str, set[str]] | None = None,
+    today: str = "",
+) -> bool:
+    if _int(row.get("exposures")) <= 0:
+        return False
+    word = row.get("word", "")
+    days = (ok_days or {}).get(word, set()) if ok_days else set()
+    if not _speaking_prod(row) > 0:
+        return True
+    # Producida oralmente alguna vez: pendiente hasta éxito espaciado.
+    if len(days) >= DRILL_SPACED_OK_DAYS:
+        return False
+    if (
+        _int(row.get("speaking_prod")) >= DRILL_SPACED_OK_DAYS
+        and _int(row.get("production_days")) >= DRILL_SPACED_OK_DAYS
+    ):
+        return False
+    if today and today in days:
+        return False
+    return True
 
 
 def recognized_not_produced(rows: list[dict]) -> list[str]:
@@ -307,8 +499,16 @@ def recognized_not_produced(rows: list[dict]) -> list[str]:
     V3.19: la señal pasa de "nunca tecleada" (semántica de teclado, era
     calculable con `appearances == 0`) a "expuestas y nunca dichas en una
     superficie oral" (`speaking_prod == 0`), que es lo que un speaking
-    micro-drill puede cerrar. Sin límite (respaldo de la lista completa)."""
-    return [row["word"] for row in rows if _is_drill_candidate(row)]
+    micro-drill puede cerrar. Sin límite (respaldo de la lista completa).
+
+    Nota V3.21 (V20-06): esta función conserva la semántica histórica "nunca
+    dichas"; la lista "pendiente" del drill (que reutiliza las ya dichas con
+    éxito no espaciado) vive en `drill_candidates`."""
+    return [
+        row["word"]
+        for row in rows
+        if _int(row.get("exposures")) > 0 and _speaking_prod(row) == 0
+    ]
 
 
 _COVERAGE_ORDER = ["Pre-A1", *CEFR_ORDER]

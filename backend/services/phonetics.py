@@ -63,6 +63,45 @@ def soundex(word: str) -> str:
     return first + (digits + "000")[:3]
 
 
+def unit_produced(expected: str, heard: str) -> bool:
+    """Determina si una unidad léxica (palabra o frase) fue producida oralmente.
+
+    V3.21 (V20-01): comprobación de ALINEACIÓN SECUENCIAL sobre la transcripción,
+    no de pertenencia de tokens. Usa siempre el mismo tokenizador normalizado
+    que `word_alignment` (`tokenize`), nunca `.split()`.
+
+    - Unidad de 1 token: debe quedar alineada como `equal` en la alineación
+      (aparece en `breakdown.correct`). Permite la palabra dentro de una oración
+      más larga ("I travel every day" produce "travel").
+    - Unidad multi-token: los tokens esperados deben aparecer CONTIGUOS en la
+      transcripción. Un extra intercalado dentro de la frase ("get it up" por
+      "get up") NO cuenta como producida; la unidad dentro de una oración más
+      larga ("my living room is nice" por "living room") sí.
+
+    Pura y determinista: es la señal que acredita `speaking_prod` en el
+    micro-drill, donde un falso positivo contaminaría el modelo de alumno.
+    """
+    expected_tokens = tokenize(expected)
+    if not expected_tokens:
+        return False
+    if len(expected_tokens) == 1:
+        correct = word_alignment(expected, heard)["correct"]
+        return expected_tokens[0] in correct
+    heard_tokens = tokenize(heard)
+    return _contains_run(expected_tokens, heard_tokens)
+
+
+def _contains_run(needle: list[str], haystack: list[str]) -> bool:
+    """True si `needle` aparece como secuencia contigua de `haystack`."""
+    n, m = len(needle), len(haystack)
+    if n == 0 or n > m:
+        return False
+    for i in range(m - n + 1):
+        if haystack[i : i + n] == needle:
+            return True
+    return False
+
+
 def word_alignment(expected: str, heard: str) -> dict:
     """Alinea palabra a palabra con SequenceMatcher sobre listas de tokens."""
     e = tokenize(expected)

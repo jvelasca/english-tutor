@@ -94,7 +94,11 @@ export function PronunciationPractice({
           const evaluated = await checkPronunciation(blob, sentence, userId);
           setAttemptKey((k) => k + 1);
           setResult(evaluated);
-          onAttempt();
+          // V3.21 (V20-14/15): con ASR no fiable el backend NO registró el
+          // intento; no inflar el contador de práctica del padre.
+          if (!evaluated.asr_status || evaluated.asr_status === "ok") {
+            onAttempt();
+          }
         } catch (e) {
           alert(`${t("pron.evalError")}${(e as Error).message}`);
         } finally {
@@ -196,6 +200,20 @@ export function PronunciationPractice({
       </Card>
 
       {result && (
+        result.asr_status && result.asr_status !== "ok" ? (
+          /* V3.21 (V20-14/15): el ASR no reconoció el audio; el backend no
+             registró el intento. Se avisa y se invita a repetir, sin feedback
+             de puntuación. */
+          <ActivityResult
+            outcome="neutral"
+            title={t("asr.title")}
+            footer={<NextStep userId={userId} onNext={onNext} />}
+          >
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t(`asr.message.${result.asr_status}`)}
+            </p>
+          </ActivityResult>
+        ) : (
         <ActivityResult
           outcome={
             result.level === "good"
@@ -274,6 +292,7 @@ export function PronunciationPractice({
             </ul>
           )}
         </ActivityResult>
+        )
       )}
     </section>
   );

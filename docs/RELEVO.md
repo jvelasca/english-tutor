@@ -3,7 +3,36 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-07 15:05 (UTC+2).
+> Actualizado por última vez: 2026-09-07 20:55 (UTC+2).
+>
+> **Nota (2026-09-07, 20:55):** posición vigente **v3.21.0** — **Speaking &
+> Evidence Calibration** (versión de app `3.20.0 → 3.21.0`). Cierra el plan
+> V3.21 del dossier de la auditoría externa V3.20.0 (F1–F6): (F1 P0) la
+> producción del micro-drill se decide por **alineación secuencial**
+> (`unit_produced`, normalización compartida `tokenize`) y las unidades
+> multi-palabra se acreditan a sí mismas (`as_unit=True`, invariante por fila
+> `sum(channel_prod)==appearances`); (F2 P1) **feedback ASR honesto** —
+> metadata de Whisper (`no_speech_prob`/`avg_logprob`/`language_probability`),
+> `asr_status ∈ {ok, no_speech, unintelligible, low_confidence}` y **gating de
+> no-penalización** (un audio no reconocido nunca se puntúa como fallo
+> lingüístico), chips re-etiquetados y mensajes por `asr_status`; (F3)
+> `DEFAULT_MODEL` fuente única (`/api/models` + `resolveDefaultChatModel`),
+> comentario `ADMIN_PIN` fail-closed, hook `useRecordingSession` (cronómetro +
+> auto-stop 120 s) con red de seguridad backend de duración (400) y aviso de
+> audio vacío; (F4) semántica de superficie Speaking (títulos por modo y pies
+> de stats con la competencia real); (F5) **matriz de competencia léxica**
+> (Recognition/Production/Transfer/Retention/gap por ítem, pura sin migrar
+> columnas) expuesta en léxico/diccionario y **Transfer Gap para FSRS**
+> (razón `transfer-gap` por objetivo); (F6) **drill escalera MVP** — paso
+> Sentence determinista sin LLM (`sentence_context_for` + endpoints
+> sentence-context/sentence-attempt) con UI Recall → Sentence en la misma
+> tarjeta, y **graduación espaciada** (2 días de éxito de drill u otra señal
+> espaciada para salir de la lista "pendiente"; sin dominio D5/E3). F6.3
+> (Contexto/Transfer libre) APLAZADO a la auditoría pedagógica de
+> Speaking/Listening. Verificación: backend **pytest 1424** + ruff limpio;
+> frontend **vitest 450** (57 archivos) + `tsc`/`vite build` OK;
+> `check_release_consistency` **3.21.0** exit 0; CONSTITUCIÓN sin cambios
+> (se mantiene señal ≠ evidencia).
 >
 > **Nota (2026-09-07, 15:05):** posición vigente **v3.20.0** — **Speaking único +
 > feedback oral** (frontend-only; versión de app `3.19.0 → 3.20.0`; la

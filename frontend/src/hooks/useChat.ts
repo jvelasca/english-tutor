@@ -15,7 +15,9 @@ import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
 import { turnTelemetry } from "../utils/telemetry";
-import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";import {
+import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";
+import { fallbackChatModel } from "../utils/models";
+import {
   LAYOUT_DEFAULTS,
   parseLayout,
   serializeLayout,
@@ -33,11 +35,10 @@ import type {
   User,
 } from "../types/api";
 
-// Modelo por defecto mientras no llega la lista real del backend (Ajustes → IA).
-// Debe ser un modelo utilizable en este equipo y no aparecer en la lista de no
-// utilizables del backend; si no está instalado, se cae al primer modelo
-// disponible de Ollama.
-const DEFAULT_MODEL = "llama3.1:8b";
+// V3.21 (V20-05): el modelo por defecto se resuelve desde el backend
+// (`/api/models` → `default_model`, fuente única en `config.py`); la constante
+// local es SOLO un fallback de emergencia mientras no responde el backend.
+const DEFAULT_MODEL = fallbackChatModel();
 
 const TUTOR_MODES: TutorMode[] = [
   "conversation",
@@ -139,10 +140,19 @@ export function useChat() {
   useEffect(() => {
     getModels()
       .then((d) => {
-        if (d.models && d.models.length) {
-          setModels(d.models);
-          if (!d.models.includes(modelRef.current)) setModel(d.models[0]);
-        }
+        const list = d.models ?? [];
+        if (list.length === 0) return;
+        setModels(list);
+        // V3.21 (V20-05): si el modelo activo ya no se oferta (p. ej. quedó
+        // excluido como no utilizable), se cae al `default_model` que expone el
+        // backend (fuente única) o, si no está utilizable, al primer modelo.
+        if (modelRef.current && list.includes(modelRef.current)) return;
+        const backendDefault = d.default_model ?? "";
+        const next =
+          backendDefault && list.includes(backendDefault)
+            ? backendDefault
+            : list[0];
+        setModel(next);
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -3,17 +3,22 @@ import { motion, type Variants } from "motion/react";
 import { BookOpen, Loader2, Mic, RefreshCw, Square } from "lucide-react";
 import {
   getDrillCandidates,
+  getDrillSentenceContext,
   getLexicon,
   submitDrillAttempt,
+  submitDrillSentenceAttempt,
 } from "../../api/vocabulary";
 import type {
   DrillAttempt,
+  DrillSentenceAttempt,
+  DrillSentenceContext,
   LexicalItem,
   LexicalStatus,
   Lexicon,
 } from "../../types/api";
 import { cefrBarValue, sortLexicalItems } from "./dictionary";
 import { useI18n } from "../../hooks/useI18n";
+import { useRecordingSession } from "../../hooks/useRecordingSession";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
 import { ListenButton } from "../../components/ListenButton";
@@ -146,6 +151,45 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
               tone="text-success"
             />
           </div>
+        </motion.section>
+
+        {/* V3.21 (V20-16): fila de stats de la matriz de competencia del léxico. */}
+        <motion.section variants={item} aria-label={t("dictionary.competenceTitle")}>
+          <Card className="gap-3 p-5">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-sm font-semibold">{t("dictionary.competenceTitle")}</h2>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {t("dictionary.competenceHint")}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <StatTile
+                label={t("dictionary.competenceRecognized")}
+                value={summary.recognized}
+                tone="text-primary"
+              />
+              <StatTile
+                label={t("dictionary.competenceProduced")}
+                value={summary.produced}
+                tone="text-success"
+              />
+              <StatTile
+                label={t("dictionary.competenceTransfer")}
+                value={summary.transfer}
+                tone="text-success"
+              />
+              <StatTile
+                label={t("dictionary.competenceRetention")}
+                value={summary.retention}
+                tone="text-primary"
+              />
+              <StatTile
+                label={t("dictionary.competenceGap")}
+                value={summary.transfer_gap}
+                tone="text-destructive"
+              />
+            </div>
+          </Card>
         </motion.section>
 
         {summary.by_cefr.length > 0 && (
@@ -367,6 +411,8 @@ function SpeakingDrillSection({
   );
 }
 
+type DrillStep = "recall" | "sentence";
+
 interface WordDrillProps {
   userId: string;
   word: string;
@@ -374,18 +420,53 @@ interface WordDrillProps {
   onClose: () => void;
 }
 
-/** Micro-práctica de una palabra: escúchala (TTS) y grábate diciéndola. Reutiliza
- * el scorer de pronunciación del servidor (`submitDrillAttempt`). Si la palabra
- * se produce, sale de la lista de candidatas. */
+type DrillOutcome = DrillAttempt | DrillSentenceAttempt;
+
+function isSentenceAttempt(outcome: DrillOutcome): outcome is DrillSentenceAttempt {
+  return "passed" in outcome;
+}
+
+/** Micro-práctica escalera de una palabra (V3.21/F6): Paso 1 "Recall" — di la
+ * palabra (scorer `submitDrillAttempt`); Paso 2 "Sentence" — repítela DENTRO de
+ * una frase de contexto determinista (scorer `submitDrillSentenceAttempt`).
+ * Reutiliza el scorer de pronunciación del servidor. No declara dominio (D5/E3):
+ * una producción del día no consolida; se consolida con éxito espaciado (F6.2). */
 function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
   const { t } = useI18n();
+  const [step, setStep] = useState<DrillStep>("recall");
+  const [sentence, setSentence] = useState<DrillSentenceContext | null>(null);
+  const [sentenceError, setSentenceError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<DrillAttempt | null>(null);
+  const [result, setResult] = useState<DrillOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [micReason, setMicReason] = useState<MicUnavailableReason | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
+  const recordingSession = useRecordingSession(recording, {
+    onAutoStop: () => {
+      if (recorderRef.current && recorderRef.current.state !== "inactive") {
+        recorderRef.current.stop();
+        setRecording(false);
+      }
+    },
+  });
+
+  function chooseStep(next: DrillStep) {
+    if (next === step || recording || processing) return;
+    setResult(null);
+    setError(null);
+    setStep(next);
+    if (next === "sentence" && !sentence) {
+      setSentenceError(null);
+      getDrillSentenceContext(userId, word)
+        .then((ctx) => setSentence(ctx))
+        .catch((e) =>
+          setSentenceError(t("dictionary.drill.error").concat((e as Error).message)),
+        );
+    }
+  }
 
   async function toggle() {
     if (recording) {
@@ -416,9 +497,15 @@ function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
         if (blob.size === 0) return;
         setProcessing(true);
         try {
-          const attempt = await submitDrillAttempt(userId, word, blob);
+          const attempt: DrillOutcome =
+            step === "sentence"
+              ? await submitDrillSentenceAttempt(userId, word, blob)
+              : await submitDrillAttempt(userId, word, blob);
           setResult(attempt);
-          if (attempt.produced) onProduced();
+          const success = isSentenceAttempt(attempt)
+            ? attempt.passed
+            : attempt.produced;
+          if (success) onProduced();
         } catch (e) {
           setError(t("dictionary.drill.error").concat((e as Error).message));
         } finally {
@@ -432,6 +519,16 @@ function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
       setError(t("dictionary.drill.micError").concat((e as Error).message));
     }
   }
+
+  const asrUnclear =
+    result && result.asr_status && result.asr_status !== "ok" ? result : null;
+  const asrLabel = asrUnclear
+    ? `${t("asr.title")} — ${t(`asr.message.${asrUnclear.asr_status}`)}`
+    : "";
+
+  const phraseReady = step === "recall" || sentence !== null;
+  const micBlocked =
+    processing || (step === "sentence" && (sentence === null || sentenceError !== null));
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-background/60 p-4">
@@ -451,8 +548,62 @@ function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
         </button>
       </div>
 
-      <p className="text-xs text-muted-foreground">{t("dictionary.drill.prompt")}</p>
+      {/* Escalera Recall -> Sentence en la misma tarjeta (V3.21/F6.1). */}
+      <div
+        role="group"
+        aria-label={t("dictionary.drill.steps")}
+        className="flex w-fit items-center gap-1 rounded-md bg-secondary p-1"
+      >
+        {(["recall", "sentence"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            disabled={recording || processing}
+            onClick={() => chooseStep(option)}
+            aria-pressed={step === option}
+            className={cn(
+              "rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
+              step === option
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {option === "recall"
+              ? t("dictionary.drill.stepRecall")
+              : t("dictionary.drill.stepSentence")}
+          </button>
+        ))}
+      </div>
 
+      {step === "recall" ? (
+        <p className="text-xs text-muted-foreground">{t("dictionary.drill.prompt")}</p>
+      ) : sentence ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">
+            {t("dictionary.drill.sentencePrompt")}
+          </p>
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+            <span className="text-sm font-medium" lang="en">
+              {sentence.phrase}
+            </span>
+            <ListenButton
+              text={sentence.phrase}
+              label={t("dictionary.drill.sentenceListen")}
+            />
+          </div>
+          {sentence.source === "template" && (
+            <p className="text-[11px] text-muted-foreground">
+              {t("dictionary.drill.sentenceTemplateNote")}
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {sentenceError && (
+        <p className="text-xs text-destructive" role="alert">
+          {sentenceError}
+        </p>
+      )}
       {micReason && <MicUnavailableNotice reason={micReason} />}
       {error && (
         <p className="text-xs text-destructive" role="alert">
@@ -464,7 +615,7 @@ function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
         <motion.button
           type="button"
           onClick={() => void toggle()}
-          disabled={processing}
+          disabled={!phraseReady || micBlocked}
           aria-pressed={recording}
           aria-label={
             processing
@@ -491,7 +642,7 @@ function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
           {processing
             ? t("pron.evaluating")
             : recording
-              ? t("pron.stop")
+              ? recordingSession.formatted
               : t("pron.record")}
         </span>
       </div>
@@ -500,17 +651,33 @@ function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
         <div
           className={cn(
             "rounded-md px-3 py-2 text-sm",
-            result.produced
-              ? "bg-success/10 text-success"
-              : "bg-warning/10 text-warning",
+            asrUnclear
+              ? "bg-muted text-muted-foreground"
+              : isSentenceAttempt(result)
+                ? result.passed
+                  ? "bg-success/10 text-success"
+                  : "bg-warning/10 text-warning"
+                : (result as DrillAttempt).produced
+                  ? "bg-success/10 text-success"
+                  : "bg-warning/10 text-warning",
           )}
           role="status"
         >
-          {result.produced
-            ? t("dictionary.drill.produced")
-            : t("dictionary.drill.notProduced")
-                .replace("{heard}", result.heard || "—")
-                .replace("{score}", String(result.score))}
+          {asrUnclear
+            ? asrLabel
+            : isSentenceAttempt(result)
+              ? result.passed
+                ? t("dictionary.drill.sentencePassed")
+                : result.produced
+                  ? t("dictionary.drill.sentenceWordOnly")
+                  : t("dictionary.drill.sentenceNotPassed")
+                      .replace("{heard}", result.heard || "—")
+                      .replace("{score}", String(result.score))
+              : (result as DrillAttempt).produced
+                ? t("dictionary.drill.produced")
+                : t("dictionary.drill.notProduced")
+                    .replace("{heard}", result.heard || "—")
+                    .replace("{score}", String(result.score))}
         </div>
       )}
     </div>

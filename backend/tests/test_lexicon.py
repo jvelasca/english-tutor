@@ -245,14 +245,16 @@ def test_recognized_not_produced_is_oral_semantics():
 
 
 def test_drill_candidates_orders_by_recall_and_limits():
-    """Candidatos: expuestas, nunca dichas (speaking_prod == 0), ordenadas por
-    recuerdo ascendente y acotadas a `limit`."""
+    """Candidatos (V3.21/F6-V20-06): expuestas pendientes de consolidar la
+    producción oral espaciada, ordenadas por recuerdo ascendente y acotadas a
+    `limit`. Una única producción del día no las elimina."""
     rows = [
         {
             "word": "oldest",
             "exposures": 3,
             "speaking_prod": 0,
             "appearances": 0,
+            "production_days": 0,
             "first_seen": "",
             "last_seen": "",
             "last_exposed_at": "2020-01-01",
@@ -262,16 +264,30 @@ def test_drill_candidates_orders_by_recall_and_limits():
             "exposures": 3,
             "speaking_prod": 0,
             "appearances": 0,
+            "production_days": 0,
             "first_seen": "",
             "last_seen": "",
             "last_exposed_at": "2026-09-01",
         },
         {
-            "word": "spoken",
+            # Dicha una sola vez (sin éxito espaciado): sigue pendiente.
+            "word": "spoken_once",
             "exposures": 3,
             "speaking_prod": 1,
             "appearances": 1,
+            "production_days": 1,
             "first_seen": "",
+            "last_seen": "2026-09-01",
+            "last_exposed_at": "",
+        },
+        {
+            # Dicha en dos días distintos (señal espaciada sin drill): sale.
+            "word": "spoken_spaced",
+            "exposures": 3,
+            "speaking_prod": 2,
+            "appearances": 2,
+            "production_days": 2,
+            "first_seen": "2026-08-01",
             "last_seen": "2026-09-01",
             "last_exposed_at": "",
         },
@@ -280,14 +296,18 @@ def test_drill_candidates_orders_by_recall_and_limits():
             "exposures": 0,
             "speaking_prod": 0,
             "appearances": 0,
+            "production_days": 0,
             "first_seen": "",
             "last_seen": "",
             "last_exposed_at": "",
         },
     ]
-    got = lexicon.drill_candidates(rows, limit=2)
-    assert got == ["oldest", "newest"]
-    assert len(got) == 2
+    got = lexicon.drill_candidates(rows, limit=10)
+    assert set(got) == {"oldest", "newest", "spoken_once"}
+    assert "unexposed" not in got
+    assert "spoken_spaced" not in got
+    # Ordena por recuerdo ascendente y acota a `limit`.
+    assert lexicon.drill_candidates(rows, limit=2) == got[:2]
 
 
 def test_drill_candidates_no_limit_when_large_limit():
@@ -350,3 +370,120 @@ def test_coverage_indicator_receptive_productive_by_level():
     assert by_level["C2"]["receptive_pct"] is None
     assert by_level["C2"]["productive_pct"] is None
     assert "nivel-raro" not in by_level
+
+
+# --- V3.21 (V20-16/V20-17): matriz de competencia --------------------------
+
+def _row(**overrides) -> dict:
+    row = {
+        "word": "w",
+        "appearances": 0,
+        "first_seen": "",
+        "last_seen": "",
+        "exposures": 0,
+        "last_exposed_at": "",
+        "production_days": 0,
+        "chat_prod": 0,
+        "speaking_prod": 0,
+        "writing_prod": 0,
+        "conversation_prod": 0,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_matrix_never_seen_is_all_false_no_gap():
+    m = lexicon.item_competence_matrix(_row())
+    assert m["recognition"] is False
+    assert m["production"] is False
+    assert m["gap"] is False  # sin reconocimiento no hay "transfer gap"
+    assert m["production_channels"] == []
+
+
+def test_matrix_recognition_only_is_gap():
+    m = lexicon.item_competence_matrix(_row(exposures=3))
+    assert m["recognition"] is True
+    assert m["production"] is False
+    assert m["transfer"] is False
+    assert m["retention"] is False
+    assert m["gap"] is True
+
+
+def test_matrix_produced_but_not_transfer():
+    # Producida una sola vez en un solo canal y un solo día: sin transfer.
+    m = lexicon.item_competence_matrix(
+        _row(
+            exposures=2,
+            appearances=1,
+            speaking_prod=1,
+            production_days=1,
+            first_seen="2026-01-01T10:00:00+00:00",
+            last_seen="2026-01-01T11:00:00+00:00",
+        )
+    )
+    assert m["production"] is True
+    assert m["production_channels"] == ["speaking"]
+    assert m["transfer"] is False
+    assert m["gap"] is False
+
+
+def test_matrix_transfer_by_two_channels():
+    m = lexicon.item_competence_matrix(
+        _row(appearances=2, exposures=2, speaking_prod=1, writing_prod=1)
+    )
+    assert set(m["production_channels"]) == {"speaking", "writing"}
+    assert m["transfer"] is True
+    assert m["retention"] is True
+    assert m["gap"] is False
+
+
+def test_matrix_transfer_by_spaced_production():
+    # Un solo canal pero producida en >= 2 días con hueco >= 1 día: transfer.
+    m = lexicon.item_competence_matrix(
+        _row(
+            appearances=2,
+            exposures=1,
+            speaking_prod=2,
+            production_days=2,
+            first_seen="2026-01-01T10:00:00+00:00",
+            last_seen="2026-01-03T10:00:00+00:00",
+        )
+    )
+    assert m["production_channels"] == ["speaking"]
+    assert m["transfer"] is True
+    assert m["retention"] is True
+
+
+def test_matrix_spaced_requires_one_day_gap():
+    # production_days == 2 pero mismas fechas (datos raros): no hay hueco real.
+    m = lexicon.item_competence_matrix(
+        _row(
+            appearances=2,
+            speaking_prod=2,
+            production_days=2,
+            first_seen="2026-01-01T10:00:00+00:00",
+            last_seen="2026-01-01T11:00:00+00:00",
+        )
+    )
+    assert m["transfer"] is False
+
+
+def test_summary_counts_matrix_competence():
+    rows = [
+        _row(word="never", exposures=0),
+        _row(word="recog", exposures=2),
+        _row(word="produced-1", exposures=1, appearances=1, speaking_prod=1),
+        _row(
+            word="transfer",
+            exposures=2,
+            appearances=2,
+            speaking_prod=1,
+            writing_prod=1,
+        ),
+    ]
+    s = lexicon.summary(rows)
+    assert s["recognized"] == 3  # recog + produced-1 + transfer
+    assert s["produced"] == 2
+    assert s["transfer"] == 1
+    assert s["retention"] == 1
+    assert s["transfer_gap"] == 1  # solo "recog"

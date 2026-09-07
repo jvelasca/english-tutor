@@ -55,3 +55,7 @@ class PronunciationResponse(BaseModel):
     breakdown: PronunciationBreakdown
     phoneme_breakdown: PhonemeBreakdown
     fluency: FluencyStats
+    # V3.21 (V20-14/V20-15): metadatos ASR del intento. Cuando `asr_status !=
+    # "ok"` el intento no se registra como fallo lingüístico.
+    asr_status: str = "ok"  # ok | no_speech | unintelligible | low_confidence
+    asr_confidence: float | None = None

@@ -1796,6 +1796,21 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, card)
 
     vocab_rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    # V3.21 (V20-17): un ítem `known` (reconocido, nunca producido) cuyo
+    # objetivo YA tiene producción en otras palabras es un "transfer gap" real
+    # (el objetivo está en producción y esta palabra espera su salto a
+    # producción). Agrupa por (level_id, objective_id) para decidir el why.
+    group_has_production: dict[tuple[str, str], bool] = {}
+    for _row in vocab_rows:
+        objective = (_row.get("objective_id") or "").strip()
+        if not objective:
+            continue
+        key = ((_row.get("level_id") or "").strip(), objective)
+        produced = any(
+            int(_row.get(column) or 0) > 0
+            for column in lexicon.PRODUCTION_CHANNELS
+        )
+        group_has_production[key] = group_has_production.get(key, False) or produced
     for row in vocab_rows:
         status = lexicon.item_status(row, now_iso)
         if status not in ("weak", "learning", "known"):
@@ -1805,7 +1820,15 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         word = row.get("word") or ""
         if not word:
             continue
-        why = fsrs.why_for_lexicon(status)
+        if status == "known":
+            objective = (row.get("objective_id") or "").strip()
+            group_key = ((row.get("level_id") or "").strip(), objective)
+            group_produced = bool(objective) and group_has_production.get(
+                group_key, False
+            )
+            why = fsrs.why_for_lexicon(status, group_produced=group_produced)
+        else:
+            why = fsrs.why_for_lexicon(status)
         key = ("lexicon", word)
         prev = existing.get(key)
         if prev and int(prev.get("reps") or 0) > 0:

@@ -40,6 +40,22 @@ class VocabularyItem(BaseModel):
     status: VocabularyStatus
 
 
+class LexicalCompetence(BaseModel):
+    """Matriz de competencia por ítem léxico (V3.21, V20-16).
+
+    Derivada de las filas existentes (sin migrar columnas): pura y
+    determinista. `retention` == `transfer` hasta que exista `exposure_days`
+    (deuda de modelo documentada en `services/lexicon`).
+    """
+
+    recognition: bool
+    production: bool
+    production_channels: list[str] = Field(default_factory=list)
+    transfer: bool
+    retention: bool
+    gap: bool
+
+
 class LexicalItemOut(BaseModel):
     word: str
     lemma: str
@@ -60,6 +76,8 @@ class LexicalItemOut(BaseModel):
     speaking_prod: int = 0
     writing_prod: int = 0
     conversation_prod: int = 0
+    # V3.21 (V20-16): matriz Recognition/Production/Transfer/Retention.
+    competence: LexicalCompetence | None = None
 
 
 class CefrBucket(BaseModel):
@@ -74,6 +92,12 @@ class LexiconSummary(BaseModel):
     weak: int
     mastered: int
     by_cefr: list[CefrBucket]
+    # V3.21 (V20-16): contadores de la matriz de competencia del léxico.
+    recognized: int = 0
+    produced: int = 0
+    transfer: int = 0
+    retention: int = 0
+    transfer_gap: int = 0
 
 
 class LexiconCoverageLevel(BaseModel):
@@ -141,3 +165,48 @@ class DrillAttemptOut(BaseModel):
     breakdown: PronunciationBreakdown
     phoneme_breakdown: PhonemeBreakdown
     fluency: FluencyStats | None = None
+    # V3.21 (V20-14/V20-15): metadatos ASR del intento. Cuando `asr_status !=
+    # "ok"` el audio no se reconoció con fiabilidad (silencio/ilegible/confianza
+    # baja): `produced` va forzado a False y NO se acredita fallo al alumno.
+    asr_status: str = "ok"  # ok | no_speech | unintelligible | low_confidence
+    asr_confidence: float | None = None
+
+
+class SentenceContextOut(BaseModel):
+    """Contexto del paso "Sentence" del micro-drill (V3.21/F6.1).
+
+    Frase determinista que contiene la palabra objetivo: del banco oficial de
+    read-aloud del nivel (`source: "route"`) o una plantilla simple sin
+    significado inventado (`source: "template"`)."""
+
+    word: str
+    phrase: str
+    source: str  # "route" | "template"
+    level: str
+
+
+class SentenceAttemptOut(BaseModel):
+    """Resultado del paso "Sentence" del micro-drill (V3.21/F6.1).
+
+    El alumno repite la frase de contexto en voz alta:
+    - `produced`: la palabra objetivo quedó alineada en la transcripción.
+    - `phrase_ok`: la frase COMPLETA superó el umbral del scorer (>= 80).
+    - `passed` = produced AND phrase_ok: es lo que acredita producción oral por
+      este paso (decir la palabra dentro de la frase, no suelta).
+
+    Igual que el paso palabra, el drill no declara dominio ni crea evidencia
+    curricular (D5/E3). Con `asr_status != "ok"` no se puntúa ni se penaliza.
+    """
+
+    word: str
+    phrase: str
+    source: str  # "route" | "template"
+    produced: bool
+    phrase_ok: bool
+    passed: bool
+    heard: str
+    score: int
+    level: PronunciationLevel
+    fluency: FluencyStats | None = None
+    asr_status: str = "ok"  # ok | no_speech | unintelligible | low_confidence
+    asr_confidence: float | None = None

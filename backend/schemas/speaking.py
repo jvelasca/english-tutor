@@ -44,6 +44,11 @@ class SpeakingAttemptResponse(BaseModel):
     observed: dict = Field(default_factory=dict)
     topic: str = ""
     difficulty: int = 1
+    # V3.21 (V20-14/V20-15): metadatos ASR del intento. Cuando `asr_status !=
+    # "ok"` el turno no se evalúa ni se persiste como fallo lingüístico (sin
+    # llamada al extractor LLM): la UI ofrece repetir en lugar de puntuar.
+    asr_status: str = "ok"  # ok | no_speech | unintelligible | low_confidence
+    asr_confidence: float | None = None
 
 
 class SpeakingGate(BaseModel):

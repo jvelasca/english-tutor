@@ -23,6 +23,9 @@ export interface ChatResponse {
 
 export interface ModelsResponse {
   models?: string[];
+  // V3.21 (V20-05): modelo por defecto (fuente única en `config.DEFAULT_MODEL`
+  // del backend). `null`/ausente en backends antiguos.
+  default_model?: string | null;
 }
 
 export interface User {
@@ -122,7 +125,13 @@ export interface PronunciationResponse {
   breakdown: PronunciationBreakdown;
   phoneme_breakdown: PhonemeBreakdown;
   fluency: FluencyStats;
+  // V3.21 (V20-14/15): metadatos ASR. Si `asr_status !== "ok"` el intento no se
+  // registró como fallo lingüístico (el audio no se reconoció con fiabilidad).
+  asr_status?: AsrStatus;
+  asr_confidence?: number | null;
 }
+
+export type AsrStatus = "ok" | "no_speech" | "unintelligible" | "low_confidence";
 
 export interface PronunciationStats {
   attempts: number;
@@ -238,6 +247,16 @@ export interface LearningProfile {
 
 export type LexicalStatus = "mastered" | "known" | "learning" | "weak";
 
+// V3.21 (V20-16): matriz Recognition/Production/Transfer/Retention por ítem.
+export interface LexicalCompetence {
+  recognition: boolean;
+  production: boolean;
+  production_channels: string[];
+  transfer: boolean;
+  retention: boolean;
+  gap: boolean;
+}
+
 export interface LexicalItem {
   word: string;
   lemma: string;
@@ -254,6 +273,8 @@ export interface LexicalItem {
   speaking_prod: number;
   writing_prod: number;
   conversation_prod: number;
+  // V3.21 (V20-16): matriz de competencia (puede faltar en respuestas viejas).
+  competence?: LexicalCompetence | null;
 }
 
 export interface DrillCandidates {
@@ -276,6 +297,37 @@ export interface DrillAttempt {
   breakdown: PronunciationBreakdown;
   phoneme_breakdown: PhonemeBreakdown;
   fluency?: FluencyStats | null;
+  // V3.21 (V20-14/15): con `asr_status !== "ok"` produced va False (no se
+  // acredita) y la UI no debe interpretarlo como fallo lingüístico.
+  asr_status?: AsrStatus;
+  asr_confidence?: number | null;
+}
+
+// V3.21 (F6.1): paso "Sentence" del micro-drill — repetir la palabra dentro de
+// una frase de contexto determinista (banco de rutas o plantilla).
+export interface DrillSentenceContext {
+  word: string;
+  phrase: string;
+  source: "route" | "template";
+  level: string;
+}
+
+export interface DrillSentenceAttempt {
+  word: string;
+  phrase: string;
+  source: "route" | "template";
+  /** La palabra objetivo quedó alineada en la transcripción (V20-01). */
+  produced: boolean;
+  /** La frase COMPLETA superó el umbral del scorer. */
+  phrase_ok: boolean;
+  /** produced AND phrase_ok: lo que acredita producción por este paso. */
+  passed: boolean;
+  heard: string;
+  score: number;
+  level: PronunciationLevel;
+  fluency?: FluencyStats | null;
+  asr_status?: AsrStatus;
+  asr_confidence?: number | null;
 }
 
 export interface CefrBucket {
@@ -290,6 +342,12 @@ export interface LexiconSummary {
   weak: number;
   mastered: number;
   by_cefr: CefrBucket[];
+  // V3.21 (V20-16): contadores de la matriz de competencia del léxico.
+  recognized: number;
+  produced: number;
+  transfer: number;
+  retention: number;
+  transfer_gap: number;
 }
 
 // P1 (§3.1): Vocabulary Coverage Indicator receptivo/productivo por nivel.
@@ -650,6 +708,10 @@ export interface SpeakingAttempt {
   observed: Record<string, boolean>;
   topic: string;
   difficulty: number;
+  // V3.21 (V20-14/15): con `asr_status !== "ok"` el turno NO se evaluó ni se
+  // persiste como fallo (audio no reconocido): la UI ofrece repetir.
+  asr_status?: AsrStatus;
+  asr_confidence?: number | null;
 }
 
 /** Trabajo de generación de práctica extra de speaking en segundo plano (V3.7). */
@@ -762,6 +824,10 @@ export interface PronunciationAttempt {
   fluency: FluencyStats;
   topic: string;
   difficulty: number;
+  // V3.21 (V20-14/15): con `asr_status !== "ok"` el intento NO se persiste como
+  // fallo (audio no reconocido): la UI avisa y ofrece reintentar.
+  asr_status?: AsrStatus;
+  asr_confidence?: number | null;
 }
 
 // V3.10 — Conversation por rutas: mini-diálogos guiados multi-turno A1-C2. Misma

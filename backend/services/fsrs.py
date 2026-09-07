@@ -380,12 +380,22 @@ def why_for_skill(entry: dict) -> str:
     return "maintenance"
 
 
-def why_for_lexicon(status: str) -> str:
+def why_for_lexicon(status: str, group_produced: bool = False) -> str:
+    """Razón pedagógica al sembrar la carta de un ítem léxico.
+
+    V3.21 (V20-17): una palabra `known` (reconocida pero nunca producida) de un
+    objetivo que YA tiene producción en otras palabras recibe `transfer-gap` en
+    lugar de `recognition-only`: hay otras unidades del objetivo en producción y
+    esta espera su salto a producción (es la señal que el micro-drill cierra).
+    Si el objetivo aún no tiene ninguna producción, sigue siendo
+    `recognition-only` (el objetivo entero está en fase receptiva)."""
     if status == "weak":
         return "weak-lexicon"
     if status == "learning":
         return "learning-lexicon"
     if status == "known":
+        if group_produced:
+            return "transfer-gap"
         return "recognition-only"
     return "lexicon-maintenance"
 

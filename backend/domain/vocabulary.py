@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from starlette.concurrency import run_in_threadpool
 
+from domain import learning as learning_service
 from repositories import vocabulary as vocabulary_repo
 from services import lexicon
 from services.fluency import compute_fluency
+from services.phonetics import unit_produced
 from services.pronunciation import score_pronunciation
+from services.pronunciation_routes import sentence_context_for
 from services.vocabulary import classify, extract_words
 
 logger = logging.getLogger(__name__)
@@ -25,7 +29,10 @@ async def analyze_text(user_id: str, text: str) -> list[str]:
 
 
 async def record_production_text(
-    user_id: str, text: str, channel: str
+    user_id: str,
+    text: str,
+    channel: str,
+    as_unit: bool = False,
 ) -> list[str]:
     """Registra producción del alumno por canal (V3.19).
 
@@ -34,11 +41,22 @@ async def record_production_text(
     destreza. `record_production` mantiene la semántica agregada de
     `appearances`/`production_days` y suma la columna `<channel>_prod`.
 
+    - `as_unit=False` (texto libre): tokeniza con `extract_words` (palabras
+      sueltas sin stopwords).
+    - `as_unit=True` (V3.21, V20-01): acredita `text` como unidad léxica
+      atómica (p. ej. "living room" o cualquier palabra del micro-drill), sin
+      trocearla en tokens. Necesario para que una unidad multi-palabra incremente
+      SU PROPIA fila (`speaking_prod`/`appearances`) y no solo las de sus tokens.
+
     Nunca lanza: el volcado al léxico es señal pedagógica (no evidencia de
     mastery) y no debe romper la puntuación del flujo que lo llama. Si el canal
     no es válido o falla la escritura, registra el aviso y devuelve la lista
     extraída igualmente."""
-    words = extract_words(text)
+    words: list[str]
+    if as_unit:
+        words = [text.strip().lower()] if text.strip() else []
+    else:
+        words = extract_words(text)
     try:
         await run_in_threadpool(
             vocabulary_repo.record_production, user_id, words, channel=channel
@@ -99,6 +117,9 @@ async def get_lexicon(user_id: str) -> dict:
             "next_review_days": lexicon.next_review_days(row),
             "exposures": row["exposures"],
             "appearances": row["appearances"],
+            # V3.21 (V20-16): matriz de competencia Recognition/Production/
+            # Transfer/Retention con el transfer gap por ítem (puro, derivado).
+            "competence": lexicon.item_competence_matrix(row),
             # V3.19: desglose de producción por destreza.
             "chat_prod": row.get("chat_prod", 0),
             "speaking_prod": row.get("speaking_prod", 0),
@@ -117,14 +138,21 @@ async def get_lexicon(user_id: str) -> dict:
 
 
 async def get_drill_candidates(user_id: str, limit: int = 8) -> list[str]:
-    """Candidatos al speaking micro-drill (V3.19, premisa 21).
+    """Candidatos al speaking micro-drill escalera (V3.21, F6/V20-06).
 
-    Señal determinista en servidor: ítems con `exposures > 0` y
-    `speaking_prod == 0`, ordenados por recuerdo ascendente y acotados a
-    `limit`. Reemplaza el recálculo cliente de `recognized_not_produced`
-    (SIGNAL-01/A2-07)."""
+    Señal determinista en servidor: ítems con `exposures > 0` que aún no han
+    consolidado la producción oral espaciada (`drill_ok_days` desde los eventos
+    `learning_events` de éxito de drill; V3.21/F6.2), ordenados por recuerdo
+    ascendente y acotados a `limit`. Reemplaza el recálculo cliente de
+    `recognized_not_produced` (SIGNAL-01/A2-07) y el criterio antiguo de salir
+    tras UNA producción del día (V20-06)."""
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
-    return lexicon.drill_candidates(rows, limit=limit)
+    events = await learning_service.list_events(user_id, event_type="exercise")
+    ok_days = lexicon.drill_ok_days(events)
+    today = datetime.now(timezone.utc).date().isoformat()
+    return lexicon.drill_candidates(
+        rows, limit=limit, ok_days=ok_days, today=today
+    )
 
 
 async def submit_drill_attempt(
@@ -132,27 +160,34 @@ async def submit_drill_attempt(
     word: str,
     heard: str,
     duration_seconds: float | None = None,
+    asr_status: str = "ok",
+    asr_confidence: float | None = None,
 ) -> dict:
     """Puntúa un intento de speaking micro-drill y marca la palabra producida.
 
     Reutiliza el scorer determinista de pronunciación (`score_pronunciation` con
-    la palabra esperada) y `compute_fluency`. Si la palabra esperada aparece en
-    el `breakdown.correct` (el alumno la dijo), la registra como producción de
-    speaking (    `speaking_prod += 1`), lo que la saca de la lista de candidatas.
-    El drill NO declara dominio ni crea evidencia curricular (D5/E3, igual que
-    el micro-review de V3.16). Devuelve el scoring + `produced`."""
+    la palabra esperada) y `compute_fluency`. La producción se decide por
+    ALINEACIÓN SECUENCIAL (`unit_produced`, V3.21/V20-01), no por pertenencia de
+    tokens: una palabra debe quedar alineada como `equal`; una frase multi-palabra
+    debe aparecer contigua en la transcripción. Si se produjo, se registra la
+    unidad léxica completa como `speaking_prod += 1` (`as_unit=True`, para que una
+    frase acredite SU fila y no solo sus tokens), lo que la saca de la lista de
+    candidatas.
+
+    V3.21 (V20-14/V20-15): si el ASR no reconoció el audio con fiabilidad
+    (`asr_status != "ok"`), `produced` va forzado a False (no se acredita
+    producción) y NO se registra fallo: no podemos distinguir "no lo dijo" de
+    "no te he oído". El drill NO declara dominio ni crea evidencia curricular
+    (D5/E3, igual que el micro-review de V3.16). Devuelve el scoring + `produced`."""
     result = score_pronunciation(word, heard)
-    correct = result["breakdown"]["correct"]
-    # La palabra "se produjo" si la dijo tal cual (alineada como correcta).
-    # `word` puede ser una frase (p. ej. "living room"): se exige la frase
-    # completa alineada, no solo un token.
-    expected_tokens = [t for t in result["expected"].split() if t]
-    produced = bool(expected_tokens) and all(
-        token in correct for token in expected_tokens
-    )
+    # La palabra/frase "se produjo" si quedó alineada secuencialmente en la
+    # transcripción (orden + cobertura + contigüidad, misma normalización).
+    # Con ASR no fiable se fuerza False para no acreditar en falso.
+    produced = unit_produced(word, heard) and asr_status == "ok"
     if produced:
         # Volcado al léxico por destreza; nunca lanza (señal, no evidencia).
-        await record_production_text(user_id, word, "speaking")
+        # `as_unit=True`: acredita la unidad atómica (V3.21, V20-01).
+        await record_production_text(user_id, word, "speaking", as_unit=True)
     return {
         "word": word,
         "produced": produced,
@@ -173,4 +208,79 @@ async def submit_drill_attempt(
             if duration_seconds is not None
             else None
         ),
+        "asr_status": asr_status,
+        "asr_confidence": asr_confidence,
+    }
+
+
+def _row_for_word(rows: list[dict], word: str) -> dict | None:
+    """Fila del léxico del usuario para una palabra (None si no existe)."""
+    return next((row for row in rows if row.get("word") == word), None)
+
+
+async def get_sentence_context(user_id: str, word: str) -> dict:
+    """Frase de contexto determinista para el paso Sentence del drill (V3.21/F6.1).
+
+    Busca en el banco oficial de frases de pronunciación del nivel CEFR del ítem
+    la primera frase que CONTIENE la unidad léxica (alineación `unit_produced`);
+    si ninguna la contiene (el banco es pequeño), usa una plantilla simple que
+    no inventa significado ("Say the word …"). Sin LLM y determinista: el mismo
+    servidor la vuelve a derivar al puntuar el intento."""
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    row = _row_for_word(rows, word)
+    cefr = (row or {}).get("cefr", "")
+    return sentence_context_for(word, level=cefr or None)
+
+
+async def submit_sentence_attempt(
+    user_id: str,
+    word: str,
+    heard: str,
+    duration_seconds: float | None = None,
+    asr_status: str = "ok",
+    asr_confidence: float | None = None,
+) -> dict:
+    """Puntúa el paso "Sentence" del speaking micro-drill (V3.21/F6.1).
+
+    El alumno repite en voz alta una FRASE de contexto que contiene la palabra
+    objetivo. Scoring determinista reutilizando `score_pronunciation` sobre la
+    frase esperada (derivada con `sentence_context_for`).
+
+    - `produced`: la palabra objetivo quedó alineada en la transcripción
+      (`unit_produced`, V3.21/V20-01).
+    - `phrase_ok`: la frase completa superó el umbral del scorer (>= 80).
+    - `passed` = produced AND phrase_ok: la evidencia del paso frase es decir la
+      palabra DENTRO de la frase, no la palabra suelta (si solo dice la palabra,
+      `produced=True` pero `phrase_ok=False` y no se acredita por este paso).
+
+    Al `passed`, se acredita la unidad atómica como `speaking_prod += 1`
+    (`as_unit=True`), igual que el paso palabra. Con ASR no fiable
+    (`asr_status != "ok"`) `passed` va forzado a False y no se registra fallo
+    (V20-14/15). El drill no declara dominio ni crea evidencia curricular (D5/E3)."""
+    ctx = await get_sentence_context(user_id, word)
+    phrase = ctx["phrase"]
+    scored = score_pronunciation(phrase, heard)
+    produced = unit_produced(word, heard) and asr_status == "ok"
+    phrase_ok = scored["ok"] and asr_status == "ok"
+    passed = produced and phrase_ok
+    if passed:
+        # Volcado al léxico por destreza; nunca lanza (señal, no evidencia).
+        await record_production_text(user_id, word, "speaking", as_unit=True)
+    return {
+        "word": word,
+        "phrase": phrase,
+        "source": ctx["source"],
+        "produced": produced,
+        "phrase_ok": phrase_ok,
+        "passed": passed,
+        "heard": scored["heard"],
+        "score": scored["score"],
+        "level": scored["level"],
+        "fluency": (
+            compute_fluency(heard, duration_seconds)
+            if duration_seconds is not None
+            else None
+        ),
+        "asr_status": asr_status,
+        "asr_confidence": asr_confidence,
     }

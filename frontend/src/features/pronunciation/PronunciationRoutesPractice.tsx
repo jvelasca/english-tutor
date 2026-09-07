@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, RefreshCw, Square } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
+import { useRecordingSession } from "../../hooks/useRecordingSession";
 import type { LearnActivity } from "../../router/learnHub";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -233,6 +234,7 @@ export function PronunciationScene({
         onSkip={onSkip}
         onRetry={() => {
           setAttemptError(null);
+          setResult(null);
           processedRef.current = false;
         }}
       />
@@ -327,6 +329,11 @@ function PhraseWordChips({
           {t("pron.chip.extraHint")}
         </p>
       )}
+      {/* V3.21 (V20-02): nota permanente: estos colores son de la transcripción
+          (ASR), no de un análisis acústico de la pronunciación. */}
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        {t("pron.chipsNote")}
+      </p>
     </div>
   );
 }
@@ -349,6 +356,15 @@ function PracticeReadCard({
   const { t } = useI18n();
   const phraseText = usePhraseTranslation(phrase?.script ?? "");
   const expectedText = usePhraseTranslation(result?.script ?? "");
+  // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend)
+  // mientras se graba la lectura.
+  const recordingRef = useRef(recording);
+  recordingRef.current = recording;
+  const recordingSession = useRecordingSession(recording, {
+    onAutoStop: () => {
+      if (recordingRef.current) onToggleRecording();
+    },
+  });
 
   if (cardLoading || !phrase) {
     return (
@@ -384,6 +400,26 @@ function PracticeReadCard({
   return (
     <Card className="gap-4 p-5 sm:p-6">
       {result ? (
+        result.asr_status && result.asr_status !== "ok" ? (
+          /* V3.21 (V20-14/15): el ASR no reconoció el audio. No se muestra
+             feedback de color (no es un fallo lingüístico): se avisa y se pide
+             repetir. El intento no se persiste en el backend. */
+          <ActivityResult
+            outcome="neutral"
+            title={t("asr.title")}
+            footer={
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" onClick={onRetry}>
+                  {t("asr.tryAgain")}
+                </Button>
+              </div>
+            }
+          >
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t(`asr.message.${result.asr_status}`)}
+            </p>
+          </ActivityResult>
+        ) : (
         <ActivityResult
           outcome={outcome}
           title={`${t("pron.title")} · ${result.score}/100`}
@@ -497,6 +533,7 @@ function PracticeReadCard({
             {t("pronRoutes.resultHonestNote")}
           </p>
         </ActivityResult>
+        )
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -573,7 +610,9 @@ function PracticeReadCard({
                   : t("pron.record")}
             </Button>
             <span className="text-xs text-muted-foreground">
-              {t("pronRoutes.recordHint")}
+              {recording
+                ? t("pronRoutes.recordHint") + " · " + recordingSession.formatted
+                : t("pronRoutes.recordHint")}
             </span>
           </div>
 

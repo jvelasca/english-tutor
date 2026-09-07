@@ -143,7 +143,8 @@ export interface RouteQuizApi {
 export interface RouteQuizConfig {
   /** Namespace i18n de la destreza (p. ej. "gramRoutes", "vocRoutes"). */
   ns: string;
-  /** Clave del nombre de la destreza (p. ej. "skill.grammar"). */
+  /** Clave del título de la página (p. ej. "skill.grammar"; en superficies
+      con modos, "speaking.surfaceTitleAccent"). */
   skillTitleKey: string;
   /** Clave del subtítulo bajo el título (p. ej. "learn.grammarSubtitle"). */
   subtitleKey: string;
@@ -166,6 +167,10 @@ export interface RouteQuizConfig {
   trailing?: ComponentType<{ userId: string | null }>;
   /** Sin perfil activo: solo spinner (p. ej. conversation). */
   requireUser?: boolean;
+  /** V3.21 (V20-03/04): clave i18n de la competencia REAL que miden las stats
+      del mapa (Producción oral / Pronunciación / Conversación). Si se omite,
+      el bloque de stats no muestra etiqueta de competencia adicional. */
+  statsCompetenceKey?: string;
 }
 
 interface QuizRoutePageProps {
@@ -733,6 +738,7 @@ export function QuizRoutePage({
                 LevelPanel={config.LevelPanel}
                 userId={userId}
                 stats={stats}
+                statsCompetenceKey={config.statsCompetenceKey}
                 showAssessed={config.loadAssessed !== undefined}
                 assessedLevel={assessedLevel}
                 expandedLevel={expandedLevel}
@@ -764,6 +770,8 @@ interface QuizRoutesSectionProps {
   LevelPanel: ComponentType<RouteLevelPanelProps>;
   userId: string | null;
   stats: RouteStats;
+  /** V3.21 (V20-03/04): competencia real del modo para etiquetar las stats. */
+  statsCompetenceKey?: string;
   /** Muestra el nivel oral demostrado (destrezas orales). */
   showAssessed: boolean;
   assessedLevel: string | null;
@@ -782,6 +790,7 @@ function QuizRoutesSection({
   LevelPanel,
   userId,
   stats,
+  statsCompetenceKey,
   showAssessed,
   assessedLevel,
   expandedLevel,
@@ -804,6 +813,11 @@ function QuizRoutesSection({
           <span className="text-muted-foreground">
             {t(nk("routesMapHint"))}
           </span>
+          {statsCompetenceKey && (
+            <span className="mt-1 w-fit rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+              {t(statsCompetenceKey)}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <ProgressRing

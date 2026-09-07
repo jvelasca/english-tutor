@@ -17,7 +17,7 @@ DEFAULT_MODEL = "llama3.1:8b"
 # ser utilizable.
 UNUSABLE_MODELS = frozenset({"qwen3.5:9b"})
 
-VERSION = "3.20.0"
+VERSION = "3.21.0"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -40,9 +40,10 @@ MAX_TTS_CHARS = 4000
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB
 MAX_AUDIO_DURATION_SECONDS = 120.0  # duración máxima aceptada por grabación
 
-# PIN de administración local (V1.37). Si está vacío, los endpoints de
-# administración de la biblioteca de audio quedan abiertos (comportamiento previo);
-# si se define, exigen la cabecera `X-Admin-Pin`. Sin OAuth/cloud: es un candado
+# PIN de administración local (V1.37). V3.21 (V20-09): el comportamiento es
+# FAIL-CLOSED: si está vacío, los endpoints de administración de la biblioteca
+# de audio quedan DESHABILITADOS (401 `Administración deshabilitada`); si se
+# define, exigen la cabecera `X-Admin-Pin`. Sin OAuth/cloud: es un candado
 # local para separar el rol `student` (aprender) del `admin` (gestionar audio).
 ADMIN_PIN = ""
 

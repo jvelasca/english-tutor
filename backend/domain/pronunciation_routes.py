@@ -91,12 +91,20 @@ async def submit_attempt(
     phrase_id: str,
     heard: str,
     duration_seconds: float | None = None,
+    asr_status: str = "ok",
+    asr_confidence: float | None = None,
 ) -> dict | None:
     """Puntúa una lectura en voz alta (determinista) y persiste el intento.
 
     Compara la transcripción (`heard`) con la frase esperada del banco mediante
     `score_pronunciation` (composite fonético sin LLM) y `compute_fluency`.
     `passed = ok` (score >= 80). None si la frase no existe.
+
+    V3.21 (V20-14/V20-15): si el ASR no reconoció el audio con fiabilidad
+    (`asr_status != "ok"`), NO se persiste el intento como fallo lingüístico ni
+    se vuelca la transcripción al léxico (no es producción del alumno): se
+    devuelve el resultado con `passed=False` y el estado ASR para que la UI
+    ofrezca repetir.
     """
     phrase = get_phrase(phrase_id)
     if phrase is None:
@@ -104,6 +112,32 @@ async def submit_attempt(
     script = phrase.get("script", "")
     result = score_pronunciation(script, heard)
     fluency = compute_fluency(heard, duration_seconds)
+    if asr_status != "ok":
+        # Audio no fiable: no penalizar. La transcripción puede ser vacía o
+        # ilegible; devolver con `asr_status` para que la UI avise y reintente.
+        return {
+            "phrase_id": phrase_id,
+            "level": phrase.get("level", ""),
+            "script": script,
+            "heard": result["heard"],
+            "score": int(result["score"]),
+            "grade": "needs_practice",
+            "passed": False,
+            "word_accuracy": int(result["word_accuracy"]),
+            "phonetic_score": int(result["phonetic_score"]),
+            "phoneme_accuracy_proxy": int(result["phoneme_accuracy_proxy"]),
+            "prosody_proxy": int(result["prosody_proxy"]),
+            "pronunciation_source": result["pronunciation_source"],
+            "breakdown": result["breakdown"],
+            "phoneme_breakdown": result["phoneme_breakdown"],
+            "fluency": fluency,
+            "topic": phrase.get("topic", ""),
+            "difficulty": difficulty_from_vector(
+                phrase.get("difficulty_vector", {})
+            ),
+            "asr_status": asr_status,
+            "asr_confidence": asr_confidence,
+        }
     passed = bool(result["ok"])
     # V3.19: volcar la producción oral (read-aloud) al léxico por destreza.
     # `record_production_text` nunca lanza (volcado no bloqueante).
@@ -138,6 +172,8 @@ async def submit_attempt(
         "fluency": fluency,
         "topic": topic,
         "difficulty": difficulty,
+        "asr_status": asr_status,
+        "asr_confidence": asr_confidence,
     }
 
 

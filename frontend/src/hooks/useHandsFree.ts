@@ -18,7 +18,8 @@ export type HandsFreeStatus =
   | "listening"
   | "transcribing"
   | "thinking"
-  | "speaking";
+  | "speaking"
+  | "unclear";
 
 export interface HandsFreeController {
   enabled: boolean;
@@ -51,6 +52,9 @@ export function useHandsFree(
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const vadTimerRef = useRef<number | null>(null);
+  // V3.21 (V20-14): temporizador del aviso "no te he oído" antes de seguir
+  // escuchando (para no repetir el aviso en bucle con cada chunk).
+  const unclearTimerRef = useRef<number | null>(null);
 
   const enabledRef = useRef(false);
   const speechDetectedRef = useRef(false);
@@ -71,6 +75,11 @@ export function useHandsFree(
     speechStartRef.current = null;
     silenceStartRef.current = null;
     chunkStartRef.current = null;
+
+    if (unclearTimerRef.current !== null) {
+      window.clearTimeout(unclearTimerRef.current);
+      unclearTimerRef.current = null;
+    }
 
     if (vadTimerRef.current !== null) {
       window.clearInterval(vadTimerRef.current);
@@ -183,7 +192,16 @@ export function useHandsFree(
     if (!enabledRef.current) return;
     text = text.trim();
     if (!text) {
-      resumeListening();
+      // V3.21 (V20-14): el tramo no se entendió (silencio/audio ilegible).
+      // Aviso breve y se sigue escuchando; nunca se manda texto vacío al chat.
+      setStatus("unclear");
+      if (unclearTimerRef.current !== null) {
+        window.clearTimeout(unclearTimerRef.current);
+      }
+      unclearTimerRef.current = window.setTimeout(() => {
+        unclearTimerRef.current = null;
+        resumeListening();
+      }, 1800);
       return;
     }
 
