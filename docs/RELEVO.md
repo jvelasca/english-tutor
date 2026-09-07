@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-07 08:15 (UTC+2).
+> Actualizado por última vez: 2026-09-07 09:10 (UTC+2).
 >
 > **Nota (2026-09-07):** posición vigente **v3.18.0** — **Knowledge Graph
 > remainder + deuda del grafo** (backend `3.17.0 → 3.18.0`). Cierra el candidato
@@ -27,6 +27,15 @@
 > "Transfer" con mock determinista). Tests: **pytest 1345**, **vitest 414**, ruff
 > limpio, `tsc`/`vite build` OK, Playwright de la región Home/grafo en desktop OK
 > y `check_release_consistency` exit 0; CONSTITUCIÓN sin cambios.
+>
+> **Nota (2026-09-07, 09:10):** verificación de cierre de v3.18 reproducida en
+> vivo sin cambios de código — pytest **1345** ✅, ruff limpio ✅, vitest **414**
+> ✅, `tsc`/`vite build` OK ✅ y `check_release_consistency` **3.18.0** exit 0 ✅
+> (versión en `config.py`/`package.json`/`package-lock.json` y resto de fuentes).
+> Con los candidatos P0–P3 cerrados, solo queda abierto el **pendiente heredado
+> de léxico** (producción volcada por destreza speaking/writing + speaking
+> micro-drill de `recognized_not_produced`); queda definido como candidato
+> **V3.19** en la sección final (bloques P0/P1). CONSTITUCIÓN sin cambios.
 >
 > **Nota (2026-09-06):** posición vigente **v3.17.0** — **Knowledge Graph +
 > Daily Adaptive Plan** (backend `3.16.0 → 3.17.0`). Cierra el candidato P2:
@@ -2904,9 +2913,51 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   **auditoría v3.17** ✅ — `ObjectiveNodeCard` error vs 404/sin-datos con
   reintento, `_as_float` defensivo, spec Playwright `homeGraphChip` nueva. Tests:
   pytest 1345, vitest 414, ruff/build/Playwright región desktop/consistencia OK.
-- **Pendiente heredado** (ABIERTO, v3.18): generación automática del speaking
-  micro-drill (`recognized_not_produced`, hoy solo señal sin consumidor) y
-  desglose speaking-vs-writing por palabra (hoy `record_words` solo lo llama el
-  chat; speaking/writing no vuelcan al léxico por destreza).
+- **🟢 Candidato V3.19 — Léxico por destreza + Speaking micro-drill** (ABIERTO,
+  definido 2026-09-07; 1 subagente + 1 release — premisa 6). **Sustituye al
+  "pendiente heredado" de v3.18** (era solo una nota; a partir de aquí es un
+  candidato con alcance propio). **Problema (verificado en el código, no
+  inferido):** la producción al léxico solo la vuelca el **chat libre** —
+  `useChat.sendText` → `/api/vocabulary/analyze` →
+  `domain.vocabulary.analyze_text` → `record_words` (`routers/vocabulary.py`) —
+  y las **exposiciones** solo llegan de la respuesta del tutor
+  (`routers/chat.py` → `record_exposure`). Ningún `submit_*` de speaking ni de
+  writing vuelca el texto del alumno (`heard`/`text`) y la tabla `vocabulary`
+  **no tiene columna de destreza** (`source` solo distingue
+  user/curriculum/imported). Por tanto `recognized_not_produced`
+  (`services/lexicon.py`, señal hoy sin consumidor) se calcula sobre producción
+  *tecleada*, no *oral*: una palabra que el alumno escribió en el chat ya no
+  aparece como candidata aunque jamás la haya pronunciado.
+  **P0 — volcado de producción por destreza**: representación a decidir en la
+  implementación (columna/contadores por destreza o ledger de eventos); el
+  **invariante** es que la producción agregada (`appearances`/`production_days`),
+  `item_status` y `coverage_indicator` actuales **no cambian** de semántica y el
+  desglose por destreza queda derivable. Puntos de inserción naturales —las
+  funciones de dominio que ya reciben el texto del alumno—:
+  `submit_speaking`/`submit_speaking_task`/assessment/mission en
+  `domain/academy.py`, `submit_attempt` en `domain/speaking_routes.py`,
+  `domain/conversation_routes.py` (reconstruye los turnos) y
+  `domain/pronunciation_routes.py`, y `submit_writing`/`submit_writing_task` en
+  `domain/academy.py`; el chat queda etiquetado `chat`. Caveat honesto: los
+  flujos reales de práctica oral del frontend son rutas/assessment/mission/
+  conversación guiada (los endpoints `objective/speaking`/`objective/writing`
+  hoy no se llaman desde la UI).
+  **P1 — Speaking micro-drill** (consumidor honesto de la señal): los
+  candidatos pasan a ser "expuestas y **nunca producidas oralmente**"
+  (exposures > 0 y spoken == 0); generador determinista en servidor (premisa
+  21) que sirve una mini-práctica reutilizando el scorer de pronunciación
+  existente (`POST /api/pronunciation`, texto esperado + audio) y, al producir
+  la palabra, la marca como producida por speaking y sale de la lista (cierra
+  el bucle exposición → producción). El drill **no** declara dominio ni crea
+  evidencia curricular (mecanismos separados, igual que el micro-review — D5/E3
+  de v3.16). UI: los chips de `recognizedNotProduced` en `PersonalDictionary`
+  (hoy inertes) ganan una acción real de práctica.
+  **Tests/verificación**: puros backend del desglose y del generador,
+  integración "exponer → drill → producir → sale de la lista", endpoints y
+  vitest de la UI; gate igual que v3.18 (hoy pytest 1345, vitest 414, ruff/
+  `tsc`/build limpios y `check_release_consistency`). **Caveats**: sin el
+  desglose el micro-drill no puede distinguir hablar de teclear; el histórico
+  previo a la migración no tiene destreza (etiquetado por defecto o excluido
+  del drill, a decidir en implementación).
 
 

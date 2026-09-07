@@ -8,6 +8,12 @@
 
 ## Estado actual
 
+- ✅ **Preparado para auditoría TOTAL externa (2026-09-07, read-only):** árbol de
+  trabajo limpio (v3.18.0 en HEAD, release-notes v3.10–v3.18 versionadas),
+  todos los gates automáticos en verde (pytest 1345, ruff, vitest 414,
+  `tsc`/`vite build`, consistencia 3.18.0, i18n exit 0, Beta V3.0, curriculum
+  `--strict --quality`, content validation) y briefing autocontenido en
+  `agentes/auditoria-total-externa.md` con el runbook y el mapa claim→código.
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
@@ -579,7 +585,30 @@
 | V2.11 SRS / FSRS | directo del gerente | ✔ hecho |
 | V2.12 Evidence Graph | directo del gerente | ✔ hecho |
 | V3.0 Beta freeze | directo del gerente | ✔ hecho |
+| V3.18 Deuda del grafo (P3) | directo del gerente | ✔ hecho |
+| V3.19 Léxico por destreza + Speaking micro-drill (candidato abierto) | pendiente de briefing | ⏳ planificado |
+| Auditoría TOTAL externa (v3.18.0) | `agentes/auditoria-total-externa.md` | ⏳ pendiente de ejecutar |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
 Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
+
+## Siguiente incremento (planificado)
+
+- **⏳ V3.19 — Léxico por destreza + Speaking micro-drill** (candidato abierto,
+  definido 2026-09-07; alcance completo en `docs/RELEVO.md`, sección final
+  "Próximos incrementos"). Cierra el pendiente heredado de v3.18.
+  - **P0 — volcado de producción por destreza**: hoy la única producción que
+    llega al léxico es la del chat libre (`/api/vocabulary/analyze` ←
+    `useChat`); speaking/writing no vuelcan `heard`/`text` y la tabla
+    `vocabulary` no distingue destreza. Volcar la producción etiquetada en los
+    `submit_*` de dominio (speaking rutas/task/assessment/mission, conversación
+    guiada, pronunciación, writing) sin cambiar la semántica de la producción
+    agregada ni de `item_status`/`coverage_indicator`.
+  - **P1 — Speaking micro-drill**: consumir `recognized_not_produced` con
+    semántica oral ("expuestas y nunca producidas hablando"); generador
+    determinista en servidor + mini-práctica sobre el scorer de pronunciación
+    existente; sin claims de dominio. UI: CTA real en `PersonalDictionary`
+    (hoy los chips son inertes).
+  - **Verificación**: gate idéntico a v3.18 (hoy pytest 1345, vitest 414,
+    ruff/`tsc`/`vite build` limpios, `check_release_consistency` 3.18.0).
