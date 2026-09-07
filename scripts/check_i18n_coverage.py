@@ -103,6 +103,8 @@ def _scanned() -> list[Path]:
         for p in SRC_DIR.rglob("*.ts*")
         if p.suffix in {".ts", ".tsx"}
         and p.name not in {"i18n.ts"}
+        and ".test." not in p.name
+        and ".spec." not in p.name
         and "node_modules" not in p.parts
     ]
 
