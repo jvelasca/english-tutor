@@ -1,4 +1,5 @@
 import type {
+  UnitReviewLevel,
   UnitReviewPlanUnit,
   UnitReviewWindowState,
 } from "../../types/api";
@@ -63,4 +64,14 @@ export function countReviewableUnits(
   units: ReadonlyArray<UnitReviewPlanUnit>,
 ): number {
   return units.filter(hasReviewableWindow).length;
+}
+
+/**
+ * Aplana las unidades de todos los niveles del plan agregado (V3.18/O3).
+ * Conserva el orden del backend (niveles asc, unidades del currículo).
+ */
+export function flattenReviewLevels(
+  levels: ReadonlyArray<UnitReviewLevel>,
+): UnitReviewPlanUnit[] {
+  return levels.flatMap((lv) => lv.units);
 }

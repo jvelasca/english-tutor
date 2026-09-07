@@ -123,6 +123,29 @@ def test_rank_empty_inputs_is_deterministic():
     )
 
 
+def test_rank_tolerates_non_numeric_mastery_without_throwing():
+    """D7.2 (V3.18): un nodo con `mastery` no numérico (None/"n/a") no rompe el
+    ranking: cae a 0.0 y se ordena al final de su grupo (empate estable)."""
+    nodes = {
+        "A": _node("A", mastery=0.5, limiting="grammar"),
+        "B": {
+            **_node("B", mastery=0.4, limiting="grammar"),
+            "mastery": None,
+        },
+        "C": {
+            **_node("C", mastery=0.4, limiting="grammar"),
+            "mastery": "n/a",
+        },
+    }
+    # Sin defensa esto lanzaría `TypeError`/`ValueError` en el `float()`.
+    ranked = eg.rank_weakness_objectives(
+        objective_ids=["A", "B", "C"], nodes_by_objective=nodes, skill="grammar"
+    )
+    # B y C (score no convertible → 0.0, los más débiles) primero en su orden de
+    # entrada (estable); A (0.5 real) después.
+    assert ranked == ["B", "C", "A"]
+
+
 # --- enrich_item (D1b, aditivo) -------------------------------------------
 
 

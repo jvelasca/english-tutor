@@ -11,6 +11,31 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.18.0` — **Knowledge Graph remainder + deuda del grafo (P3)**
+  (cierra el candidato P3, auditado ABIERTO en 2026-09-06. **P3-I2**: ancla de
+  unidad congelada al completar — tabla `unit_review_anchors` de escritura única
+  (`INSERT OR IGNORE`, backfill lazy) + `build_unit_review_plan(anchor=)`; los
+  refuerzos/decay posteriores ya no desplazan las ventanas 7/30/90 · **P3-O1**:
+  cascade de ventanas — una ventana sin intento propio se cierra con un intento
+  superado de la unidad posterior a su `due_at`; el intento propio manda siempre
+  · **P3-M4**: cartas FSRS `objective` fuera del panel autograduable (single
+  writer con el micro-review: siembra solo en ventana `due_now`/`failed` o con
+  `reps > 0`; `get_fsrs_due` y el `due_count` de resumen las excluyen y
+  `/fsrs/review` las rechaza con 400) · **P3-O3**: plan de repaso agregado por
+  niveles — `/unit-plan` devuelve `{levels, due_count}` (nivel actual +
+  anteriores matriculados), el micro-review acepta `level_id` y valida la unidad
+  en el nivel donde vive, `UnitReviewPanel` agrupa por nivel · **P3-H5**: etiquetas
+  humanas de las dimensiones del grafo — `GRAPH_DIMENSION_LABELS` + `dimensionLabel`
+  en chip de factor limitante/`NextBestCard`/`ObjectiveNodeCard`/`EvidenceGraphPanel`
+  (Transfer/Discourse/Interaction, nunca el id en crudo) · **P3-H6**: coste lazy
+  de `/session` y `/next-best` — nodos solo para los grupos de remediación que
+  pueden convertirse en paso (≤ `SESSION_CAPS.weakness`) y `list_evidence` una
+  sola vez y solo si hay nodos que construir (payloads idénticos, sin cambio de
+  API) · **P3-auditoría v3.17**: `ObjectiveNodeCard` distingue error real (copia +
+  reintento) de 404/sin-datos, `float()` defensivo en `rank_weakness_objectives`,
+  spec Playwright `homeGraphChip` nueva con mock determinista (chip "Transfer")
+  · **tests**: pytest 1345 + ruff limpio, vitest 414 + build OK, Playwright de la
+  región Home/grafo en desktop OK). Base: `3.17.0`
 - ✅ Versión estable `3.17.0` — **Knowledge Graph + Daily Adaptive Plan**
   (cierra el candidato P2: el plan diario ahora deriva del Evidence Graph.
   **P0-grafo→plan (D1b)**: `rank_weakness_objectives` + `enrich_item` en

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getJson, withTimeout } from "./client";
+import { getJson, getJsonNullable, withTimeout } from "./client";
 
 function fakeResponse(payload: unknown, status: number): Response {
   return {
@@ -77,5 +77,37 @@ describe("request: 429 RATE_LIMITED localizado (V3.6.2)", () => {
       vi.fn(async () => fakeResponse({ detail: "otro error" }, 500)),
     );
     await expect(getJson<unknown>("/x")).rejects.toThrow("otro error");
+  });
+});
+
+describe("getJsonNullable: 404 → null (V3.18, D7.1)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("resuelve null ante 404 sin lanzar", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => fakeResponse({ detail: "No encontrado" }, 404)),
+    );
+    await expect(getJsonNullable<unknown>("/x")).resolves.toBeNull();
+  });
+
+  it("lanza con el detail del backend para el resto de errores", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => fakeResponse({ detail: "Error interno" }, 500)),
+    );
+    await expect(getJsonNullable<unknown>("/x")).rejects.toThrow(
+      "Error interno",
+    );
+  });
+
+  it("resuelve con el payload en 200", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => fakeResponse({ value: 1 }, 200)),
+    );
+    await expect(getJsonNullable<{ value: number }>("/x")).resolves.toEqual({
+      value: 1,
+    });
   });
 });

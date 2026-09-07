@@ -3,6 +3,7 @@ import {
   completeLesson,
   completeSessionStep,
   finishSpeakingAssessment,
+  getEvidenceGraphNode,
   getGoal,
   getLevels,
   getSession,
@@ -110,6 +111,34 @@ describe("academy api", () => {
     });
     await getSession("u1");
     expect(fn.mock.calls[0][0]).toBe("/api/academy/session?user_id=u1");
+  });
+
+  it("getEvidenceGraphNode: 404 → null, 200 → nodo (V3.18, D7.1)", async () => {
+    const node = { can_do: "I can greet people politely." };
+    const fn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: "Objetivo no encontrado" }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => node });
+    vi.stubGlobal("fetch", fn);
+
+    // Sin nodo aún: el recurso 404 no lanza, resuelve `null` (sin-datos).
+    await expect(
+      getEvidenceGraphNode("u1", "a1-m01-u01-l01-o01"),
+    ).resolves.toBeNull();
+    // Nodo existente (con level_id en la query).
+    await expect(
+      getEvidenceGraphNode("u1", "a1-m01-u01-l01-o01", "a1"),
+    ).resolves.toEqual(node);
+    expect(fn.mock.calls[0][0]).toBe(
+      "/api/academy/evidence-graph/objective/a1-m01-u01-l01-o01?user_id=u1",
+    );
+    expect(fn.mock.calls[1][0]).toBe(
+      "/api/academy/evidence-graph/objective/a1-m01-u01-l01-o01?user_id=u1&level_id=a1",
+    );
   });
 
   it("completeSessionStep envía step_key por POST", async () => {
@@ -400,12 +429,7 @@ describe("academy api", () => {
   });
 
   it("getUnitReviewPlan llama a review/unit-plan con user_id", async () => {
-    const fn = mockJsonFetch({
-      level_id: "a1",
-      level: "A1",
-      due_count: 0,
-      units: [],
-    });
+    const fn = mockJsonFetch({ levels: [], due_count: 0 });
     await getUnitReviewPlan("u1");
     expect(fn.mock.calls[0][0]).toBe(
       "/api/academy/review/unit-plan?user_id=u1",
@@ -424,6 +448,21 @@ describe("academy api", () => {
     const url = fn.mock.calls[0][0] as string;
     expect(url).toBe(
       "/api/academy/review/unit/a1-u1/micro-review?user_id=u1&window_days=7",
+    );
+  });
+
+  it("getUnitMicroReview añade level_id cuando la unidad vive en otro nivel (O3)", async () => {
+    const fn = mockJsonFetch({
+      level_id: "b1",
+      unit_id: "b1-u1",
+      unit_title: "Opinions",
+      window_days: 7,
+      items: [],
+    });
+    await getUnitMicroReview("u1", "b1-u1", 7, "b1");
+    const url = fn.mock.calls[0][0] as string;
+    expect(url).toBe(
+      "/api/academy/review/unit/b1-u1/micro-review?user_id=u1&window_days=7&level_id=b1",
     );
   });
 
@@ -463,5 +502,26 @@ describe("academy api", () => {
     );
     expect(method).toBe("POST");
     expect(body).toEqual({ window_days: 7, answers: { c1: 0, c2: 3 } });
+  });
+
+  it("submitUnitMicroReview envía level_id cuando se indica (O3)", async () => {
+    const fn = mockJsonFetch({
+      unit_id: "b1-u1",
+      window_days: 7,
+      correct: 1,
+      total: 1,
+      accuracy: 1,
+      passed: true,
+      per_objective: [],
+      items: [],
+      plan: null,
+    });
+    await submitUnitMicroReview("u1", "b1-u1", 7, { c1: 0 }, "b1");
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body).toEqual({
+      window_days: 7,
+      answers: { c1: 0 },
+      level_id: "b1",
+    });
   });
 });

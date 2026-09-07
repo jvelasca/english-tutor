@@ -507,6 +507,7 @@ const STRINGS: Record<string, Entry> = {
 
   // Común
   "common.loading": { en: "Loading…", es: "Cargando…" },
+  "common.retry": { en: "Try again", es: "Reintentar" },
   "common.close": { en: "Close", es: "Cerrar" },
   "common.done": { en: "Done", es: "Hecho" },
   "common.cancel": { en: "Cancel", es: "Cancelar" },
@@ -1058,6 +1059,10 @@ const STRINGS: Record<string, Entry> = {
   "evidenceGraph.empty": {
     en: "No evidence graph yet.",
     es: "Aún no hay grafo de evidencia.",
+  },
+  "evidenceGraph.error": {
+    en: "Could not load the evidence graph.",
+    es: "No se pudo cargar el grafo de evidencia.",
   },
   "crossSkill.title": {
     en: "Cross-skill evidence by structure",

@@ -16,8 +16,10 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from main import app
+from repositories import academy as academy_repo
 from repositories import db
 from repositories import users as users_repo
+from services import academy as academy_svc
 from services.curriculum import load_assessments, load_level
 
 
@@ -185,3 +187,51 @@ def test_next_best_never_diverges_when_first_step_has_node(monkeypatch, tmp_path
         assert best[field] == first[field], (
             f"el campo {field} de next-best divergió del primer paso enriquecido"
         )
+
+
+def test_session_reads_evidence_once_and_skips_when_no_nodes(
+    monkeypatch, tmp_path
+):
+    """H6 (V3.18): la lectura de evidencia del bloque de nodos (rankear
+    remediación + enriquecer pasos) se hace UNA sola vez por petición y se
+    salta por completo cuando no hay ningún nodo que construir/enriquecer.
+
+    El invariante observable es el delta entre ambos caminos: el flujo de perfil
+    lee evidencia siempre (constante), de modo que «sin nodos» NO añade la
+    lectura extra del bloque y «con nodos» añade exactamente una."""
+    uid = _setup(monkeypatch, tmp_path)
+    calls = {"n": 0}
+
+    def _counting_evidence(*_a, **_k):
+        calls["n"] += 1
+        return []
+
+    client = TestClient(app)
+    monkeypatch.setattr(academy_repo, "list_evidence", _counting_evidence)
+
+    # Sin debilidad ni siguiente objetivo: nada que rankear/enriquecer → el
+    # bloque de nodos no toca la evidencia (antes H6 se leía siempre).
+    real_remediation = academy_svc.remediation_plan
+    real_recommend = academy_svc.recommend_next
+    monkeypatch.setattr(academy_svc, "remediation_plan", lambda *a, **k: [])
+    monkeypatch.setattr(academy_svc, "recommend_next", lambda *a, **k: (None, "x"))
+    _session(client, uid)
+    reads_no_node = calls["n"]
+    monkeypatch.setattr(academy_svc, "remediation_plan", real_remediation)
+    monkeypatch.setattr(academy_svc, "recommend_next", real_recommend)
+
+    # El perfil anotado lee evidencia en toda petición (base constante). El
+    # camino real añade EXACTAMENTE una lectura extra: la del bloque de nodos.
+    before = calls["n"]
+    _session(client, uid)
+    reads_real = calls["n"] - before
+    assert reads_real == reads_no_node + 1
+
+    # `/next-best` comparte `_session_steps` y nunca duplica lecturas dentro de
+    # una misma petición (mismo perfil/mismas filas → mismo nodo): el coste por
+    # petición es idéntico al de `/session`.
+    before = calls["n"]
+    nb = client.get("/api/academy/next-best", params={"user_id": uid})
+    assert nb.status_code == 200, nb.text
+    assert calls["n"] - before == reads_real
+    assert reads_no_node > 0

@@ -23,6 +23,26 @@ export const KIND_LABELS: Record<string, string> = {
   easy_wins: "Boost",
 };
 
+// Dimensiones canónicas del Evidence Graph (`GRAPH_DIMENSIONS` del backend:
+// vocabulary, grammar, discourse, listening, speaking, interaction, transfer).
+// Son etiquetas pedagógicas → inglés de inmersión también en la UI en español
+// (convención V3.6.1, igual que SKILL_LABELS). V3.18 (D5): mapa compartido por
+// el chip del factor limitante, `NextBestCard` y `ObjectiveNodeCard`.
+export const GRAPH_DIMENSION_LABELS: Record<string, string> = {
+  vocabulary: "Vocabulary",
+  grammar: "Grammar",
+  discourse: "Discourse",
+  listening: "Listening",
+  speaking: "Speaking",
+  interaction: "Interaction",
+  transfer: "Transfer",
+};
+
+/** Etiqueta humana de una dimensión del grafo (inmersión en inglés). */
+export function dimensionLabel(id: string): string {
+  return GRAPH_DIMENSION_LABELS[id] ?? id;
+}
+
 export const SUBSKILL_LABELS: Record<string, string> = {
   gist: "Main idea",
   detail: "Detail",

@@ -26,6 +26,7 @@ import { Card } from "../../components/ui/card";
 import { cn } from "../../lib/utils";
 import {
   countReviewableUnits,
+  flattenReviewLevels,
   formatPercent,
   hasReviewableWindow,
   isReviewableWindowState,
@@ -51,8 +52,10 @@ function windowStateClass(state: UnitReviewWindowState): string {
 }
 
 /**
- * Repaso/SRS por unidad (V3.16): ventanas fijas 7/30/90 de las unidades
- * completadas del nivel actual + micro-review con los checks MC oficiales.
+ * Repaso/SRS por unidad (V3.16 + V3.18/O3): ventanas fijas 7/30/90 de las
+ * unidades completadas, agregadas por niveles (actual + anteriores
+ * matriculados con unidades completadas o con plan activo), + micro-review con
+ * los checks MC oficiales.
  *
  * El micro-review es práctica de retención: el servidor puntúa las respuestas
  * (nunca envía `correct_index` antes de responder) y NO cuenta como
@@ -98,6 +101,7 @@ export function UnitReviewPanel({ userId }: UnitReviewPanelProps) {
       <div className="space-y-3">
         <UnitMicroReview
           userId={userId}
+          levelId={review.unit.level_id}
           unitId={review.unit.unit_id}
           unitTitle={review.unit.title}
           windowDays={review.window.window_days}
@@ -110,7 +114,9 @@ export function UnitReviewPanel({ userId }: UnitReviewPanelProps) {
     );
   }
 
-  const reviewable = (plan?.units ?? []).filter(hasReviewableWindow);
+  const levels = plan?.levels ?? [];
+  const units = flattenReviewLevels(levels);
+  const reviewable = units.filter(hasReviewableWindow);
 
   return (
     <div className="space-y-3">
@@ -149,94 +155,97 @@ export function UnitReviewPanel({ userId }: UnitReviewPanelProps) {
         </div>
       )}
 
-      {state === "done" && plan && plan.units.length === 0 && (
+      {state === "done" && plan && units.length === 0 && (
         <p className="text-sm text-muted-foreground">{t("unitReview.empty")}</p>
-      )}
-
-      {state === "done" && plan && plan.units.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {t("unitReview.dueCount")}:{" "}
-          <span className="font-semibold tabular-nums text-foreground">
-            {countReviewableUnits(plan.units)}
-          </span>
-        </p>
       )}
 
       {state === "done" &&
         plan &&
-        plan.units.map((unit) => (
-          <Card key={unit.unit_id} className="space-y-2 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="font-medium leading-tight">{unit.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {unit.module_title} · {unit.objectives_mastered}/
-                  {unit.objectives_total}{" "}
-                  {t("unitReview.objectives")}
-                </p>
-              </div>
-              {unit.completed ? (
-                <CheckCircle2
-                  className="mt-0.5 size-4 shrink-0 text-success"
-                  aria-hidden="true"
-                />
-              ) : (
-                <BookOpenCheck
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              )}
+        levels.map((lv) => (
+          <section key={lv.level_id} className="space-y-2" aria-label={lv.level}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-1">
+              <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {lv.level}
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                {`${t("unitReview.dueCount")}: ${countReviewableUnits(lv.units)}`}
+              </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {unit.windows.map((window) => {
-                const label = t(`unitReview.window.${window.window_days}`);
-                const stateLabel = t(`unitReview.state.${window.state}`);
-                const actionable = isReviewableWindowState(window.state);
-                return actionable ? (
-                  <Button
-                    key={window.window_days}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => setReview({ unit, window })}
-                  >
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0 text-[10px] font-semibold uppercase",
-                        windowStateClass(window.state),
-                      )}
-                    >
-                      {stateLabel}
-                    </span>
-                    {label}
-                  </Button>
-                ) : (
-                  <span
-                    key={window.window_days}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs",
-                      windowStateClass(window.state),
-                    )}
-                  >
-                    {label}
-                    {window.state === "passed" && (
-                      <CheckCircle2
-                        className="size-3.5"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </span>
-                );
-              })}
-            </div>
-          </Card>
+            {lv.units.map((unit) => (
+              <Card key={unit.unit_id} className="space-y-2 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium leading-tight">{unit.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {unit.module_title} · {unit.objectives_mastered}/
+                      {unit.objectives_total} {t("unitReview.objectives")}
+                    </p>
+                  </div>
+                  {unit.completed ? (
+                    <CheckCircle2
+                      className="mt-0.5 size-4 shrink-0 text-success"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <BookOpenCheck
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {unit.windows.map((window) => {
+                    const label = t(`unitReview.window.${window.window_days}`);
+                    const stateLabel = t(`unitReview.state.${window.state}`);
+                    const actionable = isReviewableWindowState(window.state);
+                    return actionable ? (
+                      <Button
+                        key={window.window_days}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setReview({ unit, window })}
+                      >
+                        <span
+                          className={cn(
+                            "rounded-full border px-1.5 py-0 text-[10px] font-semibold uppercase",
+                            windowStateClass(window.state),
+                          )}
+                        >
+                          {stateLabel}
+                        </span>
+                        {label}
+                      </Button>
+                    ) : (
+                      <span
+                        key={window.window_days}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs",
+                          windowStateClass(window.state),
+                        )}
+                      >
+                        {label}
+                        {window.state === "passed" && (
+                          <CheckCircle2
+                            className="size-3.5"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              </Card>
+            ))}
+          </section>
         ))}
 
       {state === "done" &&
         plan &&
-        plan.units.length > 0 &&
+        units.length > 0 &&
         reviewable.length === 0 && (
           <p className="text-sm text-muted-foreground">
             {t("unitReview.noneDue")}
@@ -252,12 +261,14 @@ export function UnitReviewPanel({ userId }: UnitReviewPanelProps) {
  */
 function UnitMicroReview({
   userId,
+  levelId,
   unitId,
   unitTitle,
   windowDays,
   onExit,
 }: {
   userId: string;
+  levelId: string;
   unitId: string;
   unitTitle: string;
   windowDays: number;
@@ -278,7 +289,7 @@ function UnitMicroReview({
     let cancelled = false;
     void (async () => {
       try {
-        const data = await getUnitMicroReview(userId, unitId, windowDays);
+        const data = await getUnitMicroReview(userId, unitId, windowDays, levelId);
         if (cancelled) return;
         setSession(data);
         setPhase("questions");
@@ -289,7 +300,7 @@ function UnitMicroReview({
     return () => {
       cancelled = true;
     };
-  }, [userId, unitId, windowDays, t]);
+  }, [userId, unitId, windowDays, levelId, t]);
 
   if (phase === "loading" && !session) {
     return (
@@ -329,6 +340,7 @@ function UnitMicroReview({
         unitId,
         windowDays,
         answers,
+        levelId,
       );
       setResult(out);
       setPhase("result");

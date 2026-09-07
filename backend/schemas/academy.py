@@ -969,14 +969,25 @@ class UnitReviewPlanUnitOut(BaseModel):
     windows: list[UnitReviewWindowOut] = Field(default_factory=list)
 
 
-class UnitReviewPlanOut(BaseModel):
-    """Plan de repaso por unidad del nivel actual (D2): unidades completadas o
-    con plan activo y cuántas tienen ventana repasable (due_now/failed)."""
+class UnitReviewLevelOut(BaseModel):
+    """Plan de repaso de un nivel (V3.18, O3): sus unidades completadas o con
+    plan activo y cuántas tienen ventana repasable (due_now/failed)."""
 
     level_id: str
     level: str
     due_count: int
     units: list[UnitReviewPlanUnitOut] = Field(default_factory=list)
+
+
+class UnitReviewPlanOut(BaseModel):
+    """Plan de repaso por unidad agregado por niveles (V3.18, O3).
+
+    El nivel actual más los niveles anteriores matriculados con unidades
+    completadas o plan activo, cada uno agrupado en `levels` (orden CEFR
+    ascendente); `due_count` es el global de unidades repasables."""
+
+    levels: list[UnitReviewLevelOut] = Field(default_factory=list)
+    due_count: int
 
 
 class MicroReviewItemOut(BaseModel):
@@ -1007,10 +1018,13 @@ class MicroReviewSubmitIn(BaseModel):
     """Respuestas del micro-review: índice elegido por cada `item_id` (D6).
 
     El cliente envía SOLO respuestas, nunca puntuaciones; el servidor compara
-    cada índice con `correct_index` del check oficial (premisa 21)."""
+    cada índice con `correct_index` del check oficial (premisa 21). V3.18 (O3):
+    `level_id` opcional fija el nivel donde vive la unidad (por defecto el
+    actual)."""
 
     window_days: int
     answers: dict[str, int] = Field(default_factory=dict)
+    level_id: str | None = None
 
 
 class UnitReviewObjectiveResultOut(BaseModel):

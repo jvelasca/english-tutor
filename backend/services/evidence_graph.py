@@ -63,6 +63,24 @@ def _pct(score: float) -> int:
     return int(round(max(0.0, min(1.0, score)) * 100))
 
 
+def _as_float(value, fallback: float = 0.0) -> float:
+    """Convierte un score a `float` sin lanzar (V3.18, D7.2).
+
+    Los nodos del grafo deberían traer siempre `mastery` numérico, pero una
+    fila de evidencia anómala o un nodo a medio construir pueden entregar
+    `None`/`"n/a"`. Cualquier valor no convertible (incluido `bool`) cae al
+    `fallback` para que el ranking de remediación nunca rompa la sesión.
+    """
+    if value is None:
+        return fallback
+    if isinstance(value, bool):
+        return fallback
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def _human(label: str) -> str:
     return label.replace("_", " ")
 
@@ -476,7 +494,9 @@ def rank_weakness_objectives(
     with_node.sort(
         key=lambda pair: (
             0 if _related(pair[1]) else 1,
-            float(pair[1].get("mastery") or 0.0),
+            # D7.2 (V3.18): mastery defensivo — un nodo con score no numérico
+            # no rompe el ranking (cae a 0.0 y se ordena al final de su grupo).
+            _as_float(pair[1].get("mastery")),
         )
     )
     return [oid for oid, _node in with_node] + without_node

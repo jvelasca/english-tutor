@@ -464,6 +464,26 @@ def init_db() -> None:
             """
         )
 
+        # Ancla de la unidad congelada (V3.18, I2): momento de la completitud de
+        # una unidad. Se escribe UNA vez, la primera vez que el dominio detecta la
+        # unidad completada (`INSERT ... ON CONFLICT DO NOTHING`, nunca se
+        # sobrescribe), y es la fuente autoritativa de las ventanas fijas 7/30/90:
+        # los refuerzos/decay posteriores no la mueven (fijeza D3).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS unit_review_anchors (
+                user_id TEXT NOT NULL,
+                level_id TEXT NOT NULL,
+                unit_id TEXT NOT NULL,
+                anchor TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, level_id, unit_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
         # Calibración observacional de ítems de placement (V1.7): contadores
         # poblacionales por ítem (no por usuario). Las columnas de estimación
         # (estimated_difficulty/standard_error/discrimination) las rellena un
@@ -776,6 +796,10 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_unit_review_attempts_lookup "
             "ON unit_review_attempts(user_id, level_id, unit_id, window_days, "
             "created_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_unit_review_anchors_lookup "
+            "ON unit_review_anchors(user_id, level_id)"
         )
 
         # Listening extra generado (V3.6): catálogo global de ítems de práctica

@@ -186,14 +186,81 @@ def test_window_passed_and_failed_from_attempts():
         unit_review.window_due_at(anchor, 7, now=NOW, attempts=mixed)["state"]
         == "failed"
     )
-    # Los intentos de OTRAS ventanas no afectan.
+    # Los intentos de OTRAS ventanas no cierran esta sin intento propio si no
+    # son superados o son anteriores a su `due_at` (cadena O1, V3.18).
     other = [
-        {"window_days": 30, "accuracy": 0.9,
+        {"window_days": 30, "accuracy": 0.9, "passed": False,
          "created_at": "2026-01-10T00:00:00+00:00"}
     ]
     assert (
         unit_review.window_due_at(anchor, 7, now=NOW, attempts=other)["state"]
         == "due_now"
+    )
+
+
+def test_window_cascade_passed_attempt_closes_earlier_due_windows():
+    """O1 (V3.18): una ventana SIN intento propio se cierra si hay un intento
+    superado de la unidad con `created_at >= due_at` (resolución tardía)."""
+    anchor = "2026-01-01T00:00:00+00:00"
+    # La ventana 7 se supera TARDE (el 10-feb, tras vencer la 30 el 31-ene).
+    late_pass = [
+        {"unit_id": "u1", "window_days": 7, "passed": True,
+         "accuracy": 0.875, "created_at": "2026-02-10T00:00:00+00:00"}
+    ]
+    now_late = "2026-02-11T00:00:00+00:00"
+    # La 7 tiene intento propio superado → passed.
+    assert unit_review.window_due_at(anchor, 7, now=now_late,
+                                     attempts=late_pass)["state"] == "passed"
+    # La 30 no tiene intento propio y el superado de la 7 (>= due 30) la cierra.
+    assert unit_review.window_due_at(anchor, 30, now=now_late,
+                                     attempts=late_pass)["state"] == "passed"
+    # La 90 aún no ha vencido su due (01-abr): el intento del 10-feb NO la cierra.
+    assert unit_review.window_due_at(anchor, 90, now=now_late,
+                                     attempts=late_pass)["state"] == "upcoming"
+
+
+def test_window_cascade_own_attempt_always_wins():
+    """O1 (V3.18): el intento propio (aunque sea fallido) manda sobre un
+    superado posterior de otra ventana que cubriría esta por cadena."""
+    anchor = "2026-01-01T00:00:00+00:00"
+    mixed = [
+        # Superado de la 7 el 10-feb (>= due 30) ...
+        {"unit_id": "u1", "window_days": 7, "passed": True,
+         "accuracy": 0.875, "created_at": "2026-02-10T00:00:00+00:00"},
+        # ... pero la 30 tiene intento propio FALLIDO posterior: manda él.
+        {"unit_id": "u1", "window_days": 30, "passed": False,
+         "accuracy": 0.5, "created_at": "2026-02-12T00:00:00+00:00"},
+    ]
+    assert (
+        unit_review.window_due_at(anchor, 30, now=NOW, attempts=mixed)["state"]
+        == "failed"
+    )
+    # La 7 sigue passed por su propio superado (otro fallo no la reabre).
+    assert (
+        unit_review.window_due_at(anchor, 7, now=NOW, attempts=mixed)["state"]
+        == "passed"
+    )
+
+
+def test_window_cascade_symmetry_later_window_pass_closes_earlier():
+    """O1 (V3.18): un superado de la 30 (>= due 7) cierra también la 7 cuando
+    esta no tiene intento propio (la retención demostrada cubre ambos hitos)."""
+    anchor = "2026-01-01T00:00:00+00:00"
+    pass30 = [
+        {"unit_id": "u1", "window_days": 30, "passed": True,
+         "accuracy": 0.9, "created_at": "2026-02-02T00:00:00+00:00"}
+    ]
+    assert (
+        unit_review.window_due_at(anchor, 7, now=NOW, attempts=pass30)["state"]
+        == "passed"
+    )
+    assert (
+        unit_review.window_due_at(anchor, 30, now=NOW, attempts=pass30)["state"]
+        == "passed"
+    )
+    assert (
+        unit_review.window_due_at(anchor, 90, now=NOW, attempts=pass30)["state"]
+        == "upcoming"
     )
 
 
@@ -284,6 +351,48 @@ def test_build_unit_review_plan_incomplete_unit_without_rows():
     assert plan["objectives_mastered"] == 1
     assert plan["anchor"] is None
     assert plan["windows"] == []
+
+
+def test_build_unit_review_plan_uses_frozen_anchor_override():
+    """I2 (V3.18): un ancla congelada persistida manda sobre las filas vivas:
+    refuerzos/decay posteriores a la completitud NO mueven las ventanas 7/30/90."""
+    unit = _sample_unit()
+    # Las filas vivas apuntan a febrero (refuerzo post-completitud) ...
+    rows = [
+        {"objective_id": oid, "updated_at": "2026-02-15T00:00:00+00:00"}
+        for oid in ("o1", "o2", "o3", "o4")
+    ]
+    # ... pero el ancla congelada es del 1-ene (momento de la completitud).
+    frozen = "2026-01-01T00:00:00+00:00"
+    plan = unit_review.build_unit_review_plan(
+        unit=unit,
+        unit_mastery_rows=rows,
+        mastered_ids={"o1", "o2", "o3", "o4"},
+        now="2026-02-20T00:00:00+00:00",
+        anchor=frozen,
+        attempts=[],
+    )
+    assert plan["anchor"] == frozen
+    assert [w["due_at"] for w in plan["windows"]] == [
+        "2026-01-08T00:00:00+00:00",  # 1-ene + 7
+        "2026-01-31T00:00:00+00:00",  # 1-ene + 30
+        "2026-04-01T00:00:00+00:00",  # 1-ene + 90
+    ]
+    # Con `now` en febrero las ventanas 7 y 30 ya vencieron (due_now) y la 90
+    # sigue upcoming: si el ancla derivara de las filas (15-feb) ninguna habría
+    # vencido aún.
+    assert plan["windows"][0]["state"] == "due_now"
+    assert plan["windows"][1]["state"] == "due_now"
+    assert plan["windows"][2]["state"] == "upcoming"
+    # Sin override se conserva la derivación por filas (backfill).
+    plan_derived = unit_review.build_unit_review_plan(
+        unit=unit,
+        unit_mastery_rows=rows,
+        mastered_ids={"o1", "o2", "o3", "o4"},
+        now="2026-02-20T00:00:00+00:00",
+        attempts=[],
+    )
+    assert plan_derived["anchor"] == "2026-02-15T00:00:00+00:00"
 
 
 # --- Muestreo determinista y balanceado -------------------------------------

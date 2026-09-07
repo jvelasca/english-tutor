@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import type { NextBestActivity } from "../types/api";
-import { SKILL_LABELS, SUBSKILL_LABELS } from "../utils/learningLabels";
+import { SKILL_LABELS, SUBSKILL_LABELS, dimensionLabel } from "../utils/learningLabels";
 import { useI18n } from "../hooks/useI18n";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./ui/button";
@@ -85,7 +85,7 @@ export function NextBestCard({
                 <p className="mt-1 text-xs">
                   {t("home.limitingFactor")}:{" "}
                   <span className="font-medium text-foreground">
-                    {next.limiting_factor.id}
+                    {dimensionLabel(next.limiting_factor.id)}
                     {next.limiting_factor.missing
                       ? ` (${t("home.missing")})`
                       : ` · ${Math.round(next.limiting_factor.score * 100)}%`}

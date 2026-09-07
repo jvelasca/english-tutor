@@ -1160,3 +1160,51 @@ def latest_unit_review_attempt(
         user_id, level_id, unit_id, window_days
     )
     return attempts[-1] if attempts else None
+
+
+# --- Unit review anchors (V3.18, I2) ---------------------------------------
+
+
+def get_unit_anchor(
+    user_id: str, level_id: str, unit_id: str
+) -> str | None:
+    """Ancla congelada de la unidad (None si aún no se ha persistido).
+
+    Sin lógica de negocio: solo lee `unit_review_anchors`. El dominio decide
+    cuándo congelar (primera detección de completitud) y con qué valor."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT anchor FROM unit_review_anchors "
+            "WHERE user_id = ? AND level_id = ? AND unit_id = ?",
+            (user_id, level_id, unit_id),
+        ).fetchone()
+    return row["anchor"] if row is not None else None
+
+
+def list_unit_anchors(user_id: str, level_id: str) -> dict[str, str]:
+    """Anclas congeladas de las unidades de un nivel: `{unit_id: anchor}`."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT unit_id, anchor FROM unit_review_anchors "
+            "WHERE user_id = ? AND level_id = ?",
+            (user_id, level_id),
+        ).fetchall()
+    return {r["unit_id"]: r["anchor"] for r in rows}
+
+
+def set_unit_anchor_if_absent(
+    user_id: str, level_id: str, unit_id: str, anchor: str
+) -> bool:
+    """Persiste el ancla de la unidad SOLO si aún no existe (INSERT OR IGNORE).
+
+    El ancla es inmutable por diseño (fijeza D3): nunca se sobrescribe, ni si la
+    unidad decae y se re-domina después. Devuelve True si se insertó (nueva)."""
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO unit_review_anchors "
+            "(user_id, level_id, unit_id, anchor, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, level_id, unit_id, anchor, now, now),
+        )
+    return cur.rowcount > 0

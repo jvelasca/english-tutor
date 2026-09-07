@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { UnitReviewPlanUnit } from "../../types/api";
+import type { UnitReviewLevel, UnitReviewPlanUnit } from "../../types/api";
 import {
   countReviewableUnits,
+  flattenReviewLevels,
   formatPercent,
   hasReviewableWindow,
   isReviewableWindowState,
@@ -88,5 +89,28 @@ describe("unitReviewLogic (V3.16)", () => {
     ];
     expect(countReviewableUnits(units)).toBe(2);
     expect(countReviewableUnits([])).toBe(0);
+  });
+
+  it("flattenReviewLevels aplana los niveles del plan agregado (V3.18/O3)", () => {
+    const a1 = unitWithStates([{ window_days: 7, state: "passed" }]);
+    const b1 = unitWithStates([{ window_days: 30, state: "due_now" }]);
+    const levels: UnitReviewLevel[] = [
+      {
+        level_id: "a1",
+        level: "A1",
+        due_count: 0,
+        units: [a1],
+      },
+      {
+        level_id: "b1",
+        level: "B1",
+        due_count: 1,
+        units: [b1],
+      },
+    ];
+    expect(flattenReviewLevels(levels)).toEqual([a1, b1]);
+    expect(flattenReviewLevels([])).toEqual([]);
+    // El contador global sobre el aplanado coincide con la suma por nivel.
+    expect(countReviewableUnits(flattenReviewLevels(levels))).toBe(1);
   });
 });

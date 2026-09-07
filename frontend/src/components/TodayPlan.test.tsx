@@ -95,6 +95,32 @@ const SESSION_NO_GRAPH: SessionData = {
   ],
 };
 
+/** Paso con factor limitante de dimensión no-skill (`transfer`): el chip debe
+ *  pintar la etiqueta humana, no el id en crudo (V3.18, D5/H5). */
+const SESSION_TRANSFER: SessionData = {
+  total_minutes: 30,
+  review_count: 0,
+  practice_count: 1,
+  items: [
+    {
+      kind: "new",
+      step_key: "new-a1-m01-u01-l01-o01",
+      skill: "vocabulary",
+      subskill: null,
+      objective_id: "a1-m01-u01-l01-o01",
+      level_id: "a1",
+      skills: ["vocabulary"],
+      title: "Greetings",
+      reason: "next in path",
+      minutes: 30,
+      can_do: "I can greet people politely.",
+      limiting_factor: { id: "transfer", score: 0.3, missing: false },
+      graph_mastery: 0.3,
+      because: ["Transfer is the limiting factor of this can-do."],
+    },
+  ],
+};
+
 // --- Helpers ---------------------------------------------------------------
 
 function routeFetch(data: {
@@ -152,5 +178,16 @@ describe("TodayPlan sesión enriquecida (V3.17, D6/M1)", () => {
 
     expect(await screen.findByText("Greetings")).toBeTruthy();
     expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("H5: un limiting factor de dimensión no-skill pinta su etiqueta (Transfer)", async () => {
+    routeFetch({ student_model: MODEL, session: SESSION_TRANSFER, goal: GOAL });
+    renderPlan(<TodayPlan userId="u1" />);
+
+    expect(await screen.findByText("I can greet people politely.")).toBeTruthy();
+    const note = screen.getByRole("note");
+    expect(note.textContent).toContain("Transfer");
+    expect(note.textContent).not.toContain(": transfer ·");
+    expect(note.textContent).toContain("30%");
   });
 });

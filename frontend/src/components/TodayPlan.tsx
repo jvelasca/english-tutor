@@ -12,6 +12,7 @@ import { cefrLabel, cefrTone } from "../utils/cefr";
 import {
   SKILL_LABELS,
   SUBSKILL_LABELS,
+  dimensionLabel,
   kindKey,
   stepTitle,
 } from "../utils/learningLabels";
@@ -350,7 +351,7 @@ function SessionStepRow({
             <span className="today-item-graph">
               <span className="today-item-can-do">{item.can_do}</span>
               <span className="today-item-limit" role="note">
-                {SKILL_LABELS[limit.id] ?? limit.id}
+                {dimensionLabel(limit.id)}
                 {limit.missing
                   ? ` · ${t("home.missing")}`
                   : ` · ${Math.round(limit.score * 100)}%`}

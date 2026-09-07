@@ -122,38 +122,65 @@ def window_due_at(
     now: str = "",
     attempts: list[dict] | None = None,
 ) -> dict:
-    """Estado de una ventana de retención fija (D3/D6).
+    """Estado de una ventana de retención fija (D3/D6 + cadena O1, V3.18).
 
     `due_at = anchor + window_days` días y no cambia jamás: un grade no la
-    mueve. El estado deriva del intento más reciente de la MISMA ventana
-    (`attempts`, filas de `unit_review_attempts` ordenadas por `created_at`):
+    mueve. `attempts` son los intentos de micro-review de la UNIDAD (todas sus
+    ventanas, filas de `unit_review_attempts`); el "intento propio" se filtra
+    aquí por `window_days`. Regla de estado (V3.18, cadena 7→30→90):
 
-    - `passed`: el último intento alcanzó `accuracy >= MICRO_REVIEW_PASS_RATIO`;
-    - `failed`: hay intentos y el último no superó el umbral (reintentable);
-    - sin intentos: `due_now` si `now >= due_at`, en otro caso `upcoming`.
+    - si hay intento propio: `passed` si el último alcanzó
+      `accuracy >= MICRO_REVIEW_PASS_RATIO`, si no `failed` (reintentable); el
+      intento propio manda SIEMPRE, incluso si otro intento superado posterior
+      de la unidad cubriría esta ventana;
+    - sin intento propio (cadena): `passed` si existe un intento SUPERADO de la
+      unidad (de cualquier ventana) con `created_at >= due_at` de esta ventana —
+      resolver tarde una ventana demuestra retención para las anteriores cuyo
+      hito ya venció (deuda O1);
+    - si no: `due_now` si `now >= due_at`, en otro caso `upcoming`.
 
     Devuelve `{window_days, due_at, state}`. Si el ancla no es un ISO válido se
     devuelve el estado `upcoming` (sin `due_at` computable) para no bloquear."""
     due_at = ""
     anchor_dt = _parse_iso(anchor_iso)
+    due_dt = None
     if anchor_dt is not None:
         due_dt = anchor_dt + timedelta(days=int(window_days))
         due_at = _iso(due_dt)
 
-    ordered = sorted(
-        (a for a in (attempts or []) if int(a.get("window_days") or -1) == window_days),
+    unit_attempts = attempts or []
+    own = sorted(
+        (
+            a
+            for a in unit_attempts
+            if int(a.get("window_days") or -1) == window_days
+        ),
         key=lambda a: a.get("created_at") or "",
     )
-    if ordered:
-        latest = ordered[-1]
+    if own:
+        latest = own[-1]
         accuracy = float(latest.get("accuracy") or 0.0)
         state = WINDOW_PASSED if accuracy >= MICRO_REVIEW_PASS_RATIO else WINDOW_FAILED
         return {"window_days": int(window_days), "due_at": due_at, "state": state}
 
+    # Cadena O1 (V3.18): sin intento propio, un intento superado de la unidad
+    # con `created_at >= due_at` cierra esta ventana (resolución tardía).
+    if due_dt is not None:
+        for a in unit_attempts:
+            if not bool(a.get("passed")):
+                continue
+            created = _parse_iso(a.get("created_at") or "")
+            if created is not None and created >= due_dt:
+                return {
+                    "window_days": int(window_days),
+                    "due_at": due_at,
+                    "state": WINDOW_PASSED,
+                }
+
     now_dt = _parse_iso(now) or _parse_iso(anchor_iso)
     state = WINDOW_UPCOMING
-    if due_at and now_dt is not None and anchor_dt is not None:
-        if now_dt >= anchor_dt + timedelta(days=int(window_days)):
+    if due_dt is not None and now_dt is not None:
+        if now_dt >= due_dt:
             state = WINDOW_DUE_NOW
     return {"window_days": int(window_days), "due_at": due_at, "state": state}
 
@@ -167,6 +194,7 @@ def build_unit_review_plan(
     level_id: str = "",
     module_id: str = "",
     module_title: str = "",
+    anchor: str | None = None,
     attempts: list[dict] | None = None,
 ) -> dict:
     """Plan de repaso de una unidad: progreso, ancla y ventanas 7/30/90.
@@ -176,25 +204,24 @@ def build_unit_review_plan(
     nivel; `now` fija la referencia temporal; `attempts` son los intentos de
     micro-review de la unidad (todas sus ventanas) para derivar los estados.
 
+    V3.18 (I2): `anchor` permite pasar el ancla CONGELADA persistida en
+    `unit_review_anchors`; si se omite (o es `None`) se deriva de las filas con
+    `unit_anchor` (backfill). Un ancla persistida no se mueve por refuerzos o
+    decay posteriores a la completitud (fijeza D3).
+
     Devuelve `{level_id, unit_id, module_id, module_title, title,
     objectives_total, objectives_mastered, completed, anchor, windows}` donde
     `windows` es la lista de `window_due_at` ordenada por ventana."""
     objective_ids = _unit_objective_ids(unit)
     total = len(objective_ids)
     mastered_here = len(objective_ids & set(mastered_ids))
-    anchor = unit_anchor(unit_mastery_rows)
+    if anchor is None:
+        anchor = unit_anchor(unit_mastery_rows)
     windows: list[dict] = []
     if anchor:
         unit_attempts = [a for a in (attempts or []) if a.get("unit_id") == unit.id]
         windows = [
-            window_due_at(
-                anchor,
-                wd,
-                now=now,
-                attempts=[
-                    a for a in unit_attempts if int(a.get("window_days") or -1) == wd
-                ],
-            )
+            window_due_at(anchor, wd, now=now, attempts=unit_attempts)
             for wd in UNIT_REVIEW_WINDOWS_DAYS
         ]
     return {

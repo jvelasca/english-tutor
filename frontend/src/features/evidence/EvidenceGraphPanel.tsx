@@ -4,6 +4,7 @@ import type { EvidenceGraph, EvidenceGraphNode } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { Card } from "../../components/ui/card";
 import { ObjectiveNodeCard } from "../../components/ObjectiveNodeCard";
+import { dimensionLabel } from "../../utils/learningLabels";
 import { cn } from "../../lib/utils";
 
 interface EvidenceGraphPanelProps {
@@ -73,7 +74,8 @@ export function EvidenceGraphPanel({
               <span className="text-muted-foreground">
                 {t("evidenceGraph.topLimiting")}:{" "}
               </span>
-              {graph.top_limiting_factor.id} (×{graph.top_limiting_factor.count})
+              {dimensionLabel(graph.top_limiting_factor.id)} (×
+              {graph.top_limiting_factor.count})
             </p>
           )}
         </Card>

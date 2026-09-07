@@ -630,8 +630,11 @@ async def fsrs_review(
 async def unit_review_plan(
     level_id: str | None = None, user: dict = Depends(current_user)
 ) -> dict:
-    """Plan de repaso por unidad del nivel actual (o el pedido): unidades
-    completadas o con plan activo y sus ventanas 7/30/90."""
+    """Plan de repaso por unidad agregado por niveles (O3, V3.18).
+
+    Sin `level_id`: nivel actual + niveles anteriores matriculados con unidades
+    completadas o plan activo (`levels` agrupados + `due_count` global). Con
+    `level_id`: solo ese nivel (404 si no existe en el currículo)."""
     result = await academy_service.get_unit_review_plan(
         user["id"], level_id=level_id
     )
@@ -647,25 +650,27 @@ async def unit_review_plan(
 async def unit_micro_review(
     unit_id: str,
     window_days: int,
+    level_id: str | None = None,
     user: dict = Depends(current_user),
 ) -> dict:
     """Sesión de micro-review (checks MC oficiales, sin `correct_index`).
 
     Solo se repasa una ventana `due_now` o `failed`; en el reintento se
-    priorizan los ítems fallados del último intento."""
+    priorizan los ítems fallados del último intento. V3.18 (O3): `level_id`
+    opcional fija el nivel donde vive la unidad (por defecto el actual)."""
     if window_days not in unit_review.UNIT_REVIEW_WINDOWS_DAYS:
         raise HTTPException(
             status_code=400, detail="window_days inválido (7/30/90)"
         )
     try:
         result = await academy_service.get_unit_micro_review(
-            user["id"], unit_id, window_days
+            user["id"], unit_id, window_days, level_id=level_id
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if result is None:
         raise HTTPException(
-            status_code=404, detail="Unidad no encontrada en tu nivel"
+            status_code=404, detail="Unidad o nivel no encontrado"
         )
     return result
 
@@ -681,20 +686,25 @@ async def unit_micro_review_submit(
 ) -> dict:
     """Puntúa y persiste un micro-review (D5/D6): respuestas → aciertos →
     intento en `unit_review_attempts` + cartas FSRS de los objetivos. Nunca
-    crea evidencia de mastery/currículo."""
+    crea evidencia de mastery/currículo. V3.18 (O3): el body puede llevar
+    `level_id` con el nivel donde vive la unidad."""
     if body.window_days not in unit_review.UNIT_REVIEW_WINDOWS_DAYS:
         raise HTTPException(
             status_code=400, detail="window_days inválido (7/30/90)"
         )
     try:
         result = await academy_service.submit_unit_micro_review(
-            user["id"], unit_id, body.window_days, body.answers
+            user["id"],
+            unit_id,
+            body.window_days,
+            body.answers,
+            level_id=body.level_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if result is None:
         raise HTTPException(
-            status_code=404, detail="Unidad no encontrada en tu nivel"
+            status_code=404, detail="Unidad o nivel no encontrado"
         )
     return result
 

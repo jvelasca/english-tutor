@@ -1647,6 +1647,14 @@ export interface UnitReviewPlanUnit {
 }
 
 export interface UnitReviewPlan {
+  /** Niveles del plan agregado (V3.18/O3): nivel actual + anteriores
+   *  matriculados que tengan unidades completadas o con plan activo. */
+  levels: UnitReviewLevel[];
+  /** Total global de unidades con ventana repasable (due_now/failed). */
+  due_count: number;
+}
+
+export interface UnitReviewLevel {
   level_id: string;
   level: string;
   due_count: number;

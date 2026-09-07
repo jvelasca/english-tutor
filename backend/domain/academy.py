@@ -88,6 +88,7 @@ from schemas.academy import (
     SpeakingResultOut,
     SpeakingTaskResultOut,
     StudentModelOut,
+    UnitReviewLevelOut,
     UnitReviewObjectiveResultOut,
     UnitReviewPlanOut,
     UnitReviewPlanUnitOut,
@@ -1737,10 +1738,40 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
             card["due_at"] = now_iso
         await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, card)
 
-    # V3.16: cartas `objective` para los objetivos de las unidades COMPLETADAS
-    # del nivel actual (D1/D2). La carta acompaña la ventana de retención de su
-    # unidad (why = fsrs.why_for_objective); no pisa cartas con reps > 0 (solo
-    # refresca why/label) y no toca `fsrs.TARGET_TYPES`.
+    # V3.16+V3.18 (M4/D3): cartas `objective` de las unidades COMPLETADAS. Se
+    # siembran/actualizan en TODOS los niveles del plan (O3/D4): la continuidad
+    # de scheduling acompaña a la ventana de retención de la unidad en el nivel
+    # donde vive. `get_fsrs_due` y el panel autograduable NO las consumen: su
+    # repaso de contenido vive en el micro-review (single writer).
+    for rlv in await _review_scope_levels(user_id):
+        await _sync_objective_cards_for_level(
+            user_id, rlv, now_iso=now_iso, existing=existing
+        )
+
+    return await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
+
+
+async def _sync_objective_cards_for_level(
+    user_id: str,
+    lv,
+    *,
+    now_iso: str,
+    existing: dict,
+) -> None:
+    """Siembra/actualiza las cartas `objective` de las unidades completadas.
+
+    Single writer (M4/D3): el repaso de contenido de una carta `objective` vive
+    SOLO en el micro-review de la ventana de la unidad (`UnitReviewPanel`). Aquí
+    solo se asegura la continuidad del scheduling:
+    - cartas ya revisadas (`reps > 0`): se refresca `why`/`label` en cada
+      ventana (la carta acompaña a la ventana fija aunque el panel autograduable
+      no la muestre);
+    - cartas NUEVAS: solo se crean cuando la primera ventana no superada de la
+      unidad está `due_now`/`failed` (en `upcoming` aún no hay nada que repasar
+      y se difiere a `due_now` o al propio micro-review).
+
+    El ancla es la congelada persistida (I2); sin ancla no hay ventanas y se
+    omite. Aislamiento por usuario (premisa 13)."""
     obj_mastery = await run_in_threadpool(
         academy_repo.list_objective_mastery, user_id, lv.level_id
     )
@@ -1751,6 +1782,7 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
     attempt_rows = await run_in_threadpool(
         academy_repo.list_unit_review_attempts, user_id, lv.level_id
     )
+    anchors = await _resolve_unit_anchors(user_id, lv, obj_mastery, mastered)
     for mod in lv.modules:
         for unit in mod.units:
             unit_ids = {
@@ -1758,27 +1790,13 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
             }
             if not unit_ids or not unit_ids.issubset(mastered):
                 continue
-            unit_rows = [
-                {"objective_id": obj.id, **row}
-                for les in unit.lessons
-                for obj in les.objectives
-                for row in (obj_mastery.get(obj.id) or {}).values()
-                if row.get("updated_at")
-            ]
-            anchor = unit_review.unit_anchor(unit_rows)
+            anchor = anchors.get(unit.id)
             if anchor is None:
                 continue
             unit_attempts = [a for a in attempt_rows if a["unit_id"] == unit.id]
             windows = [
                 unit_review.window_due_at(
-                    anchor,
-                    wd,
-                    now=now_iso,
-                    attempts=[
-                        a
-                        for a in unit_attempts
-                        if int(a.get("window_days") or -1) == wd
-                    ],
+                    anchor, wd, now=now_iso, attempts=unit_attempts
                 )
                 for wd in unit_review.UNIT_REVIEW_WINDOWS_DAYS
             ]
@@ -1789,6 +1807,7 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
                 nearest and nearest["state"] in ("due_now", "failed")
             )
             why = fsrs.why_for_objective(unit, {"windows": windows})
+            rows = _unit_review_mastery_rows(unit, obj_mastery)
             for les in unit.lessons:
                 for obj in les.objectives:
                     key = ("objective", obj.id)
@@ -1801,10 +1820,12 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
                             academy_repo.upsert_fsrs_card, user_id, updated
                         )
                         continue
+                    # M4: en `upcoming` aún no se crea la carta; nace cuando su
+                    # ventana vence o desde el micro-review (single writer).
+                    if not due_now:
+                        continue
                     rows_obj = [
-                        row
-                        for row in unit_rows
-                        if row.get("objective_id") == obj.id
+                        row for row in rows if row.get("objective_id") == obj.id
                     ]
                     states = obj_mastery.get(obj.id) or {}
                     scores = [
@@ -1824,19 +1845,22 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
                         why=why,
                         now=now_iso,
                     )
-                    if due_now:
-                        card["due_at"] = now_iso
+                    # due_now: forzar la siembra con due inmediato.
+                    card["due_at"] = now_iso
                     await run_in_threadpool(
                         academy_repo.upsert_fsrs_card, user_id, card
                     )
-
-    return await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
 
 
 async def get_fsrs_due(user_id: str, limit: int = 20) -> FsrsDueOut:
     now_iso = datetime.now(timezone.utc).isoformat()
     cards = await sync_fsrs_cards(user_id, now=now_iso)
-    due = fsrs.due_queue(cards, now=now_iso, limit=limit)
+    # M4 (D3): la cola del panel autograduable excluye las cartas `objective`;
+    # su repaso vive en el micro-review de la unidad (`UnitReviewPanel`).
+    reviewable = [
+        c for c in cards if (c.get("target_type") or "skill") != "objective"
+    ]
+    due = fsrs.due_queue(reviewable, now=now_iso, limit=limit)
     return FsrsDueOut(
         due_count=len(due),
         cards=[_fsrs_card_out(c, now=now_iso) for c in due],
@@ -1845,6 +1869,8 @@ async def get_fsrs_due(user_id: str, limit: int = 20) -> FsrsDueOut:
 
 
 async def get_fsrs_summary(user_id: str) -> FsrsSummaryOut:
+    """Resumen FSRS: totales por estado/tipo (diagnóstico) y `due_count` de las
+    cartas repasables en el panel (sin `objective`, M4/D3)."""
     now_iso = datetime.now(timezone.utc).isoformat()
     cards = await sync_fsrs_cards(user_id, now=now_iso)
     by_state: dict[str, int] = {}
@@ -1855,7 +1881,7 @@ async def get_fsrs_summary(user_id: str) -> FsrsSummaryOut:
         by_state[state] = by_state.get(state, 0) + 1
         t = card.get("target_type") or "skill"
         by_type[t] = by_type.get(t, 0) + 1
-        if fsrs.is_due(card, now=now_iso):
+        if t != "objective" and fsrs.is_due(card, now=now_iso):
             due_count += 1
     return FsrsSummaryOut(
         total=len(cards),
@@ -1873,8 +1899,14 @@ async def review_fsrs_card(
     grade: int | None = None,
     score: float | None = None,
 ) -> FsrsReviewOut | None:
-    """Aplica un grade (o lo deriva de score) y reprograma la carta."""
+    """Aplica un grade (o lo deriva de score) y reprograma la carta.
+
+    M4 (D3): las cartas `target_type="objective"` NO se gradúan aquí (single
+    writer) — su repaso de contenido vive en el micro-review de la unidad. El
+    router responde 400 ante un intento de autogradearlas."""
     if target_type not in fsrs.TARGET_TYPES:
+        return None
+    if target_type == "objective":
         return None
     if grade is None:
         if score is None:
@@ -1935,6 +1967,66 @@ def _find_review_unit(level, unit_id: str) -> tuple | None:
     return None
 
 
+def _cefr_index(lv) -> int:
+    """Posición del nivel en `CEFR_ORDER` (los ajenos van al final)."""
+    return CEFR_ORDER.index(lv.level) if lv.level in CEFR_ORDER else len(CEFR_ORDER)
+
+
+async def _review_scope_levels(
+    user_id: str, level_id: str | None = None
+) -> list[Level]:
+    """Niveles del plan de repaso (O3/D4): el pedido o todos los matriculados.
+
+    Con `level_id` devuelve ese nivel (vacío si no existe en el currículo). Sin
+    él devuelve los niveles en los que el usuario está matriculado, ordenados
+    por CEFR ascendente (los anteriores completados + el actual); sin
+    matrículas devuelve el nivel por defecto `a1` (compatibilidad)."""
+    if level_id is not None:
+        lv = _levels_by_id.get(level_id)
+        return [lv] if lv is not None else []
+    rows = await run_in_threadpool(academy_repo.list_enrollments, user_id)
+    ids = sorted(
+        (r["level_id"] for r in rows if r["level_id"] in _levels_by_id),
+        key=lambda i: _cefr_index(_levels_by_id[i]),
+    )
+    if not ids:
+        return [_levels_by_id["a1"]]
+    return [_levels_by_id[i] for i in ids]
+
+
+async def _resolve_unit_anchors(
+    user_id: str, lv, obj_mastery: dict, mastered_ids: set[str]
+) -> dict[str, str]:
+    """Anclas congeladas de las unidades de un nivel (I2/D1): `{unit_id: anchor}`.
+
+    Las unidades completadas SIN ancla persistida se congelan en esta primera
+    detección (backfill lazy al desplegar: el ancla derivada de las filas en ese
+    momento queda persistida y ya nunca se mueve). Aislamiento por usuario."""
+    persisted = await run_in_threadpool(
+        academy_repo.list_unit_anchors, user_id, lv.level_id
+    )
+    anchors = dict(persisted)
+    for mod in lv.modules:
+        for unit in mod.units:
+            if unit.id in anchors:
+                continue
+            if not unit_review.unit_completed(unit, mastered_ids):
+                continue
+            rows = _unit_review_mastery_rows(unit, obj_mastery)
+            derived = unit_review.unit_anchor(rows)
+            if not derived:
+                continue
+            await run_in_threadpool(
+                academy_repo.set_unit_anchor_if_absent,
+                user_id,
+                lv.level_id,
+                unit.id,
+                derived,
+            )
+            anchors[unit.id] = derived
+    return anchors
+
+
 def _unit_review_plan_dict(
     *,
     lv,
@@ -1944,8 +2036,12 @@ def _unit_review_plan_dict(
     mastered_ids: set[str],
     attempts: list[dict],
     now: str,
+    anchor: str | None = None,
 ) -> dict:
-    """Plan de repaso de una unidad (delegando en `services.unit_review`)."""
+    """Plan de repaso de una unidad (delegando en `services.unit_review`).
+
+    V3.18 (I2): `anchor` es el ancla congelada persistida; si se omite el
+    servicio la deriva de las filas (backfill)."""
     rows = _unit_review_mastery_rows(unit, obj_mastery)
     unit_attempts = [a for a in attempts if a.get("unit_id") == unit.id]
     return unit_review.build_unit_review_plan(
@@ -1956,6 +2052,7 @@ def _unit_review_plan_dict(
         level_id=lv.level_id,
         module_id=module.id,
         module_title=module.title,
+        anchor=anchor,
         attempts=unit_attempts,
     )
 
@@ -1982,68 +2079,83 @@ def _reviewable_unit_window(
 async def get_unit_review_plan(
     user_id: str, level_id: str | None = None
 ) -> UnitReviewPlanOut | None:
-    """Plan de repaso por unidad (V3.16) del nivel actual (o del pedido, D2).
+    """Plan de repaso por unidad (V3.16 + O3/V3.18) agregado por niveles.
 
-    Sigue el patrón de `get_session`: `lv` → `list_objective_mastery` →
-    `_split_objective_mastery` → `mastered_objective_ids`; agrupa por unidad y
-    solo incluye unidades **completadas** o con **plan activo** (al menos un
-    intento de micro-review, para que una ventana fallida siga visible aunque la
-    unidad deje de estar completa). `due_count` cuenta las unidades con una
-    ventana repasable (due_now/failed)."""
-    if level_id is None:
-        level_id = await _current_level_id(user_id)
-    lv = _levels_by_id.get(level_id)
-    if lv is None:
+    Devuelve los niveles del plan (el pedido o todos los matriculados) con sus
+    unidades completadas o con plan activo (al menos un intento de micro-review,
+    para que una ventana fallida siga visible aunque la unidad deje de estar
+    completa). `due_count` por nivel cuenta las unidades con ventana repasable
+    (due_now/failed) y el `due_count` raíz es el global. V3.18 (I2): las
+    ventanas se anclan en el ancla congelada persistida de cada unidad."""
+    levels = await _review_scope_levels(user_id, level_id=level_id)
+    if not levels:
         return None
-    obj_mastery = await run_in_threadpool(
-        academy_repo.list_objective_mastery, user_id, lv.level_id
-    )
-    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
-    mastered = academy_svc.mastered_objective_ids(
-        lv, objective_scores, objective_attempts
-    )
-    attempts = await run_in_threadpool(
-        academy_repo.list_unit_review_attempts, user_id, lv.level_id
-    )
     now_iso = datetime.now(timezone.utc).isoformat()
+    level_out: list[dict] = []
+    total_due = 0
+    for lv in levels:
+        obj_mastery = await run_in_threadpool(
+            academy_repo.list_objective_mastery, user_id, lv.level_id
+        )
+        objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+        mastered = academy_svc.mastered_objective_ids(
+            lv, objective_scores, objective_attempts
+        )
+        attempts = await run_in_threadpool(
+            academy_repo.list_unit_review_attempts, user_id, lv.level_id
+        )
+        anchors = await _resolve_unit_anchors(user_id, lv, obj_mastery, mastered)
 
-    units_out: list[dict] = []
-    due_count = 0
-    for module in lv.modules:
-        for unit in module.units:
-            plan = _unit_review_plan_dict(
-                lv=lv,
-                module=module,
-                unit=unit,
-                obj_mastery=obj_mastery,
-                mastered_ids=mastered,
-                attempts=attempts,
-                now=now_iso,
-            )
-            unit_attempts = [a for a in attempts if a.get("unit_id") == unit.id]
-            if not plan["completed"] and not unit_attempts:
-                continue
-            if any(
-                w["state"] in (unit_review.WINDOW_DUE_NOW, unit_review.WINDOW_FAILED)
-                for w in plan["windows"]
-            ):
-                due_count += 1
-            units_out.append(plan)
+        units_out: list[dict] = []
+        due_count = 0
+        for module in lv.modules:
+            for unit in module.units:
+                plan = _unit_review_plan_dict(
+                    lv=lv,
+                    module=module,
+                    unit=unit,
+                    obj_mastery=obj_mastery,
+                    mastered_ids=mastered,
+                    attempts=attempts,
+                    now=now_iso,
+                    anchor=anchors.get(unit.id),
+                )
+                unit_attempts = [a for a in attempts if a.get("unit_id") == unit.id]
+                if not plan["completed"] and not unit_attempts:
+                    continue
+                if any(
+                    w["state"]
+                    in (unit_review.WINDOW_DUE_NOW, unit_review.WINDOW_FAILED)
+                    for w in plan["windows"]
+                ):
+                    due_count += 1
+                units_out.append(plan)
+        if not units_out:
+            continue
+        total_due += due_count
+        level_out.append(
+            {
+                "level_id": lv.level_id,
+                "level": lv.level,
+                "units": [UnitReviewPlanUnitOut(**u) for u in units_out],
+                "due_count": due_count,
+            }
+        )
     return UnitReviewPlanOut(
-        level_id=lv.level_id,
-        level=lv.level,
-        due_count=due_count,
-        units=[UnitReviewPlanUnitOut(**u) for u in units_out],
+        levels=[UnitReviewLevelOut(**g) for g in level_out],
+        due_count=total_due,
     )
 
 
 async def _unit_review_context(
     user_id: str, lv
-) -> tuple[dict, set[str], list[dict], str]:
+) -> tuple[dict, set[str], list[dict], str, dict[str, str]]:
     """Contexto compartido por las operaciones de review de unidad del nivel `lv`.
 
-    Devuelve `(obj_mastery, mastered_ids, attempts, now_iso)`. Aislamiento por
-    usuario: todas las consultas se filtran por `user_id` (premisa 13)."""
+    Devuelve `(obj_mastery, mastered_ids, attempts, now_iso, anchors)` donde
+    `anchors` son las anclas congeladas (I2) de las unidades del nivel.
+    Aislamiento por usuario: todas las consultas se filtran por `user_id`
+    (premisa 13)."""
     obj_mastery = await run_in_threadpool(
         academy_repo.list_objective_mastery, user_id, lv.level_id
     )
@@ -2054,26 +2166,52 @@ async def _unit_review_context(
     attempts = await run_in_threadpool(
         academy_repo.list_unit_review_attempts, user_id, lv.level_id
     )
-    return obj_mastery, mastered, attempts, datetime.now(timezone.utc).isoformat()
+    anchors = await _resolve_unit_anchors(user_id, lv, obj_mastery, mastered)
+    return (
+        obj_mastery,
+        mastered,
+        attempts,
+        datetime.now(timezone.utc).isoformat(),
+        anchors,
+    )
+
+
+async def _resolve_micro_review_level(
+    user_id: str, level_id: str | None = None
+):
+    """Nivel de un micro-review (O3): el pedido si existe, si no el actual.
+
+    Con `level_id` devuelve ese nivel del currículo (None si es desconocido →
+    el router responde 404); sin él, el nivel actual del usuario (a1 por
+    defecto)."""
+    if level_id is not None:
+        return _levels_by_id.get(level_id)
+    lv_id = await _current_level_id(user_id)
+    return _levels_by_id.get(lv_id) or _levels_by_id["a1"]
 
 
 async def get_unit_micro_review(
-    user_id: str, unit_id: str, window_days: int
+    user_id: str,
+    unit_id: str,
+    window_days: int,
+    level_id: str | None = None,
 ) -> MicroReviewSessionOut | None:
-    """Sesión de micro-review de una unidad del nivel actual (D2/D8).
+    """Sesión de micro-review de una unidad del nivel donde vive (D2/D8 + O3).
 
-    Valida que la unidad exista en el nivel actual y que su ventana esté
-    repasable (due_now/failed); los ítems son checks MC oficiales del currículo
-    (muestreo determinista) SIN `correct_index`. En un reintento (ventana
-    `failed`) se priorizan los ítems fallados del último intento."""
-    level_id = await _current_level_id(user_id)
-    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    Con `level_id` repasa una unidad de ESE nivel (debe existir en él); sin él,
+    del nivel actual. Valida que la ventana esté repasable (due_now/failed); los
+    ítems son checks MC oficiales del currículo (muestreo determinista) SIN
+    `correct_index`. En un reintento (ventana `failed`) se priorizan los ítems
+    fallados del último intento."""
+    lv = await _resolve_micro_review_level(user_id, level_id)
+    if lv is None:
+        return None
     found = _find_review_unit(lv, unit_id)
     if found is None:
         return None
     module, unit = found
-    obj_mastery, mastered, attempts, now_iso = await _unit_review_context(
-        user_id, lv
+    obj_mastery, mastered, attempts, now_iso, anchors = (
+        await _unit_review_context(user_id, lv)
     )
     plan = _unit_review_plan_dict(
         lv=lv,
@@ -2083,13 +2221,14 @@ async def get_unit_micro_review(
         mastered_ids=mastered,
         attempts=attempts,
         now=now_iso,
+        anchor=anchors.get(unit.id),
     )
     if _reviewable_unit_window(plan, window_days) is None:
         raise ValueError("unit_review.not_due")
     latest = await run_in_threadpool(
         academy_repo.latest_unit_review_attempt,
         user_id,
-        level_id,
+        lv.level_id,
         unit.id,
         window_days,
     )
@@ -2111,22 +2250,29 @@ async def get_unit_micro_review(
 
 
 async def submit_unit_micro_review(
-    user_id: str, unit_id: str, window_days: int, answers: dict[str, int]
+    user_id: str,
+    unit_id: str,
+    window_days: int,
+    answers: dict[str, int],
+    level_id: str | None = None,
 ) -> MicroReviewResultOut | None:
-    """Puntúa y persiste un micro-review de una ventana de unidad (V3.16).
+    """Puntúa y persiste un micro-review de una ventana de unidad (V3.16 + O3).
 
     El servidor puntúa las respuestas contra los checks oficiales (premisa 21),
     persiste el intento en `unit_review_attempts` y reprograma la carta FSRS de
     cada objetivo implicado con el grade derivado de su precisión por objetivo.
-    NUNCA crea evidencia de mastery/currículo ni declara dominio (D5)."""
-    level_id = await _current_level_id(user_id)
-    lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    La unidad se valida en el nivel donde vive (el pedido con `level_id`, o el
+    actual sin él). NUNCA crea evidencia de mastery/currículo ni declara dominio
+    (D5)."""
+    lv = await _resolve_micro_review_level(user_id, level_id)
+    if lv is None:
+        return None
     found = _find_review_unit(lv, unit_id)
     if found is None:
         return None
     module, unit = found
-    obj_mastery, mastered, attempts, now_iso = await _unit_review_context(
-        user_id, lv
+    obj_mastery, mastered, attempts, now_iso, anchors = (
+        await _unit_review_context(user_id, lv)
     )
     plan = _unit_review_plan_dict(
         lv=lv,
@@ -2136,6 +2282,7 @@ async def submit_unit_micro_review(
         mastered_ids=mastered,
         attempts=attempts,
         now=now_iso,
+        anchor=anchors.get(unit.id),
     )
     if _reviewable_unit_window(plan, window_days) is None:
         raise ValueError("unit_review.not_due")
@@ -2143,7 +2290,7 @@ async def submit_unit_micro_review(
     latest = await run_in_threadpool(
         academy_repo.latest_unit_review_attempt,
         user_id,
-        level_id,
+        lv.level_id,
         unit.id,
         window_days,
     )
@@ -2214,7 +2361,7 @@ async def submit_unit_micro_review(
     await run_in_threadpool(
         academy_repo.insert_unit_review_attempt,
         user_id,
-        level_id,
+        lv.level_id,
         unit.id,
         window_days,
         correct=result["correct"],
@@ -2226,9 +2373,10 @@ async def submit_unit_micro_review(
         created_at=now_iso,
     )
 
-    # Plan actualizado tras persistir el intento (refleja passed/failed).
-    obj_mastery, mastered, attempts, now_iso = await _unit_review_context(
-        user_id, lv
+    # Plan actualizado tras persistir el intento (refleja passed/failed). El
+    # ancla congelada (I2) no cambia al persistir el intento.
+    obj_mastery, mastered, attempts, now_iso, _anchors = (
+        await _unit_review_context(user_id, lv)
     )
     updated_plan = _unit_review_plan_dict(
         lv=lv,
@@ -2238,6 +2386,7 @@ async def submit_unit_micro_review(
         mastered_ids=mastered,
         attempts=attempts,
         now=now_iso,
+        anchor=anchors.get(unit.id),
     )
 
     by_item = {i["item_id"]: i for i in sample}
@@ -2348,23 +2497,32 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
         academy_repo.list_session_steps, user_id, _today()
     )
 
-    # D1b: nodos del grafo con una única lectura de evidencia, compartidos por
-    # el ranking de debilidad y el enriquecimiento de pasos.
-    evidence_rows = await run_in_threadpool(
-        academy_repo.list_evidence, user_id, lv.level_id
-    )
+    # D1b + H6 (V3.17/V3.18): nodos del grafo SOLO donde hacen falta — el
+    # ranking de debilidad de los grupos que pueden convertirse en paso
+    # (`weakness_cap`) y el enriquecimiento de pasos con objetivo — con UNA
+    # única lectura de evidencia, compartida por ranking y enriquecimiento. Sin
+    # nodos que construir (D7) no se lee `list_evidence` (coste H6).
+    weakness_cap = adaptive.SESSION_CAPS.get("weakness", 2)
+    rank_groups = remediation[:weakness_cap]
     remediation_ids = [
-        oid for r in remediation for oid in (r.get("objective_ids") or [])
+        oid for r in rank_groups for oid in (r.get("objective_ids") or [])
     ]
-    nodes = _objective_nodes_for(
-        lv,
-        remediation_ids,
-        skills=skills,
-        objective_scores=objective_scores,
-        evidence_rows=evidence_rows,
-    )
+    needs_nodes = bool(remediation_ids) or bool(oid)
+    evidence_rows: list[dict] = []
+    nodes: dict[str, dict] = {}
+    if needs_nodes:
+        evidence_rows = await run_in_threadpool(
+            academy_repo.list_evidence, user_id, lv.level_id
+        )
+        nodes = _objective_nodes_for(
+            lv,
+            remediation_ids,
+            skills=skills,
+            objective_scores=objective_scores,
+            evidence_rows=evidence_rows,
+        )
     if nodes:
-        for r in remediation:
+        for r in rank_groups:
             candidate_ids = r.get("objective_ids") or []
             if not candidate_ids:
                 continue
@@ -2386,15 +2544,20 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
     )
 
     # Enriquecimiento aditivo de los pasos con objetivo (D1b; D7 si no hay nodo).
-    step_nodes = _objective_nodes_for(
-        lv,
-        [s["objective_id"] for s in steps if s.get("objective_id")],
-        skills=skills,
-        objective_scores=objective_scores,
-        evidence_rows=evidence_rows,
-    )
-    for oid_node, node in step_nodes.items():
-        nodes.setdefault(oid_node, node)
+    missing = [
+        s["objective_id"]
+        for s in steps
+        if s.get("objective_id") and s["objective_id"] not in nodes
+    ]
+    if needs_nodes and missing:
+        step_nodes = _objective_nodes_for(
+            lv,
+            missing,
+            skills=skills,
+            objective_scores=objective_scores,
+            evidence_rows=evidence_rows,
+        )
+        nodes.update(step_nodes)
     enriched: list[dict] = []
     for step in steps:
         oid_step = step.get("objective_id")

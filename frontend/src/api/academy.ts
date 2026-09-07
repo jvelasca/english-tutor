@@ -1,4 +1,4 @@
-import { getJson, postJson, putJson } from "./client";
+import { getJson, getJsonNullable, postJson, putJson } from "./client";
 import type {
   AttemptEntry,
   AttemptResponse,
@@ -383,38 +383,47 @@ export function reviewFsrsCard(
 
 // --- Review/SRS por unidad (V3.16) ---
 
-/** Plan de repaso por unidad del nivel actual: unidades y ventanas 7/30/90. */
+/** Plan de repaso por unidad (V3.16; V3.18/O3: agregado por niveles). */
 export function getUnitReviewPlan(userId: string): Promise<UnitReviewPlan> {
   return getJson<UnitReviewPlan>(
     `/api/academy/review/unit-plan${userQuery(userId)}`,
   );
 }
 
-/** Sesión de micro-review (checks MC oficiales, sin correct_index). */
+/** Sesión de micro-review (checks MC oficiales, sin correct_index). `levelId`
+ *  opcional: nivel real donde vive la unidad (anterior al actual, O3). */
 export function getUnitMicroReview(
   userId: string,
   unitId: string,
   windowDays: number,
+  levelId?: string,
 ): Promise<MicroReviewSession> {
   const params = new URLSearchParams({
     user_id: userId,
     window_days: String(windowDays),
   });
+  if (levelId) params.set("level_id", levelId);
   return getJson<MicroReviewSession>(
     `/api/academy/review/unit/${encodeURIComponent(unitId)}/micro-review?${params.toString()}`,
   );
 }
 
-/** Envía las respuestas del micro-review; el servidor puntúa (premisa 21). */
+/** Envía las respuestas del micro-review; el servidor puntúa (premisa 21).
+ *  `levelId` opcional: nivel real donde vive la unidad (O3). */
 export function submitUnitMicroReview(
   userId: string,
   unitId: string,
   windowDays: number,
   answers: Record<string, number>,
+  levelId?: string,
 ): Promise<MicroReviewResult> {
   return postJson<MicroReviewResult>(
     `/api/academy/review/unit/${encodeURIComponent(unitId)}/micro-review${userQuery(userId)}`,
-    { window_days: windowDays, answers },
+    {
+      window_days: windowDays,
+      answers,
+      ...(levelId ? { level_id: levelId } : {}),
+    },
   );
 }
 
@@ -536,10 +545,10 @@ export function getEvidenceGraphNode(
   userId: string,
   objectiveId: string,
   levelId?: string,
-): Promise<EvidenceGraphNode> {
+): Promise<EvidenceGraphNode | null> {
   const params = new URLSearchParams({ user_id: userId });
   if (levelId) params.set("level_id", levelId);
-  return getJson<EvidenceGraphNode>(
+  return getJsonNullable<EvidenceGraphNode>(
     `/api/academy/evidence-graph/objective/${encodeURIComponent(objectiveId)}?${params.toString()}`,
   );
 }

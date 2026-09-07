@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  GRAPH_DIMENSION_LABELS,
   KIND_LABELS,
   SKILL_LABELS,
+  dimensionLabel,
   kindKey,
   stepTitle,
 } from "./learningLabels";
@@ -32,6 +34,31 @@ describe("learningLabels", () => {
     expect(SKILL_LABELS.listening).toBe("Listening");
     expect(SKILL_LABELS.speaking).toBe("Speaking");
     expect(KIND_LABELS.review).toBe("Review");
+  });
+
+  it("GRAPH_DIMENSION_LABELS cubre las 7 dimensiones del grafo (V3.18, D5)", () => {
+    for (const id of [
+      "vocabulary",
+      "grammar",
+      "discourse",
+      "listening",
+      "speaking",
+      "interaction",
+      "transfer",
+    ]) {
+      expect(GRAPH_DIMENSION_LABELS[id]).toBeTruthy();
+    }
+    // Dimensiones no-skill: su etiqueta NO es el id en crudo.
+    expect(GRAPH_DIMENSION_LABELS.transfer).toBe("Transfer");
+    expect(GRAPH_DIMENSION_LABELS.discourse).toBe("Discourse");
+    expect(GRAPH_DIMENSION_LABELS.interaction).toBe("Interaction");
+  });
+
+  it("dimensionLabel devuelve la etiqueta humana o el id como fallback", () => {
+    expect(dimensionLabel("transfer")).toBe("Transfer");
+    expect(dimensionLabel("vocabulary")).toBe("Vocabulary");
+    // Ids desconocidos (p. ej. una destreza nueva) → se pintan en crudo.
+    expect(dimensionLabel("holistic")).toBe("holistic");
   });
 
   it("kindKey apunta a la clave i18n de cada tipo", () => {

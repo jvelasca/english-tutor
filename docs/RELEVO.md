@@ -3,7 +3,30 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-06 20:20 (UTC+2).
+> Actualizado por última vez: 2026-09-07 08:15 (UTC+2).
+>
+> **Nota (2026-09-07):** posición vigente **v3.18.0** — **Knowledge Graph
+> remainder + deuda del grafo** (backend `3.17.0 → 3.18.0`). Cierra el candidato
+> P3: **I2** — ancla de unidad congelada al completar (tabla `unit_review_anchors`
+> de escritura única `INSERT OR IGNORE` + backfill lazy; los refuerzos/decay ya
+> no desplazan las ventanas 7/30/90) · **O1** — cascade de ventanas (una ventana
+> sin intento propio se cierra con un intento superado de la unidad posterior a su
+> `due_at`; el intento propio manda) · **M4** — cartas FSRS `objective` fuera del
+> `FsrsReviewPanel` autograduable (single writer con el micro-review: siembra solo
+> en ventana `due_now`/`failed` o con `reps > 0`; `get_fsrs_due`/`due_count` las
+> excluyen y `/fsrs/review` responde 400) · **O3** — `/unit-plan` agregado por
+> niveles (`{levels, due_count}`, actual + anteriores matriculados) y micro-review
+> con `level_id` que valida la unidad en el nivel donde vive (UI agrupada por
+> nivel) · **H5** — etiquetas humanas de las 7 dimensiones del grafo
+> (`GRAPH_DIMENSION_LABELS` + `dimensionLabel`) en chip/`NextBestCard`/
+> `ObjectiveNodeCard`/`EvidenceGraphPanel` · **H6** — `/session` y `/next-best`
+> lazy (una sola `list_evidence` y solo si hay nodos que construir; payloads
+> idénticos) · **auditoría v3.17** — `ObjectiveNodeCard` distingue error real
+> (copia + reintento) de 404/sin-datos, `_as_float` defensivo en
+> `rank_weakness_objectives`, spec Playwright `homeGraphChip` nueva (chip
+> "Transfer" con mock determinista). Tests: **pytest 1345**, **vitest 414**, ruff
+> limpio, `tsc`/`vite build` OK, Playwright de la región Home/grafo en desktop OK
+> y `check_release_consistency` exit 0; CONSTITUCIÓN sin cambios.
 >
 > **Nota (2026-09-06):** posición vigente **v3.17.0** — **Knowledge Graph +
 > Daily Adaptive Plan** (backend `3.16.0 → 3.17.0`). Cierra el candidato P2:
@@ -2733,6 +2756,85 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   «9»). Deuda menor (sin fix, decidida por el gerente) → candidato v3.18:
   **H5** y **H6**.
 
+### 37.36 HECHO (V3.18) — Knowledge Graph remainder + deuda del grafo (P3)
+
+- **I2 — ancla congelada al completar**: nueva tabla `unit_review_anchors`
+  (`user_id/level_id/unit_id` PK, `anchor`, `created_at/updated_at`, índice de
+  lookup por `(user_id, level_id)`) en `repositories/db.py` + repos
+  `get_unit_anchor`/`set_unit_anchor_if_absent` (`INSERT OR IGNORE`, nunca
+  sobrescribe). El servicio puro `build_unit_review_plan` gana `anchor:
+  str | None = None` (ventanas sobre el ancla persistida si viene; si no, lo
+  deriva como antes). `domain/academy.py` persiste el ancla en la primera
+  detección de completitud (backfill lazy en `get_unit_review_plan`,
+  `_unit_review_context` y `sync_fsrs_cards`); una segunda lectura tras tocar
+  `updated_at` devuelve las mismas `due_at` (test de dominio).
+- **O1 — cascade 7→30→90**: `window_due_at` recibe los intentos de la unidad
+  (todas las ventanas) y filtra internamente el "intento propio"; sin intento
+  propio, la ventana queda `passed` si existe un intento superado de la unidad
+  con `created_at >= due_at` de esa ventana. Un intento propio mandado fallido de
+  la 30 gana sobre un superado de la 7; resolver la 7 tarde cierra la 30 vencida
+  y deja la 90 `upcoming`/`due_now` según `now`. Tests puros en
+  `test_unit_review.py` (el que fijaba "otras ventanas no afectan" se retiró con
+  rationale honesto).
+- **M4 — cartas `objective` fuera del panel autograduable (single writer)**:
+  `sync_fsrs_cards` crea cartas `objective` solo si la primera ventana no
+  superada de la unidad está `due_now`/`failed` **o** la carta ya existe con
+  `reps > 0` (continuidad de scheduling), barriendo los niveles del plan
+  agregado; `get_fsrs_due` excluye `objective` de cola y `due_count`;
+  `get_fsrs_summary` conserva `by_type` completo pero excluye `objective` del
+  `due_count`; `review_fsrs_card` rechaza `objective` (devuelve `None` → el
+  router responde 400). El contenido `objective` se repasa solo vía
+  `UnitReviewPanel`; `FsrsReviewPanel` recibe únicamente skill/lexicon.
+- **O3 — plan agregado por niveles**: `UnitReviewPlanOut` evoluciona a
+  `{levels: [UnitReviewLevelOut{level_id, level, due_count, units}], due_count}`
+  (nivel actual + anteriores matriculados con unidades completadas o con plan
+  activo, ordenados asc); `get_unit_micro_review`/`submit_unit_micro_review`
+  aceptan `level_id: str | None = None` y validan la unidad con
+  `_find_review_unit` **en el nivel donde vive** (`MicroReviewSubmitIn` gana
+  `level_id`; routers GET/POST lo aceptan). Frontend: tipos espejo,
+  `flattenReviewLevels` en `unitReviewLogic`, `UnitReviewPanel` agrupa por nivel
+  (cabecera + contador por nivel), micro-review recuerda el `level_id` de la
+  unidad, i18n es/en con parity. Aislamiento por usuario verificado.
+- **H5 — etiquetas humanas de dimensiones del grafo**: `GRAPH_DIMENSION_LABELS`
+  (7 dimensiones en inglés de inmersión, convención V3.6.1) + `dimensionLabel`
+  en `frontend/src/utils/learningLabels.ts`; sustituye `SKILL_LABELS[id] ?? id`
+  y los ids en crudo en el chip del factor limitante de `TodayPlan`,
+  `NextBestCard`, `ObjectiveNodeCard` (dimensiones y `recommended_focus`) y
+  `EvidenceGraphPanel`. `transfer`/`discourse`/`interaction` muestran
+  Transfer/Discourse/Interaction.
+- **H6 — coste lazy de `/session` y `/next-best`**: en `_session_steps` el
+  ranking y la construcción de nodos se limitan a los grupos de remediación que
+  pueden producir pasos (`remediation[:SESSION_CAPS["weakness"]]`, importado de
+  `adaptive`); `list_evidence` se lee una sola vez y solo si `needs_nodes`
+  (grupos con candidatos o `next_objective_id`). Payloads idénticos: la paridad
+  `/next-best`==`/session` y el fallback sin nodo (D7 de v3.17) siguen verdes.
+- **Observaciones auditoría v3.17**: (1) `getJsonNullable` (404 → `null`) en el
+  cliente y `getEvidenceGraphNode` lo usa; `ObjectiveNodeCard` distingue
+  `error` (copia `evidenceGraph.error` + botón reintento con `RotateCcw`) de
+  `empty` (404/sin-datos, copia actual) — vitest del componente; (2) helper
+  `_as_float` con fallback `0.0` en `rank_weakness_objectives` (tolerante a
+  `mastery: None`/`"n/a"`, empate estable) + test puro; (3) Playwright: la spec
+  `homeGraphChip.spec.ts` nueva mockea la red (sesión con `limiting_factor.id =
+  "transfer"`) y fija el chip "Transfer"; ejecutada en desktop junto a
+  `smoke.spec.ts` → verdes, captura `tests/visual/screenshots/desktop/
+  home-graph-chip.png` nueva.
+- **Tests**: `test_unit_review.py` (cascade + ancla override), `test_unit_review_endpoints.py`
+  (plan multi-nivel, ancla congelada tras refuerzo, siembra gated M4, micro-review
+  con `level_id` de nivel anterior, 400 `/fsrs/review` objective, exclusión
+  objective en due/summary), `test_session_graph.py` (coste H6: delta de
+  `list_evidence` 0 vs 1), `test_graph_plan.py` (`_as_float`); frontend
+  `learningLabels.test.ts`, `TodayPlan.test.tsx`, `academy.test.ts`,
+  `client.test.ts`, `ObjectiveNodeCard.test.tsx` (nuevo), `UnitReviewPanel.test.tsx`,
+  `FsrsReviewPanel.test.tsx` (nuevo), `unitReviewLogic.test.ts`. Backend **pytest
+  1345** + ruff limpio; frontend **vitest 414** (52 archivos) + `tsc`/`vite
+  build` OK; Playwright región Home/grafo desktop OK;
+  `check_release_consistency` exit 0.
+- **Cierre**: bump único `3.18.0` (backend `config.py` fuente única) +
+  `frontend/package.json`/`package-lock.json`, `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.36 en `docs/RELEVO.md`,
+  `release-notes-v3.18.0.md` (untracked). Sin cambios de CONSTITUCIÓN (v3.18 es
+  mecanismo/UI, no norma) ni de launcher; `GRAPH_VERSION` permanece `2.12.0`.
+
 ### Próximos incrementos (candidatos abiertos, auditados)
 
 > Lista de candidatos con su estado REAL auditado (2026-09-05, subagentes
@@ -2784,24 +2886,24 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   D7 fallback silencioso sin nodo. Tests: pytest 1333, vitest 398, ruff/build/
   consistencia OK. Deuda restante del grafo + auditoría v3.17 → candidato
   abierto v3.18 abajo.
-- **🟡 P3 — Knowledge Graph remainder + deuda del grafo** (ABIERTO, v3.18):
-  resto del candidato P2 + deuda de la auditoría externa v3.16 (37.34): **I2** —
-  congelar el ancla de la unidad al alcanzar la completitud (hoy
-  `max(updated_at)` de filas vivas; refuerzos/decay post-completitud
-  desplazan las ventanas 7/30/90 y erosionan la fijeza de D3) y test del caso;
-  **M4** — decidir si las cartas `objective` aparecen en el `FsrsReviewPanel`
-  autograduable (doble escritor) o se siembran solo en ventana due; **O1** —
-  cadena 7→30→90 (qué ocurre si la ventana 30 ya pasó cuando se resuelve la 7);
-  **O3** — plan de repaso más allá del nivel actual (D2(b)); más la deuda de la
-  auditoría externa v3.17 (37.35): **H5** — chip del factor limitante con
-  etiqueta cruda para dimensiones no-skill (`transfer`/`discourse`/
-  `interaction` caen al `id` en crudo, sin localizar); **H6** — coste por
-  petición de `/session` y `/next-best` (se construyen nodos de todos los
-  candidatos de remediación de cada destreza débil y `list_evidence` se lee
-  incluso sin pasos que enriquecer); y las observaciones del informe de la
-  auditoría v3.17 (copia error/404 vs sin-datos del `ObjectiveNodeCard`,
-  cobertura Playwright de la región nueva, `float()` asumido en
-  `rank_weakness_objectives`).
+- ~~**🟡 P3 — Knowledge Graph remainder + deuda del grafo**~~ ✅ **cerrado (V3.18,
+  entrada 37.36)**: resto del candidato P2 + deuda de la auditoría externa v3.16
+  (37.34) + deuda de la auditoría v3.17 (37.35). **I2** ✅ — ancla de unidad
+  congelada al completar (tabla `unit_review_anchors` de escritura única +
+  backfill lazy; los refuerzos/decay ya no desplazan las ventanas 7/30/90) ·
+  **M4** ✅ — cartas `objective` fuera del panel autograduable (single writer con
+  el micro-review: siembra solo en ventana due/failed o con `reps > 0`;
+  `get_fsrs_due`/`due_count` las excluyen y `/fsrs/review` → 400) · **O1** ✅ —
+  cascade 7→30→90 (un intento superado tardío cierra las ventanas vencidas sin
+  intento propio; el propio manda) · **O3** ✅ — plan de repaso agregado por
+  niveles (`{levels, due_count}`; micro-review valida la unidad donde vive; UI
+  agrupada por nivel) · **H5** ✅ — etiquetas humanas de las dimensiones del
+  grafo (`GRAPH_DIMENSION_LABELS` + `dimensionLabel` en chip/`NextBestCard`/
+  `ObjectiveNodeCard`/`EvidenceGraphPanel`) · **H6** ✅ — `/session`/`/next-best`
+  lazy (una sola `list_evidence` y solo si hay nodos; payloads idénticos) ·
+  **auditoría v3.17** ✅ — `ObjectiveNodeCard` error vs 404/sin-datos con
+  reintento, `_as_float` defensivo, spec Playwright `homeGraphChip` nueva. Tests:
+  pytest 1345, vitest 414, ruff/build/Playwright región desktop/consistencia OK.
 - **Pendiente heredado** (ABIERTO, v3.18): generación automática del speaking
   micro-drill (`recognized_not_produced`, hoy solo señal sin consumidor) y
   desglose speaking-vs-writing por palabra (hoy `record_words` solo lo llama el

@@ -10,9 +10,21 @@ function currentLang(): Lang {
   }
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+interface RequestOptions {
+  /** 404 → resuelve `null` en vez de lanzar (V3.18, D7.1). */
+  notFoundAsNull?: boolean;
+}
+
+async function request<T>(
+  url: string,
+  init?: RequestInit,
+  options?: RequestOptions,
+): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
+    if (options?.notFoundAsNull && res.status === 404) {
+      return null as T;
+    }
     // El rate limiter del backend devuelve un 429 con `code: RATE_LIMITED`
     // cuando el servidor local está saturado: se traduce a la lengua de la UI
     // en vez de pintar el texto interno del backend.
@@ -66,6 +78,21 @@ export function getJson<T>(
   headers?: Record<string, string>,
 ): Promise<T> {
   return request<T>(url, headers ? { headers } : undefined);
+}
+
+/**
+ * GET que resuelve `null` cuando el backend responde 404 (recurso sin datos
+ * esperado, p. ej. un nodo del Evidence Graph que aún no existe) y lanza con
+ * el detalle del backend para el resto de errores (red/5xx…). V3.18 (D7.1):
+ * permite a la UI distinguir "sin datos" de "error real".
+ */
+export function getJsonNullable<T>(
+  url: string,
+  headers?: Record<string, string>,
+): Promise<T | null> {
+  return request<T | null>(url, headers ? { headers } : undefined, {
+    notFoundAsNull: true,
+  });
 }
 
 function sendJson<T>(url: string, method: string, body: unknown): Promise<T> {
