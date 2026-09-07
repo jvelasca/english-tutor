@@ -73,6 +73,61 @@ def test_corpus_covers_all_levels_and_is_diverse():
     assert len({q["context"] for q in corpus}) >= 4
 
 
+def test_corpus_has_servable_item_for_every_focus_subskill():
+    """LIST-01: cada token de foco declarado por nivel (`LISTENING_FOCUS_BY_LEVEL`)
+    es un skill servible con ≥1 ítem del corpus en ese nivel.
+
+    Protege la premisa de progresión: los objetivos de escucha declaran el foco
+    (word_recognition/sound_recognition/phrase_recognition en A1/A2/B1) y ese foco
+    debe poder servirse con contenido real del banco."""
+    from services.curriculum import LISTENING_FOCUS_BY_LEVEL
+
+    corpus = [q for q in QUESTION_BANK if q["id"].startswith("c")]
+    for level_key, focus in LISTENING_FOCUS_BY_LEVEL.items():
+        level_upper = level_key.upper()
+        served = {
+            q["skill"]
+            for q in corpus
+            if q["level"] == level_upper and q.get("skill")
+        }
+        missing = [token for token in focus if token not in served]
+        assert not missing, (
+            f"{level_upper}: tokens de foco sin ítem servible en el corpus: "
+            f"{missing}"
+        )
+
+
+def test_corpus_scripts_are_unique_when_normalized():
+    """LIST-03: sin cuasi-duplicados de `script` en el banco.
+
+    Dos ítems cuya `script` normalizada (minúsculas, sin prefijos de turno ni
+    puntuación, espacios colapsados) coincide harían que el alumno escuchase el
+    mismo texto dos veces en el mismo banco: el test falla hasta re-auditar y
+    sustituir un miembro del par."""
+    from services.listening import normalized_script_key
+
+    seen: dict[str, str] = {}
+    for q in QUESTION_BANK:
+        key = normalized_script_key(q["script"])
+        assert key not in seen, (
+            f"script normalizado duplicado: {q['id']} == {seen[key]} "
+            f"({q['script']!r})"
+        )
+        seen[key] = q["id"]
+
+
+def test_validate_listening_bank_detects_duplicate_normalized_script():
+    """La validación del banco rechaza dos ítems con la misma script normalizada."""
+    from services.listening import normalized_script_key, validate_listening_bank
+
+    twin = dict(QUESTION_BANK[0], id="dup-script-test")
+    assert normalized_script_key(twin["script"]) == normalized_script_key(
+        QUESTION_BANK[0]["script"]
+    )
+    errors = validate_listening_bank([QUESTION_BANK[0], twin])
+    assert any("duplicate normalized script" in e for e in errors)
+
+
 # --- Pack de grabación -------------------------------------------------------
 
 

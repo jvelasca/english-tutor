@@ -232,6 +232,80 @@ def test_recognized_not_produced():
     assert lexicon.recognized_not_produced(rows) == ["travel"]
 
 
+def test_recognized_not_produced_is_oral_semantics():
+    """V3.19: la señal es 'expuestas y nunca producidas hablando', no 'nunca
+    tecleadas'. Una palabra tecleada en el chat (chat_prod > 0) pero nunca dicha
+    (speaking_prod == 0) sigue siendo candidata a speaking micro-drill."""
+    rows = [
+        {"word": "travel", "exposures": 3, "chat_prod": 2, "speaking_prod": 0},
+        {"word": "culture", "exposures": 3, "chat_prod": 0, "speaking_prod": 1},
+        {"word": "music", "exposures": 0, "chat_prod": 1, "speaking_prod": 0},
+    ]
+    assert lexicon.recognized_not_produced(rows) == ["travel"]
+
+
+def test_drill_candidates_orders_by_recall_and_limits():
+    """Candidatos: expuestas, nunca dichas (speaking_prod == 0), ordenadas por
+    recuerdo ascendente y acotadas a `limit`."""
+    rows = [
+        {
+            "word": "oldest",
+            "exposures": 3,
+            "speaking_prod": 0,
+            "appearances": 0,
+            "first_seen": "",
+            "last_seen": "",
+            "last_exposed_at": "2020-01-01",
+        },
+        {
+            "word": "newest",
+            "exposures": 3,
+            "speaking_prod": 0,
+            "appearances": 0,
+            "first_seen": "",
+            "last_seen": "",
+            "last_exposed_at": "2026-09-01",
+        },
+        {
+            "word": "spoken",
+            "exposures": 3,
+            "speaking_prod": 1,
+            "appearances": 1,
+            "first_seen": "",
+            "last_seen": "2026-09-01",
+            "last_exposed_at": "",
+        },
+        {
+            "word": "unexposed",
+            "exposures": 0,
+            "speaking_prod": 0,
+            "appearances": 0,
+            "first_seen": "",
+            "last_seen": "",
+            "last_exposed_at": "",
+        },
+    ]
+    got = lexicon.drill_candidates(rows, limit=2)
+    assert got == ["oldest", "newest"]
+    assert len(got) == 2
+
+
+def test_drill_candidates_no_limit_when_large_limit():
+    rows = [
+        {
+            "word": w,
+            "exposures": 1,
+            "speaking_prod": 0,
+            "appearances": 0,
+            "first_seen": "",
+            "last_seen": "",
+            "last_exposed_at": "",
+        }
+        for w in ("a", "b", "c")
+    ]
+    assert set(lexicon.drill_candidates(rows, limit=10)) == {"a", "b", "c"}
+
+
 def test_coverage_indicator_receptive_productive_by_level():
     """P1 (§3.1): el Vocabulary Coverage Indicator distingue receptivo
     (encontrado: input o producción) de productivo (producido ≥1 vez), por

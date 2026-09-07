@@ -52,8 +52,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Ejercicios de listening por niveles con feedback inmediato.",
   },
   "learn.desc.speaking": {
-    en: "Real-life scenarios and missions with structured feedback.",
-    es: "Escenarios reales y misiones con feedback estructurado.",
+    en: "One Speaking area: micro-conversations, accent drills and guided dialogues with honest feedback.",
+    es: "Un área Speaking: micro-conversaciones, ejercicios de acento y diálogos guiados con feedback honesto.",
   },
   "learn.desc.pronunciation": {
     en: "Read aloud and get instant feedback on your accent.",
@@ -72,8 +72,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Rutas A1–C2 de checks de estructuras gramaticales con feedback inmediato.",
   },
   "learn.speakingSubtitle": {
-    en: "Free speaking practice: choose a scenario or run a mission.",
-    es: "Práctica oral libre: elige un escenario o lanza una misión.",
+    en: "Micro-conversations: reply out loud to a real-life situation and compare with a model answer.",
+    es: "Micro-conversaciones: responde en voz alta a una situación real y compara con una respuesta modelo.",
   },
   "learn.pronunciationSubtitle": {
     en: "Read model phrases aloud level by level and get phonetic feedback.",
@@ -92,6 +92,11 @@ const STRINGS: Record<string, Entry> = {
     es: "Checks de estructuras gramaticales nivel a nivel desde tu currículo del curso, con las evaluaciones formales a mano.",
   },
   "learn.activityAria": { en: "Open activity", es: "Abrir actividad" },
+  "learn.pickMode": { en: "Practice mode", es: "Modo de práctica" },
+  "learn.routesInfoToggle": {
+    en: "How the routes work",
+    es: "Cómo funcionan las rutas",
+  },
 
   // Grupos de destrezas
   "group.primary": { en: "Primary skills", es: "Destrezas principales" },
@@ -313,12 +318,40 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.kind.structure": { en: "structure", es: "estructura" },
   "dictionary.kind.other": { en: "lexical unit", es: "unidad léxica" },
   "dictionary.recognizedNotProduced": {
-    en: "Recognized but not produced",
-    es: "Reconocidas pero no producidas",
+    en: "Recognized but not yet said",
+    es: "Reconocidas pero aún no dichas",
   },
   "dictionary.recognizedNotProducedHint": {
-    en: "Words you understand when reading but haven't produced yet — great speaking-drill candidates.",
-    es: "Palabras que entiendes al leer pero aún no produces — candidatas a practicar hablando.",
+    en: "Words you meet in reading or listening that you haven't produced in speaking practice yet — tap one and say it aloud.",
+    es: "Palabras que encuentras al leer u oír y que aún no has producido en la práctica de speaking — tócala y dila en voz alta.",
+  },
+  "dictionary.loadError": {
+    en: "Could not load your dictionary. ",
+    es: "No se pudo cargar tu diccionario. ",
+  },
+  "dictionary.drill.sayWord": {
+    en: "Say {word}",
+    es: "Di {word}",
+  },
+  "dictionary.drill.prompt": {
+    en: "Listen to the word, then record yourself saying it aloud.",
+    es: "Escucha la palabra y luego grábate diciéndola en voz alta.",
+  },
+  "dictionary.drill.produced": {
+    en: "Great! You produced it aloud — it left the speaking-drill list.",
+    es: "¡Bien! La has dicho en voz alta — ya salió de la lista de práctica de speaking.",
+  },
+  "dictionary.drill.notProduced": {
+    en: "We heard “{heard}” (score {score}/100). Listen again and try once more.",
+    es: "Hemos oído “{heard}” (puntuación {score}/100). Vuelve a escucharla e inténtalo otra vez.",
+  },
+  "dictionary.drill.error": {
+    en: "Could not evaluate the drill: ",
+    es: "No se pudo evaluar la práctica: ",
+  },
+  "dictionary.drill.micError": {
+    en: "Could not access the microphone: ",
+    es: "No se pudo acceder al micrófono: ",
   },
   "dictionary.empty": {
     en: "No words yet. Complete course objectives to grow your dictionary.",
@@ -1868,6 +1901,21 @@ const STRINGS: Record<string, Entry> = {
     en: "{correct} of {total} words correct",
     es: "{correct} de {total} palabras correctas",
   },
+  "pron.wordByWord": {
+    en: "Word by word",
+    es: "Palabra a palabra",
+  },
+  "pron.chip.ok": { en: "Read well", es: "Bien dicha" },
+  "pron.chip.miss": { en: "Not said", es: "No dicha" },
+  "pron.chip.sub": {
+    en: "You said “{heard}” instead",
+    es: "Dijiste «{heard}» en su lugar",
+  },
+  "pron.chip.extra": { en: "Extra word", es: "Palabra de más" },
+  "pron.chip.extraHint": {
+    en: "Words you added that are not in the phrase (they also make the score drop).",
+    es: "Palabras que añadiste y no están en la frase (también bajan la puntuación).",
+  },
 
   // Progreso: buckets de agrupación y tipos de evento.
   "progress.bucket.day": { en: "Day", es: "Día" },
@@ -1954,8 +2002,8 @@ const STRINGS: Record<string, Entry> = {
     es: "{pct}% del nivel",
   },
   "pronRoutes.assessedLevel": {
-    en: "Oral level demonstrated: {level}",
-    es: "Nivel oral demostrado: {level}",
+    en: "Current oral level (exam estimate): {level}",
+    es: "Nivel oral actual (estimado por examen): {level}",
   },
   "pronRoutes.assessedLevelNone": {
     en: "No oral exam taken yet",
@@ -2037,6 +2085,10 @@ const STRINGS: Record<string, Entry> = {
     en: "Record yourself reading the phrase",
     es: "Grábate leyendo la frase",
   },
+  "pronRoutes.playMine": {
+    en: "Hear my recording",
+    es: "Oír mi grabación",
+  },
   "pronRoutes.completedShort": {
     en: "Route passed",
     es: "Ruta superada",
@@ -2062,12 +2114,12 @@ const STRINGS: Record<string, Entry> = {
     es: "Demostrar {level} viene del examen oral (Speaking Assessment) más evidencia sostenida y retención, no de esta ruta. La ruta solo entrena; abre el examen para certificar.",
   },
   "pronRoutes.demoTitle": {
-    en: "{level} — demonstrated",
-    es: "{level} — demostrado",
+    en: "{level} — current oral level (exam)",
+    es: "{level} — nivel oral actual (examen)",
   },
   "pronRoutes.demoMet": {
-    en: "You have demonstrated this oral level with the assessment and sustained evidence.",
-    es: "Has demostrado este nivel oral con el examen y evidencia sostenida.",
+    en: "Your oral exam estimates your current level here. This is an exam estimate, not a 'demonstrated' certificate: that label would require the formal retention gate (stable ≥90% over ≥7 days), which this surface doesn't evaluate.",
+    es: "Tu examen oral estima tu nivel actual en este nivel. Es una estimación del examen, no un «demostrado»: esa etiqueta exigiría el gate formal de retención (≥90% estable durante ≥7 días), que esta superficie no evalúa.",
   },
   "pronRoutes.demonstrateTitle": {
     en: "Demonstrate {level}",
@@ -2161,8 +2213,8 @@ const STRINGS: Record<string, Entry> = {
     es: "{pct}% del nivel",
   },
   "convRoutes.assessedLevel": {
-    en: "Oral level demonstrated: {level}",
-    es: "Nivel oral demostrado: {level}",
+    en: "Current oral level (exam estimate): {level}",
+    es: "Nivel oral actual (estimado por examen): {level}",
   },
   "convRoutes.assessedLevelNone": {
     en: "No oral exam taken yet",
@@ -2272,12 +2324,12 @@ const STRINGS: Record<string, Entry> = {
     es: "Demostrar {level} viene del examen oral (Speaking Assessment) más evidencia sostenida y retención, no de esta ruta. La ruta solo entrena; abre el examen para certificar.",
   },
   "convRoutes.demoTitle": {
-    en: "{level} — demonstrated",
-    es: "{level} — demostrado",
+    en: "{level} — current oral level (exam)",
+    es: "{level} — nivel oral actual (examen)",
   },
   "convRoutes.demoMet": {
-    en: "You have demonstrated this oral level with the assessment and sustained evidence.",
-    es: "Has demostrado este nivel oral con el examen y evidencia sostenida.",
+    en: "Your oral exam estimates your current level here. This is an exam estimate, not a 'demonstrated' certificate: that label would require the formal retention gate (stable ≥90% over ≥7 days), which this surface doesn't evaluate.",
+    es: "Tu examen oral estima tu nivel actual en este nivel. Es una estimación del examen, no un «demostrado»: esa etiqueta exigiría el gate formal de retención (≥90% estable durante ≥7 días), que esta superficie no evalúa.",
   },
   "convRoutes.demonstrateTitle": {
     en: "Demonstrate {level}",
@@ -2349,8 +2401,8 @@ const STRINGS: Record<string, Entry> = {
   "convRoutes.chatAria": { en: "Your answer", es: "Tu respuesta" },
   "convRoutes.send": { en: "Send", es: "Enviar" },
   "convRoutes.voiceHint": {
-    en: "You can also answer with your voice.",
-    es: "También puedes responder con tu voz.",
+    en: "Answer by voice (recorded turn) or by typing. Voice turns are measured as your speaking time.",
+    es: "Responde por voz (turno grabado) o por escrito. Los turnos de voz se miden como tiempo de habla.",
   },
   "convRoutes.finish": { en: "Finish and score", es: "Terminar y puntuar" },
   "convRoutes.listenOpening": { en: "Listen to the opening line", es: "Escuchar la frase inicial" },
@@ -2836,12 +2888,12 @@ const STRINGS: Record<string, Entry> = {
     es: "Hito de práctica",
   },
   "speaking.demoTitle": {
-    en: "{level} Speaking — demonstrated",
-    es: "{level} Speaking — demostrado",
+    en: "{level} Speaking — current oral level (exam)",
+    es: "{level} Speaking — nivel oral actual (examen)",
   },
   "speaking.assessedLevel": {
-    en: "Oral level demonstrated: {level}",
-    es: "Nivel oral demostrado: {level}",
+    en: "Current oral level (exam estimate): {level}",
+    es: "Nivel oral actual (estimado por examen): {level}",
   },
   "speaking.assessedLevelNone": {
     en: "No oral exam taken yet",
@@ -2872,8 +2924,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Demostrar {level} Speaking viene del examen oral (Speaking Assessment) más evidencia de escenarios y misiones y retención estable, no de esta ruta. La ruta solo entrena; abre el examen para certificar.",
   },
   "speaking.demoMet": {
-    en: "You have demonstrated this oral level with the assessment and sustained evidence.",
-    es: "Has demostrado este nivel oral con el examen y evidencia sostenida.",
+    en: "Your Speaking Assessment estimates your current oral level here. This is an exam estimate, not a 'demonstrated' certificate: that label would require the formal retention gate (stable ≥90% over ≥7 days), which this surface doesn't evaluate.",
+    es: "Tu Speaking Assessment estima tu nivel oral actual en este nivel. Es una estimación del examen, no un «demostrado»: esa etiqueta exigiría el gate formal de retención (≥90% estable durante ≥7 días), que esta superficie no evalúa.",
   },
   // Bloques "demostrar el nivel" del panel de ruta.
   "speaking.demonstrateTitle": {
@@ -2970,6 +3022,17 @@ const STRINGS: Record<string, Entry> = {
     es: "Repasar {level}",
   },
 
+  // Superficie oral unificada (DISENO-SPEAKING-UNICO F1): modos de Speaking.
+  "speaking.modeMicro": {
+    en: "Micro-conversation",
+    es: "Micro-conversación",
+  },
+  "speaking.modeAccent": { en: "Accent", es: "Acento" },
+  "speaking.modeDialogue": {
+    en: "Guided dialogue",
+    es: "Diálogo guiado",
+  },
+
   // Sesión read-aloud.
   "speaking.modeLevel": {
     en: "Practice {level}",
@@ -3049,6 +3112,10 @@ const STRINGS: Record<string, Entry> = {
   "speaking.playModel": {
     en: "Hear the model answer",
     es: "Oír la respuesta modelo",
+  },
+  "speaking.playMine": {
+    en: "Hear my recording",
+    es: "Oír mi grabación",
   },
   "speaking.modelResponseTitle": {
     en: "Model answer",

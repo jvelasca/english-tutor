@@ -9,7 +9,7 @@
  * frase modelo con TTS, grabación con el micrófono y corrección determinista
  * del score fonético (sin LLM).
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, RefreshCw, Square } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import type { LearnActivity } from "../../router/learnHub";
@@ -18,6 +18,7 @@ import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
 import { ActivityResult } from "../../components/ActivityResult";
 import { ListenButton } from "../../components/ListenButton";
+import { RecordingPlayButton } from "../../components/RecordingPlayButton";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import {
   PhraseTranslateButton,
@@ -39,6 +40,7 @@ import {
   feedbackHints,
   wordsCorrectLabel,
 } from "../../utils/pronunciationFeedback";
+import { alignWords, type WordChipState } from "../../utils/pronunciationAlignment";
 import type {
   NextBestActivity,
   PronunciationAttempt,
@@ -56,7 +58,13 @@ import { PronunciationLevelPanel } from "./PronunciationLevelPanel";
 /* Config de la destreza                                                */
 /* ------------------------------------------------------------------ */
 
-const PRONUNCIATION_ROUTE_CONFIG: RouteQuizConfig = {
+/**
+ * Config de la destreza. Desde DISENO-SPEAKING-UNICO (F1) esta configuración
+ * se reutiliza como **modo Acento** de la página unificada Speaking
+ * (`features/speaking/SpeakingRoutesPractice.tsx`), que sobrescribe el título
+ * de superficie con "Speaking".
+ */
+export const PRONUNCIATION_ROUTE_CONFIG: RouteQuizConfig = {
   ns: "pronRoutes",
   skillTitleKey: "skill.pronunciation",
   subtitleKey: "learn.pronunciationSubtitle",
@@ -130,9 +138,20 @@ export function PronunciationScene({
   const [result, setResult] = useState<PronunciationAttempt | null>(null);
   const [attemptError, setAttemptError] = useState<string | null>(null);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
+  // Object URL de la grabación real del alumno (no sube al servidor: solo se
+  // transcribe). Permite «Oír mi grabación» junto a la frase modelo.
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const processedRef = useRef(false);
+
+  // Libera el object URL de la grabación al cambiar o al desmontar la escena.
+  useEffect(() => {
+    const url = recordingUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [recordingUrl]);
 
   async function toggleRecording() {
     if (recording) {
@@ -164,6 +183,9 @@ export function PronunciationScene({
         if (blob.size === 0 || processedRef.current || !userId || !phrase) {
           return;
         }
+        // Conserva la grabación real en memoria para reproducirla en el
+        // resultado («Oír mi grabación»); el servidor nunca la persiste.
+        setRecordingUrl(URL.createObjectURL(blob));
         processedRef.current = true;
         setProcessing(true);
         setAttemptError(null);
@@ -204,6 +226,7 @@ export function PronunciationScene({
         result={result}
         processing={processing}
         recording={recording}
+        recordingUrl={recordingUrl}
         attemptError={attemptError}
         onToggleRecording={() => void toggleRecording()}
         onAdvance={continueAfter}
@@ -224,12 +247,88 @@ interface PracticeReadCardProps {
   result: PronunciationAttempt | null;
   processing: boolean;
   recording: boolean;
+  /** Object URL de la grabación del alumno para reproducirla en el resultado. */
+  recordingUrl: string | null;
   attemptError: string | null;
   onToggleRecording: () => void;
   /** Continuar tras un resultado (avanza la sesión) o saltar sin responder. */
   onAdvance: () => void;
   onSkip: () => void;
   onRetry: () => void;
+}
+
+const CHIP_STYLES: Record<WordChipState, string> = {
+  ok: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  sub: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  miss: "border-destructive/40 bg-destructive/10 text-destructive",
+};
+
+/** Frase del resultado coloreada palabra a palabra (mockup §6.3). */
+function PhraseWordChips({
+  script,
+  heard,
+  t,
+}: {
+  script: string;
+  heard: string;
+  t: (k: string) => string;
+}) {
+  const { expected, extras } = alignWords(script, heard);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {t("pron.wordByWord")}
+      </p>
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        role="list"
+        aria-label={t("pron.wordByWord")}
+      >
+        {expected.map((item, idx) => {
+          const { word, state } = item;
+          const aria =
+            state === "ok"
+              ? t("pron.chip.ok")
+              : state === "miss"
+                ? t("pron.chip.miss")
+                : t("pron.chip.sub").replace("{heard}", item.heard ?? "");
+          return (
+            <span
+              key={`${word}-${idx}`}
+              role="listitem"
+              title={aria}
+              aria-label={aria}
+              className={`flex min-h-7 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium sm:text-sm ${CHIP_STYLES[state]}`}
+            >
+              <span>{word}</span>
+              {state === "sub" && item.heard && (
+                <span className="text-[10px] font-normal opacity-80">
+                  → {item.heard}
+                </span>
+              )}
+            </span>
+          );
+        })}
+        {extras.map((word) => (
+          <span
+            key={`extra-${word}`}
+            role="listitem"
+            title={t("pron.chip.extra")}
+            aria-label={t("pron.chip.extra")}
+            className="flex min-h-7 items-center rounded-lg border border-dashed border-destructive/40 bg-destructive/5 px-2 py-1 text-xs font-medium text-destructive sm:text-sm"
+          >
+            +{word}
+          </span>
+        ))}
+      </div>
+      {extras.length > 0 && (
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {t("pron.chip.extraHint")}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** Tarjeta del escenario de read-aloud (arriba, siempre visible). */
@@ -240,6 +339,7 @@ function PracticeReadCard({
   result,
   processing,
   recording,
+  recordingUrl,
   attemptError,
   onToggleRecording,
   onAdvance,
@@ -320,6 +420,18 @@ function PracticeReadCard({
               </span>
             </div>
           )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {recordingUrl && (
+              <RecordingPlayButton
+                src={recordingUrl}
+                label={t("pronRoutes.playMine")}
+              />
+            )}
+            <ListenButton text={result.script} label={t("speak.phrase")} />
+          </div>
+
+          <PhraseWordChips script={result.script} heard={result.heard} t={t} />
 
           <div className="flex flex-col gap-2.5">
             <div className="flex items-start justify-between gap-3 text-sm">

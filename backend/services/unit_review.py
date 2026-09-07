@@ -322,7 +322,7 @@ def validate_micro_review_answers(
         if selected is None:
             continue
         option_count = len(item.get("options") or [])
-        if not isinstance(selected, int) or not (0 <= selected < option_count):
+        if type(selected) is not int or not (0 <= selected < option_count):
             raise ValueError("unit_review.invalid_answers")
 
 
@@ -353,7 +353,9 @@ def score_micro_review(*, answers: dict[str, int], unit, sample: list[dict]) -> 
             continue
         objective, check = pair
         selected = answers.get(item["item_id"])
-        is_correct = isinstance(selected, int) and selected == check.correct_index
+        # BOOL-01 (V3.19): `type(...) is int` y no `isinstance` para que `True`/`False`
+        # (bool ⊂ int) no puntúen como índice elegido.
+        is_correct = type(selected) is int and selected == check.correct_index
         if is_correct:
             correct += 1
         bucket = per_objective.setdefault(
@@ -368,7 +370,7 @@ def score_micro_review(*, answers: dict[str, int], unit, sample: list[dict]) -> 
             {
                 "item_id": item["item_id"],
                 "objective_id": objective.id,
-                "selected_index": selected if isinstance(selected, int) else -1,
+                "selected_index": selected if type(selected) is int else -1,
                 "correct_index": int(check.correct_index),
                 "correct": bool(is_correct),
             }

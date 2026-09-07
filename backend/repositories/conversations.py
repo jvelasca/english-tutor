@@ -185,8 +185,11 @@ def get_turns(cid: str, user_id: str) -> list[dict] | None:
     """Telemetría de turnos de una conversación (o None si no existe / no es suya).
 
     Devuelve una lista ordenada (por id ASC) de turnos `{role, duration_ms,
-    latency_ms, created_at}` lista para `services.interaction.interaction_evidence`.
-    El `role` de la BD ("user"/"assistant") se normaliza a "student"/"assistant".
+    latency_ms, created_at, mode}` lista para
+    `services.interaction.interaction_evidence`. El `role` de la BD
+    ("user"/"assistant") se normaliza a "student"/"assistant". `mode` identifica
+    el tipo de turno persistido por el cliente (p. ej. mini-chat tecleado) para
+    reconstruir por `mode` (CONV-01): puede ser `None` en mensajes legacy.
     """
     with closing(_conn()) as conn:
         conv = conn.execute(
@@ -196,8 +199,8 @@ def get_turns(cid: str, user_id: str) -> list[dict] | None:
         if conv is None:
             return None
         rows = conn.execute(
-            "SELECT role, duration_ms, latency_ms, created_at FROM messages "
-            "WHERE conversation_id = ? ORDER BY id ASC",
+            "SELECT role, content, mode, duration_ms, latency_ms, created_at "
+            "FROM messages WHERE conversation_id = ? ORDER BY id ASC",
             (cid,),
         ).fetchall()
     return [
@@ -206,6 +209,7 @@ def get_turns(cid: str, user_id: str) -> list[dict] | None:
             "duration_ms": r["duration_ms"],
             "latency_ms": r["latency_ms"],
             "created_at": r["created_at"],
+            "mode": r["mode"],
         }
         for r in rows
     ]

@@ -8,7 +8,10 @@ export interface Message {
   id?: string;
   role: Role;
   content: string;
-  mode?: TutorMode;
+  /** Modo del turno. `voice` (diálogo guiado, F3) marca un turno hablado: su
+   *  telemetría sí computa como tiempo de habla (a diferencia del tecleo
+   *  `conversation`, CONV-01 V3.19). */
+  mode?: TutorMode | "voice";
   duration_ms?: number;
   latency_ms?: number;
 }
@@ -246,6 +249,33 @@ export interface LexicalItem {
   next_review_days: number;
   exposures: number;
   appearances: number;
+  // V3.19: desglose de producción por destreza (columnas `<channel>_prod`).
+  chat_prod: number;
+  speaking_prod: number;
+  writing_prod: number;
+  conversation_prod: number;
+}
+
+export interface DrillCandidates {
+  words: string[];
+}
+
+export interface DrillAttempt {
+  word: string;
+  produced: boolean;
+  expected: string;
+  heard: string;
+  score: number;
+  level: PronunciationLevel;
+  ok: boolean;
+  word_accuracy: number;
+  phonetic_score: number;
+  phoneme_accuracy_proxy: number;
+  prosody_proxy: number;
+  pronunciation_source: string;
+  breakdown: PronunciationBreakdown;
+  phoneme_breakdown: PhonemeBreakdown;
+  fluency?: FluencyStats | null;
 }
 
 export interface CefrBucket {

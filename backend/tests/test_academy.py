@@ -799,44 +799,108 @@ def test_endpoint_isolation_between_users(monkeypatch, tmp_path):
     assert completions_b["completions"] == []
 
 
-def test_endpoint_assessment_allows_any_objective_in_level(monkeypatch, tmp_path):
+def _first_locked_objective_id(a: str) -> str:
+    """Devuelve el primer objetivo `locked` del nivel A1 para un usuario.
+
+    GATE-01: objetivo bloqueado por gating lineal (hay un gate anterior sin
+    dominar); es el caso que hoy evaluaría 200 y debe responder 409."""
+    with TestClient(app) as client:
+        detail = client.get("/api/academy/levels/a1", params={"user_id": a}).json()
+    locked = [o["id"] for o in detail["objectives"] if o["status"] == "locked"]
+    assert locked, "A1 debería tener objetivos locked para un usuario nuevo"
+    return locked[0]
+
+
+def test_endpoint_assessment_allows_available_objective_in_level(
+    monkeypatch, tmp_path,
+):
     a, _b = _setup(monkeypatch, tmp_path)
-    objs = load_level("a1").objectives()
+    obj = load_level("a1").objectives()[0]
     with TestClient(app) as client:
         r = client.post(
             "/api/academy/objective/assessment",
             params={"user_id": a},
-            json={"level_id": "a1", "objective_id": objs[2].id, "answers": {}},
+            json={"level_id": "a1", "objective_id": obj.id, "answers": {}},
         )
     assert r.status_code == 200
 
 
-def test_endpoint_attempts_allows_any_objective_in_level(monkeypatch, tmp_path):
+def test_endpoint_assessment_rejects_locked_objective(monkeypatch, tmp_path):
+    """GATE-01: evaluar un objetivo `locked` por API responde 409 (no 200)."""
     a, _b = _setup(monkeypatch, tmp_path)
-    objs = load_level("a1").objectives()
+    target = _first_locked_objective_id(a)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/objective/assessment",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": target, "answers": {}},
+        )
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "OBJECTIVE_LOCKED"
+
+
+def test_endpoint_attempts_allows_available_objective_in_level(
+    monkeypatch, tmp_path,
+):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
     with TestClient(app) as client:
         r = client.post(
             "/api/academy/attempts",
             params={"user_id": a},
             json={
                 "level_id": "a1",
-                "objective_id": objs[2].id,
+                "objective_id": obj.id,
                 "results": [{"skill": "grammar", "result": "correct"}],
             },
         )
     assert r.status_code == 200
 
 
-def test_endpoint_lesson_complete_allows_any_objective_in_level(monkeypatch, tmp_path):
+def test_endpoint_attempts_rejects_locked_objective(monkeypatch, tmp_path):
+    """GATE-01: registrar intentos en un objetivo `locked` responde 409."""
     a, _b = _setup(monkeypatch, tmp_path)
-    objs = load_level("a1").objectives()
+    target = _first_locked_objective_id(a)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/attempts",
+            params={"user_id": a},
+            json={
+                "level_id": "a1",
+                "objective_id": target,
+                "results": [{"skill": "grammar", "result": "correct"}],
+            },
+        )
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "OBJECTIVE_LOCKED"
+
+
+def test_endpoint_lesson_complete_allows_available_objective_in_level(
+    monkeypatch, tmp_path,
+):
+    a, _b = _setup(monkeypatch, tmp_path)
+    obj = load_level("a1").objectives()[0]
     with TestClient(app) as client:
         r = client.post(
             "/api/academy/lessons/complete",
             params={"user_id": a},
-            json={"level_id": "a1", "objective_id": objs[2].id},
+            json={"level_id": "a1", "objective_id": obj.id},
         )
     assert r.status_code == 200
+
+
+def test_endpoint_lesson_complete_rejects_locked_objective(monkeypatch, tmp_path):
+    """GATE-01: completar una lección de un objetivo `locked` responde 409."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    target = _first_locked_objective_id(a)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/academy/lessons/complete",
+            params={"user_id": a},
+            json={"level_id": "a1", "objective_id": target},
+        )
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "OBJECTIVE_LOCKED"
 
 
 def test_endpoint_assessment_rejects_blocked_level(monkeypatch, tmp_path):

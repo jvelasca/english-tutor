@@ -3,10 +3,8 @@ import { Loader2 } from "lucide-react";
 import { navigateTo } from "../router/hash";
 import { LEARN_PATH } from "../router/paths";
 import {
-  CONVERSATION_ACTIVITY,
   GRAMMAR_ACTIVITY,
   LISTENING_ACTIVITY,
-  PRONUNCIATION_ACTIVITY,
   SPEAKING_ACTIVITY,
   VOCABULARY_ACTIVITY,
   type LearnActivity,
@@ -38,16 +36,6 @@ const LearnHub = lazy(() =>
 const SpeakingRoutesPractice = lazy(() =>
   import("../features/speaking/SpeakingRoutesPractice").then((m) => ({
     default: m.SpeakingRoutesPractice,
-  })),
-);
-const PronunciationRoutesPractice = lazy(() =>
-  import("../features/pronunciation/PronunciationRoutesPractice").then((m) => ({
-    default: m.PronunciationRoutesPractice,
-  })),
-);
-const ConversationRoutesPractice = lazy(() =>
-  import("../features/conversation/ConversationRoutesPractice").then((m) => ({
-    default: m.ConversationRoutesPractice,
   })),
 );
 const VocabularyRoutesPractice = lazy(() =>
@@ -172,6 +160,13 @@ export function Workspace({
   } else if (route === "help") {
     content = <HelpScreen />;
   } else if (route === "learn") {
+    // Speaking es la página oral unificada (DISENO-SPEAKING-UNICO F1): los
+    // modos Acento (pronunciación) y Diálogo guiado (conversación) se eligen
+    // en la propia página y viven en su URL (F4):
+    // /aprender/speaking/acento y /aprender/speaking/dialogo. Las sub-rutas
+    // legadas de las antiguas tarjetas (/aprender/pronunciacion,
+    // /aprender/conversar) resuelven aquí como la actividad Speaking (con su
+    // modo) y App canonicaliza la URL a la sub-ruta de modo.
     if (!learnActivity || learnActivity === SPEAKING_ACTIVITY) {
       content =
         learnActivity === SPEAKING_ACTIVITY ? (
@@ -189,28 +184,6 @@ export function Workspace({
             refreshKey={refreshKey}
           />
         );
-    } else if (learnActivity === PRONUNCIATION_ACTIVITY) {
-      content = (
-        <PronunciationRoutesPractice
-          userId={currentUserId}
-          active={learnActivity}
-          onBack={backToHub}
-          onAttempt={onAttempt}
-          onNext={onNextBestStart}
-        />
-      );
-    } else if (learnActivity === CONVERSATION_ACTIVITY) {
-      // Conversar por rutas guiadas (V3.10): mini-diálogos multi-turno + mapa
-      // A1-C2. El chat libre con el tutor vive ahora en su raíz `/chat`.
-      content = (
-        <ConversationRoutesPractice
-          userId={currentUserId}
-          active={learnActivity}
-          onBack={backToHub}
-          onAttempt={onAttempt}
-          onNext={onNextBestStart}
-        />
-      );
     } else if (learnActivity === GRAMMAR_ACTIVITY) {
       // Grammar por rutas (V3.12): página única de checks MC del currículo con
       // mapa A1-C2 y el bloque «Demostrar el nivel» (evaluaciones del curso).
@@ -254,13 +227,13 @@ export function Workspace({
     // V3.10) o una lección del curso retomada desde Formación. El workspace
     // oculta el historial mientras la lección está activa y la propia barra de
     // contexto de PracticeView distingue el modo lección del modo libre (WS7).
-    // Al llegar por URL el chat libre no trae sub-actividad: se marca Conversar
-    // en el atajo de actividades de la franja superior.
+    // Al llegar por URL el chat libre no trae sub-actividad: se marca Speaking
+    // en el atajo de actividades de la franja superior (DISENO-SPEAKING-UNICO).
     content = (
       <PracticeView
         route="chat"
         chat={chat}
-        activeActivity={learnActivity ?? CONVERSATION_ACTIVITY}
+        activeActivity={learnActivity ?? SPEAKING_ACTIVITY}
         onAttempt={onAttempt}
         onNextBestStart={onNextBestStart}
         onStep={onStep}

@@ -9,6 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import pronunciation as pronunciation_service
+from domain import vocabulary as vocabulary_service
 from schemas.pronunciation import PronunciationResponse
 from services.fluency import compute_fluency
 from services.pronunciation import score_pronunciation
@@ -42,4 +43,9 @@ async def pronunciation(
         user_id, result["expected"], result["heard"], result["score"], result["level"]
     )
     await learning_service.record_event(user_id, "pronunciation", result["expected"])
+    # V3.19: la lectura en voz alta es producción oral; volcarla al léxico por
+    # destreza (canal speaking). No bloquea la respuesta (nunca lanza).
+    await vocabulary_service.record_production_text(
+        user_id, result["heard"], "speaking"
+    )
     return PronunciationResponse(**result)

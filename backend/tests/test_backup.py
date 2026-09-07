@@ -7,9 +7,14 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+import config
 from main import app
 from repositories import db
 from services import backup as backup_svc
+
+# Fail-closed (ADMIN-01 V3.19): los endpoints de backup exigen PIN local.
+_ADMIN_PIN = "test-pin"
+_ADMIN_HEADERS = {"X-Admin-Pin": _ADMIN_PIN}
 
 
 def _setup(monkeypatch, tmp_path):
@@ -25,6 +30,7 @@ def _setup(monkeypatch, tmp_path):
     (audio / "manifest.json").write_text('{"version": "1.2.0", "entries": []}')
     (audio / "a1" / "speaker1" / "audio-l1.wav").parent.mkdir(parents=True)
     (audio / "a1" / "speaker1" / "audio-l1.wav").write_bytes(b"RIFF-WAV")
+    monkeypatch.setattr(config, "ADMIN_PIN", _ADMIN_PIN)
     return data, audio
 
 
@@ -131,6 +137,7 @@ def test_export_rejects_path_traversal(monkeypatch, tmp_path):
     with TestClient(app) as client:
         resp = client.get(
             "/api/system/backup/export",
+            headers=_ADMIN_HEADERS,
             params={"name": "../../etc/passwd.zip"},
         )
         assert resp.status_code == 404
@@ -164,22 +171,25 @@ def test_backup_endpoints(monkeypatch, tmp_path):
     db.init_db()
 
     with TestClient(app) as client:
-        created = client.post("/api/system/backup")
+        created = client.post("/api/system/backup", headers=_ADMIN_HEADERS)
         assert created.status_code == 200, created.text
         name = created.json()["name"]
         assert name.startswith("backup_")
 
-        listed = client.get("/api/system/backups")
+        listed = client.get("/api/system/backups", headers=_ADMIN_HEADERS)
         assert listed.status_code == 200
         assert listed.json()["backups"][0]["name"] == name
 
-        exported = client.get("/api/system/backup/export")
+        exported = client.get(
+            "/api/system/backup/export", headers=_ADMIN_HEADERS
+        )
         assert exported.status_code == 200
         assert exported.headers["content-type"] == "application/zip"
 
         # Restaurar el propio export (idempotente) con un multipart UploadFile.
         restored = client.post(
             "/api/system/restore",
+            headers=_ADMIN_HEADERS,
             files={
                 "file": (
                     name,
@@ -191,6 +201,6 @@ def test_backup_endpoints(monkeypatch, tmp_path):
         assert restored.status_code == 200, restored.text
         assert restored.json()["restored"] is True
 
-        status = client.get("/api/system/backup/status")
+        status = client.get("/api/system/backup/status", headers=_ADMIN_HEADERS)
         assert status.status_code == 200
         assert status.json()["keep_backups"] == 7

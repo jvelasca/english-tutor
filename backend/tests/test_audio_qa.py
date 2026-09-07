@@ -37,6 +37,14 @@ def _setup(monkeypatch, tmp_path):
         json.dumps({"version": AUDIO_LIBRARY_VERSION, "entries": []}),
         encoding="utf-8",
     )
+    # Fail-closed (ADMIN-01 V3.19): los endpoints admin exigen PIN, así que cada
+    # prueba configura uno y lo envía por cabecera salvo que pruebe el candado.
+    monkeypatch.setattr(config, "ADMIN_PIN", _ADMIN_PIN)
+
+
+# PIN local con el que las pruebas autentican las llamadas admin.
+_ADMIN_PIN = "test-pin"
+_ADMIN_HEADERS = {"X-Admin-Pin": _ADMIN_PIN}
 
 
 def _wav_from_samples(samples, framerate=8000) -> bytes:
@@ -121,6 +129,7 @@ def test_upload_returns_quality_panel(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("l15.wav", _tone(), "audio/wav")},
             data={"audio_id": "audio-l15"},
         )
@@ -138,6 +147,7 @@ def test_upload_rejects_too_long(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("l15.wav", data, "audio/wav")},
             data={"audio_id": "audio-l15"},
         )
@@ -149,20 +159,36 @@ def test_upload_rejects_non_wav_mime(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("l15.wav", _tone(), "audio/mpeg")},
             data={"audio_id": "audio-l15"},
         )
     assert r.status_code == 415
 
 
-# --- Candado admin (PIN local) -----------------------------------------------
+# --- Candado admin (PIN local; fail-closed ADMIN-01 V3.19) --------------------
 
 
-def test_admin_not_required_by_default(monkeypatch, tmp_path):
+def test_admin_disabled_without_pin(monkeypatch, tmp_path):
+    """ADMIN-01: sin `ADMIN_PIN` los endpoints admin están deshabilitados (401),
+    nunca abiertos (fail-open previo). `/status` lo expone como no requerido."""
     _setup(monkeypatch, tmp_path)
+    monkeypatch.setattr(config, "ADMIN_PIN", "")
     with TestClient(app) as client:
-        r = client.get("/api/audio-library/status")
-    assert r.json()["admin_required"] is False
+        assert (
+            client.get("/api/audio-library/status").json()["admin_required"]
+            is False
+        )
+        # Incluso con una cabecera de PIN presente, sin secreto configurado la
+        # gestión queda cerrada.
+        r = client.post(
+            "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
+            files={"file": ("l15.wav", _tone(), "audio/wav")},
+            data={"audio_id": "audio-l15"},
+        )
+    assert r.status_code == 401
+    assert "deshabilitada" in r.json()["detail"]
 
 
 def test_admin_required_blocks_upload_without_pin(monkeypatch, tmp_path):

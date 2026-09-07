@@ -21,3 +21,30 @@ class EvidenceInvariantError(Exception):
             f"Evidencia inválida para user={user_id!r} level={level_id!r}: "
             + "; ".join(violations)
         )
+
+
+class RetentionNotDueError(Exception):
+    """La retención (R6) no es debida: no ha pasado la ventana mínima ni se
+    cumple el ratio de estabilidad. Se mapea a HTTP 409 (conflicto de estado).
+    """
+
+    def __init__(self, user_id: str, level_id: str, reason: str) -> None:
+        self.user_id = user_id
+        self.level_id = level_id
+        self.reason = reason
+        super().__init__(
+            f"Retención no debida user={user_id!r} level={level_id!r}: {reason}"
+        )
+
+
+class ObjectiveLockedError(Exception):
+    """El objetivo evaluado está locked (GATE-01): no puede evaluarse ni
+    completarse. Se mapea a HTTP 409 (conflicto de estado).
+    """
+
+    def __init__(self, user_id: str, objective_id: str) -> None:
+        self.user_id = user_id
+        self.objective_id = objective_id
+        super().__init__(
+            f"Objetivo locked user={user_id!r} objective={objective_id!r}"
+        )

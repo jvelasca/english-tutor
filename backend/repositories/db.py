@@ -601,6 +601,33 @@ def init_db() -> None:
                 "ALTER TABLE vocabulary ADD COLUMN kind TEXT NOT NULL DEFAULT 'word'"
             )
 
+        # Migración idempotente (V3.19): desglose de producción por destreza.
+        # `vocabulary` conserva la semántica agregada (`appearances`/
+        # `production_days`) y suma un contador por canal de producción
+        # (`chat`/`speaking`/`writing`/`conversation`). Toda producción futura
+        # incrementa `appearances`/`production_days` igual que antes y, además,
+        # exactamente una columna `<channel>_prod`. Invariante de trazabilidad:
+        # `sum(chat_prod, speaking_prod, writing_prod, conversation_prod) ==
+        # appearances`. El histórico previo a V3.19 solo pudo venir del chat
+        # libre (única vía de volcado entonces, verificado en el código), así
+        # que el backfill etiqueta esas filas como `chat_prod` (idempotente:
+        # solo rellena filas con producción y `chat_prod = 0`).
+        for col in (
+            "chat_prod",
+            "speaking_prod",
+            "writing_prod",
+            "conversation_prod",
+        ):
+            if col not in vocab_cols:
+                conn.execute(
+                    "ALTER TABLE vocabulary ADD COLUMN "
+                    f"{col} INTEGER NOT NULL DEFAULT 0"
+                )
+        conn.execute(
+            "UPDATE vocabulary SET chat_prod = appearances "
+            "WHERE appearances > 0 AND chat_prod = 0"
+        )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {

@@ -45,7 +45,13 @@ import { ConversationGuidedChat } from "./ConversationGuidedChat";
 /* Config de la destreza                                                */
 /* ------------------------------------------------------------------ */
 
-const CONVERSATION_ROUTE_CONFIG: RouteQuizConfig = {
+/**
+ * Config de la destreza. Desde DISENO-SPEAKING-UNICO (F1) esta configuración
+ * se reutiliza como **modo Diálogo guiado** de la página unificada Speaking
+ * (`features/speaking/SpeakingRoutesPractice.tsx`), que sobrescribe el título
+ * de superficie con "Speaking".
+ */
+export const CONVERSATION_ROUTE_CONFIG: RouteQuizConfig = {
   ns: "convRoutes",
   skillTitleKey: "skill.conversation",
   subtitleKey: "learn.conversationSubtitle",

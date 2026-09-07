@@ -13,6 +13,7 @@ import { CHAT_PATH, learnActivityPath } from "./router/paths";
 import {
   SPEAKING_ACTIVITY,
   learnActivityFromPath,
+  legacySpeakingRedirect,
   type LearnActivity,
 } from "./router/learnHub";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -39,7 +40,10 @@ const SECTION_ACTIVITY: Partial<Record<Section, LearnActivity>> = {
   listening: "listening",
   speaking: SPEAKING_ACTIVITY,
   grammar: "gramatica",
-  pronunciation: "pronunciacion",
+  // Tras unificar la práctica oral (DISENO-SPEAKING-UNICO F1), la destreza
+  // pronunciation abre la página unificada Speaking (el modo Acento se
+  // selecciona dentro de la propia página).
+  pronunciation: SPEAKING_ACTIVITY,
 };
 
 // Secciones sin tarjeta propia en el hub (reading, writing — D4): su destino
@@ -52,14 +56,11 @@ const FREE_CHAT_SECTIONS: readonly Section[] = ["reading", "writing"];
 const ACTIVITY_SECTION: Partial<Record<LearnActivity, Section>> = {
   listening: "listening",
   speaking: "speaking",
-  pronunciacion: "pronunciation",
-  conversar: "speaking",
   gramatica: "grammar",
 };
 
 const ACTIVITY_MODE: Partial<Record<LearnActivity, TutorMode>> = {
   speaking: "conversation",
-  conversar: "conversation",
   gramatica: "grammar",
 };
 
@@ -92,6 +93,16 @@ export default function App() {
   const route = pathToRoute(path);
   // Sub-ruta de práctica activa dentro de APRENDER (null = hub u otra raíz).
   const learnActivity = learnActivityFromPath(path);
+  // F4: las sub-rutas legadas de las antiguas tarjetas orales redirigen a la
+  // página Speaking con su modo activo (decisión a de la decisión abierta nº 2
+  // de DISENO-SPEAKING-UNICO): /aprender/pronunciacion -> /aprender/speaking/acento
+  // y /aprender/conversar -> /aprender/speaking/dialogo.
+  const legacySpeakingTarget = legacySpeakingRedirect(path);
+  // useLayoutEffect para que el primer paint ya use la URL canónica (sin que
+  // llegue a verse el hub al que degradaban antes).
+  useLayoutEffect(() => {
+    if (legacySpeakingTarget) navigateTo(legacySpeakingTarget);
+  }, [legacySpeakingTarget]);
   // Navega desde los handlers internos: la URL (hash) es la fuente de verdad
   // de la ruta, así que "ir a una pantalla" es asignar su ruta canónica.
   const go = useCallback((next: Route) => navigateTo(routeToPath(next)), []);

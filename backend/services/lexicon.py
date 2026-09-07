@@ -270,18 +270,45 @@ def summary(rows: list[dict], now: str = "") -> dict:
     }
 
 
-def recognized_not_produced(rows: list[dict]) -> list[str]:
-    """Palabras reconocidas (leídas/oídas) pero nunca producidas.
+def _speaking_prod(row: dict) -> int:
+    """Producción de la palabra en práctica de speaking (V3.19).
 
-    Son los candidatos a un *speaking micro-drill*: el alumno reconoce la palabra
-    en input pero aún no la recupera al hablar (la señal; la generación del drill
-    queda para V2.4).
-    """
-    return [
-        row["word"]
-        for row in rows
-        if _int(row.get("exposures")) > 0 and _int(row.get("appearances")) == 0
-    ]
+    Columna `speaking_prod` de `vocabulary`: el alumno pronunció/leyó en voz
+    alta la palabra en alguna superficie oral (assessment/misión/routes/
+    pronunciación) o en el micro-drill. Es la señal real de "la he dicho", que
+    la producción *tecleada* en el chat libre (`chat_prod`) no aporta."""
+    return _int(row.get("speaking_prod"))
+
+
+def drill_candidates(rows: list[dict], limit: int = 8, now: str = "") -> list[str]:
+    """Candidatos a speaking micro-drill (V3.19): reconocidas pero nunca
+    producidas *hablando*.
+
+    Filtra ítems con `exposures > 0` (las ha leído/oído del tutor) y
+    `speaking_prod == 0` (nunca las ha dicho en una superficie oral), ordenados
+    por recuerdo actual ascendente (primero las más olvidadas) y acotados a
+    `limit`. El micro-drill no declara dominio ni crea evidencia curricular
+    (D5/E3): al superarlo, la palabra pasa a `speaking_prod > 0` y sale de la
+    lista (cierra el bucle exposición → producción oral)."""
+    candidates = sorted(
+        (row for row in rows if _is_drill_candidate(row)),
+        key=lambda row: item_recall(row, now),
+    )
+    return [row["word"] for row in candidates[: max(0, limit)]]
+
+
+def _is_drill_candidate(row: dict) -> bool:
+    return _int(row.get("exposures")) > 0 and _speaking_prod(row) == 0
+
+
+def recognized_not_produced(rows: list[dict]) -> list[str]:
+    """Palabras reconocidas (leídas/oídas) pero nunca producidas *hablando*.
+
+    V3.19: la señal pasa de "nunca tecleada" (semántica de teclado, era
+    calculable con `appearances == 0`) a "expuestas y nunca dichas en una
+    superficie oral" (`speaking_prod == 0`), que es lo que un speaking
+    micro-drill puede cerrar. Sin límite (respaldo de la lista completa)."""
+    return [row["word"] for row in rows if _is_drill_candidate(row)]
 
 
 _COVERAGE_ORDER = ["Pre-A1", *CEFR_ORDER]

@@ -259,3 +259,231 @@ def test_lexicon_endpoint_404(monkeypatch, tmp_path):
             "/api/vocabulary/lexicon", params={"user_id": "no-existe"}
         )
         assert resp.status_code == 404
+
+
+def test_record_production_by_channel_breaks_down(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert vocabulary_repo.record_production(a, ["cat"], channel="chat") is True
+    assert vocabulary_repo.record_production(a, ["cat"], channel="speaking") is True
+    assert (
+        vocabulary_repo.record_production(a, ["cat"], channel="writing") is True
+    )
+    assert (
+        vocabulary_repo.record_production(a, ["dog"], channel="conversation")
+        is True
+    )
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    cat = vocab["cat"]
+    # Semántica agregada intacta.
+    assert cat["appearances"] == 3
+    assert cat["chat_prod"] == 1
+    assert cat["speaking_prod"] == 1
+    assert cat["writing_prod"] == 1
+    assert cat["conversation_prod"] == 0
+    # Invariante de trazabilidad: suma de canales == appearances.
+    assert (
+        cat["chat_prod"] + cat["speaking_prod"]
+        + cat["writing_prod"] + cat["conversation_prod"]
+    ) == cat["appearances"]
+    dog = vocab["dog"]
+    assert dog["appearances"] == 1
+    assert dog["conversation_prod"] == 1
+    assert (
+        dog["chat_prod"] + dog["speaking_prod"]
+        + dog["writing_prod"] + dog["conversation_prod"]
+    ) == dog["appearances"]
+
+
+def test_record_production_unknown_channel_false(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert vocabulary_repo.record_production(a, ["cat"], channel="typing") is False
+    assert vocabulary_repo.get_vocabulary(a) == []
+
+
+def test_record_production_unknown_user_false(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert (
+        vocabulary_repo.record_production("no-existe", ["cat"], channel="chat")
+        is False
+    )
+
+
+def test_production_days_distinct_day_single_channel_semantics(monkeypatch, tmp_path):
+    """Un mismo día en dos canales suma una sola vez `production_days`."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    times = iter(
+        [
+            "2026-08-20T10:00:00+00:00",
+            "2026-08-20T11:00:00+00:00",  # mismo día, otro canal → no suma
+            "2026-08-21T10:00:00+00:00",  # día distinto → suma
+        ]
+    )
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
+    vocabulary_repo.record_production(a, ["cat"], channel="chat")
+    vocabulary_repo.record_production(a, ["cat"], channel="speaking")
+    vocabulary_repo.record_production(a, ["cat"], channel="chat")
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["cat"]["appearances"] == 3
+    assert vocab["cat"]["production_days"] == 2
+    assert vocab["cat"]["chat_prod"] == 2
+    assert vocab["cat"]["speaking_prod"] == 1
+
+
+def test_vocabulary_v319_channels_migration_backfills_chat(monkeypatch, tmp_path):
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    uid = users_repo.create_user("A")["id"]
+    vocabulary_repo.record_words(uid, ["cat"])
+
+    # Simula una BD previa a V3.19: sin columnas de canal.
+    conn = sqlite3.connect(db.DB_PATH)
+    for col in (
+        "chat_prod",
+        "speaking_prod",
+        "writing_prod",
+        "conversation_prod",
+    ):
+        conn.execute(f"ALTER TABLE vocabulary DROP COLUMN {col}")
+    conn.commit()
+    conn.close()
+
+    db.init_db()
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
+        row = conn.execute(
+            "SELECT appearances, chat_prod, speaking_prod FROM vocabulary "
+            "WHERE word = 'cat'"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert {
+        "chat_prod",
+        "speaking_prod",
+        "writing_prod",
+        "conversation_prod",
+    } <= cols
+    # Backfill: el histórico previo solo pudo venir del chat libre.
+    assert row[0] == 1  # appearances
+    assert row[1] == 1  # chat_prod
+    assert row[2] == 0  # speaking_prod
+
+
+def test_lexicon_endpoint_exposes_channel_breakdown(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["name"])
+    vocabulary_repo.record_production(a, ["name"], channel="chat")
+    vocabulary_repo.record_production(a, ["name"], channel="speaking")
+    with TestClient(app) as client:
+        got = client.get("/api/vocabulary/lexicon", params={"user_id": a})
+    assert got.status_code == 200
+    items = {i["word"]: i for i in got.json()["items"]}
+    item = items["name"]
+    assert item["chat_prod"] == 1
+    assert item["speaking_prod"] == 1
+    assert item["writing_prod"] == 0
+    assert item["conversation_prod"] == 0
+
+
+def _fake_transcribe(text):
+    def fake(_audio, _lang):
+        return {"text": text, "duration": 2.0}
+
+    return fake
+
+
+def test_drill_candidates_endpoint_exposes_signal(monkeypatch, tmp_path):
+    """La señal de candidatas al drill es determinista en servidor (premisa 21):
+    expuestas y nunca dichas; las tecleadas en el chat (chat_prod) siguen siendo
+    candidatas; las ya dichas salen."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["travel", "culture", "music"])
+    vocabulary_repo.record_production(a, ["culture"], channel="chat")
+    vocabulary_repo.record_production(a, ["music"], channel="speaking")
+    with TestClient(app) as client:
+        got = client.get(
+            "/api/vocabulary/drill/candidates", params={"user_id": a}
+        )
+    assert got.status_code == 200
+    assert got.json()["words"] == ["travel", "culture"]
+
+
+def test_drill_candidates_endpoint_limit(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["apple", "banana", "cherry"])
+    with TestClient(app) as client:
+        got = client.get(
+            "/api/vocabulary/drill/candidates",
+            params={"user_id": a, "limit": 2},
+        )
+    assert got.status_code == 200
+    assert len(got.json()["words"]) == 2
+
+
+def test_drill_attempt_endpoint_produces_word(monkeypatch, tmp_path):
+    """Exponer → drill → producir: el intento transcribe (mock Whisper), puntúa y
+    al producir la palabra la marca speaking_prod → sale de la lista."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["travel", "culture"])
+
+    from routers import vocabulary as router_mod
+
+    monkeypatch.setattr(
+        router_mod, "transcribe_with_timing", _fake_transcribe("travel")
+    )
+    with TestClient(app) as client:
+        ok = client.post(
+            "/api/vocabulary/drill/attempt",
+            params={"user_id": a},
+            data={"word": "travel"},
+            files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+        )
+        assert ok.status_code == 200
+        body = ok.json()
+        assert body["produced"] is True
+        assert body["score"] >= 80
+        assert "travel" in body["breakdown"]["correct"]
+
+        # Tras producirla, ya no es candidata (speaking_prod == 1).
+        got = client.get(
+            "/api/vocabulary/drill/candidates", params={"user_id": a}
+        )
+        assert got.json()["words"] == ["culture"]
+
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["travel"]["speaking_prod"] == 1
+    assert vocab["travel"]["appearances"] == 1
+    # No declara dominio ni crea evidencia curricular: solo columna de canal.
+    assert vocab["travel"]["chat_prod"] == 0
+    assert vocab["culture"]["speaking_prod"] == 0
+
+
+def test_drill_attempt_endpoint_ko_does_not_produce(monkeypatch, tmp_path):
+    """Si la palabra no sale en la transcripción no se marca como producida y
+    sigue siendo candidata."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(a, ["travel"])
+
+    from routers import vocabulary as router_mod
+
+    monkeypatch.setattr(
+        router_mod, "transcribe_with_timing", _fake_transcribe("banana")
+    )
+    with TestClient(app) as client:
+        ko = client.post(
+            "/api/vocabulary/drill/attempt",
+            params={"user_id": a},
+            data={"word": "travel"},
+            files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+        )
+        assert ko.status_code == 200
+        assert ko.json()["produced"] is False
+
+        got = client.get(
+            "/api/vocabulary/drill/candidates", params={"user_id": a}
+        )
+        assert got.json()["words"] == ["travel"]
+
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["travel"]["speaking_prod"] == 0

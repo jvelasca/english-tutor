@@ -8,6 +8,41 @@
 
 ## Estado actual
 
+- ✅ **V3.19 — Léxico por destreza + Speaking micro-drill (2026-09-07)**: cerrado
+  e implementado sobre v3.18.0 (backend `3.18.0 → 3.19.0`) con las decisiones
+  del gerente y el dossier de la auditoría profunda V3.18. **P0 — volcado por
+  destreza**: `record_words` → `record_production(user, words, channel)`; la
+  tabla `vocabulary` gana `chat_prod`/`speaking_prod`/`writing_prod`/
+  `conversation_prod` (backfill idempotente `chat_prod = appearances`;
+  invariante `sum(columnas) == appearances`) y las 7 superficies de producción
+  vuelcan por un único helper compartido (CAP-01/REFAC-01) · **P1 — Speaking
+  micro-drill**: señal en servidor `exposures > 0 AND speaking_prod == 0`
+  (`GET /api/vocabulary/drill/candidates`) + `POST /api/vocabulary/drill/attempt`
+  reutilizando el scorer de pronunciación (sin evidence/FSRS, D5/E3); chips de
+  `PersonalDictionary` con acción real · **Fixes P1 del dossier**: R6-01
+  retención impuesta en servidor (409), GATE-01 objetivo `locked` no evaluable
+  (409), CLAIM-01 copy "nivel oral actual (examen)", SIGNAL-01 semántica oral +
+  copy, ERR-01 404→503, LIST-01/02/03 tokens de foco servibles + corpus
+  re-etiquetado + unicidad de script, CONV-01 reconstrucción por `mode` (el
+  tecleo no es tiempo oral) · **Deuda externa**: ADMIN-01 fail-closed
+  (`ADMIN_PIN=""` → 401) y BOOL-01 (`type(selected) is int`). Tests: pytest
+  **1371**, vitest **417**, ruff/`tsc`/`vite build` limpios,
+  `check_release_consistency` **3.19.0** exit 0 y curriculum `--strict --quality`
+  exit 0; CONSTITUCIÓN sin cambios (R8/R9 propuesta abierta).
+- ✅ **Auditoría profunda V3.18 pre-V3.19 (2026-09-07, read-only)**: auditado
+  código por código en 6 áreas (A1 academy/dominio · A2 evidence graph/FSRS/
+  léxico · A3 speaking/pronunciación · A4 writing/conversación/cross-skill ·
+  A5 assessment/contenido CEFR · A6 frontend claims) con dossier consolidado
+  `docs/audit/I-AUDITORIA-PROFUNDA-V318.md` y lista P0/P1/P2 mapeada a
+  decisiones V3.19. Sin P0 confirmado; P1 clave: **R6-01** retención R6 sin
+  enforcement en servidor, **GATE-01** gating de objetivo no validado en
+  endpoints, **CLAIM-01** UI "demostrado" oral sin gate, **SIGNAL-01**
+  `recognized_not_produced` con semántica de teclado, **PROD-01/WR-UI-01**
+  producción oral/escrita nunca llega al léxico (confirma el P0 del candidato
+  V3.19). Deuda de la auditoría externa diferida a V3.19: **ADMIN-01**
+  (`ADMIN_PIN=""` → fail-closed) y **BOOL-01** (bool-as-int en
+  `unit_review.py`). Árbol sin cambios de código; `backend/config.py` sigue
+  `3.18.0`; CONSTITUCIÓN sin cambios (R8/R9 siguen como propuesta abierta).
 - ✅ **Preparado para auditoría TOTAL externa (2026-09-07, read-only):** árbol de
   trabajo limpio (v3.18.0 en HEAD, release-notes v3.10–v3.18 versionadas),
   todos los gates automáticos en verde (pytest 1345, ruff, vitest 414,
@@ -17,6 +52,43 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.20.0` — **Speaking único + feedback oral**
+  (cierra el candidato V3.20, definido 2026-09-07 frontend-only, F1 de
+  `docs/DISENO-SPEAKING-UNICO.md` + feedback oral: **F1** — consolidación de la
+  práctica oral en una sola superficie **Speaking** — hub de APRENDER a 4
+  tarjetas, Pronunciation/Conversation reutilizadas como modos internos
+  Micro-conversación / Acento / Diálogo guiado (`SpeakingRoutesPractice` +
+  `modeTabs` en `QuizRoutePage`, configs exportadas), `/aprender/pronunciacion`
+  y `/aprender/conversar` degradan al hub, NextBest/Recorridos navegan a
+  Speaking · texto «Cada nivel es una ruta…» plegado tras el botón (i) «Cómo
+  funcionan las rutas» · **se reproduce la grabación real del alumno**
+  (`RecordingPlayButton`, blob en memoria: el backend solo transcribe) en
+  Micro-conversación y Acento · **F3 frontend** — Diálogo guiado con turnos
+  hablados reales (`ConversationVoiceButton` + `mode="voice"` + telemetría con
+  duración real) · **chips palabra a palabra en Acento**
+  (`utils/pronunciationAlignment.ts`, puerto TS del `SequenceMatcher` con
+  paridad con el backend) · **F4** — modos por URL + redirección de URLs
+  heredadas · **fix** botón traducir del interlocutor y de la respuesta modelo
+  en Micro-conversación (pintaba el inglés crudo en vez de `display`) ·
+  **tests**: vitest 434 + `tsc`/`vite build` OK; backend sin cambios (impl
+  V3.19 sin release previo incluida en este commit) · `check_release_consistency`
+  3.20.0 exit 0; CONSTITUCIÓN sin cambios). Base: `3.19.0`
+- ✅ Versión estable `3.19.0` — **Léxico por destreza + Speaking micro-drill**
+  (cierra el candidato V3.19, definido 2026-09-07: **P0** — la producción del
+  alumno se vuelca al léxico etiquetada por destreza — `record_production(user,
+  words, channel)` + 4 columnas contadoras en `vocabulary` con backfill
+  `chat_prod = appearances` y punto único de captura en `domain/academy.py`
+  (CAP-01/REFAC-01); speaking/pronunciación/writing/conversación guiada ya no
+  descartan `heard`/`text` · **P1** — speaking micro-drill de 1 nivel honesto:
+  candidatos reales `exposures > 0 AND speaking_prod == 0` servidos por
+  endpoint determinista y practicados sobre el scorer de pronunciación; sin
+  evidence/FSRS (D5/E3); chips del diccionario con acción · **Fixes P1 del
+  dossier**: R6-01 retención (409), GATE-01 objetivo locked (409), CLAIM-01
+  copy oral "examen estimado", SIGNAL-01, ERR-01 404→503, LIST-01/02/03,
+  CONV-01 reconstrucción por `mode` · **Deuda externa**: ADMIN-01 fail-closed y
+  BOOL-01 · **tests**: pytest 1371 + ruff limpio, vitest 417 + `tsc`/`vite
+  build` OK, `check_release_consistency` 3.19.0 exit 0, curriculum
+  `--strict --quality` exit 0; CONSTITUCIÓN sin cambios). Base: `3.18.0`
 - ✅ Versión estable `3.18.0` — **Knowledge Graph remainder + deuda del grafo (P3)**
   (cierra el candidato P3, auditado ABIERTO en 2026-09-06. **P3-I2**: ancla de
   unidad congelada al completar — tabla `unit_review_anchors` de escritura única
@@ -586,7 +658,8 @@
 | V2.12 Evidence Graph | directo del gerente | ✔ hecho |
 | V3.0 Beta freeze | directo del gerente | ✔ hecho |
 | V3.18 Deuda del grafo (P3) | directo del gerente | ✔ hecho |
-| V3.19 Léxico por destreza + Speaking micro-drill (candidato abierto) | pendiente de briefing | ⏳ planificado |
+| V3.19 Léxico por destreza + Speaking micro-drill | directo del gerente (plan Cursor `v3.19_lexico_microdrill`) | ✔ hecho |
+| Auditoría profunda V3.18 pre-V3.19 (6 áreas) | `agentes/auditoria-profunda-v318.md` | ✔ hecho (dossier `docs/audit/I-AUDITORIA-PROFUNDA-V318.md`) |
 | Auditoría TOTAL externa (v3.18.0) | `agentes/auditoria-total-externa.md` | ⏳ pendiente de ejecutar |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
@@ -595,20 +668,17 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.19 — Léxico por destreza + Speaking micro-drill** (candidato abierto,
-  definido 2026-09-07; alcance completo en `docs/RELEVO.md`, sección final
-  "Próximos incrementos"). Cierra el pendiente heredado de v3.18.
-  - **P0 — volcado de producción por destreza**: hoy la única producción que
-    llega al léxico es la del chat libre (`/api/vocabulary/analyze` ←
-    `useChat`); speaking/writing no vuelcan `heard`/`text` y la tabla
-    `vocabulary` no distingue destreza. Volcar la producción etiquetada en los
-    `submit_*` de dominio (speaking rutas/task/assessment/mission, conversación
-    guiada, pronunciación, writing) sin cambiar la semántica de la producción
-    agregada ni de `item_status`/`coverage_indicator`.
-  - **P1 — Speaking micro-drill**: consumir `recognized_not_produced` con
-    semántica oral ("expuestas y nunca producidas hablando"); generador
-    determinista en servidor + mini-práctica sobre el scorer de pronunciación
-    existente; sin claims de dominio. UI: CTA real en `PersonalDictionary`
-    (hoy los chips son inertes).
-  - **Verificación**: gate idéntico a v3.18 (hoy pytest 1345, vitest 414,
-    ruff/`tsc`/`vite build` limpios, `check_release_consistency` 3.18.0).
+- ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
+  (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño
+  (ver "Estado actual" arriba, `release-notes-v3.19.0.md` y la entrada 37.37 de
+  `docs/RELEVO.md`). Tests: pytest 1371 + ruff limpio, vitest 417 + `tsc`/
+  `vite build` OK, `check_release_consistency` 3.19.0 exit 0, curriculum
+  `--strict --quality` exit 0; CONSTITUCIÓN sin cambios (R8/R9 propuesta
+  abierta). Fuera de alcance de V3.19 (decisión (b)/futura): micro-drill 3
+  niveles + integración con el grafo (GRAPH-01), flag de modalidad oral/tecleo,
+  WR-UI-01, siembra FSRS sin señal (LEX-03).
+- **Siguiente incremento — pendiente de briefing (candidato abierto)**: sin
+  alcance P0/P1 cerrado aún; las propuestas futuras se deliberan apoyadas en
+  `docs/RELEVO.md` → "Próximos incrementos". La **Auditoría TOTAL externa**
+  preparada para v3.18.0 (`agentes/auditoria-total-externa.md`) queda pendiente
+  de ejecutar sobre el árbol actual (ahora v3.19.0).

@@ -581,6 +581,41 @@ def test_score_micro_review_rejects_unknown_or_out_of_range_answers():
         )
 
 
+def test_score_micro_review_rejects_bool_as_index():
+    """BOOL-01 (V3.19): `True`/`False` son `bool` (subclase de `int`) y no valen
+    como índice elegido; el endurecimiento a `type(selected) is int` los rechaza
+    en validación y no los puntúa como acierto."""
+    unit = _unit(
+        "u-bool",
+        [
+            _objective(
+                "obool",
+                title="Only",
+                checks=(_check("cbool", correct=1), _check("cbool2", correct=0)),
+            )
+        ],
+    )
+    sample = unit_review.sample_micro_review(
+        unit=unit, user_id="u1", window_days=7, previous_failed_ids=[], now=NOW
+    )
+    assert {i["item_id"] for i in sample} == {"cbool", "cbool2"}
+
+    # Validación: bool no es un índice válido.
+    with pytest.raises(ValueError, match="unit_review.invalid_answers"):
+        unit_review.score_micro_review(
+            answers={"cbool": True}, unit=unit, sample=sample
+        )
+    with pytest.raises(ValueError, match="unit_review.invalid_answers"):
+        unit_review.score_micro_review(
+            answers={"cbool": False}, unit=unit, sample=sample
+        )
+    # Y el scorer no confunde `False` (0) con el índice 0 en el recuento.
+    with pytest.raises(ValueError, match="unit_review.invalid_answers"):
+        unit_review.validate_micro_review_answers(
+            answers={"cbool2": False}, sample=sample
+        )
+
+
 def test_grade_for_accuracy_delegates_to_fsrs():
     assert unit_review.grade_for_accuracy(0.2) == fsrs.grade_from_score(0.2)
     assert unit_review.grade_for_accuracy(0.95) == fsrs.GRADE_EASY

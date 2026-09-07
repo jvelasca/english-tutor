@@ -9,8 +9,13 @@ from services.interaction import (
 )
 
 
-def _turn(role, duration_ms=None, latency_ms=None):
-    return {"role": role, "duration_ms": duration_ms, "latency_ms": latency_ms}
+def _turn(role, duration_ms=None, latency_ms=None, mode=None):
+    return {
+        "role": role,
+        "duration_ms": duration_ms,
+        "latency_ms": latency_ms,
+        "mode": mode,
+    }
 
 
 def test_empty_turns_all_unobservable():
@@ -169,3 +174,48 @@ def test_interruptions_unobservable_without_student_latency():
 def test_interruption_threshold_constant_is_positive():
     assert INTERRUPTION_LATENCY_MS > 0
     assert TURN_DURATION_MIN_MS < TURN_DURATION_FULL_MS
+
+
+# --- CONV-01 (V3.19): reconstrucción por mode ------------------------------
+# Un turno cuyo `mode` está en `typed_modes` es de un canal TECLEADO: su
+# `duration_ms`/`latency_ms` miden redacción, no habla. Sigue contando para el
+# balance (interacción real) pero no alimenta duración/latencia/interrupciones.
+
+
+def test_typed_turns_excluded_via_mode():
+    turns = [
+        _turn("student", duration_ms=TURN_DURATION_FULL_MS, latency_ms=100),
+        _turn("assistant"),
+        _turn("student", duration_ms=1000, latency_ms=900),
+    ]
+    # Sin `typed_modes`, la telemetría conserva la semántica oral histórica.
+    ev = interaction_evidence(turns)
+    assert ev["turn_duration"] is not None
+    assert ev["avg_response_latency_ms"] is not None
+    assert ev["interruptions"] == 1
+    # Con `mode` tecleado en TODOS los turnos, duración/latencia se descartan
+    # (pero los turnos siguen contando para el balance).
+    typed = [dict(t, mode="conversation") for t in turns]
+    ev_typed = interaction_evidence(
+        typed, typed_modes=frozenset({"conversation", "grammar"})
+    )
+    assert ev_typed["turn_duration"] is None
+    assert ev_typed["avg_response_latency_ms"] is None
+    assert ev_typed["interruptions"] is None
+    assert ev_typed["student_turns"] == 2
+    assert ev_typed["assistant_turns"] == 1
+    assert ev_typed["turn_balance"] == ev["turn_balance"]
+
+
+def test_typed_modes_apply_only_to_declared_mode():
+    # Un turno tecleado (mode "conversation") no anula la telemetría de un turno
+    # con mode distinto (futura superficie oral) ni de turnos sin mode (legacy).
+    turns = [
+        _turn("student", duration_ms=2000, latency_ms=300, mode="conversation"),
+        _turn("assistant"),
+        _turn("student", duration_ms=4000, latency_ms=500),  # legacy: sin mode
+    ]
+    ev = interaction_evidence(turns, typed_modes=frozenset({"conversation"}))
+    assert ev["turn_duration"] == 1.0  # solo el turno sin mode alimenta duración
+    assert ev["avg_response_latency_ms"] == 500
+    assert ev["student_turns"] == 2

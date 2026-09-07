@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { motion, type Variants } from "motion/react";
-import { ArrowRight, BookOpen, CheckCircle2, Loader2, MessageSquareText, RefreshCw } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import {
   GrammarIcon,
   ListeningIcon,
-  PronunciationIcon,
   SpeakingIcon,
 } from "../../components/Icons";
 import { NextBestCard } from "../../components/NextBestCard";
@@ -19,10 +18,8 @@ import { cn } from "../../lib/utils";
 import { navigateTo } from "../../router/hash";
 import { learnActivityPath } from "../../router/paths";
 import {
-  CONVERSATION_ACTIVITY,
   GRAMMAR_ACTIVITY,
   LISTENING_ACTIVITY,
-  PRONUNCIATION_ACTIVITY,
   SPEAKING_ACTIVITY,
   VOCABULARY_ACTIVITY,
   type LearnActivity,
@@ -40,8 +37,6 @@ interface ActivityDef {
 const ACTIVITIES: ActivityDef[] = [
   { id: LISTENING_ACTIVITY, titleKey: "skill.listening", descKey: "learn.desc.listening", Icon: ListeningIcon },
   { id: SPEAKING_ACTIVITY, titleKey: "skill.speaking", descKey: "learn.desc.speaking", Icon: SpeakingIcon },
-  { id: PRONUNCIATION_ACTIVITY, titleKey: "skill.pronunciation", descKey: "learn.desc.pronunciation", Icon: PronunciationIcon },
-  { id: CONVERSATION_ACTIVITY, titleKey: "learn.conversation", descKey: "learn.desc.conversation", Icon: MessageSquareText },
   { id: VOCABULARY_ACTIVITY, titleKey: "skill.vocabulary", descKey: "learn.desc.vocabulary", Icon: BookOpen },
   { id: GRAMMAR_ACTIVITY, titleKey: "skill.grammar", descKey: "learn.desc.grammar", Icon: GrammarIcon },
 ];
@@ -136,10 +131,11 @@ interface LearnHubProps {
 }
 
 /**
- * Hub de APRENDER (decisión D1/D3): cabecera del mundo + 6 tarjetas de
- * práctica libre (3x2 en escritorio, lista en móvil) + "Recomendado para ti"
- * servido por el Adaptive Engine. Cada tarjeta abre su sub-ruta de práctica;
- * aquí no existe gating (docs/UI_V3.1.md §4.3).
+ * Hub de APRENDER: cabecera del mundo + 4 tarjetas de práctica libre
+ * (Listening · Speaking · Vocabulario · Gramática — DISENO-SPEAKING-UNICO F1;
+ * las dos tarjetas orales extra son ahora modos de Speaking) + "Recomendado
+ * para ti" servido por el Adaptive Engine. Cada tarjeta abre su sub-ruta de
+ * práctica; aquí no existe gating (docs/UI_V3.1.md §4.3).
  */
 export function LearnHub({ userId, onStart, refreshKey = 0 }: LearnHubProps) {
   const { t } = useI18n();

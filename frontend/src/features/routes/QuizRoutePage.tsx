@@ -20,8 +20,10 @@ import {
   Award,
   BookOpen,
   Check,
+  ChevronDown,
   ChevronRight,
   GraduationCap,
+  Info,
   Loader2,
   X,
 } from "lucide-react";
@@ -80,6 +82,19 @@ export interface RouteDictionaryConfig {
   /** Clave del hint del diccionario, p. ej. `vocRoutes.dictionaryHint`. */
   hintKey: string;
   View: ComponentType<{ userId: string | null }>;
+}
+
+/**
+ * Modo de superficie de una práctica unificada (DISENO-SPEAKING-UNICO F1):
+ * la página Speaking agrupa los modos orales micro-conversación / acento /
+ * diálogo guiado bajo una misma URL. Cada pestaña remonta la página con la
+ * configuración de su modo (`QuizRoutePage key={modo}`).
+ */
+export interface RouteModeTab {
+  /** Identificador estable del modo (p. ej. "micro" | "accent" | "dialogue"). */
+  id: string;
+  /** Clave i18n de la etiqueta de la pestaña. */
+  labelKey: string;
 }
 
 /**
@@ -160,6 +175,12 @@ interface QuizRoutePageProps {
   onAttempt: () => void;
   onNext: (section: Section | null, step: NextBestActivity) => void;
   config: RouteQuizConfig;
+  /** Pestañas de modo de superficie (p. ej. los modos orales de Speaking). */
+  modeTabs?: readonly RouteModeTab[];
+  /** Modo de superficie activo (debe ser un id de `modeTabs`). */
+  modeTab?: string;
+  /** Cambia el modo de superficie: el padre remonta la página con otra config. */
+  onModeChange?: (mode: string) => void;
 }
 
 type RouteView =
@@ -189,6 +210,9 @@ export function QuizRoutePage({
   onAttempt,
   onNext,
   config,
+  modeTabs,
+  modeTab,
+  onModeChange,
 }: QuizRoutePageProps) {
   const { t } = useI18n();
   const ns = config.ns;
@@ -214,6 +238,8 @@ export function QuizRoutePage({
   const [attemptError, setAttemptError] = useState<string | null>(null);
   // Seq de "siguiente pregunta": avanzar tras responder o saltar.
   const [seq, setSeq] = useState(0);
+  // El texto «Cómo funcionan las rutas» va plegado por defecto tras un botón (i).
+  const [routesInfoOpen, setRoutesInfoOpen] = useState(false);
 
   // --- Carga inicial de estadísticas y nivel oral demostrado ------------------
   useEffect(() => {
@@ -521,13 +547,64 @@ export function QuizRoutePage({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           <header className="mb-6">
+            {modeTabs && modeTabs.length > 0 && (
+              <div
+                role="group"
+                aria-label={t("learn.pickMode")}
+                className="mb-4 flex flex-wrap items-center gap-1.5"
+              >
+                {modeTabs.map((tab) => {
+                  const isActive = tab.id === modeTab;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => onModeChange?.(tab.id)}
+                      aria-pressed={isActive}
+                      className={cn(
+                        "inline-flex min-h-9 items-center rounded-full border px-3.5 text-xs font-semibold whitespace-nowrap transition-colors",
+                        isActive
+                          ? "cursor-default border-primary/60 bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      )}
+                    >
+                      {t(tab.labelKey)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               {t(config.skillTitleKey)}
             </h1>
             <p className="mt-1.5 text-muted-foreground">{t(config.subtitleKey)}</p>
-            <p className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-              {t(nk("routesSubtitle"))}
-            </p>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setRoutesInfoOpen((open) => !open)}
+                aria-expanded={routesInfoOpen}
+                aria-controls="routes-info-copy"
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <Info className="size-3.5 shrink-0" aria-hidden="true" />
+                {t("learn.routesInfoToggle")}
+                <ChevronDown
+                  className={cn(
+                    "size-3.5 shrink-0 transition-transform",
+                    routesInfoOpen && "rotate-180",
+                  )}
+                  aria-hidden="true"
+                />
+              </button>
+              {routesInfoOpen && (
+                <p
+                  id="routes-info-copy"
+                  className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+                >
+                  {t(nk("routesSubtitle"))}
+                </p>
+              )}
+            </div>
           </header>
 
           {!stats ? (

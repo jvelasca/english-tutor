@@ -22,6 +22,7 @@ from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
 
+from domain import vocabulary as vocabulary_domain
 from repositories import db
 from repositories import settings as settings_repo
 from repositories import speaking_routes as speaking_repo
@@ -299,6 +300,11 @@ async def submit_attempt(
         )
     scored = scores_from_evidence(
         evidence, heard, duration_seconds, task_type="conversation"
+    )
+    # V3.19: volcar la producción oral (micro-conversación guiada) al léxico.
+    # `record_production_text` nunca lanza (volcado no bloqueante).
+    await vocabulary_domain.record_production_text(
+        user_id, heard, channel="speaking"
     )
     overall = float(scored["overall"])
     passed = overall >= SPEAKING_PASS_THRESHOLD

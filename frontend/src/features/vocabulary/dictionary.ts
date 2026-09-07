@@ -18,13 +18,6 @@ export function sortLexicalItems(items: LexicalItem[]): LexicalItem[] {
   });
 }
 
-/** Palabras reconocidas (input) pero nunca producidas: candidatas a micro-drill. */
-export function recognizedNotProduced(items: LexicalItem[]): string[] {
-  return items
-    .filter((it) => it.exposures > 0 && it.appearances === 0)
-    .map((it) => it.word);
-}
-
 /** Valor 0..1 de la barra CEFR normalizado respecto al nivel con más ítems. */
 export function cefrBarValue(count: number, max: number): number {
   if (max <= 0) return 0;

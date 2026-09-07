@@ -709,7 +709,8 @@ def test_speaking_task_records_task_difficulty(monkeypatch, tmp_path):
     assert all(row["difficulty"] == 4 for row in speaking_rows)
 
 
-def test_speaking_task_llm_invalid_returns_404(monkeypatch, tmp_path):
+def test_speaking_task_llm_invalid_returns_503(monkeypatch, tmp_path):
+    """ERR-01: el fallo del extractor LLM es transitorio → 503, no 404."""
     a, _b = _setup(monkeypatch, tmp_path)
     obj = _first_speaking_objective()
     fake = FakeOllamaClient(content="not json")
@@ -725,7 +726,8 @@ def test_speaking_task_llm_invalid_returns_404(monkeypatch, tmp_path):
                 "heard": "I am a student",
             },
         )
-    assert r.status_code == 404
+    assert r.status_code == 503
+    assert r.json()["detail"] == "speaking.evidence_failed"
 
 
 def test_speaking_task_rejects_blocked_level(monkeypatch, tmp_path):

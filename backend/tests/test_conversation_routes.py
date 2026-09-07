@@ -298,6 +298,72 @@ def test_submit_attempt_unknown_returns_none(monkeypatch, tmp_path):
     )
 
 
+# --- CONV-01 (V3.19): reconstrucción por mode -------------------------------
+# La conversación guiada se conversa en un mini-chat TECLEADO (los turnos se
+# persisten con `mode="conversation"`): su `duration_ms`/`latency_ms` son tiempo
+# de redacción y no deben computarse como tiempo de habla (turn_duration /
+# segundos de habla / latencia). El balance de turnos (interacción real) y el
+# transcripto (volcado al léxico, canal `conversation`) se conservan.
+
+
+def test_typed_guided_turns_do_not_count_as_speech(monkeypatch, tmp_path):
+    uid = _setup(monkeypatch, tmp_path)
+    cid = _seed_conversation(uid)  # 3 turnos con mode "conversation" (4000ms c/u)
+
+    import asyncio
+
+    # La telemetría tecleada no produce segundos de habla.
+    assert asyncio.run(conv_domain._student_speech_seconds(cid, uid)) is None
+
+    # La señal objetiva no deriva `turn_duration`/latencia del tiempo de
+    # redacción; sí conserva el balance de turnos (intercambio real).
+    evidence: dict = {}
+    asyncio.run(conv_domain._inject_interaction_objective(evidence, cid, uid))
+    objective = evidence["interaction_objective"]
+    assert objective["turn_duration"] is None
+    assert objective["avg_response_latency_ms"] is None
+    assert objective["interruptions"] is None
+    assert objective["turn_balance"] is not None
+
+
+def test_speech_seconds_count_only_non_typed_telemetry(monkeypatch, tmp_path):
+    """Un turno con telemetría oral (sin mode tecleado) sí computa como habla."""
+    uid = _setup(monkeypatch, tmp_path)
+    cid = conversations_repo.create_conversation(uid)["id"]
+    messages = [
+        {
+            "id": "t1",
+            "role": "user",
+            "content": "Hello there!",
+            "mode": "conversation",  # mini-chat tecleado: redacción, no habla
+            "duration_ms": 5000,
+            "latency_ms": 800,
+        },
+        {"id": "a1", "role": "assistant", "content": "Hi!"},
+        {
+            "id": "t2",
+            "role": "user",
+            "content": "Nice to meet you.",
+            # Sin `mode`: telemetría de turno oral (semántica histórica).
+            "duration_ms": 3000,
+            "latency_ms": 400,
+        },
+        {"id": "a2", "role": "assistant", "content": "Likewise."},
+    ]
+    conversations_repo.save_conversation(cid, uid, "Guided chat", messages)
+
+    import asyncio
+
+    seconds = asyncio.run(conv_domain._student_speech_seconds(cid, uid))
+    assert seconds == 3.0
+
+    evidence: dict = {}
+    asyncio.run(conv_domain._inject_interaction_objective(evidence, cid, uid))
+    objective = evidence["interaction_objective"]
+    assert objective["turn_duration"] is not None
+    assert objective["avg_response_latency_ms"] == 400
+
+
 # --- Endpoints ----------------------------------------------------------------
 
 

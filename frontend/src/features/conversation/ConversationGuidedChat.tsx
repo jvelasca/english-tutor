@@ -9,7 +9,7 @@ import { deriveTitle } from "../../utils/title";
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { MicButton } from "../../components/MicButton";
+import { ConversationVoiceButton } from "./ConversationVoiceButton";
 
 // Modelo del tutor guiado: el mismo que usa el role-play conversacional (nunca
 // un modelo marcado como no utilizable; ver config.py).
@@ -94,6 +94,8 @@ export function ConversationGuidedChat({
   const lastAssistantAt = useRef<number | null>(null);
   const studentTurns = useRef<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Latencia de reacción del turno de voz (fin del tutor → pulsar el micro).
+  const voiceLatencyMsRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,23 +126,34 @@ export function ConversationGuidedChat({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  async function sendContent(content: string) {
+  /** Metadatos opcionales de un turno enviado (F3: voz) o por defecto tecleo. */
+  interface TurnMeta {
+    mode: TutorMode | "voice";
+    duration_ms?: number;
+    latency_ms?: number;
+  }
+
+  async function sendTurn(content: string, meta: TurnMeta) {
     const trimmed = content.trim();
     if (!trimmed || loading || !conversationId) return;
 
     setChatError(null);
     const sentAt = performance.now();
-    const { duration_ms, latency_ms } = turnTelemetry({
+    // Telemetría de tecleo por defecto; el turno de voz la sustituye por la
+    // duración real del audio y la latencia de reacción medidas por el botón.
+    const typed = turnTelemetry({
       sentAt,
       composeStartedAt: composeStartedAt.current,
       lastAssistantAt: lastAssistantAt.current,
     });
+    const duration_ms = meta.duration_ms ?? typed.duration_ms;
+    const latency_ms = meta.latency_ms ?? typed.latency_ms;
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
       content: trimmed,
-      mode: GUIDED_MODE,
+      mode: meta.mode,
       ...(duration_ms != null ? { duration_ms } : {}),
       ...(latency_ms != null ? { latency_ms } : {}),
     };
@@ -250,6 +263,23 @@ export function ConversationGuidedChat({
     }
   }
 
+  /** Turno tecleado (mini-chat clásico): se persiste con `mode="conversation"`.
+   *  Su telemetría mide redacción y no computa como habla (CONV-01 V3.19). */
+  async function sendContent(content: string) {
+    await sendTurn(content, { mode: GUIDED_MODE });
+  }
+
+  /** Turno hablado (F3): se persiste con `mode="voice"`, la duración real del
+   *  audio y la latencia de reacción → sí computa como habla en la evaluación
+   *  de interacción y en la resistencia de conversación. */
+  async function sendVoiceTurn(content: string, durationMs: number) {
+    await sendTurn(content, {
+      mode: "voice",
+      duration_ms: durationMs,
+      latency_ms: voiceLatencyMsRef.current ?? undefined,
+    });
+  }
+
   async function send() {
     await sendContent(input);
   }
@@ -355,7 +385,15 @@ export function ConversationGuidedChat({
       )}
 
       <div className="flex gap-2">
-        <MicButton onTranscribed={(text) => void sendContent(text)} disabled={loading} />
+        <ConversationVoiceButton
+          disabled={loading || !conversationId}
+          onStarted={() => {
+            voiceLatencyMsRef.current = lastAssistantAt.current
+              ? Math.max(0, Math.round(performance.now() - lastAssistantAt.current))
+              : null;
+          }}
+          onSpoken={(text, durationMs) => void sendVoiceTurn(text, durationMs)}
+        />
         <input
           className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/50 disabled:opacity-60"
           value={input}

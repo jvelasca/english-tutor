@@ -1,16 +1,20 @@
 /**
  * APRENDER → Speaking por rutas (V3.8), migrada al marco compartido de quiz
- * (V3.13 P2.1, wave 3).
+ * (V3.13 P2.1, wave 3) y unificada como **superficie oral única**
+ * (DISENO-SPEAKING-UNICO F1): la tarjeta Speaking del hub agrupa tres modos
+ * internos que comparten la misma página y URL — micro-conversación (la escena
+ * original de Speaking), acento (read-aloud determinista, antigua tarjeta
+ * Pronunciación) y diálogo guiado (mini-diálogos con el tutor, antigua tarjeta
+ * Conversation).
  *
  * La página única con scroll (estadísticas, máquina de sesión, mapa A1–C2,
  * panel del nivel y acceso al Speaking Assessment) vive en
- * `features/routes/QuizRoutePage.tsx`. Este archivo aporta la configuración
- * (namespace i18n, API, panel con práctica extra), la **escena personalizada
- * de micro-conversación guiada** (grabación + evaluación + respuesta modelo
- * con voz) y los desplegables contextuales (escenarios y misiones) que también
- * aportan evidencia oral.
+ * `features/routes/QuizRoutePage.tsx`. Cada modo aporta su configuración
+ * (namespace i18n, API, panel), su escena personalizada (micro-conversación
+ * con grabación + evaluación, read-aloud fonético, chat guiado) y sus bloques
+ * contextuales (escenarios/misiones y acceso al chat libre).
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   Loader2,
@@ -20,13 +24,20 @@ import {
   Volume2,
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
-import type { LearnActivity } from "../../router/learnHub";
+import { navigateTo, useHashPath } from "../../router/hash";
+import {
+  type LearnActivity,
+  type SpeakingMode,
+  speakingModeFromPath,
+  speakingModePath,
+} from "../../router/learnHub";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
 import { SkillBar } from "../../components/SkillBar";
 import { ActivityResult } from "../../components/ActivityResult";
 import { ListenButton } from "../../components/ListenButton";
+import { RecordingPlayButton } from "../../components/RecordingPlayButton";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import {
   PhraseTranslateButton,
@@ -60,8 +71,11 @@ import {
   QuizRoutePage,
   type LearnSceneProps,
   type RouteLevelPanelProps,
+  type RouteModeTab,
   type RouteQuizConfig,
 } from "../routes/QuizRoutePage";
+import { PRONUNCIATION_ROUTE_CONFIG } from "../pronunciation/PronunciationRoutesPractice";
+import { CONVERSATION_ROUTE_CONFIG } from "../conversation/ConversationRoutesPractice";
 import { SpeakingLevelPanel } from "./SpeakingLevelPanel";
 import { SpeakingScenarios } from "./SpeakingScenarios";
 import { SpeakingMission } from "./SpeakingMission";
@@ -106,15 +120,69 @@ interface SpeakingRoutesPracticeProps {
   onNext: (section: Section | null, step: NextBestActivity) => void;
 }
 
+/* ------------------------------------------------------------------ */
+/* Superficie oral unificada (modos de Speaking)                       */
+/* ------------------------------------------------------------------ */
+
+/** Modos internos de la superficie Speaking (la unión vive en learnHub, F4). */
+
+const SPEAKING_MODES: readonly RouteModeTab[] = [
+  { id: "micro", labelKey: "speaking.modeMicro" },
+  { id: "accent", labelKey: "speaking.modeAccent" },
+  { id: "dialogue", labelKey: "speaking.modeDialogue" },
+];
+
+/**
+ * Config del modo oral activo. Micro-conversación usa la config original de
+ * Speaking; Acento y Diálogo guiado reutilizan las configs de las antiguas
+ * tarjetas Pronunciación y Conversation (mismos motores, escenas, paneles y
+ * API) con el título de superficie unificado a "Speaking".
+ */
+function speakingConfigFor(mode: SpeakingMode): RouteQuizConfig {
+  switch (mode) {
+    case "accent":
+      return { ...PRONUNCIATION_ROUTE_CONFIG, skillTitleKey: "skill.speaking" };
+    case "dialogue":
+      return { ...CONVERSATION_ROUTE_CONFIG, skillTitleKey: "skill.speaking" };
+    default:
+      return SPEAKING_ROUTE_CONFIG;
+  }
+}
+
 export function SpeakingRoutesPractice(props: SpeakingRoutesPracticeProps) {
+  const path = useHashPath();
+  // El modo activo vive en la URL (F4): /aprender/speaking (micro por
+  // defecto), /aprender/speaking/acento y /aprender/speaking/dialogo. Así el
+  // refresco, los deep links y el botón atrás/adelante conservan el modo.
+  const [mode, setMode] = useState<SpeakingMode>(
+    () => speakingModeFromPath(path) ?? "micro",
+  );
+
+  // Navegación atrás/adelante o deep-link con la página ya montada: la URL
+  // manda sobre el estado (cambia el `key`, que remonta la sesión del modo).
+  useEffect(() => {
+    const next = speakingModeFromPath(path);
+    if (next && next !== mode) setMode(next);
+  }, [path, mode]);
+
+  function handleModeChange(nextId: string) {
+    const next = nextId as SpeakingMode;
+    setMode(next);
+    navigateTo(speakingModePath(next));
+  }
+
   return (
     <QuizRoutePage
+      key={mode}
       userId={props.userId}
       active={props.active}
       onBack={props.onBack}
       onAttempt={props.onAttempt}
       onNext={props.onNext}
-      config={SPEAKING_ROUTE_CONFIG}
+      config={speakingConfigFor(mode)}
+      modeTabs={SPEAKING_MODES}
+      modeTab={mode}
+      onModeChange={handleModeChange}
     />
   );
 }
@@ -198,10 +266,21 @@ export function SpeakingScene({
   const [attemptError, setAttemptError] = useState<string | null>(null);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const [playing, setPlaying] = useState<"opening" | "model" | null>(null);
+  // Object URL de la grabación real del alumno (no sube al servidor: solo se
+  // transcribe). Permite «Oír mi grabación» junto a la respuesta modelo.
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const processedRef = useRef(false);
+
+  // Libera el object URL de la grabación al cambiar o al desmontar la escena.
+  useEffect(() => {
+    const url = recordingUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [recordingUrl]);
 
   /** Reproduce la voz modelo de la línea del interlocutor o de la respuesta. */
   async function playAudio(kind: "opening" | "model") {
@@ -261,6 +340,9 @@ export function SpeakingScene({
         if (blob.size === 0 || processedRef.current || !userId || !card) {
           return;
         }
+        // Conserva la grabación real en memoria para reproducirla en el
+        // resultado («Oír mi grabación»); el servidor nunca la persiste.
+        setRecordingUrl(URL.createObjectURL(blob));
         processedRef.current = true;
         setProcessing(true);
         setAttemptError(null);
@@ -294,6 +376,7 @@ export function SpeakingScene({
         processing={processing}
         recording={recording}
         playing={playing}
+        recordingUrl={recordingUrl}
         attemptError={attemptError}
         onToggleRecording={() => void toggleRecording()}
         onPlay={(kind) => void playAudio(kind)}
@@ -318,6 +401,8 @@ interface PracticeExchangeCardProps {
   processing: boolean;
   recording: boolean;
   playing: "opening" | "model" | null;
+  /** Object URL de la grabación del alumno para reproducirla en el resultado. */
+  recordingUrl: string | null;
   attemptError: string | null;
   onToggleRecording: () => void;
   onPlay: (kind: "opening" | "model") => void;
@@ -336,6 +421,7 @@ function PracticeExchangeCard({
   processing,
   recording,
   playing,
+  recordingUrl,
   attemptError,
   onToggleRecording,
   onPlay,
@@ -405,6 +491,13 @@ function PracticeExchangeCard({
             </div>
           )}
 
+          {recordingUrl && (
+            <RecordingPlayButton
+              src={recordingUrl}
+              label={t("speaking.playMine")}
+            />
+          )}
+
           <div className="flex flex-col gap-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t("speaking.criteriaIntro")}
@@ -452,9 +545,9 @@ function PracticeExchangeCard({
               </div>
               <p
                 className="text-base font-medium leading-relaxed text-foreground"
-                lang="en"
+                lang={modelText.isSpanish ? "es" : "en"}
               >
-                {result.model_response}
+                {modelText.display}
               </p>
             </div>
           )}
@@ -508,9 +601,9 @@ function PracticeExchangeCard({
             </div>
             <p
               className="rounded-xl border border-border bg-secondary/30 px-4 py-4 text-center text-lg font-medium leading-relaxed tracking-wide text-foreground sm:text-xl"
-              lang="en"
+              lang={appLine.isSpanish ? "es" : "en"}
             >
-              {card.app_line}
+              {appLine.display}
             </p>
           </div>
 

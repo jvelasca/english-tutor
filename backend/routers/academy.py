@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from config import DEFAULT_MODEL
 from dependencies import current_user, read_audio_limited
 from domain import academy as academy_service
+from domain.speaking_routes import EvidenceExtractionError  # transitorio (503)
 from schemas.academy import (
     AssessmentV2LadderOut,
     AssessmentV2StartRequest,
@@ -326,20 +327,26 @@ async def objective_speaking(
 async def objective_speaking_task(
     body: SpeakingTaskSubmitRequest, user: dict = Depends(current_user)
 ) -> dict:
-    out = await academy_service.submit_speaking_task(
-        user["id"],
-        body.level_id,
-        body.objective_id,
-        body.task,
-        body.heard,
-        body.model,
-        body.duration_seconds,
-        body.task_type,
-        body.difficulty,
-        body.difficulty_vector,
-        body.expected,
-        body.conversation_id,
-    )
+    try:
+        out = await academy_service.submit_speaking_task(
+            user["id"],
+            body.level_id,
+            body.objective_id,
+            body.task,
+            body.heard,
+            body.model,
+            body.duration_seconds,
+            body.task_type,
+            body.difficulty,
+            body.difficulty_vector,
+            body.expected,
+            body.conversation_id,
+        )
+    except EvidenceExtractionError:
+        # ERR-01: extracción LLM fallida → transitorio (503), no 404.
+        raise HTTPException(
+            status_code=503, detail="speaking.evidence_failed"
+        ) from None
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
     return out
@@ -375,9 +382,20 @@ async def objective_pronunciation(
 async def objective_writing_task(
     body: WritingTaskSubmitRequest, user: dict = Depends(current_user)
 ) -> dict:
-    out = await academy_service.submit_writing_task(
-        user["id"], body.level_id, body.objective_id, body.task, body.text, body.model
-    )
+    try:
+        out = await academy_service.submit_writing_task(
+            user["id"],
+            body.level_id,
+            body.objective_id,
+            body.task,
+            body.text,
+            body.model,
+        )
+    except EvidenceExtractionError:
+        # ERR-01: extracción LLM fallida → transitorio (503), no 404.
+        raise HTTPException(
+            status_code=503, detail="writing.evidence_failed"
+        ) from None
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
     return out
@@ -463,14 +481,20 @@ async def speaking_mission_attempt(
     body: SpeakingMissionAttemptSubmit, user: dict = Depends(current_user)
 ) -> dict:
     """Primer intento de la misión → evaluation + targeted drills."""
-    result = await academy_service.submit_speaking_mission_attempt(
-        user["id"],
-        body.session_id,
-        body.heard,
-        body.duration_seconds,
-        body.model or DEFAULT_MODEL,
-        body.conversation_id,
-    )
+    try:
+        result = await academy_service.submit_speaking_mission_attempt(
+            user["id"],
+            body.session_id,
+            body.heard,
+            body.duration_seconds,
+            body.model or DEFAULT_MODEL,
+            body.conversation_id,
+        )
+    except EvidenceExtractionError:
+        # ERR-01: extracción LLM fallida → transitorio (503), no 404.
+        raise HTTPException(
+            status_code=503, detail="speaking.evidence_failed"
+        ) from None
     if result is None:
         raise HTTPException(
             status_code=404, detail="Sesión no válida o evidencia no disponible"
@@ -486,14 +510,20 @@ async def speaking_mission_retry(
     body: SpeakingMissionAttemptSubmit, user: dict = Depends(current_user)
 ) -> dict:
     """Retry tras el drill → improvement visible y cierre."""
-    result = await academy_service.submit_speaking_mission_retry(
-        user["id"],
-        body.session_id,
-        body.heard,
-        body.duration_seconds,
-        body.model or DEFAULT_MODEL,
-        body.conversation_id,
-    )
+    try:
+        result = await academy_service.submit_speaking_mission_retry(
+            user["id"],
+            body.session_id,
+            body.heard,
+            body.duration_seconds,
+            body.model or DEFAULT_MODEL,
+            body.conversation_id,
+        )
+    except EvidenceExtractionError:
+        # ERR-01: extracción LLM fallida → transitorio (503), no 404.
+        raise HTTPException(
+            status_code=503, detail="speaking.evidence_failed"
+        ) from None
     if result is None:
         raise HTTPException(
             status_code=404, detail="Sesión no válida o evidencia no disponible"
@@ -742,14 +772,20 @@ async def speaking_assessment_start(user: dict = Depends(current_user)) -> dict:
 async def speaking_assessment_part(
     body: SpeakingAssessmentPartSubmit, user: dict = Depends(current_user)
 ) -> dict:
-    result = await academy_service.submit_speaking_assessment_part(
-        user["id"],
-        body.session_id,
-        body.heard,
-        body.duration_seconds,
-        body.model,
-        body.conversation_id,
-    )
+    try:
+        result = await academy_service.submit_speaking_assessment_part(
+            user["id"],
+            body.session_id,
+            body.heard,
+            body.duration_seconds,
+            body.model,
+            body.conversation_id,
+        )
+    except EvidenceExtractionError:
+        # ERR-01: extracción LLM fallida → transitorio (503), no 404.
+        raise HTTPException(
+            status_code=503, detail="speaking.evidence_failed"
+        ) from None
     if result is None:
         raise HTTPException(
             status_code=404, detail="Sesión no encontrada, terminada o sin evidencia"
@@ -809,19 +845,25 @@ async def objective_speaking_task_audio(
             status_code=500, detail="No se pudo transcribir el audio"
         ) from None
     heard = timed["text"]
-    out = await academy_service.submit_speaking_task(
-        user["id"],
-        level_id,
-        objective_id,
-        task,
-        heard,
-        model,
-        timed.get("duration"),
-        task_type,
-        difficulty,
-        None,
-        expected,
-    )
+    try:
+        out = await academy_service.submit_speaking_task(
+            user["id"],
+            level_id,
+            objective_id,
+            task,
+            heard,
+            model,
+            timed.get("duration"),
+            task_type,
+            difficulty,
+            None,
+            expected,
+        )
+    except EvidenceExtractionError:
+        # ERR-01: extracción LLM fallida → transitorio (503), no 404.
+        raise HTTPException(
+            status_code=503, detail="speaking.evidence_failed"
+        ) from None
     if out is None:
         raise HTTPException(status_code=404, detail="Nivel u objetivo no encontrado")
     return out

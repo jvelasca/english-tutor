@@ -282,16 +282,30 @@ def test_assessment_v2_unit_and_level(monkeypatch, tmp_path):
     assert level_done.json()["result"]["passed"] is True
 
 
-def test_assessment_v2_retention_delta_http(monkeypatch, tmp_path):
-    uid = _setup(monkeypatch, tmp_path)
-    academy_repo.enroll(uid, "a1", "A1")
-    lv = load_level("a1")
-    unit = av2.ordered_units(lv)[0]
-    client = TestClient(app)
+def _backdate_session(session_id: int, days: int) -> None:
+    """Retrasa created_at/updated_at de una sesión Assessment 2.0 a `days`.
 
+    Simula que la sesión formal origen ocurrió hace `days` (R6-01: la ventana
+    de retención se mide desde ese `created_at`)."""
+    iso = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    conn = db._conn()
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE assessment_v2_sessions "
+                "SET created_at = ?, updated_at = ? WHERE id = ?",
+                (iso, iso, session_id),
+            )
+    finally:
+        conn.close()
+
+
+def _submit_unit_and_answers(uid: str, client, lv) -> tuple[dict, dict]:
+    """Completa un unit assessment correcto; devuelve (sesión, índice answers)."""
+    unit = av2.ordered_units(lv)[0]
     start = client.post(
         f"/api/academy/assessment/v2/start?user_id={uid}",
-        json={"kind": "unit", "level_id": "a1", "unit_id": unit.id},
+        json={"kind": "unit", "level_id": lv.level_id, "unit_id": unit.id},
     )
     session = start.json()
     index = {c.id: c for o in lv.objectives() for c in o.checks}
@@ -300,20 +314,58 @@ def test_assessment_v2_retention_delta_http(monkeypatch, tmp_path):
         for it in session["instrument"]["items"]
         if it["id"] in index
     }
-    first = client.post(
+    done = client.post(
         f"/api/academy/assessment/v2/submit?user_id={uid}",
         json={"session_id": session["session_id"], "answers": answers},
-    ).json()
+    )
+    assert done.status_code == 200, done.text
+    assert done.json()["result"]["passed"] is True
+    return session, answers
+
+
+def test_assessment_v2_retention_rejects_before_window(monkeypatch, tmp_path):
+    """R6-01: abrir un retention reassessment el mismo día (ventana no cumplida)
+    responde 409 en vez de 200 (antes: fail-open)."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, "a1", "A1")
+    lv = load_level("a1")
+    client = TestClient(app)
+
+    session, _ = _submit_unit_and_answers(uid, client, lv)
 
     ret_start = client.post(
         f"/api/academy/assessment/v2/start?user_id={uid}",
         json={
             "kind": "retention",
             "level_id": "a1",
-            "source_session_id": first["session_id"],
+            "source_session_id": session["session_id"],
         },
     )
-    assert ret_start.status_code == 200
+    assert ret_start.status_code == 409, ret_start.text
+    assert ret_start.json()["code"] == "RETENTION_NOT_DUE"
+
+
+def test_assessment_v2_retention_delta_http(monkeypatch, tmp_path):
+    """R6-01: con la ventana ≥ RETENTION_MIN_DAYS cumplida, el retention
+    reassessment se abre y cierra con evidencia `delayed` y ratio estable."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, "a1", "A1")
+    lv = load_level("a1")
+    index = {c.id: c for o in lv.objectives() for c in o.checks}
+    client = TestClient(app)
+
+    session, answers = _submit_unit_and_answers(uid, client, lv)
+    _backdate_session(session["session_id"], av2.RETENTION_MIN_DAYS + 1)
+
+    ret_start = client.post(
+        f"/api/academy/assessment/v2/start?user_id={uid}",
+        json={
+            "kind": "retention",
+            "level_id": "a1",
+            "source_session_id": session["session_id"],
+        },
+    )
+    assert ret_start.status_code == 200, ret_start.text
     ret_session = ret_start.json()
     # Fallo parcial: primer ítem incorrecto.
     ret_answers = dict(answers)
@@ -325,8 +377,45 @@ def test_assessment_v2_retention_delta_http(monkeypatch, tmp_path):
         f"/api/academy/assessment/v2/submit?user_id={uid}",
         json={"session_id": ret_session["session_id"], "answers": ret_answers},
     )
-    assert ret_done.status_code == 200
+    assert ret_done.status_code == 200, ret_done.text
     body = ret_done.json()
     assert body["retention"] is not None
     assert body["retention"]["delayed_overall"] < body["retention"]["initial_overall"]
+    assert body["retention"]["stable"] is True
     assert body["result"]["kind"] == "retention"
+
+
+def test_assessment_v2_retention_rejects_unstable_ratio(monkeypatch, tmp_path):
+    """R6-01: con ventana cumplida pero ratio delayed/initial < 0.9, el submit
+    rechaza la evidencia `delayed` con 409 (antes: fail-open)."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, "a1", "A1")
+    lv = load_level("a1")
+    index = {c.id: c for o in lv.objectives() for c in o.checks}
+    client = TestClient(app)
+
+    session, answers = _submit_unit_and_answers(uid, client, lv)
+    _backdate_session(session["session_id"], av2.RETENTION_MIN_DAYS + 1)
+
+    ret_start = client.post(
+        f"/api/academy/assessment/v2/start?user_id={uid}",
+        json={
+            "kind": "retention",
+            "level_id": "a1",
+            "source_session_id": session["session_id"],
+        },
+    )
+    assert ret_start.status_code == 200, ret_start.text
+    ret_session = ret_start.json()
+    # Fallo masivo: todas las respuestas incorrectas → ratio muy por debajo.
+    wrong = {
+        it["id"]: (index[it["id"]].correct_index + 1) % len(index[it["id"]].options)
+        for it in ret_session["instrument"]["items"]
+        if it["id"] in index
+    }
+    ret_done = client.post(
+        f"/api/academy/assessment/v2/submit?user_id={uid}",
+        json={"session_id": ret_session["session_id"], "answers": wrong},
+    )
+    assert ret_done.status_code == 409, ret_done.text
+    assert ret_done.json()["code"] == "RETENTION_NOT_DUE"

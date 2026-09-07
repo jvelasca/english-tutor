@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 
 from pydantic import BaseModel, Field, ValidationError, computed_field
 
@@ -15,6 +16,12 @@ LISTENING_SUBSKILLS: tuple[str, ...] = (
     "detail",
     "inference",
     "attitude",
+    # Tokens de foco perceptivo (LIST-01 V3.19): la progresión curricular los
+    # declara por nivel (LISTENING_FOCUS_BY_LEVEL) y, desde V3.19, son también
+    # skills servibles con ítems del corpus que respaldan el foco.
+    "word_recognition",
+    "sound_recognition",
+    "phrase_recognition",
     "vocabulary",
     "numbers",
     "speaker_intention",
@@ -1217,6 +1224,20 @@ def route_questions(
     return base + extras
 
 
+def normalized_script_key(script: str) -> str:
+    """Clave canónica de un `script` para detectar duplicados (LIST-03 V3.19).
+
+    Normaliza el texto del guion para comparar ítems como *el mismo contenido
+    audible*: minúsculas, sin los prefijos de turno de hablante (`A:`/`B:`/`C:`),
+    sin puntuación y con los espacios colapsados. Dos ítems con la misma clave
+    son cuasi-duplicados (el alumno escucharía el mismo texto) y deben re-auditarse.
+    """
+    text = re.sub(r"\b[A-Za-z]:\s*", "", script or "")
+    text = text.lower()
+    text = re.sub(r"[^a-z' ]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def validate_listening_bank(
     bank: list[dict] | None = None,
     *,
@@ -1225,12 +1246,14 @@ def validate_listening_bank(
     """Invariantes del banco de listening (devuelve lista de violaciones, vacía = ok).
 
     Garantiza que todo ítem sea un `ListeningAsset` válido, con id único, sub-destreza
-    canónica y un `difficulty_vector` de 8 dimensiones con valores 1..6. La coherencia
+    canónica, `script` normalizado único (LIST-03: sin cuasi-duplicados auditables) y
+    un `difficulty_vector` de 8 dimensiones con valores 1..6. La coherencia
     media↔dificultad ya no se valida: se cumple por construcción (`difficulty` se
     deriva del vector)."""
     bank = bank if bank is not None else QUESTION_BANK
     errors: list[str] = []
     seen_ids: set[str] = set()
+    seen_scripts: dict[str, str] = {}
     for q in bank:
         try:
             asset = ListeningAsset.model_validate(q)
@@ -1241,6 +1264,12 @@ def validate_listening_bank(
         if asset.id in seen_ids:
             errors.append(f"duplicate id: {asset.id}")
         seen_ids.add(asset.id)
+        key = normalized_script_key(asset.script)
+        if key in seen_scripts and seen_scripts[key] != asset.id:
+            errors.append(
+                f"duplicate normalized script: {asset.id} == {seen_scripts[key]}"
+            )
+        seen_scripts[key] = asset.id
         if asset.skill not in LISTENING_SUBSKILLS:
             errors.append(f"{asset.id}: invalid skill {asset.skill!r}")
         if asset.topic not in LISTENING_TOPICS:

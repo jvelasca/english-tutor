@@ -6,6 +6,12 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from config import MAX_CONTENT_CHARS
+from schemas.pronunciation import (
+    FluencyStats,
+    PhonemeBreakdown,
+    PronunciationBreakdown,
+)
+from schemas.pronunciation import Level as PronunciationLevel
 
 VocabularyStatus = Literal["exposed", "learning", "mastered"]
 
@@ -47,6 +53,13 @@ class LexicalItemOut(BaseModel):
     next_review_days: int
     exposures: int
     appearances: int
+    # V3.19: desglose de producción por destreza (columnas `<channel>_prod`).
+    # Invariante: chat_prod + speaking_prod + writing_prod + conversation_prod
+    # == appearances (producción agregada histórica, sin cambio de semántica).
+    chat_prod: int = 0
+    speaking_prod: int = 0
+    writing_prod: int = 0
+    conversation_prod: int = 0
 
 
 class CefrBucket(BaseModel):
@@ -91,3 +104,40 @@ class LexiconOut(BaseModel):
     summary: LexiconSummary
     items: list[LexicalItemOut]
     coverage: LexiconCoverage | None = None
+
+
+class DrillCandidatesOut(BaseModel):
+    """Candidatos al speaking micro-drill (V3.19).
+
+    Palabras expuestas (leídas/oídas) y nunca producidas en práctica de
+    speaking (`speaking_prod == 0`), ordenadas por recuerdo ascendente.
+    """
+
+    words: list[str]
+
+
+class DrillAttemptOut(BaseModel):
+    """Resultado de un intento de speaking micro-drill (V3.19).
+
+    Reutiliza el scoring de pronunciación existente (`score_pronunciation`
+    sobre la palabra esperada) y declara si la palabra se produjo (entra en el
+    `breakdown.correct`). El drill NO declara dominio ni crea evidencia
+    curricular (D5/E3): `produced=True` solo suma `speaking_prod` y saca la
+    palabra de la lista de candidatas.
+    """
+
+    word: str
+    produced: bool
+    expected: str
+    heard: str
+    score: int
+    level: PronunciationLevel
+    ok: bool
+    word_accuracy: int
+    phonetic_score: int
+    phoneme_accuracy_proxy: int
+    prosody_proxy: int
+    pronunciation_source: str
+    breakdown: PronunciationBreakdown
+    phoneme_breakdown: PhonemeBreakdown
+    fluency: FluencyStats | None = None

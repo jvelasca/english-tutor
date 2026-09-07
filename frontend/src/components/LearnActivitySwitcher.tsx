@@ -1,19 +1,12 @@
-import { BookOpen, MessageSquareText } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
-import {
-  GrammarIcon,
-  ListeningIcon,
-  PronunciationIcon,
-  SpeakingIcon,
-} from "./Icons";
+import { GrammarIcon, ListeningIcon, SpeakingIcon } from "./Icons";
 import { useI18n } from "../hooks/useI18n";
 import { navigateTo } from "../router/hash";
 import { learnActivityPath } from "../router/paths";
 import {
-  CONVERSATION_ACTIVITY,
   GRAMMAR_ACTIVITY,
   LISTENING_ACTIVITY,
-  PRONUNCIATION_ACTIVITY,
   SPEAKING_ACTIVITY,
   VOCABULARY_ACTIVITY,
   type LearnActivity,
@@ -31,22 +24,12 @@ interface ActivityEntry {
 }
 
 /**
- * Las 6 actividades del hub de APRENDER, en el mismo orden que las tarjetas de
+ * Las 4 actividades del hub de APRENDER, en el mismo orden que las tarjetas de
  * LearnHub: atajo directo entre prácticas desde la franja superior.
  */
 const ACTIVITIES: ActivityEntry[] = [
   { id: LISTENING_ACTIVITY, titleKey: "skill.listening", Icon: ListeningIcon },
   { id: SPEAKING_ACTIVITY, titleKey: "skill.speaking", Icon: SpeakingIcon },
-  {
-    id: PRONUNCIATION_ACTIVITY,
-    titleKey: "skill.pronunciation",
-    Icon: PronunciationIcon,
-  },
-  {
-    id: CONVERSATION_ACTIVITY,
-    titleKey: "learn.conversation",
-    Icon: MessageSquareText,
-  },
   { id: VOCABULARY_ACTIVITY, titleKey: "skill.vocabulary", Icon: BookOpen },
   { id: GRAMMAR_ACTIVITY, titleKey: "skill.grammar", Icon: GrammarIcon },
 ];

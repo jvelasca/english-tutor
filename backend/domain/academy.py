@@ -9,7 +9,12 @@ from starlette.concurrency import run_in_threadpool
 
 from config import DEFAULT_MODEL
 from domain import vocabulary as vocabulary_domain
-from domain.errors import EvidenceInvariantError
+from domain.errors import (
+    EvidenceInvariantError,
+    ObjectiveLockedError,
+    RetentionNotDueError,
+)
+from domain.speaking_routes import EvidenceExtractionError  # transitorio (503)
 from repositories import academy as academy_repo
 from repositories import conversations as conversations_repo
 from repositories import grammar as grammar_repo
@@ -431,6 +436,46 @@ async def _record_evidence_validated(
         await run_in_threadpool(academy_repo.record_evidence, user_id, **ev)
         recorded += 1
     return recorded
+
+
+async def _capture_production_text(
+    user_id: str, text: str, channel: str
+) -> None:
+    """Vuelca el texto producido por el alumno al léxico etiquetado por canal.
+
+    Punto único de captura de producción (V3.19, CAP-01/REFAC-01): todos los
+    flujos reales de práctica (speaking assessment/misión/routes/task,
+    pronunciación, writing, conversación guiada) llaman a este helper con su
+    canal; el chat libre sigue su vía propia (`/api/vocabulary/analyze`).
+    Nunca rompe el flujo de puntuación: `record_production_text` no lanza (la
+    producción es señal pedagógica, no evidencia de mastery)."""
+    if not text or not text.strip():
+        return
+    await vocabulary_domain.record_production_text(user_id, text, channel)
+
+
+async def _ensure_objective_evaluable(
+    user_id: str, lv: Level, objective_id: str
+) -> None:
+    """GATE-01: un objetivo `locked` no puede evaluarse ni completarse.
+
+    El gating curricular (`objective_gated_status`, premisa 21) debe imponerse
+    en servidor en cada writer de intento/evaluación/completar lección; si no,
+    un objetivo `locked` sería evaluable por API directa. Se eleva
+    `ObjectiveLockedError` → HTTP 409."""
+    obj_mastery = await run_in_threadpool(
+        academy_repo.list_objective_mastery, user_id, lv.level_id
+    )
+    objective_scores, objective_attempts = _split_objective_mastery(obj_mastery)
+    attempts = await run_in_threadpool(
+        academy_repo.list_attempts, user_id, lv.level_id
+    )
+    mastered = academy_svc.mastered_objective_ids(
+        lv, objective_scores, objective_attempts
+    )
+    statuses = course_svc.objective_gated_status(lv, mastered, attempts)
+    if statuses.get(objective_id) == course_svc.LOCKED:
+        raise ObjectiveLockedError(user_id, objective_id)
 
 
 async def enrollment_blocked(user_id: str, level_id: str) -> bool:
@@ -900,13 +945,18 @@ async def submit_speaking_assessment_part(
         part["prompt"], heard, model
     )
     if evidence is None:
-        return None
+        # ERR-01: la extracción falló (LLM) — transitorio → 503, no 404.
+        raise EvidenceExtractionError(
+            "el extractor no devolvió evidencia para la parte de speaking"
+        )
 
     await _inject_interaction_objective(evidence, conversation_id, user_id)
 
     result = speaking_svc.scores_from_evidence(
         evidence, heard, duration_seconds, task_type=part["task_type"]
     )
+    # V3.19: volcar la producción oral (assessment) al léxico por destreza.
+    await _capture_production_text(user_id, heard, "speaking")
 
     lv = _levels_by_id.get(await _current_level_id(user_id)) or _levels_by_id["a1"]
     evidence_rows = speaking_svc.evidence_from_speaking(
@@ -1090,7 +1140,10 @@ async def _score_mission_utterance(
         model,
     )
     if evidence is None:
-        return None
+        # ERR-01: extracción fallida (LLM) — transitorio → 503, no 404.
+        raise EvidenceExtractionError(
+            "el extractor no devolvió evidencia para el intento de misión"
+        )
     await _inject_interaction_objective(evidence, conversation_id, user_id)
     result = speaking_svc.scores_from_evidence(
         evidence,
@@ -1098,6 +1151,8 @@ async def _score_mission_utterance(
         duration_seconds,
         mission.get("task_type") or "role_play",
     )
+    # V3.19: volcar la producción oral (misión) al léxico por destreza.
+    await _capture_production_text(user_id, heard, "speaking")
     lv = _levels_by_id.get(await _current_level_id(user_id)) or _levels_by_id["a1"]
     await _record_evidence_validated(
         user_id,
@@ -1470,6 +1525,16 @@ async def start_assessment_v2(
             "session_id": source["id"],
             "title": (source.get("instrument") or {}).get("title"),
         }
+        # R6-01 (enforcement): la ventana de retención se exige en servidor, no
+        # solo en el estado de la escalera. Abrir un retention reassessment antes
+        # de RETENTION_MIN_DAYS desde la sesión formal origen (o sin origen
+        # formal) es un conflicto de estado → 409.
+        if not assessment_v2.retention_due(source.get("created_at") or ""):
+            raise RetentionNotDueError(
+                user_id,
+                level_id,
+                "ventana < RETENTION_MIN_DAYS desde la sesión formal origen",
+            )
         instrument = assessment_v2.build_retention(previous)
         uid = previous.get("unit_id") or ""
         obj_id = previous.get("objective_id") or ""
@@ -1541,13 +1606,38 @@ async def submit_assessment_v2(
     result = assessment_v2.evaluate(kind, scored, min_per_skill=min_per_skill)
 
     retention_payload = None
-    if kind == "retention" and session.get("source_session_id"):
+    if kind == "retention":
+        # R6-01 (enforcement): antes de escribir evidencia `delayed` se exige la
+        # ventana ≥ RETENTION_MIN_DAYS desde la sesión formal origen y un ratio
+        # de retención estable ≥ RETENTION_STABLE_RATIO. Si no, conflicto 409.
+        if not session.get("source_session_id"):
+            raise RetentionNotDueError(
+                user_id,
+                session["level_id"],
+                "sin sesión formal origen (source_session_id)",
+            )
         source = await run_in_threadpool(
             academy_repo.get_assessment_v2_session, session["source_session_id"]
         )
-        if source and source.get("result"):
-            retention_payload = assessment_v2.retention_delta(
-                source["result"], result
+        if source is None or not source.get("result"):
+            raise RetentionNotDueError(
+                user_id,
+                session["level_id"],
+                "sesión formal origen sin resultado",
+            )
+        retention_payload = assessment_v2.retention_delta(
+            source["result"], result
+        )
+        reasons: list[str] = []
+        if not assessment_v2.retention_due(source.get("created_at") or ""):
+            reasons.append(
+                "ventana < RETENTION_MIN_DAYS desde la sesión formal origen"
+            )
+        if retention_payload.get("stable") is not True:
+            reasons.append("ratio delayed/initial < RETENTION_STABLE_RATIO")
+        if reasons:
+            raise RetentionNotDueError(
+                user_id, session["level_id"], "; ".join(reasons)
             )
 
     evidence_kind = assessment_v2.evidence_kind_for(kind)
@@ -2793,6 +2883,8 @@ async def record_attempts(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no admite intentos (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     recorded = 0
     for r in results:
         skill = r["skill"]
@@ -2824,6 +2916,8 @@ async def record_lesson_completed(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede completar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     ok = await run_in_threadpool(
         academy_repo.record_lesson_completed, user_id, level_id, objective_id
     )
@@ -2853,6 +2947,8 @@ async def submit_objective_assessment(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede evaluar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     scored = academy_svc.score_items(obj.checks, answers)
     # Evidencia por ítem (reproducible y versionada), antes de agregar mastery.
     await _record_evidence_validated(
@@ -2920,7 +3016,11 @@ async def submit_speaking(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede evaluar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     result = speaking_svc.score_speaking(heard, expected, duration_seconds)
+    # V3.19: volcar la producción oral al léxico por destreza.
+    await _capture_production_text(user_id, heard, "speaking")
     await _record_evidence_validated(
         user_id,
         lv,
@@ -2988,9 +3088,14 @@ async def submit_speaking_task(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede evaluar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     evidence = await speaking_llm.extract_speaking_evidence(task, heard, model)
     if evidence is None:
-        return None
+        # ERR-01: extracción fallida (LLM) — transitorio → 503, no 404.
+        raise EvidenceExtractionError(
+            "el extractor no devolvió evidencia para la tarea de speaking"
+        )
     await _inject_interaction_objective(evidence, conversation_id, user_id)
     profile_difficulty = (
         difficulty
@@ -3000,6 +3105,8 @@ async def submit_speaking_task(
     result = speaking_svc.scores_from_evidence(
         evidence, heard, duration_seconds, task_type, expected
     )
+    # V3.19: volcar la producción oral (tarea libre) al léxico por destreza.
+    await _capture_production_text(user_id, heard, "speaking")
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3048,7 +3155,11 @@ async def submit_writing(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede evaluar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     result = writing_svc.score_writing(text, expected)
+    # V3.19: volcar la producción escrita al léxico por destreza.
+    await _capture_production_text(user_id, text, "writing")
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3096,7 +3207,11 @@ async def submit_pronunciation(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede evaluar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     result = pronunciation_svc.score_pronunciation_cefr(expected, heard)
+    # V3.19: volcar la producción oral (lectura en voz alta) al léxico.
+    await _capture_production_text(user_id, heard, "speaking")
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3145,10 +3260,17 @@ async def submit_writing_task(
         return None
     if await enrollment_blocked(user_id, level_id):
         return None
+    # GATE-01: un objetivo `locked` no se puede evaluar (409).
+    await _ensure_objective_evaluable(user_id, lv, objective_id)
     evidence = await writing_llm.extract_writing_evidence(task, text, model)
     if evidence is None:
-        return None
+        # ERR-01: extracción fallida (LLM) — transitorio → 503, no 404.
+        raise EvidenceExtractionError(
+            "el extractor no devolvió evidencia para la tarea de writing"
+        )
     result = writing_svc.scores_from_evidence(evidence)
+    # V3.19: volcar la producción escrita libre al léxico por destreza.
+    await _capture_production_text(user_id, text, "writing")
     await _record_evidence_validated(
         user_id,
         lv,

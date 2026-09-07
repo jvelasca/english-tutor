@@ -1,0 +1,33 @@
+# v3.20.0 — Speaking único + feedback oral
+
+**El candidato V3.20 (definido 2026-09-07, frontend-only; F1 de `docs/DISENO-SPEAKING-UNICO.md` + feedback oral) se cierra tras la prueba del gerente: Pronunciation y Conversation dejan de ser actividades propias y pasan a ser modos internos de Speaking (Micro-conversación / Acento / Diálogo guiado) sin cambiar sus motores, el alumno ya oye su propia grabación, el texto de cabecera se pliega tras un botón (i), el diálogo guiado admite turnos hablados reales, el modo Acento gana el feedback palabra a palabra y los modos viven en la URL con redirección de las URLs heredadas. Esta versión también sube a git la implementación del candidato V3.19 (léxico por destreza + micro-drill), que quedó sin release propio en el repo y viaja en este mismo commit.**
+
+## Qué cambia
+
+- **Consolidación de la práctica oral (F1).** El hub de APRENDER pasa a **4 tarjetas** (listening · speaking · vocabulario · gramática). Las antiguas tarjetas/URLs de Pronunciación y Conversación dejan de ser actividades propias: sus motores se reutilizan como modos internos de la página Speaking (`features/speaking/SpeakingRoutesPractice.tsx`), con selector **Micro-conversación / Acento / Diálogo guiado** en `QuizRoutePage` (prop `modeTabs`, título de superficie unificado "Speaking"; Acento = `PRONUNCIATION_ROUTE_CONFIG`, Diálogo guiado = `CONVERSATION_ROUTE_CONFIG`, exportadas). `/aprender/pronunciacion` y `/aprender/conversar` degradan al hub (`LEARN_ACTIVITY_IDS` de 6 a 4); el NextBest de destreza `pronunciation` y el CTA post-assessment de Recorridos navegan a Speaking; el chat libre sigue en `/chat`.
+- **Cabecera despejada.** El texto «Cada nivel es una ruta…» deja de ocupar el espacio superior por defecto: en `QuizRoutePage` vive tras el botón **(i) «Cómo funcionan las rutas»** plegado (`learn.routesInfoToggle`).
+- **El alumno oye su grabación real.** El backend solo transcribe (descartaba el audio), así que las escenas de Micro-conversación y Acento conservan el blob en memoria (`URL.createObjectURL`, revocado al cambiar/desmontar) y muestran **«Oír mi grabación»** (`components/RecordingPlayButton.tsx`) junto a la respuesta/frase modelo en el resultado; en Acento se añade también el altavoz de la frase modelo dentro del resultado.
+- **Diálogo guiado con turnos hablados de verdad (F3, parte frontend).** `features/conversation/ConversationVoiceButton.tsx` + `ConversationGuidedChat.tsx`: el micro del mini-chat ya no es dictado plano — graba el turno, mide su duración real (metadata del audio, fallback al reloj), transcribe y lo persiste con `mode="voice"` + telemetría (`Message.mode` admite `"voice"`). El backend (sin cambios, CONV-01 de V3.19) ya distingue el tecleo `mode="conversation"` de los turnos que computan como habla: los turnos por voz alimentan `_student_speech_seconds`, `turn_duration`/latencia de `interaction_evidence` y la resistencia de conversación.
+- **Chips palabra a palabra en Acento (mockup §6.3).** Nueva tarjeta «Frase palabra a palabra» en el resultado del read-aloud con la frase modelo coloreada por palabra — verde (bien dicha), ámbar (sustituida, muestra `→ lo dicho`), roja (no dicha) y «+extra» punteado (palabras de más). La clasificación la calcula `utils/pronunciationAlignment.ts`, un puerto TS del `SequenceMatcher` de difflib (Ratcliff-Obershelp sin junk) que reproduce exactamente la alineación del backend `services/phonetics.py::word_alignment`, con tests de paridad sobre los casos de `test_phonetics.py`: los chips siempre cuadran con `word_accuracy` y el breakdown mostrado.
+- **Modos por URL + redirección de legadas (F4).** El modo activo de Speaking vive en la URL (`/aprender/speaking` = micro, `/aprender/speaking/acento` = Acento, `/aprender/speaking/dialogo` = Diálogo guiado; alias en inglés aceptados). `SpeakingRoutesPractice` arranca desde la ruta, la URL manda en back/forward y cambiar de pestaña navega a la ruta canónica (`speakingModePath`). Las sub-rutas de las antiguas tarjetas resuelven SÍNCRONO como Speaking con su modo (`/aprender/pronunciacion` → Acento, `/aprender/conversar` → Diálogo) y App canonicaliza la URL al destino (`legacySpeakingRedirect`, sin parpadeo de hub).
+- **Fix del botón traducir en Micro-conversación.** El botón de **traducir la frase del interlocutor** (y el de la respuesta modelo) alternaba el estado interno de `usePhraseTranslation` pero la burbuja seguía pintando el inglés crudo (`{card.app_line}`/`{result.model_response}`): ahora pinta `display` con `lang` ES ⇄ EN, como el resto de escenas.
+
+## Técnica
+
+- Frontend (versión de app `3.19.0 → 3.20.0`, fuente única `backend/config.py`; backend sin cambios de lógica):
+  - `router/learnHub.ts`: `LEARN_ACTIVITY_IDS` a 4; `SpeakingMode` + `speakingModePath`/`speakingModeFromPath`/`legacySpeakingRedirect`; tests de degradación y canonicalización en `learnHub.test.ts`.
+  - `features/routes/QuizRoutePage.tsx`: `modeTabs`/`modeTab`/`onModeChange` + texto de rutas plegado tras el botón (i).
+  - `features/speaking/SpeakingRoutesPractice.tsx`: página Speaking unificada con selector de modos (micro/acento/diálogo) sincronizado con la URL, `RecordingPlayButton` y fix de `display` en la línea del interlocutor y la respuesta modelo.
+  - `features/conversation/ConversationRoutesPractice.tsx` y `features/pronunciation/PronunciationRoutesPractice.tsx`: exportan sus configs de rutas para su reutilización como modos; Acento gana `RecordingPlayButton` y chips palabra a palabra.
+  - `features/conversation/ConversationVoiceButton.tsx` (nuevo) + `ConversationGuidedChat.tsx`: turnos por voz con `mode="voice"` y telemetría; `types/api.ts::Message.mode` admite `"voice"`.
+  - `components/RecordingPlayButton.tsx` (nuevo): reproducción del blob real del alumno.
+  - `utils/pronunciationAlignment.ts` (nuevo) + `.test.ts`: puerto TS del `SequenceMatcher` con paridad.
+  - `App.tsx`/`app/Workspace.tsx`/`LearnHub.tsx`/`LearnActivitySwitcher.tsx`/`RecorridosTab.tsx`: 4 actividades, canonización de legadas y destinos a Speaking.
+  - `utils/i18n.ts`: claves de modos, botón (i), «Oír mi grabación» y chips; parity automática.
+- Sin cambios de backend ni de CONSTITUCIÓN pedagógica. Fuera del cierre (siguiente candidato): F2 (pulido de claims del modo, opcional), la decisión de evidencia formal de interaction (CONV-02, backend) y los pendientes anotados de V3.19 (GRAPH-01, modalidad oral/tecleo, WR-UI-01, LEX-03).
+
+## Tests
+
+- Frontend: **434 vitest en verde** (54 archivos) y build de producción (`tsc` + `vite build`) OK.
+- Backend: sin cambios desde V3.19 (**1371 pytest** en verde en el candidate); `ruff check .` limpio.
+- `scripts/check_release_consistency.py` exit 0 (3.20.0); i18n parity verde.

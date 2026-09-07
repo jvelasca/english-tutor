@@ -81,17 +81,27 @@ def _turn_duration_score(avg_duration_ms: float) -> float:
     return round((avg_duration_ms - TURN_DURATION_MIN_MS) / span, 3)
 
 
-def interaction_evidence(turns: list[dict]) -> dict:
+def interaction_evidence(
+    turns: list[dict],
+    *,
+    typed_modes: frozenset[str] = frozenset(),
+) -> dict:
     """Sub-dimensiones objetivas de interacción a partir de la telemetría de turnos.
 
     Cada turno es un dict con `role` ("student"/"assistant"), `duration_ms`
     (int|None), `latency_ms` (int|None, tiempo antes de empezar a responder) y
-    opcionalmente `created_at`. Devuelve:
+    opcionalmente `created_at` y `mode`. Devuelve:
     - `turn_balance`: balance de turnos en [0,1] (None sin intercambio real).
     - `avg_response_latency_ms`: latencia media de respuesta en ms (None sin datos).
     - `turn_duration`: duración media del turno del alumno en [0,1] (None sin datos).
     - `student_turns` / `assistant_turns`: recuento de turnos.
     - `interruptions`: recuento de interrupciones (None sin datos de latencia).
+
+    `typed_modes` son modos de turno TECLEADO (CONV-01 V3.19): su `duration_ms` y
+    `latency_ms` miden tiempo de redacción, no de habla, así que no alimentan las
+    sub-dimensiones de duración/latencia/interrupciones (aunque sus turnos siguen
+    contando para el balance y los recuentos). Sin `mode` o con un `mode` no
+    listado, la telemetría conserva la semántica histórica de turno oral.
     """
     student_durations: list[float] = []
     all_latencies: list[float] = []
@@ -102,8 +112,9 @@ def interaction_evidence(turns: list[dict]) -> dict:
 
     for turn in turns or []:
         role = turn.get("role")
-        duration = _num(turn.get("duration_ms"))
-        latency = _num(turn.get("latency_ms"))
+        typed = turn.get("mode") in typed_modes
+        duration = None if typed else _num(turn.get("duration_ms"))
+        latency = None if typed else _num(turn.get("latency_ms"))
         if latency is not None:
             all_latencies.append(latency)
         if _is_student(role):

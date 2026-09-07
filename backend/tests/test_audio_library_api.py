@@ -7,6 +7,7 @@ import wave
 import pytest
 from fastapi.testclient import TestClient
 
+import config
 from main import app
 from repositories import db
 from services.audio_library import (
@@ -18,6 +19,10 @@ from services.audio_library import (
     write_entry,
 )
 from services.listening import QUESTION_BANK
+
+# Fail-closed (ADMIN-01 V3.19): los endpoints de escritura/preview exigen PIN.
+_ADMIN_PIN = "test-pin"
+_ADMIN_HEADERS = {"X-Admin-Pin": _ADMIN_PIN}
 
 
 def _setup(monkeypatch, tmp_path):
@@ -33,6 +38,7 @@ def _setup(monkeypatch, tmp_path):
         json.dumps({"version": AUDIO_LIBRARY_VERSION, "entries": []}),
         encoding="utf-8",
     )
+    monkeypatch.setattr(config, "ADMIN_PIN", _ADMIN_PIN)
 
 
 def _wav_bytes(duration=1.0, framerate=8000) -> bytes:
@@ -147,6 +153,7 @@ def test_upload_endpoint_records_and_flips_to_recorded(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("l15.wav", _wav_bytes(duration=1.0), "audio/wav")},
             data={"audio_id": "audio-l15", "cefr": "B1", "transcript": "Hello"},
         )
@@ -164,6 +171,7 @@ def test_upload_endpoint_rejects_non_wav(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("x.wav", b"not a wav", "audio/wav")},
             data={"audio_id": "audio-l15"},
         )
@@ -175,6 +183,7 @@ def test_upload_endpoint_rejects_unknown_audio_id(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("x.wav", _wav_bytes(), "audio/wav")},
             data={"audio_id": "nope"},
         )
@@ -186,10 +195,13 @@ def test_delete_endpoint_removes(monkeypatch, tmp_path):
     with TestClient(app) as client:
         client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("l15.wav", _wav_bytes(), "audio/wav")},
             data={"audio_id": "audio-l15"},
         )
-        r = client.delete("/api/audio-library/audio-l15")
+        r = client.delete(
+            "/api/audio-library/audio-l15", headers=_ADMIN_HEADERS
+        )
     assert r.status_code == 200
     assert r.json()["removed"] is True
     assert not (tmp_path / "audio-l15.wav").exists()
@@ -199,7 +211,7 @@ def test_delete_endpoint_removes(monkeypatch, tmp_path):
 def test_delete_endpoint_unknown_404(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.delete("/api/audio-library/nope")
+        r = client.delete("/api/audio-library/nope", headers=_ADMIN_HEADERS)
     assert r.status_code == 404
 
 
@@ -209,10 +221,13 @@ def test_preview_endpoint_serves_wav(monkeypatch, tmp_path):
     with TestClient(app) as client:
         client.post(
             "/api/audio-library/upload",
+            headers=_ADMIN_HEADERS,
             files={"file": ("l15.wav", wav, "audio/wav")},
             data={"audio_id": "audio-l15"},
         )
-        r = client.get("/api/audio-library/audio-l15/audio")
+        r = client.get(
+            "/api/audio-library/audio-l15/audio", headers=_ADMIN_HEADERS
+        )
     assert r.status_code == 200
     assert r.headers["content-type"] == "audio/wav"
     assert r.content == wav
@@ -221,5 +236,7 @@ def test_preview_endpoint_serves_wav(monkeypatch, tmp_path):
 def test_preview_endpoint_missing_404(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.get("/api/audio-library/audio-l15/audio")
+        r = client.get(
+            "/api/audio-library/audio-l15/audio", headers=_ADMIN_HEADERS
+        )
     assert r.status_code == 404

@@ -12,11 +12,38 @@ def _day(iso: str) -> str:
     return iso[:10]
 
 
-def record_words(user_id: str, words: list[str]) -> bool:
-    """Registra producción del alumno (upsert). Incrementa `appearances` y, si la
-    producción ocurre en un día distinto al último, `production_days`.
+# Canales de producción (V3.19): cada columna `<channel>_prod` de `vocabulary`
+# cuenta cuántos mensajes producidos por el alumno llegaron por ese canal.
+# Invariante de trazabilidad: `sum(chat_prod, speaking_prod, writing_prod,
+# conversation_prod) == appearances`.
+PRODUCTION_CHANNELS: tuple[str, ...] = (
+    "chat",
+    "speaking",
+    "writing",
+    "conversation",
+)
 
-    Devuelve False si el usuario no existe."""
+_CHANNEL_COLUMN: dict[str, str] = {
+    channel: f"{channel}_prod" for channel in PRODUCTION_CHANNELS
+}
+
+
+def record_production(
+    user_id: str, words: list[str], channel: str = "chat"
+) -> bool:
+    """Registra producción del alumno etiquetada por canal (upsert).
+
+    Incrementa `appearances` y, si la producción ocurre en un día distinto al
+    último, `production_days` — exactamente igual que `record_words` — y además
+    suma 1 a la columna `<channel>_prod` del canal. La semántica agregada
+    (`appearances`/`production_days`/`item_status`/coverage) no cambia; el
+    desglose por destreza queda derivable de las columnas `<channel>_prod`.
+
+    Devuelve False si el usuario no existe o el canal no es válido.
+    """
+    column = _CHANNEL_COLUMN.get(channel)
+    if column is None:
+        return False
     if get_user(user_id) is None:
         return False
     if not words:
@@ -33,18 +60,28 @@ def record_words(user_id: str, words: list[str]) -> bool:
             new_day = 1 if not prior or _day(prior) != today else 0
             conn.execute(
                 "INSERT INTO vocabulary "
-                "(user_id, word, appearances, first_seen, last_seen, production_days) "
-                "VALUES (?, ?, 1, ?, ?, ?) "
+                "(user_id, word, appearances, first_seen, last_seen, "
+                f"production_days, {column}) "
+                "VALUES (?, ?, 1, ?, ?, ?, 1) "
                 "ON CONFLICT(user_id, word) DO UPDATE SET "
                 "appearances = vocabulary.appearances + 1, "
                 "first_seen = CASE WHEN vocabulary.first_seen = '' "
                 "THEN excluded.first_seen ELSE vocabulary.first_seen END, "
                 "last_seen = excluded.last_seen, "
                 "production_days = vocabulary.production_days "
-                "+ excluded.production_days",
+                f"+ excluded.production_days, "
+                f"{column} = vocabulary.{column} + 1",
                 (user_id, w, now, now, new_day),
             )
     return True
+
+
+def record_words(user_id: str, words: list[str]) -> bool:
+    """Registra producción del alumno (chat libre, canal `chat`).
+
+    Wrapper retrocompatible de `record_production` (V3.19). Devuelve False si
+    el usuario no existe."""
+    return record_production(user_id, words, channel="chat")
 
 
 def record_exposures(user_id: str, words: list[str]) -> bool:
@@ -73,13 +110,16 @@ def record_exposures(user_id: str, words: list[str]) -> bool:
 
 def get_vocabulary(user_id: str) -> list[dict]:
     """Devuelve el vocabulario del usuario ordenado por producción (desc) y
-    palabra (asc). Incluye métricas de exposición y espaciado, y el contexto
-    curricular del ítem léxico (V2.3)."""
+    palabra (asc). Incluye métricas de exposición y espaciado, el contexto
+    curricular del ítem léxico (V2.3) y el desglose de producción por destreza
+    (V3.19: `chat_prod`/`speaking_prod`/`writing_prod`/`conversation_prod`)."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT word, appearances, first_seen, last_seen, "
             "exposures, last_exposed_at, production_days, "
-            "cefr, level_id, objective_id, source, lemma, kind FROM vocabulary "
+            "cefr, level_id, objective_id, source, lemma, kind, "
+            "chat_prod, speaking_prod, writing_prod, conversation_prod "
+            "FROM vocabulary "
             "WHERE user_id = ? ORDER BY appearances DESC, word ASC",
             (user_id,),
         ).fetchall()

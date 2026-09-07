@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from starlette.concurrency import run_in_threadpool
 
+from domain import vocabulary as vocabulary_domain
 from repositories import pronunciation_routes as pron_repo
 from services.fluency import compute_fluency
 from services.listening import difficulty_from_vector
@@ -104,6 +105,9 @@ async def submit_attempt(
     result = score_pronunciation(script, heard)
     fluency = compute_fluency(heard, duration_seconds)
     passed = bool(result["ok"])
+    # V3.19: volcar la producción oral (read-aloud) al léxico por destreza.
+    # `record_production_text` nunca lanza (volcado no bloqueante).
+    await vocabulary_domain.record_production_text(user_id, heard, "speaking")
     topic = phrase.get("topic", "")
     difficulty = difficulty_from_vector(phrase.get("difficulty_vector", {}))
     await run_in_threadpool(

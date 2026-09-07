@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from starlette.concurrency import run_in_threadpool
 
+from domain import vocabulary as vocabulary_domain
 from domain.speaking_routes import EvidenceExtractionError  # transitorio (503)
 from repositories import conversation_routes as conversation_repo
 from repositories import conversations as conversations_repo
@@ -40,6 +41,13 @@ from services.translate import pick_model
 
 # Roles de mensaje que cuentan como turno del alumno (la BD guarda "user").
 _STUDENT_ROLES = frozenset({"student", "user"})
+
+# Modos de mensaje que son un canal TECLEADO (no oral): su `duration_ms`/`latency_ms`
+# miden redacción, no habla (CONV-01 V3.19). El frontend conversa los mini-diálogos
+# guiados en un mini-chat que persiste cada turno con `mode="conversation"`; si una
+# superficie oral real persiste turnos con su propia `mode` y telemetría de audio,
+# esos SÍ computarán como tiempo de habla.
+_TYPED_TURN_MODES = frozenset({"conversation"})
 
 
 def is_valid_level(level: str) -> bool:
@@ -107,7 +115,11 @@ async def _student_turns(conversation_id: str, user_id: str) -> list[dict] | Non
 
 
 async def _student_speech_seconds(conversation_id: str, user_id: str) -> float | None:
-    """Segundos de habla del alumno si la telemetría de turnos los observa."""
+    """Segundos de habla del alumno si la telemetría de turnos los observa.
+
+    Solo computan turnos ORALES (CONV-01 V3.19): un turno cuyo `mode` es un
+    mini-chat tecleado mide tiempo de redacción y no suma segundos de habla.
+    """
     turns = await run_in_threadpool(
         conversations_repo.get_turns, conversation_id, user_id
     )
@@ -115,8 +127,10 @@ async def _student_speech_seconds(conversation_id: str, user_id: str) -> float |
         return None
     total_ms = 0
     for turn in turns:
-        if (turn.get("role") or "").lower() in _STUDENT_ROLES and turn.get(
-            "duration_ms"
+        if (
+            (turn.get("role") or "").lower() in _STUDENT_ROLES
+            and turn.get("mode") not in _TYPED_TURN_MODES
+            and turn.get("duration_ms")
         ):
             total_ms += int(turn["duration_ms"])
     return round(total_ms / 1000, 1) if total_ms else None
@@ -130,14 +144,17 @@ async def _inject_interaction_objective(
     Es el mismo criterio que `domain.academy._inject_interaction_objective`: solo
     cuando `interaction_evidence` observa `turn_balance` o `turn_duration` se
     asigna `evidence["interaction_objective"]` para que el scorer determinista la
-    combine con la señal semántica del LLM.
+    combine con la señal semántica del LLM. En la conversación guiada los turnos
+    son de un mini-chat tecleado (CONV-01): su `duration_ms`/`latency_ms` son
+    tiempo de redacción y no producen `turn_duration`/latencia (el balance de
+    turnos, que sí refleja la interacción real, se conserva).
     """
     turns = await run_in_threadpool(
         conversations_repo.get_turns, conversation_id, user_id
     )
     if not turns:
         return
-    objective = interaction_evidence(turns)
+    objective = interaction_evidence(turns, typed_modes=_TYPED_TURN_MODES)
     if (
         objective["turn_balance"] is not None
         or objective["turn_duration"] is not None
@@ -214,6 +231,13 @@ async def submit_attempt(
     if turns is None:
         return None
     heard = "\n".join(m["content"].strip() for m in turns).strip()
+    # V3.19: volcar la producción de la conversación guiada al léxico por
+    # destreza (canal `conversation`). Se captura el transcripto reconstruido
+    # antes del guard de longitud: el alumno ya produjo ese texto al conversar.
+    # `record_production_text` nunca lanza (volcado no bloqueante).
+    await vocabulary_domain.record_production_text(
+        user_id, heard, channel="conversation"
+    )
     word_count = len(heard.split())
     if len(turns) < CONV_MIN_STUDENT_TURNS or word_count < CONV_MIN_STUDENT_WORDS:
         raise ValueError("conversation.too_short")

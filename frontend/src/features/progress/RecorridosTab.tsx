@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import { navigateTo } from "../../router/hash";
 import { learnActivityPath } from "../../router/paths";
-import { CONVERSATION_ACTIVITY } from "../../router/learnHub";
+import { SPEAKING_ACTIVITY } from "../../router/learnHub";
 import { SpeakingPanel } from "../speaking/SpeakingPanel";
 import { SpeakingJourney } from "../speaking/SpeakingJourney";
 import { SpeakingDiagnostic } from "../speaking/SpeakingDiagnostic";
@@ -49,9 +49,9 @@ export function RecorridosTab({ userId }: RecorridosTabProps) {
 
   // Tras un Speaking Assessment el siguiente paso recomendado no puede arrancar
   // una práctica desde MI PROGRESO (no hay workspace): se lleva al mundo
-  // Aprender → Conversar, la práctica conversacional libre.
+  // Aprender → Speaking, la práctica oral unificada (DISENO-SPEAKING-UNICO).
   const handleAssessmentNext = () =>
-    navigateTo(learnActivityPath(CONVERSATION_ACTIVITY));
+    navigateTo(learnActivityPath(SPEAKING_ACTIVITY));
 
   let content: ReactNode = null;
   if (track === "listening") {

@@ -12,7 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, VERSION
-from domain.errors import EvidenceInvariantError
+from domain.errors import (
+    EvidenceInvariantError,
+    ObjectiveLockedError,
+    RetentionNotDueError,
+)
 from repositories.db import init_db
 from routers.academy import router as academy_router
 from routers.assessment import router as assessment_router
@@ -81,6 +85,36 @@ async def evidence_invariant_handler(
             "code": "EVIDENCE_INVARIANT",
             "message": "Evidencia rechazada por violación de invariantes",
             "violations": exc.violations,
+        },
+    )
+
+
+@app.exception_handler(RetentionNotDueError)
+async def retention_not_due_handler(
+    _request: Request, exc: RetentionNotDueError
+) -> JSONResponse:
+    """R6-01: la retención no es debida (ventana/ratio) → 409 conflicto."""
+    return JSONResponse(
+        status_code=409,
+        content={
+            "code": "RETENTION_NOT_DUE",
+            "message": "Retención no debida: ventana de ≥7 días o ratio estable",
+            "reason": exc.reason,
+        },
+    )
+
+
+@app.exception_handler(ObjectiveLockedError)
+async def objective_locked_handler(
+    _request: Request, exc: ObjectiveLockedError
+) -> JSONResponse:
+    """GATE-01: objetivo locked evaluable por API → 409 conflicto."""
+    return JSONResponse(
+        status_code=409,
+        content={
+            "code": "OBJECTIVE_LOCKED",
+            "message": "Objetivo locked: no se puede evaluar ni completar",
+            "objective_id": exc.objective_id,
         },
     )
 

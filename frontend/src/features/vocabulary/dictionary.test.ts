@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  cefrBarValue,
-  recognizedNotProduced,
-  sortLexicalItems,
-} from "./dictionary";
+import { cefrBarValue, sortLexicalItems } from "./dictionary";
 import type { LexicalItem } from "../../types/api";
 
 function item(partial: Partial<LexicalItem>): LexicalItem {
@@ -18,6 +14,10 @@ function item(partial: Partial<LexicalItem>): LexicalItem {
     next_review_days: 3,
     exposures: 0,
     appearances: 0,
+    chat_prod: 0,
+    speaking_prod: 0,
+    writing_prod: 0,
+    conversation_prod: 0,
     ...partial,
   };
 }
@@ -34,19 +34,6 @@ describe("dictionary helpers", () => {
     const sorted = sortLexicalItems(items).map((i) => i.word);
     // weak primero (menor recall antes), luego learning, known, mastered.
     expect(sorted).toEqual(["c", "b", "e", "d", "a"]);
-  });
-
-  it("recognizedNotProduced devuelve solo input sin producción", () => {
-    const items = [
-      item({ word: "travel", exposures: 3, appearances: 0 }),
-      item({ word: "cat", exposures: 0, appearances: 2 }),
-      item({ word: "culture", exposures: 0, appearances: 0 }),
-    ];
-    expect(recognizedNotProduced(items)).toEqual(["travel"]);
-  });
-
-  it("recognizedNotProduced está vacío sin datos", () => {
-    expect(recognizedNotProduced([])).toEqual([]);
   });
 
   it("cefrBarValue normaliza respecto al máximo", () => {

@@ -4,7 +4,7 @@
   "levels": {
     "A1": [
       {"id": "c001", "note": "gist literal, distractores plausibles, velocidad 120 (por encima de banda de referencia 80-115, aceptado por ser TTS claro)"},
-      {"id": "c007", "note": "etiquetado speaker_intention aunque es deseo literal; etiqueta generosa a nivel A1"},
+      {"id": "c007", "note": "deseo literal (quiere café); re-etiquetado a detail en V3.19 (la etiqueta speaker_intention era generosa a nivel A1)"},
       {"id": "c043", "note": "gist de mensaje breve, distractor opuesto (hot) y plausible (umbrella)"},
       {"id": "c049", "note": "detail explícito de comida; distractores de la misma categoría"}
     ],
@@ -15,10 +15,10 @@
       {"id": "c064", "note": "inference directa (hurt knee); no exige matiz"}
     ],
     "B1": [
-      {"id": "c021", "note": "inference + connected speech real (gonna); alineado con foco B1"},
+      {"id": "c021", "note": "phrase_recognition real (gonna be a bit late); re-etiquetado desde inference en V3.19, alineado con el foco B1"},
       {"id": "c027", "note": "sequencing con marcadores; distractor correcto depende de orden"},
       {"id": "c073", "note": "connected speech auténtico (whaddaya/dunno); excelente para B1"},
-      {"id": "c079", "note": "sequencing paralelo a c027 (instrucciones); riesgo de patrón repetido"}
+      {"id": "c079", "note": "sequencing de llegada a hotel; re-autorado en V3.19 para romper el paralelo estructural con c027"}
     ],
     "B2": [
       {"id": "c031", "note": "inference multihablante (falta de acuerdo); tres voces, distractores fuertes"},

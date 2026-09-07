@@ -10,14 +10,19 @@ from domain import users as user_service
 async def require_admin(
     x_admin_pin: str | None = Header(default=None),
 ) -> None:
-    """Candado local de administración (V1.37).
+    """Candado local de administración (V1.37; fail-closed desde ADMIN-01 V3.19).
 
-    Si `config.ADMIN_PIN` está vacío, permite el acceso (comportamiento previo).
-    Si está definido, exige la cabecera `X-Admin-Pin` coincidente. Sin OAuth/cloud:
-    separa `student` (aprender) de `admin` (gestionar audio/curriculum/diagnostics).
+    Secure-by-default: si `config.ADMIN_PIN` está vacío, los endpoints admin quedan
+    DESHABILITADOS (401) porque no hay secreto configurado con el que autenticarse.
+    Con `ADMIN_PIN` definido, exige la cabecera `X-Admin-Pin` coincidente. Sin
+    OAuth/cloud: separa `student` (aprender) de `admin` (gestionar
+    audio/curriculum/diagnostics). Nunca abre la gestión por defecto (fail-open).
     """
     if not config.ADMIN_PIN:
-        return
+        raise HTTPException(
+            status_code=401,
+            detail="Administración deshabilitada (configurar ADMIN_PIN)",
+        )
     if x_admin_pin != config.ADMIN_PIN:
         raise HTTPException(status_code=401, detail="PIN de administración requerido")
 
