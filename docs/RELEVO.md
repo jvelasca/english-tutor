@@ -3,7 +3,20 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 21:25 (UTC+2).
+> Actualizado por última vez: 2026-09-08 22:10 (UTC+2).
+>
+> **Nota (2026-09-08, 22:10):** **V3.26 publicada** — release **v3.26.0** en
+> `main` (hoja de ruta completa: **Eje A** retención longitudinal multi-punto y
+> gate MASTERED con initial/practice espaciado — F-A1/F-A2/F-A3, **Eje B**
+> emisor real de `novel` en misiones B2+ jamás practicadas + ledger
+> `vocabulary_events` por superficie, **Eje C** taxonomía de capas de Listening
+> + calibración CEFR 2.1.0 unificada + `blocked_by` con motivo en UI + marcas
+> de legacy sin `context_id`). CI GitHub Actions **success**; dossier O
+> `docs/audit/O-AUDITORIA-TOTAL-V326.md`; release notes
+> `release-notes-v3.26.0.md`; CHANGELOG/PLAN/README actualizados;
+> `check_release_consistency` **3.26.0** exit 0. Pendiente: auditoría externa
+> del candidato v3.26.0 (deuda abierta documentada: reactivación calibrada de
+> `novel_required` en B2+, corpus recognition de listening, pesos de support).
 >
 > **Nota (2026-09-08, 21:25):** **V3.26 · Eje C CERRADO — Listening real
 > (taxonomía por capas) + calibración CEFR unificada + skills bloqueantes en UI

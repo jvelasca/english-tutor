@@ -52,6 +52,21 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.26.0` — **Hoja de ruta completa: Ejes A + B + C** (los
+  P2 de las auditorías externas V3.24/V3.25; dossier `docs/audit/O-AUDITORIA-TOTAL-V326.md`):
+  **Eje A — retención longitudinal y gate MASTERED** (F-A1 initial/practice
+  espaciado, F-A2 ancla `delayed` a su origen formal con `event_age` vs
+  `retention_interval`, F-A3 ≥2 reassessment points estables por destreza con
+  fix del escritor `kind=level`) · **Eje B — emisor real de `novel`** (F-B1:
+  primera misión B2+ jamás practicada; requisito `novel_required=0` intacto) +
+  **historia léxica por superficie** (F-B2: ledger `vocabulary_events`
+  append-only, sin backfill) · **Eje C — Listening real y calibración** (F-C1
+  taxonomía recognition/comprehension/inference con reporte `by_layer`,
+  F-C2 escalera CEFR monótona unificada de extremos matriz 2.1.0, F-C3
+  `blocked_by` con motivo traducido en la UI, F-C4 marcas de legacy sin
+  `context_id` por destreza/global/ladder). Verificación íntegra: pytest
+  backend **1538 passed** + ruff, vitest **450 passed** (57 archivos) + tsc;
+  `check_release_consistency` 3.26.0 exit 0.
 - ✅ Versión estable `3.25.1` — **Cierre de P1 de la auditoría externa V3.25**
   (patch correctivo sobre v3.25.0; dossier `docs/audit/N-AUDITORIA-TOTAL-V3251.md`,
   evidencia de cierre: los 6 tests negativos del gate): **certification_gate
