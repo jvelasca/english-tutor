@@ -195,3 +195,49 @@ def test_speaking_mission_unknown_scenario(monkeypatch, tmp_path):
         json={"scenario_id": "does-not-exist"},
     )
     assert res.status_code == 404
+
+
+def test_mission_session_persists_cefr_target(monkeypatch, tmp_path):
+    """V3.25 (F-K3, fase 7): la sesión de misión persiste el `cefr_target`
+    declarado por el escenario tanto en columna propia (consultable sin parsear
+    `mission_json`) como dentro del JSON de la misión."""
+    user_id = _setup(monkeypatch, tmp_path)
+    scenario = list_scenarios()[0]
+    mission = mission_svc.mission_from_scenario(scenario)
+    session = academy_repo.create_speaking_mission_session(
+        user_id, scenario["id"], mission
+    )
+    assert session is not None
+    assert session["scenario_id"] == scenario["id"]
+    # La columna `cefr_target` refleja el target declarado por la misión.
+    assert session["cefr_target"] == (mission["cefr_target"] or "")
+    assert session["cefr_target"]  # no vacío (default B1 del catálogo)
+    # `mission_json` conserva el mismo target (fuente canónica del estado).
+    assert session["mission"]["cefr_target"] == session["cefr_target"]
+
+
+def test_mission_cefr_target_migration_backfills_legacy(monkeypatch, tmp_path):
+    """V3.25 (F-K3): instalaciones previas (solo `mission_json`) migran su
+    `cefr_target` a la columna nueva de forma idempotente al re-ejecutar
+    `init_db`."""
+    user_id = _setup(monkeypatch, tmp_path)
+    scenario = list_scenarios()[0]
+    mission = mission_svc.mission_from_scenario(scenario)
+    session = academy_repo.create_speaking_mission_session(
+        user_id, scenario["id"], mission
+    )
+    # Simula una BD previa a V3.25: sin columna `cefr_target`.
+    import sqlite3
+
+    conn = sqlite3.connect(db.DB_PATH)
+    conn.execute(
+        "ALTER TABLE speaking_mission_sessions DROP COLUMN cefr_target"
+    )
+    conn.commit()
+    conn.close()
+
+    db.init_db()
+    migrated = academy_repo.get_speaking_mission_session(session["id"])
+    assert migrated is not None
+    assert migrated["cefr_target"] == (mission["cefr_target"] or "")
+    assert migrated["mission"]["cefr_target"] == migrated["cefr_target"]

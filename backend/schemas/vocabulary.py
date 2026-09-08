@@ -30,11 +30,18 @@ class VocabularyAnalyzeResponse(BaseModel):
 
 
 class VocabularyItem(BaseModel):
+    """Ítem léxico histórico (V2.3).
+
+    V3.25 (F-K7/P2-01): los contadores pasan a los nombres canónicos
+    `production_count` (producción del alumno) y `exposure_count` (input del
+    tutor). `word` conserva la forma superficial (surface form).
+    """
+
     word: str
-    appearances: int
+    production_count: int
     first_seen: str
     last_seen: str
-    exposures: int
+    exposure_count: int
     last_exposed_at: str
     production_days: int
     status: VocabularyStatus
@@ -53,6 +60,12 @@ class LexicalCompetence(BaseModel):
     `production_gap` (reconocida y nunca producida) es el gap que cierra el
     micro-drill; `transfer_gap` (producida pero nunca transferida a otro
     contexto) queda como señal de falta de transferencia real.
+
+    F-K5 (V3.25): desambiguación por dominio. `transfer`/`retention` en esta
+    capa LÉXICA (señal informativa por ítem, D5/E3) NO comparten semántica con
+    la capa ACADÉMICA (evidence_kind `transfer`/`delayed` de la escalera
+    Assessment 2.0 y la certificación §6.3). Si un schema de dominio las
+    renombra, pasarán a `contextual_transfer` / `delayed_recall`.
     """
 
     recognition: bool
@@ -70,6 +83,19 @@ class LexicalCompetence(BaseModel):
 
 
 class LexicalItemOut(BaseModel):
+    """Ítem del léxico personal (lexicón).
+
+    V3.25 (F-K7/P2-01/P2-02): `word` es la FORMA SUPERFICIAL (surface form:
+    "going"); `lemma` el lema que el currículo declara cuando el ítem es de
+    currículo ("" para léxico libre); y `lexical_unit` la UNIDAD de análisis
+    canónica (lemma si existe, superficie normalizada si no). Los contadores
+    usan los nombres canónicos `production_count`/`exposure_count` (el
+    histórico `appearances`/`exposures` quedó renombrado en la migración
+    V3.25). El agregado de dominio por `lexical_unit` evita tratar
+    `go/going/went/gone` como conocimientos independientes cuando comparten
+    lemma.
+    """
+
     word: str
     lemma: str
     cefr: str
@@ -80,11 +106,12 @@ class LexicalItemOut(BaseModel):
     status: LexicalStatus
     recall: float
     next_review_days: int
-    exposures: int
-    appearances: int
+    production_count: int
+    exposure_count: int
+    lexical_unit: str = ""
     # V3.19: desglose de producción por destreza (columnas `<channel>_prod`).
     # Invariante: chat_prod + speaking_prod + writing_prod + conversation_prod
-    # == appearances (producción agregada histórica, sin cambio de semántica).
+    # == production_count (producción agregada histórica).
     chat_prod: int = 0
     speaking_prod: int = 0
     writing_prod: int = 0

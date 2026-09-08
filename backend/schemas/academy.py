@@ -1088,6 +1088,15 @@ class SkillProfileOut(BaseModel):
     stability: float = 0.0
     trend: float | None = None
     subskills: list[dict] = Field(default_factory=list)
+    # V3.25 (fases 1-2): contexto del evento de evidencia expuesto por destreza.
+    # `evidence_by_kind`/`production_count`/`generalized_score` ya existían en el
+    # dict interno y ahora se serializan; `support_levels`/`independent_count`
+    # llegan nuevos (F-L7). Retrocompatible: campos con valor por defecto.
+    evidence_by_kind: dict[str, int] = Field(default_factory=dict)
+    support_levels: dict[str, int] = Field(default_factory=dict)
+    independent_count: int = 0
+    production_count: int = 0
+    generalized_score: float | None = None
 
 
 class CefrProfileOut(BaseModel):
@@ -1099,6 +1108,12 @@ class CefrProfileOut(BaseModel):
 
 
 class ReadinessSkillOut(BaseModel):
+    """Readiness de una destreza hacia el nivel objetivo (V2.2).
+
+    V3.25 (fase 3, F-L6): `transfer_count` es el valor EFECTIVO usado por el
+    gate: contextos de actividad distintos cuando el perfil los conoce, conteo
+    de filas en perfiles legacy (sin contexto declarado)."""
+
     skill: str
     score: float
     confidence: float
@@ -1160,8 +1175,21 @@ class MasteryRecordOut(BaseModel):
 
 
 class StudentModelOut(BaseModel):
+    """Student Model 2.0 (V3.25, Fase 5): niveles con semántica separada.
+
+    - `demonstrated_level`: mayor nivel CEFR **demostrado** (examen completado +
+      retención retardada certificable por destreza del examen). `None` hasta la
+      primera certificación — nunca un nivel hipotético.
+    - `estimated_level`/`estimated_numeric`: banda continua **estimada** anclada
+      a `completed_levels` + progreso del tramo actual (F-K2).
+    - `level_progress`: progreso 0..1 dentro del nivel actual (`overall` del
+      perfil del tramo en curso), no confundir con el eje absoluto CEFR.
+    """
+
     level_id: str
     current_level: str
+    demonstrated_level: str | None = None
+    level_progress: float = 0.0
     estimated_level: str
     estimated_numeric: float
     confidence: float

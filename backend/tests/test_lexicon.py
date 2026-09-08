@@ -108,8 +108,8 @@ def test_seed_does_not_increment_appearances(monkeypatch, tmp_path):
     items = lexicon.items_from_objective(_level(), _objective())
     assert vocabulary_repo.seed_curriculum_items(uid, items) is True
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
-    assert vocab["name"]["appearances"] == 0
-    assert vocab["name"]["exposures"] == 0
+    assert vocab["name"]["production_count"] == 0
+    assert vocab["name"]["exposure_count"] == 0
     assert vocab["name"]["production_days"] == 0
     assert vocab["name"]["cefr"] == "A1"
     assert vocab["name"]["source"] == "curriculum"
@@ -123,7 +123,7 @@ def test_seed_preserves_production_and_fills_context(monkeypatch, tmp_path):
     items = lexicon.items_from_objective(_level(), _objective())
     vocabulary_repo.seed_curriculum_items(uid, items)
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
-    assert vocab["name"]["appearances"] == 1  # no se reinicia la producción
+    assert vocab["name"]["production_count"] == 1  # no se reinicia la producción
     assert vocab["name"]["cefr"] == "A1"  # pero sí se rellena el contexto
     assert vocab["name"]["source"] == "curriculum"
 

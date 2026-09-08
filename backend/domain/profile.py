@@ -31,11 +31,11 @@ async def _activity_stats(user_id: str) -> dict:
     listening) que alimentan el perfil (no el nivel CEFR, que viene del Student
     Model)."""
     vocab = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
-    produced = [v for v in vocab if v["appearances"] > 0]
+    produced = [v for v in vocab if v["production_count"] > 0]
     mastered_words = [
         v
         for v in produced
-        if classify(v["appearances"], v["production_days"]) == "mastered"
+        if classify(v["production_count"], v["production_days"]) == "mastered"
     ]
     exposed_only = len(vocab) - len(produced)
 

@@ -228,7 +228,15 @@ def unit_gates(level: Level, unit, profile: list[dict]) -> dict:
         if not entry:
             return 0
         kinds = entry.get("evidence_by_kind") or {}
-        return int(kinds.get("transfer", 0)) + int(kinds.get("novel", 0))
+        # V3.25 (fase 3, F-L6): transfer/novel cuentan experiencias DISTINTAS
+        # por contexto cuando el perfil las declara; retroceden a filas en
+        # perfiles legacy sin contexto (retrocompatibilidad).
+        distinct = entry.get("distinct_contexts_by_kind") or {}
+        rows = int(kinds.get("transfer", 0)) + int(kinds.get("novel", 0))
+        ctx = int(distinct.get("transfer", 0) or 0) + int(
+            distinct.get("novel", 0) or 0
+        )
+        return ctx if ctx > 0 else rows
 
     transfer_total = sum(_transfer_count(s) for s in unit_skills)
     transfer_met = transfer_total >= UNIT_GATE_TRANSFER_MIN

@@ -355,7 +355,7 @@ def test_drill_attempt_asr_not_ok_never_produces(monkeypatch, tmp_path):
 
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["travel"]["speaking_prod"] == 0
-    assert vocab["travel"]["appearances"] == 0
+    assert vocab["travel"]["production_count"] == 0
     # El evento registrado es "unclear", no "ko".
     events = learning_repo.list_events(a, event_type="exercise")
     assert any(e["detail"] == "drill:travel:unclear" for e in events)
@@ -463,7 +463,7 @@ def test_drill_attempt_long_audio_rejected_400(monkeypatch, tmp_path):
 
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["travel"]["speaking_prod"] == 0
-    assert vocab["travel"]["appearances"] == 0
+    assert vocab["travel"]["production_count"] == 0
     # No se registra ningún resultado de intento (ni siquiera "unclear").
     events = learning_repo.list_events(a, event_type="exercise")
     assert not any(e["detail"].startswith("drill:travel:") for e in events)

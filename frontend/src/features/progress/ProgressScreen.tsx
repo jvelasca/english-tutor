@@ -140,6 +140,23 @@ export function ProgressScreen({
           {model && (
             <div className="flex flex-wrap items-center gap-2">
               <EstimatedLevelBadge level={model.estimated_level} />
+              {model.demonstrated_level && (
+                <Badge
+                  variant="outline"
+                  title={t("progress.certifiedTitle")}
+                  className="gap-1.5"
+                >
+                  <span aria-hidden="true">✓</span>
+                  {t("progress.certified")} {model.demonstrated_level}
+                </Badge>
+              )}
+              <Badge
+                variant="secondary"
+                title={t("progress.inLevelTitle")}
+              >
+                {Math.round(model.level_progress * 100)}%{" "}
+                {t("progress.inLevel")} {model.current_level}
+              </Badge>
               <Badge variant="secondary">
                 {model.target_level} · {t(`readiness.${band}`)}
               </Badge>

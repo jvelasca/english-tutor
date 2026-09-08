@@ -276,8 +276,13 @@ export interface LexicalItem {
   status: LexicalStatus;
   recall: number;
   next_review_days: number;
-  exposures: number;
-  appearances: number;
+  // V3.25 (F-K7/P2-01/P2-02): contadores canónicos (el histórico
+  // appearances/exposures quedó renombrado en el backend). `lexical_unit` es
+  // la unidad de análisis (lemma cuando el currículo lo declara); `word` es la
+  // forma superficial.
+  production_count: number;
+  exposure_count: number;
+  lexical_unit?: string;
   // V3.19: desglose de producción por destreza (columnas `<channel>_prod`).
   chat_prod: number;
   speaking_prod: number;
@@ -2275,6 +2280,12 @@ export interface MasteryRecord {
 export interface StudentModel {
   level_id: string;
   current_level: string;
+  /** V3.25 (Fase 5, F-L3): mayor nivel CEFR demostrado (examen + retención
+   * certificable por destreza); null hasta la primera certificación. */
+  demonstrated_level: string | null;
+  /** Progreso 0..1 dentro del nivel actual (overall del tramo en curso), no
+   * confundir con el eje CEFR absoluto de `estimated_numeric`. */
+  level_progress: number;
   estimated_level: string;
   estimated_numeric: number;
   confidence: number;

@@ -94,7 +94,7 @@ async def get_vocabulary(user_id: str) -> list[dict]:
     """Devuelve el vocabulario del usuario con el estado de dominio calculado."""
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     for row in rows:
-        row["status"] = classify(row["appearances"], row["production_days"])
+        row["status"] = classify(row["production_count"], row["production_days"])
     return rows
 
 
@@ -127,8 +127,11 @@ async def get_lexicon(user_id: str) -> dict:
             "status": lexicon.item_status(row),
             "recall": lexicon.item_recall(row),
             "next_review_days": lexicon.next_review_days(row),
-            "exposures": row["exposures"],
-            "appearances": row["appearances"],
+            "production_count": row["production_count"],
+            "exposure_count": row["exposure_count"],
+            # V3.25 (P2-02): unidad léxica canónica (lemma cuando el currículo lo
+            # declara; `word` conserva la FORMA SUPERFICIAL del ítem).
+            "lexical_unit": row.get("lexical_unit", ""),
             # V3.21 (V20-16): matriz de competencia Recognition/Production/
             # Transfer/Retention con el transfer gap por ítem (puro, derivado).
             "competence": lexicon.item_competence_matrix(row),

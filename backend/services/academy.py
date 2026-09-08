@@ -395,6 +395,41 @@ def aggregate_skill_mastery(
     }
 
 
+def evidence_context_count(
+    rows: list[dict], kind: str | None = None
+) -> int:
+    """Contextos de actividad distintos entre eventos de evidencia (V3.25, F-L6).
+
+    Cuenta combinaciones distintas de `(context_id, activity_id, task_type)`.
+    Las filas sin `context_id` (legacy o sin emisor de contexto) no se cuentan:
+    "contexto desconocido" no demuestra experiencias distintas. Si `kind` se
+    pasa, solo cuenta eventos de ese `evidence_kind`."""
+    seen: set[tuple[str, str, str]] = set()
+    for r in rows:
+        if kind is not None and (r.get("evidence_kind") or "familiar") != kind:
+            continue
+        cid = r.get("context_id") or ""
+        if not cid:
+            continue
+        seen.add((cid, r.get("activity_id") or "", r.get("task_type") or ""))
+    return len(seen)
+
+
+def effective_evidence_context_count(entry: dict, kind: str) -> int:
+    """Conteo efectivo de experiencias de `kind` para una destreza del perfil.
+
+    Si el perfil conoce contextos distintos (`distinct_contexts_by_kind`) y hay
+    alguno, devuelve ese valor (experiencias distintas). Si no (perfil legacy o
+    filas sin contexto), retrocede al conteo de filas para no bloquear datos
+    previos a V3.25."""
+    by_kind = entry.get("evidence_by_kind") or {}
+    distinct = entry.get("distinct_contexts_by_kind") or {}
+    ctx = int(distinct.get(kind, 0) or 0)
+    if ctx > 0:
+        return ctx
+    return int(by_kind.get(kind, 0) or 0)
+
+
 def build_skill_profile(
     level: Level,
     objective_mastery: dict[str, dict[str, dict]],
@@ -456,6 +491,7 @@ def build_skill_profile(
             "delayed": 0,
         }
         production_count = 0
+        support_levels: dict[str, int] = {level: 0 for level in SUPPORT_LEVELS}
         for r in rows:
             kind = r.get("evidence_kind") or "familiar"
             if kind in evidence_by_kind:
@@ -464,6 +500,17 @@ def build_skill_profile(
             # controlled_production exigen producir, no reconocer.
             if (r.get("item_type") or "mcq") in PRODUCTION_ITEM_TYPES:
                 production_count += 1
+            # V3.25 (fase 2, F-L7): nivel de apoyo por evento; las filas legacy
+            # (support_level vacío) no se cuentan en `support_levels`.
+            support = r.get("support_level") or ""
+            if support in support_levels:
+                support_levels[support] += 1
+        # V3.25 (fase 3, F-L6): experiencias distintas por evidence_kind. Los
+        # gates de transfer/mastery usarán este conteo (no el de filas) cuando
+        # el emisor declare contexto.
+        distinct_contexts_by_kind = {
+            kind: evidence_context_count(rows, kind) for kind in EVIDENCE_KINDS
+        }
         profile.append(
             {
                 "skill": skill,
@@ -476,7 +523,12 @@ def build_skill_profile(
                 ),
                 "subskills": [],
                 "evidence_by_kind": evidence_by_kind,
+                "distinct_contexts_by_kind": distinct_contexts_by_kind,
                 "production_count": production_count,
+                "support_levels": support_levels,
+                "independent_count": (
+                    support_levels["independent"] + support_levels["spontaneous"]
+                ),
                 "generalized_score": generalized_mastery_score(rows),
             }
         )
@@ -644,9 +696,16 @@ def evidence_from_items(
     curriculum_version: str = "",
     assessment_version: str = "",
     evidence_kind: str = "familiar",
+    context_id: str = "",
+    activity_id: str = "",
+    task_type: str = "",
+    support_level: str = "",
 ) -> list[dict]:
     """Convierte respuestas de ítems en registros de evidencia por ítem.
 
+    V3.25 (fase 1): cada registro es un evento de evidencia que puede llevar
+    contexto (`context_id`/`activity_id`/`task_type`) y `support_level`; sin
+    contexto, las claves quedan vacías y los agregados actuales no cambian.
     Devuelve una lista de dicts con las claves exactas que consume
     `repositories.academy.record_evidence` (sin `user_id`)."""
     records = []
@@ -667,6 +726,10 @@ def evidence_from_items(
                 "curriculum_version": curriculum_version,
                 "assessment_version": assessment_version,
                 "evidence_kind": evidence_kind,
+                "context_id": context_id,
+                "activity_id": activity_id,
+                "task_type": task_type,
+                "support_level": support_level,
             }
         )
     return records
@@ -696,6 +759,31 @@ EVIDENCE_SOURCES: tuple[str, ...] = (
 # habilidad), de novedad (nuevo audio + hablante + situación) y de retención
 # retardada (delayed — Assessment 2.0).
 EVIDENCE_KINDS: tuple[str, ...] = ("familiar", "transfer", "novel", "delayed")
+
+# Niveles de apoyo de la evidencia (F-L7, V3.25): cuánta ayuda necesitó el
+# alumno para producir/responder. Es el eje `copied → guided → cued →
+# independent → spontaneous`. Vacío ('') = no declarado (legacy). Cada emisor
+# declara su nivel por defecto al construir la evidencia.
+SUPPORT_LEVELS: tuple[str, ...] = (
+    "copied",
+    "guided",
+    "cued",
+    "independent",
+    "spontaneous",
+)
+
+# Tareas canónicas de producción/assessment (F-L6): permiten distinguir
+# experiencias por tipo de tarea, no solo por contador. Vacío = no declarado.
+TASK_TYPES: tuple[str, ...] = (
+    "multiple_choice",
+    "fill_blank",
+    "read_aloud",
+    "controlled",
+    "guided",
+    "open_ended",
+    "assessment",
+    "exam",
+)
 
 # Pesos de dominio generalizado (novel/delayed > transfer > familiar). Se
 # renormalizan sobre los kinds presentes en cada perfil.
@@ -779,6 +867,10 @@ def evidence_record_errors(
     evidence_kind = record.get("evidence_kind")
     if evidence_kind is not None and evidence_kind not in EVIDENCE_KINDS:
         errors.append(f"evidence_kind '{evidence_kind}' desconocido")
+
+    support_level = record.get("support_level") or ""
+    if support_level and support_level not in SUPPORT_LEVELS:
+        errors.append(f"support_level '{support_level}' desconocido")
 
     if not record.get("curriculum_version"):
         errors.append("curriculum_version vacío")

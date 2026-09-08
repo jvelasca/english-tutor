@@ -133,7 +133,7 @@ def test_drill_phrase_produced_accredits_atomic_unit(monkeypatch, tmp_path):
 
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["living room"]["speaking_prod"] == 1
-    assert vocab["living room"]["appearances"] == 1
+    assert vocab["living room"]["production_count"] == 1
     # Invariante de trazabilidad por fila.
     assert vocab["living room"]["chat_prod"] == 0
     assert (
@@ -141,7 +141,7 @@ def test_drill_phrase_produced_accredits_atomic_unit(monkeypatch, tmp_path):
         + vocab["living room"]["speaking_prod"]
         + vocab["living room"]["writing_prod"]
         + vocab["living room"]["conversation_prod"]
-    ) == vocab["living room"]["appearances"]
+    ) == vocab["living room"]["production_count"]
 
 
 def test_drill_phrase_reversed_not_produced(monkeypatch, tmp_path):
@@ -185,7 +185,7 @@ def test_drill_phrase_reversed_not_produced(monkeypatch, tmp_path):
 
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["get up"]["speaking_prod"] == 0
-    assert vocab["get up"]["appearances"] == 0
+    assert vocab["get up"]["production_count"] == 0
 
 
 def test_drill_phrase_interleaved_extra_not_produced(monkeypatch, tmp_path):

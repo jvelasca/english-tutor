@@ -3,7 +3,25 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 13:35 (UTC+2).
+> Actualizado por última vez: 2026-09-08 14:40 (UTC+2).
+>
+> **Nota (2026-09-08, 14:40):** **V3.25 implementada y verificada en el árbol de
+> trabajo (sin commit ni release aún)** — candidato release **v3.25.0**
+> (calibración del Student Model del dossier L — auditoría TOTAL verificada de
+> V3.24.0 — que absorbe los pendientes F-K3…F-K7: evidencia con contexto +
+> `support_level` canónico, transfer por experiencias distintas en
+> gates/readiness/unit, certificación con `delayed` verificado por `created_at`
+> + `retention_report` de intervalos, Student Model y UI con
+> `demonstrated_level`/`estimated_level`/`level_progress` separados, renombrado
+> canónico `appearances→production_count`/`exposures→exposure_count` con
+> `lexical_unit`, y doble vía speaking con `cefr_target` persistido y emisor
+> `independent`). Verificación local en el árbol: backend pytest **1481 passed**
+> + `ruff check .` limpio; frontend vitest **450 passed** (57 archivos) + `tsc`/
+> `vite build` OK; golden (`thresholds.json`) y E2E A1→A2 en verde;
+> `check_release_consistency` **3.25.0** exit 0. Dossier L
+> `docs/audit/L-AUDITORIA-TOTAL-V324.md`; release notes
+> `release-notes-v3.25.0.md`; CHANGELOG/PLAN/README actualizados. Siguiente
+> paso: cierre del release (commit + bump + CI).
 >
 > **Nota (2026-09-08, 13:35):** **V3.24 publicada** — release **v3.24.0**
 > `8970634` en `main` (calibración de salida del Student Model: **F-K1**

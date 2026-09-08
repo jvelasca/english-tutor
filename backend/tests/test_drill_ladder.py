@@ -220,14 +220,14 @@ def test_sentence_attempt_passed_accredits_word_within_phrase(
 
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["travel"]["speaking_prod"] == 1
-    assert vocab["travel"]["appearances"] == 1
+    assert vocab["travel"]["production_count"] == 1
     # Invariante de trazabilidad por fila.
     assert (
         vocab["travel"]["chat_prod"]
         + vocab["travel"]["speaking_prod"]
         + vocab["travel"]["writing_prod"]
         + vocab["travel"]["conversation_prod"]
-    ) == vocab["travel"]["appearances"]
+    ) == vocab["travel"]["production_count"]
 
     # Se registró el evento de éxito del paso frase.
     events = learning_repo.list_events(a, "exercise")

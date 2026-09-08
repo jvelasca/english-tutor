@@ -171,6 +171,24 @@ def dimension_scores(
             score, count = _evidence_kind_score(
                 objective.id, "transfer", evidence_rows
             )
+            # V3.25 (fase 3, F-L6): la cobertura transfer del nodo cuenta
+            # experiencias DISTINTAS por contexto cuando el emisor las declara;
+            # retrocede al conteo de filas en datos legacy (sin context_id).
+            transfer_rows = [
+                r
+                for r in evidence_rows
+                if (r.get("objective_id") == objective.id or not r.get("objective_id"))
+                and (r.get("evidence_kind") or "familiar") == "transfer"
+            ]
+            ctx_count = len(
+                {
+                    r.get("context_id")
+                    for r in transfer_rows
+                    if r.get("context_id")
+                }
+            )
+            if ctx_count > 0:
+                count = ctx_count
             # Si no hay transfer, mirar novel como cobertura parcial (0.5 peso).
             if count == 0:
                 novel_score, novel_n = _evidence_kind_score(

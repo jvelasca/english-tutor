@@ -371,8 +371,16 @@ def record_evidence(
     curriculum_version: str = "",
     assessment_version: str = "",
     evidence_kind: str = "familiar",
+    context_id: str = "",
+    activity_id: str = "",
+    task_type: str = "",
+    support_level: str = "",
 ) -> bool:
-    """Registra una evidencia de respuesta por ítem (reproducible y versionada)."""
+    """Registra una evidencia de respuesta por ítem (reproducible y versionada).
+
+    V3.25 (fase 1): el evento de evidencia puede llevar contexto
+    (`context_id`/`activity_id`/`task_type`) y `support_level`; las filas
+    legacy o sin contexto quedan con '' y los agregados actuales no cambian."""
     if get_user(user_id) is None:
         return False
     now = _now()
@@ -381,11 +389,13 @@ def record_evidence(
             "INSERT INTO academy_evidence "
             "(user_id, level_id, objective_id, skill, item_id, item_type, "
             "difficulty, source, result, curriculum_version, assessment_version, "
-            "evidence_kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "evidence_kind, context_id, activity_id, task_type, support_level, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id, level_id, objective_id, skill, item_id, item_type,
                 difficulty, source, result, curriculum_version, assessment_version,
-                evidence_kind, now,
+                evidence_kind, context_id, activity_id, task_type, support_level,
+                now,
             ),
         )
     return True
@@ -393,19 +403,21 @@ def record_evidence(
 
 def list_evidence(user_id: str, level_id: str | None = None) -> list[dict]:
     with closing(_conn()) as conn:
+        _cols = (
+            "id, user_id, level_id, objective_id, skill, item_id, "
+            "item_type, difficulty, source, result, curriculum_version, "
+            "assessment_version, evidence_kind, context_id, activity_id, "
+            "task_type, support_level, created_at"
+        )
         if level_id is not None:
             rows = conn.execute(
-                "SELECT id, user_id, level_id, objective_id, skill, item_id, "
-                "item_type, difficulty, source, result, curriculum_version, "
-                "assessment_version, evidence_kind, created_at FROM academy_evidence "
+                f"SELECT {_cols} FROM academy_evidence "
                 "WHERE user_id = ? AND level_id = ? ORDER BY id ASC",
                 (user_id, level_id),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT id, user_id, level_id, objective_id, skill, item_id, "
-                "item_type, difficulty, source, result, curriculum_version, "
-                "assessment_version, evidence_kind, created_at FROM academy_evidence "
+                f"SELECT {_cols} FROM academy_evidence "
                 "WHERE user_id = ? ORDER BY id ASC",
                 (user_id,),
             ).fetchall()
@@ -595,11 +607,13 @@ def create_speaking_mission_session(
     with closing(_conn()) as conn, conn:
         cur = conn.execute(
             "INSERT INTO speaking_mission_sessions "
-            "(user_id, status, scenario_id, mission_json, created_at, updated_at) "
-            "VALUES (?, 'mission', ?, ?, ?, ?)",
+            "(user_id, status, scenario_id, cefr_target, mission_json, "
+            "created_at, updated_at) "
+            "VALUES (?, 'mission', ?, ?, ?, ?, ?)",
             (
                 user_id,
                 scenario_id,
+                mission.get("cefr_target") or "",
                 json.dumps(mission, ensure_ascii=False),
                 now,
                 now,
@@ -663,9 +677,10 @@ def get_speaking_mission_session(session_id: int) -> dict | None:
     """Lee una sesión de misión con sus columnas JSON ya parseadas."""
     with closing(_conn()) as conn:
         row = conn.execute(
-            "SELECT id, user_id, status, scenario_id, mission_json, attempt_json, "
-            "evaluation_json, drill_json, retry_json, improvement_json, "
-            "created_at, updated_at FROM speaking_mission_sessions WHERE id = ?",
+            "SELECT id, user_id, status, scenario_id, cefr_target, mission_json, "
+            "attempt_json, evaluation_json, drill_json, retry_json, "
+            "improvement_json, created_at, updated_at "
+            "FROM speaking_mission_sessions WHERE id = ?",
             (session_id,),
         ).fetchone()
     if row is None:

@@ -159,6 +159,17 @@ const STRINGS: Record<string, Entry> = {
   // Progress
   "progress.title": { en: "My progress", es: "Mi progreso" },
   "progress.overall": { en: "Overall", es: "General" },
+  // V3.25 (Fase 5, F-L3): semántica separada demostrado / estimado / progreso.
+  "progress.certified": { en: "CEFR certified", es: "CEFR certificado" },
+  "progress.certifiedTitle": {
+    en: "Highest CEFR level certified: level exam passed + stable delayed retention per exam skill.",
+    es: "Nivel CEFR más alto certificado: examen del nivel aprobado + retención retardada estable por destreza del examen.",
+  },
+  "progress.inLevel": { en: "into", es: "en" },
+  "progress.inLevelTitle": {
+    en: "Estimated progress inside the current CEFR level (overall of the current band). Not a certification.",
+    es: "Progreso estimado dentro del nivel CEFR actual (overall del tramo en curso). No es una certificación.",
+  },
 
   // MI PROGRESO V3.1 — pantalla de 5 pestañas (docs/UI_V3.1.md §4.4)
   "progress.subtitle": {

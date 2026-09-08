@@ -1398,6 +1398,10 @@ def test_endpoint_student_model_empty(monkeypatch, tmp_path):
     assert body["estimated_level"] == "Pre-A1"
     assert body["target_level"] == "A2"
     assert body["confidence"] == 0.0
+    # Fase 5 (F-L3): sin certificación no hay nivel demostrado, y el progreso
+    # dentro del tramo actual (overall del perfil A1) parte de 0.
+    assert body["demonstrated_level"] is None
+    assert body["level_progress"] == 0.0
     assert body["skills"], "el perfil incluye las destrezas de A1"
     for entry in body["skills"]:
         assert "stability" in entry
@@ -1469,6 +1473,60 @@ def test_endpoint_estimated_level_anchored_across_a1_exam(
         assert post["current_level"] == "A2"
         assert post["estimated_level"] == "A1", post["estimated_level"]
         assert post["estimated_numeric"] == 1.0, post["estimated_numeric"]
+        # Fase 5 (F-L3): A1 quedó *completado* al aprobar el examen, pero la
+        # certificación exige retención retardada por destreza del examen, así
+        # que `demonstrated_level` sigue sin nivel y el progreso en A2 es 0.
+        assert post["demonstrated_level"] is None, post["demonstrated_level"]
+        assert post["level_progress"] == 0.0, post["level_progress"]
+
+
+def test_endpoint_student_model_separates_demonstrated_level(monkeypatch, tmp_path):
+    """F-L3/V3.25 (Fase 5): `demonstrated_level` del Student Model solo se
+    concede cuando el nivel completado tiene retención certificable por cada
+    destreza del examen (`delayed` verificable), nunca con el mero examen.
+
+    (a) dominar A1 + aprobar examen → `demonstrated_level` aún None.
+    (b) con evidencia `delayed` por destreza (la que solo escribe el retention
+        reassessment) → `demonstrated_level == "A1"` mientras `estimated_level`
+        sigue expresando la banda continua y `level_progress` el tramo A2."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    data = load_assessments()
+    exam = data.exams["a1"]
+    answers = {it.id: it.correct_index for it in exam.items}
+    with TestClient(app) as client:
+        _dominate_a1(client, a)
+        r = client.post(
+            "/api/academy/exam/a1/submit",
+            params={"user_id": a},
+            json={"answers": answers},
+        )
+        assert r.status_code == 200
+        assert r.json()["passed"] is True
+
+        sm = client.get("/api/academy/student-model", params={"user_id": a}).json()
+        assert sm["current_level"] == "A2"
+        assert sm["demonstrated_level"] is None, sm["demonstrated_level"]
+        assert sm["estimated_level"] == "A1"
+        assert sm["level_progress"] == 0.0
+
+        # (b) Retention reassessment superado: delayed por destreza del examen.
+        for skill in exam.skills:
+            assert academy_repo.record_evidence(
+                a,
+                level_id="a1",
+                objective_id="",
+                skill=skill,
+                item_id=f"delayed-{skill}",
+                result=1.0,
+                evidence_kind="delayed",
+            ) is True
+
+        sm2 = client.get("/api/academy/student-model", params={"user_id": a}).json()
+        assert sm2["demonstrated_level"] == "A1", sm2["demonstrated_level"]
+        # El estimado no colapsa al certificar: sigue anclado al suelo A1
+        # (numeric 1.0) mientras A2 no tenga evidencia.
+        assert sm2["estimated_level"] == "A1", sm2["estimated_level"]
+        assert sm2["estimated_numeric"] == 1.0, sm2["estimated_numeric"]
 
 
 

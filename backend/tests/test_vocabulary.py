@@ -52,7 +52,10 @@ def test_record_words_increments_appearances(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     assert vocabulary_repo.record_words(a, ["cat", "dog"]) is True
     assert vocabulary_repo.record_words(a, ["cat"]) is True
-    vocab = {v["word"]: v["appearances"] for v in vocabulary_repo.get_vocabulary(a)}
+    vocab = {
+        v["word"]: v["production_count"]
+        for v in vocabulary_repo.get_vocabulary(a)
+    }
     assert vocab["cat"] == 2
     assert vocab["dog"] == 1
 
@@ -68,19 +71,78 @@ def test_vocabulary_occurrences_migration(monkeypatch, tmp_path):
     db.init_db()
     # Simula una BD legacy con la columna antigua `occurrences`.
     conn = sqlite3.connect(db.DB_PATH)
-    conn.execute("ALTER TABLE vocabulary RENAME COLUMN appearances TO occurrences")
+    conn.execute(
+        "ALTER TABLE vocabulary RENAME COLUMN production_count TO occurrences"
+    )
     conn.commit()
     conn.close()
 
-    # init_db debe volver a renombrar a `appearances` de forma idempotente.
+    # init_db debe volver a renombrar a `production_count` de forma idempotente
+    # (V3.25/F-K7: la cadena histórica occurrences → appearances termina en el
+    # nombre canónico `production_count`).
     db.init_db()
     conn = sqlite3.connect(db.DB_PATH)
     try:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
     finally:
         conn.close()
-    assert "appearances" in cols
+    assert "production_count" in cols
     assert "occurrences" not in cols
+    assert "appearances" not in cols
+
+
+def test_vocabulary_legacy_appearances_exposures_rename(monkeypatch, tmp_path):
+    """V3.25 (F-K7/P2-01): una BD V2.3 (columnas `appearances`/`exposures`) se
+    migra a los nombres canónicos `production_count`/`exposure_count` y los
+    datos se conservan."""
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    uid = users_repo.create_user("A")["id"]
+    vocabulary_repo.record_words(uid, ["cat"])  # production_count = 1
+    vocabulary_repo.record_exposures(uid, ["cat"])  # exposure_count = 1
+
+    # Simula una instalación previa a V3.25.
+    conn = sqlite3.connect(db.DB_PATH)
+    conn.execute(
+        "ALTER TABLE vocabulary RENAME COLUMN production_count TO appearances"
+    )
+    conn.execute(
+        "ALTER TABLE vocabulary RENAME COLUMN exposure_count TO exposures"
+    )
+    conn.commit()
+    conn.close()
+
+    db.init_db()
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
+    assert vocab["cat"]["production_count"] == 1
+    assert vocab["cat"]["exposure_count"] == 1
+
+
+def test_lexical_unit_declared_from_lemma_and_surface_fallback(monkeypatch, tmp_path):
+    """V3.25 (P2-02): `lexical_unit` declara la unidad de análisis por ítem:
+    el lemma cuando el currículo lo declara (seed) y la superficie normalizada
+    en minúsculas cuando no hay lemma (producción libre)."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.seed_curriculum_items(
+        a,
+        [
+            {
+                "word": "Go",
+                "lemma": "go",
+                "cefr": "A1",
+                "level_id": "a1",
+                "objective_id": "o1",
+                "kind": "word",
+            }
+        ],
+    )
+    vocabulary_repo.record_words(a, ["Traveling"])
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["Go"]["lemma"] == "go"
+    assert vocab["Go"]["lexical_unit"] == "go"
+    assert vocab["Traveling"]["lemma"] == ""
+    assert vocab["Traveling"]["lexical_unit"] == "traveling"
 
 
 def test_vocabulary_isolation(monkeypatch, tmp_path):
@@ -173,8 +235,8 @@ def test_record_exposures_creates_exposed_rows(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     assert vocabulary_repo.record_exposures(a, ["travel", "culture"]) is True
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
-    assert vocab["travel"]["exposures"] == 1
-    assert vocab["travel"]["appearances"] == 0
+    assert vocab["travel"]["exposure_count"] == 1
+    assert vocab["travel"]["production_count"] == 0
     assert vocab["travel"]["production_days"] == 0
     assert vocab["travel"]["last_exposed_at"]
 
@@ -184,8 +246,8 @@ def test_record_exposures_accumulates(monkeypatch, tmp_path):
     vocabulary_repo.record_exposures(a, ["travel"])
     vocabulary_repo.record_exposures(a, ["travel"])
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
-    assert vocab["travel"]["exposures"] == 2
-    assert vocab["travel"]["appearances"] == 0
+    assert vocab["travel"]["exposure_count"] == 2
+    assert vocab["travel"]["production_count"] == 0
 
 
 def test_record_exposures_unknown_user_false(monkeypatch, tmp_path):
@@ -209,7 +271,7 @@ def test_exposure_days_counts_distinct_days(monkeypatch, tmp_path):
     for _ in range(4):
         vocabulary_repo.record_exposures(a, ["sun"])
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
-    assert vocab["sun"]["exposures"] == 4
+    assert vocab["sun"]["exposure_count"] == 4
     assert vocab["sun"]["exposure_days"] == 3
     assert vocab["sun"]["first_exposed_at"]  # fijado en la primera exposición
 
@@ -235,13 +297,13 @@ def test_exposure_days_columns_migration_and_backfill(monkeypatch, tmp_path):
     try:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
         row = conn.execute(
-            "SELECT exposures, exposure_days, first_exposed_at "
+            "SELECT exposure_count, exposure_days, first_exposed_at "
             "FROM vocabulary WHERE word = 'sun'"
         ).fetchone()
     finally:
         conn.close()
     assert {"exposure_days", "first_exposed_at"} <= cols
-    assert row[0] == 1  # exposures conservadas
+    assert row[0] == 1  # exposure_count conservadas
     assert row[1] == 1  # exposure_days backfill
     assert row[2]  # first_exposed_at backfill
 
@@ -260,7 +322,7 @@ def test_production_days_counts_distinct_days(monkeypatch, tmp_path):
     for _ in range(4):
         vocabulary_repo.record_words(a, ["cat"])
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
-    assert vocab["cat"]["appearances"] == 4
+    assert vocab["cat"]["production_count"] == 4
     assert vocab["cat"]["production_days"] == 3
 
 
@@ -273,7 +335,7 @@ def test_vocabulary_endpoint_reports_status(monkeypatch, tmp_path):
     assert got.status_code == 200
     by_word = {v["word"]: v for v in got.json()}
     assert by_word["travel"]["status"] == "exposed"
-    assert by_word["travel"]["appearances"] == 0
+    assert by_word["travel"]["production_count"] == 0
     assert by_word["cat"]["status"] == "learning"
 
 
@@ -284,9 +346,9 @@ def test_vocabulary_p3_columns_migration(monkeypatch, tmp_path):
     uid = users_repo.create_user("A")["id"]
     vocabulary_repo.record_words(uid, ["cat"])
 
-    # Simula una BD previa a P3: elimina las columnas nuevas.
+    # Simula una BD previa a P3: elimina las columnas nuevas (canonical V3.25).
     conn = sqlite3.connect(db.DB_PATH)
-    conn.execute("ALTER TABLE vocabulary DROP COLUMN exposures")
+    conn.execute("ALTER TABLE vocabulary DROP COLUMN exposure_count")
     conn.execute("ALTER TABLE vocabulary DROP COLUMN last_exposed_at")
     conn.execute("ALTER TABLE vocabulary DROP COLUMN production_days")
     conn.commit()
@@ -297,12 +359,13 @@ def test_vocabulary_p3_columns_migration(monkeypatch, tmp_path):
     try:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
         row = conn.execute(
-            "SELECT appearances, production_days FROM vocabulary WHERE word = 'cat'"
+            "SELECT production_count, production_days "
+            "FROM vocabulary WHERE word = 'cat'"
         ).fetchone()
     finally:
         conn.close()
-    assert {"exposures", "last_exposed_at", "production_days"} <= cols
-    assert row[0] == 1  # appearances
+    assert {"exposure_count", "last_exposed_at", "production_days"} <= cols
+    assert row[0] == 1  # production_count
     assert row[1] == 1  # production_days (backfill de producciones previas)
 
 
@@ -333,6 +396,10 @@ def test_lexicon_endpoint_shape(monkeypatch, tmp_path):
     assert items["name"]["status"] in {"mastered", "known", "learning", "weak"}
     assert 0 <= items["name"]["recall"] <= 1
     assert isinstance(items["name"]["next_review_days"], int)
+    # V3.25 (F-K7/P2-02): contadores canónicos y unidad léxica en el API.
+    assert items["name"]["production_count"] == 1
+    assert items["name"]["exposure_count"] == 1
+    assert items["name"]["lexical_unit"] == "name"
 
 
 def test_lexicon_endpoint_404(monkeypatch, tmp_path):
@@ -358,7 +425,7 @@ def test_record_production_by_channel_breaks_down(monkeypatch, tmp_path):
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     cat = vocab["cat"]
     # Semántica agregada intacta.
-    assert cat["appearances"] == 3
+    assert cat["production_count"] == 3
     assert cat["chat_prod"] == 1
     assert cat["speaking_prod"] == 1
     assert cat["writing_prod"] == 1
@@ -367,14 +434,14 @@ def test_record_production_by_channel_breaks_down(monkeypatch, tmp_path):
     assert (
         cat["chat_prod"] + cat["speaking_prod"]
         + cat["writing_prod"] + cat["conversation_prod"]
-    ) == cat["appearances"]
+    ) == cat["production_count"]
     dog = vocab["dog"]
-    assert dog["appearances"] == 1
+    assert dog["production_count"] == 1
     assert dog["conversation_prod"] == 1
     assert (
         dog["chat_prod"] + dog["speaking_prod"]
         + dog["writing_prod"] + dog["conversation_prod"]
-    ) == dog["appearances"]
+    ) == dog["production_count"]
 
 
 def test_record_production_unknown_channel_false(monkeypatch, tmp_path):
@@ -406,7 +473,7 @@ def test_production_days_distinct_day_single_channel_semantics(monkeypatch, tmp_
     vocabulary_repo.record_production(a, ["cat"], channel="speaking")
     vocabulary_repo.record_production(a, ["cat"], channel="chat")
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
-    assert vocab["cat"]["appearances"] == 3
+    assert vocab["cat"]["production_count"] == 3
     assert vocab["cat"]["production_days"] == 2
     assert vocab["cat"]["chat_prod"] == 2
     assert vocab["cat"]["speaking_prod"] == 1
@@ -442,7 +509,7 @@ def test_record_production_context_tags_merge(monkeypatch, tmp_path):
         == "chat:free_chat,speaking:drill,speaking:speaking_route"
     )
     # Semántica agregada intacta.
-    assert vocab["cat"]["appearances"] == 4
+    assert vocab["cat"]["production_count"] == 4
     assert vocab["cat"]["speaking_prod"] == 3
     assert vocab["cat"]["chat_prod"] == 1
 
@@ -596,8 +663,8 @@ def test_vocabulary_v319_channels_migration_backfills_chat(monkeypatch, tmp_path
     try:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
         row = conn.execute(
-            "SELECT appearances, chat_prod, speaking_prod FROM vocabulary "
-            "WHERE word = 'cat'"
+            "SELECT production_count, chat_prod, speaking_prod "
+            "FROM vocabulary WHERE word = 'cat'"
         ).fetchone()
     finally:
         conn.close()
@@ -608,7 +675,7 @@ def test_vocabulary_v319_channels_migration_backfills_chat(monkeypatch, tmp_path
         "conversation_prod",
     } <= cols
     # Backfill: el histórico previo solo pudo venir del chat libre.
-    assert row[0] == 1  # appearances
+    assert row[0] == 1  # production_count
     assert row[1] == 1  # chat_prod
     assert row[2] == 0  # speaking_prod
 
@@ -698,7 +765,7 @@ def test_drill_attempt_endpoint_produces_word(monkeypatch, tmp_path):
 
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
     assert vocab["travel"]["speaking_prod"] == 1
-    assert vocab["travel"]["appearances"] == 1
+    assert vocab["travel"]["production_count"] == 1
     # No declara dominio ni crea evidencia curricular: solo columna de canal.
     assert vocab["travel"]["chat_prod"] == 0
     assert vocab["culture"]["speaking_prod"] == 0

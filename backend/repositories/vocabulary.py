@@ -1,4 +1,13 @@
-"""Repositorio de vocabulario (SQLite)."""
+"""Repositorio de vocabulario (SQLite).
+
+V3.25 (F-K7/P2-01/P2-02, fase 6): los contadores de producción/input usan los
+nombres canónicos `production_count`/`exposure_count` (renombrado idempotente
+en `db.init_db` desde el histórico `appearances`/`exposures`), y cada fila
+declara su UNIDAD léxica (`lexical_unit`) además de su FORMA SUPERFICIAL
+(`word`). La producción/input sigue siendo por superficie; la unidad permite
+agregar por lemma y no tratar `go/going/went/gone` como conocimientos
+independientes cuando comparten lemma.
+"""
 from __future__ import annotations
 
 from contextlib import closing
@@ -46,10 +55,19 @@ def _merge_context_tag(existing: str, tag: str) -> str:
     return ",".join(sorted(seen, key=order_key))
 
 
+def lexical_unit_key(word: str, lemma: str = "") -> str:
+    """Clave canónica de unidad léxica (V3.25/P2-02): el lemma en minúsculas
+    cuando el currículo lo declara, o la superficie normalizada en minúsculas
+    si no hay lemma. Es la dimensión de AGREGADO de dominio (no de trazabilidad
+    por superficie, que sigue siendo `word`)."""
+    base = (lemma or word or "").strip()
+    return base.lower()
+
+
 # Canales de producción (V3.19): cada columna `<channel>_prod` de `vocabulary`
 # cuenta cuántos mensajes producidos por el alumno llegaron por ese canal.
 # Invariante de trazabilidad: `sum(chat_prod, speaking_prod, writing_prod,
-# conversation_prod) == appearances`.
+# conversation_prod) == production_count`.
 PRODUCTION_CHANNELS: tuple[str, ...] = (
     "chat",
     "speaking",
@@ -67,16 +85,20 @@ def record_production(
 ) -> bool:
     """Registra producción del alumno etiquetada por canal (upsert).
 
-    Incrementa `appearances` y, si la producción ocurre en un día distinto al
-    último, `production_days` — exactamente igual que `record_words` — y además
-    suma 1 a la columna `<channel>_prod` del canal. La semántica agregada
-    (`appearances`/`production_days`/`item_status`/coverage) no cambia; el
-    desglose por destreza queda derivable de las columnas `<channel>_prod`.
+    Incrementa `production_count` y, si la producción ocurre en un día distinto
+    al último, `production_days` — exactamente igual que `record_words` — y
+    además suma 1 a la columna `<channel>_prod` del canal. La semántica
+    agregada (`production_count`/`production_days`/`item_status`/coverage) no
+    cambia; el desglose por destreza queda derivable de las columnas
+    `<channel>_prod`.
 
     V3.23 (P1-04): si se pasa `activity`, se etiqueta la producción con el
     contexto canónico `channel:activity` en `context_tags` (V3.23): permite
     medir la transferencia por contexto real de actividad (dos actividades del
     mismo canal cuentan como contextos distintos) y no solo por canal.
+
+    V3.25 (P2-02): la fila declara su `lexical_unit` (lemma del currículo si la
+    fila ya lo tiene, si no la superficie normalizada).
 
     Devuelve False si el usuario no existe o el canal no es válido.
     """
@@ -93,31 +115,34 @@ def record_production(
     with closing(_conn()) as conn, conn:
         for w in words:
             row = conn.execute(
-                "SELECT last_seen, context_tags FROM vocabulary "
+                "SELECT last_seen, context_tags, lemma FROM vocabulary "
                 "WHERE user_id = ? AND word = ?",
                 (user_id, w),
             ).fetchone()
             prior = row["last_seen"] if row else ""
             existing_tags = row["context_tags"] if row else ""
+            lemma = row["lemma"] if row else ""
             new_day = 1 if not prior or _day(prior) != today else 0
             tags = (
                 _merge_context_tag(existing_tags, tag) if tag else existing_tags
             )
             conn.execute(
                 "INSERT INTO vocabulary "
-                "(user_id, word, appearances, first_seen, last_seen, "
-                f"production_days, {column}, context_tags) "
-                "VALUES (?, ?, 1, ?, ?, ?, 1, ?) "
+                "(user_id, word, production_count, first_seen, last_seen, "
+                f"production_days, {column}, context_tags, lexical_unit) "
+                "VALUES (?, ?, 1, ?, ?, ?, 1, ?, ?) "
                 "ON CONFLICT(user_id, word) DO UPDATE SET "
-                "appearances = vocabulary.appearances + 1, "
+                "production_count = vocabulary.production_count + 1, "
                 "first_seen = CASE WHEN vocabulary.first_seen = '' "
                 "THEN excluded.first_seen ELSE vocabulary.first_seen END, "
                 "last_seen = excluded.last_seen, "
                 "production_days = vocabulary.production_days "
                 f"+ excluded.production_days, "
                 f"{column} = vocabulary.{column} + 1, "
-                "context_tags = excluded.context_tags",
-                (user_id, w, now, now, new_day, tags),
+                "context_tags = excluded.context_tags, "
+                "lexical_unit = CASE WHEN vocabulary.lexical_unit = '' "
+                "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
+                (user_id, w, now, now, new_day, tags, lexical_unit_key(w, lemma)),
             )
     return True
 
@@ -190,14 +215,16 @@ def _earliest_day(first_seen: str, first_exposed_at: str) -> date | None:
 
 
 def record_exposures(user_id: str, words: list[str]) -> bool:
-    """Registra exposición (palabras de la respuesta del tutor). Upsert que crea la
-    fila con `appearances = 0` si el alumno aún no ha producido la palabra.
+    """Registra exposición (palabras de la respuesta del tutor). Upsert que crea
+    la fila con `production_count = 0` si el alumno aún no ha producido la
+    palabra.
 
-    V3.22: además de `exposures`/`last_exposed_at`, incrementa `exposure_days`
-    cuando la exposición ocurre en un día distinto al de la última exposición y
-    fija `first_exposed_at` en la primera exposición (patrón idéntico al de
-    `production_days`/`first_seen` en `record_production`). Así la matriz de
-    competencia puede acreditar retención RECEPTIVA espaciada sin migrar.
+    V3.22: además de `exposure_count`/`last_exposed_at`, incrementa
+    `exposure_days` cuando la exposición ocurre en un día distinto al de la
+    última exposición y fija `first_exposed_at` en la primera exposición
+    (patrón idéntico al de `production_days`/`first_seen` en
+    `record_production`). Así la matriz de competencia puede acreditar
+    retención RECEPTIVA espaciada sin migrar.
 
     Devuelve False si el usuario no existe."""
     if get_user(user_id) is None:
@@ -209,26 +236,30 @@ def record_exposures(user_id: str, words: list[str]) -> bool:
     with closing(_conn()) as conn, conn:
         for w in words:
             row = conn.execute(
-                "SELECT last_exposed_at FROM vocabulary "
+                "SELECT last_exposed_at, lemma FROM vocabulary "
                 "WHERE user_id = ? AND word = ?",
                 (user_id, w),
             ).fetchone()
             prior = row["last_exposed_at"] if row else ""
+            lemma = row["lemma"] if row else ""
             new_day = 1 if not prior or _day(prior) != today else 0
             conn.execute(
                 "INSERT INTO vocabulary "
-                "(user_id, word, appearances, first_seen, last_seen, "
-                "exposures, last_exposed_at, production_days, "
-                "exposure_days, first_exposed_at) "
-                "VALUES (?, ?, 0, '', '', 1, ?, 0, ?, ?) "
+                "(user_id, word, production_count, first_seen, last_seen, "
+                "exposure_count, last_exposed_at, production_days, "
+                "exposure_days, first_exposed_at, lexical_unit) "
+                "VALUES (?, ?, 0, '', '', 1, ?, 0, ?, ?, ?) "
                 "ON CONFLICT(user_id, word) DO UPDATE SET "
-                "exposures = vocabulary.exposures + 1, "
+                "exposure_count = vocabulary.exposure_count + 1, "
                 "last_exposed_at = excluded.last_exposed_at, "
                 "exposure_days = vocabulary.exposure_days "
                 "+ excluded.exposure_days, "
                 "first_exposed_at = CASE WHEN vocabulary.first_exposed_at = '' "
-                "THEN excluded.first_exposed_at ELSE vocabulary.first_exposed_at END",
-                (user_id, w, now, new_day, now),
+                "THEN excluded.first_exposed_at "
+                "ELSE vocabulary.first_exposed_at END, "
+                "lexical_unit = CASE WHEN vocabulary.lexical_unit = '' "
+                "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
+                (user_id, w, now, new_day, now, lexical_unit_key(w, lemma)),
             )
     return True
 
@@ -236,23 +267,24 @@ def record_exposures(user_id: str, words: list[str]) -> bool:
 def get_vocabulary(user_id: str) -> list[dict]:
     """Devuelve el vocabulario del usuario ordenado por producción (desc) y
     palabra (asc). Incluye métricas de exposición y espaciado (V3.22:
-    `exposure_days`/`first_exposed_at`), el contexto curricular del ítem léxico
-    (V2.3) y el desglose de producción por destreza
-    (V3.19: `chat_prod`/`speaking_prod`/`writing_prod`/`conversation_prod`).
-    V3.23 añade la evidencia de recuperación demorada
+    `exposure_days`/`first_exposed_at`), la unidad léxica canónica
+    (V3.25/P2-02: `lexical_unit` junto a la superficie `word` y el `lemma`),
+    el contexto curricular del ítem léxico (V2.3) y el desglose de producción
+    por destreza (V3.19: `chat_prod`/`speaking_prod`/`writing_prod`/
+    `conversation_prod`). V3.23 añade la evidencia de recuperación demorada
     (`retrieval_successes`/`retrieval_days`/`last_retrieval_at`) y el contexto
     de producción por actividad (`context_tags`)."""
     with closing(_conn()) as conn:
         rows = conn.execute(
-            "SELECT word, appearances, first_seen, last_seen, "
-            "exposures, last_exposed_at, exposure_days, first_exposed_at, "
+            "SELECT word, production_count, first_seen, last_seen, "
+            "exposure_count, last_exposed_at, exposure_days, first_exposed_at, "
             "production_days, "
-            "cefr, level_id, objective_id, source, lemma, kind, "
+            "cefr, level_id, objective_id, source, lemma, kind, lexical_unit, "
             "chat_prod, speaking_prod, writing_prod, conversation_prod, "
             "retrieval_successes, retrieval_days, last_retrieval_at, "
             "context_tags "
             "FROM vocabulary "
-            "WHERE user_id = ? ORDER BY appearances DESC, word ASC",
+            "WHERE user_id = ? ORDER BY production_count DESC, word ASC",
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -262,10 +294,13 @@ def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
     """Siembra ítems léxicos del currículo sin tocar producción/input (V2.3).
 
     `items` es una lista de dicts `{word, lemma, cefr, level_id, objective_id,
-    kind}`. Crea la fila si no existe (con `appearances=0`/`exposures=0`) o
-    rellena el contexto curricular si ya existía. Nunca incrementa `appearances`
-    ni `exposures`: solo fija el contexto, para no contaminar las métricas de
-    producción/lectura del alumno. Devuelve False si el usuario no existe.
+    kind}`. Crea la fila si no existe (con `production_count=0`/
+    `exposure_count=0`) o rellena el contexto curricular si ya existía. Nunca
+    incrementa `production_count` ni `exposure_count`: solo fija el contexto,
+    para no contaminar las métricas de producción/lectura del alumno. La
+    `lexical_unit` se fija al lemma del currículo cuando se declara (P2-02);
+    las filas legacy sin unidad se rellenan con la superficie normalizada.
+    Devuelve False si el usuario no existe.
     """
     if get_user(user_id) is None:
         return False
@@ -274,6 +309,8 @@ def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
     with closing(_conn()) as conn, conn:
         for it in items:
             word = it["word"]
+            lemma = it.get("lemma", word)
+            unit = lexical_unit_key(word, lemma)
             row = conn.execute(
                 "SELECT word FROM vocabulary WHERE user_id = ? AND word = ?",
                 (user_id, word),
@@ -281,10 +318,12 @@ def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
             if row is None:
                 conn.execute(
                     "INSERT INTO vocabulary "
-                    "(user_id, word, appearances, first_seen, last_seen, "
-                    "exposures, last_exposed_at, production_days, "
-                    "cefr, level_id, objective_id, source, lemma, kind) "
-                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, ?, ?, 'curriculum', ?, ?)",
+                    "(user_id, word, production_count, first_seen, last_seen, "
+                    "exposure_count, last_exposed_at, production_days, "
+                    "cefr, level_id, objective_id, source, lemma, kind, "
+                    "lexical_unit) "
+                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, ?, ?, 'curriculum', "
+                    "?, ?, ?)",
                     (
                         user_id,
                         word,
@@ -293,6 +332,7 @@ def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
                         it.get("objective_id", ""),
                         it.get("lemma", word),
                         it.get("kind", "word"),
+                        unit,
                     ),
                 )
             else:
@@ -306,14 +346,17 @@ def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
                     "ELSE source END, "
                     "lemma = CASE WHEN lemma = '' THEN ? ELSE lemma END, "
                     "kind = CASE WHEN kind IN ('word', 'structure') THEN ? "
-                    "ELSE kind END "
+                    "ELSE kind END, "
+                    "lexical_unit = CASE WHEN lexical_unit = '' "
+                    "THEN ? ELSE lexical_unit END "
                     "WHERE user_id = ? AND word = ?",
                     (
                         it.get("cefr", ""),
                         it.get("level_id", ""),
                         it.get("objective_id", ""),
-                        it.get("lemma", word),
+                        lemma,
                         it.get("kind", "word"),
+                        unit,
                         user_id,
                         word,
                     ),

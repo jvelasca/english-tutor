@@ -32,6 +32,8 @@ const GOAL: LearningGoal = {
 const MODEL: StudentModel = {
   level_id: "a1",
   current_level: "A1",
+  demonstrated_level: null,
+  level_progress: 0,
   estimated_level: "A1",
   estimated_numeric: 1,
   confidence: 0.5,

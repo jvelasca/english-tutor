@@ -21,7 +21,10 @@ from __future__ import annotations
 
 import math
 
-from services.academy import overall_cefr_score
+from services.academy import (
+    effective_evidence_context_count,
+    overall_cefr_score,
+)
 from services.cefr import CEFR_LEVELS, PRE_A1
 from services.cefr_matrix import requirements_for
 from services.curriculum import get_objective
@@ -227,14 +230,16 @@ def readiness(profile: list[dict], target_level: str) -> dict:
 
         by_kind = entry.get("evidence_by_kind")
         if req is not None and isinstance(by_kind, dict):
-            transfer_ok = by_kind.get("transfer", 0) >= transfer_required
-            novel_ok = by_kind.get("novel", 0) >= novel_required
+            # V3.25 (fase 3, F-L6): transfer cuenta experiencias DISTINTAS cuando
+            # el perfil conoce contextos; retrocede a filas en perfiles legacy.
+            transfer_count = effective_evidence_context_count(entry, "transfer")
+            novel_count = effective_evidence_context_count(entry, "novel")
+            transfer_ok = transfer_count >= transfer_required
+            novel_ok = novel_count >= novel_required
         else:
             # Perfil legacy sin evidence_by_kind: no gatear por transfer/novedad.
+            transfer_count = novel_count = 0
             transfer_ok = novel_ok = True
-        transfer_count = by_kind.get("transfer", 0) if isinstance(by_kind, dict) else 0
-        novel_count = by_kind.get("novel", 0) if isinstance(by_kind, dict) else 0
-
         evidence_count = entry.get("evidence_count", 0)
         score = float(entry.get("score", 0.0))
         confidence = float(entry.get("confidence", 0.0))

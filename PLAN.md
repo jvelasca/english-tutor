@@ -52,6 +52,37 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.25.0` — **Calibración del Student Model: contexto en la
+  evidencia, transfer por experiencias y semántica demostrado/estimado** (cierra
+  el plan V3.25 del dossier L — auditoría TOTAL verificada de V3.24.0 — que
+  absorbe los pendientes F-K3…F-K7): **F1 — modelo de eventos con contexto** —
+  `academy_evidence` gana `context_id`/`activity_id`/`task_type`/`support_level`
+  (migración idempotente + índice `idx_evidence_context`) y
+  `evidence_from_items`/`record_evidence` enriquecen cada evento sin romper
+  agregados · **F2 — `support_level` canónico** — enumerados
+  `copied/guided/cued/independent/spontaneous` y persistidos por emisor
+  (formative → guided/cued; objective assessment → cued; speaking
+  assessment/misión y chat libre → independent; read-aloud → guided); el perfil
+  expone `support_levels`/`independent_count` por destreza · **F3 — transfer por
+  contextos/tareas distintos** — `mastery_evidence_gate`, `adaptive.readiness`,
+  el unit gate de `course` y evidence_graph consumen contextos efectivos
+  (`effective_evidence_context_count`, con fallback legacy a nº de filas); se
+  desambigua `transfer`/`retention` académica vs léxica (F-K5) · **F4 —
+  retention longitudinal** — `certification_gate` verifica `created_at` de las
+  filas `delayed` (robustez) y emite `retention_report` con intervalos
+  D+1/D+3/D+7/D+21 · **F5 — semántica UI demostrado vs estimado** — el Student
+  Model separa `demonstrated_level`/`estimated_level`/`level_progress` y el
+  header de Progreso los muestra sin ambigüedad (F-K4 parcial: `estimated_band`
+  ya existe por destreza) · **F6 — renombrado canónico + unidad léxica** —
+  migración idempotente `occurrences→appearances→production_count` y
+  `exposures→exposure_count` en toda la pila (DB/schemas/servicios/frontend) y
+  columna `lexical_unit` (lema/superficie normalizada) para no tratar
+  `go/going/went` como conocimientos independientes (F-K7/P2-01/P2-02); decisión
+  `novel` confirmada: reservado hasta emisor real · **F7 — doble vía speaking
+  (F-K3)** — `cefr_target` persistido en columna de
+  `speaking_mission_sessions` (migración + backfill desde `mission_json`); la
+  vía assessment y la misión declaran evidencia `independent`. Tests:
+  `release-notes-v3.25.0.md`.
 - ✅ Versión estable `3.24.0` — **Calibración de salida del Student Model**
   (cierra el plan V3.24 del dossier K — auditoría profunda Eje 1 sobre v3.23.0 —
   con los dos P1 por decisión del gerente y sus tests e2e previos: **F-K1 —

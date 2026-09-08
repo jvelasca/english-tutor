@@ -69,6 +69,13 @@ RETENTION_STABLE_RATIO = 0.9
 # presencia ya codifica la ventana de 7 días con retención estable.
 CERTIFICATION_REQUIRED_DELAYED = 1
 
+# V3.25 (fase 4, F-L8): ventanas de consolidación OPCIONALES para el informe
+# longitudinal de retención sobre los eventos `delayed`. La certificación solo
+# exige la ventana formal (§6.3, RETENTION_MIN_DAYS); estos intervalos permiten
+# describir cuánto tiempo ha mantenido el alumno la retención estable después
+# de cada reassessment (infraestructura, no gate nuevo).
+RETENTION_INTERVALS: tuple[int, ...] = (1, 3, 7, 21)
+
 # Regla MASTERED (auditoría §16): no basta con terminar.
 # F-K1 (V3.24, dossier K): el kind `novel` no tiene emisor real, así que MASTERED
 # exige solo kinds emitibles — familiar (initial/practice) + transfer×2 (unit/
@@ -372,7 +379,10 @@ def retention_delta(initial: dict, delayed: dict) -> dict:
 
 
 def certification_gate(
-    exam_skills: list[str], evidence_rows: list[dict]
+    exam_skills: list[str],
+    evidence_rows: list[dict],
+    *,
+    now: str = "",
 ) -> dict:
     """Gate de certificación de un nivel (P1/H5): **completado ≠ certificado**.
 
@@ -384,20 +394,56 @@ def certification_gate(
     (filas crudas de `academy_evidence`) ya codifica el requisito formal de la
     ventana: no se trata de una evaluación aparte sino de un requisito del nivel.
 
+    V3.25 (fase 4, F-L8, robustez del hallazgo F-L4): el gate ya no confía solo
+    en la mera presencia de `delayed`; verifica la integridad de las filas
+    (`created_at` parseable → `verified`) y expone la métrica derivada
+    `retention_report` por destreza (edad de cada evento `delayed` y el
+    intervalo más largo estable alcanzado desde la última formal). Si una fila
+    `delayed` no es verificable, la certificación no puede concederse.
+
     Devuelve conformidad global, conteo `delayed` por destreza y las destrezas
     pendientes de retención. Un nivel sin examen (sin destrezas exigidas) nunca
     puede quedar certificado.
     """
-    delayed_by_skill: dict[str, int] = {}
+    now_dt = _parse_iso(now) or datetime.now(timezone.utc)
+    delayed_rows: list[dict] = []
     for row in evidence_rows:
         if str(row.get("evidence_kind") or "").lower() != "delayed":
             continue
-        skill = row.get("skill")
-        if not skill:
-            continue
+        if row.get("skill"):
+            delayed_rows.append(row)
+
+    def _report(skill: str) -> dict:
+        rows = [r for r in delayed_rows if r.get("skill") == skill]
+        ages: list[int] = []
+        verified = True
+        for r in rows:
+            created = _parse_iso(r.get("created_at") or "")
+            if created is None:
+                verified = False
+                continue
+            ages.append(max(0, (now_dt - created).days))
+        ages.sort()
+        return {
+            "count": len(rows),
+            "verified": verified,
+            "ages_days": ages,
+            "longest_interval_days": ages[-1] if ages else 0,
+            "intervals_reached": [
+                i for i in RETENTION_INTERVALS if ages and ages[-1] >= i
+            ],
+        }
+
+    delayed_by_skill: dict[str, int] = {}
+    for row in delayed_rows:
+        skill = row.get("skill") or ""
         delayed_by_skill[skill] = delayed_by_skill.get(skill, 0) + 1
+    reports = {skill: _report(skill) for skill in exam_skills}
     checks = {
-        skill: delayed_by_skill.get(skill, 0) >= CERTIFICATION_REQUIRED_DELAYED
+        skill: (
+            delayed_by_skill.get(skill, 0) >= CERTIFICATION_REQUIRED_DELAYED
+            and reports[skill]["verified"]
+        )
         for skill in exam_skills
     }
     return {
@@ -408,28 +454,50 @@ def certification_gate(
         "delayed_by_skill": {
             skill: delayed_by_skill.get(skill, 0) for skill in exam_skills
         },
+        "retention_report": reports,
         "pending_skills": [s for s, ok in checks.items() if not ok],
         "checks": checks,
     }
 
 
-def mastery_evidence_gate(by_kind: dict | None) -> dict:
+def mastery_evidence_gate(
+    by_kind: dict | None,
+    *,
+    context_counts: dict[str, int] | None = None,
+) -> dict:
     """¿Se puede considerar MASTERED? (familiar×2 + transfer×2 + delayed).
 
     F-K1 (V3.24, dossier K): el gate exige solo kinds **emitibles**
     (familiar de formatives/objetivos, transfer de unit/progress/level, delayed
     de retention estable). `novel` sigue en `counts` como señal (kind válido y
     reservado, sin emisor real) pero no forma parte de `checks`/`missing`.
+
+    V3.25 (fase 3, F-L6): cuando `context_counts` se pasa (contextos distintos
+    por kind derivados de los eventos), los checks `initial`/`practice`/
+    `transfer` exigen **experiencias distintas**, no filas repetidas del mismo
+    contexto. Si el conteo de contextos es 0 (legacy sin contexto declarado),
+    retrocede al conteo de filas para no bloquear datos previos a V3.25.
+    `delayed` se mide por filas: la ventana ≥7 días ya impone separación real.
     """
     kinds = by_kind or {}
     familiar = int(kinds.get("familiar", 0))
     transfer = int(kinds.get("transfer", 0))
     novel = int(kinds.get("novel", 0))
     delayed = int(kinds.get("delayed", 0))
+
+    def _experiences(kind: str, rows: int) -> int:
+        if context_counts:
+            ctx = int(context_counts.get(kind, 0) or 0)
+            if ctx > 0:
+                return ctx
+        return rows
+
+    familiar_xp = _experiences("familiar", familiar)
+    transfer_xp = _experiences("transfer", transfer)
     checks = {
-        "initial": familiar >= MASTERY_EVIDENCE_REQUIREMENTS["initial"],
-        "practice": familiar >= MASTERY_EVIDENCE_REQUIREMENTS["practice"],
-        "transfer": transfer >= MASTERY_EVIDENCE_REQUIREMENTS["transfer"],
+        "initial": familiar_xp >= MASTERY_EVIDENCE_REQUIREMENTS["initial"],
+        "practice": familiar_xp >= MASTERY_EVIDENCE_REQUIREMENTS["practice"],
+        "transfer": transfer_xp >= MASTERY_EVIDENCE_REQUIREMENTS["transfer"],
         "delayed": delayed >= MASTERY_EVIDENCE_REQUIREMENTS["delayed"],
     }
     missing = [name for name, ok in checks.items() if not ok]
@@ -439,7 +507,9 @@ def mastery_evidence_gate(by_kind: dict | None) -> dict:
         "missing": missing,
         "counts": {
             "familiar": familiar,
+            "familiar_contexts": familiar_xp,
             "transfer": transfer,
+            "transfer_contexts": transfer_xp,
             "novel": novel,
             "delayed": delayed,
         },

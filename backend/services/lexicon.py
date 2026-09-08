@@ -124,6 +124,32 @@ def _int(value, default: int = 0) -> int:
         return default
 
 
+# V3.25 (F-K7/P2-01, fase 6): nombres canónicos de los contadores léxicos. Las
+# filas de `vocabulary` llegan del repositorio ya renombradas
+# (`production_count`/`exposure_count`); los accesores aceptan también las
+# claves históricas (`appearances`/`exposures`) para seguir leyendo dicts
+# legacy (tests, datos en memoria) sin romper la retrocompatibilidad.
+def production_count(row: dict) -> int:
+    """Producción del alumno del ítem (nº de mensajes en los que lo dijo)."""
+    return _int(row.get("production_count", row.get("appearances")))
+
+
+def exposure_count(row: dict) -> int:
+    """Exposición del ítem (nº de mensajes del tutor en los que apareció)."""
+    return _int(row.get("exposure_count", row.get("exposures")))
+
+
+def lexical_unit(row: dict) -> str:
+    """Unidad léxica canónica de la fila (V3.25/P2-02): la columna
+    `lexical_unit`, o la superficie normalizada si la fila legacy no la tiene."""
+    unit = (row.get("lexical_unit") or "").strip()
+    if unit:
+        return unit.lower()
+    word = (row.get("word") or "").strip()
+    lemma = (row.get("lemma") or "").strip()
+    return (lemma or word).lower()
+
+
 def classify_kind(text: str, source: str = "concepts") -> str:
     """Clasifica el kind de una semilla curricular (Constitución §3.2).
 
@@ -216,7 +242,7 @@ def _exposure_days(row: dict) -> int:
     el mismo mínimo para no degradar la señal receptiva por un campo ausente.
     """
     days = _int(row.get("exposure_days"))
-    return max(days, 1) if _int(row.get("exposures")) > 0 else days
+    return max(days, 1) if exposure_count(row) > 0 else days
 
 
 def item_mastery(row: dict) -> float:
@@ -231,13 +257,13 @@ def item_mastery(row: dict) -> float:
     pesos 0.4/0.6, de modo que la evidencia espaciada en días distintos pesa
     más que acumular muchas exposiciones en un mismo día.
     """
-    appearances = _int(row.get("appearances"))
+    productions = production_count(row)
     production_days = _int(row.get("production_days"))
-    exposures = _int(row.get("exposures"))
+    exposures = exposure_count(row)
     exposure_days = _exposure_days(row)
 
     prod = (
-        0.5 * min(appearances, MASTERY_MIN_PRODUCTIONS) / MASTERY_MIN_PRODUCTIONS
+        0.5 * min(productions, MASTERY_MIN_PRODUCTIONS) / MASTERY_MIN_PRODUCTIONS
         + 0.5 * min(production_days, MASTERY_MIN_DAYS) / MASTERY_MIN_DAYS
     )
     recognition = (
@@ -253,7 +279,7 @@ def item_mastery(row: dict) -> float:
 
 def item_confidence(row: dict) -> float:
     """Consistencia (0..1) de un ítem: volumen de evidencia producida + leída."""
-    evidence = _int(row.get("appearances")) + _int(row.get("exposures"))
+    evidence = production_count(row) + exposure_count(row)
     return round(min(1.0, evidence / 3.0), 3)
 
 
@@ -304,13 +330,13 @@ def item_status(row: dict, now: str = "") -> str:
     - `learning`: el resto (descubierto en el currículo sin tocar, o producido
       aún en consolidación con recuerdo aceptable).
     """
-    appearances = _int(row.get("appearances"))
+    productions = production_count(row)
     production_days = _int(row.get("production_days"))
-    exposures = _int(row.get("exposures"))
+    exposures = exposure_count(row)
 
-    if appearances >= MASTERY_MIN_PRODUCTIONS and production_days >= MASTERY_MIN_DAYS:
+    if productions >= MASTERY_MIN_PRODUCTIONS and production_days >= MASTERY_MIN_DAYS:
         return "mastered"
-    if appearances == 0:
+    if productions == 0:
         return "known" if exposures > 0 else "learning"
     return "weak" if item_recall(row, now) < RECALL_WEAK_THRESHOLD else "learning"
 
@@ -468,8 +494,20 @@ def item_competence_matrix(row: dict) -> dict:
 
     Deuda de modelo (sin migración destructiva): renombrar conceptualmente
     `appearances` -> `production_count` y `exposures` -> `exposure_count`.
+
+    F-K5 (V3.25, fase 3): desambiguación por dominio. Esta matriz es la capa
+    LÉXICA por ítem (señal informativa, D5/E3) y NO comparte semántica con la
+    capa ACADÉMICA:
+      - `transfer` léxico  = producción en ≥2 contextos `channel:activity` por
+        ÍTEM.   No es el `evidence_kind="transfer"` académico (superar un
+        peldaño unit/progress/level de la escalera Assessment 2.0).
+      - `retention` léxico = `retrieval_days >= RETENTION_MIN_RETRIEVAL_DAYS`
+        (≥1 día) de micro-drill por ítem. No es la retención certificable
+        §6.3 (≥7 días, ratio ≥0.9, `evidence_kind="delayed"`).
+    En un futuro schema de dominio, estos campos pasarían a llamarse
+    `contextual_transfer` y `delayed_recall` para eliminar la homonimia.
     """
-    exposure_total = _int(row.get("exposures"))
+    exposure_total = exposure_count(row)
     recognition = exposure_total > 0
     channels = production_channels(row)
     production = len(channels) > 0
@@ -651,7 +689,7 @@ def _is_pending_drill_candidate(
     ok_days: dict[str, set[str]] | None = None,
     today: str = "",
 ) -> bool:
-    if _int(row.get("exposures")) <= 0:
+    if exposure_count(row) <= 0:
         return False
     word = row.get("word", "")
     days = (ok_days or {}).get(word, set()) if ok_days else set()
@@ -684,7 +722,7 @@ def recognized_not_produced(rows: list[dict]) -> list[str]:
     return [
         row["word"]
         for row in rows
-        if _int(row.get("exposures")) > 0 and _speaking_prod(row) == 0
+        if exposure_count(row) > 0 and _speaking_prod(row) == 0
     ]
 
 
@@ -739,9 +777,9 @@ def coverage_indicator(rows: list[dict], now: str = "") -> dict:
         b["total"] += 1
         status = item_status(row, now)
         b[status] += 1  # mastered/known/learning/weak ya existen en el bucket
-        if _int(row.get("exposures")) > 0 or _int(row.get("appearances")) > 0:
+        if exposure_count(row) > 0 or production_count(row) > 0:
             b["receptive"] += 1
-        if _int(row.get("appearances")) > 0:
+        if production_count(row) > 0:
             b["productive"] += 1
 
     by_level: list[dict] = []

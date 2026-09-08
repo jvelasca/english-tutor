@@ -104,9 +104,9 @@ def test_chat_records_tutor_exposure(monkeypatch, tmp_path):
         )
     assert r.status_code == 200
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
-    assert vocab["practice"]["exposures"] == 1
-    assert vocab["practice"]["appearances"] == 0
-    assert vocab["vocabulary"]["exposures"] == 1
+    assert vocab["practice"]["exposure_count"] == 1
+    assert vocab["practice"]["production_count"] == 0
+    assert vocab["vocabulary"]["exposure_count"] == 1
 
 
 def test_chat_stream_records_tutor_exposure(monkeypatch, tmp_path):
@@ -123,8 +123,8 @@ def test_chat_stream_records_tutor_exposure(monkeypatch, tmp_path):
         body = r.text  # consume el stream para que se registre la exposición
         assert '"done": true' in body
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
-    assert vocab["practice"]["exposures"] == 1
-    assert vocab["vocabulary"]["exposures"] == 1
+    assert vocab["practice"]["exposure_count"] == 1
+    assert vocab["vocabulary"]["exposure_count"] == 1
 
 
 def test_chat_stream_with_user_id_personalizes(monkeypatch, tmp_path):

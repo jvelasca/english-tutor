@@ -409,7 +409,11 @@ async def _completed_level_ids(user_id: str) -> set[str]:
 
 
 async def _record_evidence_validated(
-    user_id: str, level: Level, records: list[dict]
+    user_id: str,
+    level: Level,
+    records: list[dict],
+    *,
+    context: dict | None = None,
 ) -> int:
     """Valida y persiste registros de evidencia; rechaza los que violen invariantes.
 
@@ -417,7 +421,16 @@ async def _record_evidence_validated(
     violación es un bug de servidor (la evidencia la genera internamente el
     dominio), así que se registra en logs y se eleva `EvidenceInvariantError`
     sin persistir nada. Devuelve el nº de registros persistidos.
-    """
+
+    V3.25 (fase 1, F-L6/F-L7): el emisor puede declarar `context` para
+    enriquecer cada evento con `context_id`/`activity_id`/`task_type`/
+    `support_level` cuando el registro no los traiga ya. Las filas sin contexto
+    siguen siendo válidas (agregados actuales intactos)."""
+    if context:
+        for ev in records:
+            for key in ("context_id", "activity_id", "task_type", "support_level"):
+                if not ev.get(key):
+                    ev[key] = context.get(key, "")
     violations: list[str] = []
     for ev in records:
         violations.extend(
@@ -606,6 +619,40 @@ async def get_skill_profile(user_id: str, level_id: str) -> CefrProfileOut | Non
     )
 
 
+async def _demonstrated_level(
+    user_id: str, enrollments: list[dict]
+) -> str | None:
+    """Mayor nivel CEFR **demostrado** (F-L3/V3.25, Fase 5).
+
+    Un nivel está *completado* al aprobar su examen (desbloquea el siguiente),
+    pero solo está *demostrado/certificado* cuando además existe retención
+    retardada certificable por cada destreza del examen — el mismo gate de
+    `list_level_completions`/`submit_exam`, resuelto aquí sobre las filas reales
+    `delayed` de cada nivel completado. Por eso no puede derivarse de
+    `completed_levels` (H5/P1: completado ≠ certificado).
+
+    Devuelve `None` mientras no haya ningún nivel certificado (el alumno parte
+    de Pre-A1 sin certificación previa), nunca un nivel hipotético.
+    """
+    data = load_assessments()
+    best: str | None = None
+    for e in enrollments:
+        if e.get("status") != "completed":
+            continue
+        level_id = e["level_id"]
+        lv = _levels_by_id.get(level_id)
+        exam = data.exams.get(level_id)
+        if lv is None or exam is None:
+            continue
+        rows = await run_in_threadpool(academy_repo.list_evidence, user_id, level_id)
+        gate = assessment_v2.certification_gate(list(exam.skills), rows)
+        if not gate["certified"]:
+            continue
+        if best is None or CEFR_ORDER.index(lv.level) > CEFR_ORDER.index(best):
+            best = lv.level
+    return best
+
+
 async def build_student_model(user_id: str) -> dict:
     """Fuente única del Student Model (sin proyección a un schema concreto).
 
@@ -629,6 +676,8 @@ async def build_student_model(user_id: str) -> dict:
     est = adaptive.estimated_level(
         skills, current_level=lv.level, completed_levels=completed_levels
     )
+    demonstrated = await _demonstrated_level(user_id, enrollments)
+    level_progress = round(float(academy_svc.overall_cefr_score(skills)), 3)
     goal_row = await run_in_threadpool(academy_repo.get_goal, user_id)
     target = (
         goal_row["target_level"]
@@ -648,6 +697,14 @@ async def build_student_model(user_id: str) -> dict:
     return {
         "level_id": lv.level_id,
         "current_level": lv.level,
+        # Fase 5 (F-L3): el Student Model expone por separado el nivel
+        # **demostrado** (completado + retención certificable, `None` si aún no
+        # hay certificación), el nivel **estimado** (banda continua anclada a
+        # `completed_levels`, F-K2) y el **progreso dentro del nivel actual**
+        # (overall 0..1 del perfil del tramo en curso). Ninguno de los tres es
+        # intercambiable: la UI los lee con semánticas distintas.
+        "demonstrated_level": demonstrated,
+        "level_progress": level_progress,
         "estimated_level": est["level"],
         "estimated_numeric": est["numeric"],
         "confidence": est["confidence"],
@@ -667,6 +724,8 @@ async def get_student_model(user_id: str) -> StudentModelOut:
     return StudentModelOut(
         level_id=sm["level_id"],
         current_level=sm["current_level"],
+        demonstrated_level=sm["demonstrated_level"],
+        level_progress=sm["level_progress"],
         estimated_level=sm["estimated_level"],
         estimated_numeric=sm["estimated_numeric"],
         confidence=sm["confidence"],
@@ -989,7 +1048,17 @@ async def submit_speaking_assessment_part(
         assessment_version=SPEAKING_ASSESSMENT_VERSION,
         difficulty=part["difficulty"],
     )
-    await _record_evidence_validated(user_id, lv, evidence_rows)
+    await _record_evidence_validated(
+        user_id,
+        lv,
+        evidence_rows,
+        context={
+            "context_id": f"speaking_assessment:{session['id']}",
+            "activity_id": "speaking_assessment",
+            "task_type": part["task_type"] or "assessment",
+            "support_level": "independent",
+        },
+    )
 
     now = datetime.now(timezone.utc).isoformat()
     part_evidence = [
@@ -1188,6 +1257,13 @@ async def _score_mission_utterance(
             curriculum_version=lv.version,
             difficulty=mission.get("difficulty"),
         ),
+        context={
+            "context_id": "mission:"
+            + str(mission.get("scenario_id") or mission.get("id") or "unknown"),
+            "activity_id": "speaking_mission",
+            "task_type": mission.get("task_type") or "role_play",
+            "support_level": "independent",
+        },
     )
     return result
 
@@ -1436,7 +1512,15 @@ async def get_assessment_v2_ladder(
         kind = row.get("evidence_kind") or "familiar"
         if kind in by_kind:
             by_kind[kind] += 1
-    gate = assessment_v2.mastery_evidence_gate(by_kind)
+    # V3.25 (fase 3, F-L6): el gate MASTERED distingue experiencias por contexto
+    # cuando el emisor las declara (filas legacy retroceden a conteo de filas).
+    context_counts = {
+        kind: academy_svc.evidence_context_count(evidence_rows, kind)
+        for kind in by_kind
+    }
+    gate = assessment_v2.mastery_evidence_gate(
+        by_kind, context_counts=context_counts
+    )
     status = assessment_v2.ladder_status(
         completed_kinds=completed_kinds,
         units_done=units_done,
@@ -1678,6 +1762,12 @@ async def submit_assessment_v2(
             assessment_version=assessment_v2.ASSESSMENT_VERSION,
             evidence_kind=evidence_kind,
         ),
+        context={
+            "context_id": f"assessment_v2:{kind}:{session['id']}",
+            "activity_id": f"assessment_v2:{kind}",
+            "task_type": "exam" if kind == "level" else kind,
+            "support_level": "cued",
+        },
     )
 
     # Actualiza mastery por destreza del instrumento (umbral del peldaño).
@@ -1839,7 +1929,7 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         status = lexicon.item_status(row, now_iso)
         if status not in ("weak", "learning", "known"):
             continue
-        if status == "known" and int(row.get("exposures") or 0) < 2:
+        if status == "known" and lexicon.exposure_count(row) < 2:
             continue
         word = row.get("word") or ""
         if not word:
@@ -3010,6 +3100,12 @@ async def submit_objective_assessment(
             curriculum_version=lv.version,
             assessment_version=ASSESSMENT_VERSION,
         ),
+        context={
+            "context_id": f"objective:{objective_id}",
+            "activity_id": "objective_assessment",
+            "task_type": "assessment",
+            "support_level": "cued",
+        },
     )
     mastery_updates: dict[str, float] = {}
     for skill, b in scored["skills"].items():
@@ -3080,6 +3176,12 @@ async def submit_speaking(
             objective_id=objective_id,
             curriculum_version=lv.version,
         ),
+        context={
+            "context_id": f"objective:{objective_id}",
+            "activity_id": "speaking_controlled",
+            "task_type": "controlled",
+            "support_level": "guided",
+        },
     )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "speaking"
@@ -3169,6 +3271,12 @@ async def submit_speaking_task(
             curriculum_version=lv.version,
             difficulty=profile_difficulty,
         ),
+        context={
+            "context_id": f"objective:{objective_id}",
+            "activity_id": "speaking_task",
+            "task_type": task_type or "open_ended",
+            "support_level": "independent",
+        },
     )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "speaking"
@@ -3224,6 +3332,12 @@ async def submit_writing(
             objective_id=objective_id,
             curriculum_version=lv.version,
         ),
+        context={
+            "context_id": f"objective:{objective_id}",
+            "activity_id": "writing_controlled",
+            "task_type": "controlled",
+            "support_level": "guided",
+        },
     )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "writing"
@@ -3278,6 +3392,12 @@ async def submit_pronunciation(
             objective_id=objective_id,
             curriculum_version=lv.version,
         ),
+        context={
+            "context_id": f"objective:{objective_id}",
+            "activity_id": "read_aloud",
+            "task_type": "read_aloud",
+            "support_level": "guided",
+        },
     )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "pronunciation"
@@ -3339,6 +3459,12 @@ async def submit_writing_task(
             objective_id=objective_id,
             curriculum_version=lv.version,
         ),
+        context={
+            "context_id": f"objective:{objective_id}",
+            "activity_id": "writing_task",
+            "task_type": "open_ended",
+            "support_level": "independent",
+        },
     )
     row = await run_in_threadpool(
         academy_repo.get_objective_row, user_id, level_id, objective_id, "writing"
@@ -3623,6 +3749,12 @@ async def submit_exam(
             assessment_version=exam.id,
             curriculum_version=lv.version,
         ),
+        context={
+            "context_id": f"exam:{level_id}",
+            "activity_id": "exam",
+            "task_type": "exam",
+            "support_level": "cued",
+        },
     )
     await run_in_threadpool(
         academy_repo.record_assessment_result,

@@ -94,7 +94,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
                 word TEXT NOT NULL,
-                appearances INTEGER NOT NULL DEFAULT 1,
+                production_count INTEGER NOT NULL DEFAULT 1,
                 first_seen TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 UNIQUE (user_id, word),
@@ -308,6 +308,35 @@ def init_db() -> None:
                 "ALTER TABLE academy_evidence ADD COLUMN evidence_kind TEXT "
                 "NOT NULL DEFAULT 'familiar'"
             )
+        # F-L6/F-L7/F-K6 (V3.25, fase 1): contexto del evento de evidencia. La
+        # columna `academy_evidence` es el log de eventos de evidencia
+        # (append-only); estas columnas permiten que `transfer`/`familiar`
+        # cuenten experiencias DISTINTAS (`context_id`/`activity_id`/
+        # `task_type`) y que cada evento lleve su `support_level` sin romper
+        # los agregados existentes. Migración idempotente columna a columna;
+        # las filas legacy quedan con '' (contexto desconocido → se ignora en
+        # los conteos de contexto distinto, no en los agregados actuales).
+        for _col, _type in (
+            ("context_id", "TEXT NOT NULL DEFAULT ''"),
+            ("activity_id", "TEXT NOT NULL DEFAULT ''"),
+            ("task_type", "TEXT NOT NULL DEFAULT ''"),
+            ("support_level", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if _col not in evidence_cols:
+                conn.execute(
+                    "ALTER TABLE academy_evidence ADD COLUMN "
+                    f"{_col} {_type}"
+                )
+        # Índice para los conteos de contexto distinto por destreza (fase 3).
+        context_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(academy_evidence)")
+        }
+        if "context_id" in context_cols:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_evidence_context "
+                "ON academy_evidence(user_id, level_id, skill, evidence_kind, "
+                "context_id, activity_id)"
+            )
 
         conn.execute(
             """
@@ -368,6 +397,9 @@ def init_db() -> None:
 
         # Speaking Mission Performance (V2.9): sesión trazable del loop
         # Mission → Attempt → Evaluation → Drill → Retry → Improvement.
+        # `cefr_target` (V3.25/F-K3) persiste en columna el nivel comunicativo
+        # declarado por la misión (el del escenario) para consultas/UI sin
+        # parsear `mission_json`; la fuente sigue siendo `mission_json`.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS speaking_mission_sessions (
@@ -375,6 +407,7 @@ def init_db() -> None:
                 user_id TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'mission',
                 scenario_id TEXT NOT NULL DEFAULT '',
+                cefr_target TEXT NOT NULL DEFAULT '',
                 mission_json TEXT NOT NULL DEFAULT '{}',
                 attempt_json TEXT,
                 evaluation_json TEXT,
@@ -387,6 +420,27 @@ def init_db() -> None:
             )
             """
         )
+
+        # V3.25 (F-K3, fase 7): `cefr_target` en columna de las sesiones de
+        # misión (instalaciones previas a V3.25 lo guardaban solo en
+        # `mission_json`). Migración idempotente: backfill desde el JSON cuando
+        # se puede leer sin parsear en crudo (JSON válido con `cefr_target`).
+        spk_cols = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(speaking_mission_sessions)"
+            )
+        }
+        if "cefr_target" not in spk_cols:
+            conn.execute(
+                "ALTER TABLE speaking_mission_sessions ADD COLUMN "
+                "cefr_target TEXT NOT NULL DEFAULT ''"
+            )
+            conn.execute(
+                "UPDATE speaking_mission_sessions SET cefr_target = "
+                "(SELECT json_extract(mission_json, '$.cefr_target')) "
+                "WHERE cefr_target = '' AND mission_json != '{}'"
+            )
 
         # Assessment 2.0 (V2.10): escalera formative/unit/progress/level/retention.
         conn.execute(
@@ -539,22 +593,49 @@ def init_db() -> None:
                 "ALTER TABLE users ADD COLUMN avatar_image TEXT NOT NULL DEFAULT ''"
             )
 
-        # Migración idempotente: `occurrences` → `appearances` (nº de mensajes en
-        # los que apareció la palabra, no frecuencia real de uso).
+        # V3.25 (F-K7/P2-01, fase 6): renombrado canónico de los contadores de
+        # producción/input en `vocabulary`. El histórico pasó por
+        # `occurrences` → `appearances` (V2.2) y luego sumó `exposures`
+        # (V2.3). Los nombres colisionaban con la semántica (una "aparición"
+        # era producción del alumno, no frecuencia), así que el modelo pasa a
+        # `production_count`/`exposure_count` (léxico, D5/E3) mediante RENAME
+        # COLUMN idempotente que traduce cualquier instalación previa.
         vocab_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
-        if "occurrences" in vocab_cols and "appearances" not in vocab_cols:
+        if "occurrences" in vocab_cols and "production_count" not in vocab_cols:
             conn.execute(
-                "ALTER TABLE vocabulary RENAME COLUMN occurrences TO appearances"
+                "ALTER TABLE vocabulary RENAME COLUMN occurrences "
+                "TO production_count"
+            )
+        if "appearances" in vocab_cols and "production_count" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary RENAME COLUMN appearances "
+                "TO production_count"
+            )
+        if "exposures" in vocab_cols and "exposure_count" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary RENAME COLUMN exposures "
+                "TO exposure_count"
+            )
+        # Releer tras los RENAME: los ADD posteriores no deben reintentar una
+        # columna ya creada por el renombrado.
+        vocab_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
+        if "production_count" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN "
+                "production_count INTEGER NOT NULL DEFAULT 1"
+            )
+        if "exposure_count" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN "
+                "exposure_count INTEGER NOT NULL DEFAULT 0"
             )
 
         # Migración idempotente (P3): separa exposición / producción / dominio.
-        # `exposures` cuenta los mensajes del tutor en los que apareció la palabra
-        # (input que el alumno lee); `last_exposed_at` su última exposición; y
-        # `production_days` los días distintos con producción del alumno (espaciado).
-        if "exposures" not in vocab_cols:
-            conn.execute(
-                "ALTER TABLE vocabulary ADD COLUMN exposures INTEGER NOT NULL DEFAULT 0"
-            )
+        # `exposure_count` cuenta los mensajes del tutor en los que apareció la
+        # palabra (input que el alumno lee); `last_exposed_at` su última
+        # exposición; y `production_days` los días distintos con producción del
+        # alumno (espaciado).
+        vocab_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
         if "last_exposed_at" not in vocab_cols:
             conn.execute(
                 "ALTER TABLE vocabulary ADD COLUMN last_exposed_at TEXT "
@@ -567,14 +648,15 @@ def init_db() -> None:
             )
             conn.execute(
                 "UPDATE vocabulary SET production_days = 1 "
-                "WHERE appearances > 0 AND production_days = 0"
+                "WHERE production_count > 0 AND production_days = 0"
             )
 
         # Migración idempotente (V2.3): contexto curricular del ítem léxico.
         # Convierte la palabra en un ítem de primer nivel sembrado desde el
         # currículo (`objective.vocabulary` + `objective.concepts`). Estas
         # columnas solo añaden contexto; no afectan a las métricas de
-        # producción/input (`appearances`/`exposures`).
+        # producción/input (hoy `production_count`/`exposure_count`; históricos
+        # `appearances`/`exposures`).
         if "cefr" not in vocab_cols:
             conn.execute(
                 "ALTER TABLE vocabulary ADD COLUMN cefr TEXT NOT NULL DEFAULT ''"
@@ -602,13 +684,15 @@ def init_db() -> None:
             )
 
         # Migración idempotente (V3.19): desglose de producción por destreza.
-        # `vocabulary` conserva la semántica agregada (`appearances`/
-        # `production_days`) y suma un contador por canal de producción
+        # V3.19: desglose de producción por destreza. `vocabulary` conserva la
+        # semántica agregada (`production_count`/`production_days`) y suma un
+        # contador por canal de producción
         # (`chat`/`speaking`/`writing`/`conversation`). Toda producción futura
-        # incrementa `appearances`/`production_days` igual que antes y, además,
-        # exactamente una columna `<channel>_prod`. Invariante de trazabilidad:
-        # `sum(chat_prod, speaking_prod, writing_prod, conversation_prod) ==
-        # appearances`. El histórico previo a V3.19 solo pudo venir del chat
+        # incrementa `production_count`/`production_days` igual que antes y,
+        # además, exactamente una columna `<channel>_prod`. Invariante de
+        # trazabilidad: `sum(chat_prod, speaking_prod, writing_prod,
+        # conversation_prod) == production_count`. El histórico previo a V3.19
+        # solo pudo venir del chat
         # libre (única vía de volcado entonces, verificado en el código), así
         # que el backfill etiqueta esas filas como `chat_prod` (idempotente:
         # solo rellena filas con producción y `chat_prod = 0`).
@@ -624,8 +708,8 @@ def init_db() -> None:
                     f"{col} INTEGER NOT NULL DEFAULT 0"
                 )
         conn.execute(
-            "UPDATE vocabulary SET chat_prod = appearances "
-            "WHERE appearances > 0 AND chat_prod = 0"
+            "UPDATE vocabulary SET chat_prod = production_count "
+            "WHERE production_count > 0 AND chat_prod = 0"
         )
 
         # Migración idempotente (V3.22): días distintos con exposición y fecha de
@@ -647,13 +731,35 @@ def init_db() -> None:
             )
         conn.execute(
             "UPDATE vocabulary SET exposure_days = 1 "
-            "WHERE exposures > 0 AND exposure_days = 0"
+            "WHERE exposure_count > 0 AND exposure_days = 0"
         )
         conn.execute(
             "UPDATE vocabulary SET first_exposed_at = last_exposed_at "
-            "WHERE exposures > 0 AND first_exposed_at = '' "
+            "WHERE exposure_count > 0 AND first_exposed_at = '' "
             "AND last_exposed_at != ''"
         )
+
+        # V3.25 (P2-02, fase 6): unidad léxica canónica. `word` conserva la
+        # FORMA SUPERFICIAL exacta (surface form: "going"), mientras
+        # `lexical_unit` identifica la UNIDAD de análisis: el lemma cuando el
+        # currículo lo declara ("go") o la superficie normalizada en minúsculas
+        # si no hay lemma. La producción/input sigue siendo por superficie
+        # (`word`); el agregado de dominio por unidad evita tratar
+        # `go/going/went/gone` como conocimientos independientes cuando
+        # comparten lemma. Backfill idempotente para instalaciones previas.
+        if "lexical_unit" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN "
+                "lexical_unit TEXT NOT NULL DEFAULT ''"
+            )
+            conn.execute(
+                "UPDATE vocabulary SET lexical_unit = lemma "
+                "WHERE lexical_unit = '' AND lemma != ''"
+            )
+            conn.execute(
+                "UPDATE vocabulary SET lexical_unit = lower(word) "
+                "WHERE lexical_unit = ''"
+            )
 
         # Migración idempotente (V3.23): evidencia de RETRIEVAL y contexto de
         # producción por actividad.
