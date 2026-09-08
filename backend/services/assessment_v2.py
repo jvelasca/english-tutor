@@ -140,7 +140,7 @@ def familiar_spaced_counts(
         by_context.setdefault(cid, []).append(dt)
     initial_xp = len(by_context)
     practice_xp = 0
-    for cid, dates in by_context.items():
+    for dates in by_context.values():
         first = min(dates).date()
         # Cada día posterior distinto con gap suficiente = un re-encuentro.
         later_days = {d.date() for d in dates if d.date() > first}
@@ -446,11 +446,41 @@ def _latest_dt(rows: list[dict]) -> datetime | None:
     return max(parsed) if parsed else None
 
 
+def delayed_origin_anchors(sessions: list[dict]) -> dict[str, str]:
+    """F-A2 (V3.26, P2-02): ancla de cada sesión de retención a su origen formal.
+
+    Cada sesión `kind == "retention"` referencia en `source_session_id` la
+    sesión formal que reevalúa (examen del nivel, `kind=level`/`unit`/
+    `progress`). La evidencia `delayed` que escribe una sesión cerrada se
+    etiqueta `context_id = "assessment_v2:retention:{session_id}"`; este helper
+    resuelve para cada sesión de retención cerrada el `created_at` de su sesión
+    formal origen, devolviendo un mapa `context_id → created_at` listo para
+    `certification_gate(delayed_origins=...)`.
+
+    Solo sesiones `status == "done"` (su evidencia ya está escrita) y con
+    `source_session_id` resoluble y parseable producen ancla; el resto cae al
+    ancla global del gate (fallback legacy).
+    """
+    by_id = {s.get("id"): s for s in sessions}
+    out: dict[str, str] = {}
+    for s in sessions:
+        if s.get("kind") != "retention" or s.get("status") != "done":
+            continue
+        sid = s.get("id")
+        origin = by_id.get(s.get("source_session_id"))
+        created = (origin or {}).get("created_at")
+        if sid is None or not created or _parse_iso(created) is None:
+            continue
+        out[f"assessment_v2:retention:{sid}"] = created
+    return out
+
+
 def certification_gate(
     exam_skills: list[str],
     evidence_rows: list[dict],
     *,
     now: str = "",
+    delayed_origins: dict | None = None,
 ) -> dict:
     """Gate de certificación de un nivel (P1/H5): **completado ≠ certificado**.
 
@@ -479,10 +509,22 @@ def certification_gate(
     `interval_days >= RETENTION_MIN_DAYS` desde el ancla formal y
     `rate = delayed_score / initial_score >= RETENTION_STABLE_RATIO`.
 
+    F-A2 (V3.26, P2-02, auditoría externa V3.25): cada evento `delayed` se ancla
+    a la sesión formal que reevalúa cuando el llamador aporta `delayed_origins`
+    (mapa `context_id → created_at` de la sesión origen, resuelto por
+    `delayed_origin_anchors` desde `source_session_id`). El ancla global "examen
+    más reciente del nivel" queda solo como fallback para eventos legacy sin
+    contexto o sin origen resoluble. Así, un examen formal posterior (re-intento
+    o review) no acorta el intervalo real de un evento previo.
+
     `retention_report` (informativo, no gate) expone por destreza `baseline_date`
     y `initial_score`, el intervalo formal→delayed en días de cada evento
-    (`interval_days`), `longest_interval_days`, `intervals_reached`
-    (RETENTION_INTERVALS) y el `rate` del mejor evento (`best_rate`).
+    (`retention_interval_days`, alias retrocompatible `interval_days`), la edad
+    real de cada evento respecto al momento de la consulta (`event_age_days`;
+    ambos son conceptos distintos: la edad del evento no es el intervalo
+    pedagógico), `longest_interval_days`, `longest_event_age_days`,
+    `anchored_events`, `intervals_reached` (RETENTION_INTERVALS) y el `rate` del
+    mejor evento (`best_rate`).
 
     Devuelve conformidad global, conteo `delayed` por destreza y las destrezas
     pendientes de retención. Un nivel sin examen (sin destrezas exigidas) nunca
@@ -498,11 +540,13 @@ def certification_gate(
     ]
     formal_anchor_dt = _latest_dt(formal_rows)
     initial_by_skill = {skill: _mean_score(formal_rows, skill) for skill in exam_skills}
+    ev_now = _parse_iso(now) or datetime.now(timezone.utc)
 
     # Eventos `delayed`: filas agrupadas por `context_id` (una sesión de
     # retention emite una fila por ítem). Legacy sin `context_id`: cada fila es
     # su propio evento (contexto desconocido no demuestra experiencia conjunta).
-    events: list[list[dict]] = []
+    # Cada evento recuerda su `context_id` para resolver su ancla de origen.
+    events: list[tuple[str, list[dict]]] = []
     by_context: dict[str, list[dict]] = {}
     for row in evidence_rows:
         if str(row.get("evidence_kind") or "").lower() != "delayed":
@@ -513,25 +557,42 @@ def certification_gate(
         if cid:
             by_context.setdefault(cid, []).append(row)
         else:
-            events.append([row])
-    events.extend(rows for rows in by_context.values() if rows)
+            events.append(("", [row]))
+    events.extend((cid, rows) for cid, rows in by_context.items() if rows)
 
     delayed_by_skill: dict[str, int] = {}
     reports: dict[str, dict] = {}
     checks: dict[str, bool] = {}
     for skill in exam_skills:
         skill_events: list[dict] = []
-        for rows in events:
+        for cid, rows in events:
             own = [r for r in rows if r.get("skill") == skill]
             if not own:
                 continue
             delayed_by_skill[skill] = delayed_by_skill.get(skill, 0) + len(own)
             ev_dt = _latest_dt(rows)
             verified = all(_parse_iso(r.get("created_at") or "") for r in own)
+            # F-A2: ancla por origen real del evento (sesión formal que reevalúa)
+            # con fallback al examen más reciente del nivel (legacy).
+            anchor_dt = formal_anchor_dt
+            anchored = bool(
+                cid
+                and delayed_origins is not None
+                and cid in delayed_origins
+                and _parse_iso(delayed_origins.get(cid) or "") is not None
+            )
+            if anchored:
+                anchor_dt = _parse_iso(delayed_origins[cid])
+            # Intervalo pedagógico formal→delayed (lo que el gate exige).
             interval_days = (
-                max(0, (ev_dt - formal_anchor_dt).days)
-                if ev_dt is not None and formal_anchor_dt is not None
+                max(0, (ev_dt - anchor_dt).days)
+                if ev_dt is not None and anchor_dt is not None
                 else None
+            )
+            # Edad del evento delayed respecto al momento de la consulta
+            # (informativo; el intervalo pedagógico no depende de `now`).
+            event_age_days = (
+                max(0, (ev_now - ev_dt).days) if ev_dt is not None else None
             )
             delayed_score = _mean_score(own)
             initial_score = initial_by_skill.get(skill)
@@ -552,6 +613,8 @@ def certification_gate(
                 {
                     "verified": verified,
                     "interval_days": interval_days,
+                    "event_age_days": event_age_days,
+                    "anchored": anchored,
                     "delayed_score": delayed_score,
                     "rate": rate,
                     "ok": ok,
@@ -560,7 +623,11 @@ def certification_gate(
         intervals = [
             e["interval_days"] for e in skill_events if e["interval_days"] is not None
         ]
+        ages = [
+            e["event_age_days"] for e in skill_events if e["event_age_days"] is not None
+        ]
         longest = max(intervals) if intervals else 0
+        longest_age = max(ages) if ages else 0
         # Mejor evento a efectos del informe: el de mayor intervalo formal→delayed
         # con ratio calculable (informativo, no gate: refleja la retención real
         # aunque no alcance el umbral de certificación).
@@ -580,8 +647,12 @@ def certification_gate(
                 formal_anchor_dt.isoformat() if formal_anchor_dt is not None else None
             ),
             "initial_score": initial_by_skill.get(skill),
+            "retention_interval_days": sorted(intervals),
             "interval_days": sorted(intervals),
+            "event_age_days": sorted(ages),
             "longest_interval_days": longest,
+            "longest_event_age_days": longest_age,
+            "anchored_events": sum(1 for e in skill_events if e["anchored"]),
             "intervals_reached": [
                 i for i in RETENTION_INTERVALS if longest >= i
             ],

@@ -301,6 +301,82 @@ def test_certification_gate_empty_exam_never_certifies():
     assert av2.certification_gate([], [])["certified"] is False
 
 
+def test_retention_report_adds_event_age_and_retention_interval():
+    """F-A2 (auditoría V3.25, P2-02): `event_age_days` (edad del evento delayed
+    respecto al momento de la consulta) y `retention_interval_days` (intervalo
+    formal→delayed, el intervalo pedagógico relevante) son conceptos distintos y
+    el reporte los expone a la vez de forma aditiva (`interval_days` se conserva
+    como alias retrocompatible)."""
+    formal = "2026-08-01T00:00:00+00:00"
+    delayed_at = "2026-08-08T00:00:00+00:00"
+    now = "2026-08-30T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", delayed_at, 0.9),
+    ]
+    gate = av2.certification_gate(["listening"], rows, now=now)
+    report = gate["retention_report"]["listening"]
+    assert report["retention_interval_days"] == [7]  # formal → delayed
+    assert report["interval_days"] == [7]  # alias conservado
+    assert report["event_age_days"] == [22]  # ahora - delayed
+    assert report["longest_interval_days"] == 7
+    assert report["longest_event_age_days"] == 22
+    assert gate["certified"] is True
+
+
+def test_certification_gate_anchors_delayed_to_origin_session():
+    """F-A2: cada evento `delayed` se ancla a la sesión formal que reevalúa
+    (`delayed_origins`, resuelta desde `source_session_id`), no al examen más
+    reciente del nivel. Un examen formal posterior (re-intento) no debe acortar
+    el intervalo real del evento anterior."""
+    formal = "2026-08-01T00:00:00+00:00"
+    reattempt = "2026-08-10T00:00:00+00:00"
+    delayed_at = "2026-08-08T00:00:00+00:00"  # D+7 desde el origen real
+    rows = [
+        _exam_row("listening", formal, context_id="exam:a1:1"),
+        # Re-intento formal posterior: el ancla global "más reciente" sería
+        # 2026-08-10 y rompería el intervalo real del evento previo.
+        _exam_row("listening", reattempt, context_id="exam:a1:2"),
+        _delayed_row(
+            "listening", delayed_at, 0.9,
+            context_id="assessment_v2:retention:7",
+        ),
+    ]
+    origins = {"assessment_v2:retention:7": formal}
+    # Sin anclaje por origen (comportamiento V3.25.1) no certifica: ancla global
+    # = 2026-08-10 → intervalo 0 días.
+    old = av2.certification_gate(["listening"], rows)
+    assert old["certified"] is False
+    assert old["retention_report"]["listening"]["interval_days"] == [0]
+    # Con `delayed_origins` el evento se ancla a su sesión origen (2026-08-01):
+    # D+7 real → sí certifica.
+    gate = av2.certification_gate(["listening"], rows, delayed_origins=origins)
+    assert gate["certified"] is True
+    report = gate["retention_report"]["listening"]
+    assert report["interval_days"] == [7]
+    assert report["anchored_events"] == 1
+
+
+def test_delayed_origin_anchors_maps_retention_contexts_to_origin_created_at():
+    """F-A2: `delayed_origin_anchors` resuelve el `created_at` de la sesión
+    formal origen (`source_session_id`) para cada sesión de retención cerrada;
+    las sesiones abiertas o sin origen formal no producen ancla."""
+    sessions = [
+        {"id": 1, "kind": "level", "status": "done",
+         "source_session_id": None, "created_at": "2026-08-01T00:00:00+00:00"},
+        {"id": 2, "kind": "retention", "status": "done",
+         "source_session_id": 1, "created_at": "2026-08-08T00:00:00+00:00"},
+        {"id": 3, "kind": "retention", "status": "open",
+         "source_session_id": 1, "created_at": "2026-08-15T00:00:00+00:00"},
+        {"id": 4, "kind": "retention", "status": "done",
+         "source_session_id": None, "created_at": "2026-08-20T00:00:00+00:00"},
+    ]
+    anchors = av2.delayed_origin_anchors(sessions)
+    assert anchors == {
+        "assessment_v2:retention:2": "2026-08-01T00:00:00+00:00"
+    }
+
+
 
 def test_ladder_level_certified_requires_retention_step():
     """H5/P1: el nivel se *certifica* solo con peldaño `level` + `retention`;

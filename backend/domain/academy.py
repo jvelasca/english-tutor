@@ -645,7 +645,16 @@ async def _demonstrated_level(
         if lv is None or exam is None:
             continue
         rows = await run_in_threadpool(academy_repo.list_evidence, user_id, level_id)
-        gate = assessment_v2.certification_gate(list(exam.skills), rows)
+        # F-A2 (V3.26, P2-02): cada `delayed` se ancla a la sesión formal que
+        # reevalúa (source_session_id), no al examen más reciente del nivel.
+        sessions = await run_in_threadpool(
+            academy_repo.list_assessment_v2_sessions, user_id, level_id=level_id
+        )
+        gate = assessment_v2.certification_gate(
+            list(exam.skills),
+            rows,
+            delayed_origins=assessment_v2.delayed_origin_anchors(sessions),
+        )
         if not gate["certified"]:
             continue
         if best is None or CEFR_ORDER.index(lv.level) > CEFR_ORDER.index(best):
@@ -3807,8 +3816,15 @@ async def submit_exam(
         evidence_rows = await run_in_threadpool(
             academy_repo.list_evidence, user_id, level_id
         )
+        # F-A2 (V3.26, P2-02): anclaje de cada `delayed` a su sesión formal
+        # origen (source_session_id), no al examen más reciente del nivel.
+        sessions = await run_in_threadpool(
+            academy_repo.list_assessment_v2_sessions, user_id, level_id=level_id
+        )
         result["certification"] = assessment_v2.certification_gate(
-            list(exam.skills), evidence_rows
+            list(exam.skills),
+            evidence_rows,
+            delayed_origins=assessment_v2.delayed_origin_anchors(sessions),
         )
     else:
         # Remediation pack: objetivos del nivel dirigidos a cada destreza suspendida.
@@ -3834,8 +3850,17 @@ async def list_level_completions(user_id: str) -> list[LevelCompletionOut]:
         if exam is not None:
             # H5/P1: el listado distingue completado (examen aprobado) de
             # certificado (completado + retención retardada por destreza).
+            # F-A2 (V3.26, P2-02): cada `delayed` anclado a su sesión formal
+            # origen (source_session_id), no al examen más reciente del nivel.
+            sessions = await run_in_threadpool(
+                academy_repo.list_assessment_v2_sessions,
+                user_id,
+                level_id=r["level_id"],
+            )
             certification = assessment_v2.certification_gate(
-                list(exam.skills), by_level.get(r["level_id"], [])
+                list(exam.skills),
+                by_level.get(r["level_id"], []),
+                delayed_origins=assessment_v2.delayed_origin_anchors(sessions),
             )
         out.append(
             LevelCompletionOut(
