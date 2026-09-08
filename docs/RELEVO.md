@@ -3,7 +3,17 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 13:20 (UTC+2).
+> Actualizado por última vez: 2026-09-08 13:35 (UTC+2).
+>
+> **Nota (2026-09-08, 13:35):** **V3.24 publicada** — release **v3.24.0**
+> `8970634` en `main` (calibración de salida del Student Model: **F-K1**
+> MASTERED a lo emisible + **F-K2** estimado anclado + **F-K8** e2e del salto
+> A1→A2; `release-notes-v3.24.0.md`). CI GitHub Actions **success** (Content
+> validation · Backend ruff+pytest · Frontend tsc+vitest+build · Playwright E2E
+> visual · Beta V3.0 gate · Release consistency 3.24.0). Verificación local:
+> suite backend **1457 passed** + ruff limpio; Eje 1 del dossier K **G1 311 +
+> G2 329**. La sección 38 y su backlog quedan cerrados como histórico (V3.24);
+> los P2/P3 del dossier K (F-K3…F-K7) son candidatos del siguiente incremento.
 >
 > **Nota (2026-09-08, 13:20):** alcance de V3.24 cerrado por el gerente (solo
 > **F-K1 + F-K2 + F-K8**) e implementado en el árbol de trabajo (sin commit ni
@@ -3323,6 +3333,11 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
 
 ## 38. RELEVO HACIA V3.24 — pendientes consolidados (2026-09-08)
 
+> ⛔ **CERRADO (2026-09-08, release v3.24.0 = `8970634`).** Sección histórica:
+> el alcance V3.24 (F-K1 + F-K2 + F-K8) se implementó, verificó y publicó. Ver
+> Nota superior (13:35). Los P2/P3 del dossier K (F-K3…F-K7) quedan como
+> candidatos del siguiente incremento.
+
 > **Para el agente/contexto que retome ahora.** Condensa TODO lo pendiente
 > conocido para avanzar de v3.23.0 a v3.24. Fuentes: dossier K
 > (`docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md`, Eje 1, nuevo), dossier J
@@ -3339,9 +3354,10 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   vitest **450**/57 archivos · ruff · `tsc`/`vite build` ·
   `check_release_consistency` 3.23.0 exit 0 · CI GitHub Actions success.
 - Árbol limpio; única escritura de la auditoría = dossier K (untracked).
-- Estado del árbol a 2026-09-08 13:00 (V3.24 implementada, sin commit): suite
-  backend completa **1457 passed** · Eje 1 **G1 311** + **G2 329** (640, +2
-  tests e2e) · ruff limpio. Ver Nota superior y `agentes/v324-calibracion-salida.md`.
+- Estado del árbol a 2026-09-08 13:35: **release v3.24.0 `8970634` publicado**
+  en `main` con CI green (sección 38 cerrada como histórico). Suite backend
+  **1457 passed** · Eje 1 **G1 311** + **G2 329** (640, +2 tests e2e) · ruff
+  limpio. Detalle: Nota superior y `agentes/v324-calibracion-salida.md`.
 - CONSTITUCIÓN sin cambios V3.19→V3.23; **R8/R9 siguen como propuesta abierta**
   (no tocar código si no se cierra la propuesta).
 
@@ -3445,6 +3461,9 @@ es prerequisito del fix F-K2.
   en `docs/RELEVO.md`, `release-notes-v3.24.0.md`, `check_release_consistency`.
 
 ### 38.6 Primeros pasos sugeridos para la sesión que retome
+
+> ✅ **CERRADO (2026-09-08, release v3.24.0 `8970634`).** Lista histórica; el
+> siguiente incremento parte de los P2/P3 del dossier K (F-K3…F-K7).
 
 1. Leer: Nota superior de este documento (13:00) → sección 38 → dossier K
    (Hallazgos, Veredicto, G4) → dossier J (si se quiere el contexto total).
