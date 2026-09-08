@@ -3,7 +3,38 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 19:25 (UTC+2).
+> Actualizado por última vez: 2026-09-08 19:40 (UTC+2).
+>
+> **Nota (2026-09-08, 19:40):** **V3.26 · Eje A CERRADO — retención
+> longitudinal multi-punto en `main`** (decisión del gerente: Eje A primero).
+> El gate MASTERED y la certificación ya no se satisfacen con un único
+> encuentro/`delayed` puntual. Tres incrementos con su tests-first y su commit:
+> **F-A1** (`c5cb2b8`) — `initial` = primer encuentro de cada contexto y
+> `practice` = re-encuentros ESPACIADOS (≥ `SPACED_PRACTICE_MIN_DAYS` 1 día) del
+> mismo contexto (`familiar_spaced_counts` en `mastery_evidence_gate`); legacy
+> sin contexto conserva el fallback filas/contextos (F-C4 lo marcará en el
+> perfil). **F-A2** (`16bbb50`) — cada evento `delayed` se ancla a su sesión
+> formal origen (`delayed_origin_anchors` desde `source_session_id` → parámetro
+> `delayed_origins` del gate) y el reporte separa `retention_interval_days`
+> (formal→delayed) de `event_age_days` (edad real del evento), conceptos
+> distintos, con alias retrocompatible `interval_days`. **F-A3** (`cd69088`) —
+> la certificación exige **≥ 2 reassessment points estables por destreza**
+> (`CERTIFICATION_REQUIRED_DELAYED = 2`; `stable_points` en el informe), cada
+> uno ≥ `RETENTION_MIN_DAYS` desde su origen y con ratio ≥ 0.9 (un único
+> delayed ya no certifica); fix del escritor: la retención que reevalúa un
+> examen de nivel (`kind=level`) puntúa contra la clave del examen — sus ítems
+> no viven en el índice de checks del currículo y `submit` devolvía None sin
+> escribir `delayed` — y cada reassessment nuevo se espacia ≥ 7 días del último
+> cerrado del mismo origen (`retention_spacing_due`, 409 si no), haciendo que
+> >1 punto sea real y la certificación sea alcanzable end-to-end por la
+> escalera. Los tests previos del gate (los 6 negativos + boundaries) se
+> actualizaron a la semántica multi-punto; docs: `docs/ASSESSMENT_2.md`
+> (sección «Certificación del nivel»), `docs/CONSTITUCION-PEDAGOGICA.md` (H5,
+> item 6) y docstrings de `CertificationOut`. Verificación íntegra: pytest
+> backend **1506 passed** (4 tests nuevos) + `ruff check .` limpio; frontend
+> sin cambios. **Pendiente hacia V3.26: Eje B** (emisor real de `novel` +
+> historia léxica por superficie) y **Eje C** (Listening real + calibración
+> CEFR + `context_id` legacy en el perfil).
 >
 > **Nota (2026-09-08, 19:25):** **V3.25.1 publicada** — release **v3.25.1**
 > `4fd54a5` en `main` (cierre de los 3 P1 de la auditoría externa V3.25:
