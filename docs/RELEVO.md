@@ -3,7 +3,23 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 14:40 (UTC+2).
+> Actualizado por última vez: 2026-09-08 14:45 (UTC+2).
+>
+> **Nota (2026-09-08, 14:45):** **V3.25 publicada** — release **v3.25.0**
+> `bb31a1b` en `main` (calibración del Student Model del dossier L — auditoría
+> TOTAL verificada de V3.24.0 — que absorbe los pendientes F-K3…F-K7: evidencia
+> con contexto + `support_level` canónico, transfer por experiencias distintas,
+> certificación robusta con `created_at` + `retention_report` de intervalos,
+> semántica demostrado/estimado/progreso en Student Model y UI, renombrado
+> léxico canónico `production_count`/`exposure_count` con `lexical_unit` y
+> doble vía speaking con `cefr_target` persistido). CI GitHub Actions
+> **success** (Backend ruff+pytest · Frontend tsc+vitest+build · Playwright E2E
+> visual · Content validation · Beta V3.0 gate · Release consistency 3.25.0).
+> Verificación local reproducida íntegra (dossier M
+> `docs/audit/M-AUDITORIA-TOTAL-V325.md`, APROBADO para cierre, sin BUG REAL):
+> pytest backend **1481 passed** + ruff limpio; golden **25 passed**; vitest
+> **450 passed** (57 archivos) + tsc/vite build OK;
+> `check_release_consistency` **3.25.0** exit 0.
 >
 > **Nota (2026-09-08, 14:40):** **V3.25 implementada y verificada en el árbol de
 > trabajo (sin commit ni release aún)** — candidato release **v3.25.0**
