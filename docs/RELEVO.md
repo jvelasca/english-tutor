@@ -3,7 +3,34 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 19:40 (UTC+2).
+> Actualizado por última vez: 2026-09-08 19:55 (UTC+2).
+>
+> **Nota (2026-09-08, 19:55):** **V3.26 · Eje B CERRADO — emisor real de
+> `novel` + historia léxica por superficie en `main`**. **F-B1** (`b057e4b`):
+> `novel` deja de ser un kind reservado y gana emisor real — el primer intento
+> de una **misión por escenario B2+ jamás practicado** por el alumno
+> (detección evidence-only: `mission_context_practiced` consulta
+> `academy_evidence` por el contexto canónico `mission:{escenario}`, decisión
+> del gerente) escribe evidencia `novel` (`mission_evidence_kind`,
+> `services/speaking.py`); retries y repeticiones del mismo escenario escriben
+> `familiar` (anti-bombeo: cada escenario produce novel una sola vez, verificada
+> por test e2e de repetición). Decisión del gerente: **no se reactiva el
+> requisito** — `novel_required = 0` en las 48 celdas de la matriz y el gate
+> MASTERED intactos; la activación calibrada de B2+ queda para el Eje C.
+> **F-B2** (`5d0a19d`): historia detallada de eventos léxicos por forma de
+> superficie — tabla `vocabulary_events` append-only (`word`,
+> `lexical_unit`, `event_type` `produced|exposed|retrieval`, `channel`,
+> `activity`, `created_at`) escrita en la MISMA transacción de los 4 writers de
+> `repositories/vocabulary.py` (sin doble fuente de verdad; invariantes de
+> contadores y `sum(channel_prod) == production_count` intactos), endpoint
+> `GET /api/vocabulary/history` paginado por palabra y schema
+> `VocabularyEventOut`. SIN backfill: la historia empieza en V3.26 (mismo
+> criterio que el retrieval); el ledger es señal (D5/E3), nunca puerta de
+> mastery. Verificación íntegra: pytest backend **1520 passed** (+14 tests
+> nuevos: 4 de misión novel + 10 del ledger) + `ruff check .` limpio; frontend
+> sin cambios. **Pendiente hacia V3.26: Eje C** (Listening real + calibración
+> CEFR unificada + skills bloqueantes en UI + marca de legacy sin
+> `context_id`).
 >
 > **Nota (2026-09-08, 19:40):** **V3.26 · Eje A CERRADO — retención
 > longitudinal multi-punto en `main`** (decisión del gerente: Eje A primero).
