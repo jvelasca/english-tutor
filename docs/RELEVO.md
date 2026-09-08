@@ -3,7 +3,22 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 16:50 (UTC+2).
+> Actualizado por última vez: 2026-09-08 19:25 (UTC+2).
+>
+> **Nota (2026-09-08, 19:25):** **V3.25.1 publicada** — release **v3.25.1**
+> `4fd54a5` en `main` (cierre de los 3 P1 de la auditoría externa V3.25:
+> `certification_gate` verifica la retención real desde las filas — baseline
+> formal `task_type="exam"` + eventos `delayed` por `context_id`, enforce
+> `interval >= 7 días` y `ratio >= 0.90`, sin examen no certifica —,
+> agregación real por `lexical_unit` aditiva con superficies independientes
+> (`units_from_rows`/`summary_units`) y `SUPPORT_LEVEL_WEIGHTS` ponderando
+> `generalized_mastery_score` con legacy neutral 1.0). Verificación local
+> reproducida (dossier N `docs/audit/N-AUDITORIA-TOTAL-V3251.md`, los 6 tests
+> negativos del gate como evidencia de cierre): pytest backend **1495 passed**
+> + ruff limpio; vitest **450 passed** (57 archivos) + `tsc` OK;
+> `check_release_consistency` **3.25.1** exit 0. Siguiente paso: V3.26
+> (Listening + `novel` + retención longitudinal) — planificar juntos antes de
+> tocar código.
 >
 > **Nota (2026-09-08, 16:50):** **V3.25.1 en curso — cierre de P1 de la
 > auditoría externa V3.25** sobre `main` (la auditoría del candidato v3.25.0
