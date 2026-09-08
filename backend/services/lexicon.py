@@ -44,7 +44,7 @@ from services.curriculum import CEFR_ORDER
 MASTERY_MIN_PRODUCTIONS = 3
 MASTERY_MIN_DAYS = 2
 
-# V3.23 (P1-04): pesos de la señal RECEPTIVA en `item_mastery`. El volumen
+# V3.23 (P1-03): pesos de la señal RECEPTIVA en `item_mastery`. El volumen
 # (`exposures`) aporta 0.4 y los días distintos (`exposure_days`) 0.6: cien
 # exposiciones en un solo día ya no saturan el reconocimiento, mientras que
 # exposiciones repartidas en días distintos sí acumulan evidencia de
@@ -226,7 +226,7 @@ def item_mastery(row: dict) -> float:
     apariciones en `MASTERY_MIN_DAYS` días distintos. El reconocimiento (30%)
     aporta señal débil (haber leído/oído la palabra) sin llegar a dominio.
 
-    V3.23 (P1-04): el reconocimiento ya NO se satura con volumen: separa
+    V3.23 (P1-03): el reconocimiento ya NO se satura con volumen: separa
     `recognition_volume` (exposures) de `recognition_days` (exposure_days) con
     pesos 0.4/0.6, de modo que la evidencia espaciada en días distintos pesa
     más que acumular muchas exposiciones en un mismo día.

@@ -146,7 +146,7 @@ def test_item_mastery_bounded():
 
 
 def test_item_mastery_recognition_requires_spaced_exposure_days():
-    """V3.23 (P1-04): el reconocimiento pondera los DÍAS de exposición (0.6)
+    """V3.23 (P1-03): el reconocimiento pondera los DÍAS de exposición (0.6)
     más que el volumen (0.4). Cien exposiciones en un solo día ya no saturan la
     señal receptiva: 3 exposiciones en 3 días valen más que 100 en 1 día."""
     same_day = lexicon.item_mastery(
