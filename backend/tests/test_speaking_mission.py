@@ -9,7 +9,7 @@ from repositories import db
 from repositories import users as users_repo
 from services import llm
 from services import speaking_mission as mission_svc
-from services.speaking import SPEAKING_CRITERIA
+from services.speaking import SPEAKING_CRITERIA, mission_evidence_kind
 from services.speaking_scenarios import list_scenarios
 
 
@@ -241,3 +241,160 @@ def test_mission_cefr_target_migration_backfills_legacy(monkeypatch, tmp_path):
     assert migrated is not None
     assert migrated["cefr_target"] == (mission["cefr_target"] or "")
     assert migrated["mission"]["cefr_target"] == migrated["cefr_target"]
+
+
+# --- Eje B / F-B1 (V3.26): emisor real del kind `novel` --------------------
+# `novel` estuvo reservado (sin emisor real) desde V3.24. El emisor llega por la
+# misión por escenario: el PRIMER intento de un escenario B2+ jamás practicado
+# emite `novel`; retries y repeticiones del mismo escenario emiten `familiar`.
+
+
+def _scenario_with_cefr(target: str) -> dict:
+    return next(
+        s for s in list_scenarios() if (s.get("cefr_target") or "") == target
+    )
+
+
+def test_mission_evidence_kind_only_novel_for_first_ever_b2_plus():
+    # Primera vez en escenario B2+ → novel.
+    assert mission_evidence_kind(first_ever=True, cefr_target="B2") == "novel"
+    assert mission_evidence_kind(first_ever=True, cefr_target="C1") == "novel"
+    assert mission_evidence_kind(first_ever=True, cefr_target="C2") == "novel"
+    # Escenarios por debajo de B2 → familiar (la novedad es requisito B2+).
+    assert mission_evidence_kind(first_ever=True, cefr_target="A2") == "familiar"
+    assert mission_evidence_kind(first_ever=True, cefr_target="B1") == "familiar"
+    # Sin target declarado no puede decidirse B2+ → familiar.
+    assert mission_evidence_kind(first_ever=True, cefr_target="") == "familiar"
+    # Re-encuentro (ya practicado) de un escenario B2+ → familiar, nunca novel.
+    assert mission_evidence_kind(first_ever=False, cefr_target="B2") == "familiar"
+    assert mission_evidence_kind(first_ever=False, cefr_target="C1") == "familiar"
+
+
+def test_mission_first_attempt_b2_writes_novel_then_retry_familiar(
+    monkeypatch, tmp_path
+):
+    user_id = _setup(monkeypatch, tmp_path)
+    scenario = _scenario_with_cefr("B2")
+    client = TestClient(app)
+
+    start = client.post(
+        "/api/academy/speaking/mission/start",
+        params={"user_id": user_id},
+        json={"scenario_id": scenario["id"]},
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session_id"]
+
+    # Primer intento (jamás practicado, B2) → toda la evidencia es `novel`.
+    monkeypatch.setattr(llm, "get_client", lambda: FakeOllamaClient(WEAK_EVIDENCE))
+    attempt = client.post(
+        "/api/academy/speaking/mission/attempt",
+        params={"user_id": user_id},
+        json={"session_id": session_id, "heard": "I go shop.", "duration_seconds": 8},
+    )
+    assert attempt.status_code == 200
+    context = f"mission:{scenario['id']}"
+    rows = academy_repo.list_evidence(user_id)
+    novel_rows = [r for r in rows if r["context_id"] == context]
+    assert novel_rows
+    assert all(r["evidence_kind"] == "novel" for r in novel_rows)
+
+    # Retry del mismo escenario → re-encuentro, siempre `familiar`.
+    monkeypatch.setattr(llm, "get_client", lambda: FakeOllamaClient(STRONG_EVIDENCE))
+    retry = client.post(
+        "/api/academy/speaking/mission/retry",
+        params={"user_id": user_id},
+        json={
+            "session_id": session_id,
+            "heard": "I would like to buy a jacket, please.",
+            "duration_seconds": 12,
+        },
+    )
+    assert retry.status_code == 200
+    kinds = {
+        r["evidence_kind"]
+        for r in academy_repo.list_evidence(user_id)
+        if r["context_id"] == context
+    }
+    assert kinds == {"novel", "familiar"}
+
+
+def test_mission_b1_scenario_never_emits_novel(monkeypatch, tmp_path):
+    user_id = _setup(monkeypatch, tmp_path)
+    scenario = _scenario_with_cefr("B1")
+    client = TestClient(app)
+    start = client.post(
+        "/api/academy/speaking/mission/start",
+        params={"user_id": user_id},
+        json={"scenario_id": scenario["id"]},
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session_id"]
+    monkeypatch.setattr(llm, "get_client", lambda: FakeOllamaClient(WEAK_EVIDENCE))
+    attempt = client.post(
+        "/api/academy/speaking/mission/attempt",
+        params={"user_id": user_id},
+        json={"session_id": session_id, "heard": "I go shop.", "duration_seconds": 8},
+    )
+    assert attempt.status_code == 200
+    context = f"mission:{scenario['id']}"
+    rows = [
+        r
+        for r in academy_repo.list_evidence(user_id)
+        if r["context_id"] == context
+    ]
+    assert rows
+    assert all(r["evidence_kind"] == "familiar" for r in rows)
+
+
+def test_mission_repeat_b2_scenario_does_not_inflate_novel(monkeypatch, tmp_path):
+    """Anti-bombeo: repetir un escenario B2+ en una misión nueva NUNCA vuelve a
+    emitir `novel` (cada escenario produce novel una sola vez, en su primer
+    intento histórico)."""
+    user_id = _setup(monkeypatch, tmp_path)
+    scenario = _scenario_with_cefr("B2")
+    client = TestClient(app)
+    context = f"mission:{scenario['id']}"
+
+    def _run_mission() -> None:
+        start = client.post(
+            "/api/academy/speaking/mission/start",
+            params={"user_id": user_id},
+            json={"scenario_id": scenario["id"]},
+        )
+        assert start.status_code == 200
+        session_id = start.json()["session_id"]
+        monkeypatch.setattr(
+            llm, "get_client", lambda: FakeOllamaClient(WEAK_EVIDENCE)
+        )
+        assert (
+            client.post(
+                "/api/academy/speaking/mission/attempt",
+                params={"user_id": user_id},
+                json={
+                    "session_id": session_id,
+                    "heard": "I go shop.",
+                    "duration_seconds": 8,
+                },
+            ).status_code
+            == 200
+        )
+
+    _run_mission()
+    first_count = len(
+        [
+            r
+            for r in academy_repo.list_evidence(user_id)
+            if r["context_id"] == context and r["evidence_kind"] == "novel"
+        ]
+    )
+    assert first_count > 0
+    _run_mission()
+    novel_after = len(
+        [
+            r
+            for r in academy_repo.list_evidence(user_id)
+            if r["context_id"] == context and r["evidence_kind"] == "novel"
+        ]
+    )
+    assert novel_after == first_count

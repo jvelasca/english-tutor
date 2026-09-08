@@ -858,6 +858,37 @@ def scores_from_evidence(
     }
 
 
+# --- Emisor real del evidence_kind `novel` (V3.26, Eje B/F-B1) -------------
+# `novel` estuvo reservado (sin emisor real) desde V3.24 (F-K1): los gates y la
+# matriz CEFR lo exigen como 0 y la auditoría dejó el candidato a V3.26. El
+# emisor real llega por el bucle de misión por escenario: un escenario B2+
+# JAMÁS practicado por el alumno demuestra uso en contexto nuevo. Decisión del
+# gerente: mantener `novel_required = 0` y fuera del gate MASTERED en el Eje B
+# (la reactivación progresiva de la matriz es del Eje C); aquí solo se crea la
+# señal real, con anti-bombeo (cada escenario emite novel una sola vez; los
+# re-encuentros/retries del mismo escenario son `familiar`).
+
+NOVEL_MIN_CEFR = "B2"
+
+_CEFR_RANK = {level: i for i, level in enumerate(("A1", "A2", "B1", "B2", "C1", "C2"))}
+
+
+def mission_evidence_kind(*, first_ever: bool, cefr_target: str = "") -> str:
+    """Decide el `evidence_kind` de un intento de misión (V3.26, Eje B/F-B1).
+
+    Devuelve `novel` solo cuando es la PRIMERA vez que el alumno practica ese
+    escenario (`first_ever`) y el escenario es B2+ (`cefr_target` en el rango
+    B2..C2). En cualquier otro caso devuelve `familiar`: retries y repeticiones
+    del mismo escenario son re-encuentros (practice), no novedad, y no deben
+    inflar los contextos `novel` del perfil."""
+    if not first_ever:
+        return "familiar"
+    rank = _CEFR_RANK.get((cefr_target or "").strip().upper())
+    if rank is None or rank < _CEFR_RANK[NOVEL_MIN_CEFR]:
+        return "familiar"
+    return "novel"
+
+
 def evidence_from_speaking(
     result: dict,
     *,

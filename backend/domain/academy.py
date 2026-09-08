@@ -1225,6 +1225,24 @@ async def start_speaking_mission(
     return _mission_state_out(session)
 
 
+async def _mission_evidence_kind(user_id: str, session: dict) -> str:
+    """Kind de evidencia de un intento de misión (V3.26, Eje B/F-B1).
+
+    `novel` solo la primera vez que el alumno practica un escenario B2+; en
+    cualquier otro caso `familiar` (re-encuentro). La detección de «nunca
+    practicado» es evidence-only: ninguna fila `mission:{scenario_id}` del
+    usuario en `academy_evidence`."""
+    mission = session.get("mission") or {}
+    scenario_id = session.get("scenario_id") or mission.get("scenario_id") or ""
+    cefr_target = session.get("cefr_target") or mission.get("cefr_target") or ""
+    practiced = await run_in_threadpool(
+        academy_repo.mission_context_practiced, user_id, scenario_id
+    )
+    return speaking_svc.mission_evidence_kind(
+        first_ever=not practiced, cefr_target=cefr_target
+    )
+
+
 async def _score_mission_utterance(
     user_id: str,
     mission: dict,
@@ -1232,6 +1250,7 @@ async def _score_mission_utterance(
     duration_seconds: float | None,
     model: str,
     conversation_id: str | None,
+    evidence_kind: str = "familiar",
 ) -> dict | None:
     """Extrae evidencia (LLM) + puntúa (scorer determinista) una producción oral."""
     evidence = await speaking_llm.extract_speaking_evidence(
@@ -1265,6 +1284,7 @@ async def _score_mission_utterance(
             objective_id="",
             curriculum_version=lv.version,
             difficulty=mission.get("difficulty"),
+            evidence_kind=evidence_kind,
         ),
         context={
             "context_id": "mission:"
@@ -1296,6 +1316,9 @@ async def submit_speaking_mission_attempt(
         return None
     if session["status"] not in ("mission", "attempt"):
         return None
+    # V3.26 (Eje B/F-B1): primer intento de un escenario B2+ jamás practicado
+    # emite evidencia `novel`; el resto de intentos del mismo escenario, `familiar`.
+    evidence_kind = await _mission_evidence_kind(user_id, session)
     result = await _score_mission_utterance(
         user_id,
         session["mission"],
@@ -1303,6 +1326,7 @@ async def submit_speaking_mission_attempt(
         duration_seconds,
         model,
         conversation_id,
+        evidence_kind=evidence_kind,
     )
     if result is None:
         return None
@@ -1348,6 +1372,9 @@ async def submit_speaking_mission_retry(
         return None
     if session.get("evaluation") is None:
         return None
+    # V3.26 (Eje B/F-B1): el retry es un re-encuentro del mismo escenario
+    # (el primer intento ya escribió evidencia), por lo que siempre es
+    # `familiar` y nunca vuelve a emitir `novel`.
     result = await _score_mission_utterance(
         user_id,
         session["mission"],
@@ -1355,6 +1382,7 @@ async def submit_speaking_mission_retry(
         duration_seconds,
         model,
         conversation_id,
+        evidence_kind="familiar",
     )
     if result is None:
         return None

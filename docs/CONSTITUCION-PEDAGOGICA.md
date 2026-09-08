@@ -100,7 +100,7 @@ que ya existe en el código es orientativa (ver sección 8 para las brechas).
 | **NOT STARTED** | No hay evidencia. | `evidence_count == 0` | `mastery_stage == "acquire"`, `dimension_state == "not_started"` |
 | **DEVELOPING** | Se está aprendiendo: hay intentos, aún no consistentes. | evidencia > 0 sin cumplir el gate | `readiness_band == "developing"`, `mastery_stage == "practice"` |
 | **FUNCTIONAL** | Puede usar la competencia en las situaciones previstas del nivel, con apoyo o con ayuda. | cumple el **gate de práctica** (coverage/precisión/amplitud) sin retención retardada | `readiness_band == "ready"` o `approaching`; `route_gate.passed` de listening; gates de unidad del Course Engine |
-| **DEMONSTRATED** | Ha superado el **conjunto completo de evidencias**: gate de práctica + retención retardada + mínimo de muestras. | sección 6 (Mastery Gate) | `mastery_evidence_gate.met` de Assessment 2.0 (familiar×2 + transfer×2 + delayed; `novel` reservado sin emisor desde V3.24 F-K1); hoy NO existe como estado de nivel |
+| **DEMONSTRATED** | Ha superado el **conjunto completo de evidencias**: gate de práctica + retención retardada + mínimo de muestras. | sección 6 (Mastery Gate) | `mastery_evidence_gate.met` de Assessment 2.0 (familiar×2 + transfer×2 + delayed; `novel` con emisor real desde V3.26 Eje B/F-B1 aunque el gate no lo exige); hoy NO existe como estado de nivel |
 
 **Regla:** solo el estado DEMONSTRATED permite frases del tipo "A1 — demonstrated".
 FUNCTIONAL permite "puede desenvolverse en A1"; DEVELOPING solo "está
@@ -252,11 +252,11 @@ flowchart TB
 - **Evidencia por kind** `familiar`/`transfer`/`novel`/`delayed` y pesos
   (`backend/services/academy.py:628-787`; `EVIDENCE_KIND_WEIGHTS`).
 - **Gate MASTERED de Assessment 2.0** (familiar×2 + transfer×2 + delayed;
-  `novel` reservado sin emisor desde V3.24 F-K1): `mastery_evidence_gate`
+  `novel` con emisor real desde V3.26 Eje B/F-B1, sin exigirse): `mastery_evidence_gate`
   (`backend/services/assessment_v2.py:362-388`).
 - **Matriz de requisitos por nivel** `cefr_matrix.json` (mastery/confidence/
-  evidence/transfer por nivel; `novel_required = 0` desde V3.24 F-K1, kind
-  reservado).
+  evidence/transfer por nivel; `novel_required = 0` desde V3.24 F-K1 — la
+  reactivación calibrada de B2+ queda al Eje C, con el emisor ya real).
 - **Curva de olvido** `backend/services/forgetting.py` y reassessment ≥7 días
   (`RETENTION_MIN_DAYS`, `backend/services/assessment_v2.py:58-63`).
 
@@ -269,7 +269,7 @@ Cada competencia del nivel debe demostrar al menos:
 | cada subskill del foco del nivel (ver sección 4) | ≥ 3 intentos con ≥ 1 correcto | práctica |
 | subskills representativos (amplitud) | ≥ 2 subskills distintos (≥ 3 en Listening) | variedad |
 | transfer (situación nueva) | ≥ 1 | generalización |
-| novel (ítem no visto en práctica) | **reservado** (requisito 0; sin emisor real en el Assessment 2.0 — V3.24 F-K1) | no memorización (futuro emisor) |
+| novel (ítem no visto en práctica) | requisito 0 (reactivación calibrada → Eje C); **con emisor real desde V3.26** F-B1: primer intento de misión por escenario B2+ jamás practicado | no memorización |
 | delayed (≥ 7 días tras la evidencia) | ≥ 1 | retención |
 
 Regla anti-bombeo: ningún 100 % con menos de `MIN_SAMPLES` de la competencia
@@ -300,7 +300,7 @@ los kinds de `academy_evidence`
 | Banda | Condición | Lectura permitida |
 |---|---|---|
 | **LOW** | muestras < `minimum_evidence` del nivel, **o** el banco oficial de práctica del nivel es corto (< `QUIZ_SHORT_BANK` = 12 checks) | a lo sumo "practice coverage · evidence depth LOW" |
-| **MEDIUM** | muestras ≥ `minimum_evidence` con kinds variados (`familiar` + transfer; `novel` reservado desde V3.24 F-K1) | apoya el estado FUNCTIONAL |
+| **MEDIUM** | muestras ≥ `minimum_evidence` con kinds variados (`familiar` + transfer; `novel` con emisor real desde V3.26 Eje B/F-B1) | apoya el estado FUNCTIONAL |
 | **HIGH** | muestras ≥ `minimum_evidence`, kinds completos y retención retardada estable (≥ 1 `delayed` o ruta DEMONSTRATED de listening) | sustenta el estado DEMONSTRATED |
 
 **Regla anti-bombeo (R7):** un nivel cuyo banco oficial de práctica tenga menos
@@ -355,8 +355,9 @@ Estructura de demostración por nivel (todas las destrezas):
    `backend/services/curriculum.py:165-169`).
 2. **Amplitud:** subskills del foco del nivel representados (sección 6.2).
 3. **Transfer/novel:** evidencia transferida a situación nueva (unidad/progress/
-   examen); `novel` (ítem no memorizado) queda reservado sin emisor hasta V3.24
-   (F-K1: requisito 0).
+   examen); `novel` (ítem no memorizado) tiene emisor real desde V3.26
+   (Eje B/F-B1: misión por escenario B2+ jamás practicado) con requisito 0
+   hasta su reactivación calibrada en el Eje C.
 4. **Retención:** re-evaluación ≥ 7 días con ratio estable.
 5. **Mínimo de muestras:** respetando la matriz `cefr_matrix.json` (a extender a
    C1/C2 y a las 8 destrezas, ver sección 9).

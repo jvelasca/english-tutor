@@ -701,6 +701,23 @@ def get_speaking_mission_session(session_id: int) -> dict | None:
     return d
 
 
+def mission_context_practiced(user_id: str, scenario_id: str) -> bool:
+    """¿El usuario ya tiene evidencia de una misión de este escenario?
+
+    (V3.26, Eje B/F-B1). Detecta «contexto nunca practicado» consultando
+    `academy_evidence` con el contexto canónico `mission:{scenario_id}`: si no
+    hay ninguna fila (de ningún kind ni level), el escenario nunca se practicó
+    como misión. Decisión del gerente: la detección usa SOLO la evidencia
+    académica (no las tablas de intentos sin evidencia)."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT 1 FROM academy_evidence "
+            "WHERE user_id = ? AND context_id = ? LIMIT 1",
+            (user_id, f"mission:{scenario_id}"),
+        ).fetchone()
+    return row is not None
+
+
 # --- Calibración observacional de ítems de placement (V1.7) ---------------
 
 

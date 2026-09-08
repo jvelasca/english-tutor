@@ -23,12 +23,20 @@ Debe existir evidencia de:
 | practice | `familiar` re-encuentro espaciado ≥ 2 |
 | transfer | `transfer` ≥ 2 |
 | delayed | `delayed` ≥ 1 |
-| ~~novel~~ | reservado (sin emisor; requisito 0, frontera V3.24) |
+| novel | con emisor real (V3.26 F-B1: misión B2+ primera vez); requisito 0 — reactivación calibrada en Eje C |
 
-> **F-K1 (V3.24, dossier K):** el kind `novel` no tiene emisor real, así que el
-> gate exige solo kinds emitibles. `novel` sigue siendo un kind válido (conteos,
-> invariantes) pero ningún gate lo exige hasta que exista una modalidad que lo
-> emita de verdad.
+> **F-K1 (V3.24, dossier K):** el kind `novel` quedó reservado (sin emisor real)
+> y el gate exigió solo kinds emitibles.
+>
+> **F-B1 (V3.26, Eje B):** emisor real del kind `novel`. El primer intento de
+> una **misión por escenario B2+ jamás practicado** por el alumno (sin ninguna
+> fila `mission:{escenario}` en `academy_evidence`) escribe evidencia `novel`;
+> retries y repeticiones del mismo escenario escriben `familiar`
+> (anti-bombeo: cada escenario produce `novel` una sola vez). Detección
+> evidence-only (`mission_context_practiced`). Decisión del gerente: en el Eje B
+> se crea la señal real pero **no** se reactiva el requisito — `novel_required =
+> 0` en la matriz y el gate MASTERED siguen sin exigirlo; la activación
+> progresiva queda para el Eje C (calibración CEFR).
 
 > **F-A1 (V3.26, P2-01):** `initial` y `practice` dejan de ser dos umbrales sobre
 > el mismo contador `familiar`. Con `familiar_spaced_counts()`:
