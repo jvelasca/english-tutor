@@ -298,8 +298,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Matriz de competencia",
   },
   "dictionary.competenceHint": {
-    en: "Recognition (met it), production (used it), transfer (used in 2+ contexts), retention (recalled after a gap: receptive or productive spacing), plus the two gaps: not produced yet, and produced but not transferred.",
-    es: "Reconocimiento (la has visto), producción (la has usado), transferencia (usada en 2+ contextos), retención (recordada tras un intervalo: espaciada receptiva o productiva), y los dos gaps: aún no producida, y producida pero sin transferir.",
+    en: "Recognition (met it), production (used it), transfer (used in 2+ activity contexts), retention (delayed retrieval: recalled in a drill after a gap from the first time), plus the two gaps: not produced yet, and produced but not transferred.",
+    es: "Reconocimiento (la has visto), producción (la has usado), transferencia (usada en 2+ contextos de actividad), retención (recuperación demorada: recordada en un drill tras un intervalo desde la primera vez), y los dos gaps: aún no producida, y producida pero sin transferir.",
   },
   "dictionary.competenceRecognized": { en: "Recognized", es: "Reconocidas" },
   "dictionary.competenceProduced": { en: "Produced", es: "Producidas" },

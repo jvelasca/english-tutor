@@ -52,6 +52,31 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.23.0` — **Student Model Calibration (parte 2): Retention
+  real y Transfer por contexto** (implementa el plan V3.23 del dossier de la
+  auditoría externa V3.22.0: **P1-02 — retention por recuperación DEMORADA** —
+  migración idempotente en `vocabulary`: `retrieval_successes`/
+  `retrieval_days`/`last_retrieval_at` (sin backfill: ancla retrospectiva
+  injusta), `record_retrievals` cuenta éxitos ≥ `RETENTION_MIN_INTERVAL_DAYS`
+  tras el ancla `min(first_exposed_at, first_seen)`, hook solo en micro-drill
+  (`submit_drill_attempt` si `produced`, `submit_sentence_attempt` si
+  `passed`), y la matriz exige `retrieval_days >= RETENTION_MIN_RETRIEVAL_DAYS`
+  con `spaced_exposure`/`spaced_production` como señales independientes ·
+  **P1-04 — transfer por contexto de actividad** — migración `context_tags`
+  (CSV `channel:activity` único y ordenado), `record_production(..., activity)`
+  con merge canónico, `activity` propagada por todas las superficies
+  (`free_chat`/`speaking_assessment`/`speaking_mission`/`speaking_controlled`/
+  `writing_controlled`/`speaking_task`/`writing_task`/`read_aloud`/`drill`/
+  `speaking_route`/`guided_conversation`), y `production_contexts(row)` con
+  fallback `channel:other` para legacy; `transfer`/`transfer_contexts` por
+  contextos · **quick fixes base (auditoría externa V3.22)**: P1-01 `item_recall`
+  con `_last_activity_at` (max de `last_seen`/`last_exposed_at`); P1-03
+  `item_mastery` con pesos de reconocimiento (0.4 volumen / 0.6
+  `exposure_days`) y `no_speech` antes que `low_confidence` en el ASR ·
+  **tests**: backend pytest **1455** + ruff limpio; frontend vitest **450** (57
+  archivos) + `tsc`/`vite build` OK; curriculum `--strict --quality` y content
+  validation OK; `check_release_consistency` 3.23.0 exit 0; CONSTITUCIÓN sin
+  cambios). Base: `3.22.0`
 - ✅ Versión estable `3.22.0` — **ASR Calibration + Student Model (léxico)**
   (implementa el plan V3.22 del dossier de la auditoría externa V3.21.0:
   **ASR-01 — calibración ASR por segmentos** — `aggregate_asr_segments`

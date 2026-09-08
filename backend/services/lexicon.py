@@ -4,12 +4,18 @@ Baja el modelo de evidencia de "destreza" a "unidad léxica" (palabra o frase
 funcional). Convierte cada entrada de la tabla `vocabulary` en un ítem léxico
 de primer nivel con:
 
-- `item_mastery`  — dominio 0..1 combinando producción (espaciada) y reconocimiento.
-- `item_recall`   — probabilidad de recuerdo actual (curva de olvido existente).
+- `item_mastery`  — dominio 0..1 combinando producción (espaciada) y reconocimiento
+  (V3.23: el reconocimiento pondera días de exposición, no solo volumen).
+- `item_recall`   — probabilidad de recuerdo actual (curva de olvido) anclada a la
+  actividad más reciente, producción o exposición (V3.23, P1-01).
 - `item_status`   — `mastered`/`known`/`learning`/`weak` (determinista).
 - `item_competence_matrix` — matriz Recognition/Production/Transfer/Retention
   con gaps independientes por ítem (V3.21, V20-16/V20-17; V3.22 separa
-  Retention de Transfer con `exposure_days`).
+  Retention de Transfer con `exposure_days`; V3.23 exige recuperación DEMORADA
+  para Retention y mide Transfer por contexto de actividad `channel:activity`,
+  con `spaced_exposure`/`spaced_production` como señales independientes).
+- `production_contexts` — contextos reales de producción `channel:activity`
+  (V3.23, P1-04), base de la transferencia por contexto y no solo por canal.
 - `next_review_days` — siguiente repaso (mismo scheduler que las destrezas).
 
 P1 (§3.2 de la Constitución): el ítem pasa de `word`/`structure` a **Lexical
@@ -28,7 +34,7 @@ sigue exponiendo `next_review_days` como estimación ligera del léxico.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from services import forgetting, mastery
 from services.curriculum import CEFR_ORDER
@@ -37,6 +43,24 @@ from services.curriculum import CEFR_ORDER
 # (coinciden con `services.vocabulary`).
 MASTERY_MIN_PRODUCTIONS = 3
 MASTERY_MIN_DAYS = 2
+
+# V3.23 (P1-04): pesos de la señal RECEPTIVA en `item_mastery`. El volumen
+# (`exposures`) aporta 0.4 y los días distintos (`exposure_days`) 0.6: cien
+# exposiciones en un solo día ya no saturan el reconocimiento, mientras que
+# exposiciones repartidas en días distintos sí acumulan evidencia de
+# exposición espaciada. Pesos heurísticos a calibrar empíricamente.
+RECOGNITION_VOLUME_WEIGHT = 0.4
+RECOGNITION_DAYS_WEIGHT = 0.6
+
+# V3.23 (P1-02): evidencia de RETENCIÓN por recuperación DEMORADA. Una
+# recuperación correcta (éxito de micro-drill) solo acredita retención si
+# ocurre `RETENTION_MIN_INTERVAL_DAYS` o más días naturales después del ancla
+# (la primera exposición/producción): ver de nuevo una palabra al día siguiente
+# no demuestra que se recuerda tras un intervalo. `RETENTION_MIN_RETRIEVAL_DAYS`
+# es el nº mínimo de días distintos con recuperación demorada para declarar
+# `retention` en la matriz de competencia. Umbrales heurísticos a calibrar.
+RETENTION_MIN_INTERVAL_DAYS = 1
+RETENTION_MIN_RETRIEVAL_DAYS = 1
 
 # Umbral de recuerdo bajo el cual un ítem producido se considera "weak".
 RECALL_WEAK_THRESHOLD = 0.7
@@ -183,22 +207,47 @@ def items_from_objective(level, objective) -> list[dict]:
 
 
 
+def _exposure_days(row: dict) -> int:
+    """Días distintos de exposición del ítem (V3.23).
+
+    Defiende el invariante de la migración V3.22 (backfill): toda fila con
+    `exposures > 0` tuvo al menos un día de exposición. Las filas parciales
+    (seeds, tests, datos previos al backfill) sin `exposure_days` se tratan con
+    el mismo mínimo para no degradar la señal receptiva por un campo ausente.
+    """
+    days = _int(row.get("exposure_days"))
+    return max(days, 1) if _int(row.get("exposures")) > 0 else days
+
+
 def item_mastery(row: dict) -> float:
     """Dominio (0..1) de un ítem léxico combinando producción y reconocimiento.
 
     La producción espaciada domina (70%): se satura con `MASTERY_MIN_PRODUCTIONS`
     apariciones en `MASTERY_MIN_DAYS` días distintos. El reconocimiento (30%)
     aporta señal débil (haber leído/oído la palabra) sin llegar a dominio.
+
+    V3.23 (P1-04): el reconocimiento ya NO se satura con volumen: separa
+    `recognition_volume` (exposures) de `recognition_days` (exposure_days) con
+    pesos 0.4/0.6, de modo que la evidencia espaciada en días distintos pesa
+    más que acumular muchas exposiciones en un mismo día.
     """
     appearances = _int(row.get("appearances"))
     production_days = _int(row.get("production_days"))
     exposures = _int(row.get("exposures"))
+    exposure_days = _exposure_days(row)
 
     prod = (
         0.5 * min(appearances, MASTERY_MIN_PRODUCTIONS) / MASTERY_MIN_PRODUCTIONS
         + 0.5 * min(production_days, MASTERY_MIN_DAYS) / MASTERY_MIN_DAYS
     )
-    recognition = min(exposures, MASTERY_MIN_PRODUCTIONS) / MASTERY_MIN_PRODUCTIONS
+    recognition = (
+        RECOGNITION_VOLUME_WEIGHT
+        * min(exposures, MASTERY_MIN_PRODUCTIONS)
+        / MASTERY_MIN_PRODUCTIONS
+        + RECOGNITION_DAYS_WEIGHT
+        * min(exposure_days, MASTERY_MIN_DAYS)
+        / MASTERY_MIN_DAYS
+    )
     return round(min(1.0, 0.7 * prod + 0.3 * recognition), 3)
 
 
@@ -208,13 +257,41 @@ def item_confidence(row: dict) -> float:
     return round(min(1.0, evidence / 3.0), 3)
 
 
+def _last_activity_at(row: dict) -> str:
+    """Marca temporal ISO de la actividad léxica más reciente (V3.23, P1-01).
+
+    Compara timestamps reales de producción (`last_seen`) y de exposición
+    (`last_exposed_at`) y devuelve el ORIGINAL del más reciente. Antes se usaba
+    `last_seen or last_exposed_at`, que elegía el primero que existiera y, en
+    cuanto el ítem se había producido alguna vez, ignoraba por completo las
+    exposiciones posteriores: un recuerdo podía parecer en degradación pese a
+    una exposición reciente. Normaliza naive/aware a UTC solo para comparar.
+    """
+    best = ""
+    best_dt: datetime | None = None
+    for candidate in (row.get("last_seen"), row.get("last_exposed_at")):
+        text = (candidate or "").strip()
+        if not text:
+            continue
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if best_dt is None or dt > best_dt:
+            best, best_dt = text, dt
+    return best
+
+
 def item_recall(row: dict, now: str = "") -> float:
     """Probabilidad de recuerdo actual del ítem (curva de olvido existente).
 
-    Usa la última actividad (producción o exposición) como referencia temporal.
+    V3.23 (P1-01): usa la actividad más RECIENTE (producción o exposición,
+    `_last_activity_at`) como referencia temporal de la curva de olvido.
     """
     score = item_mastery(row)
-    last = row.get("last_seen") or row.get("last_exposed_at") or ""
+    last = _last_activity_at(row)
     return round(forgetting.retrieval_probability(score, last, now), 3)
 
 
@@ -250,6 +327,17 @@ PRODUCTION_CHANNELS: tuple[str, ...] = (
     "writing_prod",
     "conversation_prod",
     "chat_prod",
+)
+
+# Orden canónico de los CANALES (nombre plano, sin sufijo `_prod`) para la
+# derivación de contextos de producción (V3.23). Coincide con el orden de
+# `PRODUCTION_CHANNELS` del repositorio (`chat` → `conversation`) para que el
+# `context_tags` persistido y la derivación pura ordenen igual.
+ACTIVITY_CHANNEL_ORDER: tuple[str, ...] = (
+    "chat",
+    "speaking",
+    "writing",
+    "conversation",
 )
 
 
@@ -292,8 +380,9 @@ def _spaced_production(row: dict) -> bool:
 def _spaced_exposure(row: dict) -> bool:
     """Exposición espaciada: el ítem se expuso en >= 2 días distintos y con un
     hueco de >= 1 día natural entre la primera y la última exposición.
-    V3.22: señal de retención RECEPTIVA (leído/oído en días distintos), que
-    permite separar la dimensión Retention de Transfer sin tocar producción."""
+    V3.22/V3.23: señal RECEPTIVA independiente (leído/oído en días distintos).
+    Ya NO acredita `retention` (V3.23): exposición repetida no demuestra que se
+    recuerda el ítem; la retención exige recuperación demorada (retrieval)."""
     if _int(row.get("exposure_days")) < 2:
         return False
     first = _day_or_none(row.get("first_exposed_at"))
@@ -303,28 +392,79 @@ def _spaced_exposure(row: dict) -> bool:
     return (last - first).days >= 1
 
 
+def _retrieval_days(row: dict) -> int:
+    """Días distintos con recuperación correcta demorada (V3.23, P1-02).
+
+    Columna `retrieval_days` (repositorio): default 0 para filas sin columna
+    (tests, filas previas a la migración)."""
+    return _int(row.get("retrieval_days"))
+
+
+def _retrieval_successes(row: dict) -> int:
+    """Nº de recuperaciones correctas demoradas (V3.23, P1-02)."""
+    return _int(row.get("retrieval_successes"))
+
+
+def production_contexts(row: dict) -> list[str]:
+    """Contextos de producción `channel:activity` del ítem (V3.23, P1-04).
+
+    Contexto REAL de actividad: etiquetas explícitas de `context_tags` más un
+    fallback `channel:other` por cada canal con producción que aún no tenga
+    etiqueta explícita (histórico previo a V3.23). Dos actividades distintas del
+    mismo canal (p. ej. `speaking:drill` y `speaking:speaking_route`) cuentan
+    como contextos distintos, mientras que `chat` y `conversation` guiada dejan
+    de colapsar en un mismo contexto genérico. Orden canónico: canales según
+    `ACTIVITY_CHANNEL_ORDER`, luego actividad alfabética (determinista)."""
+    channel_index = {ch: i for i, ch in enumerate(ACTIVITY_CHANNEL_ORDER)}
+    by_channel: dict[str, set[str]] = {}
+    for tag in (row.get("context_tags") or "").split(","):
+        tag = tag.strip()
+        if not tag:
+            continue
+        channel, _, activity = tag.partition(":")
+        if activity:
+            by_channel.setdefault(channel, set()).add(activity)
+    # Fallback para filas legacy (sin `context_tags` explícito): cada canal con
+    # producción sin etiqueta explícita se cubre con `channel:other`. Un canal
+    # que ya tiene tag explícito NO recibe `other`.
+    for channel in ACTIVITY_CHANNEL_ORDER:
+        if channel in by_channel:
+            continue
+        if _int(row.get(f"{channel}_prod")) > 0:
+            by_channel[channel] = {"other"}
+    contexts: list[str] = []
+    for channel in sorted(by_channel, key=lambda ch: channel_index.get(ch, 99)):
+        for activity in sorted(by_channel[channel]):
+            contexts.append(f"{channel}:{activity}")
+    return contexts
+
+
 def item_competence_matrix(row: dict) -> dict:
-    """Matriz de competencia por ítem léxico (V3.21, V20-16/V20-17; V3.22).
+    """Matriz de competencia por ítem léxico (V3.21/V3.22/V3.23).
 
     Derivada SIN migrar columnas de producción (se mantiene el invariante por
-    fila `sum(channel_prod) == appearances`). V3.22 separa Retention de
-    Transfer usando `exposure_days`/`first_exposed_at`. Pura y determinista:
+    fila `sum(channel_prod) == appearances`). Pura y determinista:
 
     - `recognition`       — el ítem se ha expuesto (leído/oído): `exposures > 0`.
     - `production`        — se ha producido en algún canal (`sum(channel_prod) > 0`),
       con desglose `production_channels`.
-    - `transfer_contexts` — nº de canales de producción distintos.
-    - `transfer`          — uso fuera del contexto original de aprendizaje:
-      producción en >= 2 canales. Ya NO incluye el espaciado: ese es señal de
-      retención (¿lo recuerda después de un intervalo?), no de transferencia
-      (¿lo usa en otro contexto?).
-    - `retention`         — recuerdo tras intervalo: producción espaciada
-      (`_spaced_production`) O exposición espaciada receptiva (`_spaced_exposure`).
+    - `transfer_contexts` — nº de CONTEXTOS de producción distintos
+      (`production_contexts`: `channel:activity`), no de canales (V3.23).
+    - `transfer`          — producción en >= 2 contextos de actividad distintos:
+      evidencia de uso fuera del contexto original de aprendizaje.
+    - `retention`         — V3.23 (P1-02): recuperación correcta DEMORADA. Se
+      acredita solo con `retrieval_days >= RETENTION_MIN_RETRIEVAL_DAYS` días
+      distintos en los que el alumno recuperó el ítem (éxito de micro-drill)
+      fuera del intervalo respecto a la primera señal. La exposición o
+      producción espaciada ya NO bastan.
+    - `spaced_exposure` / `spaced_production` — señales espaciadas
+      independientes (exposición receptiva en días distintos / producción en
+      días distintos): informan, no certifican retención (V3.23).
     - `production_gap`    — reconocida pero NUNCA producida (`recognition &&
       !production`): el gap que cierra el speaking micro-drill (antes `gap`).
     - `transfer_gap`      — producida en ejercicios pero nunca usada en otro
       contexto (`production && !transfer`): señal de falta de transferencia
-      real (V3.22: antes `gap` era Recognition->Production, no un transfer gap).
+      real.
 
     Deuda de modelo (sin migración destructiva): renombrar conceptualmente
     `appearances` -> `production_count` y `exposures` -> `exposure_count`.
@@ -333,9 +473,12 @@ def item_competence_matrix(row: dict) -> dict:
     recognition = exposure_total > 0
     channels = production_channels(row)
     production = len(channels) > 0
-    transfer_contexts = len(channels)
+    contexts = production_contexts(row)
+    transfer_contexts = len(contexts)
     transfer = transfer_contexts >= 2
-    retention = _spaced_exposure(row) or _spaced_production(row)
+    spaced_exposure = _spaced_exposure(row)
+    spaced_production = _spaced_production(row)
+    retention = _retrieval_days(row) >= RETENTION_MIN_RETRIEVAL_DAYS
     return {
         "recognition": recognition,
         "production": production,
@@ -343,6 +486,10 @@ def item_competence_matrix(row: dict) -> dict:
         "transfer_contexts": transfer_contexts,
         "transfer": transfer,
         "retention": retention,
+        "spaced_exposure": spaced_exposure,
+        "spaced_production": spaced_production,
+        "retrieval_successes": _retrieval_successes(row),
+        "retrieval_days": _retrieval_days(row),
         "production_gap": recognition and not production,
         "transfer_gap": recognition and production and not transfer,
     }
@@ -367,9 +514,11 @@ def cefr_distribution(rows: list[dict]) -> list[dict]:
 
 def summary(rows: list[dict], now: str = "") -> dict:
     """Resumen del léxico: totales por estado, distribución CEFR y contadores de
-    la matriz de competencia (V3.21/V3.22): `recognized`, `produced`,
-    `transfer`, `retention`, `production_gap` (reconocidas-nunca-producidas) y
-    `transfer_gap` (producidas en ejercicios sin transferencia a otro contexto)."""
+    la matriz de competencia (V3.21/V3.22/V3.23): `recognized`, `produced`,
+    `transfer`, `retention` (V3.23: recuperación demorada), `production_gap`
+    (reconocidas-nunca-producidas), `transfer_gap` (producidas en ejercicios
+    sin transferencia a otro contexto) y `spaced_exposure` (informativo:
+    expuestas en días distintos, señal receptiva independiente de la retención)."""
     statuses = {"mastered": 0, "learning": 0, "known": 0, "weak": 0}
     competence = {
         "recognized": 0,
@@ -378,6 +527,7 @@ def summary(rows: list[dict], now: str = "") -> dict:
         "retention": 0,
         "production_gap": 0,
         "transfer_gap": 0,
+        "spaced_exposure": 0,
     }
     for row in rows:
         statuses[item_status(row, now)] += 1
@@ -390,6 +540,8 @@ def summary(rows: list[dict], now: str = "") -> dict:
             competence["transfer"] += 1
         if matrix["retention"]:
             competence["retention"] += 1
+        if matrix["spaced_exposure"]:
+            competence["spaced_exposure"] += 1
         if matrix["production_gap"]:
             competence["production_gap"] += 1
         if matrix["transfer_gap"]:

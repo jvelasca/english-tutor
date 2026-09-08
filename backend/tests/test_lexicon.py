@@ -140,8 +140,32 @@ def test_seed_unknown_user_false(monkeypatch, tmp_path):
 
 def test_item_mastery_bounded():
     assert lexicon.item_mastery({"appearances": 0, "exposures": 0}) == 0.0
+    # Evidencia completa: producida y expuesta en muchos días distintos.
     assert lexicon.item_mastery({"appearances": 100, "production_days": 100,
-                                 "exposures": 100}) == 1.0
+                                 "exposures": 100, "exposure_days": 100}) == 1.0
+
+
+def test_item_mastery_recognition_requires_spaced_exposure_days():
+    """V3.23 (P1-04): el reconocimiento pondera los DÍAS de exposición (0.6)
+    más que el volumen (0.4). Cien exposiciones en un solo día ya no saturan la
+    señal receptiva: 3 exposiciones en 3 días valen más que 100 en 1 día."""
+    same_day = lexicon.item_mastery(
+        {
+            "appearances": 3,
+            "production_days": 1,
+            "exposures": 100,
+            "exposure_days": 1,
+        }
+    )
+    spaced = lexicon.item_mastery(
+        {
+            "appearances": 3,
+            "production_days": 1,
+            "exposures": 3,
+            "exposure_days": 3,
+        }
+    )
+    assert 0 < same_day < spaced <= 1.0
 
 
 def test_item_status_deterministic():
@@ -179,6 +203,40 @@ def test_item_recall_decays_over_time():
     r0 = lexicon.item_recall(row, "2026-01-01T00:00:00+00:00")
     r1 = lexicon.item_recall(row, "2026-01-10T00:00:00+00:00")
     assert 0 <= r1 < r0 <= 1.0
+
+
+def test_item_recall_uses_most_recent_activity():
+    """V3.23 (P1-01): la curva de olvido se ancla a la actividad MÁS reciente.
+    Antes se usaba `last_seen or last_exposed_at` (primero que exista): una
+    producción antigua con exposición posterior hacía parecer el recuerdo en
+    degradación, ignorando la exposición por completo."""
+    base = {
+        "appearances": 3,
+        "production_days": 2,
+        "exposures": 3,
+        "exposure_days": 3,
+    }
+    now = "2026-09-09T00:00:00+00:00"
+    # Producción antigua + exposición reciente: el ancla es la exposición.
+    produced_old = {
+        **base,
+        "last_seen": "2026-06-01T00:00:00+00:00",
+        "last_exposed_at": "2026-09-08T00:00:00+00:00",
+    }
+    exposed_only = {**produced_old, "last_seen": ""}
+    assert lexicon.item_recall(produced_old, now) == lexicon.item_recall(
+        exposed_only, now
+    )
+    # Producción reciente + exposición antigua: el ancla es la producción.
+    exposed_old = {
+        **base,
+        "last_seen": "2026-09-08T00:00:00+00:00",
+        "last_exposed_at": "2026-06-01T00:00:00+00:00",
+    }
+    produced_only = {**exposed_old, "last_exposed_at": ""}
+    assert lexicon.item_recall(exposed_old, now) == lexicon.item_recall(
+        produced_only, now
+    )
 
 
 def test_next_review_days_bounded_and_monotonic():
@@ -372,7 +430,7 @@ def test_coverage_indicator_receptive_productive_by_level():
     assert "nivel-raro" not in by_level
 
 
-# --- V3.21 (V20-16/V20-17) / V3.22: matriz de competencia -------------------
+# --- V3.21 (V20-16/V20-17) / V3.22 / V3.23: matriz de competencia -----------
 
 def _row(**overrides) -> dict:
     row = {
@@ -389,6 +447,11 @@ def _row(**overrides) -> dict:
         "speaking_prod": 0,
         "writing_prod": 0,
         "conversation_prod": 0,
+        # V3.23: evidencia de recuperación demorada y contexto por actividad.
+        "retrieval_successes": 0,
+        "retrieval_days": 0,
+        "last_retrieval_at": "",
+        "context_tags": "",
     }
     row.update(overrides)
     return row
@@ -400,6 +463,8 @@ def test_matrix_never_seen_is_all_false_no_gap():
     assert m["production"] is False
     assert m["transfer"] is False
     assert m["retention"] is False
+    assert m["spaced_exposure"] is False
+    assert m["spaced_production"] is False
     assert m["production_gap"] is False  # sin reconocimiento no hay gap
     assert m["transfer_gap"] is False
     assert m["production_channels"] == []
@@ -440,8 +505,10 @@ def test_matrix_produced_once_single_channel_is_transfer_gap():
 
 
 def test_matrix_transfer_by_two_channels_same_day_no_retention():
-    # Dos canales el MISMO día: transfer (contextos distintos) pero sin hueco
-    # espaciado -> retention False (V3.22: Transfer y Retention se separan).
+    # Dos canales el MISMO día: transfer (contextos distintos) pero sin
+    # recuperación demorada -> retention False. Sin context_tags explícitos, el
+    # fallback por canal produce `speaking:other` + `writing:other` (2
+    # contextos).
     m = lexicon.item_competence_matrix(
         _row(appearances=2, exposures=2, speaking_prod=1, writing_prod=1)
     )
@@ -449,12 +516,14 @@ def test_matrix_transfer_by_two_channels_same_day_no_retention():
     assert m["transfer_contexts"] == 2
     assert m["transfer"] is True
     assert m["retention"] is False
+    assert m["spaced_production"] is False  # mismo día: sin espaciado productivo
     assert m["transfer_gap"] is False
 
 
-def test_matrix_spaced_production_is_retention_not_transfer():
-    # Un solo canal pero producida en >= 2 días con hueco >= 1 día: retention
-    # (recuerdo tras intervalo) sin transferencia a otro contexto (V3.22).
+def test_matrix_spaced_production_is_not_retention():
+    # Un solo canal, producción espaciada (>= 2 días, hueco >= 1 día): señal de
+    # `spaced_production` PERO no retención (V3.23: requiere recuperación
+    # demorada, no exposición/producción repetida).
     m = lexicon.item_competence_matrix(
         _row(
             appearances=2,
@@ -468,11 +537,16 @@ def test_matrix_spaced_production_is_retention_not_transfer():
     assert m["production_channels"] == ["speaking"]
     assert m["transfer_contexts"] == 1
     assert m["transfer"] is False
-    assert m["retention"] is True
+    assert m["spaced_production"] is True
+    assert m["spaced_exposure"] is False
+    assert m["retention"] is False
+    assert m["transfer_gap"] is True
 
 
-def test_matrix_spaced_receptive_exposure_is_retention():
-    # Exposición espaciada (días distintos) sin producción: retención receptiva.
+def test_matrix_spaced_receptive_exposure_is_not_retention():
+    # Exposición espaciada (días distintos) sin producción: señal de
+    # `spaced_exposure` receptiva PERO no retención (V3.23: ver la palabra dos
+    # veces no demuestra que se recuerda; falta la recuperación demorada).
     m = lexicon.item_competence_matrix(
         _row(
             exposures=3,
@@ -483,9 +557,78 @@ def test_matrix_spaced_receptive_exposure_is_retention():
     )
     assert m["recognition"] is True
     assert m["production"] is False
-    assert m["retention"] is True
+    assert m["retention"] is False
+    assert m["spaced_exposure"] is True
+    assert m["spaced_production"] is False
     assert m["transfer"] is False
     assert m["production_gap"] is True  # sigue pendiente de producción
+
+
+def test_matrix_retention_requires_delayed_retrieval_days():
+    # V3.23 (P1-02): la retención exige recuperación correcta DEMORADA. Un ítem
+    # con `retrieval_days >= umbral` (días distintos con éxito de micro-drill
+    # fuera del intervalo) es `retention`, con independencia del espaciado
+    # receptivo/productivo.
+    m = lexicon.item_competence_matrix(
+        _row(
+            exposures=3,
+            exposure_days=2,
+            first_exposed_at="2026-01-01T10:00:00+00:00",
+            last_exposed_at="2026-01-03T10:00:00+00:00",
+            retrieval_successes=3,
+            retrieval_days=2,
+            last_retrieval_at="2026-03-01T10:00:00+00:00",
+        )
+    )
+    assert m["retention"] is True
+    assert m["spaced_exposure"] is True  # señal independiente, no es retención
+    assert m["retrieval_successes"] == 3
+    assert m["retrieval_days"] == 2
+
+
+def test_matrix_retention_zero_retrieval_days():
+    # retrieval_days = 0 (o ausente): nunca retención, aunque haya producciones
+    # y exposiciones espaciadas.
+    m = lexicon.item_competence_matrix(
+        _row(appearances=3, production_days=2, speaking_prod=3, exposures=5)
+    )
+    assert m["retention"] is False
+    assert m["retrieval_days"] == 0
+
+
+def test_production_contexts_explicit_tags_and_fallback():
+    # V3.23 (P1-04): los contextos se derivan de `context_tags` (channel:activity)
+    # y, para canales legacy sin etiqueta, del fallback `channel:other`.
+    assert lexicon.production_contexts(_row()) == []
+    m = lexicon.production_contexts(
+        _row(speaking_prod=1, writing_prod=1)
+    )
+    assert m == ["speaking:other", "writing:other"]
+    m = lexicon.production_contexts(
+        _row(
+            speaking_prod=2,
+            context_tags="speaking:drill,speaking:speaking_route",
+        )
+    )
+    assert m == ["speaking:drill", "speaking:speaking_route"]
+
+
+def test_matrix_transfer_by_two_activities_same_channel():
+    # V3.23 (P1-04): dos actividades DISTINTAS dentro del MISMO canal (drill +
+    # ruta speaking) son 2 contextos de producción => transfer True, aunque haya
+    # un solo canal.
+    m = lexicon.item_competence_matrix(
+        _row(
+            exposures=2,
+            appearances=2,
+            speaking_prod=2,
+            context_tags="speaking:drill,speaking:speaking_route",
+        )
+    )
+    assert m["production_channels"] == ["speaking"]
+    assert m["transfer_contexts"] == 2
+    assert m["transfer"] is True
+    assert m["transfer_gap"] is False
 
 
 def test_matrix_spaced_requires_one_day_gap():
@@ -500,6 +643,7 @@ def test_matrix_spaced_requires_one_day_gap():
         )
     )
     assert m["retention"] is False
+    assert m["spaced_production"] is False
     assert m["transfer"] is False
 
 
@@ -516,7 +660,15 @@ def test_summary_counts_matrix_competence():
             writing_prod=1,
         ),
         _row(
-            word="retained-receptive",
+            word="retained",
+            exposures=3,
+            exposure_days=2,
+            first_exposed_at="2026-01-01T10:00:00+00:00",
+            last_exposed_at="2026-01-03T10:00:00+00:00",
+            retrieval_days=1,
+        ),
+        _row(
+            word="spaced-only",
             exposures=3,
             exposure_days=2,
             first_exposed_at="2026-01-01T10:00:00+00:00",
@@ -524,9 +676,11 @@ def test_summary_counts_matrix_competence():
         ),
     ]
     s = lexicon.summary(rows)
-    assert s["recognized"] == 4  # recog + produced-1 + transfer + retained
+    # recognized: recog + produced-1 + transfer + retained + spaced-only.
+    assert s["recognized"] == 5
     assert s["produced"] == 2
     assert s["transfer"] == 1  # solo "transfer" (2 canales)
-    assert s["retention"] == 1  # solo "retained-receptive" (espaciado)
-    assert s["production_gap"] == 2  # "recog" + "retained-receptive"
+    assert s["retention"] == 1  # solo "retained" (recuperación demorada)
+    assert s["spaced_exposure"] == 2  # retained + spaced-only (señal receptiva)
+    assert s["production_gap"] == 3  # recog + retained + spaced-only
     assert s["transfer_gap"] == 1  # solo "produced-1"

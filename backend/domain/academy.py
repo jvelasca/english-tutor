@@ -439,7 +439,7 @@ async def _record_evidence_validated(
 
 
 async def _capture_production_text(
-    user_id: str, text: str, channel: str
+    user_id: str, text: str, channel: str, activity: str | None = None
 ) -> None:
     """Vuelca el texto producido por el alumno al léxico etiquetado por canal.
 
@@ -447,11 +447,15 @@ async def _capture_production_text(
     flujos reales de práctica (speaking assessment/misión/routes/task,
     pronunciación, writing, conversación guiada) llaman a este helper con su
     canal; el chat libre sigue su vía propia (`/api/vocabulary/analyze`).
+    `activity` (V3.23, P1-04) etiqueta la actividad concreta para medir la
+    transferencia por contexto real.
     Nunca rompe el flujo de puntuación: `record_production_text` no lanza (la
     producción es señal pedagógica, no evidencia de mastery)."""
     if not text or not text.strip():
         return
-    await vocabulary_domain.record_production_text(user_id, text, channel)
+    await vocabulary_domain.record_production_text(
+        user_id, text, channel, activity=activity
+    )
 
 
 async def _ensure_objective_evaluable(
@@ -956,7 +960,9 @@ async def submit_speaking_assessment_part(
         evidence, heard, duration_seconds, task_type=part["task_type"]
     )
     # V3.19: volcar la producción oral (assessment) al léxico por destreza.
-    await _capture_production_text(user_id, heard, "speaking")
+    await _capture_production_text(
+        user_id, heard, "speaking", activity="speaking_assessment"
+    )
 
     lv = _levels_by_id.get(await _current_level_id(user_id)) or _levels_by_id["a1"]
     evidence_rows = speaking_svc.evidence_from_speaking(
@@ -1152,7 +1158,9 @@ async def _score_mission_utterance(
         mission.get("task_type") or "role_play",
     )
     # V3.19: volcar la producción oral (misión) al léxico por destreza.
-    await _capture_production_text(user_id, heard, "speaking")
+    await _capture_production_text(
+        user_id, heard, "speaking", activity="speaking_mission"
+    )
     lv = _levels_by_id.get(await _current_level_id(user_id)) or _levels_by_id["a1"]
     await _record_evidence_validated(
         user_id,
@@ -3042,8 +3050,11 @@ async def submit_speaking(
     # GATE-01: un objetivo `locked` no se puede evaluar (409).
     await _ensure_objective_evaluable(user_id, lv, objective_id)
     result = speaking_svc.score_speaking(heard, expected, duration_seconds)
-    # V3.19: volcar la producción oral al léxico por destreza.
-    await _capture_production_text(user_id, heard, "speaking")
+    # V3.19: volcar la producción oral al léxico por destreza (ejercicio
+    # controlado del objetivo, con frase esperada).
+    await _capture_production_text(
+        user_id, heard, "speaking", activity="speaking_controlled"
+    )
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3129,7 +3140,9 @@ async def submit_speaking_task(
         evidence, heard, duration_seconds, task_type, expected
     )
     # V3.19: volcar la producción oral (tarea libre) al léxico por destreza.
-    await _capture_production_text(user_id, heard, "speaking")
+    await _capture_production_text(
+        user_id, heard, "speaking", activity="speaking_task"
+    )
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3181,8 +3194,11 @@ async def submit_writing(
     # GATE-01: un objetivo `locked` no se puede evaluar (409).
     await _ensure_objective_evaluable(user_id, lv, objective_id)
     result = writing_svc.score_writing(text, expected)
-    # V3.19: volcar la producción escrita al léxico por destreza.
-    await _capture_production_text(user_id, text, "writing")
+    # V3.19: volcar la producción escrita al léxico por destreza (ejercicio
+    # controlado del objetivo, con texto esperado).
+    await _capture_production_text(
+        user_id, text, "writing", activity="writing_controlled"
+    )
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3234,7 +3250,9 @@ async def submit_pronunciation(
     await _ensure_objective_evaluable(user_id, lv, objective_id)
     result = pronunciation_svc.score_pronunciation_cefr(expected, heard)
     # V3.19: volcar la producción oral (lectura en voz alta) al léxico.
-    await _capture_production_text(user_id, heard, "speaking")
+    await _capture_production_text(
+        user_id, heard, "speaking", activity="read_aloud"
+    )
     await _record_evidence_validated(
         user_id,
         lv,
@@ -3293,7 +3311,9 @@ async def submit_writing_task(
         )
     result = writing_svc.scores_from_evidence(evidence)
     # V3.19: volcar la producción escrita libre al léxico por destreza.
-    await _capture_production_text(user_id, text, "writing")
+    await _capture_production_text(
+        user_id, text, "writing", activity="writing_task"
+    )
     await _record_evidence_validated(
         user_id,
         lv,

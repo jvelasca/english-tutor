@@ -41,15 +41,18 @@ class VocabularyItem(BaseModel):
 
 
 class LexicalCompetence(BaseModel):
-    """Matriz de competencia por ítem léxico (V3.21, V20-16; V3.22).
+    """Matriz de competencia por ítem léxico (V3.21, V20-16; V3.22; V3.23).
 
     Derivada de las filas existentes (sin migrar columnas de producción): pura y
-    determinista. V3.22 separa Retention de Transfer: `retention` es señal
-    espaciada (receptiva con `exposure_days` o productiva), mientras `transfer`
-    exige producción en >= 2 canales/contextos. `production_gap` (reconocida y
-    nunca producida) es el gap que cierra el micro-drill; `transfer_gap`
-    (producida pero nunca transferida a otro contexto) queda como señal de
-    falta de transferencia real.
+    determinista. V3.22 separó Retention de Transfer; V3.23 (P1-02/P1-04):
+    - `retention` exige recuperación DEMORADA (`retrieval_days >= umbral`), no
+      exposición/producción espaciada (que pasan a `spaced_exposure` /
+      `spaced_production`, señales independientes informativas).
+    - `transfer` se mide por CONTEXTO de actividad (`channel:activity`,
+      `transfer_contexts`), no solo por canal.
+    `production_gap` (reconocida y nunca producida) es el gap que cierra el
+    micro-drill; `transfer_gap` (producida pero nunca transferida a otro
+    contexto) queda como señal de falta de transferencia real.
     """
 
     recognition: bool
@@ -58,6 +61,10 @@ class LexicalCompetence(BaseModel):
     transfer_contexts: int = 0
     transfer: bool
     retention: bool
+    spaced_exposure: bool = False
+    spaced_production: bool = False
+    retrieval_successes: int = 0
+    retrieval_days: int = 0
     production_gap: bool
     transfer_gap: bool
 
@@ -98,11 +105,14 @@ class LexiconSummary(BaseModel):
     weak: int
     mastered: int
     by_cefr: list[CefrBucket]
-    # V3.21 (V20-16) / V3.22: contadores de la matriz de competencia del léxico.
+    # V3.21 (V20-16) / V3.22 / V3.23: contadores de la matriz de competencia.
+    # V3.23: `retention` cuenta recuperaciones demoradas; `spaced_exposure` es
+    # el contador informativo de exposición espaciada (señal independiente).
     recognized: int = 0
     produced: int = 0
     transfer: int = 0
     retention: int = 0
+    spaced_exposure: int = 0
     production_gap: int = 0
     transfer_gap: int = 0
 

@@ -141,7 +141,9 @@ async def submit_attempt(
     passed = bool(result["ok"])
     # V3.19: volcar la producción oral (read-aloud) al léxico por destreza.
     # `record_production_text` nunca lanza (volcado no bloqueante).
-    await vocabulary_domain.record_production_text(user_id, heard, "speaking")
+    await vocabulary_domain.record_production_text(
+        user_id, heard, "speaking", activity="read_aloud"
+    )
     topic = phrase.get("topic", "")
     difficulty = difficulty_from_vector(phrase.get("difficulty_vector", {}))
     await run_in_threadpool(

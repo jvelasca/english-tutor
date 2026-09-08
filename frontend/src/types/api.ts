@@ -247,9 +247,11 @@ export interface LearningProfile {
 
 export type LexicalStatus = "mastered" | "known" | "learning" | "weak";
 
-// V3.21 (V20-16) / V3.22: matriz Recognition/Production/Transfer/Retention.
-// V3.22 separa Retention (espaciada) de Transfer (>= 2 contextos/canales) y
-// distingue production_gap del transfer_gap real.
+// V3.21 (V20-16) / V3.22 / V3.23: matriz Recognition/Production/Transfer/
+// Retention. V3.23: `retention` exige recuperación DEMORADA (retrieval_days >=
+// umbral) y `transfer`/`transfer_contexts` se miden por contexto de actividad
+// (`channel:activity`); `spaced_exposure`/`spaced_production` son señales
+// espaciadas independientes (informativas, no certifican retención).
 export interface LexicalCompetence {
   recognition: boolean;
   production: boolean;
@@ -257,6 +259,10 @@ export interface LexicalCompetence {
   transfer_contexts: number;
   transfer: boolean;
   retention: boolean;
+  spaced_exposure: boolean;
+  spaced_production: boolean;
+  retrieval_successes: number;
+  retrieval_days: number;
   production_gap: boolean;
   transfer_gap: boolean;
 }
@@ -346,11 +352,14 @@ export interface LexiconSummary {
   weak: number;
   mastered: number;
   by_cefr: CefrBucket[];
-  // V3.21 (V20-16) / V3.22: contadores de la matriz de competencia del léxico.
+  // V3.21 (V20-16) / V3.22 / V3.23: contadores de la matriz de competencia.
+  // V3.23: `retention` cuenta recuperaciones demoradas; `spaced_exposure` es el
+  // contador informativo de exposición espaciada (señal independiente).
   recognized: number;
   produced: number;
   transfer: number;
   retention: number;
+  spaced_exposure: number;
   production_gap: number;
   transfer_gap: number;
 }

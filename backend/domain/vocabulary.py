@@ -23,7 +23,11 @@ async def analyze_text(user_id: str, text: str) -> list[str]:
     palabras extraídas."""
     words = extract_words(text)
     await run_in_threadpool(
-        vocabulary_repo.record_production, user_id, words, channel="chat"
+        vocabulary_repo.record_production,
+        user_id,
+        words,
+        channel="chat",
+        activity="free_chat",
     )
     return words
 
@@ -33,6 +37,7 @@ async def record_production_text(
     text: str,
     channel: str,
     as_unit: bool = False,
+    activity: str | None = None,
 ) -> list[str]:
     """Registra producción del alumno por canal (V3.19).
 
@@ -47,6 +52,9 @@ async def record_production_text(
       atómica (p. ej. "living room" o cualquier palabra del micro-drill), sin
       trocearla en tokens. Necesario para que una unidad multi-palabra incremente
       SU PROPIA fila (`speaking_prod`/`appearances`) y no solo las de sus tokens.
+    - `activity` (V3.23, P1-04): etiqueta de la actividad concreta (p. ej.
+      `drill`, `free_chat`, `speaking_task`). Permite derivar la transferencia
+      por CONTEXTO real de actividad y no solo por canal.
 
     Nunca lanza: el volcado al léxico es señal pedagógica (no evidencia de
     mastery) y no debe romper la puntuación del flujo que lo llama. Si el canal
@@ -59,7 +67,11 @@ async def record_production_text(
         words = extract_words(text)
     try:
         await run_in_threadpool(
-            vocabulary_repo.record_production, user_id, words, channel=channel
+            vocabulary_repo.record_production,
+            user_id,
+            words,
+            channel=channel,
+            activity=activity,
         )
     except Exception:  # noqa: BLE001 — volcado no bloqueante, nunca rompe
         logger.warning(
@@ -155,6 +167,25 @@ async def get_drill_candidates(user_id: str, limit: int = 8) -> list[str]:
     )
 
 
+async def _record_retrieval(user_id: str, word: str) -> None:
+    """Registra una recuperación correcta del micro-drill (V3.23, P1-02).
+
+    Solo el éxito de micro-drill cuenta como recuperación para la retención:
+    el repositorio decide si el intento quedó FUERA del intervalo de retención
+    (`record_retrievals` exige una separación >= RETENTION_MIN_INTERVAL_DAYS
+    desde el ancla de la primera exposición/producción). Nunca lanza: es señal
+    pedagógica y no debe romper la puntuación."""
+    try:
+        await run_in_threadpool(vocabulary_repo.record_retrievals, user_id, [word])
+    except Exception:  # noqa: BLE001 — señal no bloqueante
+        logger.warning(
+            "No se pudo registrar retrieval user=%s word=%s",
+            user_id,
+            word,
+            exc_info=True,
+        )
+
+
 async def submit_drill_attempt(
     user_id: str,
     word: str,
@@ -187,7 +218,12 @@ async def submit_drill_attempt(
     if produced:
         # Volcado al léxico por destreza; nunca lanza (señal, no evidencia).
         # `as_unit=True`: acredita la unidad atómica (V3.21, V20-01).
-        await record_production_text(user_id, word, "speaking", as_unit=True)
+        await record_production_text(
+            user_id, word, "speaking", as_unit=True, activity="drill"
+        )
+        # V3.23 (P1-02): recuperación correcta del micro-drill (retención si el
+        # éxito queda fuera del intervalo respecto al ancla).
+        await _record_retrieval(user_id, word)
     return {
         "word": word,
         "produced": produced,
@@ -265,7 +301,11 @@ async def submit_sentence_attempt(
     passed = produced and phrase_ok
     if passed:
         # Volcado al léxico por destreza; nunca lanza (señal, no evidencia).
-        await record_production_text(user_id, word, "speaking", as_unit=True)
+        await record_production_text(
+            user_id, word, "speaking", as_unit=True, activity="drill"
+        )
+        # V3.23 (P1-02): recuperación correcta del micro-drill (paso frase).
+        await _record_retrieval(user_id, word)
     return {
         "word": word,
         "phrase": phrase,

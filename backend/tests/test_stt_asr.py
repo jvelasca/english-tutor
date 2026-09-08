@@ -162,11 +162,42 @@ def test_classify_no_speech_when_text_is_silence_hallucination():
     )
 
 
+def test_classify_no_speech_beats_low_confidence_on_hallucination():
+    """V3.23 (P1-03): un texto alucinado sobre silencio con avg_logprob bajo NO
+    es `low_confidence` sino `no_speech` (regla: silencio/alucinación nunca se
+    penaliza). Antes el chequeo de confianza se evaluaba primero y clasificaba
+    este caso como low_confidence."""
+    assert (
+        classify_asr_status(
+            text="you",
+            metrics=_metrics(
+                mean_logprob=-1.8, max_no_speech_prob=0.9, no_speech_ratio=1.0
+            ),
+        )
+        == ASR_NO_SPEECH
+    )
+
+
 def test_classify_low_confidence_when_text_but_bad_logprob():
     # Voz con baja confianza: texto presente pero logprob agregado muy bajo.
     assert (
         classify_asr_status(
             text="hello", metrics=_metrics(mean_logprob=-2.4)
+        )
+        == ASR_LOW_CONFIDENCE
+    )
+
+
+def test_classify_low_confidence_without_no_speech_dominance():
+    """V3.23 (P1-03): sin predominio de no-habla (no_speech_ratio < 0.5), la
+    confianza baja sí clasifica como `low_confidence`, aunque haya una ventana
+    aislada marcada como no-habla."""
+    assert (
+        classify_asr_status(
+            text="hello",
+            metrics=_metrics(
+                mean_logprob=-1.8, max_no_speech_prob=0.9, no_speech_ratio=0.25
+            ),
         )
         == ASR_LOW_CONFIDENCE
     )

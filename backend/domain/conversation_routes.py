@@ -236,7 +236,7 @@ async def submit_attempt(
     # antes del guard de longitud: el alumno ya produjo ese texto al conversar.
     # `record_production_text` nunca lanza (volcado no bloqueante).
     await vocabulary_domain.record_production_text(
-        user_id, heard, channel="conversation"
+        user_id, heard, channel="conversation", activity="guided_conversation"
     )
     word_count = len(heard.split())
     if len(turns) < CONV_MIN_STUDENT_TURNS or word_count < CONV_MIN_STUDENT_WORDS:

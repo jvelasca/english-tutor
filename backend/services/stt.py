@@ -201,13 +201,15 @@ def classify_asr_status(*, text: str, metrics: dict) -> str:
         descartó todo el audio como no-habla (silencio o ruido).
       - `segment_count > 0` sin texto -> `unintelligible` (defensivo).
     - Con texto:
-      - `mean_logprob` muy bajo -> `low_confidence` (hay habla pero la
-        confianza agregada es insuficiente).
-      - El grueso de la señal decodificada está marcada como no-habla
+      - El grueso de la señal decodificada está marcado como no-habla
         (`max_no_speech_prob` alto y `no_speech_ratio` >= umbral de
         alucinación): el texto es una alucinación de Whisper sobre
-        silencio/ruido, no habla real -> `no_speech` (no se penaliza al alumno
-        por algo que no se oyó).
+        silencio/ruido, no habla real -> `no_speech`. Se evalúa ANTES que la
+        confianza baja (V3.23, P1-03): un texto alucinado sobre silencio con
+        `avg_logprob` bajo sigue siendo no-habla y nunca se penaliza al alumno
+        por algo que no se oyó.
+      - `mean_logprob` muy bajo (sin predominio de no-habla) -> `low_confidence`
+        (hay habla pero la confianza agregada es insuficiente).
       - En cualquier otro caso -> `ok`.
     """
     stripped = (text or "").strip()
@@ -219,9 +221,10 @@ def classify_asr_status(*, text: str, metrics: dict) -> str:
                 return ASR_UNINTELLIGIBLE
             return ASR_NO_SPEECH
         return ASR_UNINTELLIGIBLE
-    mean_logprob = metrics.get("mean_logprob")
-    if mean_logprob is not None and mean_logprob < LOW_LOGPROB_THRESHOLD:
-        return ASR_LOW_CONFIDENCE
+    # V3.23 (P1-03): la alucinación sobre no-habla se evalúa ANTES que la
+    # confianza baja. Whisper puede decodificar texto inventado sobre silencio
+    # con `avg_logprob` bajo; ese texto no es producción del alumno y debe ser
+    # `no_speech`, nunca `low_confidence` (regla: silencio no penaliza).
     max_no_speech_prob = metrics.get("max_no_speech_prob")
     no_speech_ratio = metrics.get("no_speech_ratio")
     if (
@@ -231,6 +234,9 @@ def classify_asr_status(*, text: str, metrics: dict) -> str:
         and no_speech_ratio >= NO_SPEECH_RATIO_HALLUCINATION_THRESHOLD
     ):
         return ASR_NO_SPEECH
+    mean_logprob = metrics.get("mean_logprob")
+    if mean_logprob is not None and mean_logprob < LOW_LOGPROB_THRESHOLD:
+        return ASR_LOW_CONFIDENCE
     return ASR_OK
 
 

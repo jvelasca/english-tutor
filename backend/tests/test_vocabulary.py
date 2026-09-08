@@ -412,6 +412,166 @@ def test_production_days_distinct_day_single_channel_semantics(monkeypatch, tmp_
     assert vocab["cat"]["speaking_prod"] == 1
 
 
+def test_record_production_context_tags_merge(monkeypatch, tmp_path):
+    """V3.23 (P1-04): `activity` etiqueta la producción con `channel:activity`
+    en `context_tags`, fusionada de forma canónica, única y ordenada."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert (
+        vocabulary_repo.record_production(
+            a, ["cat"], channel="speaking", activity="drill"
+        )
+        is True
+    )
+    # Misma actividad repetida: no duplica el tag.
+    vocabulary_repo.record_production(
+        a, ["cat"], channel="speaking", activity="drill"
+    )
+    # Segunda actividad del MISMO canal: tag adicional.
+    vocabulary_repo.record_production(
+        a, ["cat"], channel="speaking", activity="speaking_route"
+    )
+    # Canal distinto: chat libre.
+    vocabulary_repo.record_production(
+        a, ["cat"], channel="chat", activity="free_chat"
+    )
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    # Orden canónico del repositorio: canales chat → speaking → writing →
+    # conversation, luego actividad alfabética.
+    assert (
+        vocab["cat"]["context_tags"]
+        == "chat:free_chat,speaking:drill,speaking:speaking_route"
+    )
+    # Semántica agregada intacta.
+    assert vocab["cat"]["appearances"] == 4
+    assert vocab["cat"]["speaking_prod"] == 3
+    assert vocab["cat"]["chat_prod"] == 1
+
+
+def test_record_production_without_activity_keeps_tags(monkeypatch, tmp_path):
+    """Producción sin `activity` (callers legacy) no borra los tags existentes."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_production(
+        a, ["cat"], channel="speaking", activity="drill"
+    )
+    vocabulary_repo.record_words(a, ["cat"])  # record_words: sin activity
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["cat"]["context_tags"] == "speaking:drill"
+
+
+def test_record_retrievals_requires_interval_since_anchor(monkeypatch, tmp_path):
+    """V3.23 (P1-02): una recuperación solo acredita retención si ocurre
+    >= RETENTION_MIN_INTERVAL_DAYS después del ancla (primera exposición)."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    times = iter(
+        [
+            "2026-08-20T10:00:00+00:00",  # exposición (ancla)
+            "2026-08-20T11:00:00+00:00",  # retrieval mismo día: NO cuenta
+            "2026-08-21T10:00:00+00:00",  # retrieval al día siguiente: cuenta
+        ]
+    )
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
+    vocabulary_repo.record_exposures(a, ["sun"])
+    assert vocabulary_repo.record_retrievals(a, ["sun"]) is True
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["sun"]["retrieval_successes"] == 0
+    assert vocab["sun"]["retrieval_days"] == 0
+    assert vocabulary_repo.record_retrievals(a, ["sun"]) is True
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["sun"]["retrieval_successes"] == 1
+    assert vocab["sun"]["retrieval_days"] == 1
+    assert vocab["sun"]["last_retrieval_at"]
+
+
+def test_record_retrievals_dedupe_by_day_and_counts(monkeypatch, tmp_path):
+    """`retrieval_successes` suma por recuperación; `retrieval_days` una vez por
+    día distinto."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    times = iter(
+        [
+            "2026-08-20T10:00:00+00:00",  # exposición (ancla)
+            "2026-08-22T10:00:00+00:00",  # retrieval día +2
+            "2026-08-22T11:00:00+00:00",  # retrieval mismo día → no suma días
+            "2026-08-23T10:00:00+00:00",  # retrieval día +3 → suma día
+        ]
+    )
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
+    vocabulary_repo.record_exposures(a, ["sun"])
+    vocabulary_repo.record_retrievals(a, ["sun"])
+    vocabulary_repo.record_retrievals(a, ["sun"])
+    vocabulary_repo.record_retrievals(a, ["sun"])
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["sun"]["retrieval_successes"] == 3
+    assert vocab["sun"]["retrieval_days"] == 2
+
+
+def test_record_retrievals_without_anchor_ignored(monkeypatch, tmp_path):
+    """Sin ancla (ni exposición ni producción) no hay retención medible: se
+    ignora en silencio y no lanza."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    # Palabra no sembrada: no existe fila.
+    assert vocabulary_repo.record_retrievals(a, ["ghost"]) is True
+    # Palabra sembrada del currículo (sin exposición ni producción): fila sin ancla.
+    uid = users_repo.create_user("B")["id"]
+    vocabulary_repo.seed_curriculum_items(uid, [{"word": "travel"}])
+    assert vocabulary_repo.record_retrievals(uid, ["travel"]) is True
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(uid)}
+    assert vocab["travel"]["retrieval_successes"] == 0
+
+
+def test_record_retrievals_unknown_user_false(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    assert vocabulary_repo.record_retrievals("no-existe", ["cat"]) is False
+
+
+def test_vocabulary_v323_columns_migration(monkeypatch, tmp_path):
+    """V3.23: una BD previa (sin retrieval/context_tags) se migra al re-ejecutar
+    `init_db`. Los contadores de retrieval NO reciben backfill (la evidencia de
+    recuperación demorada solo cuenta desde V3.23), pero `context_tags` existe."""
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    uid = users_repo.create_user("A")["id"]
+    vocabulary_repo.record_exposures(uid, ["sun"])
+    vocabulary_repo.record_words(uid, ["cat"])
+
+    # Simula una BD previa a V3.23: elimina las columnas nuevas.
+    conn = sqlite3.connect(db.DB_PATH)
+    for col in (
+        "retrieval_successes",
+        "retrieval_days",
+        "last_retrieval_at",
+        "context_tags",
+    ):
+        conn.execute(f"ALTER TABLE vocabulary DROP COLUMN {col}")
+    conn.commit()
+    conn.close()
+
+    db.init_db()
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
+        rows = {
+            r[0]: r
+            for r in conn.execute(
+                "SELECT word, retrieval_successes, retrieval_days, "
+                "context_tags FROM vocabulary"
+            )
+        }
+    finally:
+        conn.close()
+    assert {
+        "retrieval_successes",
+        "retrieval_days",
+        "last_retrieval_at",
+        "context_tags",
+    } <= cols
+    # Sin backfill de retrieval: expuesta y producida, pero sin recuperación
+    # demorada acreditada retrospectivamente.
+    assert rows["sun"][1] == 0 and rows["sun"][2] == 0
+    assert rows["cat"][1] == 0 and rows["cat"][2] == 0
+    assert rows["sun"][3] == "" and rows["cat"][3] == ""
+
+
 def test_vocabulary_v319_channels_migration_backfills_chat(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DATA_DIR", tmp_path)
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")

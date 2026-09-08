@@ -36,11 +36,12 @@ const LEXICON: Lexicon = {
     weak: 0,
     mastered: 0,
     by_cefr: [],
-    // V3.21 (V20-16) / V3.22: contadores de la matriz de competencia.
+    // V3.21 (V20-16) / V3.22 / V3.23: contadores de la matriz de competencia.
     recognized: 0,
     produced: 0,
     transfer: 0,
     retention: 0,
+    spaced_exposure: 0,
     production_gap: 0,
     transfer_gap: 0,
   },

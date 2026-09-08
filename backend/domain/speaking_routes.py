@@ -329,7 +329,7 @@ async def submit_attempt(
     # V3.19: volcar la producción oral (micro-conversación guiada) al léxico.
     # `record_production_text` nunca lanza (volcado no bloqueante).
     await vocabulary_domain.record_production_text(
-        user_id, heard, channel="speaking"
+        user_id, heard, channel="speaking", activity="speaking_route"
     )
     overall = float(scored["overall"])
     passed = overall >= SPEAKING_PASS_THRESHOLD

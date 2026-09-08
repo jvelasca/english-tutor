@@ -67,7 +67,8 @@ async def pronunciation(
         )
         # V3.19: la lectura en voz alta es producción oral; volcarla al léxico
         # por destreza (canal speaking). No bloquea la respuesta (nunca lanza).
+        # V3.23: actividad `drill` (pronunciación libre "say this word").
         await vocabulary_service.record_production_text(
-            user_id, result["heard"], "speaking"
+            user_id, result["heard"], "speaking", activity="drill"
         )
     return PronunciationResponse(**result)

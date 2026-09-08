@@ -3,7 +3,45 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 10:30 (UTC+2).
+> Actualizado por última vez: 2026-09-08 11:15 (UTC+2).
+>
+> **Nota (2026-09-08, 11:15):** posición vigente **v3.23.0** — **Student Model
+> Calibration (parte 2): Retention real y Transfer por contexto** (versión de
+> app `3.22.0 → 3.23.0`). Cierra el plan V3.23 del dossier de la auditoría
+> externa V3.22.0 (P1-02/P1-04) sobre la base de los quick fixes de esa misma
+> auditoría (P1-01/P1-03): **(P1-02) la retención deja de ser exposición/
+> producción espaciada y exige recuperación correcta DEMORADA** — migración
+> idempotente en `vocabulary` con `retrieval_successes`/`retrieval_days`/
+> `last_retrieval_at` (sin backfill: el histórico V3.22 backfilleó
+> `first_exposed_at = last_exposed_at`, una ancla retrospectiva sería injusta —
+> mejor perder evidencia que inventarla); `record_retrievals` cuenta solo éxitos
+> ≥ `RETENTION_MIN_INTERVAL_DAYS` después del ancla
+> `min(first_exposed_at, first_seen)` (días distintos → `retrieval_days`); hook
+> solo en el micro-drill (`submit_drill_attempt` si `produced`,
+> `submit_sentence_attempt` si `passed`); en `item_competence_matrix`,
+> `retention = retrieval_days >= RETENTION_MIN_RETRIEVAL_DAYS` y
+> `_spaced_exposure`/`_spaced_production` pasan a señales independientes
+> (`spaced_exposure`/`spaced_production`) · **(P1-04) la transferencia se mide
+> por contexto de actividad `channel:activity`, no solo por canal** — migración
+> `context_tags` (CSV único y ordenado), `record_production(..., activity)` con
+> merge canónico, `activity` propagada por todas las superficies (mapeo
+> assessment/misión/checks controlados/tareas LLM/read-aloud/drill/rutas
+> speaking/conversación guiada/chat libre), `production_contexts(row)` con
+> fallback `channel:other` para legacy; `transfer`/`transfer_contexts` por
+> contextos (dos actividades del mismo canal cuentan; `chat`+`conversation`
+> dejan de colapsar) · **quick fixes base (auditoría externa V3.22)**: P1-01
+> `item_recall` con `_last_activity_at` (max de `last_seen`/`last_exposed_at`);
+> P1-03 `item_mastery` con pesos de reconocimiento 0.4 volumen / 0.6
+> `exposure_days` y orden ASR `no_speech` (alucinación de silencio) antes que
+> `low_confidence` · `summary` añade `spaced_exposure` (informativo) ·
+> `LexicalCompetence`/`LexiconSummary` (schemas + TS) con los campos nuevos;
+> tooltip del diccionario actualizado (sin renombrar chips). Fuera de alcance:
+> `support_level` por evento (V3.24), backfill de retrieval histórico, superficie
+> de recuerdo de significado. Verificación: backend **pytest 1455** + ruff
+> limpio; frontend **vitest 450** (57 archivos) + `tsc`/`vite build` OK;
+> curriculum `--strict --quality` y content validation OK;
+> `check_release_consistency` **3.23.0** exit 0; i18n parity exit 0 (1232
+> definidas); CONSTITUCIÓN sin cambios (se mantiene señal ≠ evidencia).
 >
 > **Nota (2026-09-08, 10:30):** posición vigente **v3.22.0** — **ASR
 > Calibration + Student Model (léxico)** (versión de app `3.21.0 → 3.22.0`).

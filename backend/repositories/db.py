@@ -655,6 +655,45 @@ def init_db() -> None:
             "AND last_exposed_at != ''"
         )
 
+        # Migración idempotente (V3.23): evidencia de RETRIEVAL y contexto de
+        # producción por actividad.
+        # - `retrieval_successes` / `retrieval_days` / `last_retrieval_at`:
+        #   recuperación correcta DEMORADA (éxito de micro-drill que ocurre
+        #   >= RETENTION_MIN_INTERVAL_DAYS después del primer anclaje). La
+        #   retención ya no es exposición espaciada: exige recuperar el ítem
+        #   tras un intervalo (P1-02 de la auditoría externa V3.22).
+        # - `context_tags`: etiquetas canónicas `channel:activity` de cada
+        #   producción, para que la transferencia se mida por CONTEXTO de
+        #   actividad (dos actividades del mismo canal cuentan como contextos
+        #   distintos, y chat vs conversación guiada dejan de colapsar en un
+        #   mismo canal) en lugar de solo por canal (P1-04).
+        # Sin backfill de los contadores de retrieval: el histórico anterior a
+        # V3.22 backfilleó `first_exposed_at = last_exposed_at`, así que una
+        # ancla retrospectiva sería injusta; los contadores empiezan a contar
+        # en V3.23 (mejor perder evidencia que inventarla). `context_tags` se
+        # deja vacío en las filas legacy; la derivación las cubre con el
+        # fallback `channel:other`.
+        if "retrieval_successes" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN retrieval_successes INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "retrieval_days" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN retrieval_days INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "last_retrieval_at" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN last_retrieval_at TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "context_tags" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN context_tags TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {
