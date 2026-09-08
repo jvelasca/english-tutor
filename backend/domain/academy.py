@@ -614,11 +614,21 @@ async def build_student_model(user_id: str) -> dict:
     siguiente nivel. Tanto `/api/academy/student-model` como `/api/profile`
     proyectan sobre este mismo dict, de modo que comparten nivel, `overall_ability`
     y confianza (única fuente de verdad).
+
+    F-K2 (V3.24): el nivel estimado se ancla a los niveles completados y al
+    tramo del nivel actual (véase `adaptive.estimated_level`), de modo que
+    aprobar el examen de un nivel no hace caer la etiqueta (G4 del dossier K).
     """
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
+    enrollments = await run_in_threadpool(academy_repo.list_enrollments, user_id)
+    completed_levels = tuple(
+        e["level"] for e in enrollments if e.get("status") == "completed"
+    )
     skills = await _annotated_profile(user_id, lv)
-    est = adaptive.estimated_level(skills)
+    est = adaptive.estimated_level(
+        skills, current_level=lv.level, completed_levels=completed_levels
+    )
     goal_row = await run_in_threadpool(academy_repo.get_goal, user_id)
     target = (
         goal_row["target_level"]
@@ -628,7 +638,13 @@ async def build_student_model(user_id: str) -> dict:
     target = target.upper()
     history = await run_in_threadpool(academy_repo.list_assessment_results, user_id)
     now = datetime.now(timezone.utc).isoformat()
-    reassessment = adaptive.reassessment_due(skills, history, now)
+    reassessment = adaptive.reassessment_due(
+        skills,
+        history,
+        now,
+        current_level=lv.level,
+        completed_levels=completed_levels,
+    )
     return {
         "level_id": lv.level_id,
         "current_level": lv.level,

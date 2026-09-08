@@ -1,6 +1,6 @@
 {
   "audit": "D-2026-09-02",
-  "description": "Comportamiento en frontera de la escalera Assessment 2.0 tal como se verificó en la auditoría D (docs/audit/D-ASSESSMENT-READINESS.md). PASS_THRESHOLDS vive en services/assessment_v2.py; este fixture fija la semántica (pass si overall >= umbral y, en level, todas las destrezas >= min_per_skill).",
+  "description": "Comportamiento en frontera de la escalera Assessment 2.0 tal como se verificó en la auditoría D (docs/audit/D-ASSESSMENT-READINESS.md). PASS_THRESHOLDS vive en services/assessment_v2.py; este fixture fija la semántica (pass si overall >= umbral y, en level, todas las destrezas >= min_per_skill). Los mastery_gate_cases se re-apuntaron en V3.24 por F-K1 del dossier K (docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md): MASTERED = familiar×2 + transfer×2 + delayed con `novel` reservado (requisito 0, sin emisor); `novel` ya no forma parte de `missing`.",
   "thresholds_source": "backend/services/assessment_v2.py",
   "thresholds": {
     "formative": 0.7,
@@ -45,21 +45,21 @@
   "mastery_gate_cases": [
     {
       "id": "gate-met",
-      "counts": {"familiar": 2, "transfer": 1, "novel": 1, "delayed": 1},
+      "counts": {"familiar": 2, "transfer": 2, "novel": 0, "delayed": 1},
       "expect_met": true,
       "expect_missing": []
     },
     {
-      "id": "gate-missing-novel",
+      "id": "gate-missing-transfer",
       "counts": {"familiar": 2, "transfer": 1, "novel": 0, "delayed": 1},
       "expect_met": false,
-      "expect_missing": ["novel"]
+      "expect_missing": ["transfer"]
     },
     {
       "id": "gate-missing-all-but-formative",
       "counts": {"familiar": 1, "transfer": 0, "novel": 0, "delayed": 0},
       "expect_met": false,
-      "expect_missing": ["practice", "transfer", "novel", "delayed"]
+      "expect_missing": ["practice", "transfer", "delayed"]
     }
   ]
 }

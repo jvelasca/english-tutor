@@ -22,7 +22,7 @@ from __future__ import annotations
 import math
 
 from services.academy import overall_cefr_score
-from services.cefr import PRE_A1
+from services.cefr import CEFR_LEVELS, PRE_A1
 from services.cefr_matrix import requirements_for
 from services.curriculum import get_objective
 from services.forgetting import days_since, retrieval_probability
@@ -30,7 +30,9 @@ from services.forgetting import days_since, retrieval_probability
 # --- Nivel continuo -------------------------------------------------------
 
 # Mapa nivel CEFR → valor numérico continuo (A1=1.0 … C2=6.0). Permite expresar
-# "A2.7" en lugar de una etiqueta discreta inmutable.
+# "A2.7" en lugar de una etiqueta discreta inmutable. La escala es 0.5..6.0 a lo
+# largo de la escalera (Pre-A1 = centro 0.5); `estimated_level` ancla el suelo
+# en los niveles completados (F-K2, V3.24).
 CEFR_NUMERIC: dict[str, float] = {
     "A1": 1.0,
     "A2": 2.0,
@@ -39,6 +41,9 @@ CEFR_NUMERIC: dict[str, float] = {
     "C1": 5.0,
     "C2": 6.0,
 }
+
+# Centro de la banda Pre-A1: suelo del tramo A1 cuando aún no hay certificación.
+PRE_A1_NUMERIC = 0.5
 
 
 def numeric_to_level(numeric: float) -> str:
@@ -56,30 +61,65 @@ def numeric_to_level(numeric: float) -> str:
     return "C2"
 
 
-def estimated_level(profile: list[dict]) -> dict:
-    """Nivel CEFR estimado de forma continua a partir del perfil por destreza.
+def estimated_level(
+    profile: list[dict],
+    *,
+    current_level: str = "A1",
+    completed_levels: tuple[str, ...] = (),
+) -> dict:
+    """Nivel CEFR estimado anclado a niveles completados + tramo actual (F-K2).
 
-    Convierte el `overall_cefr_score` ponderado (0..1) a una escala continua
-    A1=1.0 … C2=6.0 y devuelve `{level, numeric, confidence}`, donde `confidence`
-    es la confianza media de las destrezas con evidencia (0.0 si no hay ninguna).
+    La escala continua **no** proyecta el porcentaje de dominio de un único
+    nivel al eje CEFR absoluto (v3.23: `numeric = 1 + 5·overall`, que hacía
+    estimar B2 a quien dominaba A1 y devolver Pre-A1 al aprobar el examen y
+    matricular A2 — reproducido en G4 del dossier K). En su lugar se ancla:
 
-    Sin ninguna destreza con evidencia (perfil nuevo o sin actividad) el nivel es
-    `Pre-A1`: aún no hay base para afirmar A1. El `numeric` se mantiene en 1.0
-    (suelo de la escala continua), de modo que `overall_ability` no cambia de
-    rango para el resto del dominio.
+    - **Suelo (base)**: con `completed_levels` (matrículas en estado
+      `completed`), `CEFR_NUMERIC[mayor nivel completado]` — la etiqueta nunca
+      baja de ahí al saltar de nivel. Sin certificaciones, el centro Pre-A1
+      (0.5), de modo que un alumno que empieza A1 parte del tramo previo.
+    - **Progreso**: `overall_cefr_score` (0..1) del perfil del **nivel actual**
+      se suma al suelo. Sin certificación previa la etiqueta nunca supera el
+      nivel actual (no se afirma el siguiente sin su examen); con el nivel
+      actual recién matriculado y cero evidencia, el estimado queda en el suelo
+      (p. ej. A1 certificado → numeric 1.0, etiqueta A1).
+
+    Devuelve `{level, numeric, confidence}`, donde `confidence` es la confianza
+    media de las destrezas con evidencia del nivel actual (0.0 si no hay).
+    Sin evidencia y sin nivel completado el nivel es `Pre-A1`.
     """
     overall = overall_cefr_score(profile)
-    numeric = round(1.0 + 5.0 * overall, 2)
+    known = [
+        label.upper()
+        for label in completed_levels
+        if str(label).upper() in CEFR_NUMERIC
+    ]
+    highest = max(known, key=lambda label: CEFR_LEVELS.index(label)) if known else None
+    if highest is not None:
+        floor = CEFR_NUMERIC[highest]
+    else:
+        floor = max(
+            PRE_A1_NUMERIC, CEFR_NUMERIC.get(current_level.upper(), 1.0) - 1.0
+        )
+    progress = max(0.0, min(1.0, float(overall)))
+    numeric = round(min(6.0, floor + progress), 2)
     confidences = [
         float(e["confidence"]) for e in profile if e.get("evidence_count", 0) > 0
     ]
     confidence = (
         round(sum(confidences) / len(confidences), 2) if confidences else 0.0
     )
-    if not confidences or overall <= 0.0:
+    if highest is None and (not confidences or overall <= 0.0):
         level = PRE_A1
     else:
         level = numeric_to_level(numeric)
+        if highest is None and current_level.upper() in CEFR_NUMERIC:
+            # Sin certificación previa, no se adelanta la etiqueta al siguiente
+            # nivel: el tope del tramo actual es el propio nivel en curso.
+            if CEFR_LEVELS.index(level) > CEFR_LEVELS.index(
+                current_level.upper()
+            ):
+                level = current_level.upper()
     return {
         "level": level,
         "numeric": numeric,
@@ -154,9 +194,12 @@ def readiness(profile: list[dict], target_level: str) -> dict:
     matriz CEFR (`services.cefr_matrix`) para el `target_level` (A1–C2 × las 8
     destrezas de la Constitución §7); `pronunciation` y cualquier destreza fuera
     de la matriz usan el fallback plano (`READINESS_MINIMUMS`). A partir de B1 la
-    matriz exige evidencia de transferencia/novedad. El gate de transfer/novedad
-    es retrocompatible: solo se aplica si el perfil trae `evidence_by_kind`; un
-    perfil legacy sin esa clave no queda bloqueado por transferencia.
+    matriz exige evidencia de transferencia (B2: transfer×2, C1: ×3, C2: ×4);
+    el kind `novel` queda **reservado** (`novel_required = 0`, sin emisor real;
+    F-K1, V3.24) y se conserva en el reporte solo como señal. El gate de
+    transfer/novedad es retrocompatible: solo se aplica si el perfil trae
+    `evidence_by_kind`; un perfil legacy sin esa clave no queda bloqueado por
+    transferencia.
 
     No se "pasa" de nivel por promedio: una destreza bloqueante deja `ready` en
     False aunque el resto estén altas. Devuelve per-skill, `overall` (% de destrezas
@@ -338,7 +381,12 @@ def _weakest_skill(profile: list[dict]) -> dict | None:
 
 
 def reassessment_due(
-    profile: list[dict], assessment_history: list[dict], now: str
+    profile: list[dict],
+    assessment_history: list[dict],
+    now: str,
+    *,
+    current_level: str = "A1",
+    completed_levels: tuple[str, ...] = (),
 ) -> dict | None:
     """Propone una reevaluación de destreza/nivel, o None si aún no procede.
 
@@ -390,7 +438,11 @@ def reassessment_due(
 
     return {
         "skill": weakest["skill"],
-        "level": estimated_level(profile)["level"],
+        "level": estimated_level(
+            profile,
+            current_level=current_level,
+            completed_levels=completed_levels,
+        )["level"],
         "reason": reason,
     }
 

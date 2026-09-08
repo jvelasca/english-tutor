@@ -4,6 +4,17 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.24.0] — 2026-09-08
+
+**Calibración de salida del Student Model (dossier K, Eje 1): el gate MASTERED de Assessment 2.0 exige solo evidencia emisible (familiar×2 + transfer×2 + delayed) y el nivel estimado se ancla a niveles completados + progreso del tramo actual.**
+
+Cierra el plan V3.24 del dossier K (auditoría profunda del Eje 1 sobre v3.23.0), con los dos P1 resueltos por decisión del gerente y sus tests e2e previos (F-K8). Versión de app `3.23.0 → 3.24.0`.
+
+- **F-K1 — MASTERED relajado a lo emisible (`novel` reservado).** El evidence_kind `novel` no tiene emisor real (solo se emiten `familiar`/`transfer`/`delayed`), así que `mastery_evidence_gate` exigía `novel` permanentemente y bloqueaba la escalera Assessment 2.0. `MASTERY_EVIDENCE_REQUIREMENTS` pasa a `initial 1 + practice 2 + transfer 2 + delayed 1` (`assessment_v2.py`) y `novel_required = 0` en las 12 celdas macro de `cefr_matrix.json` (B2/C1/C2, listening/speaking/reading/writing); el kind `novel` queda **reservado** (requisito 0, sin emisor) hasta que exista una modalidad que lo emita de verdad. Frontera documentada en `docs/ASSESSMENT_2.md` y CONSTITUCIÓN §2.1/§6.1/§6.2/§6.4.
+- **F-K2 — Nivel estimado anclado (sin rebase al matricular).** `estimated_level` ya no proyecta la escala lineal `numeric = 1 + 5·overall` desde un único nivel: recibe `current_level` + `completed_levels` y ancla el suelo en el nivel completado más alto (o `current_level − 1` sin completados), con `numeric = floor + progreso` en la escala 0.5–6.0. `build_student_model` deriva ambos de las matrículas (`status == "completed"`). Corrección del escenario G4 del dossier: dominar A1 completo ya **no** estima B2, y aprobar el examen A1 (matrícula A2) ya **no** devuelve el estimado a Pre-A1 (sigue A1/numeric 1.0 hasta acreditar el tramo).
+- **F-K8 — Tests e2e del salto de nivel (prerequisito del fix).** `_dominate_a1` + `test_endpoint_estimated_level_anchored_across_a1_exam` en `test_academy.py` (escritos primero, red, hoy verdes): dominar A1 → estima A1 (nunca ≥ B2); aprobar examen A1 → matrícula A2, estimado A1 con numeric 1.0 (nunca Pre-A1).
+- **Verificación.** Backend pytest **1457 passed** + `ruff check .` limpio; baterías del Eje 1 del dossier K **G1 311 + G2 329** (640, +2 tests e2e); frontend sin cambios (vitest **450**/57 archivos + `tsc`/`vite build` como en v3.23.0); `check_release_consistency` 3.24.0 exit 0; CONSTITUCIÓN documentada (sin cambio de regla pedagógica: `novel` pasa a reservado).
+
 ## [3.23.0] — 2026-09-08
 
 **Calibración V3.23 (Student Model, parte 2): la retención deja de ser exposición/producción espaciada y exige recuperación correcta demorada (éxito de micro-drill fuera del intervalo desde el ancla), y la transferencia se mide por contexto real de actividad (`channel:activity`), no solo por canal. Base de calibración de la auditoría externa V3.22 incluida (P1-01/P1-03).**

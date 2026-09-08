@@ -10,8 +10,9 @@ Tipos canónicos (auditoría):
 
 También expone:
 - `readiness` derivado de la escalera (no es un tipo de sesión).
-- `mastery_evidence_gate`: MASTERED exige
-  initial + practice + transfer + novel + delayed.
+- `mastery_evidence_gate`: MASTERED exige kinds emitibles
+  (familiar×2 + transfer×2 + delayed); `novel` queda reservado sin emisor
+  (F-K1, V3.24).
 
 Motor puro y determinista: sin FastAPI ni BD.
 """
@@ -69,11 +70,14 @@ RETENTION_STABLE_RATIO = 0.9
 CERTIFICATION_REQUIRED_DELAYED = 1
 
 # Regla MASTERED (auditoría §16): no basta con terminar.
+# F-K1 (V3.24, dossier K): el kind `novel` no tiene emisor real, así que MASTERED
+# exige solo kinds emitibles — familiar (initial/practice) + transfer×2 (unit/
+# progress/level) + delayed (retention ≥7 días estable). `novel` queda reservado:
+# requisito 0 hasta que exista una modalidad que lo emita de verdad.
 MASTERY_EVIDENCE_REQUIREMENTS: dict[str, int] = {
     "initial": 1,  # familiar ≥ 1
     "practice": 2,  # familiar ≥ 2
-    "transfer": 1,
-    "novel": 1,
+    "transfer": 2,
     "delayed": 1,
 }
 
@@ -410,7 +414,13 @@ def certification_gate(
 
 
 def mastery_evidence_gate(by_kind: dict | None) -> dict:
-    """¿Se puede considerar MASTERED? (initial+practice+transfer+novel+delayed)."""
+    """¿Se puede considerar MASTERED? (familiar×2 + transfer×2 + delayed).
+
+    F-K1 (V3.24, dossier K): el gate exige solo kinds **emitibles**
+    (familiar de formatives/objetivos, transfer de unit/progress/level, delayed
+    de retention estable). `novel` sigue en `counts` como señal (kind válido y
+    reservado, sin emisor real) pero no forma parte de `checks`/`missing`.
+    """
     kinds = by_kind or {}
     familiar = int(kinds.get("familiar", 0))
     transfer = int(kinds.get("transfer", 0))
@@ -420,7 +430,6 @@ def mastery_evidence_gate(by_kind: dict | None) -> dict:
         "initial": familiar >= MASTERY_EVIDENCE_REQUIREMENTS["initial"],
         "practice": familiar >= MASTERY_EVIDENCE_REQUIREMENTS["practice"],
         "transfer": transfer >= MASTERY_EVIDENCE_REQUIREMENTS["transfer"],
-        "novel": novel >= MASTERY_EVIDENCE_REQUIREMENTS["novel"],
         "delayed": delayed >= MASTERY_EVIDENCE_REQUIREMENTS["delayed"],
     }
     missing = [name for name, ok in checks.items() if not ok]

@@ -1407,6 +1407,71 @@ def test_endpoint_student_model_empty(monkeypatch, tmp_path):
     assert body["reassessment"] is None
 
 
+# --- F-K8/F-K2: salto de nivel A1→A2 fijado e2e (dossier K, G4) ------------
+
+
+def _dominate_a1(client, user_id: str) -> None:
+    """Domina el currículo A1 completo por vía real (objective assessments).
+
+    Replica la fase 1 de G4 del dossier K: dominar cada objetivo de A1 con el
+    mínimo de intentos perfectos. No requiere matrícula previa; el desbloqueo
+    lineal avanza con cada objetivo dominado."""
+    lv = load_level("a1")
+    for obj in lv.objectives():
+        answers = {c.id: c.correct_index for c in obj.checks}
+        for _ in range(obj.minimum_attempts):
+            r = client.post(
+                "/api/academy/objective/assessment",
+                params={"user_id": user_id},
+                json={"level_id": "a1", "objective_id": obj.id, "answers": answers},
+            )
+            assert r.status_code == 200, (obj.id, r.text)
+
+
+def test_endpoint_estimated_level_anchored_across_a1_exam(
+    monkeypatch, tmp_path,
+):
+    """F-K2 (decisión a) + F-K8: el estimado se ancla a niveles completados +
+    progreso del tramo actual y NO rebasa ni cae al saltar de nivel (G4).
+
+    - (a) dominar todo A1 (sin examen aún) estima `A1`, nunca ≥ B2.
+    - (b) aprobar el examen A1 (→ matrícula A2, cero evidencia en A2) mantiene
+      el estimado en `A1` (numeric 1.0 = suelo anclado), nunca Pre-A1."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    data = load_assessments()
+    exam = data.exams["a1"]
+    answers = {it.id: it.correct_index for it in exam.items}
+    with TestClient(app) as client:
+        _dominate_a1(client, a)
+
+        pre = client.get("/api/academy/student-model", params={"user_id": a}).json()
+        # (a) F-K2a / K-C12: la escala ya no proyecta el mastery de A1 al eje
+        # absoluto (v3.23 estimaba B2 con numeric ~3.78).
+        assert pre["estimated_level"] == "A1", pre["estimated_level"]
+        assert pre["estimated_numeric"] < 2.0, pre["estimated_numeric"]
+
+        r = client.post(
+            "/api/academy/exam/a1/submit",
+            params={"user_id": a},
+            json={"answers": answers},
+        )
+        assert r.status_code == 200
+        assert r.json()["passed"] is True
+
+        enr = client.get("/api/academy/enrollment", params={"user_id": a}).json()
+        by_level = {e["level_id"]: e["status"] for e in enr["enrollments"]}
+        assert by_level["a1"] == "completed"
+        assert "a2" in by_level  # salto A1→A2 reproducido (G4 fase 2)
+
+        post = client.get("/api/academy/student-model", params={"user_id": a}).json()
+        # (b) F-K2b / K-C11: aprobar no devuelve el estimado a Pre-A1; el suelo
+        # ancla en el nivel completado (A1 → numeric 1.0).
+        assert post["current_level"] == "A2"
+        assert post["estimated_level"] == "A1", post["estimated_level"]
+        assert post["estimated_numeric"] == 1.0, post["estimated_numeric"]
+
+
+
 def test_endpoint_cefr_ladder_empty_user(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
@@ -1437,7 +1502,8 @@ def test_endpoint_cefr_ladder_empty_user(monkeypatch, tmp_path):
         "mediation",
     }
     # Sin evidencia, la estimación es Pre-A1 → banda `pre-a1` marcada.
-    assert body["estimated_numeric"] == 1.0
+    # F-K2 (V3.24): el suelo sin certificación es el centro Pre-A1 (0.5).
+    assert body["estimated_numeric"] == 0.5
     assert body["estimated_band"] == "pre-a1"
     current = [b for b in body["bands"] if b["is_current"]]
     assert [b["id"] for b in current] == ["pre-a1"]

@@ -41,7 +41,8 @@ def test_requirements_for_c1_and_c2_are_declared():
     assert c1.minimum_mastery == 0.80
     assert c2.minimum_mastery == 0.85
     assert c1.transfer_required == 3
-    assert c2.novel_required == 3
+    # F-K1 (V3.24): `novel` queda reservado sin emisor → exigencia 0 en C2.
+    assert c2.novel_required == 0
 
 
 def test_requirements_for_grammar_and_vocabulary_declared():

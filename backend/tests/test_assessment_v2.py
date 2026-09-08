@@ -154,16 +154,22 @@ def test_ladder_level_certified_requires_retention_step():
 
 
 def test_mastery_evidence_gate_requires_full_ladder():
+    """F-K1 (V3.24): MASTERED exige kinds emitibles — familiar×2 + transfer×2 +
+    delayed. `novel` (sin emisor real) queda reservado y nunca aparece en
+    `missing`, aunque se conserve en `counts` como señal."""
     incomplete = av2.mastery_evidence_gate({"familiar": 2, "transfer": 1})
     assert incomplete["met"] is False
-    assert "novel" in incomplete["missing"]
+    assert "transfer" in incomplete["missing"]
     assert "delayed" in incomplete["missing"]
+    assert "novel" not in incomplete["missing"]
 
+    # Kinds emitibles al completo (sin novel inyectado a mano) → met.
     complete = av2.mastery_evidence_gate(
-        {"familiar": 2, "transfer": 1, "novel": 1, "delayed": 1}
+        {"familiar": 2, "transfer": 2, "delayed": 1}
     )
     assert complete["met"] is True
     assert complete["missing"] == []
+    assert complete["counts"]["novel"] == 0
 
 
 def test_retention_due_window():

@@ -3,7 +3,40 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 11:15 (UTC+2).
+> Actualizado por última vez: 2026-09-08 13:20 (UTC+2).
+>
+> **Nota (2026-09-08, 13:20):** alcance de V3.24 cerrado por el gerente (solo
+> **F-K1 + F-K2 + F-K8**) e implementado en el árbol de trabajo (sin commit ni
+> release aún). Decisiones cerradas: **F-K1 (b)** relajar a lo emisible —
+> MASTERED = familiar×2 + transfer×2 + delayed (`assessment_v2.py`) y
+> `novel_required = 0` en las 12 celdas macro de `cefr_matrix.json`; el kind
+> `novel` queda **reservado** (sin emisor real) y la frontera se documenta en
+> `ASSESSMENT_2.md` y la CONSTITUCIÓN §2.1/§6. **F-K2 (a)** anclaje del estimado
+> a niveles completados + progreso del tramo actual (`adaptive.estimated_level`
+> recibe `current_level` + `completed_levels`; `build_student_model` las deriva
+> de las matrículas `completed`). **F-K8**: test e2e del salto A1→A2 (dominar A1
+> → estima A1, no ≥ B2; aprobar el examen A1 → matrícula A2, estimado A1 con
+> numeric 1.0, nunca Pre-A1). Verificación completa en el árbol: suite backend
+> **1457 passed** + ruff limpio; Eje 1 del dossier K **G1 311 + G2 329** (640,
+> +2 tests e2e); frontend sin cambios. Briefing:
+> `agentes/v324-calibracion-salida.md`. Se procede al cierre del release
+> (commit + bump `3.23.0 → 3.24.0` + higiene de la sección 38.5).
+>
+> **Nota (2026-09-08, 12:30):** auditar el **Eje 1 (Student Model → Evidence →
+> Mastery → Academy → CEFR)** deja dossier nuevo `docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md`
+> sobre main `bb3f253` (release v3.23.0 `f3739a9` + fix documental H1; versión
+> declarada 3.23.0 intacta). 638 tests del eje reproducidos en verde (G1+G2 del
+> dossier K). La cadena actividad → evidencia → mastery → CEFR es determinista y
+> sólida (escritor único, no contagio, certificación con `delayed` ≥7 días), pero
+> K **no aprueba el cierre del Eje 1** y deja 2 hallazgos **P1** que deciden el
+> alcance de V3.24: **F-K1** (el evidence_kind `novel` no tiene emisor mientras
+> `mastery_evidence_gate` MASTERED, la readiness B2+ de `cefr_matrix` y el grafo
+> lo exigen → `mastery_missing: novel` permanente en la escalera Assessment 2.0)
+> y **F-K2** (el nivel estimado se calcula sobre un único nivel sin calibrar y
+> rebasa al matricular nivel nuevo — reproducido: dominar A1 estima **B2**;
+> aprobar el examen A1 devuelve el estimado a **Pre-A1**). **Todo lo pendiente
+> para llegar a V3.24 queda consolidado en la sección 38 de este documento**:
+> candidato recomendado, backlog completo y siguientes pasos.
 >
 > **Nota (2026-09-08, 11:15):** posición vigente **v3.23.0** — **Student Model
 > Calibration (parte 2): Retention real y Transfer por contexto** (versión de
@@ -3283,7 +3316,146 @@ speaking declarado sin evaluación y sin C2; review/assessment solo en módulos 
   > `unit_review.py:325/356/371`). Precondición de diseño: **CAP-01/REFAC-01**
   > (captura y punto único del volcado del texto producido). Sin cambios de
   > código ni de CONSTITUCIÓN (R8/R9 propuesta abierta).
-  > *(Histórico: requerimientos superados por la implementación V3.19 — entrada
-  > 37.37 y Nota superior.)*
+> *(Histórico: requerimientos superados por la implementación V3.19 — entrada
+> 37.37 y Nota superior.)*
+
+---
+
+## 38. RELEVO HACIA V3.24 — pendientes consolidados (2026-09-08)
+
+> **Para el agente/contexto que retome ahora.** Condensa TODO lo pendiente
+> conocido para avanzar de v3.23.0 a v3.24. Fuentes: dossier K
+> (`docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md`, Eje 1, nuevo), dossier J
+> (`docs/audit/J-AUDITORIA-TOTAL-V323.md`, total v3.23), dossier I
+> (`docs/audit/I-AUDITORIA-PROFUNDA-V318.md`, profunda V3.18), `PARKED.md` y las
+> notas superiores de este documento. Leer primero la Nota superior (12:30).
+
+### 38.1 Posición actual (verificada 2026-09-08)
+
+- HEAD `main` = **`bb3f253`** (fix documental P1-04→P1-03) sobre release
+  **v3.23.0 = `f3739a9`**; versión declarada `3.23.0` (`backend/config.py`).
+- Gates en verde reproducidos: pytest total **1455** (dossier J G1) ·
+  baterías del Eje 1 **G1 310** + **G2 328** (dossier K, 638 tests del eje) ·
+  vitest **450**/57 archivos · ruff · `tsc`/`vite build` ·
+  `check_release_consistency` 3.23.0 exit 0 · CI GitHub Actions success.
+- Árbol limpio; única escritura de la auditoría = dossier K (untracked).
+- Estado del árbol a 2026-09-08 13:00 (V3.24 implementada, sin commit): suite
+  backend completa **1457 passed** · Eje 1 **G1 311** + **G2 329** (640, +2
+  tests e2e) · ruff limpio. Ver Nota superior y `agentes/v324-calibracion-salida.md`.
+- CONSTITUCIÓN sin cambios V3.19→V3.23; **R8/R9 siguen como propuesta abierta**
+  (no tocar código si no se cierra la propuesta).
+
+### 38.2 Veredicto que motiva V3.24
+
+El dossier K **NO aprueba el cierre del Eje 1**: cadena actividad →
+`academy_evidence` → mastery por objetivo → perfil → CEFR determinista y sólida
+(escritor único, kinds canónicos, no contagio, certificación con `delayed`
+≥7 días), pero **F-K1** y **F-K2** (P1) deben decidirse antes de cerrar el
+Student Model. `PLAN.md` ("Siguiente incremento") sigue sin briefing: el
+candidato V3.24 sale de este bloque.
+
+### 38.3 Alcance P1 recomendado para V3.24 (decisión del gerente)
+
+| # | Problema (1 línea) | Evidencia clave | Opciones / acción | Test que fija hoy |
+|---|---|---|---|---|
+| **F-K1** | `novel` sin emisor: solo se emiten `familiar`/`transfer`/`delayed`, pero MASTERED, readiness B2+ y el grafo exigen `novel` → `mastery_missing: novel` permanente en la escalera Assessment 2.0 | `assessment_v2.py:543-548`; `adaptive.py:177-206`; `cefr_matrix.json` (`novel_required`); `AssessmentLadder.tsx:155-157`; dossier K G1/G2 | (a) crear emisor real de `novel` (modalidad de escalera/tarea = uso en contexto nunca practicado); o (b) relajar/renombrar gate + matriz CEFR a lo emisible y documentar frontera. Premisa 12: test e2e del emisor | `test_assessment_v2.py:156-164` (solo pasa con `novel` inyectado a mano) |
+| **F-K2** | El estimado vive en un único nivel con escala `numeric = 1 + 5·overall` no calibrada y re-basa al matricular nivel nuevo | `domain/academy.py:580-591,619-627`; `adaptive.py:59-88`; dossier K **G4** (dominar A1 → **B2**; aprobar examen A1 → **Pre-A1**) | Anclar la etiqueta a niveles completados/certificados + tramo actual (no proyección lineal del mastery de un nivel). Tests e2e: (a) dominar A1 completo no estima ≥ B2; (b) aprobar A1 no baja de A1 | `test_academy.py:1389-1408` (solo usuario vacío; no fija el salto) |
+
+Opcionales ampliables al mismo release (P2, dossier K): **F-K3** separar por
+`source` la evidencia de speaking assessment/misión (hoy `objective_id=""`) y
+persistir `cefr_target`; **F-K4** marcar la etiqueta por destreza
+(`SkillState.band`) como `estimated_band`. **F-K8** (tests del salto de nivel)
+es prerequisito del fix F-K2.
+
+### 38.4 Backlog consolidado de pendientes
+
+#### Eje 1 — dossier K (todos abiertos)
+
+| ID | Sev | Qué es (resumen) | Dónde (clave) | Nota para V3.24 |
+|---|---|---|---|---|
+| F-K1 | P1 | `novel` sin emisor; gates que lo exigen | ver 38.3 | alcance P1 recomendado |
+| F-K2 | P1 | escala del estimado por nivel + rebase | ver 38.3 | alcance P1 recomendado |
+| F-K3 | P2 | doble vía speaking assessment/misión no mueve `score` por objetivos | `academy.py:968-973,1167-1174`; `services/academy.py:398-445` | decidir con F-K1/K2 o release siguiente |
+| F-K4 | P2 | `band` por destreza = estimado sin marca | `profile.py:65-110`; `schemas/profile.py` | renombrar a `estimated_band` |
+| F-K5 | P2 | colisión semántica `transfer`/`retention` léxica (señal) vs académica (gate §6.3) | `lexicon.py:442-495` vs `assessment_v2.py:370-410,543-548` | documentar en schemas/tooltips |
+| F-K6 | P2 | modelo léxico agregado sin historia de eventos fina | `repositories/vocabulary.py`; deuda `lexicon.py:468-472` | = frontera `support_level` por evento |
+| F-K7 | P3 | nomenclatura heredada `appearances`/`exposures` | `lexicon.py:470-471`; `schemas/vocabulary.py` | renombrado conceptual no destructivo |
+| F-K8 | P3 | sin test de salto de nivel | `test_academy.py:1389-1408` | prerequisito de F-K2 |
+
+#### Dossier J — observaciones abiertas (total v3.23)
+
+| ID | Sev | Qué es | Dónde | Acción |
+|---|---|---|---|---|
+| H1 | baja | docstrings P1-04→P1-03 | `lexicon.py:229-231`, `test_lexicon.py:148-149` | ✅ **cerrado por `bb3f253`** (no reabrir) |
+| H2 | baja | umbrales léxicos de 1 día acreditan chip "Retention" (≠ §6.3 ≥7 días) | `lexicon.py:44-63`; i18n tooltip | documentar distinción señal vs gate; calibrar con datos |
+| H3 | informativa | 190 claves i18n "sin uso" (higiene, no error) | `generated/i18n-report.md` | deuda de higiene opcional |
+| H4 | informativa | warning deprecación upstream (`httpx`→`httpx2`) en pytest | salida G1 (warnings summary) | revisar en la próxima subida de dependencias |
+
+#### Dossier I — ítems abiertos que tocan el eje (estado verificado en K)
+
+| Ítem | Estado en v3.23 | Nota |
+|---|---|---|
+| GRAPH-01 | abierta | grafo no distingue REC de producción; `transfer` = kind, no modalidad (`evidence_graph.py:159-240`); subirá GRAPH_VERSION cuando se toque |
+| CP-01 | abierta | doble vía de "producción" (relacionada con F-K3) |
+| LEX-02 | abierta (parcial) | la práctica académica no genera `record_exposure` (solo chat); sí hay volcados de producción/retrievals |
+| LEX-03 | mitigada parcial | la siembra curricular (`seed_objective_vocabulary`) crea filas `learning` sin señal tras lección/assessment; decidir si no sembrar sin evento |
+| TOK-01/USE-01 | abiertas | `lexical_tokens` del LLM se descartan; frontera V3.24 (support_level) |
+| SKILL-01 | abierta (ver F-K3) | misión+assessment mezcladas en el pool `skill=speaking` |
+| CONV-02 | abierta | conversación guiada sin evidencia formal de interaction (decisión: emitir o documentar como práctica D5/E3) |
+
+> Ítems del dossier I **fuera del eje** (A1-04/A1-05, A2-06/A2-07, A3-06/
+> A3-07, A5-05/A5-06, A6-04, WR-UI-01…): muchos se cubrieron en V3.19–V3.23
+> (p. ej. A2-07 → endpoint `drill_candidates`, A6-03 → estado error del
+> diccionario, R6-01/GATE-01/CLAIM-01/SIGNAL-01/ERR-01/LIST-01/02/03/CONV-01/
+> ADMIN-01/BOOL-01 en V3.19). **Estado no re-verificado en v3.23**: comprobar
+> contra el árbol antes de implementar cualquiera de ellos.
+
+#### Fronteras V3.24 y deuda declarada (no son bugs)
+
+- **`support_level` por evento** (copied/guided/cued/independent/spontaneous):
+  inferible tras el mapeo de actividades; frontera explícita en release-notes
+  v3.23, dossieres J/K y PARKED. Si V3.24 lo aborda, resolver antes F-K6
+  (ledger léxico por evento) y TOK-01/USE-01.
+- **Backfill de retrieval histórico**: NO (decisión firme, ancla retrospectiva
+  injusta; ver Nota 11:15 v3.23).
+- **Telemetría ASR persistente + frontera `LANGUAGE_MISMATCH`**: fuera de
+  alcance desde V3.22 (Nota 10:30).
+- **Superficie de "recuerdo de significado"** (Recall → Sentence → Context →
+  Free Transfer): preparación de la escalera, fuera de alcance V3.22.
+- **Renombre `appearances → production_count`**: frontera asumida (F-K7).
+- **Micro-drill 3 niveles + integración con el grafo** y **flag de modalidad
+  oral/tecleo**: fuera de alcance V3.19.
+- **F6.3 Contexto/Transfer libre** (Speaking/Listening): aplazado a auditoría
+  pedagógica (Nota V3.21).
+- **R8/R9 de la CONSTITUCIÓN**: propuesta abierta (documento, sin código).
+- **PARKED** (`docs/audit/PARKED.md`): calibración con alumnos reales, FSRS por
+  tipo de memoria, KPI de transfer, audio humano real, 50 claves i18n huérfanas
+  (candidatas legacy), patrón loading/error en paneles profundos (F4), sesgo
+  posicional MC en corpus/checks (fix mecánico pendiente de tu aprobación),
+  matriz de dispositivos (G) y variabilidad LLM de speaking con Ollama real.
+
+### 38.5 Reglas de proceso (premisas 5/6/12/21)
+
+- Un incremento a la vez, con su release; briefing de subagente en `agentes/`.
+- **Premisa 12**: cualquier fix de F-K1/F-K2 va precedido de test de extremo a
+  extremo que falle hoy; read-only durante auditorías.
+- **Premisa 21**: las señales se deciden en servidor; la UI no recalcula.
+- Cierre de release: bump `backend/config.py` (fuente única) + frontend
+  `package.json`/lock, `README`, `CHANGELOG`, `PLAN`, Nota superior + entrada
+  en `docs/RELEVO.md`, `release-notes-v3.24.0.md`, `check_release_consistency`.
+
+### 38.6 Primeros pasos sugeridos para la sesión que retome
+
+1. Leer: Nota superior de este documento (13:00) → sección 38 → dossier K
+   (Hallazgos, Veredicto, G4) → dossier J (si se quiere el contexto total).
+2. **Estado de V3.24 (2026-09-08 13:00):** alcance cerrado (F-K1 b relajar +
+   F-K2 a anclaje + F-K8) e implementado en el árbol — decisiones, tests-first y
+   detalle en `agentes/v324-calibracion-salida.md` y el PLAN. Suite backend
+   completa **1457 passed** + ruff limpio (sin commit ni bump).
+3. Siguiente paso: cerrar el release V3.24 — baterías G1/G2 del dossier K (638)
+   + frontend (sin cambios de código) + CI y la higiene de cierre de la sección
+   38.5 (bump `3.23.0 → 3.24.0`, `README`, `CHANGELOG`, `PLAN`, entrada en este
+   documento, `release-notes-v3.24.0.md`).
+
 
 

@@ -21,9 +21,14 @@ Debe existir evidencia de:
 |---|---|
 | initial | `familiar` ≥ 1 |
 | practice | `familiar` ≥ 2 |
-| transfer | `transfer` ≥ 1 |
-| novel | `novel` ≥ 1 |
+| transfer | `transfer` ≥ 2 |
 | delayed | `delayed` ≥ 1 |
+| ~~novel~~ | reservado (sin emisor; requisito 0, frontera V3.24) |
+
+> **F-K1 (V3.24, dossier K):** el kind `novel` no tiene emisor real, así que el
+> gate exige solo kinds emitibles. `novel` sigue siendo un kind válido (conteos,
+> invariantes) pero ningún gate lo exige hasta que exista una modalidad que lo
+> emita de verdad.
 
 Implementado en `mastery_evidence_gate()` (`services/assessment_v2.py`).
 

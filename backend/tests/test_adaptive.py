@@ -35,31 +35,49 @@ def test_numeric_to_level_frontiers():
 
 
 def test_estimated_level_empty_profile_is_pre_a1_no_confidence():
-    # Sin evidencia no hay base para afirmar A1: la estimación es Pre-A1.
+    # F-K2 (V3.24): sin evidencia no hay base para afirmar A1; el suelo sin
+    # certificación es el centro Pre-A1 (0.5) de la escalera continua.
     est = adaptive.estimated_level([])
     assert est["level"] == "Pre-A1"
-    assert est["numeric"] == 1.0
+    assert est["numeric"] == 0.5
     assert est["confidence"] == 0.0
 
 
-def test_estimated_level_all_zero_scores_is_pre_a1():
-    profile = [
-        _entry("grammar", score=0.0, confidence=0.0, evidence_count=1),
-        _entry("vocabulary", score=0.0, confidence=0.0, evidence_count=2),
-    ]
-    est = adaptive.estimated_level(profile)
-    assert est["level"] == "Pre-A1"
-    assert est["confidence"] == 0.0
+def test_estimated_level_anchored_by_completed_levels():
+    # F-K2 (decisión a): el suelo ancla en el mayor nivel completado. Aprobar el
+    # examen A1 (→ A2 matriculado, cero evidencia) no devuelve el estimado a
+    # Pre-A1 (G4 del dossier K).
+    fresh = adaptive.estimated_level(
+        [], current_level="A2", completed_levels=("A1",)
+    )
+    assert fresh["level"] == "A1"
+    assert fresh["numeric"] == 1.0
+    assert fresh["confidence"] == 0.0
 
-
-def test_estimated_level_scales_with_overall():
+    # Con B1 certificado y dominio alto en B2, el estimado vive en el tramo del
+    # nivel actual (nunca por debajo del ancla 3.0).
     high = [
         _entry(s, score=0.9, confidence=0.9, evidence_count=5)
         for s in ("grammar", "vocabulary", "reading", "listening")
     ]
-    est = adaptive.estimated_level(high)
-    assert est["numeric"] > 3.0
-    assert est["level"] != "Pre-A1"
+    est = adaptive.estimated_level(
+        high, current_level="B2", completed_levels=("A1", "B1")
+    )
+    assert est["numeric"] >= 3.5
+    assert est["level"] == "B2"
+    assert est["confidence"] > 0.0
+
+
+def test_estimated_level_without_completed_levels_never_claims_next():
+    # F-K2: sin certificación previa, aunque se domine el nivel actual, la
+    # etiqueta no supera el nivel en curso (no se afirma A2 sin examen A1).
+    maxed = [
+        _entry(s, score=1.0, confidence=1.0, evidence_count=8)
+        for s in ("grammar", "vocabulary", "reading", "listening")
+    ]
+    est = adaptive.estimated_level(maxed, current_level="A1")
+    assert est["level"] == "A1"
+    assert est["numeric"] <= 1.5
     assert est["confidence"] > 0.0
 
 
@@ -147,7 +165,9 @@ def test_readiness_b1_listening_blocked_without_transfer():
     assert result["blocking_skills"] == ["listening"]
 
 
-def test_readiness_b2_blocked_without_novel():
+def test_readiness_b2_ready_with_transfer_without_novel():
+    """F-K1 (V3.24): B2 ya no exige `novel` (reservado, sin emisor); con la
+    transferencia de la matriz (B2 listening = 2) la destreza queda ready."""
     profile = [
         _entry(
             "listening",
@@ -159,9 +179,28 @@ def test_readiness_b2_blocked_without_novel():
     ]
     result = adaptive.readiness(profile, "B2")
     by_skill = {s["skill"]: s for s in result["skills"]}
-    assert by_skill["listening"]["ready"] is False
-    assert by_skill["listening"]["novel_required"] == 1
+    assert by_skill["listening"]["ready"] is True
+    assert by_skill["listening"]["transfer_required"] == 2
+    assert by_skill["listening"]["novel_required"] == 0
     assert by_skill["listening"]["novel_count"] == 0
+    assert result["ready"] is True
+    assert result["blocking_skills"] == []
+
+
+def test_readiness_b2_listening_blocked_without_transfer():
+    profile = [
+        _entry(
+            "listening",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=4,
+            evidence_by_kind={"transfer": 1, "novel": 0},
+        )
+    ]
+    result = adaptive.readiness(profile, "B2")
+    by_skill = {s["skill"]: s for s in result["skills"]}
+    assert by_skill["listening"]["ready"] is False
+    assert "novel" not in result["blocking_skills"]
     assert result["blocking_skills"] == ["listening"]
 
 

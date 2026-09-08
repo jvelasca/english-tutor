@@ -10,8 +10,9 @@ bandas de profundidad (low / medium / high), comparando las muestras reales
     HIGH   → muestras ≥ `minimum_evidence` con retención retardada (≥ 1 `delayed`)
 
 `meets_matrix` indica además si la muestra satisface los requisitos de
-transferencia/novedad que la matriz exige desde B1 (los mismos que aplica
-`services.adaptive.readiness`).
+transferencia que la matriz exige desde B1 (los mismos que aplica
+`services.adaptive.readiness`); el kind `novel` quedó reservado sin emisor y la
+matriz exige `novel_required = 0` desde V3.24 (F-K1, dossier K).
 
 Regla R7 (Constitución §6.4): la profundidad describe la evidencia FORMAL de la
 destreza, nunca la práctica de una ruta; una ruta con banco corto solo puede
@@ -79,7 +80,7 @@ def evidence_depth_report(
       días, que solo se escriben tras el retention reassessment).
     - `depth` ∈ {low, medium, high} según la tabla de la Constitución §6.4.
     - `meets_matrix` es cierto cuando la muestra satisface la cantidad mínima Y
-      los requisitos de transferencia/novedad de la matriz (a partir de B1).
+      los requisitos de transferencia de la matriz (a partir de B1).
     """
     samples = int(samples or 0)
     counts = _by_kind_counts(evidence_by_kind)

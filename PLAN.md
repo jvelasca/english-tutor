@@ -52,6 +52,25 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.24.0` — **Calibración de salida del Student Model**
+  (cierra el plan V3.24 del dossier K — auditoría profunda Eje 1 sobre v3.23.0 —
+  con los dos P1 por decisión del gerente y sus tests e2e previos: **F-K1 —
+  MASTERED relajado a lo emisible** — el kind `novel` no tiene emisor real y
+  `mastery_evidence_gate` lo exigía (bloqueo permanente de la escalera
+  Assessment 2.0): `MASTERY_EVIDENCE_REQUIREMENTS` pasa a `initial 1 +
+  practice 2 + transfer 2 + delayed 1` y `novel_required = 0` en las 12 celdas
+  macro de `cefr_matrix.json`; `novel` queda **reservado** hasta que exista un
+  emisor real; frontera documentada en `ASSESSMENT_2.md` y CONSTITUCIÓN §2.1/§6 ·
+  **F-K2 — nivel estimado anclado sin rebase** — `estimated_level` recibe
+  `current_level` + `completed_levels` y ancla `numeric` (0.5–6.0) al nivel
+  completado más alto + progreso del tramo actual (fin del escenario G4:
+  dominar A1 ya no estima B2, aprobar el examen A1 ya no devuelve a Pre-A1);
+  `build_student_model` deriva ambos de las matrículas `completed` · **F-K8 —
+  tests e2e del salto A1→A2** en `test_academy.py` (dominio A1 → estimado A1,
+  nunca ≥ B2; examen A1 → matrícula A2, estimado A1 con numeric 1.0) ·
+  **tests**: backend pytest **1457** + ruff limpio; Eje 1 G1 **311** + G2
+  **329** (640); frontend sin cambios; `check_release_consistency` 3.24.0
+  exit 0). Base: `3.23.0`
 - ✅ Versión estable `3.23.0` — **Student Model Calibration (parte 2): Retention
   real y Transfer por contexto** (implementa el plan V3.23 del dossier de la
   auditoría externa V3.22.0: **P1-02 — retention por recuperación DEMORADA** —
@@ -769,8 +788,27 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   abierta). Fuera de alcance de V3.19 (decisión (b)/futura): micro-drill 3
   niveles + integración con el grafo (GRAPH-01), flag de modalidad oral/tecleo,
   WR-UI-01, siembra FSRS sin señal (LEX-03).
-- **Siguiente incremento — pendiente de briefing (candidato abierto)**: sin
-  alcance P0/P1 cerrado aún; las propuestas futuras se deliberan apoyadas en
-  `docs/RELEVO.md` → "Próximos incrementos". La **Auditoría TOTAL externa**
-  preparada para v3.18.0 (`agentes/auditoria-total-externa.md`) queda pendiente
-  de ejecutar sobre el árbol actual (ahora v3.19.0).
+- **V3.24 — Calibración de salida del Student Model (diseño cerrado
+  2026-09-08)**: alcance decidido por el gerente = los 2 hallazgos **P1** del
+  dossier `docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md` + **F-K8** (prerequisito
+  de test de F-K2). Decisiones cerradas:
+  - **F-K1 (decisión b) — relajar a lo emisible**: `MASTERY_EVIDENCE_REQUIREMENTS`
+    queda `familiar×2 + transfer×2 + delayed` (sin `novel`); `novel_required=0`
+    en las 12 celdas macro (B2/C1/C2 × listening/speaking/reading/writing) de
+    `cefr_matrix.json`; el kind `novel` queda **reservado** y la frontera se
+    documenta (sin emisor real, ningún gate debe exigirlo).
+  - **F-K2 (decisión a) — anclaje por niveles completados + progreso en el
+    tramo actual**: `adaptive.estimated_level` deja de proyectar `1 + 5·overall`
+    y pasa a anclar: con niveles completados, el suelo es `CEFR_NUMERIC[mayor
+    completado]`; sin completados, el suelo es el centro Pre-A1 (0.5, tramo
+    A1) y la etiqueta nunca supera el nivel actual sin certificación previa.
+    `build_student_model` pasa `current_level` + `completed_levels`.
+  - **F-K8**: tests e2e del salto A1→A2 (premisa 12 del dossier K), escritos
+    primero (fallan hoy) y que fijan: (a) dominar A1 no estima ≥ B2; (b) aprobar
+    el examen A1 no baja el estimado por debajo de A1.
+  El briefing autocontenido (rol/tarea/aceptación) vive en
+  `agentes/v324-calibracion-salida.md`. **Todo lo pendiente hacia V3.24 queda
+  consolidado en `docs/RELEVO.md` → sección 38** (backlog completo, fronteras y
+  primeros pasos). El dossier K supera en contexto al briefing antiguo de
+  auditoría TOTAL v3.18 (`agentes/auditoria-total-externa.md`).
+

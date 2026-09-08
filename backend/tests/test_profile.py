@@ -102,7 +102,8 @@ def test_profile_endpoint_shape(monkeypatch, tmp_path):
         assert body["estimated_level"] == PRE_A1
         assert body["estimated_descriptor"]
         assert 0.0 <= body["estimated_confidence"] < 0.1
-        assert 1.0 <= body["overall_ability"] <= 6.0
+        # F-K2 (V3.24): el suelo de la escala es el centro Pre-A1 (0.5).
+        assert 0.5 <= body["overall_ability"] <= 6.0
         assert set(body["estimated_bands"].keys()) == {
             "vocabulary",
             "grammar",
