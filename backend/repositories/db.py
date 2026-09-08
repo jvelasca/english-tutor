@@ -104,6 +104,21 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS vocabulary_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                word TEXT NOT NULL,
+                lexical_unit TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                channel TEXT NOT NULL DEFAULT '',
+                activity TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS grammar_errors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
@@ -954,6 +969,10 @@ def init_db() -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_vocabulary_user_id ON vocabulary(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vocabulary_events_user_word "
+            "ON vocabulary_events(user_id, word, created_at)"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_grammar_errors_user_id "

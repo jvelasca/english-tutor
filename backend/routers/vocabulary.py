@@ -18,6 +18,7 @@ from schemas.vocabulary import (
     SentenceContextOut,
     VocabularyAnalyzeRequest,
     VocabularyAnalyzeResponse,
+    VocabularyEventOut,
     VocabularyItem,
 )
 from services.stt import exceeds_max_duration, transcribe_with_timing
@@ -38,6 +39,24 @@ async def analyze(
 @router.get("/api/vocabulary", response_model=list[VocabularyItem])
 async def get_vocabulary(user: dict = Depends(current_user)) -> list[dict]:
     return await vocabulary_service.get_vocabulary(user["id"])
+
+
+@router.get("/api/vocabulary/history", response_model=list[VocabularyEventOut])
+async def vocabulary_history(
+    word: str | None = Query(default=None, min_length=1, max_length=120),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user: dict = Depends(current_user),
+) -> list[dict]:
+    """Historia de eventos léxicos por forma de superficie (V3.26, Eje B/F-B2).
+
+    Ledger append-only de producciones/exposiciones/recuperaciones demoradas de
+    la palabra (más reciente primero). La historia empieza en V3.26 (sin
+    backfill); el agregado de `vocabulary` sigue siendo la verdad de los
+    contadores."""
+    return await vocabulary_service.get_vocabulary_history(
+        user["id"], word=word, limit=limit, offset=offset
+    )
 
 
 @router.get("/api/vocabulary/lexicon", response_model=LexiconOut)

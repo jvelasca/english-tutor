@@ -79,6 +79,36 @@ _CHANNEL_COLUMN: dict[str, str] = {
     channel: f"{channel}_prod" for channel in PRODUCTION_CHANNELS
 }
 
+# Tipos de evento del ledger léxico (V3.26, Eje B/F-B2): la historia detallada
+# por forma de superficie. `produced` (mensaje del alumno en que apareció la
+# palabra), `exposed` (mensaje del tutor) y `retrieval` (recuperación demorada
+# correcta). Semántica de conteo idéntica a la de los contadores agregados:
+# presencia de la palabra en un mensaje/intento (extract_words único), nunca
+# frecuencia de tokens. La historia empieza en V3.26; SIN backfill (mejor
+# perder el histórico fino que inventarlo; los contadores conservan el agregado).
+VOCABULARY_EVENT_TYPES: tuple[str, ...] = ("produced", "exposed", "retrieval")
+
+
+def _insert_event(
+    conn,
+    user_id: str,
+    word: str,
+    unit: str,
+    event_type: str,
+    channel: str,
+    activity: str,
+    created_at: str,
+) -> None:
+    """Inserta una fila del ledger léxico dentro de la MISMA transacción del
+    contador que la origina (V3.26, Eje B/F-B2): evita la doble fuente de verdad
+    entre `vocabulary` (agregado) y `vocabulary_events` (historia fina)."""
+    conn.execute(
+        "INSERT INTO vocabulary_events "
+        "(user_id, word, lexical_unit, event_type, channel, activity, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, word, unit, event_type, channel, activity, created_at),
+    )
+
 
 def record_production(
     user_id: str, words: list[str], channel: str = "chat", activity: str | None = None
@@ -144,6 +174,12 @@ def record_production(
                 "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
                 (user_id, w, now, now, new_day, tags, lexical_unit_key(w, lemma)),
             )
+            # Ledger léxico (V3.26, Eje B/F-B2): un evento por palabra producida
+            # en este mensaje, en la misma transacción del contador.
+            _insert_event(
+                conn, user_id, w, lexical_unit_key(w, lemma),
+                "produced", channel, activity or "", now,
+            )
     return True
 
 
@@ -184,8 +220,8 @@ def record_retrievals(user_id: str, words: list[str]) -> bool:
     with closing(_conn()) as conn, conn:
         for w in words:
             row = conn.execute(
-                "SELECT first_seen, first_exposed_at, last_retrieval_at "
-                "FROM vocabulary WHERE user_id = ? AND word = ?",
+                "SELECT first_seen, first_exposed_at, last_retrieval_at, "
+                "lexical_unit FROM vocabulary WHERE user_id = ? AND word = ?",
                 (user_id, w),
             ).fetchone()
             if row is None:
@@ -203,6 +239,11 @@ def record_retrievals(user_id: str, words: list[str]) -> bool:
                 "last_retrieval_at = ? "
                 "WHERE user_id = ? AND word = ?",
                 (new_day, now, user_id, w),
+            )
+            # Ledger léxico (V3.26, Eje B/F-B2): una recuperación demorada OK.
+            unit = row["lexical_unit"] or lexical_unit_key(w, "")
+            _insert_event(
+                conn, user_id, w, unit, "retrieval", "", "", now,
             )
     return True
 
@@ -261,6 +302,12 @@ def record_exposures(user_id: str, words: list[str]) -> bool:
                 "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
                 (user_id, w, now, new_day, now, lexical_unit_key(w, lemma)),
             )
+            # Ledger léxico (V3.26, Eje B/F-B2): un evento por palabra expuesta
+            # en el mensaje del tutor, en la misma transacción del contador.
+            _insert_event(
+                conn, user_id, w, lexical_unit_key(w, lemma),
+                "exposed", "", "", now,
+            )
     return True
 
 
@@ -290,7 +337,41 @@ def get_vocabulary(user_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def seed_curriculum_items(user_id: str, items: list[dict]) -> bool:
+def list_vocabulary_events(
+    user_id: str,
+    word: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """Historia de eventos léxicos por forma de superficie (V3.26, Eje B/F-B2).
+
+    Devuelve las filas del ledger `vocabulary_events` del usuario ordenadas de
+    más reciente a más antigua (append-only). `word` filtra por la superficie
+    exacta (p. ej. `going`); la unidad canónica (`lexical_unit`) acompaña a la
+    forma para agregar sin perder la superficie. `limit`/`offset` pagan la
+    consulta; el ledger es señal (D5/E3), nunca puerta de mastery."""
+    clauses = ["user_id = ?"]
+    params: list[str] = [user_id]
+    if word:
+        clauses.append("word = ?")
+        params.append(word)
+    params.extend([limit, offset])
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT id, word, lexical_unit, event_type, channel, activity, "
+            "created_at "
+            "FROM vocabulary_events "
+            f"WHERE {' AND '.join(clauses)} "
+            "ORDER BY created_at DESC, id DESC "
+            "LIMIT ? OFFSET ?",
+            params,
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def seed_curriculum_items(
+    user_id: str, items: list[dict]
+) -> bool:
     """Siembra ítems léxicos del currículo sin tocar producción/input (V2.3).
 
     `items` es una lista de dicts `{word, lemma, cefr, level_id, objective_id,

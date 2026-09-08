@@ -47,6 +47,23 @@ class VocabularyItem(BaseModel):
     status: VocabularyStatus
 
 
+class VocabularyEventOut(BaseModel):
+    """Evento del ledger léxico (V3.26, Eje B/F-B2).
+
+    Historia detallada por FORMA DE SUPERFICIE (`word`), con su unidad canónica
+    (`lexical_unit`) para poder agregar sin perder la superficie. La semántica
+    de conteo es idéntica a la de los contadores: presencia de la palabra en un
+    mensaje/intento (nunca frecuencia de tokens). El ledger empieza en V3.26
+    (sin backfill) y es señal, no evidencia de mastery."""
+
+    word: str
+    lexical_unit: str
+    event_type: Literal["produced", "exposed", "retrieval"]
+    channel: str
+    activity: str
+    created_at: str
+
+
 class LexicalCompetence(BaseModel):
     """Matriz de competencia por ítem léxico (V3.21, V20-16; V3.22; V3.23).
 

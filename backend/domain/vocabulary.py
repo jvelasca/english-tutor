@@ -98,6 +98,26 @@ async def get_vocabulary(user_id: str) -> list[dict]:
     return rows
 
 
+async def get_vocabulary_history(
+    user_id: str,
+    word: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """Historia de eventos léxicos por superficie (V3.26, Eje B/F-B2).
+
+    Puente de dominio al ledger `vocabulary_events` (más reciente primero). La
+    historia empieza en V3.26 y es señal (no evidencia de mastery); el agregado
+    de `vocabulary` conserva la verdad de los contadores."""
+    return await run_in_threadpool(
+        vocabulary_repo.list_vocabulary_events,
+        user_id,
+        word=word,
+        limit=limit,
+        offset=offset,
+    )
+
+
 async def seed_objective_vocabulary(user_id: str, level, objective) -> bool:
     """Siembra el léxico declarado por un objetivo (V2.3).
 
