@@ -19,8 +19,8 @@ Debe existir evidencia de:
 
 | Requisito | Evidencia |
 |---|---|
-| initial | `familiar` ≥ 1 |
-| practice | `familiar` ≥ 2 |
+| initial | `familiar` primer encuentro ≥ 1 |
+| practice | `familiar` re-encuentro espaciado ≥ 2 |
 | transfer | `transfer` ≥ 2 |
 | delayed | `delayed` ≥ 1 |
 | ~~novel~~ | reservado (sin emisor; requisito 0, frontera V3.24) |
@@ -29,6 +29,15 @@ Debe existir evidencia de:
 > gate exige solo kinds emitibles. `novel` sigue siendo un kind válido (conteos,
 > invariantes) pero ningún gate lo exige hasta que exista una modalidad que lo
 > emita de verdad.
+
+> **F-A1 (V3.26, P2-01):** `initial` y `practice` dejan de ser dos umbrales sobre
+> el mismo contador `familiar`. Con `familiar_spaced_counts()`:
+> - `initial` = contextos con al menos un encuentro `familiar` (primer encuentro).
+> - `practice` = re-encuentros del MISMO contexto separados ≥
+>   `SPACED_PRACTICE_MIN_DAYS` (1 día) del primer encuentro, uno por día distinto.
+>
+> Datos V3.25+ (context_id + fecha parseable) activan la separación; filas legacy
+> sin contexto retroceden al conteo de filas (F-C4 las marca en el perfil).
 
 Implementado en `mastery_evidence_gate()` (`services/assessment_v2.py`).
 

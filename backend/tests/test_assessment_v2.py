@@ -352,6 +352,103 @@ def test_retention_due_window():
     assert av2.retention_due(old, now=now.isoformat()) is True
 
 
+# --- F-A1 (V3.26): initial vs practice con re-encuentro espaciado -----------
+
+
+def _familiar_row(created_at, *, context_id, skill="grammar", result=1.0):
+    """Fila de evidencia `familiar` (formative/objetivo) con contexto."""
+    return {
+        "skill": skill,
+        "evidence_kind": "familiar",
+        "task_type": "formative",
+        "item_type": "mcq",
+        "result": result,
+        "source": "objective_assessment",
+        "created_at": created_at,
+        "context_id": context_id,
+        "curriculum_version": "v1",
+        "assessment_version": "assessment-v2",
+    }
+
+
+def _day(d, skill="grammar", *, context_id="objective:o1", result=1.0):
+    """created_at en el día d (2026-09-01 + d días, 12:00 UTC)."""
+    base = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
+    return (base + timedelta(days=d)).isoformat()
+
+
+def test_familiar_spaced_counts_separates_initial_and_practice():
+    """F-A1: `initial` cuenta el primer encuentro de cada contexto; `practice`
+    cuenta los re-encuentros del MISMO contexto separados >=1 día. Dos contextos
+    distintos en un mismo día NO son practice (el agujero que audita P2-01)."""
+    rows = [
+        _familiar_row(_day(0), context_id="objective:a"),
+        # El MISMO contexto objetivo:a vuelve D+1 y D+3 → 2 re-encuentros.
+        _familiar_row(_day(1), context_id="objective:a"),
+        _familiar_row(_day(3), context_id="objective:a"),
+        # El contexto b se encuentra una sola vez (initial, sin practice).
+        _familiar_row(_day(0), context_id="objective:b"),
+    ]
+    counts = av2.familiar_spaced_counts(rows)
+    assert counts["initial_xp"] == 2  # a y b (primer encuentro de cada uno)
+    assert counts["practice_xp"] == 2  # a en D+1 y D+3
+
+
+def test_familiar_spaced_counts_ignores_rows_without_date_or_context():
+    """F-A1: filas legacy (sin context_id) o con created_at corrupto no aportan
+    re-encuentro (no se puede demostrar espaciado); el llamador usa el fallback
+    legacy cuando no hay ningún contexto."""
+    rows = [
+        _familiar_row("", context_id="objective:a"),
+        _familiar_row(_day(0), context_id=""),
+    ]
+    counts = av2.familiar_spaced_counts(rows)
+    assert counts["initial_xp"] == 0
+    assert counts["practice_xp"] == 0
+    # Sin filas útiles → sin contexto, señala legacy para el fallback.
+    assert av2.familiar_spaced_counts([]) == {"initial_xp": 0, "practice_xp": 0}
+
+
+def test_mastery_gate_practice_requires_spaced_reencounter_of_same_context():
+    """F-A1: con `familiar_spaced` presente, el gate exige que `practice` sea un
+    re-encuentro espaciado del MISMO contexto. Dos contextos distintos el mismo
+    día (2 primeras experiencias) NO satisfacen practice: es el agujero de
+    P2-01 (familiar satisfaciendo initial y practice a la vez sin espaciado)."""
+    counts = {"familiar": 3, "transfer": 2, "delayed": 1}
+    # Dos contextos distintos en el mismo día → initial 2, practice 0.
+    same_day = {"familiar": 3, "transfer": 2, "delayed": 1}
+    gate = av2.mastery_evidence_gate(
+        same_day,
+        context_counts={"familiar": 2, "transfer": 2, "delayed": 1},
+        familiar_spaced={"initial_xp": 2, "practice_xp": 0},
+    )
+    assert gate["met"] is False
+    assert "practice" in gate["missing"]
+    assert "initial" not in gate["missing"]
+    assert gate["counts"]["familiar_initial_xp"] == 2
+    assert gate["counts"]["familiar_practice_xp"] == 0
+
+    # El mismo contexto objetivo:a vuelve D+1 y D+3 → practice 2 → met.
+    gate2 = av2.mastery_evidence_gate(
+        counts,
+        context_counts={"familiar": 1, "transfer": 2, "delayed": 1},
+        familiar_spaced={"initial_xp": 1, "practice_xp": 2},
+    )
+    assert gate2["met"] is True
+    assert gate2["missing"] == []
+
+
+def test_mastery_gate_legacy_fallback_keeps_old_row_semantics():
+    """F-A1: sin `familiar_spaced` (modo legacy / llamadas puras por conteos) el
+    gate conserva el comportamiento previo (filas/contextos), que F-C4 marcará
+    como 'experiencias no verificadas' en el perfil. No rompe callers antiguos."""
+    gate = av2.mastery_evidence_gate(
+        {"familiar": 2, "transfer": 2, "delayed": 1},
+        context_counts={"familiar": 2, "transfer": 2, "delayed": 1},
+    )
+    assert gate["met"] is True
+
+
 def test_ladder_status_next_kind():
     status = av2.ladder_status(
         completed_kinds={"formative"},

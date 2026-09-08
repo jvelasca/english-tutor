@@ -1518,8 +1518,21 @@ async def get_assessment_v2_ladder(
         kind: academy_svc.evidence_context_count(evidence_rows, kind)
         for kind in by_kind
     }
+    # F-A1 (V3.26, P2-01): initial/practice con re-encuentro espaciado real.
+    # Solo se activa cuando hay al menos una fila `familiar` con contexto y fecha
+    # parseable (datos V3.25+); si todo es legacy, `familiar_spaced` se omite y
+    # el gate conserva el fallback legacy (F-C4 lo marcará en el perfil).
+    spaced = assessment_v2.familiar_spaced_counts(evidence_rows)
+    has_dated_context = any(
+        (r.get("evidence_kind") or "familiar") == "familiar"
+        and (r.get("context_id") or "").strip()
+        and bool(r.get("created_at"))
+        for r in evidence_rows
+    )
     gate = assessment_v2.mastery_evidence_gate(
-        by_kind, context_counts=context_counts
+        by_kind,
+        context_counts=context_counts,
+        familiar_spaced=spaced if has_dated_context else None,
     )
     status = assessment_v2.ladder_status(
         completed_kinds=completed_kinds,

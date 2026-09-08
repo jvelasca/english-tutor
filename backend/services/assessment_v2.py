@@ -81,12 +81,23 @@ RETENTION_INTERVALS: tuple[int, ...] = (1, 3, 7, 21)
 # exige solo kinds emitibles — familiar (initial/practice) + transfer×2 (unit/
 # progress/level) + delayed (retention ≥7 días estable). `novel` queda reservado:
 # requisito 0 hasta que exista una modalidad que lo emita de verdad.
+#
+# F-A1 (V3.26, P2-01): `initial` y `practice` dejan de ser dos umbrales sobre el
+# mismo contador `familiar`. Con datos contextuales (context_id + created_at),
+# `initial` = primer encuentro de cada contexto y `practice` = re-encuentros
+# ESPACIADOS (≥ SPACED_PRACTICE_MIN_DAYS desde el primer encuentro) del MISMO
+# contexto. Las filas legacy (sin contexto/fecha) conservan el fallback a
+# filas/contextos (F-C4 las marcará como "experiencias no verificadas").
 MASTERY_EVIDENCE_REQUIREMENTS: dict[str, int] = {
-    "initial": 1,  # familiar ≥ 1
-    "practice": 2,  # familiar ≥ 2
+    "initial": 1,  # ≥1 contexto con primer encuentro
+    "practice": 2,  # ≥2 re-encuentros espaciados del mismo contexto
     "transfer": 2,
     "delayed": 1,
 }
+
+# Separación mínima (días) entre el primer encuentro de un contexto y su
+# re-encuentro para que ese re-encuentro cuente como `practice` (F-A1, V3.26).
+SPACED_PRACTICE_MIN_DAYS = 1
 
 
 def _parse_iso(value: str) -> datetime | None:
@@ -99,6 +110,44 @@ def _parse_iso(value: str) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def familiar_spaced_counts(
+    rows: list[dict], *, min_gap_days: int = SPACED_PRACTICE_MIN_DAYS
+) -> dict:
+    """Separa la evidencia `familiar` en encuentros iniciales y re-encuentros
+    espaciados (F-A1, V3.26/P2-01).
+
+    - `initial_xp`: nº de contextos con al menos un encuentro `familiar`
+      (primer encuentro de cada contexto).
+    - `practice_xp`: nº de re-encuentros del MISMO contexto separados ≥
+      `min_gap_days` desde su primer encuentro. Se cuenta un re-encuentro por
+      día distinto posterior (una sesión que emite varias filas el mismo día no
+      infla el contador).
+
+    Solo cuentan filas con `context_id` no vacío y `created_at` parseable: las
+    filas legacy (sin contexto o con fecha corrupta) no demuestran espaciado y
+    no se incluyen (el llamador decide el fallback legacy a filas/contextos).
+    """
+    by_context: dict[str, list[datetime]] = {}
+    for r in rows:
+        if (r.get("evidence_kind") or "familiar") != "familiar":
+            continue
+        cid = (r.get("context_id") or "").strip()
+        dt = _parse_iso(r.get("created_at") or "")
+        if not cid or dt is None:
+            continue
+        by_context.setdefault(cid, []).append(dt)
+    initial_xp = len(by_context)
+    practice_xp = 0
+    for cid, dates in by_context.items():
+        first = min(dates).date()
+        # Cada día posterior distinto con gap suficiente = un re-encuentro.
+        later_days = {d.date() for d in dates if d.date() > first}
+        practice_xp += sum(
+            1 for d in later_days if (d - first).days >= min_gap_days
+        )
+    return {"initial_xp": initial_xp, "practice_xp": practice_xp}
 
 
 def ordered_units(level: Level) -> list[Unit]:
@@ -558,6 +607,7 @@ def mastery_evidence_gate(
     by_kind: dict | None,
     *,
     context_counts: dict[str, int] | None = None,
+    familiar_spaced: dict | None = None,
 ) -> dict:
     """¿Se puede considerar MASTERED? (familiar×2 + transfer×2 + delayed).
 
@@ -567,11 +617,19 @@ def mastery_evidence_gate(
     reservado, sin emisor real) pero no forma parte de `checks`/`missing`.
 
     V3.25 (fase 3, F-L6): cuando `context_counts` se pasa (contextos distintos
-    por kind derivados de los eventos), los checks `initial`/`practice`/
-    `transfer` exigen **experiencias distintas**, no filas repetidas del mismo
-    contexto. Si el conteo de contextos es 0 (legacy sin contexto declarado),
-    retrocede al conteo de filas para no bloquear datos previos a V3.25.
-    `delayed` se mide por filas: la ventana ≥7 días ya impone separación real.
+    por kind derivados de los eventos), el check `transfer` exige experiencias
+    distintas, no filas repetidas del mismo contexto. Si el conteo de contextos
+    es 0 (legacy sin contexto declarado), retrocede al conteo de filas para no
+    bloquear datos previos a V3.25. `delayed` se mide por filas: la ventana ≥7
+    días ya impone separación real.
+
+    F-A1 (V3.26, P2-01): cuando `familiar_spaced` se pasa (resultado de
+    `familiar_spaced_counts` sobre las filas), `initial` y `practice` dejan de
+    ser dos umbrales sobre el mismo contador `familiar`: `initial` exige ≥1
+    contexto con primer encuentro y `practice` exige ≥2 re-encuentros ESPACIADOS
+    del mismo contexto. Sin `familiar_spaced` (llamadas puras por conteos o
+    datos legacy), se conserva el fallback legacy (filas/contextos) — F-C4 lo
+    marcará como "experiencias no verificadas" en el perfil.
     """
     kinds = by_kind or {}
     familiar = int(kinds.get("familiar", 0))
@@ -588,9 +646,17 @@ def mastery_evidence_gate(
 
     familiar_xp = _experiences("familiar", familiar)
     transfer_xp = _experiences("transfer", transfer)
+
+    if familiar_spaced is not None:
+        initial_xp = int(familiar_spaced.get("initial_xp", 0))
+        practice_xp = int(familiar_spaced.get("practice_xp", 0))
+    else:
+        initial_xp = familiar_xp
+        practice_xp = familiar_xp
+
     checks = {
-        "initial": familiar_xp >= MASTERY_EVIDENCE_REQUIREMENTS["initial"],
-        "practice": familiar_xp >= MASTERY_EVIDENCE_REQUIREMENTS["practice"],
+        "initial": initial_xp >= MASTERY_EVIDENCE_REQUIREMENTS["initial"],
+        "practice": practice_xp >= MASTERY_EVIDENCE_REQUIREMENTS["practice"],
         "transfer": transfer_xp >= MASTERY_EVIDENCE_REQUIREMENTS["transfer"],
         "delayed": delayed >= MASTERY_EVIDENCE_REQUIREMENTS["delayed"],
     }
@@ -602,6 +668,8 @@ def mastery_evidence_gate(
         "counts": {
             "familiar": familiar,
             "familiar_contexts": familiar_xp,
+            "familiar_initial_xp": initial_xp,
+            "familiar_practice_xp": practice_xp,
             "transfer": transfer,
             "transfer_contexts": transfer_xp,
             "novel": novel,
