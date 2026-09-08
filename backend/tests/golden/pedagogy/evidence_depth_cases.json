@@ -1,8 +1,8 @@
 {
-  "audit": "C-2026-09-05",
+  "audit": "C-2026-09-08",
   "area": "pedagogy",
-  "version": "1.0.0",
-  "description": "Calibración de evidencia pedagógica V3.13 (P0.1/P0.3). Fija las bandas de profundidad de la evidencia (low/medium/high) y los suelos de 'demostrado' por destreza contra la matriz CEFR: mínimo de muestras, retención retardada y producción en destrezas productivas (R5/R7 de la Constitución). Un cambio de motor o de matriz que altere estos veredictos exige re-auditar (dossier en docs/audit/) antes de editar este fixture.",
+  "version": "1.1.0",
+  "description": "Calibración de evidencia pedagógica V3.13 (P0.1/P0.3), re-auditada en V3.26 (F-C2). Fija las bandas de profundidad de la evidencia (low/medium/high) y los suelos de 'demostrado' por destreza contra la matriz CEFR: mínimo de muestras, retención retardada y producción en destrezas productivas (R5/R7 de la Constitución). Cambio C-2026-09-08: recalibración F-C2 (matriz 2.1.0) — las destrezas de soporte adoptan la escalera de reading desde B1; el caso ed-06 (C1 grammar sin transferencia) pasa a NO cumplir la matriz (transfer×3 exigido). Un cambio de motor o de matriz que altere estos veredictos exige re-auditar (dossier en docs/audit/) antes de editar este fixture.",
   "evidence_depth_cases": [
     {
       "id": "ed-01-a1-grammar-low",
@@ -56,13 +56,13 @@
     },
     {
       "id": "ed-06-c1-grammar-recognition-only",
-      "case": "R5: solo reconocimiento (MC) nunca demuestra grammar aunque la profundidad sea alta",
+      "case": "R5 + F-C2: solo reconocimiento (MC) nunca demuestra grammar; con la recalibración C1 exige transfer×3 y sin transferencia la muestra no cumple la matriz",
       "skill": "grammar",
       "level": "C1",
       "samples": 6,
       "evidence_by_kind": { "familiar": 5, "delayed": 1 },
       "production_count": 0,
-      "expect": { "depth": "high", "meets_matrix": true, "minimum_evidence": 3, "delayed": 1, "production_count": 0 }
+      "expect": { "depth": "high", "meets_matrix": false, "minimum_evidence": 5, "delayed": 1, "production_count": 0 }
     }
   ],
   "demonstrated_floor_cases": [

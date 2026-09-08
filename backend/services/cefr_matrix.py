@@ -9,12 +9,12 @@ Cubre las 8 destrezas de la Constitución §7 (`vocabulary`, `grammar`,
 `listening`, `speaking`, `interaction`, `reading`, `writing`, `mediation`) en
 los 6 niveles A1–C2. `pronunciation` queda fuera a propósito: es componente de
 Speaking y conserva su mínimo plano (`READINESS_MINIMUMS`, `services/adaptive`),
-como define la sección 7 de la constitución. Para las destrezas sin calibración
-per-nivel (`vocabulary`/`grammar`/`interaction`/`mediation`) la fila declara el
-mismo suelo que su fallback plano histórico, de modo que la matriz es la fuente
-única y completa de requisitos (H4) sin inventar escalados no calibrados; los
-escalados por nivel de listening/speaking/reading/writing (A1–B2 calibrados en
-V2.x) se extrapolan con la misma pauta a C1/C2.
+como define la sección 7 de la constitución. Desde V3.26 (F-C2, matriz 2.1.0)
+las 8 destrezas escalan de forma monótona A1→C2: las destrezas de soporte
+(`vocabulary`/`grammar`/`interaction`/`mediation`) conservan su suelo histórico
+en A1/A2 y adoptan la escalera de `reading` desde B1, de modo que los extremos
+quedan unificados (C1/C2 exigen lo mismo a una destreza de soporte que a una
+macro).
 """
 
 from __future__ import annotations

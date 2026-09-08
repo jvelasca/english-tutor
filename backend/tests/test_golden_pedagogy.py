@@ -27,7 +27,8 @@ def _floor_case_expects() -> list[dict]:
 def test_fixture_has_audit_id():
     fixture = loader.load_json("pedagogy", "evidence_depth_cases")
     assert fixture["area"] == "pedagogy"
-    assert fixture["audit"].startswith("C-2026-09-05")
+    # Audit C-2026-09-05; re-auditado en C-2026-09-08 (recalibración F-C2 V3.26).
+    assert fixture["audit"].startswith("C-2026-09-08")
     # 6 casos A1–C2 de profundidad + 3 suelos de demostrado (dossier fijado).
     assert len(fixture["evidence_depth_cases"]) == 6
     assert len(fixture["demonstrated_floor_cases"]) == 3
