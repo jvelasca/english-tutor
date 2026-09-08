@@ -599,9 +599,10 @@ def test_exam_pass_completed_but_certification_pending(monkeypatch, tmp_path):
 
 
 def test_level_becomes_certified_with_delayed_evidence(monkeypatch, tmp_path):
-    """Tras registrar evidencia `delayed` en cada destreza del examen (la que
-    solo se escribe al superar el retention reassessment ≥7 días), el nivel
-    completado pasa a estar certificado."""
+    """F-A3 (V3.26): tras registrar DOS reassessment points `delayed` estables
+    por destreza del examen (los que solo se escriben al superar cada retention
+    reassessment ≥7 días, espaciados entre sí), el nivel completado pasa a estar
+    certificado. Un único delayed puntual ya no certifica."""
     a, _b = _setup(monkeypatch, tmp_path)
     data = load_assessments()
     exam = data.exams["a1"]
@@ -619,7 +620,7 @@ def test_level_becomes_certified_with_delayed_evidence(monkeypatch, tmp_path):
     # (V3.25.1, P1-01: la certificación exige intervalo formal→delayed ≥ 7 días).
     _backdate_evidence(a, "a1", 10)
 
-    # Retention reassessment superado: evidencia delayed por destreza del examen.
+    # Punto de retención 1: evidencia delayed por destreza del examen.
     for skill in exam.skills:
         assert academy_repo.record_evidence(
             a,
@@ -627,6 +628,27 @@ def test_level_becomes_certified_with_delayed_evidence(monkeypatch, tmp_path):
             objective_id="",
             skill=skill,
             item_id=f"delayed-{skill}",
+            result=1.0,
+            evidence_kind="delayed",
+        ) is True
+    # Un único punto estable por destreza NO certifica (F-A3, retención
+    # longitudinal multi-punto).
+    with TestClient(app) as client:
+        completions = client.get(
+            "/api/academy/level-completions", params={"user_id": a}
+        ).json()
+    cert = completions["completions"][0]["certification"]
+    assert cert["certified"] is False
+    assert set(cert["pending_skills"]) == set(exam.skills)
+
+    # Punto de retención 2 (separado): segunda evidencia delayed por destreza.
+    for skill in exam.skills:
+        assert academy_repo.record_evidence(
+            a,
+            level_id="a1",
+            objective_id="",
+            skill=skill,
+            item_id=f"delayed-{skill}-2",
             result=1.0,
             evidence_kind="delayed",
         ) is True
@@ -1598,6 +1620,24 @@ def test_endpoint_student_model_separates_demonstrated_level(monkeypatch, tmp_pa
                 objective_id="",
                 skill=skill,
                 item_id=f"delayed-{skill}",
+                result=1.0,
+                evidence_kind="delayed",
+            ) is True
+
+        # F-A3 (V3.26): un único punto estable por destreza NO certifica aún.
+        sm1p = client.get(
+            "/api/academy/student-model", params={"user_id": a}
+        ).json()
+        assert sm1p["demonstrated_level"] is None, sm1p["demonstrated_level"]
+
+        # Punto de retención 2 (espaciado): retención sostenida → certifica.
+        for skill in exam.skills:
+            assert academy_repo.record_evidence(
+                a,
+                level_id="a1",
+                objective_id="",
+                skill=skill,
+                item_id=f"delayed-{skill}-2",
                 result=1.0,
                 evidence_kind="delayed",
             ) is True

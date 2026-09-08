@@ -62,12 +62,16 @@ RETENTION_MIN_DAYS = 7
 RETENTION_STABLE_RATIO = 0.9
 
 # Certificación de nivel (H5): *completar ≠ certificar*. Completar el examen
-# desbloquea el siguiente nivel; la certificación plena exige además ≥ este nº
-# de evidencias `delayed` por cada destreza del examen. La evidencia `delayed`
-# solo se escribe tras un retention reassessment (≥ RETENTION_MIN_DAYS después
-# de la formal) con ratio estable (≥ RETENTION_STABLE_RATIO), de modo que su
-# presencia ya codifica la ventana de 7 días con retención estable.
-CERTIFICATION_REQUIRED_DELAYED = 1
+# desbloquea el siguiente nivel; la certificación plena exige retención
+# SOSTENIDA: ≥ este nº de reassessments estables por cada destreza del examen.
+# Un reassessment estable es un evento `delayed` con ventana ≥
+# RETENTION_MIN_DAYS desde su sesión formal origen Y ratio ≥
+# RETENTION_STABLE_RATIO. F-A3 (V3.26, P2-02): un único delayed puntual ya no
+# certifica — la retención longitudinal exige ≥ 2 puntos separados en el
+# tiempo, y el escritor espacia cada reassessment nuevo ≥ RETENTION_MIN_DAYS
+# desde el último del mismo origen (delayed_origin_anchors los ancla a su
+# sesión formal real, no al examen más reciente).
+CERTIFICATION_REQUIRED_DELAYED = 2
 
 # V3.25 (fase 4, F-L8): ventanas de consolidación OPCIONALES para el informe
 # longitudinal de retención sobre los eventos `delayed`. La certificación solo
@@ -485,11 +489,13 @@ def certification_gate(
     """Gate de certificación de un nivel (P1/H5): **completado ≠ certificado**.
 
     Aprobar el examen completa el nivel y desbloquea el siguiente; la
-    certificación plena exige, por cada destreza del examen, retención retardada
-    REAL: un retention reassessment ocurrido ≥ `RETENTION_MIN_DAYS` después de
-    la evaluación formal del nivel y con ratio `delayed/initial ≥
-    RETENTION_STABLE_RATIO`. La presencia de filas `delayed` no basta: el gate
-    reconstruye baseline y ratio desde las propias filas de `academy_evidence`.
+    certificación plena exige, por cada destreza del examen, retención
+    retardada REAL y SOSTENIDA: ≥ `CERTIFICATION_REQUIRED_DELAYED` reassessment
+    points estables — cada punto es un retention reassessment ocurrido ≥
+    `RETENTION_MIN_DAYS` después de la evaluación formal del nivel y con ratio
+    `delayed/initial ≥ RETENTION_STABLE_RATIO`. La presencia de filas `delayed`
+    no basta: el gate reconstruye baseline y ratio desde las propias filas de
+    `academy_evidence`.
 
     V3.25.1 (P1-01, auditoría externa V3.25): el gate ya no confía en que el
     emisor haya codificado la ventana. Verifica:
@@ -504,10 +510,13 @@ def certification_gate(
       `context_id` (una sesión de retention emite una fila por ítem compartiendo
       contexto; las filas legacy sin `context_id` son cada una su propio evento).
 
-    Una destreza queda satisfecha cuando existe un evento `delayed` suyo
-    verificable (todos sus `created_at` parseables) con
-    `interval_days >= RETENTION_MIN_DAYS` desde el ancla formal y
-    `rate = delayed_score / initial_score >= RETENTION_STABLE_RATIO`.
+    F-A3 (V3.26, P2-02): una destreza queda satisfecha cuando ≥
+    `CERTIFICATION_REQUIRED_DELAYED` eventos `delayed` suyos son verificables
+    (todos sus `created_at` parseables) con `interval_days >= RETENTION_MIN_DAYS`
+    desde el ancla formal y `rate = delayed_score / initial_score >=
+    RETENTION_STABLE_RATIO`. Un perfil con un único reassessment estable deja de
+    certificar; el informe añade `stable_points` (eventos que cumplen ventana y
+    ratio) por destreza.
 
     F-A2 (V3.26, P2-02, auditoría externa V3.25): cada evento `delayed` se ancla
     a la sesión formal que reevalúa cuando el llamador aporta `delayed_origins`
@@ -523,8 +532,9 @@ def certification_gate(
     real de cada evento respecto al momento de la consulta (`event_age_days`;
     ambos son conceptos distintos: la edad del evento no es el intervalo
     pedagógico), `longest_interval_days`, `longest_event_age_days`,
-    `anchored_events`, `intervals_reached` (RETENTION_INTERVALS) y el `rate` del
-    mejor evento (`best_rate`).
+    `anchored_events`, `stable_points` (eventos que cumplen ventana y ratio),
+    `intervals_reached` (RETENTION_INTERVALS) y el `rate` del mejor evento
+    (`best_rate`).
 
     Devuelve conformidad global, conteo `delayed` por destreza y las destrezas
     pendientes de retención. Un nivel sin examen (sin destrezas exigidas) nunca
@@ -637,9 +647,13 @@ def certification_gate(
             if e["interval_days"] is not None and e["rate"] is not None
         ]
         best = max(eligible, key=lambda e: e["interval_days"]) if eligible else None
+        # F-A3: la destreza certifica con ≥ CERTIFICATION_REQUIRED_DELAYED
+        # reassessment points ESTABLES (eventos ok: ventana y ratio a la vez).
+        stable_points = sum(1 for e in skill_events if e["ok"])
         reports[skill] = {
             "count": delayed_by_skill.get(skill, 0),
             "events": len(skill_events),
+            "stable_points": stable_points,
             "verified": (
                 all(e["verified"] for e in skill_events) if skill_events else True
             ),
@@ -658,7 +672,7 @@ def certification_gate(
             ],
             "best_rate": best["rate"] if best is not None else None,
         }
-        checks[skill] = any(e["ok"] for e in skill_events)
+        checks[skill] = stable_points >= CERTIFICATION_REQUIRED_DELAYED
 
     return {
         "required": True,
@@ -763,6 +777,40 @@ def retention_due(
     if last_dt is None:
         return False
     return (now_dt - last_dt).days >= min_days
+
+
+def retention_spacing_due(
+    sessions: list[dict],
+    *,
+    origin_session_id: int | None,
+    now: str = "",
+    min_days: int = RETENTION_MIN_DAYS,
+) -> bool:
+    """F-A3 (V3.26, P2-02): espaciado longitudinal entre reassessments del
+    MISMO origen formal.
+
+    Un retention reassessment nuevo cuyo origen es `origin_session_id` debe
+    separarse ≥ `min_days` del ÚLTIMO reassessment ya cerrado (`status ==
+    "done"`, el punto cuya evidencia `delayed` ya existe) de ese mismo origen;
+    sin reassessment previo del origen la condición es transparente (True).
+
+    El gate exige ≥ `CERTIFICATION_REQUIRED_DELAYED` puntos estables; este
+    espaciado es el que hace que >1 punto sea REAL y separado (dos submits el
+    mismo día o en días consecutivos no generan puntos longitudinales). Devuelve
+    True si ya pasó el espaciado o no hay un punto previo que respetar.
+    """
+    last_at = ""
+    for s in sessions:
+        if s.get("kind") != "retention" or s.get("status") != "done":
+            continue
+        if (s.get("source_session_id") or None) != origin_session_id:
+            continue
+        created = s.get("created_at") or ""
+        if created and created > last_at:
+            last_at = created
+    if not last_at:
+        return True
+    return retention_due(last_at, now=now, min_days=min_days)
 
 
 def ladder_status(

@@ -450,7 +450,7 @@ def _exam_row(skill, created_at, result=1.0, *, context_id="exam:a1"):
 
 
 def test_certification_gate_verifies_delayed_rows():
-    """F-L4 (V3.25.1, P1-01): el gate certifica solo con eventos `delayed`
+    """F-L4 + F-A3 (V3.26): el gate certifica solo con ≥2 eventos `delayed`
     verificables y con ventana (≥ RETENTION_MIN_DAYS desde el examen formal) +
     ratio (≥ RETENTION_STABLE_RATIO) válidos; una sesión con `created_at`
     corrupto no puede certificar."""
@@ -460,11 +460,19 @@ def test_certification_gate_verifies_delayed_rows():
     delayed_at = "2026-08-08T00:00:00+00:00"  # D+7
     g_ok = av2.certification_gate(
         ["listening"],
-        [_exam_row("listening", formal), _delayed_row("listening", delayed_at)],
+        [
+            _exam_row("listening", formal),
+            _delayed_row("listening", delayed_at, context_id="retention:1"),
+            _delayed_row(  # punto 2: D+14, separado
+                "listening", "2026-08-15T00:00:00+00:00", 0.95,
+                context_id="retention:2",
+            ),
+        ],
     )
     assert g_ok["certified"] is True
     assert g_ok["retention_report"]["listening"]["verified"] is True
-    assert g_ok["retention_report"]["listening"]["interval_days"] == [7]
+    assert g_ok["retention_report"]["listening"]["interval_days"] == [7, 14]
+    assert g_ok["retention_report"]["listening"]["stable_points"] == 2
 
     g_bad = av2.certification_gate(
         ["reading"],
@@ -477,16 +485,21 @@ def test_certification_gate_verifies_delayed_rows():
 
 def test_certification_gate_requires_delayed_per_skill():
     """Sin cambios de semántica (H5): hace falta retención validada para CADA
-    destreza del examen."""
+    destreza del examen. F-A3: listening acumula sus 2 puntos y speaking sigue
+    sin ninguno → el nivel NO certifica."""
     from services import assessment_v2 as av2
 
     formal = "2026-08-01T00:00:00+00:00"
     delayed_at = "2026-08-08T00:00:00+00:00"  # D+7
     exam_rows = [_exam_row("listening", formal), _exam_row("speaking", formal)]
-    rows = exam_rows + [_delayed_row("listening", delayed_at)]
+    rows = exam_rows + [
+        _delayed_row("listening", delayed_at, context_id="retention:1"),
+        _delayed_row("listening", "2026-08-15T00:00:00+00:00", 0.95,
+                     context_id="retention:2"),
+    ]
     g = av2.certification_gate(["listening", "speaking"], rows)
     assert g["certified"] is False
-    assert g["delayed_by_skill"] == {"listening": 1, "speaking": 0}
+    assert g["delayed_by_skill"] == {"listening": 2, "speaking": 0}
     assert g["pending_skills"] == ["speaking"]
 
 

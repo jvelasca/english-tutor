@@ -1622,16 +1622,16 @@ async def start_assessment_v2(
             exam.items, exam_id=exam.id, title=exam.title
         )
     elif kind == "retention":
+        done_sessions = await run_in_threadpool(
+            academy_repo.list_assessment_v2_sessions,
+            user_id,
+            level_id=level_id,
+            status="done",
+        )
         if source_session_id is None:
-            sessions = await run_in_threadpool(
-                academy_repo.list_assessment_v2_sessions,
-                user_id,
-                level_id=level_id,
-                status="done",
-            )
             formal = [
                 s
-                for s in sessions
+                for s in done_sessions
                 if s.get("kind") in ("unit", "progress", "level") and s.get("result")
             ]
             if not formal:
@@ -1664,6 +1664,19 @@ async def start_assessment_v2(
                 user_id,
                 level_id,
                 "ventana < RETENTION_MIN_DAYS desde la sesión formal origen",
+            )
+        # F-A3 (V3.26, P2-02): retención longitudinal multi-punto. Un reassessment
+        # nuevo del mismo origen debe separarse ≥ RETENTION_MIN_DAYS del ÚLTIMO
+        # reassessment ya cerrado de ese origen; si no, 409 (el punto no sería
+        # real ni separado).
+        if not assessment_v2.retention_spacing_due(
+            done_sessions, origin_session_id=source_id
+        ):
+            raise RetentionNotDueError(
+                user_id,
+                level_id,
+                "espaciado < RETENTION_MIN_DAYS desde el último reassessment "
+                "del mismo origen",
             )
         instrument = assessment_v2.build_retention(previous)
         uid = previous.get("unit_id") or ""
@@ -1713,13 +1726,40 @@ async def submit_assessment_v2(
     # Resolver correct_index desde currículo / examen (nunca confiar en el cliente).
     checks: list = []
     min_per_skill = None
-    if kind == "level":
+    retention_source = None
+    if kind == "retention":
+        # R6-01: sin sesión formal origen no hay baseline que reevaluar.
+        if not session.get("source_session_id"):
+            raise RetentionNotDueError(
+                user_id,
+                session["level_id"],
+                "sin sesión formal origen (source_session_id)",
+            )
+        retention_source = await run_in_threadpool(
+            academy_repo.get_assessment_v2_session, session["source_session_id"]
+        )
+        if retention_source is None or not retention_source.get("result"):
+            raise RetentionNotDueError(
+                user_id,
+                session["level_id"],
+                "sesión formal origen sin resultado",
+            )
+    # F-A3 (V3.26, P2-02): un retention reassessment que reevalúa un EXAMEN de
+    # nivel (origen `kind=level`) puntúa con la clave del examen — sus ítems no
+    # viven en el índice de checks del currículo y antes `submit` devolvía None
+    # (sin evidencia `delayed`, certificación inalcanzable por la escalera).
+    if kind == "level" or (
+        kind == "retention"
+        and retention_source is not None
+        and retention_source.get("kind") == "level"
+    ):
         data = load_assessments()
         exam = data.exams.get(session["level_id"])
         if exam is None:
             return None
         checks = [it for it in exam.items if it.id in item_ids]
-        min_per_skill = exam.min_per_skill
+        if kind == "level":
+            min_per_skill = exam.min_per_skill
     else:
         index = _checks_index(lv)
         for iid in instrument.get("item_ids") or [
@@ -1737,34 +1777,36 @@ async def submit_assessment_v2(
 
     retention_payload = None
     if kind == "retention":
-        # R6-01 (enforcement): antes de escribir evidencia `delayed` se exige la
-        # ventana ≥ RETENTION_MIN_DAYS desde la sesión formal origen y un ratio
-        # de retención estable ≥ RETENTION_STABLE_RATIO. Si no, conflicto 409.
-        if not session.get("source_session_id"):
-            raise RetentionNotDueError(
-                user_id,
-                session["level_id"],
-                "sin sesión formal origen (source_session_id)",
-            )
-        source = await run_in_threadpool(
-            academy_repo.get_assessment_v2_session, session["source_session_id"]
-        )
-        if source is None or not source.get("result"):
-            raise RetentionNotDueError(
-                user_id,
-                session["level_id"],
-                "sesión formal origen sin resultado",
-            )
+        # R6-01 + F-A3 (enforcement) antes de escribir evidencia `delayed`:
+        # ventana ≥ RETENTION_MIN_DAYS desde la sesión formal origen, ratio de
+        # retención estable ≥ RETENTION_STABLE_RATIO y espaciado ≥
+        # RETENTION_MIN_DAYS desde el último reassessment cerrado del mismo
+        # origen (para que >1 punto sea real y separado). Si no, conflicto 409.
         retention_payload = assessment_v2.retention_delta(
-            source["result"], result
+            retention_source["result"], result
         )
         reasons: list[str] = []
-        if not assessment_v2.retention_due(source.get("created_at") or ""):
+        if not assessment_v2.retention_due(
+            retention_source.get("created_at") or ""
+        ):
             reasons.append(
                 "ventana < RETENTION_MIN_DAYS desde la sesión formal origen"
             )
         if retention_payload.get("stable") is not True:
             reasons.append("ratio delayed/initial < RETENTION_STABLE_RATIO")
+        if not assessment_v2.retention_spacing_due(
+            await run_in_threadpool(
+                academy_repo.list_assessment_v2_sessions,
+                user_id,
+                level_id=session["level_id"],
+                status="done",
+            ),
+            origin_session_id=session["source_session_id"],
+        ):
+            reasons.append(
+                "espaciado < RETENTION_MIN_DAYS desde el último reassessment "
+                "del mismo origen"
+            )
         if reasons:
             raise RetentionNotDueError(
                 user_id, session["level_id"], "; ".join(reasons)

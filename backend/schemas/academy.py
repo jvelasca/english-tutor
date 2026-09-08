@@ -302,10 +302,12 @@ class CertificationOut(BaseModel):
     """Estado de certificación de un nivel superado (P1/H5).
 
     Aprobar el examen de nivel otorga la *completitud* del nivel; la
-    certificación plena exige además evidencia `delayed` por cada destreza del
-    examen (escrita solo tras un retention reassessment ≥ `window_min_days` con
-    ratio estable). `certified` es False hasta que todas las destrezas del examen
-    acumulan el mínimo de evidencias de retención.
+    certificación plena exige retención retardada SOSTENIDA por cada destreza
+    del examen: ≥ `min_delayed` reassessment points estables (cada evento
+    `delayed` anclado a su sesión formal origen con ventana ≥ `window_min_days`
+    y ratio estable). `certified` es False hasta que todas las destrezas del
+    examen acumulan ese mínimo de reassessments estables (F-A3, V3.26: un único
+    delayed puntual ya no certifica).
     """
 
     required: bool = True

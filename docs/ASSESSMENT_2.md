@@ -41,6 +41,29 @@ Debe existir evidencia de:
 
 Implementado en `mastery_evidence_gate()` (`services/assessment_v2.py`).
 
+## Certificación del nivel (H5): retención sostenida
+
+Aprobar el examen de nivel *completa* el nivel (desbloquea el siguiente); la
+**certificación plena** es retención longitudinal multi-punto por cada destreza
+del examen:
+
+- ≥ `CERTIFICATION_REQUIRED_DELAYED` (2) **reassessment points estables** por
+  destreza: cada punto es un evento `delayed` con ventana ≥ `RETENTION_MIN_DAYS`
+  desde su sesión formal origen **y** ratio `delayed/initial ≥
+  RETENTION_STABLE_RATIO`. Un único delayed puntual ya no certifica (F-A3,
+  V3.26).
+- Cada evento se ancla a su sesión formal origen (`delayed_origin_anchors` →
+  `delayed_origins`), no al examen más reciente (F-A2, V3.26); sin origen
+  resoluble se usa el examen más reciente como fallback legacy.
+- El escritor espacia cada reassessment nuevo ≥ `RETENTION_MIN_DAYS` desde el
+  último cerrado del mismo origen (`retention_spacing_due`, 409 si no) y un
+  retention que reevalúa un examen `kind=level` puntúa contra la clave del
+  examen (sus ítems no viven en el índice de checks del currículo).
+
+Implementado en `certification_gate()` + `retention_spacing_due()` en
+`services/assessment_v2.py`. El informe por destreza expone `events`,
+`stable_points`, `interval_days`/`retention_interval_days` y `event_age_days`.
+
 ## Motor puro
 
 `services/assessment_v2.py`:

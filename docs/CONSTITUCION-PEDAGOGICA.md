@@ -463,6 +463,17 @@ constitución si cambia umbrales o estructura.
    solo cuando el peldaño `level` (examen) **y** el retention reassessment están
    completos (`readiness.level_certified`). La retención ya no es evaluación
    aparte: es requisito del nivel.
+   **F-A3 (V3.26, P2-02): retención longitudinal multi-punto.** La certificación
+   ya no se satisface con un único reassessment estable por destreza
+   (`CERTIFICATION_REQUIRED_DELAYED = 2`): el gate exige ≥ 2 reassessment points
+   estables por destreza del examen, cada uno ≥ `RETENTION_MIN_DAYS` (7) desde su
+   sesión formal origen (ancla resuelta por `delayed_origin_anchors`, no el
+   examen más reciente) y con ratio ≥ `RETENTION_STABLE_RATIO` (0.9). El escritor
+   espacia cada reassessment nuevo ≥ 7 días desde el último cerrado del mismo
+   origen (409 si no), y un retention que reevalúa un examen de nivel
+   (`kind=level`) puntúa contra la clave del examen (sus ítems no viven en el
+   índice de checks del currículo), de modo que >1 punto es real y la
+   certificación es alcanzable end-to-end por la escalera.
 7. **Lexical Units** (sección 3.2) — implementado en v3.4.0: la taxonomía de
    `kind` pasa a `LEXICAL_KINDS` (`word`, `collocation`, `phrasal_verb`,
    `expression`, `sentence_frame`, `functional_chunk`, `structure` genérico) y

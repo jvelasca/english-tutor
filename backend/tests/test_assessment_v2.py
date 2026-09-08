@@ -129,14 +129,17 @@ def _delayed_row(skill, created_at, result=0.9, *, context_id="retention:1"):
     }
 
 
-def test_certification_gate_requires_delayed_per_skill():
-    """P1/H5: completar (aprobar examen) no certifica. El gate exige, por cada
-    destreza del examen, un retention reassessment REAL: evento `delayed`
-    ocurrido ≥ RETENTION_MIN_DAYS después del examen formal con ratio
-    delayed/initial ≥ RETENTION_STABLE_RATIO."""
+def test_certification_gate_requires_two_stable_reassessments_per_skill():
+    """F-A3 (V3.26): completar (aprobar examen) no certifica. Por cada destreza
+    del examen el gate exige ≥ CERTIFICATION_REQUIRED_DELAYED (2) retention
+    reassessments ESTABLES: eventos `delayed` distintos, cada uno ≥
+    RETENTION_MIN_DAYS después de su examen formal origen con ratio ≥
+    RETENTION_STABLE_RATIO. Un perfil con un único delayed puntual deja de
+    certificar."""
     skills = ["listening", "reading"]
     formal = "2026-08-01T00:00:00+00:00"
-    delayed_at = "2026-08-08T00:00:00+00:00"  # D+7 exacto
+    p1 = "2026-08-08T00:00:00+00:00"  # reassessment 1: D+7 exacto
+    p2 = "2026-08-22T00:00:00+00:00"  # reassessment 2: D+21 (separado)
     exam_rows = [
         _exam_row("listening", formal),
         _exam_row("reading", formal),
@@ -145,97 +148,139 @@ def test_certification_gate_requires_delayed_per_skill():
     assert gate["certified"] is False
     assert gate["required"] is True
     assert gate["window_min_days"] == av2.RETENTION_MIN_DAYS
+    assert gate["min_delayed"] == 2
     assert gate["pending_skills"] == ["listening", "reading"]
 
-    only_listening = exam_rows + [
-        _delayed_row("listening", delayed_at, result=0.9)  # rate 0.90
+    # Un único reassessment estable por destreza ya NO certifica (F-A3).
+    one_point = exam_rows + [
+        _delayed_row("listening", p1, result=0.9, context_id="retention:1"),
+        _delayed_row("reading", p1, result=0.95, context_id="retention:1"),
     ]
-    gate = av2.certification_gate(skills, only_listening)
+    gate = av2.certification_gate(skills, one_point)
     assert gate["certified"] is False
-    assert gate["delayed_by_skill"] == {"listening": 1, "reading": 0}
+    assert gate["retention_report"]["listening"]["stable_points"] == 1
+    assert gate["pending_skills"] == ["listening", "reading"]
+
+    # Solo listening acumula su segundo punto; reading sigue pendiente.
+    two_listening = one_point + [
+        _delayed_row("listening", p2, result=0.9, context_id="retention:2"),
+    ]
+    gate = av2.certification_gate(skills, two_listening)
+    assert gate["certified"] is False
     assert gate["pending_skills"] == ["reading"]
 
-    both = only_listening + [
-        _delayed_row("reading", delayed_at, result=0.95)  # rate 0.95
+    # Ambos puntos estables en las dos destrezas → certifica.
+    both = two_listening + [
+        _delayed_row("reading", p2, result=0.95, context_id="retention:2"),
     ]
     gate = av2.certification_gate(skills, both)
     assert gate["certified"] is True
     assert gate["pending_skills"] == []
     assert gate["checks"] == {"listening": True, "reading": True}
+    assert gate["retention_report"]["listening"]["stable_points"] == 2
 
 
 def test_certification_gate_rejects_below_min_window():
-    """P1-01 (auditoría V3.25): un `delayed` a D+6 (ventana < 7 días) no
-    certifica aunque el ratio sea estable."""
+    """P1-01 + F-A3: aunque existan DOS reassessments con ratio estable, si
+    ninguno alcanza la ventana (eventos a D+3 y D+6) el gate NO certifica."""
     formal = "2026-08-01T00:00:00+00:00"
     rows = [
         _exam_row("listening", formal),
-        _delayed_row("listening", "2026-08-07T00:00:00+00:00", 1.0),  # D+6
+        _delayed_row(  # D+3: ventana no alcanzada, ratio 1.0
+            "listening", "2026-08-04T00:00:00+00:00", 1.0,
+            context_id="retention:1",
+        ),
+        _delayed_row(  # D+6: ventana no alcanzada, ratio 1.0
+            "listening", "2026-08-07T00:00:00+00:00", 1.0,
+            context_id="retention:2",
+        ),
     ]
     gate = av2.certification_gate(["listening"], rows)
     assert gate["certified"] is False
     report = gate["retention_report"]["listening"]
-    assert report["interval_days"] == [6]
-    # El informe es informativo: el ratio es estable (1.0), pero la ventana de
-    # 6 días < RETENTION_MIN_DAYS impide certificar.
+    assert report["interval_days"] == [3, 6]
+    # El informe es informativo: los ratios son estables (1.0), pero ninguna
+    # ventana llega a RETENTION_MIN_DAYS → 0 puntos estables.
+    assert report["stable_points"] == 0
     assert report["best_rate"] == 1.0
     assert gate["pending_skills"] == ["listening"]
 
 
 def test_certification_gate_rejects_ratio_below_stable():
-    """P1-01: a D+7 con ratio 0.89 (< 0.90) el gate NO certifica."""
+    """P1-01 + F-A3: con ventanas cumplidas pero ratios 0.89 (< 0.90) en AMBOS
+    puntos, el gate NO certifica."""
     formal = "2026-08-01T00:00:00+00:00"
     rows = [
         _exam_row("listening", formal),
-        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.89),  # D+7, 0.89
-    ]
-    gate = av2.certification_gate(["listening"], rows)
-    assert gate["certified"] is False
-    assert gate["retention_report"]["listening"]["best_rate"] == 0.89
-    assert gate["pending_skills"] == ["listening"]
-
-
-def test_certification_gate_ratio_boundary_certifies():
-    """P1-01: a D+7 con ratio 0.90 exacto el gate SÍ certifica."""
-    formal = "2026-08-01T00:00:00+00:00"
-    rows = [
-        _exam_row("listening", formal),
-        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.90),  # D+7, 0.90
-    ]
-    gate = av2.certification_gate(["listening"], rows)
-    assert gate["certified"] is True
-    assert gate["pending_skills"] == []
-
-
-def test_certification_gate_rejects_long_window_low_ratio():
-    """P1-01: un intervalo largo (D+21) con ratio 0.50 no es retención
-    estable: el gate NO certifica."""
-    formal = "2026-08-01T00:00:00+00:00"
-    rows = [
-        _exam_row("listening", formal),
-        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 0.50),  # D+21
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.89,  # D+7, 0.89
+                     context_id="retention:1"),
+        _delayed_row("listening", "2026-08-15T00:00:00+00:00", 0.89,  # D+14, 0.89
+                     context_id="retention:2"),
     ]
     gate = av2.certification_gate(["listening"], rows)
     assert gate["certified"] is False
     report = gate["retention_report"]["listening"]
+    assert report["best_rate"] == 0.89
+    assert report["stable_points"] == 0
+    assert gate["pending_skills"] == ["listening"]
+
+
+def test_certification_gate_ratio_boundary_certifies():
+    """P1-01 + F-A3: dos puntos con ventana cumplida y ratio 0.90 exacto
+    (boundary por punto) SÍ certifican."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.90,  # D+7, 0.90
+                     context_id="retention:1"),
+        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 0.90,  # D+21, 0.90
+                     context_id="retention:2"),
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is True
+    assert gate["retention_report"]["listening"]["stable_points"] == 2
+    assert gate["pending_skills"] == []
+
+
+def test_certification_gate_rejects_long_window_low_ratio():
+    """P1-01 + F-A3: intervalos largos (D+7/D+21) con ratio 0.50 no son
+    retención estable: el gate NO certifica."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.50,  # D+7
+                     context_id="retention:1"),
+        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 0.50,  # D+21
+                     context_id="retention:2"),
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is False
+    report = gate["retention_report"]["listening"]
+    assert report["interval_days"] == [7, 21]
     assert report["longest_interval_days"] == 21
     assert report["intervals_reached"] == [1, 3, 7, 21]
     assert report["best_rate"] == 0.5
+    assert report["stable_points"] == 0
     assert gate["pending_skills"] == ["listening"]
 
 
 def test_certification_gate_rejects_delayed_without_created_at():
-    """F-L4 (robustez): una fila `delayed` sin `created_at` parseable no puede
+    """F-L4 (robustez): filas `delayed` sin `created_at` parseable no pueden
     certificar: el gate no confía solo en la mera presencia de la etiqueta."""
     formal = "2026-08-01T00:00:00+00:00"
     rows = [
         _exam_row("listening", formal),
         {"skill": "listening", "evidence_kind": "delayed",
-         "task_type": "retention", "result": 1.0, "created_at": "nunca"},
+         "task_type": "retention", "result": 1.0, "created_at": "nunca",
+         "context_id": "retention:1"},
+        {"skill": "listening", "evidence_kind": "delayed",
+         "task_type": "retention", "result": 1.0, "created_at": "nunca",
+         "context_id": "retention:2"},
     ]
     gate = av2.certification_gate(["listening"], rows)
     assert gate["certified"] is False
     assert gate["retention_report"]["listening"]["verified"] is False
+    assert gate["retention_report"]["listening"]["stable_points"] == 0
     assert gate["pending_skills"] == ["listening"]
 
 
@@ -264,10 +309,14 @@ def test_certification_gate_two_events_none_with_valid_ratio():
 
 
 def test_certification_gate_requires_formal_baseline():
-    """P1-01: sin filas de examen (`task_type="exam"`) no hay baseline y el
-    gate no puede certificar, aunque exista `delayed` con ventana y ratio."""
+    """P1-01 + F-A3: sin filas de examen (`task_type="exam"`) no hay baseline y
+    el gate no puede certificar, aunque existan DOS eventos `delayed` con
+    ventana y ratio."""
     rows = [
-        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 1.0),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 1.0,
+                     context_id="retention:1"),
+        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 1.0,
+                     context_id="retention:2"),
     ]
     gate = av2.certification_gate(["listening"], rows)
     assert gate["certified"] is False
@@ -280,21 +329,29 @@ def test_certification_gate_requires_formal_baseline():
 def test_certification_gate_groups_delayed_rows_by_context():
     """Una sesión de retention real emite una fila por ítem compartiendo
     `context_id`: el gate agrupa el evento y usa la media de resultado por
-    destreza (2 ítems → 1.0 y 0.8 → delayed_score 0.90)."""
+    destreza (2 ítems → 1.0 y 0.8 → delayed_score 0.90). F-A3: hacen falta DOS
+    sesiones (contextos distintos) para certificar."""
     formal = "2026-08-01T00:00:00+00:00"
     rows = [
         _exam_row("listening", formal),
+        # Sesión 1: dos ítems de listening (media 0.90).
         _delayed_row("listening", "2026-08-08T00:00:00+00:00", 1.0,
                      context_id="retention:1"),
         _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.8,
                      context_id="retention:1"),
+        # Sesión 2: punto separado (media 0.95).
+        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 1.0,
+                     context_id="retention:2"),
+        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 0.9,
+                     context_id="retention:2"),
     ]
     gate = av2.certification_gate(["listening"], rows)
     assert gate["certified"] is True
     report = gate["retention_report"]["listening"]
-    assert report["count"] == 2
-    assert report["events"] == 1
-    assert report["best_rate"] == 0.9
+    assert report["count"] == 4
+    assert report["events"] == 2
+    assert report["stable_points"] == 2
+    assert report["best_rate"] == 0.95
 
 
 def test_certification_gate_empty_exam_never_certifies():
@@ -308,19 +365,23 @@ def test_retention_report_adds_event_age_and_retention_interval():
     el reporte los expone a la vez de forma aditiva (`interval_days` se conserva
     como alias retrocompatible)."""
     formal = "2026-08-01T00:00:00+00:00"
-    delayed_at = "2026-08-08T00:00:00+00:00"
     now = "2026-08-30T00:00:00+00:00"
     rows = [
         _exam_row("listening", formal),
-        _delayed_row("listening", delayed_at, 0.9),
+        # Dos reassessment points (F-A3): D+7 y D+14 desde el formal.
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.9,
+                     context_id="retention:1"),
+        _delayed_row("listening", "2026-08-15T00:00:00+00:00", 0.95,
+                     context_id="retention:2"),
     ]
     gate = av2.certification_gate(["listening"], rows, now=now)
     report = gate["retention_report"]["listening"]
-    assert report["retention_interval_days"] == [7]  # formal → delayed
-    assert report["interval_days"] == [7]  # alias conservado
-    assert report["event_age_days"] == [22]  # ahora - delayed
-    assert report["longest_interval_days"] == 7
+    assert report["retention_interval_days"] == [7, 14]  # formal → delayed
+    assert report["interval_days"] == [7, 14]  # alias conservado
+    assert report["event_age_days"] == [15, 22]  # ahora - delayed
+    assert report["longest_interval_days"] == 14
     assert report["longest_event_age_days"] == 22
+    assert report["stable_points"] == 2
     assert gate["certified"] is True
 
 
@@ -328,33 +389,41 @@ def test_certification_gate_anchors_delayed_to_origin_session():
     """F-A2: cada evento `delayed` se ancla a la sesión formal que reevalúa
     (`delayed_origins`, resuelta desde `source_session_id`), no al examen más
     reciente del nivel. Un examen formal posterior (re-intento) no debe acortar
-    el intervalo real del evento anterior."""
+    el intervalo real de los eventos previos."""
     formal = "2026-08-01T00:00:00+00:00"
     reattempt = "2026-08-10T00:00:00+00:00"
-    delayed_at = "2026-08-08T00:00:00+00:00"  # D+7 desde el origen real
     rows = [
         _exam_row("listening", formal, context_id="exam:a1:1"),
         # Re-intento formal posterior: el ancla global "más reciente" sería
-        # 2026-08-10 y rompería el intervalo real del evento previo.
+        # 2026-08-10 y rompería el intervalo real de los eventos previos.
         _exam_row("listening", reattempt, context_id="exam:a1:2"),
-        _delayed_row(
-            "listening", delayed_at, 0.9,
+        _delayed_row(  # reassessment 1: D+7 desde su origen real
+            "listening", "2026-08-08T00:00:00+00:00", 0.9,
             context_id="assessment_v2:retention:7",
         ),
+        _delayed_row(  # reassessment 2: D+14 desde su origen real
+            "listening", "2026-08-15T00:00:00+00:00", 0.9,
+            context_id="assessment_v2:retention:8",
+        ),
     ]
-    origins = {"assessment_v2:retention:7": formal}
-    # Sin anclaje por origen (comportamiento V3.25.1) no certifica: ancla global
-    # = 2026-08-10 → intervalo 0 días.
+    origins = {
+        "assessment_v2:retention:7": formal,
+        "assessment_v2:retention:8": formal,
+    }
+    # Sin anclaje por origen no certifica: ancla global = 2026-08-10 → los
+    # eventos quedan a 0 y 5 días (ninguno ≥ RETENTION_MIN_DAYS).
     old = av2.certification_gate(["listening"], rows)
     assert old["certified"] is False
-    assert old["retention_report"]["listening"]["interval_days"] == [0]
-    # Con `delayed_origins` el evento se ancla a su sesión origen (2026-08-01):
-    # D+7 real → sí certifica.
+    assert old["retention_report"]["listening"]["interval_days"] == [0, 5]
+    assert old["retention_report"]["listening"]["anchored_events"] == 0
+    # Con `delayed_origins` cada evento se ancla a su sesión origen (2026-08-01):
+    # D+7 y D+14 reales → dos puntos estables → sí certifica.
     gate = av2.certification_gate(["listening"], rows, delayed_origins=origins)
     assert gate["certified"] is True
     report = gate["retention_report"]["listening"]
-    assert report["interval_days"] == [7]
-    assert report["anchored_events"] == 1
+    assert report["interval_days"] == [7, 14]
+    assert report["anchored_events"] == 2
+    assert report["stable_points"] == 2
 
 
 def test_delayed_origin_anchors_maps_retention_contexts_to_origin_created_at():
@@ -375,6 +444,50 @@ def test_delayed_origin_anchors_maps_retention_contexts_to_origin_created_at():
     assert anchors == {
         "assessment_v2:retention:2": "2026-08-01T00:00:00+00:00"
     }
+
+
+def test_retention_spacing_due_requires_gap_since_last_reassessment_of_origin():
+    """F-A3: un reassessment nuevo del mismo origen debe separarse ≥
+    RETENTION_MIN_DAYS del ÚLTIMO reassessment cerrado de ese origen; sin
+    reassessment previo del origen, o con orígenes distintos, no hay restricción."""
+    now = "2026-08-30T00:00:00+00:00"
+    recent = "2026-08-26T00:00:00+00:00"  # hace 4 días
+    old = "2026-08-20T00:00:00+00:00"  # hace 10 días
+    sessions = [
+        {"id": 1, "kind": "level", "status": "done",
+         "source_session_id": None, "created_at": "2026-08-01T00:00:00+00:00"},
+        {"id": 2, "kind": "retention", "status": "done",
+         "source_session_id": 1, "created_at": old},
+        {"id": 3, "kind": "retention", "status": "done",
+         "source_session_id": 1, "created_at": recent},
+        {"id": 4, "kind": "retention", "status": "open",  # abierta: no cuenta
+         "source_session_id": 1, "created_at": now},
+        {"id": 5, "kind": "retention", "status": "done",
+         "source_session_id": 99, "created_at": now},  # otro origen: no aplica
+    ]
+    # El último cerrado del origen 1 es `recent` (4 días) → espaciado NO cumplido.
+    assert av2.retention_spacing_due(sessions, origin_session_id=1, now=now) is False
+    # Sin ningún reassessment cerrado del origen → transparente (True).
+    assert av2.retention_spacing_due(sessions, origin_session_id=1, now=old) is False
+    assert av2.retention_spacing_due(
+        sessions, origin_session_id=99, now=now
+    ) is False
+    assert av2.retention_spacing_due(
+        sessions, origin_session_id=1000, now=now
+    ) is True
+
+
+def test_retention_spacing_due_transparent_without_prior_point():
+    """F-A3: el primer reassessment de un origen no tiene punto previo que
+    respetar: el espaciado es transparente (la ventana formal la cubre
+    retention_due)."""
+    sessions = [
+        {"id": 1, "kind": "level", "status": "done",
+         "source_session_id": None, "created_at": "2026-08-01T00:00:00+00:00"},
+    ]
+    assert av2.retention_spacing_due(
+        sessions, origin_session_id=1, now="2026-08-08T00:00:00+00:00"
+    ) is True
 
 
 
@@ -770,3 +883,125 @@ def test_assessment_v2_retention_rejects_unstable_ratio(monkeypatch, tmp_path):
     )
     assert ret_done.status_code == 409, ret_done.text
     assert ret_done.json()["code"] == "RETENTION_NOT_DUE"
+
+
+# --- F-A3: retención sobre el examen de nivel + espaciado multi-punto --------
+
+
+def _submit_level_exam(uid, client, *, level_id="a1") -> tuple[dict, dict]:
+    """Pasa el examen de nivel (escalera Assessment 2.0, kind=level) con todas
+    las respuestas correctas; devuelve (sesión, respuestas correctas)."""
+    exam = load_assessments().exams[level_id]
+    start = client.post(
+        f"/api/academy/assessment/v2/start?user_id={uid}",
+        json={"kind": "level", "level_id": level_id},
+    )
+    assert start.status_code == 200, start.text
+    session = start.json()
+    answers = {it.id: it.correct_index for it in exam.items}
+    done = client.post(
+        f"/api/academy/assessment/v2/submit?user_id={uid}",
+        json={"session_id": session["session_id"], "answers": answers},
+    )
+    assert done.status_code == 200, done.text
+    assert done.json()["result"]["passed"] is True
+    return session, answers
+
+
+def test_assessment_v2_retention_over_level_exam_writes_delayed(
+    monkeypatch, tmp_path
+):
+    """F-A3 (fix escritor): la retención sobre el EXAMEN de nivel (kind=level)
+    antes no se podía puntuar — los ítems del examen no viven en el índice de
+    checks del currículo y `submit` devolvía None sin escribir evidencia
+    `delayed`. Ahora `correct_index` se resuelve desde el examen (origen
+    `kind=level`) y la evidencia delayed se escribe de verdad."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, "a1", "A1")
+    client = TestClient(app)
+
+    exam_session, answers = _submit_level_exam(uid, client)
+    _backdate_session(exam_session["session_id"], av2.RETENTION_MIN_DAYS + 1)
+
+    ret_start = client.post(
+        f"/api/academy/assessment/v2/start?user_id={uid}",
+        json={
+            "kind": "retention",
+            "level_id": "a1",
+            "source_session_id": exam_session["session_id"],
+        },
+    )
+    assert ret_start.status_code == 200, ret_start.text
+    ret_session = ret_start.json()
+    assert ret_session["instrument"]["source_kind"] == "level"
+    # Las respuestas del retention se puntúan contra la clave del examen.
+    ret_done = client.post(
+        f"/api/academy/assessment/v2/submit?user_id={uid}",
+        json={"session_id": ret_session["session_id"], "answers": answers},
+    )
+    assert ret_done.status_code == 200, ret_done.text
+    body = ret_done.json()
+    assert body["retention"] is not None
+    assert body["retention"]["stable"] is True
+    assert body["result"]["kind"] == "retention"
+
+    delayed = [
+        r
+        for r in academy_repo.list_evidence(uid, "a1")
+        if (r.get("evidence_kind") or "") == "delayed"
+    ]
+    assert delayed, "la retención sobre kind=level debe escribir evidencia delayed"
+    assert {r["skill"] for r in delayed}
+
+
+def test_assessment_v2_second_retention_of_same_origin_needs_spacing(
+    monkeypatch, tmp_path
+):
+    """F-A3 (espaciado): para que >1 punto sea REAL y separado, un reassessment
+    nuevo del mismo origen exige ≥ RETENTION_MIN_DAYS desde el último cerrado
+    de ese origen (409 si no). Tras espaciar el primer punto, el segundo abre y
+    cierra con normalidad."""
+    uid = _setup(monkeypatch, tmp_path)
+    academy_repo.enroll(uid, "a1", "A1")
+    client = TestClient(app)
+
+    exam_session, answers = _submit_level_exam(uid, client)
+    _backdate_session(exam_session["session_id"], av2.RETENTION_MIN_DAYS + 1)
+
+    def _open_retention(source_sid):
+        return client.post(
+            f"/api/academy/assessment/v2/start?user_id={uid}",
+            json={
+                "kind": "retention",
+                "level_id": "a1",
+                "source_session_id": source_sid,
+            },
+        )
+
+    def _submit_retention(session_id, correct_answers):
+        return client.post(
+            f"/api/academy/assessment/v2/submit?user_id={uid}",
+            json={"session_id": session_id, "answers": correct_answers},
+        )
+
+    # Punto 1: abre y cierra estable.
+    r1_start = _open_retention(exam_session["session_id"])
+    assert r1_start.status_code == 200, r1_start.text
+    r1 = r1_start.json()
+    r1_done = _submit_retention(r1["session_id"], answers)
+    assert r1_done.status_code == 200, r1_done.text
+    assert r1_done.json()["retention"]["stable"] is True
+
+    # Punto 2 inmediato (mismo origen, 0 días) → 409.
+    r2_start = _open_retention(exam_session["session_id"])
+    assert r2_start.status_code == 409, r2_start.text
+    assert r2_start.json()["code"] == "RETENTION_NOT_DUE"
+
+    # Espaciar: el primer reassessment ocurrió hace ≥ RETENTION_MIN_DAYS.
+    _backdate_session(r1["session_id"], av2.RETENTION_MIN_DAYS + 1)
+    r2_start = _open_retention(exam_session["session_id"])
+    assert r2_start.status_code == 200, r2_start.text
+    r2 = r2_start.json()
+    r2_done = _submit_retention(r2["session_id"], answers)
+    assert r2_done.status_code == 200, r2_done.text
+    assert r2_done.json()["retention"]["stable"] is True
