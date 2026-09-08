@@ -105,10 +105,30 @@ def test_skill_stability_bounded():
 
 
 def test_readiness_requires_score_confidence_and_evidence():
+    # B1 exige además evidencia de transferencia en todas las destrezas (F-C2
+    # V3.26): las entradas que deben estar ready la declaran.
     profile = [
-        _entry("grammar", score=0.9, confidence=0.9, evidence_count=5),
-        _entry("vocabulary", score=0.9, confidence=0.9, evidence_count=2),
-        _entry("listening", score=0.5, confidence=0.9, evidence_count=5),
+        _entry(
+            "grammar",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=5,
+            evidence_by_kind={"familiar": 4, "transfer": 1},
+        ),
+        _entry(
+            "vocabulary",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=2,
+            evidence_by_kind={"familiar": 1, "transfer": 1},
+        ),
+        _entry(
+            "listening",
+            score=0.5,
+            confidence=0.9,
+            evidence_count=5,
+            evidence_by_kind={"familiar": 4, "transfer": 1},
+        ),
     ]
     result = adaptive.readiness(profile, "B1")
     by_skill = {s["skill"]: s for s in result["skills"]}
@@ -126,6 +146,7 @@ def test_readiness_ignores_unevaluated_skills():
     assert result["overall"] == 0.0
     assert result["blocking_skills"] == []
     assert result["skills"][0]["ready"] is False
+    assert result["skills"][0]["blocked_by"] == []
 
 
 def test_readiness_all_ready():
@@ -161,6 +182,7 @@ def test_readiness_b1_listening_blocked_without_transfer():
     assert by_skill["listening"]["ready"] is False
     assert by_skill["listening"]["transfer_required"] == 1
     assert by_skill["listening"]["transfer_count"] == 0
+    assert by_skill["listening"]["blocked_by"] == ["transfer"]
     assert result["ready"] is False
     assert result["blocking_skills"] == ["listening"]
 
@@ -185,6 +207,73 @@ def test_readiness_b2_ready_with_transfer_without_novel():
     assert by_skill["listening"]["novel_count"] == 0
     assert result["ready"] is True
     assert result["blocking_skills"] == []
+
+
+def test_readiness_reports_blocked_by_reasons():
+    """F-C3 (V3.26): `blocked_by` desglosa el motivo de bloqueo de cada
+    destreza evaluada y no lista (score/confidence/evidence/transfer/novel)."""
+    profile = [
+        # Grammar lista en B1 (con transfer): no tiene motivos.
+        _entry(
+            "grammar",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=5,
+            evidence_by_kind={"familiar": 4, "transfer": 1, "novel": 0},
+        ),
+        # Vocabulary: pocas evidencias → evidence.
+        _entry(
+            "vocabulary",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=2,
+            evidence_by_kind={"familiar": 1, "transfer": 1, "novel": 0},
+        ),
+        # Reading: score bajo la banda B1 → score.
+        _entry(
+            "reading",
+            score=0.5,
+            confidence=0.9,
+            evidence_count=4,
+            evidence_by_kind={"familiar": 3, "transfer": 1, "novel": 0},
+        ),
+        # Listening: confidence bajo la banda → confidence.
+        _entry(
+            "listening",
+            score=0.9,
+            confidence=0.5,
+            evidence_count=4,
+            evidence_by_kind={"familiar": 3, "transfer": 1, "novel": 0},
+        ),
+    ]
+    result = adaptive.readiness(profile, "B1")
+    by_skill = {s["skill"]: s for s in result["skills"]}
+    assert by_skill["grammar"]["blocked_by"] == []
+    assert by_skill["grammar"]["ready"] is True
+    assert by_skill["vocabulary"]["blocked_by"] == ["evidence"]
+    assert by_skill["reading"]["blocked_by"] == ["score"]
+    assert by_skill["listening"]["blocked_by"] == ["confidence"]
+    assert set(result["blocking_skills"]) == {
+        "vocabulary",
+        "reading",
+        "listening",
+    }
+
+
+def test_readiness_ready_skills_report_no_blocked_by():
+    """F-C3: una destreza lista no declara motivos de bloqueo."""
+    profile = [
+        _entry(
+            "grammar",
+            score=0.9,
+            confidence=0.9,
+            evidence_count=5,
+            evidence_by_kind={"familiar": 4, "transfer": 1, "novel": 0},
+        )
+    ]
+    result = adaptive.readiness(profile, "B1")
+    assert result["skills"][0]["ready"] is True
+    assert result["skills"][0]["blocked_by"] == []
 
 
 def test_readiness_b2_listening_blocked_without_transfer():

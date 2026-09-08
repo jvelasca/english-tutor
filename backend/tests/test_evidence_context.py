@@ -347,26 +347,80 @@ def test_profile_entry_distinct_contexts_by_kind():
     assert entry["distinct_contexts_by_kind"]["familiar"] == 1
 
 
+# --- V3.26 F-C4 — evidencia legacy sin `context_id` marcada por destreza ------
+
+
+def test_profile_entry_reports_legacy_context_rows():
+    """F-C4: `build_skill_profile` cuenta las filas sin `context_id`
+    (`legacy_context_rows`) y marca `legacy_context_used` cuando algún kind con
+    filas no tiene NINGÚN contexto conocido (el gate retrocede a filas)."""
+    lv = load_level("a1")
+    skill = next(iter(lv.objectives())).skills[0]
+    now = "2026-08-01T00:00:00+00:00"
+
+    def _row(kind, cid=""):
+        return {
+            "skill": skill,
+            "evidence_kind": kind,
+            "item_type": "mcq",
+            "result": 1.0,
+            "created_at": now,
+            "context_id": cid,
+            "activity_id": "",
+            "task_type": "",
+        }
+
+    # Solo filas legacy (sin contexto): todas se cuentan y el kind retrocede.
+    rows = [_row("familiar"), _row("familiar"), _row("transfer")]
+    profile = academy_svc.build_skill_profile(lv, {}, rows, now=now)
+    entry = next(e for e in profile if e["skill"] == skill)
+    assert entry["legacy_context_rows"] == 3
+    assert entry["legacy_context_used"] is True
+
+    # Con contextos declarados en todos los kinds: sin filas legacy ni fallback.
+    rows2 = [
+        _row("familiar", "c1"),
+        _row("transfer", "c2"),
+        _row("transfer", "c3"),
+    ]
+    profile2 = academy_svc.build_skill_profile(lv, {}, rows2, now=now)
+    entry2 = next(e for e in profile2 if e["skill"] == skill)
+    assert entry2["legacy_context_rows"] == 0
+    assert entry2["legacy_context_used"] is False
+
+    # Mezcla: `familiar` con contexto y `transfer` solo legacy → el fallback se
+    # dispara por el kind sin contextos (F-L6 no aplica a esas filas).
+    rows3 = [_row("familiar", "c1"), _row("transfer"), _row("transfer")]
+    profile3 = academy_svc.build_skill_profile(lv, {}, rows3, now=now)
+    entry3 = next(e for e in profile3 if e["skill"] == skill)
+    assert entry3["legacy_context_rows"] == 2
+    assert entry3["legacy_context_used"] is True
+
+
 def test_mastery_gate_requires_distinct_transfer_contexts():
     """F-L6: dos transfer del mismo contexto NO satisfacen el gate MASTERED
     cuando el perfil conoce los contextos; con contextos distintos, sí."""
     from services import assessment_v2 as av2
 
     counts = {"familiar": 2, "transfer": 2, "novel": 0, "delayed": 1}
-    # Sin contextos (legacy): retrocede a filas → met.
-    assert av2.mastery_evidence_gate(counts)["met"] is True
-    # Un solo contexto de transfer para 2 filas → bloqueado.
+    # Sin contextos (legacy): retrocede a filas → met, con fallback marcado.
+    gate = av2.mastery_evidence_gate(counts)
+    assert gate["met"] is True
+    assert gate["legacy_fallback"] is True
+    # Un solo contexto de transfer para 2 filas → bloqueado, sin fallback.
     gate = av2.mastery_evidence_gate(
         counts, context_counts={"familiar": 2, "transfer": 1, "delayed": 1}
     )
     assert gate["met"] is False
     assert "transfer" in gate["missing"]
     assert gate["counts"]["transfer_contexts"] == 1
-    # Dos contextos distintos → met.
+    assert gate["legacy_fallback"] is False
+    # Dos contextos distintos → met, sin fallback.
     gate2 = av2.mastery_evidence_gate(
         counts, context_counts={"familiar": 2, "transfer": 2, "delayed": 1}
     )
     assert gate2["met"] is True
+    assert gate2["legacy_fallback"] is False
 
 
 def test_mastery_gate_requires_distinct_familiar_contexts():
@@ -527,3 +581,46 @@ def test_retention_report_multi_interval():
     # 20 días cubre D+1/D+3/D+7 pero todavía no D+21.
     assert report["intervals_reached"] == [1, 3, 7]
     assert g["certified"] is True
+
+
+def test_student_model_endpoint_reports_legacy_context(monkeypatch, tmp_path):
+    """F-C4 (V3.26): el Student Model agrega la marca legacy del perfil
+    (`legacy_context_evidence`/`legacy_context_rows`) y cada destreza expone su
+    desglose (`legacy_context_rows`/`legacy_context_used`)."""
+    uid = _setup(monkeypatch, tmp_path)
+    lv = load_level("a1")
+    obj = lv.objectives()[0]
+    skill = obj.skills[0]
+
+    def _student_model(client):
+        r = client.get("/api/academy/student-model", params={"user_id": uid})
+        assert r.status_code == 200
+        return r.json()
+
+    with TestClient(app) as client:
+        base = _student_model(client)
+        assert base["legacy_context_evidence"] is False
+        assert base["legacy_context_rows"] == 0
+        assert base["skills"], "el perfil A1 incluye destrezas canónicas"
+        for entry in base["skills"]:
+            assert entry["legacy_context_rows"] == 0
+            assert entry["legacy_context_used"] is False
+        # Evidencia legacy (sin `context_id`) por vía directa del repositorio.
+        for i in range(2):
+            academy_repo.record_evidence(
+                uid,
+                lv.level_id,
+                obj.id,
+                skill,
+                f"legacy:{i}",
+                item_type="mcq",
+                source="objective_assessment",
+                result=1.0,
+                evidence_kind="familiar",
+            )
+        body = _student_model(client)
+    entry = next(e for e in body["skills"] if e["skill"] == skill)
+    assert entry["legacy_context_rows"] == 2
+    assert entry["legacy_context_used"] is True
+    assert body["legacy_context_rows"] == 2
+    assert body["legacy_context_evidence"] is True

@@ -164,6 +164,17 @@ export function ProgressScreen({
           )}
         </motion.header>
 
+        {model?.legacy_context_evidence && (
+          <motion.div variants={item}>
+            <p className="rounded-lg border border-amber-700/40 bg-warning/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              {t("progress.legacyContextNote").replace(
+                "{n}",
+                String(model.legacy_context_rows ?? 0),
+              )}
+            </p>
+          </motion.div>
+        )}
+
         {!userId ? (
           <motion.div variants={item}>
             <Card className="p-6 text-center">

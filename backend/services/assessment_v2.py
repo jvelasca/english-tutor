@@ -746,10 +746,25 @@ def mastery_evidence_gate(
         "delayed": delayed >= MASTERY_EVIDENCE_REQUIREMENTS["delayed"],
     }
     missing = [name for name, ok in checks.items() if not ok]
+
+    def _ctx(kind: str) -> int:
+        if context_counts:
+            return int(context_counts.get(kind, 0) or 0)
+        return 0
+
+    # F-C4 (V3.26): el gate retrocede al conteo de filas cuando un kind con filas
+    # no tiene ningún contexto conocido (`familiar`/`transfer`). Con contextos el
+    # conteo es de experiencias distintas (las filas legacy no se cuentan ni
+    # inflan). La UI marca este estado como "experiencias no verificadas".
+    legacy_fallback = (familiar > 0 and _ctx("familiar") == 0) or (
+        transfer > 0 and _ctx("transfer") == 0
+    )
+
     return {
         "met": not missing,
         "checks": checks,
         "missing": missing,
+        "legacy_fallback": legacy_fallback,
         "counts": {
             "familiar": familiar,
             "familiar_contexts": familiar_xp,

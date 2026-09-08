@@ -511,6 +511,20 @@ def build_skill_profile(
         distinct_contexts_by_kind = {
             kind: evidence_context_count(rows, kind) for kind in EVIDENCE_KINDS
         }
+        # F-C4 (V3.26): marca de evidencia legacy sin `context_id`. Una fila sin
+        # contexto es anterior a V3.25 o de un emisor sin contexto: no demuestra
+        # experiencia distinta. `legacy_context_rows` cuenta esas filas y
+        # `legacy_context_used` es cierto cuando algún kind con filas no tiene
+        # NINGÚN contexto conocido (el gate retrocede al conteo de filas para ese
+        # kind; F-L6/M-F2 no aplica cuando el kind tiene contextos: las filas
+        # legacy simplemente no se cuentan, no inflan experiencias).
+        legacy_context_rows = sum(
+            1 for r in rows if not (r.get("context_id") or "").strip()
+        )
+        legacy_context_used = any(
+            evidence_by_kind[kind] > 0 and distinct_contexts_by_kind[kind] == 0
+            for kind in EVIDENCE_KINDS
+        )
         profile.append(
             {
                 "skill": skill,
@@ -524,6 +538,8 @@ def build_skill_profile(
                 "subskills": [],
                 "evidence_by_kind": evidence_by_kind,
                 "distinct_contexts_by_kind": distinct_contexts_by_kind,
+                "legacy_context_rows": legacy_context_rows,
+                "legacy_context_used": legacy_context_used,
                 "production_count": production_count,
                 "support_levels": support_levels,
                 "independent_count": (

@@ -938,6 +938,28 @@ const STRINGS: Record<string, Entry> = {
   "today.nextMilestone": { en: "next milestone", es: "próximo hito" },
   "today.readyFor": { en: "Readiness for", es: "Preparación para" },
   "today.blocking": { en: "Blocking skill:", es: "Destreza bloqueante:" },
+  // F-C3 (V3.26): motivo de bloqueo de readiness por destreza (`blocked_by`).
+  "today.blockReason.score": {
+    en: "score below the band",
+    es: "puntuación por debajo de la banda",
+  },
+  "today.blockReason.confidence": {
+    en: "low confidence",
+    es: "confianza baja",
+  },
+  "today.blockReason.evidence": {
+    en: "not enough evidence",
+    es: "evidencia insuficiente",
+  },
+  "today.blockReason.transfer": {
+    en: "needs transfer tasks",
+    es: "faltan tareas de transferencia",
+  },
+  "today.blockReason.novel": {
+    en: "needs novel production",
+    es: "falta producción novel",
+  },
+  "today.blockReason.other": { en: "gate not met", es: "gate sin cumplir" },
   "today.review": { en: "review", es: "repasa" },
   "today.practice": { en: "practice", es: "practica" },
   "today.readyToReassess": {
@@ -1126,6 +1148,20 @@ const STRINGS: Record<string, Entry> = {
   "assessmentV2.masteryMissing": {
     en: "Still missing",
     es: "Aún falta",
+  },
+  // F-C4 (V3.26): el gate usó el conteo de filas (sin contextos — legacy).
+  "assessmentV2.legacyGateNote": {
+    en: "Some experiences predate context tracking: they are counted but not verified as distinct activities.",
+    es: "Algunas experiencias son anteriores al registro de contexto: cuentan, pero no están verificadas como actividades distintas.",
+  },
+  // F-C4 (V3.26): avisos de evidencia legacy sin `context_id`.
+  "progress.legacyContextNote": {
+    en: "Your profile includes {n} record(s) from before context tracking: they count toward your totals but are not verified as distinct activities.",
+    es: "Tu perfil incluye {n} registro(s) anteriores al registro de contexto: cuentan para tus totales, pero no están verificados como actividades distintas.",
+  },
+  "progress.skillLegacyNote": {
+    en: "{n} record(s) of this skill predate context tracking and are not verified as distinct activities.",
+    es: "{n} registro(s) de esta destreza son anteriores al registro de contexto y no están verificados como actividades distintas.",
   },
   "assessmentV2.retentionDue": {
     en: "Retention reassessment is due",

@@ -730,6 +730,12 @@ async def get_student_model(user_id: str) -> StudentModelOut:
     """Student Model 2.0: nivel actual/estimado, perfil por destreza con stability
     y trend, readiness hacia el siguiente nivel y reevaluación pendiente (si hay)."""
     sm = await build_student_model(user_id)
+    # F-C4 (V3.26): agregado de evidencia legacy sin `context_id` sobre las
+    # destrezas del tramo actual (marca por skill en `SkillProfileOut`).
+    legacy_rows = sum(
+        int(s.get("legacy_context_rows", 0) or 0) for s in sm["skills"]
+    )
+    legacy_used = any(bool(s.get("legacy_context_used")) for s in sm["skills"])
     return StudentModelOut(
         level_id=sm["level_id"],
         current_level=sm["current_level"],
@@ -746,6 +752,8 @@ async def get_student_model(user_id: str) -> StudentModelOut:
             ReassessmentOut(**sm["reassessment"]) if sm["reassessment"] else None
         ),
         mastery=[MasteryRecordOut(**m.model_dump()) for m in sm["mastery"]],
+        legacy_context_evidence=bool(legacy_rows) or legacy_used,
+        legacy_context_rows=legacy_rows,
     )
 
 

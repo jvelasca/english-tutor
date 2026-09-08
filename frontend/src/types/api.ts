@@ -1724,6 +1724,9 @@ export interface AssessmentV2MasteryGate {
   checks: Record<string, boolean>;
   missing: string[];
   counts: Record<string, number>;
+  // F-C4 (V3.26): el gate retrocedió al conteo de filas para familiar/transfer
+  // (sin contextos conocidos — evidencia legacy sin `context_id`).
+  legacy_fallback?: boolean;
 }
 
 export interface AssessmentV2Ladder {
@@ -2283,6 +2286,16 @@ export interface SkillProfile {
   stability: number;
   trend: number | null;
   subskills: Record<string, unknown>[];
+  // V3.25: soporte por emisor y experiencias distintas por evidence_kind.
+  evidence_by_kind?: Record<string, number>;
+  distinct_contexts_by_kind?: Record<string, number>;
+  support_levels?: Record<string, number>;
+  independent_count?: number;
+  production_count?: number;
+  generalized_score?: number | null;
+  // F-C4 (V3.26): evidencia legacy sin `context_id` en la destreza.
+  legacy_context_rows?: number;
+  legacy_context_used?: boolean;
 }
 
 export interface ReadinessSkill {
@@ -2296,6 +2309,8 @@ export interface ReadinessSkill {
   novel_required?: number;
   transfer_count?: number;
   novel_count?: number;
+  // F-C3 (V3.26): motivo de bloqueo de una destreza evaluada y no lista.
+  blocked_by?: string[];
 }
 
 export interface Readiness {
@@ -2356,6 +2371,9 @@ export interface StudentModel {
   readiness: Readiness;
   reassessment: Reassessment | null;
   mastery: MasteryRecord[];
+  // F-C4 (V3.26): el perfil contiene evidencia legacy sin `context_id`.
+  legacy_context_evidence?: boolean;
+  legacy_context_rows?: number;
 }
 
 export interface SessionStep {

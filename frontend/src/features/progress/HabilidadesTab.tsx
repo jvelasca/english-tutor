@@ -233,6 +233,14 @@ function SkillDetail({
             : t("mastery.reviewNow")}
         </Badge>
       )}
+      {(profile.legacy_context_rows ?? 0) > 0 && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          {t("progress.skillLegacyNote").replace(
+            "{n}",
+            String(profile.legacy_context_rows ?? 0),
+          )}
+        </p>
+      )}
     </div>
   );
 }

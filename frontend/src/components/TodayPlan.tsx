@@ -34,6 +34,15 @@ const GOAL_TYPE_ORDER: LearningGoalType[] = [
   "exam",
 ];
 
+// F-C3 (V3.26): motivo de bloqueo de readiness por destreza (`blocked_by`).
+const BLOCK_REASON_KEYS: Record<string, string> = {
+  score: "today.blockReason.score",
+  confidence: "today.blockReason.confidence",
+  evidence: "today.blockReason.evidence",
+  transfer: "today.blockReason.transfer",
+  novel: "today.blockReason.novel",
+};
+
 const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
 interface TodayPlanProps {
@@ -260,7 +269,18 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
           <p className="today-blocking">
             {t("today.blocking")}{" "}
             {model.readiness.blocking_skills
-              .map((s) => SKILL_LABELS[s] ?? s)
+              .map((s) => {
+                const r = model.readiness.skills.find((k) => k.skill === s);
+                const reasons = (r?.blocked_by ?? []).filter(Boolean);
+                const label = SKILL_LABELS[s] ?? s;
+                // F-C3 (V3.26): el backend declara el motivo de bloqueo
+                // (score/confidence/evidence/transfer/novel); la UI lo traduce.
+                return reasons.length > 0
+                  ? `${label} (${reasons
+                      .map((reason) => t(BLOCK_REASON_KEYS[reason] ?? "today.blockReason.other"))
+                      .join(", ")})`
+                  : label;
+              })
               .join(", ")}
           </p>
         )}

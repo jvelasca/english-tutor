@@ -252,6 +252,22 @@ def readiness(profile: list[dict], target_level: str) -> dict:
             and transfer_ok
             and novel_ok
         )
+        # F-C3 (V3.26): motivo por el que una destreza evaluada NO está lista.
+        # `blocked_by` es el desglose de gates no satisfechos; vacío si está
+        # lista o si aún no tiene evidencia (una destreza sin evaluar no
+        # bloquea: no hay dato que explicar).
+        blocked_by: list[str] = []
+        if evaluated and not is_ready:
+            if score < minimum:
+                blocked_by.append("score")
+            if confidence < min_conf:
+                blocked_by.append("confidence")
+            if evidence_count < min_evidence:
+                blocked_by.append("evidence")
+            if not transfer_ok:
+                blocked_by.append("transfer")
+            if not novel_ok:
+                blocked_by.append("novel")
         if evaluated:
             evaluated_count += 1
             if is_ready:
@@ -270,6 +286,7 @@ def readiness(profile: list[dict], target_level: str) -> dict:
                 "novel_required": novel_required,
                 "transfer_count": transfer_count,
                 "novel_count": novel_count,
+                "blocked_by": blocked_by,
             }
         )
     overall = round(ready_count / evaluated_count * 100, 1) if evaluated_count else 0.0

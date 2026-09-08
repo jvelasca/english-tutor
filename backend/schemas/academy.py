@@ -841,6 +841,10 @@ class AssessmentV2MasteryGateOut(BaseModel):
     checks: dict[str, bool] = Field(default_factory=dict)
     missing: list[str] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)
+    # F-C4 (V3.26): True cuando el gate retrocedió al conteo de filas para
+    # `familiar`/`transfer` (sin contextos conocidos en el nivel — evidencia
+    # legacy). La UI puede explicar que esas experiencias no están verificadas.
+    legacy_fallback: bool = False
 
 
 class AssessmentV2LadderOut(BaseModel):
@@ -1099,6 +1103,12 @@ class SkillProfileOut(BaseModel):
     independent_count: int = 0
     production_count: int = 0
     generalized_score: float | None = None
+    # F-C4 (V3.26): evidencia legacy sin `context_id` en la destreza.
+    # `legacy_context_rows` cuenta filas sin contexto y `legacy_context_used`
+    # marca cuando algún kind con filas no tiene NINGÚN contexto conocido (los
+    # gates retroceden al conteo de filas para ese kind; F-L6/M-F2).
+    legacy_context_rows: int = 0
+    legacy_context_used: bool = False
 
 
 class CefrProfileOut(BaseModel):
@@ -1114,7 +1124,11 @@ class ReadinessSkillOut(BaseModel):
 
     V3.25 (fase 3, F-L6): `transfer_count` es el valor EFECTIVO usado por el
     gate: contextos de actividad distintos cuando el perfil los conoce, conteo
-    de filas en perfiles legacy (sin contexto declarado)."""
+    de filas en perfiles legacy (sin contexto declarado).
+
+    V3.26 (F-C3): `blocked_by` desglosa por qué una destreza evaluada NO está
+    lista (`score`/`confidence`/`evidence`/`transfer`/`novel`); vacío si está
+    lista o si aún no tiene evidencia."""
 
     skill: str
     score: float
@@ -1126,6 +1140,7 @@ class ReadinessSkillOut(BaseModel):
     novel_required: int = 0
     transfer_count: int = 0
     novel_count: int = 0
+    blocked_by: list[str] = Field(default_factory=list)
 
 
 class ReadinessOut(BaseModel):
@@ -1201,6 +1216,11 @@ class StudentModelOut(BaseModel):
     readiness: ReadinessOut
     reassessment: ReassessmentOut | None = None
     mastery: list[MasteryRecordOut] = Field(default_factory=list)
+    # F-C4 (V3.26): agregado de evidencia legacy sin `context_id` del perfil.
+    # `legacy_context_evidence` es cierto si alguna destreza tiene filas legacy;
+    # `legacy_context_rows` es el total de filas sin contexto del tramo actual.
+    legacy_context_evidence: bool = False
+    legacy_context_rows: int = 0
 
 
 class SessionStepOut(BaseModel):

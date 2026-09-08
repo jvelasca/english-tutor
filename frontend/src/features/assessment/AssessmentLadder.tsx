@@ -156,6 +156,11 @@ export function AssessmentLadder({ userId, levelId }: AssessmentLadderProps) {
                 ? t("assessmentV2.masteryOk")
                 : `${t("assessmentV2.masteryMissing")}: ${ladder.mastery_gate.missing.join(", ")}`}
             </p>
+            {ladder.mastery_gate.legacy_fallback && (
+              <p className="text-amber-700 dark:text-amber-400">
+                {t("assessmentV2.legacyGateNote")}
+              </p>
+            )}
             {ladder.readiness.retention_due && (
               <p className="text-amber-700 dark:text-amber-400">
                 {t("assessmentV2.retentionDue")}
