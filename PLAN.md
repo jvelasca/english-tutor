@@ -52,6 +52,32 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.22.0` — **ASR Calibration + Student Model (léxico)**
+  (implementa el plan V3.22 del dossier de la auditoría externa V3.21.0:
+  **ASR-01 — calibración ASR por segmentos** — `aggregate_asr_segments`
+  materializa los `Segment` de faster-whisper y agrega `mean_logprob`/
+  `min_logprob`/`max_no_speech_prob`/`no_speech_ratio`/`speech_ratio`/
+  `compression_ratio`/`segment_count` (V3.21 los leía de `TranscriptionInfo`,
+  que no los expone: `no_speech` y `low_confidence` eran inalcanzables);
+  `classify_asr_status(*, text, metrics)` con política explícita
+  (`MIN_SPEECH_ATTEMPT_SECONDS` 0.5 s; texto vacío con 0 segmentos y audio
+  corto → `unintelligible`, con audio ≥ 0.5 s → `no_speech`; texto alucinado
+  sobre no-habla — `no_speech_ratio` alto — → `no_speech`; `mean_logprob` bajo
+  → `low_confidence`) y telemetría emitida sin clasificar (frontera
+  `LANGUAGE_MISMATCH` documentada) · **Student Model léxico (P1-04/05)** —
+  migración idempotente `exposure_days`/`first_exposed_at` en `vocabulary`
+  (backfill 1 día + `first_exposed_at = last_exposed_at`), `record_exposures`
+  cuenta días distintos de exposición y fija el alta, y la matriz
+  `item_competence_matrix` **separa Retention de Transfer**: `transfer` =
+  producción en ≥ 2 canales (`transfer_contexts`), `retention` = espaciado
+  receptivo (`_spaced_exposure`) o productivo (`_spaced_production`);
+  `production_gap` (reconocida-nunca-producida, antes `gap`) y `transfer_gap`
+  (producida-sin-transferir) independientes en la matriz y el summary; la UI
+  del diccionario pasa a 6 contadores · **tests**: backend pytest **1440** +
+  integración ASR opt-in (`test_stt_asr_integration.py`, Whisper real) + ruff
+  limpio; frontend vitest **450** (57 archivos) + `tsc`/`vite build` OK;
+  `check_release_consistency` 3.22.0 exit 0; CONSTITUCIÓN sin cambios). Base:
+  `3.21.0`
 - ✅ Versión estable `3.21.0` — **Speaking & Evidence Calibration**
   (cierra el plan V3.21 del dossier de la auditoría externa V3.20.0, calibrando
   la verdad del micro-drill y el feedback ASR honesto: **F1 P0 — verdad del

@@ -8,7 +8,8 @@ de primer nivel con:
 - `item_recall`   — probabilidad de recuerdo actual (curva de olvido existente).
 - `item_status`   — `mastered`/`known`/`learning`/`weak` (determinista).
 - `item_competence_matrix` — matriz Recognition/Production/Transfer/Retention
-  con el "transfer gap" por ítem (V3.21, V20-16/V20-17).
+  con gaps independientes por ítem (V3.21, V20-16/V20-17; V3.22 separa
+  Retention de Transfer con `exposure_days`).
 - `next_review_days` — siguiente repaso (mismo scheduler que las destrezas).
 
 P1 (§3.2 de la Constitución): el ítem pasa de `word`/`structure` a **Lexical
@@ -288,43 +289,62 @@ def _spaced_production(row: dict) -> bool:
     return (last - first).days >= 1
 
 
+def _spaced_exposure(row: dict) -> bool:
+    """Exposición espaciada: el ítem se expuso en >= 2 días distintos y con un
+    hueco de >= 1 día natural entre la primera y la última exposición.
+    V3.22: señal de retención RECEPTIVA (leído/oído en días distintos), que
+    permite separar la dimensión Retention de Transfer sin tocar producción."""
+    if _int(row.get("exposure_days")) < 2:
+        return False
+    first = _day_or_none(row.get("first_exposed_at"))
+    last = _day_or_none(row.get("last_exposed_at"))
+    if first is None or last is None:
+        return False
+    return (last - first).days >= 1
+
+
 def item_competence_matrix(row: dict) -> dict:
-    """Matriz de competencia por ítem léxico (V3.21, V20-16/V20-17).
+    """Matriz de competencia por ítem léxico (V3.21, V20-16/V20-17; V3.22).
 
-    Derivada SIN migrar columnas (se mantiene el invariante por fila
-    `sum(channel_prod) == appearances`). Pura y determinista:
+    Derivada SIN migrar columnas de producción (se mantiene el invariante por
+    fila `sum(channel_prod) == appearances`). V3.22 separa Retention de
+    Transfer usando `exposure_days`/`first_exposed_at`. Pura y determinista:
 
-    - `recognition`   — el ítem se ha expuesto (leído/oído): `exposures > 0`.
-    - `production`    — se ha producido en algún canal (`sum(channel_prod) > 0`),
+    - `recognition`       — el ítem se ha expuesto (leído/oído): `exposures > 0`.
+    - `production`        — se ha producido en algún canal (`sum(channel_prod) > 0`),
       con desglose `production_channels`.
-    - `transfer`      — la palabra se usa fuera del contexto de aprendizaje:
-      producción en >= 2 canales O producción espaciada (en >= 2 días y con
-      hueco >= 1 día). Señal de que el ítem no quedó anclado a un solo canal.
-    - `retention`     — señal espaciada previa: producción en días distintos
-      (mismo criterio que `transfer`, porque no existe aún `exposure_days`
-      para reconocimiento repetido en días distintos; ver deuda de modelo).
-    - `gap`           — el "transfer gap" real: reconocida pero NUNCA producida
-      (`recognition && !production`). Es lo que explota el speaking micro-drill.
+    - `transfer_contexts` — nº de canales de producción distintos.
+    - `transfer`          — uso fuera del contexto original de aprendizaje:
+      producción en >= 2 canales. Ya NO incluye el espaciado: ese es señal de
+      retención (¿lo recuerda después de un intervalo?), no de transferencia
+      (¿lo usa en otro contexto?).
+    - `retention`         — recuerdo tras intervalo: producción espaciada
+      (`_spaced_production`) O exposición espaciada receptiva (`_spaced_exposure`).
+    - `production_gap`    — reconocida pero NUNCA producida (`recognition &&
+      !production`): el gap que cierra el speaking micro-drill (antes `gap`).
+    - `transfer_gap`      — producida en ejercicios pero nunca usada en otro
+      contexto (`production && !transfer`): señal de falta de transferencia
+      real (V3.22: antes `gap` era Recognition->Production, no un transfer gap).
 
-    Deuda de modelo (V20-17, sin migrar ahora): renombrar conceptualmente
-    `appearances` -> `production_count` y separar `exposure_count`; añadir una
-    columna `exposure_days` (ALTER idempotente, patrón existente) para poder
-    acreditar reconocimiento repetido en días distintos como retención
-    receptiva. Hasta entonces `retention` solo refleja la producción espaciada.
+    Deuda de modelo (sin migración destructiva): renombrar conceptualmente
+    `appearances` -> `production_count` y `exposures` -> `exposure_count`.
     """
     exposure_total = _int(row.get("exposures"))
     recognition = exposure_total > 0
     channels = production_channels(row)
     production = len(channels) > 0
-    spaced = _spaced_production(row)
-    transfer = len(channels) >= 2 or spaced
+    transfer_contexts = len(channels)
+    transfer = transfer_contexts >= 2
+    retention = _spaced_exposure(row) or _spaced_production(row)
     return {
         "recognition": recognition,
         "production": production,
         "production_channels": channels,
+        "transfer_contexts": transfer_contexts,
         "transfer": transfer,
-        "retention": transfer,
-        "gap": recognition and not production,
+        "retention": retention,
+        "production_gap": recognition and not production,
+        "transfer_gap": recognition and production and not transfer,
     }
 
 
@@ -347,14 +367,16 @@ def cefr_distribution(rows: list[dict]) -> list[dict]:
 
 def summary(rows: list[dict], now: str = "") -> dict:
     """Resumen del léxico: totales por estado, distribución CEFR y contadores de
-    la matriz de competencia (V3.21, V20-16): `recognized`, `produced`,
-    `transfer`, `retention` y `transfer_gap` (reconocidas-nunca-producidas)."""
+    la matriz de competencia (V3.21/V3.22): `recognized`, `produced`,
+    `transfer`, `retention`, `production_gap` (reconocidas-nunca-producidas) y
+    `transfer_gap` (producidas en ejercicios sin transferencia a otro contexto)."""
     statuses = {"mastered": 0, "learning": 0, "known": 0, "weak": 0}
     competence = {
         "recognized": 0,
         "produced": 0,
         "transfer": 0,
         "retention": 0,
+        "production_gap": 0,
         "transfer_gap": 0,
     }
     for row in rows:
@@ -366,8 +388,11 @@ def summary(rows: list[dict], now: str = "") -> dict:
             competence["produced"] += 1
         if matrix["transfer"]:
             competence["transfer"] += 1
+        if matrix["retention"]:
             competence["retention"] += 1
-        if matrix["gap"]:
+        if matrix["production_gap"]:
+            competence["production_gap"] += 1
+        if matrix["transfer_gap"]:
             competence["transfer_gap"] += 1
     return {
         "total": len(rows),

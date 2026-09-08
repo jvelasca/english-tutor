@@ -88,35 +88,57 @@ def record_exposures(user_id: str, words: list[str]) -> bool:
     """Registra exposición (palabras de la respuesta del tutor). Upsert que crea la
     fila con `appearances = 0` si el alumno aún no ha producido la palabra.
 
+    V3.22: además de `exposures`/`last_exposed_at`, incrementa `exposure_days`
+    cuando la exposición ocurre en un día distinto al de la última exposición y
+    fija `first_exposed_at` en la primera exposición (patrón idéntico al de
+    `production_days`/`first_seen` en `record_production`). Así la matriz de
+    competencia puede acreditar retención RECEPTIVA espaciada sin migrar.
+
     Devuelve False si el usuario no existe."""
     if get_user(user_id) is None:
         return False
     if not words:
         return True
     now = _now()
+    today = _day(now)
     with closing(_conn()) as conn, conn:
-        conn.executemany(
-            "INSERT INTO vocabulary "
-            "(user_id, word, appearances, first_seen, last_seen, "
-            "exposures, last_exposed_at, production_days) "
-            "VALUES (?, ?, 0, '', '', 1, ?, 0) "
-            "ON CONFLICT(user_id, word) DO UPDATE SET "
-            "exposures = vocabulary.exposures + 1, "
-            "last_exposed_at = excluded.last_exposed_at",
-            [(user_id, w, now) for w in words],
-        )
+        for w in words:
+            row = conn.execute(
+                "SELECT last_exposed_at FROM vocabulary "
+                "WHERE user_id = ? AND word = ?",
+                (user_id, w),
+            ).fetchone()
+            prior = row["last_exposed_at"] if row else ""
+            new_day = 1 if not prior or _day(prior) != today else 0
+            conn.execute(
+                "INSERT INTO vocabulary "
+                "(user_id, word, appearances, first_seen, last_seen, "
+                "exposures, last_exposed_at, production_days, "
+                "exposure_days, first_exposed_at) "
+                "VALUES (?, ?, 0, '', '', 1, ?, 0, ?, ?) "
+                "ON CONFLICT(user_id, word) DO UPDATE SET "
+                "exposures = vocabulary.exposures + 1, "
+                "last_exposed_at = excluded.last_exposed_at, "
+                "exposure_days = vocabulary.exposure_days "
+                "+ excluded.exposure_days, "
+                "first_exposed_at = CASE WHEN vocabulary.first_exposed_at = '' "
+                "THEN excluded.first_exposed_at ELSE vocabulary.first_exposed_at END",
+                (user_id, w, now, new_day, now),
+            )
     return True
 
 
 def get_vocabulary(user_id: str) -> list[dict]:
     """Devuelve el vocabulario del usuario ordenado por producción (desc) y
-    palabra (asc). Incluye métricas de exposición y espaciado, el contexto
-    curricular del ítem léxico (V2.3) y el desglose de producción por destreza
+    palabra (asc). Incluye métricas de exposición y espaciado (V3.22:
+    `exposure_days`/`first_exposed_at`), el contexto curricular del ítem léxico
+    (V2.3) y el desglose de producción por destreza
     (V3.19: `chat_prod`/`speaking_prod`/`writing_prod`/`conversation_prod`)."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT word, appearances, first_seen, last_seen, "
-            "exposures, last_exposed_at, production_days, "
+            "exposures, last_exposed_at, exposure_days, first_exposed_at, "
+            "production_days, "
             "cefr, level_id, objective_id, source, lemma, kind, "
             "chat_prod, speaking_prod, writing_prod, conversation_prod "
             "FROM vocabulary "

@@ -372,7 +372,7 @@ def test_coverage_indicator_receptive_productive_by_level():
     assert "nivel-raro" not in by_level
 
 
-# --- V3.21 (V20-16/V20-17): matriz de competencia --------------------------
+# --- V3.21 (V20-16/V20-17) / V3.22: matriz de competencia -------------------
 
 def _row(**overrides) -> dict:
     row = {
@@ -382,6 +382,8 @@ def _row(**overrides) -> dict:
         "last_seen": "",
         "exposures": 0,
         "last_exposed_at": "",
+        "exposure_days": 0,
+        "first_exposed_at": "",
         "production_days": 0,
         "chat_prod": 0,
         "speaking_prod": 0,
@@ -396,21 +398,29 @@ def test_matrix_never_seen_is_all_false_no_gap():
     m = lexicon.item_competence_matrix(_row())
     assert m["recognition"] is False
     assert m["production"] is False
-    assert m["gap"] is False  # sin reconocimiento no hay "transfer gap"
+    assert m["transfer"] is False
+    assert m["retention"] is False
+    assert m["production_gap"] is False  # sin reconocimiento no hay gap
+    assert m["transfer_gap"] is False
     assert m["production_channels"] == []
+    assert m["transfer_contexts"] == 0
 
 
-def test_matrix_recognition_only_is_gap():
+def test_matrix_recognition_only_is_production_gap():
     m = lexicon.item_competence_matrix(_row(exposures=3))
     assert m["recognition"] is True
     assert m["production"] is False
     assert m["transfer"] is False
     assert m["retention"] is False
-    assert m["gap"] is True
+    # Reconocida y nunca producida: el gap que cierra el speaking micro-drill.
+    assert m["production_gap"] is True
+    assert m["transfer_gap"] is False
 
 
-def test_matrix_produced_but_not_transfer():
-    # Producida una sola vez en un solo canal y un solo día: sin transfer.
+def test_matrix_produced_once_single_channel_is_transfer_gap():
+    # Producida una sola vez en un solo canal y un solo día: ni transfer ni
+    # retention; es un transfer gap real (producida en ejercicios pero nunca
+    # usada en otro contexto).
     m = lexicon.item_competence_matrix(
         _row(
             exposures=2,
@@ -424,21 +434,27 @@ def test_matrix_produced_but_not_transfer():
     assert m["production"] is True
     assert m["production_channels"] == ["speaking"]
     assert m["transfer"] is False
-    assert m["gap"] is False
+    assert m["retention"] is False
+    assert m["production_gap"] is False
+    assert m["transfer_gap"] is True
 
 
-def test_matrix_transfer_by_two_channels():
+def test_matrix_transfer_by_two_channels_same_day_no_retention():
+    # Dos canales el MISMO día: transfer (contextos distintos) pero sin hueco
+    # espaciado -> retention False (V3.22: Transfer y Retention se separan).
     m = lexicon.item_competence_matrix(
         _row(appearances=2, exposures=2, speaking_prod=1, writing_prod=1)
     )
     assert set(m["production_channels"]) == {"speaking", "writing"}
+    assert m["transfer_contexts"] == 2
     assert m["transfer"] is True
-    assert m["retention"] is True
-    assert m["gap"] is False
+    assert m["retention"] is False
+    assert m["transfer_gap"] is False
 
 
-def test_matrix_transfer_by_spaced_production():
-    # Un solo canal pero producida en >= 2 días con hueco >= 1 día: transfer.
+def test_matrix_spaced_production_is_retention_not_transfer():
+    # Un solo canal pero producida en >= 2 días con hueco >= 1 día: retention
+    # (recuerdo tras intervalo) sin transferencia a otro contexto (V3.22).
     m = lexicon.item_competence_matrix(
         _row(
             appearances=2,
@@ -450,8 +466,26 @@ def test_matrix_transfer_by_spaced_production():
         )
     )
     assert m["production_channels"] == ["speaking"]
-    assert m["transfer"] is True
+    assert m["transfer_contexts"] == 1
+    assert m["transfer"] is False
     assert m["retention"] is True
+
+
+def test_matrix_spaced_receptive_exposure_is_retention():
+    # Exposición espaciada (días distintos) sin producción: retención receptiva.
+    m = lexicon.item_competence_matrix(
+        _row(
+            exposures=3,
+            exposure_days=2,
+            first_exposed_at="2026-01-01T10:00:00+00:00",
+            last_exposed_at="2026-01-03T10:00:00+00:00",
+        )
+    )
+    assert m["recognition"] is True
+    assert m["production"] is False
+    assert m["retention"] is True
+    assert m["transfer"] is False
+    assert m["production_gap"] is True  # sigue pendiente de producción
 
 
 def test_matrix_spaced_requires_one_day_gap():
@@ -465,6 +499,7 @@ def test_matrix_spaced_requires_one_day_gap():
             last_seen="2026-01-01T11:00:00+00:00",
         )
     )
+    assert m["retention"] is False
     assert m["transfer"] is False
 
 
@@ -480,10 +515,18 @@ def test_summary_counts_matrix_competence():
             speaking_prod=1,
             writing_prod=1,
         ),
+        _row(
+            word="retained-receptive",
+            exposures=3,
+            exposure_days=2,
+            first_exposed_at="2026-01-01T10:00:00+00:00",
+            last_exposed_at="2026-01-03T10:00:00+00:00",
+        ),
     ]
     s = lexicon.summary(rows)
-    assert s["recognized"] == 3  # recog + produced-1 + transfer
+    assert s["recognized"] == 4  # recog + produced-1 + transfer + retained
     assert s["produced"] == 2
-    assert s["transfer"] == 1
-    assert s["retention"] == 1
-    assert s["transfer_gap"] == 1  # solo "recog"
+    assert s["transfer"] == 1  # solo "transfer" (2 canales)
+    assert s["retention"] == 1  # solo "retained-receptive" (espaciado)
+    assert s["production_gap"] == 2  # "recog" + "retained-receptive"
+    assert s["transfer_gap"] == 1  # solo "produced-1"

@@ -292,14 +292,14 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.learning": { en: "Learning", es: "Aprendiendo" },
   "dictionary.weak": { en: "Weak", es: "Débiles" },
   "dictionary.mastered": { en: "Mastered", es: "Dominadas" },
-  // V3.21 (V20-16): matriz Recognition/Production/Transfer/Retention.
+  // V3.21 (V20-16) / V3.22: matriz Recognition/Production/Transfer/Retention.
   "dictionary.competenceTitle": {
     en: "Competence matrix",
     es: "Matriz de competencia",
   },
   "dictionary.competenceHint": {
-    en: "Recognition (met it), production (used it), transfer (used in 2+ contexts or on spaced days), retention (spaced) and the transfer gap the drill closes.",
-    es: "Reconocimiento (la has visto), producción (la has usado), transferencia (usada en 2+ contextos o en días separados), retención (espaciada) y el gap de transferencia que cierra el drill.",
+    en: "Recognition (met it), production (used it), transfer (used in 2+ contexts), retention (recalled after a gap: receptive or productive spacing), plus the two gaps: not produced yet, and produced but not transferred.",
+    es: "Reconocimiento (la has visto), producción (la has usado), transferencia (usada en 2+ contextos), retención (recordada tras un intervalo: espaciada receptiva o productiva), y los dos gaps: aún no producida, y producida pero sin transferir.",
   },
   "dictionary.competenceRecognized": { en: "Recognized", es: "Reconocidas" },
   "dictionary.competenceProduced": { en: "Produced", es: "Producidas" },
@@ -308,6 +308,10 @@ const STRINGS: Record<string, Entry> = {
     es: "Transferidas",
   },
   "dictionary.competenceRetention": { en: "Retention", es: "Retención" },
+  "dictionary.competenceProductionGap": {
+    en: "Production gap",
+    es: "Gap de producción",
+  },
   "dictionary.competenceGap": { en: "Transfer gap", es: "Gap de transferencia" },
   "dictionary.byCefr": { en: "Vocabulary by CEFR", es: "Vocabulario por CEFR" },
   "dictionary.items": { en: "Lexical items", es: "Ítems léxicos" },

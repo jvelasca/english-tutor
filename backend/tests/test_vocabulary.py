@@ -114,12 +114,12 @@ def test_vocabulary_endpoint_shape(monkeypatch, tmp_path):
 
 
 def test_lexicon_endpoint_exposes_competence_matrix(monkeypatch, tmp_path):
-    """V3.21 (V20-16): el léxico expone la matriz de competencia por ítem y los
-    contadores de gap en el summary."""
+    """V3.21 (V20-16) / V3.22: el léxico expone la matriz de competencia por ítem
+    (con `production_gap`/`transfer_gap`) y los contadores del summary."""
     a, _b = _setup(monkeypatch, tmp_path)
     # Producida por chat (pero nunca expuesta por input).
     vocabulary_repo.record_words(a, ["hello"])
-    # Reconocida (input) pero nunca producida: transfer gap.
+    # Reconocida (input) pero nunca producida: production gap.
     vocabulary_repo.record_exposures(a, ["world"])
 
     with TestClient(app) as client:
@@ -129,15 +129,18 @@ def test_lexicon_endpoint_exposes_competence_matrix(monkeypatch, tmp_path):
         by_word = {i["word"]: i for i in body["items"]}
         assert by_word["hello"]["competence"]["recognition"] is False
         assert by_word["hello"]["competence"]["production"] is True
-        assert by_word["hello"]["competence"]["gap"] is False
+        assert by_word["hello"]["competence"]["production_gap"] is False
+        assert by_word["hello"]["competence"]["transfer_gap"] is False
         assert by_word["world"]["competence"]["recognition"] is True
         assert by_word["world"]["competence"]["production"] is False
-        assert by_word["world"]["competence"]["gap"] is True
+        assert by_word["world"]["competence"]["production_gap"] is True
+        assert by_word["world"]["competence"]["transfer_gap"] is False
         s = body["summary"]
         assert s["recognized"] == 1
         assert s["produced"] == 1
         assert s["transfer"] == 0
-        assert s["transfer_gap"] == 1
+        assert s["production_gap"] == 1
+        assert s["transfer_gap"] == 0
 
 
 def test_vocabulary_endpoint_404(monkeypatch, tmp_path):
@@ -188,6 +191,59 @@ def test_record_exposures_accumulates(monkeypatch, tmp_path):
 def test_record_exposures_unknown_user_false(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     assert vocabulary_repo.record_exposures("no-existe", ["travel"]) is False
+
+
+def test_exposure_days_counts_distinct_days(monkeypatch, tmp_path):
+    """V3.22: `exposure_days` suma una vez por día distinto y `first_exposed_at`
+    se fija en la primera exposición."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    times = iter(
+        [
+            "2026-08-20T10:00:00+00:00",
+            "2026-08-20T11:00:00+00:00",  # mismo día → no suma
+            "2026-08-21T10:00:00+00:00",  # día distinto → suma
+            "2026-08-22T10:00:00+00:00",  # día distinto → suma
+        ]
+    )
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
+    for _ in range(4):
+        vocabulary_repo.record_exposures(a, ["sun"])
+    vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
+    assert vocab["sun"]["exposures"] == 4
+    assert vocab["sun"]["exposure_days"] == 3
+    assert vocab["sun"]["first_exposed_at"]  # fijado en la primera exposición
+
+
+def test_exposure_days_columns_migration_and_backfill(monkeypatch, tmp_path):
+    """V3.22: una BD previa (sin `exposure_days`/`first_exposed_at`) se migra al
+    re-ejecutar `init_db` y el histórico expuesto recibe backfill (1 día)."""
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    db.init_db()
+    uid = users_repo.create_user("A")["id"]
+    vocabulary_repo.record_exposures(uid, ["sun"])  # exposures = 1
+
+    # Simula una BD previa a V3.22: elimina las columnas nuevas.
+    conn = sqlite3.connect(db.DB_PATH)
+    conn.execute("ALTER TABLE vocabulary DROP COLUMN exposure_days")
+    conn.execute("ALTER TABLE vocabulary DROP COLUMN first_exposed_at")
+    conn.commit()
+    conn.close()
+
+    db.init_db()
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(vocabulary)")}
+        row = conn.execute(
+            "SELECT exposures, exposure_days, first_exposed_at "
+            "FROM vocabulary WHERE word = 'sun'"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert {"exposure_days", "first_exposed_at"} <= cols
+    assert row[0] == 1  # exposures conservadas
+    assert row[1] == 1  # exposure_days backfill
+    assert row[2]  # first_exposed_at backfill
 
 
 def test_production_days_counts_distinct_days(monkeypatch, tmp_path):

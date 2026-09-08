@@ -247,14 +247,18 @@ export interface LearningProfile {
 
 export type LexicalStatus = "mastered" | "known" | "learning" | "weak";
 
-// V3.21 (V20-16): matriz Recognition/Production/Transfer/Retention por ítem.
+// V3.21 (V20-16) / V3.22: matriz Recognition/Production/Transfer/Retention.
+// V3.22 separa Retention (espaciada) de Transfer (>= 2 contextos/canales) y
+// distingue production_gap del transfer_gap real.
 export interface LexicalCompetence {
   recognition: boolean;
   production: boolean;
   production_channels: string[];
+  transfer_contexts: number;
   transfer: boolean;
   retention: boolean;
-  gap: boolean;
+  production_gap: boolean;
+  transfer_gap: boolean;
 }
 
 export interface LexicalItem {
@@ -342,11 +346,12 @@ export interface LexiconSummary {
   weak: number;
   mastered: number;
   by_cefr: CefrBucket[];
-  // V3.21 (V20-16): contadores de la matriz de competencia del léxico.
+  // V3.21 (V20-16) / V3.22: contadores de la matriz de competencia del léxico.
   recognized: number;
   produced: number;
   transfer: number;
   retention: number;
+  production_gap: number;
   transfer_gap: number;
 }
 

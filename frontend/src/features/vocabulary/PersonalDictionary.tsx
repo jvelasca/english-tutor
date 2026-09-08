@@ -153,7 +153,8 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
           </div>
         </motion.section>
 
-        {/* V3.21 (V20-16): fila de stats de la matriz de competencia del léxico. */}
+        {/* V3.21 (V20-16) / V3.22: stats de la matriz de competencia del léxico
+            (Retention separada de Transfer; production_gap y transfer_gap). */}
         <motion.section variants={item} aria-label={t("dictionary.competenceTitle")}>
           <Card className="gap-3 p-5">
             <div className="flex flex-col gap-1">
@@ -162,7 +163,7 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
                 {t("dictionary.competenceHint")}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <StatTile
                 label={t("dictionary.competenceRecognized")}
                 value={summary.recognized}
@@ -182,6 +183,11 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
                 label={t("dictionary.competenceRetention")}
                 value={summary.retention}
                 tone="text-primary"
+              />
+              <StatTile
+                label={t("dictionary.competenceProductionGap")}
+                value={summary.production_gap}
+                tone="text-destructive"
               />
               <StatTile
                 label={t("dictionary.competenceGap")}

@@ -628,6 +628,33 @@ def init_db() -> None:
             "WHERE appearances > 0 AND chat_prod = 0"
         )
 
+        # Migración idempotente (V3.22): días distintos con exposición y fecha de
+        # la primera exposición. `exposure_days` permite acreditar retención
+        # RECEPTIVA (reconocimiento repetido en días distintos), separando la
+        # dimensión Retention de Transfer en la matriz de competencia léxica
+        # (V3.21 las tenía igualadas: `retention = transfer`). `first_exposed_at`
+        # fija el inicio de la ventana de espaciado receptivo. El backfill marca
+        # con 1 día el histórico ya expuesto (idempotente).
+        if "exposure_days" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN exposure_days INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "first_exposed_at" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN first_exposed_at TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        conn.execute(
+            "UPDATE vocabulary SET exposure_days = 1 "
+            "WHERE exposures > 0 AND exposure_days = 0"
+        )
+        conn.execute(
+            "UPDATE vocabulary SET first_exposed_at = last_exposed_at "
+            "WHERE exposures > 0 AND first_exposed_at = '' "
+            "AND last_exposed_at != ''"
+        )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {

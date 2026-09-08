@@ -3,7 +3,38 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-07 20:55 (UTC+2).
+> Actualizado por última vez: 2026-09-08 10:30 (UTC+2).
+>
+> **Nota (2026-09-08, 10:30):** posición vigente **v3.22.0** — **ASR
+> Calibration + Student Model (léxico)** (versión de app `3.21.0 → 3.22.0`).
+> Cierra el plan V3.22 del dossier de la auditoría externa V3.21.0
+> (P1-01/02/03 + P1-04/05 + P2-01 parcial): **(ASR-01) calibración ASR por
+> segmentos** — en faster-whisper 1.2.1 `avg_logprob`/`no_speech_prob`/
+> `compression_ratio` viven en cada `Segment`, no en `TranscriptionInfo`;
+> `services/stt.py` agrega ahora con `aggregate_asr_segments` (media ponderada
+> por duración de segmento, ratios y `segment_count`) y clasifica con
+> `classify_asr_status(*, text, metrics)` — política explícita con
+> `MIN_SPEECH_ATTEMPT_SECONDS` 0.5 s: sin texto y 0 segmentos → `unintelligible`
+> (audio corto) o `no_speech` (audio ≥ 0.5 s); texto alucinado sobre no-habla
+> (`no_speech_ratio` alto, medido real: silencio decodifica "You" con
+> `no_speech_prob` 0.85) → `no_speech`; `mean_logprob` < -1.0 →
+> `low_confidence`. Estados antes inalcanzables. El gating `asr_status != "ok"`
+> es transparente en todos los routers; la telemetría de segmentos se emite sin
+> clasificar (frontera `LANGUAGE_MISMATCH` documentada) · **(léxico) Retention ≠
+> Transfer** — migración idempotente `exposure_days`/`first_exposed_at` en
+> `vocabulary` (backfill 1 día + `first_exposed_at = last_exposed_at`),
+> `record_exposures` por fila contando días distintos de exposición (patrón
+> `production_days`/`first_seen`), matriz `item_competence_matrix` con
+> `transfer_contexts`, `transfer` = 2+ canales (sin "or spaced"), `retention` =
+> `_spaced_exposure or _spaced_production`, `production_gap` (antes `gap`) y
+> `transfer_gap` (producida-sin-transferir) independientes; `summary` con 6
+> contadores; UI del diccionario a 6 chips + claves i18n. Fuera de alcance:
+> telemetría ASR persistente, `LANGUAGE_MISMATCH`, renombre
+> `appearances → production_count`, preparación Recall → Sentence → Context →
+> Free Transfer. Verificación: backend **pytest 1440** (incluye integración ASR
+> opt-in con Whisper/piper reales) + ruff limpio; frontend **vitest 450** (57
+> archivos) + `tsc`/`vite build` OK; `check_release_consistency` **3.22.0** exit
+> 0; CONSTITUCIÓN sin cambios (se mantiene señal ≠ evidencia).
 >
 > **Nota (2026-09-07, 20:55):** posición vigente **v3.21.0** — **Speaking &
 > Evidence Calibration** (versión de app `3.20.0 → 3.21.0`). Cierra el plan

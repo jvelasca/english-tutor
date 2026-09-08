@@ -1,10 +1,15 @@
-"""Tests de V3.21 (V20-14/V20-15): taxonomía ASR y no-penalización.
+"""Tests de V3.21 (V20-14/V20-15) y V3.22 (ASR-01): taxonomía ASR.
 
-Cubre `services.stt.classify_asr_status` (puro) y el gating en los intentos
-puntuados: cuando el audio no se reconoce con fiabilidad (silencio, audio
-ininteligible o confianza baja) NO se penaliza al alumno (ni drill, ni
-read-aloud, ni speaking abierto).
+Cubre la clasificación `services.stt.classify_asr_status` (pura, sobre métricas
+agregadas), la agregación `aggregate_asr_segments` (sintética, con fakes
+duck-typed de Segment/TranscriptionInfo) y el gating en los intentos puntuados:
+cuando el audio no se reconoce con fiabilidad (silencio, audio ininteligible o
+confianza baja) NO se penaliza al alumno (ni drill, ni read-aloud, ni speaking
+abierto).
 """
+from types import SimpleNamespace as NS
+
+import pytest
 from fastapi.testclient import TestClient
 
 from config import MAX_AUDIO_DURATION_SECONDS
@@ -18,6 +23,7 @@ from services.stt import (
     ASR_NO_SPEECH,
     ASR_OK,
     ASR_UNINTELLIGIBLE,
+    aggregate_asr_segments,
     classify_asr_status,
     exceeds_max_duration,
 )
@@ -42,54 +48,243 @@ def _fake_transcribe(text, asr_status="ok", confidence=None):
     return fake
 
 
-# ---------------------------------------------------------------- puro
+# ---------------------------------------------------------------- helpers
 
-def test_classify_no_speech_when_empty_and_high_nospeech():
+def _metrics(
+    *,
+    segment_count: int = 1,
+    mean_logprob: float | None = None,
+    duration: float | None = 2.0,
+    max_no_speech_prob: float | None = None,
+    no_speech_ratio: float | None = None,
+) -> dict:
+    """Dict de métricas mínimo para `classify_asr_status` (el resto es telemetría)."""
+    return {
+        "duration": duration,
+        "language_probability": 0.9,
+        "segment_count": segment_count,
+        "mean_logprob": mean_logprob,
+        "min_logprob": mean_logprob,
+        "max_no_speech_prob": max_no_speech_prob,
+        "no_speech_ratio": no_speech_ratio,
+        "speech_ratio": None,
+        "compression_ratio": None,
+    }
+
+
+def _seg(
+    start: float,
+    end: float,
+    *,
+    text: str = "",
+    avg_logprob: float | None = -0.2,
+    no_speech_prob: float | None = 0.02,
+    compression_ratio: float | None = 1.1,
+) -> NS:
+    """Fake duck-typed de `faster_whisper.Segment`."""
+    return NS(
+        start=start,
+        end=end,
+        text=text,
+        avg_logprob=avg_logprob,
+        no_speech_prob=no_speech_prob,
+        compression_ratio=compression_ratio,
+    )
+
+
+def _info(
+    duration: float | None = 4.0, language_probability: float | None = 0.98
+) -> NS:
+    """Fake duck-typed de `faster_whisper.TranscriptionInfo` (sin métricas por
+    segmento)."""
+    return NS(duration=duration, language_probability=language_probability)
+
+
+# ---------------------------------------------------------------- puro: classify
+
+def test_classify_no_speech_when_silence_long_enough():
+    # Silencio: 0 segmentos (Whisper no emite habla) y audio >= umbral.
     assert (
-        classify_asr_status(text="", avg_logprob=None, no_speech_prob=0.9)
+        classify_asr_status(
+            text="", metrics=_metrics(segment_count=0, duration=2.0)
+        )
         == ASR_NO_SPEECH
     )
 
 
-def test_classify_unintelligible_when_empty_without_nospeech_mark():
+def test_classify_no_speech_when_noise_discarded():
+    # Ruido: Whisper lo descarta entero (0 segmentos) con audio largo.
     assert (
-        classify_asr_status(text="", avg_logprob=None, no_speech_prob=0.2)
+        classify_asr_status(
+            text="", metrics=_metrics(segment_count=0, duration=5.0)
+        )
+        == ASR_NO_SPEECH
+    )
+
+
+def test_classify_unintelligible_when_attempt_too_short():
+    # Captura fallida / audio demasiado corto: sin señal para decir "silencio".
+    assert (
+        classify_asr_status(
+            text="", metrics=_metrics(segment_count=0, duration=0.3)
+        )
         == ASR_UNINTELLIGIBLE
     )
     assert (
-        classify_asr_status(text="", avg_logprob=None, no_speech_prob=None)
+        classify_asr_status(
+            text="", metrics=_metrics(segment_count=0, duration=None)
+        )
         == ASR_UNINTELLIGIBLE
+    )
+
+
+def test_classify_unintelligible_segments_without_text():
+    # Defensivo: hay segmentos pero nada decodificable.
+    assert (
+        classify_asr_status(text="", metrics=_metrics(segment_count=1))
+        == ASR_UNINTELLIGIBLE
+    )
+
+
+def test_classify_no_speech_when_text_is_silence_hallucination():
+    # Texto alucinado por Whisper sobre silencio: toda la señal decodificada
+    # está marcada como no-habla -> NO es un fallo lingüístico del alumno.
+    # (Caso real medido: silencio digital decodifica "You" con no_speech_prob
+    # 0.85 y avg_logprob -0.91.)
+    assert (
+        classify_asr_status(
+            text="you",
+            metrics=_metrics(
+                mean_logprob=-0.9, max_no_speech_prob=0.85, no_speech_ratio=1.0
+            ),
+        )
+        == ASR_NO_SPEECH
     )
 
 
 def test_classify_low_confidence_when_text_but_bad_logprob():
+    # Voz con baja confianza: texto presente pero logprob agregado muy bajo.
     assert (
-        classify_asr_status(text="hello", avg_logprob=-2.4, no_speech_prob=0.1)
+        classify_asr_status(
+            text="hello", metrics=_metrics(mean_logprob=-2.4)
+        )
         == ASR_LOW_CONFIDENCE
     )
 
 
 def test_classify_ok_with_clean_text():
+    # Voz limpia: texto con confianza agregada aceptable.
     assert (
-        classify_asr_status(text="hello", avg_logprob=-0.3, no_speech_prob=0.05)
+        classify_asr_status(
+            text="hello", metrics=_metrics(mean_logprob=-0.3)
+        )
         == ASR_OK
     )
 
 
-def test_classify_ok_when_text_present_despite_nospeech_mark():
-    # Con texto no vacío no se descarta como no-speech (evita falsos "silencio"
-    # sobre alucinaciones con texto).
+def test_classify_ok_when_some_window_flagged_no_speech():
+    # Voz real con una ventana concreta marcada como no-habla: si el grueso de
+    # la señal es habla clara (no_speech_ratio < 0.5), no se descarta.
     assert (
-        classify_asr_status(text="hello", avg_logprob=-0.4, no_speech_prob=0.9)
+        classify_asr_status(
+            text="hello",
+            metrics=_metrics(
+                mean_logprob=-0.4, max_no_speech_prob=0.9, no_speech_ratio=0.25
+            ),
+        )
+        == ASR_OK
+    )
+
+
+def test_classify_asr_ok_does_not_decide_linguistic_ko():
+    # Frase "incorrecta" pero bien transcrita: el ASR es fiable; la corrección
+    # es lingüística (la hace el scorer), no del reconocimiento.
+    assert (
+        classify_asr_status(
+            text="banana", metrics=_metrics(mean_logprob=-0.3)
+        )
         == ASR_OK
     )
 
 
 def test_classify_ignores_whitespace():
     assert (
-        classify_asr_status(text="   ", avg_logprob=None, no_speech_prob=0.9)
+        classify_asr_status(
+            text="   ", metrics=_metrics(segment_count=0, duration=2.0)
+        )
         == ASR_NO_SPEECH
     )
+
+
+# ---------------------------------------------------------------- puro: aggregate
+
+def test_aggregate_clean_speech():
+    segs = [_seg(0.0, 2.0, text="hello"), _seg(2.0, 4.0, text="world")]
+    m = aggregate_asr_segments(segs, _info())
+    assert m["segment_count"] == 2
+    assert m["mean_logprob"] == pytest.approx(-0.2)
+    assert m["min_logprob"] == pytest.approx(-0.2)
+    assert m["max_no_speech_prob"] == pytest.approx(0.02)
+    assert m["no_speech_ratio"] == pytest.approx(0.0)
+    assert m["speech_ratio"] == pytest.approx(1.0)
+    assert m["compression_ratio"] == pytest.approx(1.1)
+    assert m["language_probability"] == pytest.approx(0.98)
+    assert m["duration"] == pytest.approx(4.0)
+
+
+def test_aggregate_mean_logprob_weighted_by_duration():
+    # Media ponderada por duración: el segmento malo (corto) pesa menos.
+    segs = [_seg(0.0, 3.0, avg_logprob=-0.1), _seg(3.0, 5.0, avg_logprob=-2.5)]
+    m = aggregate_asr_segments(segs, _info(duration=5.0))
+    expected = (3.0 * -0.1 + 2.0 * -2.5) / 5.0  # -1.06
+    assert m["mean_logprob"] == pytest.approx(expected)
+    assert m["min_logprob"] == pytest.approx(-2.5)
+
+
+def test_aggregate_mean_logprob_simple_when_no_duration():
+    # Fakes sin duración de segmento: respaldo a media simple.
+    segs = [_seg(0.0, 0.0, avg_logprob=-0.2), _seg(0.0, 0.0, avg_logprob=-0.6)]
+    m = aggregate_asr_segments(segs, _info(duration=2.0))
+    assert m["segment_count"] == 2
+    assert m["mean_logprob"] == pytest.approx(-0.4)
+
+
+def test_aggregate_no_speech_ratio():
+    segs = [
+        _seg(0.0, 1.0, no_speech_prob=0.9),
+        _seg(1.0, 3.0, no_speech_prob=0.1),
+    ]
+    m = aggregate_asr_segments(segs, _info(duration=3.0))
+    assert m["no_speech_ratio"] == pytest.approx(1.0 / 3.0, rel=1e-3)
+    assert m["max_no_speech_prob"] == pytest.approx(0.9)
+
+
+def test_aggregate_speech_ratio_partial():
+    # 2 s de habla en un audio de 4 s -> speech_ratio 0.5.
+    segs = [_seg(0.5, 2.5, avg_logprob=-0.3)]
+    m = aggregate_asr_segments(segs, _info(duration=4.0))
+    assert m["speech_ratio"] == pytest.approx(0.5)
+    assert m["speech_ratio"] <= 1.0
+
+
+def test_aggregate_empty_returns_zeros():
+    m = aggregate_asr_segments([], _info(duration=2.0))
+    assert m["segment_count"] == 0
+    assert m["mean_logprob"] is None
+    assert m["min_logprob"] is None
+    assert m["max_no_speech_prob"] is None
+    assert m["no_speech_ratio"] is None
+    assert m["speech_ratio"] is None
+    assert m["compression_ratio"] is None
+    assert m["duration"] == pytest.approx(2.0)
+    assert m["language_probability"] == pytest.approx(0.98)
+
+
+def test_aggregate_without_info():
+    m = aggregate_asr_segments([])
+    assert m["segment_count"] == 0
+    assert m["duration"] is None
+    assert m["language_probability"] is None
 
 
 # ---------------------------------------------------------------- gating

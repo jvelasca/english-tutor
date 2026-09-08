@@ -41,19 +41,25 @@ class VocabularyItem(BaseModel):
 
 
 class LexicalCompetence(BaseModel):
-    """Matriz de competencia por ítem léxico (V3.21, V20-16).
+    """Matriz de competencia por ítem léxico (V3.21, V20-16; V3.22).
 
-    Derivada de las filas existentes (sin migrar columnas): pura y
-    determinista. `retention` == `transfer` hasta que exista `exposure_days`
-    (deuda de modelo documentada en `services/lexicon`).
+    Derivada de las filas existentes (sin migrar columnas de producción): pura y
+    determinista. V3.22 separa Retention de Transfer: `retention` es señal
+    espaciada (receptiva con `exposure_days` o productiva), mientras `transfer`
+    exige producción en >= 2 canales/contextos. `production_gap` (reconocida y
+    nunca producida) es el gap que cierra el micro-drill; `transfer_gap`
+    (producida pero nunca transferida a otro contexto) queda como señal de
+    falta de transferencia real.
     """
 
     recognition: bool
     production: bool
     production_channels: list[str] = Field(default_factory=list)
+    transfer_contexts: int = 0
     transfer: bool
     retention: bool
-    gap: bool
+    production_gap: bool
+    transfer_gap: bool
 
 
 class LexicalItemOut(BaseModel):
@@ -92,11 +98,12 @@ class LexiconSummary(BaseModel):
     weak: int
     mastered: int
     by_cefr: list[CefrBucket]
-    # V3.21 (V20-16): contadores de la matriz de competencia del léxico.
+    # V3.21 (V20-16) / V3.22: contadores de la matriz de competencia del léxico.
     recognized: int = 0
     produced: int = 0
     transfer: int = 0
     retention: int = 0
+    production_gap: int = 0
     transfer_gap: int = 0
 
 
