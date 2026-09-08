@@ -33,6 +33,7 @@ from services.listening import (
     route_competence,
     route_gate,
     score_answer,
+    skill_layer,
     spoken_text,
     variant_length_scale,
 )
@@ -130,6 +131,7 @@ def _public(question: dict) -> dict:
     out["difficulty"] = difficulty_from_vector(question.get("difficulty_vector", {}))
     out["realized_difficulty"] = realized_difficulty(question)
     out["realization"] = realization_status(question)
+    out["layer"] = skill_layer(question.get("skill", ""))
     out["audio_type"] = (
         "recorded"
         if is_recorded(question)

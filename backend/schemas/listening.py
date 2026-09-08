@@ -44,6 +44,9 @@ class ListeningQuestion(BaseModel):
     context: str = ""
     realized_difficulty: int = 0
     realization: dict[str, dict[str, int | bool]] = Field(default_factory=dict)
+    # Capa cognitiva de la taxonomía de listening (F-C1, V3.26): recognition /
+    # comprehension / inference, derivada de `skill`; None en tareas de producción.
+    layer: str | None = None
     # Escalera de variantes de velocidad (P1.9): lista ordenada slow/normal/fast y
     # la variante servida por defecto (siempre "normal", que preserva el cache).
     variants: list[ListeningAudioVariant] = Field(default_factory=list)
@@ -156,6 +159,7 @@ class ListeningItemOut(BaseModel):
     script: str
     topic: str = ""
     skill: str = ""
+    layer: str | None = None
     difficulty: int = 1
     attempts: int = 0
     state: str
@@ -189,6 +193,9 @@ class ListeningStats(BaseModel):
 
 class ListeningSubskillOut(BaseModel):
     skill: str
+    # Capa cognitiva de la taxonomía de listening (F-C1, V3.26); None en tareas
+    # de producción (dictation/shadowing).
+    layer: str | None = None
     attempts: int
     correct: int
     accuracy: float | None = None
@@ -214,6 +221,19 @@ class ListeningDifficultyOut(BaseModel):
 
 class ListeningTopicOut(BaseModel):
     topic: str
+    attempts: int
+    correct: int
+    accuracy: float | None = None
+
+
+class ListeningLayerOut(BaseModel):
+    """Precisión agregada de una capa cognitiva de la taxonomía (F-C1, V3.26).
+
+    Una entrada por capa (recognition/comprehension/inference), siempre presente
+    en el diagnóstico aunque la capa no tenga evidencia (la UI puede explicar que
+    falta practicarla)."""
+
+    layer: str
     attempts: int
     correct: int
     accuracy: float | None = None
@@ -308,6 +328,9 @@ class ListeningDiagnostic(BaseModel):
     automaticity: float | None = None
     by_difficulty: list[ListeningDifficultyOut] = Field(default_factory=list)
     by_topic: list[ListeningTopicOut] = Field(default_factory=list)
+    # Precisión por capa cognitiva de la taxonomía (F-C1, V3.26): una entrada por
+    # capa en orden recognition → comprehension → inference, siempre presente.
+    by_layer: list[ListeningLayerOut] = Field(default_factory=list)
     trend: ListeningTrend
     recurrence: ListeningRecurrence
     retention: ListeningRetention

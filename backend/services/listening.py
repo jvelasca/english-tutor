@@ -35,6 +35,51 @@ LISTENING_SUBSKILLS: tuple[str, ...] = (
     "sequencing",
 )
 
+# Taxonomía de capas de la comprensión auditiva (F-C1, V3.26 / P2-04). Cada
+# sub-destreza receptiva pertenece a la capa del proceso cognitivo que su
+# evidencia ejercita (ver `SKILL_LAYER` y `skill_layer`):
+# - `recognition`   → decodificación abajo-arriba (sonido/palabra/frase).
+# - `comprehension` → construcción del significado literal.
+# - `inference`     → ir más allá de lo dicho (intención, actitud, matices).
+# `dictation`/`shadowing` son tareas de producción: quedan fuera de la taxonomía
+# receptiva (`skill_layer` devuelve None) y se reportan aparte.
+LISTENING_LAYERS: tuple[str, ...] = ("recognition", "comprehension", "inference")
+
+# Mapa determinista sub-destreza → capa (F-C1). Es la fuente única de la
+# taxonomía: no requiere migración de datos ni etiquetado por ítem, porque el
+# `skill` ya se persiste como snapshot en cada intento.
+SKILL_LAYER: dict[str, str] = {
+    # recognition: decodificación del estímulo acústico.
+    "word_recognition": "recognition",
+    "sound_recognition": "recognition",
+    "phrase_recognition": "recognition",
+    "numbers": "recognition",
+    # comprehension: significado literal de lo escuchado.
+    "gist": "comprehension",
+    "detail": "comprehension",
+    "vocabulary": "comprehension",
+    "sequencing": "comprehension",
+    "note_taking": "comprehension",
+    "prediction": "comprehension",
+    # inference: más allá de lo dicho.
+    "inference": "inference",
+    "attitude": "inference",
+    "speaker_intention": "inference",
+    "fast_speech": "inference",
+    "connected_speech": "inference",
+    "multiple_speakers": "inference",
+}
+
+
+def skill_layer(skill: str) -> str | None:
+    """Capa cognitiva de una sub-destreza de listening (F-C1, V3.26).
+
+    Devuelve `None` para las tareas de producción (`dictation`/`shadowing`) y
+    para cualquier skill desconocido: esas evidencias no entran en la taxonomía
+    receptiva y se reportan aparte.
+    """
+    return SKILL_LAYER.get(skill)
+
 # Vector de dificultad de 8 dimensiones. La dificultad escalar `difficulty` (1-6)
 # ya NO se almacena: se deriva como la media redondeada de este vector
 # (ver `difficulty_from_vector`), de modo que la coherencia media↔difficulty se
@@ -1341,6 +1386,7 @@ def level_items(
                 "script": q.get("script", ""),
                 "topic": q.get("topic", ""),
                 "skill": q.get("skill", ""),
+                "layer": skill_layer(q.get("skill", "")),
                 "difficulty": difficulty_from_vector(
                     q.get("difficulty_vector", {})
                 ),
@@ -1692,6 +1738,32 @@ def accuracy_by_topic(rows: list[dict]) -> list[dict]:
             "accuracy": _accuracy(group),
         }
         for topic, group in sorted(groups.items())
+    ]
+
+
+def accuracy_by_layer(rows: list[dict]) -> list[dict]:
+    """Precisión agregada por capa cognitiva (F-C1, V3.26 / P2-04).
+
+    Devuelve una entrada por cada capa de `LISTENING_LAYERS` en orden canónico
+    (recognition → comprehension → inference), aunque la capa no tenga evidencia
+    (la UI puede explicar que falta practicarla). Las filas sin `skill`, con
+    skill desconocido o de tareas de producción (`dictation`/`shadowing`) no
+    pertenecen a la taxonomía receptiva y quedan fuera del agregado.
+    """
+    groups: dict[str, list[dict]] = {layer: [] for layer in LISTENING_LAYERS}
+    for row in rows:
+        layer = skill_layer(row.get("skill") or "")
+        if layer is None:
+            continue
+        groups[layer].append(row)
+    return [
+        {
+            "layer": layer,
+            "attempts": len(group),
+            "correct": sum(1 for r in group if r.get("correct")),
+            "accuracy": _accuracy(group),
+        }
+        for layer, group in groups.items()
     ]
 
 
@@ -2105,6 +2177,7 @@ def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
         subskills.append(
             {
                 "skill": skill,
+                "layer": skill_layer(skill),
                 "attempts": attempts,
                 "correct": stats["correct"],
                 "accuracy": accuracy,
@@ -2178,6 +2251,7 @@ def listening_diagnostic(attempt_rows: list[dict], now: str = "") -> dict:
         ),
         "by_difficulty": accuracy_by_difficulty(attempt_rows),
         "by_topic": accuracy_by_topic(attempt_rows),
+        "by_layer": accuracy_by_layer(attempt_rows),
         "trend": recent_trend(attempt_rows),
         "recurrence": recurrence_stats(attempt_rows),
         "retention": delayed_retention(attempt_rows, now),
