@@ -4,6 +4,17 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.25.1] — 2026-09-08
+
+**Cierre de los P1 de la auditoría externa V3.25: la certificación exige retención real (ventana ≥7 días + ratio ≥0.90 verificados desde la fila de examen), el modelo léxico agrega de verdad por `lexical_unit`, y el nivel de apoyo pondera la evidencia de dominio. V3.25.0 no se considera cerrada sin estas correcciones.**
+
+Patch correctivo sobre v3.25.0 (candidato auditado en `docs/audit/M-AUDITORIA-TOTAL-V325.md`, P1 en `docs/audit/N-AUDITORIA-TOTAL-V3251.md`). Versión de app `3.25.0 → 3.25.1`.
+
+- **P1-01 — Certification gate real (ventana ≥7 días + ratio ≥0.90).** `certification_gate` (Assessment 2.0) ya no confía en la mera presencia de evidencia `delayed` ni en que el emisor haya codificado la ventana: reconstruye desde las filas de `academy_evidence` el baseline formal (`task_type="exam"`, cubre la escalera `kind=level` y el examen legacy) y los eventos `delayed` agrupados por `context_id`, y certifica cada destreza solo cuando existe un reassessment verificable con `interval_days >= RETENTION_MIN_DAYS` desde el examen y `rate = delayed/initial >= RETENTION_STABLE_RATIO`. Sin examen formal no se certifica. `retention_report` pasa a informar `interval_days`, `initial_score`, `rate` y `baseline_date` por destreza. Los 6 tests negativos de la auditoría (D+6; D+7 ratio 0.89; D+7 ratio 0.90; D+21 ratio 0.50; `created_at` inválido; dos eventos sin ratio válido) quedan en `tests/test_assessment_v2.py`; `test_evidence_context.py` y `test_academy.py` se adaptan al baseline formal.
+- **P1-02 — Agregación real por `lexical_unit` (aditiva).** El modelo léxico agrupa de verdad por unidad: `units_from_rows`/`summary_units` en `services/lexicon.py`, expuestos de forma aditiva (`LexiconOut.units` + `LexiconSummary.units`) en schemas, domain y tipos del frontend. Cada superficie conserva su propio estado (`go` dominada no domina `going`); la unidad expone derivados informativos (`mastery`/`recall` máximos, gaps) y `summary_units` cuenta cada unidad una sola vez. Tests de la parábola go/going/went/gone en `tests/test_lexicon.py` y wiring del endpoint en `test_vocabulary.py`.
+- **P1-03 — Support level como peso de la evidencia de dominio.** `SUPPORT_LEVEL_WEIGHTS` (`copied 0.5 / guided 0.7 / cued 0.9 / independent 1.0 / spontaneous 1.0`; heurística a calibrar en V3.26) pondera cada `result` dentro de `generalized_mastery_score`. Las filas legacy sin `support_level` (o con valor no declarado) usan peso neutral 1.0: los datos previos a V3.25 no cambian de valor. Tests en `test_academy.py`.
+- **Verificación.** Backend pytest **1495 passed** + `ruff check .` limpio; frontend vitest **450 passed** (57 archivos) + `tsc --noEmit` OK; `check_release_consistency` 3.25.1 exit 0. Los P2 de la auditoría quedan para V3.26 (Listening + `novel` + retención longitudinal).
+
 ## [3.25.0] — 2026-09-08
 
 **Calibración del Student Model (plan V3.25 del dossier L): la evidencia se escribe como evento con contexto (`support_level` + experiencias/tareas) y el transfer del gate MASTERED pasa a exigir contextos distintos, la certificación verifica la retención demorada desde las filas, y la UI separa nivel demostrado de nivel estimado.**

@@ -367,6 +367,9 @@ export interface LexiconSummary {
   spaced_exposure: number;
   production_gap: number;
   transfer_gap: number;
+  // V3.25.1 (P1-02): resumen del agregado por `lexical_unit` (cada unidad
+  // cuenta una sola vez). Opcional/aditivo; el contrato por superficie no cambia.
+  units?: LexiconUnitSummary | null;
 }
 
 // P1 (§3.1): Vocabulary Coverage Indicator receptivo/productivo por nivel.
@@ -390,10 +393,68 @@ export interface LexiconCoverage {
   by_level: LexiconCoverageLevel[];
 }
 
+// V3.25.1 (P1-02): superficie (surface form) dentro de una unidad léxica
+// agregada. Cada forma conserva su propio estado/mastery/recall: dominar "go"
+// no domina automáticamente "going"/"went"/"gone".
+export interface LexicalUnitSurface {
+  word: string;
+  lemma: string;
+  cefr: string;
+  kind: string;
+  source: string;
+  status: LexicalStatus;
+  mastery: number;
+  recall: number;
+  production_count: number;
+  exposure_count: number;
+  speaking_prod: number;
+  competence?: LexicalCompetence | null;
+}
+
+// V3.25.1 (P1-02): unidad léxica agregada (`lexical_unit`) con sus superficies.
+export interface LexicalUnit {
+  lexical_unit: string;
+  kind: string;
+  cefr: string;
+  lemma: string;
+  source: string;
+  status: LexicalStatus;
+  mastery: number;
+  recall: number;
+  surface_count: number;
+  mastered_surfaces: number;
+  recognized: boolean;
+  produced: boolean;
+  transfer: boolean;
+  production_count: number;
+  exposure_count: number;
+  production_gap: boolean;
+  transfer_gap: boolean;
+  surfaces: LexicalUnitSurface[];
+}
+
+export interface LexiconUnitSummary {
+  total: number;
+  mastered: number;
+  learning: number;
+  known: number;
+  weak: number;
+  by_cefr: CefrBucket[];
+  recognized: number;
+  produced: number;
+  transfer: number;
+  production_gap: number;
+  transfer_gap: number;
+  surface_total: number;
+  mastered_surfaces: number;
+}
+
 export interface Lexicon {
   summary: LexiconSummary;
   items: LexicalItem[];
   coverage?: LexiconCoverage | null;
+  // V3.25.1 (P1-02): agregado por `lexical_unit` (aditivo, contrato intacto).
+  units?: LexicalUnit[];
 }
 
 export type Bucket = "day" | "week" | "month";

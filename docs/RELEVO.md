@@ -3,7 +3,32 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 14:45 (UTC+2).
+> Actualizado por última vez: 2026-09-08 16:50 (UTC+2).
+>
+> **Nota (2026-09-08, 16:50):** **V3.25.1 en curso — cierre de P1 de la
+> auditoría externa V3.25** sobre `main` (la auditoría del candidato v3.25.0
+> detectó 3 P1 reales que la batería de V3.25 no cubría: `certification_gate`
+> no enforceaba la ventana ≥7 días ni el ratio ≥0.90; `lexical_unit` no
+> agregaba conocimiento por unidad; `support_level` no ponderaba el dominio).
+> Trabajo completo en el árbol: **P1-01** `certification_gate` reconstruye
+> baseline formal (`task_type="exam"`) + eventos `delayed` por `context_id`
+> desde las filas, enforce `interval >= RETENTION_MIN_DAYS` y `rate >= 0.90`, y
+> sin examen no certifica; `retention_report` informa `interval_days`/
+> `initial_score`/`rate`/`baseline_date`. Los 6 tests negativos de la auditoría
+> quedan en `tests/test_assessment_v2.py` (D+6 → False; D+7 ratio 0.89 →
+> False; D+7 ratio 0.90 → True; D+21 ratio 0.50 → False; `created_at` inválido
+> → False; dos eventos sin ratio válido → False). **P1-02** agregación real por
+> `lexical_unit` (aditiva): `units_from_rows`/`summary_units` en
+> `services/lexicon.py`, `LexiconOut.units` + `LexiconSummary.units` en
+> schemas/domain y tipos frontend; superficies independientes (go/going/went/
+> gone). **P1-03** `SUPPORT_LEVEL_WEIGHTS` pondera `generalized_mastery_score`
+> (legacy neutral 1.0). Verificación: backend pytest **1495 passed** + ruff
+> limpio; frontend vitest **450 passed** (57 archivos) + `tsc` OK;
+> `check_release_consistency` 3.25.1 exit 0. Dossier N
+> `docs/audit/N-AUDITORIA-TOTAL-V3251.md`; release notes
+> `release-notes-v3.25.1.md`; CHANGELOG/PLAN/README actualizados. Siguiente
+> paso: cierre del release (commit + bump + CI). Los P2 de la auditoría quedan
+> para V3.26 (Listening + `novel` + retención longitudinal).
 >
 > **Nota (2026-09-08, 14:45):** **V3.25 publicada** — release **v3.25.0**
 > `bb31a1b` en `main` (calibración del Student Model del dossier L — auditoría

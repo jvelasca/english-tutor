@@ -205,6 +205,44 @@ def test_lexicon_endpoint_exposes_competence_matrix(monkeypatch, tmp_path):
         assert s["transfer_gap"] == 0
 
 
+def test_lexicon_endpoint_exposes_units_aggregation(monkeypatch, tmp_path):
+    """V3.25.1 (P1-02): el endpoint de léxico expone el agregado por
+    `lexical_unit` (`units` + `summary.units`): dos superficies que comparten
+    unidad producen UNA unidad agregada con sus superficies independientes."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_words(a, ["go"])  # producida una vez → learning
+    vocabulary_repo.record_exposures(a, ["going"])  # solo reconocida → known
+    # Ambas superficies comparten la unidad canónica `go` (lo que hace el
+    # currículo cuando declara el lemma de la forma canónica).
+    conn = sqlite3.connect(str(db.DB_PATH))
+    try:
+        conn.execute(
+            "UPDATE vocabulary SET lexical_unit = 'go', lemma = 'go' "
+            "WHERE user_id = ? AND word IN ('go', 'going')",
+            (a,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with TestClient(app) as client:
+        got = client.get("/api/vocabulary/lexicon", params={"user_id": a})
+        assert got.status_code == 200
+        body = got.json()
+    assert body["summary"]["units"]["total"] == 1
+    assert body["summary"]["units"]["surface_total"] == 2
+    assert [u["lexical_unit"] for u in body["units"]] == ["go"]
+    unit = body["units"][0]
+    assert unit["surface_count"] == 2
+    by_word = {s["word"]: s for s in unit["surfaces"]}
+    # Cada superficie conserva su propio estado (nada se auto-masteriza solo
+    # por compartir unidad): producida-una-vez ≠ reconocida.
+    assert by_word["go"]["status"] == "weak"
+    assert by_word["going"]["status"] == "known"
+    # El contrato por superficie sigue intacto.
+    assert len(body["items"]) == 2
+
+
 def test_vocabulary_endpoint_404(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:

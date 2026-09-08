@@ -94,27 +94,61 @@ def test_retention_delta_and_stable():
     assert len(delta["by_skill"]) == 2
 
 
+def _exam_row(skill, created_at, result=1.0, *, context_id="exam:a1:1"):
+    """Fila de evidencia de EXAMEN formal (baseline) tal como la escribe la
+    escalera Assessment 2.0 (`kind=level`, task_type="exam") y submit_exam."""
+    return {
+        "skill": skill,
+        "evidence_kind": "transfer",
+        "task_type": "exam",
+        "item_type": "mcq",
+        "result": result,
+        "source": "assessment_v2",
+        "created_at": created_at,
+        "context_id": context_id,
+        "curriculum_version": "v1",
+        "assessment_version": "assessment-v2",
+    }
+
+
+def _delayed_row(skill, created_at, result=0.9, *, context_id="retention:1"):
+    """Fila de un retention reassessment (`evidence_kind="delayed"`). Por
+    defecto es un evento propio con `context_id`; pasar `context_id` compartido
+    agrupa varias filas en el mismo evento (sesión real, una fila por ítem)."""
+    return {
+        "skill": skill,
+        "evidence_kind": "delayed",
+        "task_type": "retention",
+        "item_type": "mcq",
+        "result": result,
+        "source": "assessment_v2",
+        "created_at": created_at,
+        "context_id": context_id,
+        "curriculum_version": "v1",
+        "assessment_version": "assessment-v2",
+    }
+
+
 def test_certification_gate_requires_delayed_per_skill():
-    """P1/H5: completar (aprobar examen) no certifica; exige `delayed` por
-    destreza del examen. La evidencia delayed solo existe tras la ventana de
-    retención estable (≥ RETENTION_MIN_DAYS), luego no es evaluación aparte.
-    V3.25 (fase 4, F-L4): además de la presencia, el gate verifica que las
-    filas `delayed` sean verificables (created_at parseable), como lo son las
-    que escribe realmente la escalera Assessment 2.0."""
+    """P1/H5: completar (aprobar examen) no certifica. El gate exige, por cada
+    destreza del examen, un retention reassessment REAL: evento `delayed`
+    ocurrido ≥ RETENTION_MIN_DAYS después del examen formal con ratio
+    delayed/initial ≥ RETENTION_STABLE_RATIO."""
     skills = ["listening", "reading"]
-    created = "2026-08-01T00:00:00+00:00"
-    familiar_rows = [
-        {"skill": "listening", "evidence_kind": "familiar"},
-        {"skill": "reading", "evidence_kind": "transfer"},
+    formal = "2026-08-01T00:00:00+00:00"
+    delayed_at = "2026-08-08T00:00:00+00:00"  # D+7 exacto
+    exam_rows = [
+        _exam_row("listening", formal),
+        _exam_row("reading", formal),
     ]
-    gate = av2.certification_gate(skills, familiar_rows)
+    gate = av2.certification_gate(skills, exam_rows)
     assert gate["certified"] is False
     assert gate["required"] is True
     assert gate["window_min_days"] == av2.RETENTION_MIN_DAYS
     assert gate["pending_skills"] == ["listening", "reading"]
 
-    only_listening = familiar_rows + [
-        {"skill": "listening", "evidence_kind": "delayed", "created_at": created}
+    only_listening = exam_rows + [
+        _delayed_row("listening", delayed_at, result=0.9)  # rate 0.90
     ]
     gate = av2.certification_gate(skills, only_listening)
     assert gate["certified"] is False
@@ -122,7 +156,7 @@ def test_certification_gate_requires_delayed_per_skill():
     assert gate["pending_skills"] == ["reading"]
 
     both = only_listening + [
-        {"skill": "reading", "evidence_kind": "delayed", "created_at": created}
+        _delayed_row("reading", delayed_at, result=0.95)  # rate 0.95
     ]
     gate = av2.certification_gate(skills, both)
     assert gate["certified"] is True
@@ -130,20 +164,142 @@ def test_certification_gate_requires_delayed_per_skill():
     assert gate["checks"] == {"listening": True, "reading": True}
 
 
+def test_certification_gate_rejects_below_min_window():
+    """P1-01 (auditoría V3.25): un `delayed` a D+6 (ventana < 7 días) no
+    certifica aunque el ratio sea estable."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-07T00:00:00+00:00", 1.0),  # D+6
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is False
+    report = gate["retention_report"]["listening"]
+    assert report["interval_days"] == [6]
+    # El informe es informativo: el ratio es estable (1.0), pero la ventana de
+    # 6 días < RETENTION_MIN_DAYS impide certificar.
+    assert report["best_rate"] == 1.0
+    assert gate["pending_skills"] == ["listening"]
+
+
+def test_certification_gate_rejects_ratio_below_stable():
+    """P1-01: a D+7 con ratio 0.89 (< 0.90) el gate NO certifica."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.89),  # D+7, 0.89
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is False
+    assert gate["retention_report"]["listening"]["best_rate"] == 0.89
+    assert gate["pending_skills"] == ["listening"]
+
+
+def test_certification_gate_ratio_boundary_certifies():
+    """P1-01: a D+7 con ratio 0.90 exacto el gate SÍ certifica."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.90),  # D+7, 0.90
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is True
+    assert gate["pending_skills"] == []
+
+
+def test_certification_gate_rejects_long_window_low_ratio():
+    """P1-01: un intervalo largo (D+21) con ratio 0.50 no es retención
+    estable: el gate NO certifica."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-22T00:00:00+00:00", 0.50),  # D+21
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is False
+    report = gate["retention_report"]["listening"]
+    assert report["longest_interval_days"] == 21
+    assert report["intervals_reached"] == [1, 3, 7, 21]
+    assert report["best_rate"] == 0.5
+    assert gate["pending_skills"] == ["listening"]
+
+
 def test_certification_gate_rejects_delayed_without_created_at():
     """F-L4 (robustez): una fila `delayed` sin `created_at` parseable no puede
     certificar: el gate no confía solo en la mera presencia de la etiqueta."""
-    gate = av2.certification_gate(
-        ["listening"],
-        [{"skill": "listening", "evidence_kind": "delayed"}],
-    )
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        {"skill": "listening", "evidence_kind": "delayed",
+         "task_type": "retention", "result": 1.0, "created_at": "nunca"},
+    ]
+    gate = av2.certification_gate(["listening"], rows)
     assert gate["certified"] is False
     assert gate["retention_report"]["listening"]["verified"] is False
     assert gate["pending_skills"] == ["listening"]
 
 
+def test_certification_gate_two_events_none_with_valid_ratio():
+    """P1-01: dos eventos `delayed` (D+3 y D+8) donde ninguno combina ventana y
+    ratio válidos → no certifica."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row(  # D+3: ventana no alcanzada
+            "listening", "2026-08-04T00:00:00+00:00", 1.0,
+            context_id="retention:1",
+        ),
+        _delayed_row(  # D+8: ventana ok, ratio 0.40 inválido
+            "listening", "2026-08-09T00:00:00+00:00", 0.4,
+            context_id="retention:2",
+        ),
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is False
+    report = gate["retention_report"]["listening"]
+    assert report["interval_days"] == [3, 8]
+    assert report["longest_interval_days"] == 8
+    assert report["intervals_reached"] == [1, 3, 7]
+    assert gate["pending_skills"] == ["listening"]
+
+
+def test_certification_gate_requires_formal_baseline():
+    """P1-01: sin filas de examen (`task_type="exam"`) no hay baseline y el
+    gate no puede certificar, aunque exista `delayed` con ventana y ratio."""
+    rows = [
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 1.0),
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is False
+    report = gate["retention_report"]["listening"]
+    assert report["baseline_date"] is None
+    assert report["initial_score"] is None
+    assert gate["pending_skills"] == ["listening"]
+
+
+def test_certification_gate_groups_delayed_rows_by_context():
+    """Una sesión de retention real emite una fila por ítem compartiendo
+    `context_id`: el gate agrupa el evento y usa la media de resultado por
+    destreza (2 ítems → 1.0 y 0.8 → delayed_score 0.90)."""
+    formal = "2026-08-01T00:00:00+00:00"
+    rows = [
+        _exam_row("listening", formal),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 1.0,
+                     context_id="retention:1"),
+        _delayed_row("listening", "2026-08-08T00:00:00+00:00", 0.8,
+                     context_id="retention:1"),
+    ]
+    gate = av2.certification_gate(["listening"], rows)
+    assert gate["certified"] is True
+    report = gate["retention_report"]["listening"]
+    assert report["count"] == 2
+    assert report["events"] == 1
+    assert report["best_rate"] == 0.9
+
+
 def test_certification_gate_empty_exam_never_certifies():
     assert av2.certification_gate([], [])["certified"] is False
+
 
 
 def test_ladder_level_certified_requires_retention_step():

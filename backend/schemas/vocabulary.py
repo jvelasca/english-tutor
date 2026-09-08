@@ -120,6 +120,57 @@ class LexicalItemOut(BaseModel):
     competence: LexicalCompetence | None = None
 
 
+class LexicalUnitSurfaceOut(BaseModel):
+    """Forma superficial (surface form) dentro de una unidad léxica agregada
+    (V3.25.1/P1-02).
+
+    Cada superficie conserva su PROPIO estado/mastery/recall: dominar `go` no
+    domina automáticamente `going`/`went`/`gone`, que requieren conocimiento
+    productivo distinto."""
+
+    word: str
+    lemma: str = ""
+    cefr: str = ""
+    kind: str = "word"
+    source: str = "user"  # "curriculum" | "user" | "imported"
+    status: LexicalStatus
+    mastery: float
+    recall: float
+    production_count: int
+    exposure_count: int
+    speaking_prod: int = 0
+    competence: LexicalCompetence | None = None
+
+
+class LexicalUnitOut(BaseModel):
+    """Unidad léxica agregada (V3.25.1/P1-02): el conocimiento a nivel de
+    `lexical_unit` (lema o superficie normalizada) SIN fundir las superficies.
+
+    `mastery`/`recall` de unidad son derivados informativos (máximo entre
+    superficies); `status` agrega los estados de las superficies (mastered si
+    alguna lo está). El contrato por superficie (`items`/`summary`) no cambia:
+    esta sección es aditiva y expone `surfaces` con su competencia propia."""
+
+    lexical_unit: str
+    kind: str
+    cefr: str
+    lemma: str = ""
+    source: str = "user"  # "curriculum" si alguna superficie es de currículo
+    status: LexicalStatus
+    mastery: float
+    recall: float
+    surface_count: int
+    mastered_surfaces: int
+    recognized: bool
+    produced: bool
+    transfer: bool
+    production_count: int
+    exposure_count: int
+    production_gap: bool
+    transfer_gap: bool
+    surfaces: list[LexicalUnitSurfaceOut] = Field(default_factory=list)
+
+
 class CefrBucket(BaseModel):
     cefr: str
     count: int
@@ -142,6 +193,10 @@ class LexiconSummary(BaseModel):
     spaced_exposure: int = 0
     production_gap: int = 0
     transfer_gap: int = 0
+    # V3.25.1 (P1-02): resumen del agregado por `lexical_unit` (cada unidad
+    # cuenta una sola vez; opcional y aditivo, el contrato de superficie no
+    # cambia). Ver `LexicalUnitOut` y `services.lexicon.summary_units`.
+    units: dict | None = None
 
 
 class LexiconCoverageLevel(BaseModel):
@@ -172,6 +227,8 @@ class LexiconOut(BaseModel):
     summary: LexiconSummary
     items: list[LexicalItemOut]
     coverage: LexiconCoverage | None = None
+    # V3.25.1 (P1-02): agregado por `lexical_unit` (aditivo, contrato intacto).
+    units: list[LexicalUnitOut] = Field(default_factory=list)
 
 
 class DrillCandidatesOut(BaseModel):

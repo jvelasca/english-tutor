@@ -52,6 +52,20 @@
 - ✅ Backend FastAPI + Pydantic (chat + voz + progreso + listening + CEFR + evaluación del tutor).
 - ✅ Frontend Vite + React + TypeScript (chat, voz continua, dashboard de progreso, listening, calidad del tutor).
 - ✅ Lanzador de escritorio (`launcher/`, GUI tkinter) con acceso directo e icono.
+- ✅ Versión estable `3.25.1` — **Cierre de P1 de la auditoría externa V3.25**
+  (patch correctivo sobre v3.25.0; dossier `docs/audit/N-AUDITORIA-TOTAL-V3251.md`,
+  evidencia de cierre: los 6 tests negativos del gate): **certification_gate
+  real** — baseline formal (`task_type="exam"`) + eventos `delayed` por
+  `context_id`, con ventana ≥ `RETENTION_MIN_DAYS` y ratio ≥
+  `RETENTION_STABLE_RATIO` verificados desde las propias filas (sin examen no
+  se certifica; `retention_report` informa `interval_days`/`initial_score`/
+  `rate`/`baseline_date`) · **agregación real por `lexical_unit`** —
+  `units_from_rows`/`summary_units` en `services/lexicon.py` (cada superficie
+  conserva su estado; aditivo en schemas/domain/frontend `types`) ·
+  **`support_level` pondera la evidencia de dominio** —
+  `SUPPORT_LEVEL_WEIGHTS` (copied .5 / guided .7 / cued .9 / independent 1.0 /
+  spontaneous 1.0) en `generalized_mastery_score`, con legacy neutral 1.0.
+  Tests: `release-notes-v3.25.1.md` y CHANGELOG `[3.25.1]`.
 - ✅ Versión estable `3.25.0` — **Calibración del Student Model: contexto en la
   evidencia, transfer por experiencias y semántica demostrado/estimado** (cierra
   el plan V3.25 del dossier L — auditoría TOTAL verificada de V3.24.0 — que

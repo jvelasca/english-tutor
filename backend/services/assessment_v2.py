@@ -378,6 +378,25 @@ def retention_delta(initial: dict, delayed: dict) -> dict:
     }
 
 
+def _mean_score(rows: list[dict], skill: str = "") -> float | None:
+    """Media de `result` numérico entre las filas (opcionalmente de `skill`)."""
+    scores = [
+        float(r["result"])
+        for r in rows
+        if (not skill or r.get("skill") == skill)
+        and isinstance(r.get("result"), (int, float))
+    ]
+    return round(sum(scores) / len(scores), 3) if scores else None
+
+
+def _latest_dt(rows: list[dict]) -> datetime | None:
+    """`created_at` más reciente parseable entre las filas (None si ninguna)."""
+    parsed = [
+        dt for r in rows if (dt := _parse_iso(r.get("created_at") or "")) is not None
+    ]
+    return max(parsed) if parsed else None
+
+
 def certification_gate(
     exam_skills: list[str],
     evidence_rows: list[dict],
@@ -387,65 +406,140 @@ def certification_gate(
     """Gate de certificación de un nivel (P1/H5): **completado ≠ certificado**.
 
     Aprobar el examen completa el nivel y desbloquea el siguiente; la
-    certificación plena exige además evidencia de retención retardada por cada
-    destreza del examen. La evidencia `delayed` solo se escribe tras un
-    retention reassessment que supera la ventana `RETENTION_MIN_DAYS` con ratio
-    estable (`RETENTION_STABLE_RATIO`), así que su presencia en `evidence_rows`
-    (filas crudas de `academy_evidence`) ya codifica el requisito formal de la
-    ventana: no se trata de una evaluación aparte sino de un requisito del nivel.
+    certificación plena exige, por cada destreza del examen, retención retardada
+    REAL: un retention reassessment ocurrido ≥ `RETENTION_MIN_DAYS` después de
+    la evaluación formal del nivel y con ratio `delayed/initial ≥
+    RETENTION_STABLE_RATIO`. La presencia de filas `delayed` no basta: el gate
+    reconstruye baseline y ratio desde las propias filas de `academy_evidence`.
 
-    V3.25 (fase 4, F-L8, robustez del hallazgo F-L4): el gate ya no confía solo
-    en la mera presencia de `delayed`; verifica la integridad de las filas
-    (`created_at` parseable → `verified`) y expone la métrica derivada
-    `retention_report` por destreza (edad de cada evento `delayed` y el
-    intervalo más largo estable alcanzado desde la última formal). Si una fila
-    `delayed` no es verificable, la certificación no puede concederse.
+    V3.25.1 (P1-01, auditoría externa V3.25): el gate ya no confía en que el
+    emisor haya codificado la ventana. Verifica:
+
+    - `formal_rows` — eventos de EXAMEN (`task_type == "exam"` con
+      `evidence_kind != "delayed"`): cubre la escalera Assessment 2.0
+      (`kind=level`) y el examen legacy (`submit_exam`). El ancla formal es el
+      `created_at` más reciente entre ellos; `initial_score` por destreza es la
+      media de `result` de esas filas. Sin filas de examen no hay baseline y
+      ninguna destreza puede certificarse.
+    - eventos `delayed` — filas con `evidence_kind == "delayed"` agrupadas por
+      `context_id` (una sesión de retention emite una fila por ítem compartiendo
+      contexto; las filas legacy sin `context_id` son cada una su propio evento).
+
+    Una destreza queda satisfecha cuando existe un evento `delayed` suyo
+    verificable (todos sus `created_at` parseables) con
+    `interval_days >= RETENTION_MIN_DAYS` desde el ancla formal y
+    `rate = delayed_score / initial_score >= RETENTION_STABLE_RATIO`.
+
+    `retention_report` (informativo, no gate) expone por destreza `baseline_date`
+    y `initial_score`, el intervalo formal→delayed en días de cada evento
+    (`interval_days`), `longest_interval_days`, `intervals_reached`
+    (RETENTION_INTERVALS) y el `rate` del mejor evento (`best_rate`).
 
     Devuelve conformidad global, conteo `delayed` por destreza y las destrezas
     pendientes de retención. Un nivel sin examen (sin destrezas exigidas) nunca
     puede quedar certificado.
     """
-    now_dt = _parse_iso(now) or datetime.now(timezone.utc)
-    delayed_rows: list[dict] = []
+    # Baseline formal: eventos de examen de nivel (Assessment 2.0 kind=level y
+    # submit_exam legacy). Nunca filas `delayed`.
+    formal_rows = [
+        r
+        for r in evidence_rows
+        if (r.get("task_type") or "") == "exam"
+        and str(r.get("evidence_kind") or "familiar").lower() != "delayed"
+    ]
+    formal_anchor_dt = _latest_dt(formal_rows)
+    initial_by_skill = {skill: _mean_score(formal_rows, skill) for skill in exam_skills}
+
+    # Eventos `delayed`: filas agrupadas por `context_id` (una sesión de
+    # retention emite una fila por ítem). Legacy sin `context_id`: cada fila es
+    # su propio evento (contexto desconocido no demuestra experiencia conjunta).
+    events: list[list[dict]] = []
+    by_context: dict[str, list[dict]] = {}
     for row in evidence_rows:
         if str(row.get("evidence_kind") or "").lower() != "delayed":
             continue
-        if row.get("skill"):
-            delayed_rows.append(row)
-
-    def _report(skill: str) -> dict:
-        rows = [r for r in delayed_rows if r.get("skill") == skill]
-        ages: list[int] = []
-        verified = True
-        for r in rows:
-            created = _parse_iso(r.get("created_at") or "")
-            if created is None:
-                verified = False
-                continue
-            ages.append(max(0, (now_dt - created).days))
-        ages.sort()
-        return {
-            "count": len(rows),
-            "verified": verified,
-            "ages_days": ages,
-            "longest_interval_days": ages[-1] if ages else 0,
-            "intervals_reached": [
-                i for i in RETENTION_INTERVALS if ages and ages[-1] >= i
-            ],
-        }
+        if not row.get("skill"):
+            continue
+        cid = row.get("context_id") or ""
+        if cid:
+            by_context.setdefault(cid, []).append(row)
+        else:
+            events.append([row])
+    events.extend(rows for rows in by_context.values() if rows)
 
     delayed_by_skill: dict[str, int] = {}
-    for row in delayed_rows:
-        skill = row.get("skill") or ""
-        delayed_by_skill[skill] = delayed_by_skill.get(skill, 0) + 1
-    reports = {skill: _report(skill) for skill in exam_skills}
-    checks = {
-        skill: (
-            delayed_by_skill.get(skill, 0) >= CERTIFICATION_REQUIRED_DELAYED
-            and reports[skill]["verified"]
-        )
-        for skill in exam_skills
-    }
+    reports: dict[str, dict] = {}
+    checks: dict[str, bool] = {}
+    for skill in exam_skills:
+        skill_events: list[dict] = []
+        for rows in events:
+            own = [r for r in rows if r.get("skill") == skill]
+            if not own:
+                continue
+            delayed_by_skill[skill] = delayed_by_skill.get(skill, 0) + len(own)
+            ev_dt = _latest_dt(rows)
+            verified = all(_parse_iso(r.get("created_at") or "") for r in own)
+            interval_days = (
+                max(0, (ev_dt - formal_anchor_dt).days)
+                if ev_dt is not None and formal_anchor_dt is not None
+                else None
+            )
+            delayed_score = _mean_score(own)
+            initial_score = initial_by_skill.get(skill)
+            rate = (
+                round(delayed_score / initial_score, 3)
+                if delayed_score is not None
+                and initial_score not in (None, 0.0)
+                else None
+            )
+            ok = (
+                verified
+                and interval_days is not None
+                and interval_days >= RETENTION_MIN_DAYS
+                and rate is not None
+                and rate >= RETENTION_STABLE_RATIO
+            )
+            skill_events.append(
+                {
+                    "verified": verified,
+                    "interval_days": interval_days,
+                    "delayed_score": delayed_score,
+                    "rate": rate,
+                    "ok": ok,
+                }
+            )
+        intervals = [
+            e["interval_days"] for e in skill_events if e["interval_days"] is not None
+        ]
+        longest = max(intervals) if intervals else 0
+        # Mejor evento a efectos del informe: el de mayor intervalo formal→delayed
+        # con ratio calculable (informativo, no gate: refleja la retención real
+        # aunque no alcance el umbral de certificación).
+        eligible = [
+            e
+            for e in skill_events
+            if e["interval_days"] is not None and e["rate"] is not None
+        ]
+        best = max(eligible, key=lambda e: e["interval_days"]) if eligible else None
+        reports[skill] = {
+            "count": delayed_by_skill.get(skill, 0),
+            "events": len(skill_events),
+            "verified": (
+                all(e["verified"] for e in skill_events) if skill_events else True
+            ),
+            "baseline_date": (
+                formal_anchor_dt.isoformat() if formal_anchor_dt is not None else None
+            ),
+            "initial_score": initial_by_skill.get(skill),
+            "interval_days": sorted(intervals),
+            "longest_interval_days": longest,
+            "intervals_reached": [
+                i for i in RETENTION_INTERVALS if longest >= i
+            ],
+            "best_rate": best["rate"] if best is not None else None,
+        }
+        checks[skill] = any(e["ok"] for e in skill_events)
+
     return {
         "required": True,
         "window_min_days": RETENTION_MIN_DAYS,

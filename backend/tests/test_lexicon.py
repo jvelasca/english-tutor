@@ -684,3 +684,146 @@ def test_summary_counts_matrix_competence():
     assert s["spaced_exposure"] == 2  # retained + spaced-only (señal receptiva)
     assert s["production_gap"] == 3  # recog + retained + spaced-only
     assert s["transfer_gap"] == 1  # solo "produced-1"
+
+
+# --- V3.25.1 (P1-02): agregado REAL por lexical_unit -------------------------
+
+_LEX_NOW = "2026-02-01T00:00:00+00:00"
+
+
+def _lex_row(**overrides) -> dict:
+    """Fila canónica de léxico (como la devuelve `get_vocabulary`) para las
+    superficies de la unidad `go` (paradigma go/going/went/gone)."""
+    row = _row(
+        word="go",
+        lemma="go",
+        cefr="A1",
+        kind="word",
+        source="user",
+        lexical_unit="go",
+        level_id="a1",
+        objective_id="a1-m01-u01-l01-o01",
+    )
+    row.update(overrides)
+    return row
+
+
+def _go_paradigm_rows() -> list[dict]:
+    """Cuatro superficies de la unidad `go` con estados independientes:
+    `go` dominada, `going` producida una vez, `went` solo reconocida y `gone`
+    sin evidencia. Ninguna superficie comparte el estado de otra."""
+    return [
+        _lex_row(  # go → mastered
+            word="go",
+            lemma="go",
+            source="curriculum",
+            appearances=3,
+            production_days=2,
+            exposures=4,
+            exposure_days=3,
+            first_seen="2026-01-01T10:00:00+00:00",
+            last_seen="2026-01-20T10:00:00+00:00",
+            first_exposed_at="2026-01-01T10:00:00+00:00",
+            last_exposed_at="2026-01-20T10:00:00+00:00",
+            speaking_prod=2,
+            context_tags="speaking:drill",
+        ),
+        _lex_row(  # going → producida, NO dominada
+            word="going",
+            lemma="",
+            appearances=1,
+            production_days=1,
+            exposures=0,
+            first_seen="2026-01-25T10:00:00+00:00",
+            last_seen="2026-01-25T10:00:00+00:00",
+            speaking_prod=1,
+        ),
+        _lex_row(  # went → solo reconocida
+            word="went",
+            lemma="",
+            exposures=2,
+            exposure_days=1,
+            first_exposed_at="2026-01-15T10:00:00+00:00",
+            last_exposed_at="2026-01-16T10:00:00+00:00",
+        ),
+        _lex_row(word="gone", lemma=""),  # → learning
+    ]
+
+
+def test_units_aggregate_go_paradigm_with_independent_surfaces():
+    """P1-02: go/going/went/gone comparten lexical_unit='go' → una sola unidad
+    agregada, pero cada superficie conserva su PROPIO estado (dominar `go` no
+    domina `going`)."""
+    units = lexicon.units_from_rows(_go_paradigm_rows(), now=_LEX_NOW)
+    assert len(units) == 1
+    unit = units[0]
+    assert unit["lexical_unit"] == "go"
+    assert unit["surface_count"] == 4
+    assert unit["mastered_surfaces"] == 1
+    # Metadata de la fila canónica (currículo): la forma `go`.
+    assert unit["kind"] == "word"
+    assert unit["cefr"] == "A1"
+    assert unit["lemma"] == "go"
+    assert unit["source"] == "curriculum"
+
+    by_word = {s["word"]: s for s in unit["surfaces"]}
+    assert by_word["go"]["status"] == "mastered"
+    # Independencia: solo `go` está dominada; el resto NO se auto-masteriza.
+    assert by_word["going"]["status"] != "mastered"
+    assert by_word["went"]["status"] == "known"
+    assert by_word["gone"]["status"] == "learning"
+
+    # Derivado de unidad (informativo, máximo entre superficies).
+    assert unit["status"] == "mastered"
+    assert unit["recognized"] is True
+    assert unit["produced"] is True
+    assert unit["mastery"] == pytest.approx(1.0)
+    assert unit["recall"] == pytest.approx(
+        max(s["recall"] for s in unit["surfaces"])
+    )
+    # Contadores sumados a nivel de unidad.
+    assert unit["production_count"] == sum(
+        s["production_count"] for s in unit["surfaces"]
+    )
+    assert unit["exposure_count"] == sum(
+        s["exposure_count"] for s in unit["surfaces"]
+    )
+
+
+def test_units_surfaces_are_sorted_and_empty_rows_empty():
+    assert lexicon.units_from_rows([]) == []
+    units = lexicon.units_from_rows(_go_paradigm_rows(), now=_LEX_NOW)
+    assert [s["word"] for s in units[0]["surfaces"]] == ["go", "going", "gone", "went"]
+    # Rows sin `lexical_unit` explícito se agrupan por su propia palabra/lemma
+    # (fallback de `lexical_unit`): cada fila forma al menos su unidad de
+    # superficie única; el contrato por `items`/`summary` queda intacto.
+    units2 = lexicon.units_from_rows(
+        [{"word": "orphan", "appearances": 1, "production_days": 1}]
+    )
+    assert [u["lexical_unit"] for u in units2] == ["orphan"]
+    assert units2[0]["surface_count"] == 1
+
+
+def test_summary_units_counts_each_unit_once():
+    """P1-02: `summary_units` cuenta la UNIDAD, no las 4 superficies: la
+    parábola go/going/went/gone no puede inflar el recuento a 4 conocimientos."""
+    s = lexicon.summary_units(_go_paradigm_rows(), now=_LEX_NOW)
+    assert s["total"] == 1
+    assert s["mastered"] == 1
+    assert s["known"] == 0
+    assert s["weak"] == 0
+    assert s["learning"] == 0
+    assert s["recognized"] == 1
+    assert s["produced"] == 1
+    assert s["surface_total"] == 4
+    assert s["mastered_surfaces"] == 1
+    assert s["by_cefr"] == [{"cefr": "A1", "count": 1}]
+
+    # Dos unidades distintas (una forma libre con su propia unidad) → total 2.
+    rows = _go_paradigm_rows() + [
+        _lex_row(word="cat", lemma="cat", lexical_unit="cat", exposures=2)
+    ]
+    s2 = lexicon.summary_units(rows, now=_LEX_NOW)
+    assert s2["total"] == 2
+    assert s2["mastered"] == 1
+    assert [b["cefr"] for b in s2["by_cefr"]] == ["A1"]

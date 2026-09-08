@@ -415,64 +415,101 @@ def test_readiness_uses_distinct_transfer_contexts_when_known():
 # --- V3.25 fase 4 — retención longitudinal y robustez del gate (F-L4/F-L8) -
 
 
-def _delayed_row(skill, created_at):
+def _delayed_row(skill, created_at, result=0.95, *, context_id="retention:test:1"):
+    """Fila de un retention reassessment (Assessment 2.0, kind=retention):
+    `evidence_kind="delayed"`, `task_type="retention"` y `context_id` de sesión."""
     return {
         "skill": skill,
         "evidence_kind": "delayed",
+        "task_type": "retention",
         "item_type": "mcq",
-        "result": 0.95,
+        "result": result,
         "source": "assessment_v2",
         "created_at": created_at,
+        "context_id": context_id,
         "curriculum_version": "v1",
         "assessment_version": "assessment-v2",
     }
 
 
-def test_certification_gate_verifies_delayed_rows(monkeypatch, tmp_path):
-    """F-L4: el gate certifica solo con filas `delayed` verificables; una fila
-    sin `created_at` parseable (o con destreza ausente) no puede certificar."""
+def _exam_row(skill, created_at, result=1.0, *, context_id="exam:a1"):
+    """Fila del EXAMEN formal (baseline): `task_type="exam"`, como la escribe
+    la escalera Assessment 2.0 (kind=level) y submit_exam."""
+    return {
+        "skill": skill,
+        "evidence_kind": "transfer",
+        "task_type": "exam",
+        "item_type": "mcq",
+        "result": result,
+        "source": "assessment_v2",
+        "created_at": created_at,
+        "context_id": context_id,
+        "curriculum_version": "v1",
+        "assessment_version": "assessment-v2",
+    }
+
+
+def test_certification_gate_verifies_delayed_rows():
+    """F-L4 (V3.25.1, P1-01): el gate certifica solo con eventos `delayed`
+    verificables y con ventana (≥ RETENTION_MIN_DAYS desde el examen formal) +
+    ratio (≥ RETENTION_STABLE_RATIO) válidos; una sesión con `created_at`
+    corrupto no puede certificar."""
     from services import assessment_v2 as av2
 
-    now = "2026-08-21T00:00:00+00:00"
-    valid = _delayed_row("listening", "2026-08-01T00:00:00+00:00")
-    invalid = _delayed_row("reading", "nunca")  # created_at corrupto
-
-    g_ok = av2.certification_gate(["listening"], [valid], now=now)
+    formal = "2026-08-01T00:00:00+00:00"
+    delayed_at = "2026-08-08T00:00:00+00:00"  # D+7
+    g_ok = av2.certification_gate(
+        ["listening"],
+        [_exam_row("listening", formal), _delayed_row("listening", delayed_at)],
+    )
     assert g_ok["certified"] is True
     assert g_ok["retention_report"]["listening"]["verified"] is True
-    assert g_ok["retention_report"]["listening"]["longest_interval_days"] == 20
+    assert g_ok["retention_report"]["listening"]["interval_days"] == [7]
 
-    g_bad = av2.certification_gate(["reading"], [invalid], now=now)
+    g_bad = av2.certification_gate(
+        ["reading"],
+        [_exam_row("reading", formal), _delayed_row("reading", "nunca")],
+    )
     assert g_bad["certified"] is False
     assert g_bad["retention_report"]["reading"]["verified"] is False
     assert "reading" in g_bad["pending_skills"]
 
 
-def test_certification_gate_requires_delayed_per_skill(monkeypatch, tmp_path):
-    """Sin cambios de semántica (H5): hace falta `delayed` para CADA destreza."""
+def test_certification_gate_requires_delayed_per_skill():
+    """Sin cambios de semántica (H5): hace falta retención validada para CADA
+    destreza del examen."""
     from services import assessment_v2 as av2
 
-    rows = [_delayed_row("listening", "2026-08-01T00:00:00+00:00")]
+    formal = "2026-08-01T00:00:00+00:00"
+    delayed_at = "2026-08-08T00:00:00+00:00"  # D+7
+    exam_rows = [_exam_row("listening", formal), _exam_row("speaking", formal)]
+    rows = exam_rows + [_delayed_row("listening", delayed_at)]
     g = av2.certification_gate(["listening", "speaking"], rows)
     assert g["certified"] is False
     assert g["delayed_by_skill"] == {"listening": 1, "speaking": 0}
     assert g["pending_skills"] == ["speaking"]
 
 
-def test_retention_report_multi_interval(monkeypatch, tmp_path):
-    """F-L8: los eventos `delayed` derivan el intervalo más largo alcanzado y
-    las ventanas opcionales D+1/D+3/D+7/D+21 superadas."""
+def test_retention_report_multi_interval():
+    """F-L8: los eventos `delayed` derivan el intervalo formal→delayed más
+    largo alcanzado y las ventanas opcionales D+1/D+3/D+7/D+21 superadas."""
     from services import assessment_v2 as av2
 
-    now = "2026-08-21T00:00:00+00:00"
+    formal = "2026-08-01T00:00:00+00:00"
     rows = [
-        _delayed_row("listening", "2026-08-14T00:00:00+00:00"),  # hace 7 días
-        _delayed_row("listening", "2026-08-01T00:00:00+00:00"),  # hace 20 días
+        _exam_row("listening", formal),
+        _delayed_row(  # D+7
+            "listening", "2026-08-08T00:00:00+00:00", context_id="retention:1"
+        ),
+        _delayed_row(  # D+20
+            "listening", "2026-08-21T00:00:00+00:00", context_id="retention:2"
+        ),
     ]
-    g = av2.certification_gate(["listening"], rows, now=now)
+    g = av2.certification_gate(["listening"], rows)
     report = g["retention_report"]["listening"]
     assert report["count"] == 2
-    assert report["ages_days"] == [7, 20]
+    assert report["events"] == 2
+    assert report["interval_days"] == [7, 20]
     assert report["longest_interval_days"] == 20
     # 20 días cubre D+1/D+3/D+7 pero todavía no D+21.
     assert report["intervals_reached"] == [1, 3, 7]

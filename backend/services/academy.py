@@ -794,20 +794,45 @@ EVIDENCE_KIND_WEIGHTS: dict[str, float] = {
     "delayed": 0.5,
 }
 
+# Peso del nivel de apoyo de la evidencia (F-L7, V3.25.1/P1-03): cuánto vale
+# cada `result` según la INDEPENDENCIA con que se produjo. `copied`/`guided`/
+# `cued` descuentan (el logro es menos atribuible al alumno);
+# `independent`/`spontaneous` no penalizan. Heurística a calibrar en V3.26.
+# Las filas sin `support_level` (legacy pre-V3.25) o con valor no declarado
+# usan peso neutral 1.0: no penalizan datos históricos.
+SUPPORT_LEVEL_WEIGHTS: dict[str, float] = {
+    "copied": 0.5,
+    "guided": 0.7,
+    "cued": 0.9,
+    "independent": 1.0,
+    "spontaneous": 1.0,
+}
+
+
+def _support_weight(row: dict) -> float:
+    """Peso del nivel de apoyo de una fila de evidencia.
+
+    Neutral 1.0 para legacy sin `support_level` o valores no declarados: no se
+    descuenta lo que no se pudo caracterizar."""
+    return SUPPORT_LEVEL_WEIGHTS.get(row.get("support_level") or "", 1.0)
+
 
 def generalized_mastery_score(rows: list[dict]) -> float | None:
     """Dominio generalizado (novel > transfer > familiar) sobre la evidencia.
 
     Media ponderada de `result` por `evidence_kind`, renormalizada a los kinds
-    presentes. Devuelve None si no hay evidencia (o ninguna con `result`
-    numérico)."""
+    presentes. V3.25.1 (P1-03): cada `result` se descuenta además por el nivel
+    de apoyo de su fila (`SUPPORT_LEVEL_WEIGHTS`); las filas legacy sin
+    `support_level` (o con valor no declarado) usan peso neutral 1.0, así que
+    los datos previos a V3.25 no cambian de valor. Devuelve None si no hay
+    evidencia (o ninguna con `result` numérico)."""
     by_kind: dict[str, list[float]] = defaultdict(list)
     for row in rows:
         result = row.get("result")
         if isinstance(result, bool) or not isinstance(result, (int, float)):
             continue
         kind = row.get("evidence_kind") or "familiar"
-        by_kind[kind].append(float(result))
+        by_kind[kind].append(float(result) * _support_weight(row))
 
     total_weight = 0.0
     weighted_sum = 0.0

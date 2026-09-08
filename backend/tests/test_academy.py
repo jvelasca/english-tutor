@@ -2,6 +2,7 @@
 
 import asyncio
 import sqlite3
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -29,6 +30,23 @@ def _setup(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
     return users_repo.create_user("A")["id"], users_repo.create_user("B")["id"]
+
+
+def _backdate_evidence(uid: str, level_id: str, days: int, *, task_type: str = "exam"):
+    """Retrasa `created_at` de la evidencia del nivel (por defecto las filas del
+    examen formal, `task_type="exam"`) para simular una ventana de retención de
+    `days` días entre el examen y un retention reassessment posterior."""
+    past = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    conn = sqlite3.connect(str(db.DB_PATH))
+    try:
+        conn.execute(
+            "UPDATE academy_evidence SET created_at = ? "
+            "WHERE user_id = ? AND level_id = ? AND task_type = ?",
+            (past, uid, level_id, task_type),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # --- Currículum -----------------------------------------------------------
@@ -596,6 +614,11 @@ def test_level_becomes_certified_with_delayed_evidence(monkeypatch, tmp_path):
         )
         assert r.json()["passed"] is True
 
+    # El retention reassessment real ocurre ≥7 días después del examen: se
+    # retrasa la evidencia formal del examen para respetar la ventana del gate
+    # (V3.25.1, P1-01: la certificación exige intervalo formal→delayed ≥ 7 días).
+    _backdate_evidence(a, "a1", 10)
+
     # Retention reassessment superado: evidencia delayed por destreza del examen.
     for skill in exam.skills:
         assert academy_repo.record_evidence(
@@ -1061,6 +1084,59 @@ def test_generalized_mastery_score_ignores_non_numeric():
     assert academy_svc.generalized_mastery_score(rows) == 0.8
 
 
+# V3.25.1 (P1-03, auditoría V3.25): support_level pondera la evidencia -------
+
+
+def test_support_level_weights_constant_and_legacy_neutral():
+    """P1-03: la tabla de pesos baja copiado/guíado/cued y deja
+    independent/spontaneous en 1.0. Legacy sin `support_level` (o valor no
+    declarado) usa peso neutral 1.0: los datos previos a V3.25 no cambian."""
+    assert academy_svc.SUPPORT_LEVEL_WEIGHTS == {
+        "copied": 0.5,
+        "guided": 0.7,
+        "cued": 0.9,
+        "independent": 1.0,
+        "spontaneous": 1.0,
+    }
+    legacy = [{"evidence_kind": "transfer", "result": 0.8}]
+    unknown = [
+        {"evidence_kind": "transfer", "result": 0.8, "support_level": "mágico"}
+    ]
+    assert academy_svc.generalized_mastery_score(legacy) == 0.8
+    assert academy_svc.generalized_mastery_score(unknown) == 0.8
+
+
+def test_generalized_mastery_score_support_monotonic():
+    """P1-03: a igual `result`, cuanto más apoyo requirió la evidencia menor
+    es el dominio generalizado: copied < guided < cued < independent."""
+    expected = {
+        "copied": 0.5,
+        "guided": 0.7,
+        "cued": 0.9,
+        "independent": 1.0,
+        "spontaneous": 1.0,
+    }
+    for support, score in expected.items():
+        rows = [
+            {"evidence_kind": "familiar", "result": 1.0, "support_level": support},
+            {"evidence_kind": "transfer", "result": 1.0, "support_level": support},
+        ]
+        assert academy_svc.generalized_mastery_score(rows) == score, support
+
+
+def test_generalized_mastery_score_mixes_support_levels():
+    """P1-03: dentro de un mismo `evidence_kind` el apoyo pondera cada fila
+    antes de promediar (renormalizado): (1.0·1.0 + 1.0·0.5 + 0.5)/3."""
+    rows = [
+        {"evidence_kind": "familiar", "result": 1.0, "support_level": "independent"},
+        {"evidence_kind": "familiar", "result": 1.0, "support_level": "copied"},
+        {"evidence_kind": "familiar", "result": 0.5},  # legacy neutral 1.0
+    ]
+    # familiar: (1.0 + 0.5 + 0.5)/3 = 0.667; kind único → se renormaliza solo.
+    score = academy_svc.generalized_mastery_score(rows)
+    assert score == round((1.0 + 0.5 + 0.5) / 3, 3)
+
+
 def test_build_skill_profile_includes_evidence_by_kind_and_generalized_score():
     lv = load_level("a1")
     skill = lv.objectives()[0].skills[0]
@@ -1508,6 +1584,11 @@ def test_endpoint_student_model_separates_demonstrated_level(monkeypatch, tmp_pa
         assert sm["demonstrated_level"] is None, sm["demonstrated_level"]
         assert sm["estimated_level"] == "A1"
         assert sm["level_progress"] == 0.0
+
+        # El retention reassessment real ocurre ≥7 días después del examen: se
+        # retrasa la evidencia formal para respetar la ventana del gate
+        # (V3.25.1, P1-01: la certificación exige intervalo formal→delayed ≥7d).
+        _backdate_evidence(a, "a1", 10)
 
         # (b) Retention reassessment superado: delayed por destreza del examen.
         for skill in exam.skills:

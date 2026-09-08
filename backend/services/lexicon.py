@@ -810,3 +810,178 @@ def coverage_indicator(rows: list[dict], now: str = "") -> dict:
         "mastered": totals["mastered"],
         "by_level": by_level,
     }
+
+
+# V3.25.1 (P1-02, auditoría externa V3.25): agregado REAL por unidad léxica.
+# `lexical_unit` ya existía como columna, pero el cálculo de dominio seguía
+# siendo por fila (una entrada por `word`/surface form). Estas funciones
+# agrupan las filas por `lexical_unit` para exponer el conocimiento a nivel de
+# UNIDAD sin fundir las superficies: `go/going/went/gone` comparten la unidad
+# `go`, pero cada forma conserva su PROPIO estado (dominar `go` no implica
+# dominar `going`). El estado de unidad es un derivado informativo (máximo
+# entre superficies), nunca un sustituto de la competencia por forma.
+
+
+def _unit_status(statuses: list[str]) -> str:
+    """Estado agregado de una unidad desde los estados de sus superficies.
+
+    Indicador informativo (no sustituye a la competencia por forma):
+    `mastered` si alguna superficie está dominada; si no, `weak` si alguna lo
+    está; `known` si solo hay reconocimiento; `learning` en el resto."""
+    if "mastered" in statuses:
+        return "mastered"
+    if "weak" in statuses:
+        return "weak"
+    if "known" in statuses:
+        return "known"
+    return "learning"
+
+
+def _unit_representative(group: list[dict], unit: str) -> dict:
+    """Fila representativa de una unidad para su metadata (kind/cefr/lemma).
+
+    Prefiere la fila de currículo, luego la superficie que coincide con la
+    unidad canónica (p. ej. `go` para la unidad `go`), luego el CEFR menor y
+    finalmente la superficie alfabéticamente menor. Determinista."""
+    return min(
+        group,
+        key=lambda r: (
+            r.get("source") != "curriculum",
+            (r.get("word") or "").lower() != unit,
+            (r.get("cefr") or ""),
+            (r.get("word") or "").lower(),
+        ),
+    )
+
+
+def units_from_rows(rows: list[dict], now: str = "") -> list[dict]:
+    """Unidades léxicas agregadas (V3.25.1/P1-02).
+
+    Agrupa las filas por `lexical_unit` y devuelve una entrada por UNIDAD con:
+
+    - `surfaces`: cada forma superficial con su estado/mastery/recall propio
+      (independientes entre sí) más contadores y matriz de competencia;
+    - conocimiento derivado de unidad: `recognized`/`produced`/`transfer`,
+      `mastery`/`recall` (máximo entre superficies, informativo), `status`
+      agregado (`_unit_status`), `mastered_surfaces`;
+    - gaps a nivel de unidad: `production_gap` (reconocida y ninguna forma
+      producida) y `transfer_gap` (producida y ninguna forma transferida).
+
+    Orden determinista: unidades por `lexical_unit`, superficies por `word`.
+    """
+    by_unit: dict[str, list[dict]] = {}
+    for row in rows:
+        unit = lexical_unit(row)
+        if not unit:
+            continue
+        by_unit.setdefault(unit, []).append(row)
+
+    units: list[dict] = []
+    for unit in sorted(by_unit):
+        group = by_unit[unit]
+        surfaces = [
+            {
+                "word": row["word"],
+                "lemma": row.get("lemma") or "",
+                "cefr": row.get("cefr") or "",
+                "kind": row.get("kind") or "word",
+                "source": row.get("source") or "user",
+                "status": item_status(row, now),
+                "mastery": item_mastery(row),
+                "recall": item_recall(row, now),
+                "production_count": production_count(row),
+                "exposure_count": exposure_count(row),
+                "speaking_prod": _speaking_prod(row),
+                "competence": item_competence_matrix(row),
+            }
+            for row in sorted(group, key=lambda r: (r.get("word") or "").lower())
+        ]
+        rep = _unit_representative(group, unit)
+        produced = any(s["production_count"] > 0 for s in surfaces)
+        recognized = any(
+            s["exposure_count"] > 0 or s["production_count"] > 0
+            for s in surfaces
+        )
+        transfer = any(s["competence"]["transfer"] for s in surfaces)
+        statuses = [s["status"] for s in surfaces]
+        units.append(
+            {
+                "lexical_unit": unit,
+                "kind": rep.get("kind") or "word",
+                "cefr": rep.get("cefr") or "",
+                "lemma": rep.get("lemma") or "",
+                "source": (
+                    "curriculum"
+                    if any(s["source"] == "curriculum" for s in surfaces)
+                    else "user"
+                ),
+                "status": _unit_status(statuses),
+                "mastery": round(max(s["mastery"] for s in surfaces), 3),
+                "recall": round(max(s["recall"] for s in surfaces), 3),
+                "surface_count": len(surfaces),
+                "mastered_surfaces": sum(
+                    1 for s in surfaces if s["status"] == "mastered"
+                ),
+                "recognized": recognized,
+                "produced": produced,
+                "transfer": transfer,
+                "production_count": sum(s["production_count"] for s in surfaces),
+                "exposure_count": sum(s["exposure_count"] for s in surfaces),
+                "production_gap": recognized and not produced,
+                "transfer_gap": produced and not transfer,
+                "surfaces": surfaces,
+            }
+        )
+    return units
+
+
+def summary_units(rows: list[dict], now: str = "") -> dict:
+    """Resumen por UNIDAD léxica (V3.25.1/P1-02): cada `lexical_unit` cuenta
+    una sola vez (`go/going/went/gone` ya no son 4 conocimientos
+    independientes).
+
+    Equivalente de `summary` (por superficie) a nivel de unidad: totales por
+    estado derivado, competencia de unidad (reconocida/producida/transferida,
+    gaps) y distribución CEFR de las unidades. Contadores de superficie
+    (`surface_total`, `mastered_surfaces`) acompañan como contexto del agregado.
+    """
+    units = units_from_rows(rows, now)
+    statuses = {"mastered": 0, "learning": 0, "known": 0, "weak": 0}
+    competence = {
+        "recognized": 0,
+        "produced": 0,
+        "transfer": 0,
+        "production_gap": 0,
+        "transfer_gap": 0,
+        "surface_total": 0,
+        "mastered_surfaces": 0,
+    }
+    cefr_buckets: dict[str, int] = {}
+    for u in units:
+        statuses[u["status"]] += 1
+        for key in ("recognized", "produced", "transfer"):
+            if u[key]:
+                competence[key] += 1
+        if u["production_gap"]:
+            competence["production_gap"] += 1
+        if u["transfer_gap"]:
+            competence["transfer_gap"] += 1
+        competence["surface_total"] += u["surface_count"]
+        competence["mastered_surfaces"] += u["mastered_surfaces"]
+        if u["cefr"]:
+            cefr_buckets[u["cefr"]] = cefr_buckets.get(u["cefr"], 0) + 1
+    ordered = [(c, cefr_buckets[c]) for c in CEFR_ORDER if c in cefr_buckets]
+    ordered.extend(
+        (c, cefr_buckets[c])
+        for c in sorted(cefr_buckets)
+        if c not in CEFR_ORDER
+    )
+    return {
+        "total": len(units),
+        "mastered": statuses["mastered"],
+        "learning": statuses["learning"],
+        "known": statuses["known"],
+        "weak": statuses["weak"],
+        "by_cefr": [{"cefr": c, "count": n} for c, n in ordered],
+        **competence,
+    }

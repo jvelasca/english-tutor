@@ -111,11 +111,13 @@ async def seed_objective_vocabulary(user_id: str, level, objective) -> bool:
 
 
 async def get_lexicon(user_id: str) -> dict:
-    """Léxico personal del alumno: `{summary, items}` por ítem léxico (V2.3).
+    """Léxico personal del alumno: `{summary, items, units}` por ítem léxico.
 
     Enriquece cada fila con `status`, `recall` y `next_review_days` reutilizando
-    la curva de olvido y el scheduler de repaso existentes.
-    """
+    la curva de olvido y el scheduler de repaso existentes. V3.25.1 (P1-02):
+    expone además el agregado por `lexical_unit` (`units`, con las superficies
+    y su competencia propia) y el resumen por unidad (`summary.units`), sin
+    cambiar el contrato por superficie."""
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     items = [
         {
@@ -143,9 +145,14 @@ async def get_lexicon(user_id: str) -> dict:
         }
         for row in rows
     ]
+    summary = lexicon.summary(rows)
+    # V3.25.1 (P1-02): agregado real por unidad léxica (aditivo).
+    summary["units"] = lexicon.summary_units(rows)
     return {
-        "summary": lexicon.summary(rows),
+        "summary": summary,
         "items": items,
+        # V3.25.1 (P1-02): conocimiento por lexical_unit + superficies.
+        "units": lexicon.units_from_rows(rows),
         # P1 (§3.1): Vocabulary Coverage Indicator receptivo/productivo por
         # nivel. Es un indicador interno (no una puerta): informa, no certifica.
         "coverage": lexicon.coverage_indicator(rows),
