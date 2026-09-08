@@ -3,7 +3,39 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 19:55 (UTC+2).
+> Actualizado por última vez: 2026-09-08 21:25 (UTC+2).
+>
+> **Nota (2026-09-08, 21:25):** **V3.26 · Eje C CERRADO — Listening real
+> (taxonomía por capas) + calibración CEFR unificada + skills bloqueantes en UI
+> + marca de legacy sin `context_id` en `main`**. **F-C1** (`f8e0c64`):
+> taxonomía determinista `skill → recognition/comprehension/inference` en
+> `services/listening.py` (reconocimiento = word/sound/phrase_recognition/
+> numbers; comprensión = gist/detail/vocabulary/sequencing/note_taking/
+> prediction; inferencia = inference/attitude/speaker_intention/fast_speech/
+> connected_speech/multiple_speakers; dictation/shadowing y producción aparte,
+> capa `null`), capa expuesta en ítems y reporte `by_layer` del diagnóstico;
+> sin migración de datos ni re-etiquetado del corpus (la deuda de autoría
+> recognition queda documentada). **F-C2** (`b62fc65`): las 4 destrezas planas
+> (vocabulary/grammar/interaction/mediation) pasan a escalera monótona desde
+> B1 siguiendo la fila de `reading`, conservando su suelo histórico A1/A2;
+> extremos unificados por familia (techo de reading/writing); matriz a
+> `version 2.1.0` y monotonicidad de las 8 destrezas fijada por tests y
+> goldens de `evidence_depth` actualizados. **F-C3** (`eee806a`): `readiness`
+> expone `blocked_by` por destreza evaluada y no lista (score/confidence/
+> evidence/transfer/novel) y la UI traduce el motivo en `TodayPlan` (i18n
+> es/en). **F-C4** (`eee806a`): `build_skill_profile` cuenta
+> `legacy_context_rows` y marca `legacy_context_used` por destreza — el
+> fallback del gate a filas ocurre solo cuando un kind con filas no tiene
+> NINGÚN contexto conocido (con contextos, las filas legacy no cuentan ni
+> inflan experiencias) — agregado en `StudentModelOut`
+> (`legacy_context_evidence`/`legacy_context_rows`) y `mastery_gate` expone
+> `legacy_fallback`; el ladder y ProgressScreen/SkillDetail muestran notas i18n
+> cuando el gate o el perfil cae a legacy. Verificación íntegra: pytest backend
+> **1538 passed** + `ruff check .` limpio; vitest frontend **450 passed** +
+> `tsc --noEmit` limpio. **Pendiente hacia V3.26:** cierre de release (bump +
+> dossier + commit final); el Eje C completa el alcance V3.26 del dossier
+> (P2-01/P2-02/P2-03/P2-04 y P2-06) — ver nota del Eje B: la reactivación
+> calibrada de `novel_required` en B2+ queda como decisión de negocio abierta.
 >
 > **Nota (2026-09-08, 19:55):** **V3.26 · Eje B CERRADO — emisor real de
 > `novel` + historia léxica por superficie en `main`**. **F-B1** (`b057e4b`):
