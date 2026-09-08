@@ -26,10 +26,30 @@ EXPECTED_SKILLS = {
 # Escalera de `reading` (referencia de la calibración F-C2): las destrezas de
 # soporte siguen esta fila desde B1, tras conservar su suelo histórico A1/A2.
 READING_LADDER: dict[str, dict[str, float | int]] = {
-    "B1": {"minimum_mastery": 0.70, "minimum_confidence": 0.60, "minimum_evidence": 3, "transfer_required": 1},
-    "B2": {"minimum_mastery": 0.75, "minimum_confidence": 0.65, "minimum_evidence": 4, "transfer_required": 2},
-    "C1": {"minimum_mastery": 0.80, "minimum_confidence": 0.70, "minimum_evidence": 5, "transfer_required": 3},
-    "C2": {"minimum_mastery": 0.85, "minimum_confidence": 0.75, "minimum_evidence": 6, "transfer_required": 4},
+    "B1": {
+        "minimum_mastery": 0.70,
+        "minimum_confidence": 0.60,
+        "minimum_evidence": 3,
+        "transfer_required": 1,
+    },
+    "B2": {
+        "minimum_mastery": 0.75,
+        "minimum_confidence": 0.65,
+        "minimum_evidence": 4,
+        "transfer_required": 2,
+    },
+    "C1": {
+        "minimum_mastery": 0.80,
+        "minimum_confidence": 0.70,
+        "minimum_evidence": 5,
+        "transfer_required": 3,
+    },
+    "C2": {
+        "minimum_mastery": 0.85,
+        "minimum_confidence": 0.75,
+        "minimum_evidence": 6,
+        "transfer_required": 4,
+    },
 }
 
 # Suelo histórico de las destrezas de soporte (se mantiene en A1/A2).

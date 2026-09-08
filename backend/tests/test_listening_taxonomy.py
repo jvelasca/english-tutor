@@ -10,7 +10,6 @@ cognitiva del proceso que su evidencia ejercita:
 `dictation`/`shadowing` son tareas de producción: se reportan aparte (capa
 None) y no entran en la agregación receptiva por capa.
 """
-import pytest
 
 from services.listening import (
     LISTENING_LAYERS,
@@ -23,8 +22,20 @@ from services.listening import (
 # Mapa aprobado (decisión F-C1): sub-destreza → capa. La taxonomía es
 # determinista: no requiere migración de datos ni etiquetado por ítem.
 EXPECTED_LAYER_SKILLS: dict[str, list[str]] = {
-    "recognition": ["word_recognition", "sound_recognition", "phrase_recognition", "numbers"],
-    "comprehension": ["gist", "detail", "vocabulary", "sequencing", "note_taking", "prediction"],
+    "recognition": [
+        "word_recognition",
+        "sound_recognition",
+        "phrase_recognition",
+        "numbers",
+    ],
+    "comprehension": [
+        "gist",
+        "detail",
+        "vocabulary",
+        "sequencing",
+        "note_taking",
+        "prediction",
+    ],
     "inference": [
         "inference",
         "attitude",
@@ -170,8 +181,8 @@ def test_diagnostic_empty_reports_three_empty_layers():
 def test_public_item_exposes_layer():
     """`_public` añade `layer` derivado del skill del ítem a la pregunta servida."""
     from domain import listening as listening_domain
-
-    from services.listening import QUESTION_BANK, skill_layer as _sl
+    from services.listening import QUESTION_BANK
+    from services.listening import skill_layer as _sl
 
     public = listening_domain._public(QUESTION_BANK[0])
     assert public["layer"] == _sl(QUESTION_BANK[0]["skill"])
