@@ -5,7 +5,8 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-09 (UTC+2).
 >
-> **Nota (2026-09-09):** **V3.30 publicada** — release **v3.30.0** (diccionario
+> **Nota (2026-09-09):** **V3.30 publicada** — release **v3.30.0** = commit
+> **`a3857f2`** en `main` con **CI verde 6/6 jobs** (diccionario
 > de consulta con marca de uso y aprendizaje; feature cerrada con las Fases
 > A/B/C del dossier `docs/DISENO-V330-DICCIONARIO-CONSULTA.md`). Resumen:
 > endpoint `POST /api/vocabulary/dictionary` con `usage` por forma y por
