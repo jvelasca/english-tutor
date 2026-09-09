@@ -51,6 +51,12 @@ class ListeningQuestion(BaseModel):
     # la variante servida por defecto (siempre "normal", que preserva el cache).
     variants: list[ListeningAudioVariant] = Field(default_factory=list)
     default_variant: str = "normal"
+    # Micro-flujo por ítem (V3.27, Listening Engine 4.0): `flow` es la secuencia de
+    # pasos pedagógicos [{stage, task, transcript_state_inicial, allow_skip}] y
+    # `transcript_policy` el contrato de revelado (ver services/listening_flow.py).
+    # Vacíos para consumidores antiguos que no piden el micro-flujo.
+    flow: list[dict] = Field(default_factory=list)
+    transcript_policy: dict = Field(default_factory=dict)
 
 
 class ListeningAnswerRequest(BaseModel):
@@ -58,6 +64,14 @@ class ListeningAnswerRequest(BaseModel):
     answer_index: int = Field(ge=0)
     response_time_ms: int | None = None
     replay_count: int = Field(default=0, ge=0)
+    # Evidencia ampliada (V3.27, Fase 1): metadatos de apoyo del intento. `layer`
+    # es informativo: el backend lo recalcula del skill (fuente de verdad). Los
+    # demás campos describen con qué apoyo se respondió.
+    layer: str = ""
+    speed_used: str = "normal"
+    stage: str = ""
+    transcript_used: str = ""
+    segments_replayed: int = Field(default=0, ge=0)
 
 
 class ListeningAnswerResponse(BaseModel):
@@ -75,6 +89,10 @@ class ListeningProductionRequest(BaseModel):
 
     question_id: str
     transcript: str
+    # Evidencia ampliada (V3.27, Fase 1): fase del micro-flujo y apoyo usado.
+    stage: str = ""
+    transcript_used: str = ""
+    speed_used: str = "normal"
 
 
 class ListeningProductionResult(BaseModel):
@@ -341,3 +359,7 @@ class ListeningDiagnostic(BaseModel):
     # Indicador de resiliencia auditiva (Listening 2.0): precisión por condición de
     # escucha (clara → natural → conectada → rápida → ruido → acentos).
     resilience: ListeningResilience = Field(default_factory=ListeningResilience)
+    # Perfil auditivo (V3.27, Listening Engine 4.0): capa objetivo e intervención
+    # recomendada (casos A-D de la especificación). Vacío si el diagnóstico previo
+    # no lleva `profile` (retrocompatible).
+    profile: dict = Field(default_factory=dict)

@@ -1621,6 +1621,7 @@ def pick_next_question(
     correct_ids: set[str] | None = None,
     *,
     weak_subskills: list[str] | None = None,
+    layer: str | None = None,
 ) -> dict:
     """Siguiente pregunta: prioriza la sub-destreza más débil dentro del nivel actual.
 
@@ -1630,9 +1631,24 @@ def pick_next_question(
     trabajo— las preguntas de esas sub-destrezas cuya realización auditiva es
     válida. Sin sub-destrezas débiles, conserva el comportamiento anterior:
     primero no vistas y luego falladas, avanzando de nivel al dominarlo.
+
+    Con `layer` (V3.27, perfil auditivo): el pool del nivel de trabajo se restringe
+    a los ítems de esa capa cognitiva (`recognition`/`comprehension`/`inference`)
+    que realizan su sub-destreza, manteniendo el mismo orden (débiles → no vistas →
+    falladas → rotación). Si la capa no tiene candidatos en el nivel, se cae al
+    pool completo del nivel (no bloquea la práctica).
     """
     correct_ids = correct_ids or set()
     working = questions_for_level(current_level(correct_ids))
+    if layer is not None:
+        layer_pool = [
+            q
+            for q in working
+            if skill_layer(q.get("skill", "")) == layer
+            and _realizes_subskill(q, q["skill"])
+        ]
+        if layer_pool:
+            working = layer_pool
     weak = [s for s in (weak_subskills or []) if s in LISTENING_SUBSKILLS]
 
     def _unseen_not_correct(q: dict) -> bool:

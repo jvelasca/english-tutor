@@ -22,12 +22,22 @@ def record_attempt(
     realized_difficulty: int = 0,
     task_type: str = "mcq",
     score: float | None = None,
+    layer: str = "",
+    speed_used: str = "normal",
+    stage: str = "",
+    transcript_used: str = "",
+    segments_replayed: int = 0,
 ) -> bool:
     """Persiste un intento de listening para un usuario existente.
 
     Los kwargs `task_type` y `score` son opcionales y compatibles hacia atrás: el
     flujo MCQ no los pasa (queda `task_type="mcq"` y `score=None`); las tareas de
     producción (dictado/shadowing) sí, dejando `score` como evidencia continua 0..1.
+
+    Los kwargs `layer`/`speed_used`/`stage`/`transcript_used`/`segments_replayed`
+    (V3.27, Listening Engine 4.0) registran el apoyo con el que se respondió para
+    medir "precisión con apoyo decreciente"; tienen defaults que preservan el
+    comportamiento de los llamadores existentes.
     """
     if get_user(user_id) is None:
         return False
@@ -36,8 +46,9 @@ def record_attempt(
             "INSERT INTO listening_attempts "
             "(user_id, question_id, answer_index, correct, skill, difficulty, "
             "response_time_ms, replay_count, topic, realized_difficulty, "
-            "task_type, score, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "task_type, score, layer, speed_used, stage, transcript_used, "
+            "segments_replayed, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 question_id,
@@ -51,6 +62,11 @@ def record_attempt(
                 realized_difficulty,
                 task_type,
                 score,
+                layer,
+                speed_used,
+                stage,
+                transcript_used,
+                segments_replayed,
                 _now(),
             ),
         )
@@ -63,7 +79,8 @@ def list_attempts(user_id: str) -> list[dict]:
         rows = conn.execute(
             "SELECT question_id, answer_index, correct, skill, difficulty, "
             "response_time_ms, replay_count, topic, realized_difficulty, "
-            "task_type, score, created_at "
+            "task_type, score, layer, speed_used, stage, transcript_used, "
+            "segments_replayed, created_at "
             "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
             (user_id,),
         ).fetchall()

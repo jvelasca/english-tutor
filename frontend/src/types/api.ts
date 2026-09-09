@@ -545,12 +545,52 @@ export interface ListeningQuestion {
   // defecto servida cuando el usuario no elige (siempre "normal").
   variants: ListeningAudioVariant[];
   default_variant: string;
+  // Capa cognitiva de la taxonomía (V3.26): recognition/comprehension/inference.
+  layer: string | null;
+  // Micro-flujo por ítem (V3.27, Listening Engine 4.0): pasos pedagógicos y
+  // contrato de revelado de la transcripción servidos por el backend (§3.1 del
+  // plan V3.27). El frontend solo los ejecuta, sin reglas pedagógicas propias.
+  flow?: ListeningFlowStep[];
+  transcriptPolicy?: ListeningTranscriptPolicy;
+}
+
+export interface ListeningFlowStep {
+  stage: ListeningFlowStage;
+  task: string;
+  transcript_state_inicial: ListeningTranscriptState;
+  allow_skip: boolean;
+  requires_audio: boolean;
+}
+
+export type ListeningFlowStage = "pre" | "while1" | "while2" | "post" | "shadowing";
+
+export type ListeningTranscriptState = "hidden" | "partial" | "full";
+
+export interface ListeningTranscriptPolicy {
+  revelation:
+    | "on_first_fail"
+    | "on_second_fail"
+    | "on_finish"
+    | "never_before_post";
+  max_attempts_per_stage: number;
+  allow_manual_reveal: boolean;
+  shadowing_optional: boolean;
 }
 
 export interface ListeningAudioVariant {
   variant: string;
   speech_rate: number;
   label: string;
+}
+
+// Evidencia ampliada por intento (V3.27): apoyo con el que se respondió.
+// `layer` es informativo (el backend lo recalcula del skill).
+export interface ListeningSupportMetadata {
+  layer?: string;
+  speedUsed?: string;
+  stage?: string;
+  transcriptUsed?: string;
+  segmentsReplayed?: number;
 }
 
 export interface ListeningAnswerResponse {
@@ -566,6 +606,9 @@ export interface ListeningAnswerResponse {
 export interface ListeningProductionRequest {
   question_id: string;
   transcript: string;
+  stage?: string;
+  transcript_used?: string;
+  speed_used?: string;
 }
 
 export interface ListeningProductionResult {
@@ -1218,6 +1261,19 @@ export interface ListeningResilience {
   recommendation: string;
 }
 
+export interface ListeningAuditoryProfile {
+  /** Capa objetivo que el perfil recomienda trabajar; null sin perfil. */
+  layer: "recognition" | "comprehension" | "inference" | null;
+  intervention:
+    | "bottom_up_path"
+    | "comprehension_path"
+    | "top_down_path"
+    | "connected_speech_path"
+    | null;
+  reason: string;
+  needs_min_attempts: boolean;
+}
+
 export interface ListeningDiagnostic {
   subskills: ListeningSubskillProgress[];
   weak: string[];
@@ -1233,6 +1289,9 @@ export interface ListeningDiagnostic {
   realization: ListeningRealizationSummary;
   // Indicador de resiliencia auditiva (Listening 2.0).
   resilience: ListeningResilience;
+  // Perfil auditivo (V3.27, Listening Engine 4.0): capa e intervención
+  // recomendada (casos A-D). Null en respuestas antiguas sin perfil.
+  profile?: ListeningAuditoryProfile | null;
 }
 
 // --- Biblioteca de audio humano (gestión en-app) ---

@@ -647,35 +647,64 @@ const STRINGS: Record<string, Entry> = {
   // Ayuda
   "help.title": { en: "Help", es: "Ayuda" },
   "help.subtitle": {
-    en: "A short guide to the three areas. For the full technical documentation, visit the project docs.",
-    es: "Una guía breve de los tres mundos. Para la documentación técnica completa, consulta los docs del proyecto.",
+    en: "A short guide to English Tutor: the three areas, every practice skill, the course and your progress. For the full technical documentation, visit the project docs.",
+    es: "Una guía breve de English Tutor: los tres mundos, cada destreza de práctica, el curso y tu progreso. Para la documentación técnica completa, consulta los docs del proyecto.",
   },
   "help.viewDocs": { en: "View documentation", es: "Ver en la documentación" },
   "help.documentation": { en: "Documentation", es: "Documentación" },
+  "help.groupStart": { en: "Getting started", es: "Cómo empezar" },
+  "help.groupSkills": { en: "Practice skills", es: "Destrezas de práctica" },
+  "help.groupJourney": { en: "Course and progress", es: "Curso y progreso" },
+  "help.groupSupport": { en: "Support", es: "Soporte" },
   "help.what.title": { en: "What is English Tutor?", es: "¿Qué es English Tutor?" },
   "help.what.body": {
-    en: "An English tutor that runs 100% on your computer — no internet, accounts or cloud. The app is organised into three areas: Inicio (daily plan and recommendations), Formación (guided CEFR course from A1 to C2) and Aprender (free practice).",
-    es: "Un profesor de inglés que funciona 100% en tu ordenador, sin Internet, cuentas ni nube. La app se organiza en tres mundos: INICIO (plan del día y recomendaciones), FORMACIÓN (curso CEFR guiado de A1 a C2) y APRENDER (práctica libre).",
+    en: "An English tutor that runs 100% on your computer — no internet, accounts or cloud. The app is organised into three areas: Inicio (daily plan and recommendations), Formación (guided CEFR course from A1 to C2) and Aprender (free practice). Every practice skill gives you immediate, honest feedback, and your progress follows the CEFR scale.",
+    es: "Un profesor de inglés que funciona 100% en tu ordenador, sin Internet, cuentas ni nube. La app se organiza en tres mundos: INICIO (plan del día y recomendaciones), FORMACIÓN (curso CEFR guiado de A1 a C2) y APRENDER (práctica libre). Cada destreza de práctica te da feedback inmediato y honesto, y tu progreso sigue la escala CEFR.",
   },
   "help.start.title": { en: "Getting started", es: "Cómo empezar" },
   "help.start.body": {
-    en: "Choose a profile in the header and speak or type in any conversation. Use Formación to follow the course level by level, Aprender to practise a skill freely, and Inicio to pick up your daily goal and review.",
-    es: "Elige un perfil en la cabecera y habla o escribe en cualquier conversación. Usa FORMACIÓN para seguir el curso nivel a nivel, APRENDER para practicar una destreza libremente e INICIO para retomar tu objetivo del día y el repaso.",
+    en: "Create or choose a learner profile in the header, then start with what Inicio recommends today. Speak or type in any practice: use Formación to follow the course level by level, Aprender to practise a skill freely, and Mi Progreso to see your level and strengths.",
+    es: "Crea o elige un perfil de alumno en la cabecera y empieza por lo que INICIO recomienda hoy. Habla o escribe en cualquier práctica: usa FORMACIÓN para seguir el curso nivel a nivel, APRENDER para practicar una destreza libremente y MI PROGRESO para ver tu nivel y tus fortalezas.",
   },
   "help.modes.title": { en: "The three areas", es: "Los tres mundos" },
   "help.modes.body": {
-    en: "Inicio is your day-to-day command centre: today's goal, pending review and what to do next. Formación is the structured CEFR course with units and assessments. Aprender groups all free practice: listening, speaking, pronunciation, conversation, vocabulary, grammar and adaptive review.",
-    es: "INICIO es tu centro de mando diario: objetivo de hoy, repaso pendiente y siguiente paso recomendado. FORMACIÓN es el curso CEFR estructurado, con unidades y evaluaciones. APRENDER agrupa toda la práctica libre: listening, speaking, pronunciación, conversación, vocabulario, gramática y repaso adaptativo.",
+    en: "Inicio is your day-to-day command centre: today's goal, pending review and what to do next. Formación is the structured CEFR course with units, lessons and assessments. Aprender groups all free practice — Listening, Speaking, Vocabulary and Grammar — and suggests what to work on next based on your profile.",
+    es: "INICIO es tu centro de mando diario: objetivo de hoy, repaso pendiente y siguiente paso recomendado. FORMACIÓN es el curso CEFR estructurado, con unidades, lecciones y evaluaciones. APRENDER agrupa toda la práctica libre — Listening, Speaking, Vocabulary y Grammar — y te sugiere en qué trabajar después según tu perfil.",
   },
   "help.course.title": { en: "CEFR course", es: "Curso CEFR" },
   "help.course.body": {
-    en: "A guided path through the six CEFR levels (A1, A2, B1, B2, C1, C2). Each level is divided into units with objectives; you unlock units and take assessments as you progress, at your own pace.",
-    es: "Un camino guiado por los seis niveles CEFR (A1, A2, B1, B2, C1, C2). Cada nivel se divide en unidades con objetivos; desbloqueas unidades y superas evaluaciones a tu ritmo según avanzas.",
+    en: "A guided path through the six CEFR levels (A1, A2, B1, B2, C1, C2). Each level is divided into units with objectives and lessons; you take assessments as you progress, at your own pace. Each skill (listening, speaking, reading, writing…) follows its own route with evidence and retention.",
+    es: "Un camino guiado por los seis niveles CEFR (A1, A2, B1, B2, C1, C2). Cada nivel se divide en unidades con objetivos y lecciones; superas evaluaciones a tu ritmo según avanzas. Cada destreza (listening, speaking, reading, writing…) tiene su propia ruta con evidencia y retención.",
   },
   "help.listening.title": { en: "Listening comprehension", es: "Comprensión auditiva" },
   "help.listening.body": {
-    en: "Listen to real sentences, answer the question and check your accuracy level by level. Practise it on its own in Aprender → Listening or inside your course units.",
-    es: "Escucha frases reales, responde la pregunta y comprueba tu precisión nivel a nivel. Practícalo por libre en APRENDER → Listening o dentro de las unidades del curso.",
+    en: "Listen to real sentences, answer the question and check your accuracy level by level. Every item guides you through a short flow: prepare, listen, answer, review the transcript (revealed gradually depending on your level) and, when available, repeat aloud. The app builds an auditory profile of the layer you need to work on (recognition, comprehension or inference) and adapts the next items to it.",
+    es: "Escucha frases reales, responde la pregunta y comprueba tu precisión nivel a nivel. Cada ejercicio te guía con un micro-flujo: prepárate, escucha, responde, repasa con la transcripción (que se revela progresivamente según tu nivel) y, si el ejercicio lo incluye, repite en voz alta. La app construye un perfil auditivo de la capa en la que debes trabajar (reconocimiento, comprensión o inferencia) y adapta los siguientes ejercicios a ella.",
+  },
+  "help.speaking.title": { en: "Speaking", es: "Speaking" },
+  "help.speaking.body": {
+    en: "A single speaking area with three modes: micro-conversations with instant feedback, accent drills (read sentences aloud and compare with the model voice) and guided dialogues that simulate real conversations, level by level. The microphone and the model voice are 100% local.",
+    es: "Un único espacio oral con tres modos: micro-conversaciones con feedback inmediato, ejercicios de acento (lee frases en voz alta y compáralas con la voz modelo) y diálogos guiados que simulan conversaciones reales, nivel a nivel. El micrófono y la voz modelo funcionan 100% en local.",
+  },
+  "help.vocabulary.title": { en: "Vocabulary and dictionary", es: "Vocabulary y diccionario" },
+  "help.vocabulary.body": {
+    en: "Level-by-level routes of word checks (A1–C2) with instant feedback, together with your personal dictionary. Every word you meet in the app is recorded with the contexts where you have produced or seen it, so you can review what you are learning and what you have already mastered.",
+    es: "Rutas de checks de palabras nivel a nivel (A1–C2) con feedback inmediato, junto a tu diccionario personal. Cada palabra que encuentras en la app queda registrada con los contextos en los que la has producido o visto, para que repases lo que estás aprendiendo y lo que ya dominas.",
+  },
+  "help.grammar.title": { en: "Grammar", es: "Grammar" },
+  "help.grammar.body": {
+    en: "Level-by-level routes of grammar checks (A1–C2) that test structures in context with instant feedback, and the course assessments to demonstrate your level.",
+    es: "Rutas de checks de gramática nivel a nivel (A1–C2) que prueban estructuras en contexto con feedback inmediato, y las evaluaciones del curso para demostrar tu nivel.",
+  },
+  "help.progress.title": { en: "My progress and level", es: "Mi progreso y nivel" },
+  "help.progress.body": {
+    en: "Mi Progreso shows your CEFR level with what you have demonstrated and what is estimated, your strengths and weaknesses by skill, the review and retention of what you have learned, and the trajectory of your journey. Everything updates from real evidence: exercises, conversations, missions and assessments.",
+    es: "MI PROGRESO muestra tu nivel CEFR con lo demostrado y lo estimado, tus fortalezas y debilidades por destreza, el repaso y la retención de lo aprendido, y la trayectoria de tu viaje. Todo se actualiza con evidencia real: ejercicios, conversaciones, misiones y evaluaciones.",
+  },
+  "help.author": { en: "About the author", es: "Sobre el autor" },
+  "help.authorBody": {
+    en: "English Tutor is a personal, 100% local learning project. Comments, ideas and bug reports are welcome:",
+    es: "English Tutor es un proyecto personal de aprendizaje, 100% local. Comentarios, ideas e informes de errores son bienvenidos:",
   },
   "help.troubleshooting.title": { en: "Common issues", es: "Problemas frecuentes" },
   "help.troubleshooting.body": {
@@ -1852,6 +1881,141 @@ const STRINGS: Record<string, Entry> = {
   "listening.resilience.accents": {
     en: "Accents",
     es: "Acentos",
+  },
+
+  // Listening Engine 4.0 (V3.27): micro-flujo por ítem (Pre/While1/While2/Post/
+  // shadowing) y perfil auditivo visible en la UI.
+  "listening.flow.preTitle": {
+    en: "Before you listen",
+    es: "Antes de escuchar",
+  },
+  "listening.flow.preHint": {
+    en: "Focus on the context. You will hear the audio next.",
+    es: "Fíjate en el contexto. El audio llegará a continuación.",
+  },
+  "listening.flow.begin": {
+    en: "Start listening",
+    es: "Empezar a escuchar",
+  },
+  "listening.flow.while1Title": {
+    en: "First listen",
+    es: "Primera escucha",
+  },
+  "listening.flow.while1Hint": {
+    en: "Listen for the general idea without reading the text.",
+    es: "Escucha la idea general sin leer el texto.",
+  },
+  "listening.flow.listenDone": {
+    en: "I've listened — answer",
+    es: "He escuchado — responder",
+  },
+  "listening.flow.tryAgainTitle": {
+    en: "Not quite — try again",
+    es: "Casi — inténtalo de nuevo",
+  },
+  "listening.flow.tryAgainAttempt": {
+    en: "Attempt {current} of {total}",
+    es: "Intento {current} de {total}",
+  },
+  "listening.flow.withTranscript": {
+    en: "You can look at the transcript for this attempt.",
+    es: "Puedes consultar la transcripción en este intento.",
+  },
+  "listening.flow.tryAgain": {
+    en: "Try again",
+    es: "Intentar de nuevo",
+  },
+  "listening.flow.showTranscript": {
+    en: "Show transcript",
+    es: "Ver transcripción",
+  },
+  "listening.flow.hideTranscript": {
+    en: "Hide transcript",
+    es: "Ocultar transcripción",
+  },
+  "listening.flow.continue": {
+    en: "Continue",
+    es: "Continuar",
+  },
+  "listening.flow.shadowingTitle": {
+    en: "Repeat out loud (shadowing)",
+    es: "Repite en voz alta (shadowing)",
+  },
+  "listening.flow.shadowingHint": {
+    en: "Play the audio and repeat each sentence out loud, imitating rhythm and intonation.",
+    es: "Reproduce el audio y repite cada frase en voz alta, imitando ritmo y entonación.",
+  },
+  "listening.flow.shadowingDone": {
+    en: "Done — next exercise",
+    es: "Hecho — siguiente ejercicio",
+  },
+  "listening.flow.skipStage": {
+    en: "Skip",
+    es: "Saltar",
+  },
+  "listening.layer.recognition": {
+    en: "Recognition",
+    es: "Reconocimiento",
+  },
+  "listening.layer.comprehension": {
+    en: "Comprehension",
+    es: "Comprensión",
+  },
+  "listening.layer.inference": {
+    en: "Inference",
+    es: "Inferencia",
+  },
+  "listening.profile.title": {
+    en: "Your listening profile",
+    es: "Tu perfil auditivo",
+  },
+  "listening.profile.workingOn": {
+    en: "Current focus",
+    es: "Foco actual",
+  },
+  "listening.profile.intervention.none": {
+    en: "No intervention",
+    es: "Sin intervención",
+  },
+  "listening.profile.intervention.bottom_up_path": {
+    en: "Train word recognition: work on perceiving sounds and words in the stream.",
+    es: "Entrena el reconocimiento de palabras: trabaja la percepción de sonidos y palabras en el flujo.",
+  },
+  "listening.profile.intervention.comprehension_path": {
+    en: "Train comprehension: link what you hear to meaning and structure.",
+    es: "Entrena la comprensión: conecta lo que oyes con el significado y la estructura.",
+  },
+  "listening.profile.intervention.top_down_path": {
+    en: "Train inference: use context, intention and attitude to go beyond the literal.",
+    es: "Entrena la inferencia: usa contexto, intención y actitud para ir más allá de lo literal.",
+  },
+  "listening.profile.intervention.connected_speech_path": {
+    en: "Train connected speech: practice with natural and linked speech, not only clear audio.",
+    es: "Entrena la cadena hablada: practica con habla natural y encadenada, no solo con audio claro.",
+  },
+  "listening.profile.needsMore": {
+    en: "Answer a few more questions to build your profile.",
+    es: "Responde unas cuantas preguntas más para construir tu perfil.",
+  },
+  "listening.profile.reason.recognition": {
+    en: "Recognition is your weakest layer.",
+    es: "El reconocimiento es tu capa más débil.",
+  },
+  "listening.profile.reason.comprehension": {
+    en: "Comprehension is your weakest layer.",
+    es: "La comprensión es tu capa más débil.",
+  },
+  "listening.profile.reason.inference": {
+    en: "Inference is your weakest layer.",
+    es: "La inferencia es tu capa más débil.",
+  },
+  "listening.profile.reason.connected_speech": {
+    en: "Connected speech is the condition you struggle with.",
+    es: "La cadena hablada es la condición que te cuesta.",
+  },
+  "listening.profile.reason.natural_speech": {
+    en: "Natural speech is the condition you struggle with.",
+    es: "El habla natural es la condición que te cuesta.",
   },
 
   // Learning profile

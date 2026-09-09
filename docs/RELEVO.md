@@ -3,7 +3,31 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-08 22:10 (UTC+2).
+> Actualizado por última vez: 2026-09-09 09:45 (UTC+2).
+>
+> **Nota (2026-09-09, 09:45):** **V3.27 publicada** — release **v3.27.0**
+> (Listening Engine 4.0, Fase 1) en `main`. **Backend = fuente única de la
+> política pedagógica**: nuevo módulo puro `services/listening_flow.py` sirve
+> `flow` (pre/while1/while2/post/shadowing) y `transcript_policy`
+> (`revelation`/`max_attempts_per_stage`/`allow_manual_reveal`/
+> `shadowing_optional`) en cada pregunta; el frontend ejecuta una máquina de
+> presentación (`features/listening/microFlow.ts`) sin reglas propias.
+> **Perfil auditivo visible en UI** (`services/auditory_profile.py` casos A-D +
+> `AuditoryProfileCard`, no bloqueante, estados sin datos → needsMore →
+> intervención; la capa recomendada prioriza el siguiente ítem vía
+> `pick_next_question(layer=...)`). **Evidencia ampliada**: migración
+> idempotente con 5 columnas en `listening_attempts` (`layer`, `speed_used`,
+> `stage`, `transcript_used`, `segments_replayed`) persistidas en
+> `submit_answer`/`submit_production` con metadatos opcionales de la API.
+> Plan `docs/PLAN-V327-LISTENING-ENGINE-4.md`; release notes
+> `release-notes-v3.27.0.md`; CHANGELOG/PLAN/README actualizados; backend
+> pytest **1647 passed** + ruff limpio; frontend vitest **472 passed** (59
+> archivos) + `tsc --noEmit` OK; `check_release_consistency` **3.27.0** exit 0.
+> Pendiente: auditoría externa del candidato v3.27.0; Fase 2 del engine
+> (reproductor rico, karaoke/segmentos) y calibración de umbrales del perfil.
+> **Candidato V3.28 anotado** (sin diseño): diccionario de consulta con marcas
+> de uso/aprendizaje de las palabras ya usadas en la app (ver PLAN.md →
+> «Siguiente incremento»).
 >
 > **Nota (2026-09-08, 22:10):** **V3.26 publicada** — release **v3.26.0** en
 > `main` (hoja de ruta completa: **Eje A** retención longitudinal multi-punto y

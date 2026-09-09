@@ -11,6 +11,7 @@ from repositories import listening as listening_repo
 from repositories import settings as settings_repo
 from services import tts
 from services.audio_library import is_recorded, recorded_audio_path
+from services.auditory_profile import auditory_profile
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
     AUDIO_VARIANTS,
@@ -40,6 +41,7 @@ from services.listening import (
 from services.listening import (
     level_items as motor_level_items,
 )
+from services.listening_flow import flow_for_question
 
 
 def _generated_payload(row: dict) -> dict | None:
@@ -175,9 +177,21 @@ async def next_question(
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
     correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
-    weak = listening_diagnostic(attempts)["weak"]
-    question = pick_next_question(seen, correct, weak_subskills=weak)
-    return _public(question)
+    diagnostic = listening_diagnostic(attempts)
+    weak = diagnostic["weak"]
+    profile = auditory_profile(diagnostic)
+    question = pick_next_question(
+        seen,
+        correct,
+        weak_subskills=weak,
+        layer=profile.get("layer"),
+    )
+    out = _public(question)
+    # Micro-flujo por ítem (V3.27): política y pasos viajan en el payload; el
+    # frontend solo los ejecuta. En el modo adaptativo ("all") el perfil auditivo
+    # puede hacer el shadowing obligatorio (overrides dentro de flow_for_question).
+    out.update(flow_for_question(question, profile))
+    return out
 
 
 async def level_items(user_id: str, level: str) -> dict:
@@ -214,8 +228,16 @@ async def submit_answer(
     answer_index: int,
     response_time_ms: int | None = None,
     replay_count: int = 0,
+    speed_used: str = "normal",
+    stage: str = "",
+    transcript_used: str = "",
+    segments_replayed: int = 0,
 ) -> dict | None:
-    """Evalúa y persiste la respuesta. Devuelve None si la pregunta no existe."""
+    """Evalúa y persiste la respuesta. Devuelve None si la pregunta no existe.
+
+    `layer` no llega por parámetro: es la fuente de verdad del backend y se deriva
+    del skill del ítem (la capa del esquema de clientes es solo informativa).
+    """
     question = await _resolve_question(question_id)
     if question is None:
         return None
@@ -234,6 +256,11 @@ async def submit_answer(
         replay_count,
         question.get("topic", ""),
         realized,
+        layer=skill_layer(question.get("skill", "")) or "",
+        speed_used=speed_used,
+        stage=stage,
+        transcript_used=transcript_used,
+        segments_replayed=segments_replayed,
     )
     return {
         "question_id": question_id,
@@ -251,13 +278,18 @@ async def submit_production(
     question_id: str,
     transcript: str,
     task_type: str,
+    stage: str = "",
+    transcript_used: str = "",
+    speed_used: str = "normal",
 ) -> dict | None:
     """Evalúa y persiste una tarea de producción (dictado/shadowing), sin LLM.
 
     Puntúa de forma determinista (`production_score` sobre `composite_score`) y
     persiste la evidencia con `answer_index=-1`, `task_type` y `score` continuo
     (0..1). Devuelve `None` si la pregunta no existe o su `skill` no coincide con
-    `task_type` (el router lo traduce a 404).
+    `task_type` (el router lo traduce a 404). En producción la capa cognitiva no
+    aplica (`layer=""`): los ítems dictation/shadowing no pertenecen a la taxonomía
+    receptiva.
     """
     question = get_question(question_id)
     if question is None:
@@ -284,6 +316,9 @@ async def submit_production(
         realized,
         task_type,
         result["score"] / 100.0,
+        stage=stage,
+        transcript_used=transcript_used,
+        speed_used=speed_used,
     )
     return {
         "question_id": question_id,
@@ -346,9 +381,14 @@ async def get_stats(user_id: str) -> dict:
 
 
 async def get_diagnostic(user_id: str) -> dict:
-    """Diagnóstico de sub-destrezas derivado de los intentos registrados."""
+    """Diagnóstico de sub-destrezas derivado de los intentos registrados.
+
+    Adjunta el perfil auditivo (V3.27): capa objetivo e intervención recomendada
+    (casos A-D de la especificación Listening Engine 4.0 §5)."""
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
-    return listening_diagnostic(attempts, now=db._now())
+    diagnostic = listening_diagnostic(attempts, now=db._now())
+    diagnostic["profile"] = auditory_profile(diagnostic)
+    return diagnostic
 
 
 async def get_audio(

@@ -951,6 +951,39 @@ def init_db() -> None:
                 "ALTER TABLE listening_attempts ADD COLUMN score REAL"
             )
 
+        # Migración idempotente V3.27 (Listening Engine 4.0, Fase 1): evidencia
+        # ampliada por intento. Cada columna registra el apoyo con el que se
+        # respondió, para medir "precisión con apoyo decreciente": capa cognitiva
+        # del skill, variante de velocidad usada, fase del micro-flujo, estado de
+        # transcripción permitido y fragmentos en bucle reproducidos. Todas son
+        # aditivas con default; los intentos legacy conservan los valores por
+        # defecto ('' / 'normal' / 0).
+        if "layer" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN layer TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "speed_used" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN speed_used TEXT "
+                "NOT NULL DEFAULT 'normal'"
+            )
+        if "stage" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN stage TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "transcript_used" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN transcript_used TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        if "segments_replayed" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN segments_replayed INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "
             "ON messages(conversation_id, message_id)"

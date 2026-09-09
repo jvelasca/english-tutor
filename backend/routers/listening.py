@@ -107,6 +107,10 @@ async def answer(
         body.answer_index,
         body.response_time_ms,
         body.replay_count,
+        body.speed_used,
+        body.stage,
+        body.transcript_used,
+        body.segments_replayed,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
@@ -123,7 +127,13 @@ async def dictation(
     body: ListeningProductionRequest, user: dict = Depends(current_user)
 ) -> dict:
     result = await listening_service.submit_production(
-        user["id"], body.question_id, body.transcript, "dictation"
+        user["id"],
+        body.question_id,
+        body.transcript,
+        "dictation",
+        body.stage,
+        body.transcript_used,
+        body.speed_used,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
@@ -140,7 +150,13 @@ async def shadowing(
     body: ListeningProductionRequest, user: dict = Depends(current_user)
 ) -> dict:
     result = await listening_service.submit_production(
-        user["id"], body.question_id, body.transcript, "shadowing"
+        user["id"],
+        body.question_id,
+        body.transcript,
+        "shadowing",
+        body.stage,
+        body.transcript_used,
+        body.speed_used,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")

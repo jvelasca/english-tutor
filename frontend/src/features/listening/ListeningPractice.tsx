@@ -49,6 +49,7 @@ import type {
   ListeningProductionResult,
   ListeningQuestion,
   ListeningStats,
+  ListeningSupportMetadata,
   NextBestActivity,
 } from "../../types/api";
 import type { Section } from "../../utils/sections";
@@ -67,6 +68,21 @@ import { Badge } from "../../components/ui/badge";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
+// Micro-flujo por ítem (V3.27, Listening Engine 4.0): máquina de presentación
+// que ejecuta el contrato `flow` + `transcript_policy` servido por el backend.
+import {
+  advanceToNext,
+  completeShadowing,
+  completeStageWithAnswer,
+  currentStep,
+  flowOf,
+  hasFlow,
+  initialFlow,
+  isProductionFlow,
+  revealFull,
+  type MicroFlowState,
+} from "./microFlow";
+import { AuditoryProfileCard } from "./AuditoryProfileCard";
 
 // Etiqueta legible de una dimensión de resiliencia auditiva (Listening 2.0):
 // "clear_speech" → "listening.resilience.clear_speech" (clave i18n localizada).
@@ -165,6 +181,10 @@ export function ListeningPractice({
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
   const [session, setSession] = useState<ListeningSession | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  // Micro-flujo por ítem (V3.27, Listening Engine 4.0): estado de la máquina de
+  // presentación para el modo adaptativo. Solo se activa cuando la pregunta
+  // trae `flow` del backend (las sesiones de nivel/drill no inyectan flujo).
+  const [flowState, setFlowState] = useState<MicroFlowState | null>(null);
   // Voz TTS real del perfil (Configuración → Voces): nombre amigable de la voz
   // seleccionada. Se muestra en ítems sintéticos en lugar del acento declarado
   // (que para TTS no es real). Se refresca al cambiar de usuario y al abrir la
@@ -204,6 +224,91 @@ export function ListeningPractice({
     question?.id ? `${question.id}:reference` : undefined,
   );
 
+  // --- Micro-flujo por ítem (V3.27): derivados y controles ------------------
+  // `flowSteps`/`flowPolicy`/`micro` solo existen cuando el backend sirvió
+  // `flow` (modo adaptativo). Los ítems de producción (dictation/shadowing)
+  // traen un flujo de un solo paso y conservan su tarea directa.
+  const flowSteps = question ? flowOf(question) : [];
+  const flowPolicy = question?.transcriptPolicy;
+  const micro =
+    question && hasFlow(question) && !isProductionFlow(question) && flowState
+      ? flowState
+      : null;
+
+  /** Metadatos de apoyo del intento (evidencia ampliada V3.27). Solo se envían
+   * en ítems servidos con `flow`; el resto conserva el envío anterior. */
+  function supportOpts(): ListeningSupportMetadata | undefined {
+    if (!question || !flowState) return undefined;
+    return {
+      layer: question.layer ?? undefined,
+      speedUsed: variant,
+      stage: flowState.stage ?? undefined,
+      transcriptUsed: flowState.transcript,
+    };
+  }
+
+  /** Aplica la máquina de estados tras responder en while2. */
+  function applyFlowAnswer(correct: boolean) {
+    if (!question || !flowState || !flowPolicy || !micro) return;
+    setFlowState(
+      completeStageWithAnswer(flowState, correct, flowPolicy, flowSteps),
+    );
+  }
+
+  /** Avanza una etapa de presentación (pre → while1 → while2). */
+  function continueStage() {
+    if (!flowState) return;
+    const next = advanceToNext(flowState, flowSteps);
+    setFlowState(next.finished ? null : next);
+    if (next.finished) void load();
+  }
+
+  /** Desde el resultado en `post` avanza al siguiente paso (shadowing) o, si el
+   * flujo terminó, carga la siguiente pregunta. */
+  function continueFromResult() {
+    if (!micro || !flowState) {
+      void load();
+      return;
+    }
+    if (flowState.stepIndex + 1 < flowSteps.length) {
+      setFlowState(advanceToNext(flowState, flowSteps));
+    } else {
+      setFlowState(null);
+      void load();
+    }
+  }
+
+  /** Termina la etapa de shadowing libre y avanza. */
+  function finishShadowingStage() {
+    if (!flowState) return;
+    const next = advanceToNext(completeShadowing(flowState), flowSteps);
+    setFlowState(next.finished ? null : next);
+    if (next.finished) void load();
+  }
+
+  /** Salta la etapa de shadowing solo si el paso lo permite (`allow_skip`). */
+  function skipShadowingStage() {
+    if (!flowState) return;
+    const step = currentStep(flowState, flowSteps);
+    if (step && !step.allow_skip) return;
+    const next = advanceToNext(flowState, flowSteps);
+    setFlowState(next.finished ? null : next);
+    if (next.finished) void load();
+  }
+
+  /** Reintenta la pregunta tras un fallo con reintentos disponibles. */
+  function retryQuestion() {
+    setResult(null);
+    setSelected(null);
+    setError(null);
+  }
+
+  /** Revela la transcripción manualmente si la política lo permite. */
+  function showTranscriptNow() {
+    if (!flowState || !flowPolicy) return;
+    setFlowState(revealFull(flowState, flowPolicy));
+  }
+
   async function load(
     levelOverride?: string | null,
     modeOverride?: ListeningQuestionMode,
@@ -226,7 +331,11 @@ export function ListeningPractice({
           ? "mastered"
           : "all");
     try {
-      setQuestion(await getListeningQuestion(userId, level, mode));
+      const next = await getListeningQuestion(userId, level, mode);
+      setQuestion(next);
+      // El micro-flujo arranca solo si el backend sirvió `flow` (modo
+      // adaptativo); en el resto la pantalla conserva su comportamiento.
+      setFlowState(hasFlow(next) ? initialFlow(next) : null);
       setStartedAt(Date.now());
       setReplayCount(0);
     } catch (e) {
@@ -454,51 +563,60 @@ export function ListeningPractice({
     }
   }
 
-  async function choose(index: number) {
-    if (!userId || !question || result || submitting) return;
-    setSelected(index);
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await submitListeningAnswer(
-        userId,
-        question.id,
-        index,
-        Date.now() - startedAt,
-        replayCount,
-      );
-      setResult(res);
-      setReplayCount(0);
-      applySessionOutcome(question.id, res.correct);
-      onAttempt();
-      void refreshStats();
-    } catch (e) {
-      // Fallo de red o timeout: se muestra el error y la opción de saltar a la
-      // siguiente, para que la pantalla nunca se quede sin salida.
-      setError((e as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
+async function choose(index: number) {
+  if (!userId || !question || result || submitting) return;
+  setSelected(index);
+  setError(null);
+  setSubmitting(true);
+  try {
+    const res = await submitListeningAnswer(
+      userId,
+      question.id,
+      index,
+      Date.now() - startedAt,
+      replayCount,
+      supportOpts(),
+    );
+    setResult(res);
+    setReplayCount(0);
+    // Micro-flujo: tras responder en while2, la máquina decide reintento (con o
+    // sin apoyo según la política) o el avance al post.
+    applyFlowAnswer(res.correct);
+    applySessionOutcome(question.id, res.correct);
+    onAttempt();
+    void refreshStats();
+  } catch (e) {
+    // Fallo de red o timeout: se muestra el error y la opción de saltar a la
+    // siguiente, para que la pantalla nunca se quede sin salida.
+    setError((e as Error).message);
+  } finally {
+    setSubmitting(false);
   }
+}
 
-  async function submitDictation() {
-    if (!userId || !question || productionResult) return;
-    const text = dictationText.trim();
-    if (!text) return;
-    setProcessing(true);
-    setError(null);
-    try {
-      const res = await submitListeningDictation(userId, question.id, text);
-      setProductionResult(res);
-      applySessionOutcome(question.id, res.correct);
-      onAttempt();
-      void refreshStats();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setProcessing(false);
-    }
+async function submitDictation() {
+  if (!userId || !question || productionResult) return;
+  const text = dictationText.trim();
+  if (!text) return;
+  setProcessing(true);
+  setError(null);
+  try {
+    const res = await submitListeningDictation(
+      userId,
+      question.id,
+      text,
+      supportOpts(),
+    );
+    setProductionResult(res);
+    applySessionOutcome(question.id, res.correct);
+    onAttempt();
+    void refreshStats();
+  } catch (e) {
+    setError((e as Error).message);
+  } finally {
+    setProcessing(false);
   }
+}
 
   async function toggleRecording() {
     if (!userId || !question || productionResult) return;
@@ -531,13 +649,14 @@ export function ListeningPractice({
         setProcessing(true);
         setError(null);
         try {
-          const text = await transcribe(blob);
-          setTranscribedText(text);
-          const res = await submitListeningShadowing(
-            userId,
-            question.id,
-            text,
-          );
+        const text = await transcribe(blob);
+        setTranscribedText(text);
+        const res = await submitListeningShadowing(
+          userId,
+          question.id,
+          text,
+          supportOpts(),
+        );
           setProductionResult(res);
           applySessionOutcome(question.id, res.correct);
           onAttempt();
@@ -612,6 +731,10 @@ export function ListeningPractice({
 
       {micError && <MicUnavailableNotice reason={micError} />}
 
+      {!session && (
+        <AuditoryProfileCard profile={diagnostic?.profile ?? null} t={t} />
+      )}
+
       {!question ? (
         <Card className="p-8">
           <p className="text-center text-sm text-muted-foreground">
@@ -648,6 +771,80 @@ export function ListeningPractice({
                   ? t("listening.exitSession")
                   : t("listening.exitReview")}
               </Button>
+            </Card>
+          )}
+
+          {/* Micro-flujo (V3.27): tarjetas de etapa Pre/While1/Shadowing del modo
+              adaptativo. La tarjeta de audio queda siempre disponible; la pregunta
+              solo se muestra en `while2`/`post`. */}
+          {micro?.stage === "pre" && !result && !productionResult && (
+            <Card className="gap-4 border-primary/25 p-5">
+              <p className="text-sm font-semibold text-foreground">
+                {t("listening.flow.preTitle")}
+              </p>
+              {(question.context || question.topic) && (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {question.context || topicLabel(question.topic)}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                {t("listening.flow.preHint")}
+              </p>
+              <Button
+                type="button"
+                className="min-h-10 gap-2 self-start"
+                onClick={continueStage}
+              >
+                {t("listening.flow.begin")}
+              </Button>
+            </Card>
+          )}
+
+          {micro?.stage === "while1" && !result && !productionResult && (
+            <Card className="gap-4 border-primary/25 p-5">
+              <p className="text-sm font-semibold text-foreground">
+                {t("listening.flow.while1Title")}
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {t("listening.flow.while1Hint")}
+              </p>
+              <Button
+                type="button"
+                className="min-h-10 gap-2 self-start"
+                onClick={continueStage}
+              >
+                {t("listening.flow.listenDone")}
+              </Button>
+            </Card>
+          )}
+
+          {micro?.stage === "shadowing" && (
+            <Card className="gap-4 border-primary/25 p-5">
+              <p className="text-sm font-semibold text-foreground">
+                {t("listening.flow.shadowingTitle")}
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {t("listening.flow.shadowingHint")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="min-h-10 gap-2"
+                  onClick={finishShadowingStage}
+                >
+                  {t("listening.flow.shadowingDone")}
+                </Button>
+                {flowSteps[micro.stepIndex]?.allow_skip && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-10 gap-2"
+                    onClick={skipShadowingStage}
+                  >
+                    {t("listening.flow.skipStage")}
+                  </Button>
+                )}
+              </div>
             </Card>
           )}
 
@@ -778,14 +975,18 @@ export function ListeningPractice({
             )}
           </Card>
 
-          <Card className="gap-4 p-5">
-            <div className="flex items-start justify-between gap-3">
-              <p
-                className="text-base font-semibold leading-snug"
-                lang={questionPhrase.isSpanish ? "es" : "en"}
-              >
-                {questionPhrase.display}
-              </p>
+          {(!micro ||
+            (micro.stage !== "pre" &&
+              micro.stage !== "while1" &&
+              micro.stage !== "shadowing")) && (
+            <Card className="gap-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p
+                  className="text-base font-semibold leading-snug"
+                  lang={questionPhrase.isSpanish ? "es" : "en"}
+                >
+                  {questionPhrase.display}
+                </p>
               <div className="flex shrink-0 items-center gap-2">
                 <PhraseTranslateButton
                   state={questionPhrase}
@@ -917,9 +1118,12 @@ export function ListeningPractice({
                 {t("listening.evaluating")}
               </p>
             )}
-          </Card>
+            </Card>
+          )}
 
-          {(result || productionResult) && (
+          {(result || productionResult) &&
+            !(micro?.stage === "shadowing") &&
+            !(result && !result.correct && micro?.stage === "while2") && (
             <ActivityResult
               outcome={
                 result
@@ -941,7 +1145,15 @@ export function ListeningPractice({
                     )
               }
               footer={
-                session ? (
+                micro?.stage === "post" ? (
+                  <Button
+                    type="button"
+                    className="min-h-10 gap-2"
+                    onClick={continueFromResult}
+                  >
+                    {t("listening.flow.continue")}
+                  </Button>
+                ) : session ? (
                   isSessionFinished(session) ? (
                     <Button
                       type="button"
@@ -981,7 +1193,12 @@ export function ListeningPractice({
                       .replace("{level}", session.level)}
                   </p>
                 )}
-              {result && (
+              {result &&
+                !(
+                  micro?.stage === "while2" &&
+                  !result.correct &&
+                  micro.transcript !== "full"
+                ) && (
                 <div className="flex items-start justify-between gap-3">
                   <span
                     className="text-foreground"
@@ -1073,6 +1290,48 @@ export function ListeningPractice({
               )}
             </ActivityResult>
           )}
+
+          {result &&
+            !result.correct &&
+            micro?.stage === "while2" &&
+            flowPolicy && (
+              <Card className="gap-4 border-warning/30 p-5">
+                <p className="text-sm font-semibold text-foreground">
+                  {t("listening.flow.tryAgainTitle")}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {t("listening.flow.tryAgainAttempt")
+                    .replace("{current}", String(micro.attemptCount + 1))
+                    .replace("{total}", String(flowPolicy.max_attempts_per_stage))}
+                </p>
+                {micro.transcript === "full" && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("listening.flow.withTranscript")}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    className="min-h-10 gap-2"
+                    onClick={retryQuestion}
+                  >
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                    {t("listening.flow.tryAgain")}
+                  </Button>
+                  {micro.transcript !== "full" &&
+                    flowPolicy.allow_manual_reveal && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-10 gap-2"
+                        onClick={showTranscriptNow}
+                      >
+                        {t("listening.flow.showTranscript")}
+                      </Button>
+                    )}
+                </div>
+              </Card>
+            )}
 
           {stats && (
             <Card className="gap-4 p-5">

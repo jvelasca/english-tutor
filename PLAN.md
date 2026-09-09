@@ -8,6 +8,26 @@
 
 ## Estado actual
 
+- ✅ **V3.27 — Listening Engine 4.0 Fase 1 (2026-09-09)**: cerrado e
+  implementado sobre v3.26.0 (**Versión estable `3.27.0`**, app `3.26.0 →
+  3.27.0`) con el plan
+  `docs/PLAN-V327-LISTENING-ENGINE-4.md` y la especificación
+  `docs/LISTENING_ENGINE_4.0.md`. **Backend = fuente única de la política
+  pedagógica** (`services/listening_flow.py`: `flow` pre/while1/while2/post/
+  shadowing + `transcript_policy` servidos por pregunta; el frontend ejecuta
+  una máquina de presentación en `features/listening/microFlow.ts`, sin reglas
+  propias) · **Perfil auditivo visible en UI**: `services/auditory_profile.py`
+  (casos A-D) + `AuditoryProfileCard` persistente y no bloqueante (sin datos →
+  needsMore → intervención), y `next_question` prioriza la capa recomendada
+  (`pick_next_question(layer=...)`) · **Evidencia ampliada**: 5 columnas nuevas
+  en `listening_attempts` (`layer`/`speed_used`/`stage`/`transcript_used`/
+  `segments_replayed`) con migración idempotente y persistencia en
+  `submit_answer`/`submit_production`, contrato opcional y backward compatible
+  en schemas/routers/tipos/API. Tests: pytest **1647**, vitest **472** (59
+  archivos), ruff/`tsc` limpios, `check_release_consistency` **3.27.0** exit 0.
+  Pendiente: auditoría externa del candidato v3.27.0 y Fase 2 del engine
+  (reproductor rico/karaoke; calibración de umbrales del perfil).
+
 - ✅ **V3.19 — Léxico por destreza + Speaking micro-drill (2026-09-07)**: cerrado
   e implementado sobre v3.18.0 (backend `3.18.0 → 3.19.0`) con las decisiones
   del gerente y el dossier de la auditoría profunda V3.18. **P0 — volcado por
@@ -838,6 +858,16 @@ autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos l
 Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
+
+- **V3.28 (candidato) — Diccionario de consulta con marcas de uso y aprendizaje.**
+  Idea registrada tras V3.27: además de los checks por rutas y del diccionario
+  personal actual, ofrecer un **diccionario de consulta** (definición/traducción
+  a demanda por palabra) que **marque las palabras ya usadas en la app** y su
+  estado de aprendizaje (vista/producida/dominada), conectado con la evidencia
+  léxica (`vocabulary`, `vocabulary_events`, superficies de producción). Sin
+  diseño cerrado ni alcance aún: requiere decisión de fuente de definiciones
+  (100% local, sin nube), granularidad de marca por superficie y relación con el
+  Personal Dictionary y el modo chat. Se detallará en su dossier de diseño.
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

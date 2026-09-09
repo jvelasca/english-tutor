@@ -4,6 +4,17 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.27.0] — 2026-09-09
+
+**Listening Engine 4.0 — Fase 1 (micro-flujo por ítem): el backend se vuelve la fuente única de la política pedagógica y sirve `flow` + `transcript_policy` por pregunta; el Listening práctico gana perfil auditivo visible en la UI (casos A-D), evidencia ampliada por intento (5 columnas nuevas) y revelado de transcripción progresivo por CEFR.**
+
+Implementa el plan V3.27 (`docs/PLAN-V327-LISTENING-ENGINE-4.md`, especificación `docs/LISTENING_ENGINE_4.0.md`). Versión de app `3.26.0 → 3.27.0`.
+
+- **Política de fases en el backend (decisión de arquitectura §3.1).** Nuevo módulo puro `services/listening_flow.py`: `flow` (pasos pre/while1/while2/post/shadowing con `task`, `transcript_state_inicial`, `allow_skip`, `requires_audio`) y `transcript_policy` (`revelation` `hidden_until_post`/`on_first_fail`/`never_before_post`, `max_attempts_per_stage`, `allow_manual_reveal`, `shadowing_optional`) viajan en el payload de cada pregunta (`next_question`); el frontend ejecuta una máquina de estados de **presentación** sin reglas pedagógicas propias (`features/listening/microFlow.ts`). Backward compatible: sin `flow` la pantalla conserva el comportamiento anterior.
+- **Perfil auditivo visible en la UI (objetivo 5).** `services/auditory_profile.py` deriva del diagnóstico la capa de trabajo y la intervención (casos A-D: bottom-up / comprensión / top-down / cadena hablada) con muestra mínima (`PROFILE_MIN_ATTEMPTS=3`, respuesta `needs_min_attempts` sin intervención); el diagnóstico lo expone como `profile` y la nueva tarjeta `AuditoryProfileCard` lo muestra de forma persistente y no bloqueante en el panel de Listening (estados: sin datos → `needsMore` → intervención activa). La capa recomendada se usa además para priorizar el siguiente ítem (`pick_next_question(layer=...)`).
+- **Evidencia ampliada por intento (5 columnas en `listening_attempts`).** Migración idempotente que añade `layer`, `speed_used`, `stage`, `transcript_used`, `segments_replayed`; `submit_answer`/`submit_production` las persisten con la capa derivada del ítem en backend (fuente de verdad); la API y los tipos del frontend propagan el metadato de apoyo en cada envío sin romper llamadores antiguos (campos opcionales con default).
+- **Verificación.** Backend pytest **1647 passed** + `ruff check .` limpio (incluye 35 tests nuevos de migración/flow/perfil/selector); frontend vitest **472 passed** (59 archivos) + `tsc --noEmit` OK; `check_release_consistency` 3.27.0 exit 0; release notes `release-notes-v3.27.0.md`.
+
 ## [3.26.0] — 2026-09-08
 
 **Hoja de ruta completa (Ejes A+B+C): la retención del nivel pasa a longitudinal multi-punto y el gate MASTERED separa encuentro inicial de práctica espaciada, `novel` deja de ser reservado con emisor real en misiones B2+ jamás practicadas, el léxico gana historia detallada por superficie, el Listening se ordena por capas recognition/comprehension/inference, la matriz CEFR unifica los extremos con escalera monótona, la UI explica el motivo de bloqueo por destreza y el perfil marca la evidencia legacy sin `context_id`.**

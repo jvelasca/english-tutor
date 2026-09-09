@@ -8,6 +8,7 @@ import type {
   ListeningQuestion,
   ListeningRouteExtras,
   ListeningStats,
+  ListeningSupportMetadata,
 } from "../types/api";
 
 // Timeouts de red del bucle de práctica: el backend es local, pero en iPad por
@@ -54,6 +55,7 @@ export function submitListeningAnswer(
   answerIndex: number,
   responseTimeMs: number | null = null,
   replayCount = 0,
+  opts: ListeningSupportMetadata = {},
 ): Promise<ListeningAnswerResponse> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
@@ -62,6 +64,16 @@ export function submitListeningAnswer(
       answer_index: answerIndex,
       response_time_ms: responseTimeMs,
       replay_count: replayCount,
+      // Evidencia ampliada (V3.27): se envían solo los campos presentes.
+      ...(opts.layer !== undefined ? { layer: opts.layer } : {}),
+      ...(opts.speedUsed !== undefined ? { speed_used: opts.speedUsed } : {}),
+      ...(opts.stage !== undefined ? { stage: opts.stage } : {}),
+      ...(opts.transcriptUsed !== undefined
+        ? { transcript_used: opts.transcriptUsed }
+        : {}),
+      ...(opts.segmentsReplayed !== undefined
+        ? { segments_replayed: opts.segmentsReplayed }
+        : {}),
     }),
     TIMEOUT_SUBMIT_MS,
     "submit answer",
@@ -77,19 +89,41 @@ export function getListeningStats(userId: string): Promise<ListeningStats> {
   );
 }
 
+function submitProduction(
+  endpoint: string,
+  userId: string,
+  questionId: string,
+  transcript: string,
+  opts: ListeningSupportMetadata = {},
+): Promise<ListeningProductionResult> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return withTimeout(
+    postJson<ListeningProductionResult>(`${endpoint}?${query}`, {
+      question_id: questionId,
+      transcript,
+      ...(opts.stage !== undefined ? { stage: opts.stage } : {}),
+      ...(opts.transcriptUsed !== undefined
+        ? { transcript_used: opts.transcriptUsed }
+        : {}),
+      ...(opts.speedUsed !== undefined ? { speed_used: opts.speedUsed } : {}),
+    }),
+    TIMEOUT_SUBMIT_MS,
+    "submit production",
+  );
+}
+
 export function submitListeningDictation(
   userId: string,
   questionId: string,
   transcript: string,
+  opts: ListeningSupportMetadata = {},
 ): Promise<ListeningProductionResult> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return withTimeout(
-    postJson<ListeningProductionResult>(
-      `/api/listening/dictation?${query}`,
-      { question_id: questionId, transcript },
-    ),
-    TIMEOUT_SUBMIT_MS,
-    "submit dictation",
+  return submitProduction(
+    "/api/listening/dictation",
+    userId,
+    questionId,
+    transcript,
+    opts,
   );
 }
 
@@ -97,15 +131,14 @@ export function submitListeningShadowing(
   userId: string,
   questionId: string,
   transcript: string,
+  opts: ListeningSupportMetadata = {},
 ): Promise<ListeningProductionResult> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return withTimeout(
-    postJson<ListeningProductionResult>(
-      `/api/listening/shadowing?${query}`,
-      { question_id: questionId, transcript },
-    ),
-    TIMEOUT_SUBMIT_MS,
-    "submit shadowing",
+  return submitProduction(
+    "/api/listening/shadowing",
+    userId,
+    questionId,
+    transcript,
+    opts,
   );
 }
 
