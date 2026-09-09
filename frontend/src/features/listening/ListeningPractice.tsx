@@ -62,6 +62,9 @@ import {
 import { NextStep } from "../../components/NextStep";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { ProgressRing } from "../../components/ProgressRing";
+// Playback de la grabación del alumno en el shadowing de listening (V3.28,
+// Bloque E): reutiliza el componente de Pronunciation/Speaking.
+import { RecordingPlayButton } from "../../components/RecordingPlayButton";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -83,6 +86,12 @@ import {
   type MicroFlowState,
 } from "./microFlow";
 import { AuditoryProfileCard } from "./AuditoryProfileCard";
+// AudioController 4.0 (V3.28, Bloque B): reproducción del audio de referencia
+// sobre un único elemento con play/pause/seek/velocidad/bucle de segmento.
+import { useAudioController } from "./useAudioController";
+// Transcripción dinámica con sync grueso (V3.28, Bloque D): resalta la frase
+// activa según `currentTime` y respeta el revelado `hidden/partial/full`.
+import { CoarseTranscript } from "./CoarseTranscript";
 
 // Etiqueta legible de una dimensión de resiliencia auditiva (Listening 2.0):
 // "clear_speech" → "listening.resilience.clear_speech" (clave i18n localizada).
@@ -168,9 +177,31 @@ export function ListeningPractice({
   const [submitting, setSubmitting] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // Shadowing 2.0 (V3.28, Bloque E): la grabación del alumno se conserva como
+  // objeto URL local para su playback (mismo diseño que Speaking/Pronunciation:
+  // el audio no se sube a disco, solo se transcribe; el playback es local e
+  // inmediato). Las señales auxiliares (duración y velocidad proxy en wpm) se
+  // calculan aquí, de forma determinista, y viajan con el envío del shadowing.
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [shadowingDurationMs, setShadowingDurationMs] = useState<number | null>(
+    null,
+  );
+  const [shadowingSpeechRate, setShadowingSpeechRate] = useState<number | null>(
+    null,
+  );
+  const recordingStartedAtRef = useRef(0);
   const [stats, setStats] = useState<ListeningStats | null>(null);
   const [diagnostic, setDiagnostic] = useState<ListeningDiagnostic | null>(null);
-  const [playing, setPlaying] = useState(false);
+  // AudioController 4.0 (V3.28): único elemento de audio para el audio de
+  // referencia. `playing` refleja la reproducción real del elemento; el TTS en
+  // vivo (degradación sin audio pre-renderizado) mantiene su propio indicador.
+  const {
+    controller: audioController,
+    playing: elementPlaying,
+    currentTime: audioTime,
+  } = useAudioController();
+  const [ttsLivePlaying, setTtsLivePlaying] = useState(false);
+  const playing = elementPlaying || ttsLivePlaying;
   const [error, setError] = useState<string | null>(null);
   const [micError, setMicError] = useState<MicUnavailableReason | null>(null);
   const [replayCount, setReplayCount] = useState(0);
@@ -181,9 +212,10 @@ export function ListeningPractice({
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
   const [session, setSession] = useState<ListeningSession | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
-  // Micro-flujo por ítem (V3.27, Listening Engine 4.0): estado de la máquina de
-  // presentación para el modo adaptativo. Solo se activa cuando la pregunta
-  // trae `flow` del backend (las sesiones de nivel/drill no inyectan flujo).
+  // Micro-flujo por ítem (V3.27, V3.28 Listening Engine 4.0): estado de la
+  // máquina de presentación. Se activa cuando la pregunta trae `flow` del
+  // backend: rutas adaptativa, por nivel (`level`) y drill (`failed`). Solo el
+  // repaso `mastered` sigue en modo compacto (sin flow, decisión V3.28).
   const [flowState, setFlowState] = useState<MicroFlowState | null>(null);
   // Voz TTS real del perfil (Configuración → Voces): nombre amigable de la voz
   // seleccionada. Se muestra en ítems sintéticos en lugar del acento declarado
@@ -208,6 +240,24 @@ export function ListeningPractice({
     };
   }, []);
 
+  // Al cambiar de pregunta (o al desmontar) se detiene el audio de referencia:
+  // con el AudioController 4.0 el elemento es único y reutilizable, así que no
+  // debe seguir sonando la frase anterior cuando el usuario avanza.
+  useEffect(() => {
+    return () => {
+      audioController?.pause();
+    };
+  }, [question?.id, audioController]);
+
+  // Shadowing 2.0 (V3.28, Bloque E): cada objeto URL local de la grabación se
+  // revoca al sustituirse por otro o al desmontar (no retener blobs en memoria).
+  useEffect(() => {
+    const url = recordingUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [recordingUrl]);
+
   // Traducción de apoyo EN→ES de los tres textos de la pregunta (enunciado,
   // texto oído en el resultado y referencia de dictado/shadowing). Cada una es
   // un toggle independiente que se reinicia cuando cambia la pregunta.
@@ -224,10 +274,11 @@ export function ListeningPractice({
     question?.id ? `${question.id}:reference` : undefined,
   );
 
-  // --- Micro-flujo por ítem (V3.27): derivados y controles ------------------
-  // `flowSteps`/`flowPolicy`/`micro` solo existen cuando el backend sirvió
-  // `flow` (modo adaptativo). Los ítems de producción (dictation/shadowing)
-  // traen un flujo de un solo paso y conservan su tarea directa.
+  // --- Micro-flujo por ítem (V3.27/V3.28): derivados y controles -----------
+  // `flowSteps`/`flowPolicy`/`micro` existen cuando el backend sirvió `flow`
+  // (adaptativo, nivel y drill; no en el repaso mastered compacto). Los ítems
+  // de producción (dictation/shadowing) traen un flujo de un solo paso y
+  // conservan su tarea directa.
   const flowSteps = question ? flowOf(question) : [];
   const flowPolicy = question?.transcriptPolicy;
   const micro =
@@ -320,6 +371,14 @@ export function ListeningPractice({
     setProductionResult(null);
     setDictationText("");
     setTranscribedText("");
+    // Shadowing 2.0 (V3.28, Bloque E): al cambiar de pregunta se descarta la
+    // grabación local anterior (revocando su objeto URL) y sus señales.
+    setRecordingUrl((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return null;
+    });
+    setShadowingDurationMs(null);
+    setShadowingSpeechRate(null);
     setVariant("normal");
     // Sin override, respeta el nivel y modo de la sesión en curso (si hay).
     const level = levelOverride === undefined ? session?.level : levelOverride;
@@ -333,8 +392,8 @@ export function ListeningPractice({
     try {
       const next = await getListeningQuestion(userId, level, mode);
       setQuestion(next);
-      // El micro-flujo arranca solo si el backend sirvió `flow` (modo
-      // adaptativo); en el resto la pantalla conserva su comportamiento.
+      // El micro-flujo arranca cuando el backend sirvió `flow` (adaptativo,
+      // nivel y drill); el repaso mastered (compacto) no lo usa.
       setFlowState(hasFlow(next) ? initialFlow(next) : null);
       setStartedAt(Date.now());
       setReplayCount(0);
@@ -535,31 +594,28 @@ export function ListeningPractice({
     };
   }, [userId, showAudioSettings]);
 
-  function playAudioUrl(url: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const audio = new Audio(url);
-      audio.onended = () => resolve();
-      audio.onerror = () => reject(new Error("Could not play the audio"));
-      audio.play().catch(reject);
-    });
-  }
-
   async function play() {
     if (!question || !userId || playing) return;
-    setPlaying(true);
     setReplayCount((count) => count + 1);
     try {
-      if (question.audio_ready) {
-        // Audio de referencia pre-renderizado (respeta speech_rate y repetición).
-        await playAudioUrl(getListeningAudioUrl(question.id, userId, variant));
+      if (question.audio_ready && audioController) {
+        // Audio de referencia pre-renderizado (respeta speech_rate y repetición),
+        // reproducido por el AudioController 4.0 (un solo elemento reutilizable).
+        await audioController.play(
+          getListeningAudioUrl(question.id, userId, variant),
+        );
       } else {
-        // Degradación: TTS en vivo con el script del ítem.
-        await speak(question.script, userId);
+        // Degradación: TTS en vivo con el script del ítem (o sin API Audio).
+        setTtsLivePlaying(true);
+        try {
+          await speak(question.script, userId);
+        } finally {
+          setTtsLivePlaying(false);
+        }
       }
     } catch (e) {
+      setTtsLivePlaying(false);
       setError((e as Error).message);
-    } finally {
-      setPlaying(false);
     }
   }
 
@@ -636,6 +692,7 @@ async function submitDictation() {
     try {
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
+      recordingStartedAtRef.current = performance.now();
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
@@ -646,21 +703,50 @@ async function submitDictation() {
         });
         if (blob.size === 0) return;
         if (!userId || !question) return;
+        // Shadowing 2.0 (V3.28, Bloque E): conservar la grabación como objeto
+        // URL local para su playback y calcular las señales auxiliares
+        // informativas (duración real y velocidad proxy en wpm).
+        const durationMs = Math.max(
+          0,
+          Math.round(performance.now() - recordingStartedAtRef.current),
+        );
+        setShadowingDurationMs(durationMs > 0 ? durationMs : null);
+        setRecordingUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
         setProcessing(true);
         setError(null);
         try {
-        const text = await transcribe(blob);
-        setTranscribedText(text);
-        const res = await submitListeningShadowing(
-          userId,
-          question.id,
-          text,
-          supportOpts(),
-        );
-          setProductionResult(res);
-          applySessionOutcome(question.id, res.correct);
-          onAttempt();
-          void refreshStats();
+          const text = await transcribe(blob);
+          setTranscribedText(text);
+          const words = text.trim().split(/\s+/).filter(Boolean).length;
+          const rate =
+            words > 0 && durationMs > 0
+              ? Math.round((words * 60_000) / durationMs)
+              : null;
+          setShadowingSpeechRate(rate);
+          // El envío con scoring determinista solo existe para ítems de
+          // shadowing directos (skill=shadowing). En el paso shadowing del
+          // micro-flujo de ítems receptivos la grabación es libre (playback
+          // local + señales visibles, sin POST: el backend rechazaría un
+          // shadowing cuyo ítem no es de shadowing).
+          if (question.skill === "shadowing") {
+            const res = await submitListeningShadowing(
+              userId,
+              question.id,
+              text,
+              supportOpts(),
+              {
+                durationMs: durationMs > 0 ? durationMs : undefined,
+                speechRate: rate ?? undefined,
+              },
+            );
+            setProductionResult(res);
+            applySessionOutcome(question.id, res.correct);
+            onAttempt();
+            void refreshStats();
+          }
         } catch (e) {
           setError((e as Error).message);
         } finally {
@@ -826,6 +912,61 @@ async function submitDictation() {
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {t("listening.flow.shadowingHint")}
               </p>
+              {/* Shadowing 2.0 (V3.28, Bloque E): en el paso shadowing del
+                  micro-flujo la grabación es voluntaria y NO se puntúa (el
+                  backend no admite shadowing de ítems receptivos). Sirve para
+                  escucharse, con señales auxiliares informativas. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant={recording ? "destructive" : "default"}
+                  className="min-h-10 gap-2"
+                  onClick={toggleRecording}
+                  disabled={!userId || !!productionResult || processing}
+                >
+                  {processing ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : recording ? (
+                    <Square className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Mic className="size-4" aria-hidden="true" />
+                  )}
+                  {processing
+                    ? t("listening.evaluating")
+                    : recording
+                      ? t("listening.stop")
+                      : t("listening.flow.recordShadowing")}
+                </Button>
+                {recording && (
+                  <div className="flex items-center gap-2 text-xs font-medium text-destructive">
+                    <motion.span
+                      className="size-2 rounded-full bg-destructive"
+                      animate={{ opacity: [1, 0.25, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                      aria-hidden="true"
+                    />
+                    {t("listening.record")}
+                  </div>
+                )}
+                {recordingUrl && (
+                  <RecordingPlayButton
+                    src={recordingUrl}
+                    label={t("listening.flow.playRecording")}
+                  />
+                )}
+              </div>
+              {recordingUrl && shadowingDurationMs !== null && (
+                <p className="text-xs tabular-nums text-muted-foreground">
+                  {t("listening.flow.shadowingSignals")
+                    .replace("{duration}", String(shadowingDurationMs ?? 0))
+                    .replace("{wpm}", String(shadowingSpeechRate ?? 0))}
+                </p>
+              )}
+              {transcribedText && (
+                <p className="text-sm text-muted-foreground">
+                  {t("listening.transcribed")}: {transcribedText}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -1076,6 +1217,26 @@ async function submitDictation() {
                     {t("listening.transcribed")}: {transcribedText}
                   </p>
                 )}
+                {/* Shadowing 2.0 (V3.28, Bloque E): playback local de la
+                    grabación del alumno + señales auxiliares informativas. */}
+                {recordingUrl && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RecordingPlayButton
+                      src={recordingUrl}
+                      label={t("listening.flow.playRecording")}
+                    />
+                    {shadowingDurationMs !== null && (
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {t("listening.flow.shadowingSignals")
+                          .replace(
+                            "{duration}",
+                            String(shadowingDurationMs ?? 0),
+                          )
+                          .replace("{wpm}", String(shadowingSpeechRate ?? 0))}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1120,6 +1281,18 @@ async function submitDictation() {
             )}
             </Card>
           )}
+
+          {question?.sentenceTimings &&
+            question.sentenceTimings.length > 0 &&
+            micro &&
+            micro.transcript !== "hidden" &&
+            micro.stage !== "shadowing" && (
+              <CoarseTranscript
+                timings={question.sentenceTimings}
+                state={micro.transcript}
+                currentTime={audioTime}
+              />
+            )}
 
           {(result || productionResult) &&
             !(micro?.stage === "shadowing") &&

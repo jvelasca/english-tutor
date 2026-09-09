@@ -552,6 +552,19 @@ export interface ListeningQuestion {
   // plan V3.27). El frontend solo los ejecuta, sin reglas pedagógicas propias.
   flow?: ListeningFlowStep[];
   transcriptPolicy?: ListeningTranscriptPolicy;
+  // Timings gruesos de frase (V3.28, Bloque D): reparto heurístico de
+  // `duration` por frase (`sync: "coarse_heuristic"`), para el resaltado de la
+  // frase activa con `currentTime`. Presentes solo cuando el ítem trae flow y
+  // declara `duration`; vacío no rompe a consumidores antiguos.
+  sentenceTimings?: SentenceTiming[];
+}
+
+export interface SentenceTiming {
+  index: number;
+  start: number;
+  end: number;
+  text: string;
+  sync: string;
 }
 
 export interface ListeningFlowStep {

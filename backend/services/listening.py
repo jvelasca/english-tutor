@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, ValidationError, computed_field
 
 from services.curriculum import CURRICULUM_DIR, LISTENING_BANK_VERSION
 from services.forgetting import days_since
+from services.listening_bottom_up import derived_catalog
 from services.phonetics import composite_score
 
 LISTENING_SUBSKILLS: tuple[str, ...] = (
@@ -228,7 +229,14 @@ def production_reference(question: dict) -> str:
 
     Orden de preferencia: `transcript`, `clean_transcript`, `script`. La referencia
     es la frase que el alumno debe reproducir (dictar o repetir en shadowing).
+
+    Para un dictado parcial derivado (V3.28, `task_type=partial_dictation`) la
+    referencia no es la frase completa sino exactamente los tokens ocultos que el
+    alumno debe teclear (`partial_reference`): el resto ya se le muestra escrito
+    en el hueco de la pregunta.
     """
+    if question.get("derived") and question.get("partial_reference"):
+        return (question.get("partial_reference") or "").strip()
     return (
         (question.get("transcript") or "").strip()
         or (question.get("clean_transcript") or "").strip()
@@ -974,6 +982,22 @@ QUESTION_BANK: list[dict] = _LEGACY_BANK + _load_corpus_items()
 LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 # ---------------------------------------------------------------------------
+# Catálogo derivado Bottom-Up (V3.28, Bloque C): cloze auditivo, dictado parcial
+# y segmentación derivados de forma determinista de los ítems del banco (ver
+# `services.listening_bottom_up`). Los ítems derivados:
+# - nunca entran en `questions_for_level`/`route_questions`/`level_items` (la
+#   puerta de ruta y la certificación solo evalúan ids del banco curado);
+# - se marcan `derived=True` para que cualquier filtro defensivo los excluya;
+# - reutilizan el audio del ítem padre (`derived_from`), sin WAV duplicados.
+# `DERIVED_BY_ID` resuelve el payload por id en el dominio (submit/audio) y
+# `DERIVED_RECOGNITION_POOL` es la lista que el selector puede servir en
+# práctica adaptativa de capa `recognition` dentro del nivel de trabajo.
+# ---------------------------------------------------------------------------
+DERIVED_BY_ID: dict[str, dict]
+DERIVED_RECOGNITION_POOL: list[dict]
+DERIVED_BY_ID, DERIVED_RECOGNITION_POOL = derived_catalog(QUESTION_BANK)
+
+# ---------------------------------------------------------------------------
 # Puerta de ruta (Fase 2 — calibración pedagógica): qué evidencia certifica que
 # una ruta de listening está superada.
 #
@@ -1233,6 +1257,92 @@ def get_question(question_id: str) -> dict | None:
             return q
     return None
 
+# ---------------------------------------------------------------------------
+# Sync grueso del transcript (V3.28, Bloque D): timings aproximados de frase.
+# Heurístico, NO alineación acústica: se distribuye la duración del audio entre
+# las frases de forma proporcional a su peso en texto. Se expone como tal
+# (`sync: "coarse_heuristic"`) para no confundirlo con word alignment (Fase 3).
+# ---------------------------------------------------------------------------
+
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+# Peso mínimo de una frase en el reparto proporcional (evita frases de 0 duración
+# en textos con muchas pausas de puntuación).
+_COARSE_MIN_WEIGHT = 1.0
+
+
+def transcript_display_text(question: dict) -> str:
+    """Texto del transcript que se muestra en la UI (para el sync grueso).
+
+    Preferencia `clean_transcript` (ortografía estándar legible) → `transcript`
+    (lo que suena) → `script`. Coincide con lo que el alumno lee al revelar.
+    """
+    return (
+        (question.get("clean_transcript") or "").strip()
+        or (question.get("transcript") or "").strip()
+        or (question.get("script") or "").strip()
+    )
+
+
+def _split_phrases(text: str) -> list[str]:
+    """Frases del texto (separa por puntuación terminal). Sin frases vacías."""
+    if not text:
+        return []
+    phrases = [p.strip() for p in _SENTENCE_SPLIT_RE.split(text)]
+    return [p for p in phrases if p]
+
+
+def coarse_sentence_timings(question: dict) -> list[dict]:
+    """Timings gruesos de frase del audio del ítem (heurístico y determinista).
+
+    Devuelve una lista `[{index, start, end, text, sync}]` donde cada entrada
+    cubre una frase del transcript y el total cubre `duration` (el `end` de la
+    última frase == `duration`). La duración se reparte de forma proporcional al
+    peso textual de cada frase (`len(text) + _COARSE_MIN_WEIGHT`): **no** es
+    alineación acústica, solo una referencia aproximada para resaltar la frase
+    activa mientras suena el audio (`sync: "coarse_heuristic"`).
+
+    Si el ítem no declara `duration` (> 0) no hay línea de tiempo que repartir y
+    se devuelve una lista vacía (el frontend degrada a revelado sin resaltado).
+
+    Con `repetition_policy="twice"` el audio dice el texto dos veces: cada frase
+    aparece dos veces, una por mitad de la duración (mismo orden).
+    """
+    duration = float(question.get("duration") or 0.0)
+    phrases = _split_phrases(transcript_display_text(question))
+    if duration <= 0 or not phrases:
+        return []
+    passages: list[tuple[float, float, str]] = []  # (inicio, fin, texto)
+    if question.get("repetition_policy") == "twice":
+        halves = [0.0, duration / 2.0]
+    else:
+        halves = [0.0]
+    for half_start in halves:
+        half_duration = duration - half_start if len(halves) == 1 else duration / 2.0
+        weights = [len(p) + _COARSE_MIN_WEIGHT for p in phrases]
+        total = sum(weights)
+        cursor = half_start
+        for phrase, weight in zip(phrases, weights, strict=True):
+            span = half_duration * (weight / total)
+            start = round(cursor, 3)
+            cursor += span
+            end = round(cursor, 3)
+            passages.append((start, end, phrase))
+    # Ajuste final: la última frase termina exactamente en `duration`.
+    if passages:
+        last_start, _last_end, last_text = passages[-1]
+        passages[-1] = (last_start, duration, last_text)
+    return [
+        {
+            "index": index,
+            "start": start,
+            "end": end,
+            "text": phrase,
+            "sync": "coarse_heuristic",
+        }
+        for index, (start, end, phrase) in enumerate(passages)
+    ]
+
 
 def questions_for_level(level: str) -> list[dict]:
     """Preguntas del banco pertenecientes a un nivel CEFR concreto."""
@@ -1258,13 +1368,19 @@ def route_questions(
 
     `extra_questions` son dicts de ítem ya cargados (p. ej. desde el catálogo
     `listening_generated`). Los ids duplicados con el banco se descartan.
+
+    Los ítems derivados bottom-up (`derived=True`, V3.28) se excluyen siempre de
+    forma defensiva: aunque vivan fuera del banco y del catálogo, la regla es que
+    el pool de ruta (y con él `level_items` y la puerta) nunca los contiene.
     """
     base = questions_for_level(level)
     ids = {q["id"] for q in base}
     extras = [
         q
         for q in (extra_questions or [])
-        if q.get("level") == level and q["id"] not in ids
+        if q.get("level") == level
+        and q["id"] not in ids
+        and not q.get("derived")
     ]
     return base + extras
 
@@ -1622,6 +1738,7 @@ def pick_next_question(
     *,
     weak_subskills: list[str] | None = None,
     layer: str | None = None,
+    bottom_up_questions: list[dict] | None = None,
 ) -> dict:
     """Siguiente pregunta: prioriza la sub-destreza más débil dentro del nivel actual.
 
@@ -1637,9 +1754,17 @@ def pick_next_question(
     que realizan su sub-destreza, manteniendo el mismo orden (débiles → no vistas →
     falladas → rotación). Si la capa no tiene candidatos en el nivel, se cae al
     pool completo del nivel (no bloquea la práctica).
+
+    Con `bottom_up_questions` (V3.28, Bloque C): en una sesión de capa
+    `recognition`, tras atender las sub-destrezas débiles se pueden servir ítems
+    derivados bottom-up (cloze/segmentación, ver `services.listening_bottom_up`)
+    del mismo nivel de trabajo como volumen extra de decodificación. Estos ítems
+    nunca entran en la puerta de ruta/certificación (viven fuera del banco
+    curado). Sin el parámetro (None) el comportamiento es idéntico al de V3.27.
     """
     correct_ids = correct_ids or set()
-    working = questions_for_level(current_level(correct_ids))
+    working_level = current_level(correct_ids)
+    working = questions_for_level(working_level)
     if layer is not None:
         layer_pool = [
             q
@@ -1669,7 +1794,21 @@ def pick_next_question(
         if _not_correct(q):
             return q
 
-    # 2. Progresión estándar dentro del nivel: no vistas y luego falladas.
+    # 2. Práctica bottom-up (V3.28): solo en sesiones de capa recognition y solo
+    #    del nivel de trabajo. Volumen extra de decodificación (cloze/segmentación
+    #    sobre frases del banco) cuando el perfil auditivo recomienda bottom-up.
+    if layer == "recognition" and bottom_up_questions:
+        derived_at_level = [
+            q for q in bottom_up_questions if q.get("level") == working_level
+        ]
+        for q in derived_at_level:
+            if _unseen_not_correct(q):
+                return q
+        for q in derived_at_level:
+            if _not_correct(q):
+                return q
+
+    # 3. Progresión estándar dentro del nivel: no vistas y luego falladas.
     for q in working:
         if _unseen_not_correct(q):
             return q
@@ -1677,7 +1816,7 @@ def pick_next_question(
         if _not_correct(q):
             return q
 
-    # 3. Nivel completado o sin preguntas: rota sobre el banco restante.
+    # 4. Nivel completado o sin preguntas: rota sobre el banco restante.
     for q in QUESTION_BANK:
         if _not_correct(q):
             return q

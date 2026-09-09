@@ -145,4 +145,28 @@ describe("listening api", () => {
       transcript: "could you repeat that",
     });
   });
+
+  it("submitListeningShadowing envía señales auxiliares cuando existen", async () => {
+    const fn = mockFetch(true, {
+      question_id: "l19",
+      task_type: "shadowing",
+      correct: true,
+      score: 90,
+    });
+    await submitListeningShadowing(
+      "u1",
+      "l19",
+      "could you repeat that",
+      {},
+      { durationMs: 2340, speechRate: 152 },
+    );
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/listening/shadowing?user_id=u1");
+    expect(JSON.parse(init.body as string)).toEqual({
+      question_id: "l19",
+      transcript: "could you repeat that",
+      shadowing_duration_ms: 2340,
+      shadowing_speech_rate: 152,
+    });
+  });
 });

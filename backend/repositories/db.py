@@ -984,6 +984,23 @@ def init_db() -> None:
                 "NOT NULL DEFAULT 0"
             )
 
+        # Migración idempotente V3.28 (Listening Engine 4.0, Fase 2, Bloque E):
+        # señales auxiliares de Shadowing 2.0. `shadowing_duration_ms` y
+        # `shadowing_speech_rate` son informativas y opcionales: las calcula el
+        # cliente de forma determinista desde el audio grabado (proxy honesto,
+        # sin peso de mastery — el scoring sigue siendo la comparación del texto
+        # oído). Nullables con default; los intentos legacy no las declaran.
+        if "shadowing_duration_ms" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN "
+                "shadowing_duration_ms INTEGER"
+            )
+        if "shadowing_speech_rate" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN "
+                "shadowing_speech_rate REAL"
+            )
+
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "
             "ON messages(conversation_id, message_id)"

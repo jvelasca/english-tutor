@@ -6,6 +6,7 @@ import type {
 } from "../../types/api";
 import {
   advanceToNext,
+  activeSentenceIndex,
   completeShadowing,
   completeStageWithAnswer,
   currentStep,
@@ -15,7 +16,10 @@ import {
   isAnswering,
   isProductionFlow,
   revealFull,
+  revealSentenceIndexes,
   retryStage,
+  timingsOf,
+  type SentenceTiming,
 } from "./microFlow";
 
 const A1_POLICY: ListeningTranscriptPolicy = {
@@ -229,5 +233,140 @@ describe("microFlow: revelado manual y shadowing", () => {
     expect(currentStep(state, receptiveFlow)?.stage).toBe("pre");
     const end = { ...state, finished: true, stepIndex: 5 };
     expect(currentStep(end, receptiveFlow)).toBeNull();
+  });
+});
+
+describe("microFlow: sync grueso del transcript (Bloque D)", () => {
+  const TIMINGS: SentenceTiming[] = [
+    { index: 0, start: 0, end: 2, text: "First sentence.", sync: "coarse_heuristic" },
+    { index: 1, start: 2, end: 4, text: "Second sentence.", sync: "coarse_heuristic" },
+    { index: 2, start: 4, end: 6, text: "Third sentence.", sync: "coarse_heuristic" },
+  ];
+
+  it("activeSentenceIndex: frase activa según currentTime", () => {
+    expect(activeSentenceIndex(TIMINGS, 0)).toBe(0);
+    expect(activeSentenceIndex(TIMINGS, 1.2)).toBe(0);
+    expect(activeSentenceIndex(TIMINGS, 2)).toBe(1);
+    expect(activeSentenceIndex(TIMINGS, 3.5)).toBe(1);
+    expect(activeSentenceIndex(TIMINGS, 5.9)).toBe(2);
+    // Tras el final del audio se mantiene la última frase (reveal estable).
+    expect(activeSentenceIndex(TIMINGS, 6)).toBe(2);
+    expect(activeSentenceIndex(TIMINGS, 20)).toBe(2);
+  });
+
+  it("activeSentenceIndex: antes del primer start no hay frase activa", () => {
+    expect(activeSentenceIndex(TIMINGS, -1)).toBe(-1);
+    // Timings vacíos → sin frase activa (nunca rompe).
+    expect(activeSentenceIndex([], 3)).toBe(-1);
+    // Tiempo no numérico → se trata como 0 (primera frase, comienzo del audio).
+    expect(activeSentenceIndex(TIMINGS, Number.NaN)).toBe(0);
+  });
+
+  it("revealSentenceIndexes: hidden → nada, full → todo, partial → frase activa", () => {
+    expect(revealSentenceIndexes("hidden", TIMINGS, 1)).toEqual([]);
+    expect(revealSentenceIndexes("full", TIMINGS, 1)).toEqual([0, 1, 2]);
+    expect(revealSentenceIndexes("partial", TIMINGS, 1)).toEqual([1]);
+    // Partial sin frase activa (aún no suena nada) no muestra transcripción.
+    expect(revealSentenceIndexes("partial", TIMINGS, -1)).toEqual([]);
+  });
+
+  it("revealSentenceIndexes: partial aislada en timings con repetición (twice)", () => {
+    const twice: SentenceTiming[] = [
+      { index: 0, start: 0, end: 1.5, text: "Go.", sync: "coarse_heuristic" },
+      { index: 1, start: 1.5, end: 3, text: "Where?", sync: "coarse_heuristic" },
+      { index: 2, start: 3, end: 4.5, text: "Go.", sync: "coarse_heuristic" },
+      { index: 3, start: 4.5, end: 6, text: "Where?", sync: "coarse_heuristic" },
+    ];
+    // Mientras suena la primera pasada de "Go." (t=0.8) la frase activa es la 0.
+    expect(activeSentenceIndex(twice, 0.8)).toBe(0);
+    expect(revealSentenceIndexes("partial", twice, 0)).toEqual([0]);
+    // En la segunda pasada (t=4) la frase activa es la copia index 2.
+    expect(activeSentenceIndex(twice, 4.2)).toBe(2);
+    expect(revealSentenceIndexes("partial", twice, 2)).toEqual([2]);
+  });
+
+  it("timingsOf: expone los timings servidos por el backend (o lista vacía)", () => {
+    expect(timingsOf(question({ flow: receptiveFlow }))).toEqual([]);
+    expect(timingsOf(question({ flow: receptiveFlow, sentenceTimings: TIMINGS }))).toHaveLength(3);
+  });
+});
+
+describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
+  // Flujo receptivo completo cuyo while2 es un cloze auditivo o segmentación
+  // derivada (V3.28, Bloque C): se ejecutan igual que la pregunta nativa.
+  function derivedMcqFlow(task: "cloze" | "segmentation"): ListeningFlowStep[] {
+    return [
+      { stage: "pre", task: "activate", transcript_state_inicial: "hidden", allow_skip: true, requires_audio: false },
+      { stage: "while1", task: "listen_global", transcript_state_inicial: "hidden", allow_skip: true, requires_audio: true },
+      { stage: "while2", task, transcript_state_inicial: "hidden", allow_skip: false, requires_audio: true },
+      { stage: "post", task: "review", transcript_state_inicial: "partial", allow_skip: false, requires_audio: true },
+      { stage: "shadowing", task: "shadowing", transcript_state_inicial: "full", allow_skip: true, requires_audio: true },
+    ];
+  }
+
+  it("cloze y segmentación no se confunden con producción", () => {
+    for (const task of ["cloze", "segmentation"] as const) {
+      const q = question({ flow: derivedMcqFlow(task) });
+      expect(isProductionFlow(q)).toBe(false);
+      expect(hasFlow(q)).toBe(true);
+    }
+  });
+
+  it("cloze: respuesta correcta avanza a post (review con partial)", () => {
+    let state = initialFlow(question({ flow: derivedMcqFlow("cloze") }));
+    state = advanceToNext(state, derivedMcqFlow("cloze")); // pre
+    state = advanceToNext(state, derivedMcqFlow("cloze")); // while1
+    expect(state.stage).toBe("while2");
+    const next = completeStageWithAnswer(
+      state,
+      true,
+      A1_POLICY,
+      derivedMcqFlow("cloze"),
+    );
+    expect(next.stage).toBe("post");
+    expect(next.transcript).toBe("partial"); // revisión con transcript parcial
+    expect(next.attemptCount).toBe(0);
+  });
+
+  it("segmentación: fallo sin reintentos en B2 cierra y revela en post", () => {
+    let state = initialFlow(question({ flow: derivedMcqFlow("segmentation") }));
+    state = advanceToNext(state, derivedMcqFlow("segmentation"));
+    state = advanceToNext(state, derivedMcqFlow("segmentation"));
+    const next = completeStageWithAnswer(
+      state,
+      false,
+      B2_POLICY,
+      derivedMcqFlow("segmentation"),
+    );
+    expect(next.stage).toBe("post");
+    expect(next.revealed).toBe(true);
+    expect(next.transcript).toBe("full");
+  });
+
+  it("dictado parcial derivado se sirve como tarea directa de producción", () => {
+    const partialDictationFlow: ListeningFlowStep[] = [
+      { stage: "while2", task: "production", transcript_state_inicial: "hidden", allow_skip: false, requires_audio: true },
+    ];
+    const q = question({ flow: partialDictationFlow });
+    expect(isProductionFlow(q)).toBe(true);
+    expect(initialFlow(q).stage).toBe("while2");
+    // Al igual que un dictado: al completar la tarea de producción finaliza.
+    const done = advanceToNext(initialFlow(q), partialDictationFlow);
+    expect(done.finished).toBe(true);
+  });
+
+  it("reintento con apoyo tras fallo en cloze (política A1 on_first_fail)", () => {
+    let state = initialFlow(question({ flow: derivedMcqFlow("cloze") }));
+    state = advanceToNext(state, derivedMcqFlow("cloze"));
+    state = advanceToNext(state, derivedMcqFlow("cloze"));
+    const retry = completeStageWithAnswer(
+      state,
+      false,
+      A1_POLICY,
+      derivedMcqFlow("cloze"),
+    );
+    expect(retry.stage).toBe("while2");
+    expect(retry.attemptCount).toBe(1);
+    expect(retry.transcript).toBe("full"); // apoyo visible en el reintento
   });
 });

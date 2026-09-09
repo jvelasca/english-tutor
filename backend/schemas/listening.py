@@ -57,6 +57,19 @@ class ListeningQuestion(BaseModel):
     # Vacíos para consumidores antiguos que no piden el micro-flujo.
     flow: list[dict] = Field(default_factory=list)
     transcript_policy: dict = Field(default_factory=dict)
+    # Timings gruesos de frase (V3.28, Bloque D): lista
+    # [{index, start, end, text, sync: "coarse_heuristic"}]. Heurísticos (reparto
+    # proporcional de `duration` por peso textual de cada frase), NUNCA alineación
+    # acústica; presentes solo cuando el ítem tiene micro-flow y declara `duration`.
+    sentence_timings: list[dict] = Field(default_factory=list)
+    # ítem derivado bottom-up (V3.28, Bloque C): `derived` marca que el contenido
+    # se derivó determinísticamente del corpus (no entra en el gate); `derived_from`
+    # es el id del ítem padre cuyo audio reutiliza; `task_type` identifica la tarea
+    # derivada (cloze/partial_dictation/segmentation). Opcionales y retrocompatibles:
+    # los ítems del banco no los declaran.
+    derived: bool = False
+    derived_from: str = ""
+    task_type: str = ""
 
 
 class ListeningAnswerRequest(BaseModel):
@@ -93,6 +106,12 @@ class ListeningProductionRequest(BaseModel):
     stage: str = ""
     transcript_used: str = ""
     speed_used: str = "normal"
+    # Señales auxiliares del Shadowing 2.0 (V3.28, Bloque E): informativas,
+    # opcionales y calculadas por el cliente desde el audio grabado. Se persisten
+    # en el intento pero SIN peso de mastery (el scoring determinista del
+    # shadowing sigue siendo la comparación del texto oído con la referencia).
+    shadowing_duration_ms: int | None = None
+    shadowing_speech_rate: float | None = None
 
 
 class ListeningProductionResult(BaseModel):

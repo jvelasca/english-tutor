@@ -1,9 +1,13 @@
 # LISTENING ENGINE 4.0 — Arquitectura pedagógica completa A1→C2
 
-> Documento de diseño (especificación pedagógica). Versión 1.0 — propuesta.
-> Base de partida: **freeze arquitectónico V3.26.0** (`backend/config.py` → `VERSION = "3.26.0"`, HEAD `02e195d`, rama `main`).
-> Fecha: 2026-09-09.
-> Estado: pendiente de aprobación. Mientras no se apruebe, **no se escribe código**: este documento es el paso previo al plan técnico V3.27.
+> Documento de diseño (especificación pedagógica). Versión 1.1 — implementada
+> (Fases 1 y 2). Base de partida: **freeze arquitectónico V3.26.0**
+> (`backend/config.py` → `VERSION = "3.26.0"`). Fecha: 2026-09-09.
+> Estado: **aprobada e implementada** — **Fase 1 cerrada en V3.27.0**
+> (`docs/PLAN-V327-LISTENING-ENGINE-4.md`) y **Fase 2 cerrada en V3.28.0**
+> (Bloques A–F del plan V3.28, `v3.28_listening_engine_fase_2_…plan.md`).
+> La Fase 3 (karaoke palabra a palabra / `word_alignment_proxy`) queda como
+> propuesta para V3.29+.
 
 ---
 
@@ -512,15 +516,23 @@ Siguiendo la recomendación de congelar la arquitectura V3.26, **no** se hará a
 
 ## 14. Hoja de ruta propuesta (tras la aprobación de esta especificación)
 
-Fases técnicas sugeridas (sin fechas), cada una con su propio plan detallado y release notes:
+Fases técnicas (sin fechas), cada una con su propio plan detallado y release notes:
 
-| Fase | Contenido | Release sugerida |
-|---|---|---|
-| Fase 1 | Micro-flujo por ítem (estados Pre/While/Post + transcript policy) + evidencia ampliada (campos aditivos de §8.2) + perfil auditivo e intervención (§5) | V3.27 |
-| Fase 2 | AudioController en frontend + playback de la grabación en shadowing + cloze auditivo (`task_type=cloze`) + connected speech notice→…→transfer sobre ítems existentes | V3.27/V3.28 |
-| Fase 3 | Sincronización por palabra (`word_alignment_proxy` offline) + karaoke + salto a la palabra fallada | V3.28 |
-| Fase 4 | Contenido: multi-voz Piper por ítem (§3.5), re-etiquetado recognition, primeras grabaciones humanas vía biblioteca | Continua / paralela |
-| Fuera de alcance | Lección orquestada multi-ítem (Pre/While/Post sobre pasaje largo), evaluación acústica real de pronunciación, SRS completo de audios | V3.28+ (evaluar tras F1-F3) |
+| Fase | Contenido | Release | Estado |
+|---|---|---|---|
+| Fase 1 | Micro-flujo por ítem (estados Pre/While/Post + transcript policy) + evidencia ampliada (campos aditivos de §8.2) + perfil auditivo e intervención (§5) | V3.27 | ✅ **implementada** (v3.27.0) |
+| Fase 2 | AudioController en frontend + playback de la grabación en shadowing + bottom-up derivado (cloze auditivo / dictado parcial / segmentación) + transcript dinámico con sync grueso de frase + micro-flujo unificado en rutas por nivel y drill + E2E adaptativos | V3.28 | ✅ **implementada — Fase 2 cerrada** (v3.28.0) |
+| Fase 3 | Sincronización por palabra (`word_alignment_proxy` offline) + karaoke + salto a la palabra fallada | V3.29+ | ⏳ pendiente |
+| Fase 4 | Contenido: multi-voz Piper por ítem (§3.5), re-etiquetado recognition, primeras grabaciones humanas vía biblioteca | Continua / paralela | ⏳ continua |
+| Fuera de alcance | Lección orquestada multi-ítem (Pre/While/Post sobre pasaje largo), evaluación acústica real de pronunciación, SRS completo de audios | V3.29+ (evaluar tras F2) | ⏳ |
+
+> Estado a 2026-09-09 (release v3.28.0): la Fase 2 se ejecutó con los Bloques
+> A–F del plan V3.28 — unificación del micro-flujo (P1-01), AudioController 4.0,
+> tareas bottom-up **derivadas determinísticamente del corpus** (regla «si no hay
+> candidato fiable no se emite»; nunca entran en la certificación), sync grueso
+> etiquetado `coarse_heuristic` (no alineación acústica, que es la Fase 3),
+> Shadowing 2.0 con playback y señales auxiliares no bloqueantes, y E2E
+> adaptativos + negativos del contrato pedagógico.
 
 Cada fase respeta el freeze de arquitectura (§13).
 

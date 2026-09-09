@@ -6,6 +6,18 @@ import type {
   ListeningTranscriptState,
 } from "../../types/api";
 
+// Timings gruesos de frase (V3.28, Bloque D): el backend reparte `duration` por
+// peso textual de cada frase (`sync: "coarse_heuristic"`). NO es alineación
+// acústica: la UI lo trata como referencia aproximada para resaltar la frase
+// activa mientras suena el audio, nunca como karaoke palabra a palabra (Fase 3).
+export interface SentenceTiming {
+  index: number;
+  start: number;
+  end: number;
+  text: string;
+  sync: string;
+}
+
 /**
  * Máquina de estados del micro-flujo por ítem (V3.27, Listening Engine 4.0).
  *
@@ -182,4 +194,57 @@ export function retryStage(state: MicroFlowState): MicroFlowState {
 /** True mientras el alumno está contestando la pregunta (etapa with2). */
 export function isAnswering(state: MicroFlowState): boolean {
   return state.stage === "while2" && !state.finished;
+}
+
+// ---------------------------------------------------------------------------
+// Sync grueso del transcript (V3.28, Bloque D): helpers puros de resaltado.
+// ---------------------------------------------------------------------------
+
+/** Timings de frase del ítem servidos por el backend (vacío si no hay flow o
+ * el ítem no declara `duration`). */
+export function timingsOf(question: ListeningQuestion): SentenceTiming[] {
+  return question.sentenceTimings ?? [];
+}
+
+/** Índice de la frase activa según `currentTime` del elemento de audio.
+
+ * Regla monótona: la frase activa es la última cuyo `start` ya se alcanzó (si el
+ * audio terminó se mantiene la última frase; si aún no empezó ninguna, -1). Los
+ * timings son heurísticos y no solapan entre sí, así que basta recorrerlos en
+ * orden y cortar en cuanto el tiempo no alcanza el siguiente `start`.
+ */
+export function activeSentenceIndex(
+  timings: SentenceTiming[],
+  currentTime: number,
+): number {
+  if (timings.length === 0) return -1;
+  const time = Number.isFinite(currentTime) ? currentTime : 0;
+  let active = -1;
+  for (const segment of timings) {
+    if (time < segment.start) break;
+    active = segment.index;
+    if (time < segment.end) break;
+  }
+  return active;
+}
+
+/** Frases visibles según el estado de revelado (`transcript_state_inicial`).
+
+ * - `full` → todas las frases (revelado completo).
+ * - `partial` → solo la frase activa (la transcripción parcial muestra el
+ *   segmento/frase permitido en cada etapa, no el texto entero).
+ * - `hidden` → ninguna.
+ * Devuelve índices de `timings` (que con `repetition_policy=twice` pueden
+ * repetir texto); vacío ⇒ la UI no muestra transcripción.
+ */
+export function revealSentenceIndexes(
+  state: TranscriptState,
+  timings: SentenceTiming[],
+  activeIndex: number,
+): number[] {
+  if (state === "full") return timings.map((segment) => segment.index);
+  if (state === "partial" && activeIndex >= 0) {
+    return [activeIndex];
+  }
+  return [];
 }

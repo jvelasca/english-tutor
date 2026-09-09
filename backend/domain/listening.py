@@ -15,12 +15,15 @@ from services.auditory_profile import auditory_profile
 from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
     AUDIO_VARIANTS,
+    DERIVED_BY_ID,
+    DERIVED_RECOGNITION_POOL,
     GENERATED_ID_PREFIX,
     LEVEL_ORDER,
     PRODUCTION_PASS_SCORE,
     audio_digest,
     audio_text,
     audio_variants,
+    coarse_sentence_timings,
     difficulty_from_vector,
     get_question,
     level_status,
@@ -41,6 +44,7 @@ from services.listening import (
 from services.listening import (
     level_items as motor_level_items,
 )
+from services.listening_bottom_up import DERIVED_ID_PREFIX
 from services.listening_flow import flow_for_question
 
 
@@ -86,14 +90,17 @@ async def _extra_questions(user_id: str, level: str) -> list[dict]:
 
 
 async def _resolve_question(question_id: str) -> dict | None:
-    """Resuelve un ítem del banco curado o, si es de práctica extra (id `g-`),
-    del catálogo global de ítems generados."""
+    """Resuelve un ítem del banco curado, de práctica extra (id `g-`) o derivado
+    bottom-up (id `d-`, V3.28). Los derivados se recomputan desde el catálogo
+    determinista (mismo payload siempre para el mismo id)."""
     question = get_question(question_id)
     if question is not None:
         return question
     if question_id.startswith(GENERATED_ID_PREFIX):
         row = await run_in_threadpool(listening_repo.get_generated, question_id)
         return _generated_payload(row)
+    if question_id.startswith(DERIVED_ID_PREFIX):
+        return DERIVED_BY_ID.get(question_id)
     return None
 
 
@@ -111,7 +118,11 @@ def _audio_cache_dir(voice: str) -> Path:
 
 def _audio_path(question: dict, variant: str, voice: str) -> Path:
     digest = audio_digest(question, variant)
-    return _audio_cache_dir(voice) / f"{question['id']}-{digest}.wav"
+    # Los ítems derivados bottom-up (V3.28) reutilizan el audio del ítem padre:
+    # el WAV se cachea bajo el id del padre (`derived_from`) para no duplicar
+    # ficheros con el mismo contenido audible.
+    cache_id = question.get("derived_from") or question["id"]
+    return _audio_cache_dir(voice) / f"{cache_id}-{digest}.wav"
 
 
 def audio_ready(question: dict) -> bool:
@@ -128,8 +139,17 @@ def audio_ready(question: dict) -> bool:
 
 
 def _public(question: dict) -> dict:
-    """Quita la respuesta (answer_index) y expone dificultad derivada + realización."""
-    out = {k: v for k, v in question.items() if k != "answer_index"}
+    """Quita la respuesta (answer_index/partial_reference) y expone dificultad
+    derivada + realización.
+
+    `partial_reference` es la solución de un dictado parcial derivado (V3.28): no
+    debe viajar en el payload público igual que no viaja `answer_index`.
+    """
+    out = {
+        k: v
+        for k, v in question.items()
+        if k not in ("answer_index", "partial_reference")
+    }
     out["difficulty"] = difficulty_from_vector(question.get("difficulty_vector", {}))
     out["realized_difficulty"] = realized_difficulty(question)
     out["realization"] = realization_status(question)
@@ -143,6 +163,23 @@ def _public(question: dict) -> dict:
     out["audio_ready"] = audio_ready(question)
     out["variants"] = audio_variants(question)
     out["default_variant"] = "normal"
+    return out
+
+
+def _public_with_flow(question: dict, attempts: list[dict] | None) -> dict:
+    """Payload público de un ítem + micro-flujo (V3.28, unificación del flow).
+
+    Adjunta `flow` y `transcript_policy` calculados por el backend a partir del
+    perfil auditivo del alumno (igual que la rama adaptativa). Con `attempts=None`
+    (sin evidencia) se calcula igualmente el flow con política por nivel/capa, sin
+    overrides de perfil.
+    """
+    perfil = (
+        auditory_profile(listening_diagnostic(attempts or [])) if attempts else None
+    )
+    out = _public(question)
+    out.update(flow_for_question(question, perfil))
+    out["sentence_timings"] = coarse_sentence_timings(question)
     return out
 
 
@@ -161,38 +198,56 @@ async def next_question(
     restringe la rotación a las frases intentadas pero nunca acertadas; `mode=
     "mastered"` (repasar lo aprendido) a las acertadas alguna vez. Si no quedan,
     `review_next_question` lanza `ValueError`.
+
+    Micro-flujo (V3.27/V3.28): las rutas adaptativa, por nivel (`level`) y drill
+    (`failed`) sirven el flow pre/while1/while2/post/shadowing + `transcript_policy`
+    en el payload; solo el repaso `mastered` conserva el modo compacto sin flow
+    (P1-01 de la auditoría V3.27, resuelto en V3.28).
     """
     if level is not None:
         attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
         extra = await _extra_questions(user_id, level)
-        return _public(
-            review_next_question(
-                level,
-                attempts,
-                only_failed=mode == "failed",
-                only_mastered=mode == "mastered",
-                extra_questions=extra,
-            )
+        question = review_next_question(
+            level,
+            attempts,
+            only_failed=mode == "failed",
+            only_mastered=mode == "mastered",
+            extra_questions=extra,
         )
+        if mode == "mastered":
+            # Repaso de lo ya superado: modo compacto sin micro-flujo.
+            return _public(question)
+        return _public_with_flow(question, attempts)
     seen = await run_in_threadpool(listening_repo.seen_question_ids, user_id)
     correct = await run_in_threadpool(listening_repo.correct_question_ids, user_id)
     attempts = await run_in_threadpool(listening_repo.list_attempts, user_id)
     diagnostic = listening_diagnostic(attempts)
     weak = diagnostic["weak"]
     profile = auditory_profile(diagnostic)
+    # Bottom-up (V3.28): con perfil Caso A (recognition débil) el selector puede
+    # servir ítems derivados (cloze/segmentación) del nivel de trabajo como
+    # volumen extra de decodificación. Nunca entran en la puerta/certificación.
+    bottom_up = (
+        DERIVED_RECOGNITION_POOL
+        if profile.get("layer") == "recognition"
+        else None
+    )
     question = pick_next_question(
         seen,
         correct,
         weak_subskills=weak,
         layer=profile.get("layer"),
+        bottom_up_questions=bottom_up,
     )
     out = _public(question)
     # Micro-flujo por ítem (V3.27): política y pasos viajan en el payload; el
     # frontend solo los ejecuta. En el modo adaptativo ("all") el perfil auditivo
     # puede hacer el shadowing obligatorio (overrides dentro de flow_for_question).
     out.update(flow_for_question(question, profile))
+    # Sync grueso del transcript (V3.28, Bloque D): timings heurísticos de frase
+    # para el resaltado coarse; vacío si el ítem no declara `duration`.
+    out["sentence_timings"] = coarse_sentence_timings(question)
     return out
-
 
 async def level_items(user_id: str, level: str) -> dict:
     """Estado por frase del pool de una ruta (panel del alumno) + resumen.
@@ -244,6 +299,9 @@ async def submit_answer(
     correct = score_answer(answer_index, question["answer_index"])
     difficulty = difficulty_from_vector(question.get("difficulty_vector", {}))
     realized = realized_difficulty(question)
+    # V3.28 (Bloque C): los ítems derivados persisten su `task_type`
+    # (cloze/segmentation); el resto conserva el default `mcq`.
+    task_type = question.get("task_type", "mcq")
     await run_in_threadpool(
         listening_repo.record_attempt,
         user_id,
@@ -256,6 +314,7 @@ async def submit_answer(
         replay_count,
         question.get("topic", ""),
         realized,
+        task_type=task_type,
         layer=skill_layer(question.get("skill", "")) or "",
         speed_used=speed_used,
         stage=stage,
@@ -281,6 +340,8 @@ async def submit_production(
     stage: str = "",
     transcript_used: str = "",
     speed_used: str = "normal",
+    shadowing_duration_ms: int | None = None,
+    shadowing_speech_rate: float | None = None,
 ) -> dict | None:
     """Evalúa y persiste una tarea de producción (dictado/shadowing), sin LLM.
 
@@ -290,8 +351,17 @@ async def submit_production(
     `task_type` (el router lo traduce a 404). En producción la capa cognitiva no
     aplica (`layer=""`): los ítems dictation/shadowing no pertenecen a la taxonomía
     receptiva.
+
+    Desde V3.28 (Bloque C) la pregunta puede ser también un dictado parcial
+    derivado (`d-`, `task_type=partial_dictation` con skill `dictation`): se
+    resuelve igual que el banco y puntúa contra `partial_reference`.
+
+    Desde V3.28 (Bloque E) `shadowing_duration_ms`/`shadowing_speech_rate` son
+    señales auxiliares informativas que el cliente calcula desde el audio grabado
+    (duración y velocidad proxy). Solo se persisten en intentos `shadowing` y sin
+    peso de mastery: el scoring determinista sigue siendo el texto oído.
     """
-    question = get_question(question_id)
+    question = await _resolve_question(question_id)
     if question is None:
         return None
     if question.get("skill") != task_type:
@@ -319,6 +389,12 @@ async def submit_production(
         stage=stage,
         transcript_used=transcript_used,
         speed_used=speed_used,
+        shadowing_duration_ms=(
+            shadowing_duration_ms if task_type == "shadowing" else None
+        ),
+        shadowing_speech_rate=(
+            shadowing_speech_rate if task_type == "shadowing" else None
+        ),
     )
     return {
         "question_id": question_id,

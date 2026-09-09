@@ -157,6 +157,8 @@ async def shadowing(
         body.stage,
         body.transcript_used,
         body.speed_used,
+        shadowing_duration_ms=body.shadowing_duration_ms,
+        shadowing_speech_rate=body.shadowing_speech_rate,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")

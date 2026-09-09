@@ -1953,6 +1953,34 @@ const STRINGS: Record<string, Entry> = {
     en: "Skip",
     es: "Saltar",
   },
+  "listening.flow.recordShadowing": {
+    en: "Record yourself",
+    es: "Grábate",
+  },
+  "listening.flow.playRecording": {
+    en: "Play my recording",
+    es: "Escuchar mi grabación",
+  },
+  "listening.flow.shadowingSignals": {
+    en: "Recording {duration} ms · ≈{wpm} wpm (informative, not scored)",
+    es: "Grabación {duration} ms · ≈{wpm} ppm (informativo, no puntúa)",
+  },
+  "listening.coarseTranscript.title": {
+    en: "Transcript",
+    es: "Transcripción",
+  },
+  "listening.coarseTranscript.partialTitle": {
+    en: "Transcript (partial)",
+    es: "Transcripción (parcial)",
+  },
+  "listening.coarseTranscript.syncTag": {
+    en: "Approximate sync",
+    es: "Sync aproximado",
+  },
+  "listening.coarseTranscript.syncHint": {
+    en: "Phrase highlighting follows the audio. Timings are approximate, not a word-by-word alignment.",
+    es: "El resaltado de la frase sigue el audio. Los tiempos son aproximados, no una alineación palabra a palabra.",
+  },
   "listening.layer.recognition": {
     en: "Recognition",
     es: "Reconocimiento",

@@ -37,11 +37,28 @@ export interface AudioCapabilities {
 
 export class MicUnavailableError extends Error {
   readonly reason: MicUnavailableReason;
-
   constructor(reason: MicUnavailableReason) {
     super(`Microphone unavailable: ${reason}`);
     this.name = "MicUnavailableError";
     this.reason = reason;
+  }
+}
+
+/**
+ * Disponibilidad de reproducción a velocidad variable preservando el tono
+ * (`playbackRate` + `preservesPitch`, V3.28 AudioController 4.0).
+ *
+ * El navegador estándar expone `preservesPitch` en `HTMLMediaElement`; Safari
+ * solo lo soporta en versiones recientes (antes usaba `webkitPreservesPitch`).
+ * En entornos sin DOM (SSR/tests Node) devuelve `false` sin lanzar.
+ */
+export function supportsPitchPreservedRate(): boolean {
+  if (typeof Audio === "undefined") return false;
+  try {
+    const probe = new Audio();
+    return "preservesPitch" in probe;
+  } catch {
+    return false;
   }
 }
 

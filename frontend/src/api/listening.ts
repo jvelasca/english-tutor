@@ -95,6 +95,7 @@ function submitProduction(
   questionId: string,
   transcript: string,
   opts: ListeningSupportMetadata = {},
+  aux: ListeningShadowingAux = {},
 ): Promise<ListeningProductionResult> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
@@ -106,6 +107,15 @@ function submitProduction(
         ? { transcript_used: opts.transcriptUsed }
         : {}),
       ...(opts.speedUsed !== undefined ? { speed_used: opts.speedUsed } : {}),
+      // Señales auxiliares del Shadowing 2.0 (V3.28, Bloque E): informativas,
+      // calculadas por el cliente desde el audio grabado; solo viajan cuando el
+      // llamador las aporta (dictation nunca las envía).
+      ...(aux.durationMs !== undefined
+        ? { shadowing_duration_ms: aux.durationMs }
+        : {}),
+      ...(aux.speechRate !== undefined
+        ? { shadowing_speech_rate: aux.speechRate }
+        : {}),
     }),
     TIMEOUT_SUBMIT_MS,
     "submit production",
@@ -132,6 +142,7 @@ export function submitListeningShadowing(
   questionId: string,
   transcript: string,
   opts: ListeningSupportMetadata = {},
+  aux: ListeningShadowingAux = {},
 ): Promise<ListeningProductionResult> {
   return submitProduction(
     "/api/listening/shadowing",
@@ -139,7 +150,18 @@ export function submitListeningShadowing(
     questionId,
     transcript,
     opts,
+    aux,
   );
+}
+
+// Señales auxiliares del Shadowing 2.0 (V3.28, Bloque E): informativas y
+// opcionales. El cliente las calcula de forma determinista desde el audio
+// grabado (duración real de la grabación y velocidad proxy de habla en wpm).
+// Nunca tienen peso de mastery: el backend las persiste solo en intentos de
+// shadowing y el scoring sigue siendo la comparación del texto oído.
+export interface ListeningShadowingAux {
+  durationMs?: number;
+  speechRate?: number;
 }
 
 export function getListeningDiagnostic(

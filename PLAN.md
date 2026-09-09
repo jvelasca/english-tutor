@@ -8,6 +8,47 @@
 
 ## Estado actual
 
+- ✅ **V3.28 — Listening Engine 4.0 Fase 2 (2026-09-09)**: cerrado e
+  implementado sobre v3.27.0 (**Versión estable `3.28.0`**, app `3.27.0 →
+  3.28.0`) con el plan
+  `v3.28_listening_engine_fase_2_…plan.md` y los Bloques A-F de la Fase 2 de
+  `docs/LISTENING_ENGINE_4.0.md` (§14, **Fase 2 cerrada**; el diccionario de
+  consulta se reprioriza a V3.29, candidato). **Bloque A — micro-flujo
+  unificado (P1-01)**: `next_question` sirve `flow`/`transcript_policy` también
+  en rutas por nivel (`level=X`) y drill (`mode=failed`) vía el helper
+  `_public_with_flow`; solo `mastered` conserva el modo compacto sin flow
+  (contrato E2E-04) · **Bloque B — AudioController 4.0**:
+  `features/listening/audioController.ts` (clase pura sobre
+  `HTMLAudioElement`: `play/pause/seek/setRate` con `preservesPitch` y selección
+  de la variante de URL más cercana, `loopSegment`, `replayCurrent`,
+  `markSegment`, suscripción de `currentTime`/`ended`/`ratechange`) + hook
+  `useAudioController` consumido por `ListeningPractice.tsx` (while1/while2/
+  replay ya no crean `new Audio()` sueltos) · **Bloque C — Bottom-up derivado
+  (P1-02/P1-03 parcial)**: `services/listening_bottom_up.py` deriva ítems
+  deterministas del corpus existente (`cloze` auditivo MCQ con banco de
+  distractores por nivel, `partial_dictation` de producción con scoring por
+  tokens, `segmentation` de pares contraídos solo donde el corpus los realiza;
+  regla «si no hay candidato fiable no se emite»); los derivados (`derived=True`)
+  se sirven en práctica adaptativa/por nivel con perfil Caso A pero se filtran
+  siempre del pool de ruta y la certificación · **Bloque D — transcript
+  dinámico con sync grueso**: timings de frase heurísticos y proporcionales a
+  `clean_transcript`/`duration` (etiquetados `coarse_heuristic`, nunca
+  alineación acústica) en el payload; frontend con `CoarseTranscript`
+  (hidden/partial/full + resaltado de la frase activa por `currentTime` del
+  AudioController) · **Bloque E — Shadowing 2.0**: playback real de la grabación
+  del alumno en el paso shadowing (`RecordingPlayButton` reutilizado) y señales
+  auxiliares no bloqueantes (`shadowing_duration_ms`, `shadowing_speech_rate`)
+  calculadas en cliente y persistidas con migración aditiva idempotente —sin
+  peso de mastery ni gate— · **Bloque F — E2E adaptativos y negativos**:
+  `test_listening_e2e_v328.py` recorre el ciclo completo con `TestClient`
+  (E2E-01 Caso A recognition→bottom_up con flow de 5 etapas · E2E-02 Caso D
+  connected speech que obliga al shadowing en B2 · E2E-03 Caso C top-down ·
+  E2E-04 `mastered` compacto) + negativos del contrato pedagógico (derivado
+  nunca certifica, `transcript_used` fiable, B2 sin reveal manual pre-Post).
+  Tests: pytest **1683** (backend + launcher), ruff limpio, vitest **505** (61
+  archivos), `tsc --noEmit` limpio y `check_release_consistency` **3.28.0**
+  exit 0. Pendiente: dossier de auditoría del candidato v3.28.0 (letra P) y
+  Fase 3 del engine (karaoke palabra a palabra) en V3.29.
 - ✅ **V3.27 — Listening Engine 4.0 Fase 1 (2026-09-09)**: cerrado e
   implementado sobre v3.26.0 (**Versión estable `3.27.0`**, app `3.26.0 →
   3.27.0`) con el plan
@@ -859,7 +900,13 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **V3.28 (candidato) — Diccionario de consulta con marcas de uso y aprendizaje.**
+- ✅ **V3.28 — Listening Engine 4.0 Fase 2** **cerrado (2026-09-09,
+  v3.28.0)**: implementado (ver "Estado actual" arriba,
+  `release-notes-v3.28.0.md`). Fase 2 de la especificación
+  `docs/LISTENING_ENGINE_4.0.md` cerrada. El diccionario de consulta se
+  reprioriza a V3.29 (siguiente candidato).
+
+- **V3.29 (candidato) — Diccionario de consulta con marcas de uso y aprendizaje.**
   Idea registrada tras V3.27: además de los checks por rutas y del diccionario
   personal actual, ofrecer un **diccionario de consulta** (definición/traducción
   a demanda por palabra) que **marque las palabras ya usadas en la app** y su

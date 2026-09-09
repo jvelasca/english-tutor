@@ -3,7 +3,36 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-09 09:45 (UTC+2).
+> Actualizado por última vez: 2026-09-09 10:30 (UTC+2).
+>
+> **Nota (2026-09-09, 10:30):** **V3.28 publicada** — release **v3.28.0**
+> (Listening Engine 4.0, **Fase 2**, Bloques A–F) en `main`. Plan
+> `v3.28_listening_engine_fase_2_f74493a3.plan.md`; especificación
+> `docs/LISTENING_ENGINE_4.0.md` con la Fase 2 marcada **cerrada**. Resumen:
+> **Bloque A** micro-flujo unificado — `next_question` sirve `flow`/
+> `transcript_policy` también en `level=X` y `mode=failed` (helper
+> `_public_with_flow`); `mastered` conserva el modo compacto sin flow (P1-01) ·
+> **Bloque B** AudioController 4.0 (`audioController.ts` + `useAudioController`
+> con play/seek/setRate+preservesPitch/loopSegment/replayCurrent, variante de
+> URL más cercana al rate) integrado en `ListeningPractice.tsx` · **Bloque C**
+> bottom-up derivado del corpus (`services/listening_bottom_up.py`: cloze
+> auditivo, dictado parcial y segmentación; `derived=True`, filtrados siempre de
+> `route_questions`/`level_items` → nunca certifican) · **Bloque D** timings
+> gruesos de frase (`coarse_sentence_timings`, etiqueta `coarse_heuristic`, no
+> alineación acústica) + `CoarseTranscript` en frontend (hidden/partial/full +
+> frase activa por `currentTime`) · **Bloque E** Shadowing 2.0 — playback de la
+> grabación (`RecordingPlayButton`) + señales auxiliares no bloqueantes
+> (`shadowing_duration_ms`, `shadowing_speech_rate`, migración aditiva
+> idempotente, sin peso de mastery/gate) · **Bloque F** E2E adaptativos y
+> negativos (`test_listening_e2e_v328.py`: E2E-01..04 + contrato pedagógico;
+> ampliación de `microFlow.test.ts` con tareas derivadas en el flujo).
+> Verificación íntegra local: pytest **1683 passed** + `ruff check .` limpio;
+> vitest **505 passed** (61 archivos) + `tsc --noEmit` OK;
+> `check_release_consistency` **3.28.0** exit 0. Pendiente: dossier de
+> auditoría del candidato v3.28.0 (letra P, sesión posterior); Fase 3 del
+> engine (karaoke palabra a palabra / `word_alignment_proxy`) para V3.29.
+> **Candidato V3.29 anotado** (sin diseño): diccionario de consulta con marcas
+> de uso/aprendizaje (ver PLAN.md → «Siguiente incremento»).
 >
 > **Nota (2026-09-09, 09:45):** **V3.27 publicada** — release **v3.27.0**
 > (Listening Engine 4.0, Fase 1) en `main`. **Backend = fuente única de la

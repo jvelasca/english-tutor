@@ -5,6 +5,7 @@ import {
   micErrorReason,
   MicUnavailableError,
   queryMicrophonePermission,
+  supportsPitchPreservedRate,
   watchMicrophoneAvailability,
 } from "./browserCapabilities";
 
@@ -228,5 +229,29 @@ describe("watchMicrophoneAvailability", () => {
     clean();
     doc._dispatch("visibilitychange");
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("supportsPitchPreservedRate", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("devuelve false sin API Audio (entorno sin DOM)", () => {
+    expect(supportsPitchPreservedRate()).toBe(false);
+  });
+
+  it("detecta preservesPitch en un elemento con el atributo", () => {
+    function AudioStub() {
+      return { preservesPitch: true };
+    }
+    vi.stubGlobal("Audio", AudioStub);
+    expect(supportsPitchPreservedRate()).toBe(true);
+  });
+
+  it("devuelve false cuando el elemento no expone preservesPitch", () => {
+    function AudioStub() {
+      return {};
+    }
+    vi.stubGlobal("Audio", AudioStub);
+    expect(supportsPitchPreservedRate()).toBe(false);
   });
 });

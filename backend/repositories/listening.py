@@ -27,6 +27,8 @@ def record_attempt(
     stage: str = "",
     transcript_used: str = "",
     segments_replayed: int = 0,
+    shadowing_duration_ms: int | None = None,
+    shadowing_speech_rate: float | None = None,
 ) -> bool:
     """Persiste un intento de listening para un usuario existente.
 
@@ -38,6 +40,10 @@ def record_attempt(
     (V3.27, Listening Engine 4.0) registran el apoyo con el que se respondió para
     medir "precisión con apoyo decreciente"; tienen defaults que preservan el
     comportamiento de los llamadores existentes.
+
+    Los kwargs `shadowing_duration_ms`/`shadowing_speech_rate` (V3.28, Bloque E)
+    son señales auxiliares informativas del Shadowing 2.0, nullables: el cliente
+    las calcula desde el audio grabado y jamás participan en mastery/gate.
     """
     if get_user(user_id) is None:
         return False
@@ -47,8 +53,9 @@ def record_attempt(
             "(user_id, question_id, answer_index, correct, skill, difficulty, "
             "response_time_ms, replay_count, topic, realized_difficulty, "
             "task_type, score, layer, speed_used, stage, transcript_used, "
-            "segments_replayed, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
+            "created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 question_id,
@@ -67,6 +74,8 @@ def record_attempt(
                 stage,
                 transcript_used,
                 segments_replayed,
+                shadowing_duration_ms,
+                shadowing_speech_rate,
                 _now(),
             ),
         )
@@ -80,7 +89,8 @@ def list_attempts(user_id: str) -> list[dict]:
             "SELECT question_id, answer_index, correct, skill, difficulty, "
             "response_time_ms, replay_count, topic, realized_difficulty, "
             "task_type, score, layer, speed_used, stage, transcript_used, "
-            "segments_replayed, created_at "
+            "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
+            "created_at "
             "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
             (user_id,),
         ).fetchall()
