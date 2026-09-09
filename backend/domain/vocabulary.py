@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 
 from starlette.concurrency import run_in_threadpool
 
+import config
 from domain import learning as learning_service
 from repositories import dictionary as dictionary_repo
 from repositories import vocabulary as vocabulary_repo
@@ -511,6 +514,76 @@ _inflight_content: dict[str, asyncio.Future] = {}
 # debería acercarse a este límite.
 _INFLIGHT_WAIT_SECONDS = 60.0
 
+# Endurecimiento V3.31.1 (auditoría V3.31.0, P2), best-effort por proceso como
+# `_inflight_content`:
+# - Negative cache: palabra → marca de tiempo (monotónica) hasta la que NO se
+#   vuelve a llamar al modelo tras un fallo reciente de generación. Evita la
+#   tormenta de reintentos cuando Ollama está caído o devuelve contenido
+#   inválido (cat → retry → cat → retry).
+# - Rate limit de generación: ventanas deslizantes por usuario y global. Solo
+#   el DUEÑO de un vuelo genera, así que cada palabra nueva consume cupo una
+#   vez (los waiters que esperan un vuelo ajeno no generan ni consumen). El
+#   caché evita repeticiones de la misma palabra, no la cardinalidad de
+#   palabras nuevas; esto limita el abuso local (N palabras nuevas seguidas).
+_negative_until: dict[str, float] = {}
+_user_gen_times: dict[str, deque[float]] = defaultdict(deque)
+_global_gen_times: deque[float] = deque()
+
+
+def _clear_generation_state() -> None:
+    """Limpia el estado global de generación del diccionario (tests).
+
+    Vuelos en curso, negative cache y ventanas de rate limit son estado global
+    por proceso; los tests que ejercitan la generación deben limpiarlo entre
+    pruebas para no acoplarse por palabra/usuario."""
+    _inflight_content.clear()
+    _negative_until.clear()
+    _user_gen_times.clear()
+    _global_gen_times.clear()
+
+
+def _negative_cache_hit(word: str) -> bool:
+    """¿La palabra está en negative cache aún vigente?
+
+    Si el plazo ya venció, la entrada se limpia perezosamente (el siguiente
+    lookup podrá reintentar la generación)."""
+    until = _negative_until.get(word)
+    if until is None:
+        return False
+    if time.monotonic() < until:
+        return True
+    _negative_until.pop(word, None)
+    return False
+
+
+def _mark_generation_failed(word: str) -> None:
+    """Marca `word` como no generable durante el TTL de la negative cache."""
+    _negative_until[word] = (
+        time.monotonic() + config.DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS
+    )
+
+
+def _generation_quota_allowed(user_id: str) -> bool:
+    """¿Hay cupo de generación nueva para `user_id` ahora?
+
+    Consume cupo de usuario y global SOLO si ambos tienen hueco (un intento
+    descartado por cupo no carga cupo). Ventanas deslizantes de 60 s, mismo
+    patrón que el rate limiting de `security.py`."""
+    now = time.monotonic()
+    window = 60.0
+    user_queue = _user_gen_times[user_id]
+    while user_queue and now - user_queue[0] > window:
+        user_queue.popleft()
+    if len(user_queue) >= config.DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE:
+        return False
+    while _global_gen_times and now - _global_gen_times[0] > window:
+        _global_gen_times.popleft()
+    if len(_global_gen_times) >= config.DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL:
+        return False
+    user_queue.append(now)
+    _global_gen_times.append(now)
+    return True
+
 
 def _content_is_fresh(entry: dict | None) -> bool:
     """Caché válida: tiene definición y fue generada con la versión actual.
@@ -527,7 +600,9 @@ def _content_is_fresh(entry: dict | None) -> bool:
     )
 
 
-async def _generate_and_persist(word: str, *, model: str | None) -> dict | None:
+async def _generate_and_persist(
+    word: str, *, model: str | None = None, user_id: str | None = None
+) -> dict | None:
     """Genera contenido de diccionario para `word` si la caché no es fresca.
 
     Relee la BD dentro del vuelo (entre el chequeo y la generación otra
@@ -537,18 +612,45 @@ async def _generate_and_persist(word: str, *, model: str | None) -> dict | None:
     de solo lectura, devuelve el contenido en memoria o None sin lanzar: la
     consulta nunca se rompe por el generador (la definición es contenido, no
     evidencia).
+
+    V3.31.1 (auditoría V3.31.0, P2):
+    - negative cache: si la palabra falló hace menos de
+      `DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS`, no se vuelve a llamar al modelo
+      (se degrada a None sin reintento en cascada);
+    - rate limit: una generación NUEVA consume cupo de usuario/global
+      (`_generation_quota_allowed`); sin cupo se degrada, nunca es un error;
+    - tope del dueño: la llamada al modelo se envuelve en
+      `DICTIONARY_GENERATION_TIMEOUT_SECONDS` para que un Ollama colgado no
+      deje el vuelo de la palabra clavado indefinidamente (los waiters ya
+      tenían su tope de 60 s; el dueño ahora también).
     """
     cached = await run_in_threadpool(dictionary_repo.get_entry, word)
     if _content_is_fresh(cached):
         return cached
+    if _negative_cache_hit(word):
+        logger.info("Diccionario: '%s' en negative cache, se degrada", word)
+        return None
+    if not _generation_quota_allowed(user_id or "?"):
+        logger.warning("Diccionario: cupo de generación agotado para '%s'", word)
+        return None
     try:
-        content = await dictionary_content.generate_content(word, model=model)
+        content = await asyncio.wait_for(
+            dictionary_content.generate_content(word, model=model),
+            timeout=config.DICTIONARY_GENERATION_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Diccionario: timeout generando '%s'", word)
+        _mark_generation_failed(word)
+        return None
     except dictionary_content.ContentUnavailableError:
         logger.warning("Diccionario: contenido no disponible para '%s'", word)
+        _mark_generation_failed(word)
         return None
     except Exception:  # noqa: BLE001 — señal no bloqueante, nunca rompe la consulta
         logger.exception("Diccionario: error generando contenido para '%s'", word)
+        _mark_generation_failed(word)
         return None
+    _negative_until.pop(word, None)
     try:
         await run_in_threadpool(
             dictionary_repo.save_entry,
@@ -572,7 +674,9 @@ async def _generate_and_persist(word: str, *, model: str | None) -> dict | None:
     }
 
 
-async def _ensure_cached_content(word: str, *, model: str | None = None) -> dict | None:
+async def _ensure_cached_content(
+    word: str, *, model: str | None = None, user_id: str | None = None
+) -> dict | None:
     """Devuelve contenido (`pos`/`definition`/`translation`) para `word`.
 
     Single-flight (V3.30.1, P1-01): si otra consulta ya está generando la
@@ -588,6 +692,10 @@ async def _ensure_cached_content(word: str, *, model: str | None = None) -> dict
     con None antes de propagar la cancelación. Además los waiters esperan con
     un tope defensivo (`_INFLIGHT_WAIT_SECONDS`): si el ganador colgara por
     cualquier causa, degradan a None en vez de colgarse indefinidamente.
+
+    V3.31.1: `user_id` identifica al DUEÑO del vuelo para el rate limit de
+    generación (los waiters nunca generan ni consumen cupo); con None (uso
+    interno de tests) se imputa al cubo "?".
     """
     fut = _inflight_content.get(word)
     if fut is None:
@@ -595,7 +703,9 @@ async def _ensure_cached_content(word: str, *, model: str | None = None) -> dict
         fut = loop.create_future()
         _inflight_content[word] = fut
         try:
-            result = await _generate_and_persist(word, model=model)
+            result = await _generate_and_persist(
+                word, model=model, user_id=user_id
+            )
             if not fut.done():
                 fut.set_result(result)
         except asyncio.CancelledError:
@@ -638,11 +748,16 @@ async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -
     Sin evidencia nueva: no crea filas en `vocabulary`, no registra eventos ni
     mueve mastery. Lanza `ValueError` si la palabra queda vacía tras normalizar
     (el endpoint lo traduce a 422). `model` usa el mismo contrato que
-    `/api/translate` (preferencia opcional del usuario).
+    `/api/translate` (preferencia opcional del usuario). El contenido cacheado
+    en `dictionary_entries` es GLOBAL y CANÓNICO: `model` solo influye en la
+    generación de contenido nuevo, nunca en qué contenido se sirve (V3.31.1,
+    semántica documentada en `services/dictionary_content.py`).
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
-    cached = await _ensure_cached_content(normalized, model=model)
+    cached = await _ensure_cached_content(
+        normalized, model=model, user_id=user_id
+    )
     return await run_in_threadpool(_build_dictionary_entry, normalized, rows, cached)

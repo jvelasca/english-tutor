@@ -8,6 +8,33 @@
 
 ## Estado actual
 
+- ✅ **V3.31.1 — Hardening del diccionario tras la auditoría V3.31.0
+  (2026-09-09)** (**Versión estable `3.31.1`**, app `3.31.0 → 3.31.1`; solo
+  backend + docs, sin cambios de UI ni de esquema de BD). Cierra el **P1-01
+  residual** y los **P2** de robustez del diccionario: **`pick_model` exige un
+  modelo explícito INSTALADO** (`services/translate.py`: antes bastaba con que
+  no estuviera en `UNUSABLE_MODELS` para llegar a Ollama; ahora consulta
+  `installed_models()` y solo devuelve el explícito si está instalado y es
+  utilizable, si no cae al fallback automático) · **negative cache del
+  generador** (`domain/vocabulary.py`: un fallo marca la palabra en memoria
+  durante `DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS` 30 s — las consultas
+  siguientes degradan a `definition_source="none"` sin reintentar en bucle — y
+  la marca expira o se limpia al conseguir una generación) · **rate limit de
+  generación nueva** por usuario (10/min) y global (40/min) con degradación
+  normal (nunca 5xx); solo el dueño de un vuelo genera y lo cacheado no
+  consume cupo · **tope servidor del dueño del vuelo**
+  (`DICTIONARY_GENERATION_TIMEOUT_SECONDS` 90 s con `asyncio.wait_for`: un
+  Ollama colgado degrada, libera el vuelo y marca negative cache) ·
+  **semántica documentada del contenido canónico** (la caché es global y sin
+  `model_id`; `model` solo influye en la generación de contenido nuevo).
+  Tests: pytest **1708** (+11: +3 en `test_translate.py` de explícito no
+  instalado y +8 en el nuevo `test_dictionary_hardening_v3311.py`),
+  ruff limpio, vitest y `tsc --noEmit` limpios y `check_release_consistency`
+  **3.31.1** exit 0. Pendiente hacia **V3.32**: Dictionary → Learning Bridge
+  (`agentes/v332-dictionary-learning-bridge.md`), consumo de
+  `word_breakdown_json` en agregados/práctica dirigida de las falladas y
+  palabras tocables en transcripts/chat.
+
 - ✅ **V3.31 — Cierre de la auditoría V3.30.1: robustez y contrato del
   diccionario (2026-09-09)** (**Versión estable `3.31.0`**, app
   `3.30.1 → 3.31.0`). Cierra los hallazgos residuales de la auditoría profunda
@@ -1046,6 +1073,16 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   diccionario (tipo `DictionaryLookupRequest`, test del endpoint y timeout de
   cliente). **Próximo candidato V3.32**: Dictionary → Learning Bridge
   (borrador en `agentes/v332-dictionary-learning-bridge.md`).
+
+- ~~**⏳ V3.31.1 — Hardening del diccionario (cierre de la auditoría V3.31.0)**~~ ✅
+  **cerrado (2026-09-09, v3.31.1)**: implementado y publicado (ver «Estado
+  actual» arriba y `release-notes-v3.31.1.md`). Cierra el P1-01 residual y los
+  P2 de robustez del diccionario: `pick_model` con explícito instalado +
+  utilizable, negative cache con TTL de generación, rate limit de generación
+  nueva por usuario/global y tope servidor del dueño del vuelo (90 s), más la
+  semántica documentada del contenido canónico. **Próximo candidato V3.32**:
+  Dictionary → Learning Bridge (borrador en
+  `agentes/v332-dictionary-learning-bridge.md`).
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

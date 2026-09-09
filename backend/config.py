@@ -17,7 +17,19 @@ DEFAULT_MODEL = "llama3.1:8b"
 # ser utilizable.
 UNUSABLE_MODELS = frozenset({"qwen3.5:9b"})
 
-VERSION = "3.31.0"
+# Endurecimiento del diccionario de consulta (V3.31.1, auditoría V3.31.0, P2).
+# Son límites LOCALES de generación a demanda (contenido nuevo = llamada al
+# modelo local en CPU); el caché global `dictionary_entries` evita repeticiones
+# pero no cardinalidad. Aplican por proceso (best-effort, como el single-flight
+# de `domain/vocabulary.py`), en memoria, y degradan a `definition_source="none"`
+# sin romper la consulta:
+DICTIONARY_GENERATION_TIMEOUT_SECONDS = 90.0  # tope del dueño del vuelo (waiters: 60 s)
+DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS = 30.0  # palabra fallida → no reintentar hasta T
+DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/min
+DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
+
+
+VERSION = "3.31.1"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]

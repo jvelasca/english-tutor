@@ -15,6 +15,14 @@ El contenido es idioma, NO evidencia (premisa 21): nunca alimenta mastery, la
 curva de olvido ni el ledger `vocabulary_events`. Si el modelo no está disponible
 o la respuesta no valida se lanza `ContentUnavailableError`; el dominio degrada a
 `definition_source="none"` (la marca de uso y el ejemplo se siguen sirviendo).
+
+Semántica del contenido (V3.31.1, auditoría V3.31.0): la caché
+`dictionary_entries` es GLOBAL y CANÓNICA — una definición/traducción vale para
+cualquier usuario y no lleva `model_id`. Por tanto el parámetro `model` de la
+consulta NO elige «con qué modelo se sirve mi contenido» (el cacheado se sirve
+igual a todos); significa «si hay que generar contenido nuevo, prefiero este
+modelo». Se mantiene así a propósito: el contenido es canónico y la generación
+solo decide cómo crearlo la primera vez.
 """
 
 from __future__ import annotations

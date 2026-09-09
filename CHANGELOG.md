@@ -4,6 +4,20 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.31.1] — 2026-09-09
+
+**Cierre de la auditoría V3.31.0 sobre el diccionario de consulta: el modelo explícito debe estar instalado (no solo ser utilizable), los fallos de generación dejan de reintentar en bucle (negative cache con TTL), la generación de contenido nuevo queda limitada por usuario y global, y el dueño de un vuelo ya no puede dejar la palabra clavada si Ollama se cuelga (tope servidor de 90 s).**
+
+Patch de endurecimiento de la auditoría V3.31.0 (P1-01 residual y P2 de robustez del diccionario). Versión de app `3.31.0 → 3.31.1`. Solo backend + docs; sin cambios de UI ni de esquema de BD.
+
+- **P1-01 — `pick_model` exige modelo explícito INSTALADO (`services/translate.py`).** Antes, un modelo explícito solo tenía que ser utilizable (no estar en `UNUSABLE_MODELS`) para llegar a Ollama aunque no estuviera instalado: la comprobación de instalados solo ocurría en el fallback. Ahora `pick_model` consulta `installed_models()` (con su caché de 300 s) y solo devuelve el explícito si está instalado y es utilizable; si no, cae al mismo fallback automático. Un modelo no instalado ya no puede provocar un error de Ollama ni una degradación evitable.
+- **P2 — Negative cache del generador (`domain/vocabulary.py`).** Un fallo de generación (Ollama caído, respuesta inválida o timeout) marca la palabra en memoria durante `DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS` (30 s): las consultas siguientes degradan a `definition_source="none"` sin volver a llamar al modelo, y la entrada se limpia perezosamente al vencer (o al conseguir una generación). Evita la tormenta `cat → retry → cat → retry`.
+- **P2 — Rate limit de generación nueva (por usuario y global).** `DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE` (10) y `DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL` (40) limitan las palabras NUEVAS por minuto; solo el dueño de un vuelo genera, así que cada palabra consume cupo una vez y lo cacheado no consume. Sin cupo → degradación normal (200 con `definition_source="none"`), nunca 5xx.
+- **Tope servidor del dueño del vuelo.** La generación se envuelve en `asyncio.wait_for` con `DICTIONARY_GENERATION_TIMEOUT_SECONDS` (90 s): si Ollama se cuelga, el vuelo degrada, se libera y se marca la negative cache (los waiters ya tenían su tope defensivo de 60 s; el dueño ahora también).
+- **Semántica documentada del contenido.** La caché `dictionary_entries` es global y canónica (sin `model_id`): el parámetro `model` solo influye en la generación de contenido nuevo, nunca en qué contenido se sirve (docstrings de `dictionary_content.py`, `domain/vocabulary.py` y `schemas/vocabulary.py`).
+- **Tests.** `test_translate.py` (+3: explícito utilizable no instalado → fallback; sin preferidos → primer usable; sin modelos → default; el resto con parque inyectado por defecto para hermetismo) y nuevo `test_dictionary_hardening_v3311.py` (+8: negative cache suprime el reintento inmediato y expira, el éxito limpia la marca, cupo por usuario bloquea palabras nuevas pero no cacheadas, cupo global compartido entre usuarios, sin cupo nunca lanza, timeout del dueño degrada y libera el vuelo, D3 intacto en todas las rutas).
+- **Verificación.** Backend pytest **1708 passed** (+11 sobre v3.31.0) + `ruff check .` limpio; frontend vitest + `tsc --noEmit` limpios; `check_release_consistency` 3.31.1 exit 0 (detalle con conteos en `release-notes-v3.31.1.md`).
+
 ## [3.31.0] — 2026-09-09
 
 **Cierre de los hallazgos residuales de la auditoría profunda de V3.30.1 sobre el diccionario de consulta: el single-flight ya no puede colgar a los waiters si el dueño del vuelo se cancela (ni colgarse el propio cliente si Ollama se queda mudo), la caché de contenido previa a V3.31 se invalida y regenera una sola vez, y el contrato del diccionario queda blindado en ambos lados (tests del path real y de la migración de upgrade + tipo y timeout en el cliente).**

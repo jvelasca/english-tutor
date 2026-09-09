@@ -261,6 +261,9 @@ class DictionaryLookupRequest(BaseModel):
 
     `model` es opcional (mismo contrato que `/api/translate`): el cliente puede
     pedir un modelo local concreto para la generación de contenido (Fase B).
+    V3.31.1 (semántica documentada): el contenido cacheado es global y
+    canónico, así que `model` solo influye en la generación de contenido
+    NUEVO; nunca en qué contenido se sirve (si está cacheado, se sirve igual).
     """
 
     word: str = Field(min_length=1, max_length=80)

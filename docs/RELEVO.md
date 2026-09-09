@@ -5,6 +5,42 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-09 (UTC+2).
 >
+> **Nota (2026-09-09):** **V3.31.1 publicada** — release **v3.31.1**
+> (hardening del diccionario de consulta tras la auditoría profunda de
+> V3.31.0; solo backend + docs, sin cambios de UI ni de esquema de BD). Cierra:
+> **P1-01 residual — `pick_model` exige modelo explícito INSTALADO**
+> (`services/translate.py`: antes bastaba con que no estuviera en
+> `UNUSABLE_MODELS` para llegar a Ollama aunque no estuviera instalado; ahora
+> consulta `installed_models()` — caché de 300 s — y solo devuelve el explícito
+> si está instalado y es utilizable, si no cae al fallback automático) ·
+> **negative cache del generador** (`domain/vocabulary.py`: un fallo de
+> generación — Ollama caído, respuesta inválida o timeout — marca la palabra
+> en memoria durante `DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS` = 30 s; las
+> consultas siguientes degradan a `definition_source="none"` sin reintentar en
+> bucle; la marca expira de forma perezosa o se limpia al conseguir una
+> generación) · **rate limit de generación nueva** por usuario (10/min) y
+> global (40/min) en `config.py`, aplicado solo al dueño de un vuelo (lo
+> cacheado no consume cupo; sin cupo → 200 con `definition_source="none"`,
+> nunca 5xx) · **tope servidor del dueño del vuelo**
+> (`DICTIONARY_GENERATION_TIMEOUT_SECONDS` = 90 s con `asyncio.wait_for`: un
+> Ollama colgado ya no deja el vuelo de la palabra clavado — los waiters tenían
+> su tope de 60 s; el dueño ahora también) · **semántica documentada del
+> contenido canónico** (la caché `dictionary_entries` es global y sin
+> `model_id`; `model` solo influye en la generación de contenido nuevo).
+> Tests: pytest backend **1708 passed** (+11: +3 en `test_translate.py` para
+> explícito utilizable no instalado → fallback y +8 en el nuevo
+> `backend/tests/test_dictionary_hardening_v3311.py`: negative cache suprime el
+> reintento inmediato y expira, el éxito limpia la marca, cupo por usuario
+> bloquea palabras nuevas pero no las cacheadas, cupo global compartido entre
+> usuarios, sin cupo nunca lanza, timeout del dueño degrada y libera el vuelo,
+> D3 intacto) + ruff limpio + vitest + `tsc --noEmit` limpios +
+> `check_release_consistency` **3.31.1** exit 0. Detalle y conteos:
+> `release-notes-v3.31.1.md`; `CHANGELOG.md` con entrada `[3.31.1]`; `PLAN.md`
+> con hito estable V3.31.1. Pendientes hacia **V3.32**: Dictionary → Learning
+> Bridge (borrador movido a `agentes/v332-dictionary-learning-bridge.md`),
+> consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+> falladas y palabras tocables en transcripts/chat.
+>
 > **Nota (2026-09-09):** **V3.31 publicada** — release **v3.31.0** (cierre de
 > los hallazgos residuales de la auditoría profunda de V3.30.1 sobre el
 > diccionario de consulta; backend + frontend de contrato, sin cambios de UI).

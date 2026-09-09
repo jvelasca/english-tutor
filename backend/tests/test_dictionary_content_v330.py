@@ -71,15 +71,15 @@ def _stub_fetcher(monkeypatch, payload: str, calls: list):
 
 @pytest.fixture(autouse=True)
 def _clear_inflight():
-    """Limpia el registro de vuelos del dominio entre tests.
+    """Limpia el estado de generación del dominio entre tests.
 
-    Es estado global por proceso: si una prueba dejara un Future sin resolver
-    (p. ej. al fallar a mitad de un vuelo), la siguiente prueba con la misma
-    palabra esperaría un Future muerto para siempre.
-    """
-    vocabulary_domain._inflight_content.clear()
+    Es estado global por proceso (vuelos en curso, negative cache y ventanas de
+    rate limit de V3.31.1): si una prueba dejara un Future sin resolver o una
+    palabra en negative cache, la siguiente prueba con la misma palabra
+    esperaría un Future muerto o degradaría sin llamar al fetcher."""
+    vocabulary_domain._clear_generation_state()
     yield
-    vocabulary_domain._inflight_content.clear()
+    vocabulary_domain._clear_generation_state()
 
 
 # --- parse_content (puro, sin red) -------------------------------------------
@@ -286,6 +286,10 @@ def test_lookup_passes_model_preference_to_generator(monkeypatch, tmp_path):
 
 
 def test_lookup_degrades_then_recovers(monkeypatch, tmp_path):
+    # V3.31.1: un fallo reciente deja la palabra en negative cache (TTL), así
+    # que la recuperación se verifica con el TTL vencido (0 s) — el intento
+    # inmediato dentro del TTL se cubre en test_dictionary_hardening_v3311.py.
+    monkeypatch.setattr("config.DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS", 0.0)
     a, _b = _setup(monkeypatch, tmp_path)
     calls: list = []
 

@@ -16,12 +16,20 @@ from schemas.chat import ChatResponse
 
 
 @pytest.fixture(autouse=True)
-def _clear_state():
+def _clear_state(monkeypatch):
     """La caché de frases y la de modelos instalados son globales; se limpian
-    para que cada test sea hermético."""
+    para que cada test sea hermético.
+
+    V3.31.1 (P1-01): `pick_model` consulta la lista instalada también cuando
+    hay modelo explícito, así que se inyecta por defecto un parque con
+    `llama3.1:8b` instalado (los tests que necesiten otro parque lo
+    sobrescriben con monkeypatch)."""
     translate_service._cache.clear()
     translate_service._installed = None
     translate_service._installed_at = 0.0
+    monkeypatch.setattr(
+        translate_service.llm, "list_models", _fake_list_models("llama3.1:8b")
+    )
     yield
     translate_service._cache.clear()
     translate_service._installed = None
@@ -53,8 +61,41 @@ def _fake_list_models(*names):
 
 
 def test_pick_model_uses_explicit(monkeypatch):
-    # Con modelo explícito UTILIZABLE no consulta la lista de instalados.
+    # Con modelo explícito UTILIZABLE E INSTALADO devuelve el explícito (el
+    # parque por defecto del fixture incluye llama3.1:8b).
     assert asyncio.run(translate_service.pick_model("llama3.1:8b")) == "llama3.1:8b"
+
+
+def test_pick_model_explicit_not_installed_falls_back_to_preferred(monkeypatch):
+    # V3.31.1 (P1-01): un modelo explícito UTILIZABLE pero NO instalado no
+    # puede llegar a Ollama: cae al modelo rápido instalado.
+    monkeypatch.setattr(
+        translate_service.llm, "list_models",
+        _fake_list_models("qwen2.5-coder:1.5b"),
+    )
+    assert (
+        asyncio.run(translate_service.pick_model("llama3.1:8b"))
+        == "qwen2.5-coder:1.5b"
+    )
+
+
+def test_pick_model_explicit_not_installed_falls_back_to_first_usable(monkeypatch):
+    # Sin preferidos instalados, el explícito no instalado cae al primer
+    # modelo instalado y utilizable (nunca al nombre pedido).
+    monkeypatch.setattr(
+        translate_service.llm, "list_models", _fake_list_models("qwen3-coder:30b"),
+    )
+    assert (
+        asyncio.run(translate_service.pick_model("llama3.1:8b")) == "qwen3-coder:30b"
+    )
+
+
+def test_pick_model_explicit_not_installed_and_no_models_returns_default(monkeypatch):
+    # Sin ningún modelo instalado, el explícito (aunque utilizable) no se puede
+    # servir: cae al modelo por defecto como cualquier otro fallback.
+    monkeypatch.setattr(translate_service.llm, "list_models", _fake_list_models())
+    chosen = asyncio.run(translate_service.pick_model("llama3.1:8b"))
+    assert chosen == config.DEFAULT_MODEL
 
 
 def test_pick_model_explicit_unusable_falls_back_to_default(monkeypatch):
