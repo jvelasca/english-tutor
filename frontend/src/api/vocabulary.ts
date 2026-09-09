@@ -1,6 +1,7 @@
 import { getJson, postJson } from "./client";
 import type {
   DictionaryEntry,
+  DictionaryLookupRequest,
   DrillAttempt,
   DrillCandidates,
   DrillSentenceAttempt,
@@ -24,9 +25,8 @@ export function lookupDictionaryWord(
   word: string,
 ): Promise<DictionaryEntry> {
   const query = new URLSearchParams({ user_id: userId }).toString();
-  return postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, {
-    word,
-  });
+  const body: DictionaryLookupRequest = { word };
+  return postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, body);
 }
 
 /** Candidatas al speaking micro-drill (V3.19): señal determinista en servidor

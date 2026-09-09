@@ -3,6 +3,7 @@ import {
   getDrillCandidates,
   getDrillSentenceContext,
   getLexicon,
+  lookupDictionaryWord,
   submitDrillAttempt,
   submitDrillSentenceAttempt,
 } from "./vocabulary";
@@ -21,6 +22,18 @@ describe("vocabulary api", () => {
     await getLexicon("u1");
     const [url] = fn.mock.calls[0];
     expect(url).toBe("/api/vocabulary/lexicon?user_id=u1");
+  });
+
+  it("lookupDictionaryWord hace POST a /dictionary con user_id y body {word}", async () => {
+    const fn = mockFetch({});
+    await lookupDictionaryWord("u1", "travel");
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/dictionary?user_id=u1");
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+      "application/json",
+    );
+    expect(JSON.parse(init.body as string)).toEqual({ word: "travel" });
   });
 
   it("getDrillCandidates llama con user_id y limit", async () => {

@@ -13,6 +13,14 @@ DB_PATH = DATA_DIR / "tutor.db"
 
 DEFAULT_USER_NAME = "Usuario"
 
+# Marca de versión del contenido de diccionario cacheado antes de V3.31
+# (V3.30 / V3.30.1). Se mantiene deliberadamente DISTINTA de la
+# `GENERATOR_VERSION` actual del prompt/parseador (`services/dictionary_content
+# .py`): las filas etiquetadas con ella no se sirven como caché fresca y
+# regeneran una vez al primer lookup (el criterio de parseo cambió en V3.30.1 y
+# no se puede distinguir por fila qué contenido se generó con el parser viejo).
+DICTIONARY_LEGACY_VERSION = "1.0.0"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -137,8 +145,7 @@ def init_db() -> None:
         )
         # V3.30.1 (P1-03): versionado del contenido generado. Las instalaciones
         # previas a V3.30.1 crearon la tabla sin `generator_version`; la
-        # migración añade la columna y etiqueta el contenido existente como v1
-        # (mismo prompt/política que V3.30, evita regeneraciones innecesarias).
+        # migración añade la columna (aditiva e idempotente).
         dict_cols = {
             row[1]
             for row in conn.execute("PRAGMA table_info(dictionary_entries)")
@@ -148,9 +155,17 @@ def init_db() -> None:
                 "ALTER TABLE dictionary_entries ADD COLUMN "
                 "generator_version TEXT NOT NULL DEFAULT ''"
             )
+        # V3.31: el contenido sin versión (creado antes de V3.30.1) se etiqueta
+        # con la marca LEGACY `1.0.0`, deliberadamente DISTINTA de la
+        # `GENERATOR_VERSION` actual del prompt/parseador. El dominio solo
+        # sirve caché cuya versión coincide con la actual, así que este
+        # contenido previo —posiblemente generado con el parser greedy de
+        # V3.30— regenera una sola vez al primer lookup en lugar de servirse
+        # como fresco.
         conn.execute(
-            "UPDATE dictionary_entries SET generator_version = '1.0.0' "
-            "WHERE generator_version = ''"
+            "UPDATE dictionary_entries SET generator_version = ? "
+            "WHERE generator_version = ''",
+            (DICTIONARY_LEGACY_VERSION,),
         )
         conn.execute(
             """

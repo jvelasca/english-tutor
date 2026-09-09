@@ -505,6 +505,12 @@ def _build_dictionary_entry(
 # con varias réplicas.
 _inflight_content: dict[str, asyncio.Future] = {}
 
+# Tope defensivo de espera de los waiters de un vuelo (V3.31): si el ganador
+# colgara (p. ej. Ollama sin responder), los waiters degradan a None en lugar
+# de quedarse esperando para siempre. La generación legítima de una palabra no
+# debería acercarse a este límite.
+_INFLIGHT_WAIT_SECONDS = 60.0
+
 
 def _content_is_fresh(entry: dict | None) -> bool:
     """Caché válida: tiene definición y fue generada con la versión actual.
@@ -575,6 +581,13 @@ async def _ensure_cached_content(word: str, *, model: str | None = None) -> dict
     fresca la reutiliza (determinista); si la versión es obsoleta o no existe,
     genera, persiste y devuelve la entrada. Un fallo de generación devuelve
     None para todos (incluidos los que esperaban), sin reintentos en cascada.
+
+    V3.31 (robustez del vuelo): si el primer cliente (dueño del vuelo) se
+    cancela a mitad de generación (desconexión), su `CancelledError` no puede
+    dejar a los waiters esperando un Future que nunca se resuelve: se resuelve
+    con None antes de propagar la cancelación. Además los waiters esperan con
+    un tope defensivo (`_INFLIGHT_WAIT_SECONDS`): si el ganador colgara por
+    cualquier causa, degradan a None en vez de colgarse indefinidamente.
     """
     fut = _inflight_content.get(word)
     if fut is None:
@@ -585,13 +598,28 @@ async def _ensure_cached_content(word: str, *, model: str | None = None) -> dict
             result = await _generate_and_persist(word, model=model)
             if not fut.done():
                 fut.set_result(result)
+        except asyncio.CancelledError:
+            # El dueño del vuelo fue cancelado (cliente desconectado). La
+            # generación queda truncada: se resuelve el Future para que los
+            # waiters no queden colgados y se propaga la cancelación.
+            if not fut.done():
+                fut.set_result(None)
+            raise
         except Exception:  # noqa: BLE001 — nunca romper el vuelo ni a los waiters
             logger.exception("Diccionario: fallo interno generando '%s'", word)
             if not fut.done():
                 fut.set_result(None)
         finally:
             _inflight_content.pop(word, None)
-    return await asyncio.shield(fut)
+    try:
+        return await asyncio.wait_for(
+            asyncio.shield(fut), timeout=_INFLIGHT_WAIT_SECONDS
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Diccionario: el vuelo de '%s' agotó el tope de espera", word
+        )
+        return None
 
 
 async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -> dict:

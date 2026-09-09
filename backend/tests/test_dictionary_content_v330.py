@@ -482,7 +482,54 @@ def test_concurrent_failure_generates_once_and_degrades(monkeypatch, tmp_path):
     assert _count_rows("dictionary_entries") == 0
 
 
-# --- versionado de la caché (V3.30.1, P1-03) ----------------------------------
+def test_inflight_leader_cancel_resolves_waiters_without_hanging(
+    monkeypatch, tmp_path
+):
+    """V3.31: si el primer cliente (dueño del vuelo) se cancela a mitad de la
+    generación (desconexión), los waiters reciben None en vez de quedarse
+    esperando un Future que nunca se resuelve.
+
+    La cancelación (`CancelledError`, BaseException) no la capturaba el
+    `except Exception` previo y el `finally` retiraba la clave sin resolver el
+    Future: los waiters colgaban. El tope de 1 s hace que el test falle si el
+    bug regresa."""
+    _setup(monkeypatch, tmp_path)
+    calls: list = []
+    gate = asyncio.Event()
+
+    async def _blocked(word: str, model: str | None) -> str:
+        calls.append(word)
+        await gate.wait()
+        return _payload()
+
+    monkeypatch.setattr(dictionary_content, "_default_fetcher", _blocked)
+
+    async def _run():
+        leader = asyncio.create_task(
+            vocabulary_domain._ensure_cached_content("cat", model=None)
+        )
+        # Espera determinista a que el líder entre en el fetcher (tras su
+        # lectura inicial en threadpool) y quede bloqueado en la generación.
+        for _ in range(200):
+            if calls:
+                break
+            await asyncio.sleep(0.01)
+        else:
+            raise AssertionError("el líder no llegó a la generación")
+        waiter = asyncio.create_task(
+            vocabulary_domain._ensure_cached_content("cat", model=None)
+        )
+        await asyncio.sleep(0)
+        leader.cancel()
+        return await asyncio.wait_for(waiter, timeout=1.0)
+
+    out = asyncio.run(_run())
+    assert out is None
+    assert len(calls) == 1
+    assert _count_rows("dictionary_entries") == 0
+
+
+# --- versionado de la caché (V3.30.1, P1-03 / V3.31 LEGACY) -------------------
 
 
 def test_stale_generator_version_regenerates_and_overwrites(monkeypatch, tmp_path):
@@ -509,3 +556,92 @@ def test_stale_generator_version_regenerates_and_overwrites(monkeypatch, tmp_pat
     assert stored["definition"] == "A small domesticated carnivorous mammal."
     assert stored["generator_version"] == dictionary_content.GENERATOR_VERSION
     assert _count_rows("dictionary_entries") == 1
+
+
+def test_legacy_content_regenerates_lazily_once(monkeypatch, tmp_path):
+    """V3.31: una entrada marcada con la versión LEGACY (contenido previo a
+    V3.31, p. ej. generado por el parser greedy de V3.30 o etiquetado por el
+    backfill de V3.30.1) NO se sirve como fresca: al primer lookup regenera
+    UNA vez y sobrescribe la fila con la versión actual."""
+    _setup(monkeypatch, tmp_path)
+    dictionary_repo.save_entry(
+        "cat",
+        pos="noun",
+        definition="definición del parser V3.30",
+        translation="gato",
+        generator_version=db.DICTIONARY_LEGACY_VERSION,
+    )
+    calls: list = []
+    _stub_fetcher(monkeypatch, _payload(), calls)
+
+    out = asyncio.run(
+        vocabulary_domain._ensure_cached_content("cat", model=None)
+    )
+
+    assert len(calls) == 1
+    assert out["definition"] == "A small domesticated carnivorous mammal."
+    stored = dictionary_repo.get_entry("cat")
+    assert stored["definition"] == "A small domesticated carnivorous mammal."
+    assert stored["generator_version"] == dictionary_content.GENERATOR_VERSION
+    assert _count_rows("dictionary_entries") == 1
+
+
+def test_migration_upgrade_from_v330_adds_version_and_keeps_content(
+    monkeypatch, tmp_path
+):
+    """V3.31: una BD creada por V3.30.0 (tabla `dictionary_entries` sin
+    `generator_version`) migra de forma aditiva e idempotente: la columna se
+    añade, el contenido se conserva y las filas legacy quedan marcadas con la
+    versión LEGACY (distinta de la actual), por lo que el dominio NO las sirve
+    como caché fresca y las regenera al primer lookup."""
+    monkeypatch.setattr(db, "DATA_DIR", tmp_path)
+    db_path = tmp_path / "test.db"
+    monkeypatch.setattr(db, "DB_PATH", db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE dictionary_entries (
+                word TEXT PRIMARY KEY,
+                pos TEXT NOT NULL DEFAULT '',
+                definition TEXT NOT NULL DEFAULT '',
+                translation TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO dictionary_entries "
+            "(word, pos, definition, translation, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "cat",
+                "noun",
+                "definición V3.30",
+                "gato",
+                "2026-01-01T00:00:00+00:00",
+                "2026-01-01T00:00:00+00:00",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    db.init_db()
+
+    cols = {
+        row[1]
+        for row in db._conn().execute("PRAGMA table_info(dictionary_entries)")
+    }
+    assert "generator_version" in cols
+    stored = dictionary_repo.get_entry("cat")
+    assert stored["definition"] == "definición V3.30"  # contenido conservado
+    assert stored["generator_version"] == db.DICTIONARY_LEGACY_VERSION
+    assert db.DICTIONARY_LEGACY_VERSION != dictionary_content.GENERATOR_VERSION
+    assert vocabulary_domain._content_is_fresh(stored) is False
+
+    db.init_db()  # idempotente en re-arranque
+    again = dictionary_repo.get_entry("cat")
+    assert again["generator_version"] == db.DICTIONARY_LEGACY_VERSION
+    assert again["definition"] == "definición V3.30"

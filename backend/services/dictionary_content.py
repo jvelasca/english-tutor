@@ -33,7 +33,14 @@ logger = logging.getLogger(__name__)
 # las entradas de `dictionary_entries` guardan la versión con la que se
 # generaron y el dominio solo sirve caché cuya `generator_version` coincide
 # (las anteriores se regeneran y sobrescriben).
-GENERATOR_VERSION = "1.0.0"
+#
+# V3.31: bump 1.0.0 -> 1.1.0. El contenido cacheado antes de V3.31 —incluido
+# el que V3.30.1 etiquetó como "1.0.0" al migrar y que es indistinguible por
+# fila del generado por el parser greedy de V3.30— no se sirve como fresco:
+# regenera de forma perezosa una sola vez al primer lookup.
+# `repositories/db.py` mantiene `DICTIONARY_LEGACY_VERSION = "1.0.0"` como marca
+# deliberadamente DISTINTA de esta versión para ese contenido previo.
+GENERATOR_VERSION = "1.1.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80

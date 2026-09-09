@@ -400,6 +400,15 @@ export interface DictionaryEntry {
   usage: DictionaryUsage;
 }
 
+/** Cuerpo de la consulta al diccionario (V3.30): la palabra tal como la
+ * escribe el alumno y una preferencia opcional de modelo local (mismo
+ * contrato que `/api/translate`). El backend la normaliza (minúsculas, sin
+ * puntuación circundante) y traduce una palabra vacía a 422. */
+export interface DictionaryLookupRequest {
+  word: string;
+  model?: string;
+}
+
 export interface CefrBucket {
   cefr: string;
   count: number;
