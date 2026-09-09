@@ -1,13 +1,16 @@
 # LISTENING ENGINE 4.0 — Arquitectura pedagógica completa A1→C2
 
-> Documento de diseño (especificación pedagógica). Versión 1.1 — implementada
-> (Fases 1 y 2). Base de partida: **freeze arquitectónico V3.26.0**
+> Documento de diseño (especificación pedagógica). Versión 1.2 — implementada
+> (Fases 1, 2 y núcleo de la 3). Base de partida: **freeze arquitectónico V3.26.0**
 > (`backend/config.py` → `VERSION = "3.26.0"`). Fecha: 2026-09-09.
 > Estado: **aprobada e implementada** — **Fase 1 cerrada en V3.27.0**
-> (`docs/PLAN-V327-LISTENING-ENGINE-4.md`) y **Fase 2 cerrada en V3.28.0**
-> (Bloques A–F del plan V3.28, `v3.28_listening_engine_fase_2_…plan.md`).
-> La Fase 3 (karaoke palabra a palabra / `word_alignment_proxy`) queda como
-> propuesta para V3.29+.
+> (`docs/PLAN-V327-LISTENING-ENGINE-4.md`), **Fase 2 cerrada en V3.28.0**
+> (Bloques A–F del plan V3.28, `v3.28_listening_engine_fase_2_…plan.md`) y
+> **núcleo de la Fase 3 cerrado en V3.29.0** (plan `v3.29_nucleo_fase_3…plan.md`):
+> `word_alignment_proxy` offline, karaoke palabra a palabra, controles de audio
+> precisos (seek + bucle A/B), salto a la palabra fallada y evidencia
+> `word_breakdown_json`. Siguen abiertas para V3.30+: la lección orquestada
+> multi-ítem y la evaluación acústica real de pronunciación.
 
 ---
 
@@ -275,14 +278,14 @@ Regla por defecto: **no se muestra `full` antes de que el alumno haya intentado 
 
 ### 6.4 Audio Learning Controller (AudioController)
 
-Se especifica como **componente de frontend reutilizable** (hoy no existe nada: todo es `new Audio()` play-only). No es una feature aislada: es el reproductor pedagógico del micro-flujo, y debe exponer:
+Se especificó como **componente de frontend reutilizable** (en V3.26 todo era `new Audio()` play-only). **Implementado** en V3.28 (Bloque B) sobre un único `HTMLAudioElement` reutilizable con `play`/`pause`/`seek`/`setRate`/`loop`/`replay` y suscripción de estado; la UI expone el estado vía el hook `useAudioController`. El contrato pedagógico del micro-flujo:
 
 ```
 AudioController
 │  play() / pause() / stop()
-│  seek(t)
+│  seek(t)                    # V3.28.1: notifica onCurrentTime en pausa
 │  replay_segment()          # repite el último fragmento (frase o chunk)
-│  loop_segment(from, to)    # bucle A-B
+│  loop_segment(from, to)    # bucle A-B (V3.29 P5: scheduler rAF preciso)
 │  set_rate(rate)            # 0.75 / 1.0 / 1.25 (o más fina)
 │  preserve_pitch()          # playbackRate + preservesPitch
 │  mark_segment()            # marca inicio/fin de un fragmento
@@ -294,13 +297,28 @@ Debe registrar y reportar, junto a la respuesta, **evidencia pedagógica de uso*
 
 Nota de honestidad técnica: la **velocidad en vivo con pitch preservado** (`set_rate` + `preservesPitch`) puede implementarse sobre el WAV `normal` del ítem, complementando (no sustituyendo) la escalera pre-renderizada de variantes. En navegadores modernos `HTMLAudioElement.playbackRate` con `preservesPitch` (por defecto true) es suficiente; **no requiere Web Audio API** para el caso básico. El pitch control explícito como función separada no es necesario en V3.27.
 
+> **Estado V3.29 (Fase 3, P5)**: la tarjeta de audio de `ListeningPractice` incorpora un **seek slider continuo** (`<input type="range">`, solo cuando `audio_ready` y la duración real ya se conoce) y un **control de bucle A/B** mínimo («marcar inicio» → «bucle A–B» → «quitar bucle»). La duración se conoce en `loadedmetadata` (nuevo callback `onDuration`) y el rebobinado del bucle usa un scheduler `requestAnimationFrame` inyectable (menos deriva que el `timeupdate`, que queda como respaldo sin rAF). Estos controles son la base del salto a la palabra fallada (§6.5).
+
 ### 6.5 Transcripción sincronizada por palabra (karaoke) — diseño honesto
 
-**Estado real**: el backend no produce timestamps por palabra (el ASR expone tiempos solo por segmento; ver `backend/services/stt.py`, `aggregate_asr_segments`). No se debe prometer karaoke "real" sin fuente de tiempos.
+**Estado real (V3.29, núcleo de Fase 3 implementado)**: el backend genera la alineación por palabra **offline, en el momento de sintetizar/cachear cada WAV** (y en `import_audio.py` para la biblioteca humana), ejecutando faster-whisper con `word_timestamps=True` sobre el propio WAV y guardando un sidecar `{wav}.words.json` junto a la caché de audio (`DATA_DIR/listening/{bank}/{voice}/…`). La señal se llama **`word_alignment_proxy`** (coherente con la lección P20 de `*_proxy` en pronunciación): es alineación **derivada de ASR, nunca verdad acústica**, y el sidecar la etiqueta `sync: "asr_word_proxy"` con su `coverage`.
 
-**Diseño propuesto (V3.27, fase posterior)**: generar la alineación por palabra **en el momento de sintetizar/cachear cada WAV** (proceso offline, una vez por audio y variante), ejecutando faster-whisper con `word_timestamps=True` sobre el propio WAV generado, y guardar un sidecar `{wav}.words.json` junto a la caché de audio (`DATA_DIR/listening/{bank}/{voice}/…`). Es una **señal de alineación derivada de ASR, no verdad acústica**: debe nombrarse `word_alignment_proxy` (coherente con la lección P20 de `*_proxy` en pronunciación). Para audios de la biblioteca humana, la misma alineación se computa en el `import_audio.py`.
+Contrato servido (campo `word_timings` de `ListeningQuestion`, solo en ítems con `flow` y audio TTS `audio_ready`):
 
-Alternativa más barata y determinista (si el coste ASR por ítem no se asume): **escalar** los timestamps de la variante `normal` por el ratio de `length_scale` para las variantes slow/fast (error acotado, misma voz), documentando la aproximación.
+```
+[{ index, text, start, end, sentence }]
+```
+
+- Cada palabra corresponde a una palabra **del texto audible** (lo que el ASR reconoce; las reducciones se ven como suenan: `gonna`, `d'you`).
+- `sentence` es el índice de la frase de `sentenceTimings` que contiene la palabra (se asigna **por tiempo**, comparando `start` contra los intervalos de `coarse_sentence_timings`, no por token — funciona con `repetition_policy="twice"`); `-1` sin frases/`duration` (la UI degrada a una línea continua en revelado completo).
+- Cobertura honesta: `align_words` interpola de forma monótona las palabras que el ASR no reconoció; si la cobertura cae por debajo de **~80 %**, la señal se descarta (`word_timings: []`) y la UI degrada al sync grueso de frase (`CoarseTranscript`, §V3.28).
+- Backfill: `backend/scripts/generate_word_alignments.py` regenera sidecars de la caché existente (idempotente, `--force` para re-transcribir).
+
+Frontend (`KaraokeTranscript`): resalta la palabra activa según `currentTime` del AudioController, pinta solo las frases reveladas por el `transcript_policy` y permite **saltar a cualquier palabra** con un toque (`onSeekToWord(word.start)`, seek preciso del AudioController). Slow/fast se reproducen con la misma voz pero distinta duración: el cliente **escala** los timings de `normal` por el ratio de `speech_rate` de la variante (`variantTimeScale`/`scaleWordTimings`), aproximación documentada (§6.6) que conserva el `sync` honesto.
+
+**Salto a la palabra fallada (P6)**: al fallar un dictado o un cloze/segmentación, la UI ofrece «repetir la palabra fallada» en `normal` o `slow`: el helper `failedWordTiming` localiza la primera palabra fallada (dictado: `breakdown.missing` / `breakdown.substituted[].expected`; cloze incorrecto: la opción correcta) y, si el token no está en el sidecar (p. ej. reducción/expansión), cae al `start` de la frase contenedora como aproximación honesta (`null` sin respaldo → botón oculto). El reproductor hace `seek(start − 0.05s)` + `loop(start, end)` + `play(variante)`.
+
+**Evidencia (P3)**: la columna aditiva nullable `word_breakdown_json` (TEXT) en `listening_attempts` persiste el breakdown de `word_alignment` de una producción fallada o el target (palabra diana) de un cloze/segmentation incorrecto. Migración idempotente inline en `init_db` (patrón V3.27/V3.28); sin consumo en agregados todavía (V3.30).
 
 ### 6.6 Velocidad
 
@@ -522,17 +540,24 @@ Fases técnicas (sin fechas), cada una con su propio plan detallado y release no
 |---|---|---|---|
 | Fase 1 | Micro-flujo por ítem (estados Pre/While/Post + transcript policy) + evidencia ampliada (campos aditivos de §8.2) + perfil auditivo e intervención (§5) | V3.27 | ✅ **implementada** (v3.27.0) |
 | Fase 2 | AudioController en frontend + playback de la grabación en shadowing + bottom-up derivado (cloze auditivo / dictado parcial / segmentación) + transcript dinámico con sync grueso de frase + micro-flujo unificado en rutas por nivel y drill + E2E adaptativos | V3.28 | ✅ **implementada — Fase 2 cerrada** (v3.28.0) |
-| Fase 3 | Sincronización por palabra (`word_alignment_proxy` offline) + karaoke + salto a la palabra fallada | V3.29+ | ⏳ pendiente |
+| Fase 3 | Sincronización por palabra (`word_alignment_proxy` offline) + karaoke + salto a la palabra fallada | V3.29 | ✅ **núcleo implementado** (v3.29.0); consumo de evidencia y afinado → V3.30 |
 | Fase 4 | Contenido: multi-voz Piper por ítem (§3.5), re-etiquetado recognition, primeras grabaciones humanas vía biblioteca | Continua / paralela | ⏳ continua |
-| Fuera de alcance | Lección orquestada multi-ítem (Pre/While/Post sobre pasaje largo), evaluación acústica real de pronunciación, SRS completo de audios | V3.29+ (evaluar tras F2) | ⏳ |
+| Fuera de alcance | Lección orquestada multi-ítem (Pre/While/Post sobre pasaje largo), evaluación acústica real de pronunciación, SRS completo de audios | V3.30+ (evaluar tras F3) | ⏳ |
 
-> Estado a 2026-09-09 (release v3.28.0): la Fase 2 se ejecutó con los Bloques
+> Estado a 2026-09-09 (release v3.29.0): la Fase 2 se ejecutó con los Bloques
 > A–F del plan V3.28 — unificación del micro-flujo (P1-01), AudioController 4.0,
 > tareas bottom-up **derivadas determinísticamente del corpus** (regla «si no hay
 > candidato fiable no se emite»; nunca entran en la certificación), sync grueso
 > etiquetado `coarse_heuristic` (no alineación acústica, que es la Fase 3),
 > Shadowing 2.0 con playback y señales auxiliares no bloqueantes, y E2E
-> adaptativos + negativos del contrato pedagógico.
+> adaptativos + negativos del contrato pedagógico. La Fase 3 cierra su **núcleo**
+> en V3.29 con el plan `v3.29_nucleo_fase_3…plan.md` (P1–P6): motor
+> `word_alignment_proxy` offline con sidecars `{wav}.words.json`, `word_timings`
+> servidos en el payload (asignación palabra→frase por tiempo), karaoke
+> `KaraokeTranscript` con escalado slow/fast por `speech_rate`, controles
+> precisos (seek + bucle A/B con rAF), salto a la palabra fallada (normal/slow)
+> y evidencia `word_breakdown_json`. La «lección orquestada multi-ítem» y la
+> «evaluación acústica real» siguen abiertas (V3.30+, fuera de alcance de F3).
 
 Cada fase respeta el freeze de arquitectura (§13).
 
@@ -547,8 +572,8 @@ Cada fase respeta el freeze de arquitectura (§13).
 5. [ ] Perfil auditivo: casos A–D con umbrales por defecto a calibrar y `RESILIENCE_MIN_ATTEMPTS` como mínimo de muestra.
 6. [ ] Transcript policy por fases: `hidden → cloze → partial → full`.
 7. [ ] AudioController registra `replay_count`, `speed_used`, `segments_replayed`, `time_to_answer` (evidencia pedagógica).
-8. [ ] Cloze: tarea nueva con `task_type="cloze"`, huecos elegidos por regla determinista, scorer `production_score`, salto a la palabra con `word_alignment_proxy`.
-9. [ ] Karaoke: alineación por palabra generada offline con ASR y etiquetada `*_proxy` (no verdad acústica).
+8. [x] Cloze: tarea nueva con `task_type="cloze"`, huecos elegidos por regla determinista, scorer `production_score`, salto a la palabra con `word_alignment_proxy` — **núcleo implementado en V3.29** (P6: `failedWordTiming` + «repetir palabra fallada» normal/slow).
+9. [x] Karaoke: alineación por palabra generada offline con ASR y etiquetada `*_proxy` (no verdad acústica) — **implementado en V3.29** (`word_alignment_proxy`, sidecars, `word_timings`, `KaraokeTranscript`).
 10. [ ] Evidencia ampliada: campos aditivos en `listening_attempts`; sin tocar Evidence Graph, gate ni ledger.
 11. [ ] Velocidad: escalera 0.75/1.0/1.25 existente + persistir `speed_used`; pitch en vivo opcional y documentado.
 12. [ ] Connected speech como objeto pedagógico con secuencia notice→recognize→cloze→shadowing→transfer.

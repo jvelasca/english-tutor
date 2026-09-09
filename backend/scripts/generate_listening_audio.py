@@ -31,6 +31,7 @@ from services.listening import (  # noqa: E402
     length_scale_for_rate,
     spoken_text,
 )
+from services.word_alignment_proxy import ensure_word_alignment  # noqa: E402
 
 # Cache versionado por banco + voz + digest del contenido (P1.1): un cambio en el
 # script, la velocidad, la voz o el modelo Piper invalida el WAV antiguo en lugar
@@ -68,6 +69,14 @@ def main() -> int:
             tmp = path.with_suffix(".wav.tmp")
             tmp.write_bytes(data)
             tmp.replace(path)
+            # V3.29 (Fase 3): sidecar word_alignment_proxy del WAV recién
+            # sintetizado. Si el ASR no está disponible o la cobertura es baja,
+            # el ítem sigue sirviendo audio sin karaoke (degradación controlada).
+            if ensure_word_alignment(path, text) is None:
+                print(
+                    f"[WARN] {question['id']}: sin word_alignment_proxy "
+                    "(ASR no disponible o cobertura baja)"
+                )
             generated += 1
             print(
                 f"[OK] {question['id']} "

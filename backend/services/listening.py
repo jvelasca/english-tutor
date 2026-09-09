@@ -7,6 +7,7 @@ import re
 
 from pydantic import BaseModel, Field, ValidationError, computed_field
 
+from config import DATA_DIR, PIPER_VOICE
 from services.curriculum import CURRICULUM_DIR, LISTENING_BANK_VERSION
 from services.forgetting import days_since
 from services.listening_bottom_up import (
@@ -14,6 +15,7 @@ from services.listening_bottom_up import (
     derived_catalog,
 )
 from services.phonetics import composite_score, word_alignment
+from services.word_alignment_proxy import sidecar_words
 
 LISTENING_SUBSKILLS: tuple[str, ...] = (
     "gist",
@@ -1379,6 +1381,60 @@ def coarse_sentence_timings(question: dict) -> list[dict]:
             "sync": "coarse_heuristic",
         }
         for index, (start, end, phrase) in enumerate(passages)
+    ]
+
+
+def word_timings_for(question: dict, voice: str = PIPER_VOICE) -> list[dict]:
+    """Timings por palabra del ítem desde el sidecar `word_alignment_proxy`.
+
+    Resuelve el WAV canónico del ítem (voz `voice` default y variante `normal`;
+    los ítems derivados `d-` reutilizan el sidecar del padre por `derived_from`),
+    lee su sidecar `{wav}.words.json` y asigna a cada palabra el índice de la
+    frase (`sentence_timings`) que la contiene comparando su `start` contra los
+    intervalos de `coarse_sentence_timings`.
+
+    Devuelve `[{index, text, start, end, sentence}]` en orden de tiempo; `[]` si
+    no hay sidecar (audio no pre-renderizado o ASR no disponible/cobertura baja),
+    degradando el frontend al sync de frase. Sin `duration`/frases no bloquea:
+    `sentence` queda a `-1` y la UI degrada a una sola línea continua.
+
+    Señal proxy (P20): son tiempos ASR (`sync: asr_word_proxy`) para la voz
+    default y `normal`; slow/fast se escalan en el cliente por el ratio de
+    `speech_rate` y otra voz no expone karaoke salvo sidecar propio.
+    """
+    cache_id = question.get("derived_from") or question["id"]
+    digest = audio_digest(question, "normal")
+    wav_path = (
+        DATA_DIR
+        / "listening"
+        / LISTENING_BANK_VERSION
+        / voice
+        / f"{cache_id}-{digest}.wav"
+    )
+    words = sidecar_words(wav_path)
+    if not words:
+        return []
+    sentences = coarse_sentence_timings(question)
+
+    def sentence_for(start: float) -> int:
+        for sentence in sentences:
+            if sentence["start"] <= start < sentence["end"]:
+                return int(sentence["index"])
+        # Borde final: un `start` en la última frontera (audio terminado).
+        if sentences and start >= sentences[-1]["end"]:
+            return int(sentences[-1]["index"])
+        return -1
+
+    return [
+        {
+            "index": int(word.get("index", index)),
+            "text": str(word.get("text", "")),
+            "start": round(float(word.get("start", 0.0)), 3),
+            "end": round(float(word.get("end", 0.0)), 3),
+            "sentence": sentence_for(float(word.get("start", 0.0))),
+        }
+        for index, word in enumerate(words)
+        if str(word.get("text", "")).strip()
     ]
 
 

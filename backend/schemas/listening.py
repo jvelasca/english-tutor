@@ -62,6 +62,14 @@ class ListeningQuestion(BaseModel):
     # proporcional de `duration` por peso textual de cada frase), NUNCA alineación
     # acústica; presentes solo cuando el ítem tiene micro-flow y declara `duration`.
     sentence_timings: list[dict] = Field(default_factory=list)
+    # Timings por palabra (V3.29, Fase 3): lista [{index, text, start, end,
+    # sentence}] generada OFFLINE por el motor `word_alignment_proxy` sobre el WAV
+    # de la voz default y variante `normal` (sidecar `{wav}.words.json`). Es señal
+    # ASR (`sync: "asr_word_proxy"` en el sidecar), nunca verdad acústica; si el
+    # sidecar no existe o la cobertura del ASR es baja, la lista es vacía y el
+    # frontend degrada al sync de frase. `sentence` es el índice de la frase de
+    # `sentence_timings` que contiene la palabra (`-1` sin frases/duration).
+    word_timings: list[dict] = Field(default_factory=list)
     # ítem derivado bottom-up (V3.28, Bloque C): `derived` marca que el contenido
     # se derivó determinísticamente del corpus (no entra en el gate); `derived_from`
     # es el id del ítem padre cuyo audio reutiliza; `task_type` identifica la tarea

@@ -38,6 +38,10 @@ export function useAudioController(): AudioPlaybackState {
           setDuration(element.duration);
         }
       },
+      // V3.29 (Fase 3, P5): la duración se conoce en `loadedmetadata` (no hace
+      // falta esperar al primer `timeupdate`) — habilita el slider de seek y
+      // los controles A/B en cuanto el audio está cargado.
+      onDuration: (duration) => setDuration(duration),
       onError: () => setPlaying(false),
     });
     controllerRef.current = instance;

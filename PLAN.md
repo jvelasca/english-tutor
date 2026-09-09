@@ -8,6 +8,28 @@
 
 ## Estado actual
 
+- ✅ **V3.29 — Listening Engine 4.0, Fase 3 (núcleo, 2026-09-09)**: cerrado e
+  implementado sobre v3.28.1 (**Versión estable `3.29.0`**, app `3.28.1 →
+  3.29.0`) con el plan `v3.29_nucleo_fase_3…plan.md` (P1–P6): **motor de
+  alineación por palabra offline** (`services/word_alignment_proxy.py` +
+  `transcribe_words` con `word_timestamps=True`; sidecar `{wav}.words.json`
+  etiquetado `asr_word_proxy` con cobertura mínima ~80 %, nunca verdad
+  acústica; hooks en `generate_listening_audio.py`/`get_audio`/
+  `import_audio.py` + script de backfill) · **`word_timings` servidos en el
+  payload** (`word_timings_for`; asignación palabra→frase por tiempo contra
+  `coarse_sentence_timings`; funciona con `repetition_policy="twice"` y ítems
+  derivados `d-`; slow/fast se escalan en cliente por `speech_rate`) · **karaoke
+  palabra a palabra** (`KaraokeTranscript`: revelado por frase, palabra activa,
+  toque→seek; degrada a `CoarseTranscript` sin sidecar/cobertura baja) ·
+  **controles de audio precisos** (duración vía `loadedmetadata`, bucle con
+  scheduler `requestAnimationFrame` inyectable, seek slider + bucle A/B en la
+  tarjeta) · **salto a la palabra fallada** (`failedWordTiming`, botones
+  «repetir palabra fallada» normal/slow en dictado y cloze incorrecto) ·
+  **evidencia `word_breakdown_json`** (columna aditiva nullable, migración
+  idempotente; se persiste el breakdown del dictado fallido y el target del
+  cloze/segmentation incorrecto; sin consumo en agregados — V3.30). El
+  diccionario de consulta se reprioriza a V3.30 (siguiente candidato).
+
 - ✅ **V3.28.1 — patch de la auditoría V3.28.0 (2026-09-09)**: cerrado e
   implementado sobre v3.28.0 (**Versión estable `3.28.1`**, app `3.28.0 →
   3.28.1`) con el plan `v3.28.1_patch_auditado_e76303f2.plan.md`: **P1-01**
@@ -919,14 +941,17 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- ✅ **V3.28 — Listening Engine 4.0 Fase 2** **cerrado (2026-09-09,
-  v3.28.0)**: implementado (ver "Estado actual" arriba,
-  `release-notes-v3.28.0.md`). Fase 2 de la especificación
-  `docs/LISTENING_ENGINE_4.0.md` cerrada. El diccionario de consulta se
-  reprioriza a V3.29 (siguiente candidato).
+- ✅ **V3.29 — Listening Engine 4.0 Fase 3 (núcleo) cerrado (2026-09-09,
+  v3.29.0)**: implementado (ver "Estado actual" arriba,
+  `release-notes-v3.29.0.md`). Núcleo de la Fase 3 de
+  `docs/LISTENING_ENGINE_4.0.md` cerrado (alineación por palabra offline
+  `word_alignment_proxy`, karaoke, controles precisos, salto a la palabra
+  fallada y evidencia `word_breakdown_json`). El diccionario de consulta se
+  reprioriza a V3.30 (siguiente candidato).
 
-- **V3.29 (candidato) — Diccionario de consulta con marcas de uso y aprendizaje.**
-  Idea registrada tras V3.27: además de los checks por rutas y del diccionario
+- **V3.30 (candidato) — Diccionario de consulta con marcas de uso y aprendizaje.**
+  Idea registrada tras V3.27 y repriorizada desde V3.29: además de los checks
+  por rutas y del diccionario
   personal actual, ofrecer un **diccionario de consulta** (definición/traducción
   a demanda por palabra) que **marque las palabras ya usadas en la app** y su
   estado de aprendizaje (vista/producida/dominada), conectado con la evidencia
@@ -934,6 +959,8 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   diseño cerrado ni alcance aún: requiere decisión de fuente de definiciones
   (100% local, sin nube), granularidad de marca por superficie y relación con el
   Personal Dictionary y el modo chat. Se detallará en su dossier de diseño.
+  Candidatos adicionales V3.30: consumo de `word_breakdown_json` en agregados /
+  práctica dirigida de las palabras falladas y afinado de la Fase 3.
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

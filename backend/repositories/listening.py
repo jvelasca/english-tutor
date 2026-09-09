@@ -29,6 +29,7 @@ def record_attempt(
     segments_replayed: int = 0,
     shadowing_duration_ms: int | None = None,
     shadowing_speech_rate: float | None = None,
+    word_breakdown: dict | None = None,
 ) -> bool:
     """Persiste un intento de listening para un usuario existente.
 
@@ -44,6 +45,12 @@ def record_attempt(
     Los kwargs `shadowing_duration_ms`/`shadowing_speech_rate` (V3.28, Bloque E)
     son señales auxiliares informativas del Shadowing 2.0, nullables: el cliente
     las calcula desde el audio grabado y jamás participan en mastery/gate.
+
+    `word_breakdown` (V3.29, Fase 3) es la evidencia de palabra fallada del
+    intento (dictado erróneo → breakdown de `word_alignment`; cloze/segmentation
+    fallado → `{"target": <palabra diana>}`); se serializa a JSON en
+    `word_breakdown_json`. Default `None` retrocompatible: los intentos sin
+    breakdown (MCQ correcto, dictado acertado…) guardan `NULL`.
     """
     if get_user(user_id) is None:
         return False
@@ -54,8 +61,8 @@ def record_attempt(
             "response_time_ms, replay_count, topic, realized_difficulty, "
             "task_type, score, layer, speed_used, stage, transcript_used, "
             "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
-            "created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "word_breakdown_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 question_id,
@@ -76,6 +83,7 @@ def record_attempt(
                 segments_replayed,
                 shadowing_duration_ms,
                 shadowing_speech_rate,
+                json.dumps(word_breakdown) if word_breakdown is not None else None,
                 _now(),
             ),
         )
@@ -90,7 +98,7 @@ def list_attempts(user_id: str) -> list[dict]:
             "response_time_ms, replay_count, topic, realized_difficulty, "
             "task_type, score, layer, speed_used, stage, transcript_used, "
             "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
-            "created_at "
+            "word_breakdown_json, created_at "
             "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
             (user_id,),
         ).fetchall()

@@ -557,6 +557,20 @@ export interface ListeningQuestion {
   // frase activa con `currentTime`. Presentes solo cuando el ítem trae flow y
   // declara `duration`; vacío no rompe a consumidores antiguos.
   sentenceTimings?: SentenceTiming[];
+  // Timings por palabra (V3.29, Fase 3): karaoke palabra a palabra servido
+  // desde el sidecar `word_alignment_proxy` del audio (señal ASR, voz default
+  // y variante `normal`). `sentence` es el índice de la frase que contiene la
+  // palabra en `sentenceTimings` (-1 sin frases/duration). Vacío ⇒ la UI
+  // degrada al sync de frase (`CoarseTranscript`).
+  wordTimings?: ListeningWordTiming[];
+}
+
+export interface ListeningWordTiming {
+  index: number;
+  text: string;
+  start: number;
+  end: number;
+  sentence: number;
 }
 
 export interface SentenceTiming {

@@ -4,6 +4,7 @@ import type {
   ListeningQuestion,
   ListeningTranscriptPolicy,
   ListeningTranscriptState,
+  ListeningWordTiming,
 } from "../../types/api";
 
 // Timings gruesos de frase (V3.28, Bloque D): el backend reparte `duration` por
@@ -247,4 +248,204 @@ export function revealSentenceIndexes(
     return [activeIndex];
   }
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// Karaoke palabra a palabra (V3.29, Fase 3): helpers puros sobre los word
+// timings del sidecar `word_alignment_proxy` servidos por el backend.
+// ---------------------------------------------------------------------------
+
+/** Timings por palabra del ítem (vacío si el backend no sirvió sidecar). */
+export function wordTimingsOf(question: ListeningQuestion): ListeningWordTiming[] {
+  return question.wordTimings ?? [];
+}
+
+/** Índice global de la palabra activa según `currentTime`.
+
+ * Regla monótona análoga a `activeSentenceIndex`: la palabra activa es la última
+ * cuyo `start` ya se alcanzó (si el audio terminó se mantiene la última; si aún
+ * no empezó ninguna, `null`). Los intervalos no solapan y van en orden de tiempo.
+ */
+export function activeWordIndex(
+  timings: ListeningWordTiming[],
+  currentTime: number,
+): number | null {
+  if (timings.length === 0) return null;
+  const time = Number.isFinite(currentTime) ? currentTime : 0;
+  let active: number | null = null;
+  for (const word of timings) {
+    if (time < word.start) break;
+    active = word.index;
+    if (time < word.end) break;
+  }
+  return active;
+}
+
+/** Palabras que pertenecen a una frase (`sentence` = índice en sentenceTimings). */
+export function wordsForSentence(
+  timings: ListeningWordTiming[],
+  sentence: number,
+): ListeningWordTiming[] {
+  return timings.filter((word) => word.sentence === sentence);
+}
+
+/** Escala tiempos por palabra por un factor (`start`/`end` multiplicados).
+
+ * Slow/fast se reproducen con la misma voz pero distinto `length_scale` de
+ * Piper: la duración del audio (y cada palabra) escala ~inversamente a la tasa.
+ * El factor se deriva de las `variants` del ítem
+ * (`variantTimeScale(question, variant)`) y es 1 para la variante `normal`
+ * (los timings del payload ya corresponden a ella). Aproximación documentada:
+ * `sync` pasa a ser `scaled_word_proxy` conceptualmente, nunca verdad acústica.
+ */
+export function scaleWordTimings(
+  timings: ListeningWordTiming[],
+  factor: number,
+): ListeningWordTiming[] {
+  const scale = Number.isFinite(factor) && factor > 0 ? factor : 1;
+  if (scale === 1) return timings;
+  return timings.map((word) => ({
+    ...word,
+    start: Math.round(word.start * scale * 1000) / 1000,
+    end: Math.round(word.end * scale * 1000) / 1000,
+  }));
+}
+
+/** Factor de tiempo de una variante respecto a `normal` (ver `scaleWordTimings`).
+
+ * Con `speech_rate` declarada: ratio `normal_rate / variant_rate` (slow > 1,
+ * fast < 1). Sin tasas fiables devuelve 1 (sin escalado).
+ */
+export function variantTimeScale(
+  question: ListeningQuestion,
+  variant: string,
+): number {
+  if (variant === "normal") return 1;
+  const variants = question.variants ?? [];
+  const normal = variants.find((v) => v.variant === "normal");
+  const chosen = variants.find((v) => v.variant === variant);
+  if (
+    normal &&
+    chosen &&
+    normal.speech_rate > 0 &&
+    chosen.speech_rate > 0
+  ) {
+    return normal.speech_rate / chosen.speech_rate;
+  }
+  return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Salto a la palabra fallada (V3.29, Fase 3, P6): helpers puros sobre los word
+// timings y el resultado (dictation/ MC cloze incorrecto) para "repetir la
+// palabra fallada" en normal o slow. El resultado se escala ANTES de localizar
+// (misma voz, slow/fast con distinta duración) con `scaleWordTimings`.
+// ---------------------------------------------------------------------------
+
+/** Ref acotada de una palabra (o frase) fallada para seek + loop. */
+export interface FailedWordRef {
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** Tokens normalizados de un texto (minúsculas; apóstrofo interno conservado),
+ * análogo a `tokenize` del backend para comparar grafías. */
+export function wordTokensOf(text: string): string[] {
+  return (text ?? "").toLowerCase().match(/[a-z0-9']+/g) ?? [];
+}
+
+/** Primera palabra que el alumno no oyó en el breakdown de una producción
+ * (dictado): primer token de `missing` o, si no, `expected` del primer
+ * `substituted`. `null` si no hay fallo de palabra (o el breakdown no es el
+ * esperado). */
+export function firstFailedWord(
+  breakdown: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!breakdown || typeof breakdown !== "object") return null;
+  const missing = breakdown.missing;
+  if (Array.isArray(missing)) {
+    for (const word of missing) {
+      if (typeof word === "string" && word.trim()) return word.trim();
+    }
+  }
+  const substituted = breakdown.substituted;
+  if (Array.isArray(substituted)) {
+    for (const entry of substituted) {
+      if (entry && typeof entry === "object") {
+        const expected = (entry as { expected?: unknown }).expected;
+        if (typeof expected === "string" && expected.trim()) {
+          return expected.trim();
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Localiza por tiempo la palabra/frase fallada para el salto con repetición.
+ *
+ * `targetText` es el texto que el alumno no oyó bien: en dictado, la palabra
+ * devuelta por `firstFailedWord(breakdown)`; en un MCQ cloze/segmentation
+ * incorrecto, la opción correcta (la frase diana). `wordTimings` deben venir ya
+ * escalados a la variante que se va a reproducir (ver `scaleWordTimings`).
+ *
+ * Búsqueda honesta y en cascada:
+ * 1. Aparición como secuencia contigua de tokens normalizados en `wordTimings`
+ *    (primera ocurrencia en orden de tiempo).
+ * 2. Si no aparece (p. ej. reducción/expansión: `going to` → `gonna`, o la
+ *    opción correcta es una frase completa), la frase de `sentenceTimings`
+ *    cuyo texto la contiene como secuencia contigua; se devuelve su intervalo
+ *    como aproximación honesta.
+ * 3. Sin respaldo: `null` (el llamador oculta el botón, no hay salto fiable).
+ */
+export function failedWordTiming(
+  targetText: string,
+  wordTimings: ListeningWordTiming[],
+  sentenceTimings: SentenceTiming[],
+): FailedWordRef | null {
+  const target = wordTokensOf(targetText);
+  if (target.length === 0 || wordTimings.length === 0) return null;
+  const tokens = wordTimings.map((word) => wordTokensOf(word.text)[0] ?? "");
+
+  // 1. Secuencia contigua en los word timings (primera aparición).
+  for (let i = 0; i + target.length <= tokens.length; i += 1) {
+    let matches = true;
+    for (let k = 0; k < target.length; k += 1) {
+      if (tokens[i + k] !== target[k]) {
+        matches = false;
+        break;
+      }
+    }
+    if (!matches) continue;
+    const first = wordTimings[i];
+    const last = wordTimings[i + target.length - 1];
+    return {
+      text: wordTimings.slice(i, i + target.length).map((w) => w.text).join(" "),
+      start: first.start,
+      end: last.end,
+    };
+  }
+
+  // 2. Aproximación por frase contenedora (el token no está en el sidecar).
+  for (const sentence of sentenceTimings) {
+    const sentenceTokens = wordTokensOf(sentence.text);
+    if (sentenceTokens.length < target.length) continue;
+    for (let i = 0; i + target.length <= sentenceTokens.length; i += 1) {
+      let matches = true;
+      for (let k = 0; k < target.length; k += 1) {
+        if (sentenceTokens[i + k] !== target[k]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        return { text: sentence.text, start: sentence.start, end: sentence.end };
+      }
+    }
+  }
+
+  // 3. Sin respaldo fiable.
+  return null;
 }

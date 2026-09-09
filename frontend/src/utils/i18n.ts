@@ -1555,6 +1555,44 @@ const STRINGS: Record<string, Entry> = {
     en: "Audio settings",
     es: "Ajustes de audio",
   },
+  // Controles precisos V3.29 (Fase 3, P5): seek slider continuo y bucle A/B.
+  "listening.audio.seekSlider": {
+    en: "Audio position (seek)",
+    es: "Posición del audio (seek)",
+  },
+  "listening.audio.markStart": {
+    en: "Mark start",
+    es: "Marcar inicio",
+  },
+  "listening.audio.clearMark": {
+    en: "Clear mark",
+    es: "Quitar marca",
+  },
+  "listening.audio.loopAB": {
+    en: "Loop A–B",
+    es: "Bucle A–B",
+  },
+  "listening.audio.clearLoop": {
+    en: "Remove loop",
+    es: "Quitar bucle",
+  },
+  "listening.audio.loopingHint": {
+    en: "Looping {start} → {end}",
+    es: "Repitiendo {start} → {end}",
+  },
+  // Salto a la palabra fallada (V3.29, Fase 3, P6).
+  "listening.failedWord.repeatLabel": {
+    en: "Repeat failed word:",
+    es: "Repetir palabra fallada:",
+  },
+  "listening.failedWord.repeatNormal": {
+    en: "Normal speed",
+    es: "Velocidad normal",
+  },
+  "listening.failedWord.repeatSlow": {
+    en: "Slow speed",
+    es: "Velocidad lenta",
+  },
   "listening.speed": { en: "Speed:", es: "Velocidad:" },
   "listening.audioUnavailable": {
     en: "Reference audio not available; using live generated voice.",
@@ -1980,6 +2018,26 @@ const STRINGS: Record<string, Entry> = {
   "listening.coarseTranscript.syncHint": {
     en: "Phrase highlighting follows the audio. Timings are approximate, not a word-by-word alignment.",
     es: "El resaltado de la frase sigue el audio. Los tiempos son aproximados, no una alineación palabra a palabra.",
+  },
+  "listening.karaokeTranscript.title": {
+    en: "Transcript (word sync)",
+    es: "Transcripción (sync palabra)",
+  },
+  "listening.karaokeTranscript.partialTitle": {
+    en: "Transcript (partial)",
+    es: "Transcripción (parcial)",
+  },
+  "listening.karaokeTranscript.syncTag": {
+    en: "Word-level sync",
+    es: "Sync palabra a palabra",
+  },
+  "listening.karaokeTranscript.syncHint": {
+    en: "Each word highlights as it is heard. Tap a word to replay from that point.",
+    es: "Cada palabra se resalta al oírla. Toca una palabra para reproducir desde ese punto.",
+  },
+  "listening.karaokeTranscript.seekWord": {
+    en: "Play from this word",
+    es: "Reproducir desde esta palabra",
   },
   "listening.layer.recognition": {
     en: "Recognition",

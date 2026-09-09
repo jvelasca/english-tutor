@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.28.1**.
+- Última versión estable: **v3.29.0**.
 
 ## Estructura
 
@@ -39,7 +39,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 - **Progreso pedagógico real (F6)**: dashboard con tendencias, racha, dominio de errores e hitos.
 - **Pronunciación fonética (F7)**: evaluador compuesto (palabras + Soundex + caracteres) con fluidez (WPM).
 - **Listening / nivel estimado (F8)**: ejercicios de comprensión auditiva y **nivel estimado** multi-señal (heurístico, no certificación CEFR).
-- **Listening Engine 4.0 (V3.27-V3.28)**: micro-flujo pedagógico por ítem servido por el backend (`flow` pre/while1/while2/post/shadowing + `transcript_policy`, perfil auditivo casos A-D) · **Fase 2**: AudioController rico (play/seek/rate con pitch/loop/segmentos), tareas bottom-up derivadas del corpus (cloze auditivo, dictado parcial, segmentación — nunca en certificación), transcript dinámico con sync grueso de frase y Shadowing 2.0 con playback de la grabación del alumno. Detalle en `docs/LISTENING_ENGINE_4.0.md`.
+- **Listening Engine 4.0 (V3.27-V3.29)**: micro-flujo pedagógico por ítem servido por el backend (`flow` pre/while1/while2/post/shadowing + `transcript_policy`, perfil auditivo casos A-D) · **Fase 2**: AudioController rico (play/seek/rate con pitch/loop/segmentos), tareas bottom-up derivadas del corpus (cloze auditivo, dictado parcial, segmentación — nunca en certificación), transcript dinámico con sync grueso de frase y Shadowing 2.0 con playback de la grabación del alumno · **Fase 3 (núcleo)**: karaoke palabra a palabra (`word_alignment_proxy` offline con faster-whisper), controles precisos (seek + bucle A/B), salto a la palabra fallada (normal/slow) y evidencia de palabra fallada. Detalle en `docs/LISTENING_ENGINE_4.0.md`.
 - **Evaluación objetiva del tutor (F9)**: métricas deterministas del tutor (backend + panel).
 - **Lanzador de escritorio**: GUI que arranca/detiene la app y muestra estado, BD y usuarios.
 - **Acceso LAN / móvil**: HTTPS autofirmado en la red local, QR de conexión, verificación real de

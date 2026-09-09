@@ -322,6 +322,45 @@ def transcribe(audio_bytes: bytes, language: str = "en") -> str:
     return transcribe_with_timing(audio_bytes, language)["text"]
 
 
+def transcribe_words(audio_bytes: bytes, language: str = "en") -> list[dict]:
+    """Transcribe con timestamps por palabra (`word_timestamps=True`).
+
+    Devuelve `[{word, start, end}]` con los tiempos que faster-whisper asigna a
+    cada token reconocido (`Segment.words`), redondeados y en orden de aparición.
+    `word` puede traer espacios/puntuación pegados (p. ej. `" Hello,"`): el
+    consumidor normaliza. Sin palabras reconocidas devuelve `[]`.
+
+    Es la señal `word_alignment_proxy` (V3.29, Fase 3): se ejecuta OFFLINE sobre
+    el WAV sintetizado/importado para cachear el sidecar de timings; nunca en el
+    flujo síncrono de una pregunta.
+
+    Bloqueante: ejecutar en un threadpool. Duck-typed en tests con dobles.
+    """
+    model = _get_model()
+    segments_gen, _ = model.transcribe(
+        io.BytesIO(audio_bytes),
+        language=language,
+        beam_size=5,
+        word_timestamps=True,
+    )
+    words: list[dict] = []
+    for segment in segments_gen:
+        for item in getattr(segment, "words", None) or []:
+            try:
+                start = float(item.start)
+                end = float(item.end)
+            except (TypeError, ValueError):
+                continue
+            words.append(
+                {
+                    "word": str(getattr(item, "word", "") or "").strip(),
+                    "start": _round(start),
+                    "end": _round(end),
+                }
+            )
+    return words
+
+
 def is_ready() -> bool:
     """True si el modelo Whisper está descargado (directorio no vacío)."""
     try:

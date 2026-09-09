@@ -3,7 +3,33 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-09 12:35 (UTC+2).
+> Actualizado por última vez: 2026-09-09 14:00 (UTC+2).
+>
+> **Nota (2026-09-09, 14:00):** **V3.29 publicada** — release **v3.29.0**
+> (Listening Engine 4.0, **Fase 3, núcleo**). Plan
+> `v3.29_nucleo_fase_3…plan.md` (P1–P6); especificación
+> `docs/LISTENING_ENGINE_4.0.md` a v1.2 con el núcleo de la Fase 3 marcada
+> **implementada** (§14/§15). Resumen: **P1** motor `word_alignment_proxy`
+> offline — `stt.transcribe_words` (`word_timestamps=True`) + módulo puro con
+> sidecar `{wav}.words.json` (`sync: asr_word_proxy`, `coverage`, escritura
+> atómica), `align_words` con interpolación monótona y `MIN_COVERAGE ≈ 0.8`
+> (degradación controlada al sync de frase); hooks en
+> `generate_listening_audio.py`, `get_audio` e `import_audio.py` + backfill
+> `generate_word_alignments.py` · **P2** `word_timings` en el payload
+> (`word_timings_for`, asignación palabra→frase **por tiempo**, `twice`/derivados
+> `d-`, escalado slow/fast por `speech_rate` en cliente) · **P3** evidencia
+> `word_breakdown_json` (columna aditiva nullable idempotente; dictado fallido +
+> target de cloze/segmentation incorrecto; sin consumo en agregados → V3.30) ·
+> **P4** karaoke `KaraokeTranscript` (revelado por frase + palabra activa +
+> toque→seek) · **P5** controles precisos (`onDuration` en `loadedmetadata`,
+> bucle con scheduler rAF inyectable, seek slider + bucle A/B) · **P6** salto a
+> la palabra fallada (`failedWordTiming`, botones normal/slow en dictado/cloze).
+> Verificación íntegra local: pytest + ruff, vitest + `tsc --noEmit`,
+> `check_release_consistency` **3.29.0** exit 0 (conteos finales en
+> `release-notes-v3.29.0.md`). Pendiente para V3.30: diccionario de consulta
+> (candidato), consumo de `word_breakdown_json` en agregados/práctica dirigida,
+> afinado de la Fase 3 (lección orquestada multi-ítem, evaluación acústica real)
+> y el dossier de auditoría del candidato v3.28.0 (letra P).
 >
 > **Nota (2026-09-09, 12:35):** **V3.28.1 publicada** — patch de la auditoría
 > V3.28.0 (release **v3.28.1**, P1 auditados): 1) `partial_dictation` derivado

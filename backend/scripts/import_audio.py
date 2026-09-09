@@ -190,6 +190,19 @@ def entry_from_item(item: dict, duration: float) -> AudioLibraryEntry:
     )
 
 
+def _align_if_possible(dest: Path, transcript: str) -> None:
+    """Genera el sidecar word_alignment_proxy del WAV humano importado.
+
+    Solo si hay transcripción literal con la que alinear; nunca rompe la
+    importación (degradación controlada si el ASR no está o no cubre).
+    """
+    if not (transcript or "").strip():
+        return
+    from services.word_alignment_proxy import ensure_word_alignment
+
+    ensure_word_alignment(dest, transcript.strip())
+
+
 def _batch_import(wav_dir: Path, level: str | None) -> int:
     """Importa en lote los WAV grabados del corpus a la biblioteca (manifest + copia).
 
@@ -229,6 +242,7 @@ def _batch_import(wav_dir: Path, level: str | None) -> int:
             errors += 1
             print(f"[FAIL] {audio_id}: {exc}")
             continue
+        _align_if_possible(library_dir() / entry.file, entry.transcript)
         imported += 1
         print(f"[OK] {audio_id} -> {entry.file}")
 
@@ -310,6 +324,7 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(manifest.model_dump(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    _align_if_possible(dest, entry.transcript)
 
     print(json.dumps(entry.model_dump(), ensure_ascii=False, indent=2))
     print(f"[OK] importado a {dest}")

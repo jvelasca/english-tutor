@@ -212,3 +212,98 @@ describe("AudioController", () => {
     expect(onPlayingChange.mock.calls.length).toBe(countBefore);
   });
 });
+
+describe("AudioController V3.29 (Fase 3, P5)", () => {
+  /** Scheduler de fotogramas de doble: acumula callbacks sin ejecutarlos. */
+  function fakeScheduler() {
+    const frames: Array<() => void> = [];
+    const scheduler = {
+      frame: vi.fn((cb: () => void) => {
+        frames.push(cb);
+        return frames.length;
+      }),
+      cancelFrame: vi.fn((id: number) => {
+        delete frames[id - 1];
+      }),
+      frames,
+    };
+    return scheduler;
+  }
+
+  it("loadedmetadata notifica la duración (onDuration)", () => {
+    const el = fakeElement({ duration: 12.5 });
+    const onDuration = vi.fn();
+    const ctrl = new AudioController(el, { onDuration });
+    trigger(el, "loadedmetadata");
+    expect(onDuration).toHaveBeenCalledWith(12.5);
+    ctrl.dispose();
+  });
+
+  it("rebobina el bucle con el scheduler rAF sin depender de timeupdate", () => {
+    const el = fakeElement({ duration: 10 });
+    el.paused = false;
+    const scheduler = fakeScheduler();
+    const ctrl = new AudioController(el, {}, scheduler);
+    ctrl.loop(2, 4);
+    // El scheduler arrancó (segmento + reproduciendo) y hay un frame pendiente.
+    expect(scheduler.frame).toHaveBeenCalled();
+    // La reproducción alcanza el fin del segmento... pero el navegador aún no
+    // emite `timeupdate`. El siguiente fotograma debe rebobinar igualmente.
+    el.currentTime = 4;
+    const frame = scheduler.frames[scheduler.frames.length - 1];
+    expect(frame).toBeTypeOf("function");
+    frame();
+    expect(el.currentTime).toBe(2);
+    // Y el bucle sigue vivo: el tick se reprograma mientras haya segmento.
+    expect(scheduler.frame.mock.calls.length).toBeGreaterThanOrEqual(2);
+    ctrl.dispose();
+  });
+
+  it("pausar detiene el scheduler (cancelFrame) y no reprograma", () => {
+    const el = fakeElement({ duration: 10 });
+    el.paused = false;
+    const scheduler = fakeScheduler();
+    const ctrl = new AudioController(el, {}, scheduler);
+    ctrl.loop(1, 3);
+    expect(scheduler.frame).toHaveBeenCalledTimes(1);
+    ctrl.pause();
+    trigger(el, "pause");
+    expect(scheduler.cancelFrame).toHaveBeenCalled();
+    ctrl.dispose();
+  });
+
+  it("sin segmento el scheduler no corre (no hay frames en cola)", () => {
+    const el = fakeElement({ duration: 10 });
+    el.paused = false;
+    const scheduler = fakeScheduler();
+    const ctrl = new AudioController(el, {}, scheduler);
+    trigger(el, "play"); // playing sin segmento: no debe programar frames
+    expect(scheduler.frame).not.toHaveBeenCalled();
+    ctrl.clearLoop();
+    ctrl.dispose();
+  });
+
+  it("clearLoop detiene el scheduler aunque la reproducción siga", () => {
+    const el = fakeElement({ duration: 10 });
+    el.paused = false;
+    const scheduler = fakeScheduler();
+    const ctrl = new AudioController(el, {}, scheduler);
+    ctrl.loop(0, 3);
+    expect(scheduler.frame).toHaveBeenCalled();
+    ctrl.clearLoop();
+    expect(scheduler.cancelFrame).toHaveBeenCalled();
+    expect(ctrl.loopSegment).toBeNull();
+    ctrl.dispose();
+  });
+
+  it("sin scheduler inyectado el bucle sigue por timeupdate (respaldo)", () => {
+    const el = fakeElement({ duration: 10 });
+    const ctrl = new AudioController(el);
+    el.paused = false;
+    ctrl.loop(2, 4);
+    el.currentTime = 4;
+    trigger(el, "timeupdate");
+    expect(el.currentTime).toBe(2);
+    ctrl.dispose();
+  });
+});

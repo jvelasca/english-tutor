@@ -1001,6 +1001,19 @@ def init_db() -> None:
                 "shadowing_speech_rate REAL"
             )
 
+        # Migración idempotente V3.29 (Listening Engine 4.0, Fase 3): evidencia
+        # de palabra fallada. `word_breakdown_json` (TEXT, nullable) guarda el
+        # breakdown de `word_alignment` de una tarea de producción fallada
+        # (dictado: missing/substituted → palabras que el alumno no oyó bien) o,
+        # en un acierto incorrecto de cloze/segmentation, la palabra diana del
+        # hueco. Aditiva y nullabe: sin consumo en agregados todavía (V3.30), los
+        # intentos legacy conservan `NULL`.
+        if "word_breakdown_json" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN "
+                "word_breakdown_json TEXT"
+            )
+
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "
             "ON messages(conversation_id, message_id)"

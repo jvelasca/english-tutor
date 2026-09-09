@@ -7,9 +7,12 @@ import type {
 import {
   advanceToNext,
   activeSentenceIndex,
+  activeWordIndex,
   completeShadowing,
   completeStageWithAnswer,
   currentStep,
+  failedWordTiming,
+  firstFailedWord,
   flowOf,
   hasFlow,
   initialFlow,
@@ -18,8 +21,14 @@ import {
   revealFull,
   revealSentenceIndexes,
   retryStage,
+  scaleWordTimings,
   timingsOf,
+  variantTimeScale,
+  wordTimingsOf,
+  wordTokensOf,
+  wordsForSentence,
   type SentenceTiming,
+  type TranscriptState,
 } from "./microFlow";
 
 const A1_POLICY: ListeningTranscriptPolicy = {
@@ -368,5 +377,180 @@ describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
     expect(retry.stage).toBe("while2");
     expect(retry.attemptCount).toBe(1);
     expect(retry.transcript).toBe("full"); // apoyo visible en el reintento
+  });
+});
+
+describe("microFlow: karaoke palabra a palabra (V3.29, Fase 3)", () => {
+  const WORD_TIMINGS = [
+    { index: 0, text: "Hello", start: 0, end: 0.4, sentence: 0 },
+    { index: 1, text: "world", start: 0.5, end: 0.9, sentence: 0 },
+    { index: 2, text: "Nice", start: 1.1, end: 1.5, sentence: 1 },
+    { index: 3, text: "day", start: 1.6, end: 2.0, sentence: 1 },
+  ];
+  const SENTENCE_TIMINGS: SentenceTiming[] = [
+    { index: 0, start: 0, end: 1, text: "Hello world.", sync: "coarse_heuristic" },
+    { index: 1, start: 1, end: 2, text: "Nice day.", sync: "coarse_heuristic" },
+  ];
+
+  it("wordTimingsOf expone las palabras del backend (o lista vacía)", () => {
+    expect(wordTimingsOf(question({ flow: receptiveFlow }))).toEqual([]);
+    const q = question({ flow: receptiveFlow, wordTimings: WORD_TIMINGS });
+    expect(wordTimingsOf(q)).toHaveLength(4);
+  });
+
+  it("activeWordIndex: palabra activa según currentTime (regla monótona)", () => {
+    expect(activeWordIndex(WORD_TIMINGS, 0)).toBe(0);
+    expect(activeWordIndex(WORD_TIMINGS, 0.2)).toBe(0);
+    expect(activeWordIndex(WORD_TIMINGS, 0.5)).toBe(1);
+    expect(activeWordIndex(WORD_TIMINGS, 1.6)).toBe(3);
+    // Tras el final se mantiene la última palabra (resaltado estable).
+    expect(activeWordIndex(WORD_TIMINGS, 5)).toBe(3);
+    // Sin timings o antes del primer start → null.
+    expect(activeWordIndex([], 1)).toBeNull();
+    expect(activeWordIndex(WORD_TIMINGS, -1)).toBeNull();
+    expect(activeWordIndex(WORD_TIMINGS, Number.NaN)).toBe(0);
+  });
+
+  it("wordsForSentence filtra las palabras de una frase", () => {
+    expect(wordsForSentence(WORD_TIMINGS, 0).map((w) => w.text)).toEqual([
+      "Hello",
+      "world",
+    ]);
+    expect(wordsForSentence(WORD_TIMINGS, 1)).toHaveLength(2);
+    expect(wordsForSentence(WORD_TIMINGS, 9)).toEqual([]);
+  });
+
+  it("scaleWordTimings escala slow/fast sin mutar el original", () => {
+    const slow = scaleWordTimings(WORD_TIMINGS, 1.5);
+    expect(slow[0].start).toBe(0);
+    expect(slow[1].start).toBe(0.75); // 0.5 * 1.5
+    expect(slow[3].end).toBe(3); // 2.0 * 1.5
+    // El original queda intacto.
+    expect(WORD_TIMINGS[1].start).toBe(0.5);
+    // Factor 1 devuelve la misma referencia (sin copia innecesaria).
+    expect(scaleWordTimings(WORD_TIMINGS, 1)).toBe(WORD_TIMINGS);
+    // Factor inválido → sin escalado.
+    expect(scaleWordTimings(WORD_TIMINGS, Number.NaN)).toBe(WORD_TIMINGS);
+    expect(scaleWordTimings(WORD_TIMINGS, -2)).toBe(WORD_TIMINGS);
+  });
+
+  it("variantTimeScale deriva el factor de las variantes (normal/slow/fast)", () => {
+    const variants = [
+      { variant: "slow", speech_rate: 105, label: "Slow" },
+      { variant: "normal", speech_rate: 140, label: "Normal" },
+      { variant: "fast", speech_rate: 175, label: "Fast" },
+    ];
+    const q = question({ variants });
+    expect(variantTimeScale(q, "normal")).toBe(1);
+    expect(variantTimeScale(q, "slow")).toBeCloseTo(140 / 105, 5);
+    expect(variantTimeScale(q, "fast")).toBeCloseTo(140 / 175, 5);
+    // Sin tasas declaradas no hay escalado (1) para cualquier variante.
+    const noRates = question({ variants: [{ variant: "slow", speech_rate: 0, label: "Slow" }] });
+    expect(variantTimeScale(noRates, "slow")).toBe(1);
+    expect(variantTimeScale(question(), "slow")).toBe(1);
+  });
+
+  it("revelado por frase funciona con palabras (full → todo, partial → frase)", () => {
+    const revealed = (state: TranscriptState, t: number) => {
+      const active = activeSentenceIndex(SENTENCE_TIMINGS, t);
+      const indexes = revealSentenceIndexes(state, SENTENCE_TIMINGS, active);
+      return WORD_TIMINGS.filter((w) => indexes.includes(w.sentence));
+    };
+    expect(revealed("full", 0.2).map((w) => w.text)).toEqual([
+      "Hello",
+      "world",
+      "Nice",
+      "day",
+    ]);
+    expect(revealed("partial", 0.2).map((w) => w.text)).toEqual([
+      "Hello",
+      "world",
+    ]);
+    expect(revealed("partial", 1.8).map((w) => w.text)).toEqual(["Nice", "day"]);
+  });
+});
+
+describe("microFlow: salto a la palabra fallada (V3.29, Fase 3, P6)", () => {
+  const WORD_TIMINGS = [
+    { index: 0, text: "Hello", start: 0, end: 0.4, sentence: 0 },
+    { index: 1, text: "world", start: 0.5, end: 0.9, sentence: 0 },
+    { index: 2, text: "Nice", start: 1.1, end: 1.5, sentence: 1 },
+    { index: 3, text: "day", start: 1.6, end: 2.0, sentence: 1 },
+  ];
+  const SENTENCE_TIMINGS: SentenceTiming[] = [
+    { index: 0, start: 0, end: 1, text: "Hello world.", sync: "coarse_heuristic" },
+    { index: 1, start: 1, end: 2, text: "Nice day.", sync: "coarse_heuristic" },
+  ];
+
+  it("wordTokensOf normaliza grafías (mayúsculas/puntuación, apóstrofo)", () => {
+    expect(wordTokensOf("Gonna go?")).toEqual(["gonna", "go"]);
+    expect(wordTokensOf("I'm fine!")).toEqual(["i'm", "fine"]);
+    expect(wordTokensOf("  ")).toEqual([]);
+    expect(wordTokensOf("")).toEqual([]);
+  });
+
+  it("firstFailedWord: prioriza missing y cae a substituted.expected", () => {
+    expect(
+      firstFailedWord({
+        missing: ["hello"],
+        substituted: [{ expected: "world", heard: "word" }],
+      }),
+    ).toBe("hello");
+    expect(
+      firstFailedWord({
+        missing: [],
+        substituted: [{ expected: "world", heard: "word" }],
+      }),
+    ).toBe("world");
+    // Sin fallos de palabra o breakdown inesperado → null.
+    expect(firstFailedWord({ missing: [], substituted: [] })).toBeNull();
+    expect(firstFailedWord(null)).toBeNull();
+    expect(firstFailedWord(undefined)).toBeNull();
+    expect(firstFailedWord({})).toBeNull();
+  });
+
+  it("mapea una palabra del dictado a su timing (busca la primera aparición)", () => {
+    const ref = failedWordTiming("world", WORD_TIMINGS, SENTENCE_TIMINGS);
+    expect(ref).toEqual({ text: "world", start: 0.5, end: 0.9 });
+    // Grafía distinta pero mismo token (mayúsculas / puntuación).
+    const withPunct = failedWordTiming("World,", WORD_TIMINGS, SENTENCE_TIMINGS);
+    expect(withPunct?.start).toBe(0.5);
+  });
+
+  it("mapea una frase diana completa como secuencia contigua", () => {
+    const ref = failedWordTiming("Nice day", WORD_TIMINGS, SENTENCE_TIMINGS);
+    expect(ref).toEqual({ text: "Nice day", start: 1.1, end: 2.0 });
+  });
+
+  it("cae a la frase contenedora cuando el token no está en el sidecar", () => {
+    // El ASR oyó la reducción "gonna" pero el target usa la expansión
+    // canónica "going to": sin par en los timings → aproximación por frase.
+    const reducedTimings = [
+      { index: 0, text: "I'm", start: 0, end: 0.4, sentence: 0 },
+      { index: 1, text: "gonna", start: 0.5, end: 0.9, sentence: 0 },
+      { index: 2, text: "leave", start: 1.0, end: 1.4, sentence: 0 },
+    ];
+    const sentences: SentenceTiming[] = [
+      {
+        index: 0,
+        start: 0,
+        end: 1.5,
+        text: "I'm going to leave.",
+        sync: "coarse_heuristic",
+      },
+    ];
+    const ref = failedWordTiming("going", reducedTimings, sentences);
+    expect(ref).toEqual({ text: "I'm going to leave.", start: 0, end: 1.5 });
+  });
+
+  it("sin respaldo en palabras ni frases devuelve null (degradación)", () => {
+    expect(failedWordTiming("zebra", WORD_TIMINGS, SENTENCE_TIMINGS)).toBeNull();
+    expect(failedWordTiming("", WORD_TIMINGS, SENTENCE_TIMINGS)).toBeNull();
+    expect(failedWordTiming("world", [], [])).toBeNull();
+    expect(failedWordTiming("world", WORD_TIMINGS, [])).toEqual({
+      text: "world",
+      start: 0.5,
+      end: 0.9,
+    });
   });
 });

@@ -1,3 +1,10 @@
+// ListeningPractice — práctica de Listening (Listening Engine 4.0).
+//
+// V3.29 (Fase 3): integra el karaoke palabra a palabra (`KaraokeTranscript`,
+// sidecar `word_alignment_proxy` del backend), los controles de audio precisos
+// (seek slider + bucle A/B) y el salto a la palabra fallada (dictado/cloze),
+// además del micro-flujo V3.27/V3.28, la transcripción dinámica por frase
+// (`CoarseTranscript`, sync grueso heurístico) y el Shadowing 2.0.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
@@ -5,14 +12,17 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Flag,
   Loader2,
   Mic,
   MoreHorizontal,
   Play,
   RefreshCw,
+  Repeat2,
   Send,
   Square,
   Volume2,
+  X,
 } from "lucide-react";
 import {
   addRouteExtras,
@@ -78,12 +88,18 @@ import {
   completeShadowing,
   completeStageWithAnswer,
   currentStep,
+  failedWordTiming,
+  firstFailedWord,
   flowOf,
   hasFlow,
   initialFlow,
   isProductionFlow,
   revealFull,
+  scaleWordTimings,
+  variantTimeScale,
+  type FailedWordRef,
   type MicroFlowState,
+  type TranscriptState,
 } from "./microFlow";
 import { AuditoryProfileCard } from "./AuditoryProfileCard";
 // AudioController 4.0 (V3.28, Bloque B): reproducción del audio de referencia
@@ -91,13 +107,17 @@ import { AuditoryProfileCard } from "./AuditoryProfileCard";
 //
 // Integración real en esta pantalla (V3.28.1, P1-04): `play(url)` reproduce la
 // variante de la escalera y `pause()` corta al cambiar de ítem/desmontar; el
-// estado `playing`/`currentTime` alimenta el resaltado de frase activa. Quedan
-// SIN UI (mapa a V3.29 Fase 3): `seek` (scrubber), `setRate` fino con
-// `preservesPitch`, `loop`, `replaySegment` y `markSegmentStart`.
+// estado `playing`/`currentTime` alimenta el resaltado de frase activa. Desde
+// V3.29 (Fase 3) también se integran el seek preciso (slider + palabra fallada)
+// y el bucle de segmento (control A/B y replay de palabra); quedan sin UI
+// `setRate` fino con `preservesPitch` y `replaySegment` directo.
 import { useAudioController } from "./useAudioController";
 // Transcripción dinámica con sync grueso (V3.28, Bloque D): resalta la frase
 // activa según `currentTime` y respeta el revelado `hidden/partial/full`.
 import { CoarseTranscript } from "./CoarseTranscript";
+// Transcripción karaoke palabra a palabra (V3.29, Fase 3): resalta cada palabra
+// al oírla (word_timings del sidecar word_alignment_proxy) y permite saltar.
+import { KaraokeTranscript } from "./KaraokeTranscript";
 
 // Etiqueta legible de una dimensión de resiliencia auditiva (Listening 2.0):
 // "clear_speech" → "listening.resilience.clear_speech" (clave i18n localizada).
@@ -131,6 +151,14 @@ function retentionBucketLabel(bucket: string, t: (k: string) => string): string 
 
 function audioTypeLabel(audioType: string, t: (k: string) => string): string {
   return t(audioTypeKey(audioType));
+}
+
+/** Formatea segundos como `m:ss` (seek slider y control A/B, V3.29 P5). */
+function formatSeconds(total: number): string {
+  const seconds = Math.max(0, Math.floor(Number.isFinite(total) ? total : 0));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
 const WAVE_BARS = [0.45, 0.8, 0.55, 1, 0.65, 0.9, 0.5, 0.75, 0.4, 0.85, 0.6, 1, 0.7, 0.5, 0.9, 0.65];
@@ -205,6 +233,7 @@ export function ListeningPractice({
     controller: audioController,
     playing: elementPlaying,
     currentTime: audioTime,
+    duration: audioDuration,
   } = useAudioController();
   const [ttsLivePlaying, setTtsLivePlaying] = useState(false);
   const playing = elementPlaying || ttsLivePlaying;
@@ -214,6 +243,11 @@ export function ListeningPractice({
   const [startedAt, setStartedAt] = useState(0);
   const [variant, setVariant] = useState<string>("normal");
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  // Control de bucle A/B de la tarjeta de audio (V3.29, Fase 3, P5):
+  // `markStart` es el instante "A" marcado; `isLooping` refleja si el
+  // AudioController tiene segmento activo (botón "quitar bucle").
+  const [markStart, setMarkStart] = useState<number | null>(null);
+  const [isLooping, setIsLooping] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
   const [session, setSession] = useState<ListeningSession | null>(null);
@@ -291,6 +325,75 @@ export function ListeningPractice({
     question && hasFlow(question) && !isProductionFlow(question) && flowState
       ? flowState
       : null;
+
+  // Estado de revelado de la transcripción para el render del transcript:
+  // - flujo receptivo (`micro`): lo que dicta la máquina (hidden/partial/full);
+  // - tarea de producción directa (dictation/shadowing, `micro` null): tras el
+  //   resultado se revela completa (V3.29, Fase 3) para revisar palabra a
+  //   palabra lo que sonaba; antes de responder permanece oculta.
+  const isProductionTask = question ? isProductionFlow(question) : false;
+  const transcriptVisible: TranscriptState = micro
+    ? micro.transcript
+    : isProductionTask && (result !== null || productionResult !== null)
+      ? "full"
+      : "hidden";
+
+  /** Seek preciso del AudioController (karaoke / palabra fallada). Si el audio
+   * aún no está cargado el seek se aplica cuando lo esté (duration ya notificada
+   * por el controlador desde V3.29). */
+  function seekTo(seconds: number) {
+    audioController?.seek(seconds);
+  }
+
+  /** Ref de la palabra/frase fallada (V3.29, P6), escalada a la variante que se
+   * va a reproducir. Resuelve el target según el resultado:
+   * - dictado (`productionResult`): primera palabra de `breakdown.missing` /
+   *   `substituted[].expected`;
+   * - MCQ incorrecto (`result.correct === false`): la opción correcta (diana).
+   * Solo hay salto fiable con audio pre-renderizado y word timings del sidecar.
+   */
+  function failedWordRefFor(
+    rateVariant: "normal" | "slow",
+  ): FailedWordRef | null {
+    if (!question || !question.audio_ready || !audioController) return null;
+    const timings = question.wordTimings ?? [];
+    if (timings.length === 0) return null;
+    let target: string | null = null;
+    if (productionResult?.task_type === "dictation") {
+      target = firstFailedWord(productionResult.breakdown);
+    } else if (result && !result.correct) {
+      target = question.options[result.correct_index] ?? null;
+    }
+    if (!target) return null;
+    return failedWordTiming(
+      target,
+      scaleWordTimings(timings, variantTimeScale(question, rateVariant)),
+      question.sentenceTimings ?? [],
+    );
+  }
+
+  /** Repite la palabra fallada (V3.29, P6): seek al inicio de su ref (+0.05s de
+   * margen), bucle sobre su intervalo y reproducción de la variante pedida. La
+   * cadena pedagógica de la auditoría (palabra fallada → replay → slow) activa
+   * primero `normal` y ofrece el segundo botón en `slow`. */
+  async function repeatFailedWord(rateVariant: "normal" | "slow") {
+    if (!question || !userId || !audioController) return;
+    const ref = failedWordRefFor(rateVariant);
+    if (!ref) return;
+    setVariant(rateVariant);
+    const margin = Math.max(0, ref.start - 0.05);
+    audioController.load(getListeningAudioUrl(question.id, userId, rateVariant));
+    audioController.loop(margin, ref.end);
+    audioController.seek(margin);
+    try {
+      await audioController.play();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  const failedRefNormal = failedWordRefFor("normal");
+  const failedRefSlow = failedWordRefFor("slow");
 
   /** Metadatos de apoyo del intento (evidencia ampliada V3.27). Solo se envían
    * en ítems servidos con `flow`; el resto conserva el envío anterior. */
@@ -386,6 +489,10 @@ export function ListeningPractice({
     setShadowingDurationMs(null);
     setShadowingSpeechRate(null);
     setVariant("normal");
+    // Controles A/B (V3.29, P5): nueva pregunta ⇒ sin marca ni bucle activo.
+    audioController?.clearLoop();
+    setIsLooping(false);
+    setMarkStart(null);
     // Sin override, respeta el nivel y modo de la sesión en curso (si hay).
     const level = levelOverride === undefined ? session?.level : levelOverride;
     const mode =
@@ -1037,6 +1144,91 @@ async function submitDictation() {
               )}
             </div>
 
+            {/* Controles precisos V3.29 (Fase 3, P5): seek slider continuo y
+                bucle A/B. Solo cuando el audio de referencia está pre-renderizado
+                y su duración real ya se conoce (loadedmetadata vía onDuration). */}
+            {question.audio_ready &&
+              audioDuration > 0 &&
+              audioController && (
+                <div className="flex w-full max-w-md flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                      {formatSeconds(audioTime)}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={audioDuration}
+                      step={0.05}
+                      value={Math.min(audioTime, audioDuration)}
+                      onChange={(e) => seekTo(Number(e.target.value))}
+                      aria-label={t("listening.audio.seekSlider")}
+                      className="h-2 w-full cursor-pointer appearance-none rounded-full bg-secondary accent-primary"
+                    />
+                    <span className="w-9 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {formatSeconds(audioDuration)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      variant={markStart !== null ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        if (markStart !== null) {
+                          setMarkStart(null);
+                          setIsLooping(false);
+                        } else {
+                          setMarkStart(audioTime);
+                        }
+                      }}
+                      disabled={!question.audio_ready}
+                    >
+                      <Flag className="size-3.5" aria-hidden="true" />
+                      {markStart !== null
+                        ? t("listening.audio.clearMark")
+                        : t("listening.audio.markStart")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (markStart === null) return;
+                        const end = audioTime;
+                        if (end - markStart < 0.05) return;
+                        audioController.loop(markStart, end);
+                        setIsLooping(true);
+                      }}
+                      disabled={
+                        markStart === null || audioTime - markStart < 0.05
+                      }
+                    >
+                      <Repeat2 className="size-3.5" aria-hidden="true" />
+                      {t("listening.audio.loopAB")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        audioController.clearLoop();
+                        setMarkStart(null);
+                        setIsLooping(false);
+                      }}
+                      disabled={!isLooping && markStart === null}
+                    >
+                      <X className="size-3.5" aria-hidden="true" />
+                      {t("listening.audio.clearLoop")}
+                    </Button>
+                  </div>
+                  {isLooping && markStart !== null && (
+                    <p className="text-center text-[11px] text-muted-foreground">
+                      {t("listening.audio.loopingHint")
+                        .replace("{start}", formatSeconds(markStart))
+                        .replace("{end}", formatSeconds(audioTime))}
+                    </p>
+                  )}
+                </div>
+              )}
+
             {showAudioSettings && (
               <div
                 id="listening-audio-settings"
@@ -1288,17 +1480,30 @@ async function submitDictation() {
             </Card>
           )}
 
-          {question?.sentenceTimings &&
-            question.sentenceTimings.length > 0 &&
-            micro &&
-            micro.transcript !== "hidden" &&
-            micro.stage !== "shadowing" && (
+          {/* Transcript dinámico (V3.28/V3.29): karaoke palabra a palabra cuando
+              el backend sirve `wordTimings` (sidecar word_alignment_proxy);
+              si no, sync grueso de frase. `transcriptVisible` cubre el flujo
+              receptivo (hidden/partial/full) y la revelación completa tras un
+              resultado de producción (dictado/shadowing). */}
+          {question &&
+            transcriptVisible !== "hidden" &&
+            micro?.stage !== "shadowing" &&
+            ((question.wordTimings?.length ?? 0) > 0 ? (
+              <KaraokeTranscript
+                wordTimings={question.wordTimings ?? []}
+                sentenceTimings={question.sentenceTimings ?? []}
+                state={transcriptVisible}
+                currentTime={audioTime}
+                activeVariantFactor={variantTimeScale(question, variant)}
+                onSeekToWord={(start) => seekTo(start)}
+              />
+            ) : (question.sentenceTimings?.length ?? 0) > 0 ? (
               <CoarseTranscript
-                timings={question.sentenceTimings}
-                state={micro.transcript}
+                timings={question.sentenceTimings ?? []}
+                state={transcriptVisible}
                 currentTime={audioTime}
               />
-            )}
+            ) : null)}
 
           {(result || productionResult) &&
             !(micro?.stage === "shadowing") &&
@@ -1467,6 +1672,41 @@ async function submitDictation() {
                         ),
                       )}
                   </p>
+                  {/* Salto a la palabra fallada (V3.29, Fase 3, P6): en el
+                      dictado fallado se repite en bucle la primera palabra que
+                      el alumno no oyó (normal o slow), con seek al instante de
+                      la palabra vía el sidecar word_alignment_proxy. */}
+                  {(failedRefNormal || failedRefSlow) && (
+                    <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t("listening.failedWord.repeatLabel")}
+                      </span>
+                      {failedRefNormal && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => void repeatFailedWord("normal")}
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden="true" />
+                          {t("listening.failedWord.repeatNormal")}
+                        </Button>
+                      )}
+                      {failedRefSlow && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => void repeatFailedWord("slow")}
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden="true" />
+                          {t("listening.failedWord.repeatSlow")}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </ActivityResult>
@@ -1511,6 +1751,41 @@ async function submitDictation() {
                       </Button>
                     )}
                 </div>
+                {/* Salto a la palabra fallada (V3.29, Fase 3, P6): repetir en
+                    bucle el fragmento que contiene la palabra diana que el
+                    alumno no eligió, en normal o en slow (cadena pedagógica de
+                    la auditoría: palabra fallada → replay → slow). */}
+                {(failedRefNormal || failedRefSlow) && (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t("listening.failedWord.repeatLabel")}
+                    </span>
+                    {failedRefNormal && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => void repeatFailedWord("normal")}
+                      >
+                        <RefreshCw className="size-3.5" aria-hidden="true" />
+                        {t("listening.failedWord.repeatNormal")}
+                      </Button>
+                    )}
+                    {failedRefSlow && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => void repeatFailedWord("slow")}
+                      >
+                        <RefreshCw className="size-3.5" aria-hidden="true" />
+                        {t("listening.failedWord.repeatSlow")}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </Card>
             )}
 

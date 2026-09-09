@@ -1,11 +1,17 @@
 /**
- * AudioController 4.0 (V3.28, Listening Engine 4.0, Fase 2, Bloque B).
+ * AudioController 4.0 (V3.28/3.29, Listening Engine 4.0, Fase 2/3).
  *
  * Controlador de reproducción del audio de referencia de listening sobre un
  * único `HTMLMediaElement` (reutilizable, no un `new Audio()` por pulsación):
  * play/pause/seek, velocidad con preservación de tono cuando el navegador la
  * soporta, bucle de segmento, replay del segmento marcado y suscripción de
- * estado (playing/currentTime/ended) para la UI.
+ * estado (playing/currentTime/duration/ended) para la UI.
+ *
+ * V3.29 (Fase 3, P5): el bucle de segmento pasa a un scheduler
+ * `requestAnimationFrame` inyectable (`AudioFrameScheduler`) que rebobina en
+ * cuanto `currentTime >= segment.end` en cada fotograma (menos deriva que el
+ * `timeupdate`, ~4 Hz); `timeupdate` queda como respaldo sin rAF y la
+ * duración se notifica también en `loadedmetadata` vía `onDuration`.
  *
  * El módulo es puro y testeable en Node: la clase recibe el elemento de medios
  * por constructor (un `HTMLAudioElement` real en la app, un doble en tests) y
@@ -37,6 +43,8 @@ export interface AudioElementLike {
 export interface AudioControllerCallbacks {
   onPlayingChange?: (playing: boolean) => void;
   onCurrentTime?: (time: number) => void;
+  /** Duración conocida del audio (notificada en `loadedmetadata`). V3.29. */
+  onDuration?: (duration: number) => void;
   onEnded?: () => void;
   onError?: (message: string) => void;
 }
@@ -44,6 +52,16 @@ export interface AudioControllerCallbacks {
 export interface AudioSegment {
   start: number;
   end: number;
+}
+
+/**
+ * Scheduler de fotogramas inyectable (V3.29, P5). En el navegador se usa
+ * `requestAnimationFrame`; en tests de Node se inyecta un doble para controlar
+ * el instante exacto del rebobinado del bucle sin depender de `timeupdate`.
+ */
+export interface AudioFrameScheduler {
+  frame: (callback: () => void) => number;
+  cancelFrame: (id: number) => void;
 }
 
 /** Factores de velocidad de la escalera del backend (`VARIANT_SPEED_FACTORS`). */
@@ -113,27 +131,37 @@ export function clampSegment(
 export class AudioController {
   private readonly el: AudioElementLike;
   private readonly callbacks: AudioControllerCallbacks;
+  private readonly frame: ((callback: () => void) => number) | null;
+  private readonly cancelFrame: ((id: number) => void) | null;
   private segment: AudioSegment | null = null;
   private disposed = false;
+  private rafId: number | null = null;
 
   private onTimeupdate = (): void => {
     if (!this.el.paused) this.callbacks.onCurrentTime?.(this.el.currentTime);
-    // Bucle de segmento: al alcanzar el fin, vuelve al inicio sin detenerse.
-    if (this.segment && this.el.currentTime >= this.segment.end) {
-      this.el.currentTime = this.segment.start;
-    }
+    // Respaldo del bucle de segmento si no hay `requestAnimationFrame`
+    // (entornos sin rAF o pestañas en segundo plano, donde rAF se congela).
+    this.rewindIfPastSegmentEnd();
+  };
+
+  private onLoadedMetadata = (): void => {
+    const duration = Number.isFinite(this.el.duration) ? this.el.duration : 0;
+    if (duration > 0) this.callbacks.onDuration?.(duration);
   };
 
   private onPlay = (): void => {
     this.callbacks.onPlayingChange?.(true);
+    this.startFrameLoop();
   };
 
   private onPause = (): void => {
     this.callbacks.onPlayingChange?.(false);
+    this.stopFrameLoop();
   };
 
   private onEnded = (): void => {
     this.callbacks.onPlayingChange?.(false);
+    this.stopFrameLoop();
     this.callbacks.onEnded?.();
   };
 
@@ -141,10 +169,66 @@ export class AudioController {
     this.callbacks.onError?.("audio.playbackError");
   };
 
-  constructor(el: AudioElementLike, callbacks: AudioControllerCallbacks = {}) {
+  /** Rebobina al inicio del segmento si la reproducción superó su fin. */
+  private rewindIfPastSegmentEnd(): void {
+    if (this.segment && !this.el.paused && this.el.currentTime >= this.segment.end) {
+      this.el.currentTime = this.segment.start;
+    }
+  }
+
+  /**
+   * Bucle preciso con `requestAnimationFrame` (V3.29, P5): mientras hay
+   * segmento y se reproduce, comprueba el fin en cada fotograma y rebobina en
+   * cuanto `currentTime >= segment.end` (mucho menos deriva que `timeupdate`,
+   * que el navegador dispara ~4 Hz). Sin segmento no corre: el estado de
+   * `currentTime` para la UI sigue llegando por `timeupdate`.
+   */
+  private startFrameLoop(): void {
+    if (!this.frame || !this.segment || this.rafId !== null || this.disposed) {
+      return;
+    }
+    const tick = (): void => {
+      this.rafId = null;
+      if (this.disposed) return;
+      if (!this.segment || this.el.paused) return;
+      this.rewindIfPastSegmentEnd();
+      if (this.segment && !this.el.paused) {
+        this.rafId = this.frame ? this.frame(tick) : null;
+      }
+    };
+    this.rafId = this.frame(tick);
+  }
+
+  private stopFrameLoop(): void {
+    if (this.rafId !== null) {
+      if (this.cancelFrame) this.cancelFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  constructor(
+    el: AudioElementLike,
+    callbacks: AudioControllerCallbacks = {},
+    scheduler?: AudioFrameScheduler,
+  ) {
     this.el = el;
     this.callbacks = callbacks;
+    // Scheduler por defecto: requestAnimationFrame del navegador si existe; si
+    // no (Node/SSR o tests sin inyección), el bucle usa `timeupdate` como
+    // respaldo (comportamiento V3.28).
+    const hasRaf =
+      typeof scheduler?.frame === "function" ||
+      typeof globalThis.requestAnimationFrame === "function";
+    this.frame =
+      scheduler?.frame ??
+      (hasRaf
+        ? (callback) => globalThis.requestAnimationFrame(callback)
+        : null);
+    this.cancelFrame =
+      scheduler?.cancelFrame ??
+      (hasRaf ? (id) => globalThis.cancelAnimationFrame(id) : null);
     el.addEventListener("timeupdate", this.onTimeupdate);
+    el.addEventListener("loadedmetadata", this.onLoadedMetadata);
     el.addEventListener("play", this.onPlay);
     el.addEventListener("pause", this.onPause);
     el.addEventListener("ended", this.onEnded);
@@ -172,7 +256,7 @@ export class AudioController {
     this.el.src = url;
     this.el.load();
     this.el.playbackRate = this.safeRate(playbackRate);
-    this.segment = null;
+    this.clearLoop();
   }
 
   /** Reproduce la URL cargada (o `load`+`play` si se pasa una URL nueva). */
@@ -237,15 +321,22 @@ export class AudioController {
     if (this.el.currentTime > this.segment.end) {
       this.el.currentTime = this.segment.start;
     }
+    if (!this.el.paused) this.startFrameLoop();
   }
 
   /** Marca el instante actual como inicio del segmento (para replay/loop). */
   markSegmentStart(): void {
-    this.segment = clampSegment(this.el.currentTime, this.duration || null, this.duration);
+    this.segment = clampSegment(
+      this.el.currentTime,
+      this.duration || null,
+      this.duration,
+    );
+    if (!this.el.paused) this.startFrameLoop();
   }
 
   clearLoop(): void {
     this.segment = null;
+    this.stopFrameLoop();
   }
 
   private safeRate(rate: number): number {
@@ -256,8 +347,10 @@ export class AudioController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.stopFrameLoop();
     this.el.pause();
     this.el.removeEventListener("timeupdate", this.onTimeupdate);
+    this.el.removeEventListener("loadedmetadata", this.onLoadedMetadata);
     this.el.removeEventListener("play", this.onPlay);
     this.el.removeEventListener("pause", this.onPause);
     this.el.removeEventListener("ended", this.onEnded);

@@ -42,12 +42,14 @@ from services.listening import (
     skill_layer,
     spoken_text,
     variant_length_scale,
+    word_timings_for,
 )
 from services.listening import (
     level_items as motor_level_items,
 )
 from services.listening_bottom_up import DERIVED_ID_PREFIX
 from services.listening_flow import flow_for_question
+from services.word_alignment_proxy import ensure_word_alignment
 
 
 def _generated_payload(row: dict) -> dict | None:
@@ -182,6 +184,13 @@ def _public_with_flow(question: dict, attempts: list[dict] | None) -> dict:
     out = _public(question)
     out.update(flow_for_question(question, perfil))
     out["sentence_timings"] = coarse_sentence_timings(question)
+    # V3.29 (Fase 3): karaoke palabra a palabra solo para audio TTS con sidecar
+    # `word_alignment_proxy` de la voz default (audio_ready garantiza el WAV
+    # pre-renderizado). Sin sidecar, `word_timings_for` devuelve `[]` y el
+    # frontend degrada al sync de frase. El repaso `mastered` (modo compacto) no
+    # expone timings, igual que hoy con `sentence_timings`.
+    if out.get("audio_type") == "tts" and out.get("audio_ready"):
+        out["word_timings"] = word_timings_for(question)
     return out
 
 
@@ -256,6 +265,10 @@ async def next_question(
     # Sync grueso del transcript (V3.28, Bloque D): timings heurísticos de frase
     # para el resaltado coarse; vacío si el ítem no declara `duration`.
     out["sentence_timings"] = coarse_sentence_timings(question)
+    # V3.29 (Fase 3): karaoke palabra a palabra (sidecar word_alignment_proxy de
+    # la voz default); `[]` si no hay sidecar → el frontend degrada a frase.
+    if out.get("audio_type") == "tts" and out.get("audio_ready"):
+        out["word_timings"] = word_timings_for(question)
     return out
 
 async def level_items(user_id: str, level: str) -> dict:
@@ -311,6 +324,14 @@ async def submit_answer(
     # V3.28 (Bloque C): los ítems derivados persisten su `task_type`
     # (cloze/segmentation); el resto conserva el default `mcq`.
     task_type = question.get("task_type", "mcq")
+    # V3.29 (Fase 3): en un acierto incorrecto de cloze/segmentation se persiste
+    # la palabra diana del hueco (la respuesta correcta que el alumno no eligió)
+    # como evidencia de palabra fallada; el resto de intentos guarda NULL.
+    word_breakdown = (
+        {"target": question["options"][question["answer_index"]]}
+        if not correct and task_type in ("cloze", "segmentation")
+        else None
+    )
     await run_in_threadpool(
         listening_repo.record_attempt,
         user_id,
@@ -329,6 +350,7 @@ async def submit_answer(
         stage=stage,
         transcript_used=transcript_used,
         segments_replayed=segments_replayed,
+        word_breakdown=word_breakdown,
     )
     return {
         "question_id": question_id,
@@ -410,6 +432,11 @@ async def submit_production(
         shadowing_speech_rate=(
             shadowing_speech_rate if task_type == "shadowing" else None
         ),
+        # V3.29 (Fase 3): evidencia de palabra fallada. En un intento de
+        # producción el breakdown de `word_alignment` (missing/substituted)
+        # indica exactamente qué palabras el alumno no oyó bien; se persiste
+        # para el futuro salto a palabra fallada y agregados (V3.30).
+        word_breakdown=result["breakdown"],
     )
     return {
         "question_id": question_id,
@@ -524,4 +551,8 @@ async def get_audio(
     tmp = path.with_suffix(".wav.tmp")
     tmp.write_bytes(data)
     tmp.replace(path)
+    # V3.29 (Fase 3): sidecar word_alignment_proxy para WAV generados bajo
+    # demanda (voz no-default o variante no pre-renderizada). Solo se ejecuta en
+    # la primera síntesis (cache miss); nunca rompe el flujo si el ASR no está.
+    await run_in_threadpool(ensure_word_alignment, path, spoken_text(question))
     return data, None
