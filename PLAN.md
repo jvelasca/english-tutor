@@ -8,6 +8,32 @@
 
 ## Estado actual
 
+- ✅ **V3.32 — Dictionary → Learning Bridge, primer eslabón (2026-09-09)**
+  (**Versión estable `3.32.0`**, app `3.31.1 → 3.32.0`). Convierte la
+  consulta del diccionario (V3.30, D3: solo lectura) en puerta a la práctica
+  real: la tarjeta del lookup gana **«Practicar esta palabra»**, que monta
+  in-line la escalera de drill existente (Recall → Sentence) para la palabra
+  consultada — también si `usage.tracked=false` (sin fila previa en
+  `vocabulary`): el éxito crea producción pura igual que fuera del
+  diccionario. Refactor de extracción neutro: `WordDrill`,
+  `SpeakingDrillSection`, `DrillStep` e `isSentenceAttempt` pasan de
+  `PersonalDictionary.tsx` al módulo compartido `wordDrill.tsx` (misma UI,
+  mismo comportamiento). Sin backend nuevo (los endpoints de drill ya aceptan
+  palabras arbitrarias) ni etiquetas de origen en la evidencia: un éxito llama
+  `record_production_text(speaking, as_unit=True, activity="drill")` +
+  `learning_events` `drill:<word>:ok`, con fila idéntica a practicar fuera del
+  diccionario (verificado por aceptación A/B). D3 intacto: el lookup sigue sin
+  escribir; solo la acción explícita «Practicar» y su resultado escriben en el
+  Student Model. Tests: pytest **1711** (+3 del nuevo
+  `test_dictionary_bridge_v332.py`: lookup read-only + práctica con evidencia
+  idéntica entre usuarios A/B, paso frase equivalente con cierre D3 y
+  aislamiento entre usuarios), ruff limpio, vitest y `tsc --noEmit` limpios y
+  `check_release_consistency` **3.32.0** exit 0. Pendiente hacia **V3.33**:
+  los diferidos de V3.30 — consumo de `word_breakdown_json` en
+  agregados/práctica dirigida de las falladas y palabras tocables en
+  transcripts/chat — y los siguientes eslabones del puente (escaleras por
+  destreza, recall demorado FSRS).
+
 - ✅ **V3.31.1 — Hardening del diccionario tras la auditoría V3.31.0
   (2026-09-09)** (**Versión estable `3.31.1`**, app `3.31.0 → 3.31.1`; solo
   backend + docs, sin cambios de UI ni de esquema de BD). Cierra el **P1-01
@@ -1083,6 +1109,17 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   semántica documentada del contenido canónico. **Próximo candidato V3.32**:
   Dictionary → Learning Bridge (borrador en
   `agentes/v332-dictionary-learning-bridge.md`).
+
+- ~~**⏳ V3.32 — Dictionary → Learning Bridge (primer eslabón)**~~ ✅ **cerrado
+  (2026-09-09, v3.32.0)**: implementado y publicado (ver «Estado actual» arriba
+  y `release-notes-v3.32.0.md`). Primer eslabón del puente: «Practicar esta
+  palabra» en la tarjeta del lookup reutiliza la escalera de drill existente
+  (Recall → Sentence) con evidencia idéntica a practicar fuera del diccionario
+  (D3 intacta). Siguiente incremento hacia **V3.33**: los diferidos de V3.30
+  (consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+  falladas y palabras tocables en transcripts/chat) y los siguientes eslabones
+  del puente (escaleras por destreza — reconocimiento MCQ, recall demorado con
+  FSRS — y transferencia por contexto, según `agentes/v332-dictionary-learning-bridge.md`).
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

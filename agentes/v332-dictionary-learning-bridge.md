@@ -1,15 +1,40 @@
-# Candidato V3.32 — Dictionary → Learning Bridge (borrador de diseño, sin implementar)
+# Candidato V3.32 — Dictionary → Learning Bridge (primer eslabón implementado en v3.32.0)
 
-> Rol: documento de diseño para el siguiente incremento. **No es una orden de
-> implementación**: las sesiones de 2026-09-09 cerraron V3.30.1 (endurecimiento
-> de la auditoría V3.30.0) y V3.31 (robustez del diccionario y contrato, ver
-> `release-notes-v3.31.0.md`); este borrador se redactó originalmente para
-> V3.31 y queda aquí como esquema del candidato **V3.32**. Antes de
-> implementarlo, revisar `docs/RELEVO.md` (nota superior), `PLAN.md` («Estado
+> Rol: documento de diseño del candidato **V3.32**. El **primer eslabón**
+> (puerta del diccionario → escalera de drill existente, «Practicar esta
+> palabra») se implementó y publicó el 2026-09-09 en **v3.32.0**
+> (`release-notes-v3.32.0.md`); los eslabones siguientes (escaleras por
+> destreza, recall demorado, transferencia) y los diferidos de V3.30 quedan
+> como candidatos abiertos para próximos incrementos. Antes de implementar un
+> eslabón nuevo, revisar `docs/RELEVO.md` (nota superior), `PLAN.md` («Estado
 > actual» y «Siguiente incremento») y el dossier
 > `docs/DISENO-V330-DICCIONARIO-CONSULTA.md` (decisiones D1/D2/D3 de V3.30 que
 > este candidato debe respetar).
-> Fecha del borrador: 2026-09-09 · Release objetivo: v3.32.0.
+> Borrador: 2026-09-09 · Primer eslabón cerrado: v3.32.0 (2026-09-09).
+
+## Primer eslabón cerrado (v3.32.0)
+
+- **Qué se implementó.** La tarjeta de `DictionaryLookup` gana «Practicar esta
+  palabra» (`frontend/src/features/vocabulary/DictionaryLookup.tsx`), que monta
+  in-line bajo la tarjeta la escalera de drill existente **Recall → Sentence**
+  (`wordDrill.tsx`, extraída sin cambio funcional de `PersonalDictionary.tsx`).
+  Al producir la palabra, la entrada se re-consulta en silencio para actualizar
+  las marcas de uso. Cero backend nuevo: los endpoints de drill ya aceptan
+  palabras arbitrarias (también `usage.tracked=false`).
+- **Evidencia.** Un éxito de práctica crea exactamente la misma evidencia que
+  esa práctica fuera del diccionario: `record_production_text(speaking,
+  as_unit=True, activity="drill")` + `learning_events` `drill:<word>:ok` (o
+  `:sentence:ok`), con fila de producción pura (`speaking_prod=1`,
+  `production_count=1`, `exposure_count=0`). Sin etiquetas de origen en el
+  Student Model. D3 intacto: el lookup sigue sin escribir nada.
+- **Acceptance (`backend/tests/test_dictionary_bridge_v332.py`, +3).** Lookup
+  read-only + práctica con evidencia idéntica entre usuarios A/B ·
+  paso frase equivalente con cierre D3 (segunda consulta no crea filas ni
+  eventos) · aislamiento entre usuarios.
+- **Pendiente de este candidato (NO implementado en v3.32.0).** Los eslabones
+  de las secciones «Escaleras por destreza» y «Frontend» abajo (reconocimiento
+  MCQ sobre la definición, recall demorado con FSRS, transferencia por contexto
+  de actividad V3.23 y la partición de componentes de la tarjeta cuando crezca).
 
 ## Objetivo
 
@@ -54,13 +79,16 @@ explícita del alumno sobre una palabra consultada) crea una actividad real cuyo
 
 ## Arquitectura propuesta
 
-1. **Semilla mínima (primer eslabón, reutilizable).** Añadir una acción
-   «Practicar esta palabra» a la entrada del diccionario que reutilice el
-   micro-drill existente (palabra/frase del hub Vocabulario, V3.19–V3.21):
-   Recognition (MCQ sobre la definición) → Recall → Production (drill oral /
-   sentence). El volcado de producción sigue usando los canales/actividades
-   actuales (`as_unit=True`, `activity="drill"`), de modo que la evidencia es
-   idéntica a la de cualquier otra práctica y NO distingue su origen.
+1. **Semilla mínima (primer eslabón — IMPLEMENTADO en v3.32.0).** Acción
+   «Practicar esta palabra» en la tarjeta del diccionario que reutiliza el
+   micro-drill existente (V3.19–V3.21) con la escalera **Recall (decir la
+   palabra) → Sentence (frase en contexto)** decidida con el usuario; NO se
+   añadió paso nuevo de MCQ de reconocimiento. Se puede practicar cualquier
+   palabra consultada, también `usage.tracked=false`: el intento con éxito
+   crea su fila como producción pura. El volcado de producción sigue usando
+   los canales/actividades actuales (`as_unit=True`, `activity="drill"`), de
+   modo que la evidencia es idéntica a la de cualquier otra práctica y NO
+   distingue su origen.
 2. **Sin etiquetas de origen en el Student Model.** No se persiste «vino del
    diccionario» como campo de evidencia (evitaría contaminar la semántica de
    canal/actividad); si hiciera falta telemetría de producto, usar un evento de
@@ -73,20 +101,29 @@ explícita del alumno sobre una palabra consultada) crea una actividad real cuyo
    DictionaryDefinition / DictionaryExample / DictionaryUsage /
    DictionaryUnitUsage) **antes** de acumular más secciones.
 
-## Deuda estructural declarada (fuera de V3.32)
+## Deuda estructural declarada (pendiente, no implementada)
 
 - Polisemia por senses (una entrada ≠ inventario de sentidos; relevante en B2+).
 - Definición adaptada al CEFR del alumno (hoy el prompt pide «simple English»
   sin `learner_level`).
 - Diccionario contexto-aware (headword + sentence + nivel) para transcriptos de
   listening con palabras tocables.
-- Rate limit local de generación y caché negativa con TTL (P2 de la auditoría
-  V3.30.0, no urgentes en LAN).
 
-## Criterios de aceptación (cuando se implemente)
+## Criterios de aceptación
 
-- Test e2e: lookup no crea evidencia; lookup + «Practicar» + éxito de práctica
-  SÍ crea la misma evidencia que esa práctica fuera del diccionario.
-- Test de aislamiento entre usuarios del contenido y de la práctica.
-- Sin regresiones en V3.30/V3.30.1 (single-flight, `generator_version`,
-  `UNUSABLE_MODELS`).
+Estado: los tres criterios del primer eslabón quedaron **cerrados en v3.32.0**
+por `backend/tests/test_dictionary_bridge_v332.py` (+3 tests, pytest 1711).
+
+- ✅ Test e2e: lookup no crea evidencia; lookup + «Practicar» + éxito de
+  práctica SÍ crea la misma evidencia que esa práctica fuera del diccionario
+  (`test_lookup_new_word_read_only_and_practice_writes_identical_evidence`).
+- ✅ Test de aislamiento entre usuarios del contenido y de la práctica
+  (`test_lookup_and_practice_isolated_between_users`).
+- ✅ Sin regresiones en V3.30/V3.30.1/V3.31.1 (single-flight,
+  `generator_version`, `UNUSABLE_MODELS`, negative cache): suite completa
+  pytest **1711 passed** + ruff limpio + vitest + `tsc --noEmit` +
+  `check_release_consistency` 3.32.0 exit 0.
+- ⏳ Criterios de eslabones futuros (cuando se implementen): reconocimiento
+  MCQ sobre la definición con su evidencia, recall demorado FSRS y
+  transferencia por contexto; manteniendo la regla de «evidencia idéntica,
+  sin etiquetas de origen».

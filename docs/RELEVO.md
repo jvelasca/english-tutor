@@ -5,6 +5,32 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-09 (UTC+2).
 >
+> **Nota (2026-09-09):** **V3.32.0 publicada** — release **v3.32.0**
+> (Dictionary → Learning Bridge, primer eslabón: la consulta del diccionario
+> V3.30 se convierte en puerta a la práctica real sin romper D3). El botón
+> **«Practicar esta palabra»** en la tarjeta del lookup
+> (`DictionaryLookup.tsx`) monta in-line la escalera de drill existente
+> **Recall → Sentence** (`wordDrill.tsx`, extraída SIN cambio funcional de
+> `PersonalDictionary.tsx`) para la palabra consultada — también si
+> `usage.tracked=false`: el éxito crea producción pura igual que fuera del
+> diccionario — y refresca en silencio las marcas de uso de la entrada al
+> producir. Cero backend nuevo (los endpoints de drill ya aceptan palabras
+> arbitrarias) y **evidencia idéntica, sin etiquetas de origen**:
+> `record_production_text(speaking, as_unit=True, activity="drill")` +
+> `learning_events` `drill:<word>:ok` (:sentence: en el paso frase); el lookup
+> sigue sin escribir (D3 intacto, cerrado por acceptance). Tests: pytest
+> backend **1711 passed** (+3 del nuevo `test_dictionary_bridge_v332.py`:
+> lookup read-only + práctica con evidencia idéntica entre usuarios A/B ·
+> paso frase equivalente con cierre D3 · aislamiento entre usuarios) + ruff
+> limpio + vitest (63 ficheros/542) + `tsc --noEmit` limpios +
+> `check_release_consistency` **3.32.0** exit 0. Detalle y conteos:
+> `release-notes-v3.32.0.md`; `CHANGELOG.md` con entrada `[3.32.0]`; `PLAN.md`
+> con hito estable V3.32.0. Pendientes hacia **V3.33**: los diferidos de V3.30
+> — consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+> falladas y palabras tocables en transcripts/chat — y los siguientes
+> eslabones del puente (reconocimiento MCQ, recall demorado FSRS,
+> transferencia por contexto; borrador `agentes/v332-dictionary-learning-bridge.md`).
+>
 > **Nota (2026-09-09):** **V3.31.1 publicada** — release **v3.31.1**
 > (hardening del diccionario de consulta tras la auditoría profunda de
 > V3.31.0; solo backend + docs, sin cambios de UI ni de esquema de BD). Cierra:

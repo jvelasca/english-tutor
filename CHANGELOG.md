@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.32.0] — 2026-09-09
+
+**Primer eslabón del Dictionary → Learning Bridge: la consulta del diccionario (V3.30, D3) se convierte en puerta a la práctica real con «Practicar esta palabra», que reutiliza la escalera oral existente (Recall → Sentence) sin un solo endpoint nuevo, y produce evidencia idéntica a la de cualquier otra práctica (sin etiquetas de origen).**
+
+Versión de app `3.31.1 → 3.32.0`. Frontend (UI + refactor de extracción) + backend de tests de aceptación; sin cambios de esquema de BD ni de contrato HTTP.
+
+- **«Practicar esta palabra» en la tarjeta del lookup (`DictionaryLookup.tsx`).** La tarjeta de resultado del diccionario gana una acción secundaria junto al `ListenButton` que monta, in-line bajo la tarjeta, la escalera de drill de esa palabra (userId + word). Gating idéntico al resto de la práctica: oculta sin `userId`. Al producir la palabra en el drill, la entrada del diccionario se re-consulta en silencio para actualizar las marcas de uso (`usage.tracked`, producción) sin interrumpir el drill.
+- **Refactor de extracción neutro (`wordDrill.tsx`).** `WordDrill`, `SpeakingDrillSection`, el tipo `DrillStep` y el helper `isSentenceAttempt` se extraen de `PersonalDictionary.tsx` a un módulo compartido `frontend/src/features/vocabulary/wordDrill.tsx` y se reimportan: misma UI, mismo comportamiento, cero cambio de contrato (regresión cubierta por `PersonalDictionary.test.tsx`).
+- **Cierre del puente: nada de evidencia de origen.** Practicar desde el diccionario usa los mismos endpoints de drill (`drill/attempt`, `drill/sentence-context|attempt`), que ya aceptan palabras arbitrarias: un éxito llama `record_production_text(speaking, as_unit=True, activity="drill")` + los `learning_events` `drill:<word>:ok` habituales. El Student Model no distingue el origen (D3 intacto: el lookup en sí sigue sin escribir nada; solo la acción explícita «Practicar» y su resultado escriben).
+- **Tests de aceptación backend (`test_dictionary_bridge_v332.py`, +3).** `test_lookup_new_word_read_only_and_practice_writes_identical_evidence`: A consulta una palabra nueva → sin filas ni eventos (`usage.tracked=false`), practica tras consultar → `speaking_prod=1`, `production_count=1`, `exposure_count=0`, un evento `produced` (channel=speaking, activity=drill) y un `learning_events` `drill:quokka:ok`, con la fila IDÉNTICA a la de B que practica la misma palabra directamente (aislamiento A/B) · `test_sentence_step_after_lookup_equivalent_evidence_and_d3_closure`: el paso frase acredita la misma evidencia con detalle `drill:<word>:sentence:ok`, y una segunda consulta ve la palabra ya trackeada sin crear filas ni eventos adicionales (cierre D3) · `test_lookup_and_practice_isolated_between_users`: lo que hace A no toca el léxico de B hasta que B practica por su cuenta.
+- **Verificación.** Backend pytest **1711 passed** (+3 sobre v3.31.1) + `ruff check .` limpio; frontend vitest (63 ficheros) + `tsc --noEmit` limpios; `check_release_consistency` 3.32.0 exit 0 (detalle con conteos en `release-notes-v3.32.0.md`).
+
 ## [3.31.1] — 2026-09-09
 
 **Cierre de la auditoría V3.31.0 sobre el diccionario de consulta: el modelo explícito debe estar instalado (no solo ser utilizable), los fallos de generación dejan de reintentar en bucle (negative cache con TTL), la generación de contenido nuevo queda limitada por usuario y global, y el dueño de un vuelo ya no puede dejar la palabra clavada si Ollama se cuelga (tope servidor de 90 s).**

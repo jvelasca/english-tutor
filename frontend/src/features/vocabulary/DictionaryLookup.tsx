@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Loader2, Mic, RefreshCw, Search } from "lucide-react";
 import { lookupDictionaryWord } from "../../api/vocabulary";
 import type {
   DictionaryEntry,
@@ -16,6 +16,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
+import { WordDrill } from "./wordDrill";
 
 /** Colores de estado: misma taxonomía y paleta que `PersonalDictionary`. */
 const STATUS_TONE: Record<LexicalStatus, string> = {
@@ -35,7 +36,10 @@ interface DictionaryLookupProps {
  * en el léxico del alumno) y muestra definición/traducción cacheadas del modelo
  * local (o degradación a `definition_source="none"`), una frase de ejemplo
  * determinista del banco y la marca de uso/aprendizaje. La consulta es solo
- * lectura: nunca registra evidencia. */
+ * lectura: nunca registra evidencia.
+ * V3.32: el botón «Practicar esta palabra» abre la escalera de drill oral
+ * (Recall → Sentence, `./wordDrill`) sobre la palabra consultada. Practicar es
+ * una acción explícita del alumno: solo su resultado escribe evidencia. */
 export function DictionaryLookup({ userId }: DictionaryLookupProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -45,6 +49,9 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
   const [entry, setEntry] = useState<DictionaryEntry | null>(null);
   // Palabra de la consulta actual (para el retry tras un error de red).
   const [lastQuery, setLastQuery] = useState("");
+  // V3.32: palabra en drill oral («Practicar esta palabra») lanzado desde la
+  // tarjeta. La escalera vive debajo de la tarjeta de resultado.
+  const [practiceWord, setPracticeWord] = useState<string | null>(null);
 
   async function runLookup(raw: string) {
     if (!userId) return;
@@ -56,12 +63,14 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
       setInvalidError(true);
       setNetworkError(false);
       setEntry(null);
+      setPracticeWord(null);
       return;
     }
     setInvalidError(false);
     setNetworkError(false);
     setLoading(true);
     setLastQuery(word);
+    setPracticeWord(null);
     try {
       const data = await lookupDictionaryWord(userId, word);
       setEntry(data);
@@ -70,6 +79,19 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
       setNetworkError(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // V3.32: tras producir la palabra en el drill, refresca la entrada en silencio
+  // (sin togglear `loading`, para no desmontar la tarjeta ni el drill) para
+  // actualizar la marca de uso (p. ej. una palabra nueva pasa a tracked).
+  async function refreshEntry(word: string) {
+    if (!userId) return;
+    try {
+      const data = await lookupDictionaryWord(userId, word);
+      setEntry(data);
+    } catch {
+      /* conserva la entrada actual */
     }
   }
 
@@ -161,7 +183,29 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
       )}
 
       {userId && !loading && !networkError && !invalidError && entry && (
-        <ResultCard entry={entry} />
+        <div className="mt-6 flex flex-col gap-5">
+          <ResultCard entry={entry} onPractice={() => setPracticeWord(entry.word)} />
+
+          {/* V3.32: escalera de drill oral de la palabra consultada. Practicar
+              es una acción real (no es parte de la consulta, D3): solo el
+              resultado de esta práctica escribe evidencia. */}
+          {practiceWord && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Mic className="size-4 text-primary" aria-hidden="true" />
+                <p className="text-xs text-muted-foreground">
+                  {t("dictionary.lookup.practiceHint")}
+                </p>
+              </div>
+              <WordDrill
+                userId={userId}
+                word={practiceWord}
+                onProduced={() => void refreshEntry(practiceWord)}
+                onClose={() => setPracticeWord(null)}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -331,7 +375,13 @@ function CompetenceChips({ competence }: { competence: LexicalCompetence }) {
   );
 }
 
-function ResultCard({ entry }: { entry: DictionaryEntry }) {
+function ResultCard({
+  entry,
+  onPractice,
+}: {
+  entry: DictionaryEntry;
+  onPractice: () => void;
+}) {
   const { t } = useI18n();
   const kindLabel = lexicalKindLabel(entry.kind, t);
   const pos = entry.pos ? entry.pos[0].toUpperCase() + entry.pos.slice(1) : "";
@@ -340,7 +390,7 @@ function ResultCard({ entry }: { entry: DictionaryEntry }) {
     (entry.usage.unit as DictionarySurfaceUsage | DictionaryUnitUsage | null);
 
   return (
-    <div className="mt-6 flex flex-col gap-5">
+    <>
       <Card className="gap-3 p-5">
         {/* Palabra + badges de contexto */}
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -363,10 +413,25 @@ function ResultCard({ entry }: { entry: DictionaryEntry }) {
               )}
             </h2>
           </div>
-          <ListenButton
-            text={entry.word}
-            label={t("dictionary.lookup.listenWord")}
-          />
+          <div className="flex items-center gap-2">
+            <ListenButton
+              text={entry.word}
+              label={t("dictionary.lookup.listenWord")}
+            />
+            {/* V3.32: «Practicar esta palabra» — abre la escalera de drill oral
+                (Recall → Sentence). Solo esta acción explícita escribe
+                evidencia; el lookup no (D3). */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onPractice}
+              className="gap-1.5"
+            >
+              <Mic className="size-3.5" aria-hidden="true" />
+              {t("dictionary.lookup.practiceCta")}
+            </Button>
+          </div>
         </div>
 
         {entry.definition_source === "llm" ? (
@@ -444,7 +509,7 @@ function ResultCard({ entry }: { entry: DictionaryEntry }) {
           <UnitUsageBlock usage={entry.usage.unit!} />
         )}
       </Card>
-    </div>
+    </>
   );
 }
 

@@ -10,11 +10,24 @@
  *   y botones de audio) y de la marca de uso (forma exacta y agregado por
  *   unidad canónica).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { I18nProvider } from "../../hooks/useI18n";
 import { DictionaryLookup } from "./DictionaryLookup";
+
+// V3.32: la escalera de drill montada desde el lookup usa el micrófono y
+// `MediaRecorder`; se mockean igual que en `PersonalDictionary.test.tsx`.
+vi.mock("../../utils/browserCapabilities", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../../utils/browserCapabilities")>();
+  return {
+    ...original,
+    getMicrophoneStream: vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: vi.fn() }],
+    }),
+  };
+});
 
 const COFFEE = {
   word: "coffee",
@@ -127,6 +140,47 @@ function fillAndSubmit(word: string) {
   });
   fireEvent.click(screen.getByRole("button", { name: "Look up" }));
 }
+
+function stubMediaRecorder() {
+  class FakeRecorder {
+    mimeType = "audio/webm";
+    ondataavailable: ((e: { data: Blob }) => void) | null = null;
+    onstop: (() => void) | null = null;
+    start() {
+      this.ondataavailable?.({ data: new Blob(["audio"], { type: "audio/webm" }) });
+    }
+    stop() {
+      this.onstop?.();
+    }
+  }
+  vi.stubGlobal("MediaRecorder", FakeRecorder);
+}
+
+/** Respuesta determinista de `POST /api/vocabulary/drill/attempt` (V3.32). */
+const DRILL_OK = {
+  word: "coffee",
+  produced: true,
+  expected: "coffee",
+  heard: "coffee",
+  score: 100,
+  level: "good",
+  ok: true,
+  word_accuracy: 100,
+  phonetic_score: 100,
+  phoneme_accuracy_proxy: 100,
+  prosody_proxy: 100,
+  pronunciation_source: "transcript",
+  breakdown: { correct: ["coffee"], missing: [], extra: [], substituted: [], total: 1 },
+  phoneme_breakdown: {
+    correct: ["c"],
+    missing: [],
+    extra: [],
+    substituted: [],
+    total: 1,
+  },
+  fluency: null,
+  asr_status: "ok",
+};
 
 describe("DictionaryLookup (V3.30)", () => {
   afterEach(() => {
@@ -242,5 +296,119 @@ describe("DictionaryLookup (V3.30)", () => {
     // El reintento reutiliza la última consulta (sin volver a teclear).
     const calls = fn.mock.calls.map((c) => String(c[0]));
     expect(calls.filter((c) => c.includes("/dictionary")).length).toBe(2);
+  });
+});
+
+describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
+  beforeEach(() => stubMediaRecorder());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("muestra la acción «Practice this word» y al pulsarla monta la escalera de drill", async () => {
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    // El CTA de práctica vive junto al audio de la palabra en la tarjeta.
+    const practiceCta = await screen.findByRole("button", {
+      name: "Practice this word",
+    });
+    expect(practiceCta).toBeTruthy();
+
+    fireEvent.click(practiceCta);
+    // Se monta la escalera de drill oral (Recal → Sentence): mismo prompt que
+    // en el diccionario personal.
+    expect(await screen.findByText(/Listen to the word/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 · Word" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "2 · Sentence" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Record" })).toBeTruthy();
+
+    // Cerrar la escalera la desmonta.
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Record" })).toBeNull(),
+    );
+  });
+
+  it("producir la palabra tras «Practicar» refresca la entrada en silencio (sin desmontar el drill)", async () => {
+    // V3.32: la evidencia del drill es real; tras producir, la marca de uso de
+    // la tarjeta se refresca con un re-lookup silencioso (mismo endpoint).
+    const dictionaryHits = { count: 0 };
+    const fn = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/vocabulary/dictionary")) {
+        dictionaryHits.count += 1;
+        return Promise.resolve({ ok: true, json: async () => COFFEE });
+      }
+      if (url.includes("/api/vocabulary/drill/attempt")) {
+        return Promise.resolve({ ok: true, json: async () => DRILL_OK });
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fn);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    const cta = await screen.findByRole("button", { name: "Practice this word" });
+    fireEvent.click(cta);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Record" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+
+    // Resultado del drill: producción correcta.
+    expect(await screen.findByText(/another day to consolidate it/)).toBeTruthy();
+    // El drill sigue montado (el re-lookup no lo desmonta).
+    expect(screen.getByRole("button", { name: "Record" })).toBeTruthy();
+    // Se produjo un re-lookup silencioso del diccionario para refrescar la marca.
+    await waitFor(() => expect(dictionaryHits.count).toBe(2));
+  });
+
+  it("la escalera ofrece el paso Sentence y lo supera (F6.1) sin abandonar el lookup", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: COFFEE },
+      {
+        url: "/api/vocabulary/drill/sentence-context",
+        data: {
+          word: "coffee",
+          phrase: 'Say the word "coffee".',
+          source: "template",
+          level: "A1",
+        },
+      },
+      {
+        url: "/api/vocabulary/drill/sentence-attempt",
+        data: {
+          word: "coffee",
+          phrase: 'Say the word "coffee".',
+          source: "template",
+          produced: true,
+          phrase_ok: true,
+          passed: true,
+          heard: 'say the word "coffee"',
+          score: 100,
+          level: "good",
+          fluency: null,
+          asr_status: "ok",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Practice this word" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2 · Sentence" }));
+    expect(await screen.findByText('Say the word "coffee".')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Record" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+
+    expect(await screen.findByText(/inside the sentence/)).toBeTruthy();
+    // La tarjeta de resultado sigue visible (el drill convive con ella).
+    expect(screen.getByText("A hot drink made from roasted coffee beans.")).toBeTruthy();
   });
 });

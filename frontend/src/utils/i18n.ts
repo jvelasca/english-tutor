@@ -464,6 +464,18 @@ const STRINGS: Record<string, Entry> = {
     en: "Hear the word",
     es: "Escuchar la palabra",
   },
+  // V3.32: Dictionary → Learning Bridge (primer eslabón). «Practicar» abre la
+  // escalera de drill oral (Recall → Sentence) sobre la palabra consultada.
+  // Consultar sigue siendo solo lectura (D3): solo el resultado de ESA práctica
+  // escribe evidencia, idéntica a practicar fuera del diccionario.
+  "dictionary.lookup.practiceCta": {
+    en: "Practice this word",
+    es: "Practicar esta palabra",
+  },
+  "dictionary.lookup.practiceHint": {
+    en: "Say the word (and repeat it inside a sentence) to feed it into your practice. This is a real speaking drill, not a look-up: your attempts count toward the word in your vocabulary.",
+    es: "Di la palabra (y repítela dentro de una frase) para llevarla a tu práctica. Es un drill oral real, no una consulta: tus intentos cuentan para la palabra en tu vocabulario.",
+  },
   "dictionary.lookup.listenExample": {
     en: "Listen to the example",
     es: "Escuchar el ejemplo",
