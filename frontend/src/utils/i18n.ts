@@ -425,6 +425,97 @@ const STRINGS: Record<string, Entry> = {
     en: "No words yet. Complete course objectives to grow your dictionary.",
     es: "Aún no hay palabras. Completa objetivos del curso para hacer crecer tu diccionario.",
   },
+  // V3.30: diccionario de consulta (vista «Consultar»).
+  "dictionary.viewsLabel": {
+    en: "Dictionary views",
+    es: "Vistas del diccionario",
+  },
+  "dictionary.lookup.title": {
+    en: "Dictionary lookup",
+    es: "Consulta de diccionario",
+  },
+  "dictionary.lookup.subtitle": {
+    en: "Type any English word — even one you haven't met yet — to see its meaning and how it fits your learning.",
+    es: "Escribe cualquier palabra en inglés —aunque aún no la hayas conocido— para ver su significado y cómo encaja en tu aprendizaje.",
+  },
+  "dictionary.lookup.placeholder": {
+    en: "Type a word… e.g. coffee",
+    es: "Escribe una palabra… p. ej. coffee",
+  },
+  "dictionary.lookup.button": { en: "Look up", es: "Buscar" },
+  "dictionary.lookup.searchAria": {
+    en: "Search the dictionary",
+    es: "Buscar en el diccionario",
+  },
+  "dictionary.lookup.definitionLabel": { en: "Definition", es: "Definición" },
+  "dictionary.lookup.translationLabel": {
+    en: "In Spanish",
+    es: "En español",
+  },
+  "dictionary.lookup.exampleTitle": {
+    en: "Example from the app",
+    es: "Ejemplo de la app",
+  },
+  "dictionary.lookup.exampleNote": {
+    en: "A real sentence from the app's phrase bank.",
+    es: "Una frase real del banco de frases de la app.",
+  },
+  "dictionary.lookup.listenWord": {
+    en: "Hear the word",
+    es: "Escuchar la palabra",
+  },
+  "dictionary.lookup.listenExample": {
+    en: "Listen to the example",
+    es: "Escuchar el ejemplo",
+  },
+  "dictionary.lookup.usageTitle": {
+    en: "This word in your learning",
+    es: "Esta palabra en tu aprendizaje",
+  },
+  "dictionary.lookup.notTrackedBadge": {
+    en: "Not met yet",
+    es: "No registrada aún",
+  },
+  "dictionary.lookup.usageNotTracked": {
+    en: "You haven't met this word in the app yet. Look-ups don't change your progress: it will only count once you see it in practice.",
+    es: "Aún no has encontrado esta palabra en la app. Consultar no cambia tu progreso: solo contará cuando la veas en la práctica.",
+  },
+  "dictionary.lookup.lastActivity": {
+    en: "Last activity {date}",
+    es: "Última actividad {date}",
+  },
+  "dictionary.lookup.formsCount": {
+    en: "{count} form(s) in this unit",
+    es: "{count} forma(s) de esta unidad",
+  },
+  "dictionary.lookup.unitAggregate": {
+    en: "Aggregated over the forms of the unit “{unit}”.",
+    es: "Agregado sobre las formas de la unidad «{unit}».",
+  },
+  "dictionary.lookup.producedCount": {
+    en: "Produced {count}×",
+    es: "Producida {count}×",
+  },
+  "dictionary.lookup.exposedCount": {
+    en: "Seen {count}×",
+    es: "Vista {count}×",
+  },
+  "dictionary.lookup.contentUnavailable": {
+    en: "The dictionary content isn't available right now (the local model is offline). You can still see the example and your progress with the word.",
+    es: "El contenido del diccionario no está disponible ahora mismo (el modelo local está apagado). Aun así puedes ver el ejemplo y tu progreso con la palabra.",
+  },
+  "dictionary.lookup.error.invalid": {
+    en: "That doesn't look like a valid word or phrase.",
+    es: "No parece una palabra o frase válida.",
+  },
+  "dictionary.lookup.error.network": {
+    en: "Could not look up the word. ",
+    es: "No se pudo consultar la palabra. ",
+  },
+  "dictionary.lookup.noProfile": {
+    en: "Select a learning profile to look up words.",
+    es: "Selecciona un perfil de aprendizaje para consultar palabras.",
+  },
 
   // Settings
   "settings.title": { en: "Settings", es: "Ajustes" },
@@ -2935,6 +3026,11 @@ const STRINGS: Record<string, Entry> = {
   "vocRoutes.dictionaryHint": {
     en: "Personal dictionary of the words you've met.",
     es: "Diccionario personal de las palabras que has conocido.",
+  },
+  "vocRoutes.dictionaryLookupCta": { en: "Consult", es: "Consultar" },
+  "vocRoutes.dictionaryLookupHint": {
+    en: "Look up any word: definition, translation and how you've used it.",
+    es: "Consulta cualquier palabra: definición, traducción y cómo la has usado.",
   },
   "vocRoutes.levelStates.failed": {
     en: "Missed ({count})",

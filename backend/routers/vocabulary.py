@@ -11,6 +11,8 @@ from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import vocabulary as vocabulary_service
 from schemas.vocabulary import (
+    DictionaryEntryOut,
+    DictionaryLookupRequest,
     DrillAttemptOut,
     DrillCandidatesOut,
     LexiconOut,
@@ -62,6 +64,30 @@ async def vocabulary_history(
 @router.get("/api/vocabulary/lexicon", response_model=LexiconOut)
 async def get_lexicon(user: dict = Depends(current_user)) -> dict:
     return await vocabulary_service.get_lexicon(user["id"])
+
+
+@router.post(
+    "/api/vocabulary/dictionary", response_model=DictionaryEntryOut
+)
+async def dictionary_lookup(
+    body: DictionaryLookupRequest,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Entrada del diccionario de consulta (V3.30).
+
+    Busca cualquier palabra (esté o no en la evidencia del alumno) y devuelve
+    la frase de ejemplo determinista del banco, la marca de uso/aprendizaje
+    (solo lectura del léxico del usuario) y, si existe en la caché global, la
+    definición/traducción generada por el modelo local (Fase B). La consulta NO
+    registra evidencia (D3): no crea filas en `vocabulary` ni eventos."""
+    try:
+        return await vocabulary_service.lookup_dictionary(
+            user["id"], body.word, model=body.model
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=422, detail="La palabra buscada no es válida"
+        ) from None
 
 
 @router.get("/api/vocabulary/drill/candidates", response_model=DrillCandidatesOut)

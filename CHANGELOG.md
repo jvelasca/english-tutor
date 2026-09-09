@@ -4,6 +4,17 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.30.0] — 2026-09-09
+
+**Diccionario de consulta con marca de uso y aprendizaje: busca cualquier palabra y recibe su definición/traducción generadas por el modelo local y cacheadas en BD, una frase de ejemplo determinista del banco y el estado de esa palabra en tu aprendizaje (vista/producida/dominada), en la nueva vista «Consultar» del hub Vocabulario.**
+
+Cierra el candidato V3.30 (diseño en `docs/DISENO-V330-DICCIONARIO-CONSULTA.md`; decisiones D1/D2/D3). Versión de app `3.29.0 → 3.30.0`.
+
+- **Endpoint `POST /api/vocabulary/dictionary` (backend).** Consulta una palabra arbitraria (esté o no en el léxico del alumno) y devuelve: la marca de uso/aprendizaje derivada en servidor con los cómputos puros de `services/lexicon.py` (estado, mastery/recall, contadores, matriz de competencia y agregado por `lexical_unit` cuando la forma canónica difiere de la buscada), la frase de ejemplo determinista del banco (`services/example_sentences.py`, nunca la plantilla del drill) y la definición/traducción de la caché global `dictionary_entries`. **D3 — solo lectura**: la consulta no crea filas en `vocabulary` ni eventos en `vocabulary_events`, no mueve mastery (tests negativos).
+- **Generador de contenido con el modelo local (D1, Fase B).** `services/dictionary_content.py` pide al modelo un objeto JSON `{pos, definition, translation}` (`temperature=0`, prompt estructurado) con parseo tolerante (cercas de Markdown, texto circundante, POS canónico) y límites; el dominio persiste con `INSERT OR IGNORE` en la tabla global `dictionary_entries` (la primera consulta de cada palabra es la única que paga el modelo; las siguientes son deterministas). Degradación controlada: modelo caído o respuesta inválida → 200 con `definition_source="none"` y el resto de la entrada intacto; si persistir falla se sirve el contenido en memoria.
+- **UI «Consultar» (Fase C).** Nueva vista alterna en APRENDER → Vocabulario junto al diccionario personal (`DictionaryLookup.tsx`, conmutador en la vista de diccionario de `QuizRoutePage`, solo Vocabulario la declara): caja de búsqueda accesible, tarjeta con palabra + POS/CEFR/kind y audio TTS, definición EN, traducción ES, ejemplo del banco con audio, y sección de uso (badge de estado, recall, contadores, chips de competencia o agregado por unidad). Estados vacío/carga/error de red con retry/error de entrada; el modelo caído muestra la tarjeta de uso igualmente. i18n `dictionary.lookup.*` es/en.
+- **Verificación.** Backend pytest **1684 passed** (39 tests del diccionario en `test_dictionary_lookup.py` y `test_dictionary_content_v330.py`) + `ruff check .` limpio; frontend vitest **538 passed** (63 archivos) + `tsc --noEmit` limpio; `check_release_consistency` 3.30.0 exit 0 (detalle con conteos en `release-notes-v3.30.0.md`).
+
 ## [3.29.0] — 2026-09-09
 
 **Listening Engine 4.0 — Fase 3 (núcleo): alineación por palabra offline (`word_alignment_proxy` con faster-whisper `word_timestamps=True`), karaoke palabra a palabra, controles de audio precisos (seek slider + bucle A/B con scheduler rAF), salto a la palabra fallada (normal/slow) y evidencia `word_breakdown_json`.**

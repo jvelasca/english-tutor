@@ -1,14 +1,17 @@
 """Servicio de dominio de vocabulario."""
+
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 
 from starlette.concurrency import run_in_threadpool
 
 from domain import learning as learning_service
+from repositories import dictionary as dictionary_repo
 from repositories import vocabulary as vocabulary_repo
-from services import lexicon
+from services import dictionary_content, example_sentences, lexicon
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
 from services.pronunciation import score_pronunciation
@@ -192,9 +195,7 @@ async def get_drill_candidates(user_id: str, limit: int = 8) -> list[str]:
     events = await learning_service.list_events(user_id, event_type="exercise")
     ok_days = lexicon.drill_ok_days(events)
     today = datetime.now(timezone.utc).date().isoformat()
-    return lexicon.drill_candidates(
-        rows, limit=limit, ok_days=ok_days, today=today
-    )
+    return lexicon.drill_candidates(rows, limit=limit, ok_days=ok_days, today=today)
 
 
 async def _record_retrieval(user_id: str, word: str) -> None:
@@ -354,3 +355,206 @@ async def submit_sentence_attempt(
         "asr_status": asr_status,
         "asr_confidence": asr_confidence,
     }
+
+
+# ---------------------------------------------------------------------------
+# Diccionario de consulta (V3.30). D3: la consulta es SOLO LECTURA — no crea
+# filas en `vocabulary` ni eventos en `vocabulary_events`. La marca de uso se
+# deriva en servidor con los cómputos puros de `services/lexicon.py` (premisa
+# 21); la definición/traducción viene de la caché global `dictionary_entries`
+# (Fase B rellena la caché con el modelo local; hasta entonces "none").
+# ---------------------------------------------------------------------------
+
+
+def _normalize_lookup_word(word: str) -> str:
+    """Normaliza una palabra buscada en el diccionario de consulta.
+
+    Minúsculas, recorte de puntuación en los extremos y colapso de espacios
+    (conserva apóstrofos y guiones interiores: "don't", "well-being"). Devuelve
+    "" si la búsqueda queda vacía (solo puntuación/espacios).
+    """
+    text = (word or "").strip().lower()
+    text = re.sub(r"^[^a-z0-9]+", "", text)
+    text = re.sub(r"[^a-z0-9]+$", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _latest_activity(row: dict) -> str:
+    """Marca temporal ISO (original) de la actividad léxica más reciente.
+
+    Mismo criterio que `lexicon._last_activity_at` (V3.23, P1-01): compara los
+    timestamps reales de `last_seen` (producción) y `last_exposed_at`
+    (exposición) y devuelve el ORIGINAL del más reciente, normalizando
+    naive/aware a UTC solo para comparar.
+    """
+    best = ""
+    best_dt: datetime | None = None
+    for candidate in (row.get("last_seen"), row.get("last_exposed_at")):
+        text = (candidate or "").strip()
+        if not text:
+            continue
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if best_dt is None or dt > best_dt:
+            best, best_dt = text, dt
+    return best
+
+
+def _surface_usage_from_row(row: dict) -> dict:
+    """Marca de uso de la forma superficial exacta (cómputos puros de lexicon)."""
+    return {
+        "status": lexicon.item_status(row),
+        "mastery": lexicon.item_mastery(row),
+        "recall": lexicon.item_recall(row),
+        "next_review_days": lexicon.next_review_days(row),
+        "production_count": row.get("production_count", 0),
+        "exposure_count": row.get("exposure_count", 0),
+        "production_channels": lexicon.production_channels(row),
+        "competence": lexicon.item_competence_matrix(row),
+        "last_activity_at": _latest_activity(row),
+    }
+
+
+def _unit_usage_from_rows(rows: list[dict]) -> dict | None:
+    """Marca de uso agregada por `lexical_unit` (derivado informativo).
+
+    Reutiliza `lexicon.units_from_rows`: dado que `rows` es el subconjunto de
+    filas de UNA unidad, el agregado devuelve una única entrada con las
+    superficies y el estado derivado (máximo entre superficies).
+    """
+    units = lexicon.units_from_rows(rows)
+    if not units:
+        return None
+    u = units[0]
+    return {
+        "lexical_unit": u["lexical_unit"],
+        "status": u["status"],
+        "mastery": u["mastery"],
+        "recall": u["recall"],
+        "surface_count": u["surface_count"],
+        "mastered_surfaces": u["mastered_surfaces"],
+        "recognized": u["recognized"],
+        "produced": u["produced"],
+        "transfer": u["transfer"],
+        "production_count": u["production_count"],
+        "exposure_count": u["exposure_count"],
+    }
+
+
+def _build_dictionary_entry(
+    normalized: str, rows: list[dict], cached: dict | None
+) -> dict:
+    """Compone la entrada del diccionario (forma + unidad + contenido cacheado).
+
+    Pura y determinista sobre las filas del usuario y la caché global:
+    - `usage.surface`: estado de la FORMA exacta buscada, si existe;
+    - `usage.unit`: agregado por `lexical_unit` solo cuando la unidad canónica
+      difiere de la forma buscada (p. ej. buscar "going" agrega por "go");
+    - `kind`/`cefr`: de la fila del usuario si existe; para palabra nueva, kind
+      inferido con `classify_kind` (taxonomía LEXICAL_KINDS) y cefr "".
+    """
+    surface_rows = [r for r in rows if (r.get("word") or "").lower() == normalized]
+    unit_key = lexicon.lexical_unit(surface_rows[0]) if surface_rows else normalized
+    unit_rows = [r for r in rows if lexicon.lexical_unit(r) == unit_key]
+    surface_row = surface_rows[0] if surface_rows else None
+    tracked = bool(surface_rows or unit_rows)
+    rep = surface_row or (unit_rows[0] if unit_rows else None)
+
+    cache = cached or {}
+    has_definition = bool((cache.get("definition") or "").strip())
+    definition = (cache.get("definition") or "").strip() or None
+    translation = (cache.get("translation") or "").strip() or None
+
+    return {
+        "word": normalized,
+        "kind": ((rep.get("kind") or "") if rep is not None else "")
+        or lexicon.classify_kind(normalized, source="vocabulary"),
+        "cefr": (rep or {}).get("cefr", "") or "",
+        "definition_source": "llm" if has_definition else "none",
+        "pos": cache.get("pos", ""),
+        "definition": definition,
+        "translation": translation,
+        "example": example_sentences.example_for(normalized),
+        "usage": {
+            "tracked": tracked,
+            "surface": (_surface_usage_from_row(surface_row) if surface_row else None),
+            # La unidad se muestra cuando aporta información: sin forma exacta
+            # (buscar la unidad canónica con filas bajo ella) o cuando la
+            # unidad canónica difiere de la forma buscada (p. ej. "going" con
+            # unidad "go"). Con forma exacta y unidad == forma no hay dato extra.
+            "unit": (
+                _unit_usage_from_rows(unit_rows)
+                if unit_rows and (surface_row is None or unit_key != normalized)
+                else None
+            ),
+        },
+    }
+
+
+async def _ensure_cached_content(
+    word: str, cached: dict | None, *, model: str | None = None
+) -> dict | None:
+    """Devuelve contenido (`pos`/`definition`/`translation`) para `word`.
+
+    Si la caché ya tiene definición la reutiliza (determinista). Si no, genera
+    con el modelo local y persiste `INSERT OR IGNORE`; en caso de fallo degrada
+    devolviendo el contenido en memoria o `None`, de modo que la consulta nunca
+    se rompe por el generador (la definición es contenido, no evidencia).
+    """
+    if cached and (cached.get("definition") or "").strip():
+        return cached
+    try:
+        content = await dictionary_content.generate_content(word, model=model)
+    except dictionary_content.ContentUnavailableError:
+        logger.warning("Diccionario: contenido no disponible para '%s'", word)
+        return None
+    except Exception:  # noqa: BLE001 — señal no bloqueante, nunca rompe la consulta
+        logger.exception("Diccionario: error generando contenido para '%s'", word)
+        return None
+    try:
+        await run_in_threadpool(
+            dictionary_repo.insert_entry,
+            word,
+            pos=content.get("pos", ""),
+            definition=content.get("definition", ""),
+            translation=content.get("translation", ""),
+        )
+        persisted = await run_in_threadpool(dictionary_repo.get_entry, word)
+    except Exception:  # noqa: BLE001 — persistir es opcional
+        logger.warning("Diccionario: no se pudo persistir la caché de '%s'", word)
+        persisted = None
+    if persisted:
+        return persisted
+    return {
+        "pos": content.get("pos", ""),
+        "definition": content.get("definition", ""),
+        "translation": content.get("translation", ""),
+    }
+
+
+async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -> dict:
+    """Entrada del diccionario de consulta para `word` (V3.30, D3).
+
+    Devuelve `DictionaryEntryOut`: frase de ejemplo determinista del banco y
+    marca de uso/aprendizaje (solo lectura del léxico del usuario), más la
+    definición/traducción generada por el modelo local y cacheada en
+    `dictionary_entries` (Fase B). La primera consulta de una palabra genera y
+    persiste el contenido; las siguientes son deterministas. Si el modelo no
+    está disponible, degrada a `definition_source="none"`.
+
+    Sin evidencia nueva: no crea filas en `vocabulary`, no registra eventos ni
+    mueve mastery. Lanza `ValueError` si la palabra queda vacía tras normalizar
+    (el endpoint lo traduce a 422). `model` usa el mismo contrato que
+    `/api/translate` (preferencia opcional del usuario).
+    """
+    normalized = _normalize_lookup_word(word)
+    if not normalized:
+        raise ValueError("La palabra buscada queda vacía tras normalizar")
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    cached = await run_in_threadpool(dictionary_repo.get_entry, normalized)
+    cached = await _ensure_cached_content(normalized, cached, model=model)
+    return await run_in_threadpool(_build_dictionary_entry, normalized, rows, cached)

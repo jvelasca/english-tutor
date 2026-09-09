@@ -248,6 +248,100 @@ class LexiconOut(BaseModel):
     units: list[LexicalUnitOut] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Diccionario de consulta (V3.30). D3: la consulta es SOLO LECTURA — nunca crea
+# filas en `vocabulary` ni eventos en `vocabulary_events`. La definición llega
+# de la caché global `dictionary_entries` (Fase B la rellena con el modelo
+# local); hasta entonces `definition_source="none"`.
+# ---------------------------------------------------------------------------
+
+
+class DictionaryLookupRequest(BaseModel):
+    """Petición de consulta del diccionario (V3.30).
+
+    `model` es opcional (mismo contrato que `/api/translate`): el cliente puede
+    pedir un modelo local concreto para la generación de contenido (Fase B).
+    """
+
+    word: str = Field(min_length=1, max_length=80)
+    model: str | None = None
+
+
+class DictionaryExampleOut(BaseModel):
+    """Frase de ejemplo determinista del banco de la app que contiene la palabra
+    (V3.30): sin LLM, nunca la plantilla neutra del micro-drill."""
+
+    phrase: str
+    source: str = "pronunciation_corpus"
+    level: str = ""
+
+
+class DictionarySurfaceUsageOut(BaseModel):
+    """Marca de uso de la FORMA SUPERFICIAL exacta buscada (V3.30).
+
+    Derivada en servidor con los mismos cómputos puros de `services/lexicon.py`
+    que usa `get_lexicon` (premisa 21). Todos los campos con `None`/0 indican
+    que la forma nunca se registró en la app."""
+
+    status: LexicalStatus | None = None
+    mastery: float = 0.0
+    recall: float = 0.0
+    next_review_days: int = 0
+    production_count: int = 0
+    exposure_count: int = 0
+    production_channels: list[str] = Field(default_factory=list)
+    competence: LexicalCompetence | None = None
+    last_activity_at: str = ""
+
+
+class DictionaryUnitUsageOut(BaseModel):
+    """Marca de uso del agregado por `lexical_unit` (V3.30).
+
+    Solo se expone cuando la unidad canónica difiere de la forma buscada
+    (p. ej. buscar `going` agrega por la unidad `go`). Derivado informativo:
+    `mastery`/`recall` son el máximo entre superficies; el dominio real sigue
+    siendo por forma."""
+
+    lexical_unit: str
+    status: LexicalStatus | None = None
+    mastery: float = 0.0
+    recall: float = 0.0
+    surface_count: int = 0
+    mastered_surfaces: int = 0
+    recognized: bool = False
+    produced: bool = False
+    transfer: bool = False
+    production_count: int = 0
+    exposure_count: int = 0
+
+
+class DictionaryUsageOut(BaseModel):
+    """Marca de uso/aprendizaje de una consulta al diccionario (V3.30)."""
+
+    tracked: bool = False
+    surface: DictionarySurfaceUsageOut | None = None
+    unit: DictionaryUnitUsageOut | None = None
+
+
+class DictionaryEntryOut(BaseModel):
+    """Entrada del diccionario de consulta (V3.30).
+
+    `definition`/`translation`/`pos` vienen de la caché global (generadas por el
+    modelo local, Fase B). Cuando el modelo no está disponible o aún no se ha
+    generado, `definition_source="none"` y `definition=null`: la respuesta se
+    sirve igualmente con la frase de ejemplo y la marca de uso."""
+
+    word: str
+    kind: str = ""
+    cefr: str = ""
+    definition_source: Literal["llm", "none"] = "none"
+    pos: str = ""
+    definition: str | None = None
+    translation: str | None = None
+    example: DictionaryExampleOut | None = None
+    usage: DictionaryUsageOut
+
+
 class DrillCandidatesOut(BaseModel):
     """Candidatos al speaking micro-drill (V3.19).
 

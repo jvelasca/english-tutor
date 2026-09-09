@@ -3,7 +3,31 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-09 14:00 (UTC+2).
+> Actualizado por última vez: 2026-09-09 (UTC+2).
+>
+> **Nota (2026-09-09):** **V3.30 publicada** — release **v3.30.0** (diccionario
+> de consulta con marca de uso y aprendizaje; feature cerrada con las Fases
+> A/B/C del dossier `docs/DISENO-V330-DICCIONARIO-CONSULTA.md`). Resumen:
+> endpoint `POST /api/vocabulary/dictionary` con `usage` por forma y por
+> `lexical_unit` (estado, recall, contadores, matriz de competencia; solo
+> lectura D3, sin eventos ni impacto en mastery), ejemplo determinista del
+> banco (`services/example_sentences.py`) y definición/traducción generadas por
+> el modelo local (`services/dictionary_content.py`, `temperature=0`, prompt
+> JSON, parseo tolerante) cacheadas con `INSERT OR IGNORE` en la tabla global
+> `dictionary_entries` (1.ª consulta paga el modelo; siguientes deterministas;
+> degradación a `definition_source="none"` con fallback en memoria si la BD
+> falla) · UI «Consultar» (`DictionaryLookup.tsx`, conmutador con el diccionario
+> personal en `QuizRoutePage`, solo Vocabulario la declara), cliente
+> `lookupDictionaryWord` + tipo `DictionaryEntry`, claves `dictionary.lookup.*`
+> es/en. Verificación: pytest backend **1684 passed** (39 tests del diccionario)
+> + ruff limpio; vitest **538 passed** (63 archivos) + `tsc --noEmit` limpio;
+> `check_release_consistency` **3.30.0** exit 0. Detalle y conteos:
+> `release-notes-v3.30.0.md`; `CHANGELOG.md` con entrada `[3.30.0]`; `PLAN.md`
+> con hito estable V3.30 y candidato cerrado. Pendientes hacia **V3.31**:
+> consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+> falladas, palabras tocables en transcripts/chat, afinado de la Fase 3
+> (lección orquestada multi-ítem, evaluación acústica real) y el dossier de
+> auditoría del candidato v3.28.0 (letra P).
 >
 > **Nota (2026-09-09, 14:00):** **V3.29 publicada** — release **v3.29.0**
 > (Listening Engine 4.0, **Fase 3, núcleo**). Plan

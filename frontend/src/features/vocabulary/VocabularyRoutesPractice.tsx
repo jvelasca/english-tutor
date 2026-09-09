@@ -16,6 +16,7 @@ import {
 import { QuizRoutePage, type RouteQuizConfig } from "../routes/QuizRoutePage";
 import { VocabularyLevelPanel } from "./VocabularyLevelPanel";
 import { PersonalDictionary } from "./PersonalDictionary";
+import { DictionaryLookup } from "./DictionaryLookup";
 import type { LearnActivity } from "../../router/learnHub";
 import type { NextBestActivity } from "../../types/api";
 import type { Section } from "../../utils/sections";
@@ -30,6 +31,12 @@ const VOCABULARY_ROUTE_CONFIG: RouteQuizConfig = {
     ctaKey: "vocRoutes.dictionaryCta",
     hintKey: "vocRoutes.dictionaryHint",
     View: PersonalDictionary,
+  },
+  // V3.30 (D2): vista alterna «Consultar» junto al diccionario personal.
+  dictionaryLookup: {
+    ctaKey: "vocRoutes.dictionaryLookupCta",
+    hintKey: "vocRoutes.dictionaryLookupHint",
+    View: DictionaryLookup,
   },
   api: {
     getStats: (userId) => getVocabularyStats(userId),

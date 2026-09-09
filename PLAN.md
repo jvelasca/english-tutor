@@ -8,6 +8,28 @@
 
 ## Estado actual
 
+- ✅ **V3.30 — Diccionario de consulta con marcas de uso y aprendizaje
+  (2026-09-09)**: cerrado e implementado sobre v3.29.0 (**Versión estable `3.30.0`**, app `3.29.0 → 3.30.0`) con el dossier
+  `docs/DISENO-V330-DICCIONARIO-CONSULTA.md` (decisiones **D1** LLM local a
+  demanda con caché persistente en `dictionary_entries` · **D2** entrada = hub
+  Vocabulario, vista «Consultar» · **D3** la consulta es solo lectura, sin
+  evidencia ni impacto en mastery): **endpoint `POST /api/vocabulary/dictionary`**
+  — marca de uso/aprendizaje por forma y por `lexical_unit` (estado, recall,
+  contadores, matriz de competencia, agregado de unidad), frase de ejemplo
+  determinista del banco (`services/example_sentences.py`) y definición/
+  traducción generadas por el modelo local (`services/dictionary_content.py`:
+  prompt JSON, parseo tolerante, `INSERT OR IGNORE` idempotente, degradación a
+  `definition_source="none"` y fallback en memoria si la BD falla) ·
+  **UI «Consultar»** (`DictionaryLookup.tsx`, conmutador con el diccionario
+  personal en la vista alterna de `QuizRoutePage`; solo Vocabulario la declara),
+  cliente `lookupDictionaryWord` + tipo `DictionaryEntry`, claves
+  `dictionary.lookup.*` es/en. Tests: pytest **1684** (39 tests del diccionario
+  en `test_dictionary_lookup.py` + `test_dictionary_content_v330.py`), ruff
+  limpio, vitest **538** (63 archivos; `DictionaryLookup.test.tsx`), `tsc
+  --noEmit` limpio y `check_release_consistency` **3.30.0** exit 0. Pendiente:
+  candidatos V3.31 (palabras tocables en transcripts/chat, consumo de
+  `word_breakdown_json` en agregados / práctica dirigida de las falladas).
+
 - ✅ **V3.29 — Listening Engine 4.0, Fase 3 (núcleo, 2026-09-09)**: cerrado e
   implementado sobre v3.28.1 (**Versión estable `3.29.0`**, app `3.28.1 →
   3.29.0`) con el plan `v3.29_nucleo_fase_3…plan.md` (P1–P6): **motor de
@@ -949,18 +971,12 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   fallada y evidencia `word_breakdown_json`). El diccionario de consulta se
   reprioriza a V3.30 (siguiente candidato).
 
-- **V3.30 (candidato) — Diccionario de consulta con marcas de uso y aprendizaje.**
-  Idea registrada tras V3.27 y repriorizada desde V3.29: además de los checks
-  por rutas y del diccionario
-  personal actual, ofrecer un **diccionario de consulta** (definición/traducción
-  a demanda por palabra) que **marque las palabras ya usadas en la app** y su
-  estado de aprendizaje (vista/producida/dominada), conectado con la evidencia
-  léxica (`vocabulary`, `vocabulary_events`, superficies de producción). Sin
-  diseño cerrado ni alcance aún: requiere decisión de fuente de definiciones
-  (100% local, sin nube), granularidad de marca por superficie y relación con el
-  Personal Dictionary y el modo chat. Se detallará en su dossier de diseño.
-  Candidatos adicionales V3.30: consumo de `word_breakdown_json` en agregados /
-  práctica dirigida de las palabras falladas y afinado de la Fase 3.
+- ~~**⏳ V3.30 — Diccionario de consulta con marcas de uso y aprendizaje**~~ ✅
+  **cerrado (2026-09-09, v3.30.0)**: implementado y publicado (ver «Estado
+  actual» arriba, `release-notes-v3.30.0.md` y `docs/DISENO-V330-DICCIONARIO-CONSULTA.md`).
+  Quedan abiertos hacia **V3.31** los candidatos que V3.30 había diferido:
+  consumo de `word_breakdown_json` en agregados / práctica dirigida de las
+  palabras falladas y palabras tocables en transcripts/chat.
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

@@ -25,6 +25,7 @@ import {
   GraduationCap,
   Info,
   Loader2,
+  Search,
   X,
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
@@ -154,6 +155,11 @@ export interface RouteQuizConfig {
   api: RouteQuizApi;
   /** Vista extra (diccionario personal en Vocabulary). */
   dictionary?: RouteDictionaryConfig;
+  /** V3.30: segunda vista alterna de diccionario («Consultar»). Opcional: solo
+      Vocabulary la declara; el resto de destrezas no se toca. Cuando existen
+      `dictionary` y `dictionaryLookup`, la vista de diccionario muestra un
+      conmutador entre «Diccionario personal» y «Consultar». */
+  dictionaryLookup?: RouteDictionaryConfig;
   /** Escena de práctica personalizada (read-aloud, chat guiado…). Sin ella, la
       página usa la escena de quiz MC / producción controlada. */
   scene?: ComponentType<LearnSceneProps>;
@@ -191,7 +197,8 @@ interface QuizRoutePageProps {
 type RouteView =
   | { kind: "routes" }
   | { kind: "assessment"; level: string }
-  | { kind: "dictionary" };
+  | { kind: "dictionary" }
+  | { kind: "lookup" };
 
 function routeMode(session: RouteSession | null): RouteQuestionMode {
   if (!session) return "all";
@@ -431,8 +438,16 @@ export function QuizRoutePage({
     );
   }
 
-  if (view.kind === "dictionary" && config.dictionary) {
-    const DictView = config.dictionary.View;
+  if (view.kind === "dictionary" || view.kind === "lookup") {
+    const dictCfg =
+      view.kind === "lookup" ? config.dictionaryLookup : config.dictionary;
+    if (!dictCfg) {
+      // La vista solo es alcanzable desde un CTA que existe si la config está
+      // declarada; si faltara, vuelve al mapa (guard de robustez).
+      return <></>;
+    }
+    const DictView = dictCfg.View;
+    const showSwitcher = Boolean(config.dictionary && config.dictionaryLookup);
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background/90 px-2 py-1.5 backdrop-blur">
@@ -447,10 +462,47 @@ export function QuizRoutePage({
             {t(nk("backRoutes"))}
           </Button>
           <span className="text-xs text-muted-foreground">
-            {t(config.dictionary.hintKey)}
+            {t(dictCfg.hintKey)}
           </span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {showSwitcher && (
+            <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6">
+              <div
+                role="group"
+                aria-label={t("dictionary.viewsLabel")}
+                className="flex w-fit items-center gap-1 rounded-md bg-secondary p-1"
+              >
+                {[
+                  { kind: "dictionary" as const, cfg: config.dictionary! },
+                  { kind: "lookup" as const, cfg: config.dictionaryLookup! },
+                ].map((entry) => {
+                  const isActive = view.kind === entry.kind;
+                  return (
+                    <button
+                      key={entry.kind}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => setView({ kind: entry.kind })}
+                      className={cn(
+                        "inline-flex min-h-9 items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors",
+                        isActive
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {entry.kind === "dictionary" ? (
+                        <BookOpen className="size-3.5" aria-hidden="true" />
+                      ) : (
+                        <Search className="size-3.5" aria-hidden="true" />
+                      )}
+                      {t(entry.cfg.ctaKey)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <DictView userId={userId} />
         </div>
       </div>
@@ -535,18 +587,38 @@ export function QuizRoutePage({
           {t("learn.back")}
         </Button>
         <LearnActivitySwitcher active={active} />
-        {config.dictionary && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="ml-auto min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
-            onClick={() => setView({ kind: "dictionary" })}
-          >
-            <BookOpen className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{t(config.dictionary.ctaKey)}</span>
-          </Button>
-        )}
+        {config.dictionary || config.dictionaryLookup ? (
+          <div className="ml-auto flex items-center gap-1">
+            {config.dictionary && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
+                onClick={() => setView({ kind: "dictionary" })}
+              >
+                <BookOpen className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">
+                  {t(config.dictionary.ctaKey)}
+                </span>
+              </Button>
+            )}
+            {config.dictionaryLookup && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
+                onClick={() => setView({ kind: "lookup" })}
+              >
+                <Search className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">
+                  {t(config.dictionaryLookup.ctaKey)}
+                </span>
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

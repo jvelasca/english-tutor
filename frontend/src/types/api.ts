@@ -345,6 +345,61 @@ export interface DrillSentenceAttempt {
   asr_confidence?: number | null;
 }
 
+// V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
+// SOLO lectura (D3): el backend no registra evidencia. `definition_source`
+// distingue contenido cacheado generado por el modelo local ("llm") de su
+// ausencia ("none", modelo caído o aún sin generar): en ese caso `definition`
+// y `translation` son null y la UI muestra igualmente uso y ejemplo.
+export interface DictionaryExample {
+  phrase: string;
+  source: string;
+  level: string;
+}
+
+export interface DictionarySurfaceUsage {
+  status: LexicalStatus | null;
+  mastery: number;
+  recall: number;
+  next_review_days: number;
+  production_count: number;
+  exposure_count: number;
+  production_channels: string[];
+  competence: LexicalCompetence | null;
+  last_activity_at: string;
+}
+
+export interface DictionaryUnitUsage {
+  lexical_unit: string;
+  status: LexicalStatus | null;
+  mastery: number;
+  recall: number;
+  surface_count: number;
+  mastered_surfaces: number;
+  recognized: boolean;
+  produced: boolean;
+  transfer: boolean;
+  production_count: number;
+  exposure_count: number;
+}
+
+export interface DictionaryUsage {
+  tracked: boolean;
+  surface: DictionarySurfaceUsage | null;
+  unit: DictionaryUnitUsage | null;
+}
+
+export interface DictionaryEntry {
+  word: string;
+  kind: string;
+  cefr: string;
+  definition_source: "llm" | "none";
+  pos: string;
+  definition: string | null;
+  translation: string | null;
+  example: DictionaryExample | null;
+  usage: DictionaryUsage;
+}
+
 export interface CefrBucket {
   cefr: string;
   count: number;

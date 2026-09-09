@@ -1,5 +1,6 @@
-import { getJson } from "./client";
+import { getJson, postJson } from "./client";
 import type {
+  DictionaryEntry,
   DrillAttempt,
   DrillCandidates,
   DrillSentenceAttempt,
@@ -11,6 +12,21 @@ import type {
 export function getLexicon(userId: string): Promise<Lexicon> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return getJson<Lexicon>(`/api/vocabulary/lexicon?${query}`);
+}
+
+/** Entrada del diccionario de consulta (V3.30): definición/traducción cacheada
+ * (generada por el modelo local) o `definition_source="none"`, frase de ejemplo
+ * determinista y marca de uso/aprendizaje de la palabra. Solo lectura (D3): no
+ * registra evidencia. `word` puede ser cualquier palabra (esté o no en el
+ * léxico del alumno). */
+export function lookupDictionaryWord(
+  userId: string,
+  word: string,
+): Promise<DictionaryEntry> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, {
+    word,
+  });
 }
 
 /** Candidatas al speaking micro-drill (V3.19): señal determinista en servidor

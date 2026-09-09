@@ -117,6 +117,23 @@ def init_db() -> None:
             )
             """
         )
+        # V3.30 (D1): caché GLOBAL del contenido del diccionario de consulta
+        # (definición/traducción generadas por el modelo local, a demanda). Es
+        # contenido de idioma, NO evidencia de alumno: sin user_id ni FK. Fase A
+        # crea la tabla y expone la lectura; la escritura llega con el generador
+        # LLM (Fase B).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionary_entries (
+                word TEXT PRIMARY KEY,
+                pos TEXT NOT NULL DEFAULT '',
+                definition TEXT NOT NULL DEFAULT '',
+                translation TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS grammar_errors (
