@@ -345,6 +345,22 @@ export interface DrillSentenceAttempt {
   asr_confidence?: number | null;
 }
 
+// V3.33 (eslabón 2 del puente): paso Recognition — MCQ definición ↔ palabra.
+// La pregunta es determinista en el servidor (premisa 21): el GET nunca incluye
+// la opción correcta y `correct_index` solo llega en la respuesta del intento.
+export interface DrillRecognitionQuestion {
+  word: string;
+  available: boolean;
+  options: string[];
+}
+
+export interface DrillRecognitionAttempt {
+  word: string;
+  correct: boolean;
+  correct_index: number;
+  selected_index: number;
+}
+
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
 // SOLO lectura (D3): el backend no registra evidencia. `definition_source`
 // distingue contenido cacheado generado por el modelo local ("llm") de su

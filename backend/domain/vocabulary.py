@@ -15,7 +15,12 @@ import config
 from domain import learning as learning_service
 from repositories import dictionary as dictionary_repo
 from repositories import vocabulary as vocabulary_repo
-from services import dictionary_content, example_sentences, lexicon
+from services import (
+    dictionary_content,
+    dictionary_mcq,
+    example_sentences,
+    lexicon,
+)
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
 from services.pronunciation import score_pronunciation
@@ -358,6 +363,67 @@ async def submit_sentence_attempt(
         ),
         "asr_status": asr_status,
         "asr_confidence": asr_confidence,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Paso Recognition del drill (V3.33, eslabón 2 del Dictionary → Learning
+# Bridge). MCQ definición ↔ palabra servido y puntuado por el backend (premisa
+# 21, sin estado servidor): la pregunta es una función pura y determinista por
+# palabra sobre la caché global `dictionary_entries` (`services/dictionary_mcq`).
+# Evidencia SOLO informativa (V3.13: el MC de reconocimiento no demuestra
+# destrezas productivas): el acierto/fallo registra únicamente el evento
+# `learning_events` `drill:<word>:recognition:ok|ko`; NUNCA escribe en
+# `vocabulary`/`vocabulary_events` ni mueve FSRS/mastery/usage (D3 + sin
+# "mastery de clic"), y no saca la palabra de la lista de candidatas.
+# ---------------------------------------------------------------------------
+
+
+async def get_recognition_question(user_id: str, word: str) -> dict:
+    """Pregunta del paso Recognition del drill (V3.33).
+
+    La pregunta NO depende del alumno (contenido global); `user_id` se conserva
+    por simetría con el resto de funciones de drill. Si no hay contenido
+    suficiente (palabra sin entrada o sin distractores), devuelve
+    `available=false` con `options=[]`: degradación controlada sin evento (el
+    peldaño muestra aviso y no rompe Recall/Sentence). La respuesta NUNCA
+    incluye el índice correcto: lo puntúa el POST recomputando la pregunta.
+    """
+    normalized = _normalize_lookup_word(word)
+    if not normalized:
+        raise ValueError("La palabra buscada no es válida")
+    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    built = dictionary_mcq.recognition_options_for(normalized, entries)
+    if built is None:
+        return {"word": normalized, "available": False, "options": []}
+    options, _correct_index = built
+    return {"word": normalized, "available": True, "options": options}
+
+
+async def submit_recognition_attempt(
+    user_id: str, word: str, selected_index: int
+) -> dict | None:
+    """Puntúa un intento del paso Recognition (V3.33) sin efectos colaterales.
+
+    El servidor recomputa la pregunta con la MISMA función pura (premisa 21) y
+    compara `selected_index` con la correcta. Devuelve `None` si la palabra ya
+    no tiene pregunta (el router responde un 4xx controlado sin evento).
+    """
+    normalized = _normalize_lookup_word(word)
+    if not normalized:
+        raise ValueError("La palabra buscada no es válida")
+    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    built = dictionary_mcq.recognition_options_for(normalized, entries)
+    if built is None:
+        return None
+    options, correct_index = built
+    if selected_index < 0 or selected_index >= len(options):
+        raise ValueError("selected_index fuera de rango")
+    return {
+        "word": normalized,
+        "correct": selected_index == correct_index,
+        "correct_index": correct_index,
+        "selected_index": selected_index,
     }
 
 

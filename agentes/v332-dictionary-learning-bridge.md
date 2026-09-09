@@ -35,6 +35,13 @@
   de las secciones «Escaleras por destreza» y «Frontend» abajo (reconocimiento
   MCQ sobre la definición, recall demorado con FSRS, transferencia por contexto
   de actividad V3.23 y la partición de componentes de la tarjeta cuando crezca).
+  > **Cierre parcial (v3.33.0, 2026-09-09):** el eslabón **Recognition**
+  > (peldaño `1 · Recognize` en la escalera compartida `wordDrill.tsx`, MCQ
+  > definición ↔ palabra determinista con evidencia SOLO informativa
+  > `drill:<word>:recognition:ok|ko`) se implementó y publicó en **v3.33.0**
+  > (briefing `agentes/v333-dictionary-recognition-mcq.md`). Siguen pendientes:
+  > recall demorado con FSRS, transferencia por contexto de actividad V3.23 y
+  > la partición de componentes de la tarjeta cuando crezca.
 
 ## Objetivo
 
@@ -96,6 +103,9 @@ explícita del alumno sobre una palabra consultada) crea una actividad real cuyo
 3. **Escaleras por destreza (después del primer eslabón).** Reconocimiento
    (MCQ definición ↔ palabra), recall demorado (reutilizar el scheduler FSRS),
    producción en contexto y transferencia por contexto de actividad (V3.23).
+   El peldaño **Reconocimiento** se implementó en v3.33.0 con evidencia solo
+   informativa (`drill:<word>:recognition:ok|ko`); recall demorado y
+   transferencia siguen pendientes.
 4. **Frontend.** La tarjeta de `DictionaryLookup` crece; si el candidato añade
    varios bloques, dividir el componente (DictionarySearch / DictionaryEntryCard /
    DictionaryDefinition / DictionaryExample / DictionaryUsage /
@@ -123,7 +133,10 @@ por `backend/tests/test_dictionary_bridge_v332.py` (+3 tests, pytest 1711).
   `generator_version`, `UNUSABLE_MODELS`, negative cache): suite completa
   pytest **1711 passed** + ruff limpio + vitest + `tsc --noEmit` +
   `check_release_consistency` 3.32.0 exit 0.
-- ⏳ Criterios de eslabones futuros (cuando se implementen): reconocimiento
-  MCQ sobre la definición con su evidencia, recall demorado FSRS y
-  transferencia por contexto; manteniendo la regla de «evidencia idéntica,
-  sin etiquetas de origen».
+- ⏳ Criterios de eslabones futuros (cuando se implementen): recall demorado
+  FSRS y transferencia por contexto; manteniendo la regla de «evidencia
+  idéntica, sin etiquetas de origen».
+- ✅ **Recognition (v3.33.0).** Peldaño `1 · Recognize` en la escalera
+  compartida con MCQ definición ↔ palabra determinista servido y puntuado por
+  el backend (premisa 21), evidencia SOLO informativa `drill:<word>:
+  recognition:ok|ko` (cerrado por `backend/tests/test_dictionary_recognition_v333.py`).

@@ -4,6 +4,8 @@ import type {
   DictionaryLookupRequest,
   DrillAttempt,
   DrillCandidates,
+  DrillRecognitionAttempt,
+  DrillRecognitionQuestion,
   DrillSentenceAttempt,
   DrillSentenceContext,
   Lexicon,
@@ -112,4 +114,38 @@ export async function submitDrillSentenceAttempt(
     throw new Error(err.detail ?? `HTTP ${res.status}`);
   }
   return (await res.json()) as DrillSentenceAttempt;
+}
+
+/** Pregunta del paso Recognition del drill (V3.33, eslabón 2 del puente).
+
+ * MCQ definición ↔ palabra determinista por palabra (premisa 21): la correcta
+ * nunca viaja en el GET. `available=false` con `options=[]` es la degradación
+ * controlada cuando la palabra aún no tiene significado cacheado o no hay
+ * distractores: el peldaño muestra aviso y no rompe la escalera. */
+export function getDrillRecognitionQuestion(
+  userId: string,
+  word: string,
+): Promise<DrillRecognitionQuestion> {
+  const query = new URLSearchParams({
+    user_id: userId,
+    word,
+  }).toString();
+  return getJson<DrillRecognitionQuestion>(
+    `/api/vocabulary/drill/recognition?${query}`,
+  );
+}
+
+/** Intento del paso Recognition del drill (V3.33): envía la opción elegida y
+ * el servidor puntúa recomponiendo la pregunta (nunca se declara acierto en el
+ * cliente). Evidencia SOLO informativa: el acierto NO dispara `onProduced`. */
+export function submitDrillRecognitionAttempt(
+  userId: string,
+  word: string,
+  selectedIndex: number,
+): Promise<DrillRecognitionAttempt> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<DrillRecognitionAttempt>(
+    `/api/vocabulary/drill/recognition-attempt?${query}`,
+    { word, selected_index: selectedIndex },
+  );
 }

@@ -239,8 +239,8 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     const chip = await screen.findByRole("button", { name: "Say travel" });
     fireEvent.click(chip);
 
-    // Escalera Recall -> Sentence en la misma tarjeta.
-    fireEvent.click(screen.getByRole("button", { name: "2 · Sentence" }));
+    // Escalera Recognize -> Recall -> Sentence en la misma tarjeta.
+    fireEvent.click(screen.getByRole("button", { name: "3 · Sentence" }));
     expect(await screen.findByText('Say the word "travel".')).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Record" }));
@@ -252,5 +252,78 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Say travel" })).toBeNull(),
     );
+  });
+});
+
+describe("PersonalDictionary · V3.33 paso Recognition", () => {
+  beforeEach(() => stubMediaRecorder());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const QUESTION = {
+    word: "travel",
+    available: true,
+    options: ["viajar", "comer", "dormir"],
+  };
+
+  it("acierta «1 · Recognize» y NO saca la palabra de candidatas (informativo)", async () => {
+    // Estado inmutable: el acierto de reconocimiento no produce (V3.13), así
+    // que la palabra sigue siendo candidata al drill oral.
+    const candidates: { words: string[] } = { words: ["travel"] };
+    routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: candidates },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      {
+        url: "/api/vocabulary/drill/recognition-attempt",
+        data: {
+          word: "travel",
+          correct: true,
+          correct_index: 0,
+          selected_index: 0,
+        },
+      },
+      { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
+
+    // El drill abre en el paso oral Word; el peldaño Recognition está primero.
+    expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+
+    expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "viajar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    expect(
+      await screen.findByText(/You recognize the meaning/),
+    ).toBeTruthy();
+    // Informativo: sin onProduced, la candidata sigue ahí.
+    expect(screen.getByRole("button", { name: "Say travel" })).toBeTruthy();
+  });
+
+  it("sin significado disponible degrada con aviso y no rompe la escalera", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      {
+        url: "/api/vocabulary/drill/recognition",
+        data: { word: "travel", available: false, options: [] },
+      },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
+    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+
+    expect(
+      await screen.findByText(/No meaning available for this word yet/),
+    ).toBeTruthy();
+    // El resto de pasos sigue accesible (no se rompe la escalera).
+    expect(screen.getByRole("button", { name: "2 · Word" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "3 · Sentence" })).toBeTruthy();
   });
 });

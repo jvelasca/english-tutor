@@ -72,3 +72,26 @@ def save_entry(
             (word, pos, definition, translation, generator_version, now, now),
         )
         return cursor.rowcount > 0
+
+
+_ENTRY_COLUMNS = (
+    "word, pos, definition, translation, generator_version, "
+    "created_at, updated_at"
+)
+
+
+def list_entries() -> list[dict]:
+    """Todas las entradas globales de `dictionary_entries` (sin `user_id`).
+
+    V3.33 (eslabón Recognition del puente): la caché global es el único
+    contenido de significado del diccionario, así que el helper de MCQ la usa
+    como banco de textos de significado candidatos a distractor. Sin filtro de
+    `generator_version`: aunque una entrada quede obsoleta por un cambio de
+    política del generador, su significado real sigue sirviendo de distractor
+    para el reconocimiento. Orden estable por `word` (determinista).
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            f"SELECT {_ENTRY_COLUMNS} FROM dictionary_entries ORDER BY word"
+        ).fetchall()
+    return [dict(row) for row in rows]

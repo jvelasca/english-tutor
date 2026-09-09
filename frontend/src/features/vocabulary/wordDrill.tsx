@@ -1,5 +1,6 @@
 /**
- * Escalera de micro-drill oral de una palabra (V3.19/V3.21): Recall → Sentence.
+ * Escalera de micro-drill de una palabra (V3.19/V3.21/V3.33):
+ * Recognition → Recall → Sentence.
  *
  * Extraída de `PersonalDictionary` para el Dictionary → Learning Bridge (V3.32):
  * se reutiliza tanto desde el diccionario personal (chips de candidatas de la
@@ -10,17 +11,24 @@
  * actividad drill) — sin etiquetas de origen (V3.32). No declara dominio
  * (D5/E3): una producción del día no consolida; se consolida con éxito
  * espaciado (F6.2).
+ * V3.33: el peldaño Recognition (MCQ definición ↔ palabra) es SOLO
+ * informativo — su acierto no demuestra destreza productiva (V3.13) y no
+ * dispara `onProduced`; tampoco usa micrófono (lo puntúa el backend).
  */
 import { useRef, useState } from "react";
 import { motion, type Variants } from "motion/react";
-import { Loader2, Mic, Square } from "lucide-react";
+import { Check, Loader2, Mic, Square } from "lucide-react";
 import {
+  getDrillRecognitionQuestion,
   getDrillSentenceContext,
   submitDrillAttempt,
+  submitDrillRecognitionAttempt,
   submitDrillSentenceAttempt,
 } from "../../api/vocabulary";
 import type {
   DrillAttempt,
+  DrillRecognitionAttempt,
+  DrillRecognitionQuestion,
   DrillSentenceAttempt,
   DrillSentenceContext,
 } from "../../types/api";
@@ -48,7 +56,7 @@ const item: Variants = {
   },
 };
 
-export type DrillStep = "recall" | "sentence";
+export type DrillStep = "recognition" | "recall" | "sentence";
 
 export interface SpeakingDrillSectionProps {
   userId: string;
@@ -138,15 +146,23 @@ export function isSentenceAttempt(
   return "passed" in outcome;
 }
 
-/** Micro-práctica escalera de una palabra (V3.21/F6): Paso 1 "Recall" — di la
- * palabra (scorer `submitDrillAttempt`); Paso 2 "Sentence" — repítela DENTRO de
- * una frase de contexto determinista (scorer `submitDrillSentenceAttempt`).
- * Reutiliza el scorer de pronunciación del servidor. No declara dominio (D5/E3):
- * una producción del día no consolida; se consolida con éxito espaciado (F6.2).
+/** Micro-práctica escalera de una palabra (V3.21/F6): Paso 1 "Recognition"
+ * (V3.33, eslabón 2 del puente) — elige el significado de la palabra entre
+ * opciones servidas por el backend (MCQ definición ↔ palabra, sin micrófono);
+ * Paso 2 "Recall" — di la palabra (scorer `submitDrillAttempt`); Paso 3
+ * "Sentence" — repítela DENTRO de una frase de contexto determinista (scorer
+ * `submitDrillSentenceAttempt`). Reutiliza el scorer de pronunciación del
+ * servidor. No declara dominio (D5/E3): una producción del día no consolida;
+ * se consolida con éxito espaciado (F6.2).
  * V3.32: reutilizable desde el diccionario de consulta (botón «Practicar esta
- * palabra») porque solo depende de `userId` + `word`. */
+ * palabra») porque solo depende de `userId` + `word`.
+ * V3.33: el paso Recognition es SOLO informativo (V3.13: el MC de
+ * reconocimiento no demuestra destrezas productivas): su acierto NO dispara
+ * `onProduced` y solo el servidor puntúa (premisa 21). */
 export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
   const { t } = useI18n();
+  // El drill abre en el paso oral Word (V3.19); Recognition (V3.33) es el
+  // primer peldaño de la escalera y se carga al entrar en él.
   const [step, setStep] = useState<DrillStep>("recall");
   const [sentence, setSentence] = useState<DrillSentenceContext | null>(null);
   const [sentenceError, setSentenceError] = useState<string | null>(null);
@@ -157,6 +173,16 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
   const [micReason, setMicReason] = useState<MicUnavailableReason | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // V3.33: estado del paso Recognition (la pregunta es determinista en el
+  // servidor; la correcta solo llega en la respuesta del intento).
+  const [recognition, setRecognition] =
+    useState<DrillRecognitionQuestion | null>(null);
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  const [recognitionSelected, setRecognitionSelected] = useState<number | null>(
+    null,
+  );
+  const [recognitionOutcome, setRecognitionOutcome] =
+    useState<DrillRecognitionAttempt | null>(null);
   // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
   const recordingSession = useRecordingSession(recording, {
     onAutoStop: () => {
@@ -171,7 +197,24 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
     if (next === step || recording || processing) return;
     setResult(null);
     setError(null);
-    setStep(next);
+    if (next === "recognition") {
+      // El paso Recognition es informativo: cada vez que se entra desde otro
+      // paso se reinicia el intento anterior (como Recall re-graba).
+      setRecognitionOutcome(null);
+      setRecognitionSelected(null);
+      if (!recognition) {
+        setRecognitionError(null);
+        getDrillRecognitionQuestion(userId, word)
+          .then((question) => setRecognition(question))
+          .catch((e) =>
+            setRecognitionError(
+              t("dictionary.drill.error").concat((e as Error).message),
+            ),
+          );
+      }
+      setStep(next);
+      return;
+    }
     if (next === "sentence" && !sentence) {
       setSentenceError(null);
       getDrillSentenceContext(userId, word)
@@ -179,6 +222,27 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         .catch((e) =>
           setSentenceError(t("dictionary.drill.error").concat((e as Error).message)),
         );
+    }
+    setStep(next);
+  }
+
+  async function submitRecognition() {
+    if (!recognition || !recognition.available || recognitionSelected === null) {
+      return;
+    }
+    setProcessing(true);
+    setError(null);
+    try {
+      const outcome = await submitDrillRecognitionAttempt(
+        userId,
+        word,
+        recognitionSelected,
+      );
+      setRecognitionOutcome(outcome);
+    } catch (e) {
+      setError(t("dictionary.drill.error").concat((e as Error).message));
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -262,13 +326,14 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         </button>
       </div>
 
-      {/* Escalera Recall -> Sentence en la misma tarjeta (V3.21/F6.1). */}
+      {/* Escalera Recognize -> Recall -> Sentence en la misma tarjeta
+          (V3.21/F6.1 + V3.33 Recognition). */}
       <div
         role="group"
         aria-label={t("dictionary.drill.steps")}
         className="flex w-fit items-center gap-1 rounded-md bg-secondary p-1"
       >
-        {(["recall", "sentence"] as const).map((option) => (
+        {(["recognition", "recall", "sentence"] as const).map((option) => (
           <button
             key={option}
             type="button"
@@ -282,14 +347,63 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {option === "recall"
-              ? t("dictionary.drill.stepRecall")
-              : t("dictionary.drill.stepSentence")}
+            {option === "recognition"
+              ? t("dictionary.drill.stepRecognition")
+              : option === "recall"
+                ? t("dictionary.drill.stepRecall")
+                : t("dictionary.drill.stepSentence")}
           </button>
         ))}
       </div>
 
-      {step === "recall" ? (
+      {step === "recognition" ? (
+        recognition ? (
+          recognition.available ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                {t("dictionary.drill.recognitionPrompt")}
+              </p>
+              <ul
+                role="group"
+                aria-label={t("dictionary.drill.recognitionPrompt")}
+                className="flex flex-col gap-1.5"
+              >
+                {recognition.options.map((option, i) => (
+                  <li key={`${i}-${option}`}>
+                    <button
+                      type="button"
+                      disabled={processing || recognitionOutcome !== null}
+                      onClick={() => setRecognitionSelected(i)}
+                      aria-pressed={recognitionSelected === i}
+                      className={cn(
+                        "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:opacity-60",
+                        recognitionSelected === i
+                          ? "border-transparent bg-primary text-primary-foreground"
+                          : "border-border bg-secondary text-secondary-foreground hover:border-primary/50 hover:text-foreground",
+                      )}
+                    >
+                      {option}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {t("dictionary.drill.recognitionUnavailable")}
+            </p>
+          )
+        ) : recognitionError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {recognitionError}
+          </p>
+        ) : (
+          <Loader2
+            className="size-4 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        )
+      ) : step === "recall" ? (
         <p className="text-xs text-muted-foreground">{t("dictionary.drill.prompt")}</p>
       ) : sentence ? (
         <div className="flex flex-col gap-2">
@@ -325,41 +439,67 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         </p>
       )}
 
-      <div className="flex items-center gap-3">
-        <motion.button
-          type="button"
-          onClick={() => void toggle()}
-          disabled={!phraseReady || micBlocked}
-          aria-pressed={recording}
-          aria-label={
-            processing
+      {step === "recognition" ? (
+        <div className="flex items-center gap-3">
+          <motion.button
+            type="button"
+            onClick={() => void submitRecognition()}
+            disabled={
+              !recognition ||
+              !recognition.available ||
+              recognitionSelected === null ||
+              processing ||
+              recognitionOutcome !== null
+            }
+            aria-label={t("dictionary.drill.recognitionCheck")}
+            whileTap={processing ? undefined : { scale: 0.96 }}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            {processing ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Check className="size-4" aria-hidden="true" />
+            )}
+            {t("dictionary.drill.recognitionCheck")}
+          </motion.button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <motion.button
+            type="button"
+            onClick={() => void toggle()}
+            disabled={!phraseReady || micBlocked}
+            aria-pressed={recording}
+            aria-label={
+              processing
+                ? t("pron.evaluating")
+                : recording
+                  ? t("pron.stop")
+                  : t("pron.record")
+            }
+            whileTap={processing ? undefined : { scale: 0.94 }}
+            className={cn(
+              "grid size-12 place-items-center rounded-full text-primary-foreground transition-colors disabled:opacity-50",
+              recording ? "bg-destructive" : "bg-primary hover:bg-primary/90",
+            )}
+          >
+            {processing ? (
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+            ) : recording ? (
+              <Square className="size-4" aria-hidden="true" />
+            ) : (
+              <Mic className="size-5" aria-hidden="true" />
+            )}
+          </motion.button>
+          <span className="text-sm font-medium text-foreground">
+            {processing
               ? t("pron.evaluating")
               : recording
-                ? t("pron.stop")
-                : t("pron.record")
-          }
-          whileTap={processing ? undefined : { scale: 0.94 }}
-          className={cn(
-            "grid size-12 place-items-center rounded-full text-primary-foreground transition-colors disabled:opacity-50",
-            recording ? "bg-destructive" : "bg-primary hover:bg-primary/90",
-          )}
-        >
-          {processing ? (
-            <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-          ) : recording ? (
-            <Square className="size-4" aria-hidden="true" />
-          ) : (
-            <Mic className="size-5" aria-hidden="true" />
-          )}
-        </motion.button>
-        <span className="text-sm font-medium text-foreground">
-          {processing
-            ? t("pron.evaluating")
-            : recording
-              ? recordingSession.formatted
-              : t("pron.record")}
-        </span>
-      </div>
+                ? recordingSession.formatted
+                : t("pron.record")}
+          </span>
+        </div>
+      )}
 
       {result && (
         <div
@@ -392,6 +532,27 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
                 : t("dictionary.drill.notProduced")
                     .replace("{heard}", result.heard || "—")
                     .replace("{score}", String(result.score))}
+        </div>
+      )}
+
+      {/* V3.33: feedback del paso Recognition (informativo: el acierto no
+          produce evidencia ni dispara onProduced). */}
+      {step === "recognition" && recognitionOutcome && (
+        <div
+          className={cn(
+            "rounded-md px-3 py-2 text-sm",
+            recognitionOutcome.correct
+              ? "bg-success/10 text-success"
+              : "bg-warning/10 text-warning",
+          )}
+          role="status"
+        >
+          {recognitionOutcome.correct
+            ? t("dictionary.drill.recognitionCorrect")
+            : t("dictionary.drill.recognitionIncorrect").replace(
+                "{correct}",
+                recognition?.options[recognitionOutcome.correct_index] ?? "—",
+              )}
         </div>
       )}
     </div>

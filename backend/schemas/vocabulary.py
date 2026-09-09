@@ -425,3 +425,46 @@ class SentenceAttemptOut(BaseModel):
     fluency: FluencyStats | None = None
     asr_status: str = "ok"  # ok | no_speech | unintelligible | low_confidence
     asr_confidence: float | None = None
+
+
+# ---------------------------------------------------------------------------
+# Paso Recognition del drill (V3.33, eslabón 2 del puente Dictionary → Learning).
+# MCQ definición ↔ palabra servido y puntuado por el backend (premisa 21): el GET
+# nunca expone la correcta; el POST la recomputa y devuelve `correct_index` solo
+# al alumno que ya respondió. Evidencia SOLO informativa (evento `learning_events`
+# `drill:<word>:recognition:ok|ko`): no escribe en `vocabulary` ni mueve mastery.
+# ---------------------------------------------------------------------------
+
+
+class RecognitionQuestionOut(BaseModel):
+    """Pregunta del paso Recognition (V3.33).
+
+    `available=false` con `options=[]` es la degradación controlada cuando la
+    palabra no tiene entrada en la caché global o no hay distractores
+    suficientes: el peldaño muestra aviso y no rompe la escalera.
+    """
+
+    word: str
+    available: bool
+    options: list[str] = Field(default_factory=list)
+
+
+class RecognitionAttemptIn(BaseModel):
+    """Intento del paso Recognition (V3.33): el cliente solo envía qué opción
+    eligió (`selected_index`). Nunca declara acierto (premisa 21)."""
+
+    word: str = Field(min_length=1, max_length=120)
+    selected_index: int = Field(ge=0)
+
+
+class RecognitionAttemptOut(BaseModel):
+    """Resultado puntuado por el servidor del paso Recognition (V3.33).
+
+    `correct_index` se revela solo tras responder (para mostrar la opción
+    correcta en el feedback del fallo).
+    """
+
+    word: str
+    correct: bool
+    correct_index: int
+    selected_index: int

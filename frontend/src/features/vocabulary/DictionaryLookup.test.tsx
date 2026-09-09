@@ -318,11 +318,12 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
     expect(practiceCta).toBeTruthy();
 
     fireEvent.click(practiceCta);
-    // Se monta la escalera de drill oral (Recal → Sentence): mismo prompt que
-    // en el diccionario personal.
+    // Se monta la escalera de drill (Recognize → Word → Sentence): mismo
+    // prompt que en el diccionario personal.
     expect(await screen.findByText(/Listen to the word/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "1 · Word" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "2 · Sentence" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "2 · Word" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "3 · Sentence" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Record" })).toBeTruthy();
 
     // Cerrar la escalera la desmonta.
@@ -401,7 +402,7 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
       await screen.findByRole("button", { name: "Practice this word" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "2 · Sentence" }));
+    fireEvent.click(screen.getByRole("button", { name: "3 · Sentence" }));
     expect(await screen.findByText('Say the word "coffee".')).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Record" }));
@@ -410,5 +411,98 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
     expect(await screen.findByText(/inside the sentence/)).toBeTruthy();
     // La tarjeta de resultado sigue visible (el drill convive con ella).
     expect(screen.getByText("A hot drink made from roasted coffee beans.")).toBeTruthy();
+  });
+});
+
+describe("DictionaryLookup · V3.33 Recognition (MCQ definición ↔ palabra)", () => {
+  beforeEach(() => stubMediaRecorder());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const QUESTION = {
+    word: "coffee",
+    available: true,
+    options: ["café", "a soft drink", "a type of grain", "a sweet dessert"],
+  };
+
+  it("acierta el paso «1 · Recognize» sin refrescar la tarjeta (informativo)", async () => {
+    // V3.33: el MC de reconocimiento no demuestra destreza productiva (V3.13):
+    // el acierto NO dispara onProduced y por tanto no hay re-lookup silencioso
+    // del diccionario (a diferencia del éxito del paso oral).
+    const dictionaryHits = { count: 0 };
+    const fn = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/vocabulary/dictionary")) {
+        dictionaryHits.count += 1;
+        return Promise.resolve({ ok: true, json: async () => COFFEE });
+      }
+      if (url.includes("/api/vocabulary/drill/recognition-attempt")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            word: "coffee",
+            correct: true,
+            correct_index: 0,
+            selected_index: 0,
+          }),
+        });
+      }
+      if (url.includes("/api/vocabulary/drill/recognition")) {
+        return Promise.resolve({ ok: true, json: async () => QUESTION });
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fn);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Practice this word" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+    expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
+    // Sin micrófono en este paso: se elige una opción y se comprueba.
+    expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "café" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    expect(await screen.findByText(/You recognize the meaning/)).toBeTruthy();
+    // Informativo: no re-lookup para refrescar la marca de uso.
+    expect(dictionaryHits.count).toBe(1);
+  });
+
+  it("falla y revela la opción correcta en el feedback", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: COFFEE },
+      {
+        url: "/api/vocabulary/drill/recognition-attempt",
+        data: {
+          word: "coffee",
+          correct: false,
+          correct_index: 0,
+          selected_index: 1,
+        },
+      },
+      { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Practice this word" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+    await screen.findByText(/What does this word mean/);
+
+    fireEvent.click(screen.getByRole("button", { name: "a soft drink" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    // Feedback ko con la opción correcta revelada por el servidor.
+    expect(
+      await screen.findByText(/Not this one — the meaning is “café”/),
+    ).toBeTruthy();
   });
 });

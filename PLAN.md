@@ -8,6 +8,37 @@
 
 ## Estado actual
 
+- ✅ **V3.33 — Dictionary → Learning Bridge, eslabón 2: Recognition (MCQ
+  definición ↔ palabra) (2026-09-09)** (**Versión estable `3.33.0`**, app
+  `3.32.0 → 3.33.0`). La escalera compartida de drill (`wordDrill.tsx`, lookup
+  Y hub) pasa a **`1 · Recognize` · `2 · Word` · `3 · Sentence`**: el primer
+  peldaño pide el significado de la palabra entre opciones que sirve el
+  backend. La pregunta es **pura y determinista por palabra** (premisa 21, sin
+  estado servidor): `services/dictionary_mcq.py` la deriva de la caché global
+  `dictionary_entries` (`list_entries()` nuevo en `repositories/dictionary.py`)
+  — correcta = significado real de la diana en un modo consistente
+  (`translation` si hay distractores, si no `definition`), distractores de
+  otras entradas preferir mismo `pos`, deduplicados, barajado estable ocultando
+  la correcta; sin distractores → `available=false` (degradación con aviso) — y
+  el servidor la RECOMPUTA al puntuar (`GET drill/recognition` nunca expone la
+  correcta; `POST drill/recognition-attempt` devuelve
+  `{correct, correct_index, selected_index}`). **Evidencia SOLO informativa**
+  (V3.13: el MC de reconocimiento no demuestra destrezas productivas): un
+  evento `learning_events` `drill:<word>:recognition:ok|ko`; cero cambios en
+  `vocabulary`/`vocabulary_events`, FSRS, mastery, usage ni candidatas (el
+  acierto no dispara `onProduced`/`refreshEntry`). Sin etiquetas de origen ni
+  estados servidor; sin cambios de esquema de BD. Tests: pytest **1722** (+11
+  del nuevo `test_dictionary_recognition_v333.py`: determinismo y GET sin la
+  correcta · acierto/fallo solo informativos con cero efectos · modo definition
+  y dedupe · eventos recognition que no alteran `drill_ok_days`/candidates ·
+  aislamiento A/B · sin entrada/sin distractores → 409/`available=false` ·
+  normalización), ruff limpio, vitest (63 ficheros/546) y `tsc --noEmit`
+  limpios y `check_release_consistency` **3.33.0** exit 0. Pendiente hacia
+  **V3.34**: recall demorado con FSRS, transferencia por contexto de actividad
+  V3.23 y los diferidos de V3.30 (consumo de `word_breakdown_json` en
+  agregados/práctica dirigida de las falladas y palabras tocables en
+  transcripts/chat).
+
 - ✅ **V3.32 — Dictionary → Learning Bridge, primer eslabón (2026-09-09)**
   (**Versión estable `3.32.0`**, app `3.31.1 → 3.32.0`). Convierte la
   consulta del diccionario (V3.30, D3: solo lectura) en puerta a la práctica
@@ -1120,6 +1151,17 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   falladas y palabras tocables en transcripts/chat) y los siguientes eslabones
   del puente (escaleras por destreza — reconocimiento MCQ, recall demorado con
   FSRS — y transferencia por contexto, según `agentes/v332-dictionary-learning-bridge.md`).
+
+- ~~**⏳ V3.33 — Recognition (MCQ definición ↔ palabra), eslabón 2 del
+  puente**~~ ✅ **cerrado (2026-09-09, v3.33.0)**: implementado y publicado
+  (ver «Estado actual» arriba y `release-notes-v3.33.0.md`). Segundo eslabón
+  del Dictionary → Learning Bridge: peldaño `1 · Recognize` en la escalera
+  compartida con pregunta determinista servida y puntuada por el backend y
+  evidencia SOLO informativa. Siguiente incremento hacia **V3.34**: los
+  diferidos de V3.30 (consumo de `word_breakdown_json` en agregados/práctica
+  dirigida de las falladas y palabras tocables en transcripts/chat) y los
+  eslabones restantes del puente — recall demorado con FSRS y transferencia
+  por contexto de actividad V3.23 (según `agentes/v332-dictionary-learning-bridge.md`).
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

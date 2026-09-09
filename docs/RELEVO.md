@@ -5,6 +5,42 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-09 (UTC+2).
 >
+> **Nota (2026-09-09):** **V3.33.0 publicada** — release **v3.33.0**
+> (Dictionary → Learning Bridge, eslabón 2: peldaño **Recognition — MCQ
+> definición ↔ palabra** en la escalera compartida de drill). La escalera
+> `wordDrill.tsx` (lookup Y hub) pasa a **`1 · Recognize` · `2 · Word` ·
+> `3 · Sentence`**: el primer peldaño muestra la palabra y pide su significado
+> entre opciones. La pregunta es **pura y determinista por palabra** (premisa
+> 21, sin estado servidor): `backend/services/dictionary_mcq.py` la construye
+> desde la caché global `dictionary_entries` (`list_entries()` nuevo en
+> `repositories/dictionary.py`) — correcta = `translation` de la diana con
+> distractores de otras entradas (mismo `pos` preferido, dedupe, banco de
+> reserva `definition` cuando el pool de traducciones no alcanza) y barajado
+> estable (`_stable_int`/`_place_options`) ocultando la correcta — y el
+> servidor la RECOMPUTA al puntuar: `GET /api/vocabulary/drill/recognition`
+> nunca expone la correcta y `POST /api/vocabulary/drill/recognition-attempt`
+> devuelve `{correct, correct_index, selected_index}`. Sin distractores o sin
+> entrada → `available=false` / 409 (degradación con aviso). **Evidencia SOLO
+> informativa** (V3.13: el MC de reconocimiento no demuestra destrezas
+> productivas; evita el «mastery de clic»): un `learning_events`
+> `drill:<word>:recognition:ok|ko`; cero escrituras en `vocabulary`/
+> `vocabulary_events`, FSRS, mastery, `usage` ni candidatas (el acierto NO
+> dispara `onProduced`/`refreshEntry`; D3 intacto). Sin etiquetas de origen,
+> sin cambios de esquema de BD. Tests: pytest backend **1722 passed** (+11 del
+> nuevo `backend/tests/test_dictionary_recognition_v333.py`: determinismo y GET
+> sin la correcta · acierto/fallo solo informativos con cero efectos ·
+> modo definition y dedupe · eventos recognition que no alteran
+> `drill_ok_days`/candidatas · aislamiento A/B · sin entrada/sin distractores →
+> 409/`available=false` · normalización) + ruff limpio + vitest (63
+> ficheros/546) + `tsc --noEmit` limpios + `check_release_consistency`
+> **3.33.0** exit 0. Detalle y conteos: `release-notes-v3.33.0.md`;
+> `CHANGELOG.md` con entrada `[3.33.0]`; `PLAN.md` con hito estable V3.33.0.
+> Pendientes hacia **V3.34**: los diferidos de V3.30 — consumo de
+> `word_breakdown_json` en agregados/práctica dirigida de las falladas y
+> palabras tocables en transcripts/chat — y los eslabones restantes del puente
+> (recall demorado FSRS, transferencia por contexto de actividad V3.23;
+> borrador `agentes/v332-dictionary-learning-bridge.md`).
+>
 > **Nota (2026-09-09):** **V3.32.0 publicada** — release **v3.32.0**
 > (Dictionary → Learning Bridge, primer eslabón: la consulta del diccionario
 > V3.30 se convierte en puerta a la práctica real sin romper D3). El botón

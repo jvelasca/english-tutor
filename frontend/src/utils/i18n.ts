@@ -369,13 +369,37 @@ const STRINGS: Record<string, Entry> = {
     en: "Drill steps",
     es: "Pasos de la práctica",
   },
+  "dictionary.drill.stepRecognition": {
+    en: "1 · Recognize",
+    es: "1 · Reconoce",
+  },
   "dictionary.drill.stepRecall": {
-    en: "1 · Word",
-    es: "1 · Palabra",
+    en: "2 · Word",
+    es: "2 · Palabra",
   },
   "dictionary.drill.stepSentence": {
-    en: "2 · Sentence",
-    es: "2 · Frase",
+    en: "3 · Sentence",
+    es: "3 · Frase",
+  },
+  "dictionary.drill.recognitionPrompt": {
+    en: "What does this word mean? Choose the option that matches its meaning.",
+    es: "¿Qué significa esta palabra? Elige la opción que coincide con su significado.",
+  },
+  "dictionary.drill.recognitionCheck": {
+    en: "Check answer",
+    es: "Comprobar",
+  },
+  "dictionary.drill.recognitionCorrect": {
+    en: "Correct! You recognize the meaning of this word.",
+    es: "¡Correcto! Reconoces el significado de esta palabra.",
+  },
+  "dictionary.drill.recognitionIncorrect": {
+    en: "Not this one — the meaning is “{correct}”.",
+    es: "No es esa — el significado es «{correct}».",
+  },
+  "dictionary.drill.recognitionUnavailable": {
+    en: "No meaning available for this word yet — try the Word step.",
+    es: "Aún no hay significado disponible para esta palabra — prueba el paso Palabra.",
   },
   "dictionary.drill.prompt": {
     en: "Listen to the word, then record yourself saying it aloud.",
