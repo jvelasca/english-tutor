@@ -529,6 +529,43 @@ def test_inflight_leader_cancel_resolves_waiters_without_hanging(
     assert _count_rows("dictionary_entries") == 0
 
 
+def test_dictionary_path_never_uses_unusable_explicit_model(monkeypatch, tmp_path):
+    """V3.31 (blinda P1-02 por el path REAL del diccionario): pedir un modelo
+    explícito no utilizable (qwen3.5:9b) en una consulta real de diccionario
+    nunca llega a Ollama con ese modelo.
+
+    El fetcher por defecto `_fetch_chat` consulta `translate.pick_model`, que
+    descarta el explícito de `UNUSABLE_MODELS` y cae al fallback: la llamada a
+    `chat_once` recibe el modelo utilizable. Sin Ollama (todo inyectado)."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    used: list[str] = []
+
+    class _Reply:
+        content = _payload()
+
+    async def _fake_chat_once(
+        messages, model, temperature, mode="default", system_prompt=None
+    ):
+        used.append(model)
+        return _Reply()
+
+    async def _no_preferred_installed():
+        return set()
+
+    monkeypatch.setattr("services.llm.chat_once", _fake_chat_once)
+    monkeypatch.setattr("services.translate.installed_models", _no_preferred_installed)
+
+    out = asyncio.run(
+        vocabulary_domain.lookup_dictionary(a, "cat", model="qwen3.5:9b")
+    )
+
+    assert out["definition_source"] == "llm"
+    assert out["definition"] == "A small domesticated carnivorous mammal."
+    assert len(used) == 1
+    assert used[0] != "qwen3.5:9b"
+    assert _count_rows("dictionary_entries") == 1
+
+
 # --- versionado de la caché (V3.30.1, P1-03 / V3.31 LEGACY) -------------------
 
 

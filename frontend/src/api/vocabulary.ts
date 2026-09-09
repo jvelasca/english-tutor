@@ -1,4 +1,4 @@
-import { getJson, postJson } from "./client";
+import { getJson, postJson, withTimeout } from "./client";
 import type {
   DictionaryEntry,
   DictionaryLookupRequest,
@@ -26,7 +26,15 @@ export function lookupDictionaryWord(
 ): Promise<DictionaryEntry> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   const body: DictionaryLookupRequest = { word };
-  return postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, body);
+  return withTimeout(
+    postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, body),
+    // La primera consulta de una palabra paga la generación del modelo local
+    // en CPU (el servidor además acota la espera de los waiters del
+    // single-flight a 60 s); este tope evita que la tarjeta se quede en
+    // "cargando" para siempre si Ollama se cuelga.
+    120_000,
+    "dictionary lookup",
+  );
 }
 
 /** Candidatas al speaking micro-drill (V3.19): señal determinista en servidor
