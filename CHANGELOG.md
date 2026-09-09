@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.31.0] — 2026-09-09
+
+**Cierre de los hallazgos residuales de la auditoría profunda de V3.30.1 sobre el diccionario de consulta: el single-flight ya no puede colgar a los waiters si el dueño del vuelo se cancela (ni colgarse el propio cliente si Ollama se queda mudo), la caché de contenido previa a V3.31 se invalida y regenera una sola vez, y el contrato del diccionario queda blindado en ambos lados (tests del path real y de la migración de upgrade + tipo y timeout en el cliente).**
+
+Release de estabilización del diccionario de consulta (auditoría V3.30.1 sobre v3.30.1). Versión de app `3.30.1 → 3.31.0`. Backend + frontend de contrato (tipos y API); sin cambios de UI.
+
+- **Single-flight robusto a cancelación (`domain/vocabulary.py`).** `_ensure_cached_content` captura el `CancelledError` del dueño del vuelo y resuelve el Future con `None` antes de propagar la cancelación (antes el `finally` retiraba la clave sin resolver el Future y los waiters se quedaban esperando para siempre); además los waiters esperan con un tope defensivo de 60 s (`asyncio.wait_for` + `shield`) y degradan a `definition_source="none"` si el ganador colgara.
+- **Invalidación del contenido de caché previo a V3.31 (`services/dictionary_content.py` + `repositories/db.py`).** `GENERATOR_VERSION` sube a `1.1.0`: el contenido cacheado antes de V3.31 —incluido el que V3.30.1 etiquetó como `1.0.0` al migrar y que es indistinguible por fila del generado con el parser greedy de V3.30— deja de servirse como fresco y regenera de forma perezosa una sola vez al primer lookup. La migración define `DICTIONARY_LEGACY_VERSION = "1.0.0"` como marca deliberadamente distinta de la versión actual y la aplica a las filas sin versión.
+- **Tests de la migración de upgrade y del path real del diccionario.** `test_migration_upgrade_from_v330_adds_version_and_keeps_content` simula una BD creada por V3.30.0 (tabla sin `generator_version`) y verifica el `ALTER` aditivo + backfill + conservación del contenido + idempotencia + que no se sirve como fresca; `test_dictionary_path_never_uses_unusable_explicit_model` ejercita la cadena real `lookup_dictionary → _fetch_chat → pick_model` con un modelo explícito en `UNUSABLE_MODELS` y verifica que nunca llega a Ollama; `test_legacy_content_regenerates_lazily_once` y `test_inflight_leader_cancel_resolves_waiters_without_hanging` completan la cobertura negativa.
+- **Contrato del cliente anclado y timeout (`frontend`).** Tipo `DictionaryLookupRequest` en `types/api.ts` y cuerpo tipado en `lookupDictionaryWord`; test en `vocabulary.test.ts` que verifica `POST /api/vocabulary/dictionary?user_id=` + `Content-Type: application/json` + body `{word}`; la llamada se envuelve en `withTimeout` (120 s) para que la tarjeta no se quede en «cargando» si Ollama cuelga.
+- **Verificación.** Backend pytest **1697 passed** (+4 sobre v3.30.1) + `ruff check .` limpio; frontend vitest + `tsc --noEmit` limpios; `check_release_consistency` 3.31.0 exit 0 (detalle con conteos en `release-notes-v3.31.0.md`).
+
 ## [3.30.1] — 2026-09-09
 
 **Endurecimiento del diccionario de consulta tras la auditoría V3.30.0: una sola generación LLM por palabra en concurrencia (single-flight), la política `UNUSABLE_MODELS` ya no se puede saltar pidiendo un modelo explícito, y la caché global `dictionary_entries` versiona su contenido para poder regenerarse cuando cambie el prompt/política.**

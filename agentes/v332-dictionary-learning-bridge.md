@@ -1,12 +1,15 @@
-# Candidato V3.31 — Dictionary → Learning Bridge (borrador de diseño, sin implementar)
+# Candidato V3.32 — Dictionary → Learning Bridge (borrador de diseño, sin implementar)
 
 > Rol: documento de diseño para el siguiente incremento. **No es una orden de
-> implementación**: esta sesión cerró V3.30.1 (endurecimiento de la auditoría
-> V3.30.0) y deja aquí el esquema del candidato V3.31. Antes de implementarlo,
-> revisar `docs/RELEVO.md` (nota superior), `PLAN.md` («Estado actual» y
-> «Siguiente incremento») y el dossier `docs/DISENO-V330-DICCIONARIO-CONSULTA.md`
-> (decisiones D1/D2/D3 de V3.30 que este candidato debe respetar).
-> Fecha del borrador: 2026-09-09 · Release objetivo: v3.31.0.
+> implementación**: las sesiones de 2026-09-09 cerraron V3.30.1 (endurecimiento
+> de la auditoría V3.30.0) y V3.31 (robustez del diccionario y contrato, ver
+> `release-notes-v3.31.0.md`); este borrador se redactó originalmente para
+> V3.31 y queda aquí como esquema del candidato **V3.32**. Antes de
+> implementarlo, revisar `docs/RELEVO.md` (nota superior), `PLAN.md` («Estado
+> actual» y «Siguiente incremento») y el dossier
+> `docs/DISENO-V330-DICCIONARIO-CONSULTA.md` (decisiones D1/D2/D3 de V3.30 que
+> este candidato debe respetar).
+> Fecha del borrador: 2026-09-09 · Release objetivo: v3.32.0.
 
 ## Objetivo
 
@@ -65,12 +68,12 @@ explícita del alumno sobre una palabra consultada) crea una actividad real cuyo
 3. **Escaleras por destreza (después del primer eslabón).** Reconocimiento
    (MCQ definición ↔ palabra), recall demorado (reutilizar el scheduler FSRS),
    producción en contexto y transferencia por contexto de actividad (V3.23).
-4. **Frontend.** La tarjeta de `DictionaryLookup` crece; si V3.31 añade varios
-   bloques, dividir el componente (DictionarySearch / DictionaryEntryCard /
+4. **Frontend.** La tarjeta de `DictionaryLookup` crece; si el candidato añade
+   varios bloques, dividir el componente (DictionarySearch / DictionaryEntryCard /
    DictionaryDefinition / DictionaryExample / DictionaryUsage /
    DictionaryUnitUsage) **antes** de acumular más secciones.
 
-## Deuda estructural declarada (fuera de V3.31)
+## Deuda estructural declarada (fuera de V3.32)
 
 - Polisemia por senses (una entrada ≠ inventario de sentidos; relevante en B2+).
 - Definición adaptada al CEFR del alumno (hoy el prompt pide «simple English»

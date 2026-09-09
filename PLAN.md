@@ -8,6 +8,29 @@
 
 ## Estado actual
 
+- ✅ **V3.31 — Cierre de la auditoría V3.30.1: robustez y contrato del
+  diccionario (2026-09-09)** (**Versión estable `3.31.0`**, app
+  `3.30.1 → 3.31.0`). Cierra los hallazgos residuales de la auditoría profunda
+  de V3.30.1: **single-flight robusto a cancelación** (`domain/vocabulary.py`:
+  el `CancelledError` del dueño del vuelo resuelve el Future con None antes de
+  propagar — los waiters ya no cuelgan — y tope defensivo de 60 s en los
+  waiters) · **invalidación del contenido de caché previo a V3.31**
+  (`GENERATOR_VERSION` `1.0.0 → 1.1.0` en `services/dictionary_content.py`;
+  `DICTIONARY_LEGACY_VERSION = "1.0.0"` en `repositories/db.py`, marca
+  deliberadamente distinta de la actual que la migración aplica a las filas sin
+  versión: el contenido del parser greedy de V3.30 regenera una vez) · **tests**
+  de la migración de upgrade desde una BD V3.30.0 (aditiva + backfill +
+  conservación + idempotencia), del path real del diccionario con modelo
+  explícito no utilizable (`qwen3.5:9b` nunca llega a Ollama) y de la
+  cancelación del líder · **contrato frontend**: tipo `DictionaryLookupRequest`,
+  body tipado y test del `POST /api/vocabulary/dictionary?user_id=` (método,
+  query, header y body) + timeout de cliente de 120 s. Tests: pytest **1697**
+  (+4), ruff limpio, vitest y `tsc --noEmit` limpios y
+  `check_release_consistency` **3.31.0** exit 0. Pendiente hacia **V3.32**:
+  Dictionary → Learning Bridge (`agentes/v332-dictionary-learning-bridge.md`),
+  consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+  falladas y palabras tocables en transcripts/chat.
+
 - ✅ **V3.30.1 — Endurecimiento del diccionario de consulta (2026-09-09)**:
   patch de la auditoría V3.30.0 sobre v3.30.0 (**Versión estable `3.30.1`**,
   app `3.30.0 → 3.30.1`; solo backend + docs, sin cambios de UI). Cierra los
@@ -28,8 +51,9 @@
   misma palabra y dos usuarios, fallo concurrente sin reintentos, regeneración
   por versión obsoleta, reuso de versión fresca, parser multi-objeto y llaves
   en prosa, `pick_model` con explícito no utilizable), ruff limpio y
-  `check_release_consistency` **3.30.1** exit 0. Pendiente: candidatos V3.31
-  (Dictionary → Learning Bridge, palabras tocables en transcripts/chat).
+  `check_release_consistency` **3.30.1** exit 0. Pendiente entonces: candidatos
+  hacia V3.32 (Dictionary → Learning Bridge, palabras tocables en
+  transcripts/chat).
 
 - ✅ **V3.30 — Diccionario de consulta con marcas de uso y aprendizaje
   (2026-09-09)**: cerrado e implementado sobre v3.29.0 (**Versión estable `3.30.0`**, app `3.29.0 → 3.30.0`) con el dossier
@@ -1006,10 +1030,22 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   actual» arriba y `release-notes-v3.30.1.md`). Cierra los tres P1 de la
   auditoría (single-flight de generación, política `UNUSABLE_MODELS` frente al
   modelo explícito, caché versionada con `generator_version`) y el P2 del
-  parser JSON. **Próximo candidato V3.31**: Dictionary → Learning Bridge
-  (borrador en `agentes/v331-dictionary-learning-bridge.md`) — convertir la
-  consulta en puerta al aprendizaje con «Practicar» explícito sin contaminar
-  evidencia (D3 intacta), más los diferidos de V3.30.
+  parser JSON. **Próximo candidato (rebasado a V3.32 por el cierre de V3.31)**:
+  Dictionary → Learning Bridge (borrador en `agentes/v332-dictionary-learning-bridge.md`)
+  — convertir la consulta en puerta al aprendizaje con «Practicar» explícito
+  sin contaminar evidencia (D3 intacta), más los diferidos de V3.30.
+
+- ~~**⏳ V3.31 — Cierre de la auditoría V3.30.1 (robustez y contrato del
+  diccionario)**~~ ✅ **cerrado (2026-09-09, v3.31.0)**: implementado y
+  publicado (ver «Estado actual» arriba y `release-notes-v3.31.0.md`). Cierra
+  los hallazgos residuales de la auditoría de V3.30.1: cancelación del dueño
+  del vuelo sin colgar a los waiters + tope de espera defensivo, invalidación
+  del contenido de caché previo a V3.31 (`GENERATOR_VERSION` `1.1.0` + marca
+  `DICTIONARY_LEGACY_VERSION` en la migración), tests de la migración de
+  upgrade y del path real con modelo no utilizable, y contrato frontend del
+  diccionario (tipo `DictionaryLookupRequest`, test del endpoint y timeout de
+  cliente). **Próximo candidato V3.32**: Dictionary → Learning Bridge
+  (borrador en `agentes/v332-dictionary-learning-bridge.md`).
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

@@ -5,6 +5,31 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-09 (UTC+2).
 >
+> **Nota (2026-09-09):** **V3.31 publicada** — release **v3.31.0** (cierre de
+> los hallazgos residuales de la auditoría profunda de V3.30.1 sobre el
+> diccionario de consulta; backend + frontend de contrato, sin cambios de UI).
+> Cierra: **single-flight robusto a cancelación** (`domain/vocabulary.py`: el
+> `CancelledError` del dueño del vuelo resuelve el Future con None antes de
+> propagar — los waiters ya no se cuelgan — y tope defensivo de espera de 60 s
+> en los waiters) · **invalidación del contenido de caché previo a V3.31**
+> (`GENERATOR_VERSION` `1.0.0 → 1.1.0` en `services/dictionary_content.py`;
+> `DICTIONARY_LEGACY_VERSION = "1.0.0"` en `repositories/db.py`, marca
+> deliberadamente distinta de la actual que la migración aplica a las filas sin
+> versión: el contenido del parser greedy de V3.30 regenera una vez) · **tests**
+> de la migración de upgrade desde una BD V3.30.0 (aditiva + backfill +
+> conservación + idempotencia) y del path real del diccionario con modelo
+> explícito no utilizable (`qwen3.5:9b` nunca llega a Ollama) · **contrato
+> frontend**: tipo `DictionaryLookupRequest`, body tipado, test del
+> `POST /api/vocabulary/dictionary` (método/query/header/body) y timeout de
+> cliente de 120 s. Verificación: pytest backend **1697 passed** (+4) + ruff
+> limpio + vitest + `tsc --noEmit` limpios + `check_release_consistency`
+> **3.31.0** exit 0. Detalle y conteos: `release-notes-v3.31.0.md`;
+> `CHANGELOG.md` con entrada `[3.31.0]`; `PLAN.md` con hito estable V3.31.
+> Pendientes hacia **V3.32**: Dictionary → Learning Bridge (borrador movido a
+> `agentes/v332-dictionary-learning-bridge.md`), consumo de `word_breakdown_json`
+> en agregados/práctica dirigida de las falladas y palabras tocables en
+> transcripts/chat.
+>
 > **Nota (2026-09-09):** **V3.30.1 publicada** — release **v3.30.1** (patch de
 > endurecimiento de la auditoría V3.30.0, sobre el commit `a3857f2` de v3.30.0;
 > solo backend + docs, sin cambios de UI). Cierra los tres P1 del dictamen:
