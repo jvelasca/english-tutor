@@ -16,6 +16,7 @@ from services.curriculum import LISTENING_BANK_VERSION
 from services.listening import (
     AUDIO_VARIANTS,
     DERIVED_BY_ID,
+    DERIVED_PRODUCTION_POOL,
     DERIVED_RECOGNITION_POOL,
     GENERATED_ID_PREFIX,
     LEVEL_ORDER,
@@ -24,6 +25,7 @@ from services.listening import (
     audio_text,
     audio_variants,
     coarse_sentence_timings,
+    dictation_score,
     difficulty_from_vector,
     get_question,
     level_status,
@@ -227,9 +229,15 @@ async def next_question(
     # Bottom-up (V3.28): con perfil Caso A (recognition débil) el selector puede
     # servir ítems derivados (cloze/segmentación) del nivel de trabajo como
     # volumen extra de decodificación. Nunca entran en la puerta/certificación.
-    bottom_up = (
-        DERIVED_RECOGNITION_POOL
-        if profile.get("layer") == "recognition"
+    recognition_layer = profile.get("layer") == "recognition"
+    bottom_up = DERIVED_RECOGNITION_POOL if recognition_layer else None
+    # Bottom-up de producción (V3.28.1, P1-01): los dictados parciales derivados
+    # solo se sirven en sesión Caso A cuando además el diagnóstico marca la
+    # producción escrita (`dictation`) como débil o sin muestra suficiente
+    # (review_due). Se intercalan tras cloze/segmentación, sin nueva taxonomía.
+    bottom_up_production = (
+        DERIVED_PRODUCTION_POOL
+        if recognition_layer and "dictation" in weak
         else None
     )
     question = pick_next_question(
@@ -238,6 +246,7 @@ async def next_question(
         weak_subskills=weak,
         layer=profile.get("layer"),
         bottom_up_questions=bottom_up,
+        bottom_up_production_questions=bottom_up_production,
     )
     out = _public(question)
     # Micro-flujo por ítem (V3.27): política y pasos viajan en el payload; el
@@ -345,12 +354,17 @@ async def submit_production(
 ) -> dict | None:
     """Evalúa y persiste una tarea de producción (dictado/shadowing), sin LLM.
 
-    Puntúa de forma determinista (`production_score` sobre `composite_score`) y
-    persiste la evidencia con `answer_index=-1`, `task_type` y `score` continuo
-    (0..1). Devuelve `None` si la pregunta no existe o su `skill` no coincide con
-    `task_type` (el router lo traduce a 404). En producción la capa cognitiva no
-    aplica (`layer=""`): los ítems dictation/shadowing no pertenecen a la taxonomía
-    receptiva.
+    Puntúa de forma determinista y persiste la evidencia con `answer_index=-1`,
+    `task_type` y `score` continuo (0..1). Devuelve `None` si la pregunta no
+    existe o su `skill` no coincide con `task_type` (el router lo traduce a 404).
+    En producción la capa cognitiva no aplica (`layer=""`): los ítems
+    dictation/shadowing no pertenecen a la taxonomía receptiva.
+
+    V3.28.1 (P1-02): el scoring es distinto según la tarea. El dictado escrito
+    (banco `dictation` o parcial derivado `d-`, ambos `task_type=dictation`)
+    puntúa **exacto por token** (`dictation_score`): sin Soundex, phoneme proxy
+    ni prosodia — "escribe lo que oíste" no admite tolerancia fonética. El
+    shadowing oral conserva el score compuesto de producción.
 
     Desde V3.28 (Bloque C) la pregunta puede ser también un dictado parcial
     derivado (`d-`, `task_type=partial_dictation` con skill `dictation`): se
@@ -368,7 +382,8 @@ async def submit_production(
         return None
     reference = production_reference(question)
     heard = (transcript or "").strip()
-    result = production_score(reference, heard)
+    scorer = dictation_score if task_type == "dictation" else production_score
+    result = scorer(reference, heard)
     correct = result["score"] >= PRODUCTION_PASS_SCORE
     difficulty = difficulty_from_vector(question.get("difficulty_vector", {}))
     realized = realized_difficulty(question)

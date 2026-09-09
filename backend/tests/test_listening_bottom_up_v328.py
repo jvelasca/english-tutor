@@ -20,6 +20,7 @@ from repositories import db
 from repositories import listening as listening_repo
 from services.listening import (
     DERIVED_BY_ID,
+    DERIVED_PRODUCTION_POOL,
     DERIVED_RECOGNITION_POOL,
     LEVEL_ORDER,
     QUESTION_BANK,
@@ -33,6 +34,7 @@ from services.listening import (
 from services.listening_bottom_up import (
     DERIVED_ID_PREFIX,
     DERIVED_TASK_TYPES,
+    _reductions_in,
     derive_for_item,
 )
 
@@ -132,7 +134,8 @@ def test_derived_options_include_the_audible_word():
         ).lower()
         correct = item["options"][item["answer_index"]]
         # La opción correcta aparece en el texto audible del padre (para la
-        # segmentación, la reducción puede ser subcadena de un token concatenado).
+        # segmentación, la reducción se escribe como token: nunca subcadena de
+        # una grafía concatenada no canónica).
         assert correct.lower() in parent_audio, (
             f"{item['id']}: {correct!r} no audible en {parent['id']}"
         )
@@ -305,3 +308,152 @@ def test_pick_never_serves_derived_without_recognition_layer(monkeypatch, tmp_pa
     # Sin pasar pool, el banco curado tampoco contiene derivados (por diseño).
     q_baseline = pick_next_question(seen, correct, layer="recognition")
     assert q_baseline.get("derived") is not True
+
+
+# ---------------------------------------------------------------------------
+# 5. Dictado parcial derivado: pool de producción y selector (V3.28.1, P1-01)
+# ---------------------------------------------------------------------------
+
+def test_derived_pools_are_disjoint_and_typed():
+    """El pool de producción contiene solo dictados parciales, disjunto del de
+    recognition (cloze/segmentación)."""
+    assert DERIVED_PRODUCTION_POOL, "el banco debe producir dictados parciales"
+    for item in DERIVED_PRODUCTION_POOL:
+        assert item["task_type"] == "partial_dictation"
+        assert item["skill"] == "dictation"
+        assert item["derived"] is True
+        assert item["derived_from"] != ""
+    recognition_ids = {q["id"] for q in DERIVED_RECOGNITION_POOL}
+    production_ids = {q["id"] for q in DERIVED_PRODUCTION_POOL}
+    assert recognition_ids.isdisjoint(production_ids)
+    # Un dictado parcial nunca aparece en el pool de recognition y viceversa.
+    assert all(
+        q["task_type"] in ("cloze", "segmentation")
+        for q in DERIVED_RECOGNITION_POOL
+    )
+
+
+def test_pick_serves_partial_dictation_in_recognition_layer(monkeypatch, tmp_path):
+    """Con capa recognition y agotadas las naturales + cloze/segmentación del
+    nivel, el selector sirve un dictado parcial derivado del mismo nivel."""
+    level = next(
+        lv
+        for lv in LEVEL_ORDER
+        if any(q["level"] == lv for q in DERIVED_RECOGNITION_POOL)
+        and any(q["level"] == lv for q in DERIVED_PRODUCTION_POOL)
+    )
+    natural = questions_for_level(level)
+    recog = _recognition_ids(level)
+    assert recog
+    # Marca vistas+correctas las naturales de recognition y todo el pool
+    # derivado de recognition del nivel: así quedan sin dominar las de otras
+    # capas (el nivel de trabajo se mantiene) y el pool de producción es el
+    # único candidato restante.
+    recog_pool = [q for q in DERIVED_RECOGNITION_POOL if q["level"] == level]
+    prod_pool = [q for q in DERIVED_PRODUCTION_POOL if q["level"] == level]
+    assert recog_pool and prod_pool, f"nivel {level} sin pools derivados"
+    seen = (
+        set(recog)
+        | {q["id"] for q in natural}
+        | {q["id"] for q in recog_pool}
+    )
+    correct = set(recog) | {q["id"] for q in recog_pool}
+    q = pick_next_question(
+        seen,
+        correct,
+        layer="recognition",
+        bottom_up_questions=recog_pool,
+        bottom_up_production_questions=prod_pool,
+    )
+    assert q["derived"] is True
+    assert q["task_type"] == "partial_dictation"
+    assert q["level"] == level
+    assert q["derived_from"] in {p["id"] for p in natural}
+
+
+def test_pick_never_serves_partial_dictation_without_gate(monkeypatch, tmp_path):
+    """Sin capa recognition (o sin pool de producción) nunca se sirve un
+    dictado parcial derivado: el pool de producción es un extra del Caso A."""
+    level = LEVEL_ORDER[0]
+    natural = questions_for_level(level)
+    recog = _recognition_ids(level)
+    seen = recog | {q["id"] for q in natural}
+    correct = set(recog)
+    recog_pool = [q for q in DERIVED_RECOGNITION_POOL if q["level"] == level]
+    prod_pool = [q for q in DERIVED_PRODUCTION_POOL if q["level"] == level]
+    # layer comprehension + pool de producción: el pool solo aplica a recognition.
+    q_comprehension = pick_next_question(
+        seen,
+        correct,
+        layer="comprehension",
+        bottom_up_questions=recog_pool,
+        bottom_up_production_questions=prod_pool,
+    )
+    assert q_comprehension.get("task_type") != "partial_dictation"
+    # Sin pool de producción nunca se sirve un dictado parcial.
+    q_no_prod = pick_next_question(
+        seen,
+        correct,
+        layer="recognition",
+        bottom_up_questions=recog_pool,
+        bottom_up_production_questions=None,
+    )
+    assert q_no_prod.get("task_type") != "partial_dictation"
+
+
+def test_partial_dictation_never_in_route_pool_or_items(monkeypatch, tmp_path):
+    """Un dictado parcial derivado no forma parte del pool de ruta ni de
+    `level_items`: no puede certificar (mismo contrato que cloze/segmentation)."""
+    uid = _setup(monkeypatch, tmp_path)
+    partial = next(iter(DERIVED_PRODUCTION_POOL))
+    level = partial["level"]
+    pool = route_questions(level, extra_questions=[partial])
+    assert partial["id"] not in {q["id"] for q in pool}
+    listening_repo.record_attempt(
+        uid,
+        partial["id"],
+        -1,
+        True,
+        skill="dictation",
+        difficulty=3,
+        task_type="dictation",
+        score=1.0,
+    )
+    items = level_items(level, listening_repo.list_attempts(uid))
+    assert partial["id"] not in {i["question_id"] for i in items}
+
+
+def test_partial_dictation_gate_does_not_move(monkeypatch, tmp_path):
+    """Un intento correcto sobre un dictado parcial no avanza la puerta del
+    nivel (certificación anclada al banco curado)."""
+    uid = _setup(monkeypatch, tmp_path)
+    partial = next(iter(DERIVED_PRODUCTION_POOL))
+    level = partial["level"]
+    empty_gate = route_gate(level, [])
+    listening_repo.record_attempt(
+        uid,
+        partial["id"],
+        -1,
+        True,
+        skill="dictation",
+        difficulty=3,
+        task_type="dictation",
+        score=1.0,
+    )
+    assert route_gate(level, listening_repo.list_attempts(uid)) == empty_gate
+
+
+# ---------------------------------------------------------------------------
+# 6. Detección de reducciones por token/boundary (V3.28.1, P1-03)
+# ---------------------------------------------------------------------------
+
+def test_reductions_detected_by_token_boundary_not_substring():
+    """`Gonnago` no es `gonna`: la reducción solo cuenta como token completo."""
+    # Subcadena concatenada: NO es una reducción servible.
+    assert _reductions_in("Gonnago to the store.") == []
+    assert _reductions_in("Gonnago, gonna, kinda.") == ["gonna", "kinda"]
+    assert _reductions_in("Whaddaya think? Yeah.") == ["whaddaya"]
+    # Token con puntuación pegada / mayúsculas: sí es la reducción.
+    assert _reductions_in("I'm gonna go.") == ["gonna"]
+    assert _reductions_in("gonna,") == ["gonna"]
+    assert _reductions_in("Gonna go") == ["gonna"]

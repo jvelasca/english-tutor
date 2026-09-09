@@ -17,6 +17,13 @@ tareas de decodificación:
   (`transcript` las escribe literalmente). Si no hay reducción fiable, el ítem no
   se emite: nunca se inventa audio.
 
+Desde V3.28.1 (P1-01) `derived_catalog` expone dos pools servibles por el
+selector: el de `recognition` (cloze + segmentación, sesiones Caso A) y el de
+`production` (`partial_dictation`, solo en sesiones Caso A con señal de
+`dictation` débil, intercalado tras agotar cloze/segmentación del nivel). Las
+reducciones se detectan por **token/frontera de palabra** (P1-03): una grafía
+concatenada no canónica tipo `Gonnago` no es la reducción `gonna`.
+
 Regla de integración (plan V3.28, Bloque C): los ítems derivados **no entran en
 la puerta de ruta/certificación** (la puerta solo evalúa ids del banco curado) y
 se marcan `derived=True` para que `route_questions`/`level_items` los excluyan de
@@ -45,9 +52,15 @@ DERIVED_TASK_TYPES: tuple[str, ...] = (
 )
 
 # Tipos de tarea derivados que el selector puede servir en una práctica de capa
-# `recognition`. El dictado parcial es producción y no se intercala en la
-# práctica receptiva (se puntúa por su endpoint de dictado si se sirve).
+# `recognition` (volumen extra de decodificación, perfil Caso A). El dictado
+# parcial es producción escrita y no pertenece a esta lista: se sirve vía el
+# pool de producción (ver `PRODUCTION_SERVED_TASKS`, V3.28.1 P1-01).
 RECOGNITION_SERVED_TASKS: tuple[str, ...] = ("cloze", "segmentation")
+
+# Tipos de tarea derivados de producción escrita que el selector puede servir en
+# una sesión bottom-up con señal de dictation débil (V3.28.1, P1-01): dictados
+# parciales (`partial_dictation`, skill `dictation`) sobre el audio del padre.
+PRODUCTION_SERVED_TASKS: tuple[str, ...] = ("partial_dictation",)
 
 # Skills de producción del banco (de un ítem así no se deriva cloze: el alumno ya
 # lo practica tecleando/repitiendo; sí puede dar dictado parcial y segmentación).
@@ -168,6 +181,25 @@ _BAND_BY_LEVEL: dict[str, tuple[str, ...]] = {
 _BLANK = "_" * 5
 
 
+def contains_word_token(text: str, word: str) -> bool:
+    """True si `word` aparece como *token completo* (no subcadena) en `text`.
+
+    Comprobación de frontera de palabra sin distinguir mayúsculas: un token es
+    `word` cuando ni antes ni después hay un carácter alfanumérico. Así
+    `"Gonnago"` NO contiene `"gonna"` (la reducción debe escribirse como palabra
+    para que el audio la pronuncie como tal), mientras que `"gonna,"`,
+    `"Gonna"` y `"gonna"` sí lo contienen. `word` debe ir escapado (puede
+    contener apóstrofos como `d'you`/`she'd`).
+    """
+    if not word:
+        return False
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9]){re.escape(word)}(?![A-Za-z0-9])",
+        re.IGNORECASE,
+    )
+    return pattern.search(text) is not None
+
+
 def _stable_int(text: str) -> int:
     """Entero estable entre procesos para una cadena (hash no aleatorizado).
 
@@ -195,13 +227,16 @@ def audible_text(question: dict) -> str:
 def _reductions_in(text: str) -> list[str]:
     """Reducciones inequívocas presentes literalmente en el texto audible.
 
-    Devuelve las claves de `REDUCTION_EXPANSIONS` que aparecen como palabra o
-    como subcadena de un token del texto (el audio las pronuncia tal cual; no se
-    inventa nada). Se itera sobre el texto original para no perder grafías con
-    puntuación pegada (`gonna,`, `Gonnago`, `kinda.`).
+    Devuelve las claves de `REDUCTION_EXPANSIONS` que aparecen como **token**
+    (frontera de palabra, no subcadena) del texto: el audio las pronuncia tal
+    cual y no se inventa nada. Un token concatenado como `Gonnago` no es la
+    reducción `gonna` y no debe contarse (V3.28.1, P1-03).
     """
-    lowered = text.lower()
-    return [reduced for reduced in REDUCTION_EXPANSIONS if reduced in lowered]
+    return [
+        reduced
+        for reduced in REDUCTION_EXPANSIONS
+        if contains_word_token(text, reduced)
+    ]
 
 
 def _sentence(text: str) -> str | None:
@@ -232,13 +267,17 @@ def _is_eligible_token(word: str) -> bool:
     """Token candidato a ser diana de cloze/dictado parcial.
 
     Palabra de contenido (no función), sin apóstrofo interno, de 3+ letras y sin
-    reducción fuerte escrita (un token reducido no debe mostrarse como hueco de
-    una palabra que no se deletrea así en la transcripción limpia).
+    reducción fuerte escrita como token exacto (una palabra reducida no debe
+    mostrarse como hueco de una palabra que no se deletrea así en la
+    transcripción limpia). Solo se excluye el token idéntico a una reducción:
+    la frontera de palabra evita descartar grafías normales que la contengan
+    como subcadena (`Gonnago` no es `gonna`, pero es contenido no canónico que
+    se corrige en el banco, no en el tokenizador).
     """
     lower = word.lower()
     if len(lower) < 3 or "'" in lower or lower in _STOP_WORDS:
         return False
-    return not any(reduced in lower for reduced in REDUCTION_EXPANSIONS)
+    return lower not in REDUCTION_EXPANSIONS
 
 
 def _blank_sentence(sentence: str, spans_to_blank: list[tuple[int, int]]) -> str:
@@ -490,18 +529,26 @@ def derive_for_item(parent: dict) -> list[dict]:
     return derived
 
 
-def derived_catalog(bank: list[dict]) -> tuple[dict[str, dict], list[dict]]:
-    """Catálogo derivado de un banco: `(by_id, recognition_pool)`.
+def derived_catalog(
+    bank: list[dict],
+) -> tuple[dict[str, dict], list[dict], list[dict]]:
+    """Catálogo derivado de un banco: `(by_id, recognition_pool, production_pool)`.
 
     - `by_id`: índice id → ítem derivado completo (resolución en el dominio).
     - `recognition_pool`: ítems que el selector puede servir en práctica de capa
       `recognition` (cloze + segmentación), orden estable por id.
+    - `production_pool` (V3.28.1, P1-01): dictados parciales (`partial_dictation`)
+      que el selector puede servir en sesiones bottom-up con señal de dictation
+      débil, también orden estable por id.
     """
     by_id: dict[str, dict] = {}
     recognition_pool: list[dict] = []
+    production_pool: list[dict] = []
     for parent in bank:
         for item in derive_for_item(parent):
             by_id[item["id"]] = item
             if item["task_type"] in RECOGNITION_SERVED_TASKS:
                 recognition_pool.append(item)
-    return by_id, recognition_pool
+            elif item["task_type"] in PRODUCTION_SERVED_TASKS:
+                production_pool.append(item)
+    return by_id, recognition_pool, production_pool

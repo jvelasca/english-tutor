@@ -4,6 +4,19 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.28.1] — 2026-09-09
+
+**Patch de la auditoría V3.28.0 (Listening Engine 4.0, Fase 2 en consolidación): dictado parcial derivado servible, scoring exacto por token del dictado escrito, Gonnago/reducciones detectadas por token y frontera de palabra, y verificación del AudioController con `seek` notificando en pausa.**
+
+Aplica los P1 de la auditoría del candidato v3.28.0 (plan `v3.28.1_patch_auditado_e76303f2.plan.md`). Versión de app `3.28.0 → 3.28.1`.
+
+- **P1-01 — Dictado parcial derivado servible.** `derived_catalog` devuelve ahora `(by_id, recognition_pool, production_pool)` con `PRODUCTION_SERVED_TASKS = ("partial_dictation",)`; `services/listening.py` expone `DERIVED_PRODUCTION_POOL` y `pick_next_question` acepta `bottom_up_production_questions` para servir los dictados parciales del nivel de trabajo **tras** agotar cloze/segmentación. El dominio (`next_question`) solo pasa ese pool en sesión Caso A (capa `recognition`) **y** cuando el diagnóstico marca `dictation` débil/sin muestra — el dictado parcial nunca entra en la puerta/certificación (tests negativos de pools, selector y gate).
+- **P1-02 — Scoring exacto por token del dictado escrito.** Nueva función pura `dictation_score(reference, heard)` junto a `production_score`: coincidencia exacta de tokens normalizados vía `word_alignment`, sin Soundex/phoneme proxy/prosodia (`new system` ≠ `new sistem`, score 50/100). `submit_production` la aplica a todo `task_type == "dictation"` (banco y parcial derivado); el shadowing oral conserva el composite. La UI oculta la fila fonética en el resultado de dictado.
+- **P1-03 — Gonnago y reducciones por token/boundary.** Helper compartido `contains_word_token` (regex de frontera, sin distinguir mayúsculas) en `services/listening_bottom_up.py`, usado por `_reductions_in` (un token concatenado tipo `Gonnago` no es la reducción `gonna`), `_is_eligible_token` (excluye solo el token exacto) y `_connected_speech_realized` de `services/listening.py` (con `STRONG_REDUCTIONS`/`MILD_CONTRACTIONS`). El ítem `l16` corrige su contenido a `"Gonna go …"` (audio digest regenerado) y el dictado parcial de frase completa se mantiene coherente.
+- **P1-04/P2-01 — AudioController: integración verificada y `seek` arreglado.** `ListeningPractice.tsx` usa de forma real `play(url)` (variante de la escalera) + `pause()` y alimenta el resaltado de frase activa con `playing`/`currentTime`; `seek`, `setRate` fino, `loop`, `replaySegment` y `markSegmentStart` quedan sin UI y se documenta su mapeo para V3.29 (Fase 3). `audioController.ts::seek(time)` notifica ahora `onCurrentTime(target)` además de fijar `currentTime`, para que el estado React se actualice aunque el audio esté pausado.
+- **Documentación.** `release-notes-v3.28.0.md` corrige el bullet del cloze (heurística determinista real: primera frase de un solo hablante, token de contenido único de 3+ letras, sin stop words ni reducciones, selección estable por id+slot y distractores del banco del nivel que nunca aparecen en la frase); docstrings/comentarios con `Gonnago` actualizados al contrato token/boundary; nota V3.28.1 en `docs/RELEVO.md`.
+- **Verificación.** Backend pytest **1693 passed** (backend 1619 + launcher 74) + `ruff check .` limpio; frontend vitest **506 passed** (61 archivos) + `tsc --noEmit` OK; `check_release_consistency` 3.28.1 exit 0.
+
 ## [3.28.0] — 2026-09-09
 
 **Listening Engine 4.0 — Fase 2 (Bloques A–F): micro-flujo unificado en rutas por nivel y drill, AudioController 4.0 en frontend, tareas bottom-up derivadas del corpus (cloze auditivo/dictado parcial/segmentación), transcript dinámico con sync grueso de frase, Shadowing 2.0 con playback de la grabación, y E2E adaptativos + negativos del contrato pedagógico.**

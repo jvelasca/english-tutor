@@ -3,7 +3,23 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-09 11:35 (UTC+2).
+> Actualizado por última vez: 2026-09-09 12:35 (UTC+2).
+>
+> **Nota (2026-09-09, 12:35):** **V3.28.1 publicada** — patch de la auditoría
+> V3.28.0 (release **v3.28.1**, P1 auditados): 1) `partial_dictation` derivado
+> **servible** — `derived_catalog` expone `DERIVED_PRODUCTION_POOL` y
+> `pick_next_question` lo sirve en sesiones bottom-up (Caso A) con señal de
+> `dictation` débil, tras agotar cloze/segmentación del nivel · 2) **scoring
+> exacto por token del dictado escrito** (`dictation_score`, sin Soundex/
+> phoneme/prosodia; `submit_production` lo aplica a todo `task_type=dictation`;
+> fila fonética oculta en la UI) · 3) **Gonnago/reducciones por token y
+> frontera** (`contains_word_token` compartido en
+> `_reductions_in`/`_is_eligible_token`/`_connected_speech_realized`, contenido
+> de `l16` corregido → digest de audio regenerado) · 4) **AudioController
+> integrado** (play/pausa/variantes operativas; seek/setRate fino/loop/replay/
+> markSegment sin UI → V3.29 Fase 3) y `seek()` notifica `onCurrentTime` en
+> pausa (P2-01). Tests negativos añadidos (pools, selector, dictado exacto,
+> frontera de reducción, seek). P2 restantes y Fase 3 → V3.29.
 >
 > **Nota (2026-09-09, 10:30):** **V3.28 publicada** — release **v3.28.0** =
 > commit **`74fb1b3`** en `main` con **CI verde 6/6 jobs** (Listening Engine 4.0,

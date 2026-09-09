@@ -47,9 +47,13 @@ Nuevo módulo puro `backend/services/listening_bottom_up.py` que **deriva
 determinísticamente** ítems de práctica de cada ítem del corpus (por `id` de
 ítem + nivel), sin re-etiquetar ni re-autorar los 490 ítems:
 
-- **Cloze auditivo** (`task_type="cloze"`, MCQ): token diana elegido por
-  heurística (word class/función, frecuencia en el ítem), gap + 3 opciones
-  (diana + distractores de un banco pequeño por nivel), audio del ítem padre.
+- **Cloze auditivo** (`task_type="cloze"`, MCQ): toma la primera frase audible
+  de un solo hablante del ítem padre y elige el hueco con heurística
+  **determinista** — token de contenido que aparece una sola vez en la frase,
+  de 3+ letras, sin apóstrofo, sin stop word ni reducción escrita; selección
+  estable por id de ítem + slot; opciones = palabra oída + 2 distractores de
+  contenido del banco del mismo nivel que nunca aparecen en la frase. Sin
+  frase, sin token único o sin 2 distractores → el ítem no se emite.
 - **Dictado parcial** (`task_type="partial_dictation"`, producción): hueco de
   1-N tokens y scoring determinista exacto por token (patrón de `dictation`,
   sin LLM).

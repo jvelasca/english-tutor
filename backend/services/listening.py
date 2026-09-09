@@ -9,8 +9,11 @@ from pydantic import BaseModel, Field, ValidationError, computed_field
 
 from services.curriculum import CURRICULUM_DIR, LISTENING_BANK_VERSION
 from services.forgetting import days_since
-from services.listening_bottom_up import derived_catalog
-from services.phonetics import composite_score
+from services.listening_bottom_up import (
+    contains_word_token,
+    derived_catalog,
+)
+from services.phonetics import composite_score, word_alignment
 
 LISTENING_SUBSKILLS: tuple[str, ...] = (
     "gist",
@@ -221,6 +224,32 @@ def production_score(reference: str, heard: str) -> dict:
         "phonetic_score": int(result["phonetic_score"]),
         "phoneme_accuracy_proxy": int(result["phoneme_accuracy_proxy"]),
         "breakdown": result["breakdown"],
+    }
+
+
+def dictation_score(reference: str, heard: str) -> dict:
+    """Score **exacto por token** de un dictado escrito (0..100).
+
+    A diferencia de `production_score` (producción oral: tolerancia fonética de
+    Soundex/fonemas/prosodia), el dictado escrito pide "escribe exactamente las
+    palabras que oíste", así que solo puntúa la coincidencia exacta de tokens
+    normalizados (minúsculas y sin puntuación, conservando apóstrofes vía
+    `services.phonetics.word_alignment`). `new system` ≠ `new sistem`.
+
+    Devuelve la misma forma que `production_score` para no romper consumidores,
+    con `phonetic_score`/`phoneme_accuracy_proxy` a 0: no hay señal fonética en
+    un dictado escrito (V3.28.1, P1-02).
+    """
+    result = word_alignment(reference, heard)
+    total = result["total"]
+    matched = len(result["correct"])
+    pct = round(100 * matched / total) if total else 0
+    return {
+        "score": pct,
+        "word_accuracy": pct,
+        "phonetic_score": 0,
+        "phoneme_accuracy_proxy": 0,
+        "breakdown": result,
     }
 
 
@@ -703,14 +732,14 @@ _LEGACY_BANK: list[dict] = [
         "speaker_id": "sp1",
         "accent": "neutral",
         "speech_rate": 185.0,
-        "transcript": "Gonnago to the store and grab some milk, d'you want anything "
-        "else while I'm out?",
+        "transcript": "Gonna go to the store and grab some milk, d'you want "
+        "anything else while I'm out?",
         "clean_transcript": "Going to go to the store and grab some milk. Do you want "
         "anything else while I'm out?",
         "noise_level": 3,
         "repetition_policy": "none",
-        "script": "Gonnago to the store and grab some milk, d'you want anything else "
-        "while I'm out?",
+        "script": "Gonna go to the store and grab some milk, d'you want anything "
+        "else while I'm out?",
         "question": "What is the speaker going to do?",
         "options": ["Go to the store", "Go to work", "Go to the gym", "Go to bed"],
         "answer_index": 0,
@@ -989,13 +1018,19 @@ LEVEL_ORDER: list[str] = ["A1", "A2", "B1", "B2", "C1", "C2"]
 #   puerta de ruta y la certificación solo evalúan ids del banco curado);
 # - se marcan `derived=True` para que cualquier filtro defensivo los excluya;
 # - reutilizan el audio del ítem padre (`derived_from`), sin WAV duplicados.
-# `DERIVED_BY_ID` resuelve el payload por id en el dominio (submit/audio) y
+# `DERIVED_BY_ID` resuelve el payload por id en el dominio (submit/audio),
 # `DERIVED_RECOGNITION_POOL` es la lista que el selector puede servir en
-# práctica adaptativa de capa `recognition` dentro del nivel de trabajo.
+# práctica adaptativa de capa `recognition` (cloze + segmentación) dentro del
+# nivel de trabajo, y `DERIVED_PRODUCTION_POOL` (V3.28.1, P1-01) los dictados
+# parciales que el selector sirve en sesiones bottom-up con señal de `dictation`
+# débil.
 # ---------------------------------------------------------------------------
 DERIVED_BY_ID: dict[str, dict]
 DERIVED_RECOGNITION_POOL: list[dict]
-DERIVED_BY_ID, DERIVED_RECOGNITION_POOL = derived_catalog(QUESTION_BANK)
+DERIVED_PRODUCTION_POOL: list[dict]
+DERIVED_BY_ID, DERIVED_RECOGNITION_POOL, DERIVED_PRODUCTION_POOL = (
+    derived_catalog(QUESTION_BANK)
+)
 
 # ---------------------------------------------------------------------------
 # Puerta de ruta (Fase 2 — calibración pedagógica): qué evidencia certifica que
@@ -1130,17 +1165,20 @@ def spoken_text(question: dict) -> str:
 def _connected_speech_realized(question: dict) -> int:
     """Nivel de `connected_speech` realmente presente en una voz Piper única.
 
-    Piper lee el texto literalmente: si el texto escribe la reducción ("Gonnago",
-    "Whaddaya", "d'you") la pronuncia y el connected speech se realiza al nivel
-    declarado; si solo hay contracciones suaves ("she'd", "we'll") se realiza de
-    forma parcial; si el texto está en ortografía estándar no hay reducción
-    audible, por lo que la realización es mínima (1).
+    Piper lee el texto literalmente: si el texto escribe la reducción como
+    token ("gonna", "Whaddaya", "d'you") la pronuncia y el connected speech se
+    realiza al nivel declarado; si solo hay contracciones suaves ("she'd",
+    "we'll") se realiza de forma parcial; si el texto está en ortografía
+    estándar no hay reducción audible, por lo que la realización es mínima (1).
+
+    La detección es por frontera de palabra (V3.28.1, P1-03): un token
+    concatenado como "Gonnago" no es la reducción "gonna" y no la realiza.
     """
     declared = int(question.get("difficulty_vector", {}).get("connected_speech", 1))
-    text = audio_text(question).lower()
-    if any(marker in text for marker in STRONG_REDUCTIONS):
+    text = audio_text(question)
+    if any(contains_word_token(text, marker) for marker in STRONG_REDUCTIONS):
         return declared
-    if any(marker in text for marker in MILD_CONTRACTIONS):
+    if any(contains_word_token(text, marker) for marker in MILD_CONTRACTIONS):
         return min(declared, 2)
     return 1
 
@@ -1739,6 +1777,7 @@ def pick_next_question(
     weak_subskills: list[str] | None = None,
     layer: str | None = None,
     bottom_up_questions: list[dict] | None = None,
+    bottom_up_production_questions: list[dict] | None = None,
 ) -> dict:
     """Siguiente pregunta: prioriza la sub-destreza más débil dentro del nivel actual.
 
@@ -1761,6 +1800,13 @@ def pick_next_question(
     del mismo nivel de trabajo como volumen extra de decodificación. Estos ítems
     nunca entran en la puerta de ruta/certificación (viven fuera del banco
     curado). Sin el parámetro (None) el comportamiento es idéntico al de V3.27.
+
+    Con `bottom_up_production_questions` (V3.28.1, P1-01): en esa misma sesión
+    de capa `recognition`, tras agotar cloze/segmentación servibles se pueden
+    servir dictados parciales derivados (`partial_dictation`) del nivel de
+    trabajo como volumen extra de producción escrita (el dominio solo lo pasa
+    cuando el diagnóstico marca `dictation` débil). Igual que el pool
+    receptivo, nunca entran en la puerta de ruta/certificación.
     """
     correct_ids = correct_ids or set()
     working_level = current_level(correct_ids)
@@ -1805,6 +1851,22 @@ def pick_next_question(
             if _unseen_not_correct(q):
                 return q
         for q in derived_at_level:
+            if _not_correct(q):
+                return q
+
+    # 2b. Práctica bottom-up de producción (V3.28.1, P1-01): tras agotar los
+    #     cloze/segmentación servibles, dictados parciales derivados del nivel de
+    #     trabajo (el dominio solo pasa este pool con señal de dictation débil).
+    if layer == "recognition" and bottom_up_production_questions:
+        derived_prod_at_level = [
+            q
+            for q in bottom_up_production_questions
+            if q.get("level") == working_level
+        ]
+        for q in derived_prod_at_level:
+            if _unseen_not_correct(q):
+                return q
+        for q in derived_prod_at_level:
             if _not_correct(q):
                 return q
 

@@ -8,6 +8,25 @@
 
 ## Estado actual
 
+- ✅ **V3.28.1 — patch de la auditoría V3.28.0 (2026-09-09)**: cerrado e
+  implementado sobre v3.28.0 (**Versión estable `3.28.1`**, app `3.28.0 →
+  3.28.1`) con el plan `v3.28.1_patch_auditado_e76303f2.plan.md`: **P1-01**
+  dictado parcial derivado servible — `derived_catalog` expone
+  `DERIVED_PRODUCTION_POOL` y `pick_next_question` lo sirve en sesiones
+  bottom-up (Caso A) con señal de `dictation` débil, tras agotar
+  cloze/segmentación del nivel, nunca en puerta/certificación · **P1-02**
+  scoring exacto por token del dictado escrito (`dictation_score` sin
+  Soundex/phoneme/prosodia; `submit_production` lo aplica a todo
+  `task_type=dictation`; fila fonética oculta en la UI) · **P1-03**
+  Gonnago/reducciones por token y frontera (`contains_word_token` compartido
+  en `_reductions_in`/`_is_eligible_token`/`_connected_speech_realized`;
+  contenido de `l16` corregido, audio digest regenerado) · **P1-04/P2-01**
+  AudioController integrado verificado (play/pausa/variantes operativas;
+  seek/setRate fino/loop/replay/markSegment sin UI → V3.29 Fase 3) y `seek()`
+  notifica `onCurrentTime` en pausa. Tests: pytest **1693** (backend 1619 +
+  launcher 74), ruff limpio, vitest **506** (61 archivos), `tsc --noEmit`
+  limpio y `check_release_consistency` **3.28.1** exit 0. Pendiente: dossier de
+  auditoría del candidato v3.28.0 (letra P) y Fase 3 del engine en V3.29.
 - ✅ **V3.28 — Listening Engine 4.0 Fase 2 (2026-09-09)**: cerrado e
   implementado sobre v3.27.0 (**Versión estable `3.28.0`**, app `3.27.0 →
   3.28.0`) con el plan

@@ -12,6 +12,7 @@ from repositories import db
 from repositories import listening as listening_repo
 from repositories import users as users_repo
 from services.listening import (
+    dictation_score,
     get_question,
     listening_diagnostic,
     production_reference,
@@ -41,6 +42,40 @@ def test_production_score_low_for_unrelated_text():
     result = production_score("the quick brown fox jumps", "zzz")
     assert result["score"] < 80
     assert 0 <= result["score"] <= 100
+
+
+# --- dictation_score: exacto por token (V3.28.1, P1-02) ----------------------
+
+def test_dictation_score_exact_ignores_case_and_punctuation():
+    """El dictado normaliza mayúsculas/puntuación pero exige tokens exactos."""
+    result = dictation_score("Hello world.", "hello world")
+    assert result["score"] == 100
+    assert result["word_accuracy"] == 100
+    assert result["breakdown"]["total"] == 2
+
+
+def test_dictation_score_rejects_phonetic_spelling_variant():
+    """`new sistem` por `new system` es incorrecto en dictado escrito: no hay
+    tolerancia fonética (Soundex/fonemas/prosodia a 0)."""
+    result = dictation_score("new system", "new sistem")
+    assert result["score"] == 50
+    assert result["score"] < 80  # por debajo de PRODUCTION_PASS_SCORE
+    assert result["phonetic_score"] == 0
+    assert result["phoneme_accuracy_proxy"] == 0
+    assert result["breakdown"]["substituted"] == [
+        {"expected": "system", "heard": "sistem"}
+    ]
+
+
+def test_shadowing_keeps_phonetic_composite_while_dictation_is_exact():
+    """El shadowing (oral) conserva el composite con señales fonéticas; el
+    dictado escrito no (misma entrada, puntuaciones distintas)."""
+    oral = production_score("new system", "new sistem")
+    escrito = dictation_score("new system", "new sistem")
+    assert oral["phonetic_score"] > 0
+    assert oral["phoneme_accuracy_proxy"] > 0
+    assert escrito["phonetic_score"] == 0
+    assert oral["score"] > escrito["score"]
 
 
 def test_production_reference_priority():

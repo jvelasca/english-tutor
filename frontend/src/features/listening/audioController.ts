@@ -191,11 +191,19 @@ export class AudioController {
     this.el.currentTime = this.segment ? this.segment.start : 0;
   }
 
-  /** Salta a un instante (recortado a la duración). */
+  /**
+   * Salta a un instante (recortado a la duración).
+   *
+   * V3.28.1 (P2-01): además de fijar `currentTime`, notifica a los suscriptores.
+   * Sin reproducción, `timeupdate` no se dispara y el estado React del hook
+   * quedaría obsoleto al mover un slider con el audio pausado; la notificación
+   * explícita mantiene `currentTime` consistente en cualquier estado.
+   */
   seek(time: number): void {
     const duration = this.duration;
     const target = Math.max(0, Math.min(time, duration > 0 ? duration : time));
     this.el.currentTime = target;
+    this.callbacks.onCurrentTime?.(target);
   }
 
   /**

@@ -127,6 +127,21 @@ describe("AudioController", () => {
     ctrl.dispose();
   });
 
+  it("seek notifica onCurrentTime aunque el audio esté pausado (P2-01)", () => {
+    // Pausado: `timeupdate` no se dispara; seek debe notificar el instante
+    // para que el estado React (slider/posición) se mantenga consistente.
+    const el = fakeElement({ duration: 10, paused: true });
+    const onCurrentTime = vi.fn();
+    const ctrl = new AudioController(el, { onCurrentTime });
+    ctrl.seek(4);
+    expect(el.currentTime).toBe(4);
+    expect(onCurrentTime).toHaveBeenCalledWith(4);
+    // El recorte a duración notifica el instante real (10), no el pedido (50).
+    ctrl.seek(50);
+    expect(onCurrentTime).toHaveBeenLastCalledWith(10);
+    ctrl.dispose();
+  });
+
   it("setRate con preservesPitch usa playbackRate fino", () => {
     const el = fakeElement();
     const ctrl = new AudioController(el);

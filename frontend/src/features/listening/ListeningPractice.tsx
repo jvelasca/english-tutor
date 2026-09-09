@@ -88,6 +88,12 @@ import {
 import { AuditoryProfileCard } from "./AuditoryProfileCard";
 // AudioController 4.0 (V3.28, Bloque B): reproducción del audio de referencia
 // sobre un único elemento con play/pause/seek/velocidad/bucle de segmento.
+//
+// Integración real en esta pantalla (V3.28.1, P1-04): `play(url)` reproduce la
+// variante de la escalera y `pause()` corta al cambiar de ítem/desmontar; el
+// estado `playing`/`currentTime` alimenta el resaltado de frase activa. Quedan
+// SIN UI (mapa a V3.29 Fase 3): `seek` (scrubber), `setRate` fino con
+// `preservesPitch`, `loop`, `replaySegment` y `markSegmentStart`.
 import { useAudioController } from "./useAudioController";
 // Transcripción dinámica con sync grueso (V3.28, Bloque D): resalta la frase
 // activa según `currentTime` y respeta el revelado `hidden/partial/full`.
@@ -1397,12 +1403,14 @@ async function submitDictation() {
                       </span>{" "}
                       {productionResult.word_accuracy}%
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">
-                        {t("listening.phoneticScore")}:
-                      </span>{" "}
-                      {productionResult.phonetic_score}%
-                    </div>
+                    {productionResult.task_type !== "dictation" && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          {t("listening.phoneticScore")}:
+                        </span>{" "}
+                        {productionResult.phonetic_score}%
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <span className="text-muted-foreground">

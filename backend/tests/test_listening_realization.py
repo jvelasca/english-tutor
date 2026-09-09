@@ -66,9 +66,23 @@ def test_tts_speed_realized_only_with_rate():
 
 
 def test_connected_speech_strong_reduction_realizes_declared():
-    # l16 ("Gonnago"/"d'you") y l17 ("Whaddaya") escriben la reducción → realizada.
+    # l16 ("Gonna"/"d'you") y l17 ("Whaddaya") escriben la reducción como token
+    # → se pronuncia y el connected speech declarado se realiza (V3.28.1, P1-03).
     assert realized_vector(_q("l16"))["connected_speech"] == 6
     assert realized_vector(_q("l17"))["connected_speech"] == 6
+
+
+def test_connected_speech_not_realized_by_concatenated_non_token():
+    # Una grafía concatenada tipo "Gonnago" NO es el token "gonna": no cuenta
+    # como reducción escrita y el connected speech declarado no se realiza.
+    synthetic = dict(_q("l16"))
+    synthetic["transcript"] = "Gonnago to the store and grab some milk."
+    synthetic["clean_transcript"] = (
+        "Going to go to the store and grab some milk."
+    )
+    synthetic["script"] = synthetic["transcript"]
+    assert "d'you" not in synthetic["transcript"]
+    assert realized_vector(synthetic)["connected_speech"] == 1
 
 
 def test_connected_speech_mild_contraction_partial():
