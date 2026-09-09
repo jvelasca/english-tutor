@@ -8,6 +8,29 @@
 
 ## Estado actual
 
+- ✅ **V3.30.1 — Endurecimiento del diccionario de consulta (2026-09-09)**:
+  patch de la auditoría V3.30.0 sobre v3.30.0 (**Versión estable `3.30.1`**,
+  app `3.30.0 → 3.30.1`; solo backend + docs, sin cambios de UI). Cierra los
+  tres P1: **P1-01** una sola generación LLM por palabra en concurrencia
+  (`domain/vocabulary.py`: single-flight por palabra con Future — N consultas
+  simultáneas → 1 llamada al modelo y 1 fila; el `INSERT OR IGNORE` protegía la
+  fila pero no la generación; los waiters reciben el mismo resultado y un fallo
+  no reintenta en cascada) · **P1-02** la política `UNUSABLE_MODELS` ya no se
+  salta con un modelo explícito (`services/translate.py` `pick_model`: el
+  explícito no utilizable cae al fallback automático, único punto de política
+  para diccionario y traducción) · **P1-03** caché versionada
+  (`dictionary_entries.generator_version` aditiva + migración idempotente con
+  backfill `'1.0.0'` del contenido V3.30; `save_entry` upsert `ON CONFLICT DO
+  UPDATE` con `updated_at` real; el dominio solo sirve caché con la
+  `generator_version` actual y regenera/sobrescribe la obsoleta). P2: parser
+  JSON con `raw_decode` que toma el PRIMER objeto válido (la regex greedy
+  `{.*}` se tragaba `{…} texto {…}`). Tests: pytest **1693** (+9: concurrencia
+  misma palabra y dos usuarios, fallo concurrente sin reintentos, regeneración
+  por versión obsoleta, reuso de versión fresca, parser multi-objeto y llaves
+  en prosa, `pick_model` con explícito no utilizable), ruff limpio y
+  `check_release_consistency` **3.30.1** exit 0. Pendiente: candidatos V3.31
+  (Dictionary → Learning Bridge, palabras tocables en transcripts/chat).
+
 - ✅ **V3.30 — Diccionario de consulta con marcas de uso y aprendizaje
   (2026-09-09)**: cerrado e implementado sobre v3.29.0 (**Versión estable `3.30.0`**, app `3.29.0 → 3.30.0`) con el dossier
   `docs/DISENO-V330-DICCIONARIO-CONSULTA.md` (decisiones **D1** LLM local a
@@ -977,6 +1000,16 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   Quedan abiertos hacia **V3.31** los candidatos que V3.30 había diferido:
   consumo de `word_breakdown_json` en agregados / práctica dirigida de las
   palabras falladas y palabras tocables en transcripts/chat.
+
+- ~~**⏳ V3.30.1 — Endurecimiento del diccionario (auditoría V3.30.0)**~~ ✅
+  **cerrado (2026-09-09, v3.30.1)**: implementado y publicado (ver «Estado
+  actual» arriba y `release-notes-v3.30.1.md`). Cierra los tres P1 de la
+  auditoría (single-flight de generación, política `UNUSABLE_MODELS` frente al
+  modelo explícito, caché versionada con `generator_version`) y el P2 del
+  parser JSON. **Próximo candidato V3.31**: Dictionary → Learning Bridge
+  (borrador en `agentes/v331-dictionary-learning-bridge.md`) — convertir la
+  consulta en puerta al aprendizaje con «Practicar» explícito sin contaminar
+  evidencia (D3 intacta), más los diferidos de V3.30.
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

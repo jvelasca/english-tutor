@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.30.1] — 2026-09-09
+
+**Endurecimiento del diccionario de consulta tras la auditoría V3.30.0: una sola generación LLM por palabra en concurrencia (single-flight), la política `UNUSABLE_MODELS` ya no se puede saltar pidiendo un modelo explícito, y la caché global `dictionary_entries` versiona su contenido para poder regenerarse cuando cambie el prompt/política.**
+
+Patch de la auditoría V3.30.0 (los tres P1: concurrencia del generador, modelo explícito frente a `UNUSABLE_MODELS`, caché sin versión/proveniencia). Versión de app `3.30.0 → 3.30.1`. Solo backend + docs; la UI no cambia.
+
+- **P1-01 — Single-flight de generación (`domain/vocabulary.py`).** `_ensure_cached_content` mantiene un registro en vuelo por palabra (Future por proceso): N consultas simultáneas de la misma palabra comparten exactamente UNA llamada al LLM y UNA escritura en BD; los waiters reciben el mismo resultado y un fallo no provoca reintentos en cascada. El `INSERT OR IGNORE` anterior protegía la fila pero no la generación.
+- **P1-02 — La política de modelo ya no se salta con un explícito (`services/translate.py`).** `pick_model` descarta cualquier modelo declarado en `config.UNUSABLE_MODELS` aunque el cliente lo solicite y cae al mismo fallback automático (modelo rápido instalado utilizable o el por defecto). Corrige diccionario y traducción a la vez (un único punto de política).
+- **P1-03 — Caché versionada (`dictionary_entries.generator_version`).** Columna aditiva + migración idempotente con backfill `'1.0.0'` del contenido V3.30 (mismo prompt/política) en `repositories/db.py`; `save_entry` (upsert `ON CONFLICT DO UPDATE`) sustituye a `insert_entry` y da semántica real a `updated_at` (última regeneración); el dominio solo sirve caché cuya `generator_version` coincide con la actual (`GENERATOR_VERSION` en `services/dictionary_content.py`) — una entrada obsoleta por un cambio futuro de prompt se regenera y sobrescribe en lugar de quedar como contenido obsoleto permanente.
+- **P2 — Parser JSON robusto (`services/dictionary_content.py`).** `parse_content` extrae el PRIMER objeto `{…}` válido con barrido `raw_decode` en cada `{` (la regex greedy `{.*}` podía tragarse `{…} texto {…}` hasta el último cierre).
+- **Verificación.** Backend pytest **1693 passed** (+9 tests: single-flight misma palabra y dos usuarios, fallo concurrente degradado sin reintentos, regeneración por versión obsoleta, reuso de versión fresca, parser con varios objetos y llaves en prosa; `pick_model` con explícito no utilizable) + `ruff check .` limpio; sin cambios de frontend; `check_release_consistency` 3.30.1 exit 0 (detalle con conteos en `release-notes-v3.30.1.md`).
+
 ## [3.30.0] — 2026-09-09
 
 **Diccionario de consulta con marca de uso y aprendizaje: busca cualquier palabra y recibe su definición/traducción generadas por el modelo local y cacheadas en BD, una frase de ejemplo determinista del banco y el estado de esa palabra en tu aprendizaje (vista/producida/dominada), en la nueva vista «Consultar» del hub Vocabulario.**

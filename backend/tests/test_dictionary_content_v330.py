@@ -69,6 +69,19 @@ def _stub_fetcher(monkeypatch, payload: str, calls: list):
     monkeypatch.setattr(dictionary_content, "_default_fetcher", _fake)
 
 
+@pytest.fixture(autouse=True)
+def _clear_inflight():
+    """Limpia el registro de vuelos del dominio entre tests.
+
+    Es estado global por proceso: si una prueba dejara un Future sin resolver
+    (p. ej. al fallar a mitad de un vuelo), la siguiente prueba con la misma
+    palabra esperaría un Future muerto para siempre.
+    """
+    vocabulary_domain._inflight_content.clear()
+    yield
+    vocabulary_domain._inflight_content.clear()
+
+
 # --- parse_content (puro, sin red) -------------------------------------------
 
 
@@ -143,6 +156,33 @@ def test_parse_truncates_oversized_translation():
 def test_parse_rejects_empty_raw():
     with pytest.raises(dictionary_content.ContentUnavailableError):
         dictionary_content.parse_content("   ")
+
+
+def test_parse_picks_first_object_ignoring_trailing_text_and_object():
+    """Con dos objetos JSON separados por texto, usa el PRIMERO (V3.30.1: la
+    vieja regex greedy `{.*}` intentaba todo desde el primer `{` al último `}`)."""
+    raw = (
+        '{"pos": "noun", "definition": "first", "translation": "uno"} '
+        "más texto entre medias "
+        '{"pos": "verb", "definition": "second", "translation": "dos"}'
+    )
+    out = dictionary_content.parse_content(raw)
+    assert out["definition"] == "first"
+    assert out["translation"] == "uno"
+
+
+def test_parse_skips_braces_in_prose_before_object():
+    """Llaves sueltas en prosa (JSON no válido) no descarrilan el barrido."""
+    raw = 'Nota: usa "{llaves}" sin JSON válido al principio.\n' + _payload()
+    out = dictionary_content.parse_content(raw)
+    assert out["translation"] == "gato"
+
+
+def test_parse_ignores_valid_objects_after_invalid_first_one():
+    """Si el primer `{…}` no es JSON válido, sigue hasta encontrar uno bueno."""
+    raw = "{pos: noun, definition: hola} " + _payload()
+    out = dictionary_content.parse_content(raw)
+    assert out["definition"] == "A small domesticated carnivorous mammal."
 
 
 # --- generate_content (fetcher inyectado, sin red) ----------------------------
@@ -290,7 +330,7 @@ def test_insert_failure_still_serves_content_in_memory(monkeypatch, tmp_path):
     def _boom(*_args, **_kwargs):
         raise RuntimeError("BD de solo lectura")
 
-    monkeypatch.setattr(dictionary_repo, "insert_entry", _boom)
+    monkeypatch.setattr(dictionary_repo, "save_entry", _boom)
 
     data = _lookup(a, "cat")
 
@@ -301,26 +341,43 @@ def test_insert_failure_still_serves_content_in_memory(monkeypatch, tmp_path):
     assert _count_rows("dictionary_entries") == 0
 
 
-def test_repository_insert_is_idempotent(monkeypatch, tmp_path):
+def test_repository_save_upserts_and_versions(monkeypatch, tmp_path):
+    """`save_entry` escribe UNA fila tanto en la primera generación como al
+    sobrescribir una versión obsoleta (V3.30.1, P1-03)."""
     _setup(monkeypatch, tmp_path)
-    first = dictionary_repo.insert_entry(
-        "cat", pos="noun", definition="def A", translation="gato"
+    first = dictionary_repo.save_entry(
+        "cat",
+        pos="noun",
+        definition="def A",
+        translation="gato",
+        generator_version="1.0.0",
     )
-    second = dictionary_repo.insert_entry(
-        "cat", pos="verb", definition="def B", translation="gato 2"
+    second = dictionary_repo.save_entry(
+        "cat",
+        pos="verb",
+        definition="def B",
+        translation="gato 2",
+        generator_version="1.1.0",
     )
     assert first is True
-    assert second is False
+    assert second is True
     stored = dictionary_repo.get_entry("cat")
-    assert stored["definition"] == "def A"
-    assert stored["pos"] == "noun"
+    assert stored["definition"] == "def B"
+    assert stored["pos"] == "verb"
+    assert stored["generator_version"] == "1.1.0"
+    assert _count_rows("dictionary_entries") == 1
 
 
-def test_domain_ensure_cached_content_reuses_existing(monkeypatch, tmp_path):
-    """Si la caché ya tiene definición, el dominio ni llama al generador."""
+def test_domain_ensure_cached_content_reuses_fresh_version(monkeypatch, tmp_path):
+    """Si la caché ya tiene definición generada con la versión actual, el
+    dominio ni llama al generador (V3.30.1, P1-03)."""
     _setup(monkeypatch, tmp_path)
-    dictionary_repo.insert_entry(
-        "cat", pos="noun", definition="ya en caché", translation="gato"
+    dictionary_repo.save_entry(
+        "cat",
+        pos="noun",
+        definition="ya en caché",
+        translation="gato",
+        generator_version=dictionary_content.GENERATOR_VERSION,
     )
     called = False
 
@@ -330,9 +387,125 @@ def test_domain_ensure_cached_content_reuses_existing(monkeypatch, tmp_path):
         return _payload()
 
     monkeypatch.setattr(dictionary_content, "_default_fetcher", _fake)
-    cached = dictionary_repo.get_entry("cat")
     out = asyncio.run(
-        vocabulary_domain._ensure_cached_content("cat", cached, model=None)
+        vocabulary_domain._ensure_cached_content("cat", model=None)
     )
     assert out["definition"] == "ya en caché"
     assert called is False
+
+
+# --- single-flight (V3.30.1, P1-01) -------------------------------------------
+
+
+def test_concurrent_same_word_generates_once(monkeypatch, tmp_path):
+    """N consultas simultáneas de la misma palabra → UNA generación y UNA fila.
+
+    Es la carrera que la persistencia `INSERT OR IGNORE` no deduplicaba: dos
+    requests concurrentes llamaban al LLM dos veces. El vuelo comparte el
+    Future y todos reciben el mismo resultado."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    calls: list = []
+
+    async def _slow(word: str, model: str | None) -> str:
+        calls.append(word)
+        await asyncio.sleep(0.05)
+        return _payload()
+
+    monkeypatch.setattr(dictionary_content, "_default_fetcher", _slow)
+
+    async def _run():
+        return await asyncio.gather(
+            vocabulary_domain._ensure_cached_content("cat", model=None),
+            vocabulary_domain._ensure_cached_content("cat", model=None),
+            vocabulary_domain._ensure_cached_content("cat", model=None),
+        )
+
+    outs = asyncio.run(_run())
+    assert len(calls) == 1
+    assert _count_rows("dictionary_entries") == 1
+    assert {out["definition"] for out in outs} == {
+        "A small domesticated carnivorous mammal."
+    }
+
+
+def test_concurrent_two_users_same_word_generates_once(monkeypatch, tmp_path):
+    """El single-flight es global: A y B consultando la misma palabra a la vez
+    comparten una generación; el contenido es global y la marca de uso queda
+    aislada por usuario."""
+    a, b = _setup(monkeypatch, tmp_path)
+    assert vocabulary_repo.record_words(a, ["cat"]) is True
+    calls: list = []
+
+    async def _slow(word: str, model: str | None) -> str:
+        calls.append(word)
+        await asyncio.sleep(0.05)
+        return _payload()
+
+    monkeypatch.setattr(dictionary_content, "_default_fetcher", _slow)
+
+    async def _run():
+        return await asyncio.gather(
+            vocabulary_domain.lookup_dictionary(a, "cat"),
+            vocabulary_domain.lookup_dictionary(b, "cat"),
+        )
+
+    res_a, res_b = asyncio.run(_run())
+    assert len(calls) == 1
+    assert _count_rows("dictionary_entries") == 1
+    assert res_a["definition_source"] == "llm"
+    assert res_b["definition"] == res_a["definition"]
+    assert res_a["usage"]["tracked"] is True
+    assert res_b["usage"]["tracked"] is False
+
+
+def test_concurrent_failure_generates_once_and_degrades(monkeypatch, tmp_path):
+    """Si la generación falla, el vuelo la resuelve UNA vez y todos degradan a
+    None, sin reintentos en cascada por cada waiter."""
+    _setup(monkeypatch, tmp_path)
+    calls: list = []
+
+    async def _down(word: str, model: str | None) -> str:
+        calls.append(word)
+        raise dictionary_content.ContentUnavailableError("modelo caído")
+
+    monkeypatch.setattr(dictionary_content, "_default_fetcher", _down)
+
+    async def _run():
+        return await asyncio.gather(
+            vocabulary_domain._ensure_cached_content("cat", model=None),
+            vocabulary_domain._ensure_cached_content("cat", model=None),
+        )
+
+    outs = asyncio.run(_run())
+    assert outs == [None, None]
+    assert len(calls) == 1
+    assert _count_rows("dictionary_entries") == 0
+
+
+# --- versionado de la caché (V3.30.1, P1-03) ----------------------------------
+
+
+def test_stale_generator_version_regenerates_and_overwrites(monkeypatch, tmp_path):
+    """Una entrada generada con una versión anterior de prompt/política no se
+    sirve como obsoleta permanente: se regenera y sobrescribe en la misma fila."""
+    _setup(monkeypatch, tmp_path)
+    dictionary_repo.save_entry(
+        "cat",
+        pos="noun",
+        definition="definición antigua (V3.30.0)",
+        translation="gato",
+        generator_version="0.9.0",
+    )
+    calls: list = []
+    _stub_fetcher(monkeypatch, _payload(), calls)
+
+    out = asyncio.run(
+        vocabulary_domain._ensure_cached_content("cat", model=None)
+    )
+
+    assert len(calls) == 1
+    assert out["definition"] == "A small domesticated carnivorous mammal."
+    stored = dictionary_repo.get_entry("cat")
+    assert stored["definition"] == "A small domesticated carnivorous mammal."
+    assert stored["generator_version"] == dictionary_content.GENERATOR_VERSION
+    assert _count_rows("dictionary_entries") == 1

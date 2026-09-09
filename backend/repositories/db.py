@@ -129,10 +129,28 @@ def init_db() -> None:
                 pos TEXT NOT NULL DEFAULT '',
                 definition TEXT NOT NULL DEFAULT '',
                 translation TEXT NOT NULL DEFAULT '',
+                generator_version TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT ''
             )
             """
+        )
+        # V3.30.1 (P1-03): versionado del contenido generado. Las instalaciones
+        # previas a V3.30.1 crearon la tabla sin `generator_version`; la
+        # migración añade la columna y etiqueta el contenido existente como v1
+        # (mismo prompt/política que V3.30, evita regeneraciones innecesarias).
+        dict_cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(dictionary_entries)")
+        }
+        if "generator_version" not in dict_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_entries ADD COLUMN "
+                "generator_version TEXT NOT NULL DEFAULT ''"
+            )
+        conn.execute(
+            "UPDATE dictionary_entries SET generator_version = '1.0.0' "
+            "WHERE generator_version = ''"
         )
         conn.execute(
             """

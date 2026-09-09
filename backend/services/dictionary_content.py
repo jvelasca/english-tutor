@@ -28,6 +28,13 @@ from services import llm, translate
 
 logger = logging.getLogger(__name__)
 
+# Versión del prompt + parseador + política POS. Un cambio de criterio (prompt,
+# validación, categorías aceptadas, idioma, longitud) debe SUBIR esta versión:
+# las entradas de `dictionary_entries` guardan la versión con la que se
+# generaron y el dominio solo sirve caché cuya `generator_version` coincide
+# (las anteriores se regeneran y sobrescriben).
+GENERATOR_VERSION = "1.0.0"
+
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
 MAX_DEFINITION_CHARS = 600
@@ -104,23 +111,28 @@ _default_fetcher = _fetch_chat
 def parse_content(raw: str) -> dict:
     """Parsea y valida la respuesta del modelo → `{pos, definition, translation}`.
 
-    Parseo tolerante: extrae el primer bloque `{…}` aunque el modelo lo envuelva
-    en cercas de Markdown, y normaliza `pos` a un valor canónico ("" si no es
-    válido). Lanza `ContentUnavailableError` si el JSON es corrupto, no es un
-    objeto o la definición está vacía/supera el límite.
+    Parseo tolerante: extrae el PRIMER objeto `{…}` válido aunque el modelo lo
+    envuelva en cercas de Markdown o texto alrededor (V3.30.1: barrido con
+    `raw_decode` en cada `{`; la vieja regex greedy `{.*}` podía tragarse
+    `{…} texto {…}` hasta el último cierre), y normaliza `pos` a un valor
+    canónico ("" si no es válido). Lanza `ContentUnavailableError` si no hay
+    ningún objeto JSON válido o la definición está vacía/supera el límite.
     """
     text = (raw or "").strip()
     if not text:
         raise ContentUnavailableError("Respuesta vacía del modelo")
-    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-    if not match:
+    decoder = json.JSONDecoder()
+    obj = None
+    for match in re.finditer(r"\{", text):
+        try:
+            candidate, _ = decoder.raw_decode(text, match.start())
+        except (ValueError, TypeError):
+            continue
+        if isinstance(candidate, dict):
+            obj = candidate
+            break
+    if obj is None:
         raise ContentUnavailableError("La respuesta no contiene un objeto JSON")
-    try:
-        obj = json.loads(match.group(0))
-    except (ValueError, TypeError) as exc:
-        raise ContentUnavailableError("JSON de la respuesta inválido") from exc
-    if not isinstance(obj, dict):
-        raise ContentUnavailableError("El JSON de la respuesta no es un objeto")
 
     pos = str(obj.get("pos") or "").strip().lower()
     definition = str(obj.get("definition") or "").strip()

@@ -53,8 +53,30 @@ def _fake_list_models(*names):
 
 
 def test_pick_model_uses_explicit(monkeypatch):
-    # Con modelo explícito no consulta la lista de instalados.
-    assert asyncio.run(translate_service.pick_model("qwen3.5:9b")) == "qwen3.5:9b"
+    # Con modelo explícito UTILIZABLE no consulta la lista de instalados.
+    assert asyncio.run(translate_service.pick_model("llama3.1:8b")) == "llama3.1:8b"
+
+
+def test_pick_model_explicit_unusable_falls_back_to_default(monkeypatch):
+    # qwen3.5:9b está marcado como no utilizable (config.UNUSABLE_MODELS): la
+    # preferencia explícita no puede saltarse la política → si es lo único
+    # instalado, cae al modelo por defecto.
+    monkeypatch.setattr(
+        translate_service.llm, "list_models",
+        _fake_list_models("qwen3.5:9b"),
+    )
+    chosen = asyncio.run(translate_service.pick_model("qwen3.5:9b"))
+    assert chosen == config.DEFAULT_MODEL
+
+
+def test_pick_model_explicit_unusable_falls_back_to_preferred(monkeypatch):
+    # Con un preferido utilizable instalado, el explícito no utilizable cae al
+    # modelo rápido instalado (misma política que sin modelo explícito).
+    monkeypatch.setattr(
+        translate_service.llm, "list_models",
+        _fake_list_models("qwen3.5:9b", "llama3.1:8b"),
+    )
+    assert asyncio.run(translate_service.pick_model("qwen3.5:9b")) == "llama3.1:8b"
 
 
 def test_pick_model_prefers_fastest_installed(monkeypatch):
@@ -104,11 +126,11 @@ def test_translate_text_returns_spanish(monkeypatch):
     calls = []
     monkeypatch.setattr(translate_service, "chat_once", _fake_chat_once(calls))
     result = asyncio.run(
-        translate_service.translate_text("Where is the bank?", "qwen3.5:9b")
+        translate_service.translate_text("Where is the bank?", "llama3.1:8b")
     )
     assert result == "Un banco"
     assert len(calls) == 1
-    assert calls[0][0] == "qwen3.5:9b"
+    assert calls[0][0] == "llama3.1:8b"
 
 
 def test_translate_text_auto_picks_fast_model(monkeypatch):
@@ -126,10 +148,10 @@ def test_translate_text_cache_avoids_second_call(monkeypatch):
     calls = []
     monkeypatch.setattr(translate_service, "chat_once", _fake_chat_once(calls))
     asyncio.run(
-        translate_service.translate_text("How many people are there?", "qwen3.5:9b")
+        translate_service.translate_text("How many people are there?", "llama3.1:8b")
     )
     asyncio.run(
-        translate_service.translate_text("How many people are there?", "qwen3.5:9b")
+        translate_service.translate_text("How many people are there?", "llama3.1:8b")
     )
     assert len(calls) == 1  # la segunda vez sale de la caché, sin llamada LLM
 
@@ -138,10 +160,10 @@ def test_translate_text_ignores_whitespace_for_cache(monkeypatch):
     calls = []
     monkeypatch.setattr(translate_service, "chat_once", _fake_chat_once(calls))
     asyncio.run(
-        translate_service.translate_text("Nice to meet you.", "qwen3.5:9b")
+        translate_service.translate_text("Nice to meet you.", "llama3.1:8b")
     )
     asyncio.run(
-        translate_service.translate_text("  Nice to meet you.  ", "qwen3.5:9b")
+        translate_service.translate_text("  Nice to meet you.  ", "llama3.1:8b")
     )
     assert len(calls) == 1
 
@@ -175,10 +197,10 @@ def test_translate_endpoint_with_explicit_model(monkeypatch):
     with TestClient(app) as client:
         r = client.post(
             "/api/translate",
-            json={"text": "Where is the bank?", "model": "qwen3.5:9b"},
+            json={"text": "Where is the bank?", "model": "llama3.1:8b"},
         )
     assert r.status_code == 200
-    assert calls[0][0] == "qwen3.5:9b"
+    assert calls[0][0] == "llama3.1:8b"
 
 
 def test_translate_endpoint_empty_text_422():

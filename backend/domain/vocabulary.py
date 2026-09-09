@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
@@ -495,17 +496,44 @@ def _build_dictionary_entry(
     }
 
 
-async def _ensure_cached_content(
-    word: str, cached: dict | None, *, model: str | None = None
-) -> dict | None:
-    """Devuelve contenido (`pos`/`definition`/`translation`) para `word`.
+# Vuelos en curso de generación de contenido por palabra (V3.30.1, P1-01):
+# clave → Future que resuelve con la entrada cacheada (dict) o None si la
+# generación falló. Evita que dos consultas simultáneas de la misma palabra
+# llamen al LLM dos veces (el `INSERT OR IGNORE` protegía la fila, no la
+# llamada al modelo). Best-effort por proceso (la app es de un solo proceso en
+# LAN); la persistencia `ON CONFLICT DO UPDATE` mantiene la BD consistente aun
+# con varias réplicas.
+_inflight_content: dict[str, asyncio.Future] = {}
 
-    Si la caché ya tiene definición la reutiliza (determinista). Si no, genera
-    con el modelo local y persiste `INSERT OR IGNORE`; en caso de fallo degrada
-    devolviendo el contenido en memoria o `None`, de modo que la consulta nunca
-    se rompe por el generador (la definición es contenido, no evidencia).
+
+def _content_is_fresh(entry: dict | None) -> bool:
+    """Caché válida: tiene definición y fue generada con la versión actual.
+
+    V3.30.1 (P1-03): si el contenido se generó con un prompt/política anterior
+    (`generator_version` distinta de la actual, o `""` legacy previo a la
+    migración) no se sirve: se regenera y sobrescribe. Evita que un cambio
+    futuro de prompt deje la caché como contenido obsoleto permanente.
     """
-    if cached and (cached.get("definition") or "").strip():
+    return bool(
+        entry
+        and (entry.get("definition") or "").strip()
+        and entry.get("generator_version") == dictionary_content.GENERATOR_VERSION
+    )
+
+
+async def _generate_and_persist(word: str, *, model: str | None) -> dict | None:
+    """Genera contenido de diccionario para `word` si la caché no es fresca.
+
+    Relee la BD dentro del vuelo (entre el chequeo y la generación otra
+    consulta pudo persistir), genera con el modelo local si sigue faltando,
+    persiste con `save_entry` (inserta o sobrescribe una versión obsoleta) y
+    devuelve la fila persistida. Si la generación falla o la persistencia es
+    de solo lectura, devuelve el contenido en memoria o None sin lanzar: la
+    consulta nunca se rompe por el generador (la definición es contenido, no
+    evidencia).
+    """
+    cached = await run_in_threadpool(dictionary_repo.get_entry, word)
+    if _content_is_fresh(cached):
         return cached
     try:
         content = await dictionary_content.generate_content(word, model=model)
@@ -517,11 +545,12 @@ async def _ensure_cached_content(
         return None
     try:
         await run_in_threadpool(
-            dictionary_repo.insert_entry,
+            dictionary_repo.save_entry,
             word,
             pos=content.get("pos", ""),
             definition=content.get("definition", ""),
             translation=content.get("translation", ""),
+            generator_version=dictionary_content.GENERATOR_VERSION,
         )
         persisted = await run_in_threadpool(dictionary_repo.get_entry, word)
     except Exception:  # noqa: BLE001 — persistir es opcional
@@ -533,7 +562,36 @@ async def _ensure_cached_content(
         "pos": content.get("pos", ""),
         "definition": content.get("definition", ""),
         "translation": content.get("translation", ""),
+        "generator_version": dictionary_content.GENERATOR_VERSION,
     }
+
+
+async def _ensure_cached_content(word: str, *, model: str | None = None) -> dict | None:
+    """Devuelve contenido (`pos`/`definition`/`translation`) para `word`.
+
+    Single-flight (V3.30.1, P1-01): si otra consulta ya está generando la
+    misma palabra, esta espera su resultado en lugar de llamar al modelo otra
+    vez (exactamente UNA generación por palabra en concurrencia). Con la caché
+    fresca la reutiliza (determinista); si la versión es obsoleta o no existe,
+    genera, persiste y devuelve la entrada. Un fallo de generación devuelve
+    None para todos (incluidos los que esperaban), sin reintentos en cascada.
+    """
+    fut = _inflight_content.get(word)
+    if fut is None:
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        _inflight_content[word] = fut
+        try:
+            result = await _generate_and_persist(word, model=model)
+            if not fut.done():
+                fut.set_result(result)
+        except Exception:  # noqa: BLE001 — nunca romper el vuelo ni a los waiters
+            logger.exception("Diccionario: fallo interno generando '%s'", word)
+            if not fut.done():
+                fut.set_result(None)
+        finally:
+            _inflight_content.pop(word, None)
+    return await asyncio.shield(fut)
 
 
 async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -> dict:
@@ -543,7 +601,10 @@ async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -
     marca de uso/aprendizaje (solo lectura del léxico del usuario), más la
     definición/traducción generada por el modelo local y cacheada en
     `dictionary_entries` (Fase B). La primera consulta de una palabra genera y
-    persiste el contenido; las siguientes son deterministas. Si el modelo no
+    persiste el contenido; las siguientes son deterministas. V3.30.1 (P1-01):
+    en concurrencia, N consultas simultáneas comparten UNA generación
+    (single-flight); si la caché quedó obsoleta por un cambio de prompt
+    (`generator_version`), se regenera y sobrescribe (P1-03). Si el modelo no
     está disponible, degrada a `definition_source="none"`.
 
     Sin evidencia nueva: no crea filas en `vocabulary`, no registra eventos ni
@@ -555,6 +616,5 @@ async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
-    cached = await run_in_threadpool(dictionary_repo.get_entry, normalized)
-    cached = await _ensure_cached_content(normalized, cached, model=model)
+    cached = await _ensure_cached_content(normalized, model=model)
     return await run_in_threadpool(_build_dictionary_entry, normalized, rows, cached)

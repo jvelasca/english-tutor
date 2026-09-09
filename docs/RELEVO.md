@@ -5,6 +5,36 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-09 (UTC+2).
 >
+> **Nota (2026-09-09):** **V3.30.1 publicada** — release **v3.30.1** (patch de
+> endurecimiento de la auditoría V3.30.0, sobre el commit `a3857f2` de v3.30.0;
+> solo backend + docs, sin cambios de UI). Cierra los tres P1 del dictamen:
+> **P1-01** single-flight de generación en `domain/vocabulary.py`
+> (`_inflight_content`: N consultas simultáneas de la misma palabra → UNA
+> llamada LLM y UNA fila; el `INSERT OR IGNORE` protegía la fila pero no la
+> generación; los waiters reciben el mismo resultado y un fallo no reintenta en
+> cascada) · **P1-02** la política `UNUSABLE_MODELS` ya no se puede saltar con
+> un modelo explícito (`services/translate.py` `pick_model`: el explícito no
+> utilizable, p. ej. `qwen3.5:9b`, cae al fallback automático — único punto de
+> política para diccionario y traducción) · **P1-03** caché versionada:
+> `dictionary_entries.generator_version` (columna aditiva + migración
+> idempotente con backfill `'1.0.0'` del contenido V3.30 en `repositories/db.py`;
+> `save_entry` upsert `ON CONFLICT DO UPDATE` sustituye a `insert_entry` y da
+> semántica real a `updated_at`; `GENERATOR_VERSION = "1.0.0"` en
+> `services/dictionary_content.py`; el dominio solo sirve caché cuya
+> `generator_version` coincide y regenera/sobrescribe la obsoleta). P2: parser
+> JSON robusto (`parse_content` toma el PRIMER objeto válido con `raw_decode`;
+> la regex greedy `{.*}` se tragaba `{…} texto {…}`). Verificación: pytest
+> backend **1693 passed** (+9 tests: concurrencia misma palabra y dos usuarios,
+> fallo concurrente sin reintentos, regeneración por versión obsoleta, reuso de
+> versión fresca, parser multi-objeto/llaves en prosa, `pick_model` con
+> explícito no utilizable) + ruff limpio + `check_release_consistency` **3.30.1**
+> exit 0. Detalle y conteos: `release-notes-v3.30.1.md`; `CHANGELOG.md` con
+> entrada `[3.30.1]`; `PLAN.md` con hito estable V3.30.1. Pendientes hacia
+> **V3.31**: Dictionary → Learning Bridge (Consultar → Practicar → Transferir →
+> Retener sin contaminar evidencia), consumo de `word_breakdown_json` en
+> agregados/práctica dirigida de las falladas y palabras tocables en
+> transcripts/chat.
+>
 > **Nota (2026-09-09):** **V3.30 publicada** — release **v3.30.0** = commit
 > **`a3857f2`** en `main` con **CI verde 6/6 jobs** (diccionario
 > de consulta con marca de uso y aprendizaje; feature cerrada con las Fases

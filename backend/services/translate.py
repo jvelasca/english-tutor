@@ -72,13 +72,17 @@ async def installed_models() -> set[str]:
 
 
 async def pick_model(explicit: str | None) -> str:
-    """Elige el modelo: el explícito si se aporta, si no el más rápido instalado.
+    """Elige el modelo: el explícito si se aporta y es utilizable, si no el
+    más rápido instalado.
 
-    Se descartan los modelos no utilizables (config.UNUSABLE_MODELS). Si no hay
-    ningún preferido instalado, se usa el primer modelo utilizable que haya o,
-    en último caso, el modelo por defecto.
+    El modelo explícito es una PREFERENCIA, nunca una orden: si está marcado en
+    `config.UNUSABLE_MODELS` (V3.30.1, P1-02) se descarta y se cae al mismo
+    fallback que un modelo no explícito — la política de modelos no utilizables
+    no se puede saltar por petición del cliente. Si no hay ningún preferido
+    instalado, se usa el primer modelo utilizable que haya o, en último caso,
+    el modelo por defecto.
     """
-    if explicit:
+    if explicit and explicit not in UNUSABLE_MODELS:
         return explicit
     installed = await installed_models()
     for candidate in PREFERRED_TRANSLATION_MODELS:
