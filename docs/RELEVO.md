@@ -3,10 +3,11 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-09 10:30 (UTC+2).
+> Actualizado por última vez: 2026-09-09 11:35 (UTC+2).
 >
-> **Nota (2026-09-09, 10:30):** **V3.28 publicada** — release **v3.28.0**
-> (Listening Engine 4.0, **Fase 2**, Bloques A–F) en `main`. Plan
+> **Nota (2026-09-09, 10:30):** **V3.28 publicada** — release **v3.28.0** =
+> commit **`74fb1b3`** en `main` con **CI verde 6/6 jobs** (Listening Engine 4.0,
+> **Fase 2**, Bloques A–F). Plan
 > `v3.28_listening_engine_fase_2_f74493a3.plan.md`; especificación
 > `docs/LISTENING_ENGINE_4.0.md` con la Fase 2 marcada **cerrada**. Resumen:
 > **Bloque A** micro-flujo unificado — `next_question` sirve `flow`/
