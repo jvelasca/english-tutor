@@ -303,6 +303,10 @@ export function WordDrill({
   const [recallOutcome, setRecallOutcome] = useState<DrillRecallAttempt | null>(
     null,
   );
+  // V3.36: instante en que el cue de Recall quedó visible. La latencia
+  // (cue → envío) se manda como `response_time_ms` del evento de evidencia; es
+  // observacional (no cambia la puntuación) y opcional (sin cue no hay medida).
+  const recallShownAtRef = useRef<number | null>(null);
   // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
   const recordingSession = useRecordingSession(recording, {
     onAutoStop: () => {
@@ -330,9 +334,13 @@ export function WordDrill({
     setRecallError(null);
     setRecallAnswer("");
     setRecallOutcome(null);
+    recallShownAtRef.current = null;
     getDrillRecallPrompt(userId, word)
       .then((prompt) => {
         setRecall(prompt);
+        // V3.36: el reloj de la latencia arranca cuando el cue es utilizable
+        // (con `available=false` no hay intento posible y no se mide nada).
+        recallShownAtRef.current = prompt.available ? Date.now() : null;
         if (!prompt.available) {
           setStep((current) => {
             if (current !== "recall") return current;
@@ -446,7 +454,16 @@ export function WordDrill({
     setProcessing(true);
     setError(null);
     try {
-      const outcome = await submitDrillRecallAttempt(userId, word, recallAnswer);
+      // V3.36: latencia cue → envío (observacional). Si no se midió, se omite.
+      const shownAt = recallShownAtRef.current;
+      const responseTimeMs =
+        shownAt === null ? undefined : Math.max(0, Date.now() - shownAt);
+      const outcome = await submitDrillRecallAttempt(
+        userId,
+        word,
+        recallAnswer,
+        responseTimeMs,
+      );
       setRecallOutcome(outcome);
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));

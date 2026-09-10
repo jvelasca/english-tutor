@@ -160,6 +160,20 @@ def lexical_unit(row: dict) -> str:
     return (lemma or word).lower()
 
 
+def cefr_difficulty(row: dict) -> float:
+    """Dificultad declarada del ÍTEM léxico (V3.36): posición CEFR en 1..6.
+
+    Reutiliza la escala 1..6 de `difficulty_from_vector` (listening) para que
+    todas las evidencias del proyecto hablen la misma escala. `0.0` = no
+    declarada (fila sin CEFR o con un valor fuera de la escalera). Es la
+    dificultad del ÍTEM, no del intento: no cambia con el resultado.
+    """
+    code = (row.get("cefr") or "").strip().upper()
+    if code in CEFR_ORDER:
+        return float(CEFR_ORDER.index(code) + 1)
+    return 0.0
+
+
 def classify_kind(text: str, source: str = "concepts") -> str:
     """Clasifica el kind de una semilla curricular (Constitución §3.2).
 

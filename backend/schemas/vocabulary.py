@@ -119,13 +119,24 @@ class LexicalEvidence(BaseModel):
     - `attempts` — nº de eventos (incluye fallos);
     - `successes` — nº de eventos correctos;
     - `distinct_success_days` — días naturales distintos con éxito;
-    - `intervals` — intervalos (días) de los eventos con éxito, ascendentes.
+    - `intervals` — intervalos (días) de los eventos con éxito, en orden
+      cronológico (cadena de repasos, no lista ordenada por valor).
+
+    V3.36 (Learning Evidence 2.0) añade las dimensiones del evento:
+    `success_rate`, `independent_successes` (aciertos sin apoyo: lo único que
+    podrá pesar en automaticidad), `support_levels` y `error_types`
+    (histogramas) y `mean_response_time_ms` (latencia media declarada).
     """
 
     attempts: int = 0
     successes: int = 0
     distinct_success_days: int = 0
     intervals: list[float] = Field(default_factory=list)
+    success_rate: float = 0.0
+    independent_successes: int = 0
+    support_levels: dict[str, int] = Field(default_factory=dict)
+    error_types: dict[str, int] = Field(default_factory=dict)
+    mean_response_time_ms: float | None = None
 
 
 class LexicalItemOut(BaseModel):
@@ -539,10 +550,16 @@ class RecallPromptOut(BaseModel):
 class RecallAttemptIn(BaseModel):
     """Intento del paso Recall (V3.34): el cliente envía la palabra tecleada.
 
-    Nunca declara acierto (premisa 21): el servidor compara con la diana."""
+    Nunca declara acierto (premisa 21): el servidor compara con la diana.
+    V3.36: `response_time_ms` es la latencia medida por el cliente (ms desde que
+    ve el cue hasta que envía). Opcional y aditiva: sin ella el evento se
+    registra igual, con latencia no medida (NULL)."""
 
     word: str = Field(min_length=1, max_length=120)
     answer: str = Field(default="", max_length=120)
+    response_time_ms: int | None = Field(
+        default=None, ge=0, le=600_000
+    )
 
 
 class RecallAttemptOut(BaseModel):
@@ -552,6 +569,11 @@ class RecallAttemptOut(BaseModel):
     del acierto). `delayed` indica que el intento acreditó la recuperación
     demorada existente (superó el intervalo de retención); `recall_days` es el
     nº de días distintos con recall tras este intento.
+
+    V3.36: `error_type` clasifica el intento (taxonomía de
+    `services.evidence.RECALL_ERROR_TYPES`) para que el tutor pueda distinguir
+    "no lo sabe" de "lo sabe y lo escribió mal" sin cambiar el scoring: una
+    errata sigue siendo `correct=false`.
     """
 
     word: str
@@ -559,3 +581,4 @@ class RecallAttemptOut(BaseModel):
     expected: str
     delayed: bool = False
     recall_days: int = 0
+    error_type: str = ""

@@ -320,10 +320,15 @@ async def drill_recall_attempt(
     producción), acredita la recuperación demorada si el intento supera el
     intervalo de retención y reprograma la carta FSRS `lexicon` de la palabra.
     En fallo solo aplica el lapse FSRS si la palabra ya estaba rastreada. Si la
-    palabra ya no tiene pregunta, responde 409 sin evento."""
+    palabra ya no tiene pregunta, responde 409 sin evento.
+    V3.36: la latencia del cliente (`response_time_ms`) se persiste como
+    dimensión observacional del evento; no interviene en la puntuación."""
     try:
         result = await vocabulary_service.submit_recall_attempt(
-            user["id"], body.word, body.answer
+            user["id"],
+            body.word,
+            body.answer,
+            response_time_ms=body.response_time_ms,
         )
     except ValueError:
         raise HTTPException(

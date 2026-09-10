@@ -26,6 +26,7 @@ from services import (
     lexicon,
     recall,
 )
+from services.evidence import classify_recall_error
 from services.evidence import empty_summary as empty_evidence
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
@@ -34,6 +35,18 @@ from services.pronunciation_routes import sentence_context_for
 from services.vocabulary import classify, extract_words
 
 logger = logging.getLogger(__name__)
+
+# V3.36 (Learning Evidence 2.0): APOYO declarado por canal de producción. `chat`
+# es conversación libre (espontánea); `conversation` es conversación GUIADA (con
+# andamiaje); `speaking`/`writing` son tareas sin apoyo declarado. El apoyo es
+# del CANAL, no del resultado: no cambia con el acierto. Valores canónicos de
+# `services.evidence.EVIDENCE_SUPPORT_LEVELS` (eje copied→spontaneous).
+_PRODUCTION_SUPPORT: dict[str, str] = {
+    "chat": "spontaneous",
+    "conversation": "guided",
+    "speaking": "independent",
+    "writing": "independent",
+}
 
 
 async def analyze_text(user_id: str, text: str) -> list[str]:
@@ -60,9 +73,16 @@ async def _record_production_evidence(
 
     Cada palabra producida es un EVENTO (`task="production"`, rol `evidence`).
     Best-effort: nunca lanza (el volcado al léxico no debe romper la
-    puntuación)."""
+    puntuación).
+
+    V3.36 (Learning Evidence 2.0): el evento declara su CONTEXTO
+    (`context_id="lexicon:<canal>"`), su actividad concreta (`activity_id`) y el
+    APOYO del canal (`_PRODUCTION_SUPPORT`: chat libre → `spontaneous`,
+    conversación guiada → `guided`, speaking/writing → `independent`). El apoyo
+    es del canal, no del resultado: no cambia con el acierto."""
     if not words:
         return
+    support_level = _PRODUCTION_SUPPORT.get(channel, "independent")
     try:
         await run_in_threadpool(
             evidence_repo.record_evidence_bulk,
@@ -75,6 +95,9 @@ async def _record_production_evidence(
                     "skill": channel,
                     "task": "production",
                     "activity": activity or "",
+                    "activity_id": activity or channel,
+                    "context_id": f"lexicon:{channel}",
+                    "support_level": support_level,
                     "success": True,
                     "event_role": "evidence",
                 }
@@ -299,11 +322,29 @@ async def _retrieval_decision(
     return row, decision, due_at
 
 
+def _duration_ms(duration_seconds: float | None) -> int | None:
+    """Latencia en ms a partir de una duración en segundos del cliente (V3.36).
+
+    `None` si no se midió; nunca negativa. El cliente del drill manda SEGUNDOS
+    (contrato existente) y el ledger guarda MILISEGUNDOS, la misma unidad que
+    `listening.response_time_ms`, para que las latencias sean comparables entre
+    superficies.
+    """
+    if duration_seconds is None:
+        return None
+    try:
+        return max(0, int(round(float(duration_seconds) * 1000)))
+    except (TypeError, ValueError):
+        return None
+
+
 async def _record_retrieval(
     user_id: str,
     word: str,
     *,
     task: str = "retrieval",
+    activity_id: str = "drill:word",
+    response_time_ms: int | None = None,
     write_evidence: bool = True,
 ) -> dict:
     """Registra una recuperación correcta del micro-drill (V3.23, P1-02).
@@ -320,6 +361,11 @@ async def _record_retrieval(
     que es el contrato de `interval_since_last_evidence`. El `interval_days` de
     la decisión es el hueco desde el ANCLA de retención (FSRS): otro concepto,
     que se queda en la decisión y no se persiste como intervalo de evidencia.
+    V3.36 (Learning Evidence 2.0): el evento declara su contexto
+    (`lexicon:drill`), su actividad concreta (`activity_id`, para distinguir el
+    paso palabra del paso frase), el APOYO `guided` (el alumno repite tras oír
+    un modelo: producción con andamiaje), la dificultad del ÍTEM y la latencia
+    de la respuesta cuando el cliente la mide.
     Nunca lanza: es señal pedagógica y no debe romper la puntuación. Devuelve la
     decisión tomada (para saber si acreditó y con qué intervalo de retención).
     """
@@ -342,7 +388,13 @@ async def _record_retrieval(
                 lexical_unit=row.get("lexical_unit") or word,
                 task=task,
                 activity="drill",
+                activity_id=activity_id,
+                context_id="lexicon:drill",
                 success=True,
+                support_level="guided",
+                difficulty=lexicon.cefr_difficulty(row),
+                response_time_ms=response_time_ms,
+                error_type="correct",
                 event_role="evidence",
             )
         return decision
@@ -392,8 +444,14 @@ async def submit_drill_attempt(
             user_id, word, "speaking", as_unit=True, activity="drill"
         )
         # V3.23 (P1-02): recuperación correcta del micro-drill (retención si el
-        # éxito queda fuera del intervalo respecto al ancla).
-        await _record_retrieval(user_id, word)
+        # éxito queda fuera del intervalo respecto al ancla). V3.36: la
+        # evidencia declara el paso palabra y la latencia medida por el cliente.
+        await _record_retrieval(
+            user_id,
+            word,
+            activity_id="drill:word",
+            response_time_ms=_duration_ms(duration_seconds),
+        )
     return {
         "word": word,
         "produced": produced,
@@ -475,7 +533,13 @@ async def submit_sentence_attempt(
             user_id, word, "speaking", as_unit=True, activity="drill"
         )
         # V3.23 (P1-02): recuperación correcta del micro-drill (paso frase).
-        await _record_retrieval(user_id, word)
+        # V3.36: evidencia del paso frase + latencia medida por el cliente.
+        await _record_retrieval(
+            user_id,
+            word,
+            activity_id="drill:sentence",
+            response_time_ms=_duration_ms(duration_seconds),
+        )
     return {
         "word": word,
         "phrase": phrase,
@@ -628,7 +692,13 @@ async def get_recall_prompt(user_id: str, word: str) -> dict:
     }
 
 
-async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | None:
+async def submit_recall_attempt(
+    user_id: str,
+    word: str,
+    answer: str,
+    *,
+    response_time_ms: int | None = None,
+) -> dict | None:
     """Puntúa un intento del paso Recall (V3.34) y deja su señal.
 
     El servidor re-deriva el cue con la misma función pura (premisa 21) y
@@ -653,6 +723,14 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
     intervalo) y la reprogramación de la carta FSRS de la palabra. En el fallo:
     solo la carta FSRS (`Again`), y únicamente si ya existía, para no inventar
     deuda de repaso de una palabra no rastreada.
+
+    V3.36 (Learning Evidence 2.0): el evento declara `support_level="cued"` (la
+    recuperación va guiada por un cue: traducción o definición), su contexto
+    (`lexicon:drill`) y actividad (`drill:recall`), la dificultad del ÍTEM, la
+    latencia del cliente y la CLASIFICACIÓN del intento (`classify_recall_error`:
+    vacío / errata / parcial / otra palabra). La clasificación es OBSERVACIONAL:
+    `correct` sigue siendo igualdad estricta de superficie, así que una errata no
+    acredita recall ni cambia la evidencia ni FSRS; solo informa al tutor.
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
@@ -663,6 +741,7 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
         return None
     given = _normalize_lookup_word(answer)
     correct = bool(given) and given == normalized
+    error_type = classify_recall_error(normalized, given)
     now_iso = datetime.now(timezone.utc).isoformat()
     row_before, decision, due_at = await _retrieval_decision(
         user_id, normalized, now_iso=now_iso
@@ -705,7 +784,13 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
         lexical_unit=row_before.get("lexical_unit") or normalized,
         task="recall",
         activity="drill",
+        activity_id="drill:recall",
+        context_id="lexicon:drill",
         success=correct,
+        support_level="cued",
+        difficulty=lexicon.cefr_difficulty(row_before),
+        response_time_ms=response_time_ms,
+        error_type=error_type,
         event_role="evidence",
     )
     await _reschedule_lexicon_card(
@@ -717,6 +802,7 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
         "expected": normalized,
         "delayed": delayed,
         "recall_days": recall_days,
+        "error_type": error_type,
     }
 
 

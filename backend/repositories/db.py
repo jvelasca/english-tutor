@@ -934,13 +934,39 @@ def init_db() -> None:
                 lexical_unit TEXT NOT NULL DEFAULT '',
                 task TEXT NOT NULL DEFAULT '',
                 activity TEXT NOT NULL DEFAULT '',
+                activity_id TEXT NOT NULL DEFAULT '',
+                context_id TEXT NOT NULL DEFAULT '',
                 success INTEGER NOT NULL DEFAULT 0,
+                support_level TEXT NOT NULL DEFAULT '',
+                difficulty REAL NOT NULL DEFAULT 0,
+                response_time_ms INTEGER,
+                error_type TEXT NOT NULL DEFAULT '',
                 interval_since_last_evidence REAL,
                 event_role TEXT NOT NULL DEFAULT 'evidence',
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
+        # V3.36 (Learning Evidence 2.0): dimensiones del evento que el ledger de
+        # V3.35 no guardaba. Aditivas e idempotentes, con default '' / 0 / NULL
+        # para las filas legacy (contexto y apoyo desconocidos → se ignoran en
+        # los conteos, no en los agregados ya existentes).
+        evidence_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(learning_evidence)")
+        }
+        for _col, _type in (
+            ("activity_id", "TEXT NOT NULL DEFAULT ''"),
+            ("context_id", "TEXT NOT NULL DEFAULT ''"),
+            ("support_level", "TEXT NOT NULL DEFAULT ''"),
+            ("difficulty", "REAL NOT NULL DEFAULT 0"),
+            ("response_time_ms", "INTEGER"),
+            ("error_type", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if _col not in evidence_cols:
+                conn.execute(
+                    "ALTER TABLE learning_evidence ADD COLUMN "
+                    f"{_col} {_type}"
+                )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_learning_evidence_user_target "
             "ON learning_evidence(user_id, target_id)"
@@ -948,6 +974,12 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_learning_evidence_user_occurred "
             "ON learning_evidence(user_id, occurred_at)"
+        )
+        # Índice para los conteos de contexto distinto del léxico (V3.36): el
+        # mismo eje que `academy_evidence` usa para transfer/familiar.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_learning_evidence_context "
+            "ON learning_evidence(user_id, target_type, context_id, activity_id)"
         )
 
         # Migración idempotente: confianza y estado de confirmación en errores

@@ -184,10 +184,11 @@ export function submitDrillRecallAttempt(
   userId: string,
   word: string,
   answer: string,
+  responseTimeMs?: number,
 ): Promise<DrillRecallAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecallAttempt>(
     `/api/vocabulary/drill/recall-attempt?${query}`,
-    { word, answer },
+    { word, answer, response_time_ms: responseTimeMs ?? null },
   );
 }

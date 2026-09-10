@@ -285,8 +285,18 @@ export interface LexicalEvidence {
   successes: number;
   // Días naturales distintos con éxito (dos aciertos el mismo día cuentan uno).
   distinct_success_days: number;
-  // Intervalos (días) de los eventos con éxito, ascendentes.
+  // Intervalos (días) de los eventos con éxito, en orden CRONOLÓGICO: es la
+  // cadena real de repasos, no una lista ordenada por valor.
   intervals: number[];
+  // V3.36 (Learning Evidence 2.0): dimensiones del evento.
+  success_rate: number;
+  // Aciertos sin apoyo (`independent`/`spontaneous`): lo único que podrá pesar
+  // en automaticidad.
+  independent_successes: number;
+  support_levels: Record<string, number>;
+  error_types: Record<string, number>;
+  // Latencia media declarada (null si ningún evento la midió).
+  mean_response_time_ms: number | null;
 }
 
 export interface LexicalItem {
@@ -405,6 +415,10 @@ export interface DrillRecallAttempt {
   expected: string;
   delayed: boolean;
   recall_days: number;
+  // V3.36: clasificación OBSERVACIONAL del intento
+  // (correct/empty/wrong_word/orthographic_error/partial/multiple_word_error).
+  // Una errata sigue siendo `correct=false`: no cambia el scoring.
+  error_type?: string;
 }
 
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es

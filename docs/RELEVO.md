@@ -5,6 +5,40 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.36.0 publicada** — release **v3.36.0**
+> (**Learning Evidence 2.0**: el ledger longitudinal aprende el CÓMO de cada
+> evento). Migración **aditiva e idempotente** de `learning_evidence` con seis
+> columnas — `support_level` (eje `copied → guided → cued → independent →
+> spontaneous`, espejo de `academy_evidence` con test de paridad),
+> `difficulty` (CEFR 1-6, escala compartida con listening; `0.0` = no
+> declarada), `context_id`/`activity_id`, `response_time_ms` (`NULL` = no
+> medida) y `error_type` (`''` = no clasificado) — más índice
+> `(user_id, target_type, context_id, activity_id)`. `services/evidence.py`
+> añade `EVIDENCE_SUPPORT_LEVELS`, `INDEPENDENT_SUPPORT_LEVELS`,
+> `RECALL_ERROR_TYPES` y el clasificador puro `classify_recall_error`
+> (errata = misma inicial + longitud ≥ 4 + Levenshtein acotado; parcial =
+> prefijo o comienzo de unidad multi-palabra; conservador en palabras cortas:
+> `cat`/`cut` es otra palabra). **Decisión de alcance: `error_type` es
+> OBSERVACIONAL** — no toca scoring, ni evidencia, ni FSRS; una errata sigue
+> siendo `correct=false`, pero el tutor ya distingue "no lo sabe" de "lo sabe y
+> lo escribió mal". Captura end-to-end: recall → `cued`/`drill:recall`;
+> retrieval → `guided`/`drill:word`|`drill:sentence` (duración del cliente
+> convertida a ms); producción → apoyo real del canal (`chat` → `spontaneous`,
+> conversación guiada → `guided`, `speaking`/`writing` → `independent`) y
+> contexto `lexicon:<canal>`. `summarize_evidence`/`summarize_by_target` ganan
+> `success_rate`, `independent_successes`, `support_levels`, `error_types` y
+> `mean_response_time_ms` con paridad pura↔SQL fijada por test. Contrato HTTP
+> aditivo: `RecallAttemptIn.response_time_ms` (opcional, `ge=0`, 422 si es
+> negativa), `RecallAttemptOut.error_type` y `LexicalEvidence` ampliado.
+> Frontend: el peldaño Recall mide la latencia cue → envío. Tests: pytest
+> **1791 passed** (+22) + ruff limpio + vitest (65 ficheros/**559**, +1) +
+> `tsc --noEmit` limpio + `check_release_consistency` **3.36.0** exit 0.
+> Pendientes hacia **V3.37**: cues graduados (translation → definition → cloze →
+> situación → free recall), gradiente de apoyo como señal de automaticidad y el
+> planner (grafo evidencia → conocimiento → retención → transferencia →
+> Optimal Next Task), más los diferidos de V3.30 y la transferencia por contexto
+> V3.23 (que ya tiene `context_id`/`activity_id` en el ledger léxico).
+>
 > **Nota (2026-09-10):** **V3.35.1 publicada** — release **v3.35.1** (cierre de
 > la auditoría de V3.35.0). Patch quirúrgico de integridad del modelo de
 > evidencia longitudinal, sin cambios de esquema ni de arquitectura.

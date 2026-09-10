@@ -56,7 +56,13 @@ def record_evidence(
     lexical_unit: str = "",
     task: str = "",
     activity: str = "",
+    activity_id: str = "",
+    context_id: str = "",
     success: bool = False,
+    support_level: str = "",
+    difficulty: float = 0.0,
+    response_time_ms: int | None = None,
+    error_type: str = "",
     event_role: str = "evidence",
     interval_since_last_evidence: float | None = None,
     occurred_at: str = "",
@@ -67,6 +73,12 @@ def record_evidence(
     anterior del mismo `(target_type, target_id)` con `services.evidence`
     (None en la primera observación). Devuelve la fila creada o None si el
     usuario no existe. Nunca lanza por datos parciales: el ledger es señal.
+
+    V3.36 (Learning Evidence 2.0) añade las dimensiones del evento:
+    `activity_id`/`context_id` (qué actividad concreta y en qué contexto),
+    `support_level` (eje copied→spontaneous; `services.evidence`), `difficulty`
+    (0 = no declarada), `response_time_ms` (None = no medida) y `error_type`
+    (taxonomía del intento). Todas son OBSERVACIONALES: no cambian el scoring.
     """
     if get_user(user_id) is None:
         return None
@@ -83,9 +95,11 @@ def record_evidence(
         cur = conn.execute(
             "INSERT INTO learning_evidence "
             "(user_id, occurred_at, skill, target_type, target_id, "
-            "surface_form, lexical_unit, task, activity, success, "
+            "surface_form, lexical_unit, task, activity, activity_id, "
+            "context_id, success, support_level, difficulty, "
+            "response_time_ms, error_type, "
             "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 now,
@@ -96,7 +110,13 @@ def record_evidence(
                 lexical_unit or surface_form or target_id,
                 task,
                 activity,
+                activity_id,
+                context_id,
                 1 if success else 0,
+                support_level,
+                float(difficulty or 0.0),
+                response_time_ms,
+                error_type,
                 interval,
                 event_role,
             ),
@@ -112,7 +132,13 @@ def record_evidence(
         "lexical_unit": lexical_unit or surface_form or target_id,
         "task": task,
         "activity": activity,
+        "activity_id": activity_id,
+        "context_id": context_id,
         "success": bool(success),
+        "support_level": support_level,
+        "difficulty": float(difficulty or 0.0),
+        "response_time_ms": response_time_ms,
+        "error_type": error_type,
         "interval_since_last_evidence": interval,
         "event_role": event_role,
     }
@@ -203,7 +229,13 @@ def record_evidence_bulk(
                     entry.get("lexical_unit") or surface,
                     entry.get("task", ""),
                     entry.get("activity", ""),
+                    entry.get("activity_id", ""),
+                    entry.get("context_id", ""),
                     1 if entry.get("success") else 0,
+                    entry.get("support_level", ""),
+                    float(entry.get("difficulty") or 0.0),
+                    entry.get("response_time_ms"),
+                    entry.get("error_type", ""),
                     interval,
                     entry.get("event_role", "evidence"),
                 )
@@ -211,9 +243,11 @@ def record_evidence_bulk(
         conn.executemany(
             "INSERT INTO learning_evidence "
             "(user_id, occurred_at, skill, target_type, target_id, "
-            "surface_form, lexical_unit, task, activity, success, "
+            "surface_form, lexical_unit, task, activity, activity_id, "
+            "context_id, success, support_level, difficulty, "
+            "response_time_ms, error_type, "
             "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
     return len(rows)
@@ -248,8 +282,9 @@ def list_evidence(
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT id, user_id, occurred_at, skill, target_type, target_id, "
-            "surface_form, lexical_unit, task, activity, success, "
-            "interval_since_last_evidence, event_role "
+            "surface_form, lexical_unit, task, activity, activity_id, "
+            "context_id, success, support_level, difficulty, response_time_ms, "
+            "error_type, interval_since_last_evidence, event_role "
             "FROM learning_evidence "
             f"WHERE {' AND '.join(clauses)} "
             "ORDER BY occurred_at DESC, id DESC "
@@ -269,18 +304,35 @@ def summarize_by_target(
     CRONOLÓGICO (`occurred_at`, `id`), sin límite de filas ni N+1 consultas.
     Mismo contrato que `services.evidence.summarize_evidence` (V3.35.1, P1-02:
     la secuencia real no se reordena por valor del intervalo).
+
+    V3.36 (Learning Evidence 2.0) añade al contrato `success_rate`,
+    `independent_successes`, `support_levels`, `error_types` y
+    `mean_response_time_ms` con las mismas reglas que la versión pura (la
+    paridad la fija un test): el agregado no puede introducir un segundo
+    dialecto del resumen.
+
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
+    # Import local (misma convención que el resto del repositorio): la capa pura
+    # es la única fuente de verdad de los niveles de apoyo independientes.
+    from services.evidence import INDEPENDENT_SUPPORT_LEVELS
+
+    independent = sorted(INDEPENDENT_SUPPORT_LEVELS)
+    placeholders = ", ".join("?" for _ in independent)
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT target_id, COUNT(*) AS attempts, "
             "COALESCE(SUM(success), 0) AS successes, "
             "COUNT(DISTINCT CASE WHEN success = 1 "
-            "THEN substr(occurred_at, 1, 10) END) AS distinct_success_days "
+            "THEN substr(occurred_at, 1, 10) END) AS distinct_success_days, "
+            "COALESCE(SUM(CASE WHEN success = 1 "
+            f"AND support_level IN ({placeholders}) THEN 1 ELSE 0 END), 0) "
+            "AS independent_successes, "
+            "AVG(response_time_ms) AS mean_latency "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? "
             "GROUP BY target_id",
-            (user_id, target_type),
+            (*independent, user_id, target_type),
         ).fetchall()
         interval_rows = conn.execute(
             "SELECT target_id, interval_since_last_evidence AS interval "
@@ -290,17 +342,54 @@ def summarize_by_target(
             "ORDER BY target_id, occurred_at ASC, id ASC",
             (user_id, target_type),
         ).fetchall()
+        support_rows = conn.execute(
+            "SELECT target_id, support_level, COUNT(*) AS total "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND support_level <> '' "
+            "GROUP BY target_id, support_level",
+            (user_id, target_type),
+        ).fetchall()
+        error_rows = conn.execute(
+            "SELECT target_id, error_type, COUNT(*) AS total "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND error_type <> '' "
+            "GROUP BY target_id, error_type",
+            (user_id, target_type),
+        ).fetchall()
     intervals: dict[str, list[float]] = {}
     for row in interval_rows:
         intervals.setdefault(row["target_id"], []).append(
             round(float(row["interval"]), 4)
         )
+    support_levels: dict[str, dict[str, int]] = {}
+    for row in support_rows:
+        support_levels.setdefault(row["target_id"], {})[row["support_level"]] = int(
+            row["total"]
+        )
+    error_types: dict[str, dict[str, int]] = {}
+    for row in error_rows:
+        error_types.setdefault(row["target_id"], {})[row["error_type"]] = int(
+            row["total"]
+        )
     return {
         row["target_id"]: {
             "attempts": int(row["attempts"]),
             "successes": int(row["successes"]),
+            "success_rate": (
+                round(int(row["successes"]) / int(row["attempts"]), 4)
+                if int(row["attempts"])
+                else 0.0
+            ),
             "distinct_success_days": int(row["distinct_success_days"]),
             "intervals": intervals.get(row["target_id"], []),
+            "independent_successes": int(row["independent_successes"]),
+            "support_levels": support_levels.get(row["target_id"], {}),
+            "error_types": error_types.get(row["target_id"], {}),
+            "mean_response_time_ms": (
+                round(float(row["mean_latency"]), 1)
+                if row["mean_latency"] is not None
+                else None
+            ),
         }
         for row in rows
     }

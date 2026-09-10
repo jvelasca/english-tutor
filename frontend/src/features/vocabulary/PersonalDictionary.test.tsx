@@ -404,6 +404,7 @@ describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -454,6 +455,48 @@ describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
     ).toBeTruthy();
     // Sin producción: la candidata sigue ahí.
     expect(screen.getByRole("button", { name: "Say travel" })).toBeTruthy();
+  });
+
+  it("envía la latencia cue→envío como response_time_ms (observacional)", async () => {
+    // V3.36: la latencia medida en cliente viaja como dimensión del evento de
+    // evidencia. No cambia la puntuación: el acierto se decide en servidor.
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const fetchMock = routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+      {
+        url: "/api/vocabulary/drill/recall-attempt",
+        data: { word: "travel", correct: true, expected: "travel", delayed: false, recall_days: 1, error_type: "correct" },
+      },
+      { url: "/api/vocabulary/drill/recall", data: CUE },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
+    await screen.findByText(/What does this word mean/);
+    fireEvent.click(screen.getByRole("button", { name: "2 · Recall" }));
+    // El cue queda visible con el reloj en 1000 ms.
+    expect(await screen.findByText("viajar")).toBeTruthy();
+
+    // El alumno tarda 2,5 s en responder.
+    nowSpy.mockReturnValue(3_500);
+    fireEvent.change(screen.getByLabelText("Type the word"), {
+      target: { value: "travel" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    await screen.findByText(/You retrieved the word from its meaning/);
+
+    const call = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("recall-attempt"),
+    );
+    expect(call).toBeTruthy();
+    const body = JSON.parse(
+      String((call![1] as RequestInit | undefined)?.body),
+    ) as { word: string; answer: string; response_time_ms: number | null };
+    expect(body.word).toBe("travel");
+    expect(body.response_time_ms).toBe(2_500);
+    nowSpy.mockRestore();
   });
 
   it("falla y revela la palabra correcta en el feedback", async () => {

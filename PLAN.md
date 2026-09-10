@@ -8,6 +8,29 @@
 
 ## Estado actual
 
+- ✅ **V3.36 — Learning Evidence 2.0 (2026-09-10)** (**Versión estable `3.36.0`**,
+  app `3.35.1 → 3.36.0`). El ledger longitudinal aprende el **CÓMO** de cada
+  evento, con migración aditiva e idempotente y contrato HTTP aditivo:
+  `support_level` (eje `copied → guided → cued → independent → spontaneous`, el
+  MISMO de `academy_evidence`; hay test de paridad entre ambos), `difficulty`
+  (CEFR 1-6, escala compartida con listening; `0.0` = no declarada),
+  `context_id`/`activity_id` (contexto y actividad concreta), `response_time_ms`
+  (latencia medida en cliente) y `error_type` (taxonomía determinista del
+  intento). Captura end-to-end: recall → `cued`/`drill:recall` con clasificación
+  del intento; retrieval → `guided`/`drill:word`|`drill:sentence` con la duración
+  convertida a ms; producción por canal → apoyo real del canal (`chat` →
+  `spontaneous`, `conversación guiada` → `guided`, `speaking`/`writing` →
+  `independent`) y contexto `lexicon:<canal>`. `summarize_evidence` y
+  `summarize_by_target` añaden `success_rate`, `independent_successes`,
+  `support_levels`, `error_types` y `mean_response_time_ms` con paridad pura↔SQL
+  fijada por test. **Decisión de alcance (`error_type` observacional):**
+  clasificar NO toca scoring, ni evidencia, ni FSRS — una errata sigue siendo
+  `correct=false`, pero el tutor ya distingue "no lo sabe" de "lo sabe y lo
+  escribió mal" (el clasificador es conservador a propósito: `cat`/`cut` es otra
+  palabra, no una errata). Fuera de alcance: cues graduados y planner (V3.37).
+  Tests: pytest **1791** (+22), vitest (65 ficheros/**559**, +1), `ruff`/`tsc`
+  limpios y `check_release_consistency` **3.36.0** exit 0.
+
 - ✅ **V3.35.1 — Cierre de la auditoría V3.35.0 (2026-09-10)**
   (**Versión estable `3.35.1`**, app `3.35.0 → 3.35.1`). Patch quirúrgico de
   integridad del modelo longitudinal, sin cambios de esquema ni de arquitectura:
@@ -1170,15 +1193,25 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.36 — Learning Evidence 2.0 (siguiente milestone)**: no añadir más
-  ejercicios; enriquecer el ledger con `support_level`, `difficulty`,
-  `response_time_ms`, `error_type` (taxonomía de error de recall),
-  `context_id`/`activity_id` y la escalera de cues graduados
-  (translation → definition → cloze → situación → free recall), y derivar de
-  ahí el grafo de evidencia → estado de conocimiento → retención → hueco de
-  transferencia → Optimal Next Task. V3.35.1 cierra antes los tres P1 de la
-  auditoría de V3.35.0 (semántica del intervalo, cronología y fuga de la
-  palabra en Recall/Sentence).
+- **⏳ V3.37 — Cues graduados y planner sobre la evidencia (siguiente
+  milestone)**: cerrada V3.36 (las dimensiones del evento ya están en el
+  ledger), el siguiente paso es USARLAS: la escalera de cues graduados
+  (translation → definition → cloze → situación → free recall) sobre el peldaño
+  Recall, el gradiente de apoyo como señal de automaticidad
+  (`independent_successes` ya se agrega) y el grafo de evidencia → estado de
+  conocimiento → retención → hueco de transferencia → Optimal Next Task
+  alimentado por `support_level`/`difficulty`/`response_time_ms`/`error_type`.
+  Siguen abiertos, además, los diferidos de V3.30 (consumo de
+  `word_breakdown_json` en agregados / práctica dirigida de las falladas y
+  palabras tocables en transcripts/chat) y la transferencia por contexto de
+  actividad V3.23 — ahora con `context_id`/`activity_id` ya persistidos en el
+  ledger léxico, que era la pieza que faltaba.
+
+- ~~**⏳ V3.36 — Learning Evidence 2.0**~~ ✅ **cerrado (2026-09-10, v3.36.0)**:
+  implementado y publicado (ver «Estado actual» arriba y
+  `release-notes-v3.36.0.md`). `support_level`, `difficulty`, `response_time_ms`,
+  `error_type`, `context_id`/`activity_id` ya se capturan y agregan. Los cues
+  graduados y el planner se rebasan a V3.37.
 
 - ✅ **V3.29 — Listening Engine 4.0 Fase 3 (núcleo) cerrado (2026-09-09,
   v3.29.0)**: implementado (ver "Estado actual" arriba,
