@@ -95,6 +95,21 @@ function stubMediaRecorder() {
   vi.stubGlobal("MediaRecorder", FakeRecorder);
 }
 
+/**
+ * V3.35: en el paso Sentence el botón Record se pinta DESHABILITADO hasta que
+ * llega la frase de contexto (fetch asíncrono). Un clic sobre el botón
+ * deshabilitado se pierde y el botón Stop no aparece nunca (flake en CI lento),
+ * así que se espera a que esté habilitado antes de grabar.
+ */
+async function startRecording() {
+  const record = await screen.findByRole("button", { name: "Record" });
+  await waitFor(() =>
+    expect((record as HTMLButtonElement).disabled).toBe(false),
+  );
+  fireEvent.click(record);
+  fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+}
+
 function renderPanel(ui: ReactElement) {
   return render(
     <I18nProvider lang="en" setLang={() => {}}>
@@ -201,8 +216,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
 
     // Se abre el mini-drill y degrada a Sentence (sin cue ni en Recognize ni
     // en Recall), donde vive el micrófono.
-    fireEvent.click(await screen.findByRole("button", { name: "Record" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    await startRecording();
 
     expect(await screen.findByText(/inside the sentence/)).toBeTruthy();
     // El chip desaparece (refresh tras producir).
@@ -255,8 +269,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     fireEvent.click(screen.getByRole("button", { name: "3 · Sentence" }));
     expect(await screen.findByText('Say the word "travel".')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Record" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    await startRecording();
 
     expect(
       await screen.findByText(/inside the sentence/),
