@@ -88,6 +88,13 @@ la BD. Ahora:
 - Frontend: `tsc --noEmit` limpio y `vitest` → **65 ficheros/558 tests** (+1).
 - `python scripts/check_release_consistency.py` → **3.35.1** exit 0.
 
+## CI
+
+- Commit `df78307432dddf9fe535860b2e3028258454faff` con el run
+  [34470067665](https://github.com/jvelasca/english-tutor/actions/runs/34470067665)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+
 ## Documentación
 
 - `CHANGELOG.md`: entrada `[3.35.1]`.

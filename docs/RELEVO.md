@@ -23,6 +23,9 @@
 > memoria los eventos distintos del mismo target del lote. Tests: pytest
 > **1769 passed** (+5) + ruff limpio + vitest (65 ficheros/**558**, +1) +
 > `tsc --noEmit` limpio + `check_release_consistency` **3.35.1** exit 0.
+> **CI verificable:** commit `df78307432dddf9fe535860b2e3028258454faff` con el
+> run [34470067665](https://github.com/jvelasca/english-tutor/actions/runs/34470067665)
+> en `success` (6/6 jobs).
 > Pendientes hacia **V3.36 (Learning Evidence 2.0)**: `support_level`,
 > `difficulty`, `response_time_ms`, `error_type`, `context_id`/`activity_id`,
 > cues graduados y estadísticas derivadas del ledger.
