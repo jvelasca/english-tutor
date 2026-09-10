@@ -199,8 +199,17 @@ mecanismo de degradación de la cola (sigue sin spoiler) y el esquema de BD.
 
 ## CI
 
-- Pendiente de registrar tras el push del commit de release (se añadirá en el
-  commit de docs de evidencia de CI, como en releases anteriores).
+- Commit de release `217ebfe` con el run
+  [34499476359](https://github.com/jvelasca/english-tutor/actions/runs/34499476359):
+  **5/6 jobs en success**; falló **Playwright E2E (visual)** en tablet (768px)
+  porque la 4.ª píldora desbordaba su contenedor `flex-1` e interceptaba el clic
+  del botón *Help* del header.
+- Corrección en el commit `856e11541897da41a20eccc06d21b430bc2bdee5` (corte de la
+  navegación `md` → `xl`, ver arriba), con el run
+  [34500794657](https://github.com/jvelasca/english-tutor/actions/runs/34500794657)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+  Este es el commit verde y auditable de la release.
 
 ## Fuera de alcance (V3.39)
 

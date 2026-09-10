@@ -41,7 +41,11 @@
 > retirando la barra inferior (`StatusBar.tsx` y reglas CSS huérfanas). Contrato aditivo (`LexicalEvidence`
 > gana dos histogramas; `planned_signals` gana `skills`). Tests: pytest **1890
 > passed** + `ruff` limpio + vitest (**67 ficheros/568 tests**) + `tsc`/build
-> limpios + `check_release_consistency` **3.38.1** exit 0. Diferidos a V3.39:
+> limpios + `check_release_consistency` **3.38.1** exit 0 + **CI 6/6 en verde**
+> (run [34500794657](https://github.com/jvelasca/english-tutor/actions/runs/34500794657)
+> sobre el commit `856e115`, que corrige el corte de la navegación `md` → `xl`
+> tras el fallo de Playwright E2E en tablet del commit de release `217ebfe`).
+> Diferidos a V3.39:
 > prioridad completa por skill, routing de escritura de `written_production`,
 > `sense`/CEFR/contexto y transferencia real (V3.23), pesos del planner y
 > recencia ponderada, `example_for_many` y refactor de `wordDrill.tsx`.
@@ -1354,8 +1358,10 @@ RETROCEDE hacia más apoyo ante ≥2 fallos sin ningún éxito) y la **V3.37.0**
 (Learning Evidence 3.0: cues graduados `translation (cued) < definition (cued) <
 cloze (guided)` + automaticidad por evidencia espaciada), la **V3.36.0**
 (Learning Evidence 2.0: el ledger captura el CÓMO de cada evento) y la
-**V3.35.x** (Longitudinal Learning Evidence 1.0 + patch de integridad). CI 6/6 en
-verde. Versión en
+**V3.35.x** (Longitudinal Learning Evidence 1.0 + patch de integridad). La
+V3.38.1 tiene **CI 6/6 en verde** (run
+[34500794657](https://github.com/jvelasca/english-tutor/actions/runs/34500794657)
+sobre `856e115`). Versión en
 `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`.
 **Las notas de la cabecera de este documento son la fuente de verdad más
 reciente**; si contradicen a esta sección, mandan las notas.
