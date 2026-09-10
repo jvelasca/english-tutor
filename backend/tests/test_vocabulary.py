@@ -589,14 +589,15 @@ def test_record_retrievals_requires_interval_since_anchor(monkeypatch, tmp_path)
 
 def test_record_retrievals_dedupe_by_day_and_counts(monkeypatch, tmp_path):
     """`retrieval_successes` suma por recuperación; `retrieval_days` una vez por
-    día distinto."""
+    día distinto. V3.35 (P1-1): el ancla se ENCADENA (última recuperación), así
+    que dos intentos el mismo día no acreditan el segundo (intervalo 0)."""
     a, _b = _setup(monkeypatch, tmp_path)
     times = iter(
         [
             "2026-08-20T10:00:00+00:00",  # exposición (ancla)
-            "2026-08-22T10:00:00+00:00",  # retrieval día +2
-            "2026-08-22T11:00:00+00:00",  # retrieval mismo día → no suma días
-            "2026-08-23T10:00:00+00:00",  # retrieval día +3 → suma día
+            "2026-08-22T10:00:00+00:00",  # retrieval día +2 → acredita
+            "2026-08-22T11:00:00+00:00",  # mismo día → intervalo 0: NO acredita
+            "2026-08-23T10:00:00+00:00",  # día +1 desde el anterior → acredita
         ]
     )
     monkeypatch.setattr(vocabulary_repo, "_now", lambda: next(times))
@@ -605,7 +606,7 @@ def test_record_retrievals_dedupe_by_day_and_counts(monkeypatch, tmp_path):
     vocabulary_repo.record_retrievals(a, ["sun"])
     vocabulary_repo.record_retrievals(a, ["sun"])
     vocab = {v["word"]: v for v in vocabulary_repo.get_vocabulary(a)}
-    assert vocab["sun"]["retrieval_successes"] == 3
+    assert vocab["sun"]["retrieval_successes"] == 2
     assert vocab["sun"]["retrieval_days"] == 2
 
 

@@ -16,6 +16,7 @@ import config
 from domain import learning as learning_service
 from repositories import academy as academy_repo
 from repositories import dictionary as dictionary_repo
+from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
 from services import (
     dictionary_content,
@@ -25,6 +26,7 @@ from services import (
     lexicon,
     recall,
 )
+from services.evidence import empty_summary as empty_evidence
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
 from services.pronunciation import score_pronunciation
@@ -45,7 +47,47 @@ async def analyze_text(user_id: str, text: str) -> list[str]:
         channel="chat",
         activity="free_chat",
     )
+    await _record_production_evidence(
+        user_id, words, channel="chat", activity="free_chat"
+    )
     return words
+
+
+async def _record_production_evidence(
+    user_id: str, words: list[str], *, channel: str, activity: str | None = None
+) -> None:
+    """Escribe la evidencia longitudinal de una producción (V3.35).
+
+    Cada palabra producida es un EVENTO (`task="production"`, rol `evidence`).
+    Best-effort: nunca lanza (el volcado al léxico no debe romper la
+    puntuación)."""
+    if not words:
+        return
+    try:
+        await run_in_threadpool(
+            evidence_repo.record_evidence_bulk,
+            user_id,
+            [
+                {
+                    "target_type": "lexicon",
+                    "target_id": word,
+                    "surface_form": word,
+                    "skill": channel,
+                    "task": "production",
+                    "activity": activity or "",
+                    "success": True,
+                    "event_role": "evidence",
+                }
+                for word in words
+            ],
+        )
+    except Exception:  # noqa: BLE001 — señal no bloqueante
+        logger.warning(
+            "No se pudo registrar evidencia de producción user=%s channel=%s",
+            user_id,
+            channel,
+            exc_info=True,
+        )
 
 
 async def record_production_text(
@@ -88,6 +130,9 @@ async def record_production_text(
             words,
             channel=channel,
             activity=activity,
+        )
+        await _record_production_evidence(
+            user_id, words, channel=channel, activity=activity
         )
     except Exception:  # noqa: BLE001 — volcado no bloqueante, nunca rompe
         logger.warning(
@@ -155,6 +200,12 @@ async def get_lexicon(user_id: str) -> dict:
     y su competencia propia) y el resumen por unidad (`summary.units`), sin
     cambiar el contrato por superficie."""
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    # V3.35 (Longitudinal Learning Evidence): evidencia fina del ledger por ítem
+    # (`attempts`/`successes`/`days`/`intervals`), aditiva a los contadores
+    # rápidos de `vocabulary`. Una sola consulta agregada, sin N+1.
+    evidence_by_word = await run_in_threadpool(
+        evidence_repo.summarize_by_target, user_id, target_type="lexicon"
+    )
     items = [
         {
             "word": row["word"],
@@ -173,6 +224,8 @@ async def get_lexicon(user_id: str) -> dict:
             # V3.21 (V20-16): matriz de competencia Recognition/Production/
             # Transfer/Retention con el transfer gap por ítem (puro, derivado).
             "competence": lexicon.item_competence_matrix(row),
+            # V3.35: historia longitudinal del ítem (sin filas → resumen vacío).
+            "evidence": evidence_by_word.get(row["word"]) or empty_evidence(),
             # V3.19: desglose de producción por destreza.
             "chat_prod": row.get("chat_prod", 0),
             "speaking_prod": row.get("speaking_prod", 0),
@@ -205,39 +258,91 @@ async def get_drill_candidates(user_id: str, limit: int = 8) -> list[str]:
     `recognized_not_produced` (SIGNAL-01/A2-07) y el criterio antiguo de salir
     tras UNA producción del día (V20-06).
 
-    V3.34: las palabras con carta FSRS `lexicon` VENCIDA (recall pendiente) se
-    priorizan al frente de la lista, para que el repaso espaciado de la capa
-    léxica se manifieste en la escalera sin convertirse en una puerta."""
+    V3.35 (P1-2): esta cola deja de mezclar el repaso espaciado con el
+    micro-drill. Las cartas FSRS `lexicon` vencidas ya NO se inyectan aquí: el
+    "qué repasar ahora" vive en `GET /api/learning/review`, que propone la
+    actividad óptima por hueco de competencia. Aquí solo quedan los huecos de
+    producción ORAL pendiente."""
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     events = await learning_service.list_events(user_id, event_type="exercise")
     ok_days = lexicon.drill_ok_days(events)
     now_iso = datetime.now(timezone.utc).isoformat()
     today = now_iso[:10]
-    cards = await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
-    due_words = {
-        card["target_id"]
-        for card in cards
-        if card.get("target_type") == "lexicon" and fsrs.is_due(card, now=now_iso)
-    }
     return lexicon.drill_candidates(
         rows,
         limit=limit,
         ok_days=ok_days,
         today=today,
-        due_words=due_words,
     )
 
 
-async def _record_retrieval(user_id: str, word: str) -> None:
+async def _retrieval_decision(
+    user_id: str, word: str, *, now_iso: str
+) -> tuple[dict, dict, str]:
+    """Fila del léxico + decisión de recuperación demorada + `due_at` FSRS.
+
+    V3.35 (P1-1): la decisión la toma la función pura
+    `services.lexicon.delayed_retrieval_decision`, con el ancla ENCADENADA
+    (última recuperación `last_retrieval_at`/`last_recall_at` o, en la primera,
+    la primera señal del ítem) y el intervalo de la carta FSRS `lexicon`
+    vigente cuando existe. Devuelve `(row, decision, due_at)`.
+    """
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    row = _row_for_word(rows, word) or {}
+    card = await run_in_threadpool(
+        academy_repo.get_fsrs_card, user_id, "lexicon", word
+    )
+    due_at = (card or {}).get("due_at") or ""
+    decision = lexicon.delayed_retrieval_decision(
+        row, now=now_iso, due_at=due_at
+    )
+    return row, decision, due_at
+
+
+async def _record_retrieval(
+    user_id: str,
+    word: str,
+    *,
+    task: str = "retrieval",
+    write_evidence: bool = True,
+) -> dict:
     """Registra una recuperación correcta del micro-drill (V3.23, P1-02).
 
-    Solo el éxito de micro-drill cuenta como recuperación para la retención:
-    el repositorio decide si el intento quedó FUERA del intervalo de retención
-    (`record_retrievals` exige una separación >= RETENTION_MIN_INTERVAL_DAYS
-    desde el ancla de la primera exposición/producción). Nunca lanza: es señal
-    pedagógica y no debe romper la puntuación."""
+    Solo el éxito de micro-drill cuenta como recuperación para la retención: la
+    decisión (ancla encadenada + intervalo FSRS) la toma la capa pura y el
+    repositorio solo persiste el resultado.
+
+    V3.35 (Longitudinal Learning Evidence): escribe además la fila de evidencia
+    longitudinal del intento, con su intervalo real, salvo que el llamador la
+    escriba por su cuenta (`write_evidence=False`, p. ej. el recall, que
+    registra su propio evento). Nunca lanza: es señal pedagógica y no debe
+    romper la puntuación. Devuelve la decisión tomada (para saber si acreditó y
+    con qué intervalo).
+    """
     try:
-        await run_in_threadpool(vocabulary_repo.record_retrievals, user_id, [word])
+        now_iso = datetime.now(timezone.utc).isoformat()
+        row, decision, due_at = await _retrieval_decision(
+            user_id, word, now_iso=now_iso
+        )
+        if decision["credited"]:
+            await run_in_threadpool(
+                vocabulary_repo.record_retrievals, user_id, [word], due_at=due_at
+            )
+        if write_evidence:
+            await run_in_threadpool(
+                evidence_repo.record_evidence,
+                user_id,
+                target_type="lexicon",
+                target_id=word,
+                surface_form=word,
+                lexical_unit=row.get("lexical_unit") or word,
+                task=task,
+                activity="drill",
+                success=True,
+                event_role="evidence",
+                interval_since_last_evidence=decision["interval_days"],
+            )
+        return decision
     except Exception:  # noqa: BLE001 — señal no bloqueante
         logger.warning(
             "No se pudo registrar retrieval user=%s word=%s",
@@ -245,6 +350,7 @@ async def _record_retrieval(user_id: str, word: str) -> None:
             word,
             exc_info=True,
         )
+        return {}
 
 
 async def submit_drill_attempt(
@@ -528,11 +634,19 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
     Devuelve `None` si la palabra ya no tiene pregunta (el router responde un
     4xx controlado sin evento).
 
+    V3.35 (Longitudinal Learning Evidence): el INTENTO se registra siempre
+    (`recall_attempts`, acierto o fallo), la recuperación demorada se decide con
+    la cadena encadenada (ancla = recuperación anterior) y CADA intento deja una
+    fila en `learning_evidence` con su intervalo. Orden importante: la
+    recuperación demorada se evalúa ANTES de fijar el nuevo ancla de recall, de
+    modo que el intervalo se mide desde la recuperación anterior y no desde este
+    mismo intento.
+
     En el acierto: `record_recalls` (señal de recall + ledger `recalled`),
-    `_record_retrieval` (recuperación demorada si el intento supera el intervalo
-    de retención) y la reprogramación de la carta FSRS de la palabra. En el
-    fallo: solo la carta FSRS (`Again`), y únicamente si ya existía, para no
-    inventar deuda de repaso de una palabra no rastreada.
+    `record_retrievals` (recuperación demorada, si el intento supera el
+    intervalo) y la reprogramación de la carta FSRS de la palabra. En el fallo:
+    solo la carta FSRS (`Again`), y únicamente si ya existía, para no inventar
+    deuda de repaso de una palabra no rastreada.
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
@@ -543,31 +657,52 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
         return None
     given = _normalize_lookup_word(answer)
     correct = bool(given) and given == normalized
+    now_iso = datetime.now(timezone.utc).isoformat()
+    row_before, decision, due_at = await _retrieval_decision(
+        user_id, normalized, now_iso=now_iso
+    )
     delayed = False
     recall_days = 0
     if correct:
-        rows_before = await run_in_threadpool(
-            vocabulary_repo.get_vocabulary, user_id
-        )
-        before_successes = int(
-            (_row_for_word(rows_before, normalized) or {}).get(
-                "retrieval_successes"
+        # La recuperación demorada se decide con el estado ANTERIOR al intento
+        # (ancla = recuperación previa, no este mismo recall).
+        delayed = bool(decision["credited"])
+        if delayed:
+            await run_in_threadpool(
+                vocabulary_repo.record_retrievals,
+                user_id,
+                [normalized],
+                due_at=due_at,
             )
-            or 0
-        )
         await run_in_threadpool(
             vocabulary_repo.record_recalls, user_id, [normalized]
         )
-        await _record_retrieval(user_id, normalized)
         rows_after = await run_in_threadpool(
             vocabulary_repo.get_vocabulary, user_id
         )
         row = _row_for_word(rows_after, normalized) or {}
-        # La recuperación demorada la acredita `record_retrievals` (si el intento
-        # supera el intervalo respecto al ancla): se detecta por el incremento
-        # real del contador, no re-implementando la regla aquí.
-        delayed = int(row.get("retrieval_successes") or 0) > before_successes
         recall_days = int(row.get("recall_days") or 0)
+    else:
+        # Un fallo también es evidencia: suma intento sin tocar el ancla.
+        await run_in_threadpool(
+            vocabulary_repo.record_recall_attempt,
+            user_id,
+            [normalized],
+            success=False,
+        )
+    await run_in_threadpool(
+        evidence_repo.record_evidence,
+        user_id,
+        target_type="lexicon",
+        target_id=normalized,
+        surface_form=normalized,
+        lexical_unit=row_before.get("lexical_unit") or normalized,
+        task="recall",
+        activity="drill",
+        success=correct,
+        event_role="evidence",
+        interval_since_last_evidence=decision["interval_days"],
+    )
     await _reschedule_lexicon_card(
         user_id, normalized, correct=correct, delayed=delayed
     )

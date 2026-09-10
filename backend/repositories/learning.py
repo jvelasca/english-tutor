@@ -9,15 +9,27 @@ from repositories.users import get_user
 
 def record_event(user_id: str, event_type: str, detail: str) -> dict | None:
     """Registra un evento de aprendizaje para un usuario existente. Devuelve el
-    evento creado o None si el usuario no existe."""
+    evento creado o None si el usuario no existe.
+
+    V3.35: cada evento declara su `event_role` (evidence/telemetry/informative)
+    derivado por la capa pura `services.evidence`: la tabla dejaba de mezclar
+    señales heterogéneas (una pregunta informativa de Recognition convivía con
+    la recuperación real de una palabra). El rol se deriva, nunca se confía al
+    cliente."""
     if get_user(user_id) is None:
         return None
+    # Import local: la capa pura vive en `services` y no debe acoplarse en
+    # tiempo de import (misma convención que `repositories.vocabulary`).
+    from services.evidence import classify_event_role
+
     now = _now()
+    role = classify_event_role(event_type, detail)
     with closing(_conn()) as conn, conn:
         cur = conn.execute(
-            "INSERT INTO learning_events (user_id, type, detail, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (user_id, event_type, detail, now),
+            "INSERT INTO learning_events "
+            "(user_id, type, detail, created_at, event_role) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, event_type, detail, now, role),
         )
     return {
         "id": cur.lastrowid,
@@ -25,6 +37,7 @@ def record_event(user_id: str, event_type: str, detail: str) -> dict | None:
         "type": event_type,
         "detail": detail,
         "created_at": now,
+        "event_role": role,
     }
 
 
@@ -34,13 +47,15 @@ def list_events(user_id: str, event_type: str | None = None) -> list[dict]:
     with closing(_conn()) as conn:
         if event_type is not None:
             rows = conn.execute(
-                "SELECT id, user_id, type, detail, created_at FROM learning_events "
+                "SELECT id, user_id, type, detail, created_at, event_role "
+                "FROM learning_events "
                 "WHERE user_id = ? AND type = ? ORDER BY id DESC",
                 (user_id, event_type),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT id, user_id, type, detail, created_at FROM learning_events "
+                "SELECT id, user_id, type, detail, created_at, event_role "
+                "FROM learning_events "
                 "WHERE user_id = ? ORDER BY id DESC",
                 (user_id,),
             ).fetchall()

@@ -863,37 +863,39 @@ def test_summary_counts_recalled():
     assert s["recalled"] == 2
 
 
-def test_drill_candidates_prioritizes_fsrs_due_words():
-    """V3.34: las palabras con recall vencido se anteponen en la lista de
-    candidatas, conservando el orden por recuerdo dentro de cada grupo."""
+def test_drill_candidates_order_is_forgetting_not_fsrs():
+    """V3.35 (P1-2): la cola de speaking ya NO conoce FSRS. Ordena solo por
+    recuerdo ascendente (más olvidada primero); el repaso espaciado vive en
+    `GET /api/learning/review`."""
     rows = [
         {
-            "word": "overdue",
+            "word": "forgotten",
             "exposures": 3,
             "speaking_prod": 0,
-            "appearances": 0,
-            "production_days": 0,
-            "first_seen": "",
-            "last_seen": "",
-            "last_exposed_at": "2026-09-05",
+            "appearances": 1,
+            "production_count": 1,
+            "production_days": 1,
+            "first_seen": "2026-09-01T10:00:00+00:00",
+            "last_seen": "2026-09-01T10:00:00+00:00",
+            "last_exposed_at": "2026-09-01T10:00:00+00:00",
         },
         {
-            "word": "due_recent",
+            "word": "fresh",
             "exposures": 3,
             "speaking_prod": 0,
-            "appearances": 0,
-            "production_days": 0,
-            "first_seen": "",
-            "last_seen": "",
-            "last_exposed_at": "2026-09-09",
+            "appearances": 1,
+            "production_count": 1,
+            "production_days": 1,
+            "first_seen": "2026-09-09T10:00:00+00:00",
+            "last_seen": "2026-09-09T10:00:00+00:00",
+            "last_exposed_at": "2026-09-09T10:00:00+00:00",
         },
     ]
-    # Sin `due_words` conserva el orden por recuerdo (aquí empatan y se mantiene
-    # el orden de entrada).
-    assert lexicon.drill_candidates(rows, limit=10) == ["overdue", "due_recent"]
-    # Con `due_words`, la palabra vencida se antepone al frente.
-    due = {"due_recent"}
-    assert lexicon.drill_candidates(rows, limit=10, due_words=due) == [
-        "due_recent",
-        "overdue",
+    now = "2026-09-10T10:00:00+00:00"
+    assert lexicon.drill_candidates(rows, limit=10, now=now) == [
+        "forgotten",
+        "fresh",
     ]
+    # El parámetro `due_words` de V3.34 ya no existe: la firma no lo acepta.
+    with pytest.raises(TypeError):
+        lexicon.drill_candidates(rows, limit=10, due_words={"fresh"})

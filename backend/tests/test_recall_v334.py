@@ -386,6 +386,11 @@ def test_recall_signal_isolated_between_users(monkeypatch, tmp_path):
     with TestClient(app) as client:
         _post_attempt(client, b, "quokka", "wrong")
 
-    # El fallo no crea fila de recall (solo el acierto deja señal).
-    assert _row(b, "quokka") == {}
+    # V3.35: el fallo deja señal de INTENTO (attempts vs successes). No se puede
+    # distinguir "no lo intentó" de "falló" sin este contador; el fallo no toca
+    # el ancla ni acredita un acierto.
+    row_b = _row(b, "quokka")
+    assert row_b["recall_attempts"] == 1
+    assert row_b["recall_successes"] == 0
+    assert row_b["last_recall_at"] == ""
     assert _drill_events(b) == ["drill:quokka:recall:ko"]

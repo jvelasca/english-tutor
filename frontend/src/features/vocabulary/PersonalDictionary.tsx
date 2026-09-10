@@ -4,6 +4,7 @@ import { BookOpen, RefreshCw } from "lucide-react";
 import { getDrillCandidates, getLexicon } from "../../api/vocabulary";
 import type { LexicalItem, LexicalStatus, Lexicon } from "../../types/api";
 import { cefrBarValue, sortLexicalItems } from "./dictionary";
+import { ReviewQueueSection } from "./ReviewQueueSection";
 import { SpeakingDrillSection } from "./wordDrill";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
@@ -199,6 +200,8 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
             </Card>
           </motion.section>
         )}
+
+        {userId && <ReviewQueueSection userId={userId} />}
 
         {userId && (candidates.length > 0 || drillWord !== null) && (
           <SpeakingDrillSection

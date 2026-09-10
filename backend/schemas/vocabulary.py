@@ -100,9 +100,32 @@ class LexicalCompetence(BaseModel):
     # sustituye la recuperación demorada (`retention`).
     cued_recall: bool = False
     recall_successes: int = 0
+    # V3.35 (Longitudinal Learning Evidence): INTENTOS de recall (acierto o
+    # fallo). Sin intentos no se distingue "no lo intentó" de "falló".
+    recall_attempts: int = 0
     recall_days: int = 0
     production_gap: bool
     transfer_gap: bool
+
+
+class LexicalEvidence(BaseModel):
+    """Evidencia longitudinal por ítem léxico (V3.35).
+
+    Derivada del ledger `learning_evidence` (no de los contadores rápidos de
+    `vocabulary`): cada recuperación/producción es un EVENTO con su intervalo,
+    y la retención se lee como la cadena `evento_n → intervalo → evento_{n+1}`.
+    Los contadores agregados de `LexicalCompetence` siguen siendo el atajo.
+
+    - `attempts` — nº de eventos (incluye fallos);
+    - `successes` — nº de eventos correctos;
+    - `distinct_success_days` — días naturales distintos con éxito;
+    - `intervals` — intervalos (días) de los eventos con éxito, ascendentes.
+    """
+
+    attempts: int = 0
+    successes: int = 0
+    distinct_success_days: int = 0
+    intervals: list[float] = Field(default_factory=list)
 
 
 class LexicalItemOut(BaseModel):
@@ -141,6 +164,9 @@ class LexicalItemOut(BaseModel):
     conversation_prod: int = 0
     # V3.21 (V20-16): matriz Recognition/Production/Transfer/Retention.
     competence: LexicalCompetence | None = None
+    # V3.35 (Longitudinal Learning Evidence): evidencia fina del ledger
+    # (`attempts`/`successes`/`days`/`intervals`), aditiva a los contadores.
+    evidence: LexicalEvidence | None = None
 
 
 class LexicalUnitSurfaceOut(BaseModel):

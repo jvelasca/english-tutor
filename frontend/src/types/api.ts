@@ -268,9 +268,25 @@ export interface LexicalCompetence {
   // recuperación demorada (`retention`).
   cued_recall?: boolean;
   recall_successes?: number;
+  // V3.35 (Longitudinal Learning Evidence): INTENTOS de recall (acierto o
+  // fallo). Sin intentos no se distingue "no lo intentó" de "falló".
+  recall_attempts?: number;
   recall_days?: number;
   production_gap: boolean;
   transfer_gap: boolean;
+}
+
+// V3.35 (Longitudinal Learning Evidence): evidencia fina del ledger
+// (`learning_evidence`), aditiva a los contadores rápidos de `vocabulary`.
+// Cada recuperación/producción es un EVENTO con su intervalo; la retención se
+// lee como la cadena evento_n → intervalo → evento_{n+1}.
+export interface LexicalEvidence {
+  attempts: number;
+  successes: number;
+  // Días naturales distintos con éxito (dos aciertos el mismo día cuentan uno).
+  distinct_success_days: number;
+  // Intervalos (días) de los eventos con éxito, ascendentes.
+  intervals: number[];
 }
 
 export interface LexicalItem {
@@ -296,6 +312,8 @@ export interface LexicalItem {
   conversation_prod: number;
   // V3.21 (V20-16): matriz de competencia (puede faltar en respuestas viejas).
   competence?: LexicalCompetence | null;
+  // V3.35: historia longitudinal del ítem (puede faltar en respuestas viejas).
+  evidence?: LexicalEvidence | null;
 }
 
 export interface DrillCandidates {
@@ -582,6 +600,35 @@ export interface LearningEvent {
   type: LearningEventType;
   detail: string;
   created_at: string;
+  // V3.35: rol del evento (evidence/telemetry/informative) derivado en servidor.
+  event_role?: string;
+}
+
+// V3.35 (Longitudinal Learning Evidence, P1-2): cola de repaso del léxico.
+// Separa el repaso espaciado (FSRS) del speaking micro-drill: cada ítem vencido
+// llega con la actividad recomendada por hueco de competencia.
+export type ReviewActivity = "recognition" | "recall" | "sentence";
+
+export interface ReviewQueueItem {
+  word: string;
+  lexical_unit: string;
+  cefr: string;
+  kind: string;
+  due_at: string;
+  state: string;
+  stability: number;
+  retrievability: number | null;
+  elapsed_days: number | null;
+  activity: ReviewActivity;
+  reason: string;
+  competence?: LexicalCompetence | null;
+  evidence?: LexicalEvidence | null;
+}
+
+export interface ReviewQueue {
+  due_count: number;
+  items: ReviewQueueItem[];
+  fsrs_version: string;
 }
 
 export interface SeriesPoint {

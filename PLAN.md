@@ -8,6 +8,30 @@
 
 ## Estado actual
 
+- ✅ **V3.35 — Longitudinal Learning Evidence 1.0 (2026-09-10)**
+  (**Versión estable `3.35.0`**, app `3.34.0 → 3.35.0`). Cierra los **dos P1**
+  de la auditoría de V3.34.0 y sienta el modelo de evidencia longitudinal, sin
+  rehacer arquitectura y sin migración destructiva.
+  **P1-1 (ancla):** la recuperación demorada deja de estar anclada a la primera
+  exposición. `services/lexicon.py::delayed_retrieval_decision` (pura) encadena
+  `evento_n → intervalo → evento_{n+1}`: el ancla es la última recuperación
+  válida (`max(last_retrieval_at, last_recall_at)`) y el intervalo exigido lo
+  calcula FSRS (`due_at` de la carta `lexicon`); sin carta, suelo
+  `RETENTION_MIN_INTERVAL_DAYS`. `D0 → D+3` acredita; `D+3 → D+4` ya no si FSRS
+  no ha vencido. **P1-2 (cola):** el repaso espaciado sale del speaking
+  micro-drill — nuevo `GET /api/learning/review` con cartas FSRS `lexicon`
+  vencidas ordenadas por urgencia y actividad óptima por hueco de competencia
+  (`recommend_review_activity`: recognition/recall/sentence); se retira
+  `due_words` de `drill_candidates`. **Evidencia:** tabla append-only
+  `learning_evidence` (+ `event_role` en `learning_events`), repositorio
+  `evidence.py` y servicio puro `services/evidence.py` (roles +
+  `summarize_evidence`), contador aditivo `recall_attempts` y bloque `evidence`
+  (`attempts`/`successes`/`days`/`intervals`) expuesto en el léxico y en la cola
+  de repaso. UI: sección «Repaso de hoy» (`ReviewQueueSection`) + `initialStep`
+  del `WordDrill`. Tests: pytest **1764** (+21), vitest (65 ficheros/**557**,
+  +2 ficheros/+8 tests), `ruff`/`tsc` limpios y `check_release_consistency`
+  **3.35.0** exit 0.
+
 - ✅ **V3.34 — Dictionary → Learning Bridge, eslabón 3: Recall 2.0 (texto)
   (2026-09-10)** (**Versión estable `3.34.0`**, app `3.33.1 → 3.34.0`). El
   peldaño intermedio del drill deja de ser una repetición oral de la palabra y

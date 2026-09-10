@@ -357,6 +357,65 @@ const STRINGS: Record<string, Entry> = {
     en: "Words you have met that still need spaced speaking practice — tap one, say it aloud, then repeat it inside a sentence.",
     es: "Palabras que has encontrado y que aún necesitan práctica oral espaciada — tócala, dila en voz alta y luego repítela dentro de una frase.",
   },
+  // V3.35 (Longitudinal Learning Evidence, P1-2): cola de repaso propia,
+  // separada del speaking micro-drill. El repaso espaciado (FSRS) propone la
+  // actividad óptima por hueco de competencia.
+  "dictionary.review.title": {
+    en: "Today's review",
+    es: "Repaso de hoy",
+  },
+  "dictionary.review.hint": {
+    en: "Words the spaced-repetition scheduler marks as due. Each one suggests the step that closes your current gap.",
+    es: "Palabras que el planificador de repaso marca como vencidas. Cada una propone el paso que cierra tu hueco actual.",
+  },
+  "dictionary.review.dueCount": {
+    en: "{count} due",
+    es: "{count} pendientes",
+  },
+  "dictionary.review.empty": {
+    en: "Nothing to review right now — come back later.",
+    es: "No hay nada que repasar ahora mismo — vuelve más tarde.",
+  },
+  "dictionary.review.loadError": {
+    en: "Could not load the review queue. ",
+    es: "No se pudo cargar la cola de repaso. ",
+  },
+  "dictionary.review.practice": {
+    en: "Review {word}",
+    es: "Repasar {word}",
+  },
+  "dictionary.review.overdue": {
+    en: "overdue",
+    es: "vencida",
+  },
+  "dictionary.review.activity.recognition": {
+    en: "Recognize",
+    es: "Reconoce",
+  },
+  "dictionary.review.activity.recall": {
+    en: "Recall",
+    es: "Recuerda",
+  },
+  "dictionary.review.activity.sentence": {
+    en: "Say in a sentence",
+    es: "Dilo en una frase",
+  },
+  "dictionary.review.reason.weak_recognition": {
+    en: "Needs receptive grounding first",
+    es: "Necesita base receptiva primero",
+  },
+  "dictionary.review.reason.no_recall_evidence": {
+    en: "No recall from meaning yet",
+    es: "Aún sin recuperación desde el significado",
+  },
+  "dictionary.review.reason.production_gap": {
+    en: "Understood but not produced yet",
+    es: "Entendida pero aún sin producir",
+  },
+  "dictionary.review.reason.maintenance": {
+    en: "Maintenance review",
+    es: "Repaso de mantenimiento",
+  },
   "dictionary.loadError": {
     en: "Could not load your dictionary. ",
     es: "No se pudo cargar tu diccionario. ",

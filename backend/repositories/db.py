@@ -888,6 +888,68 @@ def init_db() -> None:
                 "NOT NULL DEFAULT ''"
             )
 
+        # V3.35 (Longitudinal Learning Evidence 1.0): separar INTENTOS de ÉXITOS
+        # en la capa de recall. `recall_successes` solo cuenta aciertos; sin los
+        # intentos no se puede distinguir "no lo intentó" de "falló muchas
+        # veces". Aditivo e idempotente, sin backfill (el histórico no se puede
+        # reconstruir: mejor perderlo que inventarlo).
+        if "recall_attempts" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN recall_attempts INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+
+        # V3.35: `event_role` clasifica cada evento de `learning_events` como
+        # evidencia, telemetría o señal informativa. Antes la tabla mezclaba
+        # señales heterogéneas (una pregunta de Recognition informativa convivía
+        # con la recuperación de una palabra). Columna aditiva con default ''
+        # para las filas legacy.
+        event_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(learning_events)")
+        }
+        if "event_role" not in event_cols:
+            conn.execute(
+                "ALTER TABLE learning_events ADD COLUMN event_role TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
+        # V3.35 (Longitudinal Learning Evidence 1.0): ledger append-only de
+        # evidencia LONGITUDINAL por ítem. Cada recuperación/producción es un
+        # EVENTO con su propio intervalo (`interval_since_last_evidence`), de
+        # modo que la retención se mide como una cadena
+        # `evento_n → intervalo → evento_{n+1}` y no como repeticiones ancladas
+        # a la primera exposición. Complementa `vocabulary_events` (historia
+        # léxica por forma) sin sustituirla: aquí vive la evidencia con
+        # resultado e intervalo, allí la historia de contadores.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS learning_evidence (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                occurred_at TEXT NOT NULL,
+                skill TEXT NOT NULL DEFAULT '',
+                target_type TEXT NOT NULL DEFAULT '',
+                target_id TEXT NOT NULL DEFAULT '',
+                surface_form TEXT NOT NULL DEFAULT '',
+                lexical_unit TEXT NOT NULL DEFAULT '',
+                task TEXT NOT NULL DEFAULT '',
+                activity TEXT NOT NULL DEFAULT '',
+                success INTEGER NOT NULL DEFAULT 0,
+                interval_since_last_evidence REAL,
+                event_role TEXT NOT NULL DEFAULT 'evidence',
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_learning_evidence_user_target "
+            "ON learning_evidence(user_id, target_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_learning_evidence_user_occurred "
+            "ON learning_evidence(user_id, occurred_at)"
+        )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {

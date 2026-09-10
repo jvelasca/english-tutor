@@ -5,6 +5,52 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.35.0 publicada** — release **v3.35.0**
+> (**Longitudinal Learning Evidence 1.0**: cierra los dos P1 de la auditoría de
+> V3.34.0 y convierte el Evidence Graph en historia longitudinal real, sin
+> rehacer arquitectura ni migración destructiva). **P1-1 (ancla encadenada):** la
+> recuperación demorada deja de medirse desde la primera exposición. Nueva
+> función pura `services/lexicon.py::delayed_retrieval_decision(row, now,
+> due_at)` → `{anchor_at, interval_days, required_days, credited}`: el ancla es
+> la ÚLTIMA recuperación válida (`max(last_retrieval_at, last_recall_at)`; solo
+> la primera recuperación retrocede a `min(first_seen, first_exposed_at)`) y el
+> intervalo exigido lo calcula FSRS (`due_at` de la carta `lexicon`) o, sin
+> carta, el suelo `RETENTION_MIN_INTERVAL_DAYS`. El dominio carga la carta y el
+> repositorio solo persiste (`record_retrievals(..., due_at=…)` encadena
+> `last_retrieval_at`). Efecto: `D0 → D+3` acredita; `D+3 → D+4` ya no si FSRS no
+> ha vencido. **P1-2 (cola propia):** el repaso espaciado sale del speaking
+> micro-drill — nuevo `GET /api/learning/review` (`routers/learning.py`) con las
+> cartas FSRS `lexicon` vencidas ordenadas por urgencia (`fsrs.due_queue`) y la
+> actividad óptima por hueco (`services/lexicon.py::recommend_review_activity`:
+> sin base receptiva → `recognition`, sin `cued_recall` → `recall`,
+> `production_gap` → `sentence`, resto → `recall`); se retira `due_words` de
+> `lexicon.drill_candidates` y la lectura de cartas FSRS de
+> `get_drill_candidates`, así que el speaking drill vuelve a ser solo huecos de
+> producción oral. **Evidencia:** tabla append-only `learning_evidence` (+
+> `event_role` en `learning_events`, default `''` legacy) con repositorio
+> `repositories/evidence.py` y servicio puro `services/evidence.py`
+> (`EVIDENCE_ROLES`, `classify_event_role`, `summarize_evidence` = attempts /
+> successes / distinct_success_days / intervals); contador aditivo
+> `recall_attempts` (intento ≠ éxito) y bloque `evidence` (`LexicalEvidence`)
+> expuesto en el léxico y en la cola de repaso; escrituras de evidencia en el
+> intento de recall (acierto y FALLO), la recuperación del micro-drill y la
+> producción. **UI:** nueva sección «Repaso de hoy»
+> (`features/vocabulary/ReviewQueueSection.tsx`) montada en el diccionario
+> personal, `api/learning.ts::getReviewQueue`, `initialStep` en `WordDrill` (abre
+> el peldaño recomendado) e i18n es/en. Tests: pytest backend **1764 passed**
+> (+21: `test_longitudinal_evidence_v335.py` + `test_review_queue_v335.py`, con
+> `test_lexicon.py`/`test_vocabulary.py`/`test_recall_v334.py` actualizados al
+> ancla encadenada) + ruff limpio + vitest (65 ficheros/**557**, +2
+> ficheros/+8 tests: API de la cola — restaura los 3 casos preexistentes de
+> `getProfile`/`analyzeText`/`getEvents` —, `WordDrill` con `initialStep` y
+> `ReviewQueueSection`) + `tsc --noEmit` limpio + `check_release_consistency`
+> **3.35.0** exit 0. Detalle: `release-notes-v3.35.0.md` y `CHANGELOG.md`
+> `[3.35.0]`. Pendientes hacia **V3.36**: los P2 de la auditoría de V3.34.0
+> (`response_time_ms`, clasificación de errores ortográficos, cues graduados,
+> `support_level`, `difficulty` en evidencia, refactor completo de
+> `wordDrill.tsx`), los diferidos de V3.30 (consumo de `word_breakdown_json`,
+> palabras tocables) y la transferencia por contexto de actividad V3.23.
+>
 > **Nota (2026-09-10):** **V3.34.0 publicada** — release **v3.34.0**
 > (Dictionary → Learning Bridge, eslabón 3: **Recall 2.0 por texto**). El
 > peldaño intermedio del drill deja de ser una repetición oral de la palabra y

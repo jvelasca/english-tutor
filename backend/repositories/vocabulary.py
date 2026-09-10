@@ -11,7 +11,6 @@ independientes cuando comparten lemma.
 from __future__ import annotations
 
 from contextlib import closing
-from datetime import date, datetime
 
 from repositories.db import _conn, _now
 from repositories.users import get_user
@@ -20,20 +19,6 @@ from repositories.users import get_user
 def _day(iso: str) -> str:
     """Parte `YYYY-MM-DD` de una marca de tiempo ISO-8601."""
     return iso[:10]
-
-
-def _date_of(iso: str) -> date | None:
-    """Fecha `date` de una marca ISO (datetime o date). None si vacía o inválida."""
-    text = (iso or "").strip()
-    if not text:
-        return None
-    try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
-    except ValueError:
-        try:
-            return date.fromisoformat(text[:10])
-        except ValueError:
-            return None
 
 
 def _merge_context_tag(existing: str, tag: str) -> str:
@@ -198,65 +183,15 @@ def record_words(user_id: str, words: list[str]) -> bool:
     return record_production(user_id, words, channel="chat")
 
 
-def record_retrievals(user_id: str, words: list[str]) -> bool:
-    """Registra una RECUPERACIÓN correcta de las palabras (éxito de micro-drill).
-
-    V3.23 (P1-02): acredita retención por recuperación DEMORADA, no por
-    exposición espaciada. Para cada palabra, solo cuenta si el intento ocurre
-    `RETENTION_MIN_INTERVAL_DAYS` o más días naturales después del ancla
-    (la primera señal: `min(first_exposed_at, first_seen)`). Al cumplirse:
-
-    - `retrieval_successes += 1` (nº de recuperaciones correctas demoradas);
-    - si el día de `last_retrieval_at` es distinto del actual,
-      `retrieval_days += 1` (días distintos con recuperación demorada);
-    - `last_retrieval_at = now`.
-
-    Sin ancla (filas sin exposición ni producción) o antes del intervalo, la
-    palabra se ignora en silencio. Devuelve False si el usuario no existe."""
-    if get_user(user_id) is None:
-        return False
-    if not words:
-        return True
-    # Import local: la constante canónica vive en el servicio puro; evita
-    # dependencia en tiempo de import entre capas.
-    from services.lexicon import RETENTION_MIN_INTERVAL_DAYS
-
-    now = _now()
-    today = _day(now)
-    today_dt = _date_of(now)
-    with closing(_conn()) as conn, conn:
-        for w in words:
-            row = conn.execute(
-                "SELECT first_seen, first_exposed_at, last_retrieval_at, "
-                "lexical_unit FROM vocabulary WHERE user_id = ? AND word = ?",
-                (user_id, w),
-            ).fetchone()
-            if row is None:
-                continue
-            anchor = _earliest_day(row["first_seen"], row["first_exposed_at"])
-            if anchor is None or today_dt is None:
-                continue  # sin ancla no hay retención medible
-            if (today_dt - anchor).days < RETENTION_MIN_INTERVAL_DAYS:
-                continue  # aún dentro del intervalo: no es recuperación demorada
-            new_day = 1 if _day(row["last_retrieval_at"] or "") != today else 0
-            conn.execute(
-                "UPDATE vocabulary SET "
-                "retrieval_successes = retrieval_successes + 1, "
-                "retrieval_days = retrieval_days + ?, "
-                "last_retrieval_at = ? "
-                "WHERE user_id = ? AND word = ?",
-                (new_day, now, user_id, w),
-            )
-            # Ledger léxico (V3.26, Eje B/F-B2): una recuperación demorada OK.
-            unit = row["lexical_unit"] or lexical_unit_key(w, "")
-            _insert_event(
-                conn, user_id, w, unit, "retrieval", "", "", now,
-            )
-    return True
-
-
 def record_recalls(user_id: str, words: list[str]) -> bool:
     """Registra una RECUPERACIÓN correcta de la palabra desde su significado.
+
+    Wrapper de `record_recall_attempt(success=True)` (V3.35)."""
+    return record_recall_attempt(user_id, words, success=True)
+
+
+def record_recall_attempt(user_id: str, words: list[str], *, success: bool) -> bool:
+    """Registra un INTENTO de recall (acierto o fallo) desde su significado.
 
     V3.34 (Recall 2.0): capa PROPIA del recall por texto (paso Recall del
     drill). A diferencia de `record_production`, NO acredita producción: no
@@ -266,10 +201,17 @@ def record_recalls(user_id: str, words: list[str]) -> bool:
     la señal de recuperación en sí misma (la recuperación demorada la sigue
     acreditando `record_retrievals`).
 
+    V3.35 (Longitudinal Learning Evidence): el INTENTO se separa del ÉXITO. Todo
+    intento incrementa `recall_attempts` (un fallo también es evidencia: sin
+    intentos no se puede distinguir "no lo intentó" de "falló muchas veces").
+    En el acierto se incrementa además:
+
     - `recall_successes += 1` (nº de recuperaciones correctas);
     - si el día de `last_recall_at` es distinto del actual, `recall_days += 1`
       (días distintos con recall);
-    - `last_recall_at = now`.
+    - `last_recall_at = now`, y se añade el evento `recalled` al ledger léxico.
+
+    En el fallo NO se toca el ancla (`last_recall_at`) ni el ledger de aciertos.
 
     Crea la fila si no existe (palabra consultada en el diccionario y nunca
     expuesta/producida) con `production_count = 0`/`exposure_count = 0`: el
@@ -287,22 +229,37 @@ def record_recalls(user_id: str, words: list[str]) -> bool:
                 "WHERE user_id = ? AND word = ?",
                 (user_id, w),
             ).fetchone()
+            lemma = row["lemma"] if row else ""
+            unit = (row["lexical_unit"] if row else "") or lexical_unit_key(w, lemma)
+            if not success:
+                # Fallo: solo suma intento (crea la fila sin inventar producción).
+                conn.execute(
+                    "INSERT INTO vocabulary "
+                    "(user_id, word, production_count, exposure_count, first_seen, "
+                    "last_seen, recall_attempts, lexical_unit) "
+                    "VALUES (?, ?, 0, 0, '', '', 1, ?) "
+                    "ON CONFLICT(user_id, word) DO UPDATE SET "
+                    "recall_attempts = vocabulary.recall_attempts + 1, "
+                    "lexical_unit = CASE WHEN vocabulary.lexical_unit = '' "
+                    "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
+                    (user_id, w, unit),
+                )
+                continue
             new_day = (
                 1
                 if row is None or _day(row["last_recall_at"] or "") != today
                 else 0
             )
-            lemma = row["lemma"] if row else ""
-            unit = (row["lexical_unit"] if row else "") or lexical_unit_key(w, lemma)
             conn.execute(
                 "INSERT INTO vocabulary "
                 "(user_id, word, production_count, exposure_count, first_seen, "
-                "last_seen, recall_successes, recall_days, last_recall_at, "
-                "lexical_unit) "
-                "VALUES (?, ?, 0, 0, '', '', 1, ?, ?, ?) "
+                "last_seen, recall_successes, recall_days, recall_attempts, "
+                "last_recall_at, lexical_unit) "
+                "VALUES (?, ?, 0, 0, '', '', 1, ?, 1, ?, ?) "
                 "ON CONFLICT(user_id, word) DO UPDATE SET "
                 "recall_successes = vocabulary.recall_successes + 1, "
                 "recall_days = vocabulary.recall_days + excluded.recall_days, "
+                "recall_attempts = vocabulary.recall_attempts + 1, "
                 "last_recall_at = excluded.last_recall_at, "
                 "lexical_unit = CASE WHEN vocabulary.lexical_unit = '' "
                 "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
@@ -313,11 +270,70 @@ def record_recalls(user_id: str, words: list[str]) -> bool:
     return True
 
 
-def _earliest_day(first_seen: str, first_exposed_at: str) -> date | None:
-    """Fecha más temprana entre la primera producción y la primera exposición
-    (ancla de la ventana de retención). None si no hay ninguna."""
-    candidates = [d for d in (_date_of(first_seen), _date_of(first_exposed_at)) if d]
-    return min(candidates) if candidates else None
+def record_retrievals(user_id: str, words: list[str], *, due_at: str = "") -> bool:
+    """Registra una RECUPERACIÓN correcta de las palabras (éxito de micro-drill).
+
+    V3.23 (P1-02): acredita retención por recuperación DEMORADA, no por
+    exposición espaciada.
+
+    V3.35 (P1-1, Longitudinal Learning Evidence): el ancla deja de estar fijada
+    a la primera exposición/producción del ítem para siempre. La decisión la
+    toma la función pura `services.lexicon.delayed_retrieval_decision`:
+
+    - el ancla es la ÚLTIMA recuperación válida (`last_retrieval_at`) o, en la
+      primera, la primera señal del ítem (cadena `evento_n → intervalo →
+      evento_{n+1}`);
+    - el intervalo exigido lo calcula FSRS (`due_at` de la carta `lexicon`
+      vigente) cuando existe; sin carta se conserva el suelo
+      `RETENTION_MIN_INTERVAL_DAYS`.
+
+    Al acreditarse:
+
+    - `retrieval_successes += 1` (nº de recuperaciones correctas demoradas);
+      - si el día del ancla es distinto del actual, `retrieval_days += 1` (días
+        distintos con recuperación demorada);
+      - `last_retrieval_at = now` (nuevo ancla de la cadena).
+
+    Sin ancla (filas sin exposición ni producción) o antes del intervalo, la
+    palabra se ignora en silencio. Devuelve False si el usuario no existe."""
+    if get_user(user_id) is None:
+        return False
+    if not words:
+        return True
+    # Import local: la constante y la decisión puras viven en el servicio puro;
+    # evita dependencia en tiempo de import entre capas.
+    from services.lexicon import delayed_retrieval_decision
+
+    now = _now()
+    today = _day(now)
+    with closing(_conn()) as conn, conn:
+        for w in words:
+            row = conn.execute(
+                "SELECT first_seen, first_exposed_at, last_retrieval_at, "
+                "last_recall_at, lexical_unit FROM vocabulary "
+                "WHERE user_id = ? AND word = ?",
+                (user_id, w),
+            ).fetchone()
+            if row is None:
+                continue
+            decision = delayed_retrieval_decision(dict(row), now=now, due_at=due_at)
+            if not decision["credited"]:
+                continue  # aún dentro del intervalo: no es recuperación demorada
+            new_day = 1 if _day(row["last_retrieval_at"] or "") != today else 0
+            conn.execute(
+                "UPDATE vocabulary SET "
+                "retrieval_successes = retrieval_successes + 1, "
+                "retrieval_days = retrieval_days + ?, "
+                "last_retrieval_at = ? "
+                "WHERE user_id = ? AND word = ?",
+                (new_day, now, user_id, w),
+            )
+            # Ledger léxico (V3.26, Eje B/F-B2): una recuperación demorada OK.
+            unit = row["lexical_unit"] or lexical_unit_key(w, "")
+            _insert_event(
+                conn, user_id, w, unit, "retrieval", "", "", now,
+            )
+    return True
 
 
 def record_exposures(user_id: str, words: list[str]) -> bool:
@@ -395,7 +411,7 @@ def get_vocabulary(user_id: str) -> list[dict]:
             "cefr, level_id, objective_id, source, lemma, kind, lexical_unit, "
             "chat_prod, speaking_prod, writing_prod, conversation_prod, "
             "retrieval_successes, retrieval_days, last_retrieval_at, "
-            "recall_successes, recall_days, last_recall_at, "
+            "recall_successes, recall_days, recall_attempts, last_recall_at, "
             "context_tags "
             "FROM vocabulary "
             "WHERE user_id = ? ORDER BY production_count DESC, word ASC",

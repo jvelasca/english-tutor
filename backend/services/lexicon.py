@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from services import forgetting, mastery
+from services import forgetting, fsrs, mastery
 from services.curriculum import CEFR_ORDER
 
 # Mínimos de producción espaciada para considerar una palabra dominada
@@ -59,6 +59,16 @@ RECOGNITION_DAYS_WEIGHT = 0.6
 # no demuestra que se recuerda tras un intervalo. `RETENTION_MIN_RETRIEVAL_DAYS`
 # es el nº mínimo de días distintos con recuperación demorada para declarar
 # `retention` en la matriz de competencia. Umbrales heurísticos a calibrar.
+#
+# V3.35 (P1-1, Longitudinal Learning Evidence): el ANCLA deja de ser la primera
+# exposición/producción para toda la vida del ítem. Ahora se encadena:
+#
+#     evento_1 → intervalo_1 → evento_2 → intervalo_2 → evento_3 → ...
+#
+# El ancla es la ÚLTIMA recuperación válida (`last_retrieval_at`) y solo la
+# primera recuperación se mide desde la primera señal. El intervalo exigido lo
+# calcula el scheduler (FSRS `lexicon` `due_at`) cuando existe carta; sin carta
+# se conserva el suelo determinista de V3.23.
 RETENTION_MIN_INTERVAL_DAYS = 1
 RETENTION_MIN_RETRIEVAL_DAYS = 1
 
@@ -346,6 +356,83 @@ def next_review_days(row: dict) -> int:
     return mastery.review_interval_days(item_mastery(row), item_confidence(row))
 
 
+# V3.35 (Longitudinal Learning Evidence): actividades de repaso del léxico. La
+# cola de repaso (`GET /api/learning/review`) propone QUÉ hacer con una palabra
+# vencida, en la escalera del drill: reconocer → recuperar → producir.
+REVIEW_ACTIVITIES: tuple[str, ...] = ("recognition", "recall", "sentence")
+
+
+def recommend_review_activity(
+    row: dict, competence: dict | None = None, now: str = ""
+) -> dict:
+    """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
+
+    Proyección DETERMINISTA del hueco de competencia del ítem sobre la escalera
+    del drill (no un modelo predictivo). Prioriza el peldaño más temprano que
+    falta:
+
+    - sin base receptiva (nunca expuesta: `exposure_count == 0`) →
+      `recognition`: el repaso vuelve al primer peldaño;
+    - reconocida pero sin recuperación por texto (`cued_recall == False`) →
+      `recall`: es lo que el repaso espaciado debe comprobar;
+    - recuperada pero nunca producida (`production_gap`) → `sentence`: el hueco
+      real es la producción;
+    - el resto (producida y transferida) → `recall` de mantenimiento.
+
+    Nota de diseño: NO se usa `item_recall` para decidir "reconocimiento débil"
+    porque esa probabilidad es función de la PRODUCCIÓN (curva de olvido sobre
+    `production_count`), no del reconocimiento: un ítem solo leído/oído tendría
+    siempre recuerdo bajo y jamás llegaría a los peldaños de recall/producción.
+    El reconocimiento débil se detecta por su señal propia (falta de exposición).
+
+    Devuelve `{activity, reason}` con `activity` en `REVIEW_ACTIVITIES`.
+    """
+    matrix = competence if competence is not None else item_competence_matrix(row)
+    if exposure_count(row) <= 0:
+        return {"activity": "recognition", "reason": "weak_recognition"}
+    if not matrix.get("cued_recall"):
+        return {"activity": "recall", "reason": "no_recall_evidence"}
+    if matrix.get("production_gap"):
+        return {"activity": "sentence", "reason": "production_gap"}
+    return {"activity": "recall", "reason": "maintenance"}
+
+
+def review_queue_item(
+    row: dict, card: dict, *, now: str = "", evidence: dict | None = None
+) -> dict:
+    """Ítem de la cola de repaso lexica (V3.35), pura y determinista.
+
+    Combina la carta FSRS vencida (`card`) con la fila léxica (`row`): la
+    actividad recomendada por hueco de competencia, la urgencia del scheduler
+    (`retrievability`/`stability`) y un snapshot de la matriz de competencia.
+    Nunca incluye el cue ni la forma esperada (eso lo sirve el GET del peldaño).
+    """
+    matrix = item_competence_matrix(row)
+    recommendation = recommend_review_activity(row, matrix, now=now)
+    last = card.get("last_review_at") or card.get("last_evidence_at") or ""
+    elapsed = _days_between(last, now) if last else 0.0
+    stability = float(card.get("stability") or 0.0)
+    return {
+        "word": row.get("word") or card.get("target_id") or "",
+        "lexical_unit": lexical_unit(row),
+        "cefr": row.get("cefr") or "",
+        "kind": row.get("kind") or "word",
+        "due_at": card.get("due_at") or "",
+        "state": card.get("state") or "new",
+        "stability": round(stability, 3),
+        "retrievability": (
+            fsrs.retrievability(stability, elapsed)
+            if stability > 0 and last
+            else None
+        ),
+        "elapsed_days": round(elapsed, 3) if elapsed is not None else None,
+        "activity": recommendation["activity"],
+        "reason": recommendation["reason"],
+        "competence": matrix,
+        "evidence": evidence if evidence is not None else {},
+    }
+
+
 # Canales de producción registrados en columnas `<channel>_prod` de la tabla
 # `vocabulary` (V3.19). El orden importa para el desglose de `competence`.
 PRODUCTION_CHANNELS: tuple[str, ...] = (
@@ -389,6 +476,99 @@ def _day_or_none(value: object) -> date | None:
             return date.fromisoformat(text[:10])
         except ValueError:
             return None
+
+
+def _dt_or_none(value: object) -> datetime | None:
+    """`datetime` UTC de un valor ISO (None si vacío o inválido). V3.35."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _days_between(start: object, end: object) -> float | None:
+    """Días (fraccionarios) entre dos marcas ISO (None si falta alguna). V3.35."""
+    start_dt = _dt_or_none(start)
+    end_dt = _dt_or_none(end)
+    if start_dt is None or end_dt is None:
+        return None
+    return max(0.0, (end_dt - start_dt).total_seconds() / 86400.0)
+
+
+def retrieval_anchor_at(row: dict) -> str:
+    """Marca ISO del ancla actual de la cadena de recuperación (V3.35, P1-1).
+
+    Es la ÚLTIMA recuperación válida del ítem: el más reciente entre la última
+    recuperación del micro-drill (`last_retrieval_at`) y la última recuperación
+    por texto (`last_recall_at`), porque ambas son recuperaciones del mismo
+    ítem y comparten la cadena longitudinal. Solo para la PRIMERA recuperación
+    se retrocede a la primera señal (`min(first_seen, first_exposed_at)`).
+    Devuelve "" si no hay ancla medible (fila sin recuperaciones ni
+    exposición/producción).
+    """
+    recents = [
+        dt
+        for dt in (
+            _dt_or_none(row.get("last_retrieval_at")),
+            _dt_or_none(row.get("last_recall_at")),
+        )
+        if dt is not None
+    ]
+    if recents:
+        return max(recents).isoformat()
+    candidates = [
+        dt
+        for dt in (
+            _dt_or_none(row.get("first_seen")),
+            _dt_or_none(row.get("first_exposed_at")),
+        )
+        if dt is not None
+    ]
+    return min(candidates).isoformat() if candidates else ""
+
+
+def delayed_retrieval_decision(
+    row: dict, *, now: str, due_at: str = ""
+) -> dict:
+    """Decisión determinista de si un intento acredita recuperación DEMORADA.
+
+    V3.35 (P1-1): la retención se mide como una CADENA
+    `evento_n → intervalo → evento_{n+1}`, no como repeticiones ancladas a la
+    primera exposición:
+
+    - `anchor_at` — la última recuperación válida o, si es la primera, la
+      primera señal del ítem (`retrieval_anchor_at`).
+    - `required_days` — el intervalo exigido. Si el ítem tiene carta FSRS
+      `lexicon` con `due_at`, es el hueco hasta su vencimiento (FSRS calcula el
+      intervalo, que crece con cada éxito); sin carta, el suelo
+      `RETENTION_MIN_INTERVAL_DAYS`. Nunca por debajo del suelo: un intervalo
+      diminuto (lapse) no es una recuperación demorada.
+    - `interval_days` — días reales desde el ancla hasta `now`.
+    - `credited` — `interval_days >= required_days` (False sin ancla).
+
+    Pura: no toca BD; el repositorio solo persiste el resultado.
+    """
+    anchor = retrieval_anchor_at(row)
+    interval = _days_between(anchor, now) if anchor else None
+    from_fsrs = _days_between(anchor, due_at) if (anchor and due_at) else None
+    required = (
+        max(float(RETENTION_MIN_INTERVAL_DAYS), from_fsrs)
+        if from_fsrs is not None
+        else float(RETENTION_MIN_INTERVAL_DAYS)
+    )
+    credited = interval is not None and interval >= required
+    return {
+        "anchor_at": anchor,
+        "interval_days": round(interval, 4) if interval is not None else None,
+        "required_days": round(required, 4),
+        "credited": credited,
+    }
 
 
 def _spaced_production(row: dict) -> bool:
@@ -444,6 +624,14 @@ def _recall_successes(row: dict) -> int:
 def _recall_days(row: dict) -> int:
     """Días distintos con recuperación correcta de recall (V3.34)."""
     return _int(row.get("recall_days"))
+
+
+def _recall_attempts(row: dict) -> int:
+    """Nº de INTENTOS de recall (acierto o fallo) del paso Recall (V3.35).
+
+    Separa el intento del éxito: `recall_successes` solo cuenta aciertos, así
+    que sin este contador no se puede distinguir "no lo intentó" de "falló"."""
+    return _int(row.get("recall_attempts"))
 
 
 def production_contexts(row: dict) -> list[str]:
@@ -550,6 +738,7 @@ def item_competence_matrix(row: dict) -> dict:
         "retrieval_days": _retrieval_days(row),
         "cued_recall": _recall_successes(row) > 0,
         "recall_successes": _recall_successes(row),
+        "recall_attempts": _recall_attempts(row),
         "recall_days": _recall_days(row),
         "production_gap": recognition and not production,
         "transfer_gap": recognition and production and not transfer,
@@ -685,7 +874,6 @@ def drill_candidates(
     *,
     ok_days: dict[str, set[str]] | None = None,
     today: str = "",
-    due_words: set[str] | None = None,
 ) -> list[str]:
     """Candidatos a speaking micro-drill escalera (V3.21, F6/V20-06).
 
@@ -703,22 +891,17 @@ def drill_candidates(
       está consolidada, se oculta hasta mañana (una producción del día no la
       elimina, pero tampoco se repite el mismo día).
 
-    V3.34: `due_words` (carta FSRS `lexicon` vencida) prioriza esas palabras al
-    frente de la lista, conservando el orden por recuerdo dentro de cada grupo.
-    Es un empujón determinista del repaso espaciado, no una puerta."""
+    V3.35 (P1-2): esta cola es SOLO de producción oral pendiente. El repaso
+    espaciado del léxico (cartas FSRS `lexicon` vencidas) vive en la cola propia
+    `GET /api/learning/review` (actividad recomendada por hueco de competencia);
+    ya NO se inyecta aquí como prioridad. Mezclar la programación espaciada con
+    el micro-drill de speaking confundía dos conceptos distintos."""
     pending = (
         row
         for row in rows
         if _is_pending_drill_candidate(row, ok_days=ok_days, today=today)
     )
-    due = due_words or set()
-    candidates = sorted(
-        pending,
-        key=lambda row: (
-            0 if row.get("word") in due else 1,
-            item_recall(row, now),
-        ),
-    )
+    candidates = sorted(pending, key=lambda row: item_recall(row, now))
     return [row["word"] for row in candidates[: max(0, limit)]]
 
 

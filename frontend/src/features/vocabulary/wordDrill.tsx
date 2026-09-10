@@ -71,6 +71,9 @@ export interface SpeakingDrillSectionProps {
   drillWord: string | null;
   onDrillChange: (word: string | null) => void;
   onProduced: (word: string) => void;
+  /** V3.35: peldaño con el que abre el drill de la palabra seleccionada (la
+   * cola de repaso abre directamente en la actividad recomendada). */
+  initialStep?: DrillStep;
 }
 
 /** Speaking micro-drill de 1 nivel honesto (V3.19): chips accionables que abren
@@ -83,6 +86,7 @@ export function SpeakingDrillSection({
   drillWord,
   onDrillChange,
   onProduced,
+  initialStep,
 }: SpeakingDrillSectionProps) {
   const { t } = useI18n();
 
@@ -129,6 +133,7 @@ export function SpeakingDrillSection({
           <WordDrill
             userId={userId}
             word={drillWord}
+            initialStep={initialStep}
             onProduced={() => onProduced(drillWord)}
             onClose={() => onDrillChange(null)}
           />
@@ -143,6 +148,9 @@ export interface WordDrillProps {
   word: string;
   onProduced: () => void;
   onClose: () => void;
+  /** V3.35: peldaño inicial de la escalera. Por defecto Recognition (V3.33.1);
+   * la cola de repaso abre en la actividad recomendada por hueco. */
+  initialStep?: DrillStep;
 }
 
 type DrillOutcome = DrillAttempt | DrillSentenceAttempt;
@@ -256,11 +264,18 @@ function RecallStep({
  * paso oral de palabra suelta): el micrófono queda solo para Sentence y
  * `onProduced` solo lo dispara Sentence (un recall correcto deja señal léxica
  * de recall, no producción). Si Recall no tiene cue, degrada a Sentence. */
-export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
+export function WordDrill({
+  userId,
+  word,
+  onProduced,
+  onClose,
+  initialStep = "recognition",
+}: WordDrillProps) {
   const { t } = useI18n();
-  // V3.33.1: el drill abre en el primer peldaño (Recognition). Si la pregunta
-  // no está disponible, `loadRecognition` degrada a Recall (V3.19).
-  const [step, setStep] = useState<DrillStep>("recognition");
+  // V3.33.1: el drill abre en el primer peldaño (Recognition) salvo que la cola
+  // de repaso pida otro (V3.35). Si la pregunta no está disponible,
+  // `loadRecognition` degrada a Recall (V3.19).
+  const [step, setStep] = useState<DrillStep>(initialStep);
   const [sentence, setSentence] = useState<DrillSentenceContext | null>(null);
   const [sentenceError, setSentenceError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -361,18 +376,25 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
       );
   }, [userId, word, t, loadRecall]);
 
-  // V3.33.1: el drill arranca en Recognition (primer peldaño real de la
-  // escalera) y limpia el intento anterior al montar o cambiar de palabra.
+  // V3.33.1 / V3.35: el drill arranca en el peldaño pedido (`initialStep`,
+  // Recognition por defecto) y limpia el intento anterior al montar o cambiar
+  // de palabra o de peldaño inicial.
   useEffect(() => {
-    setStep("recognition");
+    setStep(initialStep);
     setSentence(null);
     setSentenceError(null);
     setResult(null);
     setError(null);
     setRecognition(null);
     setRecall(null);
-    loadRecognition();
-  }, [loadRecognition]);
+    if (initialStep === "recall") {
+      loadRecall();
+    } else if (initialStep === "sentence") {
+      loadSentence();
+    } else {
+      loadRecognition();
+    }
+  }, [loadRecognition, loadRecall, loadSentence, initialStep]);
 
   function chooseStep(next: DrillStep) {
     if (next === step || recording || processing) return;
