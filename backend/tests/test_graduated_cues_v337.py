@@ -92,12 +92,13 @@ def _due_lexicon_card(uid: str, word: str, *, stability: float, days_ago: int) -
 
 
 def test_ladder_vocabulary_is_declared_and_consistent():
-    assert recall.RECALL_CUES == ("translation", "definition", "cloze")
+    assert recall.RECALL_CUES == ("translation", "definition", "cloze", "situation")
     # El apoyo declarado vive junto a la escalera, en la capa pura.
     assert recall.RECALL_CUE_SUPPORT == {
         "translation": "cued",
         "definition": "cued",
         "cloze": "guided",
+        "situation": "guided",
     }
     assert set(recall.RECALL_CUE_SUPPORT) == set(recall.RECALL_CUES)
     # Todos los apoyos de la escalera pertenecen al eje canónico del ledger.
@@ -234,7 +235,7 @@ def test_next_recall_rung_ascends_only_with_consolidated_evidence():
         )
         == "cloze"
     )
-    # El techo de la escalera es el cloze (mantenimiento espaciado).
+    # V3.38: con `cloze` consolidado, el ideal es el peldaño situacional.
     assert (
         recall.next_recall_rung(
             {},
@@ -243,24 +244,48 @@ def test_next_recall_rung_ascends_only_with_consolidated_evidence():
                 "recall_rung_days": {"translation": 2, "definition": 2, "cloze": 2},
             },
         )
-        == "cloze"
+        == "situation"
+    )
+    # El techo de la escalera es `situation` (mantenimiento espaciado).
+    assert (
+        recall.next_recall_rung(
+            {},
+            {
+                "recall_rungs": {
+                    "translation": 2,
+                    "definition": 2,
+                    "cloze": 2,
+                    "situation": 2,
+                },
+                "recall_rung_days": {
+                    "translation": 2,
+                    "definition": 2,
+                    "cloze": 2,
+                    "situation": 2,
+                },
+            },
+        )
+        == "situation"
     )
 
 
 def test_resolve_recall_cue_degrades_down_never_up():
-    rungs = {"translation", "definition", "cloze"}
+    rungs = {"translation", "definition", "cloze", "situation"}
     # El ideal disponible se sirve tal cual.
+    assert recall.resolve_recall_cue("situation", rungs) == "situation"
     assert recall.resolve_recall_cue("cloze", rungs) == "cloze"
     assert recall.resolve_recall_cue("definition", rungs) == "definition"
     # Sin contenido, baja hacia MÁS apoyo (nunca hacia menos).
-    assert recall.resolve_recall_cue("cloze", {"definition"}) == "definition"
+    assert recall.resolve_recall_cue("situation", {"cloze"}) == "cloze"
+    assert recall.resolve_recall_cue("situation", {"definition"}) == "definition"
     assert recall.resolve_recall_cue("cloze", {"translation"}) == "translation"
     assert recall.resolve_recall_cue("definition", {"translation"}) == "translation"
     # Sin ningún peldaño disponible → None (degradación `available=false`).
-    assert recall.resolve_recall_cue("cloze", set()) is None
+    assert recall.resolve_recall_cue("situation", set()) is None
     # NUNCA sube la exigencia sin evidencia que lo justifique.
     assert recall.resolve_recall_cue("translation", {"cloze"}) is None
     assert recall.resolve_recall_cue("translation", {"definition", "cloze"}) is None
+    assert recall.resolve_recall_cue("cloze", {"situation"}) is None
     assert recall.resolve_recall_cue("bogus", rungs) is None
 
 

@@ -137,6 +137,7 @@ def init_db() -> None:
                 pos TEXT NOT NULL DEFAULT '',
                 definition TEXT NOT NULL DEFAULT '',
                 translation TEXT NOT NULL DEFAULT '',
+                situation TEXT NOT NULL DEFAULT '',
                 generator_version TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT ''
@@ -154,6 +155,15 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE dictionary_entries ADD COLUMN "
                 "generator_version TEXT NOT NULL DEFAULT ''"
+            )
+        # V3.38: enunciado situacional del peldaño `situation` de la escalera de
+        # recall. Columna aditiva (NULL → ''), con la misma política de versión
+        # que el resto del contenido: el bump de `GENERATOR_VERSION` a 1.2.0
+        # hace que la caché previa (sin situación) se regenere una sola vez.
+        if "situation" not in dict_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_entries ADD COLUMN "
+                "situation TEXT NOT NULL DEFAULT ''"
             )
         # V3.31: el contenido sin versión (creado antes de V3.30.1) se etiqueta
         # con la marca LEGACY `1.0.0`, deliberadamente DISTINTA de la

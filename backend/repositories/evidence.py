@@ -322,6 +322,12 @@ def summarize_by_target(
     `recall_rung_failures` (fallos por peldaño: lo que lee la regresión).
     Los tres histogramas comparten el mismo vocabulario de peldaño.
 
+    V3.38 (P1-03 de la auditoría de V3.37.0) añade la segmentación por
+    MODALIDAD: `skill_successes`/`skill_success_days` y
+    `skill_independent_successes`/`skill_independent_days`, agrupados por
+    `LOWER(skill)` y restringidos a los valores canónicos de `LEXICAL_SKILLS`
+    (solo ÉXITOS, como la versión pura). Es la base de `automatic_skills`.
+
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
     # Import local (misma convención que el resto del repositorio): la capa pura
@@ -329,12 +335,15 @@ def summarize_by_target(
     # vocabulario del peldaño.
     from services.evidence import (
         INDEPENDENT_SUPPORT_LEVELS,
+        LEXICAL_SKILLS,
         RECALL_RUNG_EVIDENCE,
         recall_rung_from_activity,
     )
 
     independent = sorted(INDEPENDENT_SUPPORT_LEVELS)
     placeholders = ", ".join("?" for _ in independent)
+    skills = tuple(LEXICAL_SKILLS)
+    skill_placeholders = ", ".join("?" for _ in skills)
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT target_id, COUNT(*) AS attempts, "
@@ -404,6 +413,24 @@ def summarize_by_target(
             "GROUP BY target_id, activity_id",
             (user_id, target_type, f"{RECALL_RUNG_EVIDENCE}%"),
         ).fetchall()
+        # V3.38 (P1-03): histogramas por MODALIDAD. Se agrupan SOLO los éxitos
+        # (`success = 1`), igual que la versión pura, que crea la clave en el
+        # éxito: una modalidad con únicamente fallos no aparece en ninguno de
+        # los dos. El `NULLIF` del día vacío replica el 0 de la versión pura.
+        skill_rows = conn.execute(
+            "SELECT target_id, LOWER(skill) AS skill, COUNT(*) AS successes, "
+            "COUNT(DISTINCT NULLIF(substr(occurred_at, 1, 10), '')) AS days, "
+            "COALESCE(SUM(CASE WHEN support_level IN "
+            f"({placeholders}) THEN 1 ELSE 0 END), 0) AS independent_successes, "
+            "COUNT(DISTINCT CASE WHEN support_level IN "
+            f"({placeholders}) THEN NULLIF(substr(occurred_at, 1, 10), '') "
+            "END) AS independent_days "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND success = 1 "
+            f"AND LOWER(skill) IN ({skill_placeholders}) "
+            "GROUP BY target_id, LOWER(skill)",
+            (*independent, *independent, user_id, target_type, *skills),
+        ).fetchall()
     intervals: dict[str, list[float]] = {}
     for row in interval_rows:
         intervals.setdefault(row["target_id"], []).append(
@@ -439,6 +466,21 @@ def summarize_by_target(
             continue
         bucket = recall_rung_failures.setdefault(row["target_id"], {})
         bucket[rung] = bucket.get(rung, 0) + int(row["total"])
+    skill_successes: dict[str, dict[str, int]] = {}
+    skill_success_days: dict[str, dict[str, int]] = {}
+    skill_independent_successes: dict[str, dict[str, int]] = {}
+    skill_independent_days: dict[str, dict[str, int]] = {}
+    for row in skill_rows:
+        target = row["target_id"]
+        skill = row["skill"]
+        skill_successes.setdefault(target, {})[skill] = int(row["successes"])
+        skill_success_days.setdefault(target, {})[skill] = int(row["days"])
+        skill_independent_successes.setdefault(target, {})[skill] = int(
+            row["independent_successes"]
+        )
+        skill_independent_days.setdefault(target, {})[skill] = int(
+            row["independent_days"]
+        )
     return {
         row["target_id"]: {
             "attempts": int(row["attempts"]),
@@ -457,6 +499,14 @@ def summarize_by_target(
             "recall_rungs": recall_rungs.get(row["target_id"], {}),
             "recall_rung_days": recall_rung_days.get(row["target_id"], {}),
             "recall_rung_failures": recall_rung_failures.get(row["target_id"], {}),
+            "skill_successes": skill_successes.get(row["target_id"], {}),
+            "skill_success_days": skill_success_days.get(row["target_id"], {}),
+            "skill_independent_successes": skill_independent_successes.get(
+                row["target_id"], {}
+            ),
+            "skill_independent_days": skill_independent_days.get(
+                row["target_id"], {}
+            ),
             "mean_response_time_ms": (
                 round(float(row["mean_latency"]), 1)
                 if row["mean_latency"] is not None

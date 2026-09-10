@@ -134,6 +134,13 @@ class LexicalEvidence(BaseModel):
     V3.37.1 (consolidación y regresión) añade `recall_rung_days` (días
     distintos con éxito por peldaño: lo que exige dar el peldaño por superado)
     y `recall_rung_failures` (fallos por peldaño: lo que lee la regresión).
+
+    V3.38 (P1-03) añade la segmentación por MODALIDAD, para que la automaticidad
+    deje de ser un booleano global: `skill_successes`/`skill_success_days`
+    (volumen y días con éxito por modalidad) y `skill_independent_successes`/
+    `skill_independent_days` (restringidos a éxito sin apoyo: la base de
+    `services.evidence.automatic_skills`). Las claves son valores de
+    `LEXICAL_SKILLS`; un `skill` legacy fuera del vocabulario no entra.
     """
 
     attempts: int = 0
@@ -148,6 +155,10 @@ class LexicalEvidence(BaseModel):
     recall_rungs: dict[str, int] = Field(default_factory=dict)
     recall_rung_days: dict[str, int] = Field(default_factory=dict)
     recall_rung_failures: dict[str, int] = Field(default_factory=dict)
+    skill_successes: dict[str, int] = Field(default_factory=dict)
+    skill_success_days: dict[str, int] = Field(default_factory=dict)
+    skill_independent_successes: dict[str, int] = Field(default_factory=dict)
+    skill_independent_days: dict[str, int] = Field(default_factory=dict)
     mean_response_time_ms: float | None = None
 
 
@@ -398,6 +409,9 @@ class DictionaryEntryOut(BaseModel):
     pos: str = ""
     definition: str | None = None
     translation: str | None = None
+    # V3.38: enunciado situacional (frase de escenario con un hueco `_____`) del
+    # 4.º peldaño de la escalera de recall. `None` si el generador no lo produjo.
+    situation: str | None = None
     example: DictionaryExampleOut | None = None
     usage: DictionaryUsageOut
 
@@ -555,13 +569,17 @@ class RecallPromptOut(BaseModel):
 
     V3.37: `cue_kind` admite el tercer peldaño (`cloze`, con la frase en blanco
     como `cue`) y el payload gana `support_level` (apoyo que declara el peldaño
-    servido: `cued`/`cued`/`guided`; vacío si no hay peldaño).
+    servido: `cued`/`cued`/`guided`/`guided`; vacío si no hay peldaño).
+
+    V3.38: `cue_kind` admite el cuarto peldaño (`situation`, el enunciado
+    situacional autorado con hueco `_____`, servido desde el contrato de
+    contenido de la caché).
     """
 
     word: str
     available: bool
     cue: str = ""
-    cue_kind: str = ""  # "translation" | "definition" | "cloze" | ""
+    cue_kind: str = ""  # "translation" | "definition" | "cloze" | "situation" | ""
     support_level: str = ""
 
 
@@ -576,7 +594,10 @@ class RecallAttemptIn(BaseModel):
     V3.37: `cue` es el peldaño que el cliente dice que le sirvieron
     (`translation`/`definition`/`cloze`; vacío = cliente antiguo, escalera por
     defecto de V3.36). El servidor lo RE-DERIVA y puntúa igual: un peldaño no
-    soportado o sin contenido para la palabra responde 422 sin evento."""
+    soportado o sin contenido para la palabra responde 422 sin evento.
+
+    V3.38: `cue` admite también `situation`.
+    """
 
     word: str = Field(min_length=1, max_length=120)
     answer: str = Field(default="", max_length=120)

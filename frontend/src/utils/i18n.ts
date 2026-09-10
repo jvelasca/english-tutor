@@ -466,6 +466,10 @@ const STRINGS: Record<string, Entry> = {
     en: "Complete the sentence with the missing word.",
     es: "Completa la frase con la palabra que falta.",
   },
+  "dictionary.drill.recallCue.situation": {
+    en: "Read the situation and type the word that fits the gap.",
+    es: "Lee la situación y escribe la palabra que encaja en el hueco.",
+  },
   "dictionary.drill.recallInputLabel": {
     en: "Type the word",
     es: "Escribe la palabra",

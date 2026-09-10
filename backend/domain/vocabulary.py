@@ -26,7 +26,13 @@ from services import (
     lexicon,
     recall,
 )
-from services.evidence import classify_recall_error, recall_rung_activity
+from services.evidence import (
+    DRILL_SKILL,
+    RECALL_SKILL,
+    classify_recall_error,
+    production_skill,
+    recall_rung_activity,
+)
 from services.evidence import empty_summary as empty_evidence
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
@@ -79,7 +85,13 @@ async def _record_production_evidence(
     (`context_id="lexicon:<canal>"`), su actividad concreta (`activity_id`) y el
     APOYO del canal (`_PRODUCTION_SUPPORT`: chat libre → `spontaneous`,
     conversación guiada → `guided`, speaking/writing → `independent`). El apoyo
-    es del canal, no del resultado: no cambia con el acierto."""
+    es del canal, no del resultado: no cambia con el acierto.
+
+    V3.38 (P1-03): la MODALIDAD (`skill`) deja de ser el canal crudo y pasa a
+    ser el vocabulario declarado de `LEXICAL_SKILLS` (`production_skill`): el
+    canal concreto no se pierde (sigue en `context_id`/`activity_id`), pero la
+    automaticidad ya puede segmentarse por modalidad en lugar de mezclar
+    producción escrita y oral."""
     if not words:
         return
     support_level = _PRODUCTION_SUPPORT.get(channel, "independent")
@@ -92,7 +104,7 @@ async def _record_production_evidence(
                     "target_type": "lexicon",
                     "target_id": word,
                     "surface_form": word,
-                    "skill": channel,
+                    "skill": production_skill(channel),
                     "task": "production",
                     "activity": activity or "",
                     "activity_id": activity or channel,
@@ -366,6 +378,8 @@ async def _record_retrieval(
     paso palabra del paso frase), el APOYO `guided` (el alumno repite tras oír
     un modelo: producción con andamiaje), la dificultad del ÍTEM y la latencia
     de la respuesta cuando el cliente la mide.
+    V3.38 (P1-03): la MODALIDAD del evento es `spoken_production` (el alumno
+    dice la palabra o la frase en voz alta), no el canal crudo.
     Nunca lanza: es señal pedagógica y no debe romper la puntuación. Devuelve la
     decisión tomada (para saber si acreditó y con qué intervalo de retención).
     """
@@ -386,6 +400,7 @@ async def _record_retrieval(
                 target_id=word,
                 surface_form=word,
                 lexical_unit=row.get("lexical_unit") or word,
+                skill=DRILL_SKILL,
                 task=task,
                 activity="drill",
                 activity_id=activity_id,
@@ -672,9 +687,10 @@ async def get_recall_prompt(
 
     - `cue=None` conserva EXACTAMENTE el comportamiento V3.34 (traducción y, si
       no, definición sin spoiler) para no romper clientes antiguos.
-    - `cue="translation"|"definition"|"cloze"` sirve ESE peldaño. El dominio
-      re-deriva el peldaño de forma pura (premisa 21) y, para `cloze`, obtiene
-      la frase real del banco de pronunciación (`example_for`).
+    - `cue="translation"|"definition"|"cloze"|"situation"` sirve ESE peldaño. El
+      dominio re-deriva el peldaño de forma pura (premisa 21) y, para `cloze`,
+      obtiene la frase real del banco de pronunciación (`example_for`); para
+      `situation` sirve el enunciado situacional de la caché (V3.38).
     - Si no hay contenido para el peldaño pedido (o no hay cue utilizable sin
       `cue`), devuelve `available=false` con `cue=""`: degradación controlada
       sin evento (el peldaño muestra aviso y no rompe Sentence).
@@ -765,10 +781,15 @@ async def submit_recall_attempt(
     premisa 21) y el servidor lo RE-DERIVA con la misma función pura: un `cue`
     no soportado o sin contenido para esa palabra se rechaza con 422, sin
     evento. El evento pasa a declarar el `support_level` del peldaño real
-    (`cued`/`cued`/`guided`) y `activity_id="drill:recall:<peldaño>"`, de modo
-    que el ledger distinga apoyos y la escalera pueda leer sus éxitos. El
+    (`cued`/`cued`/`guided`/`guided`) y el `activity_id`
+    `drill:recall:<peldaño>`, de modo que el ledger distinga apoyos y la
+    escalera pueda leer sus éxitos. El
     scoring NO cambia: un acierto con cloze vale lo mismo que con traducción
     para el contador de recall; lo que cambia es lo que el ledger sabe.
+
+    V3.38 (P1-03): el evento declara su MODALIDAD (`skill="recall"`), para que
+    la automaticidad pueda segmentarse por modalidad y no se mezcle con la
+    producción oral/escrita del mismo ítem.
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
@@ -838,6 +859,7 @@ async def submit_recall_attempt(
         target_id=normalized,
         surface_form=normalized,
         lexical_unit=row_before.get("lexical_unit") or normalized,
+        skill=RECALL_SKILL,
         task="recall",
         activity="drill",
         activity_id=activity_id,
@@ -1027,6 +1049,10 @@ def _build_dictionary_entry(
         "pos": cache.get("pos", ""),
         "definition": definition,
         "translation": translation,
+        # V3.38: enunciado situacional (4.º peldaño de recall). Se expone en la
+        # consulta como contenido, igual que definición/traducción (no es
+        # evidencia ni sirve la respuesta esperada).
+        "situation": (cache.get("situation") or "").strip() or None,
         "example": example_sentences.example_for(normalized),
         "usage": {
             "tracked": tracked,
@@ -1203,6 +1229,7 @@ async def _generate_and_persist(
             pos=content.get("pos", ""),
             definition=content.get("definition", ""),
             translation=content.get("translation", ""),
+            situation=content.get("situation", ""),
             generator_version=dictionary_content.GENERATOR_VERSION,
         )
         persisted = await run_in_threadpool(dictionary_repo.get_entry, word)
@@ -1215,6 +1242,7 @@ async def _generate_and_persist(
         "pos": content.get("pos", ""),
         "definition": content.get("definition", ""),
         "translation": content.get("translation", ""),
+        "situation": content.get("situation", ""),
         "generator_version": dictionary_content.GENERATOR_VERSION,
     }
 

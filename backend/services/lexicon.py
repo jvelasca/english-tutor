@@ -36,9 +36,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from services import forgetting, fsrs, mastery
+from services import forgetting, fsrs, mastery, planner
 from services.curriculum import CEFR_ORDER
-from services.evidence import is_automatic
+from services.evidence import automatic_skills, is_automatic
 from services.recall import RECALL_CUES, next_recall_rung, resolve_recall_cue
 
 # Mínimos de producción espaciada para considerar una palabra dominada
@@ -399,8 +399,18 @@ def recommend_review_activity(
     - V3.37: si el ítem es `automatic` (éxito independiente y ESPACIADO,
       `services.evidence.is_automatic`) y no hay hueco de producción → `recall`
       de MANTENIMIENTO (razón `automatic_maintenance`), que la cola sirve en el
-      peldaño `cloze`;
+      peldaño más exigente disponible;
     - el resto (producida y transferida) → `recall` de mantenimiento.
+
+    V3.38 (planner / Optimal Next Task): añade razones ADITIVAS dirigidas por la
+    evidencia fina de V3.36, que solo entran cuando el ledger las justifica
+    (`services.planner.evidence_reason`):
+
+    - `error_prone` — fallos `wrong_word` repetidos (confusión real, no errata)
+      → volver a practicar el ítem (`recall`);
+    - `skill_gap` — el ítem logra algo pero NO tiene ningún éxito en una
+      modalidad de producción (segmentación de V3.38) → `sentence`;
+    - `slow_recall` — aciertos medidos pero aún lentos → `recall`.
 
     Nota de diseño: NO se usa `item_recall` para decidir "reconocimiento débil"
     porque esa probabilidad es función de la PRODUCCIÓN (curva de olvido sobre
@@ -417,6 +427,9 @@ def recommend_review_activity(
         return {"activity": "recall", "reason": "no_recall_evidence"}
     if matrix.get("production_gap"):
         return {"activity": "sentence", "reason": "production_gap"}
+    planned = planner.evidence_reason(matrix, evidence)
+    if planned:
+        return {"activity": planner.ACTIVITY_FOR_REASON[planned], "reason": planned}
     if evidence is not None and is_automatic(evidence):
         return {"activity": "recall", "reason": "automatic_maintenance"}
     return {"activity": "recall", "reason": "maintenance"}
@@ -446,6 +459,16 @@ def review_queue_item(
       contenido. Sigue SIN incluir el cue: solo su nombre.
     - `automatic` — el ítem acumula éxito independiente y espaciado
       (`services.evidence.is_automatic`).
+
+    V3.38 (planner / Optimal Next Task) añade, también aditivos:
+
+    - `priority` — prioridad 0..1 de la siguiente tarea (`services.planner`):
+      combina olvido, hueco, debilidad, dependencia de apoyo y latencia. Es lo
+      que permite ordenar la cola por "tarea óptima" y no solo por urgencia;
+    - `signals` — las señales que producen esa prioridad (explicables);
+    - `why` — explicación legible (inglés) de la recomendación;
+    - `automatic_skills` — modalidades en las que el ítem es automático
+      (P1-03: la automaticidad deja de ser un booleano global).
     """
     matrix = item_competence_matrix(row)
     summary = evidence if evidence is not None else {}
@@ -455,6 +478,14 @@ def review_queue_item(
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
     stability = float(card.get("stability") or 0.0)
+    retrievability = (
+        fsrs.retrievability(stability, elapsed)
+        if stability > 0 and last
+        else None
+    )
+    signals = planner.planned_signals(
+        summary, matrix, retrievability=retrievability
+    )
     recommended_cue = ""
     if recommendation["activity"] == "recall":
         ideal = (
@@ -474,16 +505,16 @@ def review_queue_item(
         "due_at": card.get("due_at") or "",
         "state": card.get("state") or "new",
         "stability": round(stability, 3),
-        "retrievability": (
-            fsrs.retrievability(stability, elapsed)
-            if stability > 0 and last
-            else None
-        ),
+        "retrievability": retrievability,
         "elapsed_days": round(elapsed, 3) if elapsed is not None else None,
         "activity": recommendation["activity"],
         "reason": recommendation["reason"],
         "recommended_cue": recommended_cue,
         "automatic": is_automatic(summary),
+        "automatic_skills": automatic_skills(summary),
+        "priority": planner.priority_score(signals),
+        "signals": signals,
+        "why": planner.explain_priority(signals, recommendation["reason"]),
         "competence": matrix,
         "evidence": evidence if evidence is not None else {},
     }

@@ -27,12 +27,13 @@ def get_entry(word: str) -> dict | None:
 
     `word` debe venir ya normalizada (minúsculas, sin puntuación circundante).
     Incluye `generator_version` para que el dominio decida si la caché es
-    válida con la política actual (V3.30.1, P1-03).
+    válida con la política actual (V3.30.1, P1-03) y `situation` (V3.38): el
+    enunciado situacional del peldaño `situation` de la escalera de recall.
     """
     with closing(_conn()) as conn:
         row = conn.execute(
-            "SELECT word, pos, definition, translation, generator_version, "
-            "created_at, updated_at "
+            "SELECT word, pos, definition, translation, situation, "
+            "generator_version, created_at, updated_at "
             "FROM dictionary_entries WHERE word = ?",
             (word,),
         ).fetchone()
@@ -45,6 +46,7 @@ def save_entry(
     pos: str = "",
     definition: str = "",
     translation: str = "",
+    situation: str = "",
     generator_version: str = "",
 ) -> bool:
     """Inserta o sobrescribe la entrada de diccionario de `word` (V3.30.1).
@@ -55,27 +57,41 @@ def save_entry(
     actualiza en cada escritura y `created_at` solo en la inserción inicial.
     Devuelve True si hubo operación de escritura (fila insertada o
     actualizada); el contenido es global (sin `user_id`).
+
+    V3.38: `situation` es el enunciado situacional (con hueco `_____`) del
+    peldaño `situation`; se persiste junto al resto del contenido para no pagar
+    dos veces la latencia del modelo.
     """
     with closing(_conn()) as conn, conn:
         now = _now()
         cursor = conn.execute(
             "INSERT INTO dictionary_entries "
-            "(word, pos, definition, translation, generator_version, "
+            "(word, pos, definition, translation, situation, generator_version, "
             "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(word) DO UPDATE SET "
             "pos = excluded.pos, "
             "definition = excluded.definition, "
             "translation = excluded.translation, "
+            "situation = excluded.situation, "
             "generator_version = excluded.generator_version, "
             "updated_at = excluded.updated_at",
-            (word, pos, definition, translation, generator_version, now, now),
+            (
+                word,
+                pos,
+                definition,
+                translation,
+                situation,
+                generator_version,
+                now,
+                now,
+            ),
         )
         return cursor.rowcount > 0
 
 
 _ENTRY_COLUMNS = (
-    "word, pos, definition, translation, generator_version, "
+    "word, pos, definition, translation, situation, generator_version, "
     "created_at, updated_at"
 )
 

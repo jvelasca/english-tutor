@@ -5,6 +5,46 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.38 publicada** — release **v3.38.0** (**La
+> siguiente tarea óptima: `situación`, planner y automaticidad por skill**).
+> Cierra el incremento que V3.37 dejó abierto, en tres frentes. **(1) P1-03
+> (automaticidad por modalidad).** El `skill` del ledger léxico deja de ser
+> `""`: `services/evidence.py` declara el vocabulario canónico
+> `LEXICAL_SKILLS` (`recall`, `written_production`, `spoken_production`,
+> `spontaneous_use`) y el mapeo canal→skill (`production_skill`); los caminos de
+> escritura (`domain/vocabulary.py`) declaran la modalidad. `summarize_evidence`/
+> `empty_summary` y `summarize_by_target` añaden `skill_successes`/
+> `skill_success_days`/`skill_independent_successes`/`skill_independent_days`
+> (**paridad exacta pura↔SQL** fijada por test) y `automatic_skills` segmenta la
+> automaticidad por modalidad: un ítem ya no es "automático" por mezclar
+> reconocimiento con producción. **Sin migración** (la columna `skill` ya existía
+> desde V3.36.0). **(2) Planner (Optimal Next Task).** Nuevo servicio puro
+> `services/planner.py`: `planned_signals` (olvido, hueco, debilidad, dependencia
+> de apoyo y latencia), `priority_score` con `PRIORITY_WEIGHTS` declarados y
+> `evidence_reason` (`error_prone`, `skill_gap`, `slow_recall`), integrados en
+> `recommend_review_activity`. La cola (`domain/review.py`) se ordena por
+> `priority` (desempate por `retrievability` y palabra) y cada ítem expone
+> `priority`/`signals`/`why`/`automatic_skills` — aditivos y sin spoiler.
+> **(3) `situación`.** `GENERATOR_VERSION` 1.1.0 → **1.2.0** y nueva columna
+> `dictionary_entries.situation` (**migración aditiva e idempotente**, con
+> backfill `''`): un enunciado situacional con un único hueco `_____`, validado
+> de forma determinista (un solo hueco, sin spoiler, ≤ `MAX_SITUATION_CHARS`) y
+> descartado —sin invalidar definición/traducción— si no cumple.
+> `RECALL_CUES` gana `situation` como TECHO de la escalera con apoyo `guided`;
+> `next_recall_rung` solo llega a él con `cloze` consolidado y
+> `resolve_recall_cue` sigue degradando solo hacia más apoyo; el GET/POST del
+> drill lo sirven y lo declaran (`drill:recall:situation`) y la cola lo
+> recomienda cuando hay contenido. Contrato aditivo (`LexicalEvidence`,
+> `ReviewQueueItem`, `DictionaryEntry`); sin tocar scoring, FSRS ni la semántica
+> del intervalo de evidencia (V3.35.1 P1-01). Tests: pytest **1880 passed**
+> (+56: nuevos `test_skill_segmentation_v338.py`, `test_planner_v338.py` y
+> `test_situational_cue_v338.py`) + ruff limpio + vitest (65 ficheros/**560**) +
+> `tsc --noEmit` limpio + `check_release_consistency` **3.38.0** exit 0.
+> Se actualizan las expectativas de V3.37/V3.37.1 (el techo pasa de `cloze` a
+> `situation`). Diferidos a V3.39: deudas de V3.30 + transferencia por contexto
+> V3.23 + `cloze_coverage` de corpus + `example_for_many` de la Review Queue +
+> refactor de `wordDrill.tsx`.
+>
 > **Nota (2026-09-10):** **V3.37.1 publicada** — release **v3.37.1**
 > (**Política de consolidación y regresión de la escalera de recall**). Patch
 > quirúrgico que cierra los dos P1 pedagógicos de la auditoría de V3.37.0, sin
@@ -1236,44 +1276,42 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-10):** `v3.37.1` **Política de consolidación y
-regresión de la escalera de recall** — la escalera del peldaño Recall solo
-asciende cuando el peldaño está CONSOLIDADO (≥2 éxitos en ≥2 días naturales
-distintos) y RETROCEDE hacia más apoyo ante fallos repetidos (≥2 sin ningún
-éxito), nunca por debajo de `translation`: `services/recall.py` centraliza la
-política y `recall_rung_days`/`recall_rung_failures` (puros + paridad pura↔SQL)
-la alimentan consumiendo el `activity_id` que V3.37 ya escribía. Sin migración de
-BD y sin tocar scoring/FSRS. Cerrada antes la **V3.37.0** (Learning Evidence 3.0:
-la escalera es una PROGRESIÓN `translation (cued) < definition (cued) < cloze
-(guided)` —el ledger registra por peldaño `drill:recall:<peldaño>` →
-`recall_rungs`, `next_recall_rung` decide por evidencia y `resolve_recall_cue`
-degrada siempre hacia más apoyo— y `is_automatic` exige ≥2 éxitos sin apoyo en
-días naturales distintos), la **V3.36.0**
-(Learning Evidence 2.0: el ledger captura el CÓMO de cada evento —
-`support_level`, `difficulty`, `context_id`/`activity_id`, `response_time_ms` y
-`error_type` observacional), la **V3.35.1** (patch de integridad del ledger:
-semántica del intervalo de evidencia, cronología de los intervalos, no spoiler
-en la cola de repaso y lotes degenerados en `record_evidence_bulk`) y la
-**V3.35.0** (Longitudinal Learning Evidence 1.0: ancla de retención encadenada +
-cola de repaso propia + tabla `learning_evidence` + `event_role`). CI 6/6 en
+**Posición actual (2026-09-10):** `v3.38.0` **La siguiente tarea óptima:
+`situación`, planner y automaticidad por skill** — la evidencia fina (modalidad,
+latencia, tipo de error, apoyo, contexto) por fin se USA para planificar y para
+hablar por modalidad. **(1)** El `skill` del ledger léxico deja de ser `""`
+(vocabulario canónico `LEXICAL_SKILLS` + mapeo canal→skill), el resumen segmenta
+los éxitos por skill (puro + SQL con paridad exacta) y `automatic_skills` mide
+automaticidad POR modalidad: un ítem no es "automático" por mezclar
+reconocimiento con producción. **(2)** Nuevo `services/planner.py` (Optimal Next
+Task): `planned_signals` (olvido, hueco, debilidad, dependencia de apoyo,
+latencia) + `priority_score` con pesos declarados + `evidence_reason`
+(`error_prone`, `skill_gap`, `slow_recall`); la cola de repaso se ordena por
+`priority` (desempate por `retrievability` y palabra) y expone
+`priority`/`signals`/`why`/`automatic_skills` sin spoiler. **(3)** `situación`:
+`GENERATOR_VERSION` 1.2.0 y columna `dictionary_entries.situation` (migración
+aditiva e idempotente) — un enunciado situacional con un único hueco `_____`,
+validado de forma determinista y descartado (sin invalidar definición/traducción)
+si no cumple; es el TECHO de la escalera de recall (`situation`, apoyo `guided`),
+servido por el drill y recomendado por la cola, degradando siempre hacia más
+apoyo. Contrato aditivo; sin tocar scoring, FSRS ni la semántica del intervalo de
+evidencia. Cerradas antes la **V3.37.1** (política de consolidación y regresión
+de la escalera: solo asciende con ≥2 éxitos en ≥2 días naturales distintos y
+RETROCEDE hacia más apoyo ante ≥2 fallos sin ningún éxito) y la **V3.37.0**
+(Learning Evidence 3.0: cues graduados `translation (cued) < definition (cued) <
+cloze (guided)` + automaticidad por evidencia espaciada), la **V3.36.0**
+(Learning Evidence 2.0: el ledger captura el CÓMO de cada evento) y la
+**V3.35.x** (Longitudinal Learning Evidence 1.0 + patch de integridad). CI 6/6 en
 verde. Versión en
 `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`.
 **Las notas de la cabecera de este documento son la fuente de verdad más
 reciente**; si contradicen a esta sección, mandan las notas.
 
-**Siguiente incremento (V3.38): `situación` + planner (Optimal Next Task).** En
-una frase: extender el contrato de contenido de la caché
-(`generator_version`, V3.30) para un enunciado situacional por palabra — el
-peldaño que V3.37 dejó fuera porque exige contenido autorado — y generalizar
-`recommend_review_activity` con retención FSRS + hueco de producción + hueco de
-TRANSFERENCIA por contexto (`context_id`/`activity_id`) + gradiente de apoyo
-(`support_level`). **No debería requerir migración** (las dimensiones ya están
-persistidas desde V3.36.0 y los peldaños desde V3.37.0). Debe absorber además el
-P1-03 diferido de la auditoría de V3.37.0: la automaticidad segmentada por
-skill/modalidad (hoy `skill=""` en todos los eventos léxicos), que es un cambio
-de modelo de evidencia, no de política. Después: **V3.39** (deudas diferidas de
-V3.30 + transferencia por contexto V3.23 + `cloze_coverage` de corpus +
-`example_for_many` de la Review Queue + refactor de `wordDrill.tsx`).
+**Siguiente incremento (V3.39).** Deudas diferidas de V3.30 + transferencia por
+contexto V3.23 + `cloze_coverage` de corpus + `example_for_many` de la Review
+Queue + refactor de `wordDrill.tsx`. Sin cambio de modelo de evidencia previsto:
+V3.38 ya dejó el ledger segmentado por modalidad y el planner leyendo la
+evidencia fina.
 
 **Histórico (hasta V2.4, 2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
 (la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).

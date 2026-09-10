@@ -54,6 +54,13 @@ class ReviewQueueItem(BaseModel):
     # espaciado (`services.evidence.is_automatic`). Aditivos.
     recommended_cue: str = ""
     automatic: bool = False
+    # V3.38 (planner / Optimal Next Task): prioridad combinada 0..1, señales que
+    # la producen (explicables), explicación legible y modalidades en las que el
+    # ítem ya es automático (P1-03). Aditivos.
+    priority: float = 0.0
+    signals: dict | None = None
+    why: str = ""
+    automatic_skills: list[str] = Field(default_factory=list)
     competence: dict | None = None
     # V3.35: evidencia longitudinal (`attempts`/`successes`/`days`/`intervals`).
     evidence: dict | None = None

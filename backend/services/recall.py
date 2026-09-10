@@ -21,7 +21,7 @@ V3.37 (cues graduados y automaticidad): la escalera deja de ser un FALLBACK
 (traducción y, si no, definición) y pasa a ser una PROGRESIÓN de peldaños
 declarados:
 
-    translation (cued) < definition (cued) < cloze (guided)
+    translation (cued) < definition (cued) < cloze (guided) < situation (guided)
 
 `recall_prompt_for` sirve el peldaño PEDIDO (o el de V3.34 cuando no se pide
 ninguno, para no romper clientes antiguos); `next_recall_rung` decide el peldaño
@@ -48,10 +48,21 @@ import re
 from services.phonetics import tokenize, unit_produced
 
 # Peldaños soportados, ordenados de MAYOR a MENOR apoyo. El orden ES la
-# hipótesis pedagógica declarada (`translation < definition < cloze`), y V3.37
-# deja los datos (`recall_rungs` por `activity_id`) para corregirla si el
-# corpus demuestra lo contrario.
-RECALL_CUES: tuple[str, ...] = ("translation", "definition", "cloze")
+# hipótesis pedagógica declarada (`translation < definition < cloze <
+# situation`), y V3.37/V3.38 dejan los datos (`recall_rungs` por `activity_id`)
+# para corregirla si el corpus demuestra lo contrario.
+#
+# V3.38 añade `situation`: un enunciado SITUACIONAL autorado (una frase de
+# escenario con un único hueco `_____` donde encaja la diana) que exige más que
+# el cloze — que reutiliza una frase REAL del banco de pronunciación — porque no
+# da la estructura sintáctica ya montada. Es contenido del contrato de la caché
+# (`dictionary_entries.situation`, `generator_version` 1.2.0), no del corpus.
+RECALL_CUES: tuple[str, ...] = (
+    "translation",
+    "definition",
+    "cloze",
+    "situation",
+)
 
 # Apoyo que declara cada peldaño en el ledger. Vive junto a la escalera, en la
 # capa pura, para que dominio, repositorio y tests no puedan divergir.
@@ -59,6 +70,7 @@ RECALL_CUE_SUPPORT: dict[str, str] = {
     "translation": "cued",
     "definition": "cued",
     "cloze": "guided",
+    "situation": "guided",
 }
 
 # V3.37.1 (política de consolidación): umbrales de "peldaño SUPERADO".
@@ -159,12 +171,15 @@ def recall_prompt_for(
       (comparación por superficie normalizada).
     - `cue=None` conserva EXACTAMENTE el comportamiento V3.34: `translation` si
       existe; si no, `definition` siempre que no contenga la palabra diana.
-    - `cue="translation"|"definition"|"cloze"` sirve ESE peldaño o devuelve
-      `None` si no tiene contenido (degradación controlada, sin evento). Un
-      `cue` no soportado también devuelve `None`.
+    - `cue="translation"|"definition"|"cloze"|"situation"` sirve ESE peldaño o
+      devuelve `None` si no tiene contenido (degradación controlada, sin
+      evento). Un `cue` no soportado también devuelve `None`.
     - `cloze` construye la frase en blanco a partir de `example`
       (`{"phrase": …}` de `services.example_sentences.example_for`); si no hay
       frase real en el corpus, `None` (nunca se inventa una frase).
+    - `situation` (V3.38) sirve el enunciado situacional cacheado de la entrada
+      (`situation`), que ya viene validado por el generador (un solo hueco y sin
+      la diana). Si la entrada no lo tiene, `None`.
     - `None` si la diana no existe en la caché.
 
     Nunca devuelve la forma esperada como respuesta.
@@ -216,6 +231,19 @@ def recall_prompt_for(
             "word": target_word,
             "cue": definition,
             "cue_kind": "definition",
+        }
+
+    if cue == "situation":
+        # V3.38: enunciado situacional del contrato de contenido. El generador ya
+        # garantiza el hueco único y la ausencia de spoiler; aquí solo se exige
+        # que exista y no filtre la diana (defensa en profundidad).
+        situation = (target.get("situation") or "").strip()
+        if not situation or _definition_leaks_word(situation, target_word):
+            return None
+        return {
+            "word": target_word,
+            "cue": situation,
+            "cue_kind": "situation",
         }
 
     # cue == "cloze": frase real del corpus con la unidad en blanco.
@@ -275,8 +303,9 @@ def next_recall_rung(row: dict, evidence: dict | None) -> str:
        endurece el significado de "superado" (`_rung_passed`): exige varios
        éxitos ESPACIADOS, de modo que la progresión es EVIDENCIA →
        CONSOLIDACIÓN → MÁS EXIGENCIA y no EVIDENCIA → MÁS EXIGENCIA. Sin ningún
-       peldaño consolidado → `translation`; con los tres consolidados → `cloze`
-       (mantenimiento espaciado: es el techo hasta que exista `situación`).
+       peldaño consolidado → `translation`; con los cuatro consolidados →
+       `situation` (mantenimiento espaciado: es el techo de la escalera; el
+       free recall de la producción vive en Sentence).
 
     2. REGRESIÓN (V3.37.1): si el peldaño ideal acumula
        `RECALL_REGRESSION_FAILURES` fallos SIN ningún éxito, la recomendación

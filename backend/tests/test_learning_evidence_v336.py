@@ -367,6 +367,11 @@ def test_empty_summary_matches_the_extended_contract():
         # fallos por peldaño, aditivos al contrato del resumen.
         "recall_rung_days": {},
         "recall_rung_failures": {},
+        # V3.38 (P1-03): histogramas por modalidad (aditivos).
+        "skill_successes": {},
+        "skill_success_days": {},
+        "skill_independent_successes": {},
+        "skill_independent_days": {},
         "mean_response_time_ms": None,
     }
 

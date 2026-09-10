@@ -28,9 +28,15 @@ def _payload(
     pos: str = "noun",
     definition: str = "A small domesticated carnivorous mammal.",
     translation: str = "gato",
+    situation: str = "",
 ) -> str:
     return json.dumps(
-        {"pos": pos, "definition": definition, "translation": translation}
+        {
+            "pos": pos,
+            "definition": definition,
+            "translation": translation,
+            "situation": situation,
+        }
     )
 
 
@@ -91,6 +97,7 @@ def test_parse_returns_valid_content():
         "pos": "noun",
         "definition": "A small domesticated carnivorous mammal.",
         "translation": "gato",
+        "situation": "",
     }
 
 

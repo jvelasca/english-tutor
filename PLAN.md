@@ -8,6 +8,40 @@
 
 ## Estado actual
 
+- ✅ **V3.38 — La siguiente tarea óptima: `situación`, planner y automaticidad por
+  skill (2026-09-10)** (**Versión estable `3.38.0`**, app `3.37.1 → 3.38.0`). Cierra
+  el incremento que V3.37 dejó abierto en tres frentes. **(1) P1-03 — automaticidad
+  por modalidad.** El `skill` del ledger léxico deja de ser `""`: cada evento
+  declara su MODALIDAD con el vocabulario canónico `LEXICAL_SKILLS` (`recall`,
+  `written_production`, `spoken_production`, `spontaneous_use`); `summarize_evidence`
+  (puro) y `summarize_by_target` (SQL, con paridad exacta fijada por test) añaden
+  `skill_successes`/`skill_success_days`/`skill_independent_successes`/
+  `skill_independent_days`, y `automatic_skills` segmenta `is_automatic` por
+  modalidad: un ítem ya no es "automático" porque mezcle aciertos de reconocimiento
+  con producción. **(2) Planner (Optimal Next Task).** Nuevo servicio puro
+  `services/planner.py`: `planned_signals` combina olvido (1 − `retrievability`),
+  hueco (`gap`), debilidad (`weakness`), dependencia de apoyo (`support`) y latencia
+  (`latency`) con pesos declarados y calibrables (`PRIORITY_WEIGHTS`);
+  `priority_score` los agrega y `evidence_reason` añade razones dirigidas por la
+  evidencia fina (`error_prone`, `skill_gap`, `slow_recall`). La cola de repaso
+  (`GET /api/learning/review`) pasa a ordenarse por esa prioridad —desempate por
+  `retrievability` y palabra— y cada ítem expone `priority`/`signals`/`why`/
+  `automatic_skills` (aditivos, sin spoiler). **(3) `situación`.** El contrato de
+  contenido de la caché sube `GENERATOR_VERSION` 1.1.0 → **1.2.0** y gana
+  `dictionary_entries.situation` (migración aditiva e idempotente): un enunciado
+  situacional con un único hueco `_____`, validado de forma determinista (un solo
+  hueco, sin spoiler, ≤ `MAX_SITUATION_CHARS`) y descartado —sin invalidar
+  definición/traducción— si no cumple. `recall.RECALL_CUES` gana `situation` como
+  TECHO de la escalera con apoyo `guided`; `next_recall_rung` solo llega a él con
+  `cloze` consolidado y `resolve_recall_cue` sigue degradando solo hacia más apoyo.
+  El GET/POST del drill lo sirven y lo declaran (`drill:recall:situation`), y la
+  cola lo recomienda cuando hay contenido. Contrato HTTP aditivo; sin tocar scoring
+  ni FSRS. Tests: pytest **1880** (+56: nuevos `test_skill_segmentation_v338.py`,
+  `test_planner_v338.py` y `test_situational_cue_v338.py`), vitest (65
+  ficheros/**560**), `ruff`/`tsc` limpios y `check_release_consistency` **3.38.0**
+  exit 0. Diferidos a V3.39: deudas de V3.30 + transferencia por contexto V3.23 +
+  `cloze_coverage` de corpus + `example_for_many` + refactor de `wordDrill.tsx`.
+
 - ✅ **V3.37.1 — Política de consolidación y regresión de la escalera de recall
   (2026-09-10)** (**Versión estable `3.37.1`**, app `3.37.0 → 3.37.1`). Patch
   quirúrgico que cierra los dos P1 pedagógicos de la auditoría de V3.37.0, sin

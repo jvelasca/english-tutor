@@ -89,6 +89,51 @@ INDEPENDENT_SUPPORT_LEVELS: frozenset[str] = frozenset(
 # automaticidad exige éxito independiente y ESPACIADO. Declarado y calibrable.
 AUTOMATIC_MIN_INDEPENDENT = 2
 
+# V3.38 (P1-03 de la auditoría de V3.37.0): MODALIDAD del aprendizaje léxico.
+# La automaticidad de V3.37 era GLOBAL — por ítem —, así que dos éxitos
+# independientes podían venir de modalidades distintas (uno escrito y otro oral)
+# y el ítem se declaraba `automatic` sin que NINGUNA modalidad concreta lo
+# fuera: una palabra escrita bien dos días no demuestra automaticidad oral ni
+# viceversa. V3.38 segmenta el ledger por la modalidad en la que se demostró el
+# logro, con este vocabulario declarado:
+#
+#   recall              recuperar la forma desde su significado (drill:recall:*)
+#   written_production  producirla escribiendo (canal writing)
+#   spoken_production   producirla hablando (speaking, conversation, drill:word,
+#                       drill:sentence: el alumno la dice tras un modelo)
+#   spontaneous_use     usarla sin guion (chat libre)
+#
+# NO incluye `receptive`: el MCQ de Recognition es INFORMATIVO (V3.13) y no
+# escribe evidencia longitudinal, así que hoy no existe modalidad receptiva en
+# el ledger; cuando esa señal exista se añadirá aquí (aditivo).
+LEXICAL_SKILLS: tuple[str, ...] = (
+    "recall",
+    "written_production",
+    "spoken_production",
+    "spontaneous_use",
+)
+
+# Modalidad que declara cada canal de PRODUCCIÓN (`context_id="lexicon:<canal>"`).
+# El canal concreto NO se pierde — sigue en `context_id`/`activity_id` —, pero
+# `skill` declara la modalidad para poder segmentar la automaticidad.
+PRODUCTION_CHANNEL_SKILL: dict[str, str] = {
+    "chat": "spontaneous_use",
+    "conversation": "spoken_production",
+    "speaking": "spoken_production",
+    "writing": "written_production",
+}
+
+# Modalidad de la recuperación por texto (escalera de recall) y de los peldaños
+# de micro-drill que se dicen en voz alta (palabra y frase).
+RECALL_SKILL = "recall"
+DRILL_SKILL = "spoken_production"
+
+
+def production_skill(channel: str) -> str:
+    """Modalidad declarada de un canal de producción ("" si no está declarado)."""
+    return PRODUCTION_CHANNEL_SKILL.get((channel or "").strip().lower(), "")
+
+
 # V3.37: vocabulario del peldaño servido en un intento de recall
 # (`activity_id = "drill:recall:<peldaño>"`). El dominio lo ESCRIBE y el
 # servicio puro lo LEE para decidir el siguiente peldaño, de modo que el ledger
@@ -375,6 +420,17 @@ def summarize_evidence(rows: list[dict]) -> dict:
       política de regresión. Los eventos legacy sin peldaño no entran en
       ninguno de los tres histogramas (no son evidencia negativa).
 
+    V3.38 (P1-03 de la auditoría de V3.37.0) añade la segmentación por
+    MODALIDAD (`LEXICAL_SKILLS`), para que la automaticidad deje de ser un
+    booleano global y pase a leerse por modalidad:
+
+    - `skill_successes` / `skill_success_days` — volumen y días con éxito POR
+      MODALIDAD;
+    - `skill_independent_successes` / `skill_independent_days` — los mismos
+      contadores restringidos a éxito SIN apoyo: la base de `automatic_skills`.
+      Un `skill` fuera de `LEXICAL_SKILLS` (p. ej. el canal legacy `chat` de
+      V3.36-V3.37) no entra en ningún histograma.
+
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
     attempts = 0
@@ -388,6 +444,10 @@ def summarize_evidence(rows: list[dict]) -> dict:
     recall_rungs: dict[str, int] = {}
     recall_rung_days: dict[str, set[str]] = {}
     recall_rung_failures: dict[str, int] = {}
+    skill_successes: dict[str, int] = {}
+    skill_success_days: dict[str, set[str]] = {}
+    skill_independent_successes: dict[str, int] = {}
+    skill_independent_days: dict[str, set[str]] = {}
     latencies: list[float] = []
     for row in rows:
         attempts += 1
@@ -418,6 +478,22 @@ def summarize_evidence(rows: list[dict]) -> dict:
             independent_successes += 1
             if day:
                 independent_days.add(day)
+        # V3.38: segmentación por modalidad. La clave se crea en el ÉXITO
+        # (aunque falte el día) para que el valor sea 0 y no una clave ausente:
+        # paridad EXACTA con el `GROUP BY skill` de SQL.
+        skill = (row.get("skill") or "").strip().lower()
+        if skill in LEXICAL_SKILLS:
+            skill_successes[skill] = skill_successes.get(skill, 0) + 1
+            skill_day_set = skill_success_days.setdefault(skill, set())
+            if day:
+                skill_day_set.add(day)
+            if level in INDEPENDENT_SUPPORT_LEVELS:
+                skill_independent_successes[skill] = (
+                    skill_independent_successes.get(skill, 0) + 1
+                )
+                skill_ind_days = skill_independent_days.setdefault(skill, set())
+                if day:
+                    skill_ind_days.add(day)
         if rung:
             recall_rungs[rung] = recall_rungs.get(rung, 0) + 1
             # La clave se crea aunque falte el día, para que el valor sea 0 y no
@@ -447,6 +523,15 @@ def summarize_evidence(rows: list[dict]) -> dict:
             rung: len(rung_days) for rung, rung_days in recall_rung_days.items()
         },
         "recall_rung_failures": recall_rung_failures,
+        "skill_successes": skill_successes,
+        "skill_success_days": {
+            skill: len(skill_days) for skill, skill_days in skill_success_days.items()
+        },
+        "skill_independent_successes": skill_independent_successes,
+        "skill_independent_days": {
+            skill: len(skill_days)
+            for skill, skill_days in skill_independent_days.items()
+        },
         "mean_response_time_ms": (
             round(sum(latencies) / len(latencies), 1) if latencies else None
         ),
@@ -469,6 +554,10 @@ def empty_summary() -> dict:
         "recall_rungs": {},
         "recall_rung_days": {},
         "recall_rung_failures": {},
+        "skill_successes": {},
+        "skill_success_days": {},
+        "skill_independent_successes": {},
+        "skill_independent_days": {},
         "mean_response_time_ms": None,
     }
 
@@ -498,3 +587,34 @@ def is_automatic(evidence: dict) -> bool:
         successes >= AUTOMATIC_MIN_INDEPENDENT
         and days >= AUTOMATIC_MIN_INDEPENDENT
     )
+
+
+def automatic_skills(evidence: dict) -> list[str]:
+    """Modalidades en las que el ítem es `automatic` (V3.38, puro).
+
+    Aplica el MISMO umbral que `is_automatic` (`AUTOMATIC_MIN_INDEPENDENT`
+    éxitos independientes en días naturales distintos) pero POR MODALIDAD, no
+    al ítem entero. Es la respuesta a P1-03 de la auditoría de V3.37.0:
+    `automatic` global podía mezclar una producción escrita con un recall oral
+    y declarar automático un ítem que ninguna modalidad domina.
+
+    Lee `skill_independent_successes` / `skill_independent_days` (histogramas
+    del resumen) y devuelve las modalidades en orden canónico (`LEXICAL_SKILLS`).
+    Nunca lanza: un resumen vacío o incompleto devuelve [].
+    """
+    if not evidence:
+        return []
+    successes = evidence.get("skill_independent_successes") or {}
+    days = evidence.get("skill_independent_days") or {}
+    if not isinstance(successes, dict) or not isinstance(days, dict):
+        return []
+    result: list[str] = []
+    for skill in LEXICAL_SKILLS:
+        try:
+            volume = int(successes.get(skill, 0) or 0)
+            spaced = int(days.get(skill, 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if volume >= AUTOMATIC_MIN_INDEPENDENT and spaced >= AUTOMATIC_MIN_INDEPENDENT:
+            result.append(skill)
+    return result

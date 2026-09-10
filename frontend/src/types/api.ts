@@ -302,6 +302,13 @@ export interface LexicalEvidence {
   // la regresión hacia más apoyo).
   recall_rung_days: Record<string, number>;
   recall_rung_failures: Record<string, number>;
+  // V3.38 (P1-03): segmentación por MODALIDAD (`LEXICAL_SKILLS`). La
+  // automaticidad deja de ser global: estos histogramas permiten leer en qué
+  // modalidad el ítem acumula éxito (y éxito sin apoyo) y en cuáles no.
+  skill_successes: Record<string, number>;
+  skill_success_days: Record<string, number>;
+  skill_independent_successes: Record<string, number>;
+  skill_independent_days: Record<string, number>;
   support_levels: Record<string, number>;
   error_types: Record<string, number>;
   // Latencia media declarada (null si ningún evento la midió).
@@ -414,11 +421,13 @@ export interface DrillRecognitionAttempt {
 // V3.37 (cues graduados): `cue_kind` admite el tercer peldaño (`cloze`, con la
 // frase en blanco como `cue`) y `support_level` declara el apoyo del peldaño
 // servido (`cued`/`guided`).
+// V3.38: `cue_kind` admite el cuarto peldaño (`situation`, enunciado situacional
+// del contrato de contenido de la caché, con hueco `_____`).
 export interface DrillRecallPrompt {
   word: string;
   available: boolean;
   cue: string;
-  cue_kind: string; // "translation" | "definition" | "cloze" | ""
+  cue_kind: string; // "translation" | "definition" | "cloze" | "situation" | ""
   support_level?: string; // "cued" | "guided" | ""
 }
 
@@ -485,6 +494,8 @@ export interface DictionaryEntry {
   pos: string;
   definition: string | null;
   translation: string | null;
+  /** V3.38: enunciado situacional (4.º peldaño de recall), con hueco `_____`. */
+  situation?: string | null;
   example: DictionaryExample | null;
   usage: DictionaryUsage;
 }
@@ -652,6 +663,12 @@ export interface ReviewQueueItem {
   // cue) y si el ítem acumula éxito independiente y espaciado.
   recommended_cue?: string;
   automatic?: boolean;
+  // V3.38 (planner / Optimal Next Task): prioridad combinada 0..1, señales que
+  // la producen, explicación legible y modalidades ya automáticas (P1-03).
+  priority?: number;
+  signals?: Record<string, unknown> | null;
+  why?: string;
+  automatic_skills?: string[];
   competence?: LexicalCompetence | null;
   evidence?: LexicalEvidence | null;
 }

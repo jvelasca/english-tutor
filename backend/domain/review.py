@@ -43,8 +43,14 @@ async def get_review_queue(
 
     Sincroniza primero el scheduling desde la evidencia (el léxico es single
     writer de sus cartas: las ya revisadas conservan `reps > 0`) y devuelve las
-    cartas vencidas ordenadas por urgencia (`fsrs.due_queue`), enriquecidas con
-    la competencia del ítem y la actividad recomendada.
+    cartas vencidas enriquecidas con la competencia del ítem, la actividad
+    recomendada y la PRIORIDAD de la siguiente tarea óptima.
+
+    V3.38 (planner): el orden deja de ser solo la urgencia del scheduler
+    (`fsrs.due_queue`: menor retrievability primero) y pasa a ser la prioridad
+    combinada de `services.planner` (olvido + hueco + debilidad + apoyo +
+    latencia), con el olvido como primer componente. El scheduler sigue
+    aportando `retrievability`/`stability` como señal explicable.
 
     Nunca es una puerta (D5/E3): informa de lo que toca repasar; la actividad y
     su contenido los sirve el peldaño correspondiente (y el GET de ese peldaño
@@ -87,6 +93,16 @@ async def get_review_queue(
                 available_cues=available_by_word.get(row["word"] or "", set()),
             )
         )
+    # V3.38 (planner): la "siguiente tarea óptima" primero. Desempate por
+    # urgencia del scheduler (menor retrievability) y, por último, palabra
+    # (orden estable y determinista).
+    items.sort(
+        key=lambda item: (
+            -float(item.get("priority") or 0.0),
+            item["retrievability"] if item["retrievability"] is not None else 1.0,
+            item["word"],
+        )
+    )
     return {
         "due_count": len(items),
         "items": items,

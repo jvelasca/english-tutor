@@ -59,12 +59,29 @@ def test_consolidation_requires_two_successes_on_distinct_days():
     assert recall.next_recall_rung({}, spaced) == "definition"
 
 
-def test_ceiling_of_the_ladder_is_cloze():
-    all_passed = {
+def test_ceiling_of_the_ladder_is_situation():
+    # V3.38: con los tres peldaños previos consolidados, el ideal es `situation`.
+    without_situation = {
         "recall_rungs": {"translation": 2, "definition": 2, "cloze": 2},
         "recall_rung_days": {"translation": 2, "definition": 2, "cloze": 2},
     }
-    assert recall.next_recall_rung({}, all_passed) == "cloze"
+    assert recall.next_recall_rung({}, without_situation) == "situation"
+    # Y una vez consolidado `situation`, el techo se mantiene ahí.
+    all_passed = {
+        "recall_rungs": {
+            "translation": 2,
+            "definition": 2,
+            "cloze": 2,
+            "situation": 2,
+        },
+        "recall_rung_days": {
+            "translation": 2,
+            "definition": 2,
+            "cloze": 2,
+            "situation": 2,
+        },
+    }
+    assert recall.next_recall_rung({}, all_passed) == "situation"
 
 
 # --- Regresión: patrón de fallos, no un tropiezo -----------------------------
