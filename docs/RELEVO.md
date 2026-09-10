@@ -34,9 +34,11 @@
 > lectura de la escalera (una situación cacheada inválida no se sirve ni cuenta
 > como peldaño disponible). **UI:** ruta dedicada `/diccionario` (`DICTIONARY_PATH`
 > + `routeMap` + cuarto destino tras un separador + `DictionaryScreen` con
-> Personal/Consultar) y estado de conexión en la cabecera (`ConnectionIndicator`
-> con punto verde/rojo y popover `SystemStatus`), retirando la barra inferior
-> (`StatusBar.tsx` y reglas CSS huérfanas). Contrato aditivo (`LexicalEvidence`
+> Personal/Consultar; las píldoras de la cabecera pasan a montarse desde `xl`
+> porque con 4 destinos con etiqueta no caben por debajo de 1280px sin invadir
+> las acciones, y la bottom-nav cubre hasta entonces) y estado de conexión en la
+> cabecera (`ConnectionIndicator` con punto verde/rojo y popover `SystemStatus`),
+> retirando la barra inferior (`StatusBar.tsx` y reglas CSS huérfanas). Contrato aditivo (`LexicalEvidence`
 > gana dos histogramas; `planned_signals` gana `skills`). Tests: pytest **1890
 > passed** + `ruff` limpio + vitest (**67 ficheros/568 tests**) + `tsc`/build
 > limpios + `check_release_consistency` **3.38.1** exit 0. Diferidos a V3.39:

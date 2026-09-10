@@ -31,7 +31,11 @@ export function Navigation({
 }: {
   route: Route;
   onNavigate: (route: Route) => void;
-  /** "pills" para la cabecera (>=768px), "bottom" para la bottom-nav móvil. */
+  /**
+   * V3.38.1: "pills" se monta en la cabecera solo desde `xl` (>=1280px) —por
+   * debajo, con el 4.º destino, no cabe sin invadir las acciones— y "bottom"
+   * cubre el resto hasta `xl` (antes el corte estaba en `md`).
+   */
   variant?: "pills" | "bottom";
   layoutId?: string;
   className?: string;

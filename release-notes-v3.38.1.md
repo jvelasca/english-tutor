@@ -133,10 +133,21 @@ Criterio declarado y calibrable, aplicado por igual a `is_automatic` (global) y 
 - Nuevo destino AUXILIAR `dictionary` con raíz `/diccionario` (`DICTIONARY_PATH`,
   `routeMap` reversible, `routeMap.test` con 9 valores de `Route`).
 - Cuarto destino en la navegación tras un **separador** (barra vertical en las
-  píldoras de escritorio, borde divisorio en la bottom-nav móvil, `grid-cols-3 →
+  píldoras de la cabecera, borde divisorio en la bottom-nav, `grid-cols-3 →
   grid-cols-4`), icono `BookOpen`.
 - Nueva `DictionaryScreen` con las dos vistas existentes (Personal / Consultar),
   reutilizando los componentes sin duplicar lógica.
+- **Corte de la navegación `md` → `xl` (corrección del propio release).** Con
+  cuatro destinos con etiqueta, la fila de píldoras ya no cabía en la cabecera
+  por debajo de 1280px sin invadir los botones de acción: se medía en tablet
+  (768: 288px de píldoras en 129px de hueco) y en el borde `lg` (1024), y empeora
+  en español (`Diccionario`/`Formación` son más largos que `Dictionary`/`Course`;
+  +50px). Las píldoras de cabecera pasan a montarse desde `xl` (≥1280, donde
+  caben en ambos idiomas) y la bottom-nav —ya con los 4 destinos— cubre hasta
+  entonces, lo que además encaja con «ganar espacio útil». `overflow-x-auto` en
+  el contenedor de píldoras queda como red de seguridad. Lo destapó el job de
+  Playwright E2E del release (una píldora interceptaba el clic de *Help* en
+  tablet); verificado en local con la suite completa en verde.
 
 ### 7. UI — Estado de conexión en la cabecera
 
@@ -146,7 +157,8 @@ Criterio declarado y calibrable, aplicado por igual a `is_automatic` (global) y 
 - Nuevo `ConnectionIndicator` en la cabecera: punto verde/rojo con etiqueta
   Conectado/Desconectado (sondeo de `/api/health` cada ~15 s) que, al pulsarlo,
   abre un popover con el panel completo `<SystemStatus />` (que sigue además en
-  Ajustes). Visible también en móvil.
+  Ajustes). Estado y etiqueta visibles en móvil (el punto siempre; la etiqueta
+  desde `sm`).
 - E2E `mobile.spec.ts` actualizado al nuevo trigger (`System status`).
 
 ### 8. Contrato (aditivo)
@@ -167,6 +179,10 @@ mecanismo de degradación de la cola (sigue sin spoiler) y el esquema de BD.
   (+10 sobre v3.38.0).
 - Frontend: `tsc --noEmit` limpio, `vitest` → **67 ficheros/568 tests**
   (+2 ficheros/+8 tests) y `npm run build` OK.
+- Playwright E2E (visual): suite completa en local **23 passed / 22 skipped /
+  0 failed** (con un único worker; en paralelo el dev server compartido da
+  flakiness). Incluye el caso que falló en el primer push (tablet: la ayuda se
+  abre desde el header) tras el cambio de corte de la navegación.
 - `python scripts/check_release_consistency.py` → **3.38.1** exit 0.
 
 ### Matriz de pruebas nueva (resumen)

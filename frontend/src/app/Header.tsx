@@ -64,11 +64,16 @@ export function Header({
         <ConnectionIndicator />
       </div>
 
-      <div className="hidden min-w-0 flex-1 md:flex">
+      {/* V3.38.1: con el 4.º destino (diccionario) las píldoras no caben (ni en
+          español) sin invadir los botones de acción por debajo de 1280px. Se
+          muestran desde `xl` y hasta entonces manda la bottom-nav (táctil);
+          `overflow-x-auto` queda como red de seguridad (el centrado con
+          `mx-auto` mantiene el inicio accesible si hubiera scroll). */}
+      <div className="hidden min-w-0 flex-1 xl:flex xl:overflow-x-auto">
         <Navigation route={route} onNavigate={onNavigate} layoutId="nav-pill" className="mx-auto" />
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <HandsFreeToggle
           enabled={handsFreeEnabled}
           status={handsFreeStatus}

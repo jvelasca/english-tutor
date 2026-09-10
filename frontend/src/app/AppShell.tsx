@@ -39,7 +39,10 @@ export function AppShell({
       >
         {children}
       </main>
-      <div className="border-t border-border bg-background/95 backdrop-blur md:hidden">
+      {/* V3.38.1: la bottom-nav cubre hasta `xl` (antes `md`): por debajo de
+          1280px la cabecera no tiene sitio para marca + 4 destinos con etiqueta
+          + acciones, y así el diccionario sigue siempre a un toque. */}
+      <div className="border-t border-border bg-background/95 backdrop-blur xl:hidden">
         <Navigation
           route={route}
           onNavigate={onNavigate}
