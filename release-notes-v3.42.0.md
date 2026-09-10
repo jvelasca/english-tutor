@@ -163,3 +163,16 @@ de BD y la evidencia por forma superficial se conserva intacta.
 Nada pendiente del plan maestro V3.39+: las cuatro fases (diccionario reversible +
 pestaña persistida, Traductor de viaje, motor de tarea óptima y transferencia
 contextual real) quedan cerradas.
+
+## CI
+
+- Commit `3522bac4592beffe92df9fae5fbd3cae817fdc28` (tag `v3.42.0`) con el run
+  [34540962417](https://github.com/jvelasca/english-tutor/actions/runs/34540962417)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+  Este es el commit verde y auditable de la release.
+- Ese commit **agrupa las fases 1–4** (v3.39.0 → v3.42.0): el trabajo se
+  desarrolló sobre el árbol de trabajo y las tres releases anteriores no
+  llegaron a commitearse, así que **no existen estados intermedios auditables**.
+  Las notas de cada versión sí están versionadas (`release-notes-v3.39.0.md` …
+  `release-notes-v3.42.0.md`), y son la fuente para la auditoría fase a fase.

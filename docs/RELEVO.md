@@ -41,6 +41,15 @@
 > ajustado al contrato de `empty_summary`), vitest **70 ficheros/606 tests**
 > (+4), `ruff` limpio, `tsc --noEmit` limpio y `check_release_consistency`
 > **3.42.0** exit 0. **Plan maestro V3.39+ completo: sin fases pendientes.**
+> **Publicada y auditable:** commit
+> `3522bac4592beffe92df9fae5fbd3cae817fdc28` (tag `v3.42.0`) con el run
+> [34540962417](https://github.com/jvelasca/english-tutor/actions/runs/34540962417)
+> **6/6 jobs en success**. Ese commit **agrupa las cuatro fases** (v3.39.0 →
+> v3.42.0) porque el trabajo vivió en el árbol de trabajo y las releases
+> intermedias no llegaron a commitearse: **no hay estados intermedios
+> auditables**, y la auditoría fase a fase se hace sobre las notas versionadas
+> (`release-notes-v3.39.0.md` … `release-notes-v3.42.0.md`), no sobre commits
+> intermedios.
 >
 > **Nota (2026-09-10):** **V3.41.0 publicada (Fase 3 del plan maestro V3.39+)** —
 > release **v3.41.0** (**motor de tarea óptima por skill + actividad de escritura
