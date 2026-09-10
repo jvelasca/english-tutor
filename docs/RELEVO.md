@@ -31,7 +31,9 @@
 > `cued_recall`/`recalled`/priorización en `test_lexicon.py`) + ruff limpio +
 > vitest (63 ficheros/**549**, +2: peldaño Recall por texto y mocks al degrade
 > Recognize → Recall → Sentence) + `tsc --noEmit` limpio + `check_release_consistency`
-> **3.34.0** exit 0. Detalle: `release-notes-v3.34.0.md` y
+> **3.34.0** exit 0. **CI verificable:** commit
+> `f9880f15fd7e19f17587c3cd25fa9362604af1d4` con el run 34451370871 en
+> `success` (6/6 jobs). Detalle: `release-notes-v3.34.0.md` y
 > `agentes/v334-recall-2.0.md`. Pendientes hacia **V3.35**: los diferidos de
 > V3.30 (consumo de `word_breakdown_json`, palabras tocables), transferencia por
 > contexto de actividad V3.23 y Lexical Evidence Engine / Evidence Graph como

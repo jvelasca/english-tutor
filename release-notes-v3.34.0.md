@@ -125,6 +125,10 @@ placeholder, Check, ok/ko, no disponible).
   Recognize → Recall → Sentence en `DictionaryLookup.test.tsx` y
   `PersonalDictionary.test.tsx`) + `tsc --noEmit` limpio.
 - `python scripts/check_release_consistency.py` → **3.34.0** exit 0.
+- **CI verificable.** Commit `f9880f15fd7e19f17587c3cd25fa9362604af1d4` con el
+  run [34451370871](https://github.com/jvelasca/english-tutor/actions/runs/34451370871)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
 
 ## Documentación
 
