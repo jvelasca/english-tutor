@@ -124,8 +124,12 @@ class LexicalEvidence(BaseModel):
 
     V3.36 (Learning Evidence 2.0) añade las dimensiones del evento:
     `success_rate`, `independent_successes` (aciertos sin apoyo: lo único que
-    podrá pesar en automaticidad), `support_levels` y `error_types`
+    puede pesar en automaticidad), `support_levels` y `error_types`
     (histogramas) y `mean_response_time_ms` (latencia media declarada).
+
+    V3.37 (cues graduados) añade `independent_success_days` (días naturales
+    distintos con éxito sin apoyo: lo que exige `is_automatic`) y
+    `recall_rungs` (éxitos de recall por peldaño servido).
     """
 
     attempts: int = 0
@@ -134,8 +138,10 @@ class LexicalEvidence(BaseModel):
     intervals: list[float] = Field(default_factory=list)
     success_rate: float = 0.0
     independent_successes: int = 0
+    independent_success_days: int = 0
     support_levels: dict[str, int] = Field(default_factory=dict)
     error_types: dict[str, int] = Field(default_factory=dict)
+    recall_rungs: dict[str, int] = Field(default_factory=dict)
     mean_response_time_ms: float | None = None
 
 
@@ -533,18 +539,24 @@ class RecognitionAttemptOut(BaseModel):
 
 
 class RecallPromptOut(BaseModel):
-    """Cue del paso Recall (V3.34).
+    """Cue del paso Recall (V3.34; peldaños graduados en V3.37).
 
     `available=false` con `cue=""` es la degradación controlada cuando la
-    palabra no tiene entrada en la caché global o no hay cue que no filtre la
-    respuesta (definición circular): el peldaño muestra aviso y no rompe
-    Sentence. Nunca incluye la forma esperada.
+    palabra no tiene entrada en la caché global o no hay contenido para el
+    peldaño pedido (traducción ausente, definición circular o frase de corpus
+    inexistente): el peldaño muestra aviso y no rompe Sentence. Nunca incluye la
+    forma esperada.
+
+    V3.37: `cue_kind` admite el tercer peldaño (`cloze`, con la frase en blanco
+    como `cue`) y el payload gana `support_level` (apoyo que declara el peldaño
+    servido: `cued`/`cued`/`guided`; vacío si no hay peldaño).
     """
 
     word: str
     available: bool
     cue: str = ""
-    cue_kind: str = ""  # "translation" | "definition" | ""
+    cue_kind: str = ""  # "translation" | "definition" | "cloze" | ""
+    support_level: str = ""
 
 
 class RecallAttemptIn(BaseModel):
@@ -553,10 +565,16 @@ class RecallAttemptIn(BaseModel):
     Nunca declara acierto (premisa 21): el servidor compara con la diana.
     V3.36: `response_time_ms` es la latencia medida por el cliente (ms desde que
     ve el cue hasta que envía). Opcional y aditiva: sin ella el evento se
-    registra igual, con latencia no medida (NULL)."""
+    registra igual, con latencia no medida (NULL).
+
+    V3.37: `cue` es el peldaño que el cliente dice que le sirvieron
+    (`translation`/`definition`/`cloze`; vacío = cliente antiguo, escalera por
+    defecto de V3.36). El servidor lo RE-DERIVA y puntúa igual: un peldaño no
+    soportado o sin contenido para la palabra responde 422 sin evento."""
 
     word: str = Field(min_length=1, max_length=120)
     answer: str = Field(default="", max_length=120)
+    cue: str = Field(default="", max_length=32)
     response_time_ms: int | None = Field(
         default=None, ge=0, le=600_000
     )

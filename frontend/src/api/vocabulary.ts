@@ -157,38 +157,42 @@ export function submitDrillRecognitionAttempt(
   );
 }
 
-/** Cue del paso Recall del drill (V3.34, Recall 2.0).
+/** Cue del paso Recall del drill (V3.34, Recall 2.0; peldaños graduados V3.37).
  *
- * Camino inverso a Recognition: el alumno ve el SIGNIFICADO (traducción o
- * definición que no filtre la respuesta) y debe teclear la palabra. Puro y
- * determinista en el servidor (premisa 21): el GET nunca incluye la palabra
- * esperada. `available=false` con `cue=""` es la degradación controlada
- * (palabra sin entrada o cue circular): el peldaño muestra aviso y no rompe
- * Sentence. */
+ * Camino inverso a Recognition: el alumno ve el SIGNIFICADO (traducción,
+ * definición o frase en blanco) y debe teclear la palabra. Puro y determinista
+ * en el servidor (premisa 21): el GET nunca incluye la palabra esperada.
+ * `available=false` con `cue=""` es la degradación controlada (palabra sin
+ * entrada, cue circular o peldaño sin contenido): el peldaño muestra aviso y no
+ * rompe Sentence. `cue` pide un peldaño concreto (`translation`/`definition`/
+ * `cloze`); sin él el servidor conserva la escalera por defecto de V3.34. */
 export function getDrillRecallPrompt(
   userId: string,
   word: string,
+  cue?: string,
 ): Promise<DrillRecallPrompt> {
-  const query = new URLSearchParams({
-    user_id: userId,
-    word,
-  }).toString();
+  const params: Record<string, string> = { user_id: userId, word };
+  if (cue) params.cue = cue;
+  const query = new URLSearchParams(params).toString();
   return getJson<DrillRecallPrompt>(`/api/vocabulary/drill/recall?${query}`);
 }
 
 /** Intento del paso Recall del drill (V3.34): envía la palabra tecleada y el
  * servidor la compara con la diana (nunca se declara acierto en el cliente).
  * Un acierto deja señal léxica propia (recall + FSRS) pero NUNCA acredita
- * producción: no dispara `onProduced`. */
+ * producción: no dispara `onProduced`.
+ * V3.37: `cue` declara el peldaño que el cliente dice que le sirvieron
+ * (premisa 21); el servidor lo re-deriva y puntúa igual. */
 export function submitDrillRecallAttempt(
   userId: string,
   word: string,
   answer: string,
   responseTimeMs?: number,
+  cue?: string,
 ): Promise<DrillRecallAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecallAttempt>(
     `/api/vocabulary/drill/recall-attempt?${query}`,
-    { word, answer, response_time_ms: responseTimeMs ?? null },
+    { word, answer, cue: cue ?? "", response_time_ms: responseTimeMs ?? null },
   );
 }

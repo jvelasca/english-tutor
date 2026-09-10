@@ -24,10 +24,12 @@ from datetime import datetime, timezone
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
+from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
-from services import fsrs, lexicon
+from services import fsrs, lexicon, recall
 from services.evidence import empty_summary as empty_evidence
+from services.example_sentences import example_for
 
 # Tope de ítems por defecto/ máximo de la cola de repaso.
 REVIEW_QUEUE_DEFAULT_LIMIT = 20
@@ -64,6 +66,12 @@ async def get_review_queue(
     evidence_by_word = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
     )
+    # V3.37: la decisión pedagógica (`next_recall_rung`) se resuelve contra la
+    # disponibilidad REAL de contenido (`resolve_recall_cue`), para que la cola
+    # nunca recomiende un peldaño que el GET no podría servir.
+    available_by_word = await _available_recall_cues(
+        [card.get("target_id") or "" for card in due]
+    )
     items: list[dict] = []
     for card in due:
         row = by_word.get(card.get("target_id") or "")
@@ -76,6 +84,7 @@ async def get_review_queue(
                 card,
                 now=now_iso,
                 evidence=evidence_by_word.get(row["word"]) or empty_evidence(),
+                available_cues=available_by_word.get(row["word"] or "", set()),
             )
         )
     return {
@@ -83,3 +92,30 @@ async def get_review_queue(
         "items": items,
         "fsrs_version": fsrs.FSRS_VERSION,
     }
+
+
+async def _available_recall_cues(words: list[str]) -> dict[str, set[str]]:
+    """Peldaños de recall con contenido real por palabra (V3.37).
+
+    Calcula, sobre la caché global del diccionario y el banco de pronunciación,
+    qué peldaños puede servir el GET de recall para cada palabra. Es lo que
+    `services.recall.resolve_recall_cue` necesita para no recomendar un peldaño
+    sin contenido. Una sola lectura de la caché para todas las palabras.
+    """
+    unique = sorted({word for word in words if word})
+    if not unique:
+        return {}
+    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    available: dict[str, set[str]] = {}
+    for word in unique:
+        cues: set[str] = set()
+        for cue in recall.RECALL_CUES:
+            example = (
+                await run_in_threadpool(example_for, word)
+                if cue == "cloze"
+                else None
+            )
+            if recall.recall_prompt_for(word, entries, cue=cue, example=example):
+                cues.add(cue)
+        available[word] = cues
+    return available

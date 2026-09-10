@@ -454,6 +454,18 @@ const STRINGS: Record<string, Entry> = {
     en: "Type the word that matches this meaning.",
     es: "Escribe la palabra que corresponde a este significado.",
   },
+  "dictionary.drill.recallCue.translation": {
+    en: "Type the English word for this translation.",
+    es: "Escribe la palabra en inglés para esta traducción.",
+  },
+  "dictionary.drill.recallCue.definition": {
+    en: "Type the word that matches this definition.",
+    es: "Escribe la palabra que corresponde a esta definición.",
+  },
+  "dictionary.drill.recallCue.cloze": {
+    en: "Complete the sentence with the missing word.",
+    es: "Completa la frase con la palabra que falta.",
+  },
   "dictionary.drill.recallInputLabel": {
     en: "Type the word",
     es: "Escribe la palabra",

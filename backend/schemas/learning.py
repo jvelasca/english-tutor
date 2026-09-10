@@ -49,6 +49,11 @@ class ReviewQueueItem(BaseModel):
     elapsed_days: float | None = None
     activity: ReviewActivity
     reason: str = ""
+    # V3.37 (cues graduados): peldaño recomendado para `recall` (nombre del
+    # peldaño, NUNCA el cue) y si el ítem acumula éxito independiente y
+    # espaciado (`services.evidence.is_automatic`). Aditivos.
+    recommended_cue: str = ""
+    automatic: bool = False
     competence: dict | None = None
     # V3.35: evidencia longitudinal (`attempts`/`successes`/`days`/`intervals`).
     evidence: dict | None = None

@@ -26,7 +26,7 @@ from services import (
     lexicon,
     recall,
 )
-from services.evidence import classify_recall_error
+from services.evidence import classify_recall_error, recall_rung_activity
 from services.evidence import empty_summary as empty_evidence
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
@@ -662,33 +662,62 @@ async def submit_recognition_attempt(
 # ---------------------------------------------------------------------------
 
 
-async def get_recall_prompt(user_id: str, word: str) -> dict:
-    """Cue del paso Recall del drill (V3.34).
+async def get_recall_prompt(
+    user_id: str, word: str, cue: str | None = None
+) -> dict:
+    """Cue del paso Recall del drill (V3.34 → V3.37, cues graduados).
 
     La pregunta NO depende del alumno (contenido global); `user_id` se conserva
-    por simetría con el resto de funciones de drill. Si no hay cue utilizable
-    (palabra sin entrada, o sin traducción ni definición que no filtre la
-    respuesta), devuelve `available=false` con `cue=""`: degradación controlada
-    sin evento (el peldaño muestra aviso y no rompe Sentence). La respuesta
-    NUNCA incluye la forma esperada: la revela el POST tras puntuar.
+    por simetría con el resto de funciones de drill.
+
+    - `cue=None` conserva EXACTAMENTE el comportamiento V3.34 (traducción y, si
+      no, definición sin spoiler) para no romper clientes antiguos.
+    - `cue="translation"|"definition"|"cloze"` sirve ESE peldaño. El dominio
+      re-deriva el peldaño de forma pura (premisa 21) y, para `cloze`, obtiene
+      la frase real del banco de pronunciación (`example_for`).
+    - Si no hay contenido para el peldaño pedido (o no hay cue utilizable sin
+      `cue`), devuelve `available=false` con `cue=""`: degradación controlada
+      sin evento (el peldaño muestra aviso y no rompe Sentence).
+    - Un `cue` no soportado responde 422 (ValueError).
+
+    El payload incluye `support_level` (apoyo que declara el peldaño servido,
+    aditivo) y NUNCA la forma esperada: la revela el POST tras puntuar.
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada no es válida")
+    if cue is not None and cue not in recall.RECALL_CUES:
+        raise ValueError("Peldaño de recall no válido")
     entries = await run_in_threadpool(dictionary_repo.list_entries)
-    built = recall.recall_prompt_for(normalized, entries)
+    if cue is None:
+        built = recall.recall_prompt_for(normalized, entries)
+        support_level = (
+            recall.RECALL_CUE_SUPPORT.get(built["cue_kind"], "") if built else ""
+        )
+    else:
+        example = (
+            await run_in_threadpool(example_sentences.example_for, normalized)
+            if cue == "cloze"
+            else None
+        )
+        built = recall.recall_prompt_for(
+            normalized, entries, cue=cue, example=example
+        )
+        support_level = recall.RECALL_CUE_SUPPORT[cue]
     if built is None:
         return {
             "word": normalized,
             "available": False,
             "cue": "",
             "cue_kind": "",
+            "support_level": support_level,
         }
     return {
         "word": normalized,
         "available": True,
         "cue": built["cue"],
         "cue_kind": built["cue_kind"],
+        "support_level": recall.RECALL_CUE_SUPPORT.get(built["cue_kind"], ""),
     }
 
 
@@ -697,6 +726,7 @@ async def submit_recall_attempt(
     word: str,
     answer: str,
     *,
+    cue: str | None = None,
     response_time_ms: int | None = None,
 ) -> dict | None:
     """Puntúa un intento del paso Recall (V3.34) y deja su señal.
@@ -724,21 +754,47 @@ async def submit_recall_attempt(
     solo la carta FSRS (`Again`), y únicamente si ya existía, para no inventar
     deuda de repaso de una palabra no rastreada.
 
-    V3.36 (Learning Evidence 2.0): el evento declara `support_level="cued"` (la
-    recuperación va guiada por un cue: traducción o definición), su contexto
-    (`lexicon:drill`) y actividad (`drill:recall`), la dificultad del ÍTEM, la
-    latencia del cliente y la CLASIFICACIÓN del intento (`classify_recall_error`:
-    vacío / errata / parcial / otra palabra). La clasificación es OBSERVACIONAL:
-    `correct` sigue siendo igualdad estricta de superficie, así que una errata no
-    acredita recall ni cambia la evidencia ni FSRS; solo informa al tutor.
+    V3.36 (Learning Evidence 2.0): el evento declara el APOYO, su contexto
+    (`lexicon:drill`), la dificultad del ÍTEM, la latencia del cliente y la
+    CLASIFICACIÓN del intento (`classify_recall_error`: vacío / errata /
+    parcial / otra palabra). La clasificación es OBSERVACIONAL: `correct` sigue
+    siendo igualdad estricta de superficie, así que una errata no acredita
+    recall ni cambia la evidencia ni FSRS; solo informa al tutor.
+
+    V3.37 (cues graduados): el cliente declara QUÉ peldaño le sirvieron (`cue`,
+    premisa 21) y el servidor lo RE-DERIVA con la misma función pura: un `cue`
+    no soportado o sin contenido para esa palabra se rechaza con 422, sin
+    evento. El evento pasa a declarar el `support_level` del peldaño real
+    (`cued`/`cued`/`guided`) y `activity_id="drill:recall:<peldaño>"`, de modo
+    que el ledger distinga apoyos y la escalera pueda leer sus éxitos. El
+    scoring NO cambia: un acierto con cloze vale lo mismo que con traducción
+    para el contador de recall; lo que cambia es lo que el ledger sabe.
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada no es válida")
+    if cue is not None and cue not in recall.RECALL_CUES:
+        raise ValueError("Peldaño de recall no válido")
     entries = await run_in_threadpool(dictionary_repo.list_entries)
-    built = recall.recall_prompt_for(normalized, entries)
+    if cue is None:
+        built = recall.recall_prompt_for(normalized, entries)
+    else:
+        example = (
+            await run_in_threadpool(example_sentences.example_for, normalized)
+            if cue == "cloze"
+            else None
+        )
+        built = recall.recall_prompt_for(
+            normalized, entries, cue=cue, example=example
+        )
     if built is None:
+        if cue is not None:
+            # El peldaño PEDIDO no tiene contenido: 422, sin evento (V3.37).
+            raise ValueError("El peldaño no tiene contenido para esta palabra")
         return None
+    served_cue = built["cue_kind"]
+    support_level = recall.RECALL_CUE_SUPPORT[served_cue]
+    activity_id = recall_rung_activity(served_cue)
     given = _normalize_lookup_word(answer)
     correct = bool(given) and given == normalized
     error_type = classify_recall_error(normalized, given)
@@ -784,10 +840,10 @@ async def submit_recall_attempt(
         lexical_unit=row_before.get("lexical_unit") or normalized,
         task="recall",
         activity="drill",
-        activity_id="drill:recall",
+        activity_id=activity_id,
         context_id="lexicon:drill",
         success=correct,
-        support_level="cued",
+        support_level=support_level,
         difficulty=lexicon.cefr_difficulty(row_before),
         response_time_ms=response_time_ms,
         error_type=error_type,

@@ -8,6 +8,31 @@
 
 ## Estado actual
 
+- ✅ **V3.37 — Learning Evidence 3.0: cues graduados y automaticidad (2026-09-10)**
+  (**Versión estable `3.37.0`**, app `3.36.0 → 3.37.0`). La escalera del peldaño
+  `2 · Recall` deja de ser un *fallback* (traducción y, si no, definición) y pasa
+  a ser una PROGRESIÓN declarada `translation (cued) < definition (cued) <
+  cloze (guided)`: `services/recall.py` sirve el peldaño PEDIDO (o el de V3.34
+  cuando no se pide ninguno), `next_recall_rung` decide el siguiente por los
+  ÉXITOS ya registrados por peldaño (`drill:recall:<peldaño>` → histograma
+  `recall_rungs`) y `resolve_recall_cue` separa la decisión pedagógica de la
+  disponibilidad real degradando SIEMPRE hacia más apoyo (nunca al revés). Cada
+  peldaño declara su `support_level` en el ledger, así que `independent_successes`
+  (V3.36) por fin tiene de dónde salir, y la **automaticidad** (`is_automatic`)
+  exige ≥2 éxitos sin apoyo en DÍAS NATURALES distintos: un acierto suelto no
+  consolida (D5/E3). El cloze es determinista desde el banco de pronunciación
+  (`blank_out`, con reglas de honestidad: si queda alguna aparición de la
+  palabra, el cue se descarta) y **ningún peldaño llama a un LLM**. La cola de
+  repaso expone `recommended_cue`/`automatic` sin spoilear la palabra (P1-03 de
+  V3.35.1 intacto). Sin migración de BD (`support_level`/`activity_id` ya
+  existían) y sin tocar scoring, FSRS ni la semántica del intervalo de evidencia.
+  Contrato HTTP aditivo: `cue` opcional en GET/POST, `support_level` en
+  `RecallPromptOut`, `independent_success_days`/`recall_rungs` en
+  `LexicalEvidence`. Fuera de alcance: `situación` (exige contenido autorado) y
+  el planner (V3.38). Tests: pytest **1813** (+22), vitest (65
+  ficheros/**560**, +1), `ruff`/`tsc` limpios, build OK y
+  `check_release_consistency` **3.37.0** exit 0.
+
 - ✅ **V3.36 — Learning Evidence 2.0 (2026-09-10)** (**Versión estable `3.36.0`**,
   app `3.35.1 → 3.36.0`). El ledger longitudinal aprende el **CÓMO** de cada
   evento, con migración aditiva e idempotente y contrato HTTP aditivo:
@@ -1193,19 +1218,27 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.37 — Cues graduados y planner sobre la evidencia (siguiente
-  milestone)**: cerrada V3.36 (las dimensiones del evento ya están en el
-  ledger), el siguiente paso es USARLAS: la escalera de cues graduados
-  (translation → definition → cloze → situación → free recall) sobre el peldaño
-  Recall, el gradiente de apoyo como señal de automaticidad
-  (`independent_successes` ya se agrega) y el grafo de evidencia → estado de
-  conocimiento → retención → hueco de transferencia → Optimal Next Task
-  alimentado por `support_level`/`difficulty`/`response_time_ms`/`error_type`.
-  Siguen abiertos, además, los diferidos de V3.30 (consumo de
+- **⏳ V3.38 — `situación` + planner (Optimal Next Task) (siguiente milestone)**:
+  cerrada V3.37 (los peldaños graduados y la automaticidad ya están en el
+  ledger), el siguiente paso es USARLOS para planificar: extender el contrato de
+  contenido de la caché (`generator_version`, V3.30) para un enunciado
+  situacional por palabra — el último peldaño del tramo medio, que exige
+  contenido autorado y por eso quedó fuera de V3.37 — y generalizar
+  `recommend_review_activity` con retención FSRS + hueco de producción + hueco
+  de TRANSFERENCIA por contexto (`context_id`/`activity_id`, ya persistidos
+  desde V3.36) + gradiente de apoyo (`support_level`) →
+  Optimal Next Task alimentado también por `difficulty`/`response_time_ms`/
+  `error_type`. Siguen abiertos, además, los diferidos de V3.30 (consumo de
   `word_breakdown_json` en agregados / práctica dirigida de las falladas y
   palabras tocables en transcripts/chat) y la transferencia por contexto de
-  actividad V3.23 — ahora con `context_id`/`activity_id` ya persistidos en el
-  ledger léxico, que era la pieza que faltaba.
+  actividad V3.23.
+
+- ~~**⏳ V3.37 — Cues graduados y planner sobre la evidencia**~~ ✅ **cerrado
+  (2026-09-10, v3.37.0)**: implementado y publicado (ver «Estado actual» arriba y
+  `release-notes-v3.37.0.md`). La escalera graduada
+  (`translation < definition < cloze`), la automaticidad espaciada y la cola de
+  repaso con `recommended_cue`/`automatic` ya están en producción; `situación` y
+  el planner se rebasan a V3.38.
 
 - ~~**⏳ V3.36 — Learning Evidence 2.0**~~ ✅ **cerrado (2026-09-10, v3.36.0)**:
   implementado y publicado (ver «Estado actual» arriba y

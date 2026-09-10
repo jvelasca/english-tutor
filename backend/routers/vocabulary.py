@@ -286,18 +286,26 @@ async def drill_recognition_attempt(
 @router.get("/api/vocabulary/drill/recall", response_model=RecallPromptOut)
 async def drill_recall_prompt(
     word: str = Query(..., min_length=1, max_length=120),
+    cue: str = Query("", max_length=32),
     user: dict = Depends(current_user),
 ) -> dict:
-    """Cue del paso Recall del drill (V3.34, Recall 2.0).
+    """Cue del paso Recall del drill (V3.34; peldaños graduados en V3.37).
 
-    Camino inverso a Recognition: el alumno ve el SIGNIFICADO (traducción o
-    definición que no filtre la respuesta) y debe recuperar/teclear la palabra.
-    Puro y determinista sobre la caché global `dictionary_entries` (sin estado
-    servidor, premisa 21): el servidor re-deriva el cue al puntuar. Si no hay
-    cue utilizable devuelve `available=false` con `cue=""` (degradación
-    controlada, sin evento). La respuesta NUNCA incluye la palabra esperada."""
+    Camino inverso a Recognition: el alumno ve el SIGNIFICADO (cue) y debe
+    recuperar/teclear la palabra. Puro y determinista sobre la caché global
+    `dictionary_entries` (sin estado servidor, premisa 21): el servidor
+    re-deriva el cue al puntuar. Si no hay cue utilizable devuelve
+    `available=false` con `cue=""` (degradación controlada, sin evento). La
+    respuesta NUNCA incluye la palabra esperada.
+
+    V3.37: el parámetro opcional `cue` pide un peldaño concreto
+    (`translation`/`definition`/`cloze`); sin él se conserva la escalera por
+    defecto de V3.34 (traducción y, si no, definición). Un `cue` no soportado
+    responde 422 sin evento."""
     try:
-        return await vocabulary_service.get_recall_prompt(user["id"], word)
+        return await vocabulary_service.get_recall_prompt(
+            user["id"], word, cue or None
+        )
     except ValueError:
         raise HTTPException(
             status_code=422, detail="La palabra buscada no es válida"
@@ -322,12 +330,15 @@ async def drill_recall_attempt(
     En fallo solo aplica el lapse FSRS si la palabra ya estaba rastreada. Si la
     palabra ya no tiene pregunta, responde 409 sin evento.
     V3.36: la latencia del cliente (`response_time_ms`) se persiste como
-    dimensión observacional del evento; no interviene en la puntuación."""
+    dimensión observacional del evento; no interviene en la puntuación.
+    V3.37: `cue` declara el peldaño servido y el servidor lo re-deriva; un
+    peldaño no soportado o sin contenido responde 422 sin evento."""
     try:
         result = await vocabulary_service.submit_recall_attempt(
             user["id"],
             body.word,
             body.answer,
+            cue=body.cue or None,
             response_time_ms=body.response_time_ms,
         )
     except ValueError:

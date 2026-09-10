@@ -32,6 +32,8 @@ const QUEUE: ReviewQueue = {
         intervals: [],
         success_rate: 0,
         independent_successes: 0,
+        independent_success_days: 0,
+        recall_rungs: {},
         support_levels: {},
         error_types: { wrong_word: 1 },
         mean_response_time_ms: null,

@@ -188,6 +188,7 @@ def test_recall_unavailable_when_word_not_cached(monkeypatch, tmp_path):
             "available": False,
             "cue": "",
             "cue_kind": "",
+            "support_level": "",
         }
         # POST controlado: 409 sin evento (no hay pregunta que puntuar).
         res = client.post(

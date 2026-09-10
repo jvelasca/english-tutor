@@ -359,8 +359,10 @@ def test_empty_summary_matches_the_extended_contract():
         "distinct_success_days": 0,
         "intervals": [],
         "independent_successes": 0,
+        "independent_success_days": 0,
         "support_levels": {},
         "error_types": {},
+        "recall_rungs": {},
         "mean_response_time_ms": None,
     }
 
@@ -452,7 +454,8 @@ def test_recall_attempt_records_observational_dimensions(monkeypatch, tmp_path):
 
     row = evidence_repo.list_evidence(uid, "quokka", target_type="lexicon")[0]
     assert row["support_level"] == "cued"
-    assert row["activity_id"] == "drill:recall"
+    # V3.37: el ledger declara el PELDAÑO servido en el activity_id.
+    assert row["activity_id"] == "drill:recall:translation"
     assert row["context_id"] == "lexicon:drill"
     assert row["response_time_ms"] == 2500
     assert row["error_type"] == "correct"

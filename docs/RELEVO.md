@@ -5,6 +5,45 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.37.0 publicada** — release **v3.37.0**
+> (**Learning Evidence 3.0: cues graduados y automaticidad**). La escalera del
+> peldaño `2 · Recall` deja de ser un *fallback* (traducción y, si no,
+> definición) y pasa a ser una **PROGRESIÓN** `translation (cued) < definition
+> (cued) < cloze (guided)`. `services/recall.py` añade `RECALL_CUES`,
+> `RECALL_CUE_SUPPORT` (el mapeo peldaño → apoyo vive en la capa pura: dominio,
+> repositorio y tests no pueden divergir), `blank_out` (blanqueo puro del cloze
+> desde el banco de pronunciación, con la misma alineación que acredita la
+> producción del drill; descarta el cue si tras blanquear queda cualquier
+> aparición de la palabra o si no hay frase real — **nunca se inventa
+> contenido**), `next_recall_rung` (peldaño recomendado por ÉXITOS ya
+> registrados por peldaño, leídos de `recall_rungs`; techo en `cloze`) y
+> `resolve_recall_cue` (ideal sin contenido → baja hacia más apoyo, **nunca
+> hacia arriba**). Cada peldaño declara su `support_level` y su `activity_id`
+> (`drill:recall:translation|definition|cloze`), así que `independent_successes`
+> (V3.36) por fin tiene de dónde salir. `services/evidence.py` añade
+> `AUTOMATIC_MIN_INDEPENDENT = 2`, `is_automatic` (éxito independiente **y**
+> espaciado: ≥2 días naturales distintos; `cued`/`guided` no cuentan — D5/E3),
+> `RECALL_RUNG_EVIDENCE` + `recall_rung_activity`/`recall_rung_from_activity` y
+> los agregados `independent_success_days`/`recall_rungs` con **paridad
+> pura↔SQL** en `summarize_by_target`. `recommend_review_activity` incorpora el
+> ítem `automatic` sin hueco de producción → `recall` de mantenimiento
+> (`automatic_maintenance`) y `review_queue_item` expone `recommended_cue` y
+> `automatic` (aditivos) resolviendo el ideal contra la disponibilidad real, sin
+> spoilear la palabra (P1-03 de V3.35.1 intacto). Contrato HTTP aditivo:
+> `cue` opcional en GET/POST (422 **sin evento** si no está soportado o el
+> peldaño no tiene contenido; el servidor **re-deriva** el peldaño, premisa 21),
+> `support_level` en `RecallPromptOut` y `independent_success_days`/
+> `recall_rungs` en `LexicalEvidence`. **Sin migración de BD**
+> (`support_level`/`activity_id` ya existían) y **sin tocar** scoring, FSRS,
+> `error_type` (observacional) ni la semántica del intervalo de evidencia.
+> Frontend: el peldaño Recall pinta el cloze (monoespaciado) y envía su
+> `cue_kind`. Tests: pytest **1813 passed** (+22) + ruff limpio + vitest (65
+> ficheros/**560**, +1) + `tsc --noEmit` limpio + build OK +
+> `check_release_consistency` **3.37.0** exit 0.
+> Pendientes hacia **V3.38**: `situación` (exige extender el contrato de
+> contenido de la caché, `generator_version`) y el planner (Optimal Next Task),
+> más los diferidos de V3.30 y la transferencia por contexto V3.23.
+>
 > **Nota (2026-09-10):** **V3.36.0 publicada** — release **v3.36.0**
 > (**Learning Evidence 2.0**: el ledger longitudinal aprende el CÓMO de cada
 > evento). Migración **aditiva e idempotente** de `learning_evidence` con seis
@@ -1159,29 +1198,34 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-10):** `v3.36.0` **Learning Evidence 2.0** — el ledger
-longitudinal `learning_evidence` captura el CÓMO de cada evento (`support_level`,
-`difficulty`, `context_id`/`activity_id`, `response_time_ms` y `error_type`
-observacional), con migración aditiva e idempotente y contrato HTTP aditivo.
-Cerrada antes la **V3.35.1** (patch de integridad del ledger: semántica del
-intervalo de evidencia, cronología de los intervalos, no spoiler en la cola de
-repaso y lotes degenerados en `record_evidence_bulk`) y la **V3.35.0**
-(Longitudinal Learning Evidence 1.0: ancla de retención encadenada + cola de
-repaso propia + tabla `learning_evidence` + `event_role`). CI 6/6 en verde.
-Versión en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/
-`PLAN`. **Las notas de la cabecera de este documento son la fuente de verdad más
+**Posición actual (2026-09-10):** `v3.37.0` **Learning Evidence 3.0: cues
+graduados y automaticidad** — la escalera del peldaño Recall es una PROGRESIÓN
+`translation (cued) < definition (cued) < cloze (guided)`: el ledger registra por
+peldaño (`drill:recall:<peldaño>` → `recall_rungs`), `next_recall_rung` decide el
+siguiente por evidencia y `resolve_recall_cue` degrada siempre hacia más apoyo;
+`is_automatic` exige ≥2 éxitos sin apoyo en días naturales distintos. Sin
+migración de BD y sin tocar scoring/FSRS. Cerrada antes la **V3.36.0**
+(Learning Evidence 2.0: el ledger captura el CÓMO de cada evento —
+`support_level`, `difficulty`, `context_id`/`activity_id`, `response_time_ms` y
+`error_type` observacional), la **V3.35.1** (patch de integridad del ledger:
+semántica del intervalo de evidencia, cronología de los intervalos, no spoiler
+en la cola de repaso y lotes degenerados en `record_evidence_bulk`) y la
+**V3.35.0** (Longitudinal Learning Evidence 1.0: ancla de retención encadenada +
+cola de repaso propia + tabla `learning_evidence` + `event_role`). CI 6/6 en
+verde. Versión en
+`config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`.
+**Las notas de la cabecera de este documento son la fuente de verdad más
 reciente**; si contradicen a esta sección, mandan las notas.
 
-**Siguiente incremento (V3.37): cues graduados + automaticidad.** Briefing
-autocontenido en **`agentes/v337-cues-graduados.md`** (léelo antes de tocar
-nada). En una frase: la escalera del paso Recall deja de ser un *fallback*
-traducción↔definición y pasa a ser una PROGRESIÓN
-`translation → definition → cloze`, cada peldaño declara su `support_level`
-(`cued`/`cued`/`guided`), y la **automaticidad** (éxito independiente y
-espaciado, no un acierto suelto) decide el siguiente peldaño. **No requiere
-migración de BD** (las columnas ya existen desde V3.36.0). Después: **V3.38**
-(`situación` + planner / Optimal Next Task) y **V3.39** (deudas diferidas de
-V3.30 + transferencia por contexto V3.23).
+**Siguiente incremento (V3.38): `situación` + planner (Optimal Next Task).** En
+una frase: extender el contrato de contenido de la caché
+(`generator_version`, V3.30) para un enunciado situacional por palabra — el
+peldaño que V3.37 dejó fuera porque exige contenido autorado — y generalizar
+`recommend_review_activity` con retención FSRS + hueco de producción + hueco de
+TRANSFERENCIA por contexto (`context_id`/`activity_id`) + gradiente de apoyo
+(`support_level`). **No debería requerir migración** (las dimensiones ya están
+persistidas desde V3.36.0 y los peldaños desde V3.37.0). Después: **V3.39**
+(deudas diferidas de V3.30 + transferencia por contexto V3.23).
 
 **Histórico (hasta V2.4, 2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
 (la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).

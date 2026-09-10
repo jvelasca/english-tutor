@@ -293,6 +293,10 @@ export interface LexicalEvidence {
   // Aciertos sin apoyo (`independent`/`spontaneous`): lo único que podrá pesar
   // en automaticidad.
   independent_successes: number;
+  // V3.37 (cues graduados): días distintos con éxito sin apoyo (lo que exige
+  // `is_automatic`) y éxitos de recall por peldaño servido.
+  independent_success_days: number;
+  recall_rungs: Record<string, number>;
   support_levels: Record<string, number>;
   error_types: Record<string, number>;
   // Latencia media declarada (null si ningún evento la midió).
@@ -402,11 +406,15 @@ export interface DrillRecognitionAttempt {
 // el SIGNIFICADO (cue: traducción o definición) y teclea la palabra. El GET
 // nunca expone la palabra esperada; el POST la revela tras puntuar (premisa
 // 21). El acierto deja señal léxica propia (recall + FSRS), nunca producción.
+// V3.37 (cues graduados): `cue_kind` admite el tercer peldaño (`cloze`, con la
+// frase en blanco como `cue`) y `support_level` declara el apoyo del peldaño
+// servido (`cued`/`guided`).
 export interface DrillRecallPrompt {
   word: string;
   available: boolean;
   cue: string;
-  cue_kind: string; // "translation" | "definition" | ""
+  cue_kind: string; // "translation" | "definition" | "cloze" | ""
+  support_level?: string; // "cued" | "guided" | ""
 }
 
 export interface DrillRecallAttempt {
@@ -635,6 +643,10 @@ export interface ReviewQueueItem {
   elapsed_days: number | null;
   activity: ReviewActivity;
   reason: string;
+  // V3.37 (cues graduados): peldaño recomendado para `recall` (nombre, nunca el
+  // cue) y si el ítem acumula éxito independiente y espaciado.
+  recommended_cue?: string;
+  automatic?: boolean;
   competence?: LexicalCompetence | null;
   evidence?: LexicalEvidence | null;
 }

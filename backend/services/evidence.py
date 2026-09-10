@@ -76,12 +76,42 @@ EVIDENCE_SUPPORT_LEVELS: tuple[str, ...] = (
 )
 
 # Niveles que representan logro atribuible al alumno sin apoyo externo: la
-# evidencia lograda con ellos es la que puede pesar en el futuro modelo de
-# automaticidad (V3.36). `cued`/`guided`/`copied` cuentan como evidencia, pero
-# con apoyo declarado.
+# evidencia lograda con ellos es la que puede pesar en el modelo de
+# automaticidad (V3.36/V3.37). `cued`/`guided`/`copied` cuentan como evidencia,
+# pero con apoyo declarado.
 INDEPENDENT_SUPPORT_LEVELS: frozenset[str] = frozenset(
     {"independent", "spontaneous"}
 )
+
+# V3.37 (cues graduados): umbral de AUTOMATICIDAD. Un ítem es `automatic` cuando
+# acumula >= este nº de éxitos SIN apoyo en DÍAS NATURALES DISTINTOS. Una
+# producción del día no consolida (D5/E3) y un acierto suelto tampoco: la
+# automaticidad exige éxito independiente y ESPACIADO. Declarado y calibrable.
+AUTOMATIC_MIN_INDEPENDENT = 2
+
+# V3.37: vocabulario del peldaño servido en un intento de recall
+# (`activity_id = "drill:recall:<peldaño>"`). El dominio lo ESCRIBE y el
+# servicio puro lo LEE para decidir el siguiente peldaño, de modo que el ledger
+# y la decisión compartan un único vocabulario y no puedan divergir.
+# Un `activity_id` legacy (`drill:recall`, sin peldaño) no declara rung.
+RECALL_RUNG_EVIDENCE = "drill:recall:"
+
+
+def recall_rung_activity(rung: str) -> str:
+    """`activity_id` con el que el ledger declara el peldaño servido (V3.37)."""
+    return f"{RECALL_RUNG_EVIDENCE}{rung}"
+
+
+def recall_rung_from_activity(activity_id: str) -> str:
+    """Peldaño declarado por un `activity_id` de recall ("" si no lo declara).
+
+    Solo reconoce la forma V3.37 `drill:recall:<peldaño>`; el `activity_id`
+    legacy de V3.36 (`drill:recall`) devuelve "" porque no declara apoyo.
+    """
+    text = (activity_id or "").strip()
+    if not text.startswith(RECALL_RUNG_EVIDENCE):
+        return ""
+    return text[len(RECALL_RUNG_EVIDENCE):]
 
 # V3.36: taxonomía del error de Recall. `correct` está incluido para que el
 # histograma de `error_types` sea completo (una entrada por evento clasificado).
@@ -324,6 +354,16 @@ def summarize_evidence(rows: list[dict]) -> dict:
     - `mean_response_time_ms` — latencia media de los eventos que la midieron
       (None si ninguno la trae).
 
+    V3.37 (cues graduados) añade las señales de automaticidad y de peldaño:
+
+    - `independent_success_days` — DÍAS NATURALES distintos con éxito sin apoyo
+      (`independent`/`spontaneous`). `independent_successes` cuenta volumen;
+      este campo exige que ese volumen esté ESPACIADO (mismo rigor que
+      `distinct_success_days`), que es lo que `is_automatic` necesita;
+    - `recall_rungs` — histograma de ÉXITOS de recall por PELDAÑO servido
+      (`drill:recall:<peldaño>`): la evidencia con la que `next_recall_rung`
+      decide el siguiente peldaño. Los eventos legacy sin peldaño no entran.
+
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
     attempts = 0
@@ -331,11 +371,14 @@ def summarize_evidence(rows: list[dict]) -> dict:
     days: set[str] = set()
     intervals: list[float] = []
     independent_successes = 0
+    independent_days: set[str] = set()
     support_levels: dict[str, int] = {}
     error_types: dict[str, int] = {}
+    recall_rungs: dict[str, int] = {}
     latencies: list[float] = []
     for row in rows:
         attempts += 1
+        day = (row.get("occurred_at") or "")[:10]
         level = (row.get("support_level") or "").strip().lower()
         if level in EVIDENCE_SUPPORT_LEVELS:
             support_levels[level] = support_levels.get(level, 0) + 1
@@ -351,11 +394,15 @@ def summarize_evidence(rows: list[dict]) -> dict:
         if not _truthy(row.get("success")):
             continue
         successes += 1
-        if level in INDEPENDENT_SUPPORT_LEVELS:
-            independent_successes += 1
-        day = (row.get("occurred_at") or "")[:10]
         if day:
             days.add(day)
+        if level in INDEPENDENT_SUPPORT_LEVELS:
+            independent_successes += 1
+            if day:
+                independent_days.add(day)
+        rung = recall_rung_from_activity(row.get("activity_id") or "")
+        if rung:
+            recall_rungs[rung] = recall_rungs.get(rung, 0) + 1
         raw = row.get("interval_since_last_evidence")
         if raw is None:
             continue
@@ -370,8 +417,10 @@ def summarize_evidence(rows: list[dict]) -> dict:
         "distinct_success_days": len(days),
         "intervals": intervals,
         "independent_successes": independent_successes,
+        "independent_success_days": len(independent_days),
         "support_levels": support_levels,
         "error_types": error_types,
+        "recall_rungs": recall_rungs,
         "mean_response_time_ms": (
             round(sum(latencies) / len(latencies), 1) if latencies else None
         ),
@@ -388,7 +437,36 @@ def empty_summary() -> dict:
         "distinct_success_days": 0,
         "intervals": [],
         "independent_successes": 0,
+        "independent_success_days": 0,
         "support_levels": {},
         "error_types": {},
+        "recall_rungs": {},
         "mean_response_time_ms": None,
     }
+
+
+def is_automatic(evidence: dict) -> bool:
+    """¿El ítem es `automatic`? (V3.37, puro y determinista).
+
+    Exige DOS condiciones sobre el resumen de evidencia:
+
+    - `independent_successes >= AUTOMATIC_MIN_INDEPENDENT` — logro sin apoyo
+      (no basta con `cued`/`guided`: eso es recuperación CON ayuda);
+    - `independent_success_days >= AUTOMATIC_MIN_INDEPENDENT` — esos éxitos
+      caen en DÍAS NATURALES distintos.
+
+    Un acierto suelto no es automaticidad (D5/E3) y cued/guided no cuentan como
+    independientes aunque se repitan. Nunca lanza: un resumen vacío o incompleto
+    no es automaticidad.
+    """
+    if not evidence:
+        return False
+    try:
+        successes = int(evidence.get("independent_successes") or 0)
+        days = int(evidence.get("independent_success_days") or 0)
+    except (TypeError, ValueError):
+        return False
+    return (
+        successes >= AUTOMATIC_MIN_INDEPENDENT
+        and days >= AUTOMATIC_MIN_INDEPENDENT
+    )

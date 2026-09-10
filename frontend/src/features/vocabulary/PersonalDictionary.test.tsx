@@ -391,7 +391,7 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
     // (la escalera no se rompe y no exige un clic manual en Recognize). V3.34:
     // Recall es recuperación por TEXTO (cue = significado, sin micrófono).
     expect(
-      await screen.findByText(/Type the word that matches this meaning/),
+      await screen.findByText(/Type the English word for this translation/),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "2 · Recall" })).toBeTruthy();
@@ -441,7 +441,7 @@ describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
     fireEvent.click(screen.getByRole("button", { name: "2 · Recall" }));
     expect(await screen.findByText("viajar")).toBeTruthy();
     expect(
-      screen.getByText(/Type the word that matches this meaning/),
+      screen.getByText(/Type the English word for this translation/),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
 

@@ -38,6 +38,8 @@ from datetime import date, datetime, timezone
 
 from services import forgetting, fsrs, mastery
 from services.curriculum import CEFR_ORDER
+from services.evidence import is_automatic
+from services.recall import RECALL_CUES, next_recall_rung, resolve_recall_cue
 
 # Mínimos de producción espaciada para considerar una palabra dominada
 # (coinciden con `services.vocabulary`).
@@ -377,7 +379,10 @@ REVIEW_ACTIVITIES: tuple[str, ...] = ("recognition", "recall", "sentence")
 
 
 def recommend_review_activity(
-    row: dict, competence: dict | None = None, now: str = ""
+    row: dict,
+    competence: dict | None = None,
+    now: str = "",
+    evidence: dict | None = None,
 ) -> dict:
     """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
 
@@ -391,6 +396,10 @@ def recommend_review_activity(
       `recall`: es lo que el repaso espaciado debe comprobar;
     - recuperada pero nunca producida (`production_gap`) → `sentence`: el hueco
       real es la producción;
+    - V3.37: si el ítem es `automatic` (éxito independiente y ESPACIADO,
+      `services.evidence.is_automatic`) y no hay hueco de producción → `recall`
+      de MANTENIMIENTO (razón `automatic_maintenance`), que la cola sirve en el
+      peldaño `cloze`;
     - el resto (producida y transferida) → `recall` de mantenimiento.
 
     Nota de diseño: NO se usa `item_recall` para decidir "reconocimiento débil"
@@ -408,11 +417,18 @@ def recommend_review_activity(
         return {"activity": "recall", "reason": "no_recall_evidence"}
     if matrix.get("production_gap"):
         return {"activity": "sentence", "reason": "production_gap"}
+    if evidence is not None and is_automatic(evidence):
+        return {"activity": "recall", "reason": "automatic_maintenance"}
     return {"activity": "recall", "reason": "maintenance"}
 
 
 def review_queue_item(
-    row: dict, card: dict, *, now: str = "", evidence: dict | None = None
+    row: dict,
+    card: dict,
+    *,
+    now: str = "",
+    evidence: dict | None = None,
+    available_cues: object | None = None,
 ) -> dict:
     """Ítem de la cola de repaso lexica (V3.35), pura y determinista.
 
@@ -420,12 +436,36 @@ def review_queue_item(
     actividad recomendada por hueco de competencia, la urgencia del scheduler
     (`retrievability`/`stability`) y un snapshot de la matriz de competencia.
     Nunca incluye el cue ni la forma esperada (eso lo sirve el GET del peldaño).
+
+    V3.37 (cues graduados) añade dos campos ADITIVOS:
+
+    - `recommended_cue` — peldaño recomendado para la actividad `recall`. Es el
+      ideal pedagógico (`next_recall_rung`) resuelto contra la disponibilidad
+      real de contenido (`resolve_recall_cue`) cuando el llamador la aporta
+      (`available_cues`), de modo que la cola nunca recomiende un peldaño sin
+      contenido. Sigue SIN incluir el cue: solo su nombre.
+    - `automatic` — el ítem acumula éxito independiente y espaciado
+      (`services.evidence.is_automatic`).
     """
     matrix = item_competence_matrix(row)
-    recommendation = recommend_review_activity(row, matrix, now=now)
+    summary = evidence if evidence is not None else {}
+    recommendation = recommend_review_activity(
+        row, matrix, now=now, evidence=summary
+    )
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
     stability = float(card.get("stability") or 0.0)
+    recommended_cue = ""
+    if recommendation["activity"] == "recall":
+        ideal = (
+            RECALL_CUES[-1]
+            if recommendation["reason"] == "automatic_maintenance"
+            else next_recall_rung(row, summary)
+        )
+        if available_cues is None:
+            recommended_cue = ideal
+        else:
+            recommended_cue = resolve_recall_cue(ideal, available_cues) or ""
     return {
         "word": row.get("word") or card.get("target_id") or "",
         "lexical_unit": lexical_unit(row),
@@ -442,6 +482,8 @@ def review_queue_item(
         "elapsed_days": round(elapsed, 3) if elapsed is not None else None,
         "activity": recommendation["activity"],
         "reason": recommendation["reason"],
+        "recommended_cue": recommended_cue,
+        "automatic": is_automatic(summary),
         "competence": matrix,
         "evidence": evidence if evidence is not None else {},
     }

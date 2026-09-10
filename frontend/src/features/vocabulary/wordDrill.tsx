@@ -207,7 +207,9 @@ function RecallStep({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">
-        {t("dictionary.drill.recallPrompt")}
+        {prompt.cue_kind
+          ? t(`dictionary.drill.recallCue.${prompt.cue_kind}`)
+          : t("dictionary.drill.recallPrompt")}
       </p>
       <div className="flex items-center gap-2">
         <input
@@ -463,6 +465,7 @@ export function WordDrill({
         word,
         recallAnswer,
         responseTimeMs,
+        recall.cue_kind || undefined,
       );
       setRecallOutcome(outcome);
     } catch (e) {
@@ -537,7 +540,12 @@ export function WordDrill({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {hideTarget ? (
-            <span className="text-base font-semibold">
+            <span
+              className={cn(
+                "text-base font-semibold",
+                recall?.cue_kind === "cloze" && "font-mono",
+              )}
+            >
               {recall ? recall.cue : "…"}
             </span>
           ) : (

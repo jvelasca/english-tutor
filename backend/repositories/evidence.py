@@ -311,11 +311,21 @@ def summarize_by_target(
     paridad la fija un test): el agregado no puede introducir un segundo
     dialecto del resumen.
 
+    V3.37 (cues graduados) añade `independent_success_days` (días naturales
+    distintos con éxito sin apoyo: lo que `is_automatic` exige que esté
+    espaciado) y `recall_rungs` (histograma de ÉXITOS de recall por peldaño,
+    leído del `activity_id` `drill:recall:<peldaño>`). Misma paridad pura↔SQL.
+
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
     # Import local (misma convención que el resto del repositorio): la capa pura
-    # es la única fuente de verdad de los niveles de apoyo independientes.
-    from services.evidence import INDEPENDENT_SUPPORT_LEVELS
+    # es la única fuente de verdad de los niveles de apoyo independientes y del
+    # vocabulario del peldaño.
+    from services.evidence import (
+        INDEPENDENT_SUPPORT_LEVELS,
+        RECALL_RUNG_EVIDENCE,
+        recall_rung_from_activity,
+    )
 
     independent = sorted(INDEPENDENT_SUPPORT_LEVELS)
     placeholders = ", ".join("?" for _ in independent)
@@ -328,11 +338,15 @@ def summarize_by_target(
             "COALESCE(SUM(CASE WHEN success = 1 "
             f"AND support_level IN ({placeholders}) THEN 1 ELSE 0 END), 0) "
             "AS independent_successes, "
+            "COUNT(DISTINCT CASE WHEN success = 1 "
+            f"AND support_level IN ({placeholders}) "
+            "THEN NULLIF(substr(occurred_at, 1, 10), '') END) "
+            "AS independent_success_days, "
             "AVG(response_time_ms) AS mean_latency "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? "
             "GROUP BY target_id",
-            (*independent, user_id, target_type),
+            (*independent, *independent, user_id, target_type),
         ).fetchall()
         interval_rows = conn.execute(
             "SELECT target_id, interval_since_last_evidence AS interval "
@@ -356,6 +370,14 @@ def summarize_by_target(
             "GROUP BY target_id, error_type",
             (user_id, target_type),
         ).fetchall()
+        rung_rows = conn.execute(
+            "SELECT target_id, activity_id, COUNT(*) AS total "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND success = 1 "
+            "AND activity_id LIKE ? "
+            "GROUP BY target_id, activity_id",
+            (user_id, target_type, f"{RECALL_RUNG_EVIDENCE}%"),
+        ).fetchall()
     intervals: dict[str, list[float]] = {}
     for row in interval_rows:
         intervals.setdefault(row["target_id"], []).append(
@@ -371,6 +393,13 @@ def summarize_by_target(
         error_types.setdefault(row["target_id"], {})[row["error_type"]] = int(
             row["total"]
         )
+    recall_rungs: dict[str, dict[str, int]] = {}
+    for row in rung_rows:
+        rung = recall_rung_from_activity(row["activity_id"])
+        if not rung:
+            continue
+        bucket = recall_rungs.setdefault(row["target_id"], {})
+        bucket[rung] = bucket.get(rung, 0) + int(row["total"])
     return {
         row["target_id"]: {
             "attempts": int(row["attempts"]),
@@ -383,8 +412,10 @@ def summarize_by_target(
             "distinct_success_days": int(row["distinct_success_days"]),
             "intervals": intervals.get(row["target_id"], []),
             "independent_successes": int(row["independent_successes"]),
+            "independent_success_days": int(row["independent_success_days"]),
             "support_levels": support_levels.get(row["target_id"], {}),
             "error_types": error_types.get(row["target_id"], {}),
+            "recall_rungs": recall_rungs.get(row["target_id"], {}),
             "mean_response_time_ms": (
                 round(float(row["mean_latency"]), 1)
                 if row["mean_latency"] is not None

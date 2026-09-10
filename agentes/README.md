@@ -20,9 +20,10 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
-- `agentes/v337-cues-graduados.md` — **V3.37 (ACTIVO, pendiente de ejecutar)**:
-  cues graduados + automaticidad. **Es el único briefing vivo** de la biblioteca;
-  leerlo antes de empezar el siguiente incremento.
+- `agentes/v337-cues-graduados.md` — **V3.37 (ejecutado, 2026-09-10, v3.37.0)**:
+  cues graduados + automaticidad. **Histórico, hecho**; ver
+  `release-notes-v3.37.0.md`. El siguiente briefing vivo (V3.38: `situación` +
+  planner / Optimal Next Task) está por escribir.
 - `agentes/v330-*.md`, `v332-*`, `v333-*`, `v3331-*`, `v334-*` — puente
   Dictionary → Learning (V3.30–V3.34): **históricos, hechos**.
 - `agentes/m*-*.md` — milestones M0–M10 y `v17`/`v18`: **históricos, todos hechos**.
