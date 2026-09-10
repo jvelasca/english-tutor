@@ -5,7 +5,8 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-08-28): `v1.34`** — ver `docs/RELEVO.md` (sección 0 "START HERE").
+> **Estado actual (2026-09-10): `v3.36.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE").
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
@@ -19,6 +20,11 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v337-cues-graduados.md` — **V3.37 (ACTIVO, pendiente de ejecutar)**:
+  cues graduados + automaticidad. **Es el único briefing vivo** de la biblioteca;
+  leerlo antes de empezar el siguiente incremento.
+- `agentes/v330-*.md`, `v332-*`, `v333-*`, `v3331-*`, `v334-*` — puente
+  Dictionary → Learning (V3.30–V3.34): **históricos, hechos**.
 - `agentes/m*-*.md` — milestones M0–M10 y `v17`/`v18`: **históricos, todos hechos**.
 - `agentes/endurecimiento/` — Release Audit 1.1 (RA1–RA7), launcher (A1/A2) y
   endurecimiento (E1–E4, F4–F9): **históricos, todos hechos**.

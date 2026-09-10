@@ -1159,7 +1159,31 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
+**Posición actual (2026-09-10):** `v3.36.0` **Learning Evidence 2.0** — el ledger
+longitudinal `learning_evidence` captura el CÓMO de cada evento (`support_level`,
+`difficulty`, `context_id`/`activity_id`, `response_time_ms` y `error_type`
+observacional), con migración aditiva e idempotente y contrato HTTP aditivo.
+Cerrada antes la **V3.35.1** (patch de integridad del ledger: semántica del
+intervalo de evidencia, cronología de los intervalos, no spoiler en la cola de
+repaso y lotes degenerados en `record_evidence_bulk`) y la **V3.35.0**
+(Longitudinal Learning Evidence 1.0: ancla de retención encadenada + cola de
+repaso propia + tabla `learning_evidence` + `event_role`). CI 6/6 en verde.
+Versión en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/
+`PLAN`. **Las notas de la cabecera de este documento son la fuente de verdad más
+reciente**; si contradicen a esta sección, mandan las notas.
+
+**Siguiente incremento (V3.37): cues graduados + automaticidad.** Briefing
+autocontenido en **`agentes/v337-cues-graduados.md`** (léelo antes de tocar
+nada). En una frase: la escalera del paso Recall deja de ser un *fallback*
+traducción↔definición y pasa a ser una PROGRESIÓN
+`translation → definition → cloze`, cada peldaño declara su `support_level`
+(`cued`/`cued`/`guided`), y la **automaticidad** (éxito independiente y
+espaciado, no un acierto suelto) decide el siguiente peldaño. **No requiere
+migración de BD** (las columnas ya existen desde V3.36.0). Después: **V3.38**
+(`situación` + planner / Optimal Next Task) y **V3.39** (deudas diferidas de
+V3.30 + transferencia por contexto V3.23).
+
+**Histórico (hasta V2.4, 2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
 (la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).
 Cerrada la **V2.4 AUDITORÍA DE COBERTURA CURRICULAR** (instrumentación que responde con datos a
 "¿el alumno puede recorrer completo A1→C2?": servicio puro `services/curriculum_coverage.py` con
