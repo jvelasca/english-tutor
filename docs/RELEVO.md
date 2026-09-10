@@ -44,6 +44,9 @@
 > `situation`). Diferidos a V3.39: deudas de V3.30 + transferencia por contexto
 > V3.23 + `cloze_coverage` de corpus + `example_for_many` de la Review Queue +
 > refactor de `wordDrill.tsx`.
+> **CI verificable:** commit `002af70d3f480068f8a04d2449a635c196475721`
+> con el run [34493744848](https://github.com/jvelasca/english-tutor/actions/runs/34493744848)
+> en `success` (6/6 jobs).
 >
 > **Nota (2026-09-10):** **V3.37.1 publicada** — release **v3.37.1**
 > (**Política de consolidación y regresión de la escalera de recall**). Patch

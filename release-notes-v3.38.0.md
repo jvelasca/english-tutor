@@ -146,9 +146,10 @@ spoiler). El frontend solo necesita los tipos nuevos.
 
 ## CI
 
-- Commit pendiente de publicar; se completará con el run de GitHub Actions
-  (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build, release consistency,
-  Beta V3.0 gate, content validation, Playwright E2E).
+- Commit `002af70d3f480068f8a04d2449a635c196475721` con el run
+  [34493744848](https://github.com/jvelasca/english-tutor/actions/runs/34493744848)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
 
 ## Fuera de alcance (V3.39)
 
