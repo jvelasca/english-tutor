@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import secrets
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
@@ -370,7 +371,9 @@ async def submit_sentence_attempt(
 # Paso Recognition del drill (V3.33, eslabón 2 del Dictionary → Learning
 # Bridge). MCQ definición ↔ palabra servido y puntuado por el backend (premisa
 # 21, sin estado servidor): la pregunta es una función pura y determinista por
-# palabra sobre la caché global `dictionary_entries` (`services/dictionary_mcq`).
+# (palabra, question_id) sobre la caché global `dictionary_entries`
+# (`services/dictionary_mcq`); el `question_id` es un nonce por intento (V3.33.1)
+# que rebaraja la posición de la correcta sin guardar sesión.
 # Evidencia SOLO informativa (V3.13: el MC de reconocimiento no demuestra
 # destrezas productivas): el acierto/fallo registra únicamente el evento
 # `learning_events` `drill:<word>:recognition:ok|ko`; NUNCA escribe en
@@ -388,32 +391,54 @@ async def get_recognition_question(user_id: str, word: str) -> dict:
     `available=false` con `options=[]`: degradación controlada sin evento (el
     peldaño muestra aviso y no rompe Recall/Sentence). La respuesta NUNCA
     incluye el índice correcto: lo puntúa el POST recomputando la pregunta.
+
+    V3.33.1: el GET entrega un `question_id` (nonce por intento) que actúa como
+    seed del barajado. El POST lo devuelve y el servidor reconstruye la MISMA
+    permutación, de modo que la posición de la correcta cambia entre intentos
+    sin guardar estado servidor (no se puede aprender la posición).
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada no es válida")
     entries = await run_in_threadpool(dictionary_repo.list_entries)
-    built = dictionary_mcq.recognition_options_for(normalized, entries)
+    question_id = secrets.token_urlsafe(8)
+    built = dictionary_mcq.recognition_options_for(
+        normalized, entries, seed=question_id
+    )
     if built is None:
-        return {"word": normalized, "available": False, "options": []}
+        return {
+            "word": normalized,
+            "available": False,
+            "options": [],
+            "question_id": "",
+        }
     options, _correct_index = built
-    return {"word": normalized, "available": True, "options": options}
+    return {
+        "word": normalized,
+        "available": True,
+        "options": options,
+        "question_id": question_id,
+    }
 
 
 async def submit_recognition_attempt(
-    user_id: str, word: str, selected_index: int
+    user_id: str, word: str, selected_index: int, question_id: str = ""
 ) -> dict | None:
     """Puntúa un intento del paso Recognition (V3.33) sin efectos colaterales.
 
     El servidor recomputa la pregunta con la MISMA función pura (premisa 21) y
-    compara `selected_index` con la correcta. Devuelve `None` si la palabra ya
-    no tiene pregunta (el router responde un 4xx controlado sin evento).
+    el `question_id` recibido como seed (V3.33.1): misma permutación que sirvió
+    el GET. Compara `selected_index` con la correcta. Devuelve `None` si la
+    palabra ya no tiene pregunta (el router responde un 4xx controlado sin
+    evento).
     """
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada no es válida")
     entries = await run_in_threadpool(dictionary_repo.list_entries)
-    built = dictionary_mcq.recognition_options_for(normalized, entries)
+    built = dictionary_mcq.recognition_options_for(
+        normalized, entries, seed=question_id
+    )
     if built is None:
         return None
     options, correct_index = built

@@ -6,8 +6,9 @@ elige su significado entre opciones servidas por el backend (premisa 21, sin
 estado servidor: pregunta pura y determinista por palabra sobre la caché global
 `dictionary_entries`). Acceptance de integración HTTP (TestClient):
 
-- el GET nunca expone la correcta y la pregunta es determinista (mismas
-  `options` entre llamadas);
+- el GET nunca expone la correcta y la pregunta es determinista DADO el
+  `question_id` (V3.33.1: mismo seed ⇒ misma permutación; cada intento recibe un
+  seed distinto para que la posición de la correcta no se pueda memorizar);
 - acierto y fallo registran SOLO el evento informativo `learning_events`
   `drill:<word>:recognition:ok|ko`: CERO cambios en filas/eventos de
   `vocabulary` (ni retrievals ni production), igual que la consulta del
@@ -75,12 +76,20 @@ def _get_question(client: TestClient, uid: str, word: str) -> dict:
 
 
 def _post_attempt(
-    client: TestClient, uid: str, word: str, selected_index: int
+    client: TestClient,
+    uid: str,
+    word: str,
+    selected_index: int,
+    question_id: str = "",
 ) -> dict:
     res = client.post(
         "/api/vocabulary/drill/recognition-attempt",
         params={"user_id": uid},
-        json={"word": word, "selected_index": selected_index},
+        json={
+            "word": word,
+            "selected_index": selected_index,
+            "question_id": question_id,
+        },
     )
     assert res.status_code == 200, res.text
     return res.json()
@@ -105,23 +114,54 @@ def _drill_events(uid: str) -> list[str]:
 # --- Acceptance: pregunta determinista y sin respuesta en el GET ------------
 
 
-def test_recognition_question_deterministic_and_never_exposes_answer(
+def test_recognition_question_never_exposes_answer_and_carries_seed(
     monkeypatch, tmp_path
 ):
     a, _b = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        first = _get_question(client, a, "quokka")
-        second = _get_question(client, a, "quokka")
+        body = _get_question(client, a, "quokka")
 
-    assert first["word"] == "quokka"
-    assert first["available"] is True
-    # Determinista: dos GET consecutivos, misma pregunta y mismo orden.
-    assert first["options"] == second["options"]
+    assert body["word"] == "quokka"
+    assert body["available"] is True
+    # V3.33.1: el GET entrega un seed de intento (nonce), nunca la respuesta.
+    assert isinstance(body["question_id"], str)
+    assert body["question_id"] != ""
     # El GET nunca filtra la correcta (la puntúa el POST, premisa 21).
-    assert "correct_index" not in first
+    assert "correct_index" not in body
     # 4 opciones (1 correcta + 3 distractores) que incluyen el significado real.
-    assert len(first["options"]) == 4
-    assert _CORRECT_ES in first["options"]
+    assert len(body["options"]) == 4
+    assert _CORRECT_ES in body["options"]
+
+
+def test_recognition_permutation_depends_on_seed_and_is_stable():
+    """V3.33.1 (P1-01): la permutación es estable para un mismo seed y varía
+    entre seeds; la posición de la correcta deja de estar fija por palabra."""
+    entries = [
+        {
+            "word": "quokka",
+            "pos": "noun",
+            "translation": "marsupial",
+            "definition": "",
+        },
+        {"word": "apple", "pos": "noun", "translation": "manzana", "definition": ""},
+        {"word": "banana", "pos": "noun", "translation": "platano", "definition": ""},
+        {"word": "carrot", "pos": "noun", "translation": "zanahoria", "definition": ""},
+    ]
+    # Mismo seed ⇒ misma pregunta y mismo orden (determinismo reproducible).
+    first = dictionary_mcq.recognition_options_for("quokka", entries, seed="s1")
+    again = dictionary_mcq.recognition_options_for("quokka", entries, seed="s1")
+    assert first == again
+
+    # Seeds distintos ⇒ mismas opciones (misma pregunta) pero la correcta puede
+    # cambiar de posición: se varía cada intento sin guardar estado servidor.
+    positions = set()
+    for seed in ("a", "b", "c", "d", "e", "f", "g", "h"):
+        options, correct_index = dictionary_mcq.recognition_options_for(
+            "quokka", entries, seed=seed
+        )
+        assert set(options) == set(first[0])
+        positions.add(correct_index)
+    assert len(positions) > 1
 
 
 def test_recognition_mode_falls_back_to_definition(monkeypatch, tmp_path):
@@ -155,7 +195,11 @@ def test_recognition_hit_records_only_informative_event(monkeypatch, tmp_path):
     with TestClient(app) as client:
         body = _get_question(client, a, "quokka")
         hit = _post_attempt(
-            client, a, "quokka", _index_of(body["options"], _CORRECT_ES)
+            client,
+            a,
+            "quokka",
+            _index_of(body["options"], _CORRECT_ES),
+            body["question_id"],
         )
 
     assert hit["correct"] is True
@@ -176,7 +220,7 @@ def test_recognition_miss_records_ko_without_effects(monkeypatch, tmp_path):
     with TestClient(app) as client:
         body = _get_question(client, a, "quokka")
         wrong = _wrong_index(body["options"], _CORRECT_ES)
-        miss = _post_attempt(client, a, "quokka", wrong)
+        miss = _post_attempt(client, a, "quokka", wrong, body["question_id"])
 
     assert miss["correct"] is False
     # El fallo revela la opción correcta para el feedback (solo tras responder).
@@ -214,7 +258,12 @@ def test_recognition_unavailable_when_word_not_cached(monkeypatch, tmp_path):
     with TestClient(app) as client:
         # Palabra jamás generada en la caché global.
         body = _get_question(client, a, "ghost")
-        assert body == {"word": "ghost", "available": False, "options": []}
+        assert body == {
+            "word": "ghost",
+            "available": False,
+            "options": [],
+            "question_id": "",
+        }
 
         # POST controlado: 4xx sin evento.
         res = client.post(
@@ -314,14 +363,18 @@ def test_recognition_events_isolated_between_users(monkeypatch, tmp_path):
     with TestClient(app) as client:
         question_a = _get_question(client, a, "quokka")
         question_b = _get_question(client, b, "quokka")
-        # Misma pregunta global para ambos (la caché no es de un alumno).
-        assert question_a["options"] == question_b["options"]
+        # Misma pregunta global para ambos (la caché no es de un alumno);
+        # V3.33.1: cada GET trae su propio seed, así que el orden puede variar.
+        assert set(question_a["options"]) == set(question_b["options"])
+        assert question_a["question_id"] != ""
+        assert question_b["question_id"] != ""
 
         _post_attempt(
             client,
             a,
             "quokka",
             _wrong_index(question_a["options"], _CORRECT_ES),
+            question_a["question_id"],
         )
         # B no ve ningún rastro de A hasta que responde por su cuenta.
         assert _drill_events(b) == []
@@ -332,6 +385,7 @@ def test_recognition_events_isolated_between_users(monkeypatch, tmp_path):
             b,
             "quokka",
             _wrong_index(question_b["options"], _CORRECT_ES),
+            question_b["question_id"],
         )
 
     assert _drill_events(a) == ["drill:quokka:recognition:ko"]

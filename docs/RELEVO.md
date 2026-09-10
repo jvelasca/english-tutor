@@ -3,7 +3,37 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-09 (UTC+2).
+> Actualizado por última vez: 2026-09-10 (UTC+2).
+>
+> **Nota (2026-09-10):** **V3.33.1 publicada** — release **v3.33.1**
+> (hardening de Recognition tras la auditoría externa de V3.33.0). Dos
+> correcciones P1, sin tocar la evidencia informativa ni la seguridad del
+> scoring (el GET sigue sin exponer la correcta):
+> **P1-01 (posición fija de la correcta):** `recognition_options_for(word,
+> entries, seed="")` deriva ahora la permutación de `palabra + seed`; el
+> `GET /api/vocabulary/drill/recognition` entrega un nonce por intento
+> (`question_id: ""`) y el `POST .../recognition-attempt` lo reenvía para
+> reconstruir la MISMA permutación (premisa 21: sin estado servidor). Reintentar
+> la misma palabra rebaraja las opciones, así que no se puede memorizar la
+> posición. Sin firmar: el seed solo ordena y la correcta nunca viaja.
+> **P2:** `_stable_int` pasa a `SHA-256` (mejor dispersión);
+> `listening_bottom_up` conserva su hash (sus ids son content-stable y no deben
+> re-barajarse).
+> **P1-02 (arranque real en Recognize):** `WordDrill` abre en
+> `step="recognition"` y carga la pregunta sola; si `available=false` degrada a
+> Recall (`Practicar → Recognize → Recall → Sentence`, o `Practicar → Recall`),
+> sin pisar una elección manual de otro paso. Cada entrada en Recognize pide un
+> `question_id` nuevo.
+> Contrato aditivo y retrocompatible: `RecognitionQuestionOut.question_id` y
+> `RecognitionAttemptIn.question_id` (opcional). Tests: pytest backend
+> **1723 passed** (+1: test puro de permutación por seed; determinismo y
+> aislamiento reescritos sobre `question_id`) + ruff limpio + vitest (63
+> ficheros/**547**, +1: reentrar en Recognize pide pregunta nueva / arranque y
+> degradación) + `tsc --noEmit` limpios + `check_release_consistency` **3.33.1**
+> exit 0. Detalle: `release-notes-v3.33.1.md`; `CHANGELOG.md` con entrada
+> `[3.33.1]`; `PLAN.md` con hito estable V3.33.1. Pendientes hacia **V3.34**:
+> recall demorado con FSRS, transferencia por contexto de actividad V3.23 y los
+> diferidos de V3.30.
 >
 > **Nota (2026-09-09):** **V3.33.0 publicada** — release **v3.33.0**
 > (Dictionary → Learning Bridge, eslabón 2: peldaño **Recognition — MCQ

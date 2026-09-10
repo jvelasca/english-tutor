@@ -8,6 +8,23 @@
 
 ## Estado actual
 
+- ✅ **V3.33.1 — Hardening de Recognition (auditoría V3.33.0) (2026-09-10)**
+  (**Versión estable `3.33.1`**, app `3.33.0 → 3.33.1`). Dos correcciones P1 de
+  la auditoría externa, sin tocar la evidencia (sigue SOLO informativa) ni la
+  seguridad del scoring (el GET nunca expone la correcta):
+  **P1-01** la permutación deja de depender solo de la palabra —
+  `recognition_options_for(word, entries, seed="")` mezcla `palabra + seed` y el
+  `GET drill/recognition` entrega un nonce por intento (`question_id`) que el
+  `POST` reenvía para reconstruir la misma permutación (premisa 21: sin estado
+  servidor), de modo que reintentar `cat` rebaraja las opciones y no se puede
+  memorizar la posición; **P2** `_stable_int` pasa a `SHA-256` (mejor dispersión;
+  `listening_bottom_up` conserva el suyo por compatibilidad de ítems publicados);
+  **P1-02** `WordDrill` arranca en `1 · Recognize` y degrada a Recall si
+  `available=false` (`Practicar → Recognize → Recall → Sentence`). Contrato
+  aditivo (`question_id` opcional en GET/POST). Tests: pytest **1723** (+1),
+  vitest (63 ficheros/**547**, +1), `ruff`/`tsc` limpios y
+  `check_release_consistency` **3.33.1** exit 0.
+
 - ✅ **V3.33 — Dictionary → Learning Bridge, eslabón 2: Recognition (MCQ
   definición ↔ palabra) (2026-09-09)** (**Versión estable `3.33.0`**, app
   `3.32.0 → 3.33.0`). La escalera compartida de drill (`wordDrill.tsx`, lookup

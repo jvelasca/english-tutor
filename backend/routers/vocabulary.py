@@ -225,12 +225,14 @@ async def drill_recognition_question(
 ) -> dict:
     """Pregunta del paso Recognition del drill (V3.33, eslabón 2 del puente).
 
-    MCQ definición ↔ palabra determinista por palabra (sin estado servidor,
-    premisa 21): el servidor la recomputa al puntuar. La pregunta solo depende
-    de la caché global `dictionary_entries`, nunca de la evidencia del alumno.
-    Si no hay contenido suficiente devuelve `available=false` con `options=[]`
-    (degradación controlada, sin evento). La respuesta NUNCA incluye la opción
-    correcta: el POST es quien puntúa."""
+    MCQ definición ↔ palabra determinista por (palabra, question_id) (sin estado
+    servidor, premisa 21): el servidor la recomputa al puntuar. La pregunta solo
+    depende de la caché global `dictionary_entries`, nunca de la evidencia del
+    alumno. V3.33.1: entrega un `question_id` (nonce por intento) que el POST
+    reenvía para reconstruir la misma permutación; así la posición de la
+    correcta cambia entre intentos. Si no hay contenido suficiente devuelve
+    `available=false` con `options=[]` (degradación controlada, sin evento). La
+    respuesta NUNCA incluye la opción correcta: el POST es quien puntúa."""
     try:
         return await vocabulary_service.get_recognition_question(
             user["id"], word
@@ -252,14 +254,15 @@ async def drill_recognition_attempt(
     """Intento del paso Recognition del drill (V3.33).
 
     El servidor recomputa la pregunta con la misma función pura (premisa 21) y
-    puntúa `selected_index`. Evidencia SOLO informativa (V3.13: el MC de
-    reconocimiento no demuestra destrezas productivas): registra el evento
-    `learning_events` `drill:<word>:recognition:ok|ko` y NO escribe en
+    el `question_id` recibido como seed (V3.33.1), puntuando `selected_index`.
+    Evidencia SOLO informativa (V3.13: el MC de reconocimiento no demuestra
+    destrezas productivas): registra el evento `learning_events`
+    `drill:<word>:recognition:ok|ko` y NO escribe en
     `vocabulary`/`vocabulary_events` ni mueve FSRS/mastery/usage. Si la palabra
     ya no tiene pregunta (contenido desaparecido), responde 409 sin evento."""
     try:
         result = await vocabulary_service.submit_recognition_attempt(
-            user["id"], body.word, body.selected_index
+            user["id"], body.word, body.selected_index, body.question_id
         )
     except ValueError:
         raise HTTPException(

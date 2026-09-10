@@ -442,19 +442,27 @@ class RecognitionQuestionOut(BaseModel):
     `available=false` con `options=[]` es la degradación controlada cuando la
     palabra no tiene entrada en la caché global o no hay distractores
     suficientes: el peldaño muestra aviso y no rompe la escalera.
+
+    V3.33.1: `question_id` es un nonce por intento (seed del barajado) que el
+    cliente reenvía en el POST; no es la respuesta correcta ni un dato del
+    alumno, solo rompe la posición fija de la correcta entre intentos.
     """
 
     word: str
     available: bool
     options: list[str] = Field(default_factory=list)
+    question_id: str = ""
 
 
 class RecognitionAttemptIn(BaseModel):
     """Intento del paso Recognition (V3.33): el cliente solo envía qué opción
-    eligió (`selected_index`). Nunca declara acierto (premisa 21)."""
+    eligió (`selected_index`) y el `question_id` que sirvió el GET (V3.33.1,
+    seed para reconstruir la misma permutación). Nunca declara acierto
+    (premisa 21)."""
 
     word: str = Field(min_length=1, max_length=120)
     selected_index: int = Field(ge=0)
+    question_id: str = Field(default="", max_length=64)
 
 
 class RecognitionAttemptOut(BaseModel):

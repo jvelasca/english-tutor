@@ -173,6 +173,12 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     routeFetch([
       { url: "/api/vocabulary/drill/candidates", data: candidates },
       { url: "/api/vocabulary/lexicon", data: LEXICON },
+      // V3.33.1: sin pregunta de Recognition el drill degrada a Recall (paso que
+      // este test ejercita: prompt oral + grabación).
+      {
+        url: "/api/vocabulary/drill/recognition",
+        data: { word: "travel", available: false, options: [], question_id: "" },
+      },
       {
         url: "/api/vocabulary/drill/attempt",
         data: () => {
@@ -266,6 +272,7 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
     word: "travel",
     available: true,
     options: ["viajar", "comer", "dormir"],
+    question_id: "q-travel-1",
   };
 
   it("acierta «1 · Recognize» y NO saca la palabra de candidatas (informativo)", async () => {
@@ -290,11 +297,11 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
     renderPanel(<PersonalDictionary userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
 
-    // El drill abre en el paso oral Word; el peldaño Recognition está primero.
+    // V3.33.1: el drill abre directamente en Recognize (primer peldaño) y la
+    // pregunta se carga sola, sin clic manual.
     expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
-
     expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: "viajar" }));
     fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
 
@@ -305,24 +312,52 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
     expect(screen.getByRole("button", { name: "Say travel" })).toBeTruthy();
   });
 
-  it("sin significado disponible degrada con aviso y no rompe la escalera", async () => {
+  it("reentrar en «1 · Recognize» pide una pregunta nueva (nuevo intento)", async () => {
+    // V3.33.1 (P1-01): cada entrada en Recognize genera un `question_id` nuevo,
+    // de modo que la posición de la correcta no se puede memorizar.
+    const fetchFn = routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+    ]);
+    const recognitionGets = () =>
+      fetchFn.mock.calls.filter((call) =>
+        String(call[0]).includes("/api/vocabulary/drill/recognition?"),
+      ).length;
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
+    expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
+    expect(recognitionGets()).toBe(1);
+
+    // Salir a Recall y volver a Recognize dispara un nuevo GET (nuevo intento).
+    fireEvent.click(screen.getByRole("button", { name: "2 · Word" }));
+    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+
+    await waitFor(() => expect(recognitionGets()).toBe(2));
+  });
+
+  it("sin significado disponible degrada a Recall y no rompe la escalera", async () => {
     routeFetch([
       { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
       { url: "/api/vocabulary/lexicon", data: LEXICON },
       {
         url: "/api/vocabulary/drill/recognition",
-        data: { word: "travel", available: false, options: [] },
+        data: { word: "travel", available: false, options: [], question_id: "" },
       },
     ]);
 
     renderPanel(<PersonalDictionary userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
-    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
 
+    // V3.33.1: sin pregunta disponible el drill degrada a Recall automáticamente
+    // (la escalera no se rompe y no exige un clic manual en Recognize).
     expect(
-      await screen.findByText(/No meaning available for this word yet/),
+      await screen.findByText(
+        /Listen to the word, then record yourself saying it aloud/,
+      ),
     ).toBeTruthy();
-    // El resto de pasos sigue accesible (no se rompe la escalera).
+    expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "2 · Word" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "3 · Sentence" })).toBeTruthy();
   });

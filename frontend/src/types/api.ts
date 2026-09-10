@@ -348,10 +348,13 @@ export interface DrillSentenceAttempt {
 // V3.33 (eslabón 2 del puente): paso Recognition — MCQ definición ↔ palabra.
 // La pregunta es determinista en el servidor (premisa 21): el GET nunca incluye
 // la opción correcta y `correct_index` solo llega en la respuesta del intento.
+// V3.33.1: `question_id` (nonce por intento) se reenvía en el POST para
+// reconstruir la permutación servida y rebarajar la posición de la correcta.
 export interface DrillRecognitionQuestion {
   word: string;
   available: boolean;
   options: string[];
+  question_id: string;
 }
 
 export interface DrillRecognitionAttempt {

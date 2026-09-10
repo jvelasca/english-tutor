@@ -15,7 +15,7 @@
  * informativo — su acierto no demuestra destreza productiva (V3.13) y no
  * dispara `onProduced`; tampoco usa micrófono (lo puntúa el backend).
  */
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, type Variants } from "motion/react";
 import { Check, Loader2, Mic, Square } from "lucide-react";
 import {
@@ -158,12 +158,16 @@ export function isSentenceAttempt(
  * palabra») porque solo depende de `userId` + `word`.
  * V3.33: el paso Recognition es SOLO informativo (V3.13: el MC de
  * reconocimiento no demuestra destrezas productivas): su acierto NO dispara
- * `onProduced` y solo el servidor puntúa (premisa 21). */
+ * `onProduced` y solo el servidor puntúa (premisa 21).
+ * V3.33.1: el drill ARRANCA en Recognition (primer peldaño real de la escalera)
+ * y solo degrada a Recall si el backend responde `available=false`; cada
+ * intento pide un `question_id` nuevo para rebarajar la posición de la
+ * correcta. */
 export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
   const { t } = useI18n();
-  // El drill abre en el paso oral Word (V3.19); Recognition (V3.33) es el
-  // primer peldaño de la escalera y se carga al entrar en él.
-  const [step, setStep] = useState<DrillStep>("recall");
+  // V3.33.1: el drill abre en el primer peldaño (Recognition). Si la pregunta
+  // no está disponible, `loadRecognition` degrada a Recall (V3.19).
+  const [step, setStep] = useState<DrillStep>("recognition");
   const [sentence, setSentence] = useState<DrillSentenceContext | null>(null);
   const [sentenceError, setSentenceError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -174,7 +178,7 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   // V3.33: estado del paso Recognition (la pregunta es determinista en el
-  // servidor; la correcta solo llega en la respuesta del intento).
+  // servidor dado el `question_id`; la correcta solo llega en la respuesta).
   const [recognition, setRecognition] =
     useState<DrillRecognitionQuestion | null>(null);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
@@ -193,25 +197,51 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
     },
   });
 
+  /** Pide una pregunta de Recognition (V3.33.1): cada intento recibe un
+   * `question_id` nuevo, así que la posición de la correcta cambia entre
+   * intentos. Si el backend no tiene contenido suficiente (`available=false`),
+   * degrada a Recall para no romper la escalera. */
+  const loadRecognition = useCallback(() => {
+    setRecognitionError(null);
+    setRecognitionSelected(null);
+    setRecognitionOutcome(null);
+    getDrillRecognitionQuestion(userId, word)
+      .then((question) => {
+        setRecognition(question);
+        if (!question.available) {
+          // Degrada solo si el alumno sigue en Recognize: no pisa una elección
+          // manual de otro paso (p. ej. ya está en Sentence).
+          setStep((current) => (current === "recognition" ? "recall" : current));
+        }
+      })
+      .catch((e) =>
+        setRecognitionError(
+          t("dictionary.drill.error").concat((e as Error).message),
+        ),
+      );
+  }, [userId, word, t]);
+
+  // V3.33.1: el drill arranca en Recognition (primer peldaño real de la
+  // escalera) y limpia el intento anterior al montar o cambiar de palabra.
+  useEffect(() => {
+    setStep("recognition");
+    setSentence(null);
+    setSentenceError(null);
+    setResult(null);
+    setError(null);
+    setRecognition(null);
+    loadRecognition();
+  }, [loadRecognition]);
+
   function chooseStep(next: DrillStep) {
     if (next === step || recording || processing) return;
     setResult(null);
     setError(null);
     if (next === "recognition") {
-      // El paso Recognition es informativo: cada vez que se entra desde otro
-      // paso se reinicia el intento anterior (como Recall re-graba).
-      setRecognitionOutcome(null);
-      setRecognitionSelected(null);
-      if (!recognition) {
-        setRecognitionError(null);
-        getDrillRecognitionQuestion(userId, word)
-          .then((question) => setRecognition(question))
-          .catch((e) =>
-            setRecognitionError(
-              t("dictionary.drill.error").concat((e as Error).message),
-            ),
-          );
-      }
+      // V3.33.1: cada entrada en Recognition pide una pregunta nueva (nuevo
+      // `question_id`): se reinicia el intento anterior y la correcta cambia de
+      // posición, de modo que no se puede memorizar el patrón.
+      loadRecognition();
       setStep(next);
       return;
     }
@@ -237,6 +267,7 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         userId,
         word,
         recognitionSelected,
+        recognition.question_id,
       );
       setRecognitionOutcome(outcome);
     } catch (e) {

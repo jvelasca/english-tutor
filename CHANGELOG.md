@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.33.1] — 2026-09-10
+
+**Endurecimiento del peldaño Recognition (auditoría V3.33.0): la posición de la respuesta correcta deja de ser fija por palabra (seed de intento stateless `question_id`) y el drill arranca de verdad en `1 · Recognize`, degradando a Recall solo si no hay pregunta. Evidencia y contrato de seguridad intactos: sigue siendo SOLO informativa y el GET nunca expone la correcta.**
+
+Versión de app `3.33.0 → 3.33.1`. Backend (hash + seed + schemas) + frontend (arranque del drill + tests); cambio de contrato HTTP aditivo (campo opcional `question_id`); sin cambios de esquema de BD.
+
+- **P1-01 — La correcta ya no está siempre en la misma posición (`services/dictionary_mcq.py`).** `recognition_options_for(word, entries, seed="")` deriva la permutación de `palabra + seed`; el seed es un nonce por intento que el `GET drill/recognition` entrega como `question_id` y el `POST drill/recognition-attempt` reenvía para reconstruir la MISMA permutación (premisa 21: sigue sin estado servidor). Reintentar la misma palabra rebaraja las opciones, así que no se puede memorizar «para `cat`, la primera es la correcta». Sin firmar: el seed solo ordena y la correcta nunca viaja, así que manipularlo no revela ni acredita nada.
+- **P2 — `_stable_int` con SHA-256.** La suma ponderada por posición (colisionaba entre palabras distintas) se sustituye por `SHA-256(text)` (primeros 8 bytes), estable entre procesos/máquinas y con mucha mejor dispersión del índice. Se aplica SOLO al MCQ de diccionario: `listening_bottom_up` conserva su hash porque sus ids derivados son content-stable y cambiarlo re-barajaría ítems publicados.
+- **P1-02 — El drill arranca en Recognition (`wordDrill.tsx`).** `WordDrill` abre en `step="recognition"` y carga la pregunta sola (antes abría en Recall y exigía un clic manual); al montar o cambiar de palabra reinicia el intento. Si el backend responde `available=false`, degrada a Recall de forma elegante (`Practicar → Recognize → Recall → Sentence`, o `Practicar → Recall` sin pregunta). La degradación no pisa una elección manual de otro paso (guarda con `setStep(current => …)`). Cada entrada en Recognize pide un `question_id` nuevo.
+- **Contrato (`schemas/vocabulary.py`, `api/vocabulary.ts`, `types/api.ts`).** `RecognitionQuestionOut.question_id: str = ""` y `RecognitionAttemptIn.question_id: str = Field(default="", max_length=64)` (aditivo y retrocompatible); `DrillRecognitionQuestion.question_id` y `submitDrillRecognitionAttempt(..., questionId)`.
+- **Tests.** Backend pytest **1723 passed** (+1 neto): nuevo test puro de permutación por seed (mismo seed ⇒ mismo orden; seeds distintos ⇒ la correcta cambia de posición) y determinismo/aislamiento reescritos sobre `question_id`. Frontend vitest **63 ficheros/547** (+1): nuevo test «reentrar en Recognize pide una pregunta nueva», arranque directo en Recognize y degradación automática a Recall. `ruff check .` y `tsc --noEmit` limpios; `check_release_consistency` **3.33.1** exit 0.
+
 ## [3.33.0] — 2026-09-09
 
 **Segundo eslabón del Dictionary → Learning Bridge: el peldaño Recognition (MCQ definición ↔ palabra) en la escalera compartida de drill — la pregunta la sirve y puntúa el backend (determinista por palabra, premisa 21, sin estado servidor) y su evidencia es SOLO informativa: un `learning_events` `drill:<word>:recognition:ok|ko`, sin escribir en `vocabulary`, FSRS, mastery ni usage (V3.13: el MC de reconocimiento no demuestra destrezas productivas).**

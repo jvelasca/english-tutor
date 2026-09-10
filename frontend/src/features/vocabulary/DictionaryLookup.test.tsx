@@ -307,7 +307,15 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
   });
 
   it("muestra la acción «Practice this word» y al pulsarla monta la escalera de drill", async () => {
-    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: COFFEE },
+      // V3.33.1: sin pregunta de Recognition el drill degrada a Recall, que es
+      // el paso que este test comprueba (prompt oral + botón de micrófono).
+      {
+        url: "/api/vocabulary/drill/recognition",
+        data: { word: "coffee", available: false, options: [], question_id: "" },
+      },
+    ]);
     renderPanel(<DictionaryLookup userId="u1" />);
 
     fillAndSubmit("coffee");
@@ -343,6 +351,18 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
         dictionaryHits.count += 1;
         return Promise.resolve({ ok: true, json: async () => COFFEE });
       }
+      if (url.includes("/api/vocabulary/drill/recognition")) {
+        // V3.33.1: sin pregunta de Recognition el drill degrada a Recall.
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            word: "coffee",
+            available: false,
+            options: [],
+            question_id: "",
+          }),
+        });
+      }
       if (url.includes("/api/vocabulary/drill/attempt")) {
         return Promise.resolve({ ok: true, json: async () => DRILL_OK });
       }
@@ -369,6 +389,10 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
   it("la escalera ofrece el paso Sentence y lo supera (F6.1) sin abandonar el lookup", async () => {
     routeFetch([
       { url: "/api/vocabulary/dictionary", data: COFFEE },
+      {
+        url: "/api/vocabulary/drill/recognition",
+        data: { word: "coffee", available: false, options: [], question_id: "" },
+      },
       {
         url: "/api/vocabulary/drill/sentence-context",
         data: {
@@ -425,6 +449,7 @@ describe("DictionaryLookup · V3.33 Recognition (MCQ definición ↔ palabra)", 
     word: "coffee",
     available: true,
     options: ["café", "a soft drink", "a type of grain", "a sweet dessert"],
+    question_id: "q-coffee-1",
   };
 
   it("acierta el paso «1 · Recognize» sin refrescar la tarjeta (informativo)", async () => {
@@ -462,7 +487,8 @@ describe("DictionaryLookup · V3.33 Recognition (MCQ definición ↔ palabra)", 
       await screen.findByRole("button", { name: "Practice this word" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+    // V3.33.1: el drill abre en Recognize (primer peldaño) y carga la pregunta
+    // solo, sin clic manual.
     expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
     // Sin micrófono en este paso: se elige una opción y se comprueba.
     expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
@@ -494,7 +520,7 @@ describe("DictionaryLookup · V3.33 Recognition (MCQ definición ↔ palabra)", 
     fireEvent.click(
       await screen.findByRole("button", { name: "Practice this word" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
+    // V3.33.1: el drill arranca en Recognize; la pregunta se carga sola.
     await screen.findByText(/What does this word mean/);
 
     fireEvent.click(screen.getByRole("button", { name: "a soft drink" }));

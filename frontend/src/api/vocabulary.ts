@@ -118,10 +118,12 @@ export async function submitDrillSentenceAttempt(
 
 /** Pregunta del paso Recognition del drill (V3.33, eslabón 2 del puente).
 
- * MCQ definición ↔ palabra determinista por palabra (premisa 21): la correcta
- * nunca viaja en el GET. `available=false` con `options=[]` es la degradación
- * controlada cuando la palabra aún no tiene significado cacheado o no hay
- * distractores: el peldaño muestra aviso y no rompe la escalera. */
+ * MCQ definición ↔ palabra determinista por (palabra, question_id) (premisa
+ * 21): la correcta nunca viaja en el GET. `available=false` con `options=[]` es
+ * la degradación controlada cuando la palabra aún no tiene significado cacheado
+ * o no hay distractores: el peldaño muestra aviso y no rompe la escalera.
+ * V3.33.1: `question_id` es un nonce por intento que hay que reenviar en el POST
+ * (rebaraja la posición de la correcta; no es la respuesta). */
 export function getDrillRecognitionQuestion(
   userId: string,
   word: string,
@@ -137,15 +139,18 @@ export function getDrillRecognitionQuestion(
 
 /** Intento del paso Recognition del drill (V3.33): envía la opción elegida y
  * el servidor puntúa recomponiendo la pregunta (nunca se declara acierto en el
- * cliente). Evidencia SOLO informativa: el acierto NO dispara `onProduced`. */
+ * cliente). V3.33.1: reenvía el `questionId` servido por el GET para reconstruir
+ * la misma permutación. Evidencia SOLO informativa: el acierto NO dispara
+ * `onProduced`. */
 export function submitDrillRecognitionAttempt(
   userId: string,
   word: string,
   selectedIndex: number,
+  questionId: string,
 ): Promise<DrillRecognitionAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecognitionAttempt>(
     `/api/vocabulary/drill/recognition-attempt?${query}`,
-    { word, selected_index: selectedIndex },
+    { word, selected_index: selectedIndex, question_id: questionId },
   );
 }

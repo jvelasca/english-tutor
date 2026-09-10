@@ -4,9 +4,10 @@ puente V3.32).
 Segundo eslabón del Dictionary → Learning Bridge: el peldaño "Recognition" de la
 escalera compartida de drill. El alumno ve la palabra (surface form) y elige su
 significado entre opciones que sirve el backend. La pregunta es PURA y
-DETERMINISTA por palabra (premisa 21, sin estado servidor): el servidor la
-vuelve a derivar con esta misma función al puntuar el intento (mismo patrón que
-`submit_sentence_attempt` con la frase de contexto).
+DETERMINISTA dado (palabra, seed de intento) (premisa 21, sin estado servidor):
+el servidor la vuelve a derivar con esta misma función al puntuar el intento
+(mismo patrón que `submit_sentence_attempt` con la frase de contexto), usando el
+`question_id` que el GET entregó como seed.
 
 Reglas de honestidad:
 - La opción correcta es un texto de significado REAL de la diana (traducción si
@@ -17,12 +18,16 @@ Reglas de honestidad:
 - Si no hay suficientes distractores distintos (>= 2), la pregunta NO está
   disponible (`None`): el peldaño degrada con aviso en lugar de forzar una
   pregunta mala;
-- El barajado oculta la correcta con una permutación estable (patrón de
-  `services/listening_bottom_up.py`): mismo texto y mismo banco ⇒ misma
-  pregunta y mismo orden en cualquier máquina/proceso.
+- El barajado oculta la correcta con una permutación derivada de
+  `palabra + seed` (V3.33.1): el seed es un nonce por intento que el GET entrega
+  como `question_id`, de modo que reintentar la MISMA palabra rebaraja las
+  opciones (no se puede aprender la posición de la correcta) sin guardar estado
+  servidor. Sin seed el orden sigue siendo estable entre procesos/máquinas.
 """
 
 from __future__ import annotations
+
+import hashlib
 
 _MAX_OPTIONS = 4
 _MIN_DISTRACTORS = 2
@@ -31,20 +36,23 @@ _MIN_DISTRACTORS = 2
 def _stable_int(text: str) -> int:
     """Entero estable entre procesos para una cadena (hash no aleatorizado).
 
-    `hash()` de Python está aleatorizado por proceso (`PYTHONHASHSEED`), así que
-    la selección determinista usa una suma ponderada por posición: mismo texto ⇒
-    mismo entero en cualquier máquina/proceso.
+    V3.33.1: SHA-256 en lugar de la suma ponderada por posición (que colisionaba
+    entre palabras distintas). Es estable entre procesos/máquinas (a diferencia
+    de `hash()`, aleatorizado por `PYTHONHASHSEED`) y reparte mucho mejor el
+    índice de la correcta. No necesita resistencia criptográfica: solo una
+    dispersión buena y reproducible.
     """
-    return sum((i + 1) * ord(ch) for i, ch in enumerate(text))
+    digest = hashlib.sha256(text.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big")
 
 
 def _place_options(key: str, options: list[str]) -> tuple[list[str], int]:
     """Ordena las opciones de forma estable y devuelve el índice de la correcta.
 
     Mismo patrón que `listening_bottom_up._place_options`: permutación
-    determinista derivada de la palabra, de modo que cada palabra tiene un
-    orden fijo entre servidos y la correcta no queda siempre en la primera
-    posición.
+    determinista derivada de la clave `palabra + seed`, de modo que la correcta
+    no queda siempre en la primera posición y el orden cambia entre intentos
+    (sin estado servidor).
     """
     n = len(options)
     shift = _stable_int(key) % n
@@ -85,7 +93,7 @@ def _candidate_meanings(entries: list[dict], target: dict, field: str) -> list[s
 
 
 def recognition_options_for(
-    word: str, entries: list[dict]
+    word: str, entries: list[dict], seed: str = ""
 ) -> tuple[list[str], int] | None:
     """Opciones `(options, correct_index)` del MCQ de la palabra, o `None`.
 
@@ -94,6 +102,10 @@ def recognition_options_for(
       condiciones). Nunca se mezclan idiomas entre opciones de una pregunta.
     - `options` no incluye metadatos: el cliente no puede distinguir cuál es la
       correcta; `correct_index` solo lo devuelve el servidor al puntuar.
+    - `seed` (V3.33.1) es el nonce de intento (`question_id`): solo altera el
+      orden barajado, nunca qué opciones componen la pregunta (la selección de
+      distractores sigue siendo determinista por palabra). Reintentar con otro
+      seed rebaraja la posición de la correcta.
     - `None` si la diana no existe o no hay suficientes significados distintos
       en la caché global (el peldaño degrada con aviso, sin evento).
     """
@@ -112,5 +124,6 @@ def recognition_options_for(
         if len(candidates) < _MIN_DISTRACTORS:
             continue
         distractors = candidates[: _MAX_OPTIONS - 1]
-        return _place_options(target_word, [correct, *distractors])
+        place_key = f"{target_word}:{seed}"
+        return _place_options(place_key, [correct, *distractors])
     return None
