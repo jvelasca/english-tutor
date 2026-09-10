@@ -117,6 +117,13 @@ tipo nuevo (`wordDrill.tsx` consume `recommended_cue`/el cue servido sin cambios
 | 2 fallos, 1 éxito | `definition` (ideal) | `definition` (con acierto no regresa) |
 | Legacy `drill:recall` | éxito/fallo | no alimenta ninguna política |
 
+## CI
+
+- Commit `654c12f98728bf3f61648014aa9c9bb87755168a` con el run
+  [34480419514](https://github.com/jvelasca/english-tutor/actions/runs/34480419514)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+
 ## Fuera de alcance (V3.38/V3.39)
 
 - **P1-03 automaticidad por skill/modalidad** — hoy `skill=""` en todos los

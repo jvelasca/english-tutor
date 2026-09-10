@@ -33,9 +33,12 @@
 > de V3.35.1 intacto). Tests: pytest **1824 passed** (+11, nuevo
 > `test_recall_policy_v3371.py` con la matriz éxito/fallo/regresión/legacy/
 > paridad) + ruff limpio + vitest (65 ficheros/**560**) + `tsc --noEmit` limpio +
-> `check_release_consistency` **3.37.1** exit 0. Diferidos a V3.38/V3.39: P1-03
-> (automaticidad segmentada por skill), `cloze_coverage` del corpus y el refactor
-> de `wordDrill.tsx`.
+> `check_release_consistency` **3.37.1** exit 0.
+> **CI verificable:** commit `654c12f98728bf3f61648014aa9c9bb87755168a`
+> con el run [34480419514](https://github.com/jvelasca/english-tutor/actions/runs/34480419514)
+> en `success` (6/6 jobs).
+> Diferidos a V3.38/V3.39: P1-03 (automaticidad segmentada por skill),
+> `cloze_coverage` del corpus y el refactor de `wordDrill.tsx`.
 >
 > **Nota (2026-09-10):** **V3.37.0 publicada** — release **v3.37.0**
 > (**Learning Evidence 3.0: cues graduados y automaticidad**). La escalera del
