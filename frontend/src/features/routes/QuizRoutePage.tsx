@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
+import { useDictionaryView } from "../../hooks/useDictionaryView";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
@@ -229,6 +230,9 @@ export function QuizRoutePage({
   const { t } = useI18n();
   const ns = config.ns;
   const nk = (key: string) => `${ns}.${key}`;
+  // V3.39: coherencia de la pestaña del diccionario incrustado con la pantalla
+  // dedicada: al cambiar de vista aquí también se persiste como última usada.
+  const { setView: persistDictionaryView } = useDictionaryView(userId);
 
   const [view, setView] = useState<RouteView>({ kind: "routes" });
   const [stats, setStats] = useState<RouteStats | null>(null);
@@ -483,7 +487,14 @@ export function QuizRoutePage({
                       key={entry.kind}
                       type="button"
                       aria-pressed={isActive}
-                      onClick={() => setView({ kind: entry.kind })}
+                      onClick={() => {
+                        setView({ kind: entry.kind });
+                        // V3.39: recordar la pestaña usada (coherente con la
+                        // pantalla dedicada del diccionario).
+                        persistDictionaryView(
+                          entry.kind === "dictionary" ? "personal" : "lookup",
+                        );
+                      }}
                       className={cn(
                         "inline-flex min-h-9 items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors",
                         isActive
@@ -595,7 +606,10 @@ export function QuizRoutePage({
                 variant="ghost"
                 size="sm"
                 className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
-                onClick={() => setView({ kind: "dictionary" })}
+                onClick={() => {
+                  setView({ kind: "dictionary" });
+                  persistDictionaryView("personal");
+                }}
               >
                 <BookOpen className="size-4" aria-hidden="true" />
                 <span className="hidden sm:inline">
@@ -609,7 +623,10 @@ export function QuizRoutePage({
                 variant="ghost"
                 size="sm"
                 className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
-                onClick={() => setView({ kind: "lookup" })}
+                onClick={() => {
+                  setView({ kind: "lookup" });
+                  persistDictionaryView("lookup");
+                }}
               >
                 <Search className="size-4" aria-hidden="true" />
                 <span className="hidden sm:inline">

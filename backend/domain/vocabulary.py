@@ -21,10 +21,12 @@ from repositories import vocabulary as vocabulary_repo
 from services import (
     dictionary_content,
     dictionary_mcq,
+    dictionary_reverse,
     example_sentences,
     fsrs,
     lexicon,
     recall,
+    transfer,
 )
 from services.evidence import (
     DRILL_SKILL,
@@ -53,6 +55,14 @@ _PRODUCTION_SUPPORT: dict[str, str] = {
     "speaking": "independent",
     "writing": "independent",
 }
+
+# V3.39 (diccionario reversible): direcciones de búsqueda del diccionario de
+# consulta. `en-es` es la histórica (V3.30, caché `dictionary_entries`);
+# `es-en` es la inversa, que primero busca en las traducciones cacheadas y, si
+# no hay coincidencia, genera y cachea en `dictionary_reverse_entries`.
+DIRECTION_EN_ES = "en-es"
+DIRECTION_ES_EN = "es-en"
+DIRECTIONS: tuple[str, ...] = (DIRECTION_EN_ES, DIRECTION_ES_EN)
 
 
 async def analyze_text(user_id: str, text: str) -> list[str]:
@@ -131,6 +141,7 @@ async def record_production_text(
     channel: str,
     as_unit: bool = False,
     activity: str | None = None,
+    write_evidence: bool = True,
 ) -> list[str]:
     """Registra producción del alumno por canal (V3.19).
 
@@ -138,6 +149,9 @@ async def record_production_text(
     conversación guiada) vuelcan el texto producido al léxico etiquetado con su
     destreza. `record_production` mantiene la semántica agregada de
     `appearances`/`production_days` y suma la columna `<channel>_prod`.
+    V3.39: `write_evidence=False` para los pasos que escriben SU PROPIO evento
+    de evidencia (con latencia y tipo de error, p. ej. la actividad `write`),
+    evitando así DOS filas por intento.
 
     - `as_unit=False` (texto libre): tokeniza con `extract_words` (palabras
       sueltas sin stopwords).
@@ -166,9 +180,10 @@ async def record_production_text(
             channel=channel,
             activity=activity,
         )
-        await _record_production_evidence(
-            user_id, words, channel=channel, activity=activity
-        )
+        if write_evidence:
+            await _record_production_evidence(
+                user_id, words, channel=channel, activity=activity
+            )
     except Exception:  # noqa: BLE001 — volcado no bloqueante, nunca rompe
         logger.warning(
             "No se pudo volcar producción al léxico user=%s channel=%s",
@@ -576,6 +591,226 @@ async def submit_sentence_attempt(
 
 
 # ---------------------------------------------------------------------------
+# Actividad de ESCRITURA del drill (V3.39, Fase 3, motor de tarea óptima).
+# Cierra la modalidad `written_production` (el hueco `spoken ✓ / written ✗` que
+# hasta V3.38 solo se exponía). El alumno escribe una frase PROPIA con la
+# palabra objetivo: producción con el mínimo andamiaje (`independent`), pero el
+# drill no declara dominio ni crea evidencia curricular (D5/E3): una producción
+# del día no consolida.
+# ---------------------------------------------------------------------------
+
+
+async def _record_write_evidence(
+    user_id: str,
+    word: str,
+    row: dict,
+    scored: dict,
+    *,
+    response_time_ms: int | None = None,
+) -> None:
+    """Evento de evidencia del paso Write (V3.39), éxito Y fallo.
+
+    A diferencia del paso Sentence (que solo deja señal cuando acredita), la
+    escritura registra también el FALLO clasificado (taxonomía
+    `services.evidence.WRITE_ERROR_TYPES`): eso es lo que permite al planner ver
+    que la modalidad escrita se intenta y no sale, en lugar de solo que no
+    existe. La modalidad es `written_production` y el apoyo `independent` (la
+    frase es del alumno, sin modelo que repetir). Nunca lanza: es señal.
+    """
+    try:
+        await run_in_threadpool(
+            evidence_repo.record_evidence,
+            user_id,
+            target_type="lexicon",
+            target_id=word,
+            surface_form=word,
+            lexical_unit=row.get("lexical_unit") or word,
+            skill="written_production",
+            task="write",
+            activity="drill",
+            activity_id="drill:write",
+            context_id="lexicon:writing",
+            success=bool(scored["passed"]),
+            support_level="independent",
+            difficulty=lexicon.cefr_difficulty(row),
+            response_time_ms=response_time_ms,
+            error_type=scored["error_type"] or "partial",
+            event_role="evidence",
+        )
+    except Exception:  # noqa: BLE001 — señal no bloqueante
+        logger.warning(
+            "No se pudo registrar evidencia de escritura user=%s word=%s",
+            user_id,
+            word,
+            exc_info=True,
+        )
+
+
+async def submit_write_attempt(
+    user_id: str,
+    word: str,
+    text: str,
+    response_time_ms: int | None = None,
+) -> dict:
+    """Puntúa la actividad `write` del micro-drill (V3.39).
+
+    El alumno escribe una frase PROPIA que use la palabra objetivo. Scoring
+    determinista y sin LLM (`services.lexicon.score_write_attempt`): la unidad
+    alineada + longitud mínima.
+
+    Al `passed` se acredita la modalidad escrita (`writing_prod += 1` por el
+    volcado al léxico) con evidencia `written_production`; en fallo se registra
+    igualmente el intento clasificado (gap real de producción escrita). El paso
+    NO graba recuperación ni FSRS: escribir con la palabra visible no es
+    recuperación demorada (eso lo acredita el paso Recall)."""
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    row = _row_for_word(rows, word) or {}
+    scored = lexicon.score_write_attempt(word, text)
+    written = (text or "").strip()
+    if scored["passed"]:
+        # El volcado NO escribe evidencia: este paso escribe SU evento (con
+        # latencia y tipo) para no duplicar filas por intento.
+        await record_production_text(
+            user_id,
+            word,
+            "writing",
+            as_unit=True,
+            activity="drill:write",
+            write_evidence=False,
+        )
+    await _record_write_evidence(
+        user_id, word, row, scored, response_time_ms=response_time_ms
+    )
+    return {
+        "word": word,
+        "text": written,
+        **scored,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Actividad de TRANSFERENCIA a un contexto nuevo (V3.40, Fase 4).
+# Cierra la modalidad `spontaneous_use`: usar la unidad por decisión propia en un
+# contexto DISTINTO del de aprendizaje. La consigna la sirve `services.transfer`
+# (banco curado, elección determinista) y el `context_id` que se registra en el
+# ledger es el del contexto NUEVO, de modo que el éxito en >= 2 contextos
+# demuestra —con evidencia— la transferencia contextual real (P1-03 de la
+# auditoría de V3.38.1). El drill no declara dominio (D5/E3).
+# ---------------------------------------------------------------------------
+
+
+async def _record_transfer_evidence(
+    user_id: str,
+    word: str,
+    row: dict,
+    scored: dict,
+    context_id: str,
+    *,
+    response_time_ms: int | None = None,
+) -> None:
+    """Evento de evidencia del paso Transfer (V3.40), éxito Y fallo.
+
+    Modalidad `spontaneous_use` y apoyo `spontaneous` (la consigna da un
+    escenario nuevo, no ayuda con la unidad); el `context_id` es el del contexto
+    NUEVO, que es lo que permite a `services.evidence.context_signals` contar la
+    transferencia. Como en `write`, el fallo también se registra clasificado.
+    Nunca lanza: es señal.
+    """
+    try:
+        await run_in_threadpool(
+            evidence_repo.record_evidence,
+            user_id,
+            target_type="lexicon",
+            target_id=word,
+            surface_form=word,
+            lexical_unit=row.get("lexical_unit") or word,
+            skill="spontaneous_use",
+            task="transfer",
+            activity="drill",
+            activity_id="drill:transfer",
+            context_id=context_id,
+            success=bool(scored["passed"]),
+            support_level="spontaneous",
+            difficulty=lexicon.cefr_difficulty(row),
+            response_time_ms=response_time_ms,
+            error_type=scored["error_type"] or "partial",
+            event_role="evidence",
+        )
+    except Exception:  # noqa: BLE001 — señal no bloqueante
+        logger.warning(
+            "No se pudo registrar evidencia de transferencia user=%s word=%s",
+            user_id,
+            word,
+            exc_info=True,
+        )
+
+
+async def get_transfer_context(user_id: str, word: str) -> dict:
+    """Consigna de transferencia que toca practicar (V3.40, solo lectura).
+
+    Elige el contexto NUEVO con `services.transfer.context_for` sobre los
+    contextos que el ítem ya registró en su evidencia (así no repite el que ya
+    usó). No escribe nada: es el GET del peldaño.
+    """
+    summaries = await run_in_threadpool(
+        evidence_repo.summarize_by_target, user_id, target_type="lexicon"
+    )
+    summary = summaries.get(word) or {}
+    used = (summary.get("contexts") or {}).keys()
+    return transfer.context_for(word, used)
+
+
+async def submit_transfer_attempt(
+    user_id: str,
+    word: str,
+    text: str,
+    context_id: str = "",
+    response_time_ms: int | None = None,
+) -> dict:
+    """Puntúa la actividad `transfer` del micro-drill (V3.40).
+
+    El alumno usa la unidad en un contexto NUEVO (consigna abierta). Scoring
+    determinista y sin LLM (`services.lexicon.score_transfer_attempt`): unidad
+    alineada + longitud mínima, la MISMA acreditación que la escritura, pero la
+    evidencia va como `spontaneous_use` y con el `context_id` del contexto nuevo.
+
+    Al `passed` se acredita la producción con el volcado al léxico
+    (`writing_prod += 1`; `as_unit=True`) y se registra la evidencia; en fallo se
+    registra igualmente el intento clasificado. No graba recuperación ni FSRS.
+    """
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    row = _row_for_word(rows, word) or {}
+    # Sin `context_id` del cliente se DERIVA del banco (determinista): el evento
+    # nunca queda sin contexto y el contador de transferencia funciona igual.
+    context_id = context_id or transfer.context_for(word)["context_id"]
+    scored = lexicon.score_transfer_attempt(word, text)
+    written = (text or "").strip()
+    if scored["passed"]:
+        await record_production_text(
+            user_id,
+            word,
+            "writing",
+            as_unit=True,
+            activity="drill:transfer",
+            write_evidence=False,
+        )
+    await _record_transfer_evidence(
+        user_id,
+        word,
+        row,
+        scored,
+        context_id,
+        response_time_ms=response_time_ms,
+    )
+    return {
+        "word": word,
+        "text": written,
+        "context_id": context_id,
+        **scored,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Paso Recognition del drill (V3.33, eslabón 2 del Dictionary → Learning
 # Bridge). MCQ definición ↔ palabra servido y puntuado por el backend (premisa
 # 21, sin estado servidor): la pregunta es una función pura y determinista por
@@ -950,6 +1185,25 @@ def _normalize_lookup_word(word: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Letras válidas de un término español: ASCII más vocales acentuadas y la eñe.
+# La normalización inversa NO pliega acentos (el término se usa como clave de
+# caché y como `word` de la entrada: "camión" y "camion" no son la misma clave),
+# pero sí acepta ambos y el matcher inverso compara plegado.
+_SPANISH_EDGE_STRIP = re.compile(r"^[^0-9a-záéíóúüñ]+|[^0-9a-záéíóúüñ]+$")
+
+
+def _normalize_lookup_spanish(word: str) -> str:
+    """Normaliza un término buscado en dirección ES→EN (V3.39).
+
+    Minúsculas, recorte de puntuación en los extremos, colapso de espacios y
+    conservación de acentos y eñe ("camión", "mañana", "casa"). Devuelve "" si
+    queda vacío (solo puntuación/espacios).
+    """
+    text = (word or "").strip().lower()
+    text = _SPANISH_EDGE_STRIP.sub("", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _latest_activity(row: dict) -> str:
     """Marca temporal ISO (original) de la actividad léxica más reciente.
 
@@ -1054,6 +1308,10 @@ def _build_dictionary_entry(
         # evidencia ni sirve la respuesta esperada).
         "situation": (cache.get("situation") or "").strip() or None,
         "example": example_sentences.example_for(normalized),
+        # V3.39 (diccionario reversible): dirección servida y alternativas de la
+        # búsqueda inversa (siempre [] en EN→ES). Campos ADITIVOS.
+        "direction": "en-es",
+        "alternatives": [],
         "usage": {
             "tracked": tracked,
             "surface": (_surface_usage_from_row(surface_row) if surface_row else None),
@@ -1067,6 +1325,35 @@ def _build_dictionary_entry(
                 else None
             ),
         },
+    }
+
+
+def _build_reverse_entry(
+    normalized_es: str,
+    english: str,
+    alternatives: list[str],
+    rows: list[dict],
+    content: dict | None,
+) -> dict:
+    """Compone la entrada ES→EN reutilizando el constructor directo (V3.39).
+
+    La entrada describe el EQUIVALENTE INGLÉS (su definición, ejemplo, uso y
+    estado de aprendizaje) pero con `word` = término español buscado y
+    `translation` = equivalente inglés, de modo que la UI solo tenga que
+    reetiquetar. `content` es la fila cacheada del inglés (directa o inversa).
+
+    Pura y determinista; `alternatives` son las otras traducciones inglesas
+    encontradas en la inversa instantánea (sin la principal).
+    """
+    base = _build_dictionary_entry(english, rows, content)
+    return {
+        **base,
+        "word": normalized_es,
+        "direction": "es-en",
+        "translation": english or None,
+        "alternatives": [
+            word for word in alternatives if word and word.lower() != english.lower()
+        ],
     }
 
 
@@ -1113,25 +1400,35 @@ def _clear_generation_state() -> None:
     _global_gen_times.clear()
 
 
-def _negative_cache_hit(word: str) -> bool:
-    """¿La palabra está en negative cache aún vigente?
+def _negative_cache_hit(key: str) -> bool:
+    """¿La clave `(direction, word)` está en negative cache aún vigente?
 
     Si el plazo ya venció, la entrada se limpia perezosamente (el siguiente
     lookup podrá reintentar la generación)."""
-    until = _negative_until.get(word)
+    until = _negative_until.get(key)
     if until is None:
         return False
     if time.monotonic() < until:
         return True
-    _negative_until.pop(word, None)
+    _negative_until.pop(key, None)
     return False
 
 
-def _mark_generation_failed(word: str) -> None:
-    """Marca `word` como no generable durante el TTL de la negative cache."""
-    _negative_until[word] = (
+def _mark_generation_failed(key: str) -> None:
+    """Marca la clave `(direction, word)` como no generable durante el TTL."""
+    _negative_until[key] = (
         time.monotonic() + config.DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS
     )
+
+
+def _cache_key(direction: str, word: str) -> str:
+    """Clave de los mapas efímeros de generación: vuelos y negative cache.
+
+    V3.39: el contenido EN→ES y ES→EN de un mismo término son generaciones
+    distintas (prompts distintos), así que no pueden compartir vuelo ni
+    negative cache; se prefija la dirección.
+    """
+    return f"{direction}:{word}"
 
 
 def _generation_quota_allowed(user_id: str) -> bool:
@@ -1172,7 +1469,11 @@ def _content_is_fresh(entry: dict | None) -> bool:
 
 
 async def _generate_and_persist(
-    word: str, *, model: str | None = None, user_id: str | None = None
+    word: str,
+    *,
+    model: str | None = None,
+    user_id: str | None = None,
+    direction: str = DIRECTION_EN_ES,
 ) -> dict | None:
     """Genera contenido de diccionario para `word` si la caché no es fresca.
 
@@ -1194,63 +1495,102 @@ async def _generate_and_persist(
       `DICTIONARY_GENERATION_TIMEOUT_SECONDS` para que un Ollama colgado no
       deje el vuelo de la palabra clavado indefinidamente (los waiters ya
       tenían su tope de 60 s; el dueño ahora también).
+
+    V3.39: `direction` decide la tabla, el lector/escritor del repositorio y el
+    generador (prompt EN→ES o ES→EN). Las cachés están SEPARADAS: el mismo
+    término puede tener contenido directo e inverso distinto.
     """
-    cached = await run_in_threadpool(dictionary_repo.get_entry, word)
+    reverse = direction == DIRECTION_ES_EN
+    key = _cache_key(direction, word)
+    read_cached = (
+        dictionary_repo.get_reverse_entry if reverse else dictionary_repo.get_entry
+    )
+    cached = await run_in_threadpool(read_cached, word)
     if _content_is_fresh(cached):
         return cached
-    if _negative_cache_hit(word):
-        logger.info("Diccionario: '%s' en negative cache, se degrada", word)
+    if _negative_cache_hit(key):
+        logger.info(
+            "Diccionario: '%s' (%s) en negative cache, se degrada", word, direction
+        )
         return None
     if not _generation_quota_allowed(user_id or "?"):
         logger.warning("Diccionario: cupo de generación agotado para '%s'", word)
         return None
+    generate = (
+        dictionary_content.generate_reverse_content
+        if reverse
+        else dictionary_content.generate_content
+    )
     try:
         content = await asyncio.wait_for(
-            dictionary_content.generate_content(word, model=model),
+            generate(word, model=model),
             timeout=config.DICTIONARY_GENERATION_TIMEOUT_SECONDS,
         )
     except asyncio.TimeoutError:
-        logger.warning("Diccionario: timeout generando '%s'", word)
-        _mark_generation_failed(word)
+        logger.warning("Diccionario: timeout generando '%s' (%s)", word, direction)
+        _mark_generation_failed(key)
         return None
     except dictionary_content.ContentUnavailableError:
-        logger.warning("Diccionario: contenido no disponible para '%s'", word)
-        _mark_generation_failed(word)
+        logger.warning(
+            "Diccionario: contenido no disponible para '%s' (%s)", word, direction
+        )
+        _mark_generation_failed(key)
         return None
     except Exception:  # noqa: BLE001 — señal no bloqueante, nunca rompe la consulta
-        logger.exception("Diccionario: error generando contenido para '%s'", word)
-        _mark_generation_failed(word)
-        return None
-    _negative_until.pop(word, None)
-    try:
-        await run_in_threadpool(
-            dictionary_repo.save_entry,
-            word,
-            pos=content.get("pos", ""),
-            definition=content.get("definition", ""),
-            translation=content.get("translation", ""),
-            situation=content.get("situation", ""),
-            generator_version=dictionary_content.GENERATOR_VERSION,
+        logger.exception(
+            "Diccionario: error generando contenido para '%s' (%s)", word, direction
         )
-        persisted = await run_in_threadpool(dictionary_repo.get_entry, word)
+        _mark_generation_failed(key)
+        return None
+    _negative_until.pop(key, None)
+    try:
+        if reverse:
+            await run_in_threadpool(
+                dictionary_repo.save_reverse_entry,
+                word,
+                english=content.get("english", ""),
+                pos=content.get("pos", ""),
+                definition=content.get("definition", ""),
+                situation=content.get("situation", ""),
+                generator_version=dictionary_content.GENERATOR_VERSION,
+            )
+        else:
+            await run_in_threadpool(
+                dictionary_repo.save_entry,
+                word,
+                pos=content.get("pos", ""),
+                definition=content.get("definition", ""),
+                translation=content.get("translation", ""),
+                situation=content.get("situation", ""),
+                generator_version=dictionary_content.GENERATOR_VERSION,
+            )
+        persisted = await run_in_threadpool(read_cached, word)
     except Exception:  # noqa: BLE001 — persistir es opcional
         logger.warning("Diccionario: no se pudo persistir la caché de '%s'", word)
         persisted = None
     if persisted:
         return persisted
-    return {
+    fallback = {
         "pos": content.get("pos", ""),
         "definition": content.get("definition", ""),
-        "translation": content.get("translation", ""),
         "situation": content.get("situation", ""),
         "generator_version": dictionary_content.GENERATOR_VERSION,
     }
+    if reverse:
+        fallback["english"] = content.get("english", "")
+    else:
+        fallback["translation"] = content.get("translation", "")
+    return fallback
 
 
 async def _ensure_cached_content(
-    word: str, *, model: str | None = None, user_id: str | None = None
+    word: str,
+    *,
+    model: str | None = None,
+    user_id: str | None = None,
+    direction: str = DIRECTION_EN_ES,
 ) -> dict | None:
-    """Devuelve contenido (`pos`/`definition`/`translation`) para `word`.
+    """Devuelve el contenido cacheado disponible para `word` y `direction`.
 
     Single-flight (V3.30.1, P1-01): si otra consulta ya está generando la
     misma palabra, esta espera su resultado en lugar de llamar al modelo otra
@@ -1269,15 +1609,19 @@ async def _ensure_cached_content(
     V3.31.1: `user_id` identifica al DUEÑO del vuelo para el rate limit de
     generación (los waiters nunca generan ni consumen cupo); con None (uso
     interno de tests) se imputa al cubo "?".
+
+    V3.39: el vuelo y la negative cache se indexan por `(direction, word)`:
+    EN→ES y ES→EN de un mismo término son generaciones distintas.
     """
-    fut = _inflight_content.get(word)
+    key = _cache_key(direction, word)
+    fut = _inflight_content.get(key)
     if fut is None:
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
-        _inflight_content[word] = fut
+        _inflight_content[key] = fut
         try:
             result = await _generate_and_persist(
-                word, model=model, user_id=user_id
+                word, model=model, user_id=user_id, direction=direction
             )
             if not fut.done():
                 fut.set_result(result)
@@ -1293,7 +1637,7 @@ async def _ensure_cached_content(
             if not fut.done():
                 fut.set_result(None)
         finally:
-            _inflight_content.pop(word, None)
+            _inflight_content.pop(key, None)
     try:
         return await asyncio.wait_for(
             asyncio.shield(fut), timeout=_INFLIGHT_WAIT_SECONDS
@@ -1305,7 +1649,12 @@ async def _ensure_cached_content(
         return None
 
 
-async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -> dict:
+async def lookup_dictionary(
+    user_id: str,
+    word: str,
+    model: str | None = None,
+    direction: str = DIRECTION_EN_ES,
+) -> dict:
     """Entrada del diccionario de consulta para `word` (V3.30, D3).
 
     Devuelve `DictionaryEntryOut`: frase de ejemplo determinista del banco y
@@ -1322,10 +1671,17 @@ async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -
     mueve mastery. Lanza `ValueError` si la palabra queda vacía tras normalizar
     (el endpoint lo traduce a 422). `model` usa el mismo contrato que
     `/api/translate` (preferencia opcional del usuario). El contenido cacheado
-    en `dictionary_entries` es GLOBAL y CANÓNICO: `model` solo influye en la
-    generación de contenido nuevo, nunca en qué contenido se sirve (V3.31.1,
-    semántica documentada en `services/dictionary_content.py`).
+    es GLOBAL y CANÓNICO: `model` solo influye en la generación de contenido
+    nuevo, nunca en qué contenido se sirve (V3.31.1, semántica documentada en
+    `services/dictionary_content.py`).
+
+    V3.39 (diccionario reversible): con `direction="es-en"` la búsqueda es
+    inversa — primero intenta la inversa INSTANTÁNEA sobre las traducciones ya
+    cacheadas (`services.dictionary_reverse`, sin latencia del modelo) y, solo
+    si no hay coincidencia, genera y cachea contenido ES→EN.
     """
+    if direction == DIRECTION_ES_EN:
+        return await _lookup_dictionary_reverse(user_id, word, model=model)
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
@@ -1334,3 +1690,38 @@ async def lookup_dictionary(user_id: str, word: str, model: str | None = None) -
         normalized, model=model, user_id=user_id
     )
     return await run_in_threadpool(_build_dictionary_entry, normalized, rows, cached)
+
+
+async def _lookup_dictionary_reverse(
+    user_id: str, word: str, *, model: str | None = None
+) -> dict:
+    """Entrada del diccionario ES→EN para el término `word` (V3.39, D3).
+
+    Dos caminos, en este orden:
+    1. **Inversa instantánea** — `dictionary_reverse.match_translation` sobre
+       las traducciones ya cacheadas en `dictionary_entries`. Devuelve el
+       equivalente inglés y sus alternativas sin pagar latencia del modelo.
+    2. **Generación** — si no hay ninguna coincidencia, genera y cachea el
+       contenido ES→EN en `dictionary_reverse_entries`.
+    """
+    normalized = _normalize_lookup_spanish(word)
+    if not normalized:
+        raise ValueError("La palabra buscada queda vacía tras normalizar")
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    matches = dictionary_reverse.match_translation(normalized, entries)
+    if matches:
+        english = matches[0]
+        content = await _ensure_cached_content(
+            english, model=model, user_id=user_id
+        )
+        return await run_in_threadpool(
+            _build_reverse_entry, normalized, english, matches[1:], rows, content
+        )
+    content = await _ensure_cached_content(
+        normalized, model=model, user_id=user_id, direction=DIRECTION_ES_EN
+    )
+    english = (content or {}).get("english", "")
+    return await run_in_threadpool(
+        _build_reverse_entry, normalized, english, [], rows, content
+    )

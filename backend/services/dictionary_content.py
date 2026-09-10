@@ -59,12 +59,20 @@ logger = logging.getLogger(__name__)
 # (una sola frase + fuga morfológica, P2-01 de la auditoría de V3.38.0): la
 # caché 1.2.0 puede contener enunciados que las reglas nuevas descartarían, así
 # que se regenera una sola vez bajo el validador estricto.
-GENERATOR_VERSION = "1.2.1"
+#
+# V3.39: bump 1.2.1 -> 1.3.0. El contrato de contenido gana la dirección ES→EN
+# (`dictionary_reverse_entries`, prompt propio): el contenido directo se
+# regenera una sola vez para incorporar el nuevo `GENERATOR_VERSION` común a
+# ambas direcciones (una sola política de frescura para las dos cachés).
+GENERATOR_VERSION = "1.3.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
 MAX_DEFINITION_CHARS = 600
 MAX_TRANSLATION_CHARS = 200
+# La traducción inversa (ES→EN) es una palabra o locución corta; se acota para
+# que el modelo no devuelva una explicación en lugar de un equivalente.
+MAX_ENGLISH_CHARS = 120
 # El enunciado situacional es UNA frase de escenario con un único hueco; se
 # acota para que no se convierta en un párrafo.
 # V3.38.1 (P2-01): la validación del enunciado situacional vive en la capa pura
@@ -106,6 +114,27 @@ _SYSTEM_PROMPT = (
     "Do not add any text outside the JSON object."
 )
 
+# V3.39 (diccionario reversible): prompt de la dirección ES→EN. Devuelve el
+# equivalente inglés principal (`english`) más su definición simple y un
+# enunciado situacional EN INGLÉS con hueco (el peldaño `situation` sirve
+# siempre la palabra inglesa, también cuando la búsqueda fue en español).
+_REVERSE_SYSTEM_PROMPT = (
+    "You are a learner-friendly bilingual dictionary inside a local "
+    "language-learning app. For the given Spanish word or phrase, reply with "
+    "ONLY one JSON object with exactly these keys: "
+    '"english" (the most common English equivalent, a word or short phrase, '
+    "without articles or explanations), "
+    '"pos" (one of: noun, verb, adjective, adverb, pronoun, preposition, '
+    "conjunction, interjection, determiner, phrase), "
+    '"definition" (a short definition in SIMPLE English of that English '
+    "equivalent, one or two sentences, without examples inside it), "
+    '"situation" (ONE short English sentence, at most 200 characters, that '
+    "sets a concrete everyday scenario and contains EXACTLY one blank "
+    '"_____" where the English equivalent fits; do NOT write the English '
+    "equivalent or any form of it anywhere else in the sentence). "
+    "Do not add any text outside the JSON object."
+)
+
 
 class ContentUnavailableError(RuntimeError):
     """Contenido de diccionario no disponible (modelo caído o respuesta inválida).
@@ -115,13 +144,16 @@ class ContentUnavailableError(RuntimeError):
     """
 
 
-async def _fetch_chat(word: str, model: str | None) -> str:
+async def _fetch_chat(
+    word: str, model: str | None, *, system_prompt: str = _SYSTEM_PROMPT
+) -> str:
     """Llama al modelo local y devuelve el texto crudo de la respuesta.
 
     Elige modelo con la misma política de `translate.pick_model` (rápido
     instalado; nunca `config.UNUSABLE_MODELS`) y `temperature=0` para que la
     generación sea lo más reproducible posible. Cualquier fallo de red/modelo o
     respuesta vacía se convierte en `ContentUnavailableError` (degradación).
+    `system_prompt` permite reutilizarla en la dirección ES→EN (V3.39).
     """
     try:
         chosen = await translate.pick_model(model)
@@ -129,7 +161,7 @@ async def _fetch_chat(word: str, model: str | None) -> str:
             messages=[ChatMessage(role="user", content=word)],
             model=chosen,
             temperature=0.0,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
         )
     except ContentUnavailableError:
         raise
@@ -143,6 +175,23 @@ async def _fetch_chat(word: str, model: str | None) -> str:
 
 # Punto de inyección para tests (sustituible sin tocar Ollama).
 _default_fetcher = _fetch_chat
+
+
+def _first_json_object(text: str) -> dict | None:
+    """Primer objeto JSON válido del texto (o None).
+
+    Barrido tolerante con `raw_decode` en cada `{` (V3.30.1): la vieja regex
+    greedy `{.*}` podía tragarse `{…} texto {…}` hasta el último cierre.
+    """
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        try:
+            candidate, _ = decoder.raw_decode(text, match.start())
+        except (ValueError, TypeError):
+            continue
+        if isinstance(candidate, dict):
+            return candidate
+    return None
 
 
 def parse_content(raw: str, *, word: str = "") -> dict:
@@ -165,16 +214,7 @@ def parse_content(raw: str, *, word: str = "") -> dict:
     text = (raw or "").strip()
     if not text:
         raise ContentUnavailableError("Respuesta vacía del modelo")
-    decoder = json.JSONDecoder()
-    obj = None
-    for match in re.finditer(r"\{", text):
-        try:
-            candidate, _ = decoder.raw_decode(text, match.start())
-        except (ValueError, TypeError):
-            continue
-        if isinstance(candidate, dict):
-            obj = candidate
-            break
+    obj = _first_json_object(text)
     if obj is None:
         raise ContentUnavailableError("La respuesta no contiene un objeto JSON")
 
@@ -220,3 +260,58 @@ async def generate_content(
     fetch = fetcher or _default_fetcher
     raw = await fetch(word, model)
     return parse_content(raw, word=word)
+
+
+def parse_reverse_content(raw: str, *, word: str = "") -> dict:
+    """Parsea y valida la respuesta ES→EN del modelo (V3.39).
+
+    Devuelve `{english, pos, definition, situation}`. `english` es OBLIGATORIO
+    (es la razón de ser de la dirección inversa): sin equivalente inglés la
+    respuesta se descarta y el dominio degrada a `definition_source="none"`.
+    `pos` se normaliza a la taxonomía canónica, `definition` se acota a
+    `MAX_DEFINITION_CHARS` y `situation` pasa por el mismo validador puro que la
+    dirección directa (una frase, un hueco, sin fuga de la diana inglesa).
+    """
+    text = (raw or "").strip()
+    if not text:
+        raise ContentUnavailableError("Respuesta vacía del modelo")
+    obj = _first_json_object(text)
+    if obj is None:
+        raise ContentUnavailableError("La respuesta no contiene un objeto JSON")
+    english = str(obj.get("english") or "").strip()
+    if not english:
+        raise ContentUnavailableError("La respuesta no incluye el equivalente inglés")
+    english = english[:MAX_ENGLISH_CHARS].strip()
+    definition = str(obj.get("definition") or "").strip()
+    if not definition:
+        raise ContentUnavailableError("La respuesta no incluye una definición")
+    if len(definition) > MAX_DEFINITION_CHARS:
+        raise ContentUnavailableError("La definición supera el límite de longitud")
+    pos = str(obj.get("pos") or "").strip().lower()
+    return {
+        "english": english,
+        "pos": pos if pos in _VALID_POS else "",
+        "definition": definition,
+        "situation": _situation_from(obj.get("situation"), english),
+    }
+
+
+async def generate_reverse_content(
+    word: str,
+    *,
+    model: str | None = None,
+    fetcher=None,
+) -> dict:
+    """Genera `{english, pos, definition, situation}` para el término ES `word`.
+
+    Mismo `fetcher` inyectable y misma degradación que `generate_content`; el
+    término debe venir normalizado (minúsculas, acentos conservados).
+    """
+    fetch = fetcher or _reverse_fetcher
+    raw = await fetch(word, model)
+    return parse_reverse_content(raw, word=word)
+
+
+async def _reverse_fetcher(word: str, model: str | None) -> str:
+    """Llama al modelo local con el prompt ES→EN (misma política y degradación)."""
+    return await _fetch_chat(word, model, system_prompt=_REVERSE_SYSTEM_PROMPT)

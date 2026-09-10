@@ -13,6 +13,9 @@ from schemas.pronunciation import (
 )
 from schemas.pronunciation import Level as PronunciationLevel
 
+# V3.39: tope de la frase escrita a mano en la actividad `write` del drill.
+MAX_WRITE_CHARS = 600
+
 VocabularyStatus = Literal["exposed", "learning", "mastered"]
 
 # Estado determinista por ítem léxico (V2.3). Más granular que `VocabularyStatus`
@@ -343,6 +346,11 @@ class DictionaryLookupRequest(BaseModel):
 
     word: str = Field(min_length=1, max_length=80)
     model: str | None = None
+    # V3.39 (diccionario reversible): dirección de la búsqueda. `en-es` es la
+    # histórica (palabra inglesa → definición EN + traducción ES); `es-en`
+    # busca un término español y devuelve su equivalente inglés. Aditivo: el
+    # valor por defecto mantiene intactos los clientes anteriores.
+    direction: Literal["en-es", "es-en"] = "en-es"
 
 
 class DictionaryExampleOut(BaseModel):
@@ -416,6 +424,12 @@ class DictionaryEntryOut(BaseModel):
     pos: str = ""
     definition: str | None = None
     translation: str | None = None
+    # V3.39 (diccionario reversible): dirección servida y alternativas de la
+    # búsqueda inversa. En `es-en`, `translation` es el equivalente INGLÉS y
+    # `alternatives` las otras traducciones encontradas en la inversa
+    # instantánea (sin la principal). En `en-es` siempre `[]`.
+    direction: Literal["en-es", "es-en"] = "en-es"
+    alternatives: list[str] = Field(default_factory=list)
     # V3.38: enunciado situacional (frase de escenario con un hueco `_____`) del
     # 4.º peldaño de la escalera de recall. `None` si el generador no lo produjo.
     situation: str | None = None
@@ -633,4 +647,95 @@ class RecallAttemptOut(BaseModel):
     expected: str
     delayed: bool = False
     recall_days: int = 0
+    error_type: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Actividad de ESCRITURA del drill (V3.39, Fase 3): cierra la modalidad
+# `written_production` del motor de tarea óptima. El alumno escribe una frase
+# PROPIA que use la palabra objetivo (producción con el mínimo andamiaje: la
+# palabra se muestra, la frase no). Determinista y sin LLM: el servidor
+# comprueba la alineación de la unidad y la longitud mínima, así que el cliente
+# nunca declara acierto (premisa 21). El drill no declara dominio (D5/E3).
+# ---------------------------------------------------------------------------
+
+
+class WriteAttemptIn(BaseModel):
+    """Intento del paso Write (V3.39): el cliente envía la frase escrita.
+
+    `response_time_ms` es la latencia medida por el cliente (ms desde que la
+    consigna queda visible hasta que envía); opcional y observacional.
+    """
+
+    word: str = Field(min_length=1, max_length=120)
+    text: str = Field(default="", max_length=MAX_WRITE_CHARS)
+    response_time_ms: int | None = Field(default=None, ge=0, le=600_000)
+
+
+class WriteAttemptOut(BaseModel):
+    """Resultado puntuado por el servidor del paso Write (V3.39).
+
+    - `used_word`: la unidad objetivo quedó alineada en la frase escrita;
+    - `word_count`: nº de palabras de la frase (longitud mínima declarada en
+      `services.lexicon.WRITE_MIN_WORDS`);
+    - `passed` = `used_word` AND longitud mínima: es lo que acredita la
+      modalidad `written_production` (`writing_prod += 1` + evidencia con
+      `activity_id="drill:write"`).
+
+    `error_type` clasifica el intento (`services.evidence.WRITE_ERROR_TYPES`)
+    sin cambiar el scoring.
+    """
+
+    word: str
+    text: str
+    used_word: bool
+    word_count: int
+    passed: bool
+    error_type: str = ""
+
+
+class TransferContextOut(BaseModel):
+    """Consigna de TRANSFERENCIA a un contexto nuevo (V3.40, solo lectura).
+
+    El contexto (`context_id`) es el del ledger: se registra con el intento y es
+    lo que permite acreditar la transferencia real (éxito en >= 2 contextos
+    distintos). `available` es siempre `True` con el banco curado; se mantiene
+    por simetría con los demás GET del drill.
+    """
+
+    word: str
+    context_id: str = ""
+    topic: str = ""
+    prompt: str = ""
+    available: bool = True
+
+
+class TransferAttemptIn(BaseModel):
+    """Intento del paso Transfer (V3.40).
+
+    `context_id` es el contexto servido por `TransferContextOut` (si falta, el
+    servidor lo deriva del banco: nunca queda sin contexto).
+    """
+
+    word: str = Field(min_length=1, max_length=120)
+    text: str = Field(default="", max_length=MAX_WRITE_CHARS)
+    context_id: str = Field(default="", max_length=120)
+    response_time_ms: int | None = Field(default=None, ge=0, le=600_000)
+
+
+class TransferAttemptOut(BaseModel):
+    """Resultado puntuado por el servidor del paso Transfer (V3.40).
+
+    `passed` = unidad alineada AND longitud mínima: acredita la modalidad
+    `spontaneous_use` con evidencia `activity_id="drill:transfer"` y el
+    `context_id` del contexto nuevo. `error_type` reutiliza la taxonomía
+    observacional de `WRITE_ERROR_TYPES`.
+    """
+
+    word: str
+    text: str
+    context_id: str = ""
+    used_word: bool
+    word_count: int
+    passed: bool
     error_type: str = ""

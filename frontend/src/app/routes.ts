@@ -9,7 +9,10 @@ export type Route =
   | "help"
   // V3.38.1: destino AUXILIAR del diccionario (ruta `/diccionario`), separado
   // del núcleo de aprendizaje en la navegación.
-  | "dictionary";
+  | "dictionary"
+  // V3.39 (Fase 2): destino AUXILIAR Traductor (ruta `/traductor`), utilidad
+  // bidireccional ES↔EN por voz que NO registra evidencia.
+  | "translator";
 
 export interface RouteOption {
   id: Route;
@@ -31,4 +34,5 @@ export const ROUTES: RouteOption[] = [
   { id: "course", i18nKey: "nav.formation" },
   { id: "learn", i18nKey: "nav.learn" },
   { id: "dictionary", i18nKey: "nav.dictionary" },
+  { id: "translator", i18nKey: "nav.translator" },
 ];

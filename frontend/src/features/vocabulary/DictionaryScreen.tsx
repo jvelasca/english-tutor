@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { BookOpen, Search } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
+import { useDictionaryView } from "../../hooks/useDictionaryView";
+import type { DictionaryView } from "../../utils/dictionaryView";
 import { cn } from "../../lib/utils";
 import { PersonalDictionary } from "./PersonalDictionary";
 import { DictionaryLookup } from "./DictionaryLookup";
-
-type DictionaryView = "personal" | "lookup";
 
 const VIEWS: {
   id: DictionaryView;
@@ -24,10 +23,14 @@ const VIEWS: {
  * ahora tiene su propio destino en la navegación (tras un separador) y esta
  * pantalla reutiliza las dos vistas ya existentes —diccionario personal y
  * consulta— sin duplicar lógica.
+ *
+ * V3.39: la vista activa se persiste (localStorage + settings por usuario) con
+ * `useDictionaryView`, así que al volver a abrir la app se recuerda la última
+ * pestaña usada.
  */
 export function DictionaryScreen({ userId }: { userId: string | null }) {
   const { t } = useI18n();
-  const [view, setView] = useState<DictionaryView>("personal");
+  const { view, setView } = useDictionaryView(userId);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

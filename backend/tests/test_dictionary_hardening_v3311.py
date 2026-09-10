@@ -106,7 +106,9 @@ def test_failure_marks_negative_cache_and_suppresses_immediate_retry(
     second = _lookup_domain(a, "cat")
     assert second["definition_source"] == "none"
     assert calls == ["offline"]  # no se llamó al fetcher
-    assert "cat" in vocabulary_domain._negative_until
+    assert vocabulary_domain._cache_key("en-es", "cat") in (
+        vocabulary_domain._negative_until
+    )
 
 
 def test_negative_cache_expires_and_recovers(monkeypatch, tmp_path):
@@ -128,7 +130,9 @@ def test_negative_cache_expires_and_recovers(monkeypatch, tmp_path):
     assert recovered["definition"] == "A small domesticated carnivorous mammal."
     assert len(calls) == 2  # offline + reintento tras expirar
     assert _count_rows("dictionary_entries") == 1
-    assert "cat" not in vocabulary_domain._negative_until
+    assert vocabulary_domain._cache_key("en-es", "cat") not in (
+        vocabulary_domain._negative_until
+    )
 
 
 def test_successful_generation_clears_negative_cache(monkeypatch, tmp_path):
@@ -136,14 +140,18 @@ def test_successful_generation_clears_negative_cache(monkeypatch, tmp_path):
     palabra se limpia (no puede quedar una marca obsoleta)."""
     monkeypatch.setattr("config.DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS", 0.0)
     a, _b = _setup(monkeypatch, tmp_path)
-    vocabulary_domain._mark_generation_failed("cat")
+    vocabulary_domain._mark_generation_failed(
+        vocabulary_domain._cache_key("en-es", "cat")
+    )
 
     calls: list = []
     _stub_fetcher(monkeypatch, _payload(), calls)
     out = _lookup_domain(a, "cat")
 
     assert out["definition_source"] == "llm"
-    assert "cat" not in vocabulary_domain._negative_until
+    assert vocabulary_domain._cache_key("en-es", "cat") not in (
+        vocabulary_domain._negative_until
+    )
 
 
 # --- Rate limit de generación ------------------------------------------------
@@ -233,7 +241,9 @@ def test_owner_generation_timeout_degrades_and_releases_flight(
     assert calls == ["hang"]
     assert elapsed < 2.0  # no esperó a los 5 s del fetcher
     assert vocabulary_domain._inflight_content == {}
-    assert "slowword" in vocabulary_domain._negative_until
+    assert vocabulary_domain._cache_key("en-es", "slowword") in (
+        vocabulary_domain._negative_until
+    )
     assert _count_rows("dictionary_entries") == 0
 
 

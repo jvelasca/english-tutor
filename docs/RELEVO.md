@@ -5,6 +5,155 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.42.0 publicada (Fase 4 y CIERRE del plan maestro
+> V3.39+)** — release **v3.42.0** (**transferencia contextual real + actividad
+> `spontaneous_use` + gobierno por unidad léxica**). Cuarta y última de las
+> cuatro fases acordadas (diccionario reversible → Traductor → motor de tarea
+> óptima → transferencia real). **Transferencia ≠ recuperación contextualizada:**
+> `services/transfer.py` (puro) define el banco curado de contextos nuevos
+> (`TRANSFER_CONTEXTS`) y la elección determinista del que toca
+> (`context_for(word, used_context_ids)`: filtra los `context_id` ya usados y
+> elige por hash ESTABLE `zlib.crc32` —no el `hash()` sembrado—, rotando sobre el
+> banco completo con `exhausted=True` al agotarse). `services/evidence.
+> context_signals` (pura, reutilizada por el resumen SQL) agrupa el ledger por
+> `context_id` y expone `contexts`/`context_attempts`/`success_contexts`/
+> `home_context`/`transfer` (éxito en ≥ `CONTEXT_TRANSFER_MIN = 2` contextos
+> distintos). `planner.transfer_gap` decide cuándo pedirla: exige contexto
+> registrado, ≥ `TRANSFER_MIN_SUCCESSES = 2` éxitos y <
+> `TRANSFER_MIN_SUCCESS_CONTEXTS = 2` contextos con éxito (sin ventana devuelve
+> `False`); `transfer_gap` entra como último motivo de `EVIDENCE_REASON_ORDER`.
+> **La modalidad `spontaneous_use` deja de medirse sin tarea:** actividad
+> `transfer` con `lexicon.score_transfer_attempt`, `GET /api/vocabulary/drill/
+> transfer-context` (solo lectura; sin `context_id` del cliente el servidor lo
+> deriva del banco) y `POST /api/vocabulary/drill/transfer-attempt` (evidencia
+> `spontaneous_use`, `activity_id="drill:transfer"`, apoyo `spontaneous` y el
+> `context_id` del contexto NUEVO). **Gobierno por `lexical_unit`:** `lexicon.
+> unit_evidence(rows, evidence_by_word)` suma contadores y mapas de las formas
+> hermanas, **recalcula** `success_rate` del total, une `automatic`/
+> `automatic_skills`/`success_contexts` y deriva `transfer`; `ReviewQueueOut.units`
+> (aditivo) y `ReviewQueueItem.unit_surfaces`/`transfer`/`success_contexts`
+> exponen el roll-up sin cambiar la evidencia por forma. **Descomposición de
+> `wordDrill.tsx`:** peldaños presentacionales extraídos a
+> `features/vocabulary/wordDrillSteps.tsx` (`RecognitionStep`/`RecallStep`/
+> `ProductionTextarea`/`TransferStep`) sin cambiar el contrato; la escalera pasa
+> a 5 peldaños y la cola abre `transfer` con `initialStep`. Tests: pytest
+> **1975 passed** (+15, `test_transfer_v340.py`; `test_learning_evidence_v336.py`
+> ajustado al contrato de `empty_summary`), vitest **70 ficheros/606 tests**
+> (+4), `ruff` limpio, `tsc --noEmit` limpio y `check_release_consistency`
+> **3.42.0** exit 0. **Plan maestro V3.39+ completo: sin fases pendientes.**
+>
+> **Nota (2026-09-10):** **V3.41.0 publicada (Fase 3 del plan maestro V3.39+)** —
+> release **v3.41.0** (**motor de tarea óptima por skill + actividad de escritura
+> + robustez de señales**). Tercera de las cuatro fases acordadas (diccionario
+> reversible → Traductor → motor de tarea óptima → transferencia real). El
+> planner deja de responder "¿qué palabra repaso?" y responde **"¿qué modalidad
+> limita, qué actividad la cierra y con qué apoyo?"**: `planner.skill_priority`
+> aplica `PRIORITY_WEIGHTS` a las señales por modalidad, `planner.limiting_skill`
+> devuelve el argmax con desempate por `LEXICAL_SKILLS` (sin segmentación cae en
+> `recall`) y `planner.select_task(matrix, evidence, signals)` devuelve
+> `{skill, activity, reason, support_level}` con orden declarado `error_prone` →
+> `skill_gap` → `slow_recall`. `ACTIVITY_FOR_SKILL` mapea la modalidad a la
+> actividad (`recall`, `sentence`, **`write`**) y `ACTIVITY_SUPPORT_LEVEL`
+> declara el andamiaje; `evidence_reason` queda como fachada estable y
+> `priority`/`signals`/`why` conservan su semántica. **El hueco simétrico
+> `spoken ✓ / written ✗` ya es accionable:** nueva actividad `write` con
+> `services/lexicon.score_write_attempt` (puro, sin LLM: `unit_produced` sobre la
+> frase propia + `WRITE_MIN_WORDS = 4`, taxonomía `WRITE_ERROR_TYPES`),
+> `domain/vocabulary.submit_write_attempt`, endpoint nuevo
+> `POST /api/vocabulary/drill/write-attempt` y paso `write` en `wordDrill.tsx`
+> (la cola lo abre con `initialStep`). **Señales robustas:** `services/evidence.
+> recency_signals` (ventana de `RECENT_WINDOW_EVENTS = 10`, `recent_error_rate`,
+> `recent_wrong_word`, `median`/`p75`/`p90_response_time_ms` por rango más
+> cercano, `recent_response_time_ms`, `latency_trend`), reutilizada por
+> `repositories/evidence.summarize_by_target` (paridad por construcción);
+> `_has_grave_error` y `error_prone` miran la VENTANA; `is_automatic` se
+> **unifica** con `automatic_skills` cuando el resumen trae segmentación (el
+> criterio global de V3.38.1 queda como fallback de resúmenes parciales/legacy);
+> el ledger encadena el intervalo al evento **cronológicamente anterior**
+> (`last_evidence_at(..., before=now)`) y `example_for_many` batchea los ejemplos
+> del `cloze` en una sola pasada al banco. **Contratos HTTP aditivos:**
+> `ReviewQueueItem.limiting_skill`/`ReviewQueueItem.task` y los campos nuevos del
+> resumen (sección `LexicalEvidence`). Tests: pytest **1960 passed** (+36),
+> vitest **70 ficheros/602 tests** (+5), `ruff` limpio, `tsc --noEmit` limpio y
+> `check_release_consistency` **3.41.0** exit 0. Diferido a la **Fase 4**:
+> transferencia contextual real (contextos A/B/nuevos con evidencia por
+> `context_id`), actividad propia de `spontaneous_use`, agregación del estado
+> pedagógico por `lexical_unit` y descomposición de `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.40.0 publicada (Fase 2 del plan maestro V3.39+)** —
+> release **v3.40.0** (**Traductor de viaje bidireccional ES↔EN, 5.º destino**).
+> Segunda de las cuatro fases acordadas (diccionario reversible → Traductor →
+> motor de tarea óptima → transferencia real). **Nuevo destino AUXILIAR**
+> `translator` con ruta propia `/traductor` (`TRANSLATOR_PATH`, `routeMap`
+> reversible de 10 valores y `pathToRoute` de `#/traductor`), registrado en
+> `ROUTES` justo tras el diccionario —mismo bloque auxiliar tras el separador—,
+> icono `Languages` y bottom-nav `grid-cols-4 → grid-cols-5`; el corte de las
+> píldoras de cabecera se mantiene en `xl` (con `overflow-x-auto` como red de
+> seguridad). **`TranslatorScreen`** (`features/translator/`): conmutador de
+> dirección ES→EN / EN→ES con **ES→EN por defecto** (el caso del viajero),
+> botón ⇄ que intercambia sentido y textos, entrada por voz (`MicButton`, que
+> ahora acepta `language` y auto-detiene a los 120 s) o de texto, panel de
+> resultado con `ListenButton` por idioma para escuchar origen y destino,
+> historial reciente (8 frases) en `localStorage`
+> (`english-tutor.translator-history`) con reutilización y borrado, y aviso de
+> utilidad de apoyo. Es **solo lectura pedagógica**: no crea evidencia, no toca
+> `vocabulary` y es válida sin perfil. **Backend:** `services/translate.py` pasa
+> a BIDIRECCIONAL (`_SYSTEM_PROMPT_ES_EN` nuevo, caché por `(direction, text)`,
+> dirección desconocida → `"en-es"`), `TranslateRequest.direction`
+> (`Literal["en-es","es-en"]`, defecto `"en-es"` → 422 si no), `TTSRequest.language`
+> (defecto `"en"`), `resolve_voice(prefs, language="en")` puro con
+> `voice_language(id)` (preferida del idioma → default del idioma → primera voz
+> del idioma → fallback global documentado) y tres voces `es_*` **medium** en el
+> catálogo curado de Piper (`es_ES-davefx-medium`, `es_ES-sharvard-medium`,
+> `es_MX-ald-medium`, descargables desde Ajustes → Voces). Todo aditivo y
+> retrocompatible: sin `direction`/`language` el comportamiento es el histórico
+> de las pantallas de práctica. Tests: pytest **1924 passed** (+14),
+> vitest **70 ficheros/597 tests** (+2 ficheros/+19), `ruff` limpio,
+> `tsc --noEmit` limpio y `check_release_consistency` **3.40.0** exit 0.
+> Diferido a las fases siguientes: **Fase 3** motor de tarea óptima por skill
+> (`skill_priority`/`limiting_skill`/`select_task`) + ruta de escritura
+> `written_production` + robustez de señales; **Fase 4** transferencia
+> contextual real, actividad `spontaneous_use`, agregación por `lexical_unit` y
+> refactor de `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.39.0 publicada (Fase 1 del plan maestro V3.39+)** —
+> release **v3.39.0** (**Diccionario reversible EN↔ES + persistencia de la
+> pestaña Personal/Consultar**). Primera de las cuatro fases acordadas
+> (diccionario reversible → Traductor → motor de tarea óptima → transferencia
+> real). **Diccionario ES→EN:** doble escalón — (1) inversa INSTANTÁNEA sobre las
+> traducciones ya cacheadas, nuevo servicio PURO `services/dictionary_reverse.py`
+> (`match_translation`: segmenta glosas `, ; / |`, quita paréntesis y artículos
+> iniciales, pliega acentos conservando la eñe, puntúa exacto > parcial y
+> deduplica en orden determinista); (2) generación con el modelo local solo si no
+> hay coincidencia, en la tabla PROPIA `dictionary_reverse_entries` (aislada de
+> `dictionary_entries` para no contaminar el banco de distractores del MCQ;
+> `word` ES como PK + `english`/`pos`/`definition`/`situation`/`generator_version`).
+> `GENERATOR_VERSION` 1.2.1 → **1.3.0** (una sola política de frescura para las
+> dos direcciones; la caché directa se regenera una vez) con
+> `parse_reverse_content`/`generate_reverse_content` (reutiliza el validador puro
+> `services/situation.py` sobre el equivalente inglés). La fontanería de
+> generación (single-flight, negative cache, rate limit) se indexa por
+> `(direction, word)`. Contrato HTTP **aditivo**: `DictionaryLookupRequest.direction`
+> (defecto `"en-es"`) y `DictionaryEntryOut.direction`/`alternatives`. La consulta
+> inversa sigue siendo SOLO LECTURA (D3) y su marca de uso es la del EQUIVALENTE
+> INGLÉS. **Frontend:** conmutador EN↔ES en `DictionaryLookup` (con `lang`/
+> placeholder por dirección), tarjeta reetiquetada (término ES de cabecera,
+> inglés como «In English», definición EN y `alternatives`) y puente de práctica
+> que practica SIEMPRE el término inglés; `lookupDictionaryWord(userId, word,
+> direction)` + tipos TS. **Persistencia de pestaña:** hook `useDictionaryView`
+> con patrón doble (`localStorage` `english-tutor.dictionary-view` +
+> `settings.dictionary_view`, hidratación al cambiar de usuario), integrado en
+> `DictionaryScreen` y en el conmutador incrustado de `QuizRoutePage`. Tests:
+> pytest **1910 passed** (+20, nuevo `test_dictionary_reverse_v339.py`), vitest
+> **68 ficheros/578 tests** (nuevos ES→EN + `DictionaryScreen.test.tsx`), `ruff`
+> limpio, `tsc --noEmit` limpio y `check_release_consistency` **3.39.0** exit 0.
+> Diferido a las fases siguientes: **Fase 2** Traductor bidireccional por voz
+> (5.º destino, voces Piper `es_*`); **Fase 3** motor de tarea óptima por skill
+> (`skill_priority`/`limiting_skill`/`select_task`) + ruta de escritura
+> `written_production` + robustez de señales; **Fase 4** transferencia contextual
+> real, actividad `spontaneous_use`, agregación por `lexical_unit` y refactor de
+> `wordDrill.tsx`.
+>
 > **Nota (2026-09-10):** **V3.38.1 publicada** — release **v3.38.1** (**Cierre
 > quirúrgico de los P1 del Planner + UI de diccionario y estado**). Release
 > ADITIVA que NO añade funcionalidad: cierra los 4 P1 de la auditoría de V3.38.0

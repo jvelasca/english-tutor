@@ -24,10 +24,15 @@ from schemas.vocabulary import (
     RecognitionQuestionOut,
     SentenceAttemptOut,
     SentenceContextOut,
+    TransferAttemptIn,
+    TransferAttemptOut,
+    TransferContextOut,
     VocabularyAnalyzeRequest,
     VocabularyAnalyzeResponse,
     VocabularyEventOut,
     VocabularyItem,
+    WriteAttemptIn,
+    WriteAttemptOut,
 )
 from services.stt import exceeds_max_duration, transcribe_with_timing
 
@@ -88,7 +93,7 @@ async def dictionary_lookup(
     registra evidencia (D3): no crea filas en `vocabulary` ni eventos."""
     try:
         return await vocabulary_service.lookup_dictionary(
-            user["id"], body.word, model=body.model
+            user["id"], body.word, model=body.model, direction=body.direction
         )
     except ValueError:
         raise HTTPException(
@@ -215,6 +220,93 @@ async def drill_sentence_attempt(
     )
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{word}:sentence:{outcome}"
+    )
+    return result
+
+
+@router.post(
+    "/api/vocabulary/drill/write-attempt",
+    response_model=WriteAttemptOut,
+)
+async def drill_write_attempt(
+    body: WriteAttemptIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Actividad de escritura del drill (V3.39, Fase 3).
+
+    El alumno escribe una frase PROPIA que use la palabra objetivo. Puntúa el
+    servidor (premisa 21) de forma determinista y sin LLM: la unidad alineada
+    (`unit_produced`) y una longitud mínima. Al superarla se acredita la
+    modalidad `written_production` (volcado `writing_prod`) y se registra la
+    evidencia `activity_id="drill:write"` — es lo que cierra el hueco
+    `spoken ✓ / written ✗` que el motor de tarea óptima detecta. En fallo
+    también se registra el intento clasificado. El paso no graba recuperación
+    ni FSRS y no declara dominio (D5/E3)."""
+    result = await vocabulary_service.submit_write_attempt(
+        user["id"],
+        body.word,
+        body.text,
+        response_time_ms=body.response_time_ms,
+    )
+    outcome = "ok" if result["passed"] else "ko"
+    await learning_service.record_event(
+        user["id"], "exercise", f"drill:{body.word}:write:{outcome}"
+    )
+    return result
+
+
+@router.get(
+    "/api/vocabulary/drill/transfer-context",
+    response_model=TransferContextOut,
+)
+async def drill_transfer_context(
+    word: str = Query(..., min_length=1, max_length=120),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Consigna de TRANSFERENCIA del drill (V3.40, Fase 4).
+
+    Servicio de solo lectura: elige un contexto NUEVO (banco curado) que el ítem
+    aún no haya usado con éxito, para que el alumno use la unidad por decisión
+    propia. NO incluye la forma esperada ni ayuda con la unidad: la consigna da
+    el escenario, la producción es del alumno (modalidad `spontaneous_use`). El
+    `context_id` que devuelve es el que el intento registra en el ledger.
+    """
+    normalized = (word or "").strip()
+    if not normalized:
+        raise HTTPException(
+            status_code=422, detail="La palabra buscada no es válida"
+        )
+    return await vocabulary_service.get_transfer_context(user["id"], normalized)
+
+
+@router.post(
+    "/api/vocabulary/drill/transfer-attempt",
+    response_model=TransferAttemptOut,
+)
+async def drill_transfer_attempt(
+    body: TransferAttemptIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Intento del paso Transfer del drill (V3.40, Fase 4).
+
+    El alumno usa la unidad en un contexto NUEVO. Puntúa el servidor (premisa
+    21) de forma determinista y sin LLM: unidad alineada + longitud mínima
+    (`services.lexicon.score_transfer_attempt`). Al superarlo se acredita la
+    modalidad `spontaneous_use` con evidencia `activity_id="drill:transfer"` y el
+    `context_id` del contexto nuevo — el éxito en >= 2 contextos distintos es lo
+    que demuestra la transferencia contextual real. En fallo también se registra
+    el intento clasificado. No graba recuperación ni FSRS y no declara dominio.
+    """
+    result = await vocabulary_service.submit_transfer_attempt(
+        user["id"],
+        body.word,
+        body.text,
+        context_id=body.context_id,
+        response_time_ms=body.response_time_ms,
+    )
+    outcome = "ok" if result["passed"] else "ko"
+    await learning_service.record_event(
+        user["id"], "exercise", f"drill:{body.word}:transfer:{outcome}"
     )
     return result
 

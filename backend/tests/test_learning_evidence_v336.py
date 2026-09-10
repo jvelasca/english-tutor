@@ -376,6 +376,21 @@ def test_empty_summary_matches_the_extended_contract():
         "skill_attempts": {},
         "skill_mean_response_time_ms": {},
         "mean_response_time_ms": None,
+        # V3.39 (Fase 3C): recencia y distribución de latencia (aditivos).
+        "recent_attempts": 0,
+        "recent_error_rate": 0.0,
+        "recent_wrong_word": 0,
+        "median_response_time_ms": None,
+        "p75_response_time_ms": None,
+        "p90_response_time_ms": None,
+        "recent_response_time_ms": None,
+        "latency_trend": None,
+        # V3.40 (Fase 4): contextos de transferencia contextual (aditivos).
+        "contexts": {},
+        "context_attempts": 0,
+        "success_contexts": [],
+        "home_context": "",
+        "transfer": False,
     }
 
 

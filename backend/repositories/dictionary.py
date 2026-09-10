@@ -111,3 +111,85 @@ def list_entries() -> list[dict]:
             f"SELECT {_ENTRY_COLUMNS} FROM dictionary_entries ORDER BY word"
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# V3.39 (diccionario reversible): caché ES→EN. Tabla propia y aislada de
+# `dictionary_entries` para no contaminar el banco de distractores del MCQ
+# (ver `repositories/db.py`). Misma política de versionado que la directa: el
+# dominio solo sirve caché cuya `generator_version` coincide con la actual.
+# ---------------------------------------------------------------------------
+
+_REVERSE_COLUMNS = (
+    "word, english, pos, definition, situation, generator_version, "
+    "created_at, updated_at"
+)
+
+
+def get_reverse_entry(word: str) -> dict | None:
+    """Entrada ES→EN cacheada de `word` (None si no existe).
+
+    `word` es el término ESPAÑOL ya normalizado (sin acentos plegados: la
+    normalización conserva la eñe). Devuelve `english` (traducción principal) y
+    el contenido inglés asociado (`pos`/`definition`/`situation`).
+    """
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_REVERSE_COLUMNS} FROM dictionary_reverse_entries "
+            "WHERE word = ?",
+            (word,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def save_reverse_entry(
+    word: str,
+    *,
+    english: str = "",
+    pos: str = "",
+    definition: str = "",
+    situation: str = "",
+    generator_version: str = "",
+) -> bool:
+    """Inserta o sobrescribe la entrada ES→EN de `word` (V3.39).
+
+    Mismo `INSERT ... ON CONFLICT(word) DO UPDATE` que `save_entry`: sirve tanto
+    para la primera generación como para regenerar contenido obsoleto. Devuelve
+    True si hubo escritura. Contenido GLOBAL (sin `user_id`).
+    """
+    with closing(_conn()) as conn, conn:
+        now = _now()
+        cursor = conn.execute(
+            "INSERT INTO dictionary_reverse_entries "
+            "(word, english, pos, definition, situation, generator_version, "
+            "created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(word) DO UPDATE SET "
+            "english = excluded.english, "
+            "pos = excluded.pos, "
+            "definition = excluded.definition, "
+            "situation = excluded.situation, "
+            "generator_version = excluded.generator_version, "
+            "updated_at = excluded.updated_at",
+            (
+                word,
+                english,
+                pos,
+                definition,
+                situation,
+                generator_version,
+                now,
+                now,
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def list_reverse_entries() -> list[dict]:
+    """Todas las entradas ES→EN (orden estable por término español)."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            f"SELECT {_REVERSE_COLUMNS} FROM dictionary_reverse_entries "
+            "ORDER BY word"
+        ).fetchall()
+    return [dict(row) for row in rows]

@@ -27,6 +27,13 @@ export const CHAT_PATH: Path = "/chat";
 export const DICTIONARY_PATH: Path = "/diccionario";
 
 /**
+ * Ruta raíz del destino AUXILIAR Traductor: "/traductor" (V3.39, Fase 2). Igual
+ * que el diccionario, es una utilidad de apoyo (traducción bidireccional ES↔EN
+ * por voz o texto) con icono propio, no un mundo del núcleo de aprendizaje.
+ */
+export const TRANSLATOR_PATH: Path = "/traductor";
+
+/**
  * Ruta canónica de un nivel dentro de Formación para deep links, por ejemplo
  * formationLevelPath("b1") -> "/formacion/b1". El `levelId` se percent-codifica.
  */

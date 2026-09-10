@@ -12,6 +12,7 @@ const ALL_ROUTES: Route[] = [
   "chat",
   "help",
   "dictionary",
+  "translator",
 ];
 
 describe("routeToPath", () => {
@@ -25,11 +26,12 @@ describe("routeToPath", () => {
     expect(routeToPath("chat")).toBe("/chat");
     expect(routeToPath("help")).toBe("/ayuda");
     expect(routeToPath("dictionary")).toBe("/diccionario");
+    expect(routeToPath("translator")).toBe("/traductor");
   });
 });
 
 describe("round-trip routeToPath + pathToRoute", () => {
-  it("devuelve la misma pantalla para los 9 valores de Route", () => {
+  it("devuelve la misma pantalla para los 10 valores de Route", () => {
     for (const route of ALL_ROUTES) {
       expect(pathToRoute(routeToPath(route))).toBe(route);
     }
@@ -59,6 +61,12 @@ describe("pathToRoute: hoja antes que prefijo", () => {
     expect(pathToRoute("/diccionario")).toBe("dictionary");
     // No hay sub-rutas: cualquier hoja cae en home.
     expect(pathToRoute("/diccionario/personal")).toBe("home");
+  });
+
+  it("resuelve la raíz del traductor auxiliar (V3.39, Fase 2)", () => {
+    expect(pathToRoute("/traductor")).toBe("translator");
+    // No hay sub-rutas: cualquier hoja cae en home.
+    expect(pathToRoute("/traductor/historial")).toBe("home");
   });
 
   it("considera todo /formacion como course (cualquier sub-nivel)", () => {
@@ -101,6 +109,7 @@ describe("pathToRoute: normalización de la entrada", () => {
     expect(pathToRoute("/aprender/vocabulario/")).toBe("vocabulary");
     expect(pathToRoute("/ayuda/")).toBe("help");
     expect(pathToRoute("/diccionario/")).toBe("dictionary");
+    expect(pathToRoute("/traductor/")).toBe("translator");
   });
 
   it("tolera valores con '#' del hash de la URL", () => {

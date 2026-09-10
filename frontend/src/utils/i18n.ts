@@ -19,6 +19,8 @@ const STRINGS: Record<string, Entry> = {
   // V3.38.1: el diccionario es un destino AUXILIAR (no un mundo del core),
   // separado visualmente del resto en la navegación.
   "nav.dictionary": { en: "Dictionary", es: "Diccionario" },
+  // V3.39 (Fase 2): el Traductor es otro destino AUXILIAR del mismo bloque.
+  "nav.translator": { en: "Translator", es: "Traductor" },
 
   // Destrezas. Nombres de destreza/actividad en inglés también para la UI en
   // español (decisión V3.6.1): "Grammar/Pronunciation/Vocabulary/…" mantienen
@@ -401,6 +403,17 @@ const STRINGS: Record<string, Entry> = {
     en: "Word hidden — produce it in a sentence",
     es: "Palabra oculta — prodúcela en una frase",
   },
+  // V3.40: `write`/`transfer` muestran el recurso (la palabra), así que no
+  // necesitan texto "oculto"; se deja `transfer` por simetría y por si un
+  // cliente lo usa para una actividad abierta futura.
+  "dictionary.review.hidden.write": {
+    en: "Use the word shown above",
+    es: "Usa la palabra de arriba",
+  },
+  "dictionary.review.hidden.transfer": {
+    en: "Use the word in a new situation",
+    es: "Usa la palabra en una situación nueva",
+  },
   "dictionary.review.overdue": {
     en: "overdue",
     es: "vencida",
@@ -417,6 +430,16 @@ const STRINGS: Record<string, Entry> = {
     en: "Say in a sentence",
     es: "Dilo en una frase",
   },
+  // V3.39 (Fase 3): actividad que cierra la modalidad escrita.
+  "dictionary.review.activity.write": {
+    en: "Write a sentence",
+    es: "Escribe una frase",
+  },
+  // V3.40 (Fase 4): actividad que cierra `spontaneous_use` en contexto nuevo.
+  "dictionary.review.activity.transfer": {
+    en: "Use it in a new situation",
+    es: "Úsala en una situación nueva",
+  },
   "dictionary.review.reason.weak_recognition": {
     en: "Needs receptive grounding first",
     es: "Necesita base receptiva primero",
@@ -432,6 +455,12 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.review.reason.maintenance": {
     en: "Maintenance review",
     es: "Repaso de mantenimiento",
+  },
+  // V3.40 (Fase 4): la unidad ya se usa bien en su contexto de aprendizaje y
+  // toca transferirla a uno NUEVO (transferencia contextual real).
+  "dictionary.review.reason.transfer_gap": {
+    en: "Ready to use it in a new situation",
+    es: "Lista para usarla en una situación nueva",
   },
   "dictionary.loadError": {
     en: "Could not load your dictionary. ",
@@ -500,6 +529,70 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.drill.stepSentence": {
     en: "3 · Sentence",
     es: "3 · Frase",
+  },
+  // V3.39 (Fase 3): actividad de escritura que cierra la modalidad
+  // `written_production` (el hueco `spoken ✓ / written ✗` del planner).
+  "dictionary.drill.stepWrite": {
+    en: "4 · Write",
+    es: "4 · Escribe",
+  },
+  "dictionary.drill.writePrompt": {
+    en: "Write your own sentence using “{word}” (everyday English, no need to be perfect).",
+    es: "Escribe tu propia frase usando «{word}» (inglés cotidiano, no hace falta que sea perfecta).",
+  },
+  "dictionary.drill.writeInputLabel": {
+    en: "Your sentence",
+    es: "Tu frase",
+  },
+  "dictionary.drill.writePlaceholder": {
+    en: "I travel by train every summer...",
+    es: "I travel by train every summer...",
+  },
+  "dictionary.drill.writeMinWords": {
+    en: "At least {count} words, using the word shown above.",
+    es: "Al menos {count} palabras, usando la palabra de arriba.",
+  },
+  "dictionary.drill.writeCheck": {
+    en: "Check sentence",
+    es: "Comprobar frase",
+  },
+  "dictionary.drill.writePassed": {
+    en: "Great! You produced the word in writing — it closes the pending written modality.",
+    es: "¡Bien! Has producido la palabra por escrito — cierra la modalidad escrita pendiente.",
+  },
+  "dictionary.drill.writeTooShort": {
+    en: "The word is there, but write a longer sentence (at least {count} words) to count as your own production.",
+    es: "La palabra está, pero escribe una frase más larga (al menos {count} palabras) para que cuente como producción propia.",
+  },
+  "dictionary.drill.writeMissingWord": {
+    en: "Your sentence must use the word “{word}”.",
+    es: "Tu frase debe usar la palabra «{word}».",
+  },
+  // V3.40 (Fase 4): paso Transfer — usar la unidad en un contexto NUEVO. Cierra
+  // la modalidad `spontaneous_use`; el contexto lo sirve el backend.
+  "dictionary.drill.stepTransfer": {
+    en: "5 · Transfer",
+    es: "5 · Transferencia",
+  },
+  "dictionary.drill.transferInputLabel": {
+    en: "Your answer",
+    es: "Tu respuesta",
+  },
+  "dictionary.drill.transferPlaceholder": {
+    en: "Use the word in this new situation...",
+    es: "Usa la palabra en esta situación nueva...",
+  },
+  "dictionary.drill.transferCheck": {
+    en: "Check answer",
+    es: "Comprobar respuesta",
+  },
+  "dictionary.drill.transferPassed": {
+    en: "Great! You used the word in a new situation — do it in another one to prove real transfer.",
+    es: "¡Bien! Has usado la palabra en una situación nueva — hazlo en otra para demostrar transferencia real.",
+  },
+  "dictionary.drill.transferUnavailable": {
+    en: "No new situation available for this word yet — try the Write step.",
+    es: "Aún no hay situación nueva para esta palabra — prueba el paso Escribe.",
   },
   "dictionary.drill.recognitionPrompt": {
     en: "What does this word mean? Choose the option that matches its meaning.",
@@ -595,6 +688,26 @@ const STRINGS: Record<string, Entry> = {
     en: "Type a word… e.g. coffee",
     es: "Escribe una palabra… p. ej. coffee",
   },
+  // V3.39 (diccionario reversible): conmutador de dirección y textos propios de
+  // la búsqueda inversa ES→EN.
+  "dictionary.lookup.directionLabel": { en: "Direction", es: "Dirección" },
+  "dictionary.lookup.direction.en-es": {
+    en: "English → Spanish",
+    es: "Inglés → Español",
+  },
+  "dictionary.lookup.direction.es-en": {
+    en: "Spanish → English",
+    es: "Español → Inglés",
+  },
+  "dictionary.lookup.placeholder.es-en": {
+    en: "Type a word… e.g. casa",
+    es: "Escribe una palabra… p. ej. casa",
+  },
+  "dictionary.lookup.englishLabel": { en: "In English", es: "En inglés" },
+  "dictionary.lookup.alternativesLabel": {
+    en: "Other translations",
+    es: "Otras traducciones",
+  },
   "dictionary.lookup.button": { en: "Look up", es: "Buscar" },
   "dictionary.lookup.searchAria": {
     en: "Search the dictionary",
@@ -680,6 +793,77 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.lookup.noProfile": {
     en: "Select a learning profile to look up words.",
     es: "Selecciona un perfil de aprendizaje para consultar palabras.",
+  },
+
+  // V3.39 (Fase 2): Traductor de viaje (ruta /traductor). Utilidad auxiliar
+  // bidireccional ES↔EN por voz o texto; NO registra evidencia de aprendizaje.
+  "translator.title": { en: "Travel translator", es: "Traductor de viaje" },
+  "translator.subtitle": {
+    en: "Speak or type a phrase and read/hear it in the other language. A support tool: it doesn't count as practice.",
+    es: "Habla o escribe una frase y léela/escúchala en el otro idioma. Herramienta de apoyo: no cuenta como práctica.",
+  },
+  "translator.directionLabel": { en: "Direction", es: "Dirección" },
+  "translator.direction.es-en": {
+    en: "Spanish → English",
+    es: "Español → Inglés",
+  },
+  "translator.direction.en-es": {
+    en: "English → Spanish",
+    es: "Inglés → Español",
+  },
+  "translator.swap": {
+    en: "Swap direction",
+    es: "Invertir dirección",
+  },
+  "translator.sourceLabel": { en: "You say", es: "Tú dices" },
+  "translator.targetLabel": { en: "Translation", es: "Traducción" },
+  "translator.placeholder.es-en": {
+    en: "Type in Spanish… e.g. ¿Dónde está el hotel?",
+    es: "Escribe en español… p. ej. ¿Dónde está el hotel?",
+  },
+  "translator.placeholder.en-es": {
+    en: "Type in English… e.g. Where is the hotel?",
+    es: "Escribe en inglés… p. ej. Where is the hotel?",
+  },
+  "translator.inputAria": {
+    en: "Phrase to translate",
+    es: "Frase a traducir",
+  },
+  "translator.button": { en: "Translate", es: "Traducir" },
+  "translator.button.busy": { en: "Translating…", es: "Traduciendo…" },
+  "translator.listenSource": {
+    en: "Hear the original",
+    es: "Escuchar el original",
+  },
+  "translator.listenTarget": {
+    en: "Hear the translation",
+    es: "Escuchar la traducción",
+  },
+  "translator.empty": {
+    en: "Your translation will appear here.",
+    es: "Tu traducción aparecerá aquí.",
+  },
+  "translator.error": {
+    en: "Translation unavailable. ",
+    es: "Traducción no disponible. ",
+  },
+  "translator.notTracked": {
+    en: "Support tool",
+    es: "Herramienta de apoyo",
+  },
+  "translator.notTrackedHint": {
+    en: "Using the translator doesn't change your progress: only your practice does.",
+    es: "Usar el traductor no cambia tu progreso: solo lo hace tu práctica.",
+  },
+  "translator.history.title": { en: "Recent", es: "Recientes" },
+  "translator.history.empty": {
+    en: "Your latest translations will show up here.",
+    es: "Tus últimas traducciones aparecerán aquí.",
+  },
+  "translator.history.clear": { en: "Clear", es: "Borrar" },
+  "translator.history.reuse": {
+    en: "Reuse “{text}”",
+    es: "Reutilizar «{text}»",
   },
 
   // Settings

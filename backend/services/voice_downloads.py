@@ -6,10 +6,11 @@ se guarda como `{PIPER_DIR}/{voice_id}.onnx` + `.onnx.json`, el mismo formato
 que las voces colocadas a mano; el resto de la app las detecta igual
 (`services.tts.list_voices`).
 
-El catálogo solo incluye voces *de inglés* en calidad `medium`: son las que
-tienen sentido pedagógico para esta app (comprensión de acentos) sin inflar el
-disco con modelos `high` (~100 MB+). Los ids no listados aquí no se ofrecen en
-la UI, pero si se colocan a mano en `models/piper` se siguen detectando.
+El catálogo incluye voces *medium* de inglés (el núcleo pedagógico de esta app)
+y, desde V3.39 (Fase 2, Traductor), voces de español para poder escuchar la
+salida ES→EN y leer en voz alta el texto español. Se evitan las calidades `high`
+(~100 MB+) para no inflar el disco. Los ids no listados aquí no se ofrecen en la
+UI, pero si se colocan a mano en `models/piper` se siguen detectando.
 """
 from __future__ import annotations
 
@@ -72,6 +73,23 @@ CATALOG: list[PiperVoiceSpec] = [
         "en_GB-jenny_dioco-medium",
         "British English · Jenny (dioco)",
         "en/en_GB/jenny_dioco/medium",
+    ),
+    # V3.39 (Fase 2): voces de español para el Traductor (salida EN→ES leída y
+    # entrada ES leída en voz alta). Calidad medium, como el resto del catálogo.
+    PiperVoiceSpec(
+        "es_ES-davefx-medium",
+        "Español (España) · DaveFX (masculina)",
+        "es/es_ES/davefx/medium",
+    ),
+    PiperVoiceSpec(
+        "es_ES-sharvard-medium",
+        "Español (España) · Sharvard (femenina)",
+        "es/es_ES/sharvard/medium",
+    ),
+    PiperVoiceSpec(
+        "es_MX-ald-medium",
+        "Español (México) · Ald (masculina)",
+        "es/es_MX/ald/medium",
     ),
 ]
 

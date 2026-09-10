@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getDrillRecognitionQuestion: vi.fn(),
   getDrillRecallPrompt: vi.fn(),
   getDrillSentenceContext: vi.fn(),
+  getDrillTransferContext: vi.fn(),
 }));
 
 vi.mock("../../api/learning", () => ({
@@ -24,9 +25,12 @@ vi.mock("../../api/vocabulary", () => ({
   getDrillRecognitionQuestion: mocks.getDrillRecognitionQuestion,
   getDrillRecallPrompt: mocks.getDrillRecallPrompt,
   getDrillSentenceContext: mocks.getDrillSentenceContext,
+  getDrillTransferContext: mocks.getDrillTransferContext,
   submitDrillRecognitionAttempt: vi.fn(),
   submitDrillRecallAttempt: vi.fn(),
   submitDrillSentenceAttempt: vi.fn(),
+  submitDrillWriteAttempt: vi.fn(),
+  submitDrillTransferAttempt: vi.fn(),
 }));
 
 function queue(payload: Partial<ReviewQueue>): ReviewQueue {
@@ -180,5 +184,106 @@ describe("ReviewQueueSection (V3.35)", () => {
     expect(mocks.getDrillRecallPrompt).toHaveBeenCalledWith("u1", "river");
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(await screen.findByText("río")).toBeTruthy();
+  });
+
+  it("la actividad Write revela la palabra y abre el paso de escritura (V3.39)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "write",
+            reason: "skill_gap",
+            limiting_skill: "written_production",
+            task: {
+              skill: "written_production",
+              activity: "write",
+              reason: "skill_gap",
+              support_level: "independent",
+            },
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    // La palabra es el RECURSO de la tarea: se muestra (a diferencia de recall).
+    expect(await screen.findByText("river")).toBeTruthy();
+    expect(screen.getByText("Write a sentence")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review river" }));
+
+    // El paso Write no pide contenido al servidor: la consigna es la palabra.
+    expect(await screen.findByText(/using “river”/)).toBeTruthy();
+    expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
+    expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
+    expect(mocks.getDrillSentenceContext).not.toHaveBeenCalled();
+  });
+
+  it("la actividad Transfer revela la palabra y abre el paso de transferencia (V3.40)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "transfer",
+            reason: "transfer_gap",
+            limiting_skill: "spontaneous_use",
+            task: {
+              skill: "spontaneous_use",
+              activity: "transfer",
+              reason: "transfer_gap",
+              support_level: "spontaneous",
+            },
+            unit_surfaces: ["river"],
+            transfer: false,
+            success_contexts: ["lexicon:writing"],
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    mocks.getDrillTransferContext.mockResolvedValue({
+      word: "river",
+      context_id: "transfer:story",
+      topic: "story",
+      prompt: 'Tell a short story about your day using "river".',
+      available: true,
+    });
+    renderSection();
+
+    expect(await screen.findByText("river")).toBeTruthy();
+    expect(screen.getByText("Use it in a new situation")).toBeTruthy();
+    expect(
+      screen.getByText("Ready to use it in a new situation"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review river" }));
+
+    expect(mocks.getDrillTransferContext).toHaveBeenCalledWith("u1", "river");
+    expect(
+      await screen.findByText(/Tell a short story about your day/),
+    ).toBeTruthy();
+    expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
+    expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
   });
 });

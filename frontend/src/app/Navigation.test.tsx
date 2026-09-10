@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Vitest de la navegación raíz (V3.38.1): además de los 3 mundos, el
- * diccionario es un 4.º destino AUXILIAR separado visualmente del núcleo.
+ * Vitest de la navegación raíz (V3.39): además de los 3 mundos, el diccionario
+ * y el traductor son destinos AUXILIARES separados visualmente del núcleo.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -17,17 +17,17 @@ function renderNav(ui: ReactElement) {
   );
 }
 
-describe("Navigation (V3.38.1)", () => {
+describe("Navigation (V3.39)", () => {
   afterEach(cleanup);
 
-  it("ofrece los 3 mundos más el diccionario auxiliar", () => {
+  it("ofrece los 3 mundos más los destinos auxiliares", () => {
     renderNav(<Navigation route="home" onNavigate={() => {}} />);
-    for (const name of ["Home", "Course", "Learn", "Dictionary"]) {
+    for (const name of ["Home", "Course", "Learn", "Dictionary", "Translator"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
   });
 
-  it("separa el diccionario del núcleo con un divisor", () => {
+  it("separa los destinos auxiliares del núcleo con un divisor", () => {
     const { getAllByTestId } = renderNav(
       <Navigation route="home" onNavigate={() => {}} />,
     );
@@ -41,6 +41,13 @@ describe("Navigation (V3.38.1)", () => {
     expect(onNavigate).toHaveBeenCalledWith("dictionary");
   });
 
+  it("navega al traductor al pulsar su destino", () => {
+    const onNavigate = vi.fn();
+    renderNav(<Navigation route="home" onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "Translator" }));
+    expect(onNavigate).toHaveBeenCalledWith("translator");
+  });
+
   it("la bottom-nav marca el diccionario como destino activo", () => {
     renderNav(
       <Navigation route="dictionary" onNavigate={() => {}} variant="bottom" />,
@@ -48,6 +55,17 @@ describe("Navigation (V3.38.1)", () => {
     expect(
       screen
         .getByRole("button", { name: "Dictionary" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+  });
+
+  it("la bottom-nav marca el traductor como destino activo", () => {
+    renderNav(
+      <Navigation route="translator" onNavigate={() => {}} variant="bottom" />,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Translator" })
         .getAttribute("aria-current"),
     ).toBe("page");
   });

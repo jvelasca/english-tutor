@@ -177,6 +177,31 @@ def init_db() -> None:
             "WHERE generator_version = ''",
             (DICTIONARY_LEGACY_VERSION,),
         )
+        # V3.39 (diccionario reversible): caché GLOBAL del contenido generado en
+        # dirección ES→EN. Se mantiene en su PROPIA tabla (y no como columna de
+        # `dictionary_entries`) por dos razones:
+        #   1. la PK de `dictionary_entries` es la palabra INGLESA, y una misma
+        #      palabra española ("banco") puede tener varias traducciones;
+        #   2. `dictionary_repo.list_entries()` es el banco de distractores del
+        #      MCQ de Recognition (`services/dictionary_mcq.py`): meter términos
+        #      españoles ahí contaminaría los significados candidatos.
+        # `word` es el término ESPAÑOL normalizado (PK); `english` la traducción
+        # inglesa principal. Misma política de versionado que la tabla directa
+        # (`generator_version`): el contenido obsoleto se regenera y sobrescribe.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionary_reverse_entries (
+                word TEXT PRIMARY KEY,
+                english TEXT NOT NULL DEFAULT '',
+                pos TEXT NOT NULL DEFAULT '',
+                definition TEXT NOT NULL DEFAULT '',
+                situation TEXT NOT NULL DEFAULT '',
+                generator_version TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS grammar_errors (

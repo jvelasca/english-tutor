@@ -19,7 +19,9 @@ async def translate(body: TranslateRequest) -> TranslateResponse:
     if not body.text.strip():
         raise HTTPException(status_code=422, detail="text está vacío")
     try:
-        translation = await translate_service.translate_text(body.text, body.model)
+        translation = await translate_service.translate_text(
+            body.text, body.model, body.direction
+        )
     except Exception:  # noqa: BLE001
         logger.exception("Error en /api/translate")
         raise HTTPException(

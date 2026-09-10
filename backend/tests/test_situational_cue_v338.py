@@ -102,10 +102,11 @@ def _due_lexicon_card(uid: str, word: str, *, stability: float, days_ago: int) -
 
 
 def test_generator_version_and_prompt_declare_the_situation_field():
-    # V3.38.1: el validador se endurece (una frase + fuga morfológica) y la
-    # versión sube para regenerar la caché previa bajo las reglas nuevas.
-    assert dictionary_content.GENERATOR_VERSION == "1.2.1"
+    # V3.39: el contrato de contenido gana la dirección ES→EN y la versión sube
+    # para regenerar una sola vez la caché previa bajo la política nueva.
+    assert dictionary_content.GENERATOR_VERSION == "1.3.0"
     assert "situation" in dictionary_content._SYSTEM_PROMPT
+    assert "situation" in dictionary_content._REVERSE_SYSTEM_PROMPT
     assert dictionary_content.SITUATION_BLANK == "_____"
 
 

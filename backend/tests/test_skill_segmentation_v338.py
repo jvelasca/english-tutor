@@ -213,6 +213,10 @@ def test_mixing_modalities_does_not_make_any_modality_automatic():
 
     Un éxito escrito (D1) más un éxito oral (D5) hacían `is_automatic` global
     verdadero, aunque ninguna modalidad tuviera dos éxitos espaciados.
+
+    V3.39 (Fase 3C): el bug se cierra también a nivel de ÍTEM — `is_automatic`
+    se unifica con `automatic_skills` (una sola definición), así que tres éxitos
+    sueltos en tres modalidades distintas tampoco declaran automático el ítem.
     """
     mixed = evidence_svc.summarize_evidence(
         [
@@ -228,14 +232,15 @@ def test_mixing_modalities_does_not_make_any_modality_automatic():
                 support="independent",
                 day="2026-09-05",
             ),
-            # V3.38.1 (P1-04): se añade un tercer éxito de OTRA modalidad para
-            # que el ítem cruce el umbral GLOBAL (3 éxitos / 3 días) mientras
-            # ninguna modalidad por sí sola lo alcanza.
+            # V3.39 (Fase 3C): un tercer éxito de OTRA modalidad deja el umbral
+            # GLOBAL cruzado (3 éxitos / 3 días) sin que ninguna modalidad lo
+            # alcance: es exactamente el caso que la definición unificada ya no
+            # declara automático.
             _row("recall", success=True, support="independent", day="2026-09-03"),
         ]
     )
-    assert evidence_svc.is_automatic(mixed) is True  # el ítem, globalmente...
-    assert evidence_svc.automatic_skills(mixed) == []  # ...pero ninguna modalidad
+    assert evidence_svc.is_automatic(mixed) is False  # V3.39: una sola definición
+    assert evidence_svc.automatic_skills(mixed) == []  # ...ninguna modalidad
 
 
 def test_automatic_skills_can_coexist_in_several_modalities():

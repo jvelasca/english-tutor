@@ -18,6 +18,11 @@
  * ve el SIGNIFICADO (cue) y teclea la palabra; no usa micrófono y su acierto
  * NO acredita producción (solo señal léxica de recall + FSRS), así que tampoco
  * dispara `onProduced`. El micrófono queda reservado al paso Sentence.
+ * V3.39 (Fase 3): se añade el peldaño Write — frase PROPIA que acredita la
+ * modalidad escrita y cierra el hueco `spoken ✓ / written ✗`.
+ * V3.40 (Fase 4): se añade el peldaño Transfer — usar la unidad en un CONTEXTO
+ * NUEVO servido por el backend; acredita `spontaneous_use` con su `context_id`.
+ * Los peldaños presentacionales viven en `wordDrillSteps.tsx` (descomposición).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, type Variants } from "motion/react";
@@ -26,9 +31,12 @@ import {
   getDrillRecallPrompt,
   getDrillRecognitionQuestion,
   getDrillSentenceContext,
+  getDrillTransferContext,
   submitDrillRecallAttempt,
   submitDrillRecognitionAttempt,
   submitDrillSentenceAttempt,
+  submitDrillTransferAttempt,
+  submitDrillWriteAttempt,
 } from "../../api/vocabulary";
 import type {
   DrillAttempt,
@@ -38,6 +46,9 @@ import type {
   DrillRecognitionQuestion,
   DrillSentenceAttempt,
   DrillSentenceContext,
+  DrillTransferAttempt,
+  DrillTransferContext,
+  DrillWriteAttempt,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { useRecordingSession } from "../../hooks/useRecordingSession";
@@ -50,6 +61,12 @@ import {
   type MicUnavailableReason,
 } from "../../utils/browserCapabilities";
 import { cn } from "../../lib/utils";
+import {
+  ProductionTextarea,
+  RecallStep,
+  RecognitionStep,
+  TransferStep,
+} from "./wordDrillSteps";
 
 /** Variante de entrada de sección (idéntica a la de `PersonalDictionary`): la
  * animación la dispara el ancestro `motion` con `initial="hidden"` cuando hay
@@ -63,7 +80,34 @@ const item: Variants = {
   },
 };
 
-export type DrillStep = "recognition" | "recall" | "sentence";
+export type DrillStep =
+  | "recognition"
+  | "recall"
+  | "sentence"
+  | "write"
+  | "transfer";
+
+/** Etiqueta i18n de cada peldaño (orden de la escalera). */
+const STEP_LABEL_KEY: Record<DrillStep, string> = {
+  recognition: "dictionary.drill.stepRecognition",
+  recall: "dictionary.drill.stepRecall",
+  sentence: "dictionary.drill.stepSentence",
+  write: "dictionary.drill.stepWrite",
+  transfer: "dictionary.drill.stepTransfer",
+};
+
+const DRILL_STEPS: readonly DrillStep[] = [
+  "recognition",
+  "recall",
+  "sentence",
+  "write",
+  "transfer",
+];
+
+/** V3.39: longitud mínima (en palabras) de la frase propia que acredita la
+ * modalidad escrita. Espejo de `services.lexicon.WRITE_MIN_WORDS`; el servidor
+ * es quien puntúa (premisa 21), esto solo se muestra en la consigna. */
+const WRITE_MIN_WORDS = 4;
 
 export interface SpeakingDrillSectionProps {
   userId: string;
@@ -161,89 +205,6 @@ export function isSentenceAttempt(
   return "passed" in outcome;
 }
 
-interface RecallStepProps {
-  prompt: DrillRecallPrompt | null;
-  error: string | null;
-  answer: string;
-  onAnswerChange: (value: string) => void;
-  outcome: DrillRecallAttempt | null;
-  processing: boolean;
-  onSubmit: () => void;
-}
-
-/** Peldaño Recall (V3.34): recuperación por texto. Presentacional: el estado y
- * el scoring viven en `WordDrill` (el servidor puntúa, premisa 21). Sin
- * micrófono: el alumno escribe la palabra a partir del significado (cue). */
-function RecallStep({
-  prompt,
-  error,
-  answer,
-  onAnswerChange,
-  outcome,
-  processing,
-  onSubmit,
-}: RecallStepProps) {
-  const { t } = useI18n();
-  if (!prompt) {
-    return error ? (
-      <p className="text-xs text-destructive" role="alert">
-        {error}
-      </p>
-    ) : (
-      <Loader2
-        className="size-4 animate-spin text-muted-foreground"
-        aria-hidden="true"
-      />
-    );
-  }
-  if (!prompt.available) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        {t("dictionary.drill.recallUnavailable")}
-      </p>
-    );
-  }
-  const done = outcome !== null;
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs text-muted-foreground">
-        {prompt.cue_kind
-          ? t(`dictionary.drill.recallCue.${prompt.cue_kind}`)
-          : t("dictionary.drill.recallPrompt")}
-      </p>
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={answer}
-          onChange={(e) => onAnswerChange(e.target.value)}
-          disabled={processing || done}
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          lang="en"
-          aria-label={t("dictionary.drill.recallInputLabel")}
-          placeholder={t("dictionary.drill.recallPlaceholder")}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60"
-        />
-        <motion.button
-          type="button"
-          onClick={() => onSubmit()}
-          disabled={!answer.trim() || processing || done}
-          whileTap={processing ? undefined : { scale: 0.96 }}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          {processing ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Check className="size-4" aria-hidden="true" />
-          )}
-          {t("dictionary.drill.recallCheck")}
-        </motion.button>
-      </div>
-    </div>
-  );
-}
-
 /** Micro-práctica escalera de una palabra (V3.21/F6): Paso 1 "Recognition"
  * (V3.33, eslabón 2 del puente) — elige el significado de la palabra entre
  * opciones servidas por el backend (MCQ definición ↔ palabra, sin micrófono);
@@ -305,6 +266,23 @@ export function WordDrill({
   const [recallOutcome, setRecallOutcome] = useState<DrillRecallAttempt | null>(
     null,
   );
+  // V3.39: estado del paso Write (frase propia con la palabra objetivo; la
+  // puntuación es del servidor: unidad alineada + longitud mínima).
+  const [writeAnswer, setWriteAnswer] = useState("");
+  const [writeOutcome, setWriteOutcome] = useState<DrillWriteAttempt | null>(
+    null,
+  );
+  // Instante en que la consigna de escritura quedó visible (latencia
+  // observacional; opcional, como en Recall).
+  const writeShownAtRef = useRef<number | null>(null);
+  // V3.40: estado del paso Transfer (consigna de contexto NUEVO + producción
+  // propia; la puntuación es del servidor y el `context_id` viaja al ledger).
+  const [transfer, setTransfer] = useState<DrillTransferContext | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferAnswer, setTransferAnswer] = useState("");
+  const [transferOutcome, setTransferOutcome] =
+    useState<DrillTransferAttempt | null>(null);
+  const transferShownAtRef = useRef<number | null>(null);
   // V3.36: instante en que el cue de Recall quedó visible. La latencia
   // (cue → envío) se manda como `response_time_ms` del evento de evidencia; es
   // observacional (no cambia la puntuación) y opcional (sin cue no hay medida).
@@ -386,6 +364,26 @@ export function WordDrill({
       );
   }, [userId, word, t, loadRecall]);
 
+  /** Carga la consigna del paso Transfer (V3.40): contexto NUEVO elegido por el
+   * servidor entre los que el ítem aún no usó. Si no hay consigna
+   * (`available=false`), degrada a Sentence sin romper la escalera. */
+  const loadTransfer = useCallback(() => {
+    setTransferError(null);
+    setTransferAnswer("");
+    setTransferOutcome(null);
+    transferShownAtRef.current = null;
+    getDrillTransferContext(userId, word)
+      .then((ctx) => {
+        setTransfer(ctx);
+        transferShownAtRef.current = ctx.available ? Date.now() : null;
+      })
+      .catch((e) =>
+        setTransferError(
+          t("dictionary.drill.error").concat((e as Error).message),
+        ),
+      );
+  }, [userId, word, t]);
+
   // V3.33.1 / V3.35: el drill arranca en el peldaño pedido (`initialStep`,
   // Recognition por defecto) y limpia el intento anterior al montar o cambiar
   // de palabra o de peldaño inicial.
@@ -397,14 +395,26 @@ export function WordDrill({
     setError(null);
     setRecognition(null);
     setRecall(null);
+    setWriteAnswer("");
+    setWriteOutcome(null);
+    writeShownAtRef.current = initialStep === "write" ? Date.now() : null;
+    setTransfer(null);
+    setTransferAnswer("");
+    setTransferOutcome(null);
+    transferShownAtRef.current = initialStep === "transfer" ? Date.now() : null;
     if (initialStep === "recall") {
       loadRecall();
     } else if (initialStep === "sentence") {
       loadSentence();
-    } else {
+    } else if (initialStep === "transfer") {
+      // V3.40: el paso Transfer sí carga consigna (el contexto nuevo).
+      loadTransfer();
+    } else if (initialStep !== "write") {
+      // Los pasos Write (V3.39) no tienen contenido que cargar: la consigna es
+      // la propia palabra objetivo (ya visible) y la puntuación es del servidor.
       loadRecognition();
     }
-  }, [loadRecognition, loadRecall, loadSentence, initialStep]);
+  }, [loadRecognition, loadRecall, loadSentence, loadTransfer, initialStep]);
 
   function chooseStep(next: DrillStep) {
     if (next === step || recording || processing) return;
@@ -421,6 +431,21 @@ export function WordDrill({
     if (next === "recall") {
       // V3.34: cada entrada en Recall pide el cue (determinista en servidor).
       loadRecall();
+      setStep(next);
+      return;
+    }
+    if (next === "write") {
+      // V3.39: cada entrada reinicia el intento y arranca el reloj de latencia.
+      setWriteAnswer("");
+      setWriteOutcome(null);
+      writeShownAtRef.current = Date.now();
+      setStep(next);
+      return;
+    }
+    if (next === "transfer") {
+      // V3.40: cada entrada pide una consigna de contexto nuevo (determinista
+      // en servidor según los contextos ya usados) y reinicia el intento.
+      loadTransfer();
       setStep(next);
       return;
     }
@@ -468,6 +493,54 @@ export function WordDrill({
         recall.cue_kind || undefined,
       );
       setRecallOutcome(outcome);
+    } catch (e) {
+      setError(t("dictionary.drill.error").concat((e as Error).message));
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function submitWrite() {
+    if (!writeAnswer.trim() || writeOutcome !== null) return;
+    setProcessing(true);
+    setError(null);
+    try {
+      const shownAt = writeShownAtRef.current;
+      const responseTimeMs =
+        shownAt === null ? undefined : Math.max(0, Date.now() - shownAt);
+      const outcome = await submitDrillWriteAttempt(
+        userId,
+        word,
+        writeAnswer,
+        responseTimeMs,
+      );
+      setWriteOutcome(outcome);
+      if (outcome.passed) onProduced();
+    } catch (e) {
+      setError(t("dictionary.drill.error").concat((e as Error).message));
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function submitTransfer() {
+    if (!transfer || !transfer.available) return;
+    if (!transferAnswer.trim() || transferOutcome !== null) return;
+    setProcessing(true);
+    setError(null);
+    try {
+      const shownAt = transferShownAtRef.current;
+      const responseTimeMs =
+        shownAt === null ? undefined : Math.max(0, Date.now() - shownAt);
+      const outcome = await submitDrillTransferAttempt(
+        userId,
+        word,
+        transferAnswer,
+        transfer.context_id,
+        responseTimeMs,
+      );
+      setTransferOutcome(outcome);
+      if (outcome.passed) onProduced();
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));
     } finally {
@@ -573,7 +646,7 @@ export function WordDrill({
         aria-label={t("dictionary.drill.steps")}
         className="flex w-fit items-center gap-1 rounded-md bg-secondary p-1"
       >
-        {(["recognition", "recall", "sentence"] as const).map((option) => (
+        {DRILL_STEPS.map((option) => (
           <button
             key={option}
             type="button"
@@ -587,62 +660,19 @@ export function WordDrill({
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {option === "recognition"
-              ? t("dictionary.drill.stepRecognition")
-              : option === "recall"
-                ? t("dictionary.drill.stepRecall")
-                : t("dictionary.drill.stepSentence")}
+            {t(STEP_LABEL_KEY[option])}
           </button>
         ))}
       </div>
 
       {step === "recognition" ? (
-        recognition ? (
-          recognition.available ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs text-muted-foreground">
-                {t("dictionary.drill.recognitionPrompt")}
-              </p>
-              <ul
-                role="group"
-                aria-label={t("dictionary.drill.recognitionPrompt")}
-                className="flex flex-col gap-1.5"
-              >
-                {recognition.options.map((option, i) => (
-                  <li key={`${i}-${option}`}>
-                    <button
-                      type="button"
-                      disabled={processing || recognitionOutcome !== null}
-                      onClick={() => setRecognitionSelected(i)}
-                      aria-pressed={recognitionSelected === i}
-                      className={cn(
-                        "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:opacity-60",
-                        recognitionSelected === i
-                          ? "border-transparent bg-primary text-primary-foreground"
-                          : "border-border bg-secondary text-secondary-foreground hover:border-primary/50 hover:text-foreground",
-                      )}
-                    >
-                      {option}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {t("dictionary.drill.recognitionUnavailable")}
-            </p>
-          )
-        ) : recognitionError ? (
-          <p className="text-xs text-destructive" role="alert">
-            {recognitionError}
-          </p>
-        ) : (
-          <Loader2
-            className="size-4 animate-spin text-muted-foreground"
-            aria-hidden="true"
-          />
-        )
+        <RecognitionStep
+          question={recognition}
+          error={recognitionError}
+          selected={recognitionSelected}
+          onSelect={setRecognitionSelected}
+          disabled={processing || recognitionOutcome !== null}
+        />
       ) : step === "recall" ? (
         <RecallStep
           prompt={recall}
@@ -652,6 +682,33 @@ export function WordDrill({
           outcome={recallOutcome}
           processing={processing}
           onSubmit={() => void submitRecall()}
+        />
+      ) : step === "write" ? (
+        <ProductionTextarea
+          prompt={t("dictionary.drill.writePrompt").replace("{word}", word)}
+          value={writeAnswer}
+          onValueChange={setWriteAnswer}
+          disabled={processing || writeOutcome !== null}
+          inputLabel={t("dictionary.drill.writeInputLabel")}
+          placeholder={t("dictionary.drill.writePlaceholder")}
+          minWordsNote={t("dictionary.drill.writeMinWords").replace(
+            "{count}",
+            String(WRITE_MIN_WORDS),
+          )}
+        />
+      ) : step === "transfer" ? (
+        <TransferStep
+          context={transfer}
+          error={transferError}
+          answer={transferAnswer}
+          onAnswerChange={setTransferAnswer}
+          disabled={processing || transferOutcome !== null}
+          minWordsNote={t("dictionary.drill.writeMinWords").replace(
+            "{count}",
+            String(WRITE_MIN_WORDS),
+          )}
+          inputLabel={t("dictionary.drill.transferInputLabel")}
+          placeholder={t("dictionary.drill.transferPlaceholder")}
         />
       ) : sentence ? (
         <div className="flex flex-col gap-2">
@@ -711,7 +768,49 @@ export function WordDrill({
             {t("dictionary.drill.recognitionCheck")}
           </motion.button>
         </div>
-      ) : step === "recall" ? null : (
+      ) : step === "recall" ? null : step === "write" ? (
+        <div className="flex items-center gap-3">
+          <motion.button
+            type="button"
+            onClick={() => void submitWrite()}
+            disabled={!writeAnswer.trim() || processing || writeOutcome !== null}
+            aria-label={t("dictionary.drill.writeCheck")}
+            whileTap={processing ? undefined : { scale: 0.96 }}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            {processing ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Check className="size-4" aria-hidden="true" />
+            )}
+            {t("dictionary.drill.writeCheck")}
+          </motion.button>
+        </div>
+      ) : step === "transfer" ? (
+        <div className="flex items-center gap-3">
+          <motion.button
+            type="button"
+            onClick={() => void submitTransfer()}
+            disabled={
+              !transfer ||
+              !transfer.available ||
+              !transferAnswer.trim() ||
+              processing ||
+              transferOutcome !== null
+            }
+            aria-label={t("dictionary.drill.transferCheck")}
+            whileTap={processing ? undefined : { scale: 0.96 }}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            {processing ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Check className="size-4" aria-hidden="true" />
+            )}
+            {t("dictionary.drill.transferCheck")}
+          </motion.button>
+        </div>
+      ) : (
         <div className="flex items-center gap-3">
           <motion.button
             type="button"
@@ -822,6 +921,61 @@ export function WordDrill({
                 "{expected}",
                 recallOutcome.expected || "—",
               )}
+        </div>
+      )}
+
+      {/* V3.39: feedback del paso Write. El acierto acredita la modalidad
+          escrita (cierra el hueco del motor de tarea óptima); el fallo explica
+          qué faltó (palabra objetivo / longitud) sin declarar dominio. */}
+      {step === "write" && writeOutcome && (
+        <div
+          className={cn(
+            "rounded-md px-3 py-2 text-sm",
+            writeOutcome.passed
+              ? "bg-success/10 text-success"
+              : "bg-warning/10 text-warning",
+          )}
+          role="status"
+        >
+          {writeOutcome.passed
+            ? t("dictionary.drill.writePassed")
+            : writeOutcome.used_word
+              ? t("dictionary.drill.writeTooShort").replace(
+                  "{count}",
+                  String(WRITE_MIN_WORDS),
+                )
+              : t("dictionary.drill.writeMissingWord").replace(
+                  "{word}",
+                  word,
+                )}
+        </div>
+      )}
+
+      {/* V3.40: feedback del paso Transfer. El acierto acredita
+          `spontaneous_use` en un contexto NUEVO (transferencia real cuando se
+          logra en >= 2 contextos); el fallo explica qué faltó sin declarar
+          dominio. */}
+      {step === "transfer" && transferOutcome && (
+        <div
+          className={cn(
+            "rounded-md px-3 py-2 text-sm",
+            transferOutcome.passed
+              ? "bg-success/10 text-success"
+              : "bg-warning/10 text-warning",
+          )}
+          role="status"
+        >
+          {transferOutcome.passed
+            ? t("dictionary.drill.transferPassed")
+            : transferOutcome.used_word
+              ? t("dictionary.drill.writeTooShort").replace(
+                  "{count}",
+                  String(WRITE_MIN_WORDS),
+                )
+              : t("dictionary.drill.writeMissingWord").replace(
+                  "{word}",
+                  word,
+                )}
         </div>
       )}
     </div>

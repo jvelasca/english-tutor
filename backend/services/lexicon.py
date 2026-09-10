@@ -34,11 +34,19 @@ sigue exponiendo `next_review_days` como estimación ligera del léxico.
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 
 from services import forgetting, fsrs, mastery, planner
 from services.curriculum import CEFR_ORDER
-from services.evidence import automatic_skills, is_automatic
+from services.evidence import (
+    CONTEXT_TRANSFER_MIN,
+    LEXICAL_SKILLS,
+    WRITE_ERROR_TYPES,
+    automatic_skills,
+    is_automatic,
+)
+from services.phonetics import unit_produced
 from services.recall import RECALL_CUES, next_recall_rung, resolve_recall_cue
 
 # Mínimos de producción espaciada para considerar una palabra dominada
@@ -375,7 +383,85 @@ def next_review_days(row: dict) -> int:
 # V3.35 (Longitudinal Learning Evidence): actividades de repaso del léxico. La
 # cola de repaso (`GET /api/learning/review`) propone QUÉ hacer con una palabra
 # vencida, en la escalera del drill: reconocer → recuperar → producir.
-REVIEW_ACTIVITIES: tuple[str, ...] = ("recognition", "recall", "sentence")
+# V3.39 (Fase 3): se añade `write`, la actividad que cierra la modalidad
+# `written_production` (producción escrita propia, sin modelo que repetir).
+# V3.40 (Fase 4): se añade `transfer`, la actividad que cierra `spontaneous_use`
+# (usar la unidad en un contexto NUEVO, no solo repetirla con un modelo).
+REVIEW_ACTIVITIES: tuple[str, ...] = (
+    "recognition",
+    "recall",
+    "sentence",
+    "write",
+    "transfer",
+)
+
+# Longitud mínima (en palabras) de una producción PROPIA (escritura o
+# transferencia). Declarado y calibrable: por debajo, el intento es la palabra
+# suelta con relleno y no una producción.
+WRITE_MIN_WORDS = 4
+
+
+def _score_production_text(word: str, text: str, min_words: int) -> dict:
+    """Puntúa una producción textual PROPIA con la unidad objetivo (V3.40, pura).
+
+    Criterio determinista y sin LLM (premisa 21), compartido por la escritura
+    (`write`) y la transferencia (`transfer`) para que la acreditación sea la
+    MISMA en ambas:
+
+    - `used_word` — la unidad objetivo quedó alineada en el texto (mismo
+      `unit_produced` que acredita la producción oral: un tokenizador
+      normalizado único para todas las modalidades);
+    - `word_count` — palabras del texto (tokens alfabéticos);
+    - `passed` — `used_word` AND `word_count >= min_words`;
+    - `error_type` — taxonomía observacional `WRITE_ERROR_TYPES`.
+
+    NO juzga corrección gramatical: no hay modelo de lengua local fiable y un
+    falso negativo contaminaría el modelo de alumno. Acredita PRODUCCIÓN con la
+    palabra, que es lo que cierran ambas modalidades.
+    """
+    written = (text or "").strip()
+    count = len(re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", written))
+    used = bool(written) and unit_produced(word, written)
+    passed = bool(used and count >= min_words)
+    if passed:
+        error_type = "correct"
+    elif not written:
+        error_type = "empty"
+    elif not used:
+        error_type = "missing_target"
+    else:
+        error_type = "too_short"
+    if error_type not in WRITE_ERROR_TYPES:  # paridad defensiva con la taxonomía
+        error_type = ""
+    return {
+        "used_word": used,
+        "word_count": count,
+        "passed": passed,
+        "error_type": error_type,
+    }
+
+
+def score_write_attempt(word: str, text: str) -> dict:
+    """Puntúa la actividad de ESCRITURA propia del drill (V3.39, pura).
+
+    El alumno escribe una frase SUYA que use la palabra objetivo: es la
+    producción con menos andamiaje de la escalera de escritura (la palabra se
+    muestra, la frase no). Acredita la modalidad `written_production`. Delegación
+    en `_score_production_text` con `WRITE_MIN_WORDS`. Nunca lanza.
+    """
+    return _score_production_text(word, text, WRITE_MIN_WORDS)
+
+
+def score_transfer_attempt(word: str, text: str) -> dict:
+    """Puntúa la actividad de TRANSFERENCIA a un contexto nuevo (V3.40, pura).
+
+    El alumno usa la unidad en un contexto NUEVO con una consigna abierta (p. ej.
+    «cuenta algo de tu día usando …»). Misma acreditación determinista que la
+    escritura (`_score_production_text`) pero modalidad `spontaneous_use`: lo que
+    se demuestra es el uso espontáneo, no la repetición ni la escritura guiada.
+    Nunca lanza.
+    """
+    return _score_production_text(word, text, WRITE_MIN_WORDS)
 
 
 def recommend_review_activity(
@@ -412,6 +498,13 @@ def recommend_review_activity(
       modalidad de producción (segmentación de V3.38) → `sentence`;
     - `slow_recall` — aciertos medidos pero aún lentos → `recall`.
 
+    V3.39 (Fase 3, motor de tarea óptima): la decisión dirigida por evidencia se
+    delega en `services.planner.select_task`, la ÚNICA fuente de verdad, que
+    separa "¿qué skill limita?" de "¿qué ítem primero?" (prioridad, que se
+    calcula en `review_queue_item`). La novedad funcional es que el hueco de
+    escritura (`spoken ✓ / written ✗`) pasa a ser accionable: la modalidad
+    `written_production` se cierra con la actividad `write`.
+
     Nota de diseño: NO se usa `item_recall` para decidir "reconocimiento débil"
     porque esa probabilidad es función de la PRODUCCIÓN (curva de olvido sobre
     `production_count`), no del reconocimiento: un ítem solo leído/oído tendría
@@ -427,9 +520,11 @@ def recommend_review_activity(
         return {"activity": "recall", "reason": "no_recall_evidence"}
     if matrix.get("production_gap"):
         return {"activity": "sentence", "reason": "production_gap"}
-    planned = planner.evidence_reason(matrix, evidence)
-    if planned:
-        return {"activity": planner.ACTIVITY_FOR_REASON[planned], "reason": planned}
+    planned = planner.select_task(
+        matrix, evidence, planner.planned_signals(evidence, matrix)
+    )
+    if planned["activity"]:
+        return {"activity": planned["activity"], "reason": planned["reason"]}
     if evidence is not None and is_automatic(evidence):
         return {"activity": "recall", "reason": "automatic_maintenance"}
     return {"activity": "recall", "reason": "maintenance"}
@@ -442,6 +537,7 @@ def review_queue_item(
     now: str = "",
     evidence: dict | None = None,
     available_cues: object | None = None,
+    unit_surfaces: list[str] | None = None,
 ) -> dict:
     """Ítem de la cola de repaso lexica (V3.35), pura y determinista.
 
@@ -469,6 +565,22 @@ def review_queue_item(
     - `why` — explicación legible (inglés) de la recomendación;
     - `automatic_skills` — modalidades en las que el ítem es automático
       (P1-03: la automaticidad deja de ser un booleano global).
+
+    V3.39 (Fase 3) añade, aditivos:
+
+    - `limiting_skill` — modalidad con mayor prioridad (`planner.limiting_skill`),
+      el "qué limita" de la tarea óptima;
+    - `task` — la DECISIÓN de tarea (`planner.select_task`): `{skill, activity,
+      reason, support_level}`. Cuando la evidencia no dirige nada, `skill` es la
+      modalidad limitante y `activity`/`reason` son los de la escalera, de modo
+      que la cola siempre expone la tarea con su apoyo declarado.
+
+    V3.40 (Fase 4) añade, aditivos:
+
+    - `unit_surfaces` — formas superficiales de la misma `lexical_unit` (el
+      llamador las aporta; el gobierno del estado es de la unidad);
+    - `transfer` / `success_contexts` — transferencia contextual demostrada
+      (éxito en >= 2 contextos distintos) y los contextos con éxito.
     """
     matrix = item_competence_matrix(row)
     summary = evidence if evidence is not None else {}
@@ -515,8 +627,44 @@ def review_queue_item(
         "priority": planner.priority_score(signals),
         "signals": signals,
         "why": planner.explain_priority(signals, recommendation["reason"]),
+        # V3.39 (Fase 3): decisión de tarea óptima (skill limitante + actividad
+        # + apoyo declarado). Aditivo: `activity`/`reason` conservan su
+        # semántica y `task` la explica.
+        "limiting_skill": planner.limiting_skill(signals),
+        "task": _task_decision(matrix, summary, signals, recommendation),
         "competence": matrix,
+        # V3.40 (Fase 4): estado a nivel de UNIDAD (formas hermanas) y
+        # transferencia contextual. Aditivos: el drill sigue practicando `word`.
+        "unit_surfaces": list(unit_surfaces or [row.get("word") or ""]),
+        "transfer": planner.has_contextual_transfer(summary),
+        "success_contexts": list(summary.get("success_contexts") or []),
         "evidence": evidence if evidence is not None else {},
+    }
+
+
+def _task_decision(
+    matrix: dict,
+    evidence: dict,
+    signals: dict,
+    recommendation: dict,
+) -> dict:
+    """Decisión de tarea expuesta en la cola (V3.39, puro).
+
+    Si la evidencia dirige la tarea (`planner.select_task`), esa es la decisión;
+    si no, la modalidad limitante con la actividad y la razón de la escalera. El
+    `support_level` se declara siempre a partir de la actividad
+    (`planner.ACTIVITY_SUPPORT_LEVEL`), para que el cliente sepa con cuánto
+    andamiaje se espera el intento.
+    """
+    planned = planner.select_task(matrix, evidence, signals)
+    if planned["activity"]:
+        return planned
+    activity = recommendation.get("activity") or ""
+    return {
+        "skill": planner.limiting_skill(signals),
+        "activity": activity,
+        "reason": recommendation.get("reason") or "",
+        "support_level": planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
     }
 
 
@@ -1294,3 +1442,116 @@ def summary_units(rows: list[dict], now: str = "") -> dict:
         "by_cefr": [{"cefr": c, "count": n} for c, n in ordered],
         **competence,
     }
+
+
+# V3.40 (Fase 4, P1-04 de la auditoría de V3.38.1): agrega el estado PEDAGÓGICO
+# (la evidencia) por `lexical_unit`, no solo por forma superficial. `go/went/
+# gone/going` dejan de ser cuatro estados independientes cuando el planner
+# decide: la unidad es la que sabe o no sabe, y sus formas son sus pruebas.
+#
+# Solo se SUMAN los contadores (volumen, días, modalidades, errores) y se
+# recalculan las ratios: es un roll-up informativo y determinista, no una
+# segunda definición de automaticidad (`automatic`/`automatic_skills` se OR-ean
+# de las formas, que es lo que ya exponía `automatic_skills` por forma).
+_UNIT_EVIDENCE_SUM_KEYS: tuple[str, ...] = (
+    "attempts",
+    "successes",
+    "distinct_success_days",
+    "independent_successes",
+    "independent_success_days",
+)
+_UNIT_EVIDENCE_SUM_MAPS: tuple[str, ...] = (
+    "error_types",
+    "skill_successes",
+    "skill_success_days",
+    "skill_independent_successes",
+    "skill_independent_days",
+    "skill_attempts",
+)
+
+
+def unit_evidence(
+    rows: list[dict],
+    evidence_by_word: dict | None = None,
+) -> list[dict]:
+    """Evidencia agregada por `lexical_unit` (V3.40, pura y determinista).
+
+    Devuelve una entrada por unidad con las formas superficiales que la componen
+    y el roll-up de su evidencia:
+
+    - contadores sumados (`attempts`, `successes`, `independent_successes`, …);
+    - mapas sumados por modalidad y tipo de error;
+    - `success_rate` RECALCULADA del total (nunca media de medias);
+    - `automatic` / `automatic_skills` unidos de las formas (si cualquier forma
+      lo es, la unidad da esa modalidad por consolidada);
+    - `success_contexts` unidos y `transfer` (éxito en >= 2 contextos, contando
+      los contextos de todas las formas).
+
+    Es la pieza que permite que el estado pedagógico esté gobernado por la
+    UNIDAD (irregulares, phrasal verbs, collocations, chunks) sin cambiar la
+    evidencia por forma: cada intento sigue registrando su `surface_form`.
+    Orden determinista por unidad. `evidence_by_word` acepta el mapa
+    `{word: resumen}` del repositorio; sin él solo se exponen las formas.
+    """
+    evidence_map = evidence_by_word if isinstance(evidence_by_word, dict) else {}
+    by_unit: dict[str, list[str]] = {}
+    for row in rows:
+        unit = lexical_unit(row)
+        word = (row.get("word") or "").strip()
+        if not unit or not word:
+            continue
+        forms = by_unit.setdefault(unit, [])
+        if word not in forms:
+            forms.append(word)
+    result: list[dict] = []
+    for unit in sorted(by_unit):
+        forms = sorted(by_unit[unit])
+        totals: dict[str, int] = dict.fromkeys(_UNIT_EVIDENCE_SUM_KEYS, 0)
+        maps: dict[str, dict[str, int]] = {
+            key: {} for key in _UNIT_EVIDENCE_SUM_MAPS
+        }
+        automatic = False
+        automatic_skills: list[str] = []
+        success_contexts: set[str] = set()
+        for word in forms:
+            summary = evidence_map.get(word)
+            if not isinstance(summary, dict):
+                continue
+            for key in _UNIT_EVIDENCE_SUM_KEYS:
+                totals[key] += _int(summary.get(key))
+            for key in _UNIT_EVIDENCE_SUM_MAPS:
+                bucket = summary.get(key)
+                if not isinstance(bucket, dict):
+                    continue
+                for name, value in bucket.items():
+                    maps[key][str(name)] = maps[key].get(str(name), 0) + _int(value)
+            if summary.get("automatic") or summary.get("automatic_skills"):
+                automatic = True
+            for skill in summary.get("automatic_skills") or ():
+                if skill not in automatic_skills:
+                    automatic_skills.append(str(skill))
+            for context in summary.get("success_contexts") or ():
+                text = str(context or "").strip()
+                if text:
+                    success_contexts.add(text)
+        attempts = totals["attempts"]
+        successes = totals["successes"]
+        result.append(
+            {
+                "lexical_unit": unit,
+                "surfaces": forms,
+                "surface_count": len(forms),
+                **totals,
+                "success_rate": (
+                    round(successes / attempts, 4) if attempts else 0.0
+                ),
+                **maps,
+                "automatic": automatic,
+                "automatic_skills": [
+                    skill for skill in LEXICAL_SKILLS if skill in automatic_skills
+                ],
+                "success_contexts": sorted(success_contexts),
+                "transfer": len(success_contexts) >= CONTEXT_TRANSFER_MIN,
+            }
+        )
+    return result

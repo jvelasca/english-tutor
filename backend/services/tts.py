@@ -37,6 +37,10 @@ VOICE_LABELS: dict[str, str] = {
     "en_GB-northern_english_male-medium": "Northern English · Male",
     "en_GB-southern_english_female-medium": "Southern English · Female",
     "en_GB-jenny_dioco-medium": "British English · Jenny (dioco)",
+    # V3.39 (Fase 2, Traductor): voces de español del catálogo descargable.
+    "es_ES-davefx-medium": "Español (España) · DaveFX",
+    "es_ES-sharvard-medium": "Español (España) · Sharvard",
+    "es_MX-ald-medium": "Español (México) · Ald",
 }
 
 _lock = threading.Lock()
@@ -88,19 +92,46 @@ def _fallback_voice() -> str:
     return DEFAULT_VOICE
 
 
-def resolve_voice(prefs: dict[str, str] | None) -> str:
-    """Resuelve la voz preferida de un usuario frente a lo instalado.
+def voice_language(voice_id: str) -> str:
+    """Código de idioma de un id de voz Piper: `"en_US-lessac-medium"` → `"en"`.
 
-    Función pura: `prefs["tts_voice"]` si está instalada; si no hay preferencia
-    o no está disponible, la voz por defecto utilizable (default instalado o, si
-    el default no está, la primera voz instalada). Nunca devuelve una voz no
-    instalada salvo que no haya ninguna instalada (el sistema quedará en 503
-    hasta instalar una).
+    El locale va antes del primer guion (`en_US`, `es_MX`) y el idioma antes del
+    guion bajo. Función pura, tolerante a ids inesperados.
     """
+    locale = voice_id.split("-", 1)[0]
+    return locale.split("_", 1)[0].lower()
+
+
+def resolve_voice(prefs: dict[str, str] | None, language: str = "en") -> str:
+    """Resuelve la voz preferida de un usuario frente a lo instalado y al idioma.
+
+    Función pura. Prioridad (V3.39, Fase 2):
+    1. `prefs["tts_voice"]` si está instalada Y es del idioma pedido;
+    2. la voz por defecto del sistema si es de ese idioma;
+    3. la primera voz instalada de ese idioma;
+    4. fallback global (default instalado o la primera instalada) — con un aviso
+       implícito: si no hay ninguna voz del idioma, se sintetizará con otra, que
+       es la degradación menos mala (nunca se devuelve una voz no instalada salvo
+       que no haya ninguna, en cuyo caso el sistema quedará en 503).
+
+    Con `language="en"` el comportamiento es el histórico (la preferencia del
+    usuario manda y si no está se usa la voz por defecto o la primera instalada).
+    """
+    lang = (language or "en").strip().lower()[:2]
+    installed = list_voices()
     if prefs:
         preferred = prefs.get("tts_voice")
-        if preferred and preferred in list_voices():
+        if (
+            preferred
+            and preferred in installed
+            and voice_language(preferred) == lang
+        ):
             return preferred
+    same_language = [v for v in installed if voice_language(v) == lang]
+    if DEFAULT_VOICE in same_language:
+        return DEFAULT_VOICE
+    if same_language:
+        return same_language[0]
     return _fallback_voice()
 
 

@@ -39,7 +39,21 @@ const ACTIVITY_TONE: Record<ReviewActivity, string> = {
   recognition: "border-transparent bg-primary/15 text-primary",
   recall: "border-transparent bg-warning/15 text-warning",
   sentence: "border-transparent bg-success/15 text-success",
+  // V3.39: la actividad de escritura es producción con menos andamiaje.
+  write: "border-transparent bg-success/15 text-success",
+  // V3.40: la transferencia es producción espontánea (máximo andamiaje cero).
+  transfer: "border-transparent bg-success/15 text-success",
 };
+
+/** Actividades en las que la palabra es el RECURSO de la tarea (se muestra);
+ * en Recall/Sentence es la DIANA (se oculta hasta el intento). */
+function showsWord(activity: ReviewActivity): boolean {
+  return (
+    activity === "recognition" ||
+    activity === "write" ||
+    activity === "transfer"
+  );
+}
 
 interface ReviewQueueSectionProps {
   userId: string;
@@ -120,7 +134,7 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    {entry.activity === "recognition" ? (
+                    {showsWord(entry.activity) ? (
                       <span className="truncate text-sm font-medium" lang="en">
                         {entry.word}
                       </span>
@@ -145,7 +159,7 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
                   onClick={() => setActive(entry)}
                   aria-pressed={active?.word === entry.word}
                   aria-label={
-                    entry.activity === "recognition"
+                    showsWord(entry.activity)
                       ? t("dictionary.review.practice").replace(
                           "{word}",
                           entry.word,

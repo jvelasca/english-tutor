@@ -318,6 +318,25 @@ export interface LexicalEvidence {
   error_types: Record<string, number>;
   // Latencia media declarada (null si ningún evento la midió).
   mean_response_time_ms: number | null;
+  // V3.39 (Fase 3C): recencia y distribución de latencia (aditivos). Miran la
+  // VENTANA de eventos recientes, no todo el histórico: lo que importa es la
+  // confusión que sigue ocurriendo.
+  recent_attempts?: number;
+  recent_error_rate?: number;
+  recent_wrong_word?: number;
+  median_response_time_ms?: number | null;
+  p75_response_time_ms?: number | null;
+  p90_response_time_ms?: number | null;
+  recent_response_time_ms?: number | null;
+  latency_trend?: number | null;
+  // V3.40 (Fase 4): CONTEXTOS del ledger. `situation` es recuperación
+  // contextualizada; estos contadores son los que permiten demostrar la
+  // transferencia real (éxito en >= 2 contextos distintos).
+  contexts?: Record<string, { attempts: number; successes: number }>;
+  context_attempts?: number;
+  success_contexts?: string[];
+  home_context?: string;
+  transfer?: boolean;
 }
 
 export interface LexicalItem {
@@ -448,6 +467,42 @@ export interface DrillRecallAttempt {
   error_type?: string;
 }
 
+// V3.39 (Fase 3): actividad de escritura del drill. El alumno escribe una frase
+// PROPIA con la palabra objetivo; el servidor la puntúa (unidad alineada +
+// longitud mínima) y acredita la modalidad `written_production`, que cierra el
+// hueco `spoken ✓ / written ✗` del motor de tarea óptima.
+export interface DrillWriteAttempt {
+  word: string;
+  text: string;
+  used_word: boolean;
+  word_count: number;
+  passed: boolean;
+  // Taxonomía observacional: correct/empty/missing_target/too_short.
+  error_type?: string;
+}
+
+// V3.40 (Fase 4): actividad de TRANSFERENCIA. El alumno usa la unidad en un
+// contexto NUEVO (banco curado de `services.transfer`); el `context_id` es el
+// del ledger y es lo que permite demostrar la transferencia real (éxito en >= 2
+// contextos distintos). Cierra la modalidad `spontaneous_use`.
+export interface DrillTransferContext {
+  word: string;
+  context_id: string;
+  topic: string;
+  prompt: string;
+  available: boolean;
+}
+
+export interface DrillTransferAttempt {
+  word: string;
+  text: string;
+  context_id: string;
+  used_word: boolean;
+  word_count: number;
+  passed: boolean;
+  error_type?: string;
+}
+
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
 // SOLO lectura (D3): el backend no registra evidencia. `definition_source`
 // distingue contenido cacheado generado por el modelo local ("llm") de su
@@ -499,6 +554,13 @@ export interface DictionaryEntry {
   pos: string;
   definition: string | null;
   translation: string | null;
+  /**
+   * V3.39: dirección servida. En `es-en`, `word` es el término español buscado,
+   * `translation` es el equivalente INGLÉS y `alternatives` las otras
+   * traducciones encontradas en la inversa instantánea.
+   */
+  direction: "en-es" | "es-en";
+  alternatives: string[];
   /** V3.38: enunciado situacional (4.º peldaño de recall), con hueco `_____`. */
   situation?: string | null;
   example: DictionaryExample | null;
@@ -508,11 +570,16 @@ export interface DictionaryEntry {
 /** Cuerpo de la consulta al diccionario (V3.30): la palabra tal como la
  * escribe el alumno y una preferencia opcional de modelo local (mismo
  * contrato que `/api/translate`). El backend la normaliza (minúsculas, sin
- * puntuación circundante) y traduce una palabra vacía a 422. */
+ * puntuación circundante) y traduce una palabra vacía a 422. V3.39 añade la
+ * dirección (`en-es` por defecto). */
 export interface DictionaryLookupRequest {
   word: string;
   model?: string;
+  direction?: DictionaryDirection;
 }
+
+/** V3.39: dirección de búsqueda del diccionario de consulta. */
+export type DictionaryDirection = "en-es" | "es-en";
 
 export interface CefrBucket {
   cefr: string;
@@ -650,7 +717,22 @@ export interface LearningEvent {
 // V3.35 (Longitudinal Learning Evidence, P1-2): cola de repaso del léxico.
 // Separa el repaso espaciado (FSRS) del speaking micro-drill: cada ítem vencido
 // llega con la actividad recomendada por hueco de competencia.
-export type ReviewActivity = "recognition" | "recall" | "sentence";
+export type ReviewActivity =
+  | "recognition"
+  | "recall"
+  | "sentence"
+  | "write"
+  | "transfer";
+
+// V3.39 (Fase 3, motor de tarea óptima): la DECISIÓN de tarea del planner
+// (`services.planner.select_task`): qué modalidad limita, qué actividad la
+// cierra, por qué y con cuánto apoyo se espera el intento.
+export interface ReviewTask {
+  skill: string;
+  activity: ReviewActivity | "";
+  reason: string;
+  support_level: string;
+}
 
 export interface ReviewQueueItem {
   word: string;
@@ -674,14 +756,49 @@ export interface ReviewQueueItem {
   signals?: Record<string, unknown> | null;
   why?: string;
   automatic_skills?: string[];
+  // V3.39 (Fase 3): modalidad que limita y la tarea óptima que la cierra.
+  limiting_skill?: string;
+  task?: ReviewTask | null;
   competence?: LexicalCompetence | null;
+  // V3.40 (Fase 4): gobierno por unidad léxica. `unit_surfaces` son las formas
+  // hermanas (go/went/gone/going) y `transfer`/`success_contexts` la
+  // transferencia contextual demostrada.
+  unit_surfaces?: string[];
+  transfer?: boolean;
+  success_contexts?: string[];
   evidence?: LexicalEvidence | null;
+}
+
+// V3.40 (Fase 4): evidencia agregada por UNIDAD léxica (roll-up aditivo de las
+// formas superficiales que la componen).
+export interface ReviewUnitEvidence {
+  lexical_unit: string;
+  surfaces: string[];
+  surface_count: number;
+  attempts: number;
+  successes: number;
+  distinct_success_days: number;
+  independent_successes: number;
+  independent_success_days: number;
+  success_rate: number;
+  error_types: Record<string, number>;
+  skill_successes: Record<string, number>;
+  skill_success_days: Record<string, number>;
+  skill_independent_successes: Record<string, number>;
+  skill_independent_days: Record<string, number>;
+  skill_attempts: Record<string, number>;
+  automatic: boolean;
+  automatic_skills: string[];
+  success_contexts: string[];
+  transfer: boolean;
 }
 
 export interface ReviewQueue {
   due_count: number;
   items: ReviewQueueItem[];
   fsrs_version: string;
+  // V3.40 (Fase 4): roll-up por unidad (aditivo).
+  units?: ReviewUnitEvidence[];
 }
 
 export interface SeriesPoint {

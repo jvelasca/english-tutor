@@ -29,7 +29,7 @@ from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
 from services import fsrs, lexicon, recall
 from services.evidence import empty_summary as empty_evidence
-from services.example_sentences import example_for
+from services.example_sentences import example_for_many
 
 # Tope de ítems por defecto/ máximo de la cola de repaso (límite de PRESENTACIÓN).
 REVIEW_QUEUE_DEFAULT_LIMIT = 20
@@ -94,6 +94,17 @@ async def get_review_queue(
     )
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     by_word = {row["word"]: row for row in rows}
+    # V3.40 (Fase 4): formas superficiales por unidad léxica, para exponer en
+    # cada ítem las hermanas de su unidad (go/went/gone/going). Se calcula de las
+    # filas ya leídas: coste cero de IO.
+    surfaces_by_unit: dict[str, list[str]] = {}
+    for row in rows:
+        unit = lexicon.lexical_unit(row)
+        if not unit:
+            continue
+        forms = surfaces_by_unit.setdefault(unit, [])
+        if row["word"] not in forms:
+            forms.append(row["word"])
     # V3.35: historia longitudinal del ítem (una consulta agregada, sin N+1).
     evidence_by_word = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
@@ -115,6 +126,9 @@ async def get_review_queue(
             card,
             now=now_iso,
             evidence=evidence_by_word.get(row["word"]) or empty_evidence(),
+            unit_surfaces=surfaces_by_unit.get(
+                lexicon.lexical_unit(row) or "", None
+            ),
         )
         for row, card in candidates
     ]
@@ -142,12 +156,19 @@ async def get_review_queue(
                 now=now_iso,
                 evidence=evidence_by_word.get(row["word"]) or empty_evidence(),
                 available_cues=available_by_word.get(row["word"] or "", set()),
+                unit_surfaces=surfaces_by_unit.get(
+                    lexicon.lexical_unit(row) or "", None
+                ),
             )
         )
     return {
         "due_count": len(served_items),
         "items": served_items,
         "fsrs_version": fsrs.FSRS_VERSION,
+        # V3.40 (Fase 4): roll-up por unidad léxica (aditivo). Es el estado
+        # pedagógico que gobierna irregulares, phrasal verbs y chunks sin tocar
+        # la evidencia por forma (cada intento sigue siendo de su `surface_form`).
+        "units": lexicon.unit_evidence(rows, evidence_by_word),
     }
 
 
@@ -158,20 +179,22 @@ async def _available_recall_cues(words: list[str]) -> dict[str, set[str]]:
     qué peldaños puede servir el GET de recall para cada palabra. Es lo que
     `services.recall.resolve_recall_cue` necesita para no recomendar un peldaño
     sin contenido. Una sola lectura de la caché para todas las palabras.
+
+    V3.39 (Fase 3C): los ejemplos del peldaño `cloze` se resuelven con UNA sola
+    pasada al banco (`example_for_many`) en lugar de un lookup por palabra
+    (P2 de la auditoría).
     """
     unique = sorted({word for word in words if word})
     if not unique:
         return {}
     entries = await run_in_threadpool(dictionary_repo.list_entries)
+    examples = await run_in_threadpool(example_for_many, unique)
     available: dict[str, set[str]] = {}
     for word in unique:
+        example_all = examples.get(word)
         cues: set[str] = set()
         for cue in recall.RECALL_CUES:
-            example = (
-                await run_in_threadpool(example_for, word)
-                if cue == "cloze"
-                else None
-            )
+            example = example_all if cue == "cloze" else None
             if recall.recall_prompt_for(word, entries, cue=cue, example=example):
                 cues.add(cue)
         available[word] = cues

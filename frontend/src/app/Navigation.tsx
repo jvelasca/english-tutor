@@ -1,24 +1,27 @@
 import { Fragment } from "react";
-import { BookOpen, GraduationCap, House, Sparkles } from "lucide-react";
+import { BookOpen, GraduationCap, House, Languages, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useI18n } from "../hooks/useI18n";
 import { ROUTES, type Route } from "./routes";
 import { cn } from "@/lib/utils";
 
-/** Icono lucide de cada destino raíz (los 3 mundos + el diccionario auxiliar). */
+/** Icono lucide de cada destino raíz (3 mundos + diccionario y traductor). */
 const ROUTE_ICONS: Partial<Record<Route, LucideIcon>> = {
   home: House,
   course: GraduationCap,
   learn: Sparkles,
   dictionary: BookOpen,
+  // V3.39 (Fase 2): utilidad de traducción bidireccional ES↔EN.
+  translator: Languages,
 };
 
 /**
  * V3.38.1: el diccionario es un destino AUXILIAR, no un mundo del core. Se
  * marca visualmente con un separador (barra vertical en las píldoras de
  * escritorio, borde divisorio en la bottom-nav móvil) para que no compita con
- * Inicio / Formación / Aprender.
+ * Inicio / Formación / Aprender. V3.39 añade el Traductor al MISMO bloque
+ * auxiliar (tras el separador, junto al diccionario).
  */
 const DIVIDER_BEFORE: Route = "dictionary";
 
@@ -45,7 +48,7 @@ export function Navigation({
   if (variant === "bottom") {
     return (
       <nav
-        className={cn("grid w-full grid-cols-4", className)}
+        className={cn("grid w-full grid-cols-5", className)}
         aria-label={t("nav.aria")}
       >
         {ROUTES.map((r) => {

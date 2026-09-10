@@ -6,6 +6,7 @@ import {
   lookupDictionaryWord,
   submitDrillAttempt,
   submitDrillSentenceAttempt,
+  submitDrillWriteAttempt,
 } from "./vocabulary";
 
 function mockFetch(data: unknown) {
@@ -24,7 +25,7 @@ describe("vocabulary api", () => {
     expect(url).toBe("/api/vocabulary/lexicon?user_id=u1");
   });
 
-  it("lookupDictionaryWord hace POST a /dictionary con user_id y body {word}", async () => {
+  it("lookupDictionaryWord hace POST a /dictionary con user_id, body {word} y dirección", async () => {
     const fn = mockFetch({});
     await lookupDictionaryWord("u1", "travel");
     const [url, init] = fn.mock.calls[0];
@@ -33,7 +34,21 @@ describe("vocabulary api", () => {
     expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
       "application/json",
     );
-    expect(JSON.parse(init.body as string)).toEqual({ word: "travel" });
+    // V3.39: la dirección por defecto es EN→ES (contrato aditivo).
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "travel",
+      direction: "en-es",
+    });
+  });
+
+  it("lookupDictionaryWord envía la dirección inversa ES→EN", async () => {
+    const fn = mockFetch({});
+    await lookupDictionaryWord("u1", "casa", "es-en");
+    const [, init] = fn.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "casa",
+      direction: "es-en",
+    });
   });
 
   it("getDrillCandidates llama con user_id y limit", async () => {
@@ -80,5 +95,28 @@ describe("vocabulary api", () => {
     const form = init.body as FormData;
     expect(form.get("word")).toBe("travel");
     expect(form.get("file")).not.toBeNull();
+  });
+
+  it("submitDrillWriteAttempt envía la frase propia y la latencia (V3.39)", async () => {
+    const fn = mockFetch({
+      word: "travel",
+      used_word: true,
+      word_count: 7,
+      passed: true,
+    });
+    await submitDrillWriteAttempt(
+      "u1",
+      "travel",
+      "I usually travel by train in summer.",
+      4200,
+    );
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/drill/write-attempt?user_id=u1");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "travel",
+      text: "I usually travel by train in summer.",
+      response_time_ms: 4200,
+    });
   });
 });

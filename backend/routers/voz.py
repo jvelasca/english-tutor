@@ -38,15 +38,20 @@ async def tts(
     req: TTSRequest,
     user: dict | None = Depends(current_user_optional),
 ) -> Response:
-    """Sintetiza con la voz preferida del usuario (`user_id` opcional por query).
+    """Sintetiza con la voz del idioma pedido (`user_id` opcional por query).
 
-    Con `user_id` usa su voz guardada en Ajustes (si está instalada); sin usuario
-    (o sin preferencia) usa la voz por defecto del sistema.
+    Con `user_id` usa su voz guardada en Ajustes si está instalada Y es del
+    idioma de `req.language` (V3.39, Fase 2: el Traductor pide `es` para la
+    salida en español); sin usuario (o sin preferencia válida) usa la voz por
+    defecto del sistema para ese idioma o, si no hay ninguna, otra instalada.
     """
+    language = (req.language or "en").strip().lower()[:2] or "en"
     voice: str | None = None
     if user is not None:
         prefs = await settings_service.get_settings(user["id"])
-        voice = resolve_voice(prefs)
+        voice = resolve_voice(prefs, language)
+    else:
+        voice = resolve_voice(None, language)
     try:
         wav = await run_in_threadpool(synthesize_speech, req.text, 1.0, voice)
     except Exception:  # noqa: BLE001

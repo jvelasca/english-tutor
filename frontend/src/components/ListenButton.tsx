@@ -1,25 +1,31 @@
 import { useState } from "react";
 import { Loader2, Volume2 } from "lucide-react";
-import { speak } from "../api/voz";
+import { speak, type VoiceLanguage } from "../api/voz";
 import { cn } from "../lib/utils";
 
 interface ListenButtonProps {
-  /** Texto en inglés que se reproducirá con TTS. */
+  /** Texto que se reproducirá con TTS. */
   text: string;
   /** Etiqueta accesible / tooltip del botón. */
   label: string;
+  /** V3.39 (Fase 2): idioma de la síntesis; `"en"` por defecto (histórico). */
+  language?: VoiceLanguage;
+  /** V3.39 (Fase 2): perfil opcional para respetar su voz del idioma. */
+  userId?: string | null;
   className?: string;
   disabled?: boolean;
 }
 
 /**
- * Altavoz compacto (TTS) para escuchar una frase en inglés en pantallas de
- * práctica y resultados. Reutiliza `speak()` y muestra un spinner mientras
- * suena. Los fallos de voz son silenciosos: nunca bloquean el flujo.
+ * Altavoz compacto (TTS) para escuchar una frase en pantallas de práctica y
+ * resultados. Reutiliza `speak()` y muestra un spinner mientras suena. Los
+ * fallos de voz son silenciosos: nunca bloquean el flujo.
  */
 export function ListenButton({
   text,
   label,
+  language = "en",
+  userId,
   className,
   disabled,
 }: ListenButtonProps) {
@@ -30,7 +36,7 @@ export function ListenButton({
     if (!canPlay) return;
     setBusy(true);
     try {
-      await speak(text);
+      await speak(text, userId, language);
     } catch {
       /* TTS no disponible: se ignora, no rompe el resultado */
     } finally {

@@ -38,6 +38,8 @@ const DYNAMIC_KEY_PREFIXES: string[] = [
   "unitReview.state.", // UnitReviewPanel: t(`unitReview.state.${state}`)
   "skill.", // CourseScreen/UnitReviewPanel: t(`skill.${section|skill}`)
   "fsrs.whyReason.", // FsrsReviewPanel: t(`fsrs.whyReason.${explain.why}`)
+  // V3.39 (Fase 2): el placeholder del Traductor depende de la dirección.
+  "translator.placeholder.", // TranslatorScreen: t(`translator.placeholder.${direction}`)
 ];
 
 function walkTsFiles(dir: string): string[] {

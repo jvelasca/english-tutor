@@ -37,6 +37,8 @@ const COFFEE = {
   pos: "noun",
   definition: "A hot drink made from roasted coffee beans.",
   translation: "café",
+  direction: "en-es",
+  alternatives: [],
   example: {
     phrase: "I drink coffee every morning.",
     source: "pronunciation_corpus",
@@ -80,6 +82,8 @@ const NEBULA = {
   pos: "",
   definition: null,
   translation: null,
+  direction: "en-es",
+  alternatives: [],
   example: null,
   usage: { tracked: false, surface: null, unit: null },
 };
@@ -92,6 +96,8 @@ const GO_UNIT = {
   pos: "verb",
   definition: "to move or travel somewhere",
   translation: "ir",
+  direction: "en-es",
+  alternatives: [],
   example: null,
   usage: {
     tracked: true,
@@ -560,5 +566,132 @@ describe("DictionaryLookup · V3.33 Recognition (MCQ definición ↔ palabra)", 
     expect(
       await screen.findByText(/Not this one — the meaning is “café”/),
     ).toBeTruthy();
+  });
+});
+
+describe("DictionaryLookup · V3.39 diccionario reversible ES→EN", () => {
+  beforeEach(() => stubMediaRecorder());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const CASA_REVERSE = {
+    word: "casa",
+    kind: "word",
+    cefr: "A1",
+    definition_source: "llm",
+    pos: "noun",
+    definition: "A building where people live.",
+    translation: "house",
+    direction: "es-en",
+    alternatives: ["home", "place"],
+    example: null,
+    usage: {
+      tracked: true,
+      surface: {
+        status: "known",
+        mastery: 0.5,
+        recall: 0.7,
+        next_review_days: 4,
+        production_count: 1,
+        exposure_count: 2,
+        production_channels: ["speaking"],
+        competence: {
+          recognition: true,
+          production: true,
+          production_channels: ["speaking"],
+          transfer_contexts: 0,
+          transfer: false,
+          retention: false,
+          spaced_exposure: false,
+          spaced_production: false,
+          retrieval_successes: 1,
+          retrieval_days: 1,
+          production_gap: false,
+          transfer_gap: false,
+        },
+        last_activity_at: "2026-09-01T10:00:00Z",
+      },
+      unit: null,
+    },
+  };
+
+  const CASA_NO_EQUIVALENT = {
+    ...CASA_REVERSE,
+    definition_source: "none",
+    definition: null,
+    translation: null,
+    alternatives: [],
+    example: null,
+  };
+
+  it("conmutador: busca ES→EN, reetiqueta el resultado y lista alternativas", async () => {
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: CASA_REVERSE },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    // Por defecto EN→ES: la etiqueta de la traducción es «In Spanish».
+    fireEvent.click(screen.getByRole("button", { name: "Spanish → English" }));
+
+    fillAndSubmit("casa");
+
+    expect(await screen.findByText("A building where people live.")).toBeTruthy();
+    // El equivalente inglés llega como `translation` con la etiqueta inversa.
+    expect(screen.getByText("house")).toBeTruthy();
+    expect(screen.getByText("In English")).toBeTruthy();
+    expect(screen.queryByText("In Spanish")).toBeNull();
+    expect(screen.getByText("Other translations")).toBeTruthy();
+    expect(screen.getByText("home · place")).toBeTruthy();
+    // La petición viaja con la dirección inversa.
+    const body = JSON.parse(fn.mock.calls[0][1].body as string);
+    expect(body).toEqual({ word: "casa", direction: "es-en" });
+  });
+
+  it("sin equivalente inglés no ofrece practicar ni audio", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: CASA_NO_EQUIVALENT },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Spanish → English" }));
+    fillAndSubmit("casa");
+
+    expect(
+      await screen.findByText(/The dictionary content isn't available right now/),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Practice this word" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Hear the word" })).toBeNull();
+  });
+
+  it("en ES→EN el drill practica el equivalente inglés, no el término español", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: CASA_REVERSE },
+      {
+        url: "/api/vocabulary/drill/recognition",
+        data: {
+          word: "house",
+          available: true,
+          options: ["casa", "a vehicle", "a meal"],
+          question_id: "q-house-1",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Spanish → English" }));
+    fillAndSubmit("casa");
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Practice this word" }),
+    );
+
+    // La escalera arranca con la palabra INGLESA.
+    expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
+    const recognitionCall = (
+      globalThis.fetch as unknown as { mock: { calls: unknown[][] } }
+    ).mock.calls.find((call) => String(call[0]).includes("drill/recognition"));
+    expect(String(recognitionCall?.[0])).toContain("word=house");
   });
 });

@@ -54,6 +54,12 @@ const DictionaryScreen = lazy(() =>
     default: m.DictionaryScreen,
   })),
 );
+// V3.39 (Fase 2): destino auxiliar Traductor (ruta /traductor).
+const TranslatorScreen = lazy(() =>
+  import("../features/translator/TranslatorScreen").then((m) => ({
+    default: m.TranslatorScreen,
+  })),
+);
 
 interface WorkspaceProps {
   route: Route;
@@ -167,6 +173,10 @@ export function Workspace({
     // V3.38.1: el diccionario es un destino auxiliar propio, no una vista
     // incrustada en Vocabulary.
     content = <DictionaryScreen userId={currentUserId} />;
+  } else if (route === "translator") {
+    // V3.39 (Fase 2): el Traductor es una utilidad auxiliar (ES↔EN por voz o
+    // texto) que NO registra evidencia; es válida sin perfil.
+    content = <TranslatorScreen userId={currentUserId} />;
   } else if (route === "help") {
     content = <HelpScreen />;
   } else if (route === "learn") {

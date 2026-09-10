@@ -30,6 +30,7 @@ Puro y determinista: recibe filas ya agregadas o construidas por el repositorio.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 
 # Roles del ledger de eventos (V3.35). `evidence` = señal que puede acreditar
@@ -191,6 +192,18 @@ RECALL_ERROR_TYPES: tuple[str, ...] = (
     "multiple_word_error",
 )
 
+# V3.39 (Fase 3, actividad de escritura): taxonomía del intento de la actividad
+# `write`. Paralela a `RECALL_ERROR_TYPES` y también OBSERVACIONAL: distingue
+# "no usó la palabra objetivo" (`missing_target`, hueco real de producción) de
+# "frase demasiado corta para ser producción propia" (`too_short`), sin cambiar
+# la puntuación.
+WRITE_ERROR_TYPES: tuple[str, ...] = (
+    "correct",
+    "empty",
+    "missing_target",
+    "too_short",
+)
+
 # Longitud mínima de la forma esperada para admitir `orthographic_error`. Por
 # debajo, una diferencia de un carácter suele ser OTRA palabra (cat/cut, sun/son)
 # y no una errata: mejor no excusarla (clasificación conservadora).
@@ -232,6 +245,209 @@ def interval_days(previous_at: str, now: str) -> float | None:
     if previous is None or current is None:
         return None
     return round(max(0.0, (current - previous).total_seconds() / 86400.0), 4)
+
+
+# ---------------------------------------------------------------------------
+# V3.39 (Fase 3C, robustez de señales): RECENCIA y DISTRIBUCIÓN de latencia.
+#
+# El resumen de V3.38 medía todo el histórico: un `wrong_word` de hace cuarenta
+# repasos bloqueaba la automaticidad igual que uno de ayer, y la latencia era
+# una media única que ocultaba la cola lenta (un p90 de 15 s con mediana de 3 s
+# es un problema de fluidez que la media no muestra). Estas señales se calculan
+# con funciones PURAS reutilizadas por la capa SQL (`repositories.
+# evidence.summarize_by_target`), de modo que no exista un segundo dialecto.
+# ---------------------------------------------------------------------------
+
+# Nº de eventos más recientes que forman la VENTANA de recencia. Declarado y
+# calibrable: no es una ventana temporal (el alumno puede pasar semanas sin
+# practicar y su último repaso sigue siendo "reciente" en su propia cadena).
+RECENT_WINDOW_EVENTS = 10
+
+# V3.40 (Fase 4, transferencia contextual real): nº mínimo de contextos
+# DISTINTOS con al menos un éxito para declarar transferencia contextual. Un
+# éxito no acredita transferencia: usarla bien en el mismo contexto de siempre
+# es recuperación contextualizada, no transferencia (auditoría de V3.38.1).
+CONTEXT_TRANSFER_MIN = 2
+
+
+def _row_sort_key(row: dict) -> tuple[str, int]:
+    """Clave de orden cronológico de una fila del ledger (pura).
+
+    Por `(occurred_at, id)` y en TEXTO la fecha (las marcas ISO de la aplicación
+    ordenan lexicográficamente); el id se normaliza a entero (0 si falta o no es
+    numérico), de modo que dos eventos del mismo instante se desempatan por
+    orden de inserción y nunca mezclando int y str.
+    """
+    try:
+        ident = int(row.get("id") or 0)
+    except (TypeError, ValueError):
+        ident = 0
+    return (str(row.get("occurred_at") or ""), ident)
+
+
+def recent_events(
+    rows: list[dict], limit: int = RECENT_WINDOW_EVENTS
+) -> list[dict]:
+    """Últimos `limit` eventos del ítem, en orden cronológico (V3.39, pura).
+
+    Ordena una COPIA por `(occurred_at, id)`: nunca muta ni reordena la lista
+    del llamador (el orden de las filas recibidas sigue siendo el contrato de
+    `intervals`). Determinista ante empates y ante filas sin fecha.
+    """
+    if limit <= 0:
+        return []
+    ordered = sorted(rows, key=_row_sort_key)
+    return ordered[-limit:]
+
+
+def _percentile(ordered_values: list[float], pct: float) -> float | None:
+    """Percentil por RANGO MÁS CERCANO sobre valores YA ordenados (pura).
+
+    `pct` en 0..100. Es la definición que puede replicar SQL sin interpolación
+    (nearest-rank): `None` sin valores. Nunca lanza.
+    """
+    if not ordered_values:
+        return None
+    if pct <= 0:
+        return ordered_values[0]
+    if pct >= 100:
+        return ordered_values[-1]
+    rank = max(1, math.ceil(pct / 100.0 * len(ordered_values)))
+    return ordered_values[min(rank, len(ordered_values)) - 1]
+
+
+def _mean(values: list[float]) -> float | None:
+    """Media redondeada a 1 decimal (None sin valores)."""
+    if not values:
+        return None
+    return round(sum(values) / len(values), 1)
+
+
+def _latency_of(row: dict) -> float | None:
+    """Latencia medida de una fila (None si no se midió o no es numérica)."""
+    raw = row.get("response_time_ms")
+    if raw is None:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def recency_signals(
+    rows: list[dict], window: int = RECENT_WINDOW_EVENTS
+) -> dict:
+    """Señales de RECENCIA y DISTRIBUCIÓN de latencia (V3.39, pura).
+
+    Devuelve, sobre la ventana de los `window` eventos MÁS RECIENTES y sobre el
+    histórico de latencias:
+
+    - `recent_attempts` / `recent_error_rate` — intentos y tasa de fallo de la
+      ventana: distingue "le cuesta AHORA" de "le costaba";
+    - `recent_wrong_word` — confusión real (`wrong_word`) DENTRO de la ventana:
+      lo que `_has_grave_error` consulta para no bloquear la automaticidad con
+      un fallo ya corregido;
+    - `median_response_time_ms` / `p75_response_time_ms` /
+      `p90_response_time_ms` — distribución de la latencia medida (la media
+      sola oculta la cola lenta);
+    - `recent_response_time_ms` — media de la latencia medida en la ventana;
+    - `latency_trend` — `recent - histórico anterior` (positivo = se está
+      volviendo MÁS lento): la dirección de la fluidez, no solo su nivel.
+
+    Reutilizada tal cual por el resumen SQL (paridad por construcción). Nunca
+    lanza: filas incompletas se ignoran donde corresponda.
+    """
+    ordered_rows = sorted(rows, key=_row_sort_key)
+    if window > 0:
+        recent = ordered_rows[-window:]
+        older = ordered_rows[:-window]
+    else:
+        recent, older = [], ordered_rows
+    measured = [
+        value for value in (_latency_of(row) for row in rows) if value is not None
+    ]
+    ordered = sorted(measured)
+    recent_latencies = [
+        value for value in (_latency_of(row) for row in recent) if value is not None
+    ]
+    older_latencies = [
+        value for value in (_latency_of(row) for row in older) if value is not None
+    ]
+    recent_mean = _mean(recent_latencies)
+    older_mean = _mean(older_latencies)
+    recent_attempts = len(recent)
+    recent_failures = sum(1 for row in recent if not _truthy(row.get("success")))
+    recent_wrong_word = sum(
+        1
+        for row in recent
+        if (row.get("error_type") or "").strip().lower() == "wrong_word"
+    )
+    return {
+        "recent_attempts": recent_attempts,
+        "recent_error_rate": (
+            round(recent_failures / recent_attempts, 4) if recent_attempts else 0.0
+        ),
+        "recent_wrong_word": recent_wrong_word,
+        "median_response_time_ms": _percentile(ordered, 50),
+        "p75_response_time_ms": _percentile(ordered, 75),
+        "p90_response_time_ms": _percentile(ordered, 90),
+        "recent_response_time_ms": recent_mean,
+        "latency_trend": (
+            round(recent_mean - older_mean, 1)
+            if recent_mean is not None and older_mean is not None
+            else None
+        ),
+    }
+
+
+def context_signals(rows: list[dict]) -> dict:
+    """Señales de TRANSFERENCIA por CONTEXTO (V3.40, pura).
+
+    La auditoría de V3.38.1 recordó que `situation` (completar un hueco) es
+    recuperación CONTEXTUALIZADA, no transferencia: transferir es usar la unidad
+    en un contexto DISTINTO del de aprendizaje. Estas señales agrupan el ledger
+    por `context_id` para poder demostrarlo y para que el planner tenga una
+    tarea de transferencia que proponer.
+
+    Devuelve:
+
+    - `contexts` — `{context_id: {attempts, successes}}` de los contextos
+      registrados (las filas sin `context_id` se ignoran: no son contexto);
+    - `context_attempts` — nº de contextos distintos con algún intento;
+    - `success_contexts` — contextos con al menos un ÉXITO (orden estable);
+    - `home_context` — contexto con más intentos (desempate alfabético): el
+      contexto "de casa" del ítem; `""` si no hay contextos;
+    - `transfer` — `True` si hay éxito en >= `CONTEXT_TRANSFER_MIN` contextos
+      distintos (transferencia contextual demostrada).
+
+    Reutilizada tal cual por el resumen SQL (paridad por construcción). Nunca
+    lanza: filas incompletas se ignoran donde corresponda.
+    """
+    buckets: dict[str, dict[str, int]] = {}
+    for row in rows:
+        context = (row.get("context_id") or "").strip()
+        if not context:
+            continue
+        bucket = buckets.setdefault(context, {"attempts": 0, "successes": 0})
+        bucket["attempts"] += 1
+        if _truthy(row.get("success")):
+            bucket["successes"] += 1
+    success_contexts = sorted(
+        context for context, bucket in buckets.items() if bucket["successes"] > 0
+    )
+    home_context = ""
+    if buckets:
+        home_context = min(
+            buckets,
+            key=lambda context: (-buckets[context]["attempts"], context),
+        )
+    return {
+        "contexts": {context: dict(buckets[context]) for context in sorted(buckets)},
+        "context_attempts": len(buckets),
+        "success_contexts": success_contexts,
+        "home_context": home_context,
+        "transfer": len(success_contexts) >= CONTEXT_TRANSFER_MIN,
+    }
 
 
 def classify_event_role(event_type: str, detail: str) -> str:
@@ -461,6 +677,19 @@ def summarize_evidence(rows: list[dict]) -> dict:
       `slow_recall` sobre `recall` y no sobre una media que mezcla speaking con
       recuperación de texto.
 
+    V3.39 (Fase 3C, robustez de señales) añade las señales de RECENCIA y de
+    DISTRIBUCIÓN de latencia que aporta `recency_signals` (ventana de
+    `RECENT_WINDOW_EVENTS` eventos más recientes + percentiles): `recent_
+    attempts`, `recent_error_rate`, `recent_wrong_word`, `median/p75/p90_
+    response_time_ms`, `recent_response_time_ms` y `latency_trend`. Las calcula
+    la MISMA función pura que usa el resumen SQL (paridad por construcción).
+
+    V3.40 (Fase 4, transferencia contextual real) añade las señales por CONTEXTO
+    que aporta `context_signals` (`contexts`, `context_attempts`,
+    `success_contexts`, `home_context`, `transfer`): el éxito en un contexto
+    distinto del de aprendizaje es una dimensión SEPARADA de `situation`
+    (recuperación contextualizada) y habilita la tarea de transferencia.
+
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
     attempts = 0
@@ -588,6 +817,12 @@ def summarize_evidence(rows: list[dict]) -> dict:
         "mean_response_time_ms": (
             round(sum(latencies) / len(latencies), 1) if latencies else None
         ),
+        # V3.39 (Fase 3C): recencia + distribución de latencia. Se delega en la
+        # función pura que también usa el resumen SQL: un solo dialecto.
+        **recency_signals(rows),
+        # V3.40 (Fase 4): transferencia contextual por `context_id` (misma
+        # función pura que el resumen SQL).
+        **context_signals(rows),
     }
 
 
@@ -614,6 +849,21 @@ def empty_summary() -> dict:
         "skill_attempts": {},
         "skill_mean_response_time_ms": {},
         "mean_response_time_ms": None,
+        # V3.39 (Fase 3C): recencia y distribución de latencia.
+        "recent_attempts": 0,
+        "recent_error_rate": 0.0,
+        "recent_wrong_word": 0,
+        "median_response_time_ms": None,
+        "p75_response_time_ms": None,
+        "p90_response_time_ms": None,
+        "recent_response_time_ms": None,
+        "latency_trend": None,
+        # V3.40 (Fase 4): transferencia contextual por `context_id`.
+        "contexts": {},
+        "context_attempts": 0,
+        "success_contexts": [],
+        "home_context": "",
+        "transfer": False,
     }
 
 
@@ -641,10 +891,21 @@ def _success_ratio(evidence: dict) -> float | None:
 def _has_grave_error(evidence: dict) -> bool:
     """¿El ítem acumula confusión real (`wrong_word`) por encima del umbral?
 
-    Aproximación determinista a "sin fallo reciente grave" (V3.38.1): el resumen
-    no pondera recencia todavía (deuda de V3.39). Una errata
+    V3.38.1: aproximación determinista a "sin fallo grave". Una errata
     (`orthographic_error`) no cuenta: no es no-saber.
+
+    V3.39 (Fase 3C): si el resumen trae la VENTANA de recencia
+    (`recent_wrong_word`, que sí aporta `summarize_evidence`/el resumen SQL), el
+    juicio se hace SOLO sobre ella: una confusión de hace cuarenta repasos ya
+    corregida no debe bloquear la automaticidad para siempre. Sin ventana (un
+    resumen parcial construido a mano) se cae al histórico, como en V3.38.1.
     """
+    recent = evidence.get("recent_wrong_word")
+    if recent is not None:
+        try:
+            return int(recent) > AUTOMATIC_MAX_WRONG_WORD_ERRORS
+        except (TypeError, ValueError):
+            pass
     errors = evidence.get("error_types")
     if not isinstance(errors, dict):
         return False
@@ -654,19 +915,42 @@ def _has_grave_error(evidence: dict) -> bool:
         return False
 
 
+def _has_skill_segmentation(evidence: dict) -> bool:
+    """¿El resumen trae segmentación POR MODALIDAD con datos? (V3.39, pura).
+
+    Un resumen de V3.38+ (`summarize_evidence`/`summarize_by_target`) siempre
+    incluye las claves `skill_*`, pero pueden estar VACÍAS si el ledger no
+    registró modalidad (filas legacy o actividades sin `skill`). En ese caso no
+    hay segunda definición de automaticidad que aplicar y `is_automatic` cae al
+    criterio GLOBAL, que es el único que el resumen puede sostener.
+    """
+    for key in (
+        "skill_successes",
+        "skill_attempts",
+        "skill_independent_successes",
+        "skill_independent_days",
+    ):
+        bucket = evidence.get(key)
+        if isinstance(bucket, dict) and bucket:
+            return True
+    return False
+
+
 def is_automatic(evidence: dict) -> bool:
-    """¿El ítem es `automatic`? (V3.37 → V3.38.1, puro y determinista).
+    """¿El ítem es `automatic`? (V3.37 → V3.39, puro y determinista).
 
-    Exige CUATRO condiciones sobre el resumen de evidencia:
+    V3.39 (Fase 3C): se UNIFICA la definición para acabar con las dos que podían
+    divergir (P2 de la auditoría de V3.38.1). Si el resumen trae segmentación por
+    modalidad (`_has_skill_segmentation`), el ítem es automático EXACTAMENTE
+    cuando ALGUNA modalidad lo es (`automatic_skills`): dos modalidades distintas,
+    ninguna consolidada, ya no suman automaticidad a nivel de ítem — el bug de
+    P1-03 que V3.38 solo había cerrado por modalidad.
 
-    - `independent_successes >= AUTOMATIC_MIN_INDEPENDENT` — logro sin apoyo
-      (no basta con `cued`/`guided`: eso es recuperación CON ayuda);
-    - `independent_success_days >= AUTOMATIC_MIN_INDEPENDENT` — esos éxitos
-      caen en DÍAS NATURALES distintos;
-    - `success_rate >= AUTOMATIC_MIN_SUCCESS_RATIO` — V3.38.1 (P1-04): el
-      volumen no basta si el alumno falla la mayoría de intentos;
-    - sin fallo grave — V3.38.1: `wrong_word` (confusión real) por encima de
-      `AUTOMATIC_MAX_WRONG_WORD_ERRORS`.
+    Para resúmenes SIN segmentación (parciales construidos a mano o ledger
+    legacy sin `skill`) se mantiene el criterio GLOBAL de V3.38.1 — 3 éxitos
+    independientes en 3 días naturales distintos, ratio mínima y sin fallo grave
+    —, que es el único que esos resúmenes pueden sostener. Así el cambio es
+    aditivo para el contrato parcial y correctivo para el resumen real.
 
     Un acierto suelto no es automaticidad (D5/E3) y cued/guided no cuentan como
     independientes aunque se repitan. Nunca lanza: un resumen vacío o incompleto
@@ -674,6 +958,8 @@ def is_automatic(evidence: dict) -> bool:
     """
     if not evidence or _has_grave_error(evidence):
         return False
+    if _has_skill_segmentation(evidence):
+        return bool(automatic_skills(evidence))
     try:
         successes = int(evidence.get("independent_successes") or 0)
         days = int(evidence.get("independent_success_days") or 0)

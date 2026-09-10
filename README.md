@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.38.1**.
+- Última versión estable: **v3.42.0**.
 
 ## Estructura
 
@@ -65,6 +65,18 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   sembrado automáticamente desde el currículo, con estado determinista
   (`known`/`learning`/`weak`/`mastered`), `recall` por ítem (curva de olvido), distribución CEFR
   y señal "reconoce pero no produce" para practicar hablando.
+- **Diccionario reversible + Traductor de viaje (V3.39-V3.40)**: el diccionario de consulta
+  funciona en ambos sentidos (**EN→ES y ES→EN**, con la pestaña Personal/Consultar recordada entre
+  sesiones) y se añade el 5.º destino **Traductor** (`/traductor`): utilidad de viaje por voz o
+  texto en ES↔EN, con voces Piper en español descargables, historial reciente y sin registrar
+  evidencia (no es núcleo de aprendizaje).
+- **Motor de tarea óptima + transferencia real (V3.41-V3.42)**: el planner pasa de "¿qué palabra
+  repaso?" a **"¿qué modalidad limita, qué actividad la cierra y con qué apoyo?"**
+  (`skill_priority`/`limiting_skill`/`select_task`), con actividades nuevas en el drill
+  **`write`** (cierra `spoken ✓ / written ✗`) y **`transfer`** (usar la unidad en un contexto
+  NUEVO, que acredita `spontaneous_use` y demuestra transferencia real cuando se logra en ≥ 2
+  contextos), señales robustas (recencia de errores, percentiles de latencia, automaticidad
+  unificada) y gobierno del estado pedagógico por **unidad léxica** (go/went/gone/going).
 - **Curriculum Coverage (V2.4) + Quality Dashboard (V2.6)**: auditoría de cobertura curricular que
   recorre Pre-A1 → C2 por las 7 secciones (vocabulary/grammar/listening/speaking/interaction/
   review/assessment), cruza el contenido del curso con los bancos de listening/speaking y genera

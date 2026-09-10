@@ -29,19 +29,31 @@ from repositories.users import get_user
 
 
 def last_evidence_at(
-    user_id: str, target_type: str, target_id: str
+    user_id: str, target_type: str, target_id: str, before: str = ""
 ) -> str:
     """Marca ISO de la evidencia más reciente de un ítem ("" si no hay).
 
     Es el ancla de la cadena longitudinal: el intervalo de un evento nuevo se
     mide desde AQUÍ, no desde la primera exposición del ítem (V3.35).
+
+    V3.39 (Fase 3C): `before` acota la búsqueda a los eventos ANTERIORES (o
+    simultáneos) a una marca. El intervalo debe encadenarse al evento
+    CRONOLÓGICAMENTE anterior, no al último INSERTADO: con un `occurred_at`
+    externo fuera de orden (importaciones, sincronización de otro dispositivo) el
+    orden de inserción miente y el intervalo podía salir negativo o absurdo.
+    Sin `before` se conserva el comportamiento histórico (el más reciente).
     """
+    clauses = ["user_id = ?", "target_type = ?", "target_id = ?"]
+    params: list[object] = [user_id, target_type, target_id]
+    if before:
+        clauses.append("occurred_at <= ?")
+        params.append(before)
     with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT occurred_at FROM learning_evidence "
-            "WHERE user_id = ? AND target_type = ? AND target_id = ? "
+            f"WHERE {' AND '.join(clauses)} "
             "ORDER BY occurred_at DESC, id DESC LIMIT 1",
-            (user_id, target_type, target_id),
+            params,
         ).fetchone()
     return row["occurred_at"] if row else ""
 
@@ -89,7 +101,9 @@ def record_evidence(
     now = occurred_at or _now()
     interval = interval_since_last_evidence
     if interval is None:
-        previous = last_evidence_at(user_id, target_type, target_id)
+        # V3.39: el ancla es el evento CRONOLÓGICAMENTE anterior a `now`, no el
+        # último insertado (un `occurred_at` externo puede llegar desordenado).
+        previous = last_evidence_at(user_id, target_type, target_id, before=now)
         interval = interval_days(previous, now) if previous else None
     with closing(_conn()) as conn, conn:
         cur = conn.execute(
@@ -332,6 +346,14 @@ def summarize_by_target(
     `skill_mean_response_time_ms` (latencia media por modalidad), agrupados por
     `LOWER(skill)` con paridad exacta frente a la versión pura.
 
+    V3.39 (Fase 3C, robustez de señales) añade las señales de recencia y de
+    distribución de latencia (`recent_attempts`, `recent_error_rate`,
+    `recent_wrong_word`, `median/p75/p90_response_time_ms`,
+    `recent_response_time_ms`, `latency_trend`). No se reimplementan en SQL: se
+    leen las filas necesarias (fecha, id, resultado, tipo de error, latencia) y
+    se delegan en `services.evidence.recency_signals`, la MISMA función pura que
+    usa `summarize_evidence` — paridad por construcción, sin un segundo dialecto.
+
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
     # Import local (misma convención que el resto del repositorio): la capa pura
@@ -341,7 +363,9 @@ def summarize_by_target(
         INDEPENDENT_SUPPORT_LEVELS,
         LEXICAL_SKILLS,
         RECALL_RUNG_EVIDENCE,
+        context_signals,
         recall_rung_from_activity,
+        recency_signals,
     )
 
     independent = sorted(INDEPENDENT_SUPPORT_LEVELS)
@@ -448,6 +472,20 @@ def summarize_by_target(
             "GROUP BY target_id, LOWER(skill)",
             (user_id, target_type, *skills),
         ).fetchall()
+        # V3.39 (Fase 3C): filas mínimas para las señales de recencia y de
+        # distribución de latencia. Se calculan con la función pura compartida
+        # (`recency_signals`), no con un segundo dialecto en SQL.
+        detail_rows = conn.execute(
+            "SELECT target_id, id, occurred_at, success, error_type, "
+            "response_time_ms, context_id "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? "
+            "ORDER BY target_id, occurred_at ASC, id ASC",
+            (user_id, target_type),
+        ).fetchall()
+    detail_by_target: dict[str, list[dict]] = {}
+    for row in detail_rows:
+        detail_by_target.setdefault(row["target_id"], []).append(dict(row))
     intervals: dict[str, list[float]] = {}
     for row in interval_rows:
         intervals.setdefault(row["target_id"], []).append(
@@ -543,6 +581,11 @@ def summarize_by_target(
                 if row["mean_latency"] is not None
                 else None
             ),
+            # V3.39 (Fase 3C): misma función pura que `summarize_evidence`.
+            **recency_signals(detail_by_target.get(row["target_id"], [])),
+            # V3.40 (Fase 4): transferencia contextual por `context_id` (misma
+            # función pura que `summarize_evidence`).
+            **context_signals(detail_by_target.get(row["target_id"], [])),
         }
         for row in rows
     }

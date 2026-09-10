@@ -1,5 +1,6 @@
 import { getJson, postJson, withTimeout } from "./client";
 import type {
+  DictionaryDirection,
   DictionaryEntry,
   DictionaryLookupRequest,
   DrillAttempt,
@@ -10,6 +11,9 @@ import type {
   DrillRecognitionQuestion,
   DrillSentenceAttempt,
   DrillSentenceContext,
+  DrillTransferAttempt,
+  DrillTransferContext,
+  DrillWriteAttempt,
   Lexicon,
 } from "../types/api";
 
@@ -23,13 +27,17 @@ export function getLexicon(userId: string): Promise<Lexicon> {
  * (generada por el modelo local) o `definition_source="none"`, frase de ejemplo
  * determinista y marca de uso/aprendizaje de la palabra. Solo lectura (D3): no
  * registra evidencia. `word` puede ser cualquier palabra (esté o no en el
- * léxico del alumno). */
+ * léxico del alumno).
+ *
+ * V3.39: `direction` (`en-es` por defecto) permite la búsqueda inversa ES→EN,
+ * en la que `word` es el término español y `translation` el equivalente inglés. */
 export function lookupDictionaryWord(
   userId: string,
   word: string,
+  direction: DictionaryDirection = "en-es",
 ): Promise<DictionaryEntry> {
   const query = new URLSearchParams({ user_id: userId }).toString();
-  const body: DictionaryLookupRequest = { word };
+  const body: DictionaryLookupRequest = { word, direction };
   return withTimeout(
     postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, body),
     // La primera consulta de una palabra paga la generación del modelo local
@@ -194,5 +202,62 @@ export function submitDrillRecallAttempt(
   return postJson<DrillRecallAttempt>(
     `/api/vocabulary/drill/recall-attempt?${query}`,
     { word, answer, cue: cue ?? "", response_time_ms: responseTimeMs ?? null },
+  );
+}
+
+/** Intento de la actividad de escritura del drill (V3.39, Fase 3): envía la
+ * frase PROPIA que usa la palabra objetivo y el servidor la puntúa de forma
+ * determinista (unidad alineada + longitud mínima, premisa 21). Un acierto
+ * acredita la modalidad `written_production` (cierra el hueco `spoken ✓ /
+ * written ✗` del motor de tarea óptima) y dispara `onProduced`; el fallo se
+ * registra clasificado y nunca acredita. */
+export function submitDrillWriteAttempt(
+  userId: string,
+  word: string,
+  text: string,
+  responseTimeMs?: number,
+): Promise<DrillWriteAttempt> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<DrillWriteAttempt>(
+    `/api/vocabulary/drill/write-attempt?${query}`,
+    { word, text, response_time_ms: responseTimeMs ?? null },
+  );
+}
+
+/** Consigna del paso Transfer del drill (V3.40, Fase 4): contexto NUEVO en el
+ * que usar la unidad, elegido por el servidor entre los que el ítem aún no ha
+ * usado. Solo lectura: no escribe evidencia. La consigna nunca da la forma
+ * esperada (eso sería `sentence`), solo el escenario. */
+export function getDrillTransferContext(
+  userId: string,
+  word: string,
+): Promise<DrillTransferContext> {
+  const query = new URLSearchParams({ user_id: userId, word }).toString();
+  return getJson<DrillTransferContext>(
+    `/api/vocabulary/drill/transfer-context?${query}`,
+  );
+}
+
+/** Intento del paso Transfer (V3.40, Fase 4): envía la producción propia en el
+ * contexto servido. El servidor la puntúa (unidad alineada + longitud mínima) y
+ * registra la evidencia como `spontaneous_use` con el `context_id` del contexto
+ * nuevo: el éxito en >= 2 contextos distintos demuestra transferencia real. Un
+ * acierto dispara `onProduced`; el fallo se registra clasificado. */
+export function submitDrillTransferAttempt(
+  userId: string,
+  word: string,
+  text: string,
+  contextId: string,
+  responseTimeMs?: number,
+): Promise<DrillTransferAttempt> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<DrillTransferAttempt>(
+    `/api/vocabulary/drill/transfer-attempt?${query}`,
+    {
+      word,
+      text,
+      context_id: contextId,
+      response_time_ms: responseTimeMs ?? null,
+    },
   );
 }

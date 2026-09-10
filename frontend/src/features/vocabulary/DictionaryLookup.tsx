@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Loader2, Mic, RefreshCw, Search } from "lucide-react";
 import { lookupDictionaryWord } from "../../api/vocabulary";
 import type {
+  DictionaryDirection,
   DictionaryEntry,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
@@ -28,6 +29,12 @@ const STATUS_TONE: Record<LexicalStatus, string> = {
 
 const MAX_QUERY_LENGTH = 80;
 
+/** V3.39: direcciones ofrecidas por el conmutador del buscador. */
+const DIRECTIONS: Array<{ id: DictionaryDirection; labelKey: string }> = [
+  { id: "en-es", labelKey: "dictionary.lookup.direction.en-es" },
+  { id: "es-en", labelKey: "dictionary.lookup.direction.es-en" },
+];
+
 interface DictionaryLookupProps {
   userId: string | null;
 }
@@ -42,18 +49,22 @@ interface DictionaryLookupProps {
  * una acción explícita del alumno: solo su resultado escribe evidencia. */
 export function DictionaryLookup({ userId }: DictionaryLookupProps) {
   const { t } = useI18n();
+  const [direction, setDirection] = useState<DictionaryDirection>("en-es");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [invalidError, setInvalidError] = useState(false);
   const [entry, setEntry] = useState<DictionaryEntry | null>(null);
-  // Palabra de la consulta actual (para el retry tras un error de red).
+  // Palabra y dirección de la consulta actual (para el retry tras un error de
+  // red: reintentar con la dirección con la que se buscó, no con la activa).
   const [lastQuery, setLastQuery] = useState("");
+  const [lastDirection, setLastDirection] = useState<DictionaryDirection>("en-es");
   // V3.32: palabra en drill oral («Practicar esta palabra») lanzado desde la
-  // tarjeta. La escalera vive debajo de la tarjeta de resultado.
+  // tarjeta. La escalera vive debajo de la tarjeta de resultado. V3.39: en
+  // ES→EN se practica siempre el EQUIVALENTE INGLÉS, nunca el término español.
   const [practiceWord, setPracticeWord] = useState<string | null>(null);
 
-  async function runLookup(raw: string) {
+  async function runLookup(raw: string, dir: DictionaryDirection = direction) {
     if (!userId) return;
     const word = raw.trim();
     // Validación local espejo del backend (422): vacía tras recortar, solo
@@ -70,9 +81,10 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
     setNetworkError(false);
     setLoading(true);
     setLastQuery(word);
+    setLastDirection(dir);
     setPracticeWord(null);
     try {
-      const data = await lookupDictionaryWord(userId, word);
+      const data = await lookupDictionaryWord(userId, word, dir);
       setEntry(data);
     } catch {
       setEntry(null);
@@ -85,15 +97,32 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
   // V3.32: tras producir la palabra en el drill, refresca la entrada en silencio
   // (sin togglear `loading`, para no desmontar la tarjeta ni el drill) para
   // actualizar la marca de uso (p. ej. una palabra nueva pasa a tracked).
-  async function refreshEntry(word: string) {
+  async function refreshEntry(word: string, dir: DictionaryDirection) {
     if (!userId) return;
     try {
-      const data = await lookupDictionaryWord(userId, word);
+      const data = await lookupDictionaryWord(userId, word, dir);
       setEntry(data);
     } catch {
       /* conserva la entrada actual */
     }
   }
+
+  // V3.39: cambiar de dirección invalida el resultado anterior (la palabra
+  // buscada era de la otra lengua). Se conserva el texto para editarlo.
+  function changeDirection(next: DictionaryDirection) {
+    if (next === direction) return;
+    setDirection(next);
+    setEntry(null);
+    setPracticeWord(null);
+    setInvalidError(false);
+    setNetworkError(false);
+  }
+
+  const practiceTerm = entry
+    ? entry.direction === "es-en"
+      ? entry.translation
+      : entry.word
+    : null;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -112,6 +141,33 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
         </p>
       </header>
 
+      {/* V3.39: conmutador de dirección (EN→ES / ES→EN). */}
+      <div
+        role="group"
+        aria-label={t("dictionary.lookup.directionLabel")}
+        className="bg-secondary mb-3 flex w-fit items-center gap-1 rounded-md p-1"
+      >
+        {DIRECTIONS.map((option) => {
+          const isActive = direction === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => changeDirection(option.id)}
+              className={cn(
+                "inline-flex min-h-8 items-center rounded px-3 text-xs font-semibold transition-colors",
+                isActive
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t(option.labelKey)}
+            </button>
+          );
+        })}
+      </div>
+
       <form role="search" onSubmit={onSubmit} className="flex flex-col gap-2 sm:flex-row">
         <label className="sr-only" htmlFor="dictionary-lookup-input">
           {t("dictionary.lookup.searchAria")}
@@ -122,7 +178,7 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          lang="en"
+          lang={direction === "es-en" ? "es" : "en"}
           value={query}
           maxLength={MAX_QUERY_LENGTH}
           disabled={!userId || loading}
@@ -130,7 +186,11 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
             setQuery(e.target.value);
             setInvalidError(false);
           }}
-          placeholder={t("dictionary.lookup.placeholder")}
+          placeholder={
+            direction === "es-en"
+              ? t("dictionary.lookup.placeholder.es-en")
+              : t("dictionary.lookup.placeholder")
+          }
           className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
         />
         <Button
@@ -174,7 +234,7 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => void runLookup(lastQuery)}
+            onClick={() => void runLookup(lastQuery, lastDirection)}
           >
             <RefreshCw className="size-3.5" aria-hidden="true" />
             {t("common.retry")}
@@ -184,11 +244,15 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
 
       {userId && !loading && !networkError && !invalidError && entry && (
         <div className="mt-6 flex flex-col gap-5">
-          <ResultCard entry={entry} onPractice={() => setPracticeWord(entry.word)} />
+          <ResultCard
+            entry={entry}
+            onPractice={practiceTerm ? () => setPracticeWord(practiceTerm) : undefined}
+          />
 
           {/* V3.32: escalera de drill oral de la palabra consultada. Practicar
               es una acción real (no es parte de la consulta, D3): solo el
-              resultado de esta práctica escribe evidencia. */}
+              resultado de esta práctica escribe evidencia. V3.39: en ES→EN se
+              practica el equivalente inglés. */}
           {practiceWord && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
@@ -200,7 +264,9 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
               <WordDrill
                 userId={userId}
                 word={practiceWord}
-                onProduced={() => void refreshEntry(practiceWord)}
+                onProduced={() =>
+                  void refreshEntry(practiceWord, entry.direction)
+                }
                 onClose={() => setPracticeWord(null)}
               />
             </div>
@@ -380,7 +446,7 @@ function ResultCard({
   onPractice,
 }: {
   entry: DictionaryEntry;
-  onPractice: () => void;
+  onPractice?: () => void;
 }) {
   const { t } = useI18n();
   const kindLabel = lexicalKindLabel(entry.kind, t);
@@ -388,6 +454,12 @@ function ResultCard({
   const base =
     entry.usage.surface ??
     (entry.usage.unit as DictionarySurfaceUsage | DictionaryUnitUsage | null);
+  // V3.39: en ES→EN la palabra de cabecera es el término español y el
+  // equivalente inglés llega en `translation`; el audio, el drill y la marca de
+  // uso son siempre del INGLÉS.
+  const isReverse = entry.direction === "es-en";
+  const audioText = isReverse ? entry.translation ?? "" : entry.word;
+  const alternatives = entry.alternatives ?? [];
 
   return (
     <>
@@ -396,7 +468,7 @@ function ResultCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-tight">
-              <span lang="en">{entry.word}</span>
+              <span lang={isReverse ? "es" : "en"}>{entry.word}</span>
               {entry.cefr && <LevelBadge level={entry.cefr} />}
               {pos && (
                 <Badge
@@ -414,23 +486,28 @@ function ResultCard({
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <ListenButton
-              text={entry.word}
-              label={t("dictionary.lookup.listenWord")}
-            />
+            {audioText && (
+              <ListenButton
+                text={audioText}
+                label={t("dictionary.lookup.listenWord")}
+              />
+            )}
             {/* V3.32: «Practicar esta palabra» — abre la escalera de drill oral
                 (Recall → Sentence). Solo esta acción explícita escribe
-                evidencia; el lookup no (D3). */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onPractice}
-              className="gap-1.5"
-            >
-              <Mic className="size-3.5" aria-hidden="true" />
-              {t("dictionary.lookup.practiceCta")}
-            </Button>
+                evidencia; el lookup no (D3). V3.39: sin equivalente inglés
+                (ES→EN sin contenido) no hay nada que practicar. */}
+            {onPractice && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onPractice}
+                className="gap-1.5"
+              >
+                <Mic className="size-3.5" aria-hidden="true" />
+                {t("dictionary.lookup.practiceCta")}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -449,10 +526,22 @@ function ResultCard({
             {entry.translation && (
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t("dictionary.lookup.translationLabel")}
+                  {isReverse
+                    ? t("dictionary.lookup.englishLabel")
+                    : t("dictionary.lookup.translationLabel")}
                 </span>
-                <p className="text-sm leading-relaxed" lang="es">
+                <p className="text-sm leading-relaxed" lang={isReverse ? "en" : "es"}>
                   {entry.translation}
+                </p>
+              </div>
+            )}
+            {alternatives.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("dictionary.lookup.alternativesLabel")}
+                </span>
+                <p className="text-sm leading-relaxed" lang="en">
+                  {alternatives.join(" · ")}
                 </p>
               </div>
             )}

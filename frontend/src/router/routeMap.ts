@@ -10,6 +10,7 @@ import {
   LEARN_PATH,
   LEGACY_VOCABULARY_ACTIVITY,
   PROGRESS_PATH,
+  TRANSLATOR_PATH,
   learnActivityPath,
 } from "./paths";
 
@@ -30,6 +31,7 @@ const ROUTE_TO_PATH: Record<Route, Path> = {
   chat: CHAT_PATH,
   help: HELP_PATH,
   dictionary: DICTIONARY_PATH,
+  translator: TRANSLATOR_PATH,
 };
 
 /**
@@ -72,6 +74,8 @@ export function pathToRoute(path: Path): Route {
       return segments.length === 1 ? "help" : "home";
     case "diccionario":
       return segments.length === 1 ? "dictionary" : "home";
+    case "traductor":
+      return segments.length === 1 ? "translator" : "home";
     default:
       return "home";
   }

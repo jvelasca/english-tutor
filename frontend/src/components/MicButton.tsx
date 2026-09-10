@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { transcribe } from "../api/voz";
+import { transcribe, type VoiceLanguage } from "../api/voz";
 import { useI18n } from "../hooks/useI18n";
+import { useRecordingSession } from "../hooks/useRecordingSession";
 import {
   getMicrophoneStream,
   MicUnavailableError,
@@ -11,9 +12,18 @@ import { MicUnavailableNotice } from "./MicUnavailableNotice";
 interface MicButtonProps {
   onTranscribed: (text: string) => void;
   disabled?: boolean;
+  /**
+   * V3.39 (Fase 2): idioma que se espera en el audio (`"en"` por defecto,
+   * histórico del dictado de inglés). El Traductor lo usa con `"es"`.
+   */
+  language?: VoiceLanguage;
 }
 
-export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
+export function MicButton({
+  onTranscribed,
+  disabled = false,
+  language = "en",
+}: MicButtonProps) {
   const { t } = useI18n();
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -22,6 +32,11 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
   const [noSpeech, setNoSpeech] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // V3.21 (V20-13) / V3.39: auto-stop a los 120 s (máximo del backend), también
+  // para el dictado del Traductor.
+  useRecordingSession(recording, {
+    onAutoStop: () => stop(),
+  });
 
   async function start() {
     setMicError(null);
@@ -49,7 +64,7 @@ export function MicButton({ onTranscribed, disabled = false }: MicButtonProps) {
         if (blob.size === 0) return;
         setProcessing(true);
         try {
-          const text = await transcribe(blob);
+          const text = await transcribe(blob, language);
           if (text) {
             setNoSpeech(false);
             onTranscribed(text);

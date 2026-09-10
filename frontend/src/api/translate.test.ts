@@ -24,7 +24,24 @@ describe("translateText", () => {
     expect(postJsonMock).toHaveBeenCalledTimes(1);
     expect(postJsonMock).toHaveBeenCalledWith("/api/translate", {
       text: "Where is the bank?",
+      direction: "en-es",
     });
+  });
+
+  it("envía la dirección ES→EN cuando se pide (Traductor)", async () => {
+    await expect(
+      translateText("¿Dónde está el banco?", "es-en"),
+    ).resolves.toBe("Un banco");
+    expect(postJsonMock).toHaveBeenCalledWith("/api/translate", {
+      text: "¿Dónde está el banco?",
+      direction: "es-en",
+    });
+  });
+
+  it("la caché es por dirección: la misma frase en ambas direcciones llama dos veces", async () => {
+    await translateText("hola", "es-en");
+    await translateText("hola", "en-es");
+    expect(postJsonMock).toHaveBeenCalledTimes(2);
   });
 
   it("usa la caché: repetir la misma frase no vuelve a llamar al backend", async () => {

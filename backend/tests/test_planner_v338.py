@@ -232,11 +232,15 @@ def test_skill_gap_targets_the_partial_production_hole():
     partial = {"skill_successes": {"recall": 2, "written_production": 3}}
     assert planner.skill_gaps(partial) == ["spoken_production"]
     assert planner.evidence_reason(matrix, partial) == "skill_gap"
-    # El hueco simétrico (falta escritura) se expone pero no emite razón: la
-    # cola no tiene todavía un drill de escritura (V3.39).
+    # V3.39 (Fase 3): el hueco SIMÉTRICO (falta escritura) también es accionable
+    # con la actividad de escritura (`write`); lo decide `planner.select_task`.
     written_missing = {"skill_successes": {"recall": 2, "spoken_production": 3}}
     assert planner.skill_gaps(written_missing) == ["written_production"]
-    assert planner.evidence_reason(matrix, written_missing) == ""
+    assert planner.evidence_reason(matrix, written_missing) == "skill_gap"
+    task = planner.select_task(matrix, written_missing)
+    assert task["skill"] == "written_production"
+    assert task["activity"] == "write"
+    assert task["support_level"] == "independent"
 
 
 def test_evidence_reason_never_breaks_on_partial_data():
@@ -270,13 +274,26 @@ def test_recommend_review_activity_prefers_evidence_reasons():
         lexicon.recommend_review_activity(
             produced,
             evidence={
-                # Producción oral cubierta (sin hueco de modalidad) + recall lento.
-                "skill_successes": {"recall": 1, "spoken_production": 1},
+                # Producción oral Y escrita cubiertas (sin hueco de modalidad) +
+                # recall lento → la fluidez es la razón.
+                "skill_successes": {
+                    "recall": 1,
+                    "spoken_production": 1,
+                    "written_production": 1,
+                },
                 "skill_mean_response_time_ms": {"recall": 12000},
             },
         )["reason"]
         == "slow_recall"
     )
+    # V3.39 (Fase 3): `spoken ✓ / written ✗` ya es accionable → actividad de
+    # escritura con hueco de modalidad (antes caía en mantenimiento).
+    written_gap = lexicon.recommend_review_activity(
+        produced,
+        evidence={"skill_successes": {"recall": 2, "spoken_production": 2}},
+    )
+    assert written_gap["activity"] == "write"
+    assert written_gap["reason"] == "skill_gap"
 
 
 def test_recommend_review_activity_keeps_v335_reasons_without_new_data():

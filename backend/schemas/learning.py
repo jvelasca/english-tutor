@@ -26,7 +26,9 @@ class LearningEvent(BaseModel):
     event_role: str = ""
 
 
-ReviewActivity = Literal["recognition", "recall", "sentence"]
+ReviewActivity = Literal[
+    "recognition", "recall", "sentence", "write", "transfer"
+]
 
 
 class ReviewQueueItem(BaseModel):
@@ -61,14 +63,32 @@ class ReviewQueueItem(BaseModel):
     signals: dict | None = None
     why: str = ""
     automatic_skills: list[str] = Field(default_factory=list)
+    # V3.39 (Fase 3, motor de tarea óptima): modalidad con mayor prioridad y la
+    # DECISIÓN de tarea (`{skill, activity, reason, support_level}`). Aditivos:
+    # `activity`/`reason` conservan su semántica.
+    limiting_skill: str = ""
+    task: dict | None = None
     competence: dict | None = None
+    # V3.40 (Fase 4, gobierno por unidad léxica): formas superficiales de la
+    # unidad y transferencia contextual demostrada (éxito en contextos distintos).
+    # Aditivos: el ítem sigue siendo UNA forma superficial (lo que práctica el
+    # drill), pero su estado se lee también a nivel de unidad.
+    unit_surfaces: list[str] = Field(default_factory=list)
+    transfer: bool = False
+    success_contexts: list[str] = Field(default_factory=list)
     # V3.35: evidencia longitudinal (`attempts`/`successes`/`days`/`intervals`).
     evidence: dict | None = None
 
 
 class ReviewQueueOut(BaseModel):
-    """Cola de repaso del léxico: `due_count` + ítems ordenados por urgencia."""
+    """Cola de repaso del léxico: `due_count` + ítems ordenados por urgencia.
+
+    V3.40 añade `units` (aditivo): la evidencia agregada por `lexical_unit`
+    (`services.lexicon.unit_evidence`), para que el estado pedagógico esté
+    gobernado por la unidad (go/went/gone/going) y no solo por la forma.
+    """
 
     due_count: int
     items: list[ReviewQueueItem] = Field(default_factory=list)
     fsrs_version: str = ""
+    units: list[dict] = Field(default_factory=list)

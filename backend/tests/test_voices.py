@@ -69,6 +69,60 @@ def test_resolve_voice_falls_back_to_any_installed_if_default_missing(
     assert tts.resolve_voice(None) == "en_GB-alan-medium"
 
 
+# --- V3.39 (Fase 2): resolución por idioma (Traductor) -----------------------
+
+
+def test_voice_language_extracts_locale_prefix():
+    assert tts.voice_language("en_US-lessac-medium") == "en"
+    assert tts.voice_language("es_MX-ald-medium") == "es"
+    assert tts.voice_language("weird") == "weird"
+
+
+def test_resolve_voice_language_skips_other_language_preference(
+    monkeypatch, tmp_path,
+):
+    # Con language="es", una preferencia inglesa instalada NO se usa: se elige la
+    # voz española instalada (el Traductor no debe leer español con voz inglesa).
+    _install(
+        monkeypatch, tmp_path,
+        tts.DEFAULT_VOICE, "en_GB-alan-medium", "es_MX-ald-medium",
+    )
+    assert (
+        tts.resolve_voice({"tts_voice": "en_GB-alan-medium"}, "es")
+        == "es_MX-ald-medium"
+    )
+
+
+def test_resolve_voice_language_uses_matching_preference(monkeypatch, tmp_path):
+    _install(
+        monkeypatch, tmp_path,
+        tts.DEFAULT_VOICE, "es_ES-davefx-medium", "es_MX-ald-medium",
+    )
+    assert (
+        tts.resolve_voice({"tts_voice": "es_MX-ald-medium"}, "es")
+        == "es_MX-ald-medium"
+    )
+
+
+def test_resolve_voice_language_defaults_to_installed_language_voice(
+    monkeypatch, tmp_path,
+):
+    # Sin preferencia, la primera voz del idioma pedido (default primero si es
+    # de ese idioma).
+    _install(monkeypatch, tmp_path, "en_GB-alan-medium", "es_MX-ald-medium")
+    assert tts.resolve_voice(None, "es") == "es_MX-ald-medium"
+    assert tts.resolve_voice(None, "en") == "en_GB-alan-medium"
+
+
+def test_resolve_voice_language_falls_back_when_no_voice_of_language(
+    monkeypatch, tmp_path,
+):
+    # Sin ninguna voz española instalada cae al fallback global (degradación
+    # documentada: mejor sintetizar con otra voz que quedarse sin audio).
+    _install(monkeypatch, tmp_path, "en_GB-alan-medium")
+    assert tts.resolve_voice(None, "es") == "en_GB-alan-medium"
+
+
 def test_voice_name_known_and_derived():
     assert "Lessac" in tts.voice_name(tts.DEFAULT_VOICE)
     assert tts.voice_name("en_GB-nope-medium") == "en_GB · nope (medium)"
@@ -84,14 +138,14 @@ def test_is_ready_voice_specific(monkeypatch, tmp_path):
 # --- Catálogo curado (voice_downloads) ---------------------------------------
 
 
-def test_catalog_has_english_medium_voices():
-    # El catálogo solo ofrece voces de inglés; el set inicial está cubierto.
+def test_catalog_has_english_and_spanish_medium_voices():
+    # El catálogo ofrece voces medium de inglés (núcleo) y de español (V3.39,
+    # Fase 2, Traductor); no se ofrecen calidades `high` ni `low`.
     ids = {s.id for s in voice_downloads.CATALOG}
     assert {"en_GB-alan-medium", "en_US-amy-medium"} <= ids
-    assert all(
-        s.id.startswith("en_") and s.id.endswith("-medium")
-        for s in voice_downloads.CATALOG
-    )
+    assert {"es_ES-davefx-medium", "es_MX-ald-medium"} <= ids
+    assert all(s.id.endswith("-medium") for s in voice_downloads.CATALOG)
+    assert all(s.id.startswith(("en_", "es_")) for s in voice_downloads.CATALOG)
 
 
 def test_available_to_download_excludes_installed():
@@ -211,3 +265,65 @@ def test_download_endpoint_failure_502(monkeypatch, tmp_path):
         r = client.post("/api/voices/download", json={"voice_id": "en_GB-alan-medium"})
     assert r.status_code == 502
     assert "sin conexión" in r.json()["detail"]
+
+
+# --- V3.39 (Fase 2): /api/tts con idioma (Traductor) -------------------------
+
+
+def test_tts_endpoint_uses_voice_of_requested_language(monkeypatch, tmp_path):
+    # El Traductor pide `language="es"`: aunque la preferencia guardada sea
+    # inglesa, la síntesis usa una voz española instalada.
+    uid = _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "es_MX-ald-medium")
+    settings_repo.set_settings(uid, {"tts_voice": tts.DEFAULT_VOICE})
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/tts",
+            json={"text": "¿Dónde está el hotel?", "language": "es"},
+            params={"user_id": uid},
+        )
+    assert r.status_code == 200
+    assert captured["voice"] == "es_MX-ald-medium"
+
+
+def test_tts_endpoint_without_user_uses_language_voice(monkeypatch, tmp_path):
+    _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "es_ES-davefx-medium")
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post("/api/tts", json={"text": "Hola", "language": "es"})
+    assert r.status_code == 200
+    assert captured["voice"] == "es_ES-davefx-medium"
+
+
+def test_tts_endpoint_defaults_to_english_without_language(monkeypatch, tmp_path):
+    # Retrocompatible: sin `language` el contrato es el histórico (voz inglesa).
+    uid = _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "es_MX-ald-medium")
+    settings_repo.set_settings(uid, {"tts_voice": tts.DEFAULT_VOICE})
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/tts", json={"text": "Hello"}, params={"user_id": uid}
+        )
+    assert r.status_code == 200
+    assert captured["voice"] == tts.DEFAULT_VOICE

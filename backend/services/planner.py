@@ -71,11 +71,56 @@ PRODUCTION_SKILLS: tuple[str, ...] = ("written_production", "spoken_production")
 SPEAKING_SKILL = "spoken_production"
 
 # Actividad del drill que cierra cada razón dirigida por la evidencia.
+# V3.39/V3.40: mapa LEGACY conservado por retrocompatibilidad; la fuente de
+# verdad es `ACTIVITY_FOR_SKILL` (una razón puede cerrarse con más de una
+# actividad: `skill_gap` → `sentence` o `write` según la modalidad que falte).
 ACTIVITY_FOR_REASON: dict[str, str] = {
     "error_prone": "recall",
     "skill_gap": "sentence",
     "slow_recall": "recall",
+    "transfer_gap": "transfer",
 }
+
+# V3.39 (Fase 3, motor de tarea óptima): ACTIVIDAD que cierra cada MODALIDAD.
+# Es la tabla que separa la SELECCIÓN DE ACTIVIDAD ("¿qué ejercicio toca?") de
+# la PUNTUACIÓN DE PRIORIDAD ("¿qué ítem primero?"), que V3.38 tenía mezcladas
+# en el mapeo razón→actividad (P1-02 de la auditoría de V3.38.1).
+#   recall            → el propio peldaño de recuperación;
+#   spoken_production → frase oral guiada (`sentence`);
+#   written_production→ escritura de una frase propia (`write`, V3.39);
+#   spontaneous_use   → producción ABIERTA en un contexto nuevo (`transfer`,
+#                       V3.40): la transferencia contextual es su propia tarea.
+ACTIVITY_FOR_SKILL: dict[str, str] = {
+    RECALL_SKILL: "recall",
+    "spoken_production": "sentence",
+    "written_production": "write",
+    "spontaneous_use": "transfer",
+}
+
+# Nivel de apoyo que DECLARA cada actividad del drill (mismos valores canónicos
+# que el ledger: `copied → guided → cued → independent → spontaneous`). La
+# decisión lo expone para que la cola sea explicable sin re-derivarlo.
+ACTIVITY_SUPPORT_LEVEL: dict[str, str] = {
+    "recognition": "cued",
+    "recall": "cued",
+    "sentence": "guided",
+    "write": "independent",
+    # V3.40: la consigna de transferencia ofrece un contexto nuevo, no ayuda con
+    # la unidad: la producción es del alumno (uso espontáneo).
+    "transfer": "spontaneous",
+}
+
+# Modalidad de la TRANSFERENCIA contextual (V3.40, P1-03 de la auditoría de
+# V3.38.1): usar la unidad en un contexto distinto del de aprendizaje.
+TRANSFER_SKILL = "spontaneous_use"
+
+# V3.40: éxitos en contextos distintos exigidos para declarar transferencia
+# (espejo de `services.evidence.CONTEXT_TRANSFER_MIN`).
+TRANSFER_MIN_SUCCESS_CONTEXTS = 2
+
+# V3.40: éxitos totales mínimos antes de proponer transferencia. Con un solo uso
+# la unidad aún se está aprendiendo; transferir exige cierta solidez.
+TRANSFER_MIN_SUCCESSES = 2
 
 # Orden de prioridad de las razones dirigidas por la evidencia (el primero que
 # se cumpla gana). Declarado para que el desempate no dependa del diccionario.
@@ -83,6 +128,10 @@ EVIDENCE_REASON_ORDER: tuple[str, ...] = (
     "error_prone",
     "skill_gap",
     "slow_recall",
+    # V3.40: la transferencia va AL FINAL: solo cuando no hay nada más urgente
+    # (ni confusión, ni hueco de modalidad, ni fluidez pendiente) tiene sentido
+    # pedir uso en un contexto nuevo.
+    "transfer_gap",
 )
 
 
@@ -106,9 +155,22 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 
 def error_prone(evidence: dict | None) -> bool:
-    """¿El ítem acumula confusión real (`wrong_word` repetido)? (V3.38, puro)."""
+    """¿El ítem acumula confusión real (`wrong_word` repetido)? (V3.38, puro).
+
+    V3.39 (Fase 3C): si el resumen trae la VENTANA de recencia
+    (`recent_wrong_word`, que ya aportan `summarize_evidence`/el resumen SQL), el
+    juicio mira SOLO esa ventana: lo que importa es la confusión que sigue
+    ocurriendo, no la de hace cuarenta repasos. Sin ventana (resumen parcial) se
+    cae al histórico, como en V3.38.
+    """
     if not evidence:
         return False
+    recent = evidence.get("recent_wrong_word")
+    if recent is not None:
+        try:
+            return int(recent) >= ERROR_PRONE_MIN_WRONG
+        except (TypeError, ValueError):
+            pass
     errors = evidence.get("error_types")
     if not isinstance(errors, dict):
         return False
@@ -226,33 +288,205 @@ def skill_signals(evidence: dict | None) -> dict[str, dict]:
     return result
 
 
-def evidence_reason(matrix: dict | None, evidence: dict | None) -> str:
-    """Razón dirigida por la evidencia fina, o "" (V3.38, puro).
+def directed_production_gap(matrix: dict | None, evidence: dict | None) -> str:
+    """Modalidad de PRODUCCIÓN sin éxito que el drill puede cerrar (V3.39, puro).
 
-    Solo mira señales que registran eventos concretos (errores, modalidades,
-    latencia). Un resumen vacío o legacy devuelve "": las razones de hueco de
-    V3.35 siguen siendo la decisión por defecto.
+    Es la generalización del hueco de V3.38.1: antes solo `spoken_production`
+    era accionable (la actividad `sentence`); con la actividad de escritura
+    (`write`, V3.39) el hueco SIMÉTRICO `spoken ✓ / written ✗` también lo es.
+
+    Orden declarado y estable: si falta la modalidad ORAL se devuelve esa (el
+    comportamiento de V3.38.1 no cambia); si ya hay logro oral pero falta la
+    escrita, se devuelve `written_production`.
+
+    Vacía si no hay ningún logro previo (nada que transferir), si la matriz no
+    declara producción o si no hay hueco de producción.
     """
-    matrix = matrix or {}
-    checks = {
-        "error_prone": lambda: error_prone(evidence),
-        # V3.38.1 (P1-03): basta con que falte la modalidad ORAL para dirigir la
-        # siguiente tarea a `sentence`. Antes exigía que faltaran AMBAS
-        # productivas (`len(skill_gaps) == len(PRODUCTION_SKILLS)`), así que el
-        # caso `written ✓ / spoken ✗` —justo el que V3.38 quería detectar—
-        # caía en mantenimiento.
-        "skill_gap": lambda: bool(
-            matrix.get("production") and SPEAKING_SKILL in skill_gaps(evidence)
-        ),
-        "slow_recall": lambda: is_slow_recall(evidence),
-    }
-    for reason in EVIDENCE_REASON_ORDER:
-        try:
-            if checks[reason]():
-                return reason
-        except Exception:  # noqa: BLE001 — el planner nunca rompe la cola
-            continue
+    if not (matrix or {}).get("production"):
+        return ""
+    gaps = skill_gaps(evidence)
+    if not gaps:
+        return ""
+    if SPEAKING_SKILL in gaps:
+        return SPEAKING_SKILL
+    for skill in gaps:
+        if skill in ACTIVITY_FOR_SKILL:
+            return skill
     return ""
+
+
+def has_contextual_transfer(evidence: dict | None) -> bool:
+    """¿La unidad se ha usado con éxito en >= 2 contextos distintos? (V3.40)."""
+    return bool((evidence or {}).get("transfer"))
+
+
+def transfer_gap(evidence: dict | None) -> bool:
+    """¿Toca TRANSFERIR la unidad a un contexto nuevo? (V3.40, puro).
+
+    La auditoría de V3.38.1 (P1-03) pidió separar `situation` (recuperación
+    contextualizada) de la transferencia real: usar la unidad en un contexto
+    DISTINTO del de aprendizaje. `services.evidence.context_signals` aporta los
+    contextos con éxito; aquí se decide si es el momento de pedirla.
+
+    Exige, para no adelantarse:
+    - que el ledger tenga contexto registrado (`context_attempts > 0`);
+    - al menos `TRANSFER_MIN_SUCCESSES` éxitos (un solo uso aún se está
+      aprendiendo);
+    - éxito en AL MENOS un contexto (hay algo que transferir) y en MENOS de
+      `TRANSFER_MIN_SUCCESS_CONTEXTS` (aún no hay transferencia demostrada).
+
+    Sin ventana por contexto (resumen parcial) devuelve `False`: no se inventa.
+    """
+    if not evidence:
+        return False
+    contexts = evidence.get("contexts")
+    if not isinstance(contexts, dict) or not contexts:
+        return False
+    if _int(evidence.get("context_attempts")) <= 0:
+        return False
+    if has_contextual_transfer(evidence):
+        return False
+    successes = sum(
+        _int(bucket.get("successes"))
+        for bucket in contexts.values()
+        if isinstance(bucket, dict)
+    )
+    if successes < TRANSFER_MIN_SUCCESSES:
+        return False
+    success_contexts = evidence.get("success_contexts")
+    if isinstance(success_contexts, list):
+        distinct = len([c for c in success_contexts if str(c or "").strip()])
+    else:  # resumen parcial sin la lista: se deriva del mapa de contextos
+        distinct = sum(
+            1
+            for bucket in contexts.values()
+            if isinstance(bucket, dict) and _int(bucket.get("successes")) > 0
+        )
+    return 1 <= distinct < TRANSFER_MIN_SUCCESS_CONTEXTS
+
+
+def skill_priority(signals: dict) -> dict[str, float]:
+    """Prioridad 0..1 POR MODALIDAD (V3.39, puro).
+
+    Aplica los MISMOS pesos declarados (`PRIORITY_WEIGHTS`) a las señales de cada
+    modalidad (`signals["skills"]`): la debilidad, la dependencia de apoyo y la
+    latencia son por modalidad, mientras que el olvido (`forgetting`) y el hueco
+    (`gap`) son del ítem y se comparten. Es la pieza que permite responder "¿qué
+    skill limita?" en lugar de "¿cuánto urge?".
+
+    Devuelve una entrada por modalidad presente en `signals["skills"]` (dict
+    vacío si no hay segmentación). Nunca lanza.
+    """
+    skills = signals.get("skills") if isinstance(signals, dict) else None
+    if not isinstance(skills, dict):
+        return {}
+    try:
+        forgetting = _clamp(float(signals.get("forgetting") or 0.0))
+    except (TypeError, ValueError):
+        forgetting = 0.0
+    try:
+        gap = _clamp(float(signals.get("gap") or 0.0))
+    except (TypeError, ValueError):
+        gap = 0.0
+    result: dict[str, float] = {}
+    for skill, data in skills.items():
+        payload = data if isinstance(data, dict) else {}
+        result[str(skill)] = priority_score(
+            {
+                "forgetting": forgetting,
+                "gap": gap,
+                "weakness": payload.get("weakness", 0.0),
+                "support": payload.get("support", 0.0),
+                "latency": payload.get("latency", 0.0),
+            }
+        )
+    return result
+
+
+def limiting_skill(signals: dict) -> str:
+    """Modalidad con mayor prioridad (argmax) (V3.39, puro).
+
+    Desempate determinista por el orden canónico `LEXICAL_SKILLS` (recall antes
+    que producción), de modo que sin evidencia segmentada la decisión cae en
+    `recall` —el peldaño por defecto del repaso— y no en un orden accidental de
+    diccionario. Devuelve "" si no hay bloque `skills`.
+    """
+    priorities = skill_priority(signals)
+    if not priorities:
+        return ""
+    candidates = [skill for skill in LEXICAL_SKILLS if skill in priorities]
+    candidates.extend(
+        skill for skill in priorities if skill not in LEXICAL_SKILLS
+    )
+    return max(candidates, key=lambda skill: priorities[skill]) if candidates else ""
+
+
+def _task(skill: str, reason: str) -> dict:
+    activity = ACTIVITY_FOR_SKILL.get(skill, "")
+    return {
+        "skill": skill,
+        "activity": activity,
+        "reason": reason,
+        "support_level": ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
+    }
+
+
+def select_task(
+    matrix: dict | None,
+    evidence: dict | None,
+    signals: dict | None = None,
+) -> dict:
+    """Tarea ÓPTIMA por skill: `{skill, activity, reason, support_level}` (V3.39).
+
+    Función PURA y determinista que decide QUÉ modalidad limita y QUÉ actividad
+    la cierra, separando esa decisión de la puntuación de prioridad (P1-02 de la
+    auditoría de V3.38.1). Orden declarado:
+
+    1. `error_prone` — confusión real acumulada (`wrong_word` repetido) → volver
+       a recuperar (`recall`);
+    2. `skill_gap` — hay logro previo y falta una modalidad de producción → la
+       actividad de ESA modalidad (oral → `sentence`; escrita → `write`);
+    3. `slow_recall` — recuperación correcta pero lenta → `recall`.
+    4. `transfer_gap` — la unidad ya se usa con éxito pero solo en un contexto →
+       usarla en un contexto NUEVO (`transfer`, modalidad `spontaneous_use`).
+
+    Si no hay directriz devuelve `{skill: "", activity: "", reason: "",
+    support_level: ""}`: la escalera de competencia de V3.35 decide y el
+    comportamiento previo no cambia. Nunca lanza.
+    """
+    try:
+        resolvers = {
+            "error_prone": lambda: (
+                RECALL_SKILL if error_prone(evidence) else ""
+            ),
+            "skill_gap": lambda: directed_production_gap(matrix, evidence),
+            "slow_recall": lambda: (
+                RECALL_SKILL if is_slow_recall(evidence) else ""
+            ),
+            "transfer_gap": lambda: (
+                TRANSFER_SKILL if transfer_gap(evidence) else ""
+            ),
+        }
+        for reason in EVIDENCE_REASON_ORDER:
+            # Cada resolutor devuelve la MODALIDAD que limita (o "" si esa razón
+            # no aplica): la tabla `ACTIVITY_FOR_SKILL` cierra el resto.
+            skill = resolvers[reason]()
+            if skill:
+                return _task(skill, reason)
+    except Exception:  # noqa: BLE001 — el planner nunca rompe la cola
+        return {"skill": "", "activity": "", "reason": "", "support_level": ""}
+    return {"skill": "", "activity": "", "reason": "", "support_level": ""}
+
+
+def evidence_reason(matrix: dict | None, evidence: dict | None) -> str:
+    """Razón dirigida por la evidencia fina, o "" (V3.38 → V3.39, puro).
+
+    Se conserva como fachada estable del vocabulario de razones: delega en
+    `select_task` (única fuente de verdad). Un resumen vacío o legacy devuelve
+    "": las razones de hueco de V3.35 siguen siendo la decisión por defecto.
+    """
+    return select_task(matrix, evidence).get("reason", "")
+
 
 
 def planned_signals(
@@ -274,6 +508,9 @@ def planned_signals(
     - `skills` — V3.38.1: las señales `weakness`/`support`/`latency` y la
       `success_rate` segmentadas POR MODALIDAD, que evitan recomprimir la
       evidencia fina en una sola media global.
+    - `transfer` / `success_contexts` / `home_context` — V3.40: transferencia
+      contextual (éxito en >= 2 contextos distintos) y los contextos con éxito,
+      la señal que habilita la tarea `transfer` (`spontaneous_use`).
     """
     ev = evidence or {}
     mx = matrix or {}
@@ -321,6 +558,13 @@ def planned_signals(
         "skills": skill_signals(ev),
         "error_prone": error_prone(ev),
         "slow_recall": is_slow_recall(ev),
+        # V3.40 (Fase 4): transferencia contextual (contexto distinto del de
+        # aprendizaje). Señal del ítem, no de una modalidad.
+        "transfer": has_contextual_transfer(ev),
+        "transfer_gap": transfer_gap(ev),
+        "success_contexts": list(ev.get("success_contexts") or []),
+        "home_context": ev.get("home_context") or "",
+        "context_attempts": _int(ev.get("context_attempts")),
     }
 
 
@@ -363,6 +607,8 @@ def explain_priority(signals: dict, reason: str = "") -> str:
             parts.append("production modality still missing")
     if reason == "slow_recall":
         parts.append("correct but not yet fluent")
+    if reason == "transfer_gap":
+        parts.append("used in one context only; time to transfer it")
     if reason == "automatic_maintenance":
         parts.append("automatic: spaced independent success")
     try:

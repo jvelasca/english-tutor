@@ -214,6 +214,92 @@ def test_translate_text_empty_raises():
         asyncio.run(translate_service.translate_text("   "))
 
 
+# --- V3.39 (Fase 2): traducción bidireccional (Traductor) ---------------------
+
+
+def _fake_chat_once_capture(calls, reply="Where is the bank?"):
+    async def fake(messages, model, temperature, mode="default", system_prompt=None):
+        calls.append((model, messages[-1].content, system_prompt))
+        return ChatResponse(
+            model=model,
+            content=reply,
+            total_duration_ms=10,
+            prompt_eval_count=1,
+            eval_count=1,
+        )
+
+    return fake
+
+
+def test_translate_text_es_en_uses_reverse_prompt(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        translate_service, "chat_once", _fake_chat_once_capture(calls)
+    )
+    result = asyncio.run(
+        translate_service.translate_text("¿Dónde está el banco?", direction="es-en")
+    )
+    assert result == "Where is the bank?"
+    prompt = calls[0][2]
+    assert "Spanish into English" in prompt
+
+
+def test_translate_text_default_direction_keeps_english_prompt(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        translate_service, "chat_once", _fake_chat_once_capture(calls, "Un banco")
+    )
+    asyncio.run(translate_service.translate_text("Where is the bank?"))
+    assert "English into Spanish" in calls[0][2]
+
+
+def test_translate_text_cache_is_per_direction(monkeypatch):
+    # La misma cadena en direcciones distintas no colisiona: son dos llamadas.
+    calls = []
+    monkeypatch.setattr(
+        translate_service, "chat_once", _fake_chat_once_capture(calls)
+    )
+    asyncio.run(translate_service.translate_text("hola", direction="es-en"))
+    asyncio.run(translate_service.translate_text("hola", direction="en-es"))
+    assert len(calls) == 2
+
+
+def test_translate_text_unknown_direction_falls_back_to_en_es(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        translate_service, "chat_once", _fake_chat_once_capture(calls, "Un banco")
+    )
+    result = asyncio.run(
+        translate_service.translate_text("Where is the bank?", direction="de-en")
+    )
+    assert result == "Un banco"
+    assert "English into Spanish" in calls[0][2]
+
+
+def test_translate_endpoint_accepts_es_en_direction(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        translate_service, "chat_once", _fake_chat_once_capture(calls)
+    )
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/translate",
+            json={"text": "¿Dónde está el banco?", "direction": "es-en"},
+        )
+    assert r.status_code == 200
+    assert r.json() == {"translation": "Where is the bank?"}
+    assert "Spanish into English" in calls[0][2]
+
+
+def test_translate_endpoint_rejects_unknown_direction_422():
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/translate",
+            json={"text": "Hello", "direction": "fr-en"},
+        )
+    assert r.status_code == 422
+
+
 # --- Endpoint -----------------------------------------------------------------
 
 
