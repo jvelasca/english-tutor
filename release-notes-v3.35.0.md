@@ -129,3 +129,10 @@ flowchart TD
   `ReviewQueueSection`).
 - `ruff check backend/` y `tsc --noEmit` limpios;
   `python scripts/check_release_consistency.py` → **3.35.0** exit 0.
+
+## CI verificable
+
+Commit `b304c257da1cffb408e127c80af1b43e12aa9955` con el run
+[34467763326](https://github.com/jvelasca/english-tutor/actions/runs/34467763326)
+en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build, release
+consistency, Beta V3.0 gate, content validation, Playwright E2E).

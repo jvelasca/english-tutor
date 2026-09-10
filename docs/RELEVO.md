@@ -44,8 +44,13 @@
 > ficheros/+8 tests: API de la cola — restaura los 3 casos preexistentes de
 > `getProfile`/`analyzeText`/`getEvents` —, `WordDrill` con `initialStep` y
 > `ReviewQueueSection`) + `tsc --noEmit` limpio + `check_release_consistency`
-> **3.35.0** exit 0. Detalle: `release-notes-v3.35.0.md` y `CHANGELOG.md`
-> `[3.35.0]`. Pendientes hacia **V3.36**: los P2 de la auditoría de V3.34.0
+> **3.35.0** exit 0. **CI verificable:** commit
+> `b304c257da1cffb408e127c80af1b43e12aa9955` con el run
+> [34467763326](https://github.com/jvelasca/english-tutor/actions/runs/34467763326)
+> en `success` (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+> release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+> Detalle: `release-notes-v3.35.0.md` y `CHANGELOG.md` `[3.35.0]`. Pendientes
+> hacia **V3.36**: los P2 de la auditoría de V3.34.0
 > (`response_time_ms`, clasificación de errores ortográficos, cues graduados,
 > `support_level`, `difficulty` en evidencia, refactor completo de
 > `wordDrill.tsx`), los diferidos de V3.30 (consumo de `word_breakdown_json`,
