@@ -16,6 +16,9 @@ from schemas.vocabulary import (
     DrillAttemptOut,
     DrillCandidatesOut,
     LexiconOut,
+    RecallAttemptIn,
+    RecallAttemptOut,
+    RecallPromptOut,
     RecognitionAttemptIn,
     RecognitionAttemptOut,
     RecognitionQuestionOut,
@@ -276,5 +279,63 @@ async def drill_recognition_attempt(
     outcome = "ok" if result["correct"] else "ko"
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{result['word']}:recognition:{outcome}"
+    )
+    return result
+
+
+@router.get("/api/vocabulary/drill/recall", response_model=RecallPromptOut)
+async def drill_recall_prompt(
+    word: str = Query(..., min_length=1, max_length=120),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Cue del paso Recall del drill (V3.34, Recall 2.0).
+
+    Camino inverso a Recognition: el alumno ve el SIGNIFICADO (traducción o
+    definición que no filtre la respuesta) y debe recuperar/teclear la palabra.
+    Puro y determinista sobre la caché global `dictionary_entries` (sin estado
+    servidor, premisa 21): el servidor re-deriva el cue al puntuar. Si no hay
+    cue utilizable devuelve `available=false` con `cue=""` (degradación
+    controlada, sin evento). La respuesta NUNCA incluye la palabra esperada."""
+    try:
+        return await vocabulary_service.get_recall_prompt(user["id"], word)
+    except ValueError:
+        raise HTTPException(
+            status_code=422, detail="La palabra buscada no es válida"
+        ) from None
+
+
+@router.post(
+    "/api/vocabulary/drill/recall-attempt",
+    response_model=RecallAttemptOut,
+)
+async def drill_recall_attempt(
+    body: RecallAttemptIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Intento del paso Recall del drill (V3.34).
+
+    El servidor re-deriva el cue con la misma función pura (premisa 21) y
+    compara la respuesta con la palabra (forma de superficie normalizada). En
+    acierto deja señal léxica PROPIA (recall + evento `recalled`; nunca
+    producción), acredita la recuperación demorada si el intento supera el
+    intervalo de retención y reprograma la carta FSRS `lexicon` de la palabra.
+    En fallo solo aplica el lapse FSRS si la palabra ya estaba rastreada. Si la
+    palabra ya no tiene pregunta, responde 409 sin evento."""
+    try:
+        result = await vocabulary_service.submit_recall_attempt(
+            user["id"], body.word, body.answer
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=422, detail="Intento de recall no válido"
+        ) from None
+    if result is None:
+        raise HTTPException(
+            status_code=409,
+            detail="La palabra ya no tiene pregunta de recall",
+        ) from None
+    outcome = "ok" if result["correct"] else "ko"
+    await learning_service.record_event(
+        user["id"], "exercise", f"drill:{result['word']}:recall:{outcome}"
     )
     return result

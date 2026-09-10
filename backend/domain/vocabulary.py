@@ -14,13 +14,16 @@ from starlette.concurrency import run_in_threadpool
 
 import config
 from domain import learning as learning_service
+from repositories import academy as academy_repo
 from repositories import dictionary as dictionary_repo
 from repositories import vocabulary as vocabulary_repo
 from services import (
     dictionary_content,
     dictionary_mcq,
     example_sentences,
+    fsrs,
     lexicon,
+    recall,
 )
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
@@ -200,12 +203,29 @@ async def get_drill_candidates(user_id: str, limit: int = 8) -> list[str]:
     `learning_events` de éxito de drill; V3.21/F6.2), ordenados por recuerdo
     ascendente y acotados a `limit`. Reemplaza el recálculo cliente de
     `recognized_not_produced` (SIGNAL-01/A2-07) y el criterio antiguo de salir
-    tras UNA producción del día (V20-06)."""
+    tras UNA producción del día (V20-06).
+
+    V3.34: las palabras con carta FSRS `lexicon` VENCIDA (recall pendiente) se
+    priorizan al frente de la lista, para que el repaso espaciado de la capa
+    léxica se manifieste en la escalera sin convertirse en una puerta."""
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     events = await learning_service.list_events(user_id, event_type="exercise")
     ok_days = lexicon.drill_ok_days(events)
-    today = datetime.now(timezone.utc).date().isoformat()
-    return lexicon.drill_candidates(rows, limit=limit, ok_days=ok_days, today=today)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    today = now_iso[:10]
+    cards = await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
+    due_words = {
+        card["target_id"]
+        for card in cards
+        if card.get("target_type") == "lexicon" and fsrs.is_due(card, now=now_iso)
+    }
+    return lexicon.drill_candidates(
+        rows,
+        limit=limit,
+        ok_days=ok_days,
+        today=today,
+        due_words=due_words,
+    )
 
 
 async def _record_retrieval(user_id: str, word: str) -> None:
@@ -450,6 +470,158 @@ async def submit_recognition_attempt(
         "correct_index": correct_index,
         "selected_index": selected_index,
     }
+
+
+# ---------------------------------------------------------------------------
+# Paso Recall del drill (V3.34, Recall 2.0). Camino INVERSO a Recognition: el
+# alumno ve el SIGNIFICADO (cue) y recupera/teclea la palabra. Recuperación
+# productiva por texto, sin micrófono. A diferencia de Recognition (SOLO
+# informativo, V3.13), el acierto de Recall SÍ deja señal en la capa léxica:
+# `recall_successes`/`recall_days` + evento `vocabulary_events` `recalled`
+# (NUNCA cuenta como producción: no toca `production_count` ni `<channel>_prod`,
+# ni saca la palabra de candidatas) y, si el intento supera el intervalo de
+# retención, acredita la recuperación demorada existente (`retrieval_*`).
+# Además reprograma la carta FSRS `lexicon` de la palabra con intervalos reales
+# (acierto inmediato = Good, recuperación demorada = Easy, fallo = Again).
+# La pregunta es pura y determinista sobre la caché global `dictionary_entries`
+# (`services.recall`); el servidor la re-deriva al puntuar y solo revela la
+# palabra esperada tras el intento (premisa 21).
+# ---------------------------------------------------------------------------
+
+
+async def get_recall_prompt(user_id: str, word: str) -> dict:
+    """Cue del paso Recall del drill (V3.34).
+
+    La pregunta NO depende del alumno (contenido global); `user_id` se conserva
+    por simetría con el resto de funciones de drill. Si no hay cue utilizable
+    (palabra sin entrada, o sin traducción ni definición que no filtre la
+    respuesta), devuelve `available=false` con `cue=""`: degradación controlada
+    sin evento (el peldaño muestra aviso y no rompe Sentence). La respuesta
+    NUNCA incluye la forma esperada: la revela el POST tras puntuar.
+    """
+    normalized = _normalize_lookup_word(word)
+    if not normalized:
+        raise ValueError("La palabra buscada no es válida")
+    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    built = recall.recall_prompt_for(normalized, entries)
+    if built is None:
+        return {
+            "word": normalized,
+            "available": False,
+            "cue": "",
+            "cue_kind": "",
+        }
+    return {
+        "word": normalized,
+        "available": True,
+        "cue": built["cue"],
+        "cue_kind": built["cue_kind"],
+    }
+
+
+async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | None:
+    """Puntúa un intento del paso Recall (V3.34) y deja su señal.
+
+    El servidor re-deriva el cue con la misma función pura (premisa 21) y
+    compara la respuesta normalizada con la palabra (igualdad estricta de
+    superficie, sin tolerar variantes: recuperar la forma es el objetivo).
+    Devuelve `None` si la palabra ya no tiene pregunta (el router responde un
+    4xx controlado sin evento).
+
+    En el acierto: `record_recalls` (señal de recall + ledger `recalled`),
+    `_record_retrieval` (recuperación demorada si el intento supera el intervalo
+    de retención) y la reprogramación de la carta FSRS de la palabra. En el
+    fallo: solo la carta FSRS (`Again`), y únicamente si ya existía, para no
+    inventar deuda de repaso de una palabra no rastreada.
+    """
+    normalized = _normalize_lookup_word(word)
+    if not normalized:
+        raise ValueError("La palabra buscada no es válida")
+    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    built = recall.recall_prompt_for(normalized, entries)
+    if built is None:
+        return None
+    given = _normalize_lookup_word(answer)
+    correct = bool(given) and given == normalized
+    delayed = False
+    recall_days = 0
+    if correct:
+        rows_before = await run_in_threadpool(
+            vocabulary_repo.get_vocabulary, user_id
+        )
+        before_successes = int(
+            (_row_for_word(rows_before, normalized) or {}).get(
+                "retrieval_successes"
+            )
+            or 0
+        )
+        await run_in_threadpool(
+            vocabulary_repo.record_recalls, user_id, [normalized]
+        )
+        await _record_retrieval(user_id, normalized)
+        rows_after = await run_in_threadpool(
+            vocabulary_repo.get_vocabulary, user_id
+        )
+        row = _row_for_word(rows_after, normalized) or {}
+        # La recuperación demorada la acredita `record_retrievals` (si el intento
+        # supera el intervalo respecto al ancla): se detecta por el incremento
+        # real del contador, no re-implementando la regla aquí.
+        delayed = int(row.get("retrieval_successes") or 0) > before_successes
+        recall_days = int(row.get("recall_days") or 0)
+    await _reschedule_lexicon_card(
+        user_id, normalized, correct=correct, delayed=delayed
+    )
+    return {
+        "word": normalized,
+        "correct": correct,
+        "expected": normalized,
+        "delayed": delayed,
+        "recall_days": recall_days,
+    }
+
+
+async def _reschedule_lexicon_card(
+    user_id: str, word: str, *, correct: bool, delayed: bool
+) -> None:
+    """Reprograma la carta FSRS de la palabra tras un intento de Recall (V3.34).
+
+    Acierto inmediato → `Good`; recuperación demorada → `Easy`; fallo → `Again`
+    (lapse). No crea carta por un FALLO de una palabra no rastreada (no se
+    inventa deuda de repaso); en acierto sí la siembra si no existía. Nunca
+    lanza: el scheduling es señal pedagógica y no debe romper la puntuación.
+    `sync_fsrs_cards` respeta las cartas con `reps > 0`, así que este intervalo
+    no se pisa en la siguiente sincronización.
+    """
+    try:
+        existing = await run_in_threadpool(
+            academy_repo.get_fsrs_card, user_id, "lexicon", word
+        )
+        if existing is None:
+            if not correct:
+                return
+            card = fsrs.empty_card(
+                target_type="lexicon",
+                target_id=word,
+                label=word,
+                why="recall",
+            )
+        else:
+            card = existing
+        if not correct:
+            grade, why = fsrs.GRADE_AGAIN, "recall-miss"
+        elif delayed:
+            grade, why = fsrs.GRADE_EASY, "recall-delayed"
+        else:
+            grade, why = fsrs.GRADE_GOOD, "recall"
+        updated = fsrs.schedule(card, grade, why=why)
+        await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
+    except Exception:  # noqa: BLE001 — señal no bloqueante
+        logger.warning(
+            "No se pudo reprogramar la carta FSRS user=%s word=%s",
+            user_id,
+            word,
+            exc_info=True,
+        )
 
 
 # ---------------------------------------------------------------------------

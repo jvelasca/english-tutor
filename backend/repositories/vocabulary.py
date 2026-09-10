@@ -81,12 +81,19 @@ _CHANNEL_COLUMN: dict[str, str] = {
 
 # Tipos de evento del ledger léxico (V3.26, Eje B/F-B2): la historia detallada
 # por forma de superficie. `produced` (mensaje del alumno en que apareció la
-# palabra), `exposed` (mensaje del tutor) y `retrieval` (recuperación demorada
-# correcta). Semántica de conteo idéntica a la de los contadores agregados:
-# presencia de la palabra en un mensaje/intento (extract_words único), nunca
-# frecuencia de tokens. La historia empieza en V3.26; SIN backfill (mejor
-# perder el histórico fino que inventarlo; los contadores conservan el agregado).
-VOCABULARY_EVENT_TYPES: tuple[str, ...] = ("produced", "exposed", "retrieval")
+# palabra), `exposed` (mensaje del tutor), `retrieval` (recuperación demorada
+# correcta) y `recalled` (V3.34: recuperación correcta de la palabra desde su
+# significado en el paso Recall del drill, sin acreditar producción). Semántica
+# de conteo idéntica a la de los contadores agregados: presencia de la palabra
+# en un mensaje/intento (extract_words único), nunca frecuencia de tokens. La
+# historia empieza en V3.26; SIN backfill (mejor perder el histórico fino que
+# inventarlo; los contadores conservan el agregado).
+VOCABULARY_EVENT_TYPES: tuple[str, ...] = (
+    "produced",
+    "exposed",
+    "retrieval",
+    "recalled",
+)
 
 
 def _insert_event(
@@ -248,6 +255,64 @@ def record_retrievals(user_id: str, words: list[str]) -> bool:
     return True
 
 
+def record_recalls(user_id: str, words: list[str]) -> bool:
+    """Registra una RECUPERACIÓN correcta de la palabra desde su significado.
+
+    V3.34 (Recall 2.0): capa PROPIA del recall por texto (paso Recall del
+    drill). A diferencia de `record_production`, NO acredita producción: no
+    toca `production_count` ni las columnas `<channel>_prod`, y no ensucia
+    `first_seen`/`last_seen` (que miden producción). A diferencia de
+    `record_retrievals`, no exige que el intento quede fuera de la ventana: es
+    la señal de recuperación en sí misma (la recuperación demorada la sigue
+    acreditando `record_retrievals`).
+
+    - `recall_successes += 1` (nº de recuperaciones correctas);
+    - si el día de `last_recall_at` es distinto del actual, `recall_days += 1`
+      (días distintos con recall);
+    - `last_recall_at = now`.
+
+    Crea la fila si no existe (palabra consultada en el diccionario y nunca
+    expuesta/producida) con `production_count = 0`/`exposure_count = 0`: el
+    recall no inventa producción. Devuelve False si el usuario no existe."""
+    if get_user(user_id) is None:
+        return False
+    if not words:
+        return True
+    now = _now()
+    today = _day(now)
+    with closing(_conn()) as conn, conn:
+        for w in words:
+            row = conn.execute(
+                "SELECT last_recall_at, lexical_unit, lemma FROM vocabulary "
+                "WHERE user_id = ? AND word = ?",
+                (user_id, w),
+            ).fetchone()
+            new_day = (
+                1
+                if row is None or _day(row["last_recall_at"] or "") != today
+                else 0
+            )
+            lemma = row["lemma"] if row else ""
+            unit = (row["lexical_unit"] if row else "") or lexical_unit_key(w, lemma)
+            conn.execute(
+                "INSERT INTO vocabulary "
+                "(user_id, word, production_count, exposure_count, first_seen, "
+                "last_seen, recall_successes, recall_days, last_recall_at, "
+                "lexical_unit) "
+                "VALUES (?, ?, 0, 0, '', '', 1, ?, ?, ?) "
+                "ON CONFLICT(user_id, word) DO UPDATE SET "
+                "recall_successes = vocabulary.recall_successes + 1, "
+                "recall_days = vocabulary.recall_days + excluded.recall_days, "
+                "last_recall_at = excluded.last_recall_at, "
+                "lexical_unit = CASE WHEN vocabulary.lexical_unit = '' "
+                "THEN excluded.lexical_unit ELSE vocabulary.lexical_unit END",
+                (user_id, w, new_day, now, unit),
+            )
+            # Ledger léxico (V3.26): una recuperación correcta de recall.
+            _insert_event(conn, user_id, w, unit, "recalled", "", "", now)
+    return True
+
+
 def _earliest_day(first_seen: str, first_exposed_at: str) -> date | None:
     """Fecha más temprana entre la primera producción y la primera exposición
     (ancla de la ventana de retención). None si no hay ninguna."""
@@ -320,7 +385,8 @@ def get_vocabulary(user_id: str) -> list[dict]:
     por destreza (V3.19: `chat_prod`/`speaking_prod`/`writing_prod`/
     `conversation_prod`). V3.23 añade la evidencia de recuperación demorada
     (`retrieval_successes`/`retrieval_days`/`last_retrieval_at`) y el contexto
-    de producción por actividad (`context_tags`)."""
+    de producción por actividad (`context_tags`). V3.34 añade la señal de recall
+    por texto (`recall_successes`/`recall_days`/`last_recall_at`)."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT word, production_count, first_seen, last_seen, "
@@ -329,6 +395,7 @@ def get_vocabulary(user_id: str) -> list[dict]:
             "cefr, level_id, objective_id, source, lemma, kind, lexical_unit, "
             "chat_prod, speaking_prod, writing_prod, conversation_prod, "
             "retrieval_successes, retrieval_days, last_retrieval_at, "
+            "recall_successes, recall_days, last_recall_at, "
             "context_tags "
             "FROM vocabulary "
             "WHERE user_id = ? ORDER BY production_count DESC, word ASC",

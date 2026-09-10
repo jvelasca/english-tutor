@@ -1,5 +1,5 @@
 /**
- * Escalera de micro-drill de una palabra (V3.19/V3.21/V3.33):
+ * Escalera de micro-drill de una palabra (V3.19/V3.21/V3.33/V3.34):
  * Recognition → Recall → Sentence.
  *
  * Extraída de `PersonalDictionary` para el Dictionary → Learning Bridge (V3.32):
@@ -14,19 +14,26 @@
  * V3.33: el peldaño Recognition (MCQ definición ↔ palabra) es SOLO
  * informativo — su acierto no demuestra destreza productiva (V3.13) y no
  * dispara `onProduced`; tampoco usa micrófono (lo puntúa el backend).
+ * V3.34 (Recall 2.0): el peldaño Recall es RECUPERACIÓN por TEXTO — el alumno
+ * ve el SIGNIFICADO (cue) y teclea la palabra; no usa micrófono y su acierto
+ * NO acredita producción (solo señal léxica de recall + FSRS), así que tampoco
+ * dispara `onProduced`. El micrófono queda reservado al paso Sentence.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, type Variants } from "motion/react";
 import { Check, Loader2, Mic, Square } from "lucide-react";
 import {
+  getDrillRecallPrompt,
   getDrillRecognitionQuestion,
   getDrillSentenceContext,
-  submitDrillAttempt,
+  submitDrillRecallAttempt,
   submitDrillRecognitionAttempt,
   submitDrillSentenceAttempt,
 } from "../../api/vocabulary";
 import type {
   DrillAttempt,
+  DrillRecallAttempt,
+  DrillRecallPrompt,
   DrillRecognitionAttempt,
   DrillRecognitionQuestion,
   DrillSentenceAttempt,
@@ -146,11 +153,93 @@ export function isSentenceAttempt(
   return "passed" in outcome;
 }
 
+interface RecallStepProps {
+  prompt: DrillRecallPrompt | null;
+  error: string | null;
+  answer: string;
+  onAnswerChange: (value: string) => void;
+  outcome: DrillRecallAttempt | null;
+  processing: boolean;
+  onSubmit: () => void;
+}
+
+/** Peldaño Recall (V3.34): recuperación por texto. Presentacional: el estado y
+ * el scoring viven en `WordDrill` (el servidor puntúa, premisa 21). Sin
+ * micrófono: el alumno escribe la palabra a partir del significado (cue). */
+function RecallStep({
+  prompt,
+  error,
+  answer,
+  onAnswerChange,
+  outcome,
+  processing,
+  onSubmit,
+}: RecallStepProps) {
+  const { t } = useI18n();
+  if (!prompt) {
+    return error ? (
+      <p className="text-xs text-destructive" role="alert">
+        {error}
+      </p>
+    ) : (
+      <Loader2
+        className="size-4 animate-spin text-muted-foreground"
+        aria-hidden="true"
+      />
+    );
+  }
+  if (!prompt.available) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {t("dictionary.drill.recallUnavailable")}
+      </p>
+    );
+  }
+  const done = outcome !== null;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">
+        {t("dictionary.drill.recallPrompt")}
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={answer}
+          onChange={(e) => onAnswerChange(e.target.value)}
+          disabled={processing || done}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          lang="en"
+          aria-label={t("dictionary.drill.recallInputLabel")}
+          placeholder={t("dictionary.drill.recallPlaceholder")}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60"
+        />
+        <motion.button
+          type="button"
+          onClick={() => onSubmit()}
+          disabled={!answer.trim() || processing || done}
+          whileTap={processing ? undefined : { scale: 0.96 }}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+        >
+          {processing ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Check className="size-4" aria-hidden="true" />
+          )}
+          {t("dictionary.drill.recallCheck")}
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
 /** Micro-práctica escalera de una palabra (V3.21/F6): Paso 1 "Recognition"
  * (V3.33, eslabón 2 del puente) — elige el significado de la palabra entre
  * opciones servidas por el backend (MCQ definición ↔ palabra, sin micrófono);
- * Paso 2 "Recall" — di la palabra (scorer `submitDrillAttempt`); Paso 3
- * "Sentence" — repítela DENTRO de una frase de contexto determinista (scorer
+ * Paso 2 "Recall" (V3.34, Recall 2.0) — recupera y teclea la palabra a partir
+ * de su significado (sin micrófono, puntuado en servidor); Paso 3 "Sentence" —
+ * repítela DENTRO de una frase de contexto determinista (scorer
  * `submitDrillSentenceAttempt`). Reutiliza el scorer de pronunciación del
  * servidor. No declara dominio (D5/E3): una producción del día no consolida;
  * se consolida con éxito espaciado (F6.2).
@@ -162,7 +251,11 @@ export function isSentenceAttempt(
  * V3.33.1: el drill ARRANCA en Recognition (primer peldaño real de la escalera)
  * y solo degrada a Recall si el backend responde `available=false`; cada
  * intento pide un `question_id` nuevo para rebarajar la posición de la
- * correcta. */
+ * correcta.
+ * V3.34: el peldaño Recall pasa a ser recuperación por TEXTO (se retira el
+ * paso oral de palabra suelta): el micrófono queda solo para Sentence y
+ * `onProduced` solo lo dispara Sentence (un recall correcto deja señal léxica
+ * de recall, no producción). Si Recall no tiene cue, degrada a Sentence. */
 export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps) {
   const { t } = useI18n();
   // V3.33.1: el drill abre en el primer peldaño (Recognition). Si la pregunta
@@ -187,6 +280,14 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
   );
   const [recognitionOutcome, setRecognitionOutcome] =
     useState<DrillRecognitionAttempt | null>(null);
+  // V3.34: estado del paso Recall (cue + palabra tecleada; la esperada solo
+  // llega en la respuesta).
+  const [recall, setRecall] = useState<DrillRecallPrompt | null>(null);
+  const [recallError, setRecallError] = useState<string | null>(null);
+  const [recallAnswer, setRecallAnswer] = useState("");
+  const [recallOutcome, setRecallOutcome] = useState<DrillRecallAttempt | null>(
+    null,
+  );
   // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
   const recordingSession = useRecordingSession(recording, {
     onAutoStop: () => {
@@ -196,6 +297,41 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
       }
     },
   });
+
+  /** Carga la frase de contexto del paso Sentence (determinista en servidor). */
+  const loadSentence = useCallback(() => {
+    setSentenceError(null);
+    getDrillSentenceContext(userId, word)
+      .then((ctx) => setSentence(ctx))
+      .catch((e) =>
+        setSentenceError(t("dictionary.drill.error").concat((e as Error).message)),
+      );
+  }, [userId, word, t]);
+
+  /** Carga el cue del paso Recall (V3.34). Si no hay cue utilizable
+   * (`available=false`), degrada a Sentence sin romper la escalera y sin pisar
+   * una elección manual de otro paso. */
+  const loadRecall = useCallback(() => {
+    setRecallError(null);
+    setRecallAnswer("");
+    setRecallOutcome(null);
+    getDrillRecallPrompt(userId, word)
+      .then((prompt) => {
+        setRecall(prompt);
+        if (!prompt.available) {
+          setStep((current) => {
+            if (current !== "recall") return current;
+            loadSentence();
+            return "sentence";
+          });
+        }
+      })
+      .catch((e) =>
+        setRecallError(
+          t("dictionary.drill.error").concat((e as Error).message),
+        ),
+      );
+  }, [userId, word, t, loadSentence]);
 
   /** Pide una pregunta de Recognition (V3.33.1): cada intento recibe un
    * `question_id` nuevo, así que la posición de la correcta cambia entre
@@ -211,7 +347,11 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         if (!question.available) {
           // Degrada solo si el alumno sigue en Recognize: no pisa una elección
           // manual de otro paso (p. ej. ya está en Sentence).
-          setStep((current) => (current === "recognition" ? "recall" : current));
+          setStep((current) => {
+            if (current !== "recognition") return current;
+            loadRecall();
+            return "recall";
+          });
         }
       })
       .catch((e) =>
@@ -219,7 +359,7 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
           t("dictionary.drill.error").concat((e as Error).message),
         ),
       );
-  }, [userId, word, t]);
+  }, [userId, word, t, loadRecall]);
 
   // V3.33.1: el drill arranca en Recognition (primer peldaño real de la
   // escalera) y limpia el intento anterior al montar o cambiar de palabra.
@@ -230,6 +370,7 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
     setResult(null);
     setError(null);
     setRecognition(null);
+    setRecall(null);
     loadRecognition();
   }, [loadRecognition]);
 
@@ -245,13 +386,14 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
       setStep(next);
       return;
     }
+    if (next === "recall") {
+      // V3.34: cada entrada en Recall pide el cue (determinista en servidor).
+      loadRecall();
+      setStep(next);
+      return;
+    }
     if (next === "sentence" && !sentence) {
-      setSentenceError(null);
-      getDrillSentenceContext(userId, word)
-        .then((ctx) => setSentence(ctx))
-        .catch((e) =>
-          setSentenceError(t("dictionary.drill.error").concat((e as Error).message)),
-        );
+      loadSentence();
     }
     setStep(next);
   }
@@ -270,6 +412,20 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         recognition.question_id,
       );
       setRecognitionOutcome(outcome);
+    } catch (e) {
+      setError(t("dictionary.drill.error").concat((e as Error).message));
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function submitRecall() {
+    if (!recall || !recall.available || !recallAnswer.trim()) return;
+    setProcessing(true);
+    setError(null);
+    try {
+      const outcome = await submitDrillRecallAttempt(userId, word, recallAnswer);
+      setRecallOutcome(outcome);
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));
     } finally {
@@ -306,15 +462,11 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
         if (blob.size === 0) return;
         setProcessing(true);
         try {
-          const attempt: DrillOutcome =
-            step === "sentence"
-              ? await submitDrillSentenceAttempt(userId, word, blob)
-              : await submitDrillAttempt(userId, word, blob);
+          // V3.34: el micrófono queda reservado al paso Sentence (la escalera
+          // ya no tiene un paso oral de palabra suelta).
+          const attempt = await submitDrillSentenceAttempt(userId, word, blob);
           setResult(attempt);
-          const success = isSentenceAttempt(attempt)
-            ? attempt.passed
-            : attempt.produced;
-          if (success) onProduced();
+          if (attempt.passed) onProduced();
         } catch (e) {
           setError(t("dictionary.drill.error").concat((e as Error).message));
         } finally {
@@ -335,18 +487,28 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
     ? `${t("asr.title")} — ${t(`asr.message.${asrUnclear.asr_status}`)}`
     : "";
 
-  const phraseReady = step === "recall" || sentence !== null;
   const micBlocked =
-    processing || (step === "sentence" && (sentence === null || sentenceError !== null));
+    processing ||
+    (step === "sentence" && (sentence === null || sentenceError !== null));
+  // V3.34: en Recall se OCULTA la palabra diana (el resultado la revela).
+  const hideTarget = step === "recall" && recallOutcome === null;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-background/60 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-lg font-semibold" lang="en">
-            {word}
-          </span>
-          <ListenButton text={word} label={t("speak.phrase")} />
+          {hideTarget ? (
+            <span className="text-base font-semibold">
+              {recall ? recall.cue : "…"}
+            </span>
+          ) : (
+            <>
+              <span className="text-lg font-semibold" lang="en">
+                {word}
+              </span>
+              <ListenButton text={word} label={t("speak.phrase")} />
+            </>
+          )}
         </div>
         <button
           type="button"
@@ -358,7 +520,7 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
       </div>
 
       {/* Escalera Recognize -> Recall -> Sentence en la misma tarjeta
-          (V3.21/F6.1 + V3.33 Recognition). */}
+          (V3.21/F6.1 + V3.33 Recognition + V3.34 Recall por texto). */}
       <div
         role="group"
         aria-label={t("dictionary.drill.steps")}
@@ -435,7 +597,15 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
           />
         )
       ) : step === "recall" ? (
-        <p className="text-xs text-muted-foreground">{t("dictionary.drill.prompt")}</p>
+        <RecallStep
+          prompt={recall}
+          error={recallError}
+          answer={recallAnswer}
+          onAnswerChange={setRecallAnswer}
+          outcome={recallOutcome}
+          processing={processing}
+          onSubmit={() => void submitRecall()}
+        />
       ) : sentence ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted-foreground">
@@ -494,12 +664,12 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
             {t("dictionary.drill.recognitionCheck")}
           </motion.button>
         </div>
-      ) : (
+      ) : step === "recall" ? null : (
         <div className="flex items-center gap-3">
           <motion.button
             type="button"
             onClick={() => void toggle()}
-            disabled={!phraseReady || micBlocked}
+            disabled={!sentence || micBlocked}
             aria-pressed={recording}
             aria-label={
               processing
@@ -583,6 +753,27 @@ export function WordDrill({ userId, word, onProduced, onClose }: WordDrillProps)
             : t("dictionary.drill.recognitionIncorrect").replace(
                 "{correct}",
                 recognition?.options[recognitionOutcome.correct_index] ?? "—",
+              )}
+        </div>
+      )}
+
+      {/* V3.34: feedback del paso Recall (recuperación por texto: el acierto
+          deja señal léxica de recall, nunca producción ni onProduced). */}
+      {step === "recall" && recallOutcome && (
+        <div
+          className={cn(
+            "rounded-md px-3 py-2 text-sm",
+            recallOutcome.correct
+              ? "bg-success/10 text-success"
+              : "bg-warning/10 text-warning",
+          )}
+          role="status"
+        >
+          {recallOutcome.correct
+            ? t("dictionary.drill.recallCorrect")
+            : t("dictionary.drill.recallIncorrect").replace(
+                "{expected}",
+                recallOutcome.expected || "—",
               )}
         </div>
       )}

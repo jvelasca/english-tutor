@@ -8,6 +8,23 @@
 
 ## Estado actual
 
+- ✅ **V3.34 — Dictionary → Learning Bridge, eslabón 3: Recall 2.0 (texto)
+  (2026-09-10)** (**Versión estable `3.34.0`**, app `3.33.1 → 3.34.0`). El
+  peldaño intermedio del drill deja de ser una repetición oral de la palabra y
+  pasa a ser recuperación REAL por texto: el alumno ve el SIGNIFICADO (cue =
+  traducción o definición sin spoiler) y teclea la palabra. A diferencia de
+  Recognition (informativo), el acierto deja señal léxica PROPIA
+  (`recall_successes`/`recall_days` + ledger `recalled`) sin acreditar
+  producción, acredita la recuperación demorada existente si supera el
+  intervalo (`retrieval_*`) y reprograma la carta FSRS `lexicon` con intervalos
+  reales (Good/Easy/Again). La escalera queda en tres peldaños
+  (`1 · Recognize` · `2 · Recall` · `3 · Sentence`) con el micrófono reservado a
+  Sentence; si Recall no tiene cue, degrada a Sentence sin romperla. Endpoints
+  `GET /api/vocabulary/drill/recall` y `POST …/recall-attempt`; migración
+  idempotente y sin backfill de la capa de recall. Tests: pytest **1743** (+20),
+  vitest (63 ficheros/**549**, +2), `ruff`/`tsc` limpios y
+  `check_release_consistency` **3.34.0** exit 0.
+
 - ✅ **V3.33.1 — Hardening de Recognition (auditoría V3.33.0) (2026-09-10)**
   (**Versión estable `3.33.1`**, app `3.33.0 → 3.33.1`). Dos correcciones P1 de
   la auditoría externa, sin tocar la evidencia (sigue SOLO informativa) ni la
@@ -1179,6 +1196,20 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   dirigida de las falladas y palabras tocables en transcripts/chat) y los
   eslabones restantes del puente — recall demorado con FSRS y transferencia
   por contexto de actividad V3.23 (según `agentes/v332-dictionary-learning-bridge.md`).
+
+- ~~**⏳ V3.34 — Recall 2.0 (recuperación por texto + FSRS), eslabón 3 del
+  puente**~~ ✅ **cerrado (2026-09-10, v3.34.0)**: implementado y publicado
+  (ver «Estado actual» arriba, `release-notes-v3.34.0.md` y
+  `agentes/v334-recall-2.0.md`). El peldaño intermedio del drill pasa a ser
+  recuperación real por texto (cue = significado, nunca la palabra): señal de
+  recall propia (`recall_successes`/`recall_days` + ledger `recalled`),
+  recuperación demorada si supera el intervalo y reprogramación FSRS `lexicon`
+  con intervalos reales; la escalera queda `1 · Recognize` · `2 · Recall` ·
+  `3 · Sentence`, con el micrófono solo en Sentence. Siguiente incremento hacia
+  **V3.35**: los diferidos de V3.30 (consumo de `word_breakdown_json` en
+  agregados/práctica dirigida de las falladas y palabras tocables en
+  transcripts/chat), la transferencia por contexto de actividad V3.23 y el
+  Lexical Evidence Engine / Evidence Graph como fuente longitudinal.
 
 - ~~**⏳ V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅ **cerrado
   (2026-09-07, v3.19.0)**: implementado con las decisiones cerradas de diseño

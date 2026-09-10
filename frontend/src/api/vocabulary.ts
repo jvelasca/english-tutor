@@ -4,6 +4,8 @@ import type {
   DictionaryLookupRequest,
   DrillAttempt,
   DrillCandidates,
+  DrillRecallAttempt,
+  DrillRecallPrompt,
   DrillRecognitionAttempt,
   DrillRecognitionQuestion,
   DrillSentenceAttempt,
@@ -152,5 +154,40 @@ export function submitDrillRecognitionAttempt(
   return postJson<DrillRecognitionAttempt>(
     `/api/vocabulary/drill/recognition-attempt?${query}`,
     { word, selected_index: selectedIndex, question_id: questionId },
+  );
+}
+
+/** Cue del paso Recall del drill (V3.34, Recall 2.0).
+ *
+ * Camino inverso a Recognition: el alumno ve el SIGNIFICADO (traducción o
+ * definición que no filtre la respuesta) y debe teclear la palabra. Puro y
+ * determinista en el servidor (premisa 21): el GET nunca incluye la palabra
+ * esperada. `available=false` con `cue=""` es la degradación controlada
+ * (palabra sin entrada o cue circular): el peldaño muestra aviso y no rompe
+ * Sentence. */
+export function getDrillRecallPrompt(
+  userId: string,
+  word: string,
+): Promise<DrillRecallPrompt> {
+  const query = new URLSearchParams({
+    user_id: userId,
+    word,
+  }).toString();
+  return getJson<DrillRecallPrompt>(`/api/vocabulary/drill/recall?${query}`);
+}
+
+/** Intento del paso Recall del drill (V3.34): envía la palabra tecleada y el
+ * servidor la compara con la diana (nunca se declara acierto en el cliente).
+ * Un acierto deja señal léxica propia (recall + FSRS) pero NUNCA acredita
+ * producción: no dispara `onProduced`. */
+export function submitDrillRecallAttempt(
+  userId: string,
+  word: string,
+  answer: string,
+): Promise<DrillRecallAttempt> {
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  return postJson<DrillRecallAttempt>(
+    `/api/vocabulary/drill/recall-attempt?${query}`,
+    { word, answer },
   );
 }

@@ -431,6 +431,21 @@ def _retrieval_successes(row: dict) -> int:
     return _int(row.get("retrieval_successes"))
 
 
+def _recall_successes(row: dict) -> int:
+    """Nº de recuperaciones correctas de RECALL por texto (V3.34).
+
+    Señal propia del paso Recall del drill (teclear la palabra desde su
+    significado). Distinta de la producción (`<channel>_prod`) y de la
+    recuperación demorada (`retrieval_successes`): no acredita ni una ni otra,
+    solo constata que el alumno recuperó la palabra."""
+    return _int(row.get("recall_successes"))
+
+
+def _recall_days(row: dict) -> int:
+    """Días distintos con recuperación correcta de recall (V3.34)."""
+    return _int(row.get("recall_days"))
+
+
 def production_contexts(row: dict) -> list[str]:
     """Contextos de producción `channel:activity` del ítem (V3.23, P1-04).
 
@@ -486,6 +501,11 @@ def item_competence_matrix(row: dict) -> dict:
     - `spaced_exposure` / `spaced_production` — señales espaciadas
       independientes (exposición receptiva en días distintos / producción en
       días distintos): informan, no certifican retención (V3.23).
+    - `cued_recall` — V3.34: el alumno ha RECUPERADO la palabra desde su
+      significado en el paso Recall del drill (`recall_successes > 0`), por
+      texto y sin micrófono. Señal propia: no acredita producción ni sustituye
+      la recuperación demorada (`retention`), pero es más fuerte que reconocer
+      el significado.
     - `production_gap`    — reconocida pero NUNCA producida (`recognition &&
       !production`): el gap que cierra el speaking micro-drill (antes `gap`).
     - `transfer_gap`      — producida en ejercicios pero nunca usada en otro
@@ -528,6 +548,9 @@ def item_competence_matrix(row: dict) -> dict:
         "spaced_production": spaced_production,
         "retrieval_successes": _retrieval_successes(row),
         "retrieval_days": _retrieval_days(row),
+        "cued_recall": _recall_successes(row) > 0,
+        "recall_successes": _recall_successes(row),
+        "recall_days": _recall_days(row),
         "production_gap": recognition and not production,
         "transfer_gap": recognition and production and not transfer,
     }
@@ -555,8 +578,9 @@ def summary(rows: list[dict], now: str = "") -> dict:
     la matriz de competencia (V3.21/V3.22/V3.23): `recognized`, `produced`,
     `transfer`, `retention` (V3.23: recuperación demorada), `production_gap`
     (reconocidas-nunca-producidas), `transfer_gap` (producidas en ejercicios
-    sin transferencia a otro contexto) y `spaced_exposure` (informativo:
-    expuestas en días distintos, señal receptiva independiente de la retención)."""
+    sin transferencia a otro contexto), `spaced_exposure` (informativo:
+    expuestas en días distintos, señal receptiva independiente de la retención)
+    y `recalled` (V3.34: recuperadas desde el significado en el paso Recall)."""
     statuses = {"mastered": 0, "learning": 0, "known": 0, "weak": 0}
     competence = {
         "recognized": 0,
@@ -566,6 +590,7 @@ def summary(rows: list[dict], now: str = "") -> dict:
         "production_gap": 0,
         "transfer_gap": 0,
         "spaced_exposure": 0,
+        "recalled": 0,
     }
     for row in rows:
         statuses[item_status(row, now)] += 1
@@ -580,6 +605,8 @@ def summary(rows: list[dict], now: str = "") -> dict:
             competence["retention"] += 1
         if matrix["spaced_exposure"]:
             competence["spaced_exposure"] += 1
+        if matrix["cued_recall"]:
+            competence["recalled"] += 1
         if matrix["production_gap"]:
             competence["production_gap"] += 1
         if matrix["transfer_gap"]:
@@ -658,6 +685,7 @@ def drill_candidates(
     *,
     ok_days: dict[str, set[str]] | None = None,
     today: str = "",
+    due_words: set[str] | None = None,
 ) -> list[str]:
     """Candidatos a speaking micro-drill escalera (V3.21, F6/V20-06).
 
@@ -673,13 +701,24 @@ def drill_candidates(
         (`speaking_prod >= 2` y `production_days >= 2`, aproximación);
     - `today` (YYYY-MM-DD): si la palabra ya se superó HOY en el drill y aún no
       está consolidada, se oculta hasta mañana (una producción del día no la
-      elimina, pero tampoco se repite el mismo día)."""
+      elimina, pero tampoco se repite el mismo día).
+
+    V3.34: `due_words` (carta FSRS `lexicon` vencida) prioriza esas palabras al
+    frente de la lista, conservando el orden por recuerdo dentro de cada grupo.
+    Es un empujón determinista del repaso espaciado, no una puerta."""
     pending = (
         row
         for row in rows
         if _is_pending_drill_candidate(row, ok_days=ok_days, today=today)
     )
-    candidates = sorted(pending, key=lambda row: item_recall(row, now))
+    due = due_words or set()
+    candidates = sorted(
+        pending,
+        key=lambda row: (
+            0 if row.get("word") in due else 1,
+            item_recall(row, now),
+        ),
+    )
     return [row["word"] for row in candidates[: max(0, limit)]]
 
 

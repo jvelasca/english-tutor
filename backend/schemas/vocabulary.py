@@ -58,7 +58,7 @@ class VocabularyEventOut(BaseModel):
 
     word: str
     lexical_unit: str
-    event_type: Literal["produced", "exposed", "retrieval"]
+    event_type: Literal["produced", "exposed", "retrieval", "recalled"]
     channel: str
     activity: str
     created_at: str
@@ -95,6 +95,12 @@ class LexicalCompetence(BaseModel):
     spaced_production: bool = False
     retrieval_successes: int = 0
     retrieval_days: int = 0
+    # V3.34 (Recall 2.0): recuperación de la palabra desde su significado
+    # (paso Recall por texto). Señal propia: no acredita producción ni
+    # sustituye la recuperación demorada (`retention`).
+    cued_recall: bool = False
+    recall_successes: int = 0
+    recall_days: int = 0
     production_gap: bool
     transfer_gap: bool
 
@@ -208,6 +214,8 @@ class LexiconSummary(BaseModel):
     transfer: int = 0
     retention: int = 0
     spaced_exposure: int = 0
+    # V3.34: recuperadas desde el significado en el paso Recall del drill.
+    recalled: int = 0
     production_gap: int = 0
     transfer_gap: int = 0
     # V3.25.1 (P1-02): resumen del agregado por `lexical_unit` (cada unidad
@@ -476,3 +484,52 @@ class RecognitionAttemptOut(BaseModel):
     correct: bool
     correct_index: int
     selected_index: int
+
+
+# ---------------------------------------------------------------------------
+# Paso Recall del drill (V3.34, Recall 2.0). Camino INVERSO a Recognition: el
+# alumno ve el SIGNIFICADO (cue) y teclea la palabra. El GET nunca expone la
+# forma esperada; el POST la revela tras puntuar (premisa 21). A diferencia de
+# Recognition, el acierto SÍ deja señal léxica (recall + FSRS), pero NUNCA
+# cuenta como producción.
+# ---------------------------------------------------------------------------
+
+
+class RecallPromptOut(BaseModel):
+    """Cue del paso Recall (V3.34).
+
+    `available=false` con `cue=""` es la degradación controlada cuando la
+    palabra no tiene entrada en la caché global o no hay cue que no filtre la
+    respuesta (definición circular): el peldaño muestra aviso y no rompe
+    Sentence. Nunca incluye la forma esperada.
+    """
+
+    word: str
+    available: bool
+    cue: str = ""
+    cue_kind: str = ""  # "translation" | "definition" | ""
+
+
+class RecallAttemptIn(BaseModel):
+    """Intento del paso Recall (V3.34): el cliente envía la palabra tecleada.
+
+    Nunca declara acierto (premisa 21): el servidor compara con la diana."""
+
+    word: str = Field(min_length=1, max_length=120)
+    answer: str = Field(default="", max_length=120)
+
+
+class RecallAttemptOut(BaseModel):
+    """Resultado puntuado por el servidor del paso Recall (V3.34).
+
+    `expected` se revela solo tras responder (feedback del fallo y confirmación
+    del acierto). `delayed` indica que el intento acreditó la recuperación
+    demorada existente (superó el intervalo de retención); `recall_days` es el
+    nº de días distintos con recall tras este intento.
+    """
+
+    word: str
+    correct: bool
+    expected: str
+    delayed: bool = False
+    recall_days: int = 0

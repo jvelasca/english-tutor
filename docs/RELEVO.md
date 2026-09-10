@@ -5,6 +5,38 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.34.0 publicada** — release **v3.34.0**
+> (Dictionary → Learning Bridge, eslabón 3: **Recall 2.0 por texto**). El
+> peldaño intermedio del drill deja de ser una repetición oral de la palabra y
+> pasa a ser recuperación REAL por texto: el alumno ve el SIGNIFICADO (cue =
+> traducción o definición sin spoiler, `services/recall.py`) y **teclea la
+> palabra**. La escalera queda **`1 · Recognize` · `2 · Recall` · `3 · Sentence`**
+> (se retira el paso oral de palabra suelta; el micrófono vive solo en
+> Sentence). A diferencia de Recognition (informativo), el acierto de Recall SÍ
+> deja señal léxica PROPIA — `recall_successes`/`recall_days` + ledger
+> `recalled`, migración idempotente y sin backfill en `vocabulary` —, acredita
+> la recuperación demorada existente si supera el intervalo (`retrieval_*`) y
+> **reprograma la carta FSRS `lexicon` con intervalos reales** (Good immediate,
+> Easy si demorado, Again si falla) sin crear deuda por fallar una palabra no
+> rastreada. NUNCA acredita producción (`production_count`/`<channel>_prod`
+> intactos) ni saca la palabra de candidatas: `onProduced` solo lo dispara
+> Sentence (D5/E3: el recall vive en la capa léxica, no en `academy_evidence`).
+> Contrato aditivo: `GET /api/vocabulary/drill/recall` (`available=false` sin
+> cue) y `POST /api/vocabulary/drill/recall-attempt` (409 sin pregunta, 422
+> inválido); el GET nunca expone `expected` (premisa 21). `LexicalCompetence`
+> gana `cued_recall`/`recall_successes`/`recall_days`, `LexiconSummary` gana
+> `recalled` y `get_drill_candidates` antepone las palabras con carta FSRS
+> vencida. Tests: pytest backend **1743 passed** (+20: `test_recall_v334.py`
+> con cue/scoring/señal propia/demorada/FSRS/aislamiento + casos de
+> `cued_recall`/`recalled`/priorización en `test_lexicon.py`) + ruff limpio +
+> vitest (63 ficheros/**549**, +2: peldaño Recall por texto y mocks al degrade
+> Recognize → Recall → Sentence) + `tsc --noEmit` limpio + `check_release_consistency`
+> **3.34.0** exit 0. Detalle: `release-notes-v3.34.0.md` y
+> `agentes/v334-recall-2.0.md`. Pendientes hacia **V3.35**: los diferidos de
+> V3.30 (consumo de `word_breakdown_json`, palabras tocables), transferencia por
+> contexto de actividad V3.23 y Lexical Evidence Engine / Evidence Graph como
+> fuente longitudinal.
+>
 > **Nota (2026-09-10):** **V3.33.1 publicada** — release **v3.33.1**
 > (hardening de Recognition tras la auditoría externa de V3.33.0). Dos
 > correcciones P1, sin tocar la evidencia informativa ni la seguridad del

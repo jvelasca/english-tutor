@@ -156,32 +156,6 @@ function stubMediaRecorder() {
   vi.stubGlobal("MediaRecorder", FakeRecorder);
 }
 
-/** Respuesta determinista de `POST /api/vocabulary/drill/attempt` (V3.32). */
-const DRILL_OK = {
-  word: "coffee",
-  produced: true,
-  expected: "coffee",
-  heard: "coffee",
-  score: 100,
-  level: "good",
-  ok: true,
-  word_accuracy: 100,
-  phonetic_score: 100,
-  phoneme_accuracy_proxy: 100,
-  prosody_proxy: 100,
-  pronunciation_source: "transcript",
-  breakdown: { correct: ["coffee"], missing: [], extra: [], substituted: [], total: 1 },
-  phoneme_breakdown: {
-    correct: ["c"],
-    missing: [],
-    extra: [],
-    substituted: [],
-    total: 1,
-  },
-  fluency: null,
-  asr_status: "ok",
-};
-
 describe("DictionaryLookup (V3.30)", () => {
   afterEach(() => {
     cleanup();
@@ -309,11 +283,14 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
   it("muestra la acción «Practice this word» y al pulsarla monta la escalera de drill", async () => {
     routeFetch([
       { url: "/api/vocabulary/dictionary", data: COFFEE },
-      // V3.33.1: sin pregunta de Recognition el drill degrada a Recall, que es
-      // el paso que este test comprueba (prompt oral + botón de micrófono).
       {
         url: "/api/vocabulary/drill/recognition",
-        data: { word: "coffee", available: false, options: [], question_id: "" },
+        data: {
+          word: "coffee",
+          available: true,
+          options: ["café", "a soft drink", "a type of grain"],
+          question_id: "q-coffee-1",
+        },
       },
     ]);
     renderPanel(<DictionaryLookup userId="u1" />);
@@ -326,24 +303,27 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
     expect(practiceCta).toBeTruthy();
 
     fireEvent.click(practiceCta);
-    // Se monta la escalera de drill (Recognize → Word → Sentence): mismo
-    // prompt que en el diccionario personal.
-    expect(await screen.findByText(/Listen to the word/)).toBeTruthy();
+    // Se monta la escalera de drill (Recognize → Recall → Sentence): mismo
+    // arranque en Recognize que en el diccionario personal (V3.33.1).
+    expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "2 · Word" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "2 · Recall" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "3 · Sentence" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Record" })).toBeTruthy();
+    // V3.34: Recognize no usa micrófono (el micrófono vive en Sentence).
+    expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
 
     // Cerrar la escalera la desmonta.
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Record" })).toBeNull(),
+      expect(screen.queryByText(/What does this word mean/)).toBeNull(),
     );
   });
 
   it("producir la palabra tras «Practicar» refresca la entrada en silencio (sin desmontar el drill)", async () => {
     // V3.32: la evidencia del drill es real; tras producir, la marca de uso de
     // la tarjeta se refresca con un re-lookup silencioso (mismo endpoint).
+    // V3.34: la producción oral vive en el paso Sentence (el paso Word oral se
+    // retiró), así que el test recorre Recognize → Recall → Sentence.
     const dictionaryHits = { count: 0 };
     const fn = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -352,7 +332,6 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
         return Promise.resolve({ ok: true, json: async () => COFFEE });
       }
       if (url.includes("/api/vocabulary/drill/recognition")) {
-        // V3.33.1: sin pregunta de Recognition el drill degrada a Recall.
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -363,8 +342,45 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
           }),
         });
       }
-      if (url.includes("/api/vocabulary/drill/attempt")) {
-        return Promise.resolve({ ok: true, json: async () => DRILL_OK });
+      if (url.includes("/api/vocabulary/drill/recall")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            word: "coffee",
+            available: false,
+            cue: "",
+            cue_kind: "",
+          }),
+        });
+      }
+      if (url.includes("/api/vocabulary/drill/sentence-context")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            word: "coffee",
+            phrase: 'Say the word "coffee".',
+            source: "template",
+            level: "A1",
+          }),
+        });
+      }
+      if (url.includes("/api/vocabulary/drill/sentence-attempt")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            word: "coffee",
+            phrase: 'Say the word "coffee".',
+            source: "template",
+            produced: true,
+            phrase_ok: true,
+            passed: true,
+            heard: 'say the word "coffee"',
+            score: 100,
+            level: "good",
+            fluency: null,
+            asr_status: "ok",
+          }),
+        });
       }
       return Promise.reject(new Error(`unexpected fetch: ${url}`));
     });
@@ -375,11 +391,12 @@ describe("DictionaryLookup · V3.32 Dictionary → Learning Bridge", () => {
     const cta = await screen.findByRole("button", { name: "Practice this word" });
     fireEvent.click(cta);
 
+    // Sin cue de Recognition ni de Recall la escalera degrada a Sentence.
     fireEvent.click(await screen.findByRole("button", { name: "Record" }));
     fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
 
     // Resultado del drill: producción correcta.
-    expect(await screen.findByText(/another day to consolidate it/)).toBeTruthy();
+    expect(await screen.findByText(/inside the sentence/)).toBeTruthy();
     // El drill sigue montado (el re-lookup no lo desmonta).
     expect(screen.getByRole("button", { name: "Record" })).toBeTruthy();
     // Se produjo un re-lookup silencioso del diccionario para refrescar la marca.

@@ -103,24 +103,6 @@ function renderPanel(ui: ReactElement) {
   );
 }
 
-const DRILL_OK = {
-  word: "travel",
-  produced: true,
-  expected: "travel",
-  heard: "travel",
-  score: 100,
-  level: "good",
-  ok: true,
-  word_accuracy: 100,
-  phonetic_score: 100,
-  phoneme_accuracy_proxy: 100,
-  prosody_proxy: 100,
-  pronunciation_source: "transcript",
-  breakdown: { correct: ["travel"], missing: [], extra: [], substituted: [], total: 1 },
-  phoneme_breakdown: { correct: ["t"], missing: [], extra: [], substituted: [], total: 1 },
-  fluency: null,
-};
-
 describe("PersonalDictionary (V3.19 drill)", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
@@ -168,22 +150,47 @@ describe("PersonalDictionary (V3.19 drill)", () => {
   });
 
   it("al producir una palabra en el drill sale de la lista de candidatas", async () => {
-    // Estado mutable: tras el POST (produced), ya no es candidata.
+    // Estado mutable: tras el POST (passed en Sentence), ya no es candidata.
+    // V3.34: la producción oral vive en Sentence (se retiró el paso Word oral),
+    // así que el drill degrada Recognize → Recall → Sentence.
     const candidates: { words: string[] } = { words: ["travel"] };
     routeFetch([
       { url: "/api/vocabulary/drill/candidates", data: candidates },
       { url: "/api/vocabulary/lexicon", data: LEXICON },
-      // V3.33.1: sin pregunta de Recognition el drill degrada a Recall (paso que
-      // este test ejercita: prompt oral + grabación).
       {
         url: "/api/vocabulary/drill/recognition",
         data: { word: "travel", available: false, options: [], question_id: "" },
       },
       {
-        url: "/api/vocabulary/drill/attempt",
+        url: "/api/vocabulary/drill/recall",
+        data: { word: "travel", available: false, cue: "", cue_kind: "" },
+      },
+      {
+        url: "/api/vocabulary/drill/sentence-context",
+        data: {
+          word: "travel",
+          phrase: 'Say the word "travel".',
+          source: "template",
+          level: "A1",
+        },
+      },
+      {
+        url: "/api/vocabulary/drill/sentence-attempt",
         data: () => {
           candidates.words = [];
-          return DRILL_OK;
+          return {
+            word: "travel",
+            phrase: 'Say the word "travel".',
+            source: "template",
+            produced: true,
+            phrase_ok: true,
+            passed: true,
+            heard: 'say the word "travel"',
+            score: 100,
+            level: "good",
+            fluency: null,
+            asr_status: "ok",
+          };
         },
       },
     ]);
@@ -192,13 +199,12 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     const chip = await screen.findByRole("button", { name: "Say travel" });
     fireEvent.click(chip);
 
-    // Se abre el mini-drill con la palabra y su botón de grabar.
-    expect(await screen.findByText(/Listen to the word/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Record" }));
-    // Detener la grabación dispara submitDrillAttempt → produced.
+    // Se abre el mini-drill y degrada a Sentence (sin cue ni en Recognize ni
+    // en Recall), donde vive el micrófono.
+    fireEvent.click(await screen.findByRole("button", { name: "Record" }));
     fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
 
-    expect(await screen.findByText(/another day to consolidate it/)).toBeTruthy();
+    expect(await screen.findByText(/inside the sentence/)).toBeTruthy();
     // El chip desaparece (refresh tras producir).
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Say travel" })).toBeNull(),
@@ -319,6 +325,15 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
       { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
       { url: "/api/vocabulary/lexicon", data: LEXICON },
       { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+      {
+        url: "/api/vocabulary/drill/recall",
+        data: {
+          word: "travel",
+          available: true,
+          cue: "viajar",
+          cue_kind: "translation",
+        },
+      },
     ]);
     const recognitionGets = () =>
       fetchFn.mock.calls.filter((call) =>
@@ -331,13 +346,13 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
     expect(recognitionGets()).toBe(1);
 
     // Salir a Recall y volver a Recognize dispara un nuevo GET (nuevo intento).
-    fireEvent.click(screen.getByRole("button", { name: "2 · Word" }));
+    fireEvent.click(screen.getByRole("button", { name: "2 · Recall" }));
     fireEvent.click(screen.getByRole("button", { name: "1 · Recognize" }));
 
     await waitFor(() => expect(recognitionGets()).toBe(2));
   });
 
-  it("sin significado disponible degrada a Recall y no rompe la escalera", async () => {
+  it("sin significado disponible en Recognition degrada a Recall y no rompe la escalera", async () => {
     routeFetch([
       { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
       { url: "/api/vocabulary/lexicon", data: LEXICON },
@@ -345,20 +360,112 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
         url: "/api/vocabulary/drill/recognition",
         data: { word: "travel", available: false, options: [], question_id: "" },
       },
+      {
+        url: "/api/vocabulary/drill/recall",
+        data: {
+          word: "travel",
+          available: true,
+          cue: "viajar",
+          cue_kind: "translation",
+        },
+      },
     ]);
 
     renderPanel(<PersonalDictionary userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
 
     // V3.33.1: sin pregunta disponible el drill degrada a Recall automáticamente
-    // (la escalera no se rompe y no exige un clic manual en Recognize).
+    // (la escalera no se rompe y no exige un clic manual en Recognize). V3.34:
+    // Recall es recuperación por TEXTO (cue = significado, sin micrófono).
     expect(
-      await screen.findByText(
-        /Listen to the word, then record yourself saying it aloud/,
-      ),
+      await screen.findByText(/Type the word that matches this meaning/),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "1 · Recognize" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "2 · Word" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "2 · Recall" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "3 · Sentence" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
+  });
+});
+
+describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
+  beforeEach(() => stubMediaRecorder());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const QUESTION = {
+    word: "travel",
+    available: true,
+    options: ["viajar", "comer", "dormir"],
+    question_id: "q-travel-1",
+  };
+  const CUE = {
+    word: "travel",
+    available: true,
+    cue: "viajar",
+    cue_kind: "translation",
+  };
+
+  it("muestra el significado, oculta la palabra y acredita el recall (sin producción)", async () => {
+    // V3.34: el acierto de Recall deja señal léxica de recall, NO producción,
+    // así que la palabra sigue siendo candidata al drill oral.
+    const candidates: { words: string[] } = { words: ["travel"] };
+    routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: candidates },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+      { url: "/api/vocabulary/drill/recall-attempt", data: { word: "travel", correct: true, expected: "travel", delayed: false, recall_days: 1 } },
+      { url: "/api/vocabulary/drill/recall", data: CUE },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
+    await screen.findByText(/What does this word mean/);
+
+    // Entrar en Recall: cue visible, sin micrófono y sin la palabra diana.
+    fireEvent.click(screen.getByRole("button", { name: "2 · Recall" }));
+    expect(await screen.findByText("viajar")).toBeTruthy();
+    expect(
+      screen.getByText(/Type the word that matches this meaning/),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Record" })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Type the word"), {
+      target: { value: "travel" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    expect(
+      await screen.findByText(/You retrieved the word from its meaning/),
+    ).toBeTruthy();
+    // Sin producción: la candidata sigue ahí.
+    expect(screen.getByRole("button", { name: "Say travel" })).toBeTruthy();
+  });
+
+  it("falla y revela la palabra correcta en el feedback", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
+      { url: "/api/vocabulary/lexicon", data: LEXICON },
+      { url: "/api/vocabulary/drill/recognition", data: QUESTION },
+      {
+        url: "/api/vocabulary/drill/recall-attempt",
+        data: { word: "travel", correct: false, expected: "travel", delayed: false, recall_days: 0 },
+      },
+      { url: "/api/vocabulary/drill/recall", data: CUE },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
+    await screen.findByText(/What does this word mean/);
+
+    fireEvent.click(screen.getByRole("button", { name: "2 · Recall" }));
+    expect(await screen.findByText("viajar")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Type the word"), {
+      target: { value: "journey" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    expect(await screen.findByText(/the word is "travel"/)).toBeTruthy();
   });
 });

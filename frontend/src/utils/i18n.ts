@@ -374,8 +374,36 @@ const STRINGS: Record<string, Entry> = {
     es: "1 · Reconoce",
   },
   "dictionary.drill.stepRecall": {
-    en: "2 · Word",
-    es: "2 · Palabra",
+    en: "2 · Recall",
+    es: "2 · Recuerda",
+  },
+  "dictionary.drill.recallPrompt": {
+    en: "Type the word that matches this meaning.",
+    es: "Escribe la palabra que corresponde a este significado.",
+  },
+  "dictionary.drill.recallInputLabel": {
+    en: "Type the word",
+    es: "Escribe la palabra",
+  },
+  "dictionary.drill.recallPlaceholder": {
+    en: "Type the word...",
+    es: "Escribe la palabra...",
+  },
+  "dictionary.drill.recallCheck": {
+    en: "Check",
+    es: "Comprobar",
+  },
+  "dictionary.drill.recallCorrect": {
+    en: "Correct! You retrieved the word from its meaning.",
+    es: "¡Correcto! Has recuperado la palabra desde su significado.",
+  },
+  "dictionary.drill.recallIncorrect": {
+    en: "Not quite - the word is \"{expected}\".",
+    es: "Casi - la palabra es \"{expected}\".",
+  },
+  "dictionary.drill.recallUnavailable": {
+    en: "No meaning available for this word yet - try the Sentence step.",
+    es: "Aún no hay significado disponible para esta palabra - prueba el paso Frase.",
   },
   "dictionary.drill.stepSentence": {
     en: "3 · Sentence",

@@ -865,6 +865,29 @@ def init_db() -> None:
                 "NOT NULL DEFAULT ''"
             )
 
+        # V3.34 (Recall 2.0): señal de RECALL (recuperar la palabra desde su
+        # significado, por texto). Es una capa PROPIA y distinta de la
+        # producción (`<channel>_prod`) y de la recuperación demorada
+        # (`retrieval_*`, éxito de micro-drill). Acertar un recall no crea
+        # producción; solo deja señal de recuperación y (si supera el intervalo)
+        # recuperación demorada. Migración aditiva e idempotente, sin backfill
+        # (mejor perder el histórico que inventarlo).
+        if "recall_successes" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN recall_successes INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "recall_days" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN recall_days INTEGER "
+                "NOT NULL DEFAULT 0"
+            )
+        if "last_recall_at" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN last_recall_at TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
         # Migración idempotente: confianza y estado de confirmación en errores
         # gramaticales (candidato vs confirmado), para verificación futura por LLM.
         grammar_cols = {

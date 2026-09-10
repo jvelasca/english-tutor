@@ -263,6 +263,12 @@ export interface LexicalCompetence {
   spaced_production: boolean;
   retrieval_successes: number;
   retrieval_days: number;
+  // V3.34 (Recall 2.0): recuperación de la palabra desde su significado (paso
+  // Recall por texto). Señal propia: no acredita producción ni sustituye la
+  // recuperación demorada (`retention`).
+  cued_recall?: boolean;
+  recall_successes?: number;
+  recall_days?: number;
   production_gap: boolean;
   transfer_gap: boolean;
 }
@@ -364,6 +370,25 @@ export interface DrillRecognitionAttempt {
   selected_index: number;
 }
 
+// V3.34 (Recall 2.0): paso Recall — camino INVERSO a Recognition. El alumno ve
+// el SIGNIFICADO (cue: traducción o definición) y teclea la palabra. El GET
+// nunca expone la palabra esperada; el POST la revela tras puntuar (premisa
+// 21). El acierto deja señal léxica propia (recall + FSRS), nunca producción.
+export interface DrillRecallPrompt {
+  word: string;
+  available: boolean;
+  cue: string;
+  cue_kind: string; // "translation" | "definition" | ""
+}
+
+export interface DrillRecallAttempt {
+  word: string;
+  correct: boolean;
+  expected: string;
+  delayed: boolean;
+  recall_days: number;
+}
+
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
 // SOLO lectura (D3): el backend no registra evidencia. `definition_source`
 // distingue contenido cacheado generado por el modelo local ("llm") de su
@@ -448,6 +473,8 @@ export interface LexiconSummary {
   transfer: number;
   retention: number;
   spaced_exposure: number;
+  // V3.34: recuperadas desde el significado en el paso Recall del drill.
+  recalled?: number;
   production_gap: number;
   transfer_gap: number;
   // V3.25.1 (P1-02): resumen del agregado por `lexical_unit` (cada unidad

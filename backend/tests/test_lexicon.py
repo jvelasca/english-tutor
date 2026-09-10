@@ -452,6 +452,11 @@ def _row(**overrides) -> dict:
         "retrieval_days": 0,
         "last_retrieval_at": "",
         "context_tags": "",
+        # V3.34: señal de recall por texto (recuperar la palabra desde su
+        # significado), capa propia distinta de la producción.
+        "recall_successes": 0,
+        "recall_days": 0,
+        "last_recall_at": "",
     }
     row.update(overrides)
     return row
@@ -827,3 +832,68 @@ def test_summary_units_counts_each_unit_once():
     assert s2["total"] == 2
     assert s2["mastered"] == 1
     assert [b["cefr"] for b in s2["by_cefr"]] == ["A1"]
+
+
+# --- V3.34 (Recall 2.0): señal de recall por texto --------------------------
+
+
+def test_matrix_cued_recall_is_its_own_signal_not_production():
+    """`recall_successes > 0` marca `cued_recall` sin acreditar producción ni
+    recuperación demorada: es una señal propia de la recuperación por texto."""
+    m = lexicon.item_competence_matrix(
+        _row(exposures=3, recall_successes=1, recall_days=1)
+    )
+    assert m["cued_recall"] is True
+    assert m["recall_successes"] == 1
+    assert m["recall_days"] == 1
+    # No es producción ni retención: solo recuperación desde el significado.
+    assert m["production"] is False
+    assert m["retention"] is False
+    # Nunca vista en recall → señal apagada.
+    assert lexicon.item_competence_matrix(_row())["cued_recall"] is False
+
+
+def test_summary_counts_recalled():
+    rows = [
+        _row(word="a", exposures=2, recall_successes=1, recall_days=1),
+        _row(word="b", exposures=2, recall_successes=2, recall_days=2),
+        _row(word="c", exposures=2),
+    ]
+    s = lexicon.summary(rows)
+    assert s["recalled"] == 2
+
+
+def test_drill_candidates_prioritizes_fsrs_due_words():
+    """V3.34: las palabras con recall vencido se anteponen en la lista de
+    candidatas, conservando el orden por recuerdo dentro de cada grupo."""
+    rows = [
+        {
+            "word": "overdue",
+            "exposures": 3,
+            "speaking_prod": 0,
+            "appearances": 0,
+            "production_days": 0,
+            "first_seen": "",
+            "last_seen": "",
+            "last_exposed_at": "2026-09-05",
+        },
+        {
+            "word": "due_recent",
+            "exposures": 3,
+            "speaking_prod": 0,
+            "appearances": 0,
+            "production_days": 0,
+            "first_seen": "",
+            "last_seen": "",
+            "last_exposed_at": "2026-09-09",
+        },
+    ]
+    # Sin `due_words` conserva el orden por recuerdo (aquí empatan y se mantiene
+    # el orden de entrada).
+    assert lexicon.drill_candidates(rows, limit=10) == ["overdue", "due_recent"]
+    # Con `due_words`, la palabra vencida se antepone al frente.
+    due = {"due_recent"}
+    assert lexicon.drill_candidates(rows, limit=10, due_words=due) == [
+        "due_recent",
+        "overdue",
+    ]
