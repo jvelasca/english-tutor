@@ -5,6 +5,28 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.35.1 publicada** — release **v3.35.1** (cierre de
+> la auditoría de V3.35.0). Patch quirúrgico de integridad del modelo de
+> evidencia longitudinal, sin cambios de esquema ni de arquitectura.
+> **P1-01 (intervalo de evidencia):** `interval_since_last_evidence` deja de
+> recibir el `interval_days` de `delayed_retrieval_decision` (hueco desde el
+> ANCLA de retención FSRS) y lo deriva SIEMPRE `record_evidence` de la evidencia
+> anterior del ledger (`learning_evidence → learning_evidence`); el intervalo de
+> retención se queda en la decisión (`credited` + reprogramación de carta) y no
+> se persiste como intervalo de evidencia. **P1-02 (cronología):** se retira
+> `intervals.sort()` de `summarize_evidence` y `summarize_by_target` ordena por
+> `occurred_at, id` — la secuencia real del scheduler ya no se reordena por
+> valor. **P1-03 (pedagógico):** «Repaso de hoy» solo muestra la palabra en
+> `recognition`; en `recall`/`sentence` la oculta (el `WordDrill` ya la ocultaba
+> en Recall). **P2-02:** `record_evidence_bulk` deduplica eventos idénticos
+> (`target_type`+`target_id`+`task`+`activity`+`occurred_at`) y encadena en
+> memoria los eventos distintos del mismo target del lote. Tests: pytest
+> **1769 passed** (+5) + ruff limpio + vitest (65 ficheros/**558**, +1) +
+> `tsc --noEmit` limpio + `check_release_consistency` **3.35.1** exit 0.
+> Pendientes hacia **V3.36 (Learning Evidence 2.0)**: `support_level`,
+> `difficulty`, `response_time_ms`, `error_type`, `context_id`/`activity_id`,
+> cues graduados y estadísticas derivadas del ledger.
+>
 > **Nota (2026-09-10):** **V3.35.0 publicada** — release **v3.35.0**
 > (**Longitudinal Learning Evidence 1.0**: cierra los dos P1 de la auditoría de
 > V3.34.0 y convierte el Evidence Graph en historia longitudinal real, sin

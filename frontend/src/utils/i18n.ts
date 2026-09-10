@@ -384,6 +384,20 @@ const STRINGS: Record<string, Entry> = {
     en: "Review {word}",
     es: "Repasar {word}",
   },
+  // V3.35.1 (P1-03): en Recall/Sentence la forma esperada se OCULTA hasta el
+  // intento (el drill ya la oculta); la cola no debe spoilearla.
+  "dictionary.review.practiceHidden": {
+    en: "Review word",
+    es: "Repasar palabra",
+  },
+  "dictionary.review.hidden.recall": {
+    en: "Word hidden — recall from meaning",
+    es: "Palabra oculta — recupérala por significado",
+  },
+  "dictionary.review.hidden.sentence": {
+    en: "Word hidden — produce it in a sentence",
+    es: "Palabra oculta — prodúcela en una frase",
+  },
   "dictionary.review.overdue": {
     en: "overdue",
     es: "vencida",

@@ -313,11 +313,15 @@ async def _record_retrieval(
     repositorio solo persiste el resultado.
 
     V3.35 (Longitudinal Learning Evidence): escribe además la fila de evidencia
-    longitudinal del intento, con su intervalo real, salvo que el llamador la
-    escriba por su cuenta (`write_evidence=False`, p. ej. el recall, que
-    registra su propio evento). Nunca lanza: es señal pedagógica y no debe
-    romper la puntuación. Devuelve la decisión tomada (para saber si acreditó y
-    con qué intervalo).
+    longitudinal del intento, salvo que el llamador la escriba por su cuenta
+    (`write_evidence=False`, p. ej. el recall, que registra su propio evento).
+    V3.35.1 (P1-01): el intervalo NO se pasa: `record_evidence` lo deriva SIEMPRE
+    de la evidencia anterior del ledger (`learning_evidence → learning_evidence`),
+    que es el contrato de `interval_since_last_evidence`. El `interval_days` de
+    la decisión es el hueco desde el ANCLA de retención (FSRS): otro concepto,
+    que se queda en la decisión y no se persiste como intervalo de evidencia.
+    Nunca lanza: es señal pedagógica y no debe romper la puntuación. Devuelve la
+    decisión tomada (para saber si acreditó y con qué intervalo de retención).
     """
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -340,7 +344,6 @@ async def _record_retrieval(
                 activity="drill",
                 success=True,
                 event_role="evidence",
-                interval_since_last_evidence=decision["interval_days"],
             )
         return decision
     except Exception:  # noqa: BLE001 — señal no bloqueante
@@ -637,10 +640,13 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
     V3.35 (Longitudinal Learning Evidence): el INTENTO se registra siempre
     (`recall_attempts`, acierto o fallo), la recuperación demorada se decide con
     la cadena encadenada (ancla = recuperación anterior) y CADA intento deja una
-    fila en `learning_evidence` con su intervalo. Orden importante: la
-    recuperación demorada se evalúa ANTES de fijar el nuevo ancla de recall, de
-    modo que el intervalo se mide desde la recuperación anterior y no desde este
-    mismo intento.
+    fila en `learning_evidence`. V3.35.1 (P1-01): el intervalo de esa fila lo
+    deriva `record_evidence` de la evidencia ANTERIOR del ledger (contrato de
+    `interval_since_last_evidence`); el `interval_days` de la decisión es el
+    hueco desde el ancla de RETENCIÓN (FSRS) y no se persiste como intervalo de
+    evidencia. Orden importante: la recuperación demorada se evalúa ANTES de
+    fijar el nuevo ancla de recall, de modo que el intervalo se mide desde la
+    recuperación anterior y no desde este mismo intento.
 
     En el acierto: `record_recalls` (señal de recall + ledger `recalled`),
     `record_retrievals` (recuperación demorada, si el intento supera el
@@ -701,7 +707,6 @@ async def submit_recall_attempt(user_id: str, word: str, answer: str) -> dict | 
         activity="drill",
         success=correct,
         event_role="evidence",
-        interval_since_last_evidence=decision["interval_days"],
     )
     await _reschedule_lexicon_card(
         user_id, normalized, correct=correct, delayed=delayed

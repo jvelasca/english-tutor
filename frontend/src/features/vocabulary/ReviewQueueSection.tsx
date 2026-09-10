@@ -120,12 +120,18 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span
-                      className="truncate text-sm font-medium"
-                      lang="en"
-                    >
-                      {entry.word}
-                    </span>
+                    {entry.activity === "recognition" ? (
+                      <span className="truncate text-sm font-medium" lang="en">
+                        {entry.word}
+                      </span>
+                    ) : (
+                      // V3.35.1 (P1-03): en Recall/Sentence la forma esperada NO
+                      // se muestra antes del intento (el drill la oculta); el
+                      // objetivo es medir recuperación, no reconocimiento.
+                      <span className="truncate text-sm font-medium text-muted-foreground">
+                        {t(`dictionary.review.hidden.${entry.activity}`)}
+                      </span>
+                    )}
                     <Badge className={cn(ACTIVITY_TONE[entry.activity])}>
                       {t(`dictionary.review.activity.${entry.activity}`)}
                     </Badge>
@@ -138,10 +144,14 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
                   type="button"
                   onClick={() => setActive(entry)}
                   aria-pressed={active?.word === entry.word}
-                  aria-label={t("dictionary.review.practice").replace(
-                    "{word}",
-                    entry.word,
-                  )}
+                  aria-label={
+                    entry.activity === "recognition"
+                      ? t("dictionary.review.practice").replace(
+                          "{word}",
+                          entry.word,
+                        )
+                      : t("dictionary.review.practiceHidden")
+                  }
                   className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium transition-colors hover:border-primary/50 hover:text-foreground"
                 >
                   {t("dictionary.review.overdue")}

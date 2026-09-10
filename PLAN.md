@@ -8,6 +8,24 @@
 
 ## Estado actual
 
+- ✅ **V3.35.1 — Cierre de la auditoría V3.35.0 (2026-09-10)**
+  (**Versión estable `3.35.1`**, app `3.35.0 → 3.35.1`). Patch quirúrgico de
+  integridad del modelo longitudinal, sin cambios de esquema ni de arquitectura:
+  **P1-01** `interval_since_last_evidence` deja de recibir el `interval_days` de
+  la decisión de retención (ancla FSRS) y lo deriva SIEMPRE `record_evidence` de
+  la evidencia anterior del ledger (`learning_evidence → learning_evidence`):
+  dos conceptos distintos que ya no se mezclan; **P1-02** los `intervals` del
+  resumen conservan el orden CRONOLÓGICO (se retira el `sort()` de
+  `summarize_evidence` y el `summarize_by_target` ordena por
+  `occurred_at, id`, no por valor del intervalo): la secuencia real del
+  scheduler no se pierde; **P1-03** la cola «Repaso de hoy» solo muestra la
+  palabra en `recognition` — en `recall`/`sentence` la oculta (el drill ya la
+  ocultaba) para no spoilear la recuperación; **P2-02**
+  `record_evidence_bulk` deduplica eventos idénticos y encadena el intervalo de
+  eventos distintos del mismo target dentro del lote. Tests: pytest **1769**
+  (+5), vitest (65 ficheros/**558**, +1), `ruff`/`tsc` limpios y
+  `check_release_consistency` **3.35.1** exit 0.
+
 - ✅ **V3.35 — Longitudinal Learning Evidence 1.0 (2026-09-10)**
   (**Versión estable `3.35.0`**, app `3.34.0 → 3.35.0`). Cierra los **dos P1**
   de la auditoría de V3.34.0 y sienta el modelo de evidencia longitudinal, sin
@@ -1151,6 +1169,16 @@ autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos l
 Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
+
+- **⏳ V3.36 — Learning Evidence 2.0 (siguiente milestone)**: no añadir más
+  ejercicios; enriquecer el ledger con `support_level`, `difficulty`,
+  `response_time_ms`, `error_type` (taxonomía de error de recall),
+  `context_id`/`activity_id` y la escalera de cues graduados
+  (translation → definition → cloze → situación → free recall), y derivar de
+  ahí el grafo de evidencia → estado de conocimiento → retención → hueco de
+  transferencia → Optimal Next Task. V3.35.1 cierra antes los tres P1 de la
+  auditoría de V3.35.0 (semántica del intervalo, cronología y fuga de la
+  palabra en Recall/Sentence).
 
 - ✅ **V3.29 — Listening Engine 4.0 Fase 3 (núcleo) cerrado (2026-09-09,
   v3.29.0)**: implementado (ver "Estado actual" arriba,

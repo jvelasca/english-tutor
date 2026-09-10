@@ -18,8 +18,11 @@ Aquí se cubren:
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi.testclient import TestClient
 
+from domain import vocabulary as domain_vocabulary
 from main import app
 from repositories import db
 from repositories import dictionary as dictionary_repo
@@ -327,3 +330,173 @@ def test_lexicon_exposes_longitudinal_evidence(monkeypatch, tmp_path):
     assert item["evidence"]["attempts"] == 1
     assert item["evidence"]["successes"] == 1
     assert item["evidence"]["distinct_success_days"] == 1
+
+
+# --- V3.35.1 (P1-01): el intervalo de evidencia NO es el ancla de retención ---
+
+
+def _frozen_now(iso: str) -> type[datetime]:
+    """`datetime` falso que congela `now()` en una marca ISO (V3.35.1)."""
+
+    class _At(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: ANN001, ANN206 — firma de datetime
+            return datetime.fromisoformat(iso)
+
+    return _At
+
+
+def test_recall_evidence_interval_measures_ledger_gap_not_retention_anchor(
+    monkeypatch, tmp_path
+):
+    """V3.35.1 (P1-01): con D0 exposición, D1 evidencia de producción y D5
+    recall, el ledger guarda 2 días (hueco desde la EVIDENCIA anterior) y NO los
+    4 días del ancla de retención. El caso del audit: producción intercalada
+    entre el ancla y el intento no debe contaminar el intervalo de evidencia."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    dictionary_repo.save_entry(
+        "quokka",
+        pos="noun",
+        definition="a small Australian marsupial",
+        translation="marsupial australiano",
+        generator_version="test",
+    )
+    t0 = "2026-09-01T10:00:00+00:00"  # primera señal (ancla de retención)
+    t1 = "2026-09-03T10:00:00+00:00"  # evidencia de PRODUCCIÓN (no mueve ancla)
+    t2 = "2026-09-05T10:00:00+00:00"  # intento de recall
+
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: t0)
+    vocabulary_repo.record_exposures(a, ["quokka"])  # first_exposed_at = t0
+    # Evidencia previa en t1: el ledger la ve, el ancla de retención no.
+    evidence_repo.record_evidence(
+        a,
+        target_type="lexicon",
+        target_id="quokka",
+        surface_form="quokka",
+        task="production",
+        activity="free_chat",
+        success=True,
+        occurred_at=t1,
+    )
+
+    monkeypatch.setattr(domain_vocabulary, "datetime", _frozen_now(t2))
+    monkeypatch.setattr(vocabulary_repo, "_now", lambda: t2)
+    monkeypatch.setattr(evidence_repo, "_now", lambda: t2)
+    with TestClient(app) as client:
+        res = client.post(
+            "/api/vocabulary/drill/recall-attempt",
+            params={"user_id": a},
+            json={"word": "quokka", "answer": "quokka"},
+        )
+        assert res.status_code == 200, res.text
+
+    events = evidence_repo.list_evidence(a, "quokka", target_type="lexicon")
+    recall_event = next(e for e in events if e["task"] == "recall")
+    # Evidencia anterior = t1 (producción) → 2.0 días. El ancla de retención es
+    # t0 → 4.0 días: es OTRO concepto y no debe escribirse en este campo.
+    assert recall_event["interval_since_last_evidence"] == 2.0
+
+
+# --- V3.35.1 (P1-02): los intervalos conservan el orden cronológico ---------
+
+
+def test_summarize_evidence_preserves_chronological_order():
+    """Un intervalo puede BAJAR (repaso antes de lo programado): la secuencia
+    real no se reordena por valor."""
+    rows = [
+        {
+            "success": 1,
+            "occurred_at": "2026-09-01T10:00:00+00:00",
+            "interval_since_last_evidence": 7.0,
+        },
+        {
+            "success": 1,
+            "occurred_at": "2026-09-02T10:00:00+00:00",
+            "interval_since_last_evidence": 1.0,
+        },
+        {
+            "success": 1,
+            "occurred_at": "2026-09-05T10:00:00+00:00",
+            "interval_since_last_evidence": 3.0,
+        },
+    ]
+    assert evidence_svc.summarize_evidence(rows)["intervals"] == [7.0, 1.0, 3.0]
+
+
+def test_summarize_by_target_intervals_follow_occurred_at(monkeypatch, tmp_path):
+    """El agregado SQL no ordena por VALOR del intervalo sino por cronología."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    # Cadena real: D0 (sin intervalo) → D2 (+2) → D3 (+1) → D10 (+7).
+    for at in (
+        "2026-09-01T10:00:00+00:00",
+        "2026-09-03T10:00:00+00:00",
+        "2026-09-04T10:00:00+00:00",
+        "2026-09-11T10:00:00+00:00",
+    ):
+        evidence_repo.record_evidence(
+            a,
+            target_type="lexicon",
+            target_id="cat",
+            task="retrieval",
+            success=True,
+            occurred_at=at,
+        )
+    summary = evidence_repo.summarize_by_target(a, target_type="lexicon")
+    # Ordenados por valor serían [1.0, 2.0, 7.0]: se pierde la secuencia.
+    assert summary["cat"]["intervals"] == [2.0, 1.0, 7.0]
+
+
+# --- V3.35.1 (P2-02): record_evidence_bulk blindado -------------------------
+
+
+def test_record_evidence_bulk_dedupes_identical_events(monkeypatch, tmp_path):
+    """Dos entradas idénticas del mismo evento insertan UNA sola fila."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    at = "2026-09-01T10:00:00+00:00"
+    entry = {
+        "target_type": "lexicon",
+        "target_id": "cat",
+        "task": "production",
+        "activity": "free_chat",
+        "success": True,
+        "occurred_at": at,
+    }
+    assert evidence_repo.record_evidence_bulk(a, [entry, dict(entry)]) == 1
+    assert len(evidence_repo.list_evidence(a, "cat", target_type="lexicon")) == 1
+
+
+def test_record_evidence_bulk_chains_distinct_events_of_same_target(
+    monkeypatch, tmp_path
+):
+    """Dos eventos DISTINTOS del mismo target encadenan su intervalo (el segundo
+    mide desde el primero del lote, no desde la BD)."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    t1 = "2026-09-01T10:00:00+00:00"
+    t2 = "2026-09-04T10:00:00+00:00"
+    inserted = evidence_repo.record_evidence_bulk(
+        a,
+        [
+            {
+                "target_type": "lexicon",
+                "target_id": "cat",
+                "task": "production",
+                "activity": "free_chat",
+                "success": True,
+                "occurred_at": t1,
+            },
+            {
+                "target_type": "lexicon",
+                "target_id": "cat",
+                "task": "production",
+                "activity": "writing",
+                "success": True,
+                "occurred_at": t2,
+            },
+        ],
+    )
+    assert inserted == 2
+    events = evidence_repo.list_evidence(a, "cat", target_type="lexicon")
+    by_activity = {e["activity"]: e for e in events}
+    assert by_activity["free_chat"]["interval_since_last_evidence"] is None
+    assert by_activity["writing"]["interval_since_last_evidence"] == 3.0
+

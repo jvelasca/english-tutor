@@ -87,12 +87,51 @@ describe("ReviewQueueSection (V3.35)", () => {
     );
     renderSection();
 
-    expect(await screen.findByText("river")).toBeTruthy();
+    // V3.35.1 (P1-03): Recall/Sentence NO revelan la forma esperada.
+    expect(
+      await screen.findByText("Word hidden — recall from meaning"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Word hidden — produce it in a sentence"),
+    ).toBeTruthy();
+    expect(screen.queryByText("river")).toBeNull();
+    expect(screen.queryByText("apple")).toBeNull();
     expect(screen.getByText("2 due")).toBeTruthy();
     expect(screen.getByText("Recall")).toBeTruthy();
     expect(screen.getByText("No recall from meaning yet")).toBeTruthy();
     expect(screen.getByText("Say in a sentence")).toBeTruthy();
     expect(screen.getByText("Understood but not produced yet")).toBeTruthy();
+  });
+
+  it("solo revela la palabra cuando la actividad es Recognition", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.3,
+            elapsed_days: 12,
+            activity: "recognition",
+            reason: "weak_recognition",
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    expect(await screen.findByText("river")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Review river" }),
+    ).toBeTruthy();
   });
 
   it("sin ítems vencidos muestra el estado vacío", async () => {
@@ -134,7 +173,10 @@ describe("ReviewQueueSection (V3.35)", () => {
     });
     renderSection();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Review river" }));
+    // V3.35.1 (P1-03): con Recall, el botón no filtra la palabra en su nombre.
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Review word" }),
+    );
     expect(mocks.getDrillRecallPrompt).toHaveBeenCalledWith("u1", "river");
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(await screen.findByText("río")).toBeTruthy();

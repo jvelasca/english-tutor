@@ -10,7 +10,10 @@ Cada recuperación o producción es una fila con:
 - `task` / `activity` — QUÉ se hizo y en qué actividad;
 - `success` — el resultado del intento (los fallos también son evidencia);
 - `interval_since_last_evidence` — días desde la evidencia ANTERIOR del mismo
-  ítem (None en la primera): la cadena `evento_n → intervalo → evento_{n+1}`;
+  ítem (None en la primera): la cadena `evento_n → intervalo → evento_{n+1}`.
+  Es un intervalo de EVIDENCIA (`learning_evidence → learning_evidence`), no el
+  hueco desde el ancla de retención FSRS: son conceptos distintos (V3.35.1,
+  P1-01; el intervalo de retención vive solo en la decisión, no se persiste);
 - `event_role` — evidence / telemetry / informative (ver `services.evidence`).
 
 Sin backfill: el ledger empieza en V3.35 y los contadores agregados de
@@ -124,8 +127,19 @@ def record_evidence_bulk(
     la evidencia anterior de cada ítem en una sola pasada y calcula el intervalo
     de cada evento. Devuelve el nº de filas insertadas (0 si el usuario no
     existe o no hay entradas). Cada entrada admite `target_type`, `target_id`,
-    `skill`, `surface_form`, `lexical_unit`, `task`, `activity`, `success` y
-    `event_role`.
+    `skill`, `surface_form`, `lexical_unit`, `task`, `activity`, `success`,
+    `event_role` y `occurred_at` (por entrada; si falta, el `occurred_at` del
+    lote o `_now()`).
+
+    V3.35.1 (P2-02): el contrato del ledger se blinda contra lotes degenerados:
+
+    - DEDUPE: dos entradas idénticas del mismo evento
+      (`target_type`, `target_id`, `task`, `activity`, `occurred_at`) insertan
+      UNA sola fila (el ledger es un histórico de eventos, no un contador);
+    - CADENA SECUENCIAL: `previous` se actualiza en memoria tras cada fila, de
+      modo que dos eventos DISTINTOS del mismo target dentro del lote encadenan
+      su intervalo (el segundo mide desde el primero, no desde la BD); el lote
+      se procesa en orden cronológico para que la cadena sea correcta.
     """
     if not entries or get_user(user_id) is None:
         return 0
@@ -133,10 +147,31 @@ def record_evidence_bulk(
     from services.evidence import interval_days
 
     now = occurred_at or _now()
+    # Normaliza + deduplica conservando el primer evento de cada clave; ordena
+    # cronológicamente para encadenar los intervalos del lote (V3.35.1, P2-02).
+    normalized: list[dict] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+    for entry in entries:
+        target_type = entry.get("target_type", "")
+        target_id = entry.get("target_id", "")
+        at = entry.get("occurred_at") or now
+        key = (
+            target_type,
+            target_id,
+            entry.get("task", ""),
+            entry.get("activity", ""),
+            at,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append({**entry, "_occurred_at": at})
+    normalized.sort(key=lambda e: e["_occurred_at"])
     with closing(_conn()) as conn, conn:
         previous: dict[tuple[str, str], str] = {}
         for target_type, target_id in {
-            (e.get("target_type", ""), e.get("target_id", "")) for e in entries
+            (e.get("target_type", ""), e.get("target_id", ""))
+            for e in normalized
         }:
             row = conn.execute(
                 "SELECT occurred_at FROM learning_evidence "
@@ -147,16 +182,20 @@ def record_evidence_bulk(
             if row:
                 previous[(target_type, target_id)] = row["occurred_at"]
         rows = []
-        for entry in entries:
+        for entry in normalized:
             target_type = entry.get("target_type", "")
             target_id = entry.get("target_id", "")
             surface = entry.get("surface_form") or target_id
+            at = entry["_occurred_at"]
             prev = previous.get((target_type, target_id), "")
-            interval = interval_days(prev, now) if prev else None
+            interval = interval_days(prev, at) if prev else None
+            # Encadena en memoria: el siguiente evento del mismo target mide
+            # desde este, no desde la BD (V3.35.1, P2-02).
+            previous[(target_type, target_id)] = at
             rows.append(
                 (
                     user_id,
-                    now,
+                    at,
                     entry.get("skill", ""),
                     target_type,
                     target_id,
@@ -226,8 +265,10 @@ def summarize_by_target(
     """Resumen longitudinal por `target_id` desde el ledger (V3.35).
 
     Agrega en SQL los contadores (`attempts`, `successes`, días distintos con
-    éxito) y recoge los intervalos de los eventos con éxito, sin límite de filas
-    ni N+1 consultas. Mismo contrato que `services.evidence.summarize_evidence`.
+    éxito) y recoge los intervalos de los eventos con éxito EN ORDEN
+    CRONOLÓGICO (`occurred_at`, `id`), sin límite de filas ni N+1 consultas.
+    Mismo contrato que `services.evidence.summarize_evidence` (V3.35.1, P1-02:
+    la secuencia real no se reordena por valor del intervalo).
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
     with closing(_conn()) as conn:
@@ -246,7 +287,7 @@ def summarize_by_target(
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? AND success = 1 "
             "AND interval_since_last_evidence IS NOT NULL "
-            "ORDER BY target_id, interval_since_last_evidence",
+            "ORDER BY target_id, occurred_at ASC, id ASC",
             (user_id, target_type),
         ).fetchall()
     intervals: dict[str, list[float]] = {}

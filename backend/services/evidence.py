@@ -82,9 +82,10 @@ def interval_days(previous_at: str, now: str) -> float | None:
     """Días transcurridos entre dos marcas ISO (None si falta alguna).
 
     Es el `interval_since_last_evidence` de un evento: el hueco REAL desde la
-    evidencia anterior del mismo ítem, no desde el primer contacto con él. Sin
-    evidencia previa no hay intervalo (None), y esa ausencia es información: es
-    la primera observación de la cadena longitudinal.
+    EVIDENCIA anterior del mismo ítem (`learning_evidence → learning_evidence`),
+    no desde la primera exposición ni desde el ancla de retención FSRS (V3.35.1,
+    P1-01). Sin evidencia previa no hay intervalo (None), y esa ausencia es
+    información: es la primera observación de la cadena longitudinal.
     """
     previous = _parse_iso(previous_at)
     current = _parse_iso(now)
@@ -133,8 +134,10 @@ def summarize_evidence(rows: list[dict]) -> dict:
     - `successes` — nº de eventos con `success` verdadero;
     - `distinct_success_days` — días naturales distintos con éxito (dos aciertos
       el mismo día cuentan una sola vez, igual que `recall_days`);
-    - `intervals` — intervalos (en días) de los eventos CON éxito, ascendentes.
-      Es la historia que el scheduler puede leer como cadena de repasos.
+    - `intervals` — intervalos (en días) de los eventos CON éxito, en orden
+      CRONOLÓGICO (el de las filas recibidas), no ordenados por valor. Es la
+      historia que el scheduler puede leer como cadena de repasos: `[1, 7, 3]`
+      no es `[1, 3, 7]` (V3.35.1, P1-02: no se pierde la secuencia real).
 
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
@@ -157,7 +160,6 @@ def summarize_evidence(rows: list[dict]) -> dict:
             intervals.append(round(float(raw), 4))
         except (TypeError, ValueError):
             continue
-    intervals.sort()
     return {
         "attempts": attempts,
         "successes": successes,
