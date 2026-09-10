@@ -154,7 +154,48 @@ def test_automatic_skills_requires_spacing_within_one_modality():
             ),
         ]
     )
-    assert evidence_svc.automatic_skills(two_days) == ["written_production"]
+    # V3.38.1 (P1-04): 2 éxitos en 2 días ya no declaran automaticidad.
+    assert evidence_svc.automatic_skills(two_days) == []
+    three_days = evidence_svc.summarize_evidence(
+        [
+            _row(
+                "written_production",
+                success=True,
+                support="independent",
+                day="2026-09-01",
+            ),
+            _row(
+                "written_production",
+                success=True,
+                support="independent",
+                day="2026-09-05",
+            ),
+            _row(
+                "written_production",
+                success=True,
+                support="independent",
+                day="2026-09-08",
+            ),
+        ]
+    )
+    assert evidence_svc.automatic_skills(three_days) == ["written_production"]
+
+
+def test_automatic_skills_requires_a_minimum_success_ratio():
+    # 3 éxitos independientes en 3 días, pero con 30 intentos (ratio 0.1): la
+    # modalidad NO es automática (V3.38.1, P1-04).
+    noisy = evidence_svc.summarize_evidence(
+        [
+            _row("recall", success=True, support="independent", day="2026-09-01"),
+            _row("recall", success=True, support="independent", day="2026-09-03"),
+            _row("recall", success=True, support="independent", day="2026-09-05"),
+            *[
+                _row("recall", success=False, support="cued", day=f"2026-09-{d:02d}")
+                for d in range(10, 37)
+            ],
+        ]
+    )
+    assert evidence_svc.automatic_skills(noisy) == []
 
 
 def test_same_day_volume_is_not_automatic_in_a_modality():
@@ -187,6 +228,10 @@ def test_mixing_modalities_does_not_make_any_modality_automatic():
                 support="independent",
                 day="2026-09-05",
             ),
+            # V3.38.1 (P1-04): se añade un tercer éxito de OTRA modalidad para
+            # que el ítem cruce el umbral GLOBAL (3 éxitos / 3 días) mientras
+            # ninguna modalidad por sí sola lo alcanza.
+            _row("recall", success=True, support="independent", day="2026-09-03"),
         ]
     )
     assert evidence_svc.is_automatic(mixed) is True  # el ítem, globalmente...
@@ -198,6 +243,8 @@ def test_automatic_skills_can_coexist_in_several_modalities():
         [
             _row("recall", success=True, support="independent", day="2026-09-01"),
             _row("recall", success=True, support="independent", day="2026-09-03"),
+            # V3.38.1 (P1-04): umbral de 3 éxitos por modalidad.
+            _row("recall", success=True, support="independent", day="2026-09-05"),
             _row(
                 "spoken_production",
                 success=True,
@@ -209,6 +256,12 @@ def test_automatic_skills_can_coexist_in_several_modalities():
                 success=True,
                 support="spontaneous",
                 day="2026-09-04",
+            ),
+            _row(
+                "spoken_production",
+                success=True,
+                support="spontaneous",
+                day="2026-09-06",
             ),
         ]
     )
@@ -240,13 +293,13 @@ def test_automatic_skills_never_raises_on_partial_evidence():
 def test_skill_histograms_match_between_pure_and_sql(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     events = [
-        ("recall", True, "cued", "2026-09-01"),
-        ("recall", True, "independent", "2026-09-02"),
-        ("recall", False, "cued", "2026-09-03"),
-        ("spoken_production", True, "independent", "2026-09-01"),
-        ("chat", True, "spontaneous", "2026-09-02"),  # legacy: se ignora
+        ("recall", True, "cued", "2026-09-01", 4000),
+        ("recall", True, "independent", "2026-09-02", 6000),
+        ("recall", False, "cued", "2026-09-03", None),
+        ("spoken_production", True, "independent", "2026-09-01", 12000),
+        ("chat", True, "spontaneous", "2026-09-02", None),  # legacy: se ignora
     ]
-    for skill, success, support, day in events:
+    for skill, success, support, day, latency in events:
         evidence_repo.record_evidence(
             uid,
             target_type="lexicon",
@@ -255,6 +308,7 @@ def test_skill_histograms_match_between_pure_and_sql(monkeypatch, tmp_path):
             task="recall",
             success=success,
             support_level=support,
+            response_time_ms=latency,
             occurred_at=f"{day}T10:00:00+00:00",
         )
     rows = evidence_repo.list_evidence(uid, target_type="lexicon")
@@ -265,9 +319,17 @@ def test_skill_histograms_match_between_pure_and_sql(monkeypatch, tmp_path):
         "skill_success_days",
         "skill_independent_successes",
         "skill_independent_days",
+        "skill_attempts",
+        "skill_mean_response_time_ms",
     ):
         assert sql[field] == pure[field], field
     assert sql["skill_successes"] == {"recall": 2, "spoken_production": 1}
+    # V3.38.1 (P1-02): los intentos cuentan fallos y la latencia es por modalidad.
+    assert sql["skill_attempts"] == {"recall": 3, "spoken_production": 1}
+    assert sql["skill_mean_response_time_ms"] == {
+        "recall": 5000.0,
+        "spoken_production": 12000.0,
+    }
     assert evidence_svc.automatic_skills(sql) == []
 
 

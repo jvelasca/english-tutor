@@ -16,6 +16,9 @@ const STRINGS: Record<string, Entry> = {
   "nav.home": { en: "Home", es: "Inicio" },
   "nav.formation": { en: "Course", es: "Formación" },
   "nav.learn": { en: "Learn", es: "Aprender" },
+  // V3.38.1: el diccionario es un destino AUXILIAR (no un mundo del core),
+  // separado visualmente del resto en la navegación.
+  "nav.dictionary": { en: "Dictionary", es: "Diccionario" },
 
   // Destrezas. Nombres de destreza/actividad en inglés también para la UI en
   // español (decisión V3.6.1): "Grammar/Pronunciation/Vocabulary/…" mantienen
@@ -566,6 +569,15 @@ const STRINGS: Record<string, Entry> = {
     en: "No words yet. Complete course objectives to grow your dictionary.",
     es: "Aún no hay palabras. Completa objetivos del curso para hacer crecer tu diccionario.",
   },
+  // V3.38.1: pantalla dedicada del diccionario (ruta `/diccionario`), con las
+  // mismas dos vistas que el conmutador incrustado de Vocabulary.
+  "dictionary.screen.title": { en: "Dictionary", es: "Diccionario" },
+  "dictionary.screen.subtitle": {
+    en: "Your personal dictionary and the look-up of any word.",
+    es: "Tu diccionario personal y la consulta de cualquier palabra.",
+  },
+  "dictionary.tabs.personal": { en: "Personal", es: "Personal" },
+  "dictionary.tabs.lookup": { en: "Look up", es: "Consultar" },
   // V3.30: diccionario de consulta (vista «Consultar»).
   "dictionary.viewsLabel": {
     en: "Dictionary views",
@@ -729,7 +741,11 @@ const STRINGS: Record<string, Entry> = {
   "settings.model": { en: "AI model", es: "Modelo IA" },
 
   // Estado del sistema
-  "status.ready": { en: "Ready", es: "Listo" },
+  // V3.38.1: indicador de conexión integrado en la cabecera (sustituye a la
+  // barra de estado inferior, que se retiró junto con su "status.ready").
+  "status.connected": { en: "Connected", es: "Conectado" },
+  "status.disconnected": { en: "Disconnected", es: "Desconectado" },
+  "status.connectionChecking": { en: "Checking…", es: "Comprobando…" },
   "status.systemStatus": { en: "System status", es: "Estado del sistema" },
   "status.api": { en: "API", es: "API" },
   "status.database": { en: "Database", es: "Base de datos" },

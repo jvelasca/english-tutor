@@ -20,6 +20,13 @@ export const HELP_PATH: Path = "/ayuda";
 export const CHAT_PATH: Path = "/chat";
 
 /**
+ * Ruta raíz del destino AUXILIAR Diccionario: "/diccionario" (V3.38.1). No es
+ * un mundo del núcleo: es una herramienta de consulta (diccionario personal +
+ * consulta de cualquier palabra) accesible desde su propio icono.
+ */
+export const DICTIONARY_PATH: Path = "/diccionario";
+
+/**
  * Ruta canónica de un nivel dentro de Formación para deep links, por ejemplo
  * formationLevelPath("b1") -> "/formacion/b1". El `levelId` se percent-codifica.
  */

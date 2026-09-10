@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import re
 
+from services import situation as situation_service
 from services.phonetics import tokenize, unit_produced
 
 # Peldaños soportados, ordenados de MAYOR a MENOR apoyo. El orden ES la
@@ -234,11 +235,15 @@ def recall_prompt_for(
         }
 
     if cue == "situation":
-        # V3.38: enunciado situacional del contrato de contenido. El generador ya
-        # garantiza el hueco único y la ausencia de spoiler; aquí solo se exige
-        # que exista y no filtre la diana (defensa en profundidad).
-        situation = (target.get("situation") or "").strip()
-        if not situation or _definition_leaks_word(situation, target_word):
+        # V3.38: enunciado situacional del contrato de contenido. V3.38.1: se
+        # revalida con el MISMO validador puro que la generación (un hueco, una
+        # frase, sin fuga morfológica), de modo que una situación cacheada por
+        # una versión previa con reglas más laxas no se sirva ni cuente como
+        # peldaño disponible en la escalera.
+        situation = situation_service.validate_situation(
+            target.get("situation"), target_word
+        )
+        if not situation:
             return None
         return {
             "word": target_word,

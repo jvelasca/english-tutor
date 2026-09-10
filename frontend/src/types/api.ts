@@ -309,6 +309,11 @@ export interface LexicalEvidence {
   skill_success_days: Record<string, number>;
   skill_independent_successes: Record<string, number>;
   skill_independent_days: Record<string, number>;
+  // V3.38.1 (P1-02): intentos y latencia media POR MODALIDAD, para que la
+  // fluidez y la ratio de éxito se puedan leer por skill (p. ej. `slow_recall`
+  // sobre `recall`) en lugar de sobre una media global que mezcla modalidades.
+  skill_attempts: Record<string, number>;
+  skill_mean_response_time_ms: Record<string, number>;
   support_levels: Record<string, number>;
   error_types: Record<string, number>;
   // Latencia media declarada (null si ningún evento la midió).

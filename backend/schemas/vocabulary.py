@@ -159,6 +159,13 @@ class LexicalEvidence(BaseModel):
     skill_success_days: dict[str, int] = Field(default_factory=dict)
     skill_independent_successes: dict[str, int] = Field(default_factory=dict)
     skill_independent_days: dict[str, int] = Field(default_factory=dict)
+    # V3.38.1 (P1-02): intentos y latencia media POR MODALIDAD. `skill_attempts`
+    # cuenta todos los eventos del skill (aciertos y fallos) y
+    # `skill_mean_response_time_ms` mide la fluidez de cada modalidad (clave
+    # ausente si no midió latencia), para no recomprimir la evidencia en una
+    # sola media global.
+    skill_attempts: dict[str, int] = Field(default_factory=dict)
+    skill_mean_response_time_ms: dict[str, float] = Field(default_factory=dict)
     mean_response_time_ms: float | None = None
 
 

@@ -5,6 +5,7 @@ import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
 import type { Route } from "./routes";
 import { Navigation } from "./Navigation";
+import { ConnectionIndicator } from "../components/ConnectionIndicator";
 import { HandsFreeToggle } from "../components/HandsFreeToggle";
 import { UserMenu } from "../components/UserMenu";
 import { GearIcon, HelpIcon } from "../components/Icons";
@@ -41,7 +42,7 @@ export function Header({
   const { t } = useI18n();
   return (
     <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-border bg-background/80 px-4 py-2.5 backdrop-blur-xl">
-      <div className="flex min-w-0 items-center">
+      <div className="flex min-w-0 items-center gap-2.5">
         <button
           type="button"
           onClick={() => onNavigate("home")}
@@ -58,6 +59,9 @@ export function Header({
             <span className="text-xs text-muted-foreground">{t("brand.subtitle")}</span>
           </span>
         </button>
+        {/* V3.38.1: estado de conexión integrado en la cabecera (sustituye a la
+            barra inferior); visible también en móvil, fuera del bloque sm:flex. */}
+        <ConnectionIndicator />
       </div>
 
       <div className="hidden min-w-0 flex-1 md:flex">

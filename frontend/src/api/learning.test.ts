@@ -40,6 +40,8 @@ const QUEUE: ReviewQueue = {
         skill_success_days: {},
         skill_independent_successes: {},
         skill_independent_days: {},
+        skill_attempts: {},
+        skill_mean_response_time_ms: {},
         support_levels: {},
         error_types: { wrong_word: 1 },
         mean_response_time_ms: null,

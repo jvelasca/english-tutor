@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { StatusBar } from "../components/StatusBar";
 import { Navigation } from "./Navigation";
 import { useI18n } from "../hooks/useI18n";
 import type { Route } from "./routes";
@@ -40,7 +39,6 @@ export function AppShell({
       >
         {children}
       </main>
-      <StatusBar />
       <div className="border-t border-border bg-background/95 backdrop-blur md:hidden">
         <Navigation
           route={route}

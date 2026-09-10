@@ -3,6 +3,7 @@ import type { Path } from "./hash";
 import { joinPath, normalizeHash, parseSegments } from "./hash";
 import {
   CHAT_PATH,
+  DICTIONARY_PATH,
   FORMATION_PATH,
   HELP_PATH,
   HOME_PATH,
@@ -16,7 +17,8 @@ import {
  * Tabla reversible Route -> Path canónica. Es el único punto donde cada valor
  * del tipo `Route` ("home" | "learn" | ... ) queda ligado a su URL. Desde
  * V3.10 el chat libre (Route "chat") tiene su propia raíz `/chat`, y las
- * actividades "learn" cuelgan de Aprender como sub-rutas.
+ * actividades "learn" cuelgan de Aprender como sub-rutas. V3.38.1 añade el
+ * destino auxiliar "dictionary" con raíz propia `/diccionario`.
  */
 const ROUTE_TO_PATH: Record<Route, Path> = {
   home: HOME_PATH,
@@ -27,6 +29,7 @@ const ROUTE_TO_PATH: Record<Route, Path> = {
   vocabulary: learnActivityPath(LEGACY_VOCABULARY_ACTIVITY),
   chat: CHAT_PATH,
   help: HELP_PATH,
+  dictionary: DICTIONARY_PATH,
 };
 
 /**
@@ -67,6 +70,8 @@ export function pathToRoute(path: Path): Route {
       return segments.length === 1 ? "chat" : "home";
     case "ayuda":
       return segments.length === 1 ? "help" : "home";
+    case "diccionario":
+      return segments.length === 1 ? "dictionary" : "home";
     default:
       return "home";
   }

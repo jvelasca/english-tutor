@@ -8,6 +8,39 @@
 
 ## Estado actual
 
+- ✅ **V3.38.1 — Cierre quirúrgico de los P1 del Planner + UI de diccionario y
+  estado (2026-09-10)** (**Versión estable `3.38.1`**, app `3.38.0 → 3.38.1`).
+  Release ADITIVA que cierra los 4 P1 de la auditoría de V3.38.0 y endurece
+  `situation`, sin funcionalidad nueva, sin migración de BD y sin tocar scoring,
+  FSRS ni la semántica del intervalo de evidencia. **(P1-01) Planner globalmente
+  óptimo:** `domain/review.py` separa la cota de CANDIDATOS
+  (`REVIEW_QUEUE_CANDIDATE_LIMIT = 500`) del límite de PRESENTACIÓN
+  (`REVIEW_QUEUE_*_LIMIT`) y el recorte se aplica DESPUÉS del ranking global por
+  `priority`; las cues se resuelven solo para los ítems servidos (arregla de paso
+  el coste de `example_for` por todas las vencidas). **(P1-02) Señales por
+  modalidad:** `summarize_evidence`/`summarize_by_target` (paridad exacta pura↔SQL)
+  añaden `skill_attempts` y `skill_mean_response_time_ms`, `planned_signals` gana
+  el bloque `skills` (attempts/successes/success_rate/weakness/support/latency por
+  modalidad) y `is_slow_recall` deja de leer la media GLOBAL: mide la latencia de
+  `recall` y exige un éxito de recall. **(P1-03) `skill_gap` parcial accionable:**
+  basta con que falte `spoken_production` (caso `written ✓ / spoken ✗`) para
+  dirigir la siguiente tarea a `sentence`. **(P1-04) Automaticidad robusta:**
+  `AUTOMATIC_MIN_INDEPENDENT` 2 → **3**, nueva ratio mínima
+  `AUTOMATIC_MIN_SUCCESS_RATIO = 0.80` y ausencia de fallo grave
+  (`wrong_word` > `AUTOMATIC_MAX_WRONG_WORD_ERRORS`), aplicado a `is_automatic` y
+  a `automatic_skills`. **(P2-01) `situation` endurecida:** nuevo módulo puro
+  `services/situation.py` (única fuente de verdad) exige UN hueco, UNA sola frase
+  y sin fuga morfológica regular de la diana; lo usan la generación
+  (`GENERATOR_VERSION` 1.2.0 → **1.2.1**, regeneración lazy de la caché) y la
+  lectura de la escalera. **UI:** ruta dedicada `/diccionario`
+  (`DICTIONARY_PATH`, `routeMap`, cuarto destino tras separador, `DictionaryScreen`
+  con vistas Personal/Consultar) y el indicador de conexión se integra en la
+  cabecera (`ConnectionIndicator` con popover `SystemStatus`), eliminando la barra
+  de estado inferior. Tests: pytest **1890**, vitest (**67 ficheros/568**),
+  `ruff`/`tsc` limpios y `check_release_consistency` **3.38.1** exit 0. Diferido a
+  V3.39: prioridad completa por skill, routing de escritura para
+  `written_production`, `sense`/CEFR/contexto y refactor de `wordDrill.tsx`.
+
 - ✅ **V3.38 — La siguiente tarea óptima: `situación`, planner y automaticidad por
   skill (2026-09-10)** (**Versión estable `3.38.0`**, app `3.37.1 → 3.38.0`). Cierra
   el incremento que V3.37 dejó abierto en tres frentes. **(1) P1-03 — automaticidad

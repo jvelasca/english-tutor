@@ -82,6 +82,11 @@ def test_planned_signals_reads_the_evidence_dimensions():
         "success_rate": 0.5,
         "independent_successes": 1,
         "mean_response_time_ms": 10000.0,
+        # V3.38.1 (P1-02): la fluidez se lee por modalidad (recall), no de la
+        # media global.
+        "skill_successes": {"recall": 2},
+        "skill_attempts": {"recall": 3},
+        "skill_mean_response_time_ms": {"recall": 10000.0},
     }
     signals = planner.planned_signals(
         evidence, {"production_gap": True}, retrievability=0.25
@@ -93,6 +98,11 @@ def test_planned_signals_reads_the_evidence_dimensions():
     assert signals["support"] == 0.5
     assert signals["latency"] == 0.5
     assert signals["slow_recall"] is True
+    # Segmentación por modalidad (nueva en V3.38.1).
+    assert signals["skills"]["recall"]["attempts"] == 3
+    assert signals["skills"]["recall"]["successes"] == 2
+    assert signals["skills"]["recall"]["latency"] == 0.5
+    assert signals["skills"]["spoken_production"]["attempts"] == 0
 
 
 def test_planned_signals_without_evidence_is_all_zero():
@@ -158,14 +168,35 @@ def test_skill_gap_needs_production_and_no_production_modality():
 
 
 def test_slow_recall_needs_measured_latency_and_a_success():
-    slow = {"successes": 1, "mean_response_time_ms": 12000}
-    fast = {"successes": 1, "mean_response_time_ms": 3000}
+    # V3.38.1 (P1-02): la señal es la latencia DE RECALL, no la media global.
+    slow = {
+        "skill_successes": {"recall": 1},
+        "skill_mean_response_time_ms": {"recall": 12000},
+    }
+    fast = {
+        "skill_successes": {"recall": 1},
+        "skill_mean_response_time_ms": {"recall": 3000},
+    }
     assert planner.is_slow_recall(slow) is True
     assert planner.is_slow_recall(fast) is False
     # La latencia de un fallo mide dificultad, no fluidez.
-    failed = {"successes": 0, "mean_response_time_ms": 20000}
+    failed = {
+        "skill_successes": {"recall": 0},
+        "successes": 0,
+        "skill_mean_response_time_ms": {"recall": 20000},
+    }
     assert planner.is_slow_recall(failed) is False
-    assert planner.is_slow_recall({"successes": 1}) is False
+    # Sin latencia de recall medida no hay señal (aunque haya latencia global).
+    assert (
+        planner.is_slow_recall({"successes": 1, "mean_response_time_ms": 20000})
+        is False
+    )
+    # Una producción oral lenta NO hace lento el recall (mezcla de modalidades).
+    speaking_slow = {
+        "skill_successes": {"recall": 2},
+        "skill_mean_response_time_ms": {"recall": 2000, "spoken_production": 15000},
+    }
+    assert planner.is_slow_recall(speaking_slow) is False
 
 
 def test_evidence_reason_has_a_declared_priority_order():
@@ -183,10 +214,29 @@ def test_evidence_reason_has_a_declared_priority_order():
         == "skill_gap"
     )
     assert (
-        planner.evidence_reason({}, {"successes": 2, "mean_response_time_ms": 9000})
+        planner.evidence_reason(
+            {},
+            {
+                "skill_successes": {"recall": 2},
+                "skill_mean_response_time_ms": {"recall": 9000},
+            },
+        )
         == "slow_recall"
     )
     assert planner.evidence_reason({}, {}) == ""
+
+
+def test_skill_gap_targets_the_partial_production_hole():
+    """V3.38.1 (P1-03): `written ✓ / spoken ✗` es un hueco accionable."""
+    matrix = {"production": True}
+    partial = {"skill_successes": {"recall": 2, "written_production": 3}}
+    assert planner.skill_gaps(partial) == ["spoken_production"]
+    assert planner.evidence_reason(matrix, partial) == "skill_gap"
+    # El hueco simétrico (falta escritura) se expone pero no emite razón: la
+    # cola no tiene todavía un drill de escritura (V3.39).
+    written_missing = {"skill_successes": {"recall": 2, "spoken_production": 3}}
+    assert planner.skill_gaps(written_missing) == ["written_production"]
+    assert planner.evidence_reason(matrix, written_missing) == ""
 
 
 def test_evidence_reason_never_breaks_on_partial_data():
@@ -218,7 +268,12 @@ def test_recommend_review_activity_prefers_evidence_reasons():
     )
     assert (
         lexicon.recommend_review_activity(
-            produced, evidence={"successes": 1, "mean_response_time_ms": 12000}
+            produced,
+            evidence={
+                # Producción oral cubierta (sin hueco de modalidad) + recall lento.
+                "skill_successes": {"recall": 1, "spoken_production": 1},
+                "skill_mean_response_time_ms": {"recall": 12000},
+            },
         )["reason"]
         == "slow_recall"
     )
@@ -230,7 +285,14 @@ def test_recommend_review_activity_keeps_v335_reasons_without_new_data():
     assert (
         lexicon.recommend_review_activity(
             produced,
-            evidence={"independent_successes": 2, "independent_success_days": 2},
+            evidence={
+                # V3.38.1 (P1-04): automaticidad robusta.
+                "independent_successes": 3,
+                "independent_success_days": 3,
+                "successes": 3,
+                "attempts": 3,
+                "success_rate": 1.0,
+            },
         )["reason"]
         == "automatic_maintenance"
     )
@@ -291,7 +353,12 @@ def test_review_queue_route_exposes_planner_and_skill_fields(
     uid = _setup(monkeypatch, tmp_path)
     vocabulary_repo.record_exposures(uid, ["river"])
     _due_lexicon_card(uid, "river", stability=5.0, days_ago=3)
-    for day in ("2026-09-01T10:00:00+00:00", "2026-09-03T10:00:00+00:00"):
+    for day in (
+        "2026-09-01T10:00:00+00:00",
+        "2026-09-03T10:00:00+00:00",
+        # V3.38.1 (P1-04): 3 éxitos independientes en 3 días para automaticidad.
+        "2026-09-05T10:00:00+00:00",
+    ):
         evidence_repo.record_evidence(
             uid,
             target_type="lexicon",
@@ -314,3 +381,107 @@ def test_review_queue_route_exposes_planner_and_skill_fields(
     assert item["automatic"] is True
     assert item["priority"] >= 0
     assert item["why"]
+
+
+def test_review_queue_ranks_globally_not_just_the_fsrs_head(monkeypatch, tmp_path):
+    """V3.38.1 (P1-01): la mejor tarjeta se elige sobre TODAS las vencidas.
+
+    Antes el límite de PRESENTACIÓN se pasaba a `fsrs.due_queue`, así que el
+    planner solo veía las 20 más urgentes del scheduler. Aquí la mejor candidata
+    es la MENOS urgente (alta estabilidad): queda fuera de la cabeza de FSRS y,
+    aun así, el planner debe elegirla.
+    """
+    uid = _setup(monkeypatch, tmp_path)
+    words = [f"w{i:03d}" for i in range(100)]
+    best = "w000"
+    for word in words:
+        vocabulary_repo.record_exposures(uid, [word])
+        if word == best:
+            # Reconocida, nunca producida (gap = 1.0) y con fallos (weakness =
+            # 1.0): la tarea óptima... pero la menos urgente del scheduler.
+            for _ in range(4):
+                evidence_repo.record_evidence(
+                    uid,
+                    target_type="lexicon",
+                    target_id=word,
+                    skill="recall",
+                    task="recall",
+                    success=False,
+                    support_level="cued",
+                    occurred_at="2026-09-01T10:00:00+00:00",
+                )
+            _due_lexicon_card(uid, word, stability=365.0, days_ago=1)
+        else:
+            # Sin hueco de producción y sin debilidad, pero muy urgentes.
+            vocabulary_repo.record_production(uid, [word], channel="writing")
+            _due_lexicon_card(uid, word, stability=1.0, days_ago=1)
+
+    cards = [
+        card
+        for card in academy_repo.list_fsrs_cards(uid)
+        if (card.get("target_type") or "") == "lexicon"
+    ]
+    fsrs_head = {
+        card["target_id"] for card in fsrs.due_queue(cards, limit=20)
+    }
+    assert best not in fsrs_head  # el scheduler, solo, no la vería
+
+    with TestClient(app) as client:
+        items = client.get(
+            "/api/learning/review", params={"user_id": uid}
+        ).json()["items"]
+
+    assert len(items) == 20  # límite de presentación intacto
+    assert items[0]["word"] == best  # ...pero el planner la encuentra y la pone 1.ª
+    assert items[0]["priority"] > items[1]["priority"]
+
+
+def test_review_queue_directs_a_partial_production_gap_to_speaking(
+    monkeypatch, tmp_path
+):
+    """V3.38.1 (P1-03): `written ✓ / spoken ✗` es un hueco accionable.
+
+    La escritura está consolidada (automática) y la oral no tiene ningún éxito:
+    la siguiente tarea debe ser producción oral (`sentence`), no mantenimiento.
+    """
+    uid = _setup(monkeypatch, tmp_path)
+    vocabulary_repo.record_exposures(uid, ["harbor"])
+    vocabulary_repo.record_recalls(uid, ["harbor"])
+    vocabulary_repo.record_production(uid, ["harbor"], channel="writing")
+    for day in ("2026-08-01", "2026-08-03", "2026-08-05"):
+        evidence_repo.record_evidence(
+            uid,
+            target_type="lexicon",
+            target_id="harbor",
+            skill="written_production",
+            task="production",
+            activity_id="writing_task",
+            success=True,
+            support_level="independent",
+            occurred_at=f"{day}T10:00:00+00:00",
+        )
+    for day in ("2026-08-02", "2026-08-04"):
+        evidence_repo.record_evidence(
+            uid,
+            target_type="lexicon",
+            target_id="harbor",
+            skill="recall",
+            task="recall",
+            activity_id="drill:recall:translation",
+            success=True,
+            support_level="independent",
+            occurred_at=f"{day}T10:00:00+00:00",
+        )
+    _due_lexicon_card(uid, "harbor", stability=5.0, days_ago=3)
+
+    with TestClient(app) as client:
+        item = client.get(
+            "/api/learning/review", params={"user_id": uid}
+        ).json()["items"][0]
+
+    assert item["reason"] == "skill_gap"
+    assert item["activity"] == "sentence"
+    assert item["signals"]["skill_gaps"] == ["spoken_production"]
+    assert "spoken_production" in item["why"]
+    # La escritura sí está consolidada por modalidad: el hueco es solo el oral.
+    assert "written_production" in item["signals"]["automatic_skills"]

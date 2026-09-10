@@ -33,6 +33,7 @@ from __future__ import annotations
 
 from services.evidence import (
     LEXICAL_SKILLS,
+    RECALL_SKILL,
     automatic_skills,
     is_automatic,
 )
@@ -62,6 +63,12 @@ ERROR_PRONE_MIN_WRONG = 2
 # Modalidades de PRODUCCIÓN: su ausencia en el ledger es el hueco que cierra la
 # actividad `sentence`.
 PRODUCTION_SKILLS: tuple[str, ...] = ("written_production", "spoken_production")
+
+# V3.38.1 (P1-03): modalidad que la actividad `sentence` SÍ puede cerrar — la
+# producción ORAL. El hueco parcial `written ✓ / spoken ✗` debe ser accionable;
+# el simétrico (`spoken ✓ / written ✗`) se sigue exponiendo en `skill_gaps` pero
+# no emite razón hasta que la cola tenga un drill de escritura (V3.39).
+SPEAKING_SKILL = "spoken_production"
 
 # Actividad del drill que cierra cada razón dirigida por la evidencia.
 ACTIVITY_FOR_REASON: dict[str, str] = {
@@ -142,21 +149,81 @@ def has_production_evidence(evidence: dict | None) -> bool:
 
 
 def is_slow_recall(evidence: dict | None) -> bool:
-    """¿Hay aciertos pero aún no son fluidos? (V3.38, puro).
+    """¿El RECALL es correcto pero aún no fluido? (V3.38 puro → V3.38.1).
 
-    Exige latencia medida Y al menos un éxito: la latencia de un fallo no mide
-    fluidez, mide dificultad (señal que ya cubre `weakness`).
+    V3.38 leía la latencia MEDIA GLOBAL (`mean_response_time_ms`), que mezcla
+    modalidades: una producción oral de 12 s y un recall de 2 s promedian 7 s y
+    no revelan que la recuperación textual es rápida (ni al revés). V3.38.1
+    (P1-02) lee la latencia DE RECALL (`skill_mean_response_time_ms["recall"]`).
+
+    Exige latencia de recall medida Y al menos un ÉXITO de recall: la latencia
+    de un fallo no mide fluidez, mide dificultad (señal que cubre `weakness`).
+    Sin latencia de recall no hay señal: no se inventa.
     """
     if not evidence:
         return False
-    latency = evidence.get("mean_response_time_ms")
+    latencies = evidence.get("skill_mean_response_time_ms")
+    if not isinstance(latencies, dict):
+        return False
+    latency = latencies.get(RECALL_SKILL)
     if latency is None:
         return False
     try:
         measured = float(latency)
     except (TypeError, ValueError):
         return False
-    return measured >= SLOW_RECALL_MS and _int(evidence.get("successes")) > 0
+    recall_successes = _int(
+        (evidence.get("skill_successes") or {}).get(RECALL_SKILL)
+    )
+    return measured >= SLOW_RECALL_MS and recall_successes > 0
+
+
+def skill_signals(evidence: dict | None) -> dict[str, dict]:
+    """Señales por MODALIDAD (V3.38.1, puro y determinista).
+
+    El Evidence Model segmenta el ledger por modalidad, pero el planner V3.38
+    lo volvía a recomprimir en una `weakness`/`support`/`latency` global: 20
+    aciertos de recall y 2 de speaking sobre 8 fallos daban un único 0.3125 y
+    se perdía el problema real. Estas señales conservan la segmentación para
+    que el planner pueda razonar por modalidad sin migrar el contrato global.
+
+    Devuelve una entrada por modalidad canónica (`LEXICAL_SKILLS`), con zeros
+    donde no hay evidencia (determinista y de forma estable). No entra en
+    `priority_score` todavía: V3.38.1 solo las usa para `slow_recall`, el
+    `skill_gap` parcial y la explicabilidad; la prioridad por skill es V3.39.
+    """
+    ev = evidence or {}
+    attempts = ev.get("skill_attempts") or {}
+    successes = ev.get("skill_successes") or {}
+    independent = ev.get("skill_independent_successes") or {}
+    latencies = ev.get("skill_mean_response_time_ms") or {}
+    if not all(
+        isinstance(bucket, dict)
+        for bucket in (attempts, successes, independent, latencies)
+    ):
+        attempts = successes = independent = latencies = {}
+    result: dict[str, dict] = {}
+    for skill in LEXICAL_SKILLS:
+        total = _int(attempts.get(skill))
+        won = _int(successes.get(skill))
+        ind = _int(independent.get(skill))
+        rate = _ratio(won, total)
+        latency = 0.0
+        raw = latencies.get(skill)
+        if raw is not None:
+            try:
+                latency = _clamp(float(raw) / LATENCY_CEILING_MS)
+            except (TypeError, ValueError):
+                latency = 0.0
+        result[skill] = {
+            "attempts": total,
+            "successes": won,
+            "success_rate": round(rate, 4),
+            "weakness": round(_clamp(1.0 - rate), 4),
+            "support": round(1.0 - _ratio(ind, won), 4) if won > 0 else 0.0,
+            "latency": round(latency, 4),
+        }
+    return result
 
 
 def evidence_reason(matrix: dict | None, evidence: dict | None) -> str:
@@ -169,10 +236,13 @@ def evidence_reason(matrix: dict | None, evidence: dict | None) -> str:
     matrix = matrix or {}
     checks = {
         "error_prone": lambda: error_prone(evidence),
+        # V3.38.1 (P1-03): basta con que falte la modalidad ORAL para dirigir la
+        # siguiente tarea a `sentence`. Antes exigía que faltaran AMBAS
+        # productivas (`len(skill_gaps) == len(PRODUCTION_SKILLS)`), así que el
+        # caso `written ✓ / spoken ✗` —justo el que V3.38 quería detectar—
+        # caía en mantenimiento.
         "skill_gap": lambda: bool(
-            matrix.get("production")
-            and skill_gaps(evidence)
-            and len(skill_gaps(evidence)) == len(PRODUCTION_SKILLS)
+            matrix.get("production") and SPEAKING_SKILL in skill_gaps(evidence)
         ),
         "slow_recall": lambda: is_slow_recall(evidence),
     }
@@ -200,7 +270,10 @@ def planned_signals(
     - `weakness` — 1 - `success_rate` (0.0 sin intentos);
     - `support` — proporción de éxitos que NO fueron independientes (0.0 sin
       éxitos): un ítem que solo acierta con apoyo depende de él;
-    - `latency` — latencia media normalizada por `LATENCY_CEILING_MS`.
+    - `latency` — latencia media normalizada por `LATENCY_CEILING_MS`;
+    - `skills` — V3.38.1: las señales `weakness`/`support`/`latency` y la
+      `success_rate` segmentadas POR MODALIDAD, que evitan recomprimir la
+      evidencia fina en una sola media global.
     """
     ev = evidence or {}
     mx = matrix or {}
@@ -243,6 +316,9 @@ def planned_signals(
         "automatic": is_automatic(ev),
         "automatic_skills": automatic_skills(ev),
         "skill_gaps": skill_gaps(ev),
+        # V3.38.1 (P1-02): señales por modalidad (no entran aún en la prioridad
+        # global; alimentan `slow_recall`, `skill_gap` y la explicabilidad).
+        "skills": skill_signals(ev),
         "error_prone": error_prone(ev),
         "slow_recall": is_slow_recall(ev),
     }

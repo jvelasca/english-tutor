@@ -48,6 +48,12 @@ const GrammarRoutesPractice = lazy(() =>
     default: m.GrammarRoutesPractice,
   })),
 );
+// V3.38.1: destino auxiliar del diccionario (ruta /diccionario).
+const DictionaryScreen = lazy(() =>
+  import("../features/vocabulary/DictionaryScreen").then((m) => ({
+    default: m.DictionaryScreen,
+  })),
+);
 
 interface WorkspaceProps {
   route: Route;
@@ -157,6 +163,10 @@ export function Workspace({
         onNext={onNextBestStart}
       />
     );
+  } else if (route === "dictionary") {
+    // V3.38.1: el diccionario es un destino auxiliar propio, no una vista
+    // incrustada en Vocabulary.
+    content = <DictionaryScreen userId={currentUserId} />;
   } else if (route === "help") {
     content = <HelpScreen />;
   } else if (route === "learn") {

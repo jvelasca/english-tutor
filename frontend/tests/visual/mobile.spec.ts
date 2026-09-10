@@ -34,9 +34,10 @@ test("móvil: la ayuda general se abre desde el header", async ({ page }) => {
     page.getByRole("heading", { name: "What is English Tutor?" }),
   ).toBeVisible();
 
-  // La guía de conexión vive en el popover del sistema (barra "Ready"):
-  // con backend avisa "Local network only…", sin backend (CI) degrada.
-  await page.getByRole("button", { name: "Ready" }).click();
+  // La guía de conexión vive en el popover del sistema (indicador de conexión
+  // del header, V3.38.1): con backend avisa "Local network only…", sin backend
+  // (CI) degrada.
+  await page.getByRole("button", { name: "System status" }).click();
 
   await expect(
     page.getByText(
@@ -52,7 +53,7 @@ test("móvil: el test de micrófono se renderiza en el estado del sistema", asyn
 
   await gotoApp(page);
 
-  await page.getByRole("button", { name: "Ready" }).click();
+  await page.getByRole("button", { name: "System status" }).click();
 
   await expect(
     page.getByRole("button", { name: "Test microphone" }),
@@ -71,7 +72,7 @@ test("móvil: permiso denegado muestra el aviso de micrófono no disponible", as
 
   await gotoApp(page);
 
-  await page.getByRole("button", { name: "Ready" }).click();
+  await page.getByRole("button", { name: "System status" }).click();
   await page.getByRole("button", { name: "Test microphone" }).click();
 
   await expect(

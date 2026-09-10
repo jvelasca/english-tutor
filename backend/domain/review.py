@@ -31,9 +31,28 @@ from services import fsrs, lexicon, recall
 from services.evidence import empty_summary as empty_evidence
 from services.example_sentences import example_for
 
-# Tope de ítems por defecto/ máximo de la cola de repaso.
+# Tope de ítems por defecto/ máximo de la cola de repaso (límite de PRESENTACIÓN).
 REVIEW_QUEUE_DEFAULT_LIMIT = 20
 REVIEW_QUEUE_MAX_LIMIT = 50
+
+# V3.38.1 (P1-01): cota de CANDIDATOS que entran al planner. El planner debe
+# comparar TODAS las cartas vencidas para elegir la siguiente tarea óptima; el
+# recorte de presentación (`REVIEW_QUEUE_*_LIMIT`) se aplica DESPUÉS del ranking.
+# Antes, el límite de presentación se pasaba a `fsrs.due_queue`, así que el
+# planner solo veía el subconjunto que el scheduler ya había recortado: una
+# tarea muy prioritaria podía quedar fuera. La cota es una salvaguarda de
+# memoria, no una decisión pedagógica (volumen doméstico, SQLite).
+REVIEW_QUEUE_CANDIDATE_LIMIT = 500
+
+
+def _queue_sort_key(item: dict) -> tuple:
+    """Orden de la cola: prioridad, urgencia del scheduler, palabra (V3.38.1)."""
+    retrievability = item.get("retrievability")
+    return (
+        -float(item.get("priority") or 0.0),
+        retrievability if retrievability is not None else 1.0,
+        item.get("word") or "",
+    )
 
 
 async def get_review_queue(
@@ -52,6 +71,11 @@ async def get_review_queue(
     latencia), con el olvido como primer componente. El scheduler sigue
     aportando `retrievability`/`stability` como señal explicable.
 
+    V3.38.1 (P1-01): el planner decide sobre TODAS las vencidas. `fsrs.due_queue`
+    solo acota por `REVIEW_QUEUE_CANDIDATE_LIMIT`; el recorte de presentación
+    (`limit`) se aplica DESPUÉS del ranking global por prioridad, de modo que la
+    "siguiente tarea óptima" ya no es "la mejor del subconjunto de FSRS".
+
     Nunca es una puerta (D5/E3): informa de lo que toca repasar; la actividad y
     su contenido los sirve el peldaño correspondiente (y el GET de ese peldaño
     sigue sin exponer la forma esperada).
@@ -63,8 +87,10 @@ async def get_review_queue(
         for card in cards
         if (card.get("target_type") or "") == "lexicon"
     ]
+    # V3.38.1: candidatos = TODAS las vencidas (acotadas por la salvaguarda),
+    # no el top del scheduler.
     due = fsrs.due_queue(
-        lexicon_cards, now=now_iso, limit=max(1, min(limit, REVIEW_QUEUE_MAX_LIMIT))
+        lexicon_cards, now=now_iso, limit=REVIEW_QUEUE_CANDIDATE_LIMIT
     )
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     by_word = {row["word"]: row for row in rows}
@@ -72,19 +98,44 @@ async def get_review_queue(
     evidence_by_word = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
     )
-    # V3.37: la decisión pedagógica (`next_recall_rung`) se resuelve contra la
-    # disponibilidad REAL de contenido (`resolve_recall_cue`), para que la cola
-    # nunca recomiende un peldaño que el GET no podría servir.
-    available_by_word = await _available_recall_cues(
-        [card.get("target_id") or "" for card in due]
-    )
-    items: list[dict] = []
+    # V3.38.1: primera pasada SIN disponibilidad de contenido. La PRIORIDAD no
+    # depende del cue recomendado, así que basta para el ranking global; así el
+    # coste de resolver el cue (que consulta el corpus por palabra, P2 de V3.38)
+    # se paga solo por lo que se sirve.
+    candidates: list[tuple[dict, dict]] = []
     for card in due:
         row = by_word.get(card.get("target_id") or "")
         if row is None:
             # Carta huérfana (la palabra ya no está en el léxico): se omite.
             continue
-        items.append(
+        candidates.append((row, card))
+    items = [
+        lexicon.review_queue_item(
+            row,
+            card,
+            now=now_iso,
+            evidence=evidence_by_word.get(row["word"]) or empty_evidence(),
+        )
+        for row, card in candidates
+    ]
+    # V3.38: la "siguiente tarea óptima" primero (ranking GLOBAL). Desempate por
+    # urgencia del scheduler (menor retrievability) y, por último, palabra.
+    items.sort(key=_queue_sort_key)
+    # Recorte de presentación DESPUÉS del ranking.
+    display_limit = max(1, min(limit, REVIEW_QUEUE_MAX_LIMIT))
+    served = items[:display_limit]
+    # V3.37/V3.38.1: segunda pasada (solo lo servido): resolver la decisión
+    # pedagógica (`next_recall_rung`) contra la disponibilidad REAL de contenido
+    # (`resolve_recall_cue`), para que la cola nunca recomiende un peldaño que el
+    # GET no podría servir, sin pagar `example_for` por todas las vencidas.
+    available_by_word = await _available_recall_cues(
+        [item["word"] for item in served]
+    )
+    by_candidate_word = {row["word"]: (row, card) for row, card in candidates}
+    served_items: list[dict] = []
+    for item in served:
+        row, card = by_candidate_word[item["word"]]
+        served_items.append(
             lexicon.review_queue_item(
                 row,
                 card,
@@ -93,19 +144,9 @@ async def get_review_queue(
                 available_cues=available_by_word.get(row["word"] or "", set()),
             )
         )
-    # V3.38 (planner): la "siguiente tarea óptima" primero. Desempate por
-    # urgencia del scheduler (menor retrievability) y, por último, palabra
-    # (orden estable y determinista).
-    items.sort(
-        key=lambda item: (
-            -float(item.get("priority") or 0.0),
-            item["retrievability"] if item["retrievability"] is not None else 1.0,
-            item["word"],
-        )
-    )
     return {
-        "due_count": len(items),
-        "items": items,
+        "due_count": len(served_items),
+        "items": served_items,
         "fsrs_version": fsrs.FSRS_VERSION,
     }
 

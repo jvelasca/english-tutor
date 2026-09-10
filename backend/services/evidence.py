@@ -87,7 +87,27 @@ INDEPENDENT_SUPPORT_LEVELS: frozenset[str] = frozenset(
 # acumula >= este nº de éxitos SIN apoyo en DÍAS NATURALES DISTINTOS. Una
 # producción del día no consolida (D5/E3) y un acierto suelto tampoco: la
 # automaticidad exige éxito independiente y ESPACIADO. Declarado y calibrable.
-AUTOMATIC_MIN_INDEPENDENT = 2
+#
+# V3.38.1 (P1-04 de la auditoría de V3.38.0): el volumen + espaciado era una
+# definición DEMASIADO DÉBIL — 100 intentos con 98 fallos y 2 aciertos sueltos
+# en 2 días declaraban automaticidad. Se añaden dos condiciones declaradas y
+# calibrables: una RATIO mínima de éxito y la ausencia de fallo "grave"
+# (`wrong_word`, confusión real y no errata). Se aplican por igual a la
+# automaticidad GLOBAL (`is_automatic`) y a la segmentada por modalidad
+# (`automatic_skills`).
+AUTOMATIC_MIN_INDEPENDENT = 3
+
+# V3.38.1: ratio mínima de éxito para declarar automaticidad. Se mide sobre el
+# `success_rate` global (item) o sobre `skill_successes`/`skill_attempts`
+# (modalidad). Un ítem que acierta casi siempre pero falla en la mayoría de
+# intentos no es automático por mucha racha que acumule.
+AUTOMATIC_MIN_SUCCESS_RATIO = 0.80
+
+# V3.38.1: nº máximo de fallos `wrong_word` (confusión real) tolerados para
+# declarar automaticidad. Aproximación determinista a "sin fallo reciente
+# grave": hoy el resumen no pondera recencia (deuda de V3.39); `> 1` (2 o más)
+# bloquea. Una errata (`orthographic_error`) no cuenta: no es confusión.
+AUTOMATIC_MAX_WRONG_WORD_ERRORS = 1
 
 # V3.38 (P1-03 de la auditoría de V3.37.0): MODALIDAD del aprendizaje léxico.
 # La automaticidad de V3.37 era GLOBAL — por ítem —, así que dos éxitos
@@ -431,6 +451,16 @@ def summarize_evidence(rows: list[dict]) -> dict:
       Un `skill` fuera de `LEXICAL_SKILLS` (p. ej. el canal legacy `chat` de
       V3.36-V3.37) no entra en ningún histograma.
 
+    V3.38.1 (P1-02 de la auditoría de V3.38.0) añade las señales por modalidad
+    que faltaban para no recomprimir la evidencia en una sola media global:
+
+    - `skill_attempts` — nº de eventos POR MODALIDAD (aciertos y fallos): lo que
+      permite calcular la ratio de éxito de cada skill (automaticidad robusta);
+    - `skill_mean_response_time_ms` — latencia media POR MODALIDAD (clave
+      ausente si la modalidad no midió latencia): lo que permite medir
+      `slow_recall` sobre `recall` y no sobre una media que mezcla speaking con
+      recuperación de texto.
+
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
     attempts = 0
@@ -448,6 +478,13 @@ def summarize_evidence(rows: list[dict]) -> dict:
     skill_success_days: dict[str, set[str]] = {}
     skill_independent_successes: dict[str, int] = {}
     skill_independent_days: dict[str, set[str]] = {}
+    # V3.38.1 (P1-02): intentos y latencia POR MODALIDAD. Antes solo existía una
+    # `mean_response_time_ms` global, así que una producción oral lenta y un
+    # recall rápido se promediaban y ninguna señal representaba la fluidez real
+    # de la recuperación. `skill_attempts` cuenta TODOS los eventos del skill
+    # (aciertos y fallos), como el `attempts` global.
+    skill_attempts: dict[str, int] = {}
+    skill_latencies: dict[str, list[float]] = {}
     latencies: list[float] = []
     for row in rows:
         attempts += 1
@@ -458,12 +495,19 @@ def summarize_evidence(rows: list[dict]) -> dict:
         error = (row.get("error_type") or "").strip().lower()
         if error:
             error_types[error] = error_types.get(error, 0) + 1
+        skill = (row.get("skill") or "").strip().lower()
+        if skill in LEXICAL_SKILLS:
+            skill_attempts[skill] = skill_attempts.get(skill, 0) + 1
         raw_latency = row.get("response_time_ms")
         if raw_latency is not None:
             try:
-                latencies.append(max(0.0, float(raw_latency)))
+                measured = max(0.0, float(raw_latency))
             except (TypeError, ValueError):
-                pass
+                measured = None
+            if measured is not None:
+                latencies.append(measured)
+                if skill in LEXICAL_SKILLS:
+                    skill_latencies.setdefault(skill, []).append(measured)
         # El peldaño se declara en `activity_id` tanto en ÉXITOS como en FALLOS:
         # la progresión lee los éxitos y la regresión, los fallos (V3.37.1).
         rung = recall_rung_from_activity(row.get("activity_id") or "")
@@ -480,8 +524,8 @@ def summarize_evidence(rows: list[dict]) -> dict:
                 independent_days.add(day)
         # V3.38: segmentación por modalidad. La clave se crea en el ÉXITO
         # (aunque falte el día) para que el valor sea 0 y no una clave ausente:
-        # paridad EXACTA con el `GROUP BY skill` de SQL.
-        skill = (row.get("skill") or "").strip().lower()
+        # paridad EXACTA con el `GROUP BY skill` de SQL. El `skill` ya se
+        # normalizó arriba (V3.38.1: también cuenta intentos por modalidad).
         if skill in LEXICAL_SKILLS:
             skill_successes[skill] = skill_successes.get(skill, 0) + 1
             skill_day_set = skill_success_days.setdefault(skill, set())
@@ -532,6 +576,15 @@ def summarize_evidence(rows: list[dict]) -> dict:
             skill: len(skill_days)
             for skill, skill_days in skill_independent_days.items()
         },
+        # V3.38.1 (P1-02): intentos y latencia media por modalidad (0/None si la
+        # modalidad no tiene eventos). La latencia se redondea a 1 decimal para
+        # paridad EXACTA con el `AVG(response_time_ms)` de SQL.
+        "skill_attempts": skill_attempts,
+        "skill_mean_response_time_ms": {
+            skill: round(sum(measured) / len(measured), 1)
+            for skill, measured in skill_latencies.items()
+            if measured
+        },
         "mean_response_time_ms": (
             round(sum(latencies) / len(latencies), 1) if latencies else None
         ),
@@ -558,63 +611,124 @@ def empty_summary() -> dict:
         "skill_success_days": {},
         "skill_independent_successes": {},
         "skill_independent_days": {},
+        "skill_attempts": {},
+        "skill_mean_response_time_ms": {},
         "mean_response_time_ms": None,
     }
 
 
-def is_automatic(evidence: dict) -> bool:
-    """¿El ítem es `automatic`? (V3.37, puro y determinista).
+def _success_ratio(evidence: dict) -> float | None:
+    """Ratio de éxito del resumen (None si no se puede confirmar).
 
-    Exige DOS condiciones sobre el resumen de evidencia:
+    Prioriza `success_rate` (contrato del resumen); si falta, lo deriva de
+    `successes`/`attempts` (dicts parciales). Sin intentos no hay ratio: la
+    automaticidad NO se declara (no se inventa evidencia).
+    """
+    rate = evidence.get("success_rate")
+    if rate is not None:
+        try:
+            return float(rate)
+        except (TypeError, ValueError):
+            pass
+    try:
+        attempts = int(evidence.get("attempts") or 0)
+        successes = int(evidence.get("successes") or 0)
+    except (TypeError, ValueError):
+        return None
+    return (successes / attempts) if attempts > 0 else None
+
+
+def _has_grave_error(evidence: dict) -> bool:
+    """¿El ítem acumula confusión real (`wrong_word`) por encima del umbral?
+
+    Aproximación determinista a "sin fallo reciente grave" (V3.38.1): el resumen
+    no pondera recencia todavía (deuda de V3.39). Una errata
+    (`orthographic_error`) no cuenta: no es no-saber.
+    """
+    errors = evidence.get("error_types")
+    if not isinstance(errors, dict):
+        return False
+    try:
+        return int(errors.get("wrong_word") or 0) > AUTOMATIC_MAX_WRONG_WORD_ERRORS
+    except (TypeError, ValueError):
+        return False
+
+
+def is_automatic(evidence: dict) -> bool:
+    """¿El ítem es `automatic`? (V3.37 → V3.38.1, puro y determinista).
+
+    Exige CUATRO condiciones sobre el resumen de evidencia:
 
     - `independent_successes >= AUTOMATIC_MIN_INDEPENDENT` — logro sin apoyo
       (no basta con `cued`/`guided`: eso es recuperación CON ayuda);
     - `independent_success_days >= AUTOMATIC_MIN_INDEPENDENT` — esos éxitos
-      caen en DÍAS NATURALES distintos.
+      caen en DÍAS NATURALES distintos;
+    - `success_rate >= AUTOMATIC_MIN_SUCCESS_RATIO` — V3.38.1 (P1-04): el
+      volumen no basta si el alumno falla la mayoría de intentos;
+    - sin fallo grave — V3.38.1: `wrong_word` (confusión real) por encima de
+      `AUTOMATIC_MAX_WRONG_WORD_ERRORS`.
 
     Un acierto suelto no es automaticidad (D5/E3) y cued/guided no cuentan como
     independientes aunque se repitan. Nunca lanza: un resumen vacío o incompleto
     no es automaticidad.
     """
-    if not evidence:
+    if not evidence or _has_grave_error(evidence):
         return False
     try:
         successes = int(evidence.get("independent_successes") or 0)
         days = int(evidence.get("independent_success_days") or 0)
     except (TypeError, ValueError):
         return False
+    ratio = _success_ratio(evidence)
     return (
         successes >= AUTOMATIC_MIN_INDEPENDENT
         and days >= AUTOMATIC_MIN_INDEPENDENT
+        and ratio is not None
+        and ratio >= AUTOMATIC_MIN_SUCCESS_RATIO
     )
 
 
 def automatic_skills(evidence: dict) -> list[str]:
-    """Modalidades en las que el ítem es `automatic` (V3.38, puro).
+    """Modalidades en las que el ítem es `automatic` (V3.38 → V3.38.1, puro).
 
-    Aplica el MISMO umbral que `is_automatic` (`AUTOMATIC_MIN_INDEPENDENT`
-    éxitos independientes en días naturales distintos) pero POR MODALIDAD, no
-    al ítem entero. Es la respuesta a P1-03 de la auditoría de V3.37.0:
-    `automatic` global podía mezclar una producción escrita con un recall oral
-    y declarar automático un ítem que ninguna modalidad domina.
+    Aplica el MISMO umbral que `is_automatic` — `AUTOMATIC_MIN_INDEPENDENT`
+    éxitos independientes en días naturales distintos, ratio mínima de éxito y
+    sin fallo grave — pero POR MODALIDAD, no al ítem entero. Es la respuesta a
+    P1-03 de la auditoría de V3.37.0: `automatic` global podía mezclar una
+    producción escrita con un recall oral y declarar automático un ítem que
+    ninguna modalidad domina.
 
-    Lee `skill_independent_successes` / `skill_independent_days` (histogramas
-    del resumen) y devuelve las modalidades en orden canónico (`LEXICAL_SKILLS`).
-    Nunca lanza: un resumen vacío o incompleto devuelve [].
+    Lee `skill_independent_successes`/`skill_independent_days` y, para la ratio,
+    `skill_successes`/`skill_attempts` (V3.38.1) del resumen. Devuelve las
+    modalidades en orden canónico (`LEXICAL_SKILLS`). El fallo grave es global
+    (el resumen no segmenta `error_types` por modalidad): un ítem con confusión
+    real no declara ninguna modalidad automática. Nunca lanza.
     """
-    if not evidence:
+    if not evidence or _has_grave_error(evidence):
         return []
     successes = evidence.get("skill_independent_successes") or {}
     days = evidence.get("skill_independent_days") or {}
-    if not isinstance(successes, dict) or not isinstance(days, dict):
+    skill_successes = evidence.get("skill_successes") or {}
+    skill_attempts = evidence.get("skill_attempts") or {}
+    if not all(
+        isinstance(bucket, dict)
+        for bucket in (successes, days, skill_successes, skill_attempts)
+    ):
         return []
     result: list[str] = []
     for skill in LEXICAL_SKILLS:
         try:
             volume = int(successes.get(skill, 0) or 0)
             spaced = int(days.get(skill, 0) or 0)
+            won = int(skill_successes.get(skill, 0) or 0)
+            total = int(skill_attempts.get(skill, 0) or 0)
         except (TypeError, ValueError):
             continue
-        if volume >= AUTOMATIC_MIN_INDEPENDENT and spaced >= AUTOMATIC_MIN_INDEPENDENT:
+        rate = (won / total) if total > 0 else 0.0
+        if (
+            volume >= AUTOMATIC_MIN_INDEPENDENT
+            and spaced >= AUTOMATIC_MIN_INDEPENDENT
+            and rate >= AUTOMATIC_MIN_SUCCESS_RATIO
+        ):
             result.append(skill)
     return result

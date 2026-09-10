@@ -5,6 +5,45 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.38.1 publicada** — release **v3.38.1** (**Cierre
+> quirúrgico de los P1 del Planner + UI de diccionario y estado**). Release
+> ADITIVA que NO añade funcionalidad: cierra los 4 P1 de la auditoría de V3.38.0
+> y endurece `situation`, sin migración de BD y sin tocar scoring, FSRS ni la
+> semántica del intervalo de evidencia. **(P1-01) Planner globalmente óptimo:**
+> `domain/review.py` separa la cota de CANDIDATOS
+> (`REVIEW_QUEUE_CANDIDATE_LIMIT = 500`) del límite de PRESENTACIÓN: el planner
+> compara TODAS las vencidas y el recorte se aplica DESPUÉS del ranking por
+> `priority`; las cues se resuelven solo para los ítems servidos (de paso, deja
+> de pagarse `example_for` por todas las vencidas). **(P1-02) Señales por
+> modalidad:** `summarize_evidence`/`summarize_by_target` (paridad exacta
+> pura↔SQL) añaden `skill_attempts` y `skill_mean_response_time_ms`;
+> `planned_signals` gana el bloque `skills` (attempts/successes/success_rate/
+> weakness/support/latency por modalidad, aún sin entrar en `priority_score`) e
+> `is_slow_recall` mide la latencia DE `recall` exigiendo un éxito de recall (ya
+> no la media global, que mezclaba modalidades). **(P1-03) `skill_gap` parcial
+> accionable:** basta con que falte `spoken_production` (caso `written ✓ / spoken
+> ✗`) para dirigir la siguiente tarea a `sentence`; el hueco simétrico se expone
+> pero no emite razón hasta que exista un drill de escritura (V3.39). **(P1-04)
+> Automaticidad robusta:** `AUTOMATIC_MIN_INDEPENDENT` 2 → **3** + nueva ratio
+> `AUTOMATIC_MIN_SUCCESS_RATIO = 0.80` + ausencia de fallo grave (`wrong_word` >
+> `AUTOMATIC_MAX_WRONG_WORD_ERRORS = 1`), aplicado a `is_automatic` y a
+> `automatic_skills`. **(P2-01) `situation` endurecida:** nuevo módulo puro
+> `services/situation.py` como única fuente de verdad (UN hueco, UNA sola frase,
+> sin fuga morfológica REGULAR de la diana), usado por la generación
+> (`GENERATOR_VERSION` 1.2.0 → **1.2.1**, regeneración lazy de la caché) y por la
+> lectura de la escalera (una situación cacheada inválida no se sirve ni cuenta
+> como peldaño disponible). **UI:** ruta dedicada `/diccionario` (`DICTIONARY_PATH`
+> + `routeMap` + cuarto destino tras un separador + `DictionaryScreen` con
+> Personal/Consultar) y estado de conexión en la cabecera (`ConnectionIndicator`
+> con punto verde/rojo y popover `SystemStatus`), retirando la barra inferior
+> (`StatusBar.tsx` y reglas CSS huérfanas). Contrato aditivo (`LexicalEvidence`
+> gana dos histogramas; `planned_signals` gana `skills`). Tests: pytest **1890
+> passed** + `ruff` limpio + vitest (**67 ficheros/568 tests**) + `tsc`/build
+> limpios + `check_release_consistency` **3.38.1** exit 0. Diferidos a V3.39:
+> prioridad completa por skill, routing de escritura de `written_production`,
+> `sense`/CEFR/contexto y transferencia real (V3.23), pesos del planner y
+> recencia ponderada, `example_for_many` y refactor de `wordDrill.tsx`.
+>
 > **Nota (2026-09-10):** **V3.38 publicada** — release **v3.38.0** (**La
 > siguiente tarea óptima: `situación`, planner y automaticidad por skill**).
 > Cierra el incremento que V3.37 dejó abierto, en tres frentes. **(1) P1-03
@@ -1279,10 +1318,19 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-10):** `v3.38.0` **La siguiente tarea óptima:
-`situación`, planner y automaticidad por skill** — la evidencia fina (modalidad,
-latencia, tipo de error, apoyo, contexto) por fin se USA para planificar y para
-hablar por modalidad. **(1)** El `skill` del ledger léxico deja de ser `""`
+**Posición actual (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
+Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra
+sus 4 P1 (planner globalmente óptimo, señales por modalidad, `skill_gap` parcial
+accionable y automaticidad robusta), endurece `situation` (nuevo módulo puro
+`services/situation.py`; `GENERATOR_VERSION` 1.2.1) y reubica en la UI el
+diccionario (ruta dedicada `/diccionario`) y el estado de conexión (cabecera,
+sin barra inferior). Sin migración de BD y sin tocar scoring, FSRS ni la
+semántica del intervalo de evidencia.
+
+**Base inmediata — V3.38.0, «La siguiente tarea óptima: `situación`, planner y
+automaticidad por skill».** V3.38.0 dejó la evidencia fina (modalidad, latencia,
+tipo de error, apoyo, contexto) USÁNDOSE para planificar y para hablar por
+modalidad: **(1)** El `skill` del ledger léxico deja de ser `""`
 (vocabulario canónico `LEXICAL_SKILLS` + mapeo canal→skill), el resumen segmenta
 los éxitos por skill (puro + SQL con paridad exacta) y `automatic_skills` mide
 automaticidad POR modalidad: un ítem no es "automático" por mezclar
@@ -1310,11 +1358,42 @@ verde. Versión en
 **Las notas de la cabecera de este documento son la fuente de verdad más
 reciente**; si contradicen a esta sección, mandan las notas.
 
-**Siguiente incremento (V3.39).** Deudas diferidas de V3.30 + transferencia por
-contexto V3.23 + `cloze_coverage` de corpus + `example_for_many` de la Review
-Queue + refactor de `wordDrill.tsx`. Sin cambio de modelo de evidencia previsto:
-V3.38 ya dejó el ledger segmentado por modalidad y el planner leyendo la
-evidencia fina.
+**Siguiente incremento (V3.39) — arquitectura por skill del planner (definida,
+no implementada).** V3.38.1 dejó la SEGMENTACIÓN montada y consumida en parte: el
+planner ya recibe `planned_signals.skills[skill] = {attempts, successes,
+success_rate, weakness, support, latency}` (calculado por `planner.skill_signals`
+a partir de `skill_attempts`/`skill_successes`/`skill_independent_successes`/
+`skill_mean_response_time_ms`, con paridad pura↔SQL), y de ahí ya se derivan
+`automatic_skills`, el `skill_gap` PARCIAL (solo oral) y el `slow_recall` por
+latencia de `recall`. Lo que queda para V3.39 es la DECISIÓN, no la señal:
+
+- **Elegir skill + actividad óptima, no solo la razón.** Hoy `priority_score` es
+  GLOBAL y la actividad sale de `ACTIVITY_FOR_REASON` (razones cualitativas). El
+  paso siguiente es puntuar por (skill, actividad) —argmax sobre
+  `planned_signals.skills` con los mismos pesos declarados— para que el planner
+  pueda decir "la modalidad limitante es `spoken_production`, la tarea es
+  `sentence`" y no solo "hay un hueco oral".
+- **Routing de ESCRITURA para `written_production`.** Hoy el hueco simétrico
+  (`spoken ✓ / written ✗`) se expone en `signals.skill_gaps` pero NO emite razón
+  accionable: no hay un drill de escritura en la cola (el `sentence` del drill
+  actual es oral). V3.39 debe añadir esa ruta para que el hueco de escritura sea
+  accionable igual que el oral (P1-03 quedó cerrado solo para el oral, a
+  propósito).
+- **`spontaneous_use` sin actividad.** La cuarta modalidad se mide pero no tiene
+  tarea asociada (el canal legacy `chat` mapea a ella); decidir su actividad es
+  parte de la decisión por skill.
+- **Recencia ponderada de fallos y calibración de pesos.** `AUTOMATIC_MAX_WRONG_
+  WORD_ERRORS` es una aproximación determinista SIN recencia (documentada en
+  `services/evidence.py`) y `PRIORITY_WEIGHTS` no se ha optimizado: V3.39 los
+  convierte en señales ponderadas por tiempo/skill.
+- **`sense`/CEFR/contexto + transferencia real (V3.23).** La transferencia por
+  contexto sigue diferida (el `gap` de transferencia existe como señal, 0.5).
+- **Deudas menores:** `cloze_coverage` de corpus, `example_for_many` de la Review
+  Queue y refactor de `wordDrill.tsx`.
+
+Sin cambio de modelo de evidencia previsto: V3.38.0 ya dejó el ledger segmentado
+por modalidad y V3.38.1 dejó el planner leyendo la evidencia fina por modalidad,
+así que V3.39 puede atacar la decisión sin migración.
 
 **Histórico (hasta V2.4, 2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
 (la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).

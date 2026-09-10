@@ -328,6 +328,10 @@ def summarize_by_target(
     `LOWER(skill)` y restringidos a los valores canónicos de `LEXICAL_SKILLS`
     (solo ÉXITOS, como la versión pura). Es la base de `automatic_skills`.
 
+    V3.38.1 (P1-02) añade `skill_attempts` (TODOS los eventos del skill) y
+    `skill_mean_response_time_ms` (latencia media por modalidad), agrupados por
+    `LOWER(skill)` con paridad exacta frente a la versión pura.
+
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
     # Import local (misma convención que el resto del repositorio): la capa pura
@@ -431,6 +435,19 @@ def summarize_by_target(
             "GROUP BY target_id, LOWER(skill)",
             (*independent, *independent, user_id, target_type, *skills),
         ).fetchall()
+        # V3.38.1 (P1-02): intentos y latencia media POR MODALIDAD. Cuenta TODOS
+        # los eventos del skill (aciertos y fallos), como el `attempts` global;
+        # el `AVG` ignora las latencias NULL (la versión pura omite la clave de
+        # una modalidad sin latencia medida: misma semántica).
+        skill_stat_rows = conn.execute(
+            "SELECT target_id, LOWER(skill) AS skill, COUNT(*) AS attempts, "
+            "AVG(response_time_ms) AS mean_latency "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? "
+            f"AND LOWER(skill) IN ({skill_placeholders}) "
+            "GROUP BY target_id, LOWER(skill)",
+            (user_id, target_type, *skills),
+        ).fetchall()
     intervals: dict[str, list[float]] = {}
     for row in interval_rows:
         intervals.setdefault(row["target_id"], []).append(
@@ -481,6 +498,16 @@ def summarize_by_target(
         skill_independent_days.setdefault(target, {})[skill] = int(
             row["independent_days"]
         )
+    skill_attempts: dict[str, dict[str, int]] = {}
+    skill_mean_response_time_ms: dict[str, dict[str, float]] = {}
+    for row in skill_stat_rows:
+        target = row["target_id"]
+        skill = row["skill"]
+        skill_attempts.setdefault(target, {})[skill] = int(row["attempts"])
+        if row["mean_latency"] is not None:
+            skill_mean_response_time_ms.setdefault(target, {})[skill] = round(
+                float(row["mean_latency"]), 1
+            )
     return {
         row["target_id"]: {
             "attempts": int(row["attempts"]),
@@ -505,6 +532,10 @@ def summarize_by_target(
                 row["target_id"], {}
             ),
             "skill_independent_days": skill_independent_days.get(
+                row["target_id"], {}
+            ),
+            "skill_attempts": skill_attempts.get(row["target_id"], {}),
+            "skill_mean_response_time_ms": skill_mean_response_time_ms.get(
                 row["target_id"], {}
             ),
             "mean_response_time_ms": (

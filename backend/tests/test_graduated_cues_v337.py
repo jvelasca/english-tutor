@@ -308,11 +308,36 @@ def test_is_automatic_requires_spaced_independent_success():
         )
         is False
     )
+    # V3.38.1 (P1-04): 2 éxitos independientes ya no bastan (el umbral sube a 3)
+    # y además se exige una ratio mínima de éxito.
     assert (
         evidence_svc.is_automatic(
             {"independent_successes": 2, "independent_success_days": 2}
         )
+        is False
+    )
+    assert (
+        evidence_svc.is_automatic(
+            {
+                "independent_successes": 3,
+                "independent_success_days": 3,
+                "success_rate": 1.0,
+            }
+        )
         is True
+    )
+    # Muchos fallos con 3 aciertos sueltos NO son automaticidad (ratio < 0.80).
+    assert (
+        evidence_svc.is_automatic(
+            {
+                "independent_successes": 3,
+                "independent_success_days": 3,
+                "successes": 3,
+                "attempts": 30,
+                "success_rate": 0.1,
+            }
+        )
+        is False
     )
 
 
@@ -348,9 +373,15 @@ def test_cued_successes_do_not_count_as_automatic():
                 "success": 1,
                 "support_level": "spontaneous",
             },
+            {
+                # V3.38.1: el umbral sube a 3 éxitos independientes en 3 días.
+                "occurred_at": "2026-09-03T10:00:00+00:00",
+                "success": 1,
+                "support_level": "spontaneous",
+            },
         ]
     )
-    assert spontaneous["independent_success_days"] == 2
+    assert spontaneous["independent_success_days"] == 3
     assert evidence_svc.is_automatic(spontaneous) is True
 
 
@@ -388,6 +419,7 @@ def test_independent_success_days_and_rungs_pure_sql_parity(monkeypatch, tmp_pat
     for day, support in (
         ("2026-09-01T10:00:00+00:00", "independent"),
         ("2026-09-02T10:00:00+00:00", "spontaneous"),
+        ("2026-09-03T10:00:00+00:00", "independent"),
     ):
         evidence_repo.record_evidence(
             uid,
@@ -404,8 +436,8 @@ def test_independent_success_days_and_rungs_pure_sql_parity(monkeypatch, tmp_pat
         evidence_repo.list_evidence(uid, "river", target_type="lexicon")
     )
     assert aggregated == pure
-    assert aggregated["independent_success_days"] == 2  # 09-01 y 09-02
-    assert aggregated["recall_rungs"] == {"translation": 2}
+    assert aggregated["independent_success_days"] == 3  # 09-01, 09-02 y 09-03
+    assert aggregated["recall_rungs"] == {"translation": 3}
     assert evidence_svc.is_automatic(aggregated) is True
 
 
@@ -549,8 +581,13 @@ def test_review_queue_item_exposes_recommended_cue_and_automatic():
         "last_review_at": "2026-09-06T10:00:00+00:00",
     }
     evidence = {
-        "independent_successes": 2,
-        "independent_success_days": 2,
+        # V3.38.1 (P1-04): automaticidad robusta = 3 éxitos independientes en 3
+        # días distintos y ratio de éxito suficiente.
+        "independent_successes": 3,
+        "independent_success_days": 3,
+        "successes": 3,
+        "attempts": 3,
+        "success_rate": 1.0,
         "recall_rungs": {"translation": 1, "definition": 1},
     }
     item = lexicon.review_queue_item(
@@ -606,7 +643,12 @@ def test_review_queue_route_exposes_the_new_fields_without_leaking(
     vocabulary_repo.record_exposures(uid, ["student"])
     vocabulary_repo.record_recalls(uid, ["student"])
     vocabulary_repo.record_production(uid, ["student"], channel="speaking")
-    for day in ("2026-09-01T10:00:00+00:00", "2026-09-02T10:00:00+00:00"):
+    for day in (
+        "2026-09-01T10:00:00+00:00",
+        "2026-09-02T10:00:00+00:00",
+        # V3.38.1 (P1-04): el umbral de automaticidad sube a 3 días.
+        "2026-09-03T10:00:00+00:00",
+    ):
         evidence_repo.record_evidence(
             uid,
             target_type="lexicon",

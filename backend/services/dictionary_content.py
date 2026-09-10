@@ -33,6 +33,7 @@ import re
 
 from schemas.chat import ChatMessage
 from services import llm, translate
+from services import situation as situation_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,12 @@ logger = logging.getLogger(__name__)
 # enunciado situacional que sirve el 4.º peldaño de la escalera de recall. El
 # contenido cacheado con 1.0.0/1.1.0 no lo tiene, así que se regenera una sola
 # vez al primer lookup (misma política de invalidación, sin migración de datos).
-GENERATOR_VERSION = "1.2.0"
+#
+# V3.38.1: bump 1.2.0 -> 1.2.1. Endurecimiento del validador de `situation`
+# (una sola frase + fuga morfológica, P2-01 de la auditoría de V3.38.0): la
+# caché 1.2.0 puede contener enunciados que las reglas nuevas descartarían, así
+# que se regenera una sola vez bajo el validador estricto.
+GENERATOR_VERSION = "1.2.1"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
@@ -61,12 +67,11 @@ MAX_DEFINITION_CHARS = 600
 MAX_TRANSLATION_CHARS = 200
 # El enunciado situacional es UNA frase de escenario con un único hueco; se
 # acota para que no se convierta en un párrafo.
-MAX_SITUATION_CHARS = 240
-
-# Hueco canónico del enunciado situacional. El modelo puede escribir una raya
-# de guiones bajos de cualquier longitud; se normaliza a esta forma exacta.
-SITUATION_BLANK = "_____"
-_BLANK_RE = re.compile(r"_{3,}")
+# V3.38.1 (P2-01): la validación del enunciado situacional vive en la capa pura
+# `services.situation` (única fuente de verdad, compartida con la lectura de la
+# escalera). Aquí solo se re-exportan los nombres por retrocompatibilidad.
+MAX_SITUATION_CHARS = situation_service.MAX_SITUATION_CHARS
+SITUATION_BLANK = situation_service.SITUATION_BLANK
 
 # Categorías gramaticales aceptadas del `pos` devuelto por el modelo. Cualquier
 # otro valor se normaliza a "" (la UI no muestra POS inventado).
@@ -191,29 +196,13 @@ def parse_content(raw: str, *, word: str = "") -> dict:
 def _situation_from(raw_situation: object, word: str) -> str:
     """Enunciado situacional validado, o "" si no cumple el contrato (V3.38).
 
-    Reglas (deterministas, mismas que exige la escalera):
-    - es UNA frase con EXACTAMENTE un hueco, normalizado a `_____`;
-    - no supera `MAX_SITUATION_CHARS`;
-    - no contiene la palabra diana (spoiler) cuando el llamador la declara. Es
-      la misma honestidad que `services.recall._definition_leaks_word` aplica
-      a la definición y al cloze.
+    V3.38.1 (P2-01): delega en el validador puro `services.situation`, que
+    exige UN hueco, UNA sola frase, longitud acotada y ausencia de fuga de la
+    diana (forma textual o variante morfológica regular). La misma función
+    valida la lectura en la escalera de recall, así que generación y servicio no
+    pueden divergir.
     """
-    text = str(raw_situation or "").strip()
-    if not text:
-        return ""
-    text = _BLANK_RE.sub(SITUATION_BLANK, text)
-    # EXACTAMENTE un hueco: dos huecos no son un enunciado situacional, son dos
-    # preguntas encadenadas (y la escalera solo puede blanquear una diana).
-    if text.count(SITUATION_BLANK) != 1:
-        return ""
-    if len(text) > MAX_SITUATION_CHARS:
-        return ""
-    target = (word or "").strip().lower()
-    if target and re.search(
-        rf"\b{re.escape(target)}\b", text.lower()
-    ):
-        return ""
-    return text
+    return situation_service.validate_situation(raw_situation, word)
 
 
 async def generate_content(

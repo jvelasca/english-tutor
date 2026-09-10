@@ -372,6 +372,9 @@ def test_empty_summary_matches_the_extended_contract():
         "skill_success_days": {},
         "skill_independent_successes": {},
         "skill_independent_days": {},
+        # V3.38.1 (P1-02): intentos y latencia media por modalidad (aditivos).
+        "skill_attempts": {},
+        "skill_mean_response_time_ms": {},
         "mean_response_time_ms": None,
     }
 

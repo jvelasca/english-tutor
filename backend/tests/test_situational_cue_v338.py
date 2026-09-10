@@ -102,7 +102,9 @@ def _due_lexicon_card(uid: str, word: str, *, stability: float, days_ago: int) -
 
 
 def test_generator_version_and_prompt_declare_the_situation_field():
-    assert dictionary_content.GENERATOR_VERSION == "1.2.0"
+    # V3.38.1: el validador se endurece (una frase + fuga morfológica) y la
+    # versión sube para regenerar la caché previa bajo las reglas nuevas.
+    assert dictionary_content.GENERATOR_VERSION == "1.2.1"
     assert "situation" in dictionary_content._SYSTEM_PROMPT
     assert dictionary_content.SITUATION_BLANK == "_____"
 
@@ -158,6 +160,44 @@ def test_generate_content_validates_the_situation_against_the_word():
         dictionary_content.generate_content("cat", fetcher=_fake)
     )
     assert out["situation"] == "The _____ purred on the sofa."
+
+
+# --- Endurecimiento del validador (V3.38.1, P2-01) --------------------------
+
+
+def test_situation_validator_rejects_a_second_sentence():
+    out = dictionary_content.parse_content(
+        _payload("The _____ purred softly. Then it slept.")
+    )
+    assert out["situation"] == ""
+
+
+def test_situation_validator_accepts_a_single_closing_mark():
+    out = dictionary_content.parse_content(_payload("The _____ purred loudly!"))
+    assert out["situation"] == "The _____ purred loudly!"
+
+
+def test_situation_validator_rejects_regular_morphological_leaks():
+    # Cada caso contiene una diana en forma derivada REGULAR (plural, 3.ª
+    # persona, pasado, gerundio con e-drop/duplicación, adverbio o posesivo).
+    leaks = (
+        ("dog", "The dogs barked at the _____."),
+        ("study", "He _____ hard and studied all night."),
+        ("stop", "They _____ here and stopped the car."),
+        ("make", "She is _____ a cake while making coffee."),
+        ("quick", "He _____ left and quickly returned."),
+        ("friend", "My friend's car was near the _____."),
+    )
+    for word, situation in leaks:
+        out = dictionary_content.parse_content(_payload(situation), word=word)
+        assert out["situation"] == "", (word, situation)
+
+
+def test_situation_validator_keeps_a_legit_situation():
+    out = dictionary_content.parse_content(
+        _payload("At the vet, the _____ was purring loudly."), word="cat"
+    )
+    assert out["situation"] == "At the vet, the _____ was purring loudly."
 
 
 # --- Persistencia y migración -----------------------------------------------
@@ -259,6 +299,29 @@ def test_recall_prompt_rejects_a_situation_that_leaks_the_word():
         }
     ]
     assert recall.recall_prompt_for("cat", entries, cue="situation") is None
+
+
+def test_recall_prompt_revalidates_a_stale_situation():
+    """V3.38.1: una situación cacheada por reglas laxas no se sirve."""
+    entries = [
+        {
+            "word": "cat",
+            "translation": "gato",
+            "situation": "The _____ purred softly. Then it slept.",
+        }
+    ]
+    assert recall.recall_prompt_for("cat", entries, cue="situation") is None
+
+
+def test_recall_prompt_rejects_a_morphological_leak():
+    entries = [
+        {
+            "word": "dog",
+            "translation": "perro",
+            "situation": "The dogs barked near the _____.",
+        }
+    ]
+    assert recall.recall_prompt_for("dog", entries, cue="situation") is None
 
 
 def test_next_recall_rung_reaches_situation_after_cloze():
@@ -434,7 +497,12 @@ def test_review_queue_route_recommends_the_situation_when_cached(
     vocabulary_repo.record_exposures(uid, ["student"])
     vocabulary_repo.record_recalls(uid, ["student"])
     vocabulary_repo.record_production(uid, ["student"], channel="speaking")
-    for day in ("2026-09-01T10:00:00+00:00", "2026-09-02T10:00:00+00:00"):
+    for day in (
+        "2026-09-01T10:00:00+00:00",
+        "2026-09-02T10:00:00+00:00",
+        # V3.38.1 (P1-04): 3 éxitos independientes en 3 días.
+        "2026-09-03T10:00:00+00:00",
+    ):
         evidence_repo.record_evidence(
             uid,
             target_type="lexicon",
