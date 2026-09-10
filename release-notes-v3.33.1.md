@@ -104,6 +104,19 @@ Practicar esta palabra
   puente V3.32 que abren el drill conservan su intención declarando Recognition
   no disponible.
 - `python scripts/check_release_consistency.py` → **3.33.1** exit 0.
+- **CI verificable (GitHub Actions).** Commit
+  `dcaa74cacf4912c3f747a104e491d6a0723c5ca7` (push `5207729..dcaa74c` a `main`)
+  con el run [34447562780](https://github.com/jvelasca/english-tutor/actions/runs/34447562780)
+  en **success** y los 6 jobs verdes: `Backend (ruff + pytest)`,
+  `Frontend (tsc + vitest + build)`, `Release consistency`, `Beta V3.0 gate`,
+  `Content validation` y `Playwright E2E (visual)`.
+- **Nota para la auditoría (aclaración de V3.33.0).** El informe anterior marcó
+  la CI como «no verificable»; V3.33.0 **sí** tenía CI y **sí** pasó: run
+  [34383922526](https://github.com/jvelasca/english-tutor/actions/runs/34383922526)
+  sobre el sha `52077290b91748df98a60066ada064ba7bc0b2ce`, con los 6 jobs en
+  `success`. La confusión viene de consultar *commit statuses* (`/status`, que
+  queda en `pending`) en lugar de los *check runs*, que es lo que publica
+  `.github/workflows/ci.yml`.
 
 ## Documentación
 

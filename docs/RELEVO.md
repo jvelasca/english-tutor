@@ -30,7 +30,14 @@
 > aislamiento reescritos sobre `question_id`) + ruff limpio + vitest (63
 > ficheros/**547**, +1: reentrar en Recognize pide pregunta nueva / arranque y
 > degradación) + `tsc --noEmit` limpios + `check_release_consistency` **3.33.1**
-> exit 0. Detalle: `release-notes-v3.33.1.md`; `CHANGELOG.md` con entrada
+> exit 0. **CI verificable:** commit
+> `dcaa74cacf4912c3f747a104e491d6a0723c5ca7` con el run 34447562780 en
+> `success` (6/6 jobs). Aclaración para la auditoría: el informe anterior marcó
+> la CI de V3.33.0 como «no verificable», pero **sí** tenía CI verde (run
+> 34383922526, sha `5207729`, 6/6 jobs); la confusión viene de consultar
+> *commit statuses* (`/status`, que queda en `pending`) en lugar de los
+> *check runs* que publica `.github/workflows/ci.yml`.
+> Detalle: `release-notes-v3.33.1.md`; `CHANGELOG.md` con entrada
 > `[3.33.1]`; `PLAN.md` con hito estable V3.33.1. Pendientes hacia **V3.34**:
 > recall demorado con FSRS, transferencia por contexto de actividad V3.23 y los
 > diferidos de V3.30.
