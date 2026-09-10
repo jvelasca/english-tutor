@@ -178,6 +178,13 @@ pura (premisa 21: la UI declara QUÉ peldaño le sirvieron; el servidor puntúa)
   `npm run build` OK.
 - `python scripts/check_release_consistency.py` → **3.37.0** exit 0.
 
+## CI
+
+- Commit `bdc77cd5e467cea4b027178e6235da8e57b36f9e` con el run
+  [34476875230](https://github.com/jvelasca/english-tutor/actions/runs/34476875230)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+
 ## Documentación
 
 - `CHANGELOG.md`: entrada `[3.37.0]`.

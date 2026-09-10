@@ -40,6 +40,9 @@
 > `cue_kind`. Tests: pytest **1813 passed** (+22) + ruff limpio + vitest (65
 > ficheros/**560**, +1) + `tsc --noEmit` limpio + build OK +
 > `check_release_consistency` **3.37.0** exit 0.
+> **CI verificable:** commit `bdc77cd5e467cea4b027178e6235da8e57b36f9e` con el
+> run [34476875230](https://github.com/jvelasca/english-tutor/actions/runs/34476875230)
+> en `success` (6/6 jobs).
 > Pendientes hacia **V3.38**: `situación` (exige extender el contrato de
 > contenido de la caché, `generator_version`) y el planner (Optimal Next Task),
 > más los diferidos de V3.30 y la transferencia por contexto V3.23.
