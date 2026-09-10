@@ -123,6 +123,13 @@ produce medida) y la envía como `response_time_ms`; sin medición el campo va a
 - Frontend: `tsc --noEmit` limpio y `vitest` → **65 ficheros/559 tests** (+1).
 - `python scripts/check_release_consistency.py` → **3.36.0** exit 0.
 
+## CI
+
+- Commit `d91a637a74678e080478656ed02d7c1e6cd4ba07` con el run
+  [34473218199](https://github.com/jvelasca/english-tutor/actions/runs/34473218199)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+
 ## Documentación
 
 - `CHANGELOG.md`: entrada `[3.36.0]`.

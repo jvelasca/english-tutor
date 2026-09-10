@@ -33,6 +33,9 @@
 > Frontend: el peldaño Recall mide la latencia cue → envío. Tests: pytest
 > **1791 passed** (+22) + ruff limpio + vitest (65 ficheros/**559**, +1) +
 > `tsc --noEmit` limpio + `check_release_consistency` **3.36.0** exit 0.
+> **CI verificable:** commit `d91a637a74678e080478656ed02d7c1e6cd4ba07` con el
+> run [34473218199](https://github.com/jvelasca/english-tutor/actions/runs/34473218199)
+> en `success` (6/6 jobs).
 > Pendientes hacia **V3.37**: cues graduados (translation → definition → cloze →
 > situación → free recall), gradiente de apoyo como señal de automaticidad y el
 > planner (grafo evidencia → conocimiento → retención → transferencia →
