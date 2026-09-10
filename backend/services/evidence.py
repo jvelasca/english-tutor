@@ -364,6 +364,17 @@ def summarize_evidence(rows: list[dict]) -> dict:
       (`drill:recall:<peldaño>`): la evidencia con la que `next_recall_rung`
       decide el siguiente peldaño. Los eventos legacy sin peldaño no entran.
 
+    V3.37.1 (política de consolidación y regresión) añade los otros dos ejes
+    que la escalera necesita para no ascender con un acierto suelto y para
+    retroceder ante fallos repetidos:
+
+    - `recall_rung_days` — DÍAS NATURALES distintos con ÉXITO por peldaño: lo
+      que exige `_rung_passed` para dar un peldaño por superado (espaciado,
+      mismo rigor que `distinct_success_days`);
+    - `recall_rung_failures` — intentos FALLIDOS por peldaño: lo que lee la
+      política de regresión. Los eventos legacy sin peldaño no entran en
+      ninguno de los tres histogramas (no son evidencia negativa).
+
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
     attempts = 0
@@ -375,6 +386,8 @@ def summarize_evidence(rows: list[dict]) -> dict:
     support_levels: dict[str, int] = {}
     error_types: dict[str, int] = {}
     recall_rungs: dict[str, int] = {}
+    recall_rung_days: dict[str, set[str]] = {}
+    recall_rung_failures: dict[str, int] = {}
     latencies: list[float] = []
     for row in rows:
         attempts += 1
@@ -391,7 +404,12 @@ def summarize_evidence(rows: list[dict]) -> dict:
                 latencies.append(max(0.0, float(raw_latency)))
             except (TypeError, ValueError):
                 pass
+        # El peldaño se declara en `activity_id` tanto en ÉXITOS como en FALLOS:
+        # la progresión lee los éxitos y la regresión, los fallos (V3.37.1).
+        rung = recall_rung_from_activity(row.get("activity_id") or "")
         if not _truthy(row.get("success")):
+            if rung:
+                recall_rung_failures[rung] = recall_rung_failures.get(rung, 0) + 1
             continue
         successes += 1
         if day:
@@ -400,9 +418,13 @@ def summarize_evidence(rows: list[dict]) -> dict:
             independent_successes += 1
             if day:
                 independent_days.add(day)
-        rung = recall_rung_from_activity(row.get("activity_id") or "")
         if rung:
             recall_rungs[rung] = recall_rungs.get(rung, 0) + 1
+            # La clave se crea aunque falte el día, para que el valor sea 0 y no
+            # una clave ausente (paridad EXACTA con el `COUNT DISTINCT` de SQL).
+            rung_day_set = recall_rung_days.setdefault(rung, set())
+            if day:
+                rung_day_set.add(day)
         raw = row.get("interval_since_last_evidence")
         if raw is None:
             continue
@@ -421,6 +443,10 @@ def summarize_evidence(rows: list[dict]) -> dict:
         "support_levels": support_levels,
         "error_types": error_types,
         "recall_rungs": recall_rungs,
+        "recall_rung_days": {
+            rung: len(rung_days) for rung, rung_days in recall_rung_days.items()
+        },
+        "recall_rung_failures": recall_rung_failures,
         "mean_response_time_ms": (
             round(sum(latencies) / len(latencies), 1) if latencies else None
         ),
@@ -441,6 +467,8 @@ def empty_summary() -> dict:
         "support_levels": {},
         "error_types": {},
         "recall_rungs": {},
+        "recall_rung_days": {},
+        "recall_rung_failures": {},
         "mean_response_time_ms": None,
     }
 

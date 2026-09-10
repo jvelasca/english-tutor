@@ -5,6 +5,38 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-10 (UTC+2).
 >
+> **Nota (2026-09-10):** **V3.37.1 publicada** — release **v3.37.1**
+> (**Política de consolidación y regresión de la escalera de recall**). Patch
+> quirúrgico que cierra los dos P1 pedagógicos de la auditoría de V3.37.0, sin
+> migración de BD (el peldaño ya se declaraba en `activity_id` desde V3.37.0) y
+> sin tocar scoring ni FSRS. **P1-01:** `services/recall.py` añade
+> `RECALL_RUNG_PASS_MIN_SUCCESSES = 2` / `RECALL_RUNG_PASS_MIN_DAYS = 2` y
+> `_rung_passed`: un peldaño (`translation`/`definition`/`cloze`) solo se da por
+> SUPERADO con varios éxitos en DÍAS NATURALES distintos (un acierto suelto o el
+> volumen del mismo día no ascienden; la progresión pasa a EVIDENCIA →
+> CONSOLIDACIÓN → MÁS EXIGENCIA). El umbral se mide sobre los ÉXITOS DEL PROPIO
+> PELDAÑO, no sobre `independent_successes`, porque `cued`/`guided` nunca son
+> `independent` y exigir automaticidad bloquearía la escalera. **P1-02:**
+> `RECALL_REGRESSION_FAILURES = 2` y una política determinista:
+> `next_recall_rung` BAJA al peldaño inmediatamente inferior (más apoyo) si el
+> peldaño ideal acumula ≥2 fallos SIN ningún éxito; nunca baja de `translation`,
+> fallar jamás hace subir y la recomendación no oscila (el peldaño inferior ya
+> está consolidado). `resolve_recall_cue` no cambia: sigue degradando SOLO hacia
+> más apoyo. El resumen de evidencia añade `recall_rung_days` y
+> `recall_rung_failures` (`services/evidence.py` + `summarize_by_target` con
+> **paridad pura↔SQL**), consumiendo el `activity_id`
+> `drill:recall:<peldaño>` que V3.37 ya escribía: **sin migración**. La evidencia
+> legacy `drill:recall` (sin peldaño) no alimenta ninguna de las dos políticas
+> (no es evidencia negativa ni acredita peldaños que no declaraba). Contrato
+> aditivo: `LexicalEvidence` amplía esos dos histogramas (schema Pydantic y tipo
+> TS); el resto del contrato HTTP no cambia y la cola sigue sin spoilear (P1-03
+> de V3.35.1 intacto). Tests: pytest **1824 passed** (+11, nuevo
+> `test_recall_policy_v3371.py` con la matriz éxito/fallo/regresión/legacy/
+> paridad) + ruff limpio + vitest (65 ficheros/**560**) + `tsc --noEmit` limpio +
+> `check_release_consistency` **3.37.1** exit 0. Diferidos a V3.38/V3.39: P1-03
+> (automaticidad segmentada por skill), `cloze_coverage` del corpus y el refactor
+> de `wordDrill.tsx`.
+>
 > **Nota (2026-09-10):** **V3.37.0 publicada** — release **v3.37.0**
 > (**Learning Evidence 3.0: cues graduados y automaticidad**). La escalera del
 > peldaño `2 · Recall` deja de ser un *fallback* (traducción y, si no,
@@ -1201,13 +1233,19 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-10):** `v3.37.0` **Learning Evidence 3.0: cues
-graduados y automaticidad** — la escalera del peldaño Recall es una PROGRESIÓN
-`translation (cued) < definition (cued) < cloze (guided)`: el ledger registra por
-peldaño (`drill:recall:<peldaño>` → `recall_rungs`), `next_recall_rung` decide el
-siguiente por evidencia y `resolve_recall_cue` degrada siempre hacia más apoyo;
-`is_automatic` exige ≥2 éxitos sin apoyo en días naturales distintos. Sin
-migración de BD y sin tocar scoring/FSRS. Cerrada antes la **V3.36.0**
+**Posición actual (2026-09-10):** `v3.37.1` **Política de consolidación y
+regresión de la escalera de recall** — la escalera del peldaño Recall solo
+asciende cuando el peldaño está CONSOLIDADO (≥2 éxitos en ≥2 días naturales
+distintos) y RETROCEDE hacia más apoyo ante fallos repetidos (≥2 sin ningún
+éxito), nunca por debajo de `translation`: `services/recall.py` centraliza la
+política y `recall_rung_days`/`recall_rung_failures` (puros + paridad pura↔SQL)
+la alimentan consumiendo el `activity_id` que V3.37 ya escribía. Sin migración de
+BD y sin tocar scoring/FSRS. Cerrada antes la **V3.37.0** (Learning Evidence 3.0:
+la escalera es una PROGRESIÓN `translation (cued) < definition (cued) < cloze
+(guided)` —el ledger registra por peldaño `drill:recall:<peldaño>` →
+`recall_rungs`, `next_recall_rung` decide por evidencia y `resolve_recall_cue`
+degrada siempre hacia más apoyo— y `is_automatic` exige ≥2 éxitos sin apoyo en
+días naturales distintos), la **V3.36.0**
 (Learning Evidence 2.0: el ledger captura el CÓMO de cada evento —
 `support_level`, `difficulty`, `context_id`/`activity_id`, `response_time_ms` y
 `error_type` observacional), la **V3.35.1** (patch de integridad del ledger:
@@ -1227,8 +1265,12 @@ peldaño que V3.37 dejó fuera porque exige contenido autorado — y generalizar
 `recommend_review_activity` con retención FSRS + hueco de producción + hueco de
 TRANSFERENCIA por contexto (`context_id`/`activity_id`) + gradiente de apoyo
 (`support_level`). **No debería requerir migración** (las dimensiones ya están
-persistidas desde V3.36.0 y los peldaños desde V3.37.0). Después: **V3.39**
-(deudas diferidas de V3.30 + transferencia por contexto V3.23).
+persistidas desde V3.36.0 y los peldaños desde V3.37.0). Debe absorber además el
+P1-03 diferido de la auditoría de V3.37.0: la automaticidad segmentada por
+skill/modalidad (hoy `skill=""` en todos los eventos léxicos), que es un cambio
+de modelo de evidencia, no de política. Después: **V3.39** (deudas diferidas de
+V3.30 + transferencia por contexto V3.23 + `cloze_coverage` de corpus +
+`example_for_many` de la Review Queue + refactor de `wordDrill.tsx`).
 
 **Histórico (hasta V2.4, 2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
 (la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).

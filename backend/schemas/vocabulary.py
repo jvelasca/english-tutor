@@ -130,6 +130,10 @@ class LexicalEvidence(BaseModel):
     V3.37 (cues graduados) añade `independent_success_days` (días naturales
     distintos con éxito sin apoyo: lo que exige `is_automatic`) y
     `recall_rungs` (éxitos de recall por peldaño servido).
+
+    V3.37.1 (consolidación y regresión) añade `recall_rung_days` (días
+    distintos con éxito por peldaño: lo que exige dar el peldaño por superado)
+    y `recall_rung_failures` (fallos por peldaño: lo que lee la regresión).
     """
 
     attempts: int = 0
@@ -142,6 +146,8 @@ class LexicalEvidence(BaseModel):
     support_levels: dict[str, int] = Field(default_factory=dict)
     error_types: dict[str, int] = Field(default_factory=dict)
     recall_rungs: dict[str, int] = Field(default_factory=dict)
+    recall_rung_days: dict[str, int] = Field(default_factory=dict)
+    recall_rung_failures: dict[str, int] = Field(default_factory=dict)
     mean_response_time_ms: float | None = None
 
 

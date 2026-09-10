@@ -201,26 +201,47 @@ def test_recall_prompt_default_is_the_v334_regression():
     }
 
 
-def test_next_recall_rung_ascends_only_with_evidence():
+def test_next_recall_rung_ascends_only_with_consolidated_evidence():
     # Sin éxito previo → primer peldaño (máximo apoyo).
     assert recall.next_recall_rung({}, {}) == "translation"
     assert recall.next_recall_rung({}, {"recall_rungs": {}}) == "translation"
-    # Cada éxito habilita el siguiente peldaño...
-    assert (
-        recall.next_recall_rung({}, {"recall_rungs": {"translation": 1}})
-        == "definition"
-    )
-    assert (
-        recall.next_recall_rung(
-            {}, {"recall_rungs": {"translation": 1, "definition": 1}}
-        )
-        == "cloze"
-    )
-    # ...y el techo de la escalera es el cloze (mantenimiento espaciado).
+    # Un solo éxito NO consolida el peldaño (V3.37.1, P1-01): sigue en él.
+    one_success = {
+        "recall_rungs": {"translation": 1},
+        "recall_rung_days": {"translation": 1},
+    }
+    assert recall.next_recall_rung({}, one_success) == "translation"
+    # Volumen el mismo día tampoco consolida (exige DÍAS distintos).
+    same_day = {
+        "recall_rungs": {"translation": 3},
+        "recall_rung_days": {"translation": 1},
+    }
+    assert recall.next_recall_rung({}, same_day) == "translation"
+    # Dos éxitos en dos días distintos SÍ superan el peldaño...
+    translation_passed = {
+        "recall_rungs": {"translation": 2},
+        "recall_rung_days": {"translation": 2},
+    }
+    assert recall.next_recall_rung({}, translation_passed) == "definition"
+    # ...y con `definition` consolidado, el ideal es `cloze`.
     assert (
         recall.next_recall_rung(
             {},
-            {"recall_rungs": {"translation": 1, "definition": 1, "cloze": 1}},
+            {
+                "recall_rungs": {"translation": 2, "definition": 2},
+                "recall_rung_days": {"translation": 2, "definition": 2},
+            },
+        )
+        == "cloze"
+    )
+    # El techo de la escalera es el cloze (mantenimiento espaciado).
+    assert (
+        recall.next_recall_rung(
+            {},
+            {
+                "recall_rungs": {"translation": 2, "definition": 2, "cloze": 2},
+                "recall_rung_days": {"translation": 2, "definition": 2, "cloze": 2},
+            },
         )
         == "cloze"
     )
@@ -535,7 +556,11 @@ def test_review_queue_item_recommends_the_next_rung_and_resolves_content():
         "recall_days": 1,
     }
     card = {"target_id": "river", "due_at": "2026-09-09T10:00:00+00:00"}
-    evidence = {"recall_rungs": {"translation": 1}}
+    # V3.37.1: `translation` superado exige 2 éxitos en 2 días distintos.
+    evidence = {
+        "recall_rungs": {"translation": 2},
+        "recall_rung_days": {"translation": 2},
+    }
     now = "2026-09-09T10:00:00+00:00"
     # Tras superar `translation`, el ideal es `definition`...
     item = lexicon.review_queue_item(row, card, now=now, evidence=evidence)

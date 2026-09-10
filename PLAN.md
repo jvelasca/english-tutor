@@ -8,6 +8,33 @@
 
 ## Estado actual
 
+- ✅ **V3.37.1 — Política de consolidación y regresión de la escalera de recall
+  (2026-09-10)** (**Versión estable `3.37.1`**, app `3.37.0 → 3.37.1`). Patch
+  quirúrgico que cierra los dos P1 pedagógicos de la auditoría de V3.37.0, sin
+  migración de BD (el peldaño ya se declaraba en `activity_id` desde V3.37.0) y
+  sin tocar scoring ni FSRS. **P1-01 (consolidación):** un peldaño
+  (`translation`/`definition`/`cloze`) solo se da por SUPERADO con
+  `RECALL_RUNG_PASS_MIN_SUCCESSES = 2` éxitos en
+  `RECALL_RUNG_PASS_MIN_DAYS = 2` días naturales distintos; la progresión pasa a
+  ser EVIDENCIA → CONSOLIDACIÓN → MÁS EXIGENCIA (el umbral se mide sobre los
+  éxitos del propio peldaño, no sobre `independent_successes`, porque
+  `cued`/`guided` nunca son `independent` y exigir automaticidad bloquearía la
+  escalera). **P1-02 (regresión):** si el peldaño ideal acumula
+  `RECALL_REGRESSION_FAILURES = 2` fallos SIN ningún éxito, la recomendación
+  baja al peldaño inmediatamente inferior (más apoyo); nunca por debajo de
+  `translation`, y fallar jamás hace subir (el peldaño inferior ya está
+  consolidado, así que no hay oscilación). `resolve_recall_cue` sigue
+  degradando SOLO hacia más apoyo. El resumen de evidencia añade
+  `recall_rung_days`/`recall_rung_failures` (puros y con paridad pura↔SQL en
+  `summarize_by_target`), consumiendo el `activity_id` `drill:recall:<peldaño>`
+  que V3.37 ya escribía; la evidencia legacy `drill:recall` no alimenta ninguna
+  política. Contrato aditivo: `LexicalEvidence` amplía esos dos histogramas.
+  Tests: pytest **1824** (+11, nuevo `test_recall_policy_v3371.py` con la matriz
+  éxito/fallo/regresión/legacy/paridad), vitest (65 ficheros/**560**), `ruff`/
+  `tsc` limpios y `check_release_consistency` **3.37.1** exit 0. Diferidos a
+  V3.38/V3.39: P1-03 (automaticidad por skill), `cloze_coverage` y el refactor de
+  `wordDrill.tsx`.
+
 - ✅ **V3.37 — Learning Evidence 3.0: cues graduados y automaticidad (2026-09-10)**
   (**Versión estable `3.37.0`**, app `3.36.0 → 3.37.0`). La escalera del peldaño
   `2 · Recall` deja de ser un *fallback* (traducción y, si no, definición) y pasa
@@ -1219,8 +1246,10 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 ## Siguiente incremento (planificado)
 
 - **⏳ V3.38 — `situación` + planner (Optimal Next Task) (siguiente milestone)**:
-  cerrada V3.37 (los peldaños graduados y la automaticidad ya están en el
-  ledger), el siguiente paso es USARLOS para planificar: extender el contrato de
+  cerradas V3.37 (los peldaños graduados y la automaticidad ya están en el
+  ledger) y V3.37.1 (la progresión ya exige consolidación y ya existe regresión
+  hacia más apoyo), el siguiente paso es USARLOS para planificar: extender el
+  contrato de
   contenido de la caché (`generator_version`, V3.30) para un enunciado
   situacional por palabra — el último peldaño del tramo medio, que exige
   contenido autorado y por eso quedó fuera de V3.37 — y generalizar

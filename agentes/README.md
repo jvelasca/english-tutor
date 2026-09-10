@@ -5,7 +5,7 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-10): `v3.36.0`** — ver `docs/RELEVO.md` (nota superior
+> **Estado actual (2026-09-10): `v3.37.1`** — ver `docs/RELEVO.md` (nota superior
 > y sección 0 "START HERE").
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
@@ -20,10 +20,15 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v3371-politica-recall.md` — **V3.37.1 (ejecutado, 2026-09-10,
+  v3.37.1)**: política de consolidación (≥2 éxitos en ≥2 días) y regresión
+  (≥2 fallos sin éxito) de la escalera de recall. **Histórico, hecho**; ver
+  `release-notes-v3.37.1.md`.
 - `agentes/v337-cues-graduados.md` — **V3.37 (ejecutado, 2026-09-10, v3.37.0)**:
   cues graduados + automaticidad. **Histórico, hecho**; ver
   `release-notes-v3.37.0.md`. El siguiente briefing vivo (V3.38: `situación` +
-  planner / Optimal Next Task) está por escribir.
+  planner / Optimal Next Task + automaticidad por skill, P1-03 diferido) está por
+  escribir.
 - `agentes/v330-*.md`, `v332-*`, `v333-*`, `v3331-*`, `v334-*` — puente
   Dictionary → Learning (V3.30–V3.34): **históricos, hechos**.
 - `agentes/m*-*.md` — milestones M0–M10 y `v17`/`v18`: **históricos, todos hechos**.

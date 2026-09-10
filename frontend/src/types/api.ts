@@ -297,6 +297,11 @@ export interface LexicalEvidence {
   // `is_automatic`) y éxitos de recall por peldaño servido.
   independent_success_days: number;
   recall_rungs: Record<string, number>;
+  // V3.37.1 (consolidación y regresión): días distintos con éxito por peldaño
+  // (lo que exige dar el peldaño por superado) y fallos por peldaño (lo que lee
+  // la regresión hacia más apoyo).
+  recall_rung_days: Record<string, number>;
+  recall_rung_failures: Record<string, number>;
   support_levels: Record<string, number>;
   error_types: Record<string, number>;
   // Latencia media declarada (null si ningún evento la midió).

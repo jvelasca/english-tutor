@@ -363,6 +363,10 @@ def test_empty_summary_matches_the_extended_contract():
         "support_levels": {},
         "error_types": {},
         "recall_rungs": {},
+        # V3.37.1 (consolidación y regresión): histogramas de días con éxito y
+        # fallos por peldaño, aditivos al contrato del resumen.
+        "recall_rung_days": {},
+        "recall_rung_failures": {},
         "mean_response_time_ms": None,
     }
 

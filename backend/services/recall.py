@@ -1,4 +1,4 @@
-"""Pregunta de RECALL del drill (V3.34 → V3.37, cues graduados).
+"""Pregunta de RECALL del drill (V3.34 → V3.37.1, cues graduados).
 
 Tercer eslabón del Dictionary → Learning Bridge: el peldaño "Recall" de la
 escalera compartida de drill. Frente a Recognition (elegir el significado de la
@@ -30,6 +30,15 @@ siguiente a partir de los ÉXITOS ya registrados en el ledger por peldaño
 de la disponibilidad real de contenido, degradando SIEMPRE hacia más apoyo
 (nunca al revés). Todo se deriva de contenido que ya existe (caché del
 diccionario + banco de pronunciación): no se inventa contenido.
+
+V3.37.1 (política de consolidación y regresión, auditoría de V3.37.0 P1-01/
+P1-02): `next_recall_rung` deja de ascender con UN éxito. Un peldaño está
+SUPERADO solo con varios éxitos en DÍAS NATURALES distintos
+(`RECALL_RUNG_PASS_MIN_SUCCESSES`/`RECALL_RUNG_PASS_MIN_DAYS`), y fallos
+repetidos en el peldaño ideal (sin ningún éxito) hacen RETROCEDER la
+recomendación hacia más apoyo (`RECALL_REGRESSION_FAILURES`). La progresión
+pasa a ser EVIDENCIA → CONSOLIDACIÓN → MÁS EXIGENCIA, y el sistema empieza a
+responder también "¿dónde puede rendir el alumno AHORA?".
 """
 
 from __future__ import annotations
@@ -51,6 +60,22 @@ RECALL_CUE_SUPPORT: dict[str, str] = {
     "definition": "cued",
     "cloze": "guided",
 }
+
+# V3.37.1 (política de consolidación): umbrales de "peldaño SUPERADO".
+# Un único éxito no consolida (auditoría V3.37, P1-01): pasar el peldaño exige
+# ≥ este nº de éxitos en ≥ este nº de DÍAS NATURALES distintos. Se mide sobre
+# los ÉXITOS DEL PROPIO PELDAÑO (histograma `recall_rungs`) y no sobre
+# `independent_successes`, porque `cued`/`guided` nunca son `independent` y
+# exigir automaticidad bloquearía la escalera por completo. Declarado y
+# calibrable, como el resto de umbrales pedagógicos del proyecto.
+RECALL_RUNG_PASS_MIN_SUCCESSES = 2
+RECALL_RUNG_PASS_MIN_DAYS = 2
+
+# V3.37.1 (política de regresión): nº de FALLOS en el peldaño ideal que, sin
+# ningún éxito en él, hacen bajar la recomendación al peldaño inmediatamente
+# inferior (más apoyo). Un solo fallo solo repite el peldaño; la remediación
+# exige un patrón, no un tropiezo (auditoría V3.37, P1-02).
+RECALL_REGRESSION_FAILURES = 2
 
 # Tokenizador alineado con `services.phonetics.tokenize` (mismo patrón, sin
 # bajar el texto: se normaliza cada token por separado conservando los índices
@@ -200,30 +225,86 @@ def recall_prompt_for(
     return {"word": target_word, "cue": blanked, "cue_kind": "cloze"}
 
 
-def next_recall_rung(row: dict, evidence: dict | None) -> str:
-    """Peldaño RECOMENDADO de la escalera de recall (V3.37, puro).
+def _int_field(histogram: object, key: str) -> int:
+    """Entero no negativo de un histograma del resumen (0 si falta o es inválido)."""
+    if not isinstance(histogram, dict):
+        return 0
+    try:
+        return max(0, int(histogram.get(key, 0) or 0))
+    except (TypeError, ValueError):
+        return 0
 
-    La escalera solo asciende con EVIDENCIA, no por tiempo ni por nº de
-    intentos: se recorre de mayor a menor apoyo y se devuelve el primer peldaño
-    que el ítem AÚN NO ha superado. Sin ningún éxito previo → `translation`; con
-    `translation` superado, sin `definition` → `definition`; con `definition`
-    superado, sin `cloze` → `cloze`; con los tres superados → `cloze`
-    (mantenimiento espaciado: es el techo hasta que exista `situación`).
 
-    El "éxito en el peldaño X" se lee del ledger por `activity_id`
-    (`drill:recall:<peldaño>`, agregado en `recall_rungs`), no de contadores
-    nuevos. `row` se recibe por simetría con el resto de la cola de repaso; el
-    peldaño es una propiedad del ÍTEM y hoy la evidencia ya llega agregada.
+def _rung_stats(evidence: dict | None, rung: str) -> tuple[int, int, int]:
+    """`(éxitos, días con éxito, fallos)` de un peldaño según la evidencia.
+
+    Los tres histogramas se leen del ledger por `activity_id`
+    (`drill:recall:<peldaño>`). Un valor ausente o no numérico cuenta 0: la
+    evidencia legacy sin peldaño NUNCA alimenta la escalera (ni a favor ni en
+    contra), tal y como documenta el contrato del ledger (V3.37).
     """
-    rungs = (evidence or {}).get("recall_rungs") or {}
+    data = evidence or {}
+    return (
+        _int_field(data.get("recall_rungs"), rung),
+        _int_field(data.get("recall_rung_days"), rung),
+        _int_field(data.get("recall_rung_failures"), rung),
+    )
+
+
+def _rung_passed(successes: int, days: int) -> bool:
+    """¿Está SUPERADO el peldaño? (V3.37.1: consolidación, no un acierto suelto).
+
+    Exige `RECALL_RUNG_PASS_MIN_SUCCESSES` éxitos en
+    `RECALL_RUNG_PASS_MIN_DAYS` días naturales distintos. Un único acierto
+    (aunque sea con mucha latencia, por ensayo o accidental) NO habilita subir
+    la exigencia: primero se consolida (D5/E3).
+    """
+    return (
+        successes >= RECALL_RUNG_PASS_MIN_SUCCESSES
+        and days >= RECALL_RUNG_PASS_MIN_DAYS
+    )
+
+
+def next_recall_rung(row: dict, evidence: dict | None) -> str:
+    """Peldaño RECOMENDADO de la escalera de recall (V3.37 → V3.37.1, puro).
+
+    Combina DOS políticas separadas y deterministas:
+
+    1. PROGRESIÓN (V3.37): se recorre la escalera de mayor a menor apoyo y se
+       devuelve el primer peldaño que el ítem AÚN NO ha superado. V3.37.1
+       endurece el significado de "superado" (`_rung_passed`): exige varios
+       éxitos ESPACIADOS, de modo que la progresión es EVIDENCIA →
+       CONSOLIDACIÓN → MÁS EXIGENCIA y no EVIDENCIA → MÁS EXIGENCIA. Sin ningún
+       peldaño consolidado → `translation`; con los tres consolidados → `cloze`
+       (mantenimiento espaciado: es el techo hasta que exista `situación`).
+
+    2. REGRESIÓN (V3.37.1): si el peldaño ideal acumula
+       `RECALL_REGRESSION_FAILURES` fallos SIN ningún éxito, la recomendación
+       baja al peldaño inmediatamente inferior (MÁS apoyo). La adaptación real
+       no es solo "¿hasta dónde ha llegado?", sino "¿dónde puede rendir
+       AHORA?". Nunca baja de `translation`, y fallar jamás hace subir.
+
+    El éxito/fallo por peldaño se lee del ledger por `activity_id`
+    (`drill:recall:<peldaño>`; histogramas `recall_rungs`/`recall_rung_days`/
+    `recall_rung_failures`), no de contadores nuevos. `row` se recibe por
+    simetría con el resto de la cola de repaso; el peldaño es una propiedad del
+    ÍTEM y hoy la evidencia ya llega agregada.
+    """
+    ideal = RECALL_CUES[-1]
     for rung in RECALL_CUES:
-        try:
-            reached = int(rungs.get(rung, 0) or 0) > 0
-        except (TypeError, ValueError):
-            reached = False
-        if not reached:
-            return rung
-    return RECALL_CUES[-1]
+        successes, days, _failures = _rung_stats(evidence, rung)
+        if not _rung_passed(successes, days):
+            ideal = rung
+            break
+    # Regresión: el peldaño ideal se le atraganta (fallos repetidos y ningún
+    # éxito). Se baja un peldaño: el de abajo SÍ está consolidado por
+    # construcción, así que la recomendación es estable (sin oscilación).
+    successes, _days, failures = _rung_stats(evidence, ideal)
+    if failures >= RECALL_REGRESSION_FAILURES and successes == 0:
+        index = RECALL_CUES.index(ideal)
+        if index > 0:
+            return RECALL_CUES[index - 1]
+    return ideal
 
 
 def resolve_recall_cue(ideal: str, available: object) -> str | None:

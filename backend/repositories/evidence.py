@@ -316,6 +316,12 @@ def summarize_by_target(
     espaciado) y `recall_rungs` (histograma de ÉXITOS de recall por peldaño,
     leído del `activity_id` `drill:recall:<peldaño>`). Misma paridad pura↔SQL.
 
+    V3.37.1 (política de consolidación y regresión) añade
+    `recall_rung_days` (días distintos con éxito por peldaño: lo que exige
+    `next_recall_rung` para dar el peldaño por superado) y
+    `recall_rung_failures` (fallos por peldaño: lo que lee la regresión).
+    Los tres histogramas comparten el mismo vocabulario de peldaño.
+
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
     """
     # Import local (misma convención que el resto del repositorio): la capa pura
@@ -378,6 +384,26 @@ def summarize_by_target(
             "GROUP BY target_id, activity_id",
             (user_id, target_type, f"{RECALL_RUNG_EVIDENCE}%"),
         ).fetchall()
+        # V3.37.1: días distintos con éxito por peldaño (lo que exige la
+        # consolidación) y fallos por peldaño (lo que lee la regresión). El
+        # `NULLIF` sobre el día vacío replica el 0 de la versión pura (paridad).
+        rung_day_rows = conn.execute(
+            "SELECT target_id, activity_id, "
+            "COUNT(DISTINCT NULLIF(substr(occurred_at, 1, 10), '')) AS days "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND success = 1 "
+            "AND activity_id LIKE ? "
+            "GROUP BY target_id, activity_id",
+            (user_id, target_type, f"{RECALL_RUNG_EVIDENCE}%"),
+        ).fetchall()
+        rung_failure_rows = conn.execute(
+            "SELECT target_id, activity_id, COUNT(*) AS total "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND success = 0 "
+            "AND activity_id LIKE ? "
+            "GROUP BY target_id, activity_id",
+            (user_id, target_type, f"{RECALL_RUNG_EVIDENCE}%"),
+        ).fetchall()
     intervals: dict[str, list[float]] = {}
     for row in interval_rows:
         intervals.setdefault(row["target_id"], []).append(
@@ -400,6 +426,19 @@ def summarize_by_target(
             continue
         bucket = recall_rungs.setdefault(row["target_id"], {})
         bucket[rung] = bucket.get(rung, 0) + int(row["total"])
+    recall_rung_days: dict[str, dict[str, int]] = {}
+    for row in rung_day_rows:
+        rung = recall_rung_from_activity(row["activity_id"])
+        if not rung:
+            continue
+        recall_rung_days.setdefault(row["target_id"], {})[rung] = int(row["days"])
+    recall_rung_failures: dict[str, dict[str, int]] = {}
+    for row in rung_failure_rows:
+        rung = recall_rung_from_activity(row["activity_id"])
+        if not rung:
+            continue
+        bucket = recall_rung_failures.setdefault(row["target_id"], {})
+        bucket[rung] = bucket.get(rung, 0) + int(row["total"])
     return {
         row["target_id"]: {
             "attempts": int(row["attempts"]),
@@ -416,6 +455,8 @@ def summarize_by_target(
             "support_levels": support_levels.get(row["target_id"], {}),
             "error_types": error_types.get(row["target_id"], {}),
             "recall_rungs": recall_rungs.get(row["target_id"], {}),
+            "recall_rung_days": recall_rung_days.get(row["target_id"], {}),
+            "recall_rung_failures": recall_rung_failures.get(row["target_id"], {}),
             "mean_response_time_ms": (
                 round(float(row["mean_latency"]), 1)
                 if row["mean_latency"] is not None
