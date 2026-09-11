@@ -22,11 +22,12 @@ pedir más contexto.
 > sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). La **auditoría externa de
 > V3.52 ya está ejecutada** (informe Q,
 > sin P0/P1) y su briefing se conserva como histórico del método. Los P3-01/P3-02
-> quedan abiertos y aceptados. El siguiente incremento (V3.53+: P1-02 Learner Skill
-> State 2.0 / `observed_difficulty` y P1-03 Planner 2.0 / Expected Learning Value,
-> además de
-> Sense Engine 2.0, `assessed_skill`→planner y `skill_priorities`→`select_task`
-> (V3.55) y la entrega oral real del transfer) aún no tiene briefing. Antes de
+> quedan abiertos y aceptados. El siguiente incremento es **V3.53 (P1-02 Learner
+> Skill State 2.0 + `observed_difficulty` persistido por evento) y su briefing YA
+> ESTÁ ESCRITO Y LISTO PARA LANZAR**: `agentes/v353-learner-skill-state.md`
+> (2026-09-11). Sin briefing todavía: P1-03 (Planner 2.0 / Expected Learning
+> Value), Sense Engine 2.0, `assessed_skill`→planner y `skill_priorities`→
+> `select_task` (V3.55) y la entrega oral real del transfer. Antes de
 > lanzar cualquier subagente, lee esa sección para no partir de un estado obsoleto
 > (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
@@ -40,6 +41,18 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v353-learner-skill-state.md` — **V3.53 (LISTO PARA LANZAR, escrito
+  2026-09-11 sobre `v3.52.2`)**: cierra el candidato **P1-02** (Learner Skill
+  State 2.0 + `observed_difficulty` persistido por evento). Parte A: persistir el
+  `difficulty_vector` del contexto SERVIDO en el evento de transferencia
+  (columna aditiva `learning_evidence.observed_difficulty`, vector canónico con
+  `format_vector`/`parse_vector` puros). Parte B: capacidad observada por
+  modalidad y dimensión (`observed_signals` con muestra/días espaciados) →
+  `services/learner_skill.py` (nivel equivalente + capacidad del alumno) →
+  fuente `observed` en `LEVEL_SOURCES` (entre `demonstrated` y `estimated`) y
+  caché O(1) en `learning_profile`, con **no-regresión exhaustiva** cuando no hay
+  datos. NO toca `CEFR_CAPACITY`, la escalera, el scoring ni FSRS; el planner no
+  la consume (eso es P1-03). **Pendiente de ejecutar.**
 - `agentes/v3522-cierre-p2-auditoria-q.md` — **no existe**: V3.52.2 (**ejecutado
   directamente por el gerente**, 2026-09-11) se resolvió sin briefing separado,
   como V3.38.1 y las FASES 1–5. Cierra los **dos P2** de la auditoría Q

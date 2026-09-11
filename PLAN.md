@@ -1394,7 +1394,8 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   (`_context_vector` trata un contexto sin vector como vector). Candidatos de
   producto ya documentados: **Sense Engine 2.0**
   (`surface→lemma→sense→semantic_fit`), **P1-02 Learner Skill State 2.0 +
-  `observed_difficulty` persistido por evento**, **P1-03 Planner 2.0 /
+  `observed_difficulty` persistido por evento** (**briefing listo para lanzar:
+  `agentes/v353-learner-skill-state.md`**), **P1-03 Planner 2.0 /
   `expected_learning_value`**, **deuda de planner confirmada**
   (`assessed_skill` → decisión del planner y `skill_priorities` → `select_task`,
   con el doble conteo de `written_production` por resolver; V3.55), **entrega

@@ -31,7 +31,10 @@
 > limpio, vitest **76 ficheros/651 tests**, `tsc` en verde y
 > `check_release_consistency` **3.52.2** exit 0. **CI 6/6 en verde** (run
 > [34627238005](https://github.com/jvelasca/english-tutor/actions/runs/34627238005)
-> sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). Ver
+> sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). **Siguiente paso ya
+> preparado:** el briefing de **V3.53 (P1-02 Learner Skill State 2.0 +
+> `observed_difficulty` persistido por evento)** está escrito y listo para
+> lanzar desde un agente local: `agentes/v353-learner-skill-state.md`. Ver
 > `release-notes-v3.52.2.md` y, para el contexto de los hallazgos,
 > `docs/audit/Q-AUDITORIA-TOTAL-V352.md`.
 >
