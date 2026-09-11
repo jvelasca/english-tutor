@@ -5,6 +5,47 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.50.0 (Context→Skill mapping + difficulty
+> matching)** — release **v3.50.0**, ADITIVA y **SIN migración de BD** que NO
+> cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS: cierra
+> el candidato diferido por V3.49.0. Hasta V3.49 el banco declaraba `cefr` y
+> `difficulty_vector` (V3.47/V3.48) y el planner calculaba la modalidad limitante,
+> pero `context_for` solo miraba usados/nivel/novedad: un ítem B1 podía recibir el
+> contexto A1 más plano y dos ítems con modalidades débiles distintas recibían el
+> mismo escenario. **Parte A — Context→Skill mapping:** nuevo vocabulario
+> declarado `CONTEXT_SKILLS` (`recall`/`written_production`/`spoken_production`/
+> `spontaneous_use`), espejo verificado por test de
+> `services.evidence.LEXICAL_SKILLS` y declarado en `services/transfer.py` para no
+> crear el ciclo `evidence → transfer → evidence`; los 20 contextos del banco
+> ganan `skills` curado (subconjunto no vacío, con al menos una modalidad de
+> producción y `spontaneous_use` donde el escenario admite uso libre) y los 6
+> originales conservan `id` y valores core congelados (solo se les AÑADE
+> `skills`); helper puro `context_skills(context)` (acepta dict/`id`/`context_id`,
+> deduplica, ordena por `CONTEXT_SKILLS`, ignora valores fuera del vocabulario,
+> nunca lanza). **Parte B — Difficulty matching:** `TRANSFER_DIFFICULTY_BAND = 1`,
+> `_difficulty_floor(pool, level)` fija el objetivo como la MAYOR del techo real
+> de dificultad alcanzable y la posición del nivel en la escala 1..6 (A1≈1 … C2≈6;
+> anclar al nivel era necesario con los datos reales del banco, porque sin él un
+> ítem B1 seguía recibiendo contextos A1) y `_within_band(pool, floor)` degrada
+> con gracia a lo más difícil disponible si la banda no existe en el pool
+> filtrado. `context_for` gana la firma aditiva `skill=""` y un pipeline
+> determinista (usados → `_within_level` → mínimo sobre todo el alcance →
+> preferencia por modalidad limitante → banda → novedad V3.43 → `_stable_index`);
+> el retorno añade `skills`. Consumo en `domain/vocabulary.py` con
+> `_transfer_target_skill` (`planner.limiting_skill(planned_signals(summary,
+> item_competence_matrix(row)))`, `""` si no hay segmentación por modalidad) en el
+> GET y en el fallback del POST, con paridad de `context_id` GET↔POST. Contratos
+> aditivos `TransferContextOut.skills` (`schemas/vocabulary.py`) y
+> `DrillTransferContext.skills?` (`types/api.ts`); sin cambio de UI. Tests: pytest
+> **2099 passed** (+15: nuevo `test_context_skill_v350.py`; ajuste de
+> `test_transfer_cefr_v347.py`, cuya semántica «con C2 la elección es la de sin
+> nivel» queda superada por el difficulty matching), vitest **75 ficheros/641
+> tests** (sin cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build`,
+> `check_beta_v3.py`, `content_validation.py` y `check_release_consistency`
+> **3.50.0** exit 0. CI 6/6: **pendiente de publicar**. Fuera de alcance (V3.51+):
+> Sense Engine 2.0, semantic appropriateness, `expected_learning_value`/Adaptive
+> Planner 2.0 y la persistencia de la dificultad del contexto servido por evento.
+>
 > **Nota (2026-09-11):** **V3.49.0 (Transfer Evidence 3.0 — confianza del eje de
 > transferencia)** — release **v3.49.0**, ADITIVA y **SIN migración de BD** que NO
 > cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS: cierra el

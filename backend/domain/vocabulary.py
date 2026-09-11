@@ -25,6 +25,7 @@ from services import (
     example_sentences,
     fsrs,
     lexicon,
+    planner,
     recall,
     transfer,
 )
@@ -777,6 +778,29 @@ def _transfer_condition_for(summary: dict) -> str:
     )
 
 
+def _transfer_target_skill(row: dict, summary: dict) -> str:
+    """Modalidad LIMITANTE del ítem para orientar el contexto nuevo (V3.50, pura).
+
+    Devuelve la skill que el planner considera limitante (`planner.limiting_skill`
+    sobre las señales que produce `planned_signals`) o "" si no hay segmentación
+    por modalidad en el ledger: sin evidencia fina no se inventa una preferencia
+    y `context_for` sirve el contexto como en V3.49. Es una PREFERENCIA (no una
+    obligación): la decisión sigue siendo del servidor, sin LLM (premisa 21).
+    Nunca lanza.
+    """
+    attempts = (summary or {}).get("skill_attempts")
+    if not isinstance(attempts, dict):
+        return ""
+    try:
+        if not any(int(value or 0) > 0 for value in attempts.values()):
+            return ""
+        matrix = lexicon.item_competence_matrix(row or {})
+        signals = planner.planned_signals(summary, matrix)
+        return planner.limiting_skill(signals)
+    except Exception:  # noqa: BLE001 — preferencia no bloqueante
+        return ""
+
+
 async def get_transfer_context(user_id: str, word: str) -> dict:
     """Consigna de transferencia que toca practicar (V3.40 → V3.46, solo lectura).
 
@@ -807,12 +831,16 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     # mantiene el comportamiento de V3.46).
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     row = _row_for_word(rows, word) or {}
+    # V3.50: la modalidad limitante del ítem orienta el contexto servido ("" si
+    # el ledger no tiene segmentación por modalidad: comportamiento de V3.49).
+    skill = _transfer_target_skill(row, summary)
     return transfer.context_for(
         word,
         used,
         success_context_ids=success,
         condition=condition,
         level=row.get("cefr") or "",
+        skill=skill,
     )
 
 
@@ -871,12 +899,15 @@ async def submit_transfer_attempt(
     summary = summaries.get(word) or {}
     condition = _transfer_condition_for(summary)
     if not context_id:
+        # V3.50: mismo criterio que el GET (modalidad limitante) para que ambos
+        # caminos deriven el MISMO `context_id`.
         context_id = transfer.context_for(
             word,
             (summary.get("contexts") or {}).keys(),
             success_context_ids=summary.get("success_contexts") or [],
             condition=condition,
             level=row.get("cefr") or "",
+            skill=_transfer_target_skill(row, summary),
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)
     written = (text or "").strip()

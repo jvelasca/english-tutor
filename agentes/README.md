@@ -5,8 +5,10 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.48.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE").
+> **Estado actual (2026-09-11): `v3.50.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.50 (Context→Skill mapping + difficulty matching)
+> ya está ejecutada y publicada; el siguiente incremento (V3.51+: Sense Engine
+> 2.0 / semantic appropriateness / Adaptive Planner 2.0) aún no tiene briefing.
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
@@ -20,6 +22,12 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v350-context-skill-mapping.md` — **V3.50 (ejecutado, 2026-09-11,
+  v3.50.0)**: Context→Skill mapping (cada contexto declara qué competencias
+  ejercita y `context_for` prioriza la modalidad limitante) + difficulty matching
+  por banda derivada del CEFR del ítem, sin migración, sin tocar la escalera
+  `transfer_state` ni el gate. Cierra el candidato diferido por V3.49.0.
+  **Histórico, hecho**; ver `release-notes-v3.50.0.md`.
 - `agentes/v348-context-bank.md` — **V3.48 (ejecutado, 2026-09-11, v3.48.0)**:
   Context Bank 2.0 (banco de 6 → 20 contextos con cobertura A1–C2, 6 originales
   congelados) + diversidad 2.0 informativa (`register`/`lexical_environment`/

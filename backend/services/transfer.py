@@ -55,6 +55,17 @@ contextos con cobertura A1–C2 y añade una capa de VARIEDAD informativa
 contextos originales se mantienen congelados (mismos `id` y mismos valores core)
 para no alterar la evidencia ya registrada.
 
+V3.50 (**Context→Skill mapping + difficulty matching**) hace que los datos que
+V3.47/V3.48 declaraban y nadie consumía al elegir la tarea pasen a decidirla:
+cada contexto declara las competencias que ejercita (`skills`, vocabulario
+`CONTEXT_SKILLS`) y `context_for` acepta la modalidad LIMITANTE del ítem
+(`skill`, derivada por el llamador del planner) y la prefiere; además ajusta a la
+banda de dificultad alcanzable (`TRANSFER_DIFFICULTY_BAND`) para no servir el
+contexto más plano del banco a un alumno avanzado. Los dos filtros son
+PREFERENCIAS con degradación con gracia y no tocan la escalera `transfer_state`,
+sus umbrales, el scoring ni FSRS. El `skills` del contexto servido se expone de
+forma aditiva.
+
 No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
 contextos ya registrados en el ledger (`context_id`), así que la misma evidencia
@@ -108,6 +119,25 @@ TRANSFER_DIFFICULTY_KEYS: tuple[str, ...] = (
     "discourse",
     "interaction",
 )
+
+# V3.50 (Context→Skill mapping): vocabulario de competencias que un contexto de
+# transferencia puede ejercitar. Es un ESPEJO de `services.evidence.LEXICAL_SKILLS`
+# declarado aquí (no importado) porque `services.evidence` ya importa este módulo:
+# importarlo de vuelta crearía un ciclo. Un test de paridad falla si divergen.
+# Orden canónico: es el orden en el que `context_skills` normaliza las listas y el
+# que usan los contratos.
+CONTEXT_SKILLS: tuple[str, ...] = (
+    "recall",
+    "written_production",
+    "spoken_production",
+    "spontaneous_use",
+)
+
+# V3.50 (difficulty matching): banda de tolerancia por debajo del contexto más
+# exigente ALCANZABLE por el alumno. Con banda 1, un ítem B2 recibe contextos de
+# dificultad >= (máximo alcanzable - 1): se evita servir el contexto más plano del
+# banco cuando hay uno más cercano a su nivel. Declarado y calibrable.
+TRANSFER_DIFFICULTY_BAND = 1
 
 # Orden del Marco para comparar niveles (Pre-A1 y valores desconocidos quedan
 # fuera: `cefr_index` devuelve -1 y no filtran).
@@ -171,6 +201,78 @@ def _within_level(pool: list[dict], level: object) -> list[dict]:
         return pool
     nearest = min(rank for rank, _ in known)
     return [context for rank, context in known if rank == nearest]
+
+
+def _filter_skill(pool: list[dict], skill: object) -> list[dict]:
+    """Prefiere los contextos que ejercitan la modalidad pedida (V3.50, pura).
+
+    Filtra el pool a los contextos que declaran `skill` en sus `skills`. Si la
+    modalidad no es del vocabulario o NINGÚN contexto la declara, devuelve el
+    pool intacto: el filtro es una PREFERENCIA, nunca deja al alumno sin tarea
+    (degradación con gracia). Nunca lanza.
+    """
+    wanted = str(skill or "").strip().lower()
+    if wanted not in CONTEXT_SKILLS:
+        return pool
+    matched = [context for context in pool if wanted in context_skills(context)]
+    return matched or pool
+
+
+def _difficulty_floor(pool: list[dict], level: object) -> int:
+    """Dificultad mínima admisible para el nivel del alumno (V3.50, pura).
+
+    El «objetivo» es la MAYOR de dos referencias: el techo de dificultad real de
+    los contextos alcanzables y la posición del nivel en la escala 1..6
+    (A1≈1 … C2≈6, la misma escala que `difficulty_from_vector`). Anclar al nivel
+    evita que un item B1 reciba el contexto A1 más plano cuando el techo
+    declarado de su alcance es bajo. Devuelve `1` (sin filtro) si el nivel no se
+    reconoce o no hay contextos alcanzables: comportamiento de V3.47. Nunca
+    lanza.
+    """
+    index = cefr_index(level)
+    if index < 0:
+        return 1
+    reachable = [
+        context
+        for context in pool
+        if 0 <= cefr_index(context.get("cefr")) <= index
+    ]
+    if not reachable:
+        return 1
+    ceiling = max(
+        difficulty_from_vector(context.get("difficulty_vector"))
+        for context in reachable
+    )
+    target = max(ceiling, index + 1)
+    return max(1, target - TRANSFER_DIFFICULTY_BAND)
+
+
+def _within_band(pool: list[dict], floor: int) -> list[dict]:
+    """Conserva los contextos dentro de la banda de dificultad (V3.50, pura).
+
+    Si la banda pedida no existe en el pool (p. ej. la modalidad filtrada no
+    tiene contextos tan difíciles), degrada con gracia a lo MÁS DIFÍCIL
+    disponible: nunca devuelve algo más plano de lo necesario ni deja el pool
+    vacío. Con `floor <= 1` devuelve el pool intacto. Nunca lanza.
+    """
+    if floor <= 1 or not pool:
+        return pool
+    band = [
+        context
+        for context in pool
+        if difficulty_from_vector(context.get("difficulty_vector")) >= floor
+    ]
+    if band:
+        return band
+    best = max(
+        difficulty_from_vector(context.get("difficulty_vector"))
+        for context in pool
+    )
+    return [
+        context
+        for context in pool
+        if difficulty_from_vector(context.get("difficulty_vector")) == best
+    ]
 
 # ---------------------------------------------------------------------------
 # V3.46 (P1-03 de la auditoría de V3.43.0): CONDICIÓN DE RECUPERACIÓN.
@@ -241,6 +343,11 @@ CONDITION_INSTRUCTIONS: dict[str, str] = {
 TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     {
         "id": "story",
+        "skills": (
+            "written_production",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "personal_experience",
         "communicative_goal": "narrate",
         "discourse_type": "narrative",
@@ -265,6 +372,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "question",
+        "skills": (
+            "written_production",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "friend_life",
         "communicative_goal": "ask",
         "discourse_type": "dialogue",
@@ -286,6 +398,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "work",
+        "skills": (
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "employment",
         "communicative_goal": "describe",
         "discourse_type": "descriptive",
@@ -309,6 +425,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "future",
+        "skills": (
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "personal_plans",
         "communicative_goal": "plan",
         "discourse_type": "expository",
@@ -329,6 +449,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "opinion",
+        "skills": (
+            "recall",
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "everyday_topics",
         "communicative_goal": "give_opinion",
         "discourse_type": "argumentative",
@@ -352,6 +477,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "problem",
+        "skills": (
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "everyday_problems",
         "communicative_goal": "explain",
         "discourse_type": "explanatory",
@@ -373,6 +502,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     # --- V3.48 (Context Bank 2.0): 14 contextos nuevos, cobertura A1–C2 ---
     {
         "id": "introductions",
+        "skills": (
+            "written_production",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "social_introductions",
         "communicative_goal": "introduce",
         "discourse_type": "dialogue",
@@ -396,6 +530,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "routine",
+        "skills": (
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "daily_routine",
         "communicative_goal": "describe",
         "discourse_type": "descriptive",
@@ -416,6 +554,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "directions",
+        "skills": (
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "city_navigation",
         "communicative_goal": "ask",
         "discourse_type": "dialogue",
@@ -439,6 +581,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "shopping",
+        "skills": (
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "shopping",
         "communicative_goal": "request",
         "discourse_type": "dialogue",
@@ -462,6 +608,10 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "health",
+        "skills": (
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "health",
         "communicative_goal": "explain",
         "discourse_type": "explanatory",
@@ -485,6 +635,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "travel_plan",
+        "skills": (
+            "recall",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "trip_planning",
         "communicative_goal": "plan",
         "discourse_type": "expository",
@@ -508,6 +663,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "work_problem",
+        "skills": (
+            "recall",
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "employment",
         "communicative_goal": "explain",
         "discourse_type": "explanatory",
@@ -531,6 +691,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "community",
+        "skills": (
+            "recall",
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "community",
         "communicative_goal": "persuade",
         "discourse_type": "argumentative",
@@ -554,6 +719,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "debate",
+        "skills": (
+            "recall",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "society",
         "communicative_goal": "argue",
         "discourse_type": "argumentative",
@@ -577,6 +747,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "review",
+        "skills": (
+            "recall",
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "culture",
         "communicative_goal": "evaluate",
         "discourse_type": "evaluative",
@@ -600,6 +775,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "mediation",
+        "skills": (
+            "recall",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "interpersonal_conflict",
         "communicative_goal": "mediate",
         "discourse_type": "explanatory",
@@ -623,6 +803,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "academic",
+        "skills": (
+            "recall",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "research",
         "communicative_goal": "justify",
         "discourse_type": "academic",
@@ -646,6 +831,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "negotiation",
+        "skills": (
+            "recall",
+            "spoken_production",
+            "spontaneous_use",
+        ),
         "topic": "high_stakes",
         "communicative_goal": "negotiate",
         "discourse_type": "negotiation",
@@ -670,6 +860,11 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "keynote",
+        "skills": (
+            "recall",
+            "written_production",
+            "spoken_production",
+        ),
         "topic": "abstract_ideas",
         "communicative_goal": "present",
         "discourse_type": "academic",
@@ -827,6 +1022,25 @@ def context_attributes(context: object) -> dict[str, str]:
     (`"transfer:story"`). Devuelve una COPIA: nunca expone el dict del banco.
     """
     return _as_attributes(context)
+
+
+def context_skills(context: object) -> tuple[str, ...]:
+    """Competencias que DECLARA un contexto de transferencia (V3.50, pura).
+
+    Acepta el dict del banco, un `id` (`"story"`) o un `context_id` de ledger
+    (`"transfer:story"`). Normaliza: deduplica, ordena por `CONTEXT_SKILLS`
+    (orden canónico y estable) e ignora cualquier valor fuera del vocabulario.
+    Un contexto sin `skills` declaradas (o no reconocido) devuelve `()`. Nunca
+    lanza.
+    """
+    attributes = _as_attributes(context)
+    declared = attributes.get("skills")
+    if isinstance(declared, str) or not isinstance(
+        declared, (list, tuple, set, frozenset)
+    ):
+        return ()
+    wanted = {str(skill or "").strip().lower() for skill in declared}
+    return tuple(skill for skill in CONTEXT_SKILLS if skill in wanted)
 
 
 def _normalize_dimensions(dimensions: object) -> tuple[str, ...]:
@@ -1004,17 +1218,18 @@ def context_for(
     success_context_ids: object = (),
     condition: object = "",
     level: object = "",
+    skill: object = "",
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.47, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.50, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
-    unscaffolded, cefr, difficulty_vector, difficulty}`. La consigna es la del
-    banco; el escenario **no contiene la unidad objetivo** salvo en la condición
-    `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46) es la condición de
-    recuperación SERVIDA: la deriva el llamador del estado de evidencia
-    (`condition_for_state`) y aquí se compone el enunciado con su instrucción
-    (`CONDITION_INSTRUCTIONS`).
+    unscaffolded, cefr, difficulty_vector, difficulty, skills}`. La consigna es
+    la del banco; el escenario **no contiene la unidad objetivo** salvo en la
+    condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46) es la
+    condición de recuperación SERVIDA: la deriva el llamador del estado de
+    evidencia (`condition_for_state`) y aquí se compone el enunciado con su
+    instrucción (`CONDITION_INSTRUCTIONS`).
 
     Elección, determinista y estable:
 
@@ -1023,6 +1238,12 @@ def context_for(
     1b. V3.47: con un `level` CEFR reconocible se prefieren los contextos de
        nivel igual o inferior (y, si ninguno es alcanzable, los del nivel más
        cercano por arriba). Sin `level` el comportamiento es el de V3.46;
+    1c. V3.50: si se aporta una `skill` (la modalidad LIMITANTE del ítem), se
+       prefieren los contextos que la declaran en `skills`; y se prefiere la
+       banda de dificultad alcanzable (`_difficulty_band`), para no servir el
+       contexto más plano del banco a un alumno avanzado. Ambos filtros son
+       PREFERENCIAS con degradación con gracia: si dejan el pool vacío, se
+       ignoran;
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
        (el más novedoso pedagógicamente, V3.43/P1-03); los empates los resuelve
@@ -1063,6 +1284,14 @@ def context_for(
         pool = list(TRANSFER_CONTEXTS)
     # V3.47: ajusta al nivel del alumno (sin nivel reconocible, pool intacto).
     pool = _within_level(pool, level)
+    # V3.50: el mínimo de dificultad se calcula sobre TODO el alcance del nivel
+    # (antes de filtrar por modalidad, para no rebajar el objetivo al filtrar) y
+    # luego se prioriza la modalidad limitante y la banda. Ambos filtros degradan
+    # con gracia: si la modalidad no tiene contextos, se ignora; si la banda no
+    # existe, se queda con lo más difícil disponible.
+    floor = _difficulty_floor(pool, level)
+    pool = _filter_skill(pool, skill)
+    pool = _within_band(pool, floor)
     if not pool:  # banco vacío: no se inventa contenido
         return {
             "word": unit,
@@ -1079,6 +1308,7 @@ def context_for(
             "cefr": "",
             "difficulty_vector": {},
             "difficulty": 0,
+            "skills": [],
         }
     if success:
         best = max(_novelty_score(context, success) for context in pool)
@@ -1103,6 +1333,8 @@ def context_for(
         "cefr": context.get("cefr", ""),
         "difficulty_vector": vector,
         "difficulty": difficulty_from_vector(vector),
+        # V3.50: competencias que declara el contexto servido (aditivo).
+        "skills": list(context_skills(context)),
     }
 
 

@@ -129,13 +129,18 @@ def test_context_for_serves_any_context_above_an_unknown_level():
     )
 
 
-def test_context_for_ignores_level_when_every_candidate_is_within_reach():
-    # Con nivel C2 todos los contextos son alcanzables: la elección debe ser la
-    # misma que sin nivel (la novedad y el hash estable deciden).
-    assert (
-        transfer.context_for("travel", level="C2")["context_id"]
-        == transfer.context_for("travel")["context_id"]
+def test_context_for_with_c2_matches_the_highest_difficulty_band():
+    # V3.47: con nivel C2 ningún contexto queda fuera por CEFR. V3.50: además
+    # entra el difficulty matching, así que la elección NO es la de «sin nivel»
+    # (que puede caer en un contexto B2): con C2 se sirve el tramo más exigente.
+    got = transfer.context_for("travel", level="C2")
+    assert got["available"] is True
+    assert transfer.cefr_index(got["cefr"]) <= transfer.cefr_index("C2")
+    hardest = max(
+        transfer.difficulty_from_vector(context["difficulty_vector"])
+        for context in transfer.TRANSFER_CONTEXTS
     )
+    assert got["difficulty"] == hardest
 
 
 # ------------------------------------------------------------ contrato HTTP

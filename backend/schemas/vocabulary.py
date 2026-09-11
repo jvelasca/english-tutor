@@ -724,6 +724,9 @@ class TransferContextOut(BaseModel):
 
     V3.47: `cefr`/`difficulty_vector`/`difficulty` (aditivos) declaran el nivel y
     la carga del contexto servido.
+
+    V3.50: `skills` (aditivo) declara las competencias que ejercita el contexto
+    servido, con el vocabulario `services.transfer.CONTEXT_SKILLS`.
     """
 
     word: str
@@ -747,6 +750,8 @@ class TransferContextOut(BaseModel):
     cefr: str = ""
     difficulty_vector: dict[str, int] = Field(default_factory=dict)
     difficulty: int = 0
+    # V3.50: competencias que ejercita el contexto servido (aditivo).
+    skills: list[str] = Field(default_factory=list)
 
 
 class TransferAttemptIn(BaseModel):

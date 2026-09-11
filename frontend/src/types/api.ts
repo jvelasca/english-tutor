@@ -549,6 +549,8 @@ export interface DrillTransferContext {
   cefr?: string;
   difficulty_vector?: Record<string, number>;
   difficulty?: number;
+  // V3.50: competencias que ejercita el contexto servido (aditivo).
+  skills?: string[];
 }
 
 export interface DrillTransferAttempt {
