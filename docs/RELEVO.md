@@ -41,7 +41,9 @@
 > contrato exacto de `empty_summary` en `test_learning_evidence_v336.py`), vitest
 > **75 ficheros/641 tests** (+2 en `ReviewQueueSection.test.tsx`), `ruff` limpio,
 > `tsc --noEmit` limpio, `npm run build` y `check_release_consistency` **3.49.0**
-> exit 0. Fuera de alcance (V3.50+): Context→Skill mapping y difficulty matching
+> exit 0. **CI 6/6 en verde** (run
+> [34591158824](https://github.com/jvelasca/english-tutor/actions/runs/34591158824)
+> sobre `034da5c`). Fuera de alcance (V3.50+): Context→Skill mapping y difficulty matching
 > por `difficulty_vector` (datos de V3.47/V3.48 aún no consumidos por el
 > planner), Sense Engine 2.0 (surface→lemma→sense), semantic appropriateness
 > (punto 7) y `expected_learning_value` / Adaptive Planner 2.0.

@@ -92,6 +92,11 @@ semantic appropriateness (punto 7) y `expected_learning_value`/Adaptive Planner
   `ReviewQueueSection.test.tsx`: con evidencia y sin ella).
 - `ruff check backend/` limpio, `tsc --noEmit` limpio, `npm run build` y
   `check_release_consistency` **3.49.0** exit 0.
+- **CI 6/6 en verde** (run
+  [34591158824](https://github.com/jvelasca/english-tutor/actions/runs/34591158824)
+  sobre `034da5c`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation.
 
 ## Fuera de alcance (V3.50+)
 
