@@ -136,6 +136,11 @@ El drill **Transfer** declara así el «split honesto»: su eje es
   en verde (el warning de bundle >500 kB es deuda preexistente).
 - Scripts: `check_release_consistency.py` (**3.51.0**), `check_beta_v3.py` y
   `content_validation.py` exit 0.
+- **CI 6/6 en verde** (run
+  [34599637351](https://github.com/jvelasca/english-tutor/actions/runs/34599637351)
+  sobre `c056546`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation.
 
 ## P3-01 (corrección documental)
 

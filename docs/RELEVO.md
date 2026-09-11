@@ -47,7 +47,11 @@
 > `test_task_semantics_v351.py`; ajuste del contrato exacto de `empty_summary` en
 > `test_learning_evidence_v336.py`), vitest **75 ficheros/641 tests**, `ruff`/
 > `tsc` limpios, `npm run build`, `check_beta_v3.py`, `content_validation.py` y
-> `check_release_consistency` **3.51.0** exit 0. **P3-01:** corregida la cifra de
+> `check_release_consistency` **3.51.0** exit 0. **CI 6/6 en verde** (run
+> [34599637351](https://github.com/jvelasca/english-tutor/actions/runs/34599637351)
+> sobre `c056546`): Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation. **P3-01:** corregida la cifra de
 > V3.50 (2099 → **2097 passed**, la verificada en CI). Fuera de alcance (V3.52+):
 > entrega oral real del transfer (audio+STT), Sense Engine 2.0,
 > `observed_difficulty` por evento, `expected_learning_value`/Adaptive Planner
