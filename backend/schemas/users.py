@@ -14,11 +14,16 @@ class User(BaseModel):
     avatar_color: str = ""
     avatar_emoji: str = ""
     avatar_image: str = ""
+    # V3.52.1: perfil de PRUEBA (tests visuales). Nunca aparece en el selector
+    # de la app; se expone para que los tests puedan localizar y limpiar el suyo.
+    is_test: bool = False
     created_at: str
 
 
 class UserCreate(BaseModel):
     name: str = Field(min_length=1)
+    # Solo los tests lo marcan; la app siempre crea perfiles reales.
+    is_test: bool = False
 
 
 class UserUpdate(BaseModel):

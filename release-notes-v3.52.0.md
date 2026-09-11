@@ -136,7 +136,8 @@ Módulo **puro** con:
 
 ## Verificación
 
-- Backend: `ruff` limpio y `pytest` **2158 passed** (+39: `test_student_state_v352.py`
+- Backend: `ruff` limpio y `pytest` **2156 passed + 2 skipped en CI** (2158 passed
+  en local con el modelo Whisper; +39: `test_student_state_v352.py`
   15 y `test_difficulty_engine_v352.py` 24; ajuste de
   `test_learner_level_raises_the_difficulty_floor` para comparar `difficulty_fit`
   en lugar de escalares); cero regresión de `test_context_skill_v350.py`,
@@ -150,10 +151,8 @@ Módulo **puro** con:
   [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
   sobre `23cbad7`): Release consistency, Backend (ruff + pytest), Frontend
   (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
-  validation. La CI cuenta **2156 passed + 2 skipped**
-  (`backend/tests/test_stt_asr_integration.py`, opt-in del modelo Whisper no
-  descargado en el runner); en local (Windows, con el modelo) son los
-  **2158 passed**.
+  validation. Los 2 skipped son `backend/tests/test_stt_asr_integration.py`
+  (opt-in del modelo Whisper no descargado en el runner).
 
 ## Qué NO cambia
 

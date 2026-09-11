@@ -152,6 +152,9 @@ def test_fit_measures_distance_overshoot_and_tolerance():
     challenge = {"lexical": 3, "syntax": 3, "discourse": 3, "interaction": 3}
     assert difficulty.fit(challenge, challenge) == {
         "dimensions": 4,
+        "dimensions_compared": 4,
+        "dimensions_expected": 4,
+        "coverage": 1.0,
         "distance": 0,
         "max_overshoot": 0,
         "within": True,
@@ -167,13 +170,24 @@ def test_fit_measures_distance_overshoot_and_tolerance():
 
 
 def test_fit_with_empty_or_invalid_vectors_is_vacuous():
+    # Reto VACÍO: encaje vacuo legítimo (no había nada que filtrar).
     assert difficulty.fit({}, {})["within"] is True
-    assert difficulty.fit(None, {"lexical": 3})["dimensions"] == 0
+    assert difficulty.fit({}, {})["coverage"] == 1.0
     assert difficulty.fit({"lexical": 3}, {})["within"] is True
-    # Solo se comparan las dimensiones presentes en AMBOS vectores.
+    # Reto DECLARADO sin dimensiones comunes: cobertura 0 y NO hay encaje
+    # (V3.52.1, P1-01: antes devolvía within=True con distance=0).
+    empty = difficulty.fit(None, {"lexical": 3})
+    assert empty["dimensions"] == 0
+    assert empty["dimensions_expected"] == 1
+    assert empty["coverage"] == 0.0
+    assert empty["within"] is False
+    # Vector PARCIAL: se compara lo común, pero la cobertura incompleta no encaja.
     partial = difficulty.fit({"lexical": 5}, {"lexical": 3, "syntax": 3})
     assert partial["dimensions"] == 1
+    assert partial["dimensions_expected"] == 2
+    assert partial["coverage"] == 0.5
     assert partial["distance"] == 2
+    assert partial["within"] is False
 
 
 def test_normalize_vector_ignores_and_clamps():
@@ -245,6 +259,30 @@ def test_select_accepts_a_raw_vector_or_a_context_dict():
     assert difficulty.select_by_difficulty(raw, challenge, tolerance=1) == raw
 
 
+def test_select_never_rewards_a_context_without_declared_vector():
+    # V3.52.1 (P1-01): antes la intersección vacía daba within=True y distance=0,
+    # así que un contexto sin `difficulty_vector` ganaba siempre la selección.
+    challenge = {"lexical": 3, "syntax": 3, "discourse": 3, "interaction": 3}
+    pool = [
+        {"id": "sin_vector"},
+        _context("declarado", lexical=2, syntax=2, discourse=2, interaction=2),
+    ]
+    chosen = difficulty.select_by_difficulty(pool, challenge, tolerance=1)
+    assert [context["id"] for context in chosen] == ["declarado"]
+
+
+def test_select_degrades_by_coverage_before_distance():
+    # Ningún contexto entra en la tolerancia: se prefiere COBERTURA completa
+    # aunque su distancia sea mucho mayor que la de un vector parcial.
+    challenge = {"lexical": 1, "syntax": 1, "discourse": 1, "interaction": 1}
+    pool = [
+        _context("parcial", lexical=2, syntax=2),
+        _context("completo", lexical=5, syntax=5, discourse=5, interaction=5),
+    ]
+    chosen = difficulty.select_by_difficulty(pool, challenge, tolerance=0)
+    assert [context["id"] for context in chosen] == ["completo"]
+
+
 def test_tolerance_for_is_strict_only_for_demonstrated():
     assert difficulty.tolerance_for("demonstrated") == difficulty.DIFFICULTY_TOLERANCE
     assert (
@@ -299,6 +337,9 @@ def test_difficulty_fit_shape_is_stable_across_returns():
     keys = {
         "challenge",
         "dimensions",
+        "dimensions_compared",
+        "dimensions_expected",
+        "coverage",
         "distance",
         "max_overshoot",
         "within",
@@ -337,6 +378,11 @@ def test_api_exposes_learner_level_source_and_difficulty_fit(monkeypatch, tmp_pa
     assert body["difficulty_fit"]["tolerance"] == difficulty.DIFFICULTY_TOLERANCE
     expected_challenge = difficulty.challenge_vector("B1", "A2")
     assert body["difficulty_fit"]["challenge"] == expected_challenge
+    # V3.52.1 (P1-01): la cobertura dimensional viaja en el payload. Los 20
+    # contextos reales declaran las 4 dimensiones, así que aquí es completa.
+    assert body["difficulty_fit"]["coverage"] == 1.0
+    assert body["difficulty_fit"]["dimensions_expected"] == len(expected_challenge)
+    assert body["difficulty_fit"]["dimensions_compared"] == len(expected_challenge)
     # Aditivo: los campos de V3.47/V3.50/V3.51 siguen presentes.
     assert body["cefr"] in CEFR_LEVELS
     assert body["difficulty"] == transfer.difficulty_from_vector(

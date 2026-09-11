@@ -71,12 +71,25 @@ _CAPACITY_BY_LEVEL: dict[str, dict[str, int]] = {
     for level, vector in CEFR_CAPACITY.items()
 }
 
-_EMPTY_FIT: dict[str, object] = {
-    "dimensions": 0,
-    "distance": 0,
-    "max_overshoot": 0,
-    "within": True,
-}
+
+def _empty_fit(expected: int) -> dict[str, object]:
+    """Encaje sin dimensiones comparadas (V3.52.1, pura).
+
+    `within` solo es True si NO había reto que comparar (`expected == 0`): un
+    reto vacío no filtra y el encaje es vacuo. Con un reto declarado y NINGUNA
+    dimensión común la cobertura es 0 y NO se considera encaje: antes se
+    devolvía un `within=True` «perfecto» que premiaba a los contextos que no
+    declaran `difficulty_vector`.
+    """
+    return {
+        "dimensions": 0,
+        "dimensions_compared": 0,
+        "dimensions_expected": expected,
+        "coverage": 1.0 if expected == 0 else 0.0,
+        "distance": 0,
+        "max_overshoot": 0,
+        "within": expected == 0,
+    }
 
 
 def _as_load(value: object) -> int | None:
@@ -150,29 +163,39 @@ def fit(
 ) -> dict[str, object]:
     """Encaje dimensión a dimensión de un contexto contra el reto (V3.52, pura).
 
-    Devuelve `{dimensions, distance, max_overshoot, within}`:
+    Devuelve `{dimensions, dimensions_compared, dimensions_expected, coverage,
+    distance, max_overshoot, within}`:
 
-    - `dimensions` — nº de dimensiones comparadas (las presentes en AMBOS
-      vectores);
+    - `dimensions_expected` — nº de dimensiones que declara el RETO;
+    - `dimensions_compared` — nº de dimensiones presentes en AMBOS vectores
+      (`dimensions` se conserva como alias por compatibilidad);
+    - `coverage` — `dimensions_compared / dimensions_expected` (1.0 si no hay
+      reto). Una cobertura < 1 significa que el contexto declara MENOS
+      dimensiones que el reto y por tanto no es comparable del todo;
     - `distance` — suma de las distancias ABSOLUTAS por dimensión (0 = encaje
       perfecto). Es el criterio de «más cercano» del selector;
     - `max_overshoot` — mayor exceso de la carga del contexto sobre la capacidad
       de reto (0 si el contexto no supera el reto en ninguna dimensión);
-    - `within` — `max_overshoot <= tolerance` (el contexto no se pasa del reto
-      más de lo admitido).
+    - `within` — cobertura COMPLETA (`compared == expected`) y
+      `max_overshoot <= tolerance`.
 
-    Con vectores vacíos el encaje es vacuo: `dimensions=0`, `distance=0`,
-    `within=True`. Nunca lanza.
+    V3.52.1 (P1-01 de la auditoría): antes se comparaban solo las dimensiones
+    comunes y una intersección vacía devolvía un `within=True` «perfecto», de
+    modo que un contexto SIN `difficulty_vector` (o con vector parcial) ganaba
+    la selección con `distance=0`. Ahora un reto declarado exige cobertura
+    completa para considerarse `within`; solo un reto VACÍO (`expected == 0`)
+    deja el encaje vacuo con `within=True`. Nunca lanza.
     """
     context = normalize_vector(context_vector)
     target = normalize_vector(challenge)
+    expected = len(target)
     dimensions = [
         dimension
         for dimension in DIFFICULTY_DIMENSIONS
         if dimension in context and dimension in target
     ]
     if not dimensions:
-        return dict(_EMPTY_FIT)
+        return _empty_fit(expected)
     distance = 0
     max_overshoot = 0
     for dimension in dimensions:
@@ -180,11 +203,16 @@ def fit(
         distance += abs(delta)
         if delta > max_overshoot:
             max_overshoot = delta
+    compared = len(dimensions)
     return {
-        "dimensions": len(dimensions),
+        "dimensions": compared,
+        "dimensions_compared": compared,
+        "dimensions_expected": expected,
+        "coverage": compared / expected if expected else 1.0,
         "distance": distance,
         "max_overshoot": max_overshoot,
-        "within": max_overshoot <= max(0, int(tolerance)),
+        "within": compared == expected
+        and max_overshoot <= max(0, int(tolerance)),
     }
 
 
@@ -204,12 +232,13 @@ def select_by_difficulty(
 ) -> list[dict]:
     """Contextos más cercanos al reto sin pasarse de la tolerancia (V3.52, pura).
 
-    Conserva los contextos `within` (no exceden el reto más de `tolerance`) y,
-    entre ellos, los de MENOR `distance`; si NINGUNO está `within`, degrada a los
-    de menor `distance` de todo el pool (el más cercano posible, nunca el más
-    difícil por defecto). Nunca deja el pool vacío: sin reto reconocible o sin
-    pool devuelve el pool intacto. Determinista: preserva el orden de entrada.
-    Nunca lanza.
+    Conserva los contextos `within` (cobertura dimensional completa y sin
+    exceder el reto más de `tolerance`) y, entre ellos, los de MENOR `distance`;
+    si NINGUNO está `within`, degrada primero por MAYOR cobertura y luego por
+    menor `distance` (V3.52.1: antes bastaba la distancia, así que un contexto
+    sin `difficulty_vector` ganaba con `distance=0`). Nunca deja el pool vacío:
+    sin reto reconocible o sin pool devuelve el pool intacto. Determinista:
+    preserva el orden de entrada. Nunca lanza.
     """
     contexts = list(pool)
     target = normalize_vector(challenge)
@@ -219,17 +248,26 @@ def select_by_difficulty(
         fit(_context_vector(context), target, tolerance=tolerance)
         for context in contexts
     ]
-    within = {index for index, result in enumerate(results) if result["within"]}
-    best = min(
-        results[index]["distance"]
-        for index in range(len(contexts))
-        if not within or index in within
-    )
+    within = [index for index, result in enumerate(results) if result["within"]]
+    if within:
+        best = min(results[index]["distance"] for index in within)
+        return [
+            context
+            for index, context in enumerate(contexts)
+            if index in within and results[index]["distance"] == best
+        ]
+    # Nadie encaja: degradar por cobertura completa y, a igualdad, por cercanía.
+    best_coverage = max(result["coverage"] for result in results)
+    candidates = [
+        index
+        for index, result in enumerate(results)
+        if result["coverage"] == best_coverage
+    ]
+    best_distance = min(results[index]["distance"] for index in candidates)
     return [
         context
         for index, context in enumerate(contexts)
-        if results[index]["distance"] == best
-        and (not within or index in within)
+        if index in candidates and results[index]["distance"] == best_distance
     ]
 
 

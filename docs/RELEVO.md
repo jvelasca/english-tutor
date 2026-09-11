@@ -5,6 +5,34 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11): V3.52.1 (hotfix de producto + cierre del P1-01)** — release
+> **v3.52.1**, ADITIVA (una columna de BD, `users.is_test`) y determinista. NO
+> cambia la escalera `transfer_state`, el scoring ni FSRS, y tampoco el
+> comportamiento real del motor de dificultad (los 20 contextos declaran las 4
+> dimensiones). **(A) Usuarios fantasma «Visual Tester»:** la raíz era el
+> find-or-create no atómico de `frontend/tests/visual/gateHelper.ts` contra la BD
+> real (specs en paralelo); ahora un `globalSetup` de Playwright crea UN perfil
+> marcado `is_test` en proceso único y un `globalTeardown` lo borra. Guarda:
+> migración aditiva `users.is_test`, `GET /api/users` filtra por defecto
+> (`include_test=true` para tests), `DELETE /api/users/{id}` solo borra
+> `is_test=1`, filtro en `launcher/status.py` con degradación tolerante, y
+> `scripts/purge_virtual_testers.py --is-test`; los 2 perfiles existentes quedaron
+> purgados. **(B) Listening «RUTA ACTUAL»:** sigue al nivel seleccionado
+> (`resolveRouteLevel` sesión > selección > recomendado) y cambiar de ruta recarga
+> la pregunta. **(C) Bucle A/B:** nuevo módulo PURO `features/listening/abLoop.ts`
+> como única fuente de verdad UI↔controller, `play(url)` idempotente por URL,
+> rebobinado con `>=` + `onCurrentTime`, marca con `audioController.currentTime`,
+> hint con el B marcado y controles centrados. **(D) P1-01 de la auditoría de
+> V3.52:** `difficulty.fit` expone `dimensions_expected`/`dimensions_compared`/
+> `coverage` y exige cobertura completa para `within` (un contexto sin
+> `difficulty_vector` ya no gana con `distance=0`); `select_by_difficulty` degrada
+> por cobertura y luego por distancia. **(E)** Cifra de CI normalizada (2156+2
+> skipped primario). Tests: pytest **2164 passed** en local (+6), vitest **76
+> ficheros/651 tests** (+11), lanzador 76, `ruff`/`tsc`/`build` limpios y
+> `check_release_consistency` **3.52.1** exit 0. Fuera de alcance (V3.53+): P1-02
+> (Learner Skill State 2.0 + `observed_difficulty`) y P1-03 (Planner 2.0 /
+> Expected Learning Value).
+>
 > **Nota (2026-09-11):** **V3.52.0 (Student Skill State + Difficulty Engine
 > 2.0)** — release **v3.52.0**, ADITIVA con **dos columnas de BD** que NO cambia
 > la escalera `transfer_state`, sus umbrales, `context_signals`,
@@ -44,16 +72,16 @@
 > (`DrillTransferContext`/`DrillDifficultyFit`). **Deuda confirmada y diferida
 > (V3.55):** `assessed_skill` → decisión del planner y `skill_priorities` →
 > `select_task` (evitar el doble conteo de `written_production` con el drill
-> `write`). Tests: pytest **2158 passed** (+39: `test_student_state_v352.py` 15 y
+> `write`). Tests: pytest **2156 passed + 2 skipped en CI** (2158 passed en local
+> con el modelo Whisper; +39: `test_student_state_v352.py` 15 y
 > `test_difficulty_engine_v352.py` 24; ajuste de
 > `test_learner_level_raises_the_difficulty_floor` a `difficulty_fit`), `ruff`
 > limpio, `check_release_consistency` **3.52.0** exit 0. **CI 6/6 en verde** (run
 > [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
 > sobre `23cbad7`): Release consistency, Backend (ruff + pytest), Frontend
 > (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
-> validation. La CI cuenta **2156 passed + 2 skipped** (`test_stt_asr_integration.py`,
-> opt-in del modelo Whisper no descargado en el runner); en local (Windows, con el
-> modelo) son los **2158 passed**. Fuera de alcance:
+> validation. Los 2 skipped son `test_stt_asr_integration.py` (opt-in del modelo
+> Whisper, no descargado en el runner). Fuera de alcance:
 > Sense Engine 2.0, `observed_difficulty` persistido, entrega oral real del
 > transfer, `expected_learning_value`/Adaptive Planner 2.0, Context Bank
 > Family/Instance, offline TTS y code splitting del frontend.

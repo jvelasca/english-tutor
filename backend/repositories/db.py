@@ -67,7 +67,8 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                is_test INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -735,6 +736,13 @@ def init_db() -> None:
         if "avatar_image" not in user_cols:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN avatar_image TEXT NOT NULL DEFAULT ''"
+            )
+        # V3.52.1: marca de perfil de PRUEBA (p. ej. el de los tests visuales de
+        # Playwright). Los perfiles marcados no se listan en la app ni en el
+        # lanzador; el flag permite distinguirlos sin depender del nombre.
+        if "is_test" not in user_cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0"
             )
 
         # V3.25 (F-K7/P2-01, fase 6): renombrado canónico de los contadores de

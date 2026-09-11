@@ -34,6 +34,8 @@ export interface User {
   avatar_color?: string;
   avatar_emoji?: string;
   avatar_image?: string;
+  /** V3.52.1: perfil de prueba (tests visuales); el backend no lo lista. */
+  is_test?: boolean;
   created_at: string;
 }
 
@@ -571,7 +573,14 @@ export interface DrillTransferContext {
 
 export interface DrillDifficultyFit {
   challenge?: Record<string, number>;
+  /** Alias de `dimensions_compared` (compatibilidad). */
   dimensions?: number;
+  /** V3.52.1: dimensiones declaradas por el reto. */
+  dimensions_expected?: number;
+  /** V3.52.1: dimensiones realmente comparadas (intersección). */
+  dimensions_compared?: number;
+  /** V3.52.1: `compared / expected`; < 1 = contexto parcialmente comparable. */
+  coverage?: number;
   distance?: number;
   max_overshoot?: number;
   within?: boolean;

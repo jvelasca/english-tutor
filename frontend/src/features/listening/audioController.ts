@@ -136,6 +136,9 @@ export class AudioController {
   private segment: AudioSegment | null = null;
   private disposed = false;
   private rafId: number | null = null;
+  /** URL cargada actualmente: permite que `play(url)` no recargue si es la
+   * misma (V3.52.1: al reanudar no se pierde el bucle A/B activo). */
+  private loadedUrl: string | null = null;
 
   private onTimeupdate = (): void => {
     if (!this.el.paused) this.callbacks.onCurrentTime?.(this.el.currentTime);
@@ -173,6 +176,10 @@ export class AudioController {
   private rewindIfPastSegmentEnd(): void {
     if (this.segment && !this.el.paused && this.el.currentTime >= this.segment.end) {
       this.el.currentTime = this.segment.start;
+      // V3.52.1: notifica el salto para que el slider/contador no se quede
+      // mostrando el instante B (el `onCurrentTime` previo de `timeupdate`
+      // llegaba antes del rebobinado).
+      this.callbacks.onCurrentTime?.(this.segment.start);
     }
   }
 
@@ -254,14 +261,38 @@ export class AudioController {
   /** Carga una URL (sin reproducir) y restablece velocidad y segmento. */
   load(url: string, playbackRate = 1): void {
     this.el.src = url;
+    this.loadedUrl = url;
     this.el.load();
     this.el.playbackRate = this.safeRate(playbackRate);
     this.clearLoop();
   }
 
-  /** Reproduce la URL cargada (o `load`+`play` si se pasa una URL nueva). */
+  /**
+   * Reproduce la URL cargada (o `load`+`play` si es una URL NUEVA).
+   *
+   * V3.52.1: si la URL es la misma que la ya cargada NO se recarga, para no
+   * perder el segmento A/B activo ni reiniciar la posición al reanudar tras una
+   * pausa (antes `play(url)` recargaba siempre y `load` limpiaba el bucle).
+   * La única excepción es que la reproducción haya TERMINADO: entonces se
+   * vuelve al principio (o al inicio del segmento) para poder repetir.
+   */
   async play(url?: string, playbackRate?: number): Promise<void> {
-    if (url) this.load(url, playbackRate ?? this.el.playbackRate);
+    if (url) {
+      const finished =
+        this.duration > 0 && this.el.currentTime >= this.duration - 0.05;
+      if (url !== this.loadedUrl) {
+        this.load(url, playbackRate ?? this.el.playbackRate);
+      } else if (finished) {
+        // Misma URL ya cargada: si terminó, se repite (desde el inicio del
+        // segmento activo si lo hay; si no, desde el principio) sin recargar.
+        if (this.segment) {
+          this.el.currentTime = this.segment.start;
+          this.callbacks.onCurrentTime?.(this.segment.start);
+        } else {
+          this.load(url, playbackRate ?? this.el.playbackRate);
+        }
+      }
+    }
     await this.el.play();
   }
 
@@ -317,9 +348,10 @@ export class AudioController {
   loop(start: number, end: number): void {
     this.segment = clampSegment(start, end, this.duration);
     if (!this.segment) return;
-    // Si la reproducción ya pasó el fin del segmento, se reinicia dentro.
-    if (this.el.currentTime > this.segment.end) {
+    // Si la reproducción ya alcanzó el fin del segmento, se reinicia dentro.
+    if (this.el.currentTime >= this.segment.end) {
       this.el.currentTime = this.segment.start;
+      this.callbacks.onCurrentTime?.(this.segment.start);
     }
     if (!this.el.paused) this.startFrameLoop();
   }

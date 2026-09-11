@@ -5,16 +5,19 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.52.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.52 (Student Skill State + Difficulty Engine 2.0)
-> ya está ejecutada; cierra los dos P1 de la auditoría externa de V3.51. La
+> **Estado actual (2026-09-11): `v3.52.1`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.52.1 es un **hotfix de producto** (usuarios
+> fantasma «Visual Tester», «RUTA ACTUAL» de Listening y bucle A/B) que además
+> cierra el **P1-01** de la auditoría externa de V3.52 sin cambiar el
+> comportamiento real del motor de dificultad. La
 > **auditoría externa de V3.52 está lista para lanzar**
 > (`agentes/auditoria-externa-v352.md`, apuntando al commit `23cbad7`). El
-> siguiente incremento (V3.53+: Sense Engine 2.0 / `assessed_skill`→planner y
-> `skill_priorities`→`select_task` (V3.55) / Adaptive Planner 2.0 / entrega oral
-> real del transfer) aún no tiene briefing. Antes de lanzar cualquier subagente,
-> lee esa sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al
-> saturar y ancla contra la alucinación).
+> siguiente incremento (V3.53+: P1-02 Learner Skill State 2.0 /
+> `observed_difficulty` y P1-03 Planner 2.0 / Expected Learning Value, además de
+> Sense Engine 2.0, `assessed_skill`→planner y `skill_priorities`→`select_task`
+> (V3.55) y la entrega oral real del transfer) aún no tiene briefing. Antes de
+> lanzar cualquier subagente, lee esa sección para no partir de un estado obsoleto
+> (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
 
@@ -26,6 +29,11 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v3521-hotfix.md` — **V3.52.1 (ejecutado, 2026-09-11, v3.52.1)**: hotfix
+  de producto (usuarios fantasma «Visual Tester» con guarda `users.is_test`,
+  «RUTA ACTUAL» de Listening y bucle A/B) + cierre del P1-01 de la auditoría
+  externa de V3.52 (cobertura dimensional en `difficulty.fit`). **Histórico,
+  hecho**; ver `release-notes-v3.52.1.md`.
 - `agentes/auditoria-externa-v352.md` — **auditoría EXTERNA de V3.52.0 (listo
   para lanzar)**: prompt autocontenido para un auditor que solo ve GitHub
   (repo/tag `v3.52.0`/commit `23cbad7`, run de CI 6/6), con punto de entrada,

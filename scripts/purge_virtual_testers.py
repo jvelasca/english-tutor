@@ -22,6 +22,7 @@ Uso:
     python scripts/purge_virtual_testers.py                 # dry-run
     python scripts/purge_virtual_testers.py --apply         # borra de verdad
     python scripts/purge_virtual_testers.py --db ruta.db    # otra base de datos
+    python scripts/purge_virtual_testers.py --is-test --apply  # solo perfiles marcados
 
 Requiere cerrar la app/launcher antes de `--apply` (si no, el WAL puede estar
 activo y el fichero bloqueado en Windows).
@@ -78,7 +79,10 @@ def placeholders(count: int) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Elimina los perfiles de prueba «VIRTUAL TESTER» de tutor.db.",
+        description=(
+            "Elimina los perfiles de prueba «VIRTUAL TESTER» de tutor.db "
+            "(--pattern) o los marcados con is_test=1 (--is-test)."
+        ),
     )
     parser.add_argument(
         "--apply",
@@ -96,6 +100,15 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_PATTERN,
         help=f"Patrón LIKE del nombre de usuario (por defecto: {DEFAULT_PATTERN!r}).",
     )
+    parser.add_argument(
+        "--is-test",
+        action="store_true",
+        dest="is_test",
+        help=(
+            "Borra los perfiles marcados con users.is_test = 1 (más seguro que "
+            "el patrón de nombre, que podría coincidir con un alumno real)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     db_path: Path = args.db
@@ -105,15 +118,31 @@ def main(argv: list[str] | None = None) -> int:
 
     conn = sqlite3.connect(db_path)
     try:
-        targets = conn.execute(
-            "SELECT id, name, created_at FROM users "
-            "WHERE name LIKE ? COLLATE NOCASE ORDER BY name",
-            (args.pattern,),
-        ).fetchall()
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if args.is_test:
+            if "is_test" not in columns:
+                print(
+                    "ERROR: la BD no tiene la columna users.is_test "
+                    "(migración V3.52.1); usa --pattern.",
+                    file=sys.stderr,
+                )
+                return 2
+            targets = conn.execute(
+                "SELECT id, name, created_at FROM users "
+                "WHERE is_test = 1 ORDER BY name"
+            ).fetchall()
+            selector = "is_test = 1"
+        else:
+            targets = conn.execute(
+                "SELECT id, name, created_at FROM users "
+                "WHERE name LIKE ? COLLATE NOCASE ORDER BY name",
+                (args.pattern,),
+            ).fetchall()
+            selector = repr(args.pattern)
         total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
         print(f"Base de datos: {db_path}")
-        print(f"Patrón:        {args.pattern!r}")
+        print(f"Selector:      {selector}")
         print(f"Usuarios totales: {total_users}")
         print(f"Coincidencias:    {len(targets)}")
         for user_id, name, created_at in targets:

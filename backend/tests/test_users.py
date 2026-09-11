@@ -2,6 +2,7 @@ import sqlite3
 
 from repositories import conversations as conversations_repo
 from repositories import db
+from repositories import settings as settings_repo
 from repositories import users as users_repo
 
 
@@ -35,6 +36,43 @@ def test_list_users(monkeypatch, tmp_path):
     assert "Usuario" in names
     assert "Ana" in names
     assert "Bob" in names
+
+
+def test_test_profiles_are_hidden_by_default(monkeypatch, tmp_path):
+    # V3.52.1: los perfiles de prueba («Visual Tester») no se listan en la app.
+    _setup(monkeypatch, tmp_path)
+    users_repo.create_user("Ana")
+    tester = users_repo.create_user("Visual Tester", is_test=True)
+    assert tester["is_test"] is True
+    names = [u["name"] for u in users_repo.list_users()]
+    assert "Visual Tester" not in names
+    assert "Ana" in names
+    # `include_test` los expone: lo usan los propios tests visuales.
+    all_names = [u["name"] for u in users_repo.list_users(include_test=True)]
+    assert "Visual Tester" in all_names
+    assert users_repo.get_user(tester["id"]) is not None
+
+
+def test_delete_test_user_never_removes_real_profiles(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    real = users_repo.create_user("Ana")
+    tester = users_repo.create_user("Visual Tester", is_test=True)
+    assert users_repo.delete_test_user(real["id"]) is False
+    assert users_repo.get_user(real["id"]) is not None
+    assert users_repo.delete_test_user(tester["id"]) is True
+    assert users_repo.get_user(tester["id"]) is None
+    assert [u["name"] for u in users_repo.list_users()] == ["Usuario", "Ana"]
+
+
+def test_delete_test_user_removes_dependent_rows(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    uid = users_repo.create_user("Visual Tester", is_test=True)["id"]
+    settings_repo.set_settings(uid, {"layout_insights_width": "320"})
+    conv = conversations_repo.create_conversation(uid)
+    assert conv is not None
+    assert users_repo.delete_test_user(uid) is True
+    assert settings_repo.get_settings(uid) == {}
+    assert conversations_repo.get_conversation(conv["id"], uid) is None
 
 
 def test_create_conversation_associates_user(monkeypatch, tmp_path):

@@ -246,14 +246,19 @@ def _difficulty_fit_for(
 ) -> dict:
     """`difficulty_fit` del contexto servido contra el reto (V3.52, pura).
 
-    Devuelve `{challenge, dimensions, distance, max_overshoot, within,
-    tolerance}`. Con reto vacío el encaje es vacuo (`within=True`): no había nada
-    que comparar y la elección no se filtró. Nunca lanza.
+    Devuelve `{challenge, dimensions, dimensions_compared, dimensions_expected,
+    coverage, distance, max_overshoot, within, tolerance}`. Con reto vacío el
+    encaje es vacuo (`within=True`, cobertura 1.0): no había nada que comparar y
+    la elección no se filtró. V3.52.1 (P1-01): se expone la COBERTURA dimensional
+    para que la UI pueda distinguir «encaja» de «no era comparable». Nunca lanza.
     """
     if not challenge:
         return {
             "challenge": {},
             "dimensions": 0,
+            "dimensions_compared": 0,
+            "dimensions_expected": 0,
+            "coverage": 1.0,
             "distance": 0,
             "max_overshoot": 0,
             "within": True,
@@ -268,6 +273,9 @@ def _difficulty_fit_for(
     return {
         "challenge": dict(challenge),
         "dimensions": result["dimensions"],
+        "dimensions_compared": result["dimensions_compared"],
+        "dimensions_expected": result["dimensions_expected"],
+        "coverage": result["coverage"],
         "distance": result["distance"],
         "max_overshoot": result["max_overshoot"],
         "within": result["within"],

@@ -307,3 +307,53 @@ describe("AudioController V3.29 (Fase 3, P5)", () => {
     ctrl.dispose();
   });
 });
+
+describe("AudioController V3.52.1 (A/B sin desincronización)", () => {
+  it("play con la MISMA URL no recarga ni pierde el bucle activo", async () => {
+    const el = fakeElement({ duration: 10 });
+    const ctrl = new AudioController(el);
+    ctrl.load("http://audio/1.wav");
+    ctrl.loop(2, 4);
+    const loads = (el.load as ReturnType<typeof vi.fn>).mock.calls.length;
+    await ctrl.play("http://audio/1.wav");
+    expect((el.load as ReturnType<typeof vi.fn>).mock.calls.length).toBe(loads);
+    expect(ctrl.loopSegment).toEqual({ start: 2, end: 4 });
+    ctrl.dispose();
+  });
+
+  it("play con URL nueva sí recarga y limpia el bucle", async () => {
+    const el = fakeElement({ duration: 10 });
+    const ctrl = new AudioController(el);
+    ctrl.load("http://audio/1.wav");
+    ctrl.loop(2, 4);
+    await ctrl.play("http://audio/2.wav");
+    expect(el.src).toBe("http://audio/2.wav");
+    expect(ctrl.loopSegment).toBeNull();
+    ctrl.dispose();
+  });
+
+  it("play con la misma URL y audio terminado reinicia el bucle por A", async () => {
+    const el = fakeElement({ duration: 10 });
+    const ctrl = new AudioController(el);
+    ctrl.load("http://audio/1.wav");
+    ctrl.loop(2, 4);
+    el.currentTime = 10; // terminó
+    await ctrl.play("http://audio/1.wav");
+    expect(el.currentTime).toBe(2);
+    expect(ctrl.loopSegment).toEqual({ start: 2, end: 4 });
+    ctrl.dispose();
+  });
+
+  it("el rebobinado del bucle notifica onCurrentTime (el slider no se queda en B)", () => {
+    const el = fakeElement({ duration: 10 });
+    el.paused = false;
+    const onCurrentTime = vi.fn();
+    const ctrl = new AudioController(el, { onCurrentTime });
+    ctrl.loop(2, 4);
+    el.currentTime = 4;
+    trigger(el, "timeupdate");
+    expect(el.currentTime).toBe(2);
+    expect(onCurrentTime).toHaveBeenLastCalledWith(2);
+    ctrl.dispose();
+  });
+});

@@ -119,6 +119,18 @@ import { AuditoryProfileCard } from "./AuditoryProfileCard";
 // y el bucle de segmento (control A/B y replay de palabra); quedan sin UI
 // `setRate` fino con `preservesPitch` y `replaySegment` directo.
 import { useAudioController } from "./useAudioController";
+// Máquina de estados PURA del bucle A/B (V3.52.1): único origen de verdad que
+// mantiene sincronizados el estado de la UI y el segmento del AudioController.
+import {
+  EMPTY_AB_LOOP,
+  MIN_AB_LOOP_SECONDS,
+  armLoop,
+  canClear,
+  clearLoop as clearAbLoop,
+  loopFromSegment,
+  toggleMark,
+  type AbLoopState,
+} from "./abLoop";
 // Transcripción dinámica con sync grueso (V3.28, Bloque D): resalta la frase
 // activa según `currentTime` y respeta el revelado `hidden/partial/full`.
 import { CoarseTranscript } from "./CoarseTranscript";
@@ -252,11 +264,13 @@ export function ListeningPractice({
   const [startedAt, setStartedAt] = useState(0);
   const [variant, setVariant] = useState<string>("normal");
   const [showAudioSettings, setShowAudioSettings] = useState(false);
-  // Control de bucle A/B de la tarjeta de audio (V3.29, Fase 3, P5):
-  // `markStart` es el instante "A" marcado; `isLooping` refleja si el
-  // AudioController tiene segmento activo (botón "quitar bucle").
-  const [markStart, setMarkStart] = useState<number | null>(null);
-  const [isLooping, setIsLooping] = useState(false);
+  // Control de bucle A/B de la tarjeta de audio (V3.29; máquina de estados PURA
+  // en `abLoop.ts` desde V3.52.1). Un único estado evita la desincronización
+  // entre la UI (`markStart`/`isLooping`) y el segmento real del controller.
+  const [abLoop, setAbLoop] = useState<AbLoopState>(EMPTY_AB_LOOP);
+  const markStart = abLoop.markStart;
+  const isLooping = abLoop.looping;
+  const loopEnd = abLoop.loopEnd;
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
   const [session, setSession] = useState<ListeningSession | null>(null);
@@ -394,6 +408,9 @@ export function ListeningPractice({
     audioController.load(getListeningAudioUrl(question.id, userId, rateVariant));
     audioController.loop(margin, ref.end);
     audioController.seek(margin);
+    // V3.52.1: refleja el bucle en la UI A/B; antes se armaba un segmento
+    // «invisible» que la pantalla no podía mostrar ni quitar.
+    setAbLoop(loopFromSegment(margin, ref.end));
     try {
       await audioController.play();
     } catch (e) {
@@ -500,8 +517,7 @@ export function ListeningPractice({
     setVariant("normal");
     // Controles A/B (V3.29, P5): nueva pregunta ⇒ sin marca ni bucle activo.
     audioController?.clearLoop();
-    setIsLooping(false);
-    setMarkStart(null);
+    setAbLoop(EMPTY_AB_LOOP);
     // Sin override: sesión activa > ruta seleccionada > elección del backend
     // (modo adaptativo). V3.48.1: la ruta seleccionada es persistente.
     const level =
@@ -697,8 +713,11 @@ export function ListeningPractice({
   useEffect(() => {
     void load();
     void refreshStats();
+    // V3.52.1: al cambiar la ruta seleccionada se recarga la pregunta para
+    // servirla del nivel elegido (antes solo se recargaba al cambiar de perfil,
+    // así que seleccionar A2 no tenía efecto inmediato).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, selectedLevel]);
 
   // Voz TTS seleccionada del perfil (nombre amigable) para la etiqueta honesta de
   // los ítems sintéticos. `showAudioSettings` fuerza un refresco cada vez que se
@@ -908,8 +927,18 @@ async function submitDictation() {
       })()
     : "";
 
-  const currentLevelStat = stats?.level
-    ? stats.levels.find((lv) => lv.level === stats.level) ?? null
+  // V3.52.1: la "ruta actual" es la que se está sirviendo de verdad, con la
+  // MISMA prioridad que la carga de pregunta (sesión > ruta seleccionada >
+  // recomendada por el motor). Antes el anillo leía `stats.level` (la primera
+  // ruta no superada) y por eso seguía diciendo «Ruta actual A1» al elegir A2.
+  const stageLevel = resolveRouteLevel(
+    session?.level,
+    selectedLevel,
+    stats?.level,
+  );
+  const routeLevel = stageLevel ?? "";
+  const currentLevelStat = routeLevel
+    ? stats?.levels.find((lv) => lv.level === routeLevel) ?? null
     : null;
   const currentLevelPct =
     currentLevelStat && currentLevelStat.total > 0
@@ -1147,7 +1176,7 @@ async function submitDictation() {
             {/* V3.48.1: señal situacional del ítem (antes en la tarjeta «Antes
                 de escuchar»), ahora caption compacta de una línea. */}
             {(question.context || question.topic) && (
-              <p className="max-w-md text-center text-xs leading-relaxed text-muted-foreground">
+              <p className="max-w-md self-center text-center text-xs leading-relaxed text-muted-foreground">
                 {question.context || topicLabel(question.topic)}
               </p>
             )}
@@ -1158,7 +1187,7 @@ async function submitDictation() {
             {question.audio_ready &&
               audioDuration > 0 &&
               audioController && (
-                <div className="flex w-full max-w-md flex-col gap-3">
+                <div className="flex w-full max-w-md flex-col gap-3 self-center">
                   <div className="flex items-center gap-2">
                     <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                       {formatSeconds(audioTime)}
@@ -1182,11 +1211,16 @@ async function submitDictation() {
                       variant={markStart !== null ? "secondary" : "outline"}
                       size="sm"
                       onClick={() => {
+                        // V3.52.1: la marca se toma del instante REAL del
+                        // controller (no del estado React de ~4 Hz) y quitar la
+                        // marca desarma también el bucle del controller.
                         if (markStart !== null) {
-                          setMarkStart(null);
-                          setIsLooping(false);
+                          audioController.clearLoop();
+                          setAbLoop(clearAbLoop());
                         } else {
-                          setMarkStart(audioTime);
+                          setAbLoop((state) =>
+                            toggleMark(state, audioController.currentTime),
+                          );
                         }
                       }}
                       disabled={!question.audio_ready}
@@ -1200,14 +1234,14 @@ async function submitDictation() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (markStart === null) return;
-                        const end = audioTime;
-                        if (end - markStart < 0.05) return;
-                        audioController.loop(markStart, end);
-                        setIsLooping(true);
+                        const next = armLoop(abLoop, audioController.currentTime);
+                        if (!next) return;
+                        audioController.loop(next.markStart!, next.loopEnd!);
+                        setAbLoop(next);
                       }}
                       disabled={
-                        markStart === null || audioTime - markStart < 0.05
+                        markStart === null ||
+                        audioTime - markStart < MIN_AB_LOOP_SECONDS
                       }
                     >
                       <Repeat2 className="size-3.5" aria-hidden="true" />
@@ -1218,20 +1252,19 @@ async function submitDictation() {
                       size="sm"
                       onClick={() => {
                         audioController.clearLoop();
-                        setMarkStart(null);
-                        setIsLooping(false);
+                        setAbLoop(clearAbLoop());
                       }}
-                      disabled={!isLooping && markStart === null}
+                      disabled={!canClear(abLoop)}
                     >
                       <X className="size-3.5" aria-hidden="true" />
                       {t("listening.audio.clearLoop")}
                     </Button>
                   </div>
-                  {isLooping && markStart !== null && (
+                  {isLooping && markStart !== null && loopEnd !== null && (
                     <p className="text-center text-[11px] text-muted-foreground">
                       {t("listening.audio.loopingHint")
                         .replace("{start}", formatSeconds(markStart))
-                        .replace("{end}", formatSeconds(audioTime))}
+                        .replace("{end}", formatSeconds(loopEnd))}
                     </p>
                   )}
                 </div>
@@ -1804,7 +1837,7 @@ async function submitDictation() {
                 label={t("common.moreInfo")}
               >
                 <p>
-                  {t("listening.routeNote").replace("{level}", stats.level)}
+                  {t("listening.routeNote").replace("{level}", routeLevel)}
                 </p>
                 <p>{t("listening.routeCertNote")}</p>
                 <p>{t("listening.routeRingHelp")}</p>
@@ -1835,17 +1868,17 @@ async function submitDictation() {
                 <div className="flex flex-col items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => toggleLevel(stats.level)}
-                    aria-expanded={expandedLevel === stats.level}
+                    onClick={() => toggleLevel(routeLevel)}
+                    aria-expanded={expandedLevel === routeLevel}
                     aria-controls="listening-level-items"
                     aria-label={t("listening.levelHistoryTitle").replace(
                       "{level}",
-                      stats.level,
+                      routeLevel,
                     )}
                     disabled={!!session}
                     className={cn(
                       "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                      expandedLevel === stats.level && "bg-accent",
+                      expandedLevel === routeLevel && "bg-accent",
                       session && "cursor-not-allowed opacity-60",
                     )}
                   >
@@ -1854,10 +1887,10 @@ async function submitDictation() {
                       size={72}
                       strokeWidth={7}
                       className="text-primary"
-                      ariaLabel={`${t("listening.currentLevel")}: ${stats.level}`}
+                      ariaLabel={`${t("listening.currentLevel")}: ${routeLevel}`}
                     >
                       <span className="text-sm font-bold text-foreground">
-                        {stats.level}
+                        {routeLevel}
                       </span>
                     </ProgressRing>
                     <span className="text-xs font-medium text-foreground">
@@ -1877,7 +1910,7 @@ async function submitDictation() {
                       <span className="text-[11px] font-semibold text-success">
                         {t("listening.demoTitle").replace(
                           "{level}",
-                          stats.level,
+                          routeLevel,
                         )}
                       </span>
                     )}
@@ -1887,13 +1920,13 @@ async function submitDictation() {
                           <span className="text-[11px] font-semibold text-success">
                             {t("listening.routeCompleted").replace(
                               "{level}",
-                              stats.level,
+                              routeLevel,
                             )}
                           </span>
                           <span className="text-[11px] font-medium text-warning">
                             {t("listening.demoNotYet").replace(
                               "{level}",
-                              stats.level,
+                              routeLevel,
                             )}
                           </span>
                         </>
@@ -1904,7 +1937,7 @@ async function submitDictation() {
                         <span className="text-[11px] font-semibold text-success">
                           {t("listening.routeCompleted").replace(
                             "{level}",
-                            stats.level,
+                            routeLevel,
                           )}
                         </span>
                       )}

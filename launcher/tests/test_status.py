@@ -53,6 +53,22 @@ def test_read_users(tmp_path):
     assert ana[3] == 3
 
 
+def test_read_users_excludes_test_profiles(tmp_path):
+    # V3.52.1: los perfiles de prueba («Visual Tester») no se listan.
+    db = tmp_path / "t.db"
+    _make_db(db)
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0"
+        )
+        conn.execute(
+            "INSERT INTO users (id, name, created_at, is_test) "
+            "VALUES ('u3', 'Visual Tester', 'now', 1)"
+        )
+    users = status.read_users(str(db))
+    assert [u[1] for u in users] == ["Ana", "Bob"]
+
+
 def test_read_db_counts_missing_file():
     assert status.read_db_counts("Z:/no/existe/tutor.db") == {
         "users": 0,

@@ -172,21 +172,32 @@ def read_db_info(db_path: str) -> dict:
 
 
 def read_users(db_path: str) -> list[tuple]:
-    """Lista de (id, name, conversations, messages) por usuario."""
+    """Lista de (id, name, conversations, messages) por usuario.
+
+    V3.52.1: excluye los perfiles marcados como prueba (`is_test`), que crean
+    los tests visuales («Visual Tester»). Si la columna aún no existe (BD sin
+    migrar), se reintenta sin el filtro para no dejar el lanzador sin usuarios.
+    """
+    query = (
+        "SELECT u.id, u.name, "
+        "COUNT(DISTINCT c.id) AS conversations, "
+        "COUNT(m.id) AS messages "
+        "FROM users u "
+        "LEFT JOIN conversations c ON c.user_id = u.id "
+        "LEFT JOIN messages m ON m.conversation_id = c.id "
+        "{where}"
+        "GROUP BY u.id "
+        "ORDER BY u.name"
+    )
     try:
         with closing(_connect_readonly(db_path)) as conn:
-            rows = conn.execute(
-                """
-                SELECT u.id, u.name,
-                       COUNT(DISTINCT c.id) AS conversations,
-                       COUNT(m.id) AS messages
-                FROM users u
-                LEFT JOIN conversations c ON c.user_id = u.id
-                LEFT JOIN messages m ON m.conversation_id = c.id
-                GROUP BY u.id
-                ORDER BY u.name
-                """
-            ).fetchall()
+            try:
+                rows = conn.execute(
+                    query.format(where="WHERE u.is_test = 0 ")
+                ).fetchall()
+            except sqlite3.OperationalError:
+                # Columna ausente (BD legada sin migrar): se listan todos.
+                rows = conn.execute(query.format(where="")).fetchall()
         return [(r["id"], r["name"], r["conversations"], r["messages"]) for r in rows]
     except Exception:  # noqa: BLE001
         return []

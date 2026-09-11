@@ -11,6 +11,11 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/visual",
   outputDir: "./tests/visual/.artifacts",
+  // V3.52.1: el perfil de prueba se crea UNA vez (globalSetup) y se borra al
+  // terminar (globalTeardown). Antes cada spec hacía su propio find-or-create en
+  // paralelo contra la BD real y se duplicaban los perfiles «Visual Tester».
+  globalSetup: "./tests/visual/globalSetup.ts",
+  globalTeardown: "./tests/visual/globalTeardown.ts",
   timeout: 30_000,
   reporter: [["list"]],
   use: {
