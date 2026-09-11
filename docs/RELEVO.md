@@ -35,6 +35,23 @@
 > (V3.53+): P1-02 (Learner Skill State 2.0 + `observed_difficulty`) y P1-03
 > (Planner 2.0 / Expected Learning Value).
 >
+> **Auditoría Q (2026-09-11): V3.52.1 auditada — 🟢 publicable, SIN P0/P1.**
+> Informe en `docs/audit/Q-AUDITORIA-TOTAL-V352.md` (briefing actualizado:
+> `agentes/auditoria-externa-v352.md`). Verificado por ejecución (ruff, pytest
+> dirigido 78, `tsc`, vitest 31, Playwright 23/22 y CI 6/6) que los dos P1 de
+> V3.51 y el P1-01 de V3.52 están cerrados, que la escalera/scoring/FSRS no se
+> tocan y que el hotfix de producto está corregido de raíz. **Hallazgos abiertos
+> para V3.53:** (P2-01) `CEFR_CAPACITY` no cuadra con el banco que dice calibrar
+> —`interaction` de A1/A2 por debajo del máximo real (1 vs 2/3) y léxico/sintaxis
+> de B2/C1 por encima (4/5 vs 3/4)—: con la tolerancia estricta un alumno A2
+> **demostrado** excluye 2 de los 4 contextos A2; conviene derivar/validar la
+> tabla del banco con un test de consistencia. (P2-02) la tolerancia por fuente
+> (`DIFFICULTY_TOLERANCE` vs `_ESTIMATED`) es **inerte** en el banco real (0 de 48
+> combinaciones) y su justificación escrita está invertida (más margen admite más
+> exceso, no menos exigencia). (P3) fila legacy etiquetada `practice` en vez de
+> `estimated`, `_context_vector` que trata un contexto sin vector como vector, e
+> `is_test` marcable por el cliente. (Proceso) `v3.52.1` no está etiquetada.
+>
 > **Nota (2026-09-11):** **V3.52.0 (Student Skill State + Difficulty Engine
 > 2.0)** — release **v3.52.0**, ADITIVA con **dos columnas de BD** que NO cambia
 > la escalera `transfer_state`, sus umbrales, `context_signals`,

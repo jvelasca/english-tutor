@@ -37,15 +37,18 @@ pedir más contexto.
   «RUTA ACTUAL» de Listening y bucle A/B) + cierre del P1-01 de la auditoría
   externa de V3.52 (cobertura dimensional en `difficulty.fit`). **Histórico,
   hecho**; ver `release-notes-v3.52.1.md`.
-- `agentes/auditoria-externa-v352.md` — **auditoría EXTERNA de V3.52.0 (listo
-  para lanzar)**: prompt autocontenido para un auditor que solo ve GitHub
-  (repo/tag `v3.52.0`/commit `23cbad7`, run de CI 6/6), con punto de entrada,
-  contexto de los dos P1 de V3.51, alcance dentro/fuera, método reproducible,
-  14 preguntas concretas (política del suelo, calibración de `CEFR_CAPACITY`
-  contra el banco real, semántica de `challenge_vector`/`fit`, tolerancias,
-  determinismo, O(1) del camino caliente, paridad GET↔POST, contrato aditivo,
-  cobertura de tests) y formato de informe
-  (`docs/audit/Q-AUDITORIA-TOTAL-V352.md`).
+- `agentes/auditoria-externa-v352.md` — **auditoría EXTERNA de V3.52.1
+  (EJECUTADA, 2026-09-11)**: prompt autocontenido para un auditor que solo ve
+  GitHub (árbol `bdaaff9`, base tag `v3.52.0`/commit `23cbad7`, runs de CI 6/6),
+  con punto de entrada, contexto de los dos P1 de V3.51 + el delta del hotfix
+  V3.52.1, alcance dentro/fuera, método reproducible, 17 preguntas concretas
+  (política del suelo, calibración de `CEFR_CAPACITY` **contra el banco real**,
+  semántica de `challenge_vector`/`fit`, tolerancias, determinismo, O(1) del
+  camino caliente, paridad GET↔POST, contrato aditivo, cobertura de tests y el
+  delta del hotfix) y formato de informe. **Informe entregado**:
+  `docs/audit/Q-AUDITORIA-TOTAL-V352.md` → **sin P0/P1**; 2 P2 (calibración de
+  `CEFR_CAPACITY` frente al banco y tolerancia por fuente hoy inerte con la
+  justificación invertida) y 3 P3, recomendados para V3.53.
 - `agentes/auditoria-externa-v350.md` — auditoría EXTERNA de V3.50.0
   **ya entregada y resuelta** (sus tres P1 se cerraron en V3.51.0; V3.50 la dejó
   como briefing «listo para lanzar»). Se conserva como histórico del método.

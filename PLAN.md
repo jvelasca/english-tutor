@@ -1382,10 +1382,21 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.53+ — candidatos abiertos (a la espera de la auditoría externa de
-  V3.52)**: con V3.52 cerrada, el siguiente incremento se decide con el informe
-  de `agentes/auditoria-externa-v352.md`. Candidatos documentados como fuera de
-  alcance en las release notes: **Sense Engine 2.0**
+- **⏳ V3.53+ — candidatos abiertos (auditoría externa de V3.52 EJECUTADA)**:
+  informe en `docs/audit/Q-AUDITORIA-TOTAL-V352.md` → **sin P0/P1**, con **2 P2
+  recomendados para V3.53**: **(P2-01)** la tabla declarada `CEFR_CAPACITY` no
+  cuadra con el banco que dice calibrar (interaction de A1/A2 por debajo del
+  máximo real —1 vs 2/3— y léxico/sintaxis de B2/C1 por encima —4/5 vs 3/4—, de
+  modo que con la tolerancia estricta un alumno A2 demostrado excluye 2 de los 4
+  contextos A2): derivar/validar la tabla del banco y añadir un test de
+  consistencia; **(P2-02)** la tolerancia por fuente es inerte en el banco real
+  (0 de 48 combinaciones) y su justificación escrita está invertida (más margen
+  admite más `overshoot`): corregir el docstring y decidir si se ejercita
+  (calibrando) o se documenta como perilla prospectiva con un test que fije la
+  inercia. P3 menores: fila legacy etiquetada `practice` en vez de `estimated`,
+  `_context_vector` que trata un contexto sin vector como vector, e `is_test`
+  marcable por el cliente; proceso: etiquetar `v3.52.1`. Los candidatos ya
+  documentados siguen abiertos: **Sense Engine 2.0**
   (`surface→lemma→sense→semantic_fit`), **deuda de planner confirmada**
   (`assessed_skill` → decisión del planner y `skill_priorities` → `select_task`,
   con el doble conteo de `written_production` por resolver; V3.55),

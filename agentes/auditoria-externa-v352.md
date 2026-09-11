@@ -1,5 +1,9 @@
-# Briefing de auditoría EXTERNA — V3.52.0 (Student Skill State + Difficulty Engine 2.0)
+# Briefing de auditoría EXTERNA — V3.52.1 (Student Skill State + Difficulty Engine 2.0 + hotfix de producto)
 
+> **ESTADO: EJECUTADA** (2026-09-11). Informe entregado en
+> [`docs/audit/Q-AUDITORIA-TOTAL-V352.md`](../docs/audit/Q-AUDITORIA-TOTAL-V352.md).
+> Se conserva este briefing como histórico del método.
+>
 > **Para quién:** un agente/auditor EXTERNO que solo tiene acceso al repositorio
 > público de GitHub (no al chat del gerente ni al historial de la sesión).
 > **Qué entregar:** un informe siguiendo `docs/audit/TEMPLATE.md`, propuesto como
@@ -9,23 +13,27 @@
 ## Punto de entrada (todo desde GitHub)
 
 - **Repositorio:** https://github.com/jvelasca/english-tutor (público).
-- **Release auditada:** tag **`v3.52.0`** → commit
+- **Estado auditado:** `main` → commit
+  `bdaaff9` («docs(v3.52.1): registrar el run 6/6 de CI del hotfix»), que
+  contiene la release **v3.52.1** (`89eff0b`, «release(v3.52.1): hotfix de
+  producto + cierre del P1-01 de la auditoria»). El objeto de la auditoría es ese
+  árbol: V3.52.0 + el hotfix V3.52.1. **Nota: `v3.52.1` NO tiene tag** (el
+  último es `v3.52.0`); ver el hallazgo P3-05 del informe.
+- **Release de referencia (base):** tag **`v3.52.0`** → commit
   `23cbad738524465201d4025843478f4220252846` («release(v3.52.0): Student Skill
   State + Difficulty Engine 2.0»). Tag anotado: objeto `7f1d3ee`.
-- **Estado de `main`:** el HEAD contiene, además del commit de release, dos
-  commits de **documentación** que no tocan código: la evidencia de CI
-  (`6744579`) y este briefing. El árbol auditado es el del tag; si `main` ha
-  avanzado con más docs, no cambia el objeto de la auditoría.
-- **CI del release:** run
-  [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
-  sobre `23cbad7`, **6/6 jobs en success** (Release consistency, Backend
+- **CI del hotfix:** run
+  [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
+  sobre `89eff0b` y run
+  [34623244239](https://github.com/jvelasca/english-tutor/actions/runs/34623244239)
+  sobre `bdaaff9`, **ambos 6/6 en success** (Release consistency, Backend
   ruff+pytest, Frontend tsc+vitest+build, Playwright E2E (visual), Beta V3.0
-  gate, Content validation). Los commits de docs se empujaron juntos, así que no
-  tienen run propio: los cubre el run
-  [34617402860](https://github.com/jvelasca/english-tutor/actions/runs/34617402860)
-  del commit `0ad12ba`, también **6/6 en success**.
-- **Documento de resultado (fuente de verdad de lo que se afirma):**
-  `release-notes-v3.52.0.md`. Briefing previo (planificación/traspaso):
+  gate, Content validation). CI del release base (V3.52.0): run
+  [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
+  sobre `23cbad7`, también 6/6.
+- **Documentos de resultado (afirmaciones a verificar):**
+  `release-notes-v3.52.1.md` (el hotfix) y `release-notes-v3.52.0.md` (la base).
+  Briefings previos: `agentes/v3521-hotfix.md` y
   `agentes/v352-student-state-difficulty.md`.
 - **Releases previas de referencia:** `v3.51.0` → `c056546`,
   `v3.50.0` → `1c8d6e0`.
@@ -66,6 +74,41 @@ V3.52 introduce `backend/services/difficulty.py`, que compara **vector contra
 vector** por dimensión (`CEFR_CAPACITY`, `challenge_vector`, `fit`,
 `select_by_difficulty`, `tolerance_for`) y sustituye el escalar en `transfer.py`.
 
+## Delta de V3.52.1 (lo que añade el hotfix y también se juzga)
+
+Sobre esa base, V3.52.1 (`89eff0b`, diff completo contra el tag `v3.52.0`)
+introduce cuatro bloques, **todos aditivos**:
+
+1. **Cierre real del P1-01 de V3.52** (`services/difficulty.py`): `fit` añade
+   `dimensions_expected`/`dimensions_compared`/`coverage` y `within` exige
+   **cobertura dimensional completa** (`compared == expected`) además de no
+   pasarse de la tolerancia; solo un reto VACÍO deja el encaje vacuo.
+   `select_by_difficulty`, cuando nadie encaja, degrada por **mayor cobertura** y
+   luego por menor distancia (antes solo por distancia). `services/transfer.py`
+   expone las claves nuevas en `difficulty_fit` (añadido puro: verificado por
+   diff, 19 líneas).
+2. **Usuarios fantasma «Visual Tester»** (raíz + guarda + purga): columna aditiva
+   `users.is_test` (`CREATE TABLE` + `ALTER TABLE` idempotente), filtro por
+   defecto en `GET /api/users` (`include_test=true` lo usan los tests),
+   `DELETE /api/users/{id}` acotado a `is_test=1`, filtro en
+   `launcher/status.py::read_users` con degradación tolerante, `globalSetup`/
+   `globalTeardown` de Playwright (un único perfil de prueba, sin carrera) y
+   `scripts/purge_virtual_testers.py --is-test`.
+3. **Listening «RUTA ACTUAL»** (`ListeningPractice.tsx`): el anillo pasa de
+   `stats.level` a `resolveRouteLevel(sesión > ruta seleccionada > recomendada)` y
+   el efecto de carga depende de `[userId, selectedLevel]`.
+4. **Bucle A/B de Listening**: módulo puro `features/listening/abLoop.ts` como
+   única fuente de verdad UI↔controller, `AudioController.play(url)` idempotente
+   por URL, `loop`/`rewindIfPastSegmentEnd` con `>=` y notificación
+   `onCurrentTime`, marca tomada de `audioController.currentTime`, hint con el B
+   marcado y controles centrados.
+
+**Cifras declaradas de este hotfix (a verificar):** pytest **2162 passed + 2
+skipped en CI** (2164 passed en local con el modelo Whisper), vitest **76
+ficheros/651 tests**, lanzador 76, `check_release_consistency` **3.52.1**.
+Playwright en local: 23 passed / 22 skipped (el resto son `test.skip` por
+proyecto/viewport).
+
 ## Alcance de la auditoría (qué juzgar)
 
 **Dentro:**
@@ -100,6 +143,16 @@ vector** por dimensión (`CEFR_CAPACITY`, `challenge_vector`, `fit`,
   `backend/tests/test_difficulty_engine_v352.py` (24) y el ajuste de
   `backend/tests/test_task_semantics_v351.py::test_learner_level_raises_the_difficulty_floor`
   (pasa de comparar escalares a comparar `difficulty_fit`).
+- **Delta V3.52.1:** `backend/services/difficulty.py` (`_empty_fit`, `fit`,
+  `select_by_difficulty`), `backend/services/transfer.py::_difficulty_fit_for`,
+  `backend/repositories/{db,users}.py`, `backend/domain/users.py`,
+  `backend/routers/users.py`, `backend/schemas/users.py`,
+  `backend/tests/{test_difficulty_engine_v352,test_users,test_user_profile}.py`,
+  `launcher/status.py` + `launcher/tests/test_status.py`,
+  `scripts/purge_virtual_testers.py`,
+  `frontend/src/features/listening/{ListeningPractice.tsx,audioController.ts,abLoop.ts,abLoop.test.ts,audioController.test.ts}`,
+  `frontend/src/types/api.ts`, `frontend/tests/visual/{gateHelper,globalSetup,globalTeardown}.ts`
+  y `frontend/playwright.config.ts`.
 
 **Fuera (documentado y diferido; si un hallazgo cae aquí, márcalo como
 «fuera de alcance/diferido», no como P0):** `assessed_skill` → decisión del
@@ -116,7 +169,8 @@ CONSTITUCIÓN (R8/R9 sigue como propuesta abierta).
 ```powershell
 git clone https://github.com/jvelasca/english-tutor.git
 cd english-tutor
-git checkout v3.52.0
+git checkout bdaaff9          # v3.52.1 (el tag v3.52.1 NO existe: ver P3-05)
+git diff v3.52.0..bdaaff9     # delta del hotfix
 
 # Backend
 cd backend
@@ -133,23 +187,30 @@ npm run build
 
 # Gates del repo
 cd ..
-python scripts/check_release_consistency.py   # debe imprimir 3.52.0
+python scripts/check_release_consistency.py   # debe imprimir 3.52.1
 python scripts/check_beta_v3.py
 python backend/scripts/content_validation.py
+
+# Verificación del hotfix (local, con backend+frontend arriba)
+cd frontend
+npx playwright test                            # visual (crea y borra el perfil de prueba)
 ```
 
-Cifras declaradas que debes poder reproducir: pytest **2158 passed** (+39: 15 de
-`test_student_state_v352.py` y 24 de `test_difficulty_engine_v352.py`), vitest
-**75 ficheros/641 tests**, `ruff`/`tsc`/`build` limpios, `check_release_consistency`
-**3.52.0** exit 0.
+Cifras declaradas que debes poder reproducir en `bdaaff9` (V3.52.1): pytest
+**2164 passed en local** (+6 del hotfix) / **2162 passed + 2 skipped en CI**,
+vitest **76 ficheros/651 tests**, `ruff`/`tsc`/`build` limpios,
+`check_release_consistency` **3.52.1** exit 0. Para la base V3.52.0: pytest
+**2158 passed** (2156 + 2 skipped en CI), vitest **75/641**,
+`check_release_consistency` **3.52.0**.
 
 > **Nota sobre el recuento de pytest (para que no lo cuentes como hallazgo
 > nuevo):** en local (Windows, con el modelo Whisper descargado) son **2158
-> passed**; en el runner de CI son **2156 passed + 2 skipped**, porque
-> `backend/tests/test_stt_asr_integration.py` está marcado con
-> `pytest.mark.skipif(not is_ready(), ...)` (integración ASR opt-in) y el runner
-> no tiene el modelo. Es una discrepancia de entorno ya documentada en
-> `release-notes-v3.52.0.md`, `CHANGELOG.md`, `PLAN.md` y `docs/RELEVO.md`.
+> passed** (V3.52.0) / **2164** (V3.52.1); en el runner de CI son **2156** /
+> **2162** **+ 2 skipped**, porque `backend/tests/test_stt_asr_integration.py`
+> está marcado con `pytest.mark.skipif(not is_ready(), ...)` (integración ASR
+> opt-in) y el runner no tiene el modelo. Es una discrepancia de entorno ya
+> documentada en `release-notes-v3.52.{0,1}.md`, `CHANGELOG.md`, `PLAN.md` y
+> `docs/RELEVO.md`.
 
 ## Preguntas concretas que debe responder el informe
 
@@ -197,8 +258,9 @@ Cifras declaradas que debes poder reproducir: pytest **2158 passed** (+39: 15 de
    `DIFFICULTY_TOLERANCE_ESTIMATED = 2` (estimado/declarado/ausente). ¿Están
    justificadas y en la dirección conservadora? ¿Un `learner_level_source`
    desconocido o con mayúsculas cae al margen amplio?
-9. **Cero regresión de la escalera.** Verifica por `git diff 788ecc0..23cbad7` y
-   por grep que **nada** de `transfer_state`, sus umbrales,
+9. **Cero regresión de la escalera.** Verifica por `git diff 788ecc0..bdaaff9`
+   (V3.51 → V3.52.1) y, en particular, por `git diff v3.52.0..bdaaff9` (el
+   hotfix) y por grep que **nada** de `transfer_state`, sus umbrales,
    `context_signals`, `context_diversity`, `score_transfer_attempt` ni FSRS
    cambia. `TRANSFER_DIFFICULTY_BAND` queda declarada como deprecada: comprueba
    que **ningún** camino de selección la consume (`_difficulty_floor` y
@@ -230,6 +292,39 @@ Cifras declaradas que debes poder reproducir: pytest **2158 passed** (+39: 15 de
     desconocidas o cargas fuera de 1..5, empates exactos de distancia, banco
     vacío, migración sobre una BD legacy **real** (no solo un `CREATE TABLE`
     limpio) y paridad pura↔SQL?
+15. **¿La `CEFR_CAPACITY` declarada cuadra con el banco que dice calibrar?**
+    El docstring de `services/difficulty.py` afirma que la tabla está «calibrada
+    con la distribución real del banco de transferencia (en A1–B1 la
+    `interaction` va por detrás del resto)». Calcula la media **y el máximo** por
+    dimensión de los 20 contextos de `TRANSFER_CONTEXTS` agrupados por `cefr` y
+    contrástalos con la tabla. ¿Qué contextos del banco quedan `within=False`
+    contra el reto de **su propio nivel** con la tolerancia ESTRICTA (demostrado)?
+    ¿Es defendible que el alumno con más confianza no pueda recibir contextos que
+    el banco etiqueta con su mismo nivel? ¿Se puede derivar la tabla del banco?
+    ¿Y los tramos B2/C1: la capacidad declarada de léxico/sintaxis (4 y 5)
+    EXCEDE todo el banco de ese nivel (máximo real 3 y 4)?
+16. **¿La distinción de tolerancia cambia alguna vez la selección?** Enumera
+    todas las combinaciones (nivel de ítem × nivel de alumno) con reto reconocible
+    sobre el banco real y comprueba si `select_by_difficulty` devuelve un conjunto
+    distinto con `tolerance=1` y con `tolerance=2`. Si no cambia en ningún caso,
+    la diferenciación «estricta para demostrado / amplia para estimado» es hoy
+    **inerte**: ¿basta con que el número viaje en el payload
+    (`test_learner_level_source_selects_the_tolerance_in_the_payload`) o falta un
+    test de COMPORTAMIENTO? Además, el docstring afirma que el margen amplio es
+    «conservador: ante la duda, más margen en lugar de más exigencia»: razona si
+    un margen mayor no admite de hecho **más** exceso (más exigencia).
+17. **Delta del hotfix (producto).** ¿El cierre del P1-01 es real y completo (un
+    contexto sin `difficulty_vector` ya no puede ganar con `distance=0`, ni antes
+    ni ahora)? ¿La migración `users.is_test` es idempotente y no destructiva?
+    ¿`DELETE /api/users/{id}` no puede borrar un perfil real y limpia todas las
+    filas dependientes (`settings`, `conversations`, `messages`…)? ¿`is_test` es
+    inmutable por `PATCH`? ¿El perfil de prueba de Playwright se crea UNA vez
+    (`globalSetup`) y se borra al terminar (`globalTeardown`), sin carrera?
+    ¿La app y el lanzador lo ocultan? ¿El lanzador degrada si la columna no
+    existe? ¿«RUTA ACTUAL» de Listening sigue al nivel seleccionado y recarga la
+    pregunta? ¿El bucle A/B mantiene el estado UI↔controller (quitar marca
+    desarma el bucle, el hint muestra el B marcado, los controles están
+    centrados)? ¿El `is_test` es marcable por el cliente (y qué implica)?
 
 ## Formato del informe
 
