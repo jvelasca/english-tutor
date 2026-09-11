@@ -99,6 +99,13 @@ appropriateness, transfer_state enriquecido y Adaptive Planner 2.0 /
 - Verificación: `pytest` 0 fallos, `ruff check backend/` limpio, `npm run test`,
   `npx tsc --noEmit`, `npm run build` y `check_release_consistency` **3.46.0**
   exit 0.
+- **CI 6/6 en verde** (run
+  [34578101387](https://github.com/jvelasca/english-tutor/actions/runs/34578101387)
+  sobre `107d8ec`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation. El commit de release **agrupa V3.44 + V3.45 + V3.46** (ninguno se
+  había commiteado desde v3.43.0, mismo caso que v3.42.0); no hay estados
+  intermedios auditables de V3.44/V3.45 por separado.
 
 ## Fuera de alcance (V3.47+)
 

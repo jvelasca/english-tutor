@@ -40,7 +40,11 @@
 > `test_learning_evidence_v336.py` y `test_transfer_v340.py`), vitest **72
 > ficheros/623 tests** (+2 en `wordDrill.test.tsx`), `ruff` limpio, `tsc
 > --noEmit` limpio, `npm run build` y `check_release_consistency` **3.46.0**
-> exit 0. Fuera de alcance (V3.47+): CEFR/`difficulty_vector` del contexto (P1
+> exit 0. **CI 6/6 en verde** (run
+> [34578101387](https://github.com/jvelasca/english-tutor/actions/runs/34578101387)
+> sobre `107d8ec`); el commit de release agrupa V3.44 + V3.45 + V3.46 porque
+> ninguno se había commiteado desde v3.43.0 (mismo caso que v3.42.0). Fuera de
+> alcance (V3.47+): CEFR/`difficulty_vector` del contexto (P1
 > restante), Context Bank 2.0, diversidad 2.0, semantic appropriateness,
 > transfer_state enriquecido y `expected_learning_value` / Adaptive Planner 2.0.
 >
