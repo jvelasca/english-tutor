@@ -26,16 +26,23 @@ import {
   Info,
   Loader2,
   Search,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
+import { useSelectedRoute } from "../../hooks/useSelectedRoute";
+import {
+  resolveRouteLevel,
+  type SelectedRouteLevel,
+} from "../../utils/selectedRoute";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
 import { ActivityResult } from "../../components/ActivityResult";
 import { LearnActivitySwitcher } from "../../components/LearnActivitySwitcher";
 import { ProgressRing } from "../../components/ProgressRing";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import type { LearnActivity } from "../../router/learnHub";
 import type { NextBestActivity } from "../../types/api";
 import type { Section } from "../../utils/sections";
@@ -233,6 +240,8 @@ export function QuizRoutePage({
   // V3.39: coherencia de la pestaña del diccionario incrustado con la pantalla
   // dedicada: al cambiar de vista aquí también se persiste como última usada.
   const { setView: persistDictionaryView } = useDictionaryView(userId);
+  // V3.48.1: ruta CEFR seleccionada por el alumno (persistente). `null` = Auto.
+  const { selectedLevel, setSelectedLevel } = useSelectedRoute(userId);
 
   const [view, setView] = useState<RouteView>({ kind: "routes" });
   const [stats, setStats] = useState<RouteStats | null>(null);
@@ -287,9 +296,20 @@ export function QuizRoutePage({
   }, [userId, refreshNonce]);
 
   // --- Pregunta activa del escenario ------------------------------------------
+  // V3.48.1: prioridad de nivel session > ruta seleccionada > recomendada.
   const finished = session !== null && isSessionFinished(session);
-  const stageLevel = session?.level ?? stats?.level ?? null;
+  const stageLevel = resolveRouteLevel(
+    session?.level,
+    selectedLevel,
+    stats?.level,
+  );
   const stageMode = routeMode(session);
+
+  // V3.48.1: al seleccionar (o hidratar) una ruta, su panel de historial queda
+  // desplegado para que el alumno vea el estado de esa ruta.
+  useEffect(() => {
+    if (selectedLevel) setExpandedLevel(selectedLevel);
+  }, [selectedLevel]);
 
   useEffect(() => {
     if (!userId || finished || !stageLevel) return;
@@ -832,6 +852,8 @@ export function QuizRoutePage({
                 assessedLevel={assessedLevel}
                 expandedLevel={expandedLevel}
                 setExpandedLevel={setExpandedLevel}
+                selectedLevel={selectedLevel}
+                setSelectedLevel={setSelectedLevel}
                 disabled={session !== null}
                 refreshNonce={refreshNonce}
                 onStartSession={startSession}
@@ -866,6 +888,9 @@ interface QuizRoutesSectionProps {
   assessedLevel: string | null;
   expandedLevel: string | null;
   setExpandedLevel: (level: string | null) => void;
+  /** V3.48.1: ruta CEFR seleccionada (persistente); `null` = Auto. */
+  selectedLevel: string | null;
+  setSelectedLevel: (level: SelectedRouteLevel | null) => void;
   disabled: boolean;
   refreshNonce: number;
   onStartSession: (session: RouteSession) => void;
@@ -884,6 +909,8 @@ function QuizRoutesSection({
   assessedLevel,
   expandedLevel,
   setExpandedLevel,
+  selectedLevel,
+  setSelectedLevel,
   disabled,
   refreshNonce,
   onStartSession,
@@ -898,9 +925,6 @@ function QuizRoutesSection({
         <div className="flex flex-col gap-0.5 text-xs">
           <span className="font-semibold uppercase tracking-wide text-muted-foreground">
             {t(nk("routesMapTitle"))}
-          </span>
-          <span className="text-muted-foreground">
-            {t(nk("routesMapHint"))}
           </span>
           {statsCompetenceKey && (
             <span className="mt-1 w-fit rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
@@ -946,20 +970,52 @@ function QuizRoutesSection({
         </div>
       </div>
 
-      <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-        {t(nk("routeNote")).replace("{level}", stats.level)}
-      </p>
-      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-        {t(nk("routeCertNote"))}
-      </p>
+      {/* V3.48.1: notas del mapa/ruta al desplegable «...» (pantalla limpia). */}
+      <InfoDisclosure
+        align="end"
+        id={`${ns}-route-notes`}
+        label={t("common.moreInfo")}
+      >
+        <p>{t(nk("routesMapHint"))}</p>
+        <p>{t(nk("routeNote")).replace("{level}", stats.level)}</p>
+        <p>{t(nk("routeCertNote"))}</p>
+        <p>{t(nk("routeRingHelp"))}</p>
+      </InfoDisclosure>
 
       <div className="flex flex-col border-t border-border pt-4">
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t(nk("routeRingHelp"))}
-        </p>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+          {/* V3.48.1: «Auto» devuelve el nivel al motor (ruta recomendada). */}
+          <button
+            type="button"
+            onClick={() => setSelectedLevel(null)}
+            aria-pressed={selectedLevel === null}
+            aria-label={t("learn.routeAutoHint")}
+            title={t("learn.routeAutoHint")}
+            disabled={disabled}
+            className={cn(
+              "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              selectedLevel === null && "bg-accent",
+              disabled && "cursor-not-allowed opacity-60",
+            )}
+          >
+            <span
+              className={cn(
+                "grid size-[46px] place-items-center rounded-full border-2 border-dashed",
+                selectedLevel === null
+                  ? "border-primary text-primary"
+                  : "border-border text-muted-foreground",
+              )}
+            >
+              <Sparkles className="size-4" aria-hidden="true" />
+            </span>
+            <span className="text-[10px] font-medium text-muted-foreground">
+              {t("learn.routeAuto")}
+            </span>
+          </button>
           {stats.levels.map((lv) => {
             const expanded = expandedLevel === lv.level;
+            // V3.48.1: la ruta seleccionada gobierna de qué nivel se practica.
+            const isSelected = selectedLevel === lv.level;
             const pct = lv.completed
               ? 100
               : lv.total > 0
@@ -969,9 +1025,13 @@ function QuizRoutesSection({
               <button
                 key={lv.level}
                 type="button"
-                onClick={() => setExpandedLevel(expanded ? null : lv.level)}
+                onClick={() => {
+                  setSelectedLevel(lv.level as SelectedRouteLevel);
+                  setExpandedLevel(lv.level);
+                }}
                 aria-expanded={expanded}
                 aria-controls={ariaLevelItemsId}
+                aria-pressed={isSelected}
                 aria-label={t(nk("levelHistoryTitle")).replace(
                   "{level}",
                   lv.level,
@@ -980,6 +1040,7 @@ function QuizRoutesSection({
                 className={cn(
                   "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                   expanded && "bg-accent",
+                  isSelected && "ring-2 ring-primary/60",
                   disabled && "cursor-not-allowed opacity-60",
                 )}
               >
@@ -1020,6 +1081,11 @@ function QuizRoutesSection({
                       "{pct}",
                       String(Math.round((lv.mastered / lv.total) * 100)),
                     )}
+                  </span>
+                )}
+                {isSelected && (
+                  <span className="text-[10px] font-semibold text-primary">
+                    {t("learn.routeSelected")}
                   </span>
                 )}
               </button>

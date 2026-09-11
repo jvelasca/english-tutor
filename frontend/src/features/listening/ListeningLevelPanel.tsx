@@ -17,6 +17,7 @@ import {
 } from "../../components/PhraseTranslate";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { cn } from "../../lib/utils";
 
 const GROUPS: ListeningItemState[] = ["failed", "mastered", "unseen"];
@@ -268,9 +269,12 @@ export function ListeningLevelPanel({
                 </span>
               )}
             </div>
-            <p className="leading-relaxed text-muted-foreground">
-              {t("listening.extraHonestNote")}
-            </p>
+            <InfoDisclosure
+              id={`listening-extra-note-${level}`}
+              label={t("common.moreInfo")}
+            >
+              <p>{t("listening.extraHonestNote")}</p>
+            </InfoDisclosure>
             {jobRunning ? (
               <p
                 role="status"

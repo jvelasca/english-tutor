@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Repeat2,
   Send,
+  Sparkles,
   Square,
   Volume2,
   X,
@@ -65,6 +66,7 @@ import type {
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
 import { ListenButton } from "../../components/ListenButton";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import {
   PhraseTranslateButton,
   usePhraseTranslation,
@@ -80,6 +82,11 @@ import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useI18n } from "../../hooks/useI18n";
+import { useSelectedRoute } from "../../hooks/useSelectedRoute";
+import {
+  resolveRouteLevel,
+  type SelectedRouteLevel,
+} from "../../utils/selectedRoute";
 import { cn } from "../../lib/utils";
 // Micro-flujo por ítem (V3.27, Listening Engine 4.0): máquina de presentación
 // que ejecuta el contrato `flow` + `transcript_policy` servido por el backend.
@@ -196,6 +203,8 @@ export function ListeningPractice({
   onNext,
 }: ListeningPracticeProps) {
   const { t } = useI18n();
+  // V3.48.1: ruta CEFR seleccionada por el alumno (persistente). `null` = Auto.
+  const { selectedLevel, setSelectedLevel } = useSelectedRoute(userId);
   const [question, setQuestion] = useState<ListeningQuestion | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [result, setResult] = useState<ListeningAnswerResponse | null>(null);
@@ -493,8 +502,12 @@ export function ListeningPractice({
     audioController?.clearLoop();
     setIsLooping(false);
     setMarkStart(null);
-    // Sin override, respeta el nivel y modo de la sesión en curso (si hay).
-    const level = levelOverride === undefined ? session?.level : levelOverride;
+    // Sin override: sesión activa > ruta seleccionada > elección del backend
+    // (modo adaptativo). V3.48.1: la ruta seleccionada es persistente.
+    const level =
+      levelOverride === undefined
+        ? resolveRouteLevel(session?.level, selectedLevel, undefined)
+        : levelOverride;
     const mode =
       modeOverride ??
       (session?.mode === "drill"
@@ -540,13 +553,14 @@ export function ListeningPractice({
     void load(level, "mastered");
   }
 
-  /** Cierra la sesión actual y vuelve al modo adaptativo (sin override de nivel). */
+  /** Cierra la sesión actual y vuelve a la ruta seleccionada (o al adaptativo). */
   function exitSession() {
     setSession(null);
-    setExpandedLevel(null);
-    // Override explícito a null: el cierre aún conserva la `session` vieja y sin
-    // override `load()` seguiría pidiendo frases del nivel que se abandona.
-    void load(null, "all");
+    setExpandedLevel(selectedLevel ?? null);
+    // `selectedLevel ?? null` explícito: el cierre aún conserva la `session`
+    // vieja en el closure y sin override `load()` seguiría pidiendo frases del
+    // nivel que se abandona.
+    void load(selectedLevel ?? null, "all");
   }
 
   /** Abre/cierra el historial desplegable de un nivel (uno a la vez). */
@@ -674,6 +688,11 @@ export function ListeningPractice({
       /* backend no disponible */
     }
   }
+
+  // V3.48.1: al seleccionar (o hidratar) una ruta, se despliega su panel.
+  useEffect(() => {
+    if (selectedLevel) setExpandedLevel(selectedLevel);
+  }, [selectedLevel]);
 
   useEffect(() => {
     void load();
@@ -976,28 +995,9 @@ async function submitDictation() {
           {/* Micro-flujo (V3.27): tarjetas de etapa Pre/While1/Shadowing del modo
               adaptativo. La tarjeta de audio queda siempre disponible; la pregunta
               solo se muestra en `while2`/`post`. */}
-          {micro?.stage === "pre" && !result && !productionResult && (
-            <Card className="gap-4 border-primary/25 p-5">
-              <p className="text-sm font-semibold text-foreground">
-                {t("listening.flow.preTitle")}
-              </p>
-              {(question.context || question.topic) && (
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {question.context || topicLabel(question.topic)}
-                </p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {t("listening.flow.preHint")}
-              </p>
-              <Button
-                type="button"
-                className="min-h-10 gap-2 self-start"
-                onClick={continueStage}
-              >
-                {t("listening.flow.begin")}
-              </Button>
-            </Card>
-          )}
+          {/* V3.48.1: la etapa `pre` («Antes de escuchar») se retira de la UI
+              (microFlow salta los pasos `pre`); el contexto del ítem pasa a la
+              tarjeta de audio como caption de una línea. */}
 
           {micro?.stage === "while1" && !result && !productionResult && (
             <Card className="gap-4 border-primary/25 p-5">
@@ -1143,6 +1143,14 @@ async function submitDictation() {
                 </span>
               )}
             </div>
+
+            {/* V3.48.1: señal situacional del ítem (antes en la tarjeta «Antes
+                de escuchar»), ahora caption compacta de una línea. */}
+            {(question.context || question.topic) && (
+              <p className="max-w-md text-center text-xs leading-relaxed text-muted-foreground">
+                {question.context || topicLabel(question.topic)}
+              </p>
+            )}
 
             {/* Controles precisos V3.29 (Fase 3, P5): seek slider continuo y
                 bucle A/B. Solo cuando el audio de referencia está pre-renderizado
@@ -1315,9 +1323,7 @@ async function submitDictation() {
           </Card>
 
           {(!micro ||
-            (micro.stage !== "pre" &&
-              micro.stage !== "while1" &&
-              micro.stage !== "shadowing")) && (
+            (micro.stage !== "while1" && micro.stage !== "shadowing")) && (
             <Card className="gap-4 p-5">
               <div className="flex items-start justify-between gap-3">
                 <p
@@ -1790,7 +1796,19 @@ async function submitDictation() {
             )}
 
           {stats && (
-            <Card className="gap-4 p-5">
+            <Card className="relative gap-4 p-5">
+              {/* V3.48.1: notas CEFR/honestidad de la ruta al desplegable «...». */}
+              <InfoDisclosure
+                variant="corner"
+                id="listening-route-notes"
+                label={t("common.moreInfo")}
+              >
+                <p>
+                  {t("listening.routeNote").replace("{level}", stats.level)}
+                </p>
+                <p>{t("listening.routeCertNote")}</p>
+                <p>{t("listening.routeRingHelp")}</p>
+              </InfoDisclosure>
               <div className="flex flex-wrap items-center justify-around gap-6">
                 <div className="flex flex-col items-center gap-1.5">
                   <ProgressRing
@@ -1904,27 +1922,50 @@ async function submitDictation() {
                 </div>
               </div>
 
-              <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-                {t("listening.routeNote").replace("{level}", stats.level)}
-              </p>
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                {t("listening.routeCertNote")}
-              </p>
-
               <div className="flex flex-col border-t border-border pt-4">
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  {t("listening.routeRingHelp")}
-                </p>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+                  {/* V3.48.1: «Auto» devuelve el nivel al motor. */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLevel(null)}
+                    aria-pressed={selectedLevel === null}
+                    aria-label={t("learn.routeAutoHint")}
+                    title={t("learn.routeAutoHint")}
+                    disabled={!!session}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      selectedLevel === null && "bg-accent",
+                      session && "cursor-not-allowed opacity-60",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-11 place-items-center rounded-full border-2 border-dashed",
+                        selectedLevel === null
+                          ? "border-primary text-primary"
+                          : "border-border text-muted-foreground",
+                      )}
+                    >
+                      <Sparkles className="size-4" aria-hidden="true" />
+                    </span>
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {t("learn.routeAuto")}
+                    </span>
+                  </button>
                   {stats.levels.map((lv) => {
                     const expanded = expandedLevel === lv.level;
+                    const isSelected = selectedLevel === lv.level;
                     return (
                       <button
                         key={lv.level}
                         type="button"
-                        onClick={() => toggleLevel(lv.level)}
+                        onClick={() => {
+                          setSelectedLevel(lv.level as SelectedRouteLevel);
+                          setExpandedLevel(lv.level);
+                        }}
                         aria-expanded={expanded}
                         aria-controls="listening-level-items"
+                        aria-pressed={isSelected}
                         aria-label={t("listening.levelHistoryTitle").replace(
                           "{level}",
                           lv.level,
@@ -1933,6 +1974,7 @@ async function submitDictation() {
                         className={cn(
                           "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                           expanded && "bg-accent",
+                          isSelected && "ring-2 ring-primary/60",
                           session && "cursor-not-allowed opacity-60",
                         )}
                       >
@@ -2008,6 +2050,11 @@ async function submitDictation() {
                                 .replace("{total}", String(lv.gate.total))}
                             </span>
                           )}
+                        {isSelected && (
+                          <span className="text-[10px] font-semibold text-primary">
+                            {t("learn.routeSelected")}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

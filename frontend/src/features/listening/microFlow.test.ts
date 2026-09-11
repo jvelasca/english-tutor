@@ -106,25 +106,24 @@ describe("microFlow: helpers", () => {
   it("reconoce el flujo receptivo de cinco pasos", () => {
     const q = question({ flow: receptiveFlow });
     expect(isProductionFlow(q)).toBe(false);
-    expect(initialFlow(q).stage).toBe("pre");
+    // V3.48.1: la etapa `pre` se sirve por contrato pero la UI la salta.
+    expect(initialFlow(q).stage).toBe("while1");
   });
 });
 
 describe("microFlow: transiciones", () => {
-  it("initialFlow arranca en el primer paso y sin estado resuelto", () => {
+  it("initialFlow arranca en el primer paso presentable y sin estado resuelto", () => {
     const state = initialFlow(question({ flow: receptiveFlow }));
-    expect(state.stepIndex).toBe(0);
-    expect(state.stage).toBe("pre");
+    expect(state.stepIndex).toBe(1); // `pre` (índice 0) se salta
+    expect(state.stage).toBe("while1");
     expect(state.transcript).toBe("hidden");
     expect(state.revealed).toBe(false);
     expect(state.attemptCount).toBe(0);
     expect(state.finished).toBe(false);
   });
 
-  it("advanceToNext recorre pre → while1 → while2 → post → shadowing", () => {
+  it("advanceToNext recorre while1 → while2 → post → shadowing", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
-    state = advanceToNext(state, receptiveFlow); // → while1
-    expect(state.stage).toBe("while1");
     state = advanceToNext(state, receptiveFlow); // → while2
     expect(state.stage).toBe("while2");
     state = advanceToNext(state, receptiveFlow); // → post
@@ -140,15 +139,14 @@ describe("microFlow: transiciones", () => {
   it("no muta el estado (funciones puras)", () => {
     const state = initialFlow(question({ flow: receptiveFlow }));
     advanceToNext(state, receptiveFlow);
-    expect(state.stage).toBe("pre");
+    expect(state.stage).toBe("while1");
   });
 });
 
 describe("microFlow: respuesta correcta/incorrecta en while2", () => {
   it("respuesta correcta avanza a post sin revelar", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
-    state = advanceToNext(state, receptiveFlow); // pre
-    state = advanceToNext(state, receptiveFlow); // while1
+    state = advanceToNext(state, receptiveFlow); // while2
     expect(state.stage).toBe("while2");
     const next = completeStageWithAnswer(state, true, A1_POLICY, receptiveFlow);
     expect(next.stage).toBe("post");
@@ -158,7 +156,6 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
 
   it("fallo con reintentos restantes reintenta en la misma fase (A1)", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
-    state = advanceToNext(state, receptiveFlow);
     state = advanceToNext(state, receptiveFlow); // while2
     const retry = completeStageWithAnswer(state, false, A1_POLICY, receptiveFlow);
     expect(retry.stage).toBe("while2");
@@ -171,7 +168,6 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
   it("fallo agotado en A1 (2º fallo) revela y pasa a post", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
     state = advanceToNext(state, receptiveFlow);
-    state = advanceToNext(state, receptiveFlow);
     const first = completeStageWithAnswer(state, false, A1_POLICY, receptiveFlow);
     const second = completeStageWithAnswer(first, false, A1_POLICY, receptiveFlow);
     expect(second.stage).toBe("post");
@@ -182,7 +178,6 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
   it("fallo en B2+ (sin reintentos) cierra la fase y revela", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
     state = advanceToNext(state, receptiveFlow);
-    state = advanceToNext(state, receptiveFlow);
     const next = completeStageWithAnswer(state, false, B2_POLICY, receptiveFlow);
     expect(next.stage).toBe("post");
     expect(next.revealed).toBe(true);
@@ -192,7 +187,6 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
   it("B2+ nunca ofrece reintento", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
     state = advanceToNext(state, receptiveFlow);
-    state = advanceToNext(state, receptiveFlow);
     const next = completeStageWithAnswer(state, false, B2_POLICY, receptiveFlow);
     expect(next.stage).not.toBe("while2");
   });
@@ -201,8 +195,7 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
 describe("microFlow: revelado manual y shadowing", () => {
   it("revealFull requiere allow_manual_reveal", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
-    state = advanceToNext(state, receptiveFlow);
-    state = advanceToNext(state, receptiveFlow);
+    state = advanceToNext(state, receptiveFlow); // while2
     // En B2+ el toggle manual está bloqueado.
     expect(revealFull(state, B2_POLICY).revealed).toBe(false);
     // En A1 se permite.
@@ -215,7 +208,7 @@ describe("microFlow: revelado manual y shadowing", () => {
 
   it("shadowing se completa y luego finaliza el flujo", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
-    for (let i = 0; i < 4; i += 1) state = advanceToNext(state, receptiveFlow);
+    for (let i = 0; i < 3; i += 1) state = advanceToNext(state, receptiveFlow);
     expect(state.stage).toBe("shadowing");
     const done = completeShadowing(state);
     expect(done.shadowingDone).toBe(true);
@@ -226,20 +219,19 @@ describe("microFlow: revelado manual y shadowing", () => {
   it("isAnswering solo es true en while2 sin finalizar", () => {
     const state = initialFlow(question({ flow: receptiveFlow }));
     expect(isAnswering(state)).toBe(false);
-    const atWhile2 = advanceToNext(advanceToNext(state, receptiveFlow), receptiveFlow);
+    const atWhile2 = advanceToNext(state, receptiveFlow);
     expect(isAnswering(atWhile2)).toBe(true);
   });
 
   it("retryStage incrementa el contador sin avanzar", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
-    state = advanceToNext(state, receptiveFlow);
-    state = advanceToNext(state, receptiveFlow);
+    state = advanceToNext(state, receptiveFlow); // while2
     expect(retryStage(state).attemptCount).toBe(1);
   });
 
   it("currentStep devuelve el paso actual o null", () => {
     const state = initialFlow(question({ flow: receptiveFlow }));
-    expect(currentStep(state, receptiveFlow)?.stage).toBe("pre");
+    expect(currentStep(state, receptiveFlow)?.stage).toBe("while1");
     const end = { ...state, finished: true, stepIndex: 5 };
     expect(currentStep(end, receptiveFlow)).toBeNull();
   });
@@ -323,8 +315,7 @@ describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
 
   it("cloze: respuesta correcta avanza a post (review con partial)", () => {
     let state = initialFlow(question({ flow: derivedMcqFlow("cloze") }));
-    state = advanceToNext(state, derivedMcqFlow("cloze")); // pre
-    state = advanceToNext(state, derivedMcqFlow("cloze")); // while1
+    state = advanceToNext(state, derivedMcqFlow("cloze")); // while2
     expect(state.stage).toBe("while2");
     const next = completeStageWithAnswer(
       state,
@@ -339,8 +330,7 @@ describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
 
   it("segmentación: fallo sin reintentos en B2 cierra y revela en post", () => {
     let state = initialFlow(question({ flow: derivedMcqFlow("segmentation") }));
-    state = advanceToNext(state, derivedMcqFlow("segmentation"));
-    state = advanceToNext(state, derivedMcqFlow("segmentation"));
+    state = advanceToNext(state, derivedMcqFlow("segmentation")); // while2
     const next = completeStageWithAnswer(
       state,
       false,
@@ -366,8 +356,7 @@ describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
 
   it("reintento con apoyo tras fallo en cloze (política A1 on_first_fail)", () => {
     let state = initialFlow(question({ flow: derivedMcqFlow("cloze") }));
-    state = advanceToNext(state, derivedMcqFlow("cloze"));
-    state = advanceToNext(state, derivedMcqFlow("cloze"));
+    state = advanceToNext(state, derivedMcqFlow("cloze")); // while2
     const retry = completeStageWithAnswer(
       state,
       false,

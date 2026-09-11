@@ -26,14 +26,34 @@ export interface SentenceTiming {
  * backend sirve en cada pregunta el `flow` (pasos) y la `transcriptPolicy`
  * (contrato de revelado); este módulo solo los ejecuta (§3.1 del plan V3.27).
  *
- * Etapas receptivas: pre → while1 (escucha global) → while2 (pregunta nativa)
- * → post (revisión) → shadowing (opcional) → finished.
+ * Etapas receptivas: while1 (escucha global) → while2 (pregunta nativa) → post
+ * (revisión) → shadowing (opcional) → finished.
  * Ítems de producción (dictation/shadowing) llegan con un único paso `while2`
  * (task production): al completarlo con respuesta se acaba el flujo.
+ *
+ * V3.48.1: la etapa `pre` («Antes de escuchar») se retira de la UI. El backend
+ * sigue sirviéndola por contrato (es inocua: no tiene respuesta ni evidencia),
+ * pero el cliente la salta para dejar la pantalla limpia; el contexto se
+ * muestra como caption de una línea en la tarjeta de audio.
  */
 
 export type Stage = ListeningFlowStage;
 export type TranscriptState = ListeningTranscriptState;
+
+/** Etapas que la UI no presenta como paso propio (se saltan al avanzar). */
+const SKIPPED_STAGES: readonly Stage[] = ["pre"];
+
+/** Índice del primer paso presentable desde `from` (salta etapas retiradas). */
+function firstRenderableIndex(
+  flow: ListeningFlowStep[],
+  from: number,
+): number {
+  let index = from;
+  while (index < flow.length && SKIPPED_STAGES.includes(flow[index].stage)) {
+    index += 1;
+  }
+  return index;
+}
 
 export interface MicroFlowState {
   /** Índice del paso actual dentro de `flow`; -1 si no hay flujo. */
@@ -87,9 +107,21 @@ export function initialFlow(question: ListeningQuestion): MicroFlowState {
       finished: false,
     };
   }
-  const first = flow[0];
+  const firstIndex = firstRenderableIndex(flow, 0);
+  if (firstIndex >= flow.length) {
+    return {
+      stepIndex: flow.length,
+      stage: null,
+      transcript: "hidden",
+      revealed: false,
+      attemptCount: 0,
+      shadowingDone: false,
+      finished: true,
+    };
+  }
+  const first = flow[firstIndex];
   return {
-    stepIndex: 0,
+    stepIndex: firstIndex,
     stage: first.stage,
     transcript: first.transcript_state_inicial,
     revealed: false,
@@ -100,12 +132,12 @@ export function initialFlow(question: ListeningQuestion): MicroFlowState {
 }
 
 /** Avanza al siguiente paso del flujo (sin resolver respuesta). Usado para
- * completar pre/while1/post/shadowing. */
+ * completar while1/post/shadowing. */
 export function advanceToNext(
   state: MicroFlowState,
   flow: ListeningFlowStep[],
 ): MicroFlowState {
-  const nextIndex = state.stepIndex + 1;
+  const nextIndex = firstRenderableIndex(flow, state.stepIndex + 1);
   const next = nextIndex < flow.length ? flow[nextIndex] : null;
   if (!next) {
     return {
@@ -152,7 +184,7 @@ export function completeShadowing(state: MicroFlowState): MicroFlowState {
  * - Incorrecta y sin reintentos → avanza a post y revela la transcripción
  *   (en post se revisa el resultado con `transcript_used=full`).
  *
- * En etapas que no son de respuesta (pre/while1/post) simplemente avanza.
+ * En etapas que no son de respuesta (while1/post) simplemente avanza.
  */
 export function completeStageWithAnswer(
   state: MicroFlowState,

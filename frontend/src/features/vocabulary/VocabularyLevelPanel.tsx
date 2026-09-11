@@ -9,6 +9,7 @@ import type {
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { cn } from "../../lib/utils";
 
 const GROUPS: VocabularyItemState[] = ["failed", "mastered", "unseen"];
@@ -287,12 +288,13 @@ export function VocabularyLevelPanel({
           </p>
           <GraduationCap className="size-4 text-primary" aria-hidden="true" />
         </div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("vocRoutes.demonstrateNote").replace("{level}", level)}
-        </p>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("vocRoutes.demonstrateFormal").replace("{level}", level)}
-        </p>
+        <InfoDisclosure
+          id={`voc-demonstrate-note-${level}`}
+          label={t("common.moreInfo")}
+        >
+          <p>{t("vocRoutes.demonstrateNote").replace("{level}", level)}</p>
+          <p>{t("vocRoutes.demonstrateFormal").replace("{level}", level)}</p>
+        </InfoDisclosure>
         <div>
           <Button
             type="button"

@@ -9,6 +9,7 @@ import type {
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { CrossSkillMatrix } from "../evidence/CrossSkillMatrix";
 import { cn } from "../../lib/utils";
 
@@ -288,12 +289,13 @@ export function GrammarLevelPanel({
           </p>
           <GraduationCap className="size-4 text-primary" aria-hidden="true" />
         </div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("gramRoutes.demonstrateNote").replace("{level}", level)}
-        </p>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("gramRoutes.demonstrateFormal").replace("{level}", level)}
-        </p>
+        <InfoDisclosure
+          id={`gram-demonstrate-note-${level}`}
+          label={t("common.moreInfo")}
+        >
+          <p>{t("gramRoutes.demonstrateNote").replace("{level}", level)}</p>
+          <p>{t("gramRoutes.demonstrateFormal").replace("{level}", level)}</p>
+        </InfoDisclosure>
         <div>
           <Button
             type="button"

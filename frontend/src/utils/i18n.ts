@@ -102,6 +102,16 @@ const STRINGS: Record<string, Entry> = {
     en: "How the routes work",
     es: "Cómo funcionan las rutas",
   },
+  // V3.48.1: ruta CEFR seleccionada (persistente) en las pantallas de práctica.
+  "learn.routeAuto": { en: "Auto", es: "Auto" },
+  "learn.routeAutoHint": {
+    en: "Let the engine choose the level (recommended)",
+    es: "Deja que el motor elija el nivel (recomendada)",
+  },
+  "learn.routeSelected": {
+    en: "Selected route",
+    es: "Ruta seleccionada",
+  },
 
   // Grupos de destrezas
   "group.primary": { en: "Primary skills", es: "Destrezas principales" },
@@ -1177,6 +1187,8 @@ const STRINGS: Record<string, Entry> = {
   "common.saving": { en: "Saving…", es: "Guardando…" },
   "common.delete": { en: "Delete", es: "Eliminar" },
   "common.edit": { en: "Edit", es: "Editar" },
+  // V3.48.1: etiqueta del disparador «...» de las notas informativas.
+  "common.moreInfo": { en: "More information", es: "Más información" },
 
   // Cabecera / navegación
   "nav.aria": { en: "Main navigation", es: "Navegación principal" },
@@ -2482,20 +2494,10 @@ const STRINGS: Record<string, Entry> = {
     es: "Acentos",
   },
 
-  // Listening Engine 4.0 (V3.27): micro-flujo por ítem (Pre/While1/While2/Post/
-  // shadowing) y perfil auditivo visible en la UI.
-  "listening.flow.preTitle": {
-    en: "Before you listen",
-    es: "Antes de escuchar",
-  },
-  "listening.flow.preHint": {
-    en: "Focus on the context. You will hear the audio next.",
-    es: "Fíjate en el contexto. El audio llegará a continuación.",
-  },
-  "listening.flow.begin": {
-    en: "Start listening",
-    es: "Empezar a escuchar",
-  },
+  // Listening Engine 4.0 (V3.27): micro-flujo por ítem (While1/While2/Post/
+  // shadowing) y perfil auditivo visible en la UI. V3.48.1 retira la etapa
+  // «Antes de escuchar» (`preTitle`/`preHint`/`begin` eliminadas): el contexto
+  // pasa a caption de la tarjeta de audio.
   "listening.flow.while1Title": {
     en: "First listen",
     es: "Primera escucha",

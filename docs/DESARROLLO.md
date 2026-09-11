@@ -114,6 +114,16 @@ Una tarea está terminada cuando:
 - **Backend** (`backend/scripts/`): scripts de utilidad (p. ej. `smoke_test.py` contra el
   servidor en ejecución).
 - **Frontend** (`frontend/scripts/`): scripts de verificación (p. ej. `check.ps1` → tsc + tests).
+- **Mantenimiento** (`scripts/`): higiene de release y mantenimiento de datos.
+  - `check_release_consistency.py`, `check_i18n_coverage.py`: guards de CI.
+  - `purge_virtual_testers.py`: borra los perfiles de prueba (`%tester%`) de
+    `backend/data/tutor.db` junto con su evidencia. **Dry-run por defecto**; con
+    `--apply` hace copia de seguridad (`tutor.db.bak-<ts>`) y borra en una única
+    transacción. Cerrar la app/launcher antes de aplicar.
+    ```powershell
+    python scripts/purge_virtual_testers.py            # simula
+    python scripts/purge_virtual_testers.py --apply    # borra
+    ```
 
 > Los tests deben ser rápidos y deterministas: no dependen de la red ni de modelos externos.
 > Para probar integración real (Ollama, Whisper, Piper) se usan los scripts de `scripts/`.

@@ -15,6 +15,7 @@ import {
 } from "../../components/PhraseTranslate";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { cn } from "../../lib/utils";
 
 const GROUPS: PronunciationItemState[] = ["failed", "mastered", "unseen"];
@@ -302,9 +303,12 @@ export function PronunciationLevelPanel({
             </Badge>
           )}
         </div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("pronRoutes.demonstrateNote").replace("{level}", level)}
-        </p>
+        <InfoDisclosure
+          id={`pron-demonstrate-note-${level}`}
+          label={t("common.moreInfo")}
+        >
+          <p>{t("pronRoutes.demonstrateNote").replace("{level}", level)}</p>
+        </InfoDisclosure>
         <div>
           <Button
             type="button"

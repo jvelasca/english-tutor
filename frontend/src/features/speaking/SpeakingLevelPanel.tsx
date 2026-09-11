@@ -16,6 +16,7 @@ import {
 } from "../../components/PhraseTranslate";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { cn } from "../../lib/utils";
 
 const GROUPS: SpeakingItemState[] = ["failed", "mastered", "unseen"];
@@ -241,9 +242,12 @@ export function SpeakingLevelPanel({
                 </span>
               )}
             </div>
-            <p className="leading-relaxed text-muted-foreground">
-              {t("speaking.extraHonestNote")}
-            </p>
+            <InfoDisclosure
+              id={`speaking-extra-note-${level}`}
+              label={t("common.moreInfo")}
+            >
+              <p>{t("speaking.extraHonestNote")}</p>
+            </InfoDisclosure>
             {jobRunning ? (
               <p
                 role="status"
@@ -378,9 +382,12 @@ export function SpeakingLevelPanel({
             </Badge>
           )}
         </div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("speaking.demonstrateNote").replace("{level}", level)}
-        </p>
+        <InfoDisclosure
+          id={`speaking-demonstrate-note-${level}`}
+          label={t("common.moreInfo")}
+        >
+          <p>{t("speaking.demonstrateNote").replace("{level}", level)}</p>
+        </InfoDisclosure>
         <div>
           <Button
             type="button"

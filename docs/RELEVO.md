@@ -5,6 +5,36 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.48.1 (APRENDER más limpio + ruta CEFR seleccionada)**
+> — patch **v3.48.1**, **SOLO-FRONTEND** (más un script de mantenimiento), **sin
+> cambios de contrato ni migración de BD**. **(A) Listening sin «Antes de
+> escuchar»:** `microFlow` salta los pasos `stage === "pre"` (`firstRenderableIndex`)
+> y el flujo arranca en `while1`; se eliminan la tarjeta y las claves
+> `listening.flow.preTitle`/`preHint`/`begin`, y el contexto del ítem pasa a
+> caption compacta bajo el botón de audio (el backend sigue sirviendo `pre` por
+> contrato, sin alterar `transcript_policy`). **(B) Notas CEFR plegables:** nuevo
+> `components/InfoDisclosure.tsx` (`button` + `aria-expanded` + `MoreHorizontal`,
+> montado solo al abrir; variantes `inline`/`corner`) que pliega
+> `routeNote`/`routeCertNote`/`routeRingHelp`/`routesMapHint` en Listening y en el
+> mapa de rutas de las cinco destrezas (`QuizRoutesSection`), y la prosa
+> explicativa (`demonstrateNote`/`demonstrateFormal`/`extraHonestNote`) en los seis
+> paneles de nivel, dejando visibles los estados accionables (gate/`demoNotYet`).
+> **(C) Ruta CEFR seleccionada persistente:** `utils/selectedRoute.ts` (validación
+> `A1..C2`, parseo tolerante, `resolveRouteLevel`) y `hooks/useSelectedRoute.ts`
+> (persistencia doble `localStorage` + `selected_route_level` en `GET/PUT
+> /api/settings`, sin cambios de backend); prioridad **sesión > ruta seleccionada
+> > nivel recomendado**, pulsar un anillo A1–C2 selecciona y abre su panel (anillo
+> resaltado + «Ruta seleccionada»), chip «Auto» para volver al motor y
+> `exitSession` que conserva la selección. **(D) Limpieza:**
+> `scripts/purge_virtual_testers.py` (dry-run por defecto; `--apply` con copia
+> `tutor.db.bak-<ts>` y borrado transaccional enumerando tablas con `user_id`) y
+> eliminación de los 6 perfiles `Visual Tester` (quedan los 2 reales). Tests:
+> vitest **75 ficheros/639 tests** (+3/+16: `InfoDisclosure`, `selectedRoute`,
+> `useSelectedRoute`), `check_i18n_coverage` 0 indefinidas/0 duplicadas,
+> `tsc`/`build`/`check_release_consistency` **3.48.1** en verde. Fuera de alcance
+> (V3.49): Sense Engine 2.0, Context→Skill mapping, difficulty matching y
+> Transfer evidence 3.0; no se tocan FSRS, Evidence Ledger ni el gate.
+>
 > **Nota (2026-09-11):** **V3.48.0 (Context Bank 2.0 + diversidad 2.0)** —
 > release **v3.48.0**, ADITIVA, **sin migración de BD** y sin tocar la escalera
 > `transfer_state`, el scoring ni FSRS, que cierra los dos P2 abiertos por la
