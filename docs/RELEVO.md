@@ -42,7 +42,14 @@
 > Tests: pytest **1989 passed** (+14, `test_transfer_v343.py`; ajustes en
 > `test_transfer_v340.py` y `test_learning_evidence_v336.py`), vitest **70
 > ficheros/607 tests** (+1), `ruff` limpio, `tsc --noEmit` limpio, `npm run
-> build` y `check_release_consistency` **3.43.0** exit 0. Fuera de alcance
+> build` y `check_release_consistency` **3.43.0** exit 0. **Publicada y
+> auditable:** commit `04d8db92df8ea12c247c460ee263bf46a189a406` (tag
+> `v3.43.0`) con el run
+> [34571938704](https://github.com/jvelasca/english-tutor/actions/runs/34571938704)
+> **6/6 jobs en success**. La auditoría pre-release del árbol de trabajo
+> corrigió P2-02 (`transfer_state` respeta el booleano `transfer` de un resumen
+> legacy/parcial) y dejó abierto P2-01 (falsos positivos del proxy semántico en
+> palabras noun/verb). Fuera de alcance
 > (V3.44): modelo *sense-aware*, Context Bank a escala y
 > `expected_learning_value`.
 >

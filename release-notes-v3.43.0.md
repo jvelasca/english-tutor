@@ -145,3 +145,16 @@ Fuera de alcance (diferido a V3.44): modelo léxico *sense-aware*
 - **`spontaneous` pasa a ser semánticamente correcto** al ocultarse el target:
   coincide con la tabla del punto 16 de la auditoría. No se renombra el valor
   canónico.
+
+## CI
+
+- Commit `04d8db92df8ea12c247c460ee263bf46a189a406` (tag `v3.43.0`) con el run
+  [34571938704](https://github.com/jvelasca/english-tutor/actions/runs/34571938704)
+  en **success** (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+  release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+  Este es el commit verde y auditable de la release.
+- La auditoría pre-release del árbol de trabajo (previa al commit) corrigió
+  P2-02: `transfer_state` respeta el booleano `transfer` de un resumen
+  legacy/parcial; se añadió su test (`test_transfer_v343.py`) y el commit de
+  release ya lo incluye. Queda abierto, sin corregir, P2-01 (falsos positivos
+  del proxy semántico en palabras noun/verb: `I travel`, `I water`, `We plan`).
