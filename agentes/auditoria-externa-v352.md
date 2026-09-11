@@ -12,15 +12,18 @@
 - **Release auditada:** tag **`v3.52.0`** → commit
   `23cbad738524465201d4025843478f4220252846` («release(v3.52.0): Student Skill
   State + Difficulty Engine 2.0»). Tag anotado: objeto `7f1d3ee`.
-- **HEAD de `main` (incluye el commit de evidencia de CI):** `6744579`
-  («docs(v3.52.0): registrar la evidencia de CI del release (run 34604654412
-  sobre 23cbad7, 6/6 jobs en success)»).
+- **Estado de `main`:** el HEAD contiene, además del commit de release, dos
+  commits de **documentación** que no tocan código: la evidencia de CI
+  (`6744579`) y este briefing. El árbol auditado es el del tag; si `main` ha
+  avanzado con más docs, no cambia el objeto de la auditoría.
 - **CI del release:** run
   [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
   sobre `23cbad7`, **6/6 jobs en success** (Release consistency, Backend
   ruff+pytest, Frontend tsc+vitest+build, Playwright E2E (visual), Beta V3.0
-  gate, Content validation). El commit de evidencia `6744579` tiene su propio run
-  en verde.
+  gate, Content validation). Los commits de docs se empujaron juntos, así que no
+  tienen run propio: los cubre el run
+  [34617402860](https://github.com/jvelasca/english-tutor/actions/runs/34617402860)
+  del commit `0ad12ba`, también **6/6 en success**.
 - **Documento de resultado (fuente de verdad de lo que se afirma):**
   `release-notes-v3.52.0.md`. Briefing previo (planificación/traspaso):
   `agentes/v352-student-state-difficulty.md`.
