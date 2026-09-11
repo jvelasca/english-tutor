@@ -1369,8 +1369,10 @@
 | V3.0 Beta freeze | directo del gerente | ✔ hecho |
 | V3.18 Deuda del grafo (P3) | directo del gerente | ✔ hecho |
 | V3.19 Léxico por destreza + Speaking micro-drill | directo del gerente (plan Cursor `v3.19_lexico_microdrill`) | ✔ hecho |
+| V3.20–V3.52 (Dictionary→Learning Bridge, Listening 3.0/4.0, Transfer 2.0 y posteriores) | briefings en `agentes/` (`v324`, `v332`–`v352`) | ✔ hecho (histórico; fuente de verdad `CHANGELOG.md` + `docs/RELEVO.md`) |
 | Auditoría profunda V3.18 pre-V3.19 (6 áreas) | `agentes/auditoria-profunda-v318.md` | ✔ hecho (dossier `docs/audit/I-AUDITORIA-PROFUNDA-V318.md`) |
-| Auditoría TOTAL externa (v3.18.0) | `agentes/auditoria-total-externa.md` | ⏳ pendiente de ejecutar |
+| Auditoría TOTAL externa (v3.18.0) | `agentes/auditoria-total-externa.md` | ⚠️ sin dossier propio; la serie TOTAL continuó con `agentes/auditoria-total-externa-v321/v322/v323.md` y los dossiers `docs/audit/J-…`, `L-…`–`P-…` |
+| Auditoría EXTERNA de V3.52.0 | `agentes/auditoria-externa-v352.md` | ⏳ listo para lanzar (tag `v3.52.0`, commit `23cbad7`) |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1378,22 +1380,25 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.38 — `situación` + planner (Optimal Next Task) (siguiente milestone)**:
-  cerradas V3.37 (los peldaños graduados y la automaticidad ya están en el
-  ledger) y V3.37.1 (la progresión ya exige consolidación y ya existe regresión
-  hacia más apoyo), el siguiente paso es USARLOS para planificar: extender el
-  contrato de
-  contenido de la caché (`generator_version`, V3.30) para un enunciado
-  situacional por palabra — el último peldaño del tramo medio, que exige
-  contenido autorado y por eso quedó fuera de V3.37 — y generalizar
-  `recommend_review_activity` con retención FSRS + hueco de producción + hueco
-  de TRANSFERENCIA por contexto (`context_id`/`activity_id`, ya persistidos
-  desde V3.36) + gradiente de apoyo (`support_level`) →
-  Optimal Next Task alimentado también por `difficulty`/`response_time_ms`/
-  `error_type`. Siguen abiertos, además, los diferidos de V3.30 (consumo de
-  `word_breakdown_json` en agregados / práctica dirigida de las falladas y
-  palabras tocables en transcripts/chat) y la transferencia por contexto de
-  actividad V3.23.
+- **⏳ V3.53+ — candidatos abiertos (a la espera de la auditoría externa de
+  V3.52)**: con V3.52 cerrada, el siguiente incremento se decide con el informe
+  de `agentes/auditoria-externa-v352.md`. Candidatos documentados como fuera de
+  alcance en las release notes: **Sense Engine 2.0**
+  (`surface→lemma→sense→semantic_fit`), **deuda de planner confirmada**
+  (`assessed_skill` → decisión del planner y `skill_priorities` → `select_task`,
+  con el doble conteo de `written_production` por resolver; V3.55),
+  `observed_difficulty` persistido por evento, **entrega oral real del transfer**
+  (audio + STT), **Adaptive Planner 2.0** (`expected_learning_value`), Context
+  Bank Family/Instance, offline TTS y code splitting del frontend. Del backlog
+  histórico siguen abiertos los P2/P3 del dossier K (F-K3…F-K7) y los ítems de
+  `docs/audit/PARKED.md`; comprobar su estado contra el árbol antes de adoptarlos.
+
+- ~~**⏳ V3.38 — `situación` + planner (Optimal Next Task)**~~ ✅ **cerrado
+  (2026-09-10, v3.38.0 + v3.38.1)**: implementado y publicado (ver «Estado
+  actual» arriba, `release-notes-v3.38.0.md`/`v3.38.1.md` y
+  `agentes/v338-situacion-planner.md`). El enunciado situacional, el planner
+  (Optimal Next Task) y la automaticidad por skill están en producción; la
+  historia posterior a V3.38 vive en `CHANGELOG.md` y `docs/RELEVO.md`.
 
 - ~~**⏳ V3.37 — Cues graduados y planner sobre la evidencia**~~ ✅ **cerrado
   (2026-09-10, v3.37.0)**: implementado y publicado (ver «Estado actual» arriba y
