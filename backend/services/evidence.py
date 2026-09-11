@@ -600,6 +600,15 @@ def _int(value: object) -> int:
         return 0
 
 
+def _clamp(value: object, low: float = 0.0, high: float = 1.0) -> float:
+    """Acota a `[low, high]` (0.0 si no es numérico). Nunca lanza."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return low
+    return max(low, min(high, number))
+
+
 def _unscaffolded_transfer_ok(evidence: dict) -> bool:
     """¿La transferencia está acreditada SIN andamiaje? (V3.46 → V3.47, pura).
 
@@ -675,6 +684,148 @@ def _clean_success_goals(evidence: dict, contexts: list[str]) -> list[str]:
     return list(
         transfer.context_dimensions(contexts).get("communicative_goal", [])
     )
+
+
+# ---------------------------------------------------------------------------
+# V3.49 (Transfer Evidence 3.0): CONFIANZA del eje de transferencia.
+#
+# La auditoría de V3.43.0 (punto 8) avisó de que los nombres de los estados
+# (`transfer_demonstrated`, `transfer_stable`) pueden sugerir más evidencia de
+# la disponible. V3.49 NO cambia la escalera: sintetiza la evidencia fina ya
+# registrada en una confianza EXPLICABLE (`score`/`level`/`drivers`), para poder
+# decir no solo en qué estado está la unidad sino con cuánta evidencia se
+# afirma. Todo se deriva de campos que `context_signals` ya calcula: no hay
+# migración, ni LLM, ni reloj en el `score`.
+# ---------------------------------------------------------------------------
+
+# Niveles declarados (de menos a más). `none` = sin evidencia limpia que
+# cuantificar (nunca se inventa confianza).
+TRANSFER_CONFIDENCE_LEVELS: tuple[str, ...] = ("none", "low", "medium", "high")
+
+# Pesos DECLARADOS y calibrables de los `drivers` (suman 1.0). `independence`
+# pesa más porque es lo que distingue recuperar CON ayuda de transferir de
+# verdad; `successes` pesa menos porque es volumen, no calidad.
+TRANSFER_CONFIDENCE_WEIGHTS: dict[str, float] = {
+    "contexts": 0.20,
+    "successes": 0.10,
+    "diversity": 0.20,
+    "independence": 0.25,
+    "variety": 0.15,
+    "spacing": 0.10,
+}
+
+# Umbrales del nivel (0..1). Calibrados para que `transfer_stable` (3 contextos,
+# 3 días, 2 objetivos, >= 2 éxitos no andamiados) caiga en `high` y
+# `transfer_demonstrated` quede por debajo.
+TRANSFER_CONFIDENCE_HIGH = 0.80
+TRANSFER_CONFIDENCE_MEDIUM = 0.45
+
+
+def _confidence_ratio(value: object, ceiling: int) -> float:
+    """Componente 0..1 de un contador sobre su techo declarado (0 si no hay).
+
+    Monótono no decreciente en `value`: es lo que garantiza que añadir evidencia
+    limpia no baje la confianza. Nunca lanza.
+    """
+    if ceiling <= 0:
+        return 0.0
+    return min(1.0, max(0.0, _int(value) / ceiling))
+
+
+def _confidence_recency_days(evidence: dict, now: str) -> int | None:
+    """Días desde el último éxito limpio (`None` sin `now` o sin marca) (V3.49).
+
+    INFORMATIVO: no entra en el `score` (la decisión de confianza no usa reloj,
+    igual que `transfer_state`). Nunca lanza.
+    """
+    if not (now or "").strip():
+        return None
+    last = (evidence.get("last_clean_success_at") or "").strip()
+    start = _parse_iso(last)
+    end = _parse_iso(now)
+    if start is None or end is None:
+        return None
+    return max(0, int((end - start).total_seconds() // 86400))
+
+
+def transfer_confidence(evidence: dict | None, *, now: str = "") -> dict:
+    """Confianza EXPLICABLE del eje de transferencia (V3.49, pura).
+
+    Devuelve `{score, level, sample, drivers, recency_days}`:
+
+    - `score` — 0..1, suma ponderada (`TRANSFER_CONFIDENCE_WEIGHTS`) de los
+      `drivers`; NO usa reloj ni LLM;
+    - `level` — `none`/`low`/`medium`/`high` (`TRANSFER_CONFIDENCE_LEVELS`);
+    - `sample` — nº de éxitos LIMPIOS observados (tamaño de muestra);
+    - `drivers` — componentes 0..1 de evidencia YA registrada: `contexts`
+      (contextos con éxito limpio / `TRANSFER_STABLE_MIN_CONTEXTS`), `successes`
+      (`clean_successes` normalizado con techo
+      `2 * TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED`), `diversity`
+      (`diverse_dimensions` / nº de ejes core), `independence`
+      (`unscaffolded_clean_successes` / `clean_successes`), `variety`
+      (objetivos comunicativos distintos / `TRANSFER_STABLE_MIN_GOALS`) y
+      `spacing` (`clean_success_days` / `TRANSFER_STABLE_MIN_DAYS`);
+    - `recency_days` — INFORMATIVO (`now` opcional), fuera del `score`.
+
+    Monótona no decreciente al añadir evidencia NO andamiada (cada driver lo es).
+    Un resumen legacy/parcial no infla: sin los campos finos de V3.43 en adelante
+    devuelve `none`. Nunca lanza.
+    """
+    ev = evidence or {}
+    contexts = ev.get("clean_success_contexts")
+    if not isinstance(contexts, list):
+        contexts = []
+    context_values = [str(c).strip() for c in contexts if str(c).strip()]
+    distinct_contexts = len(set(context_values))
+    clean_successes = _int(ev.get("clean_successes"))
+    unscaffolded = _int(ev.get("unscaffolded_clean_successes"))
+    diversity = ev.get("context_diversity")
+    if isinstance(diversity, dict):
+        diverse_dimensions = _int(diversity.get("diverse_dimensions"))
+    else:
+        diverse_dimensions = 0
+    goals = _clean_success_goals(ev, context_values)
+    drivers = {
+        "contexts": _confidence_ratio(
+            distinct_contexts, TRANSFER_STABLE_MIN_CONTEXTS
+        ),
+        "successes": _confidence_ratio(
+            clean_successes, 2 * TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED
+        ),
+        "diversity": _confidence_ratio(
+            diverse_dimensions, len(transfer.CONTEXT_DIMENSIONS)
+        ),
+        # Ratio (no contador): de los éxitos limpios, cuántos fueron SIN apoyo.
+        # Añadir un éxito no andamiado nunca lo baja; sin éxitos es 0.0.
+        "independence": (
+            min(1.0, unscaffolded / clean_successes) if clean_successes > 0 else 0.0
+        ),
+        "variety": _confidence_ratio(
+            len(set(goals)), TRANSFER_STABLE_MIN_GOALS
+        ),
+        "spacing": _confidence_ratio(
+            _int(ev.get("clean_success_days")), TRANSFER_STABLE_MIN_DAYS
+        ),
+    }
+    score = 0.0
+    for key, weight in TRANSFER_CONFIDENCE_WEIGHTS.items():
+        score += weight * _clamp(drivers.get(key, 0.0))
+    score = round(_clamp(score), 4)
+    if clean_successes <= 0:
+        level = "none"
+    elif score >= TRANSFER_CONFIDENCE_HIGH:
+        level = "high"
+    elif score >= TRANSFER_CONFIDENCE_MEDIUM:
+        level = "medium"
+    else:
+        level = "low"
+    return {
+        "score": score,
+        "level": level,
+        "sample": clean_successes,
+        "drivers": {key: round(value, 4) for key, value in drivers.items()},
+        "recency_days": _confidence_recency_days(ev, now),
+    }
 
 
 def transfer_state(evidence: dict | None) -> str:
@@ -764,13 +915,16 @@ def transfer_state(evidence: dict | None) -> str:
 
 
 def with_transfer_state(summary: dict) -> dict:
-    """Añade el `transfer_state` derivado a un resumen de evidencia (V3.43, pura).
+    """Añade el `transfer_state` y la `transfer_confidence` a un resumen (pura).
 
     El estado se DERIVA de los campos de contexto; no se persiste. Se computa en
     la frontera (resumen puro y resumen SQL) para que ambos expongan el mismo
-    valor sin un segundo dialecto de cálculo.
+    valor sin un segundo dialecto de cálculo. V3.49 añade la confianza explicable
+    (`transfer_confidence`) en la MISMA frontera, por la misma razón: paridad
+    pura↔SQL por construcción.
     """
     summary["transfer_state"] = transfer_state(summary)
+    summary["transfer_confidence"] = transfer_confidence(summary)
     return summary
 
 

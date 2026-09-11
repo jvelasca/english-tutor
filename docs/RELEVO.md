@@ -5,6 +5,47 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.49.0 (Transfer Evidence 3.0 — confianza del eje de
+> transferencia)** — release **v3.49.0**, ADITIVA y **SIN migración de BD** que NO
+> cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS: cierra el
+> punto 8 de la auditoría de V3.43.0 («los nombres de los estados pueden sugerir
+> más evidencia de la disponible»). Nueva función PURA
+> `services.evidence.transfer_confidence(evidence, *, now="")` →
+> `{score, level, sample, drivers, recency_days}`: `score` es la suma ponderada
+> (`TRANSFER_CONFIDENCE_WEIGHTS`, suman 1.0) de seis `drivers` 0..1 derivados de
+> evidencia YA registrada por `context_signals` (`contexts` = contextos con éxito
+> limpio / `TRANSFER_STABLE_MIN_CONTEXTS`; `successes` = `clean_successes` con
+> techo `2 * TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED`; `diversity` =
+> `diverse_dimensions` / nº de ejes core; `independence` =
+> `unscaffolded_clean_successes` / `clean_successes`; `variety` = objetivos
+> comunicativos distintos / `TRANSFER_STABLE_MIN_GOALS`; `spacing` =
+> `clean_success_days` / `TRANSFER_STABLE_MIN_DAYS`). `level` ∈
+> `none`/`low`/`medium`/`high` (`TRANSFER_CONFIDENCE_LEVELS`, umbrales
+> `TRANSFER_CONFIDENCE_HIGH = 0.80` / `TRANSFER_CONFIDENCE_MEDIUM = 0.45`)
+> calibrados para que `transfer_stable` caiga en `high` y `transfer_demonstrated`
+> quede por debajo. Es **monótona no decreciente** al añadir evidencia NO
+> andamiada (cada driver lo es) y **conservadora** en resúmenes legacy/parciales
+> (`none`, sin inflar y sin lanzar); `recency_days` es INFORMATIVO (`now`
+> opcional) y NO entra en el `score` (la decisión no usa reloj, igual que
+> `transfer_state`). Se deriva en la MISMA frontera pura↔SQL
+> (`with_transfer_state`), así que resumen puro y SQL exponen el mismo valor, y
+> `empty_summary()` gana el default neutro. Explicabilidad en
+> `planner.planned_signals` (aditivo; `transfer_gap`/`has_contextual_transfer` NO
+> cambian) y en `lexicon.review_item`, con contrato aditivo
+> `ReviewQueueItem.transfer_confidence` (`schemas/learning.py`) y
+> `TransferConfidence` (`types/api.ts`). UI honesta en `ReviewQueueSection`
+> (etiqueta solo con evidencia, `title`/`aria-label` que aclaran «transferencia
+> contextual demostrada bajo el protocolo interno», no generalizada) con claves
+> `dictionary.review.transfer.level.*`/`scope` en paridad es/en. Tests: pytest
+> **2084 passed** (+9: nuevo `test_transfer_confidence_v349.py`; ajuste del
+> contrato exacto de `empty_summary` en `test_learning_evidence_v336.py`), vitest
+> **75 ficheros/641 tests** (+2 en `ReviewQueueSection.test.tsx`), `ruff` limpio,
+> `tsc --noEmit` limpio, `npm run build` y `check_release_consistency` **3.49.0**
+> exit 0. Fuera de alcance (V3.50+): Context→Skill mapping y difficulty matching
+> por `difficulty_vector` (datos de V3.47/V3.48 aún no consumidos por el
+> planner), Sense Engine 2.0 (surface→lemma→sense), semantic appropriateness
+> (punto 7) y `expected_learning_value` / Adaptive Planner 2.0.
+>
 > **Nota (2026-09-11):** **V3.48.1 (APRENDER más limpio + ruta CEFR seleccionada)**
 > — patch **v3.48.1**, **SOLO-FRONTEND** (más un script de mantenimiento), **sin
 > cambios de contrato ni migración de BD**. **(A) Listening sin «Antes de

@@ -347,6 +347,8 @@ export interface LexicalEvidence {
   clean_success_days?: number;
   context_diversity?: ContextDiversity | null;
   transfer_state?: string;
+  // V3.49 (Transfer Evidence 3.0): confianza explicable del eje (aditiva).
+  transfer_confidence?: TransferConfidence | null;
 }
 
 // V3.43 (P1-03): diversidad contextual REAL de una colección de contextos. No
@@ -365,6 +367,19 @@ export interface ContextDiversity {
     varied_dimensions: number;
     score: number;
   };
+}
+
+// V3.49 (Transfer Evidence 3.0): confianza EXPLICABLE del eje de transferencia.
+// `score` (0..1) es la suma ponderada de los `drivers` (evidencia fina ya
+// registrada). `level` resume cuánta evidencia hay para no sugerir más de la
+// disponible (`transfer_demonstrated` no significa transferencia generalizada).
+// `recency_days` es informativo y NO entra en el `score`.
+export interface TransferConfidence {
+  score: number;
+  level: "none" | "low" | "medium" | "high";
+  sample: number;
+  drivers: Record<string, number>;
+  recency_days: number | null;
 }
 
 export interface LexicalItem {
@@ -838,6 +853,8 @@ export interface ReviewQueueItem {
   // V3.43 (P1-03/P1-04): estado formalizado y diversidad contextual real.
   transfer_state?: string;
   context_diversity?: ContextDiversity | null;
+  // V3.49 (Transfer Evidence 3.0): confianza explicable del eje (aditiva).
+  transfer_confidence?: TransferConfidence | null;
   evidence?: LexicalEvidence | null;
 }
 

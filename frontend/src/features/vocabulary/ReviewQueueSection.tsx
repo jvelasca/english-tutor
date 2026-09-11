@@ -45,6 +45,14 @@ const ACTIVITY_TONE: Record<ReviewActivity, string> = {
   transfer: "border-transparent bg-success/15 text-success",
 };
 
+// V3.49 (Transfer Evidence 3.0): tono de la etiqueta de CONFIANZA del eje de
+// transferencia. Solo se muestra con evidencia (`level` distinto de `none`).
+const CONFIDENCE_TONE: Record<string, string> = {
+  low: "border-transparent bg-secondary text-muted-foreground",
+  medium: "border-transparent bg-primary/15 text-primary",
+  high: "border-transparent bg-success/15 text-success",
+};
+
 /** Actividades en las que la palabra es el RECURSO de la tarea (se muestra);
  * en Recall/Sentence/Transfer es la DIANA (se oculta hasta el intento).
  * V3.43 (P1-01): Transfer deja de revelar la palabra en la cola: su consigna da
@@ -147,6 +155,20 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
                     <Badge className={cn(ACTIVITY_TONE[entry.activity])}>
                       {t(`dictionary.review.activity.${entry.activity}`)}
                     </Badge>
+                    {entry.transfer_confidence &&
+                      entry.transfer_confidence.level !== "none" && (
+                        <Badge
+                          className={cn(
+                            CONFIDENCE_TONE[entry.transfer_confidence.level],
+                          )}
+                          title={t("dictionary.review.transfer.scope")}
+                          aria-label={t("dictionary.review.transfer.scope")}
+                        >
+                          {t(
+                            `dictionary.review.transfer.level.${entry.transfer_confidence.level}`,
+                          )}
+                        </Badge>
+                      )}
                   </div>
                   <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                     {t(`dictionary.review.reason.${entry.reason}`)}

@@ -295,4 +295,78 @@ describe("ReviewQueueSection (V3.35)", () => {
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
   });
+
+  it("muestra la confianza de transferencia cuando hay evidencia (V3.49)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "transfer",
+            reason: "transfer_gap",
+            transfer_state: "transfer_stable",
+            transfer_confidence: {
+              score: 0.91,
+              level: "high",
+              sample: 3,
+              drivers: { contexts: 1, independence: 1 },
+              recency_days: null,
+            },
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    const badge = await screen.findByText("Transfer evidence: solid");
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("title")).toContain("internal protocol");
+  });
+
+  it("no muestra la confianza de transferencia sin evidencia (V3.49)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "recall",
+            reason: "no_recall_evidence",
+            transfer_confidence: {
+              score: 0,
+              level: "none",
+              sample: 0,
+              drivers: {},
+              recency_days: null,
+            },
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    await screen.findByText("Word hidden — recall from meaning");
+    expect(screen.queryByText("No transfer evidence yet")).toBeNull();
+  });
 });

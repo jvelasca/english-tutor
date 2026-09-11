@@ -472,6 +472,30 @@ const STRINGS: Record<string, Entry> = {
     en: "Ready to use it in a new situation",
     es: "Lista para usarla en una situación nueva",
   },
+  // V3.49 (Transfer Evidence 3.0): confianza del eje de transferencia. Los
+  // niveles NO son dominio: resumen cuánta evidencia hay. `scope` aclara que el
+  // estado demostrado es «bajo el protocolo interno», no transferencia
+  // generalizada (auditoría de V3.43.0, punto 8).
+  "dictionary.review.transfer.level.none": {
+    en: "No transfer evidence yet",
+    es: "Aún sin evidencia de transferencia",
+  },
+  "dictionary.review.transfer.level.low": {
+    en: "Transfer evidence: early",
+    es: "Evidencia de transferencia: inicial",
+  },
+  "dictionary.review.transfer.level.medium": {
+    en: "Transfer evidence: building",
+    es: "Evidencia de transferencia: en progreso",
+  },
+  "dictionary.review.transfer.level.high": {
+    en: "Transfer evidence: solid",
+    es: "Evidencia de transferencia: sólida",
+  },
+  "dictionary.review.transfer.scope": {
+    en: "Contextual transfer shown under the internal protocol (clean, unscaffolded successes in different contexts). It does not mean the word is used everywhere.",
+    es: "Transferencia contextual demostrada bajo el protocolo interno (éxitos limpios sin apoyo en contextos distintos). No significa que la palabra se use en todas partes.",
+  },
   "dictionary.loadError": {
     en: "Could not load your dictionary. ",
     es: "No se pudo cargar tu diccionario. ",

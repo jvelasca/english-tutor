@@ -37,6 +37,7 @@ from services.evidence import (
     TRANSFER_DEMONSTRATED_STATES,
     automatic_skills,
     is_automatic,
+    transfer_confidence,
     transfer_state,
 )
 
@@ -533,6 +534,8 @@ def planned_signals(
     - `transfer_state` / `context_diversity` — V3.43: estado formalizado del eje
       (sustituto gradual de `transfer`) y diversidad contextual real de los
       contextos con éxito limpio (explicabilidad).
+    - `transfer_confidence` — V3.49: confianza explicable del eje
+      (`services.evidence.transfer_confidence`: score/nivel/drivers).
     """
     ev = evidence or {}
     mx = matrix or {}
@@ -586,6 +589,9 @@ def planned_signals(
         # V3.43 (P1-03/P1-04): estado formalizado y diversidad contextual real
         # (explicabilidad; `transfer` se conserva como booleano de compatibilidad).
         "transfer_state": ev.get("transfer_state") or transfer_state(ev),
+        # V3.49 (Transfer Evidence 3.0): confianza explicable del eje (score,
+        # nivel y drivers). Aditiva; no altera ninguna decisión previa.
+        "transfer_confidence": transfer_confidence(ev),
         "context_diversity": (
             dict(ev["context_diversity"])
             if isinstance(ev.get("context_diversity"), dict)

@@ -47,6 +47,7 @@ from services.evidence import (
     WRITE_ERROR_TYPES,
     automatic_skills,
     is_automatic,
+    transfer_confidence,
     transfer_state,
 )
 from services.phonetics import unit_produced
@@ -643,6 +644,11 @@ def review_queue_item(
       (`services.evidence.transfer_state`), sustituto gradual de `transfer`;
     - `context_diversity` — diversidad contextual REAL de los contextos con
       éxito limpio (dimensiones que cambian de verdad).
+
+    V3.49 (Transfer Evidence 3.0) añade, aditivo:
+
+    - `transfer_confidence` — confianza explicable del eje de transferencia
+      (`score`/`level`/`drivers`), derivada de la misma evidencia fina.
     """
     matrix = item_competence_matrix(row)
     summary = evidence if evidence is not None else {}
@@ -700,6 +706,8 @@ def review_queue_item(
         "unit_surfaces": list(unit_surfaces or [row.get("word") or ""]),
         "transfer": planner.has_contextual_transfer(summary),
         "transfer_state": transfer_state(summary),
+        # V3.49 (Transfer Evidence 3.0): confianza explicable del eje (aditiva).
+        "transfer_confidence": transfer_confidence(summary),
         "success_contexts": list(summary.get("success_contexts") or []),
         "context_diversity": (
             dict(summary["context_diversity"])

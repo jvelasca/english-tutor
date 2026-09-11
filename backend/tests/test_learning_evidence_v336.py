@@ -416,6 +416,21 @@ def test_empty_summary_matches_the_extended_contract():
         "last_clean_success_at": "",
         "last_unscaffolded_clean_success_at": "",
         "transfer_state": "not_ready",
+        # V3.49 (Transfer Evidence 3.0): confianza explicable del eje (aditiva).
+        "transfer_confidence": {
+            "score": 0.0,
+            "level": "none",
+            "sample": 0,
+            "drivers": {
+                "contexts": 0.0,
+                "successes": 0.0,
+                "diversity": 0.0,
+                "independence": 0.0,
+                "variety": 0.0,
+                "spacing": 0.0,
+            },
+            "recency_days": None,
+        },
     }
 
 

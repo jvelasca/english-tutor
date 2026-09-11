@@ -81,6 +81,9 @@ class ReviewQueueItem(BaseModel):
     # éxito limpio. Aditivos.
     transfer_state: str = "not_ready"
     context_diversity: dict | None = None
+    # V3.49 (Transfer Evidence 3.0): confianza EXPLICABLE del eje
+    # (`{score, level, sample, drivers, recency_days}`). Aditivo.
+    transfer_confidence: dict | None = None
     # V3.35: evidencia longitudinal (`attempts`/`successes`/`days`/`intervals`).
     evidence: dict | None = None
 
