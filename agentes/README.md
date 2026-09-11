@@ -22,6 +22,11 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/auditoria-externa-v350.md` — **auditoría EXTERNA de V3.50.0 (listo
+  para lanzar)**: prompt autocontenido para un auditor que solo ve GitHub
+  (repo/tag `v3.50.0`/commit `1c8d6e0`, run de CI 6/6), con alcance, método
+  reproducible, preguntas concretas y formato de informe
+  (`docs/audit/Q-AUDITORIA-TOTAL-V350.md`).
 - `agentes/v350-context-skill-mapping.md` — **V3.50 (ejecutado, 2026-09-11,
   v3.50.0)**: Context→Skill mapping (cada contexto declara qué competencias
   ejercita y `context_for` prioriza la modalidad limitante) + difficulty matching
