@@ -7,7 +7,9 @@ pedir más contexto.
 
 > **Estado actual (2026-09-11): `v3.52.0`** — ver `docs/RELEVO.md` (nota superior
 > y sección 0 "START HERE"). V3.52 (Student Skill State + Difficulty Engine 2.0)
-> ya está ejecutada; cierra los dos P1 de la auditoría externa de V3.51. El
+> ya está ejecutada; cierra los dos P1 de la auditoría externa de V3.51. La
+> **auditoría externa de V3.52 está lista para lanzar**
+> (`agentes/auditoria-externa-v352.md`, apuntando al commit `23cbad7`). El
 > siguiente incremento (V3.53+: Sense Engine 2.0 / `assessed_skill`→planner y
 > `skill_priorities`→`select_task` (V3.55) / Adaptive Planner 2.0 / entrega oral
 > real del transfer) aún no tiene briefing. Antes de lanzar cualquier subagente,
@@ -24,11 +26,18 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
-- `agentes/auditoria-externa-v350.md` — **auditoría EXTERNA de V3.50.0 (listo
+- `agentes/auditoria-externa-v352.md` — **auditoría EXTERNA de V3.52.0 (listo
   para lanzar)**: prompt autocontenido para un auditor que solo ve GitHub
-  (repo/tag `v3.50.0`/commit `1c8d6e0`, run de CI 6/6), con alcance, método
-  reproducible, preguntas concretas y formato de informe
-  (`docs/audit/Q-AUDITORIA-TOTAL-V350.md`).
+  (repo/tag `v3.52.0`/commit `23cbad7`, run de CI 6/6), con punto de entrada,
+  contexto de los dos P1 de V3.51, alcance dentro/fuera, método reproducible,
+  14 preguntas concretas (política del suelo, calibración de `CEFR_CAPACITY`
+  contra el banco real, semántica de `challenge_vector`/`fit`, tolerancias,
+  determinismo, O(1) del camino caliente, paridad GET↔POST, contrato aditivo,
+  cobertura de tests) y formato de informe
+  (`docs/audit/Q-AUDITORIA-TOTAL-V352.md`).
+- `agentes/auditoria-externa-v350.md` — auditoría EXTERNA de V3.50.0
+  **ya entregada y resuelta** (sus tres P1 se cerraron en V3.51.0; V3.50 la dejó
+  como briefing «listo para lanzar»). Se conserva como histórico del método.
 - `agentes/v352-student-state-difficulty.md` — **V3.52 (ejecutado, 2026-09-11,
   v3.52.0)**: Student level state (separación `practice`/`estimated`/`demonstrated`
   con el demostrado como suelo, migración aditiva de `learning_profile` y lectura
