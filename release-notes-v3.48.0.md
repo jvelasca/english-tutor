@@ -86,6 +86,11 @@ Fuera de alcance (diferido y documentado): TTS/offline P1, Sense Engine 2.0,
 - Verificación: `pytest` 0 fallos, `ruff check backend/` limpio, `npm run test`,
   `npx tsc --noEmit`, `npm run build` y `check_release_consistency` **3.48.0**
   exit 0.
+- **CI 6/6 en verde** (run
+  [34583804612](https://github.com/jvelasca/english-tutor/actions/runs/34583804612)
+  sobre `3438e55`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation.
 
 ## Fuera de alcance (V3.49+)
 

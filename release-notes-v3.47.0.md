@@ -101,6 +101,11 @@ enriquecido y el aislamiento por usuario del Traductor.
 - Verificación: `pytest` 0 fallos, `ruff check backend/` limpio, `npm run test`,
   `npx tsc --noEmit`, `npm run build` y `check_release_consistency` **3.47.0**
   exit 0.
+- **CI 6/6 en verde** (run
+  [34582697000](https://github.com/jvelasca/english-tutor/actions/runs/34582697000)
+  sobre `1aa16af`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation.
 
 ## Fuera de alcance (V3.47.1/V3.48)
 

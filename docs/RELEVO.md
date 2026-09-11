@@ -33,9 +33,11 @@
 > `test_context_bank_v348.py`; ajustes en `test_transfer_v343.py` y
 > `test_learning_evidence_v336.py`), vitest **72 ficheros/623 tests** (sin
 > cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
-> `check_release_consistency` **3.48.0** exit 0. Fuera de alcance (V3.49+):
-> TTS/offline (auto-descarga implícita de voces), Sense Engine 2.0,
-> `transfer_state` enriquecido (`confidence`/`recency`) y
+> `check_release_consistency` **3.48.0** exit 0. **CI 6/6 en verde** (run
+> [34583804612](https://github.com/jvelasca/english-tutor/actions/runs/34583804612)
+> sobre `3438e55`); mismo commit de release `3438e55` que cierra V3.48.0. Fuera
+> de alcance (V3.49+): TTS/offline (auto-descarga implícita de voces), Sense
+> Engine 2.0, `transfer_state` enriquecido (`confidence`/`recency`) y
 > `expected_learning_value` / Adaptive Planner 2.0.
 >
 > **Nota (2026-09-11):** **V3.47.0 (Transfer Evidence 2.0 + CEFR/`difficulty_vector`
@@ -67,7 +69,9 @@
 > `test_transfer_v340.py`/`v343.py`/`test_transfer_condition_v346.py` y
 > `test_learning_evidence_v336.py`), vitest **72 ficheros/623 tests** (sin
 > cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
-> `check_release_consistency` **3.47.0** exit 0. Fuera de alcance
+> `check_release_consistency` **3.47.0** exit 0. **CI 6/6 en verde** (run
+> [34582697000](https://github.com/jvelasca/english-tutor/actions/runs/34582697000)
+> sobre `1aa16af`). Fuera de alcance
 > (V3.47.1/V3.48): TTS/offline (auto-descarga implícita de voces), Sense Engine
 > 2.0, Context Bank 2.0, `transfer_state` enriquecido (`confidence`/`recency`) y
 > `expected_learning_value` / Adaptive Planner 2.0.
