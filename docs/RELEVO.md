@@ -47,7 +47,13 @@
 > `write`). Tests: pytest **2158 passed** (+39: `test_student_state_v352.py` 15 y
 > `test_difficulty_engine_v352.py` 24; ajuste de
 > `test_learner_level_raises_the_difficulty_floor` a `difficulty_fit`), `ruff`
-> limpio, `check_release_consistency` **3.52.0** exit 0. Fuera de alcance:
+> limpio, `check_release_consistency` **3.52.0** exit 0. **CI 6/6 en verde** (run
+> [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
+> sobre `23cbad7`): Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation. La CI cuenta **2156 passed + 2 skipped** (`test_stt_asr_integration.py`,
+> opt-in del modelo Whisper no descargado en el runner); en local (Windows, con el
+> modelo) son los **2158 passed**. Fuera de alcance:
 > Sense Engine 2.0, `observed_difficulty` persistido, entrega oral real del
 > transfer, `expected_learning_value`/Adaptive Planner 2.0, Context Bank
 > Family/Instance, offline TTS y code splitting del frontend.

@@ -143,9 +143,17 @@ Módulo **puro** con:
   `test_transfer_cefr_v347.py`, `test_context_bank_v348.py`, `test_transfer_*`,
   `test_optimal_task_v339.py`, `test_learning_evidence_v336.py`,
   `test_profile.py` y `test_academy.py`.
-- Frontend: `vitest`, `tsc --noEmit` y `npm run build` en verde.
+- Frontend: `vitest` (**75 ficheros/641 tests**), `tsc --noEmit` y `npm run build` en verde.
 - Scripts: `check_release_consistency.py` (**3.52.0**), `check_beta_v3.py` y
   `content_validation.py` exit 0.
+- **CI 6/6 en verde** (run
+  [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
+  sobre `23cbad7`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation. La CI cuenta **2156 passed + 2 skipped**
+  (`backend/tests/test_stt_asr_integration.py`, opt-in del modelo Whisper no
+  descargado en el runner); en local (Windows, con el modelo) son los
+  **2158 passed**.
 
 ## Qué NO cambia
 
