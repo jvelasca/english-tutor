@@ -119,7 +119,7 @@ aclaración de local con el modelo Whisper, en lugar del titular anterior.
 
 - Backend: `ruff` limpio y `pytest` **2164 passed** en local (+6: filtro
   `is_test` por defecto, `DELETE` acotado a test, borrado de filas dependientes y
-  cobertura de `fit`/selector). En CI serán 2162 + 2 skipped (los mismos 2 de
+  cobertura de `fit`/selector). En CI son 2162 + 2 skipped (los mismos 2 de
   `test_stt_asr_integration.py`).
 - Frontend: `vitest` (**76 ficheros/651 tests**, +1 fichero/+11: `abLoop.test.ts`
   nuevo y `play` idempotente/rebobinado en `audioController.test.ts`),
@@ -130,6 +130,11 @@ aclaración de local con el modelo Whisper, en lugar del titular anterior.
 - Manual: los 2 `Visual Tester` purgados; la app y el lanzador muestran solo los 2
   perfiles reales; A1 → A2 en Listening actualiza «RUTA ACTUAL» y recarga la
   pregunta; los botones A/B funcionan y el bloque está centrado.
+- **CI 6/6 en verde** (run
+  [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
+  sobre `89eff0b`): Release consistency, Backend (ruff + pytest, **2162 passed + 2
+  skipped**), Frontend (tsc + vitest + build), Playwright E2E (visual), Beta V3.0
+  gate y Content validation.
 
 ## Qué NO cambia
 

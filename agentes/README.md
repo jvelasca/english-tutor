@@ -9,7 +9,10 @@ pedir más contexto.
 > y sección 0 "START HERE"). V3.52.1 es un **hotfix de producto** (usuarios
 > fantasma «Visual Tester», «RUTA ACTUAL» de Listening y bucle A/B) que además
 > cierra el **P1-01** de la auditoría externa de V3.52 sin cambiar el
-> comportamiento real del motor de dificultad. La
+> comportamiento real del motor de dificultad. Release verificada: **CI 6/6 en
+> verde** (run
+> [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
+> sobre `89eff0b`). La
 > **auditoría externa de V3.52 está lista para lanzar**
 > (`agentes/auditoria-externa-v352.md`, apuntando al commit `23cbad7`). El
 > siguiente incremento (V3.53+: P1-02 Learner Skill State 2.0 /

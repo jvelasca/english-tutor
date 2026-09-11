@@ -29,9 +29,11 @@
 > por cobertura y luego por distancia. **(E)** Cifra de CI normalizada (2156+2
 > skipped primario). Tests: pytest **2164 passed** en local (+6), vitest **76
 > ficheros/651 tests** (+11), lanzador 76, `ruff`/`tsc`/`build` limpios y
-> `check_release_consistency` **3.52.1** exit 0. Fuera de alcance (V3.53+): P1-02
-> (Learner Skill State 2.0 + `observed_difficulty`) y P1-03 (Planner 2.0 /
-> Expected Learning Value).
+> `check_release_consistency` **3.52.1** exit 0. **CI 6/6 en verde** (run
+> [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
+> sobre `89eff0b`; pytest 2162 passed + 2 skipped en CI). Fuera de alcance
+> (V3.53+): P1-02 (Learner Skill State 2.0 + `observed_difficulty`) y P1-03
+> (Planner 2.0 / Expected Learning Value).
 >
 > **Nota (2026-09-11):** **V3.52.0 (Student Skill State + Difficulty Engine
 > 2.0)** — release **v3.52.0**, ADITIVA con **dos columnas de BD** que NO cambia
