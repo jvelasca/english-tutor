@@ -31,7 +31,7 @@
 > eliminación de los 6 perfiles `Visual Tester` (quedan los 2 reales). Tests:
 > vitest **75 ficheros/639 tests** (+3/+16: `InfoDisclosure`, `selectedRoute`,
 > `useSelectedRoute`), `check_i18n_coverage` 0 indefinidas/0 duplicadas,
-> `tsc`/`build`/`check_release_consistency` **3.48.1** en verde. Fuera de alcance
+> `tsc`/`build`/`check_release_consistency` **3.48.1** en verde. **CI 6/6 en verde** (run [34588975928](https://github.com/jvelasca/english-tutor/actions/runs/34588975928) sobre `6a0a757`). Fuera de alcance
 > (V3.49): Sense Engine 2.0, Context→Skill mapping, difficulty matching y
 > Transfer evidence 3.0; no se tocan FSRS, Evidence Ledger ni el gate.
 >

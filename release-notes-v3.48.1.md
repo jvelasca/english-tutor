@@ -80,8 +80,13 @@ transferencia.
 - `check_i18n_coverage`: **0 claves indefinidas, 0 duplicadas** (se retiran las
   tres de `pre` y se añaden `common.moreInfo` y `learn.route*`).
 - Verificación local: `npm run test`, `npx tsc --noEmit`, `npm run build`,
-  `pytest` backend, `ruff check backend/` y `check_release_consistency`
-  **3.48.1** exit 0.
+  `pytest` backend (**2075 passed**), `ruff check backend/` y
+  `check_release_consistency` **3.48.1** exit 0.
+- **CI 6/6 en verde** (run
+  [34588975928](https://github.com/jvelasca/english-tutor/actions/runs/34588975928)
+  sobre `6a0a757`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation.
 
 ## Fuera de alcance (V3.49+)
 
