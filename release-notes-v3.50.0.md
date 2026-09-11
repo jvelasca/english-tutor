@@ -120,7 +120,11 @@ El dict de retorno gana `skills` (lista, aditivo). `cefr`/`difficulty_vector`/
 - `ruff check backend/` limpio, `tsc --noEmit` limpio, `npm run build` y
   `check_release_consistency` **3.50.0** exit 0.
 - `scripts/check_beta_v3.py` y `scripts/content_validation.py` en verde.
-- **CI 6/6 en verde** (run _pendiente de publicar_).
+- **CI 6/6 en verde** (run
+  [34594042697](https://github.com/jvelasca/english-tutor/actions/runs/34594042697)
+  sobre `1c8d6e0`): Release consistency, Backend (ruff + pytest), Frontend
+  (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+  validation. Tag `v3.50.0`.
 
 ## Fuera de alcance (V3.51+)
 

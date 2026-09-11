@@ -42,7 +42,9 @@
 > nivel» queda superada por el difficulty matching), vitest **75 ficheros/641
 > tests** (sin cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build`,
 > `check_beta_v3.py`, `content_validation.py` y `check_release_consistency`
-> **3.50.0** exit 0. CI 6/6: **pendiente de publicar**. Fuera de alcance (V3.51+):
+> **3.50.0** exit 0. **CI 6/6 en verde** (run
+> [34594042697](https://github.com/jvelasca/english-tutor/actions/runs/34594042697)
+> sobre `1c8d6e0`). Fuera de alcance (V3.51+):
 > Sense Engine 2.0, semantic appropriateness, `expected_learning_value`/Adaptive
 > Planner 2.0 y la persistencia de la dificultad del contexto servido por evento.
 >
