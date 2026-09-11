@@ -1168,6 +1168,12 @@ def summarize_evidence(rows: list[dict]) -> dict:
     distinto del de aprendizaje es una dimensión SEPARADA de `situation`
     (recuperación contextualizada) y habilita la tarea de transferencia.
 
+    V3.51 (Task/Skill semantics) añade `assessed_skill_attempts` y
+    `assessed_skill_successes`: la modalidad que la tarea puede MEDIR de verdad
+    (`services.task_semantics`), separada de `skill` (contrato histórico del
+    gate). Mismo criterio que los histogramas por modalidad: intentos = todos
+    los eventos; éxitos = clave creada en el éxito.
+
     Nunca lanza: una fila incompleta se cuenta como intento sin éxito.
     """
     attempts = 0
@@ -1192,6 +1198,13 @@ def summarize_evidence(rows: list[dict]) -> dict:
     # (aciertos y fallos), como el `attempts` global.
     skill_attempts: dict[str, int] = {}
     skill_latencies: dict[str, list[float]] = {}
+    # V3.51: modalidad EVALUADA (`assessed_skill`), la dimensión que separa de
+    # verdad la competencia que la tarea puede medir (p. ej. el transfer mide
+    # producción ESCRITA aunque su eje sea `spontaneous_use`). Mismo contrato
+    # que los histogramas por `skill`: intentos = todos los eventos; éxitos =
+    # clave creada en el éxito. Las filas legacy (valor '') quedan fuera.
+    assessed_skill_attempts: dict[str, int] = {}
+    assessed_skill_successes: dict[str, int] = {}
     latencies: list[float] = []
     for row in rows:
         attempts += 1
@@ -1205,6 +1218,12 @@ def summarize_evidence(rows: list[dict]) -> dict:
         skill = (row.get("skill") or "").strip().lower()
         if skill in LEXICAL_SKILLS:
             skill_attempts[skill] = skill_attempts.get(skill, 0) + 1
+        # V3.51: la modalidad evaluada se cuenta por separado de la histórica.
+        assessed = (row.get("assessed_skill") or "").strip().lower()
+        if assessed in LEXICAL_SKILLS:
+            assessed_skill_attempts[assessed] = (
+                assessed_skill_attempts.get(assessed, 0) + 1
+            )
         raw_latency = row.get("response_time_ms")
         if raw_latency is not None:
             try:
@@ -1233,6 +1252,10 @@ def summarize_evidence(rows: list[dict]) -> dict:
         # (aunque falte el día) para que el valor sea 0 y no una clave ausente:
         # paridad EXACTA con el `GROUP BY skill` de SQL. El `skill` ya se
         # normalizó arriba (V3.38.1: también cuenta intentos por modalidad).
+        if assessed in LEXICAL_SKILLS:
+            assessed_skill_successes[assessed] = (
+                assessed_skill_successes.get(assessed, 0) + 1
+            )
         if skill in LEXICAL_SKILLS:
             skill_successes[skill] = skill_successes.get(skill, 0) + 1
             skill_day_set = skill_success_days.setdefault(skill, set())
@@ -1292,6 +1315,9 @@ def summarize_evidence(rows: list[dict]) -> dict:
             for skill, measured in skill_latencies.items()
             if measured
         },
+        # V3.51: modalidad REALMENTE evaluada (paridad exacta con el resumen SQL).
+        "assessed_skill_attempts": assessed_skill_attempts,
+        "assessed_skill_successes": assessed_skill_successes,
         "mean_response_time_ms": (
             round(sum(latencies) / len(latencies), 1) if latencies else None
         ),
@@ -1326,6 +1352,9 @@ def empty_summary() -> dict:
         "skill_independent_days": {},
         "skill_attempts": {},
         "skill_mean_response_time_ms": {},
+        # V3.51: modalidad evaluada (vacía sin eventos).
+        "assessed_skill_attempts": {},
+        "assessed_skill_successes": {},
         "mean_response_time_ms": None,
         # V3.39 (Fase 3C): recencia y distribución de latencia.
         "recent_attempts": 0,

@@ -64,6 +64,7 @@ def record_evidence(
     target_type: str,
     target_id: str,
     skill: str = "",
+    assessed_skill: str = "",
     surface_form: str = "",
     lexical_unit: str = "",
     task: str = "",
@@ -97,6 +98,12 @@ def record_evidence(
     transferencia: `prompted`/`cued_context`/`open_context`/`free_choice`/
     `naturally_emergent`; `services.transfer`). Aditiva y observacional: las
     filas legacy y no-transfer quedan con ''.
+
+    V3.51 añade `assessed_skill` (modalidad que la tarea puede MEDIR de verdad;
+    `services.task_semantics`). Es observacional y ADITIVA: `skill` conserva su
+    contrato histórico (el gate de transferencia sigue leyendo
+    `spontaneous_use`), mientras que `assessed_skill` dice qué se evaluó. Las
+    filas legacy quedan con '' (no se inventa semántica hacia atrás).
     """
     if get_user(user_id) is None:
         return None
@@ -114,16 +121,17 @@ def record_evidence(
     with closing(_conn()) as conn, conn:
         cur = conn.execute(
             "INSERT INTO learning_evidence "
-            "(user_id, occurred_at, skill, target_type, target_id, "
-            "surface_form, lexical_unit, task, activity, activity_id, "
-            "context_id, success, support_level, difficulty, "
+            "(user_id, occurred_at, skill, assessed_skill, target_type, "
+            "target_id, surface_form, lexical_unit, task, activity, "
+            "activity_id, context_id, success, support_level, difficulty, "
             "response_time_ms, error_type, transfer_condition, "
             "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 now,
                 skill,
+                assessed_skill,
                 target_type,
                 target_id,
                 surface_form or target_id,
@@ -147,6 +155,7 @@ def record_evidence(
         "user_id": user_id,
         "occurred_at": now,
         "skill": skill,
+        "assessed_skill": assessed_skill,
         "target_type": target_type,
         "target_id": target_id,
         "surface_form": surface_form or target_id,
@@ -175,9 +184,9 @@ def record_evidence_bulk(
     la evidencia anterior de cada ítem en una sola pasada y calcula el intervalo
     de cada evento. Devuelve el nº de filas insertadas (0 si el usuario no
     existe o no hay entradas). Cada entrada admite `target_type`, `target_id`,
-    `skill`, `surface_form`, `lexical_unit`, `task`, `activity`, `success`,
-    `event_role` y `occurred_at` (por entrada; si falta, el `occurred_at` del
-    lote o `_now()`).
+    `skill`, `assessed_skill` (V3.51), `surface_form`, `lexical_unit`, `task`,
+    `activity`, `success`, `event_role` y `occurred_at` (por entrada; si falta,
+    el `occurred_at` del lote o `_now()`).
 
     V3.35.1 (P2-02): el contrato del ledger se blinda contra lotes degenerados:
 
@@ -245,6 +254,7 @@ def record_evidence_bulk(
                     user_id,
                     at,
                     entry.get("skill", ""),
+                    entry.get("assessed_skill", ""),
                     target_type,
                     target_id,
                     surface,
@@ -265,12 +275,12 @@ def record_evidence_bulk(
             )
         conn.executemany(
             "INSERT INTO learning_evidence "
-            "(user_id, occurred_at, skill, target_type, target_id, "
-            "surface_form, lexical_unit, task, activity, activity_id, "
-            "context_id, success, support_level, difficulty, "
+            "(user_id, occurred_at, skill, assessed_skill, target_type, "
+            "target_id, surface_form, lexical_unit, task, activity, "
+            "activity_id, context_id, success, support_level, difficulty, "
             "response_time_ms, error_type, transfer_condition, "
             "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
     return len(rows)
@@ -304,11 +314,11 @@ def list_evidence(
     params.extend([limit, offset])
     with closing(_conn()) as conn:
         rows = conn.execute(
-            "SELECT id, user_id, occurred_at, skill, target_type, target_id, "
-            "surface_form, lexical_unit, task, activity, activity_id, "
-            "context_id, success, support_level, difficulty, response_time_ms, "
-            "error_type, transfer_condition, interval_since_last_evidence, "
-            "event_role "
+            "SELECT id, user_id, occurred_at, skill, assessed_skill, "
+            "target_type, target_id, surface_form, lexical_unit, task, "
+            "activity, activity_id, context_id, success, support_level, "
+            "difficulty, response_time_ms, error_type, transfer_condition, "
+            "interval_since_last_evidence, event_role "
             "FROM learning_evidence "
             f"WHERE {' AND '.join(clauses)} "
             "ORDER BY occurred_at DESC, id DESC "
@@ -488,6 +498,28 @@ def summarize_by_target(
             "GROUP BY target_id, LOWER(skill)",
             (user_id, target_type, *skills),
         ).fetchall()
+        # V3.51: modalidad REALMENTE evaluada (`assessed_skill`). Mismo criterio
+        # y misma paridad que los histogramas por `skill`: los ÉXITOS agrupan
+        # por sí solos (la clave se crea en el éxito) y los intentos cuentan
+        # todos los eventos. Las filas legacy (columna '') quedan fuera.
+        assessed_skill_rows = conn.execute(
+            "SELECT target_id, LOWER(assessed_skill) AS skill, "
+            "COUNT(*) AS successes "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND success = 1 "
+            f"AND LOWER(assessed_skill) IN ({skill_placeholders}) "
+            "GROUP BY target_id, LOWER(assessed_skill)",
+            (user_id, target_type, *skills),
+        ).fetchall()
+        assessed_skill_stat_rows = conn.execute(
+            "SELECT target_id, LOWER(assessed_skill) AS skill, "
+            "COUNT(*) AS attempts "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? "
+            f"AND LOWER(assessed_skill) IN ({skill_placeholders}) "
+            "GROUP BY target_id, LOWER(assessed_skill)",
+            (user_id, target_type, *skills),
+        ).fetchall()
         # V3.39 (Fase 3C): filas mínimas para las señales de recencia y de
         # distribución de latencia. Se calculan con la función pura compartida
         # (`recency_signals`), no con un segundo dialecto en SQL.
@@ -562,6 +594,19 @@ def summarize_by_target(
             skill_mean_response_time_ms.setdefault(target, {})[skill] = round(
                 float(row["mean_latency"]), 1
             )
+    # V3.51: histogramas de la modalidad EVALUADA (paridad exacta con la capa
+    # pura: `assessed_skill_successes` crea la clave en el éxito y
+    # `assessed_skill_attempts` cuenta todos los eventos).
+    assessed_skill_successes: dict[str, dict[str, int]] = {}
+    for row in assessed_skill_rows:
+        assessed_skill_successes.setdefault(row["target_id"], {})[
+            row["skill"]
+        ] = int(row["successes"])
+    assessed_skill_attempts: dict[str, dict[str, int]] = {}
+    for row in assessed_skill_stat_rows:
+        assessed_skill_attempts.setdefault(row["target_id"], {})[
+            row["skill"]
+        ] = int(row["attempts"])
     return {
         row["target_id"]: with_transfer_state({
             "attempts": int(row["attempts"]),
@@ -590,6 +635,13 @@ def summarize_by_target(
             ),
             "skill_attempts": skill_attempts.get(row["target_id"], {}),
             "skill_mean_response_time_ms": skill_mean_response_time_ms.get(
+                row["target_id"], {}
+            ),
+            # V3.51: modalidad REALMENTE evaluada por la tarea.
+            "assessed_skill_attempts": assessed_skill_attempts.get(
+                row["target_id"], {}
+            ),
+            "assessed_skill_successes": assessed_skill_successes.get(
                 row["target_id"], {}
             ),
             "mean_response_time_ms": (

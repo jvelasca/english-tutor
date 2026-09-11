@@ -76,6 +76,7 @@ from __future__ import annotations
 
 import zlib
 
+from services import task_semantics
 from services.cefr import CEFR_LEVELS
 
 # Prefijo del `context_id` del ledger para esta actividad. Distingue la
@@ -218,32 +219,48 @@ def _filter_skill(pool: list[dict], skill: object) -> list[dict]:
     return matched or pool
 
 
-def _difficulty_floor(pool: list[dict], level: object) -> int:
-    """Dificultad mínima admisible para el nivel del alumno (V3.50, pura).
+def _difficulty_floor(
+    pool: list[dict], level: object, learner_level: object = ""
+) -> int:
+    """Dificultad mínima admisible (V3.50 → V3.51, pura).
 
     El «objetivo» es la MAYOR de dos referencias: el techo de dificultad real de
-    los contextos alcanzables y la posición del nivel en la escala 1..6
-    (A1≈1 … C2≈6, la misma escala que `difficulty_from_vector`). Anclar al nivel
-    evita que un item B1 reciba el contexto A1 más plano cuando el techo
-    declarado de su alcance es bajo. Devuelve `1` (sin filtro) si el nivel no se
-    reconoce o no hay contextos alcanzables: comportamiento de V3.47. Nunca
-    lanza.
+    los contextos ALCANZABLES por el ítem y la posición del nivel en la escala
+    1..6 (A1≈1 … C2≈6, la misma escala que `difficulty_from_vector`). Anclar al
+    nivel evita que un item B1 reciba el contexto A1 más plano cuando el techo
+    declarado de su alcance es bajo. Devuelve `1` (sin filtro) si no se reconoce
+    ningún nivel o no hay contextos alcanzables: comportamiento de V3.47.
+
+    V3.51 (P1-02): `level` es el CEFR del ÍTEM (techo lingüístico: hasta dónde
+    llega el contenido) y `learner_level` el nivel DEMOSTRADO del alumno (suelo
+    de reto: lo que ya domina). El suelo usa el MAYOR de los dos índices, de
+    modo que un alumno C1 con un ítem B1 no recibe los contextos más planos
+    del alcance B1. Sin `learner_level` reconocible el resultado es idéntico al
+    de V3.50. Nunca lanza.
     """
-    index = cefr_index(level)
-    if index < 0:
+    item_index = cefr_index(level)
+    learner_index = cefr_index(learner_level)
+    if item_index < 0 and learner_index < 0:
         return 1
-    reachable = [
-        context
-        for context in pool
-        if 0 <= cefr_index(context.get("cefr")) <= index
-    ]
+    if item_index >= 0:
+        reachable = [
+            context
+            for context in pool
+            if 0 <= cefr_index(context.get("cefr")) <= item_index
+        ]
+        if not reachable:
+            return 1
+    else:
+        # Sin techo declarado por el ítem, el alcance es el banco entero.
+        reachable = list(pool)
     if not reachable:
         return 1
     ceiling = max(
         difficulty_from_vector(context.get("difficulty_vector"))
         for context in reachable
     )
-    target = max(ceiling, index + 1)
+    floor_index = max(item_index, learner_index) if learner_index >= 0 else item_index
+    target = max(ceiling, floor_index + 1)
     return max(1, target - TRANSFER_DIFFICULTY_BAND)
 
 
@@ -1219,12 +1236,16 @@ def context_for(
     condition: object = "",
     level: object = "",
     skill: object = "",
+    learner_level: object = "",
+    skill_priorities: object = None,
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.50, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.51, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
-    unscaffolded, cefr, difficulty_vector, difficulty, skills}`. La consigna es
+    unscaffolded, cefr, difficulty_vector, difficulty, skills, target_skill,
+    assessed_skill, assessment_mode, item_level, learner_level,
+    skill_priorities}`. La consigna es
     la del banco; el escenario **no contiene la unidad objetivo** salvo en la
     condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46) es la
     condición de recuperación SERVIDA: la deriva el llamador del estado de
@@ -1238,12 +1259,16 @@ def context_for(
     1b. V3.47: con un `level` CEFR reconocible se prefieren los contextos de
        nivel igual o inferior (y, si ninguno es alcanzable, los del nivel más
        cercano por arriba). Sin `level` el comportamiento es el de V3.46;
-    1c. V3.50: si se aporta una `skill` (la modalidad LIMITANTE del ítem), se
+    1c. V3.50: si se aporta una `skill` (la modalidad limitante del ítem), se
        prefieren los contextos que la declaran en `skills`; y se prefiere la
        banda de dificultad alcanzable (`_difficulty_band`), para no servir el
        contexto más plano del banco a un alumno avanzado. Ambos filtros son
        PREFERENCIAS con degradación con gracia: si dejan el pool vacío, se
        ignoran;
+    1d. V3.51 (P1-02): `learner_level` (nivel DEMOSTRADO del alumno) eleva el
+       suelo de dificultad sobre el CEFR del ítem (`level`, que actúa de techo);
+       sin él el resultado es idéntico a V3.50. `skill_priorities` es informativo
+       (se devuelve tal cual para explicar la elección);
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
        (el más novedoso pedagógicamente, V3.43/P1-03); los empates los resuelve
@@ -1289,9 +1314,31 @@ def context_for(
     # luego se prioriza la modalidad limitante y la banda. Ambos filtros degradan
     # con gracia: si la modalidad no tiene contextos, se ignora; si la banda no
     # existe, se queda con lo más difícil disponible.
-    floor = _difficulty_floor(pool, level)
+    # V3.51: el suelo se ancla al nivel DEMOSTRADO del alumno (si lo hay) sin
+    # perder el techo del CEFR del ítem (`_difficulty_floor(level, learner_level)`).
+    floor = _difficulty_floor(pool, level, learner_level)
     pool = _filter_skill(pool, skill)
     pool = _within_band(pool, floor)
+    # V3.51: dimensiones semánticas de la tarea (idénticas en todos los retornos).
+    # `target_skill` es lo que la tarea quiere provocar: la modalidad limitante
+    # que pidió el llamador si la hay, o el eje propio del transfer. Los niveles
+    # no reconocidos se devuelven como "" (degradación con gracia: el retorno es
+    # idéntico al de V3.50 y la elección no cambia).
+    requested = str(skill or "").strip().lower()
+    target_skill = requested or task_semantics.target_skill_for("transfer")
+    assessed_skill = task_semantics.assessed_skill_for("transfer")
+    assessment_mode = task_semantics.assessment_mode_for("transfer")
+    item_level = str(level or "").strip().upper() if cefr_index(level) >= 0 else ""
+    learner = (
+        str(learner_level or "").strip().upper()
+        if cefr_index(learner_level) >= 0
+        else ""
+    )
+    priorities = (
+        {str(k): float(v) for k, v in skill_priorities.items()}
+        if isinstance(skill_priorities, dict)
+        else {}
+    )
     if not pool:  # banco vacío: no se inventa contenido
         return {
             "word": unit,
@@ -1309,6 +1356,12 @@ def context_for(
             "difficulty_vector": {},
             "difficulty": 0,
             "skills": [],
+            "target_skill": target_skill,
+            "assessed_skill": assessed_skill,
+            "assessment_mode": assessment_mode,
+            "item_level": item_level,
+            "learner_level": learner,
+            "skill_priorities": priorities,
         }
     if success:
         best = max(_novelty_score(context, success) for context in pool)
@@ -1333,8 +1386,18 @@ def context_for(
         "cefr": context.get("cefr", ""),
         "difficulty_vector": vector,
         "difficulty": difficulty_from_vector(vector),
-        # V3.50: competencias que declara el contexto servido (aditivo).
+        # V3.50: competencias que declara el contexto servido (aditivo). Es la
+        # INTENCIÓN pedagógica del escenario (`context_skills`), no la modalidad
+        # que la tarea puede evaluar (ver `assessed_skill`).
         "skills": list(context_skills(context)),
+        # V3.51 (P1-01/P1-02): dimensiones explícitas de la tarea y de la
+        # dificultad (todas aditivas).
+        "target_skill": target_skill,
+        "assessed_skill": assessed_skill,
+        "assessment_mode": assessment_mode,
+        "item_level": item_level,
+        "learner_level": learner,
+        "skill_priorities": priorities,
     }
 
 

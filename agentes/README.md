@@ -5,12 +5,13 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.50.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.50 (Context→Skill mapping + difficulty matching)
-> ya está ejecutada y publicada; el siguiente incremento (V3.51+: Sense Engine
-> 2.0 / semantic appropriateness / Adaptive Planner 2.0) aún no tiene briefing.
-> Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
-> obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
+> **Estado actual (2026-09-11): `v3.51.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.51 (Task/Skill semantics + learner-level
+> difficulty matching) ya está ejecutada y publicada; el siguiente incremento
+> (V3.52+: Sense Engine 2.0 / semantic appropriateness / Adaptive Planner 2.0 /
+> entrega oral real del transfer) aún no tiene briefing. Antes de lanzar
+> cualquier subagente, lee esa sección para no partir de un estado obsoleto
+> (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
 
@@ -27,6 +28,13 @@ pedir más contexto.
   (repo/tag `v3.50.0`/commit `1c8d6e0`, run de CI 6/6), con alcance, método
   reproducible, preguntas concretas y formato de informe
   (`docs/audit/Q-AUDITORIA-TOTAL-V350.md`).
+- `agentes/v351-task-skill-semantics.md` — **V3.51 (ejecutado, 2026-09-11,
+  v3.51.0)**: Task/Skill semantics (separación `target_skill`/`assessed_skill`/
+  `assessment_mode`/`evidence_skill` con el transfer midiendo producción ESCRITA,
+  columna aditiva `learning_evidence.assessed_skill`) + vector completo
+  `planner.skill_priorities` + dificultad anclada al nivel DEMOSTRADO del alumno
+  (suelo) sin perder el CEFR del ítem (techo). Cierra los tres P1 de la auditoría
+  externa de V3.50. **Histórico, hecho**; ver `release-notes-v3.51.0.md`.
 - `agentes/v350-context-skill-mapping.md` — **V3.50 (ejecutado, 2026-09-11,
   v3.50.0)**: Context→Skill mapping (cada contexto declara qué competencias
   ejercita y `context_for` prioriza la modalidad limitante) + difficulty matching

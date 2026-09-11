@@ -17,6 +17,7 @@ from domain import learning as learning_service
 from repositories import academy as academy_repo
 from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
+from repositories import profile as profile_repo
 from repositories import vocabulary as vocabulary_repo
 from services import (
     dictionary_content,
@@ -27,6 +28,7 @@ from services import (
     lexicon,
     planner,
     recall,
+    task_semantics,
     transfer,
 )
 from services.evidence import (
@@ -119,6 +121,9 @@ async def _record_production_evidence(
                     "target_id": word,
                     "surface_form": word,
                     "skill": production_skill(channel),
+                    # V3.51: la modalidad evaluada del canal es la suya propia
+                    # (el canal `writing` evalúa escritura, `speaking` oral...).
+                    "assessed_skill": production_skill(channel),
                     "task": "production",
                     "activity": activity or "",
                     "activity_id": activity or channel,
@@ -420,6 +425,11 @@ async def _record_retrieval(
                 surface_form=word,
                 lexical_unit=row.get("lexical_unit") or word,
                 skill=DRILL_SKILL,
+                # V3.51: modalidad EVALUADA del peldaño (el paso palabra y el
+                # paso frase se dicen en voz alta: oral).
+                assessed_skill=task_semantics.assessed_skill_for(
+                    task_semantics.activity_from_activity_id(activity_id)
+                ),
                 task=task,
                 activity="drill",
                 activity_id=activity_id,
@@ -630,6 +640,9 @@ async def _record_write_evidence(
             surface_form=word,
             lexical_unit=row.get("lexical_unit") or word,
             skill="written_production",
+            # V3.51: el paso Write evalúa producción escrita (coincide con la
+            # modalidad histórica, pero se declara explícitamente).
+            assessed_skill=task_semantics.assessed_skill_for("write"),
             task="write",
             activity="drill",
             activity_id="drill:write",
@@ -742,6 +755,11 @@ async def _record_transfer_evidence(
             surface_form=word,
             lexical_unit=row.get("lexical_unit") or word,
             skill="spontaneous_use",
+            # V3.51 (P1-01): el eje sigue siendo `spontaneous_use` (contrato del
+            # gate de transferencia), pero la modalidad REALMENTE evaluada por
+            # el drill es ESCRITA (se entrega por texto): el ledger lo declara
+            # sin alterar la escalera.
+            assessed_skill=task_semantics.assessed_skill_for("transfer"),
             task="transfer",
             activity="drill",
             activity_id="drill:transfer",
@@ -778,27 +796,78 @@ def _transfer_condition_for(summary: dict) -> str:
     )
 
 
-def _transfer_target_skill(row: dict, summary: dict) -> str:
-    """Modalidad LIMITANTE del ítem para orientar el contexto nuevo (V3.50, pura).
+def _transfer_priorities(row: dict, summary: dict) -> dict[str, float]:
+    """Vector completo de prioridad por modalidad del ítem (V3.51, pura).
 
-    Devuelve la skill que el planner considera limitante (`planner.limiting_skill`
-    sobre las señales que produce `planned_signals`) o "" si no hay segmentación
-    por modalidad en el ledger: sin evidencia fina no se inventa una preferencia
-    y `context_for` sirve el contexto como en V3.49. Es una PREFERENCIA (no una
-    obligación): la decisión sigue siendo del servidor, sin LLM (premisa 21).
-    Nunca lanza.
+    V3.50 reducía la evidencia fina a un único argmax (`limiting_skill`), lo que
+    descartaba el resto de la información (P1-03 de la auditoría externa). Este
+    vector conserva TODAS las prioridades (`planner.skill_priorities`) para que
+    el selector pueda razonar sobre ellas y para explicar la elección.
+
+    Devuelve `{}` si el ledger no tiene segmentación por modalidad
+    (`skill_attempts` vacío): sin evidencia fina no se inventa preferencia y el
+    comportamiento es el de V3.49. Nunca lanza.
     """
     attempts = (summary or {}).get("skill_attempts")
     if not isinstance(attempts, dict):
-        return ""
+        return {}
     try:
         if not any(int(value or 0) > 0 for value in attempts.values()):
-            return ""
+            return {}
         matrix = lexicon.item_competence_matrix(row or {})
         signals = planner.planned_signals(summary, matrix)
-        return planner.limiting_skill(signals)
+        return planner.skill_priorities(signals)
+    except Exception:  # noqa: BLE001 — preferencia no bloqueante
+        return {}
+
+
+def _transfer_target_skill(
+    row: dict, summary: dict, priorities: dict | None = None
+) -> str:
+    """Modalidad que la TRANSFERENCIA puede evocar/evaluar (V3.50 → V3.51, pura).
+
+    V3.50 devolvía la modalidad limitante sin más, de modo que un ítem limitado
+    en `spoken_production` orientaba el contexto a habilidades orales aunque la
+    actividad se entregue por TEXTO (P1-01). V3.51 restringe la orientación a
+    las modalidades que el transfer puede de verdad evocar/medir
+    (`task_semantics.assessable_skills("transfer")`: producción escrita y uso
+    espontáneo) y elige la de mayor prioridad; `spoken_production` lo cubre la
+    actividad `sentence`, no el transfer.
+
+    Devuelve "" si no hay segmentación por modalidad (comportamiento de V3.49).
+    Es una PREFERENCIA, no una obligación, y nunca lanza.
+    """
+    if priorities is None:
+        priorities = _transfer_priorities(row, summary)
+    candidates = [
+        skill
+        for skill in task_semantics.assessable_skills("transfer")
+        if skill in priorities
+    ]
+    if not candidates:
+        return ""
+    return max(candidates, key=lambda skill: priorities[skill])
+
+
+async def _learner_level(user_id: str) -> str:
+    """Nivel CEFR DEMOSTRADO del alumno, cacheado por el Student Model (V3.51).
+
+    Lee `learning_profile.cefr_level` (fila única, coste O(1)), la caché que
+    `/api/profile` escribe al calcular el Student Model
+    (`domain.profile.get_profile_summary` → `repositories.profile.set_cefr`).
+    NO se recalcula el Student Model en el camino caliente del drill: el drill
+    no debe pagar el agregado completo por un contexto. Devolver "" (perfil
+    ausente o nivel no reconocido) mantiene EXACTAMENTE el comportamiento de
+    V3.50, que anclaba la dificultad al CEFR del ítem.
+
+    Nunca lanza: la dificultad es una preferencia, no un bloqueo.
+    """
+    try:
+        row = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — preferencia no bloqueante
         return ""
+    level = str((row or {}).get("cefr_level") or "").strip().upper()
+    return level if transfer.cefr_index(level) >= 0 else ""
 
 
 async def get_transfer_context(user_id: str, word: str) -> dict:
@@ -819,6 +888,11 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     V3.47: pasa el nivel CEFR declarado del ítem (`row["cefr"]`) a
     `context_for`, de modo que no se sirve un contexto por encima del alcance del
     alumno si hay uno alcanzable.
+
+    V3.51 (P1-02): el CEFR del ítem actúa de TECHO lingüístico y el nivel
+    DEMOSTRADO del alumno (`_learner_level`, caché del Student Model) de SUELO
+    de reto: no se sirve a un alumno avanzado el contexto más plano del banco.
+    Sin nivel de alumno conocido el comportamiento es exactamente el de V3.50.
     """
     summaries = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
@@ -831,9 +905,10 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     # mantiene el comportamiento de V3.46).
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     row = _row_for_word(rows, word) or {}
-    # V3.50: la modalidad limitante del ítem orienta el contexto servido ("" si
-    # el ledger no tiene segmentación por modalidad: comportamiento de V3.49).
-    skill = _transfer_target_skill(row, summary)
+    # V3.51: vector completo de prioridades (explicabilidad), modalidad que el
+    # transfer puede realmente EVALUAR y nivel demostrado del alumno (suelo).
+    priorities = _transfer_priorities(row, summary)
+    skill = _transfer_target_skill(row, summary, priorities)
     return transfer.context_for(
         word,
         used,
@@ -841,6 +916,8 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
         condition=condition,
         level=row.get("cefr") or "",
         skill=skill,
+        learner_level=await _learner_level(user_id),
+        skill_priorities=priorities,
     )
 
 
@@ -898,16 +975,19 @@ async def submit_transfer_attempt(
     )
     summary = summaries.get(word) or {}
     condition = _transfer_condition_for(summary)
+    # V3.51: mismo criterio que el GET (modalidad evaluable + nivel demostrado)
+    # para que ambos caminos deriven el MISMO `context_id`.
+    priorities = _transfer_priorities(row, summary)
     if not context_id:
-        # V3.50: mismo criterio que el GET (modalidad limitante) para que ambos
-        # caminos deriven el MISMO `context_id`.
         context_id = transfer.context_for(
             word,
             (summary.get("contexts") or {}).keys(),
             success_context_ids=summary.get("success_contexts") or [],
             condition=condition,
             level=row.get("cefr") or "",
-            skill=_transfer_target_skill(row, summary),
+            skill=_transfer_target_skill(row, summary, priorities),
+            learner_level=await _learner_level(user_id),
+            skill_priorities=priorities,
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)
     written = (text or "").strip()
@@ -939,6 +1019,12 @@ async def submit_transfer_attempt(
         "context_id": context_id,
         "condition": condition,
         "required_target": required,
+        # V3.51 (P1-01): dimensiones explícitas de la tarea. El eje es
+        # `spontaneous_use`, pero la modalidad que el drill puede EVALUAR es la
+        # escrita (se entrega por texto).
+        "target_skill": task_semantics.target_skill_for("transfer"),
+        "assessed_skill": task_semantics.assessed_skill_for("transfer"),
+        "assessment_mode": task_semantics.assessment_mode_for("transfer"),
         **scored,
     }
 
@@ -1228,6 +1314,9 @@ async def submit_recall_attempt(
         surface_form=normalized,
         lexical_unit=row_before.get("lexical_unit") or normalized,
         skill=RECALL_SKILL,
+        # V3.51: el recall se teclea: la modalidad evaluada es la misma que la
+        # histórica (`recall`), declarada explícitamente.
+        assessed_skill=task_semantics.assessed_skill_for("recall"),
         task="recall",
         activity="drill",
         activity_id=activity_id,

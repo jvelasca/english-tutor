@@ -423,22 +423,49 @@ def skill_priority(signals: dict) -> dict[str, float]:
     return result
 
 
+def skill_priorities(signals: dict) -> dict[str, float]:
+    """Vector COMPLETO de prioridad por modalidad, en orden canónico (V3.51).
+
+    V3.50 exponía la modalidad limitante como un único argmax, lo que descartaba
+    el resto de la información pedagógica (con `written_production=0.62` y
+    `spoken_production=0.60` la segunda desaparecía de la decisión). Este vector
+    conserva TODAS las prioridades para que el selector pueda razonar sobre
+    ellas: la primera del orden canónico (`LEXICAL_SKILLS`) es siempre la
+    limitante cuando hay empate.
+
+    Es un diccionario ordenado: primero las modalidades canónicas (recall,
+    written_production, spoken_production, spontaneous_use) y después cualquier
+    clave no canónica presente en las señales. Vacío si no hay bloque `skills`.
+    Nunca lanza.
+    """
+    priorities = skill_priority(signals)
+    if not priorities:
+        return {}
+    ordered: dict[str, float] = {
+        skill: priorities[skill] for skill in LEXICAL_SKILLS if skill in priorities
+    }
+    for skill, value in priorities.items():
+        if skill not in ordered:
+            ordered[skill] = value
+    return ordered
+
+
 def limiting_skill(signals: dict) -> str:
-    """Modalidad con mayor prioridad (argmax) (V3.39, puro).
+    """Modalidad con mayor prioridad (argmax) (V3.39 → V3.51, pura).
 
     Desempate determinista por el orden canónico `LEXICAL_SKILLS` (recall antes
     que producción), de modo que sin evidencia segmentada la decisión cae en
     `recall` —el peldaño por defecto del repaso— y no en un orden accidental de
-    diccionario. Devuelve "" si no hay bloque `skills`.
+    diccionario. Se implementa sobre `skill_priorities` (vector completo), así
+    que el argmax y el vector no pueden divergir. Devuelve "" si no hay bloque
+    `skills`. Nunca lanza.
     """
-    priorities = skill_priority(signals)
+    priorities = skill_priorities(signals)
     if not priorities:
         return ""
-    candidates = [skill for skill in LEXICAL_SKILLS if skill in priorities]
-    candidates.extend(
-        skill for skill in priorities if skill not in LEXICAL_SKILLS
-    )
-    return max(candidates, key=lambda skill: priorities[skill]) if candidates else ""
+    # `max` es estable sobre el orden de inserción: con prioridades empatadas
+    # gana la primera del orden canónico.
+    return max(priorities, key=lambda skill: priorities[skill])
 
 
 def _task(skill: str, reason: str) -> dict:

@@ -549,8 +549,20 @@ export interface DrillTransferContext {
   cefr?: string;
   difficulty_vector?: Record<string, number>;
   difficulty?: number;
-  // V3.50: competencias que ejercita el contexto servido (aditivo).
+  // V3.50: competencias que ejercita el contexto servido (aditivo). Es la
+  // INTENCIÓN del escenario, no la modalidad evaluada.
   skills?: string[];
+  // V3.51 (P1-01/P1-02, Task/Skill semantics): dimensiones explícitas de la
+  // tarea y de la dificultad (aditivas). `target_skill` es lo que la tarea
+  // quiere provocar; `assessed_skill`/`assessment_mode` lo que puede medir (el
+  // transfer se entrega por texto: producción escrita); `item_level` es el
+  // techo del ítem y `learner_level` el suelo demostrado del alumno.
+  target_skill?: string;
+  assessed_skill?: string;
+  assessment_mode?: string;
+  item_level?: string;
+  learner_level?: string;
+  skill_priorities?: Record<string, number>;
 }
 
 export interface DrillTransferAttempt {
@@ -575,6 +587,11 @@ export interface DrillTransferAttempt {
   // un fallo: el servidor no lo registra como evidencia.
   condition?: string;
   required_target?: boolean;
+  // V3.51 (P1-01): semántica explícita del intento (aditiva). El eje sigue
+  // siendo `spontaneous_use`, pero la modalidad evaluada es escrita.
+  target_skill?: string;
+  assessed_skill?: string;
+  assessment_mode?: string;
 }
 
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
@@ -844,6 +861,9 @@ export interface ReviewQueueItem {
   automatic_skills?: string[];
   // V3.39 (Fase 3): modalidad que limita y la tarea óptima que la cierra.
   limiting_skill?: string;
+  // V3.51: vector completo de prioridad por modalidad (aditivo; `limiting_skill`
+  // es su argmax).
+  skill_priorities?: Record<string, number>;
   task?: ReviewTask | null;
   competence?: LexicalCompetence | null;
   // V3.40 (Fase 4): gobierno por unidad léxica. `unit_surfaces` son las formas

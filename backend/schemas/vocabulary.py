@@ -750,8 +750,20 @@ class TransferContextOut(BaseModel):
     cefr: str = ""
     difficulty_vector: dict[str, int] = Field(default_factory=dict)
     difficulty: int = 0
-    # V3.50: competencias que ejercita el contexto servido (aditivo).
+    # V3.50: competencias que ejercita el contexto servido (aditivo). Es la
+    # INTENCIÓN del escenario (`context_skills`), no la modalidad evaluada.
     skills: list[str] = Field(default_factory=list)
+    # V3.51 (P1-01/P1-02, Task/Skill semantics): dimensiones explícitas de la
+    # tarea y de la dificultad (aditivas). `target_skill` es lo que la tarea
+    # quiere provocar; `assessed_skill`/`assessment_mode` lo que puede MEDIR
+    # (el transfer se entrega por texto: producción escrita); `item_level` es el
+    # techo del ítem y `learner_level` el suelo demostrado del alumno.
+    target_skill: str = ""
+    assessed_skill: str = ""
+    assessment_mode: str = ""
+    item_level: str = ""
+    learner_level: str = ""
+    skill_priorities: dict[str, float] = Field(default_factory=dict)
 
 
 class TransferAttemptIn(BaseModel):
@@ -804,3 +816,9 @@ class TransferAttemptOut(BaseModel):
     # evidencia: `passed` refleja solo el transfer léxico del texto entregado.
     condition: str = ""
     required_target: bool = True
+    # V3.51 (P1-01): semántica explícita del intento. El eje sigue siendo
+    # `spontaneous_use`, pero la modalidad que el drill puede EVALUAR es escrita
+    # (la actividad se entrega por texto).
+    target_skill: str = ""
+    assessed_skill: str = ""
+    assessment_mode: str = ""

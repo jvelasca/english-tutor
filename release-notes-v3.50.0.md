@@ -102,7 +102,7 @@ El dict de retorno gana `skills` (lista, aditivo). `cefr`/`difficulty_vector`/
 
 ## Tests y verificación
 
-- Backend pytest **2099 passed** (+15): nuevo
+- Backend pytest **2097 passed** (+15): nuevo
   `backend/tests/test_context_skill_v350.py` (paridad `CONTEXT_SKILLS` ↔
   `LEXICAL_SKILLS`; los 20 contextos declaran skills válidas y normalizadas; cada
   skill del vocabulario la ejerce algún contexto; `context_skills` con ids/dicts y

@@ -699,6 +699,8 @@ def review_queue_item(
         # + apoyo declarado). Aditivo: `activity`/`reason` conservan su
         # semántica y `task` la explica.
         "limiting_skill": planner.limiting_skill(signals),
+        # V3.51: vector completo de prioridad por modalidad (aditivo).
+        "skill_priorities": planner.skill_priorities(signals),
         "task": _task_decision(matrix, summary, signals, recommendation),
         "competence": matrix,
         # V3.40 (Fase 4): estado a nivel de UNIDAD (formas hermanas) y

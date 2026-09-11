@@ -67,6 +67,10 @@ class ReviewQueueItem(BaseModel):
     # DECISIÓN de tarea (`{skill, activity, reason, support_level}`). Aditivos:
     # `activity`/`reason` conservan su semántica.
     limiting_skill: str = ""
+    # V3.51 (Task/Skill semantics): vector completo de prioridad por modalidad
+    # (aditivo). `limiting_skill` es su argmax; el vector conserva la
+    # información que el argmax descartaba.
+    skill_priorities: dict[str, float] = Field(default_factory=dict)
     task: dict | None = None
     competence: dict | None = None
     # V3.40 (Fase 4, gobierno por unidad léxica): formas superficiales de la

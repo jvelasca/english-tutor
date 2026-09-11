@@ -375,6 +375,9 @@ def test_empty_summary_matches_the_extended_contract():
         # V3.38.1 (P1-02): intentos y latencia media por modalidad (aditivos).
         "skill_attempts": {},
         "skill_mean_response_time_ms": {},
+        # V3.51: modalidad REALMENTE evaluada (aditivos).
+        "assessed_skill_attempts": {},
+        "assessed_skill_successes": {},
         "mean_response_time_ms": None,
         # V3.39 (Fase 3C): recencia y distribución de latencia (aditivos).
         "recent_attempts": 0,

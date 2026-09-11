@@ -5,6 +5,54 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.51.0 (Task/Skill semantics + learner-level
+> difficulty matching)** — release **v3.51.0**, ADITIVA con **una columna de BD**
+> que NO cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS:
+> cierra los tres P1 de la auditoría externa de V3.50. **P1-01 (qué se EVALÚA):**
+> nuevo módulo PURO `services/task_semantics.py` con `ASSESSMENT_MODES`
+> (`written`/`spoken`/`receptive`), la tabla `TASK_SEMANTICS` por actividad
+> (`target_skill` = lo que la tarea QUIERE provocar, `assessed_skill` = lo que
+> puede MEDIR, `assessment_mode` = canal, `evidence_skill` = el `skill=` histórico
+> del ledger) y helpers que nunca lanzan (`semantics_for`, `assessed_skill_for`,
+> `assessment_mode_for`, `target_skill_for`, `evidence_skill_for`,
+> `assessable_skills`, `is_assessable`, `activity_for_target`,
+> `activity_from_activity_id`). El drill **Transfer**, que se entrega por TEXTO,
+> declara `target_skill="spontaneous_use"`, **`assessed_skill="written_production"`**,
+> **`assessment_mode="written"`** y conserva `evidence_skill="spontaneous_use"`:
+> antes se podía afirmar que el contexto «servía para hablar» sin que la
+> actividad midiera oral. **Ledger honesto (migración aditiva):**
+> `learning_evidence.assessed_skill` (CREATE TABLE + bucle idempotente
+> `ALTER TABLE`, filas legacy `''`), persistido en
+> `record_evidence`/`record_evidence_bulk`/`list_evidence`; `summarize_evidence`,
+> `empty_summary` y `summarize_by_target` añaden
+> `assessed_skill_attempts`/`assessed_skill_successes` (intentos = todos los
+> eventos; éxito = clave creada en el éxito) con paridad exacta pura↔SQL; las
+> cinco vías de `domain/vocabulary.py` registran las dos dimensiones sin cambiar
+> `skill`. **P1-03 (el argmax descarta información):**
+> `planner.skill_priorities(signals)` expone el vector COMPLETO en orden canónico
+> y `limiting_skill` pasa a ser su argmax; `_transfer_target_skill` elige solo
+> entre `task_semantics.assessable_skills("transfer")` (`written_production`,
+> `spontaneous_use`) y `context_for`/`ReviewQueueItem` exponen `skill_priorities`
+> (aditivo). **P1-02 (de quién es la dificultad):**
+> `context_for(..., learner_level="")`; `level` = CEFR del ÍTEM (techo,
+> `_within_level`) y `learner_level` = nivel DEMOSTRADO del alumno (suelo de reto
+> en `_difficulty_floor`, que usa `max(item_index, learner_index)`);
+> `domain.vocabulary._learner_level` lee la caché del Student Model
+> (`learning_profile.cefr_level`, O(1)) sin recalcular el modelo en el camino
+> caliente; sin nivel conocido el resultado es IDÉNTICO a V3.50 (test de
+> regresión). Contratos aditivos `TransferContextOut` (target/assessed/mode/
+> item_level/learner_level/skill_priorities), `TransferAttemptOut`
+> (target/assessed/mode) y `ReviewQueueItem.skill_priorities`, con espejo
+> opcional en `types/api.ts`. Tests: pytest **2119 passed** (+20: nuevo
+> `test_task_semantics_v351.py`; ajuste del contrato exacto de `empty_summary` en
+> `test_learning_evidence_v336.py`), vitest **75 ficheros/641 tests**, `ruff`/
+> `tsc` limpios, `npm run build`, `check_beta_v3.py`, `content_validation.py` y
+> `check_release_consistency` **3.51.0** exit 0. **P3-01:** corregida la cifra de
+> V3.50 (2099 → **2097 passed**, la verificada en CI). Fuera de alcance (V3.52+):
+> entrega oral real del transfer (audio+STT), Sense Engine 2.0,
+> `observed_difficulty` por evento, `expected_learning_value`/Adaptive Planner
+> 2.0, Context Bank Family/Instance y offline TTS.
+>
 > **Nota (2026-09-11):** **V3.50.0 (Context→Skill mapping + difficulty
 > matching)** — release **v3.50.0**, ADITIVA y **SIN migración de BD** que NO
 > cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS: cierra
@@ -37,7 +85,7 @@
 > GET y en el fallback del POST, con paridad de `context_id` GET↔POST. Contratos
 > aditivos `TransferContextOut.skills` (`schemas/vocabulary.py`) y
 > `DrillTransferContext.skills?` (`types/api.ts`); sin cambio de UI. Tests: pytest
-> **2099 passed** (+15: nuevo `test_context_skill_v350.py`; ajuste de
+> **2097 passed** (+15: nuevo `test_context_skill_v350.py`; ajuste de
 > `test_transfer_cefr_v347.py`, cuya semántica «con C2 la elección es la de sin
 > nivel» queda superada por el difficulty matching), vitest **75 ficheros/641
 > tests** (sin cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build`,

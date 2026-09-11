@@ -988,6 +988,7 @@ def init_db() -> None:
                 user_id TEXT NOT NULL,
                 occurred_at TEXT NOT NULL,
                 skill TEXT NOT NULL DEFAULT '',
+                assessed_skill TEXT NOT NULL DEFAULT '',
                 target_type TEXT NOT NULL DEFAULT '',
                 target_id TEXT NOT NULL DEFAULT '',
                 surface_form TEXT NOT NULL DEFAULT '',
@@ -1014,6 +1015,8 @@ def init_db() -> None:
         # los conteos, no en los agregados ya existentes).
         # V3.46: `transfer_condition` (condición de recuperación de la
         # transferencia) se añade por el mismo camino aditivo.
+        # V3.51: `assessed_skill` (modalidad REALMENTE evaluada por la tarea;
+        # `services.task_semantics`) usa el mismo camino aditivo.
         evidence_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_evidence)")
         }
@@ -1025,6 +1028,7 @@ def init_db() -> None:
             ("response_time_ms", "INTEGER"),
             ("error_type", "TEXT NOT NULL DEFAULT ''"),
             ("transfer_condition", "TEXT NOT NULL DEFAULT ''"),
+            ("assessed_skill", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in evidence_cols:
                 conn.execute(

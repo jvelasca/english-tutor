@@ -82,7 +82,7 @@ python scripts/check_beta_v3.py
 python backend/scripts/content_validation.py
 ```
 
-Cifras declaradas que debes poder reproducir: pytest **2099 passed** (+15),
+Cifras declaradas que debes poder reproducir: pytest **2097 passed** (+15),
 `ruff` limpio, vitest **75 ficheros/641 tests**, `tsc`/`build` limpios,
 `check_release_consistency` **3.50.0** exit 0.
 
