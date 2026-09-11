@@ -59,12 +59,21 @@ V3.50 (**Context→Skill mapping + difficulty matching**) hace que los datos que
 V3.47/V3.48 declaraban y nadie consumía al elegir la tarea pasen a decidirla:
 cada contexto declara las competencias que ejercita (`skills`, vocabulario
 `CONTEXT_SKILLS`) y `context_for` acepta la modalidad LIMITANTE del ítem
-(`skill`, derivada por el llamador del planner) y la prefiere; además ajusta a la
-banda de dificultad alcanzable (`TRANSFER_DIFFICULTY_BAND`) para no servir el
-contexto más plano del banco a un alumno avanzado. Los dos filtros son
+(`skill`, derivada por el llamador del planner) y la prefiere. Los filtros son
 PREFERENCIAS con degradación con gracia y no tocan la escalera `transfer_state`,
 sus umbrales, el scoring ni FSRS. El `skills` del contexto servido se expone de
 forma aditiva.
+
+V3.52 (**Difficulty Engine 2.0**) sustituye el ajuste de dificultad ESCALAR de
+V3.50/V3.51 (que mezclaba el ordinal CEFR con la media del `difficulty_vector` y
+colapsaba las cuatro dimensiones: un `(5,1,5,1)` y un `(3,3,3,3)` eran
+indistinguibles) por una comparación VECTOR contra VECTOR por dimensión
+(`services.difficulty`). `level` sigue siendo el TECHO lingüístico del ítem
+(`_within_level`) y `learner_level` el SUELO de reto del alumno, ahora con su
+origen (`learner_level_source`: demostrado/estimado/declarado) para elegir la
+tolerancia. El retorno gana `difficulty_fit` (reto objetivo + distancia +
+overshoot) y `learner_level_source`, aditivos; `difficulty` y
+`difficulty_vector` se conservan por compatibilidad.
 
 No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
@@ -76,7 +85,7 @@ from __future__ import annotations
 
 import zlib
 
-from services import task_semantics
+from services import difficulty, task_semantics
 from services.cefr import CEFR_LEVELS
 
 # Prefijo del `context_id` del ledger para esta actividad. Distingue la
@@ -114,12 +123,9 @@ CONTEXT_DIVERSITY_MIN = 2
 # V3.47: dimensiones de CARGA del contexto de transferencia (misma convención que
 # el `difficulty_vector` de listening/speaking: enteros 1..5). No entran en la
 # diversidad contextual (son dificultad, no atributo de variedad).
-TRANSFER_DIFFICULTY_KEYS: tuple[str, ...] = (
-    "lexical",
-    "syntax",
-    "discourse",
-    "interaction",
-)
+# V3.52: pasa a ser un ALIAS del vocabulario canónico del Difficulty Engine 2.0
+# (`services.difficulty.DIFFICULTY_DIMENSIONS`), verificado por test de paridad.
+TRANSFER_DIFFICULTY_KEYS: tuple[str, ...] = difficulty.DIFFICULTY_DIMENSIONS
 
 # V3.50 (Context→Skill mapping): vocabulario de competencias que un contexto de
 # transferencia puede ejercitar. Es un ESPEJO de `services.evidence.LEXICAL_SKILLS`
@@ -135,9 +141,11 @@ CONTEXT_SKILLS: tuple[str, ...] = (
 )
 
 # V3.50 (difficulty matching): banda de tolerancia por debajo del contexto más
-# exigente ALCANZABLE por el alumno. Con banda 1, un ítem B2 recibe contextos de
-# dificultad >= (máximo alcanzable - 1): se evita servir el contexto más plano del
-# banco cuando hay uno más cercano a su nivel. Declarado y calibrable.
+# exigente ALCANZABLE por el alumno.
+# DEPRECADA en V3.52 (P1-02): la sustituye el Difficulty Engine 2.0 por dimensión
+# (`services.difficulty.select_by_difficulty`), que ya no mezcla el ordinal CEFR
+# con la media del vector. Se conserva declarada por trazabilidad y compatibilidad
+# de lectura; ningún camino de selección la consume.
 TRANSFER_DIFFICULTY_BAND = 1
 
 # Orden del Marco para comparar niveles (Pre-A1 y valores desconocidos quedan
@@ -219,77 +227,58 @@ def _filter_skill(pool: list[dict], skill: object) -> list[dict]:
     return matched or pool
 
 
-def _difficulty_floor(
-    pool: list[dict], level: object, learner_level: object = ""
-) -> int:
-    """Dificultad mínima admisible (V3.50 → V3.51, pura).
+def _challenge_and_tolerance(
+    level: object, learner_level: object, learner_level_source: object
+) -> tuple[dict[str, int], int]:
+    """Reto objetivo por dimensión y tolerancia aplicable (V3.52, pura).
 
-    El «objetivo» es la MAYOR de dos referencias: el techo de dificultad real de
-    los contextos ALCANZABLES por el ítem y la posición del nivel en la escala
-    1..6 (A1≈1 … C2≈6, la misma escala que `difficulty_from_vector`). Anclar al
-    nivel evita que un item B1 reciba el contexto A1 más plano cuando el techo
-    declarado de su alcance es bajo. Devuelve `1` (sin filtro) si no se reconoce
-    ningún nivel o no hay contextos alcanzables: comportamiento de V3.47.
-
-    V3.51 (P1-02): `level` es el CEFR del ÍTEM (techo lingüístico: hasta dónde
-    llega el contenido) y `learner_level` el nivel DEMOSTRADO del alumno (suelo
-    de reto: lo que ya domina). El suelo usa el MAYOR de los dos índices, de
-    modo que un alumno C1 con un ítem B1 no recibe los contextos más planos
-    del alcance B1. Sin `learner_level` reconocible el resultado es idéntico al
-    de V3.50. Nunca lanza.
+    `challenge` es el MÁXIMO por dimensión entre la capacidad del ítem (techo
+    lingüístico) y la del alumno (suelo de reto); `{}` si no se reconoce ningún
+    nivel (el selector no filtra). La tolerancia es estricta solo con un suelo
+    DEMOSTRADO; estimado/declarado/ausente usan el margen amplio. Nunca lanza.
     """
-    item_index = cefr_index(level)
-    learner_index = cefr_index(learner_level)
-    if item_index < 0 and learner_index < 0:
-        return 1
-    if item_index >= 0:
-        reachable = [
-            context
-            for context in pool
-            if 0 <= cefr_index(context.get("cefr")) <= item_index
-        ]
-        if not reachable:
-            return 1
-    else:
-        # Sin techo declarado por el ítem, el alcance es el banco entero.
-        reachable = list(pool)
-    if not reachable:
-        return 1
-    ceiling = max(
-        difficulty_from_vector(context.get("difficulty_vector"))
-        for context in reachable
-    )
-    floor_index = max(item_index, learner_index) if learner_index >= 0 else item_index
-    target = max(ceiling, floor_index + 1)
-    return max(1, target - TRANSFER_DIFFICULTY_BAND)
+    challenge = difficulty.challenge_vector(level, learner_level)
+    return challenge, difficulty.tolerance_for(learner_level_source)
 
 
-def _within_band(pool: list[dict], floor: int) -> list[dict]:
-    """Conserva los contextos dentro de la banda de dificultad (V3.50, pura).
+def _difficulty_fit_for(
+    context: object, challenge: dict[str, int], tolerance: int
+) -> dict:
+    """`difficulty_fit` del contexto servido contra el reto (V3.52, pura).
 
-    Si la banda pedida no existe en el pool (p. ej. la modalidad filtrada no
-    tiene contextos tan difíciles), degrada con gracia a lo MÁS DIFÍCIL
-    disponible: nunca devuelve algo más plano de lo necesario ni deja el pool
-    vacío. Con `floor <= 1` devuelve el pool intacto. Nunca lanza.
+    Devuelve `{challenge, dimensions, distance, max_overshoot, within,
+    tolerance}`. Con reto vacío el encaje es vacuo (`within=True`): no había nada
+    que comparar y la elección no se filtró. Nunca lanza.
     """
-    if floor <= 1 or not pool:
-        return pool
-    band = [
-        context
-        for context in pool
-        if difficulty_from_vector(context.get("difficulty_vector")) >= floor
-    ]
-    if band:
-        return band
-    best = max(
-        difficulty_from_vector(context.get("difficulty_vector"))
-        for context in pool
+    if not challenge:
+        return {
+            "challenge": {},
+            "dimensions": 0,
+            "distance": 0,
+            "max_overshoot": 0,
+            "within": True,
+            "tolerance": tolerance,
+        }
+    vector = (
+        (context or {}).get("difficulty_vector")
+        if isinstance(context, dict)
+        else None
     )
-    return [
-        context
-        for context in pool
-        if difficulty_from_vector(context.get("difficulty_vector")) == best
-    ]
+    result = difficulty.fit(vector, challenge, tolerance=tolerance)
+    return {
+        "challenge": dict(challenge),
+        "dimensions": result["dimensions"],
+        "distance": result["distance"],
+        "max_overshoot": result["max_overshoot"],
+        "within": result["within"],
+        "tolerance": tolerance,
+    }
+
+
+def _normalize_source(value: object) -> str:
+    """Fuente del suelo normalizada a minúsculas ("" si no se aporta) (pura)."""
+    return str(value or "").strip().lower()
+
 
 # ---------------------------------------------------------------------------
 # V3.46 (P1-03 de la auditoría de V3.43.0): CONDICIÓN DE RECUPERACIÓN.
@@ -1237,15 +1226,16 @@ def context_for(
     level: object = "",
     skill: object = "",
     learner_level: object = "",
+    learner_level_source: object = "",
     skill_priorities: object = None,
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.51, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.52, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
     unscaffolded, cefr, difficulty_vector, difficulty, skills, target_skill,
     assessed_skill, assessment_mode, item_level, learner_level,
-    skill_priorities}`. La consigna es
+    learner_level_source, difficulty_fit, skill_priorities}`. La consigna es
     la del banco; el escenario **no contiene la unidad objetivo** salvo en la
     condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46) es la
     condición de recuperación SERVIDA: la deriva el llamador del estado de
@@ -1260,14 +1250,14 @@ def context_for(
        nivel igual o inferior (y, si ninguno es alcanzable, los del nivel más
        cercano por arriba). Sin `level` el comportamiento es el de V3.46;
     1c. V3.50: si se aporta una `skill` (la modalidad limitante del ítem), se
-       prefieren los contextos que la declaran en `skills`; y se prefiere la
-       banda de dificultad alcanzable (`_difficulty_band`), para no servir el
-       contexto más plano del banco a un alumno avanzado. Ambos filtros son
-       PREFERENCIAS con degradación con gracia: si dejan el pool vacío, se
-       ignoran;
-    1d. V3.51 (P1-02): `learner_level` (nivel DEMOSTRADO del alumno) eleva el
-       suelo de dificultad sobre el CEFR del ítem (`level`, que actúa de techo);
-       sin él el resultado es idéntico a V3.50. `skill_priorities` es informativo
+       prefieren los contextos que la declaran en `skills`. Es una PREFERENCIA
+       con degradación con gracia: si deja el pool vacío, se ignora;
+    1d. V3.52 (P1-02): `level` (CEFR del ítem: TECHO lingüístico) y
+       `learner_level` (nivel del alumno: SUELO de reto) se comparan VECTOR
+       contra VECTOR por dimensión con el Difficulty Engine 2.0
+       (`services.difficulty`); `learner_level_source` fija la tolerancia
+       (estricta solo si el suelo es DEMOSTRADO). Sin niveles reconocibles el
+       comportamiento es el de V3.46/V3.47. `skill_priorities` es informativo
        (se devuelve tal cual para explicar la elección);
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
@@ -1309,16 +1299,14 @@ def context_for(
         pool = list(TRANSFER_CONTEXTS)
     # V3.47: ajusta al nivel del alumno (sin nivel reconocible, pool intacto).
     pool = _within_level(pool, level)
-    # V3.50: el mínimo de dificultad se calcula sobre TODO el alcance del nivel
-    # (antes de filtrar por modalidad, para no rebajar el objetivo al filtrar) y
-    # luego se prioriza la modalidad limitante y la banda. Ambos filtros degradan
-    # con gracia: si la modalidad no tiene contextos, se ignora; si la banda no
-    # existe, se queda con lo más difícil disponible.
-    # V3.51: el suelo se ancla al nivel DEMOSTRADO del alumno (si lo hay) sin
-    # perder el techo del CEFR del ítem (`_difficulty_floor(level, learner_level)`).
-    floor = _difficulty_floor(pool, level, learner_level)
+    # V3.50/V3.52: primero se prefiere la modalidad limitante y DESPUÉS se aplica
+    # el Difficulty Engine 2.0 sobre ese pool. El reto objetivo solo depende de
+    # los niveles (ítem/alumno), así que filtrar por modalidad no lo rebaja.
     pool = _filter_skill(pool, skill)
-    pool = _within_band(pool, floor)
+    challenge, tolerance = _challenge_and_tolerance(
+        level, learner_level, learner_level_source
+    )
+    pool = difficulty.select_by_difficulty(pool, challenge, tolerance=tolerance)
     # V3.51: dimensiones semánticas de la tarea (idénticas en todos los retornos).
     # `target_skill` es lo que la tarea quiere provocar: la modalidad limitante
     # que pidió el llamador si la hay, o el eje propio del transfer. Los niveles
@@ -1334,6 +1322,7 @@ def context_for(
         if cefr_index(learner_level) >= 0
         else ""
     )
+    level_source = _normalize_source(learner_level_source)
     priorities = (
         {str(k): float(v) for k, v in skill_priorities.items()}
         if isinstance(skill_priorities, dict)
@@ -1361,6 +1350,9 @@ def context_for(
             "assessment_mode": assessment_mode,
             "item_level": item_level,
             "learner_level": learner,
+            # V3.52: origen del suelo y encaje del reto (aditivos).
+            "learner_level_source": level_source,
+            "difficulty_fit": _difficulty_fit_for(None, challenge, tolerance),
             "skill_priorities": priorities,
         }
     if success:
@@ -1397,6 +1389,10 @@ def context_for(
         "assessment_mode": assessment_mode,
         "item_level": item_level,
         "learner_level": learner,
+        # V3.52 (P1-02): origen del suelo y encaje VECTOR a VECTOR del contexto
+        # servido contra el reto objetivo (aditivos).
+        "learner_level_source": level_source,
+        "difficulty_fit": _difficulty_fit_for(context, challenge, tolerance),
         "skill_priorities": priorities,
     }
 

@@ -28,6 +28,7 @@ from services import (
     lexicon,
     planner,
     recall,
+    student_state,
     task_semantics,
     transfer,
 )
@@ -849,25 +850,41 @@ def _transfer_target_skill(
     return max(candidates, key=lambda skill: priorities[skill])
 
 
-async def _learner_level(user_id: str) -> str:
-    """Nivel CEFR DEMOSTRADO del alumno, cacheado por el Student Model (V3.51).
+async def _learner_level_state(user_id: str) -> dict:
+    """Estado de nivel del alumno desde la caché del Student Model (V3.52).
 
-    Lee `learning_profile.cefr_level` (fila única, coste O(1)), la caché que
-    `/api/profile` escribe al calcular el Student Model
-    (`domain.profile.get_profile_summary` → `repositories.profile.set_cefr`).
-    NO se recalcula el Student Model en el camino caliente del drill: el drill
-    no debe pagar el agregado completo por un contexto. Devolver "" (perfil
-    ausente o nivel no reconocido) mantiene EXACTAMENTE el comportamiento de
-    V3.50, que anclaba la dificultad al CEFR del ítem.
+    Lee `learning_profile` (fila única, coste O(1)) y aplica
+    `student_state.level_state`: la caché guarda los niveles SEPARADOS que
+    escribe `domain.profile.get_profile_summary` — `estimated_level` (banda de
+    práctica continua) y `demonstrated_level` (certificación con retención) — y
+    conserva `cefr_level` como nivel DECLARADO/legacy (filas migradas de V3.51).
 
-    Nunca lanza: la dificultad es una preferencia, no un bloqueo.
+    Devuelve `{practice_level, estimated_cefr, demonstrated_cefr, floor_level,
+    floor_source}`. El suelo prioriza lo DEMOSTRADO sobre lo estimado y lo
+    declarado; sin nivel conocido devuelve el estado vacío y el drill conserva el
+    comportamiento de V3.46/V3.47 (el motor de dificultad no filtra). NO se
+    recalcula el Student Model en el camino caliente del drill. Nunca lanza.
     """
     try:
         row = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — preferencia no bloqueante
-        return ""
-    level = str((row or {}).get("cefr_level") or "").strip().upper()
-    return level if transfer.cefr_index(level) >= 0 else ""
+        return student_state.empty_state()
+    row = row or {}
+    return student_state.level_state(
+        practice_level=row.get("cefr_level") or "",
+        estimated_cefr=row.get("estimated_level") or "",
+        demonstrated_cefr=row.get("demonstrated_level") or "",
+    )
+
+
+async def _learner_level(user_id: str) -> str:
+    """Suelo CEFR del alumno (compatibilidad V3.51): string de `floor_level`.
+
+    Se conserva para los llamadores que solo necesitan el nivel; el origen
+    (`floor_source`) se consulta con `_learner_level_state`. Nunca lanza.
+    """
+    state = await _learner_level_state(user_id)
+    return state["floor_level"]
 
 
 async def get_transfer_context(user_id: str, word: str) -> dict:
@@ -907,8 +924,11 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     row = _row_for_word(rows, word) or {}
     # V3.51: vector completo de prioridades (explicabilidad), modalidad que el
     # transfer puede realmente EVALUAR y nivel demostrado del alumno (suelo).
+    # V3.52: el suelo llega con su FUENTE (demostrado/estimado/declarado) para
+    # que el motor de dificultad elija la tolerancia.
     priorities = _transfer_priorities(row, summary)
     skill = _transfer_target_skill(row, summary, priorities)
+    learner_state = await _learner_level_state(user_id)
     return transfer.context_for(
         word,
         used,
@@ -916,7 +936,8 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
         condition=condition,
         level=row.get("cefr") or "",
         skill=skill,
-        learner_level=await _learner_level(user_id),
+        learner_level=learner_state["floor_level"],
+        learner_level_source=learner_state["floor_source"],
         skill_priorities=priorities,
     )
 
@@ -979,6 +1000,7 @@ async def submit_transfer_attempt(
     # para que ambos caminos deriven el MISMO `context_id`.
     priorities = _transfer_priorities(row, summary)
     if not context_id:
+        learner_state = await _learner_level_state(user_id)
         context_id = transfer.context_for(
             word,
             (summary.get("contexts") or {}).keys(),
@@ -986,7 +1008,8 @@ async def submit_transfer_attempt(
             condition=condition,
             level=row.get("cefr") or "",
             skill=_transfer_target_skill(row, summary, priorities),
-            learner_level=await _learner_level(user_id),
+            learner_level=learner_state["floor_level"],
+            learner_level_source=learner_state["floor_source"],
             skill_priorities=priorities,
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)

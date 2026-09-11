@@ -9,31 +9,76 @@ from repositories.users import get_user
 
 
 def get_profile(user_id: str) -> dict | None:
-    """Devuelve el perfil almacenado o None si no existe."""
+    """Devuelve el perfil almacenado o None si no existe.
+
+    V3.52: además de `cefr_level` (compatibilidad) expone `estimated_level` y
+    `demonstrated_level` (niveles SEPARADOS de la caché del Student Model).
+    """
     with closing(_conn()) as conn:
         row = conn.execute(
-            "SELECT user_id, cefr_level, updated_at FROM learning_profile "
-            "WHERE user_id = ?",
+            "SELECT user_id, cefr_level, estimated_level, demonstrated_level, "
+            "updated_at FROM learning_profile WHERE user_id = ?",
             (user_id,),
         ).fetchone()
     return dict(row) if row is not None else None
 
 
-def set_cefr(user_id: str, level: str) -> dict | None:
-    """Persiste (upsert) el nivel CEFR del usuario. Devuelve None si el usuario
-    no existe."""
+def set_level_state(
+    user_id: str,
+    *,
+    estimated_level: str,
+    demonstrated_level: str,
+    cefr_level: str | None = None,
+) -> dict | None:
+    """Persiste (upsert) el estado de nivel del usuario (V3.52).
+
+    `estimated_level` es la banda de práctica continua (lo que históricamente
+    guardaba `cefr_level`) y `demonstrated_level` el nivel certificado ("" hasta
+    la primera certificación). `cefr_level` se conserva por compatibilidad: si no
+    se aporta, toma el valor del estimado. Devuelve None si el usuario no existe.
+    """
     if get_user(user_id) is None:
         return None
+    legacy = estimated_level if cefr_level is None else cefr_level
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
-            "INSERT INTO learning_profile (user_id, cefr_level, updated_at) "
-            "VALUES (?, ?, ?) "
+            "INSERT INTO learning_profile "
+            "(user_id, cefr_level, estimated_level, demonstrated_level, updated_at) "
+            "VALUES (?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET "
-            "cefr_level = excluded.cefr_level, updated_at = excluded.updated_at",
-            (user_id, level, now),
+            "cefr_level = excluded.cefr_level, "
+            "estimated_level = excluded.estimated_level, "
+            "demonstrated_level = excluded.demonstrated_level, "
+            "updated_at = excluded.updated_at",
+            (user_id, legacy, estimated_level, demonstrated_level, now),
         )
-    return {"user_id": user_id, "cefr_level": level, "updated_at": now}
+    return {
+        "user_id": user_id,
+        "cefr_level": legacy,
+        "estimated_level": estimated_level,
+        "demonstrated_level": demonstrated_level,
+        "updated_at": now,
+    }
+
+
+def set_cefr(user_id: str, level: str) -> dict | None:
+    """Persiste (upsert) el nivel CEFR ESTIMADO del usuario (compatibilidad).
+
+    Wrapper histórico de V3.51: antes escribía solo `cefr_level`, que en realidad
+    cachaba el nivel ESTIMADO. En V3.52 delega en `set_level_state` para que la
+    caché quede coherente (`cefr_level` y `estimated_level` con el mismo valor)
+    sin pisar un `demonstrated_level` ya certificado. Devuelve None si el usuario
+    no existe.
+    """
+    existing = get_profile(user_id) or {}
+    demonstrated = str(existing.get("demonstrated_level") or "")
+    return set_level_state(
+        user_id,
+        estimated_level=level,
+        demonstrated_level=demonstrated,
+        cefr_level=level,
+    )
 
 
 def record_cefr_snapshot(

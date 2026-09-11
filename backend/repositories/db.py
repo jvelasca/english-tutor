@@ -267,11 +267,30 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS learning_profile (
                 user_id TEXT PRIMARY KEY,
                 cefr_level TEXT NOT NULL DEFAULT 'A1',
+                estimated_level TEXT NOT NULL DEFAULT '',
+                demonstrated_level TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
+        # V3.52 (P1-01 de la auditoría de V3.51): se separa el nivel ESTIMADO
+        # (banda de práctica continua, el que históricamente guardaba
+        # `cefr_level`) del nivel DEMOSTRADO (certificación con retención). Ambos
+        # son aditivos; `cefr_level` se conserva intacto por compatibilidad y las
+        # filas legacy quedan en '' (el siguiente `/api/profile` reescribe la
+        # caché con ambos). Migración idempotente columna a columna.
+        profile_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(learning_profile)")
+        }
+        for _col, _type in (
+            ("estimated_level", "TEXT NOT NULL DEFAULT ''"),
+            ("demonstrated_level", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if _col not in profile_cols:
+                conn.execute(
+                    f"ALTER TABLE learning_profile ADD COLUMN {_col} {_type}"
+                )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS settings (

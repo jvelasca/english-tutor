@@ -106,6 +106,9 @@ class LearningProfile(BaseModel):
     user_id: str
     current_level: str
     estimated_level: str
+    # V3.52 (P1-01): nivel DEMOSTRADO (certificación con retención). `None`
+    # mientras no exista; NUNCA se rellena con el estimado.
+    demonstrated_level: str | None = None
     estimated_bands: EstimatedBands
     estimated_descriptor: str
     estimated_confidence: float

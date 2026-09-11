@@ -167,6 +167,9 @@ async def _compute_profile(user_id: str) -> dict | None:
         "user_id": user_id,
         "current_level": student_model["current_level"],
         "estimated_level": level,
+        # V3.52 (P1-01): el nivel DEMOSTRADO se expone aparte del estimado. Es
+        # `None` mientras no haya certificación con retención (nunca hipotético).
+        "demonstrated_level": student_model["demonstrated_level"],
         "estimated_bands": bands,
         "estimated_descriptor": level_descriptor(level),
         "estimated_confidence": student_model["confidence"],
@@ -225,7 +228,16 @@ async def get_profile_summary(user_id: str) -> dict | None:
     profile = await _compute_profile(user_id)
     if profile is None:
         return None
-    await run_in_threadpool(profile_repo.set_cefr, user_id, profile["estimated_level"])
+    # V3.52 (P1-01): la caché guarda AMBOS niveles. `cefr_level` se mantiene con
+    # el estimado por compatibilidad; el suelo del drill lee `demonstrated_level`
+    # (certificación) y cae al estimado solo si no existe.
+    await run_in_threadpool(
+        profile_repo.set_level_state,
+        user_id,
+        estimated_level=profile["estimated_level"],
+        demonstrated_level=profile["demonstrated_level"] or "",
+        cefr_level=profile["estimated_level"],
+    )
     await _maybe_record_snapshot(user_id, profile)
     history = await run_in_threadpool(profile_repo.list_cefr_history, user_id)
     profile["cefr_history"] = [

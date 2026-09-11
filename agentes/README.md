@@ -5,13 +5,14 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.51.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.51 (Task/Skill semantics + learner-level
-> difficulty matching) ya está ejecutada y publicada; el siguiente incremento
-> (V3.52+: Sense Engine 2.0 / semantic appropriateness / Adaptive Planner 2.0 /
-> entrega oral real del transfer) aún no tiene briefing. Antes de lanzar
-> cualquier subagente, lee esa sección para no partir de un estado obsoleto
-> (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
+> **Estado actual (2026-09-11): `v3.52.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.52 (Student Skill State + Difficulty Engine 2.0)
+> ya está ejecutada; cierra los dos P1 de la auditoría externa de V3.51. El
+> siguiente incremento (V3.53+: Sense Engine 2.0 / `assessed_skill`→planner y
+> `skill_priorities`→`select_task` (V3.55) / Adaptive Planner 2.0 / entrega oral
+> real del transfer) aún no tiene briefing. Antes de lanzar cualquier subagente,
+> lee esa sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al
+> saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
 
@@ -28,6 +29,13 @@ pedir más contexto.
   (repo/tag `v3.50.0`/commit `1c8d6e0`, run de CI 6/6), con alcance, método
   reproducible, preguntas concretas y formato de informe
   (`docs/audit/Q-AUDITORIA-TOTAL-V350.md`).
+- `agentes/v352-student-state-difficulty.md` — **V3.52 (ejecutado, 2026-09-11,
+  v3.52.0)**: Student level state (separación `practice`/`estimated`/`demonstrated`
+  con el demostrado como suelo, migración aditiva de `learning_profile` y lectura
+  O(1) en el drill) + Difficulty Engine 2.0 por dimensión (`CEFR_CAPACITY`,
+  `challenge_vector`, `fit`, `select_by_difficulty` con degradación por mínima
+  distancia). Cierra los dos P1 de la auditoría externa de V3.51. **Histórico,
+  hecho**; ver `release-notes-v3.52.0.md`.
 - `agentes/v351-task-skill-semantics.md` — **V3.51 (ejecutado, 2026-09-11,
   v3.51.0)**: Task/Skill semantics (separación `target_skill`/`assessed_skill`/
   `assessment_mode`/`evidence_skill` con el transfer midiendo producción ESCRITA,

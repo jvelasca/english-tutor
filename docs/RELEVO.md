@@ -5,6 +5,53 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.52.0 (Student Skill State + Difficulty Engine
+> 2.0)** — release **v3.52.0**, ADITIVA con **dos columnas de BD** que NO cambia
+> la escalera `transfer_state`, sus umbrales, `context_signals`,
+> `context_diversity`, el scoring ni FSRS: cierra los DOS P1 de la auditoría
+> externa de V3.51. **P1-01 (el `learner_level` no era el demostrado):** nuevo
+> módulo PURO `services/student_state.py` (`LEVEL_SOURCES`, `floor_level`,
+> `level_state`, `is_certified`, `empty_state`) que separa `practice_level` /
+> `estimated_cefr` / `demonstrated_cefr` y deriva el SUELO de dificultad con la
+> política conservadora **demostrado > estimado > declarado > ninguno** (el
+> demostrado gana aunque su banda sea inferior: acredita retención; solo él exige
+> `certification_gate` y usa tolerancia estricta). Migración aditiva:
+> `learning_profile.estimated_level`/`demonstrated_level` (CREATE TABLE + bucle
+> idempotente `ALTER TABLE`, filas legacy `''` que siguen alimentando el suelo
+> como nivel DECLARADO `practice`), conservando `cefr_level`;
+> `repositories.profile.get_profile` devuelve las dos columnas y nueva
+> `set_level_state` (`set_cefr` queda de wrapper que no pisa el demostrado);
+> `domain.profile.get_profile_summary` escribe AMBOS niveles y expone
+> `demonstrated_level` (aditivo en `schemas/profile.py`); nuevo
+> `domain.vocabulary._learner_level_state` lee la caché en O(1) (sin recalcular
+> el Student Model) y pasa `learner_level` + `learner_level_source` a
+> `context_for` con paridad GET↔POST. **P1-02 (el floor mezclaba escalas):**
+> nuevo módulo PURO `services/difficulty.py` (`DIFFICULTY_DIMENSIONS`,
+> `CEFR_CAPACITY` monótona con la `interaction` retrasada en A1–B1, `capacity_for`,
+> `challenge_vector` = máximo por dimensión entre ítem (techo) y alumno (suelo),
+> `fit` con distancia/`max_overshoot`/`within`, `select_by_difficulty` que
+> conserva los `within` y, entre ellos, los de menor distancia, degradando al más
+> cercano si ninguno encaja — nunca al más difícil; tolerancias
+> `DIFFICULTY_TOLERANCE = 1` demostrado / `DIFFICULTY_TOLERANCE_ESTIMATED = 2`).
+> `services/transfer.py` sustituye `_difficulty_floor`/`_within_band` escalares
+> por el motor (el TECHO lingüístico del ítem sigue en `_within_level: una
+> unidad A1 con alumno C2 NO recibe contextos > A1`; `TRANSFER_DIFFICULTY_BAND`
+> queda DEPRECADA y `TRANSFER_DIFFICULTY_KEYS` pasa a alias del vocabulario
+> canónico) y su retorno gana `difficulty_fit` + `learner_level_source`
+> (aditivos; `difficulty`/`difficulty_vector` se conservan). Contratos aditivos
+> `TransferContextOut.learner_level_source`/`difficulty_fit`,
+> `LearningProfile.demonstrated_level` y espejo opcional en `types/api.ts`
+> (`DrillTransferContext`/`DrillDifficultyFit`). **Deuda confirmada y diferida
+> (V3.55):** `assessed_skill` → decisión del planner y `skill_priorities` →
+> `select_task` (evitar el doble conteo de `written_production` con el drill
+> `write`). Tests: pytest **2158 passed** (+39: `test_student_state_v352.py` 15 y
+> `test_difficulty_engine_v352.py` 24; ajuste de
+> `test_learner_level_raises_the_difficulty_floor` a `difficulty_fit`), `ruff`
+> limpio, `check_release_consistency` **3.52.0** exit 0. Fuera de alcance:
+> Sense Engine 2.0, `observed_difficulty` persistido, entrega oral real del
+> transfer, `expected_learning_value`/Adaptive Planner 2.0, Context Bank
+> Family/Instance, offline TTS y code splitting del frontend.
+>
 > **Nota (2026-09-11):** **V3.51.0 (Task/Skill semantics + learner-level
 > difficulty matching)** — release **v3.51.0**, ADITIVA con **una columna de BD**
 > que NO cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS:

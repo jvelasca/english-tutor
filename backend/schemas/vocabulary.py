@@ -727,6 +727,10 @@ class TransferContextOut(BaseModel):
 
     V3.50: `skills` (aditivo) declara las competencias que ejercita el contexto
     servido, con el vocabulario `services.transfer.CONTEXT_SKILLS`.
+
+    V3.52: `learner_level_source` y `difficulty_fit` (aditivos) explican de dónde
+    viene el suelo de dificultad y cómo encaja el contexto servido contra el reto
+    por dimensión.
     """
 
     word: str
@@ -764,6 +768,12 @@ class TransferContextOut(BaseModel):
     item_level: str = ""
     learner_level: str = ""
     skill_priorities: dict[str, float] = Field(default_factory=dict)
+    # V3.52 (Difficulty Engine 2.0): ORIGEN del suelo de dificultad
+    # (`demonstrated`/`estimated`/`practice`/`none`) y encaje VECTOR a VECTOR del
+    # contexto servido contra el reto objetivo (`challenge`, `distance`,
+    # `max_overshoot`, `within`, `tolerance`). Aditivos y solo explicativos.
+    learner_level_source: str = ""
+    difficulty_fit: dict = Field(default_factory=dict)
 
 
 class TransferAttemptIn(BaseModel):

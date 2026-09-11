@@ -268,13 +268,25 @@ def test_unknown_learner_level_degrades_gracefully():
 
 
 def test_learner_level_raises_the_difficulty_floor():
-    # Ítem B1 (techo bajo) con alumno C1 (suelo alto): el contexto servido no
-    # puede ser tan plano como el de V3.50, que solo miraba el ítem.
+    # Ítem B1 (techo bajo) con alumno C1 (suelo alto): el RETO objetivo sube por
+    # dimensión, de modo que el contexto servido no puede quedarse tan plano como
+    # en el caso de solo-ítem de V3.50. La comparación es VECTOR a VECTOR (V3.52),
+    # no escalar: es el P1-02 de la auditoría de V3.51.
     item_only = transfer.context_for("travel", level="B1")
     with_learner = transfer.context_for("travel", level="B1", learner_level="C1")
+    item_challenge = item_only["difficulty_fit"]["challenge"]
+    learner_challenge = with_learner["difficulty_fit"]["challenge"]
+    assert set(learner_challenge) == set(transfer.TRANSFER_DIFFICULTY_KEYS)
+    assert all(
+        learner_challenge[dimension] >= item_challenge[dimension]
+        for dimension in transfer.TRANSFER_DIFFICULTY_KEYS
+    )
+    assert learner_challenge != item_challenge
+    # El contexto servido no es más plano y el TECHO del ítem se respeta.
     assert with_learner["difficulty"] >= item_only["difficulty"]
     assert with_learner["item_level"] == "B1"
     assert with_learner["learner_level"] == "C1"
+    assert transfer.cefr_index(with_learner["cefr"]) <= transfer.cefr_index("B1")
 
 
 def test_context_exposes_the_semantic_dimensions():

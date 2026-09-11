@@ -563,6 +563,19 @@ export interface DrillTransferContext {
   item_level?: string;
   learner_level?: string;
   skill_priorities?: Record<string, number>;
+  // V3.52 (Difficulty Engine 2.0): origen del suelo de dificultad y encaje del
+  // contexto servido contra el reto por dimensión (aditivos, solo explicativos).
+  learner_level_source?: string;
+  difficulty_fit?: DrillDifficultyFit;
+}
+
+export interface DrillDifficultyFit {
+  challenge?: Record<string, number>;
+  dimensions?: number;
+  distance?: number;
+  max_overshoot?: number;
+  within?: boolean;
+  tolerance?: number;
 }
 
 export interface DrillTransferAttempt {
