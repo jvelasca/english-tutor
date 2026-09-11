@@ -29,7 +29,9 @@
 > SÍ discrimina con un contexto sintético. **(C)** etiqueta `v3.52.1` creada y
 > empujada (P3-04). Tests: pytest **2166 passed** en local (+2 netos), `ruff`
 > limpio, vitest **76 ficheros/651 tests**, `tsc` en verde y
-> `check_release_consistency` **3.52.2** exit 0. Ver
+> `check_release_consistency` **3.52.2** exit 0. **CI 6/6 en verde** (run
+> [34627238005](https://github.com/jvelasca/english-tutor/actions/runs/34627238005)
+> sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). Ver
 > `release-notes-v3.52.2.md` y, para el contexto de los hallazgos,
 > `docs/audit/Q-AUDITORIA-TOTAL-V352.md`.
 >

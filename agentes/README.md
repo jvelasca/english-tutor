@@ -17,7 +17,10 @@ pedir más contexto.
 > verificada: **CI 6/6 en verde** (runs
 > [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
 > sobre `89eff0b` y [34623244239](https://github.com/jvelasca/english-tutor/actions/runs/34623244239)
-> sobre `bdaaff9`). La **auditoría externa de V3.52 ya está ejecutada** (informe Q,
+> sobre `bdaaff9`). V3.52.2 también verificada: **CI 6/6 en verde** (run
+> [34627238005](https://github.com/jvelasca/english-tutor/actions/runs/34627238005)
+> sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). La **auditoría externa de
+> V3.52 ya está ejecutada** (informe Q,
 > sin P0/P1) y su briefing se conserva como histórico del método. Los P3-01/P3-02
 > quedan abiertos y aceptados. El siguiente incremento (V3.53+: P1-02 Learner Skill
 > State 2.0 / `observed_difficulty` y P1-03 Planner 2.0 / Expected Learning Value,

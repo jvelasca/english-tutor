@@ -93,9 +93,13 @@ auditoría), que faltaba desde el hotfix.
 
 ## Verificación
 
-- Backend: `ruff` limpio y `pytest` **2166 passed** en local (+2 netos: 3 tests
-  nuevos y 1 reemplazado). En CI serán 2164 + 2 skipped (los mismos 2 de
-  `test_stt_asr_integration.py`).
+- **CI 6/6 en verde** (run
+  [34627238005](https://github.com/jvelasca/english-tutor/actions/runs/34627238005)
+  sobre `a5e2d38`): Backend (ruff + pytest), Frontend (tsc + vitest + build),
+  Release consistency, Beta V3.0 gate, Content validation y Playwright E2E.
+- Backend: `ruff` limpio y `pytest` **2164 passed + 2 skipped** en CI (los 2 de
+  `test_stt_asr_integration.py`) y **2166 passed** en local (+2 netos: 3 tests
+  nuevos y 1 reemplazado).
 - Frontend: `vitest` **76 ficheros/651 tests**, `tsc --noEmit` y `npm run build`
   en verde (sin cambios de contrato, el espejo `DrillDifficultyFit` no cambia).
 - Scripts: `check_release_consistency.py` (**3.52.2**), `check_beta_v3.py`,
