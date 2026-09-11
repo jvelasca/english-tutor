@@ -5,7 +5,7 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-10): `v3.38.1`** — ver `docs/RELEVO.md` (nota superior
+> **Estado actual (2026-09-11): `v3.43.0`** — ver `docs/RELEVO.md` (nota superior
 > y sección 0 "START HERE").
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
@@ -20,6 +20,10 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v343-transfer-2.md` — **V3.43 (ejecutado, 2026-09-11, v3.43.0)**:
+  Transfer 2.0 (target oculto, semanticidad determinista, diversidad contextual
+  real y `transfer_state`). Cierra los 4 P1 de la auditoría de V3.42.0.
+  **Histórico, hecho**; ver `release-notes-v3.43.0.md`.
 - `agentes/v338-situacion-planner.md` — **V3.38 (ejecutado, 2026-09-10,
   v3.38.0)**: `situación` como techo de la escalera + planner (Optimal Next Task)
   + automaticidad por skill. **Histórico, hecho**; ver

@@ -263,13 +263,14 @@ async def drill_transfer_context(
     word: str = Query(..., min_length=1, max_length=120),
     user: dict = Depends(current_user),
 ) -> dict:
-    """Consigna de TRANSFERENCIA del drill (V3.40, Fase 4).
+    """Consigna de TRANSFERENCIA del drill (V3.40 → V3.43).
 
     Servicio de solo lectura: elige un contexto NUEVO (banco curado) que el ítem
-    aún no haya usado con éxito, para que el alumno use la unidad por decisión
-    propia. NO incluye la forma esperada ni ayuda con la unidad: la consigna da
-    el escenario, la producción es del alumno (modalidad `spontaneous_use`). El
-    `context_id` que devuelve es el que el intento registra en el ledger.
+    aún no haya usado, priorizando el más DISTANTE de los ya logrados con éxito
+    (V3.43/P1-03). La consigna da un ESCENARIO y un objetivo comunicativo y
+    **nunca contiene la unidad objetivo** (V3.43/P1-01): la producción es del
+    alumno (modalidad `spontaneous_use`). El `context_id` que devuelve es el que
+    el intento registra en el ledger.
     """
     normalized = (word or "").strip()
     if not normalized:
@@ -287,15 +288,18 @@ async def drill_transfer_attempt(
     body: TransferAttemptIn,
     user: dict = Depends(current_user),
 ) -> dict:
-    """Intento del paso Transfer del drill (V3.40, Fase 4).
+    """Intento del paso Transfer del drill (V3.40 → V3.43).
 
     El alumno usa la unidad en un contexto NUEVO. Puntúa el servidor (premisa
     21) de forma determinista y sin LLM: unidad alineada + longitud mínima
-    (`services.lexicon.score_transfer_attempt`). Al superarlo se acredita la
-    modalidad `spontaneous_use` con evidencia `activity_id="drill:transfer"` y el
-    `context_id` del contexto nuevo — el éxito en >= 2 contextos distintos es lo
-    que demuestra la transferencia contextual real. En fallo también se registra
-    el intento clasificado. No graba recuperación ni FSRS y no declara dominio.
+    (`services.lexicon.score_transfer_attempt`), más un proxy de ADECUACIÓN
+    semántica (V3.43/P1-02) que separa el uso correcto del sospechoso sin
+    bloquear el éxito léxico. Al superarlo se acredita la modalidad
+    `spontaneous_use` con evidencia `activity_id="drill:transfer"` y el
+    `context_id` del contexto nuevo; un uso sospechoso añade
+    `error_type="semantic_mismatch"` y no cuenta como ÉXITO LIMPIO del estado de
+    transferencia. En fallo también se registra el intento clasificado. No graba
+    recuperación ni FSRS y no declara dominio.
     """
     result = await vocabulary_service.submit_transfer_attempt(
         user["id"],

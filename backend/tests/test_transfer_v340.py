@@ -102,7 +102,9 @@ def test_context_for_prefers_a_context_the_item_never_used():
     assert got["available"] is True
     assert got["context_id"] != "transfer:story"
     assert got["context_id"].startswith("transfer:")
-    assert '"travel"' in got["prompt"]
+    assert got["prompt"]
+    # V3.43 (P1-01): la consigna NUNCA contiene la unidad objetivo.
+    assert "travel" not in got["prompt"].lower()
 
 
 def test_context_for_is_deterministic_and_stable_across_calls():
@@ -147,9 +149,20 @@ def test_context_signals_count_transfer_by_distinct_success_contexts():
     assert signals["success_contexts"] == ["lexicon:writing"]
     assert signals["home_context"] == "lexicon:writing"
     assert signals["transfer"] is False
-
+    # V3.43 (P1-03): un contexto NO reconocido del banco no aporta diversidad;
+    # con un único contexto del banco la transferencia sigue sin demostrarse.
     rows.append({"context_id": "transfer:story", "success": 1})
-    assert context_signals(rows)["transfer"] is True
+    assert context_signals(rows)["transfer"] is False
+    # Dos contextos del banco con dimensiones distintas: transferencia real.
+    rows.append({"context_id": "transfer:future", "success": 1})
+    diverse = context_signals(rows)
+    assert diverse["transfer"] is True
+    assert set(diverse["clean_success_contexts"]) == {
+        "lexicon:writing",
+        "transfer:future",
+        "transfer:story",
+    }
+    assert diverse["context_diversity"]["diverse_dimensions"] >= 2
 
 
 def test_transfer_gap_and_has_contextual_transfer():
@@ -287,7 +300,11 @@ def test_transfer_context_endpoint_is_read_only_and_new(monkeypatch, tmp_path):
     body = res.json()
     assert body["available"] is True
     assert body["context_id"].startswith("transfer:")
-    assert "travel" in body["prompt"]
+    # V3.43 (P1-01): la consigna da un escenario, nunca la unidad objetivo.
+    assert body["prompt"]
+    assert "travel" not in body["prompt"].lower()
+    assert body["communicative_goal"]
+    assert body["discourse_type"]
     # El GET no escribe nada.
     assert evidence_repo.list_evidence(uid, "travel") == before
     # Pero el contexto nuevo queda en el ledger al intentar.

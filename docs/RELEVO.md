@@ -3,7 +3,48 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-10 (UTC+2).
+> Actualizado por última vez: 2026-09-11 (UTC+2).
+>
+> **Nota (2026-09-11):** **V3.43.0 (Transfer 2.0)** — release **v3.43.0** que
+> cierra los 4 P1 de la auditoría de V3.42.0 sobre la evidencia de transferencia.
+> **P1-01 (target oculto):** `services/transfer.py` reescribe
+> `TRANSFER_CONTEXTS` con atributos (`topic`, `communicative_goal`,
+> `discourse_type`, `social_relation`, `time_reference`, `register`,
+> `interaction_type`) y consignas que **nunca contienen `{word}`**;
+> `context_for(word, used_context_ids, *, success_context_ids)` ya no sustituye
+> el target, prioriza el contexto de mayor DISTANCIA mínima a los ya logrados y
+> expone `communicative_goal`/`discourse_type`. El drill oculta la palabra
+> también en `transfer` (cabecera con `transferHiddenTarget`, revelada tras el
+> intento) y la cola deja de mostrarla (`showsWord` sin `transfer`).
+> **P1-02 (semanticidad):** `score_transfer_attempt(word, text, *, pos="")`
+> separa `lexical_transfer` (alias de `passed`) de la adecuación
+> (`semantic_fit`/`adequacy` = `fit`/`suspect`/`unknown`) con un proxy
+> DETERMINISTA y advisory (`_semantic_fit`: POS `noun` usada como verbo o POS
+> `verb` tras determinante → `suspect`); el uso léxicamente correcto pero
+> sospechoso conserva `passed=True` y guarda `error_type="semantic_mismatch"`
+> (nueva `TRANSFER_ERROR_TYPES`), sin bloquear la evidencia léxica.
+> `domain/vocabulary.py` lee la `pos` de `dictionary_entries` y la pasa al
+> scorer; el drill muestra `dictionary.drill.transferSemanticWarning` sin dejar
+> de llamar a `onProduced`. Se documenta (P2-04) que `score_write_attempt`
+> acredita producción LÉXICA, no corrección gramatical ni ortográfica.
+> **P1-03 (diversidad real):** `context_signals` añade
+> `clean_contexts`/`clean_successes`/`clean_success_contexts`/`clean_success_days`
+> y `context_diversity` (ÉXITO LIMPIO = éxito sin `semantic_mismatch`); `transfer`
+> exige `>= CONTEXT_TRANSFER_MIN` contextos limpios **y**
+> `diverse_dimensions >= CONTEXT_DIVERSITY_MIN = 2`. **P1-04 (estado):** nueva
+> `transfer_state` + `TRANSFER_STATES` (`not_ready` → `emerging` →
+> `contextualized` → `transfer_demonstrated` → `transfer_stable` → `automatic`)
+> y `with_transfer_state`; `has_contextual_transfer`/`transfer_gap` leen el
+> estado (`transfer_state` respeta el booleano `transfer` de un resumen
+> legacy/parcial: lo lee como DEMOSTRADA, nunca estable) y `planned_signals`
+> expone `transfer_state`/`context_diversity`. Contratos HTTP aditivos
+> (`TransferContextOut`/`TransferAttemptOut`/`ReviewQueueItem`), sin migración.
+> Tests: pytest **1989 passed** (+14, `test_transfer_v343.py`; ajustes en
+> `test_transfer_v340.py` y `test_learning_evidence_v336.py`), vitest **70
+> ficheros/607 tests** (+1), `ruff` limpio, `tsc --noEmit` limpio, `npm run
+> build` y `check_release_consistency` **3.43.0** exit 0. Fuera de alcance
+> (V3.44): modelo *sense-aware*, Context Bank a escala y
+> `expected_learning_value`.
 >
 > **Nota (2026-09-10):** **V3.42.0 publicada (Fase 4 y CIERRE del plan maestro
 > V3.39+)** — release **v3.42.0** (**transferencia contextual real + actividad

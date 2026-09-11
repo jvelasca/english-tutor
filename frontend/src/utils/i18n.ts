@@ -403,16 +403,16 @@ const STRINGS: Record<string, Entry> = {
     en: "Word hidden — produce it in a sentence",
     es: "Palabra oculta — prodúcela en una frase",
   },
-  // V3.40: `write`/`transfer` muestran el recurso (la palabra), así que no
-  // necesitan texto "oculto"; se deja `transfer` por simetría y por si un
-  // cliente lo usa para una actividad abierta futura.
+  // V3.43 (P1-01): `transfer` ya NO muestra la palabra en la cola (la consigna
+  // da un escenario, no el target), así que se sirve la etiqueta de oculta. El
+  // `write` sí la muestra porque la palabra es el recurso de la tarea.
   "dictionary.review.hidden.write": {
     en: "Use the word shown above",
     es: "Usa la palabra de arriba",
   },
   "dictionary.review.hidden.transfer": {
-    en: "Use the word in a new situation",
-    es: "Usa la palabra en una situación nueva",
+    en: "Word hidden — use it on your own in a new situation",
+    es: "Palabra oculta — úsala por tu cuenta en una situación nueva",
   },
   "dictionary.review.overdue": {
     en: "overdue",
@@ -586,9 +586,21 @@ const STRINGS: Record<string, Entry> = {
     en: "Check answer",
     es: "Comprobar respuesta",
   },
+  // V3.43 (P1-01): la cabecera del paso Transfer no revela el target; la
+  // consigna da un escenario y el alumno decide si usa la unidad.
+  "dictionary.drill.transferHiddenTarget": {
+    en: "Word hidden — use it on your own",
+    es: "Palabra oculta — úsala por tu cuenta",
+  },
   "dictionary.drill.transferPassed": {
-    en: "Great! You used the word in a new situation — do it in another one to prove real transfer.",
-    es: "¡Bien! Has usado la palabra en una situación nueva — hazlo en otra para demostrar transferencia real.",
+    en: "Great! You used the word on your own in a new situation — repeat it in a different one to prove real transfer.",
+    es: "¡Bien! Has usado la palabra por tu cuenta en una situación nueva — repítelo en otra distinta para demostrar transferencia real.",
+  },
+  // V3.43 (P1-02): éxito léxico pero uso semánticamente sospechoso (proxy
+  // determinista): hubo producción, pero no cuenta como éxito limpio.
+  "dictionary.drill.transferSemanticWarning": {
+    en: "You used the word, but it doesn't seem to fit here. This attempt won't count as confirmed transfer yet — try it with its usual meaning.",
+    es: "Has usado la palabra, pero aquí no parece encajar. Este intento aún no cuenta como transferencia confirmada — pruébala con su significado habitual.",
   },
   "dictionary.drill.transferUnavailable": {
     en: "No new situation available for this word yet — try the Write step.",

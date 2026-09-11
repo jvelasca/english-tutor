@@ -46,13 +46,11 @@ const ACTIVITY_TONE: Record<ReviewActivity, string> = {
 };
 
 /** Actividades en las que la palabra es el RECURSO de la tarea (se muestra);
- * en Recall/Sentence es la DIANA (se oculta hasta el intento). */
+ * en Recall/Sentence/Transfer es la DIANA (se oculta hasta el intento).
+ * V3.43 (P1-01): Transfer deja de revelar la palabra en la cola: su consigna da
+ * un escenario, así que mostrar el target rompería la medida de transferencia. */
 function showsWord(activity: ReviewActivity): boolean {
-  return (
-    activity === "recognition" ||
-    activity === "write" ||
-    activity === "transfer"
-  );
+  return activity === "recognition" || activity === "write";
 }
 
 interface ReviewQueueSectionProps {

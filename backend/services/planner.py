@@ -34,8 +34,10 @@ from __future__ import annotations
 from services.evidence import (
     LEXICAL_SKILLS,
     RECALL_SKILL,
+    TRANSFER_DEMONSTRATED_STATES,
     automatic_skills,
     is_automatic,
+    transfer_state,
 )
 
 # Pesos declarados de la prioridad (suman 1.0). El olvido manda — es la razón de
@@ -316,26 +318,40 @@ def directed_production_gap(matrix: dict | None, evidence: dict | None) -> str:
 
 
 def has_contextual_transfer(evidence: dict | None) -> bool:
-    """¿La unidad se ha usado con éxito en >= 2 contextos distintos? (V3.40)."""
-    return bool((evidence or {}).get("transfer"))
+    """¿La unidad tiene transferencia contextual DEMOSTRADA? (V3.40 → V3.43).
+
+    V3.43 (P1-04): deja de bastar el booleano `transfer` (que exigía solo dos
+    `context_id` distintos, aunque fueran el mismo tipo de producción) y manda el
+    ESTADO: `transfer_demonstrated`, `transfer_stable` o `automatic`. Con un
+    resumen parcial sin `transfer_state` se cae al booleano histórico.
+    """
+    ev = evidence or {}
+    state = ev.get("transfer_state")
+    if state:
+        return state in TRANSFER_DEMONSTRATED_STATES
+    return bool(ev.get("transfer"))
 
 
 def transfer_gap(evidence: dict | None) -> bool:
-    """¿Toca TRANSFERIR la unidad a un contexto nuevo? (V3.40, puro).
+    """¿Toca TRANSFERIR la unidad a un contexto nuevo? (V3.40 → V3.43, puro).
 
     La auditoría de V3.38.1 (P1-03) pidió separar `situation` (recuperación
     contextualizada) de la transferencia real: usar la unidad en un contexto
     DISTINTO del de aprendizaje. `services.evidence.context_signals` aporta los
-    contextos con éxito; aquí se decide si es el momento de pedirla.
+    contextos con éxito limpio; aquí se decide si es el momento de pedirla.
 
     Exige, para no adelantarse:
     - que el ledger tenga contexto registrado (`context_attempts > 0`);
     - al menos `TRANSFER_MIN_SUCCESSES` éxitos (un solo uso aún se está
-      aprendiendo);
-    - éxito en AL MENOS un contexto (hay algo que transferir) y en MENOS de
-      `TRANSFER_MIN_SUCCESS_CONTEXTS` (aún no hay transferencia demostrada).
+      aprendiendo).
 
-    Sin ventana por contexto (resumen parcial) devuelve `False`: no se inventa.
+    V3.43 (P1-04): con `transfer_state` formalizado, el hueco se dispara en
+    `emerging` (un contexto limpio) y `contextualized` (varios contextos pero SIN
+    diversidad real: es justo cuando hay que empujar a un contexto distinto).
+    Desde `transfer_demonstrated` ya no hay hueco (`has_contextual_transfer`).
+
+    Sin `transfer_state` (resumen parcial) se mantiene el criterio histórico:
+    éxito en AL MENOS un contexto y en MENOS de `TRANSFER_MIN_SUCCESS_CONTEXTS`.
     """
     if not evidence:
         return False
@@ -353,6 +369,9 @@ def transfer_gap(evidence: dict | None) -> bool:
     )
     if successes < TRANSFER_MIN_SUCCESSES:
         return False
+    state = evidence.get("transfer_state")
+    if state:
+        return state in ("emerging", "contextualized")
     success_contexts = evidence.get("success_contexts")
     if isinstance(success_contexts, list):
         distinct = len([c for c in success_contexts if str(c or "").strip()])
@@ -511,6 +530,9 @@ def planned_signals(
     - `transfer` / `success_contexts` / `home_context` — V3.40: transferencia
       contextual (éxito en >= 2 contextos distintos) y los contextos con éxito,
       la señal que habilita la tarea `transfer` (`spontaneous_use`).
+    - `transfer_state` / `context_diversity` — V3.43: estado formalizado del eje
+      (sustituto gradual de `transfer`) y diversidad contextual real de los
+      contextos con éxito limpio (explicabilidad).
     """
     ev = evidence or {}
     mx = matrix or {}
@@ -561,6 +583,14 @@ def planned_signals(
         # V3.40 (Fase 4): transferencia contextual (contexto distinto del de
         # aprendizaje). Señal del ítem, no de una modalidad.
         "transfer": has_contextual_transfer(ev),
+        # V3.43 (P1-03/P1-04): estado formalizado y diversidad contextual real
+        # (explicabilidad; `transfer` se conserva como booleano de compatibilidad).
+        "transfer_state": ev.get("transfer_state") or transfer_state(ev),
+        "context_diversity": (
+            dict(ev["context_diversity"])
+            if isinstance(ev.get("context_diversity"), dict)
+            else {}
+        ),
         "transfer_gap": transfer_gap(ev),
         "success_contexts": list(ev.get("success_contexts") or []),
         "home_context": ev.get("home_context") or "",

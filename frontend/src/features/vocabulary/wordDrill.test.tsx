@@ -214,13 +214,15 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     vi.clearAllMocks();
   });
 
-  it("initialStep='transfer' carga la consigna de contexto nuevo", async () => {
+  it("initialStep='transfer' carga la consigna sin revelar el target (V3.43)", async () => {
     mocks.getDrillTransferContext.mockResolvedValue({
       word: "river",
       context_id: "transfer:story",
-      topic: "story",
-      prompt: 'Tell a short story about your day using "river".',
+      topic: "personal_experience",
+      prompt: "Tell a short story about something that happened to you recently.",
       available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
     });
     renderDrill("transfer");
 
@@ -229,8 +231,13 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
     expect(mocks.getDrillSentenceContext).not.toHaveBeenCalled();
     expect(
-      await screen.findByText(/Tell a short story about your day/),
+      await screen.findByText(/Tell a short story about something/),
     ).toBeTruthy();
+    // V3.43 (P1-01): la cabecera NO revela la palabra y la consigna no la lleva.
+    expect(
+      screen.getAllByText("Word hidden — use it on your own").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("river")).toBeNull();
   });
 
   it("un acierto envía el context_id y avisa al padre", async () => {
@@ -238,9 +245,11 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     mocks.getDrillTransferContext.mockResolvedValue({
       word: "river",
       context_id: "transfer:story",
-      topic: "story",
-      prompt: 'Tell a short story about your day using "river".',
+      topic: "personal_experience",
+      prompt: "Tell a short story about something that happened to you recently.",
       available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
     });
     mocks.submitDrillTransferAttempt.mockResolvedValue({
       word: "river",
@@ -250,6 +259,9 @@ describe("WordDrill paso Transfer (V3.40)", () => {
       word_count: 8,
       passed: true,
       error_type: "correct",
+      lexical_transfer: true,
+      semantic_fit: true,
+      adequacy: "fit",
     });
     renderDrill("transfer", onProduced);
 
@@ -267,8 +279,50 @@ describe("WordDrill paso Transfer (V3.40)", () => {
         expect.any(Number),
       ),
     );
-    expect(await screen.findByText(/used the word in a new situation/)).toBeTruthy();
+    expect(
+      await screen.findByText(/used the word on your own in a new situation/),
+    ).toBeTruthy();
     expect(onProduced).toHaveBeenCalledTimes(1);
+  });
+
+  it("un uso léxico con adecuación sospechosa avisa y no declara transferencia limpia", async () => {
+    const onProduced = vi.fn();
+    mocks.getDrillTransferContext.mockResolvedValue({
+      word: "river",
+      context_id: "transfer:story",
+      topic: "personal_experience",
+      prompt: "Tell a short story about something that happened to you recently.",
+      available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
+    });
+    mocks.submitDrillTransferAttempt.mockResolvedValue({
+      word: "river",
+      text: "I river the water every morning before work.",
+      context_id: "transfer:story",
+      used_word: true,
+      word_count: 8,
+      passed: true,
+      error_type: "semantic_mismatch",
+      lexical_transfer: true,
+      semantic_fit: false,
+      adequacy: "suspect",
+    });
+    renderDrill("transfer", onProduced);
+
+    fireEvent.change(await screen.findByLabelText("Your answer"), {
+      target: { value: "I river the water every morning before work." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    // V3.43 (P1-02): hubo producción léxica (onProduced) pero se avisa de que
+    // el uso no encaja y no cuenta como transferencia confirmada.
+    expect(
+      await screen.findByText(/won't count as confirmed transfer/),
+    ).toBeTruthy();
+    expect(onProduced).toHaveBeenCalledTimes(1);
+    // El target se revela en la cabecera tras el intento.
+    expect(await screen.findByText("river")).toBeTruthy();
   });
 
   it("sin consigna disponible avisa y no deja enviar", async () => {

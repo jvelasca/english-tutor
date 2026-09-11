@@ -337,6 +337,24 @@ export interface LexicalEvidence {
   success_contexts?: string[];
   home_context?: string;
   transfer?: boolean;
+  // V3.43 (P1-03/P1-04): éxito LIMPIO (sin `semantic_mismatch`), diversidad
+  // contextual REAL de esos contextos y estado formalizado del eje de
+  // transferencia (`not_ready`→`automatic`). Aditivos.
+  clean_successes?: number;
+  clean_success_contexts?: string[];
+  clean_success_days?: number;
+  context_diversity?: ContextDiversity | null;
+  transfer_state?: string;
+}
+
+// V3.43 (P1-03): diversidad contextual REAL de una colección de contextos. No
+// basta con `context_id A != context_id B`: `diverse_dimensions` cuenta cuántas
+// dimensiones pedagógicas (topic, goal, discurso…) cambian de verdad.
+export interface ContextDiversity {
+  distinct_contexts: number;
+  dimensions: Record<string, string[]>;
+  diverse_dimensions: number;
+  score: number;
 }
 
 export interface LexicalItem {
@@ -491,6 +509,11 @@ export interface DrillTransferContext {
   topic: string;
   prompt: string;
   available: boolean;
+  // V3.43 (P1-01): consigna sin target; estos campos (aditivos) explican la
+  // producción pedida y si el banco ya rotó por completo.
+  exhausted?: boolean;
+  communicative_goal?: string;
+  discourse_type?: string;
 }
 
 export interface DrillTransferAttempt {
@@ -500,7 +523,15 @@ export interface DrillTransferAttempt {
   used_word: boolean;
   word_count: number;
   passed: boolean;
+  // Taxonomía observacional: correct/empty/missing_target/too_short/
+  // semantic_mismatch (V3.43).
   error_type?: string;
+  // V3.43 (P1-02): transfer LÉXICO (alias de `passed`) separado de la
+  // adecuación semántica determinista (`semantic_fit`/`adequacy`). `semantic_fit`
+  // es null cuando no es determinable (sin POS declarada).
+  lexical_transfer?: boolean;
+  semantic_fit?: boolean | null;
+  adequacy?: "fit" | "suspect" | "unknown" | string;
 }
 
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
@@ -766,6 +797,9 @@ export interface ReviewQueueItem {
   unit_surfaces?: string[];
   transfer?: boolean;
   success_contexts?: string[];
+  // V3.43 (P1-03/P1-04): estado formalizado y diversidad contextual real.
+  transfer_state?: string;
+  context_diversity?: ContextDiversity | null;
   evidence?: LexicalEvidence | null;
 }
 

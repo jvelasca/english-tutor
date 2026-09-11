@@ -33,6 +33,8 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 
+from services import transfer
+
 # Roles del ledger de eventos (V3.35). `evidence` = señal que puede acreditar
 # aprendizaje; `informative` = señal que informa pero no acredita (p. ej. el MCQ
 # de Recognition, V3.13); `telemetry` = traza operativa sin valor pedagógico.
@@ -202,6 +204,22 @@ WRITE_ERROR_TYPES: tuple[str, ...] = (
     "empty",
     "missing_target",
     "too_short",
+)
+
+# V3.43 (Transfer 2.0, P1-02): la transferencia separa el TRANSFER LÉXICO (la
+# unidad quedó alineada, `passed`) de la ADECUACIÓN SEMÁNTICA del uso.
+# `semantic_mismatch` es la señal OBSERVACIONAL de "la unidad se usó en una
+# función incompatible con su categoría gramatical declarada" (p. ej. un
+# sustantivo conjugado como verbo: `I bank yesterday`). NO cambia el scoring
+# léxico (`passed` sigue siendo el resultado léxico); clasifica el intento para
+# que el estado de transferencia no lo cuente como ÉXITO LIMPIO.
+SEMANTIC_MISMATCH_ERROR = "semantic_mismatch"
+TRANSFER_ERROR_TYPES: tuple[str, ...] = (
+    "correct",
+    "empty",
+    "missing_target",
+    "too_short",
+    SEMANTIC_MISMATCH_ERROR,
 )
 
 # Longitud mínima de la forma esperada para admitir `orthographic_error`. Por
@@ -401,7 +419,7 @@ def recency_signals(
 
 
 def context_signals(rows: list[dict]) -> dict:
-    """Señales de TRANSFERENCIA por CONTEXTO (V3.40, pura).
+    """Señales de TRANSFERENCIA por CONTEXTO (V3.40 → V3.43, pura).
 
     La auditoría de V3.38.1 recordó que `situation` (completar un hueco) es
     recuperación CONTEXTUALIZADA, no transferencia: transferir es usar la unidad
@@ -417,24 +435,47 @@ def context_signals(rows: list[dict]) -> dict:
     - `success_contexts` — contextos con al menos un ÉXITO (orden estable);
     - `home_context` — contexto con más intentos (desempate alfabético): el
       contexto "de casa" del ítem; `""` si no hay contextos;
-    - `transfer` — `True` si hay éxito en >= `CONTEXT_TRANSFER_MIN` contextos
-      distintos (transferencia contextual demostrada).
+    - `clean_contexts` / `clean_successes` / `clean_success_contexts` /
+      `clean_success_days` (V3.43, P1-03): el ÉXITO LIMPIO excluye los intentos
+      clasificados `semantic_mismatch` (la unidad quedó alineada pero se usó en
+      una función incompatible con su POS). Solo los éxitos limpios avanzan la
+      transferencia;
+    - `context_diversity` (V3.43, P1-03): diversidad contextual REAL de los
+      contextos con éxito limpio (`transfer.context_diversity`);
+    - `transfer` — `True` si hay éxito LIMPIO en >= `CONTEXT_TRANSFER_MIN`
+      contextos distintos **y** diversidad contextual real
+      (`diverse_dimensions >= CONTEXT_DIVERSITY_MIN`). Antes bastaba con dos
+      `context_id` distintos, que podían ser el mismo tipo de producción.
 
     Reutilizada tal cual por el resumen SQL (paridad por construcción). Nunca
     lanza: filas incompletas se ignoran donde corresponda.
     """
     buckets: dict[str, dict[str, int]] = {}
+    clean_successes: dict[str, int] = {}
+    clean_days: set[str] = set()
     for row in rows:
         context = (row.get("context_id") or "").strip()
         if not context:
             continue
+        success = _truthy(row.get("success"))
         bucket = buckets.setdefault(context, {"attempts": 0, "successes": 0})
         bucket["attempts"] += 1
-        if _truthy(row.get("success")):
-            bucket["successes"] += 1
+        if not success:
+            continue
+        bucket["successes"] += 1
+        if (row.get("error_type") or "").strip().lower() == SEMANTIC_MISMATCH_ERROR:
+            # Éxito léxico con uso semánticamente sospechoso: cuenta como
+            # intento y como éxito léxico, pero NO como éxito limpio.
+            continue
+        clean_successes[context] = clean_successes.get(context, 0) + 1
+        day = (row.get("occurred_at") or "")[:10]
+        if day:
+            clean_days.add(day)
     success_contexts = sorted(
         context for context, bucket in buckets.items() if bucket["successes"] > 0
     )
+    clean_success_contexts = sorted(clean_successes)
+    diversity = transfer.context_diversity(clean_success_contexts)
     home_context = ""
     if buckets:
         home_context = min(
@@ -446,8 +487,139 @@ def context_signals(rows: list[dict]) -> dict:
         "context_attempts": len(buckets),
         "success_contexts": success_contexts,
         "home_context": home_context,
-        "transfer": len(success_contexts) >= CONTEXT_TRANSFER_MIN,
+        "clean_contexts": {
+            context: {"successes": clean_successes[context]}
+            for context in clean_success_contexts
+        },
+        "clean_successes": sum(clean_successes.values()),
+        "clean_success_contexts": clean_success_contexts,
+        "clean_success_days": len(clean_days),
+        "context_diversity": diversity,
+        "transfer": (
+            len(clean_success_contexts) >= CONTEXT_TRANSFER_MIN
+            and diversity["diverse_dimensions"] >= transfer.CONTEXT_DIVERSITY_MIN
+        ),
     }
+
+
+def _int(value: object) -> int:
+    """Entero tolerante (0 si no es convertible): los resúmenes pueden ser parciales."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+# V3.43 (P1-04): estados del eje de transferencia. Un booleano `transfer = true`
+# se quedaba corto: dos contextos con éxito solo son la PRIMERA demostración, no
+# estabilidad. El estado es un refinamiento del booleano (que se conserva).
+TRANSFER_STATES: tuple[str, ...] = (
+    "not_ready",
+    "emerging",
+    "contextualized",
+    "transfer_demonstrated",
+    "transfer_stable",
+    "automatic",
+)
+
+# Mínimo de éxitos LIMPIOS para empezar a hablar de transferencia (espejo de
+# `planner.TRANSFER_MIN_SUCCESSES`; ambos se mantienen en 2).
+TRANSFER_MIN_SUCCESSES = 2
+
+# Estabilidad: exige variedad (más contextos) Y tiempo (días distintos con éxito
+# limpio). Un solo día demuestra transferencia, no estabilidad.
+TRANSFER_STABLE_MIN_CONTEXTS = 3
+TRANSFER_STABLE_MIN_DAYS = 2
+
+# Estados que cuentan como transferencia DEMOSTRADA (los lee
+# `planner.has_contextual_transfer`).
+TRANSFER_DEMONSTRATED_STATES: tuple[str, ...] = (
+    "transfer_demonstrated",
+    "transfer_stable",
+    "automatic",
+)
+
+
+def transfer_state(evidence: dict | None) -> str:
+    """Estado del eje de TRANSFERENCIA contextual (V3.43, pura y determinista).
+
+    Sustituye la lectura booleana `transfer = true` por un estado gradual:
+
+    - `not_ready` — sin éxitos limpios suficientes (< `TRANSFER_MIN_SUCCESSES`);
+    - `emerging` — éxito limpio en 1 contexto;
+    - `contextualized` — >= 2 contextos limpios pero diversidad insuficiente
+      (casi el mismo tipo de producción: no es transferencia real);
+    - `transfer_demonstrated` — >= 2 contextos limpios y diversidad real;
+    - `transfer_stable` — además >= 3 contextos y >= 2 días con éxito limpio;
+    - `automatic` — estable y la modalidad `spontaneous_use` ya es automática.
+
+    Acepta resúmenes parciales o legacy (cae a `success_contexts`/`successes` y
+    respeta el booleano `transfer` cuando no traen los campos de V3.43). No usa
+    LLM. Nunca lanza.
+    """
+    ev = evidence or {}
+    has_v43_fields = (
+        isinstance(ev.get("clean_success_contexts"), list)
+        or isinstance(ev.get("context_diversity"), dict)
+        or ev.get("clean_successes") is not None
+    )
+    if not has_v43_fields and _truthy(ev.get("transfer")):
+        # Resumen legacy (sin ningún campo de V3.43) cuyo booleano `transfer` ya
+        # certificaba éxito en >= CONTEXT_TRANSFER_MIN contextos (regla V3.42).
+        # Sin diversidad ni días no se puede refinar más: es transferencia
+        # DEMOSTRADA, nunca estable. Se respeta el fallback pedido por el plan en
+        # lugar de degradar el estado por falta de contadores nuevos.
+        return "transfer_demonstrated"
+    contexts = ev.get("clean_success_contexts")
+    if not isinstance(contexts, list):
+        contexts = ev.get("success_contexts") or []
+    distinct = len({str(c).strip() for c in contexts if str(c).strip()})
+    clean_successes = _int(ev.get("clean_successes"))
+    if not clean_successes:
+        # Resumen parcial/legacy sin el contador limpio: se usa el total.
+        clean_successes = _int(ev.get("successes"))
+    if not clean_successes:
+        # Último recurso: cada contexto con éxito garantiza >= 1 éxito. Sin
+        # contadores nuevos no se puede afirmar más, pero tampoco menos.
+        clean_successes = distinct
+    days = _int(ev.get("clean_success_days"))
+    diversity = ev.get("context_diversity")
+    if isinstance(diversity, dict):
+        diverse_dimensions = _int(diversity.get("diverse_dimensions"))
+    else:
+        # Resumen parcial/legacy SIN la diversidad de V3.43: la única regla
+        # disponible era el booleano `transfer` de V3.42 («éxito en
+        # >= CONTEXT_TRANSFER_MIN contextos»), que NO medía dimensiones. Se
+        # respeta esa semántica en lugar de degradar el estado: sin datos de
+        # diversidad no se puede afirmar que sea insuficiente. Si el booleano
+        # tampoco viaja, se asume 0 (no se inventa transferencia).
+        diverse_dimensions = (
+            transfer.CONTEXT_DIVERSITY_MIN if _truthy(ev.get("transfer")) else 0
+        )
+    automatic = "spontaneous_use" in (ev.get("automatic_skills") or [])
+    if distinct < 1 or clean_successes < TRANSFER_MIN_SUCCESSES:
+        return "not_ready"
+    if distinct < CONTEXT_TRANSFER_MIN:
+        return "emerging"
+    if diverse_dimensions < transfer.CONTEXT_DIVERSITY_MIN:
+        return "contextualized"
+    if (
+        distinct >= TRANSFER_STABLE_MIN_CONTEXTS
+        and days >= TRANSFER_STABLE_MIN_DAYS
+    ):
+        return "automatic" if automatic else "transfer_stable"
+    return "transfer_demonstrated"
+
+
+def with_transfer_state(summary: dict) -> dict:
+    """Añade el `transfer_state` derivado a un resumen de evidencia (V3.43, pura).
+
+    El estado se DERIVA de los campos de contexto; no se persiste. Se computa en
+    la frontera (resumen puro y resumen SQL) para que ambos expongan el mismo
+    valor sin un segundo dialecto de cálculo.
+    """
+    summary["transfer_state"] = transfer_state(summary)
+    return summary
 
 
 def classify_event_role(event_type: str, detail: str) -> str:
@@ -781,7 +953,7 @@ def summarize_evidence(rows: list[dict]) -> dict:
             intervals.append(round(float(raw), 4))
         except (TypeError, ValueError):
             continue
-    return {
+    return with_transfer_state({
         "attempts": attempts,
         "successes": successes,
         "success_rate": round(successes / attempts, 4) if attempts else 0.0,
@@ -823,13 +995,13 @@ def summarize_evidence(rows: list[dict]) -> dict:
         # V3.40 (Fase 4): transferencia contextual por `context_id` (misma
         # función pura que el resumen SQL).
         **context_signals(rows),
-    }
+    })
 
 
 def empty_summary() -> dict:
     """Resumen de evidencia de un ítem sin eventos (mismo contrato que
     `summarize_evidence`). Dict nuevo en cada llamada: nunca compartir estado."""
-    return {
+    return with_transfer_state({
         "attempts": 0,
         "successes": 0,
         "success_rate": 0.0,
@@ -863,8 +1035,20 @@ def empty_summary() -> dict:
         "context_attempts": 0,
         "success_contexts": [],
         "home_context": "",
+        # V3.43 (P1-03/P1-04): éxito limpio, diversidad contextual real y estado
+        # de transferencia (lo añade `with_transfer_state` al final).
+        "clean_contexts": {},
+        "clean_successes": 0,
+        "clean_success_contexts": [],
+        "clean_success_days": 0,
+        "context_diversity": {
+            "distinct_contexts": 0,
+            "dimensions": {},
+            "diverse_dimensions": 0,
+            "score": 0.0,
+        },
         "transfer": False,
-    }
+    })
 
 
 def _success_ratio(evidence: dict) -> float | None:

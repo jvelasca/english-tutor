@@ -708,13 +708,19 @@ async def _record_transfer_evidence(
     *,
     response_time_ms: int | None = None,
 ) -> None:
-    """Evento de evidencia del paso Transfer (V3.40), éxito Y fallo.
+    """Evento de evidencia del paso Transfer (V3.40 → V3.43), éxito Y fallo.
 
     Modalidad `spontaneous_use` y apoyo `spontaneous` (la consigna da un
     escenario nuevo, no ayuda con la unidad); el `context_id` es el del contexto
     NUEVO, que es lo que permite a `services.evidence.context_signals` contar la
     transferencia. Como en `write`, el fallo también se registra clasificado.
     Nunca lanza: es señal.
+
+    V3.43: al ocultarse el target (P1-01), `spontaneous` pasa a ser literal —el
+    alumno decide si usa la unidad—. `success` sigue siendo el TRANSFER LÉXICO
+    (`scored["passed"]`); un uso léxicamente correcto pero `suspect` guarda
+    `error_type="semantic_mismatch"` y NO contará como ÉXITO LIMPIO en
+    `context_signals` (V3.43/P1-02).
     """
     try:
         await run_in_threadpool(
@@ -746,18 +752,21 @@ async def _record_transfer_evidence(
 
 
 async def get_transfer_context(user_id: str, word: str) -> dict:
-    """Consigna de transferencia que toca practicar (V3.40, solo lectura).
+    """Consigna de transferencia que toca practicar (V3.40 → V3.43, solo lectura).
 
     Elige el contexto NUEVO con `services.transfer.context_for` sobre los
     contextos que el ítem ya registró en su evidencia (así no repite el que ya
-    usó). No escribe nada: es el GET del peldaño.
+    usó) y, V3.43 (P1-03), prioriza el contexto más DISTANTE de los que ya
+    logró con éxito: máxima novedad pedagógica, no solo otro `context_id`. No
+    escribe nada: es el GET del peldaño.
     """
     summaries = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
     )
     summary = summaries.get(word) or {}
     used = (summary.get("contexts") or {}).keys()
-    return transfer.context_for(word, used)
+    success = summary.get("success_contexts") or []
+    return transfer.context_for(word, used, success_context_ids=success)
 
 
 async def submit_transfer_attempt(
@@ -767,23 +776,35 @@ async def submit_transfer_attempt(
     context_id: str = "",
     response_time_ms: int | None = None,
 ) -> dict:
-    """Puntúa la actividad `transfer` del micro-drill (V3.40).
+    """Puntúa la actividad `transfer` del micro-drill (V3.40 → V3.43).
 
-    El alumno usa la unidad en un contexto NUEVO (consigna abierta). Scoring
-    determinista y sin LLM (`services.lexicon.score_transfer_attempt`): unidad
-    alineada + longitud mínima, la MISMA acreditación que la escritura, pero la
-    evidencia va como `spontaneous_use` y con el `context_id` del contexto nuevo.
+    El alumno usa la unidad en un contexto NUEVO (consigna abierta, sin la
+    palabra: V3.43/P1-01). Scoring determinista y sin LLM
+    (`services.lexicon.score_transfer_attempt`): unidad alineada + longitud
+    mínima (TRANSFER LÉXICO), más un proxy determinista de ADECUACIÓN SEMÁNTICA
+    (V3.43/P1-02) que exige la categoría declarada del ítem
+    (`dictionary_entries.pos`). La evidencia va como `spontaneous_use` y con el
+    `context_id` del contexto nuevo.
 
     Al `passed` se acredita la producción con el volcado al léxico
     (`writing_prod += 1`; `as_unit=True`) y se registra la evidencia; en fallo se
-    registra igualmente el intento clasificado. No graba recuperación ni FSRS.
+    registra igualmente el intento clasificado. Un uso léxicamente correcto pero
+    semánticamente `suspect` mantiene `passed=True` y añade
+    `error_type="semantic_mismatch"`, que lo excluye de los ÉXITOS LIMPIOS del
+    estado de transferencia. No graba recuperación ni FSRS.
     """
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     row = _row_for_word(rows, word) or {}
-    # Sin `context_id` del cliente se DERIVA del banco (determinista): el evento
-    # nunca queda sin contexto y el contador de transferencia funciona igual.
-    context_id = context_id or transfer.context_for(word)["context_id"]
-    scored = lexicon.score_transfer_attempt(word, text)
+    # POS declarada del ítem para el proxy semántico (vacía si no hay caché: el
+    # proxy queda `unknown` y no inventa).
+    entry = await run_in_threadpool(dictionary_repo.get_entry, word)
+    pos = (entry or {}).get("pos") or ""
+    # Sin `context_id` del cliente se DERIVA del banco (determinista) con la
+    # MISMA función que el GET (incluidos los contextos ya logrados), para que el
+    # evento nunca quede sin contexto y no discrepe del peldaño servido.
+    if not context_id:
+        context_id = (await get_transfer_context(user_id, word)).get("context_id", "")
+    scored = lexicon.score_transfer_attempt(word, text, pos=pos)
     written = (text or "").strip()
     if scored["passed"]:
         await record_production_text(

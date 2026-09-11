@@ -390,7 +390,20 @@ def test_empty_summary_matches_the_extended_contract():
         "context_attempts": 0,
         "success_contexts": [],
         "home_context": "",
+        # V3.43 (P1-03/P1-04): éxito limpio, diversidad contextual real y estado
+        # de transferencia (aditivos).
+        "clean_contexts": {},
+        "clean_successes": 0,
+        "clean_success_contexts": [],
+        "clean_success_days": 0,
+        "context_diversity": {
+            "distinct_contexts": 0,
+            "dimensions": {},
+            "diverse_dimensions": 0,
+            "score": 0.0,
+        },
         "transfer": False,
+        "transfer_state": "not_ready",
     }
 
 

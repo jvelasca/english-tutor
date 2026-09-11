@@ -695,12 +695,15 @@ class WriteAttemptOut(BaseModel):
 
 
 class TransferContextOut(BaseModel):
-    """Consigna de TRANSFERENCIA a un contexto nuevo (V3.40, solo lectura).
+    """Consigna de TRANSFERENCIA a un contexto nuevo (V3.40 → V3.43, solo lectura).
 
     El contexto (`context_id`) es el del ledger: se registra con el intento y es
-    lo que permite acreditar la transferencia real (éxito en >= 2 contextos
-    distintos). `available` es siempre `True` con el banco curado; se mantiene
-    por simetría con los demás GET del drill.
+    lo que permite acreditar la transferencia real. `available` es siempre `True`
+    con el banco curado; se mantiene por simetría con los demás GET del drill.
+
+    V3.43 (P1-01): la consigna da un ESCENARIO y un objetivo comunicativo, y
+    NUNCA contiene la unidad objetivo. `communicative_goal`/`discourse_type`
+    (aditivos) explican el tipo de producción pedida.
     """
 
     word: str
@@ -708,6 +711,9 @@ class TransferContextOut(BaseModel):
     topic: str = ""
     prompt: str = ""
     available: bool = True
+    exhausted: bool = False
+    communicative_goal: str = ""
+    discourse_type: str = ""
 
 
 class TransferAttemptIn(BaseModel):
@@ -724,12 +730,18 @@ class TransferAttemptIn(BaseModel):
 
 
 class TransferAttemptOut(BaseModel):
-    """Resultado puntuado por el servidor del paso Transfer (V3.40).
+    """Resultado puntuado por el servidor del paso Transfer (V3.40 → V3.43).
 
     `passed` = unidad alineada AND longitud mínima: acredita la modalidad
     `spontaneous_use` con evidencia `activity_id="drill:transfer"` y el
     `context_id` del contexto nuevo. `error_type` reutiliza la taxonomía
-    observacional de `WRITE_ERROR_TYPES`.
+    observacional de `TRANSFER_ERROR_TYPES`.
+
+    V3.43 (P1-02): `passed` se mantiene como contrato histórico y `lexical_transfer`
+    lo explicita; `semantic_fit`/`adequacy` añaden la capa SEPARADA de adecuación
+    semántica (proxy determinista, advisory). `semantic_fit` es `None` cuando no
+    es determinable (sin POS declarada). Un uso léxicamente correcto pero
+    sospechoso mantiene `passed=True` y `error_type="semantic_mismatch"`.
     """
 
     word: str
@@ -739,3 +751,6 @@ class TransferAttemptOut(BaseModel):
     word_count: int
     passed: bool
     error_type: str = ""
+    lexical_transfer: bool = False
+    semantic_fit: bool | None = None
+    adequacy: str = ""

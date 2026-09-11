@@ -42,9 +42,11 @@ from services.curriculum import CEFR_ORDER
 from services.evidence import (
     CONTEXT_TRANSFER_MIN,
     LEXICAL_SKILLS,
+    SEMANTIC_MISMATCH_ERROR,
     WRITE_ERROR_TYPES,
     automatic_skills,
     is_automatic,
+    transfer_state,
 )
 from services.phonetics import unit_produced
 from services.recall import RECALL_CUES, next_recall_rung, resolve_recall_cue
@@ -400,6 +402,90 @@ REVIEW_ACTIVITIES: tuple[str, ...] = (
 # suelta con relleno y no una producción.
 WRITE_MIN_WORDS = 4
 
+# V3.43 (Transfer 2.0, P1-02): la adecuación semántica del intento de
+# transferencia se aproxima con un proxy DETERMINISTA (sin LLM, premisa 21) que
+# solo marca `suspect` ante una contradicción CLARA entre la categoría
+# gramatical declarada del ítem (`dictionary_entries.pos`) y su función en la
+# frase. Conservador a propósito: el proxy INFORMA y separa la señal léxica de
+# la semántica; nunca bloquea la evidencia léxica ni declara dominio.
+_SUBJECT_PRONOUNS = frozenset({"i", "you", "he", "she", "it", "we", "they"})
+_DETERMINERS = frozenset(
+    {
+        "the", "a", "an", "my", "your", "his", "her", "its", "our", "their",
+        "this", "that", "these", "those", "some", "any", "no", "every",
+    }
+)
+_INFLECTION_SUFFIXES = ("ed", "ing", "ies", "s")
+
+
+def _pos_family(pos: str) -> str:
+    """Familia gramatical declarada del ítem (`noun`/`verb`/"" si no se sabe)."""
+    text = (pos or "").strip().lower()
+    if not text:
+        return ""
+    # El orden importa: "phrasal verb" contiene "verb".
+    if "verb" in text:
+        return "verb"
+    if "noun" in text:
+        return "noun"
+    return ""
+
+
+def _unit_positions(tokens: list[str], word: str) -> list[int]:
+    """Posiciones donde la unidad objetivo aparece (o su forma flexionada).
+
+    Reconoce la secuencia contigua de la unidad y, para unidades de una palabra,
+    la forma flexionada (`bank` → `banked`/`banking`): es la contradicción más
+    típica entre un sustantivo declarado y su uso como verbo.
+    """
+    unit_tokens = (word or "").strip().lower().split()
+    if not unit_tokens:
+        return []
+    size = len(unit_tokens)
+    positions = [
+        index
+        for index in range(len(tokens) - size + 1)
+        if tokens[index:index + size] == unit_tokens
+    ]
+    if size == 1:
+        base = unit_tokens[0]
+        for index, token in enumerate(tokens):
+            if token == base:
+                continue
+            suffix = token[len(base):] if token.startswith(base) else ""
+            if suffix in _INFLECTION_SUFFIXES:
+                positions.append(index)
+    return positions
+
+
+def _semantic_fit(pos: str, word: str, text: str) -> str:
+    """Adecuación semántica determinista del uso de la unidad (V3.43, pura).
+
+    Devuelve `"fit"` / `"suspect"` / `"unknown"`. Solo `suspect` ante
+    contradicción clara POS ↔ función sintáctica:
+
+    - POS de familia `noun` usado como verbo (precedido de pronombre sujeto, o
+      con flexión verbal `-ed`/`-ing`) → `suspect`;
+    - POS de familia `verb` precedido de determinante → `suspect`.
+
+    Sin POS declarada, sin la unidad en el texto o sin patrón contradictorio
+    devuelve `unknown`/`fit`: el proxy informa, nunca inventa.
+    """
+    family = _pos_family(pos)
+    if not family:
+        return "unknown"
+    tokens = re.findall(r"[a-z]+(?:'[a-z]+)?", (text or "").lower())
+    positions = _unit_positions(tokens, word)
+    if not positions:
+        return "unknown"
+    for index in positions:
+        previous = tokens[index - 1] if index > 0 else ""
+        if family == "noun" and previous in _SUBJECT_PRONOUNS:
+            return "suspect"
+        if family == "verb" and previous in _DETERMINERS:
+            return "suspect"
+    return "fit"
+
 
 def _score_production_text(word: str, text: str, min_words: int) -> dict:
     """Puntúa una producción textual PROPIA con la unidad objetivo (V3.40, pura).
@@ -448,20 +534,44 @@ def score_write_attempt(word: str, text: str) -> dict:
     producción con menos andamiaje de la escalera de escritura (la palabra se
     muestra, la frase no). Acredita la modalidad `written_production`. Delegación
     en `_score_production_text` con `WRITE_MIN_WORDS`. Nunca lanza.
+
+    V3.43 (P2-04 de la auditoría de V3.42.0): `passed` acredita PRODUCCIÓN
+    LÉXICA (la unidad quedó alineada en una frase con longitud mínima), NUNCA
+    corrección gramatical ni ortográfica. `I goed to work yesterday.` pasa si
+    usa la unidad objetivo: no hay modelo de lengua local fiable y un falso
+    negativo contaminaría el modelo de alumno. No interpretar
+    `written_production = success` como calidad de la lengua escrita.
     """
     return _score_production_text(word, text, WRITE_MIN_WORDS)
 
 
-def score_transfer_attempt(word: str, text: str) -> dict:
-    """Puntúa la actividad de TRANSFERENCIA a un contexto nuevo (V3.40, pura).
+def score_transfer_attempt(word: str, text: str, *, pos: str = "") -> dict:
+    """Puntúa la actividad de TRANSFERENCIA a un contexto nuevo (V3.40 → V3.43).
 
-    El alumno usa la unidad en un contexto NUEVO con una consigna abierta (p. ej.
-    «cuenta algo de tu día usando …»). Misma acreditación determinista que la
-    escritura (`_score_production_text`) pero modalidad `spontaneous_use`: lo que
-    se demuestra es el uso espontáneo, no la repetición ni la escritura guiada.
-    Nunca lanza.
+    La consigna da un ESCENARIO, nunca la unidad objetivo (V3.43, P1-01): el
+    alumno decide si la usa. El TRANSFER LÉXICO es determinista y sin LLM
+    (`_score_production_text`): unidad alineada + longitud mínima, la MISMA
+    acreditación que la escritura.
+
+    V3.43 (P1-02) añade una capa SEPARADA de adecuación semántica
+    (`_semantic_fit`): un intento puede transferir la unidad correctamente en lo
+    léxico y, aun así, usarla en una función incompatible con su categoría
+    declarada (`I bank yesterday`). Entonces `passed`/`lexical_transfer` siguen
+    siendo verdaderos, pero `adequacy="suspect"` y el `error_type` es
+    `semantic_mismatch`, de modo que el estado de transferencia no lo cuenta como
+    ÉXITO LIMPIO. `pos` es la categoría declarada del ítem (vacía = no
+    determinable). Nunca lanza.
     """
-    return _score_production_text(word, text, WRITE_MIN_WORDS)
+    scored = _score_production_text(word, text, WRITE_MIN_WORDS)
+    adequacy = _semantic_fit(pos, word, text)
+    if scored["passed"] and adequacy == "suspect":
+        scored["error_type"] = SEMANTIC_MISMATCH_ERROR
+    scored["lexical_transfer"] = bool(scored["passed"])
+    scored["semantic_fit"] = (
+        None if adequacy == "unknown" else adequacy == "fit"
+    )
+    scored["adequacy"] = adequacy
+    return scored
 
 
 def recommend_review_activity(
@@ -581,6 +691,13 @@ def review_queue_item(
       llamador las aporta; el gobierno del estado es de la unidad);
     - `transfer` / `success_contexts` — transferencia contextual demostrada
       (éxito en >= 2 contextos distintos) y los contextos con éxito.
+
+    V3.43 (P1-03/P1-04) añade, aditivos:
+
+    - `transfer_state` — estado formalizado del eje de transferencia
+      (`services.evidence.transfer_state`), sustituto gradual de `transfer`;
+    - `context_diversity` — diversidad contextual REAL de los contextos con
+      éxito limpio (dimensiones que cambian de verdad).
     """
     matrix = item_competence_matrix(row)
     summary = evidence if evidence is not None else {}
@@ -637,7 +754,13 @@ def review_queue_item(
         # transferencia contextual. Aditivos: el drill sigue practicando `word`.
         "unit_surfaces": list(unit_surfaces or [row.get("word") or ""]),
         "transfer": planner.has_contextual_transfer(summary),
+        "transfer_state": transfer_state(summary),
         "success_contexts": list(summary.get("success_contexts") or []),
+        "context_diversity": (
+            dict(summary["context_diversity"])
+            if isinstance(summary.get("context_diversity"), dict)
+            else {}
+        ),
         "evidence": evidence if evidence is not None else {},
     }
 
@@ -1551,6 +1674,10 @@ def unit_evidence(
                     skill for skill in LEXICAL_SKILLS if skill in automatic_skills
                 ],
                 "success_contexts": sorted(success_contexts),
+                # V3.43: el roll-up por unidad conserva el booleano histórico
+                # (unión de contextos con éxito de todas las formas). El estado
+                # AUTORITATIVO del eje de transferencia es `transfer_state`
+                # (con diversidad real y éxitos limpios) a nivel de resumen.
                 "transfer": len(success_contexts) >= CONTEXT_TRANSFER_MIN,
             }
         )

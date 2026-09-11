@@ -355,6 +355,11 @@ def summarize_by_target(
     usa `summarize_evidence` — paridad por construcción, sin un segundo dialecto.
 
     Los ítems sin eventos no aparecen: el llamador usa `empty_summary()`.
+
+    V3.43 (P1-03/P1-04) añade los campos de transferencia de `context_signals`
+    (éxitos limpios sin `semantic_mismatch`, diversidad contextual real) y el
+    `transfer_state` derivado (`with_transfer_state`), con paridad por
+    construcción frente a la versión pura.
     """
     # Import local (misma convención que el resto del repositorio): la capa pura
     # es la única fuente de verdad de los niveles de apoyo independientes y del
@@ -366,6 +371,7 @@ def summarize_by_target(
         context_signals,
         recall_rung_from_activity,
         recency_signals,
+        with_transfer_state,
     )
 
     independent = sorted(INDEPENDENT_SUPPORT_LEVELS)
@@ -547,7 +553,7 @@ def summarize_by_target(
                 float(row["mean_latency"]), 1
             )
     return {
-        row["target_id"]: {
+        row["target_id"]: with_transfer_state({
             "attempts": int(row["attempts"]),
             "successes": int(row["successes"]),
             "success_rate": (
@@ -586,6 +592,6 @@ def summarize_by_target(
             # V3.40 (Fase 4): transferencia contextual por `context_id` (misma
             # función pura que `summarize_evidence`).
             **context_signals(detail_by_target.get(row["target_id"], [])),
-        }
+        })
         for row in rows
     }

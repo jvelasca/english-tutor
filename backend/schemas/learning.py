@@ -76,6 +76,11 @@ class ReviewQueueItem(BaseModel):
     unit_surfaces: list[str] = Field(default_factory=list)
     transfer: bool = False
     success_contexts: list[str] = Field(default_factory=list)
+    # V3.43 (P1-03/P1-04): estado formalizado de transferencia (sustituto gradual
+    # del booleano `transfer`) y diversidad contextual real de los contextos con
+    # éxito limpio. Aditivos.
+    transfer_state: str = "not_ready"
+    context_diversity: dict | None = None
     # V3.35: evidencia longitudinal (`attempts`/`successes`/`days`/`intervals`).
     evidence: dict | None = None
 

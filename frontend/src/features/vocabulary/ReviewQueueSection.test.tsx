@@ -230,7 +230,7 @@ describe("ReviewQueueSection (V3.35)", () => {
     expect(mocks.getDrillSentenceContext).not.toHaveBeenCalled();
   });
 
-  it("la actividad Transfer revela la palabra y abre el paso de transferencia (V3.40)", async () => {
+  it("la actividad Transfer NO revela la palabra y abre el paso de transferencia (V3.43)", async () => {
     mocks.getReviewQueue.mockResolvedValue(
       queue({
         due_count: 1,
@@ -256,7 +256,9 @@ describe("ReviewQueueSection (V3.35)", () => {
             },
             unit_surfaces: ["river"],
             transfer: false,
+            transfer_state: "emerging",
             success_contexts: ["lexicon:writing"],
+            context_diversity: null,
             competence: null,
             evidence: null,
           },
@@ -266,23 +268,30 @@ describe("ReviewQueueSection (V3.35)", () => {
     mocks.getDrillTransferContext.mockResolvedValue({
       word: "river",
       context_id: "transfer:story",
-      topic: "story",
-      prompt: 'Tell a short story about your day using "river".',
+      topic: "personal_experience",
+      prompt: "Tell a short story about something that happened to you recently.",
       available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
     });
     renderSection();
 
-    expect(await screen.findByText("river")).toBeTruthy();
-    expect(screen.getByText("Use it in a new situation")).toBeTruthy();
+    // V3.43 (P1-01): la cola muestra la etiqueta de oculta, no la palabra.
     expect(
-      screen.getByText("Ready to use it in a new situation"),
+      await screen.findByText(
+        "Word hidden — use it on your own in a new situation",
+      ),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Review river" }));
+    expect(screen.queryByText("river")).toBeNull();
+    expect(screen.getByText("Use it in a new situation")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review word" }));
 
     expect(mocks.getDrillTransferContext).toHaveBeenCalledWith("u1", "river");
     expect(
-      await screen.findByText(/Tell a short story about your day/),
+      await screen.findByText(/Tell a short story about something/),
     ).toBeTruthy();
+    // La cabecera del drill tampoco revela el target antes del intento.
+    expect(screen.queryByText("river")).toBeNull();
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
   });

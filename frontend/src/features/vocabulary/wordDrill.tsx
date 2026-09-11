@@ -606,7 +606,11 @@ export function WordDrill({
     processing ||
     (step === "sentence" && (sentence === null || sentenceError !== null));
   // V3.34: en Recall se OCULTA la palabra diana (el resultado la revela).
-  const hideTarget = step === "recall" && recallOutcome === null;
+  // V3.43 (P1-01): en Transfer TAMBIÉN: la consigna da un escenario, nunca el
+  // target, así que la cabecera no puede revelarlo antes del intento.
+  const hideTarget =
+    (step === "recall" && recallOutcome === null) ||
+    (step === "transfer" && transferOutcome === null);
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-background/60 p-4">
@@ -616,10 +620,16 @@ export function WordDrill({
             <span
               className={cn(
                 "text-base font-semibold",
-                recall?.cue_kind === "cloze" && "font-mono",
+                step === "recall" &&
+                  recall?.cue_kind === "cloze" &&
+                  "font-mono",
               )}
             >
-              {recall ? recall.cue : "…"}
+              {step === "transfer"
+                ? t("dictionary.drill.transferHiddenTarget")
+                : recall
+                  ? recall.cue
+                  : "…"}
             </span>
           ) : (
             <>
@@ -954,19 +964,23 @@ export function WordDrill({
       {/* V3.40: feedback del paso Transfer. El acierto acredita
           `spontaneous_use` en un contexto NUEVO (transferencia real cuando se
           logra en >= 2 contextos); el fallo explica qué faltó sin declarar
-          dominio. */}
+          dominio. V3.43 (P1-02): un acierto léxico con uso semánticamente
+          sospechoso se avisa en tono warning (hubo producción léxica, pero no
+          cuenta como éxito limpio). */}
       {step === "transfer" && transferOutcome && (
         <div
           className={cn(
             "rounded-md px-3 py-2 text-sm",
-            transferOutcome.passed
+            transferOutcome.passed && transferOutcome.adequacy !== "suspect"
               ? "bg-success/10 text-success"
               : "bg-warning/10 text-warning",
           )}
           role="status"
         >
           {transferOutcome.passed
-            ? t("dictionary.drill.transferPassed")
+            ? transferOutcome.adequacy === "suspect"
+              ? t("dictionary.drill.transferSemanticWarning")
+              : t("dictionary.drill.transferPassed")
             : transferOutcome.used_word
               ? t("dictionary.drill.writeTooShort").replace(
                   "{count}",
