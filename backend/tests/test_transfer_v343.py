@@ -31,6 +31,7 @@ from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
 from services import lexicon, planner, transfer
 from services.evidence import (
+    SEMANTIC_DOUBT_ERROR,
     SEMANTIC_MISMATCH_ERROR,
     TRANSFER_ERROR_TYPES,
     TRANSFER_STATES,
@@ -143,13 +144,16 @@ def test_context_for_prefers_the_most_distant_context_from_successes():
 
 
 def test_score_transfer_attempt_separates_lexical_from_semantic():
+    # V3.44: la contradicción es FUERTE (pronombre sujeto delante de una unidad
+    # declarada solo como noun) → `incorrect`, el único valor que bloquea el
+    # clean success.
     suspect = lexicon.score_transfer_attempt(
         "bank", "I bank money every day.", pos="noun"
     )
     assert suspect["passed"] is True
     assert suspect["lexical_transfer"] is True
     assert suspect["semantic_fit"] is False
-    assert suspect["adequacy"] == "suspect"
+    assert suspect["adequacy"] == "incorrect"
     assert suspect["error_type"] == SEMANTIC_MISMATCH_ERROR
 
     fit = lexicon.score_transfer_attempt(
@@ -162,12 +166,15 @@ def test_score_transfer_attempt_separates_lexical_from_semantic():
 
 
 def test_score_transfer_attempt_flags_verb_after_determiner():
+    # V3.44: determinante delante de una unidad declarada solo como verb es una
+    # pista DÉBIL (un verbo puede nominalizarse: "a long take") → `suspect`
+    # advisory, que NO bloquea el clean success.
     got = lexicon.score_transfer_attempt(
         "take", "The take was long today.", pos="verb"
     )
     assert got["passed"] is True
     assert got["adequacy"] == "suspect"
-    assert got["error_type"] == SEMANTIC_MISMATCH_ERROR
+    assert got["error_type"] == SEMANTIC_DOUBT_ERROR
 
 
 def test_score_transfer_attempt_is_unknown_without_pos():
@@ -381,7 +388,7 @@ def test_transfer_endpoint_persists_semantic_mismatch(monkeypatch, tmp_path):
     body = res.json()
     assert body["passed"] is True
     assert body["lexical_transfer"] is True
-    assert body["adequacy"] == "suspect"
+    assert body["adequacy"] == "incorrect"
     assert body["error_type"] == SEMANTIC_MISMATCH_ERROR
 
     rows = evidence_repo.list_evidence(uid, "bank")

@@ -235,6 +235,17 @@ export interface TransferStepProps {
   placeholder: string;
 }
 
+// V3.46 (P1-03): etiqueta legible de la CONDICIÓN de recuperación servida. El
+// servidor decide cuánta ayuda da la tarea (nombra la palabra, la insinúa o no
+// la exige); la UI solo la explica.
+const CONDITION_LABEL_KEYS: Record<string, string> = {
+  prompted: "dictionary.drill.transferConditionPrompted",
+  cued_context: "dictionary.drill.transferConditionCued",
+  open_context: "dictionary.drill.transferConditionOpen",
+  free_choice: "dictionary.drill.transferConditionFree",
+  naturally_emergent: "dictionary.drill.transferConditionNatural",
+};
+
 export function TransferStep({
   context,
   error,
@@ -265,16 +276,24 @@ export function TransferStep({
       </p>
     );
   }
+  const conditionKey = CONDITION_LABEL_KEYS[context.condition ?? ""];
   return (
-    <ProductionTextarea
-      prompt={context.prompt}
-      value={answer}
-      onValueChange={onAnswerChange}
-      disabled={disabled}
-      inputLabel={inputLabel}
-      placeholder={placeholder}
-      minWordsNote={minWordsNote}
-      rows={3}
-    />
+    <div className="flex flex-col gap-2">
+      {conditionKey && (
+        <p className="text-[11px] text-muted-foreground">
+          {t("dictionary.drill.transferConditionLabel")}: {t(conditionKey)}
+        </p>
+      )}
+      <ProductionTextarea
+        prompt={context.prompt}
+        value={answer}
+        onValueChange={onAnswerChange}
+        disabled={disabled}
+        inputLabel={inputLabel}
+        placeholder={placeholder}
+        minWordsNote={minWordsNote}
+        rows={3}
+      />
+    </div>
   );
 }

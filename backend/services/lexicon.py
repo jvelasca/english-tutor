@@ -37,11 +37,12 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timezone
 
-from services import forgetting, fsrs, mastery, planner
+from services import forgetting, fsrs, mastery, planner, semantics
 from services.curriculum import CEFR_ORDER
 from services.evidence import (
     CONTEXT_TRANSFER_MIN,
     LEXICAL_SKILLS,
+    SEMANTIC_DOUBT_ERROR,
     SEMANTIC_MISMATCH_ERROR,
     WRITE_ERROR_TYPES,
     automatic_skills,
@@ -402,89 +403,16 @@ REVIEW_ACTIVITIES: tuple[str, ...] = (
 # suelta con relleno y no una producción.
 WRITE_MIN_WORDS = 4
 
-# V3.43 (Transfer 2.0, P1-02): la adecuación semántica del intento de
-# transferencia se aproxima con un proxy DETERMINISTA (sin LLM, premisa 21) que
-# solo marca `suspect` ante una contradicción CLARA entre la categoría
-# gramatical declarada del ítem (`dictionary_entries.pos`) y su función en la
-# frase. Conservador a propósito: el proxy INFORMA y separa la señal léxica de
-# la semántica; nunca bloquea la evidencia léxica ni declara dominio.
-_SUBJECT_PRONOUNS = frozenset({"i", "you", "he", "she", "it", "we", "they"})
-_DETERMINERS = frozenset(
-    {
-        "the", "a", "an", "my", "your", "his", "her", "its", "our", "their",
-        "this", "that", "these", "those", "some", "any", "no", "every",
-    }
-)
-_INFLECTION_SUFFIXES = ("ed", "ing", "ies", "s")
-
-
-def _pos_family(pos: str) -> str:
-    """Familia gramatical declarada del ítem (`noun`/`verb`/"" si no se sabe)."""
-    text = (pos or "").strip().lower()
-    if not text:
-        return ""
-    # El orden importa: "phrasal verb" contiene "verb".
-    if "verb" in text:
-        return "verb"
-    if "noun" in text:
-        return "noun"
-    return ""
-
-
-def _unit_positions(tokens: list[str], word: str) -> list[int]:
-    """Posiciones donde la unidad objetivo aparece (o su forma flexionada).
-
-    Reconoce la secuencia contigua de la unidad y, para unidades de una palabra,
-    la forma flexionada (`bank` → `banked`/`banking`): es la contradicción más
-    típica entre un sustantivo declarado y su uso como verbo.
-    """
-    unit_tokens = (word or "").strip().lower().split()
-    if not unit_tokens:
-        return []
-    size = len(unit_tokens)
-    positions = [
-        index
-        for index in range(len(tokens) - size + 1)
-        if tokens[index:index + size] == unit_tokens
-    ]
-    if size == 1:
-        base = unit_tokens[0]
-        for index, token in enumerate(tokens):
-            if token == base:
-                continue
-            suffix = token[len(base):] if token.startswith(base) else ""
-            if suffix in _INFLECTION_SUFFIXES:
-                positions.append(index)
-    return positions
-
-
-def _semantic_fit(pos: str, word: str, text: str) -> str:
-    """Adecuación semántica determinista del uso de la unidad (V3.43, pura).
-
-    Devuelve `"fit"` / `"suspect"` / `"unknown"`. Solo `suspect` ante
-    contradicción clara POS ↔ función sintáctica:
-
-    - POS de familia `noun` usado como verbo (precedido de pronombre sujeto, o
-      con flexión verbal `-ed`/`-ing`) → `suspect`;
-    - POS de familia `verb` precedido de determinante → `suspect`.
-
-    Sin POS declarada, sin la unidad en el texto o sin patrón contradictorio
-    devuelve `unknown`/`fit`: el proxy informa, nunca inventa.
-    """
-    family = _pos_family(pos)
-    if not family:
-        return "unknown"
-    tokens = re.findall(r"[a-z]+(?:'[a-z]+)?", (text or "").lower())
-    positions = _unit_positions(tokens, word)
-    if not positions:
-        return "unknown"
-    for index in positions:
-        previous = tokens[index - 1] if index > 0 else ""
-        if family == "noun" and previous in _SUBJECT_PRONOUNS:
-            return "suspect"
-        if family == "verb" and previous in _DETERMINERS:
-            return "suspect"
-    return "fit"
+# V3.43 (Transfer 2.0, P1-02) → V3.44 (P1-01/P1-02): la adecuación semántica del
+# intento de transferencia se decide en el módulo PURO `services.semantics`
+# (sin LLM, premisa 21): compara la función de la ocurrencia con las FAMILIAS
+# POS declaradas por los SENTIDOS de la unidad (con fallback a la `pos` global)
+# y devuelve `fit`/`suspect`/`incorrect`/`unknown`. Conservador a propósito: el
+# proxy INFORMA y separa la señal léxica de la semántica; solo `incorrect`
+# bloquea el clean success y nunca declara dominio.
+def _semantic_fit(pos: str, word: str, text: str, senses: object = ()) -> str:
+    """Adecuación semántica determinista del uso de la unidad (delegada, pura)."""
+    return semantics.semantic_adequacy(word, text, senses=senses, pos=pos)
 
 
 def _score_production_text(word: str, text: str, min_words: int) -> dict:
@@ -545,30 +473,47 @@ def score_write_attempt(word: str, text: str) -> dict:
     return _score_production_text(word, text, WRITE_MIN_WORDS)
 
 
-def score_transfer_attempt(word: str, text: str, *, pos: str = "") -> dict:
-    """Puntúa la actividad de TRANSFERENCIA a un contexto nuevo (V3.40 → V3.43).
+def score_transfer_attempt(
+    word: str,
+    text: str,
+    *,
+    pos: str = "",
+    senses: object = (),
+) -> dict:
+    """Puntúa la actividad de TRANSFERENCIA a un contexto nuevo (V3.40 → V3.44).
 
     La consigna da un ESCENARIO, nunca la unidad objetivo (V3.43, P1-01): el
     alumno decide si la usa. El TRANSFER LÉXICO es determinista y sin LLM
     (`_score_production_text`): unidad alineada + longitud mínima, la MISMA
     acreditación que la escritura.
 
-    V3.43 (P1-02) añade una capa SEPARADA de adecuación semántica
-    (`_semantic_fit`): un intento puede transferir la unidad correctamente en lo
-    léxico y, aun así, usarla en una función incompatible con su categoría
-    declarada (`I bank yesterday`). Entonces `passed`/`lexical_transfer` siguen
-    siendo verdaderos, pero `adequacy="suspect"` y el `error_type` es
-    `semantic_mismatch`, de modo que el estado de transferencia no lo cuenta como
-    ÉXITO LIMPIO. `pos` es la categoría declarada del ítem (vacía = no
-    determinable). Nunca lanza.
+    V3.44 (P1-01/P1-02 de la auditoría de V3.43.0): la adecuación semántica se
+    decide contra los SENTIDOS de la unidad (`senses`, `[{pos, gloss}]` de la
+    caché) y no contra la `pos` global; así `I plan my trip` deja de ser falso
+    positivo cuando `plan` declara también sentido verbal. Taxonomía:
+
+    - `fit` — la ocurrencia encaja con algún sentido declarado;
+    - `incorrect` — contradice TODOS con pista fuerte → `semantic_mismatch`,
+      el ÚNICO valor que bloquea el clean success (no destruye la evidencia
+      léxica: `passed` sigue siendo verdadero);
+    - `suspect` — contradice con pista débil → `semantic_doubt` (advisory);
+    - `unknown` — sin datos suficientes (nunca bloquea).
+
+    `pos` es la categoría declarada del ítem y actúa de FALLBACK cuando no hay
+    sentidos (retrocompatible con el contrato de V3.43). Nunca lanza.
     """
     scored = _score_production_text(word, text, WRITE_MIN_WORDS)
-    adequacy = _semantic_fit(pos, word, text)
-    if scored["passed"] and adequacy == "suspect":
-        scored["error_type"] = SEMANTIC_MISMATCH_ERROR
+    adequacy = _semantic_fit(pos, word, text, senses)
+    if scored["passed"]:
+        if adequacy == semantics.SENSE_INCORRECT:
+            scored["error_type"] = SEMANTIC_MISMATCH_ERROR
+        elif adequacy == semantics.SENSE_SUSPECT:
+            scored["error_type"] = SEMANTIC_DOUBT_ERROR
     scored["lexical_transfer"] = bool(scored["passed"])
     scored["semantic_fit"] = (
-        None if adequacy == "unknown" else adequacy == "fit"
+        None
+        if adequacy == semantics.SENSE_UNKNOWN
+        else adequacy == semantics.SENSE_FIT
     )
     scored["adequacy"] = adequacy
     return scored

@@ -29,7 +29,7 @@ from repositories import learning as learning_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
 from services import fsrs, lexicon, planner, transfer
-from services.evidence import context_signals
+from services.evidence import context_signals, transfer_state
 
 
 def _setup(monkeypatch, tmp_path):
@@ -371,8 +371,9 @@ def test_transfer_attempt_failure_is_recorded_and_never_accredits(
     assert rows[0]["skill"] == "spontaneous_use"
 
 
-def test_two_distinct_contexts_demonstrate_real_transfer(monkeypatch, tmp_path):
-    """El segundo contexto con éxito cierra el `transfer_gap` con evidencia."""
+def test_two_diverse_contexts_need_an_unscaffolded_success(monkeypatch, tmp_path):
+    """V3.46 (P1-03): dos contextos distintos con ayuda NO demuestran
+    transferencia; hace falta un éxito limpio SIN andamiaje (`open_context`)."""
     uid = _setup(monkeypatch, tmp_path)
     _seed_word(uid, "travel")
 
@@ -390,6 +391,8 @@ def test_two_distinct_contexts_demonstrate_real_transfer(monkeypatch, tmp_path):
         # Dos éxitos, pero en un solo contexto: toca transferir al siguiente.
         assert planner.transfer_gap(first) is True
 
+        # Contexto distinto con diversidad real, pero aún ANDAMIADO
+        # (`cued_context`): la unidad se usa, no se demuestra transferencia.
         _post_transfer(
             client,
             uid,
@@ -397,12 +400,38 @@ def test_two_distinct_contexts_demonstrate_real_transfer(monkeypatch, tmp_path):
             "Next year I will travel to Chile.",
             "transfer:future",
         )
+        scaffolded = evidence_repo.summarize_by_target(
+            uid, target_type="lexicon"
+        )["travel"]
+        assert scaffolded["transfer"] is True
+        assert scaffolded["clean_success_contexts"] == [
+            "transfer:future",
+            "transfer:work",
+        ]
+        assert scaffolded["unscaffolded_clean_successes"] == 0
+        assert transfer_state(scaffolded) == "contextualized"
+        assert planner.transfer_gap(scaffolded) is True
 
-    summary = evidence_repo.summarize_by_target(uid, target_type="lexicon")[
-        "travel"
-    ]
-    assert summary["transfer"] is True
-    assert summary["success_contexts"] == ["transfer:future", "transfer:work"]
+        # Estado `contextualized` → el drill sirve `open_context`, que NO exige la
+        # unidad: un éxito limpio aquí sí acredita la transferencia.
+        served = client.get(
+            "/api/vocabulary/drill/transfer-context",
+            params={"word": "travel", "user_id": uid},
+        ).json()
+        assert served["condition"] == "open_context"
+        assert served["required_target"] is False
+        _post_transfer(
+            client,
+            uid,
+            "travel",
+            "I travel to Chile every summer.",
+            served["context_id"],
+        )
+
+    summary = evidence_repo.summarize_by_target(uid, target_type="lexicon")["travel"]
+    assert summary["unscaffolded_clean_successes"] == 1
+    assert summary["success_conditions"] == ["cued_context", "open_context"]
+    assert transfer_state(summary) == "transfer_demonstrated"
     assert planner.transfer_gap(summary) is False
 
 

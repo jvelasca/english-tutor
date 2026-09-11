@@ -303,7 +303,7 @@ describe("WordDrill paso Transfer (V3.40)", () => {
       used_word: true,
       word_count: 8,
       passed: true,
-      error_type: "semantic_mismatch",
+      error_type: "semantic_doubt",
       lexical_transfer: true,
       semantic_fit: false,
       adequacy: "suspect",
@@ -325,6 +325,45 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     expect(await screen.findByText("river")).toBeTruthy();
   });
 
+  it("un uso semánticamente incorrecto avisa con firmeza y no cuenta como transferencia", async () => {
+    const onProduced = vi.fn();
+    mocks.getDrillTransferContext.mockResolvedValue({
+      word: "river",
+      context_id: "transfer:story",
+      topic: "personal_experience",
+      prompt: "Tell a short story about something that happened to you recently.",
+      available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
+    });
+    mocks.submitDrillTransferAttempt.mockResolvedValue({
+      word: "river",
+      text: "I river the water every morning before work.",
+      context_id: "transfer:story",
+      used_word: true,
+      word_count: 8,
+      passed: true,
+      // V3.44: contradicción FUERTE con los sentidos de la unidad.
+      error_type: "semantic_mismatch",
+      lexical_transfer: true,
+      semantic_fit: false,
+      adequacy: "incorrect",
+    });
+    renderDrill("transfer", onProduced);
+
+    fireEvent.change(await screen.findByLabelText("Your answer"), {
+      target: { value: "I river the water every morning before work." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    expect(
+      await screen.findByText(/wrong meaning here/),
+    ).toBeTruthy();
+    // La evidencia léxica sigue existiendo (hubo producción).
+    expect(onProduced).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("river")).toBeTruthy();
+  });
+
   it("sin consigna disponible avisa y no deja enviar", async () => {
     const onProduced = vi.fn();
     mocks.getDrillTransferContext.mockResolvedValue({
@@ -342,6 +381,70 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     expect(
       screen.getByRole("button", { name: "Check answer" }),
     ).toHaveProperty("disabled", true);
+    expect(onProduced).not.toHaveBeenCalled();
+  });
+
+  it("muestra la condición de recuperación servida (V3.46)", async () => {
+    mocks.getDrillTransferContext.mockResolvedValue({
+      word: "river",
+      context_id: "transfer:story",
+      topic: "personal_experience",
+      prompt:
+        "Tell a short story about something that happened to you recently. Use any vocabulary you need.",
+      available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
+      condition: "open_context",
+      required_target: false,
+      unscaffolded: true,
+    });
+    renderDrill("transfer");
+
+    // La condición explica cuánta ayuda da la tarea (V3.46, P1-03).
+    expect(
+      await screen.findByText(/Open use: you choose your words/),
+    ).toBeTruthy();
+  });
+
+  it("no usar la palabra en condición abierta se explica como no-error (V3.46)", async () => {
+    const onProduced = vi.fn();
+    mocks.getDrillTransferContext.mockResolvedValue({
+      word: "river",
+      context_id: "transfer:story",
+      topic: "personal_experience",
+      prompt:
+        "Tell a short story about something that happened to you recently. Use any vocabulary you need.",
+      available: true,
+      communicative_goal: "narrate",
+      discourse_type: "narrative",
+      condition: "open_context",
+      required_target: false,
+      unscaffolded: true,
+    });
+    mocks.submitDrillTransferAttempt.mockResolvedValue({
+      word: "river",
+      text: "I walked to the beach yesterday with my sister.",
+      context_id: "transfer:story",
+      used_word: false,
+      word_count: 8,
+      passed: false,
+      error_type: "missing_target",
+      lexical_transfer: false,
+      semantic_fit: null,
+      adequacy: "unknown",
+      condition: "open_context",
+      required_target: false,
+    });
+    renderDrill("transfer", onProduced);
+
+    fireEvent.change(await screen.findByLabelText("Your answer"), {
+      target: { value: "I walked to the beach yesterday with my sister." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    // En `open_context` la palabra NO era obligatoria: ni error ni evidencia.
+    expect(await screen.findByText(/wasn't required here/)).toBeTruthy();
+    expect(screen.queryByText(/must use the word/)).toBeNull();
     expect(onProduced).not.toHaveBeenCalled();
   });
 });

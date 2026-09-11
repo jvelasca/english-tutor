@@ -17,9 +17,67 @@ Este repositorio nunca registra evidencia del alumno ni toca
 
 from __future__ import annotations
 
+import json
 from contextlib import closing
 
 from repositories.db import _conn, _now
+
+
+def _decode_senses(raw: object) -> list[dict]:
+    """Sentidos desde el JSON persistido (`[]` si vacío o corrupto) (V3.44).
+
+    Tolerante a propósito: un `senses_json` ilegible no debe romper la consulta
+    del diccionario ni el scoring (que degrada a `unknown`).
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return []
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [
+        {
+            "pos": str(item.get("pos") or ""),
+            "gloss": str(item.get("gloss") or ""),
+        }
+        for item in data
+        if isinstance(item, dict)
+    ]
+
+
+def _encode_senses(senses: object) -> str:
+    """Serializa los sentidos a JSON compacto y orden estable (V3.44).
+
+    `""` cuando no hay sentidos. Acepta una lista de `{pos, gloss}` (o una
+    cadena JSON ya serializada, que se conserva). Descarta entradas vacías o no
+    diccionario; nunca lanza.
+    """
+    if not senses:
+        return ""
+    if isinstance(senses, str):
+        return senses.strip()
+    cleaned = []
+    for item in senses if isinstance(senses, (list, tuple)) else ():
+        if not isinstance(item, dict):
+            continue
+        pos = str(item.get("pos") or "").strip()
+        gloss = str(item.get("gloss") or "").strip()
+        if not pos and not gloss:
+            continue
+        cleaned.append({"pos": pos, "gloss": gloss})
+    if not cleaned:
+        return ""
+    return json.dumps(cleaned, ensure_ascii=False, separators=(",", ":"))
+
+
+def _entry_dict(row: object) -> dict:
+    """Fila de caché con los sentidos ya decodificados (V3.44)."""
+    entry = dict(row)  # type: ignore[arg-type]
+    entry["senses"] = _decode_senses(entry.get("senses_json"))
+    return entry
 
 
 def get_entry(word: str) -> dict | None:
@@ -27,17 +85,17 @@ def get_entry(word: str) -> dict | None:
 
     `word` debe venir ya normalizada (minúsculas, sin puntuación circundante).
     Incluye `generator_version` para que el dominio decida si la caché es
-    válida con la política actual (V3.30.1, P1-03) y `situation` (V3.38): el
-    enunciado situacional del peldaño `situation` de la escalera de recall.
+    válida con la política actual (V3.30.1, P1-03), `situation` (V3.38) y
+    `senses` (V3.44, ya decodificados desde `senses_json`).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
-            "SELECT word, pos, definition, translation, situation, "
+            "SELECT word, pos, definition, translation, situation, senses_json, "
             "generator_version, created_at, updated_at "
             "FROM dictionary_entries WHERE word = ?",
             (word,),
         ).fetchone()
-    return dict(row) if row else None
+    return _entry_dict(row) if row else None
 
 
 def save_entry(
@@ -47,6 +105,7 @@ def save_entry(
     definition: str = "",
     translation: str = "",
     situation: str = "",
+    senses: object = None,
     generator_version: str = "",
 ) -> bool:
     """Inserta o sobrescribe la entrada de diccionario de `word` (V3.30.1).
@@ -61,19 +120,24 @@ def save_entry(
     V3.38: `situation` es el enunciado situacional (con hueco `_____`) del
     peldaño `situation`; se persiste junto al resto del contenido para no pagar
     dos veces la latencia del modelo.
+
+    V3.44: `senses` (`[{pos, gloss}]`) se serializa en `senses_json` (JSON
+    compacto). Es contenido, no evidencia: permite que el scoring semántico
+    deje de depender de la `pos` global.
     """
     with closing(_conn()) as conn, conn:
         now = _now()
         cursor = conn.execute(
             "INSERT INTO dictionary_entries "
-            "(word, pos, definition, translation, situation, generator_version, "
-            "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "(word, pos, definition, translation, situation, senses_json, "
+            "generator_version, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(word) DO UPDATE SET "
             "pos = excluded.pos, "
             "definition = excluded.definition, "
             "translation = excluded.translation, "
             "situation = excluded.situation, "
+            "senses_json = excluded.senses_json, "
             "generator_version = excluded.generator_version, "
             "updated_at = excluded.updated_at",
             (
@@ -82,6 +146,7 @@ def save_entry(
                 definition,
                 translation,
                 situation,
+                _encode_senses(senses),
                 generator_version,
                 now,
                 now,
@@ -91,8 +156,8 @@ def save_entry(
 
 
 _ENTRY_COLUMNS = (
-    "word, pos, definition, translation, situation, generator_version, "
-    "created_at, updated_at"
+    "word, pos, definition, translation, situation, senses_json, "
+    "generator_version, created_at, updated_at"
 )
 
 
@@ -110,7 +175,7 @@ def list_entries() -> list[dict]:
         rows = conn.execute(
             f"SELECT {_ENTRY_COLUMNS} FROM dictionary_entries ORDER BY word"
         ).fetchall()
-    return [dict(row) for row in rows]
+    return [_entry_dict(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -121,8 +186,8 @@ def list_entries() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _REVERSE_COLUMNS = (
-    "word, english, pos, definition, situation, generator_version, "
-    "created_at, updated_at"
+    "word, english, pos, definition, situation, senses_json, "
+    "generator_version, created_at, updated_at"
 )
 
 
@@ -131,7 +196,7 @@ def get_reverse_entry(word: str) -> dict | None:
 
     `word` es el término ESPAÑOL ya normalizado (sin acentos plegados: la
     normalización conserva la eñe). Devuelve `english` (traducción principal) y
-    el contenido inglés asociado (`pos`/`definition`/`situation`).
+    el contenido inglés asociado (`pos`/`definition`/`situation`/`senses`).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
@@ -139,7 +204,7 @@ def get_reverse_entry(word: str) -> dict | None:
             "WHERE word = ?",
             (word,),
         ).fetchone()
-    return dict(row) if row else None
+    return _entry_dict(row) if row else None
 
 
 def save_reverse_entry(
@@ -149,26 +214,29 @@ def save_reverse_entry(
     pos: str = "",
     definition: str = "",
     situation: str = "",
+    senses: object = None,
     generator_version: str = "",
 ) -> bool:
     """Inserta o sobrescribe la entrada ES→EN de `word` (V3.39).
 
     Mismo `INSERT ... ON CONFLICT(word) DO UPDATE` que `save_entry`: sirve tanto
     para la primera generación como para regenerar contenido obsoleto. Devuelve
-    True si hubo escritura. Contenido GLOBAL (sin `user_id`).
+    True si hubo escritura. Contenido GLOBAL (sin `user_id`). V3.44: `senses`
+    se persiste en `senses_json` (misma política que la dirección directa).
     """
     with closing(_conn()) as conn, conn:
         now = _now()
         cursor = conn.execute(
             "INSERT INTO dictionary_reverse_entries "
-            "(word, english, pos, definition, situation, generator_version, "
-            "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "(word, english, pos, definition, situation, senses_json, "
+            "generator_version, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(word) DO UPDATE SET "
             "english = excluded.english, "
             "pos = excluded.pos, "
             "definition = excluded.definition, "
             "situation = excluded.situation, "
+            "senses_json = excluded.senses_json, "
             "generator_version = excluded.generator_version, "
             "updated_at = excluded.updated_at",
             (
@@ -177,6 +245,7 @@ def save_reverse_entry(
                 pos,
                 definition,
                 situation,
+                _encode_senses(senses),
                 generator_version,
                 now,
                 now,
@@ -192,4 +261,4 @@ def list_reverse_entries() -> list[dict]:
             f"SELECT {_REVERSE_COLUMNS} FROM dictionary_reverse_entries "
             "ORDER BY word"
         ).fetchall()
-    return [dict(row) for row in rows]
+    return [_entry_dict(row) for row in rows]

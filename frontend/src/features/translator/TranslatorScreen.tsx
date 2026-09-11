@@ -6,6 +6,9 @@ import { ListenButton } from "../../components/ListenButton";
 import { MicButton } from "../../components/MicButton";
 import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
+import { ConversationTranslator } from "./ConversationTranslator";
+
+type TranslatorMode = "conversation" | "write";
 
 /** Últimas frases traducidas que se recuerdan entre sesiones. */
 export const HISTORY_STORAGE_KEY = "english-tutor.translator-history";
@@ -67,6 +70,9 @@ function readHistory(): HistoryItem[] {
  */
 export function TranslatorScreen({ userId }: { userId: string | null }) {
   const { t } = useI18n();
+  // V3.45: la conversación (dos botones grandes) es el modo por defecto; el
+  // modo Escribir conserva el comportamiento histórico del traductor.
+  const [mode, setMode] = useState<TranslatorMode>("conversation");
   const [direction, setDirection] = useState<TranslateDirection>("es-en");
   const [sourceText, setSourceText] = useState("");
   const [targetText, setTargetText] = useState("");
@@ -160,6 +166,48 @@ export function TranslatorScreen({ userId }: { userId: string | null }) {
           </p>
         </header>
 
+        <div
+          role="group"
+          aria-label={t("translator.mode.label")}
+          className="bg-secondary mb-4 flex w-fit items-center gap-1 rounded-md p-1"
+        >
+          {(["conversation", "write"] as const).map((value) => {
+            const isActive = mode === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setMode(value)}
+                className={cn(
+                  "inline-flex min-h-9 items-center rounded px-3 text-xs font-semibold transition-colors",
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t(
+                  value === "conversation"
+                    ? "translator.mode.conversation"
+                    : "translator.mode.write",
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {mode === "conversation" ? (
+          <>
+            <ConversationTranslator userId={userId} />
+            <p className="mt-3 text-xs text-muted-foreground">
+              <span className="border-border mr-1.5 rounded border px-1.5 py-0.5 font-semibold">
+                {t("translator.notTracked")}
+              </span>
+              {t("translator.notTrackedHint")}
+            </p>
+          </>
+        ) : (
+          <>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div
             role="group"
@@ -333,6 +381,8 @@ export function TranslatorScreen({ userId }: { userId: string | null }) {
             </ul>
           )}
         </section>
+          </>
+        )}
       </div>
     </div>
   );

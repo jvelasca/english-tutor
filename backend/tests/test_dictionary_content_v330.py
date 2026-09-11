@@ -98,6 +98,9 @@ def test_parse_returns_valid_content():
         "definition": "A small domesticated carnivorous mammal.",
         "translation": "gato",
         "situation": "",
+        # V3.44: el contrato de contenido gana `senses` ([] si el modelo no los
+        # da, sin invalidar definición/traducción).
+        "senses": [],
     }
 
 

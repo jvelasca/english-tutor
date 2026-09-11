@@ -966,30 +966,38 @@ export function WordDrill({
           logra en >= 2 contextos); el fallo explica qué faltó sin declarar
           dominio. V3.43 (P1-02): un acierto léxico con uso semánticamente
           sospechoso se avisa en tono warning (hubo producción léxica, pero no
-          cuenta como éxito limpio). */}
+          cuenta como éxito limpio). V3.44: se distingue `suspect` (advisory) de
+          `incorrect` (contradicción fuerte, el único que bloquea el clean
+          success en el servidor). */}
       {step === "transfer" && transferOutcome && (
         <div
           className={cn(
             "rounded-md px-3 py-2 text-sm",
-            transferOutcome.passed && transferOutcome.adequacy !== "suspect"
+            transferOutcome.passed &&
+              transferOutcome.adequacy !== "suspect" &&
+              transferOutcome.adequacy !== "incorrect"
               ? "bg-success/10 text-success"
               : "bg-warning/10 text-warning",
           )}
           role="status"
         >
           {transferOutcome.passed
-            ? transferOutcome.adequacy === "suspect"
-              ? t("dictionary.drill.transferSemanticWarning")
-              : t("dictionary.drill.transferPassed")
+            ? transferOutcome.adequacy === "incorrect"
+              ? t("dictionary.drill.transferSemanticWrong")
+              : transferOutcome.adequacy === "suspect"
+                ? t("dictionary.drill.transferSemanticWarning")
+                : t("dictionary.drill.transferPassed")
             : transferOutcome.used_word
               ? t("dictionary.drill.writeTooShort").replace(
                   "{count}",
                   String(WRITE_MIN_WORDS),
                 )
-              : t("dictionary.drill.writeMissingWord").replace(
-                  "{word}",
-                  word,
-                )}
+              : transferOutcome.required_target === false
+                ? t("dictionary.drill.transferNotRequired")
+                : t("dictionary.drill.writeMissingWord").replace(
+                    "{word}",
+                    word,
+                  )}
         </div>
       )}
     </div>

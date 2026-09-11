@@ -104,9 +104,13 @@ def _due_lexicon_card(uid: str, word: str, *, stability: float, days_ago: int) -
 def test_generator_version_and_prompt_declare_the_situation_field():
     # V3.39: el contrato de contenido gana la dirección ES→EN y la versión sube
     # para regenerar una sola vez la caché previa bajo la política nueva.
-    assert dictionary_content.GENERATOR_VERSION == "1.3.0"
+    # V3.44: sube a 1.4.0 al ganar `senses` (modelo de sentidos del scoring).
+    assert dictionary_content.GENERATOR_VERSION == "1.4.0"
     assert "situation" in dictionary_content._SYSTEM_PROMPT
     assert "situation" in dictionary_content._REVERSE_SYSTEM_PROMPT
+    # V3.44 (P1-01): el contrato de contenido también declara `senses`.
+    assert "senses" in dictionary_content._SYSTEM_PROMPT
+    assert "senses" in dictionary_content._REVERSE_SYSTEM_PROMPT
     assert dictionary_content.SITUATION_BLANK == "_____"
 
 

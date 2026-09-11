@@ -5,7 +5,7 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.43.0`** — ver `docs/RELEVO.md` (nota superior
+> **Estado actual (2026-09-11): `v3.46.0`** — ver `docs/RELEVO.md` (nota superior
 > y sección 0 "START HERE").
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
@@ -20,6 +20,23 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v346-transfer-condition.md` — **V3.46 (ejecutado, 2026-09-11,
+  v3.46.0)**: condición de recuperación en la transferencia
+  (`prompted`/`cued_context`/`open_context`/`free_choice`/`naturally_emergent`),
+  escalera pura por evidencia, persistencia aditiva y endurecimiento de
+  `transfer_demonstrated` (exige ≥1 éxito limpio NO andamiado). Cierra el P1
+  `transfer_condition` de la auditoría de V3.43.0. **Histórico, hecho**; ver
+  `release-notes-v3.46.0.md`.
+- `agentes/v345-translator.md` — **V3.45 (ejecutado, 2026-09-11, v3.45.0)**:
+  Traductor de viaje práctico (modo Conversación con dos botones grandes, VAD,
+  auto-traducción y auto-reproducción, «cara a cara») + voz española real
+  (`es_ES-davefx-medium`, default por idioma y auto-descarga en `/api/tts`).
+  **Histórico, hecho**; ver `release-notes-v3.45.0.md`.
+- `agentes/v344-sense-aware.md` — **V3.44 (ejecutado, 2026-09-11, v3.44.0)**:
+  Lexicón sense-aware (`lexical_unit → sense`) + scoring semántico 2.0
+  (`fit`/`suspect`/`incorrect`/`unknown`, solo `incorrect` bloquea el clean
+  success). Cierra los dos P1 conceptuales de la auditoría de V3.43.0.
+  **Histórico, hecho**; ver `release-notes-v3.44.0.md`.
 - `agentes/v343-transfer-2.md` — **V3.43 (ejecutado, 2026-09-11, v3.43.0)**:
   Transfer 2.0 (target oculto, semanticidad determinista, diversidad contextual
   real y `transfer_state`). Cierra los 4 P1 de la auditoría de V3.42.0.

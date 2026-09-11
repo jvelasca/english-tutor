@@ -26,13 +26,16 @@ class VoicesResponse(BaseModel):
     `downloadable` son las voces del catálogo curado que aún no están instaladas
     (la UI ofrece descargarlas); `default` es la voz por defecto del sistema y
     `selected` la del usuario (o `default` si el usuario no ha elegido / su
-    elección no está instalada).
+    elección no está instalada). V3.45: `defaults` es el mapa idioma → voz por
+    defecto (`{"en": ..., "es": ...}`) para que el Traductor conozca el id del
+    español sin hardcodearlo.
     """
 
     voices: list[VoiceInfo]
     downloadable: list[DownloadableVoice]
     default: str
     selected: str
+    defaults: dict[str, str]
 
 
 class VoiceDownloadRequest(BaseModel):

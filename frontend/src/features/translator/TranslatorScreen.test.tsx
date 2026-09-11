@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /**
- * Vitest de `TranslatorScreen` (V3.39, Fase 2): traductor de viaje ES↔EN.
+ * Vitest de `TranslatorScreen` (V3.39 Fase 2; V3.45 modos).
  *
- * Es una utilidad AUXILIAR: bidireccional, por voz o texto, con historial
- * reciente persistido en `localStorage`. Se mockean la API de traducción, la de
- * voz (para el altavoz) y el botón de micrófono (MediaRecorder no existe en
- * jsdom) para verificar el cableado de idioma y el auto-traducido del dictado.
+ * Es una utilidad AUXILIAR: bidireccional, por voz o texto. V3.45 añade el modo
+ * Conversación (por defecto, dos botones grandes) y deja el modo Escribir con el
+ * comportamiento histórico. Se mockean las APIs de traducción, voz y voces, y el
+ * `MicButton` (MediaRecorder no existe en jsdom).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -17,6 +17,7 @@ import {
   within,
 } from "@testing-library/react";
 import { translateText } from "../../api/translate";
+import { getVoices } from "../../api/voices";
 import { speak } from "../../api/voz";
 import { I18nProvider } from "../../hooks/useI18n";
 import { HISTORY_STORAGE_KEY, TranslatorScreen } from "./TranslatorScreen";
@@ -26,6 +27,10 @@ vi.mock("../../api/translate", () => ({
 }));
 vi.mock("../../api/voz", () => ({
   speak: vi.fn(),
+}));
+vi.mock("../../api/voices", () => ({
+  getVoices: vi.fn(),
+  downloadVoice: vi.fn(),
 }));
 // El micrófono real usa MediaRecorder (no disponible en jsdom): se sustituye por
 // un botón que entrega el texto dictado y expone el idioma configurado.
@@ -52,6 +57,20 @@ vi.mock("../../components/MicButton", () => ({
 
 const translateMock = vi.mocked(translateText);
 const speakMock = vi.mocked(speak);
+const getVoicesMock = vi.mocked(getVoices);
+
+function voicesInstalled() {
+  return {
+    voices: [
+      { id: "en_US-lessac-medium", name: "Lessac" },
+      { id: "es_ES-davefx-medium", name: "DaveFX" },
+    ],
+    downloadable: [],
+    default: "en_US-lessac-medium",
+    selected: "en_US-lessac-medium",
+    defaults: { en: "en_US-lessac-medium", es: "es_ES-davefx-medium" },
+  };
+}
 
 function renderScreen(userId: string | null = "u1") {
   return render(
@@ -59,6 +78,11 @@ function renderScreen(userId: string | null = "u1") {
       <TranslatorScreen userId={userId} />
     </I18nProvider>,
   );
+}
+
+/** Cambia al modo Escribir (el modo texto histórico). */
+function switchToWrite() {
+  fireEvent.click(screen.getByRole("button", { name: "Type" }));
 }
 
 function translateButton() {
@@ -85,8 +109,10 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
     micLanguages.length = 0;
     translateMock.mockReset();
     speakMock.mockReset();
+    getVoicesMock.mockReset();
     translateMock.mockResolvedValue("Where is the hotel?");
     speakMock.mockResolvedValue(undefined);
+    getVoicesMock.mockResolvedValue(voicesInstalled());
   });
 
   afterEach(() => {
@@ -94,8 +120,38 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
     vi.clearAllMocks();
   });
 
+  it("arranca en el modo Conversación con los dos paneles", () => {
+    renderScreen();
+    expect(screen.getByTestId("conversation-panel-es")).toBeTruthy();
+    expect(screen.getByTestId("conversation-panel-en")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Conversation" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("el modo Cara a cara rota el panel del interlocutor", () => {
+    renderScreen();
+    const enPanel = screen.getByTestId("conversation-panel-en");
+    expect(enPanel.className).not.toContain("rotate-180");
+    fireEvent.click(screen.getByLabelText("Face to face"));
+    expect(enPanel.className).toContain("rotate-180");
+  });
+
+  it("cambia entre Conversación y Escribir", () => {
+    renderScreen();
+    switchToWrite();
+    expect(screen.getByLabelText("Phrase to translate")).toBeTruthy();
+    expect(screen.queryByTestId("conversation-panel-es")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversation" }));
+    expect(screen.getByTestId("conversation-panel-es")).toBeTruthy();
+  });
+
   it("arranca en Español → Inglés (el caso del viajero)", () => {
     renderScreen();
+    switchToWrite();
     expect(
       screen
         .getByRole("button", { name: "Spanish → English" })
@@ -110,6 +166,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
 
   it("traduce por texto con la dirección activa y muestra el resultado", async () => {
     renderScreen();
+    switchToWrite();
     fireEvent.change(textarea(), {
       target: { value: "¿Dónde está el hotel?" },
     });
@@ -123,6 +180,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
 
   it("invertir la dirección cambia el idioma de entrada y limpia el resultado", async () => {
     renderScreen();
+    switchToWrite();
     fireEvent.change(textarea(), {
       target: { value: "¿Dónde está el hotel?" },
     });
@@ -145,6 +203,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
 
   it("el botón ⇄ intercambia sentido y textos", async () => {
     renderScreen();
+    switchToWrite();
     fireEvent.change(textarea(), {
       target: { value: "¿Dónde está el hotel?" },
     });
@@ -169,6 +228,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
   it("muestra un error y no deja resultado si el modelo no está disponible", async () => {
     translateMock.mockRejectedValue(new Error("HTTP 502"));
     renderScreen();
+    switchToWrite();
     fireEvent.change(textarea(), { target: { value: "Hola" } });
     fireEvent.click(translateButton());
 
@@ -182,6 +242,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
 
   it("el dictado usa el idioma de origen y auto-traduce lo transcrito", async () => {
     renderScreen();
+    switchToWrite();
     expect(micLanguages).toContain("es");
 
     fireEvent.click(screen.getByRole("button", { name: "dictate" }));
@@ -199,6 +260,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
 
   it("guarda el historial reciente en localStorage", async () => {
     renderScreen();
+    switchToWrite();
     fireEvent.change(textarea(), { target: { value: "Hola" } });
     fireEvent.click(translateButton());
     await waitFor(() =>
@@ -228,6 +290,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
       ]),
     );
     renderScreen();
+    switchToWrite();
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -252,6 +315,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
       ]),
     );
     renderScreen();
+    switchToWrite();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 
@@ -264,6 +328,7 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
   it("funciona sin perfil (utilidad auxiliar)", () => {
     renderScreen(null);
     expect(screen.getByText("Travel translator")).toBeTruthy();
+    switchToWrite();
     expect(textarea()).toBeTruthy();
   });
 });

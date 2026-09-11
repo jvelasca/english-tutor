@@ -10,7 +10,7 @@ from dependencies import current_user_optional, read_audio_limited
 from domain import settings as settings_service
 from schemas.voz import TranscribeResponse, TTSRequest
 from services.stt import transcribe as transcribe_audio
-from services.tts import resolve_voice
+from services.tts import ensure_voice_for_language, resolve_voice
 from services.tts import synthesize as synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,14 @@ async def tts(
     idioma de `req.language` (V3.39, Fase 2: el Traductor pide `es` para la
     salida en español); sin usuario (o sin preferencia válida) usa la voz por
     defecto del sistema para ese idioma o, si no hay ninguna, otra instalada.
+
+    V3.45: si no hay ninguna voz instalada del idioma, se auto-descarga el
+    default del idioma (p. ej. `es_ES-davefx-medium`) antes de resolver; si la
+    descarga falla (sin red) se sigue con el fallback, nunca se devuelve 500 por
+    ese motivo.
     """
     language = (req.language or "en").strip().lower()[:2] or "en"
+    await run_in_threadpool(ensure_voice_for_language, language)
     voice: str | None = None
     if user is not None:
         prefs = await settings_service.get_settings(user["id"])

@@ -138,6 +138,7 @@ def init_db() -> None:
                 definition TEXT NOT NULL DEFAULT '',
                 translation TEXT NOT NULL DEFAULT '',
                 situation TEXT NOT NULL DEFAULT '',
+                senses_json TEXT NOT NULL DEFAULT '',
                 generator_version TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT ''
@@ -164,6 +165,16 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE dictionary_entries ADD COLUMN "
                 "situation TEXT NOT NULL DEFAULT ''"
+            )
+        # V3.44 (P1-01 de la auditoría de V3.43.0): sentidos declarados de la
+        # unidad (`[{pos, gloss}]` serializado como JSON). Columna aditiva
+        # (NULL → ''): el scoring semántico deja de depender de la `pos` global.
+        # La caché previa se regenera una sola vez por el bump de
+        # `GENERATOR_VERSION` (misma política de invalidación lazy).
+        if "senses_json" not in dict_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_entries ADD COLUMN "
+                "senses_json TEXT NOT NULL DEFAULT ''"
             )
         # V3.31: el contenido sin versión (creado antes de V3.30.1) se etiqueta
         # con la marca LEGACY `1.0.0`, deliberadamente DISTINTA de la
@@ -196,12 +207,26 @@ def init_db() -> None:
                 pos TEXT NOT NULL DEFAULT '',
                 definition TEXT NOT NULL DEFAULT '',
                 situation TEXT NOT NULL DEFAULT '',
+                senses_json TEXT NOT NULL DEFAULT '',
                 generator_version TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT ''
             )
             """
         )
+        # V3.44: la tabla inversa pudo crearse sin `senses_json` en
+        # instalaciones previas; `CREATE TABLE IF NOT EXISTS` no añade columnas,
+        # así que la migración es explícita e idempotente (mismo patrón que la
+        # tabla directa).
+        reverse_cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(dictionary_reverse_entries)")
+        }
+        if "senses_json" not in reverse_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_reverse_entries ADD COLUMN "
+                "senses_json TEXT NOT NULL DEFAULT ''"
+            )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS grammar_errors (
@@ -978,6 +1003,7 @@ def init_db() -> None:
                 error_type TEXT NOT NULL DEFAULT '',
                 interval_since_last_evidence REAL,
                 event_role TEXT NOT NULL DEFAULT 'evidence',
+                transfer_condition TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
@@ -986,6 +1012,8 @@ def init_db() -> None:
         # V3.35 no guardaba. Aditivas e idempotentes, con default '' / 0 / NULL
         # para las filas legacy (contexto y apoyo desconocidos → se ignoran en
         # los conteos, no en los agregados ya existentes).
+        # V3.46: `transfer_condition` (condición de recuperación de la
+        # transferencia) se añade por el mismo camino aditivo.
         evidence_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_evidence)")
         }
@@ -996,6 +1024,7 @@ def init_db() -> None:
             ("difficulty", "REAL NOT NULL DEFAULT 0"),
             ("response_time_ms", "INTEGER"),
             ("error_type", "TEXT NOT NULL DEFAULT ''"),
+            ("transfer_condition", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in evidence_cols:
                 conn.execute(

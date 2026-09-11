@@ -64,7 +64,14 @@ logger = logging.getLogger(__name__)
 # (`dictionary_reverse_entries`, prompt propio): el contenido directo se
 # regenera una sola vez para incorporar el nuevo `GENERATOR_VERSION` común a
 # ambas direcciones (una sola política de frescura para las dos cachés).
-GENERATOR_VERSION = "1.3.0"
+#
+# V3.44 (P1-01 de la auditoría de V3.43.0): bump 1.3.0 -> 1.4.0. El contrato de
+# contenido gana `senses` (los sentidos declarados de la unidad, cada uno con su
+# `pos` y su glosa): es lo que permite que el scoring semántico deje de usar la
+# `pos` GLOBAL como sustituto de sentido. El contenido cacheado con 1.3.0 no los
+# tiene, así que se regenera una sola vez al primer lookup (misma política de
+# invalidación lazy, sin migración de datos).
+GENERATOR_VERSION = "1.4.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
@@ -80,6 +87,13 @@ MAX_ENGLISH_CHARS = 120
 # escalera). Aquí solo se re-exportan los nombres por retrocompatibilidad.
 MAX_SITUATION_CHARS = situation_service.MAX_SITUATION_CHARS
 SITUATION_BLANK = situation_service.SITUATION_BLANK
+
+# V3.44 (P1-01): sentidos declarados de la unidad. Cada sentido es
+# `{"pos": <categoría canónica>, "gloss": <etiqueta corta en inglés simple>}`.
+# El tope evita que el modelo convierta la ficha en un listado interminable y la
+# glosa se acota para que sea una ETIQUETA de sentido, no una definición.
+MAX_SENSES = 4
+MAX_GLOSS_CHARS = 120
 
 # Categorías gramaticales aceptadas del `pos` devuelto por el modelo. Cualquier
 # otro valor se normaliza a "" (la UI no muestra POS inventado).
@@ -110,7 +124,12 @@ _SYSTEM_PROMPT = (
     '"situation" (ONE short English sentence, at most 200 characters, that '
     "sets a concrete everyday scenario and contains EXACTLY one blank "
     '"_____" where the headword fits; do NOT write the headword or any form '
-    "of it anywhere else in the sentence). "
+    "of it anywhere else in the sentence), "
+    '"senses" (a JSON array with ONE object per DIFFERENT part of speech the '
+    "headword can take, at most 4, ordered with the most common sense first; "
+    'each object has "pos" (same list as above) and "gloss" (a very short '
+    "sense label in SIMPLE English, at most 60 characters, for example "
+    '{"pos":"noun","gloss":"an arrangement to do something"}). '
     "Do not add any text outside the JSON object."
 )
 
@@ -131,7 +150,11 @@ _REVERSE_SYSTEM_PROMPT = (
     '"situation" (ONE short English sentence, at most 200 characters, that '
     "sets a concrete everyday scenario and contains EXACTLY one blank "
     '"_____" where the English equivalent fits; do NOT write the English '
-    "equivalent or any form of it anywhere else in the sentence). "
+    "equivalent or any form of it anywhere else in the sentence), "
+    '"senses" (a JSON array with ONE object per DIFFERENT part of speech the '
+    "English equivalent can take, at most 4, ordered with the most common "
+    'sense first; each object has "pos" (same list as above) and "gloss" (a '
+    "very short sense label in SIMPLE English, at most 60 characters). "
     "Do not add any text outside the JSON object."
 )
 
@@ -194,6 +217,43 @@ def _first_json_object(text: str) -> dict | None:
     return None
 
 
+def normalize_senses(raw: object) -> list[dict]:
+    """Sentidos declarados de la unidad, normalizados y deterministas (V3.44).
+
+    Acepta la lista cruda del modelo y devuelve una lista NUEVA de
+    `{"pos": <categoría canónica>, "gloss": <etiqueta corta>}`:
+
+    - descarta los elementos que no son objetos o cuyo `pos` no es canónico
+      (nunca se inventa una categoría);
+    - colapsa los espacios de la glosa y la recorta a `MAX_GLOSS_CHARS`;
+    - deduplica por `(pos, gloss)` conservando el primer orden;
+    - limita a `MAX_SENSES`.
+
+    Es contenido OPCIONAL: una entrada inválida se descarta y devuelve `[]` sin
+    invalidar definición/traducción. Nunca lanza.
+    """
+    if not isinstance(raw, list):
+        return []
+    senses: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        pos = str(item.get("pos") or "").strip().lower()
+        if pos not in _VALID_POS:
+            continue
+        gloss = " ".join(str(item.get("gloss") or "").split())
+        gloss = gloss[:MAX_GLOSS_CHARS].strip()
+        key = (pos, gloss)
+        if key in seen:
+            continue
+        seen.add(key)
+        senses.append({"pos": pos, "gloss": gloss})
+        if len(senses) >= MAX_SENSES:
+            break
+    return senses
+
+
 def parse_content(raw: str, *, word: str = "") -> dict:
     """Parsea y valida la respuesta del modelo → `{pos, definition, translation,
     situation}`.
@@ -210,6 +270,11 @@ def parse_content(raw: str, *, word: str = "") -> dict:
     o filtra la palabra diana, se descarta (queda "") sin invalidar la
     definición/traducción. `word` (normalizada) activa la comprobación de
     spoiler: el enunciado no puede contener la diana en ningún otro sitio.
+
+    V3.44: `senses` (lista de `{pos, gloss}`) es el modelo de sentidos con el
+    que el scoring semántico deja de depender de una `pos` global. También es
+    contenido OPCIONAL y se normaliza con `normalize_senses` (nunca invalida la
+    definición/traducción); el `pos` superior se deriva del primer sentido.
     """
     text = (raw or "").strip()
     if not text:
@@ -225,11 +290,16 @@ def parse_content(raw: str, *, word: str = "") -> dict:
         raise ContentUnavailableError("La respuesta no incluye una definición")
     if len(definition) > MAX_DEFINITION_CHARS:
         raise ContentUnavailableError("La definición supera el límite de longitud")
+    senses = normalize_senses(obj.get("senses"))
     return {
-        "pos": pos if pos in _VALID_POS else "",
+        # V3.44: una sola fuente de verdad para el `pos` superior: el primer
+        # sentido válido; sin sentidos se conserva el `pos` del modelo si es
+        # canónico (retrocompatible con el contrato 1.3.0).
+        "pos": senses[0]["pos"] if senses else (pos if pos in _VALID_POS else ""),
         "definition": definition,
         "translation": translation[:MAX_TRANSLATION_CHARS],
         "situation": _situation_from(obj.get("situation"), word),
+        "senses": senses,
     }
 
 
@@ -251,7 +321,7 @@ async def generate_content(
     model: str | None = None,
     fetcher=None,
 ) -> dict:
-    """Genera `{pos, definition, translation, situation}` para `word`.
+    """Genera `{pos, definition, translation, situation, senses}` para `word`.
 
     `fetcher` es inyectable para tests (default: llamada real `_fetch_chat`).
     La palabra debe venir normalizada (minúsculas, sin puntuación circundante).
@@ -271,6 +341,9 @@ def parse_reverse_content(raw: str, *, word: str = "") -> dict:
     `pos` se normaliza a la taxonomía canónica, `definition` se acota a
     `MAX_DEFINITION_CHARS` y `situation` pasa por el mismo validador puro que la
     dirección directa (una frase, un hueco, sin fuga de la diana inglesa).
+
+    V3.44: `senses` (del equivalente INGLÉS) se normaliza con el mismo
+    `normalize_senses`; el `pos` superior se deriva del primer sentido.
     """
     text = (raw or "").strip()
     if not text:
@@ -288,11 +361,13 @@ def parse_reverse_content(raw: str, *, word: str = "") -> dict:
     if len(definition) > MAX_DEFINITION_CHARS:
         raise ContentUnavailableError("La definición supera el límite de longitud")
     pos = str(obj.get("pos") or "").strip().lower()
+    senses = normalize_senses(obj.get("senses"))
     return {
         "english": english,
-        "pos": pos if pos in _VALID_POS else "",
+        "pos": senses[0]["pos"] if senses else (pos if pos in _VALID_POS else ""),
         "definition": definition,
         "situation": _situation_from(obj.get("situation"), english),
+        "senses": senses,
     }
 
 
@@ -302,7 +377,7 @@ async def generate_reverse_content(
     model: str | None = None,
     fetcher=None,
 ) -> dict:
-    """Genera `{english, pos, definition, situation}` para el término ES `word`.
+    """Genera `{english, pos, definition, situation, senses}` para el término ES `word`.
 
     Mismo `fetcher` inyectable y misma degradación que `generate_content`; el
     término debe venir normalizado (minúsculas, acentos conservados).

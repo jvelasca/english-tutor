@@ -12,13 +12,17 @@ los WAV de la voz anterior; los nuevos se sintetizan bajo demanda.
 from __future__ import annotations
 
 import io
+import logging
 import threading
+import time
 import wave
 
 from piper import PiperVoice
 from piper.config import SynthesisConfig
 
-from config import PIPER_DIR, PIPER_VOICE
+from config import DEFAULT_VOICES, PIPER_DIR, PIPER_VOICE
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_VOICE = PIPER_VOICE
 
@@ -45,6 +49,12 @@ VOICE_LABELS: dict[str, str] = {
 
 _lock = threading.Lock()
 _voices: dict[str, PiperVoice] = {}
+
+# V3.45: caché negativa de la auto-descarga de voces por idioma. Si un intento
+# falla (sin red), no se reintenta en cada `/api/tts` durante este TTL: evita
+# sumar la latencia del fallo de red a cada petición en español.
+_VOICE_ENSURE_FAILED: dict[str, float] = {}
+_VOICE_ENSURE_FAILED_TTL_SECONDS = 300.0
 
 
 def list_voices() -> list[str]:
@@ -102,12 +112,22 @@ def voice_language(voice_id: str) -> str:
     return locale.split("_", 1)[0].lower()
 
 
+def default_voice_for(language: str) -> str:
+    """Voz por defecto del idioma (`config.DEFAULT_VOICES`), pura.
+
+    `"en"` → `en_US-lessac-medium`, `"es"` → `es_ES-davefx-medium`; idiomas sin
+    default declarado caen al default histórico (`config.PIPER_VOICE`).
+    """
+    lang = (language or "en").strip().lower()[:2]
+    return DEFAULT_VOICES.get(lang, DEFAULT_VOICE)
+
+
 def resolve_voice(prefs: dict[str, str] | None, language: str = "en") -> str:
     """Resuelve la voz preferida de un usuario frente a lo instalado y al idioma.
 
-    Función pura. Prioridad (V3.39, Fase 2):
+    Función pura. Prioridad (V3.39 Fase 2; V3.45: default por idioma):
     1. `prefs["tts_voice"]` si está instalada Y es del idioma pedido;
-    2. la voz por defecto del sistema si es de ese idioma;
+    2. la voz por defecto DE ESE IDIOMA (`default_voice_for`) si está instalada;
     3. la primera voz instalada de ese idioma;
     4. fallback global (default instalado o la primera instalada) — con un aviso
        implícito: si no hay ninguna voz del idioma, se sintetizará con otra, que
@@ -128,11 +148,54 @@ def resolve_voice(prefs: dict[str, str] | None, language: str = "en") -> str:
         ):
             return preferred
     same_language = [v for v in installed if voice_language(v) == lang]
-    if DEFAULT_VOICE in same_language:
-        return DEFAULT_VOICE
+    language_default = default_voice_for(lang)
+    if language_default in same_language:
+        return language_default
     if same_language:
         return same_language[0]
     return _fallback_voice()
+
+
+def ensure_voice_for_language(language: str) -> bool:
+    """Garantiza que hay una voz instalada del idioma (auto-descarga si falta).
+
+    V3.45 (Traductor): evita que `language="es"` caiga en silencio a una voz
+    inglesa. Si ya hay una voz del idioma, no hace nada. Si falta, descarga el
+    default del idioma cuando está en el catálogo curado (`voice_downloads`).
+
+    Devuelve `True` si ya había voz del idioma o si se descargó con éxito;
+    `False` si no se pudo (sin red, disco, o default fuera del catálogo).
+    NUNCA lanza: el TTS degrada al fallback en lugar de romper la petición.
+    Un fallo se recuerda `_VOICE_ENSURE_FAILED_TTL_SECONDS` para no reintentar la
+    descarga en cada petición.
+    """
+    lang = (language or "en").strip().lower()[:2]
+    installed = list_voices()
+    if any(voice_language(v) == lang for v in installed):
+        return True
+    failed_at = _VOICE_ENSURE_FAILED.get(lang)
+    recently_failed = (
+        failed_at is not None
+        and time.monotonic() - failed_at < _VOICE_ENSURE_FAILED_TTL_SECONDS
+    )
+    if recently_failed:
+        return False
+    target = default_voice_for(lang)
+    # Import local: `voice_downloads` solo hace falta en la descarga perezosa.
+    from services import voice_downloads  # noqa: PLC0415
+
+    if voice_downloads.spec_for(target) is None:
+        return False
+    try:
+        voice_downloads.download_voice(target)
+    except (ValueError, RuntimeError) as exc:
+        logger.warning(
+            "No se pudo auto-descargar la voz %s para %s: %s", target, lang, exc
+        )
+        _VOICE_ENSURE_FAILED[lang] = time.monotonic()
+        return False
+    _VOICE_ENSURE_FAILED.pop(lang, None)
+    return True
 
 
 def _load_voice(voice_id: str) -> PiperVoice:

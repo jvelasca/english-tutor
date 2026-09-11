@@ -213,13 +213,22 @@ WRITE_ERROR_TYPES: tuple[str, ...] = (
 # sustantivo conjugado como verbo: `I bank yesterday`). NO cambia el scoring
 # léxico (`passed` sigue siendo el resultado léxico); clasifica el intento para
 # que el estado de transferencia no lo cuente como ÉXITO LIMPIO.
+#
+# V3.44 (P1-02 de la auditoría de V3.43.0): se separa «incorrecto» de
+# «sospechoso». `semantic_mismatch` es ahora el veredicto FUERTE (adecuación
+# `incorrect`, contradicción con TODAS las familias POS y pista fuerte) y es el
+# ÚNICO que bloquea el clean success; `semantic_doubt` es el veredicto DÉBIL
+# (adecuación `suspect`): advierte y reduce confianza, pero NO destruye la
+# evidencia léxica.
 SEMANTIC_MISMATCH_ERROR = "semantic_mismatch"
+SEMANTIC_DOUBT_ERROR = "semantic_doubt"
 TRANSFER_ERROR_TYPES: tuple[str, ...] = (
     "correct",
     "empty",
     "missing_target",
     "too_short",
     SEMANTIC_MISMATCH_ERROR,
+    SEMANTIC_DOUBT_ERROR,
 )
 
 # Longitud mínima de la forma esperada para admitir `orthographic_error`. Por
@@ -419,7 +428,7 @@ def recency_signals(
 
 
 def context_signals(rows: list[dict]) -> dict:
-    """Señales de TRANSFERENCIA por CONTEXTO (V3.40 → V3.43, pura).
+    """Señales de TRANSFERENCIA por CONTEXTO (V3.40 → V3.46, pura).
 
     La auditoría de V3.38.1 recordó que `situation` (completar un hueco) es
     recuperación CONTEXTUALIZADA, no transferencia: transferir es usar la unidad
@@ -446,6 +455,16 @@ def context_signals(rows: list[dict]) -> dict:
       contextos distintos **y** diversidad contextual real
       (`diverse_dimensions >= CONTEXT_DIVERSITY_MIN`). Antes bastaba con dos
       `context_id` distintos, que podían ser el mismo tipo de producción.
+    - `transfer_conditions` / `success_conditions` /
+      `unscaffolded_clean_successes` (V3.46, P1-03): la CONDICIÓN de recuperación
+      de cada intento (`services.transfer`). `transfer_conditions` es
+      `{condición: {attempts, clean_successes}}` solo de los intentos con
+      condición DECLARADA (las filas legacy sin condición no aparecen: no se
+      puede afirmar de qué condición eran); `success_conditions` son las
+      condiciones con >= 1 éxito limpio, en orden de andamiaje decreciente; y
+      `unscaffolded_clean_successes` cuenta los éxitos limpios en condiciones NO
+      andamiadas — lo que `transfer_state` exige para declarar transferencia
+      demostrada.
 
     Reutilizada tal cual por el resumen SQL (paridad por construcción). Nunca
     lanza: filas incompletas se ignoran donde corresponda.
@@ -453,8 +472,13 @@ def context_signals(rows: list[dict]) -> dict:
     buckets: dict[str, dict[str, int]] = {}
     clean_successes: dict[str, int] = {}
     clean_days: set[str] = set()
+    condition_attempts: dict[str, int] = {}
+    condition_clean: dict[str, int] = {}
     for row in rows:
         context = (row.get("context_id") or "").strip()
+        condition = transfer.normalize_condition(row.get("transfer_condition"))
+        if condition:
+            condition_attempts[condition] = condition_attempts.get(condition, 0) + 1
         if not context:
             continue
         success = _truthy(row.get("success"))
@@ -464,13 +488,17 @@ def context_signals(rows: list[dict]) -> dict:
             continue
         bucket["successes"] += 1
         if (row.get("error_type") or "").strip().lower() == SEMANTIC_MISMATCH_ERROR:
-            # Éxito léxico con uso semánticamente sospechoso: cuenta como
+            # Éxito léxico con uso semánticamente INCORRECTO: cuenta como
             # intento y como éxito léxico, pero NO como éxito limpio.
+            # V3.44: `semantic_doubt` (adecuación `suspect`) es advisory y SÍ
+            # cuenta como limpio: no destruye evidencia léxica.
             continue
         clean_successes[context] = clean_successes.get(context, 0) + 1
         day = (row.get("occurred_at") or "")[:10]
         if day:
             clean_days.add(day)
+        if condition:
+            condition_clean[condition] = condition_clean.get(condition, 0) + 1
     success_contexts = sorted(
         context for context, bucket in buckets.items() if bucket["successes"] > 0
     )
@@ -499,6 +527,24 @@ def context_signals(rows: list[dict]) -> dict:
             len(clean_success_contexts) >= CONTEXT_TRANSFER_MIN
             and diversity["diverse_dimensions"] >= transfer.CONTEXT_DIVERSITY_MIN
         ),
+        # V3.46: condición de recuperación (solo intentos con condición declarada).
+        "transfer_conditions": {
+            condition: {
+                "attempts": condition_attempts.get(condition, 0),
+                "clean_successes": condition_clean.get(condition, 0),
+            }
+            for condition in transfer.TRANSFER_CONDITIONS
+            if condition_attempts.get(condition, 0) or condition_clean.get(condition, 0)
+        },
+        "success_conditions": [
+            condition
+            for condition in transfer.TRANSFER_CONDITIONS
+            if condition_clean.get(condition, 0) > 0
+        ],
+        "unscaffolded_clean_successes": sum(
+            condition_clean.get(condition, 0)
+            for condition in transfer.UNSCAFFOLDED_CONDITIONS
+        ),
     }
 
 
@@ -508,6 +554,25 @@ def _int(value: object) -> int:
         return int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0
+
+
+def _unscaffolded_transfer_ok(evidence: dict) -> bool:
+    """¿La transferencia está acreditada SIN andamiaje? (V3.46, pura).
+
+    V3.43 declaraba `transfer_demonstrated` con «2 contextos limpios y diversidad
+    real», sin mirar CÓMO se había usado la unidad: un éxito en tareas que
+    nombran o insinúan el objetivo (`prompted`/`cued_context`) bastaba. V3.46
+    exige además >= 1 éxito limpio en condición NO andamiada
+    (`open_context`/`free_choice`/`naturally_emergent`).
+
+    Sin datos de condición (resumen legacy/parcial, o transferencia registrada
+    antes de V3.46) devuelve True: no se puede afirmar que falte el requisito, así
+    que se conserva la regla anterior y no hay regresión. Nunca lanza.
+    """
+    conditions = evidence.get("transfer_conditions")
+    if not (isinstance(conditions, dict) and conditions):
+        return True
+    return _int(evidence.get("unscaffolded_clean_successes")) > 0
 
 
 # V3.43 (P1-04): estados del eje de transferencia. Un booleano `transfer = true`
@@ -548,14 +613,18 @@ def transfer_state(evidence: dict | None) -> str:
     - `not_ready` — sin éxitos limpios suficientes (< `TRANSFER_MIN_SUCCESSES`);
     - `emerging` — éxito limpio en 1 contexto;
     - `contextualized` — >= 2 contextos limpios pero diversidad insuficiente
-      (casi el mismo tipo de producción: no es transferencia real);
-    - `transfer_demonstrated` — >= 2 contextos limpios y diversidad real;
+      (casi el mismo tipo de producción: no es transferencia real) **o** toda la
+      evidencia limpia proviene de condiciones andamiadas (V3.46: falta el uso
+      sin andamiaje);
+    - `transfer_demonstrated` — >= 2 contextos limpios, diversidad real **y**
+      >= 1 éxito limpio no andamiado (V3.46);
     - `transfer_stable` — además >= 3 contextos y >= 2 días con éxito limpio;
     - `automatic` — estable y la modalidad `spontaneous_use` ya es automática.
 
     Acepta resúmenes parciales o legacy (cae a `success_contexts`/`successes` y
-    respeta el booleano `transfer` cuando no traen los campos de V3.43). No usa
-    LLM. Nunca lanza.
+    respeta el booleano `transfer` cuando no traen los campos de V3.43; sin datos
+    de condición de V3.46 se conserva la regla anterior). No usa LLM. Nunca
+    lanza.
     """
     ev = evidence or {}
     has_v43_fields = (
@@ -601,7 +670,13 @@ def transfer_state(evidence: dict | None) -> str:
         return "not_ready"
     if distinct < CONTEXT_TRANSFER_MIN:
         return "emerging"
-    if diverse_dimensions < transfer.CONTEXT_DIVERSITY_MIN:
+    if (
+        diverse_dimensions < transfer.CONTEXT_DIVERSITY_MIN
+        or not _unscaffolded_transfer_ok(ev)
+    ):
+        # Diversidad insuficiente O exito limpio solo en condiciones andamiadas:
+        # la unidad se usa en contextos distintos, pero aún no se ha demostrado
+        # que se recupere SIN ayuda (V3.46).
         return "contextualized"
     if (
         distinct >= TRANSFER_STABLE_MIN_CONTEXTS
@@ -1048,6 +1123,11 @@ def empty_summary() -> dict:
             "score": 0.0,
         },
         "transfer": False,
+        # V3.46: condición de recuperación ({} = sin datos de condición, se
+        # aplica la regla legacy de `transfer_state`).
+        "transfer_conditions": {},
+        "success_conditions": [],
+        "unscaffolded_clean_successes": 0,
     })
 
 

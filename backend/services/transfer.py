@@ -1,4 +1,4 @@
-"""Contextos de TRANSFERENCIA auténtica de una unidad léxica (V3.40 → V3.43).
+"""Contextos de TRANSFERENCIA auténtica de una unidad léxica (V3.40 → V3.46).
 
 La auditoría de V3.38.1 (P1-03) distingue dos cosas que hasta ahora se
 confundían:
@@ -26,6 +26,16 @@ V3.43 (Transfer 2.0, auditoría de V3.42.0) corrige dos sobreestimaciones:
   producir la MISMA estructura lingüística (work/future/problem con "take").
   Cada contexto declara ahora sus atributos y `context_diversity` mide cuántas
   dimensiones cambian de verdad.
+
+V3.46 (P1-03 de la auditoría de V3.43.0) añade la **CONDICIÓN DE RECUPERACIÓN**:
+hasta ahora todo intento de transferencia era `spontaneous_use` con
+`support_level="spontaneous"`, sin distinguir si la unidad se usó porque se pidió
+(`prompted`), porque el escenario la insinuaba (`cued_context`), por decisión
+propia en un escenario abierto (`open_context`), por elección libre
+(`free_choice`) o porque surgió sola (`naturally_emergent`). La condición se
+DERIVA de la evidencia (nunca la declara el cliente) y es lo que permite
+endurecer `transfer_demonstrated`: un éxito en una tarea andamiada no acredita
+transferencia no andamiada.
 
 No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
@@ -57,6 +67,68 @@ CONTEXT_DIMENSIONS: tuple[str, ...] = (
 # contextos con éxito limpio para declarar diversidad real. Declarado y
 # calibrable; dos contextos distintos suelen diferir en >= 2 dimensiones.
 CONTEXT_DIVERSITY_MIN = 2
+
+# ---------------------------------------------------------------------------
+# V3.46 (P1-03 de la auditoría de V3.43.0): CONDICIÓN DE RECUPERACIÓN.
+#
+# `spontaneous_use` era una etiqueta DEMASIADO amplia: no es lo mismo usar la
+# unidad porque la tarea la nombra que recuperarla por decisión propia en un
+# escenario abierto. La condición es una dimensión ADICIONAL (no sustituye al
+# `support_level`, que sigue declarando el andamiaje de la ACTIVIDAD) y se
+# DERIVA del estado de evidencia, nunca la declara el cliente (premisa 21).
+#
+# Orden de andamiaje DECRECIENTE (el primero da más ayuda):
+#   prompted → cued_context → open_context → free_choice → naturally_emergent
+# ---------------------------------------------------------------------------
+TRANSFER_CONDITIONS: tuple[str, ...] = (
+    "prompted",
+    "cued_context",
+    "open_context",
+    "free_choice",
+    "naturally_emergent",
+)
+
+# Condiciones que este drill puede SERVIR. `free_choice`/`naturally_emergent`
+# solo se pueden REGISTRAR (llegan de conversación libre/natural, fuera del
+# banco de escenarios); se declaran para que el vocabulario sea único.
+SERVABLE_CONDITIONS: tuple[str, ...] = (
+    "prompted",
+    "cued_context",
+    "open_context",
+)
+
+# Condiciones NO andamiadas: ningún enunciado da la unidad ni la exige. Solo un
+# ÉXITO LIMPIO en una de ellas acredita transferencia DEMOSTRADA (V3.46); un
+# acierto en `prompted`/`cued_context` demuestra producción con ayuda, no
+# recuperación espontánea.
+UNSCAFFOLDED_CONDITIONS: tuple[str, ...] = (
+    "open_context",
+    "free_choice",
+    "naturally_emergent",
+)
+
+# Condición por defecto: la de V3.43 (escenario sin nombrar la unidad). Mantiene
+# el comportamiento previo cuando no se declara condición.
+DEFAULT_TRANSFER_CONDITION = "cued_context"
+
+# Condiciones que EXIGEN la unidad objetivo: no usarla es un intento fallido
+# (`missing_target`). En las no andamiadas la ausencia NO es un fallo (el alumno
+# elige su vocabulario), así que un intento sin la unidad no se registra como
+# evidencia: no hay nada que observar sobre el objetivo.
+REQUIRED_TARGET_CONDITIONS: tuple[str, ...] = (
+    "prompted",
+    "cued_context",
+)
+
+# Instrucción que se AÑADE al escenario del banco para componer la consigna
+# servida. `cued_context` no añade nada: el escenario ES la consigna (V3.43).
+# `prompted` nombra la unidad a propósito (es la condición más débil y queda
+# registrada como tal); `open_context` deja claro que no hay palabra obligatoria.
+CONDITION_INSTRUCTIONS: dict[str, str] = {
+    "prompted": "Try to use the word “{word}” in your answer.",
+    "cued_context": "",
+    "open_context": "Use any vocabulary you need.",
+}
 
 # Banco curado de contextos NOVEDOSOS. La consigna NO da la palabra (eso sería
 # `sentence`): solo un escenario y un objetivo comunicativo en los que usarla por
@@ -143,6 +215,87 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
 _CONTEXTS_BY_ID: dict[str, dict[str, str]] = {
     context["id"]: context for context in TRANSFER_CONTEXTS
 }
+
+
+# ---------------------------------------------------------------------------
+# V3.46: vocabulario de la CONDICIÓN DE RECUPERACIÓN (puro y determinista).
+# ---------------------------------------------------------------------------
+
+def normalize_condition(value: object) -> str:
+    """Condición canónica de un valor libre ("" si no se reconoce) (V3.46, pura).
+
+    Tolerante a propósito: el ledger puede traer filas legacy (sin condición) o
+    valores de una taxonomía futura. Lo no reconocido se trata como "sin
+    condición" y NUNCA como una condición andamiada inventada.
+    """
+    text = str(value or "").strip().lower()
+    return text if text in TRANSFER_CONDITIONS else ""
+
+
+def is_unscaffolded(condition: object) -> bool:
+    """¿La condición acredita uso NO andamiado? (V3.46, pura)."""
+    return normalize_condition(condition) in UNSCAFFOLDED_CONDITIONS
+
+
+def requires_target(condition: object) -> bool:
+    """¿La condición EXIGE la unidad objetivo? (V3.46, pura).
+
+    Sin condición declarada se responde con la condición por defecto (la de
+    V3.43), para no cambiar el comportamiento previo.
+    """
+    canonical = normalize_condition(condition) or DEFAULT_TRANSFER_CONDITION
+    return canonical in REQUIRED_TARGET_CONDITIONS
+
+
+def condition_instruction(condition: object, word: str = "") -> str:
+    """Instrucción que se añade al escenario para una condición (V3.46, pura).
+
+    Devuelve "" para las condiciones cuyo escenario ya ES la consigna
+    (`cued_context`) y para las no servibles. Nunca lanza.
+    """
+    canonical = normalize_condition(condition) or DEFAULT_TRANSFER_CONDITION
+    template = CONDITION_INSTRUCTIONS.get(canonical, "")
+    if not template:
+        return ""
+    return template.format(word=(word or "").strip())
+
+
+def condition_for_state(
+    state: object,
+    *,
+    attempted: bool = False,
+    clean_successes: int = 0,
+) -> str:
+    """Condición que toca SERVIR según el estado de transferencia (V3.46, pura).
+
+    Escalera de andamiaje DECRECIENTE, derivada del estado formal (que ya se
+    calcula en `services.evidence.transfer_state`):
+
+    - `not_ready` **con intentos y sin ningún éxito limpio** → `prompted`: el
+      alumno no recupera la unidad ni con un escenario, así que se le nombra
+      explícitamente. Es la única puerta a `prompted` (no se degrada la tarea a
+      quien ya acierta ni a quien aún no lo ha intentado).
+    - `not_ready` en el resto de casos y `emerging` → `cued_context`: escenario
+      sin nombrar la unidad, exactamente el comportamiento de V3.43 (sin
+      regresión).
+    - `contextualized` o superior → `open_context`: la unidad ya se usa con éxito
+      en contextos distintos, así que toca el escenario abierto que NO exige la
+      palabra — el único que puede acreditar transferencia demostrada (V3.46).
+
+    Un estado desconocido (resumen parcial/legacy) cae a la condición por
+    defecto. Nunca lanza.
+    """
+    value = str(state or "").strip().lower()
+    if value in (
+        "contextualized",
+        "transfer_demonstrated",
+        "transfer_stable",
+        "automatic",
+    ):
+        return "open_context"
+    if value == "not_ready" and attempted and clean_successes <= 0:
+        return "prompted"
+    return DEFAULT_TRANSFER_CONDITION
 
 
 def context_id_for(context: dict | str) -> str:
@@ -294,12 +447,17 @@ def context_for(
     used_context_ids: object = (),
     *,
     success_context_ids: object = (),
+    condition: object = "",
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.43, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.46, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
-    communicative_goal, discourse_type}`. La consigna es la del banco y **no
-    contiene la unidad objetivo** (V3.43, P1-01): el escenario no da la palabra.
+    communicative_goal, discourse_type, condition, required_target,
+    unscaffolded}`. La consigna es la del banco; el escenario **no contiene la
+    unidad objetivo** salvo en la condición `prompted` (V3.43/P1-01 y V3.46).
+    `condition` (V3.46) es la condición de recuperación SERVIDA: la deriva el
+    llamador del estado de evidencia (`condition_for_state`) y aquí se compone el
+    enunciado con su instrucción (`CONDITION_INSTRUCTIONS`).
 
     Elección, determinista y estable:
 
@@ -319,6 +477,7 @@ def context_for(
     Nunca lanza.
     """
     unit = (word or "").strip()
+    served = normalize_condition(condition) or DEFAULT_TRANSFER_CONDITION
     if isinstance(used_context_ids, dict):
         # Comodidad: se acepta el mapa `contexts` del resumen de evidencia.
         used_context_ids = used_context_ids.keys()
@@ -352,6 +511,9 @@ def context_for(
             "exhausted": True,
             "communicative_goal": "",
             "discourse_type": "",
+            "condition": served,
+            "required_target": requires_target(served),
+            "unscaffolded": is_unscaffolded(served),
         }
     if success:
         best = max(_novelty_score(context, success) for context in pool)
@@ -363,9 +525,24 @@ def context_for(
         "word": unit,
         "context_id": context_id_for(context),
         "topic": context.get("topic", ""),
-        "prompt": context.get("prompt", ""),
+        "prompt": _compose_prompt(context.get("prompt", ""), served, unit),
         "available": True,
         "exhausted": exhausted,
         "communicative_goal": context.get("communicative_goal", ""),
         "discourse_type": context.get("discourse_type", ""),
+        "condition": served,
+        "required_target": requires_target(served),
+        "unscaffolded": is_unscaffolded(served),
     }
+
+
+def _compose_prompt(scenario: str, condition: str, word: str) -> str:
+    """Consigna servida = escenario + instrucción de la condición (V3.46, pura).
+
+    `cued_context` devuelve el escenario tal cual (V3.43). Nunca lanza.
+    """
+    base = (scenario or "").strip()
+    instruction = condition_instruction(condition, word)
+    if not instruction:
+        return base
+    return f"{base} {instruction}".strip()

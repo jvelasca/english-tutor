@@ -64,6 +64,8 @@ export interface VoicesResponse {
   downloadable: DownloadableVoice[];
   default: string;
   selected: string;
+  /** V3.45: mapa idioma → voz por defecto (`{"en": ..., "es": ...}`). */
+  defaults: Record<string, string>;
 }
 
 export interface ConversationMeta {
@@ -514,6 +516,12 @@ export interface DrillTransferContext {
   exhausted?: boolean;
   communicative_goal?: string;
   discourse_type?: string;
+  // V3.46 (P1-03): condición de recuperación SERVIDA por el servidor (aditiva).
+  // `required_target=false` en `open_context` (la palabra no es obligatoria);
+  // `unscaffolded=true` en las condiciones que acreditan transferencia sin ayuda.
+  condition?: string;
+  required_target?: boolean;
+  unscaffolded?: boolean;
 }
 
 export interface DrillTransferAttempt {
@@ -524,14 +532,20 @@ export interface DrillTransferAttempt {
   word_count: number;
   passed: boolean;
   // Taxonomía observacional: correct/empty/missing_target/too_short/
-  // semantic_mismatch (V3.43).
+  // semantic_mismatch (incorrecto) / semantic_doubt (sospechoso, V3.44).
   error_type?: string;
-  // V3.43 (P1-02): transfer LÉXICO (alias de `passed`) separado de la
+  // V3.43 (P1-02) / V3.44: transfer LÉXICO (alias de `passed`) separado de la
   // adecuación semántica determinista (`semantic_fit`/`adequacy`). `semantic_fit`
-  // es null cuando no es determinable (sin POS declarada).
+  // es null cuando no es determinable; `adequacy` añade `incorrect` (único valor
+  // que bloquea el clean success) frente a `suspect` (advisory).
   lexical_transfer?: boolean;
   semantic_fit?: boolean | null;
-  adequacy?: "fit" | "suspect" | "unknown" | string;
+  adequacy?: "fit" | "suspect" | "incorrect" | "unknown" | string;
+  // V3.46 (P1-03): condición de recuperación aplicada al intento y si la palabra
+  // era obligatoria. En `open_context` (`required_target=false`) no usarla NO es
+  // un fallo: el servidor no lo registra como evidencia.
+  condition?: string;
+  required_target?: boolean;
 }
 
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es
@@ -594,8 +608,20 @@ export interface DictionaryEntry {
   alternatives: string[];
   /** V3.38: enunciado situacional (4.º peldaño de recall), con hueco `_____`. */
   situation?: string | null;
+  /**
+   * V3.44: sentidos declarados de la unidad (`[{pos, gloss}]`). Contenido
+   * aditivo que explica la adecuación semántica; `[]` si el generador no los
+   * dio. No es evidencia.
+   */
+  senses?: DictionarySense[];
   example: DictionaryExample | null;
   usage: DictionaryUsage;
+}
+
+/** V3.44: sentido declarado de una unidad léxica (contenido del diccionario). */
+export interface DictionarySense {
+  pos: string;
+  gloss: string;
 }
 
 /** Cuerpo de la consulta al diccionario (V3.30): la palabra tal como la

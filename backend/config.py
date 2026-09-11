@@ -29,7 +29,7 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 
-VERSION = "3.43.0"
+VERSION = "3.46.0"
 
 # Orígenes permitidos para CORS (frontend de desarrollo local).
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -72,6 +72,12 @@ WHISPER_DIR = MODELS_DIR / "whisper"
 WHISPER_SIZE = "small"
 PIPER_DIR = MODELS_DIR / "piper"
 PIPER_VOICE = "en_US-lessac-medium"
+# V3.45 (Traductor de viaje): voz española por defecto. Antes, `language="es"`
+# caía en silencio a una voz inglesa porque no había ninguna `es_*` instalada;
+# esta es la voz que se instala/auto-descarga para el idioma español.
+SPANISH_VOICE = "es_ES-davefx-medium"
+# Voz por defecto de cada idioma soportado por `/api/tts` (`resolve_voice`).
+DEFAULT_VOICES: dict[str, str] = {"en": PIPER_VOICE, "es": SPANISH_VOICE}
 
 # Persistencia local (SQLite).
 DATA_DIR = Path(__file__).resolve().parent / "data"

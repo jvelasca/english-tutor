@@ -5,6 +5,128 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.46.0 (Condición de recuperación en la
+> transferencia — `transfer_condition`)** — release **v3.46.0** que cierra el P1
+> `transfer_condition` de la auditoría de V3.43.0, **aditiva y sin migración
+> destructiva**. Hasta ahora TODO intento de transferencia era `spontaneous_use`
+> con `support_level="spontaneous"`, sin distinguir si la unidad se usó porque se
+> pidió (`prompted`), porque el escenario la insinuaba (`cued_context`), por
+> decisión propia en un escenario abierto (`open_context`), por elección libre
+> (`free_choice`) o porque surgió sola (`naturally_emergent`); sin esa dimensión
+> `transfer_demonstrated` podía declararse con tareas ANDAMIADAS.
+> `services/transfer.py` define `TRANSFER_CONDITIONS` (andamiaje decreciente),
+> `SERVABLE_CONDITIONS` (`prompted`/`cued_context`/`open_context`),
+> `UNSCAFFOLDED_CONDITIONS` (`open_context`/`free_choice`/`naturally_emergent`),
+> `REQUIRED_TARGET_CONDITIONS`, `CONDITION_INSTRUCTIONS`, `normalize_condition`
+> (valores desconocidos → `""`) y la escalera PURA `condition_for_state`
+> (`not_ready` con intentos → `prompted`; `not_ready` sin intentos y `emerging` →
+> `cued_context`, comportamiento de V3.43; `contextualized`+ → `open_context`,
+> unidad NO obligatoria). La condición la DERIVA el servidor del resumen del
+> ledger (premisa 21: el cliente nunca la declara). Persistencia aditiva
+> `transfer_condition TEXT NOT NULL DEFAULT ''` en `learning_evidence` (ALTER
+> idempotente) con plumbing en `record_evidence`/lote/`list_evidence`/SELECT de
+> detalle (paridad pura↔SQL por construcción: el resumen SQL reutiliza la MISMA
+> `context_signals`). `services/evidence.py` agrega `transfer_conditions`
+> (`{condición: {attempts, clean_successes}}`), `success_conditions` y
+> `unscaffolded_clean_successes`, y **endurece `transfer_demonstrated`**: además
+> de 2 contextos limpios con diversidad real (`diverse_dimensions >= 2`), exige
+> ≥1 éxito limpio NO andamiado; sin datos de condición (legacy/parcial) se
+> conserva la regla anterior (cero regresión). `domain/vocabulary.py` sirve,
+> re-deriva y persiste la condición, y un intento de `open_context` que NO usa la
+> unidad no se registra (`required_target=false`). Contratos aditivos
+> (`condition`/`required_target`/`unscaffolded`) y UI del drill con la condición
+> visible y aviso neutro `transferNotRequired`. Tests: pytest **2047 passed**
+> (+17; nuevo `test_transfer_condition_v346.py`; ajustes en
+> `test_learning_evidence_v336.py` y `test_transfer_v340.py`), vitest **72
+> ficheros/623 tests** (+2 en `wordDrill.test.tsx`), `ruff` limpio, `tsc
+> --noEmit` limpio, `npm run build` y `check_release_consistency` **3.46.0**
+> exit 0. Fuera de alcance (V3.47+): CEFR/`difficulty_vector` del contexto (P1
+> restante), Context Bank 2.0, diversidad 2.0, semantic appropriateness,
+> transfer_state enriquecido y `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.45.0 (Traductor de viaje práctico + voz española
+> real)** — release **v3.45.0** que cierra la experiencia del Traductor de viaje.
+> **(A) Voz española real:** la salida en español sonaba a «un inglés hablando
+> español» porque `language="es"` degradaba a la voz inglesa (no había voces
+> `es_*` instaladas, `download_models.py` solo bajaba la inglesa y
+> `resolve_voice` caía al fallback global). Ahora
+> `SPANISH_VOICE = "es_ES-davefx-medium"` y
+> `DEFAULT_VOICES = {"en": PIPER_VOICE, "es": SPANISH_VOICE}`; la pura
+> `default_voice_for(language)` y `resolve_voice` priorizan el default del
+> idioma (preferencia del usuario del idioma → default del idioma instalado →
+> primera instalada del idioma → fallback global; con `en` idéntico al
+> histórico). `ensure_voice_for_language(language)` (no-op si ya hay voz del
+> idioma; descarga el default del catálogo curado vía
+> `services.voice_downloads`; `False` sin red/disco, NUNCA lanza) se ejecuta en
+> `/api/tts` antes de resolver la voz, así que la primera petición en español
+> instala la voz y sintetiza con ella sin 500 si no hay red;
+> `download_models.py` instala también la española reutilizando el catálogo.
+> Contrato aditivo: `VoicesResponse.defaults` (idioma → voz por defecto).
+> **(B) Modo Conversación:** `TranslatorScreen` gana dos pestañas
+> (**Conversación** por defecto, **Escribir** intacto). Nuevos
+> `useVoiceTurn.ts` (MediaRecorder + AnalyserNode + VAD + transcripción; helper
+> PURO `nextTurnVadState` que cierra por silencio ≥ `SILENCE_MS` tras voz ≥
+> `MIN_SPEECH_MS` y descarta picos de ruido; auto-stop 120 s),
+> `BigMicButton.tsx` (botón `size-24` con anillo según nivel),
+> `ConversationPanel.tsx` (por idioma, con repetir audio, avisos de micro/
+> transcripción y rotación) y `ConversationTranslator.tsx` (dos paneles; cada
+> turno se transcribe, traduce y —si el auto-play está activo— se reproduce en el
+> idioma del interlocutor; historial en
+> `english-tutor.translator-conversation`; toggles «Reproducir automáticamente»
+> y «Cara a cara»; tamaño de texto; aviso y descarga en segundo plano de la voz
+> española). i18n `translator.mode.*`/`translator.conversation.*` con paridad
+> es/en. El Traductor sigue siendo **AUXILIAR**: no registra evidencia ni toca
+> FSRS. Tests: pytest **2030 passed** (+10; `test_voices.py`), vitest **72
+> ficheros/621 tests** (+13; `useVoiceTurn.test.ts`,
+> `ConversationPanel.test.tsx` y `TranslatorScreen.test.tsx` con pestañas),
+> `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
+> `check_release_consistency` **3.45.0** exit 0. Fuera de alcance (V3.46+):
+> `transfer_condition` + CEFR/`difficulty_vector` del contexto (P1), Context Bank
+> 2.0, diversidad 2.0, semantic appropriateness, transfer_state enriquecido y
+> `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.44.0 (Lexicón sense-aware + scoring semántico
+> 2.0)** — release **v3.44.0** que cierra los dos P1 conceptuales que la
+> auditoría externa de V3.43.0 (9,6/10) deja abiertos, **sin migración de datos
+> y con contratos aditivos**. **P1-01 (sense-aware):** el proxy semántico deja
+> de usar la `pos` GLOBAL como sustituto de sentido. El contrato de contenido
+> gana `senses` (`GENERATOR_VERSION` `1.3.0 → 1.4.0`, regeneración lazy una sola
+> vez) con el helper puro `normalize_senses` (pos canónico, dedupe por
+> `(pos, gloss)`, tope `MAX_SENSES = 4`, orden estable; nunca invalida
+> definición/traducción). Persistencia aditiva `senses_json TEXT NOT NULL DEFAULT
+> ''` en `dictionary_entries` **y** `dictionary_reverse_entries` (migración
+> idempotente con `PRAGMA table_info` + `ALTER TABLE`, también en la tabla
+> inversa ya creada; JSON ilegible → `[]`). Nuevo módulo **PURO**
+> `services/semantics.py`: `pos_family` (por palabras, no subcadenas),
+> `families_from_senses` (con fallback a la `pos` global), `unit_positions`,
+> `occurrence_role` (cues FUERTES: pronombre sujeto, auxiliar/`to`, flexión
+> `-ed`/`-ing`; DÉBILES: determinante, `-s`/`-ies`; las unidades multi-palabra se
+> abstienen) y `semantic_adequacy`. `domain/vocabulary.py` prefiere los sentidos
+> de la `lexical_unit` y cae a la superficie; `_build_dictionary_entry` expone
+> `senses`. Así `I plan my trip.` deja de ser falso positivo si `plan` declara
+> sentido verbal. **P1-02 (scoring robusto):** `score_transfer_attempt(word,
+> text, *, pos="", senses=())` mantiene `passed`/`lexical_transfer` y devuelve
+> `adequacy` ∈ `fit`/`suspect`/`incorrect`/`unknown`: `incorrect` (contradicción
+> fuerte con TODAS las familias) → `semantic_mismatch` es el **ÚNICO** valor que
+> bloquea el clean success; `suspect` → `semantic_doubt` (nueva const en
+> `TRANSFER_ERROR_TYPES`) es **advisory** y NO destruye la evidencia léxica; sin
+> sentidos/POS → `unknown` (nunca bloquea). `semantic_fit: bool | None` se
+> conserva y `score_write_attempt` mantiene su contrato exacto (4 claves).
+> `context_signals` excluye SOLO `semantic_mismatch`, así que `semantic_doubt`
+> cuenta como éxito limpio y `transfer`/`transfer_state` avanzan con él (paridad
+> pura↔SQL por construcción). Contratos aditivos: `DictionaryEntryOut.senses`
+> (+ `DictionarySenseOut`), `adequacy` admite `incorrect`, y `wordDrill.tsx`
+> avisa de `incorrect` con `dictionary.drill.transferSemanticWrong` (warning, sin
+> bloquear `onProduced`). Tests: pytest **2020 passed** (+31; nuevos
+> `test_senses_v344.py` y `test_transfer_v344.py`; ajustes en
+> `test_transfer_v343.py`, `test_dictionary_content_v330.py` y
+> `test_situational_cue_v338.py`), vitest **70 ficheros/608 tests** (+1), `ruff`
+> limpio, `tsc --noEmit` limpio, `npm run build` y `check_release_consistency`
+> **3.44.0** exit 0. Dossier de la auditoría externa:
+> `docs/audit/P-AUDITORIA-TOTAL-V343.md`. Fuera de alcance (V3.45+):
+> `transfer_condition`, CEFR/`difficulty_vector` del contexto, Context Bank 2.0
+> y `expected_learning_value` / Adaptive Planner 2.0.
+>
 > **Nota (2026-09-11):** **V3.43.0 (Transfer 2.0)** — release **v3.43.0** que
 > cierra los 4 P1 de la auditoría de V3.42.0 sobre la evidencia de transferencia.
 > **P1-01 (target oculto):** `services/transfer.py` reescribe

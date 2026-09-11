@@ -409,6 +409,19 @@ class DictionaryUsageOut(BaseModel):
     unit: DictionaryUnitUsageOut | None = None
 
 
+class DictionarySenseOut(BaseModel):
+    """Sentido declarado de una unidad léxica (V3.44).
+
+    Contenido generado por el modelo local y cacheado (`dictionary_entries` /
+    `dictionary_reverse_entries`): cada sentido declara su categoría gramatical
+    (`pos`) y una etiqueta corta (`gloss`). Es lo que permite que el scoring
+    semántico deje de depender de una única `pos` global.
+    """
+
+    pos: str = ""
+    gloss: str = ""
+
+
 class DictionaryEntryOut(BaseModel):
     """Entrada del diccionario de consulta (V3.30).
 
@@ -433,6 +446,10 @@ class DictionaryEntryOut(BaseModel):
     # V3.38: enunciado situacional (frase de escenario con un hueco `_____`) del
     # 4.º peldaño de la escalera de recall. `None` si el generador no lo produjo.
     situation: str | None = None
+    # V3.44: sentidos declarados de la unidad (`[{pos, gloss}]`). Contenido
+    # aditivo que explica la adecuación semántica; `[]` si el generador no los
+    # dio (el scoring degrada a `unknown`, que nunca bloquea).
+    senses: list[DictionarySenseOut] = Field(default_factory=list)
     example: DictionaryExampleOut | None = None
     usage: DictionaryUsageOut
 
@@ -714,6 +731,13 @@ class TransferContextOut(BaseModel):
     exhausted: bool = False
     communicative_goal: str = ""
     discourse_type: str = ""
+    # V3.46 (P1-03): condición de recuperación SERVIDA (derivada por el servidor
+    # del estado de evidencia; aditiva). `required_target=False` en
+    # `open_context` (la unidad no es obligatoria); `unscaffolded=True` en las
+    # condiciones que acreditan transferencia no andamiada.
+    condition: str = ""
+    required_target: bool = True
+    unscaffolded: bool = False
 
 
 class TransferAttemptIn(BaseModel):
@@ -741,7 +765,13 @@ class TransferAttemptOut(BaseModel):
     lo explicita; `semantic_fit`/`adequacy` añaden la capa SEPARADA de adecuación
     semántica (proxy determinista, advisory). `semantic_fit` es `None` cuando no
     es determinable (sin POS declarada). Un uso léxicamente correcto pero
-    sospechoso mantiene `passed=True` y `error_type="semantic_mismatch"`.
+    sospechoso mantiene `passed=True`.
+
+    V3.44 (P1-01/P1-02): `adequacy` gana el valor `incorrect`
+    (`fit`/`suspect`/`incorrect`/`unknown`). Solo `incorrect` bloquea el clean
+    success y guarda `error_type="semantic_mismatch"`; `suspect` es advisory y
+    guarda `error_type="semantic_doubt"` (no bloquea). La decisión usa los
+    SENTIDOS de la unidad, no la `pos` global.
     """
 
     word: str
@@ -754,3 +784,9 @@ class TransferAttemptOut(BaseModel):
     lexical_transfer: bool = False
     semantic_fit: bool | None = None
     adequacy: str = ""
+    # V3.46 (P1-03): condición de recuperación aplicada al intento (derivada por
+    # el servidor) y si la unidad era obligatoria. En `open_context`
+    # (`required_target=False`) no usarla NO es un fallo ni se registra como
+    # evidencia: `passed` refleja solo el transfer léxico del texto entregado.
+    condition: str = ""
+    required_target: bool = True

@@ -14,7 +14,13 @@ from schemas.voices import (
     VoicesResponse,
 )
 from services import voice_downloads
-from services.tts import DEFAULT_VOICE, list_voices, resolve_voice, voice_name
+from services.tts import (
+    DEFAULT_VOICE,
+    default_voice_for,
+    list_voices,
+    resolve_voice,
+    voice_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +37,10 @@ def _response(selected: str) -> VoicesResponse:
         ],
         default=DEFAULT_VOICE,
         selected=selected,
+        defaults={
+            "en": default_voice_for("en"),
+            "es": default_voice_for("es"),
+        },
     )
 
 

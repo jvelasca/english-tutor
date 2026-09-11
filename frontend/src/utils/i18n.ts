@@ -602,9 +602,47 @@ const STRINGS: Record<string, Entry> = {
     en: "You used the word, but it doesn't seem to fit here. This attempt won't count as confirmed transfer yet — try it with its usual meaning.",
     es: "Has usado la palabra, pero aquí no parece encajar. Este intento aún no cuenta como transferencia confirmada — pruébala con su significado habitual.",
   },
+  // V3.44 (P1-01/P1-02): contradicción FUERTE con los sentidos de la unidad
+  // (adecuación `incorrect`). Es el único caso que bloquea el clean success; se
+  // avisa con más firmeza que el mero `suspect`.
+  "dictionary.drill.transferSemanticWrong": {
+    en: "You used the word with the wrong meaning here. This attempt doesn't count as transfer — check its senses and try it with the right one.",
+    es: "Has usado la palabra con un significado que no encaja aquí. Este intento no cuenta como transferencia — revisa sus sentidos y pruébala con el correcto.",
+  },
   "dictionary.drill.transferUnavailable": {
     en: "No new situation available for this word yet — try the Write step.",
     es: "Aún no hay situación nueva para esta palabra — prueba el paso Escribe.",
+  },
+  // V3.46 (P1-03): CONDICIÓN DE RECUPERACIÓN. El servidor deriva cuánta ayuda
+  // da la tarea (nombra la palabra, la insinúa o no la exige) y lo declara para
+  // que el alumno sepa qué se le está pidiendo. Aditivo.
+  "dictionary.drill.transferConditionLabel": {
+    en: "Condition",
+    es: "Condición",
+  },
+  "dictionary.drill.transferConditionPrompted": {
+    en: "The word is given: use it",
+    es: "Con la palabra: úsala",
+  },
+  "dictionary.drill.transferConditionCued": {
+    en: "Context cue: try to use it",
+    es: "Pista de contexto: intenta usarla",
+  },
+  "dictionary.drill.transferConditionOpen": {
+    en: "Open use: you choose your words",
+    es: "Uso abierto: tú eliges tus palabras",
+  },
+  "dictionary.drill.transferConditionFree": {
+    en: "Free choice",
+    es: "Elección libre",
+  },
+  "dictionary.drill.transferConditionNatural": {
+    en: "Natural use",
+    es: "Uso natural",
+  },
+  "dictionary.drill.transferNotRequired": {
+    en: "Using the word wasn't required here, so it doesn't count as a mistake. Try to use it next time to show you can retrieve it on your own.",
+    es: "Usar la palabra no era obligatorio aquí, así que no cuenta como error. Intenta usarla la próxima vez para demostrar que la recuperas por tu cuenta.",
   },
   "dictionary.drill.recognitionPrompt": {
     en: "What does this word mean? Choose the option that matches its meaning.",
@@ -876,6 +914,73 @@ const STRINGS: Record<string, Entry> = {
   "translator.history.reuse": {
     en: "Reuse “{text}”",
     es: "Reutilizar «{text}»",
+  },
+
+  // V3.45: modo Conversación del Traductor (dos botones grandes, ES/EN).
+  "translator.mode.label": { en: "Mode", es: "Modo" },
+  "translator.mode.conversation": { en: "Conversation", es: "Conversación" },
+  "translator.mode.write": { en: "Type", es: "Escribir" },
+  "translator.conversation.youLabel": { en: "You · Spanish", es: "Tú · Español" },
+  "translator.conversation.themLabel": {
+    en: "Them · English",
+    es: "Interlocutor · Inglés",
+  },
+  "translator.conversation.tapToSpeak": {
+    en: "Tap to speak",
+    es: "Toca para hablar",
+  },
+  "translator.conversation.tapToStop": {
+    en: "Tap to stop",
+    es: "Toca para parar",
+  },
+  "translator.conversation.listening": {
+    en: "Listening…",
+    es: "Escuchando…",
+  },
+  "translator.conversation.transcribing": {
+    en: "Transcribing…",
+    es: "Transcribiendo…",
+  },
+  "translator.conversation.translating": {
+    en: "Translating…",
+    es: "Traduciendo…",
+  },
+  "translator.conversation.replay": {
+    en: "Play the translation again",
+    es: "Repetir la traducción",
+  },
+  "translator.conversation.autoPlay": {
+    en: "Play automatically",
+    es: "Reproducir automáticamente",
+  },
+  "translator.conversation.faceToFace": {
+    en: "Face to face",
+    es: "Cara a cara",
+  },
+  "translator.conversation.textSize": {
+    en: "Text size",
+    es: "Tamaño del texto",
+  },
+  "translator.conversation.turns": {
+    en: "Conversation",
+    es: "Conversación",
+  },
+  "translator.conversation.empty": {
+    en: "Tap a microphone and speak; the translation shows up here.",
+    es: "Toca un micrófono y habla; la traducción aparece aquí.",
+  },
+  "translator.conversation.panelEmpty": {
+    en: "Nothing said yet.",
+    es: "Todavía no ha dicho nada.",
+  },
+  "translator.conversation.clear": { en: "Clear", es: "Borrar" },
+  "translator.conversation.voicePreparing": {
+    en: "Preparing the Spanish voice… (first time only)",
+    es: "Preparando la voz en español… (solo la primera vez)",
+  },
+  "translator.conversation.voiceError": {
+    en: "The Spanish voice is not ready. You can install it in Settings → Voices.",
+    es: "La voz en español no está lista. Puedes instalarla en Ajustes → Voces.",
   },
 
   // Settings

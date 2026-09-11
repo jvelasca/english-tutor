@@ -75,6 +75,7 @@ def record_evidence(
     difficulty: float = 0.0,
     response_time_ms: int | None = None,
     error_type: str = "",
+    transfer_condition: str = "",
     event_role: str = "evidence",
     interval_since_last_evidence: float | None = None,
     occurred_at: str = "",
@@ -91,6 +92,11 @@ def record_evidence(
     `support_level` (eje copied→spontaneous; `services.evidence`), `difficulty`
     (0 = no declarada), `response_time_ms` (None = no medida) y `error_type`
     (taxonomía del intento). Todas son OBSERVACIONALES: no cambian el scoring.
+
+    V3.46 añade `transfer_condition` (condición de recuperación de la
+    transferencia: `prompted`/`cued_context`/`open_context`/`free_choice`/
+    `naturally_emergent`; `services.transfer`). Aditiva y observacional: las
+    filas legacy y no-transfer quedan con ''.
     """
     if get_user(user_id) is None:
         return None
@@ -111,9 +117,9 @@ def record_evidence(
             "(user_id, occurred_at, skill, target_type, target_id, "
             "surface_form, lexical_unit, task, activity, activity_id, "
             "context_id, success, support_level, difficulty, "
-            "response_time_ms, error_type, "
+            "response_time_ms, error_type, transfer_condition, "
             "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 now,
@@ -131,6 +137,7 @@ def record_evidence(
                 float(difficulty or 0.0),
                 response_time_ms,
                 error_type,
+                transfer_condition,
                 interval,
                 event_role,
             ),
@@ -153,6 +160,7 @@ def record_evidence(
         "difficulty": float(difficulty or 0.0),
         "response_time_ms": response_time_ms,
         "error_type": error_type,
+        "transfer_condition": transfer_condition,
         "interval_since_last_evidence": interval,
         "event_role": event_role,
     }
@@ -250,6 +258,7 @@ def record_evidence_bulk(
                     float(entry.get("difficulty") or 0.0),
                     entry.get("response_time_ms"),
                     entry.get("error_type", ""),
+                    entry.get("transfer_condition", ""),
                     interval,
                     entry.get("event_role", "evidence"),
                 )
@@ -259,9 +268,9 @@ def record_evidence_bulk(
             "(user_id, occurred_at, skill, target_type, target_id, "
             "surface_form, lexical_unit, task, activity, activity_id, "
             "context_id, success, support_level, difficulty, "
-            "response_time_ms, error_type, "
+            "response_time_ms, error_type, transfer_condition, "
             "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
     return len(rows)
@@ -298,7 +307,8 @@ def list_evidence(
             "SELECT id, user_id, occurred_at, skill, target_type, target_id, "
             "surface_form, lexical_unit, task, activity, activity_id, "
             "context_id, success, support_level, difficulty, response_time_ms, "
-            "error_type, interval_since_last_evidence, event_role "
+            "error_type, transfer_condition, interval_since_last_evidence, "
+            "event_role "
             "FROM learning_evidence "
             f"WHERE {' AND '.join(clauses)} "
             "ORDER BY occurred_at DESC, id DESC "
@@ -483,7 +493,7 @@ def summarize_by_target(
         # (`recency_signals`), no con un segundo dialecto en SQL.
         detail_rows = conn.execute(
             "SELECT target_id, id, occurred_at, success, error_type, "
-            "response_time_ms, context_id "
+            "response_time_ms, context_id, transfer_condition "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? "
             "ORDER BY target_id, occurred_at ASC, id ASC",

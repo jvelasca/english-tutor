@@ -1,5 +1,6 @@
 """Tests de voces TTS (Configuración → Voces): catálogo instalado, resolución por
 usuario, endpoint /api/voices y descarga del catálogo curado."""
+import pytest
 from fastapi.testclient import TestClient
 
 import services.tts as tts
@@ -8,6 +9,14 @@ from main import app
 from repositories import db
 from repositories import settings as settings_repo
 from repositories import users as users_repo
+
+
+@pytest.fixture(autouse=True)
+def _clear_voice_ensure_cache():
+    """Limpia la caché negativa de auto-descarga entre tests (V3.45)."""
+    tts._VOICE_ENSURE_FAILED.clear()
+    yield
+    tts._VOICE_ENSURE_FAILED.clear()
 
 
 def _install(monkeypatch, tmp_path, *voice_ids):
@@ -327,3 +336,132 @@ def test_tts_endpoint_defaults_to_english_without_language(monkeypatch, tmp_path
         )
     assert r.status_code == 200
     assert captured["voice"] == tts.DEFAULT_VOICE
+
+
+# --- V3.45: voz por defecto de cada idioma y auto-descarga --------------------
+
+
+def test_default_voice_for_known_and_unknown_languages():
+    assert tts.default_voice_for("en") == tts.DEFAULT_VOICE
+    assert tts.default_voice_for("es") == "es_ES-davefx-medium"
+    # Idioma sin default declarado cae al default histórico.
+    assert tts.default_voice_for("fr") == tts.DEFAULT_VOICE
+    assert tts.default_voice_for("") == tts.DEFAULT_VOICE
+
+
+def test_resolve_voice_prefers_language_default_over_first_alphabetical(
+    monkeypatch, tmp_path,
+):
+    # El default del idioma manda aunque alfabéticamente no sea el primero.
+    _install(
+        monkeypatch, tmp_path,
+        "en_GB-alan-medium", "es_ES-sharvard-medium", "es_MX-ald-medium",
+    )
+    monkeypatch.setattr(tts, "DEFAULT_VOICES", {"es": "es_MX-ald-medium"})
+    assert tts.resolve_voice(None, "es") == "es_MX-ald-medium"
+
+
+def test_resolve_voice_falls_back_to_any_installed_of_language(
+    monkeypatch, tmp_path,
+):
+    # Sin el default del idioma instalado pero con otra voz del idioma, se usa esa.
+    _install(monkeypatch, tmp_path, "en_GB-alan-medium", "es_ES-sharvard-medium")
+    assert tts.resolve_voice(None, "es") == "es_ES-sharvard-medium"
+
+
+def test_ensure_voice_for_language_noop_when_installed(monkeypatch, tmp_path):
+    _install(monkeypatch, tmp_path, "en_GB-alan-medium", "es_MX-ald-medium")
+    called = False
+
+    def fake_download(url, dest):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(voice_downloads, "_download_file", fake_download)
+    assert tts.ensure_voice_for_language("es") is True
+    assert not called  # ya había voz española: no descarga
+
+
+def test_ensure_voice_for_language_downloads_language_default(
+    monkeypatch, tmp_path,
+):
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)  # solo inglés instalado
+
+    def fake_download(url, dest):
+        dest.write_bytes(b"model")
+
+    monkeypatch.setattr(voice_downloads, "_download_file", fake_download)
+    assert tts.ensure_voice_for_language("es") is True
+    assert (tmp_path / "es_ES-davefx-medium.onnx").exists()
+    assert (tmp_path / "es_ES-davefx-medium.onnx.json").exists()
+    assert tts.resolve_voice(None, "es") == "es_ES-davefx-medium"
+
+
+def test_ensure_voice_for_language_returns_false_on_download_error(
+    monkeypatch, tmp_path,
+):
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)
+
+    def broken_download(url, dest):
+        raise RuntimeError("sin conexión")
+
+    monkeypatch.setattr(voice_downloads, "_download_file", broken_download)
+    # No lanza: degrada y deja que el TTS use el fallback.
+    assert tts.ensure_voice_for_language("es") is False
+    assert tts.resolve_voice(None, "es") == tts.DEFAULT_VOICE
+
+
+def test_ensure_voice_for_language_false_when_default_not_in_catalog(
+    monkeypatch, tmp_path,
+):
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)
+    monkeypatch.setattr(tts, "DEFAULT_VOICES", {"es": "es_XX-ghost-medium"})
+    assert tts.ensure_voice_for_language("es") is False
+
+
+def test_ensure_voice_for_language_caches_failure(monkeypatch, tmp_path):
+    # Un fallo de red no se reintenta en cada petición (caché negativa).
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)
+    calls = {"n": 0}
+
+    def broken_download(url, dest):
+        calls["n"] += 1
+        raise RuntimeError("sin conexión")
+
+    monkeypatch.setattr(voice_downloads, "_download_file", broken_download)
+    assert tts.ensure_voice_for_language("es") is False
+    assert tts.ensure_voice_for_language("es") is False
+    assert calls["n"] == 1  # solo el primer intento llegó a descargar
+
+
+def test_voices_endpoint_exposes_language_defaults(monkeypatch, tmp_path):
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)
+    with TestClient(app) as client:
+        r = client.get("/api/voices")
+    assert r.status_code == 200
+    assert r.json()["defaults"] == {
+        "en": tts.DEFAULT_VOICE,
+        "es": "es_ES-davefx-medium",
+    }
+
+
+def test_tts_endpoint_auto_downloads_missing_language_voice(monkeypatch, tmp_path):
+    # Sin voz española instalada, /api/tts la descarga y sintetiza con ella.
+    _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)
+
+    def fake_download(url, dest):
+        dest.write_bytes(b"model")
+
+    monkeypatch.setattr(voice_downloads, "_download_file", fake_download)
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post("/api/tts", json={"text": "Hola", "language": "es"})
+    assert r.status_code == 200
+    assert captured["voice"] == "es_ES-davefx-medium"

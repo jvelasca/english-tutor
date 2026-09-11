@@ -36,6 +36,9 @@ from services.evidence import (
     recall_rung_activity,
 )
 from services.evidence import empty_summary as empty_evidence
+from services.evidence import (
+    transfer_state as evidence_transfer_state,
+)
 from services.fluency import compute_fluency
 from services.phonetics import unit_produced
 from services.pronunciation import score_pronunciation
@@ -706,9 +709,10 @@ async def _record_transfer_evidence(
     scored: dict,
     context_id: str,
     *,
+    condition: str = "",
     response_time_ms: int | None = None,
 ) -> None:
-    """Evento de evidencia del paso Transfer (V3.40 → V3.43), éxito Y fallo.
+    """Evento de evidencia del paso Transfer (V3.40 → V3.46), éxito Y fallo.
 
     Modalidad `spontaneous_use` y apoyo `spontaneous` (la consigna da un
     escenario nuevo, no ayuda con la unidad); el `context_id` es el del contexto
@@ -721,6 +725,12 @@ async def _record_transfer_evidence(
     (`scored["passed"]`); un uso léxicamente correcto pero `suspect` guarda
     `error_type="semantic_mismatch"` y NO contará como ÉXITO LIMPIO en
     `context_signals` (V3.43/P1-02).
+
+    V3.46 (P1-03): `condition` persiste la CONDICIÓN DE RECUPERACIÓN
+    (`services.transfer`) derivada por el servidor del estado de evidencia. El
+    `support_level` sigue declarando el andamiaje de la ACTIVIDAD
+    (`spontaneous`); la condición es la dimensión fina que permite ponderar el
+    acierto (un éxito en `cued_context` no acredita transferencia no andamiada).
     """
     try:
         await run_in_threadpool(
@@ -740,6 +750,7 @@ async def _record_transfer_evidence(
             difficulty=lexicon.cefr_difficulty(row),
             response_time_ms=response_time_ms,
             error_type=scored["error_type"] or "partial",
+            transfer_condition=condition,
             event_role="evidence",
         )
     except Exception:  # noqa: BLE001 — señal no bloqueante
@@ -751,14 +762,35 @@ async def _record_transfer_evidence(
         )
 
 
+def _transfer_condition_for(summary: dict) -> str:
+    """Condición de recuperación que toca SERVIR/registrar (V3.46, pura).
+
+    La deriva el SERVIDOR del resumen de evidencia (nunca la declara el cliente,
+    premisa 21): `services.evidence.transfer_state` fija el andamiaje y
+    `attempted` distingue si el alumno ya intentó transferir alguna vez.
+    """
+    state = evidence_transfer_state(summary or {})
+    attempted = int((summary or {}).get("context_attempts") or 0) > 0
+    clean = int((summary or {}).get("clean_successes") or 0)
+    return transfer.condition_for_state(
+        state, attempted=attempted, clean_successes=clean
+    )
+
+
 async def get_transfer_context(user_id: str, word: str) -> dict:
-    """Consigna de transferencia que toca practicar (V3.40 → V3.43, solo lectura).
+    """Consigna de transferencia que toca practicar (V3.40 → V3.46, solo lectura).
 
     Elige el contexto NUEVO con `services.transfer.context_for` sobre los
     contextos que el ítem ya registró en su evidencia (así no repite el que ya
     usó) y, V3.43 (P1-03), prioriza el contexto más DISTANTE de los que ya
     logró con éxito: máxima novedad pedagógica, no solo otro `context_id`. No
     escribe nada: es el GET del peldaño.
+
+    V3.46 (P1-03): además sirve la CONDICIÓN DE RECUPERACIÓN derivada del estado
+    (`_transfer_condition_for`): `prompted` tras fallar sin éxito limpio,
+    `cued_context` por defecto (comportamiento de V3.43) y `open_context` cuando
+    la unidad ya se usa en contextos distintos — el escenario abierto que no
+    exige la palabra y única condición que acredita transferencia demostrada.
     """
     summaries = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
@@ -766,7 +798,10 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     summary = summaries.get(word) or {}
     used = (summary.get("contexts") or {}).keys()
     success = summary.get("success_contexts") or []
-    return transfer.context_for(word, used, success_context_ids=success)
+    condition = _transfer_condition_for(summary)
+    return transfer.context_for(
+        word, used, success_context_ids=success, condition=condition
+    )
 
 
 async def submit_transfer_attempt(
@@ -776,7 +811,7 @@ async def submit_transfer_attempt(
     context_id: str = "",
     response_time_ms: int | None = None,
 ) -> dict:
-    """Puntúa la actividad `transfer` del micro-drill (V3.40 → V3.43).
+    """Puntúa la actividad `transfer` del micro-drill (V3.40 → V3.46).
 
     El alumno usa la unidad en un contexto NUEVO (consigna abierta, sin la
     palabra: V3.43/P1-01). Scoring determinista y sin LLM
@@ -790,22 +825,49 @@ async def submit_transfer_attempt(
     (`writing_prod += 1`; `as_unit=True`) y se registra la evidencia; en fallo se
     registra igualmente el intento clasificado. Un uso léxicamente correcto pero
     semánticamente `suspect` mantiene `passed=True` y añade
-    `error_type="semantic_mismatch"`, que lo excluye de los ÉXITOS LIMPIOS del
-    estado de transferencia. No graba recuperación ni FSRS.
+    `error_type="semantic_doubt"`, que NO bloquea los ÉXITOS LIMPIOS (V3.44).
+
+    V3.46 (P1-03): la CONDICIÓN la deriva el servidor (`_transfer_condition_for`)
+    y se persiste con el intento. En condiciones que NO exigen la unidad
+    (`open_context`), un intento que no la usa NO se registra como evidencia: no
+    hay nada que observar sobre el objetivo y no debe penalizar al alumno (el
+    contrato lo declara con `required_target=false`). No graba recuperación ni
+    FSRS.
     """
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     row = _row_for_word(rows, word) or {}
-    # POS declarada del ítem para el proxy semántico (vacía si no hay caché: el
-    # proxy queda `unknown` y no inventa).
+    # POS y SENTIDOS declarados del ítem para el proxy semántico (vacíos si no
+    # hay caché: el proxy queda `unknown` y no inventa). V3.44: se prefieren los
+    # sentidos de la UNIDAD léxica (go/went/gone comparten sentido) y se cae a
+    # la superficie buscada cuando la unidad no tiene entrada propia.
     entry = await run_in_threadpool(dictionary_repo.get_entry, word)
     pos = (entry or {}).get("pos") or ""
+    senses = list((entry or {}).get("senses") or [])
+    unit = (row.get("lexical_unit") or "").strip().lower()
+    if unit and unit != (word or "").strip().lower():
+        unit_entry = await run_in_threadpool(dictionary_repo.get_entry, unit)
+        if unit_entry and unit_entry.get("senses"):
+            senses = list(unit_entry.get("senses") or [])
+            pos = unit_entry.get("pos") or pos
     # Sin `context_id` del cliente se DERIVA del banco (determinista) con la
     # MISMA función que el GET (incluidos los contextos ya logrados), para que el
-    # evento nunca quede sin contexto y no discrepe del peldaño servido.
+    # evento nunca quede sin contexto y no discrepe del peldaño servido. La
+    # CONDICIÓN se deriva del mismo resumen: el cliente no la declara (premisa 21).
+    summaries = await run_in_threadpool(
+        evidence_repo.summarize_by_target, user_id, target_type="lexicon"
+    )
+    summary = summaries.get(word) or {}
+    condition = _transfer_condition_for(summary)
     if not context_id:
-        context_id = (await get_transfer_context(user_id, word)).get("context_id", "")
-    scored = lexicon.score_transfer_attempt(word, text, pos=pos)
+        context_id = transfer.context_for(
+            word,
+            (summary.get("contexts") or {}).keys(),
+            success_context_ids=summary.get("success_contexts") or [],
+            condition=condition,
+        ).get("context_id", "")
+    scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)
     written = (text or "").strip()
+    required = transfer.requires_target(condition)
     if scored["passed"]:
         await record_production_text(
             user_id,
@@ -815,18 +877,24 @@ async def submit_transfer_attempt(
             activity="drill:transfer",
             write_evidence=False,
         )
-    await _record_transfer_evidence(
-        user_id,
-        word,
-        row,
-        scored,
-        context_id,
-        response_time_ms=response_time_ms,
-    )
+    # Sin la unidad en una condición que no la exige no hay evidencia que
+    # registrar: no es un fallo, es una elección legítima del alumno (V3.46).
+    if scored["passed"] or required:
+        await _record_transfer_evidence(
+            user_id,
+            word,
+            row,
+            scored,
+            context_id,
+            condition=condition,
+            response_time_ms=response_time_ms,
+        )
     return {
         "word": word,
         "text": written,
         "context_id": context_id,
+        "condition": condition,
+        "required_target": required,
         **scored,
     }
 
@@ -1328,6 +1396,10 @@ def _build_dictionary_entry(
         # consulta como contenido, igual que definición/traducción (no es
         # evidencia ni sirve la respuesta esperada).
         "situation": (cache.get("situation") or "").strip() or None,
+        # V3.44: sentidos declarados de la unidad (`[{pos, gloss}]`). Contenido
+        # aditivo que explica por qué el scoring semántico no depende de una
+        # `pos` global; [] si el modelo no los dio.
+        "senses": list(cache.get("senses") or []),
         "example": example_sentences.example_for(normalized),
         # V3.39 (diccionario reversible): dirección servida y alternativas de la
         # búsqueda inversa (siempre [] en EN→ES). Campos ADITIVOS.
@@ -1573,6 +1645,7 @@ async def _generate_and_persist(
                 pos=content.get("pos", ""),
                 definition=content.get("definition", ""),
                 situation=content.get("situation", ""),
+                senses=content.get("senses") or [],
                 generator_version=dictionary_content.GENERATOR_VERSION,
             )
         else:
@@ -1583,6 +1656,7 @@ async def _generate_and_persist(
                 definition=content.get("definition", ""),
                 translation=content.get("translation", ""),
                 situation=content.get("situation", ""),
+                senses=content.get("senses") or [],
                 generator_version=dictionary_content.GENERATOR_VERSION,
             )
         persisted = await run_in_threadpool(read_cached, word)
@@ -1595,6 +1669,7 @@ async def _generate_and_persist(
         "pos": content.get("pos", ""),
         "definition": content.get("definition", ""),
         "situation": content.get("situation", ""),
+        "senses": content.get("senses") or [],
         "generator_version": dictionary_content.GENERATOR_VERSION,
     }
     if reverse:

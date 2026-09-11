@@ -403,6 +403,10 @@ def test_empty_summary_matches_the_extended_contract():
             "score": 0.0,
         },
         "transfer": False,
+        # V3.46 (P1-03): condición de recuperación (aditivos).
+        "transfer_conditions": {},
+        "success_conditions": [],
+        "unscaffolded_clean_successes": 0,
         "transfer_state": "not_ready",
     }
 
