@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.47.0**.
+- Última versión estable: **v3.48.0**.
 
 ## Estructura
 
@@ -77,6 +77,10 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   NUEVO, que acredita `spontaneous_use` y demuestra transferencia real cuando se logra en ≥ 2
   contextos), señales robustas (recencia de errores, percentiles de latencia, automaticidad
   unificada) y gobierno del estado pedagógico por **unidad léxica** (go/went/gone/going).
+  **Context Bank 2.0 (V3.48)**: el banco curado de contextos de transferencia pasa a **20 escenarios**
+  (A1–C2, con `cefr`/`difficulty_vector` por contexto) y la diversidad contextual se mide en dos capas:
+  el gate de evidencia (ejes core) y una capa de variedad informativa (`register`, entorno léxico y
+  foco sintáctico) que explica la cobertura sin alterar los umbrales.
 - **Curriculum Coverage (V2.4) + Quality Dashboard (V2.6)**: auditoría de cobertura curricular que
   recorre Pre-A1 → C2 por las 7 secciones (vocabulary/grammar/listening/speaking/interaction/
   review/assessment), cruza el contenido del curso con los bancos de listening/speaking y genera

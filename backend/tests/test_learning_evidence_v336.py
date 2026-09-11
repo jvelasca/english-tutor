@@ -401,6 +401,8 @@ def test_empty_summary_matches_the_extended_contract():
             "dimensions": {},
             "diverse_dimensions": 0,
             "score": 0.0,
+            # V3.48: variedad informativa (no entra en el gate de evidencia).
+            "variety": {"dimensions": {}, "varied_dimensions": 0, "score": 0.0},
         },
         "transfer": False,
         # V3.46 (P1-03): condición de recuperación (aditivos).

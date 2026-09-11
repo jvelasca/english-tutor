@@ -1,4 +1,4 @@
-"""Contextos de TRANSFERENCIA auténtica de una unidad léxica (V3.40 → V3.46).
+"""Contextos de TRANSFERENCIA auténtica de una unidad léxica (V3.40 → V3.48).
 
 La auditoría de V3.38.1 (P1-03) distingue dos cosas que hasta ahora se
 confundían:
@@ -45,6 +45,16 @@ contexto por encima del alcance del alumno si hay uno alcanzable (si no, cae al
 nivel más cercano). Todo es aditivo: sin `level` el comportamiento es el de
 V3.46.
 
+V3.48 (**Context Bank 2.0 + diversidad 2.0**) amplía el banco curado de 6 a 20
+contextos con cobertura A1–C2 y añade una capa de VARIEDAD informativa
+(`CONTEXT_VARIETY_DIMENSIONS`: `register`/`lexical_environment`/
+`syntactic_focus`). La variedad se expone en `context_diversity.variety` y
+`context_variety` para explicabilidad, pero **NO entra en el gate de evidencia**:
+`CONTEXT_DIMENSIONS`, `context_distance`, `_novelty_score` y
+`diverse_dimensions` conservan la semántica de V3.47 (cero regresión). Los seis
+contextos originales se mantienen congelados (mismos `id` y mismos valores core)
+para no alterar la evidencia ya registrada.
+
 No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
 contextos ya registrados en el ledger (`context_id`), así que la misma evidencia
@@ -71,6 +81,17 @@ CONTEXT_DIMENSIONS: tuple[str, ...] = (
     "social_relation",
     "time_reference",
     "interaction_type",
+)
+
+# V3.48 (Context Bank 2.0): dimensiones de VARIEDAD del banco. Son INFORMATIVAS
+# (explicabilidad y reporte) y NO entran en el gate de evidencia: los umbrales de
+# transferencia siguen midiéndose sobre `CONTEXT_DIMENSIONS` (cero regresión).
+# `register` ya se declaraba en todos los contextos; aquí se formaliza como
+# dimensión de variedad junto a dos ejes nuevos del entorno lingüístico.
+CONTEXT_VARIETY_DIMENSIONS: tuple[str, ...] = (
+    "register",
+    "lexical_environment",
+    "syntactic_focus",
 )
 
 # V3.43 (P1-03): nº mínimo de dimensiones con valores DISTINTOS que exigen los
@@ -235,6 +256,9 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "discourse": 2,
             "interaction": 1,
         },
+        # V3.48: ejes de variedad (solo reporte; ver CONTEXT_VARIETY_DIMENSIONS).
+        "lexical_environment": "personal_experience",
+        "syntactic_focus": "past_narrative",
         "prompt": (
             "Tell a short story about something that happened to you recently."
         ),
@@ -256,6 +280,8 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "discourse": 1,
             "interaction": 2,
         },
+        "lexical_environment": "concrete_everyday",
+        "syntactic_focus": "questions",
         "prompt": "Write a question you would like to ask a friend.",
     },
     {
@@ -274,6 +300,8 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "discourse": 3,
             "interaction": 2,
         },
+        "lexical_environment": "professional",
+        "syntactic_focus": "simple_present",
         "prompt": (
             "You have a new job. Describe something interesting about your "
             "first week to a colleague."
@@ -295,6 +323,8 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "discourse": 2,
             "interaction": 1,
         },
+        "lexical_environment": "personal_experience",
+        "syntactic_focus": "future_forms",
         "prompt": "Talk about your plans for next year.",
     },
     {
@@ -313,6 +343,8 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "discourse": 3,
             "interaction": 1,
         },
+        "lexical_environment": "abstract",
+        "syntactic_focus": "complex_subordination",
         "prompt": (
             "Give your opinion about something you feel strongly about, and "
             "say why."
@@ -334,7 +366,330 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "discourse": 3,
             "interaction": 1,
         },
+        "lexical_environment": "concrete_everyday",
+        "syntactic_focus": "past_narrative",
         "prompt": "Describe a small problem you had and how you solved it.",
+    },
+    # --- V3.48 (Context Bank 2.0): 14 contextos nuevos, cobertura A1–C2 ---
+    {
+        "id": "introductions",
+        "topic": "social_introductions",
+        "communicative_goal": "introduce",
+        "discourse_type": "dialogue",
+        "social_relation": "stranger",
+        "time_reference": "present",
+        "register": "neutral",
+        "interaction_type": "dialogue",
+        "cefr": "A1",
+        "difficulty_vector": {
+            "lexical": 1,
+            "syntax": 1,
+            "discourse": 1,
+            "interaction": 2,
+        },
+        "lexical_environment": "concrete_everyday",
+        "syntactic_focus": "simple_present",
+        "prompt": (
+            "You meet someone new at a class. Introduce yourself and say where "
+            "you are from."
+        ),
+    },
+    {
+        "id": "routine",
+        "topic": "daily_routine",
+        "communicative_goal": "describe",
+        "discourse_type": "descriptive",
+        "social_relation": "family",
+        "time_reference": "present",
+        "register": "informal",
+        "interaction_type": "monologue",
+        "cefr": "A1",
+        "difficulty_vector": {
+            "lexical": 1,
+            "syntax": 1,
+            "discourse": 2,
+            "interaction": 1,
+        },
+        "lexical_environment": "concrete_everyday",
+        "syntactic_focus": "simple_present",
+        "prompt": "Describe what you usually do on a normal morning at home.",
+    },
+    {
+        "id": "directions",
+        "topic": "city_navigation",
+        "communicative_goal": "ask",
+        "discourse_type": "dialogue",
+        "social_relation": "stranger",
+        "time_reference": "present",
+        "register": "neutral",
+        "interaction_type": "dialogue",
+        "cefr": "A2",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 2,
+            "discourse": 2,
+            "interaction": 3,
+        },
+        "lexical_environment": "concrete_everyday",
+        "syntactic_focus": "questions",
+        "prompt": (
+            "You are lost in a new city. Ask a passer-by how to get to the "
+            "station."
+        ),
+    },
+    {
+        "id": "shopping",
+        "topic": "shopping",
+        "communicative_goal": "request",
+        "discourse_type": "dialogue",
+        "social_relation": "stranger",
+        "time_reference": "present",
+        "register": "informal",
+        "interaction_type": "dialogue",
+        "cefr": "A2",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 2,
+            "discourse": 2,
+            "interaction": 3,
+        },
+        "lexical_environment": "concrete_everyday",
+        "syntactic_focus": "modals",
+        "prompt": (
+            "You are in a shop and cannot find what you need. Ask an assistant "
+            "for help."
+        ),
+    },
+    {
+        "id": "health",
+        "topic": "health",
+        "communicative_goal": "explain",
+        "discourse_type": "explanatory",
+        "social_relation": "professional",
+        "time_reference": "present",
+        "register": "neutral",
+        "interaction_type": "dialogue",
+        "cefr": "B1",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 3,
+            "discourse": 3,
+            "interaction": 2,
+        },
+        "lexical_environment": "professional",
+        "syntactic_focus": "modals",
+        "prompt": (
+            "You do not feel well. Explain your symptoms to a doctor and answer "
+            "their questions."
+        ),
+    },
+    {
+        "id": "travel_plan",
+        "topic": "trip_planning",
+        "communicative_goal": "plan",
+        "discourse_type": "expository",
+        "social_relation": "friend",
+        "time_reference": "future",
+        "register": "informal",
+        "interaction_type": "dialogue",
+        "cefr": "B2",
+        "difficulty_vector": {
+            "lexical": 3,
+            "syntax": 3,
+            "discourse": 3,
+            "interaction": 3,
+        },
+        "lexical_environment": "personal_experience",
+        "syntactic_focus": "future_forms",
+        "prompt": (
+            "Plan a weekend away with a friend: suggest where to go and why, "
+            "and agree on the details."
+        ),
+    },
+    {
+        "id": "work_problem",
+        "topic": "employment",
+        "communicative_goal": "explain",
+        "discourse_type": "explanatory",
+        "social_relation": "colleague",
+        "time_reference": "past",
+        "register": "formal",
+        "interaction_type": "dialogue",
+        "cefr": "B2",
+        "difficulty_vector": {
+            "lexical": 3,
+            "syntax": 3,
+            "discourse": 4,
+            "interaction": 3,
+        },
+        "lexical_environment": "professional",
+        "syntactic_focus": "past_narrative",
+        "prompt": (
+            "Something went wrong on a project at work. Explain to a colleague "
+            "what happened and how you fixed it."
+        ),
+    },
+    {
+        "id": "community",
+        "topic": "community",
+        "communicative_goal": "persuade",
+        "discourse_type": "argumentative",
+        "social_relation": "neighbour",
+        "time_reference": "future",
+        "register": "formal",
+        "interaction_type": "monologue",
+        "cefr": "B2",
+        "difficulty_vector": {
+            "lexical": 3,
+            "syntax": 3,
+            "discourse": 4,
+            "interaction": 2,
+        },
+        "lexical_environment": "abstract",
+        "syntactic_focus": "conditionals",
+        "prompt": (
+            "Propose one change to improve your neighbourhood and explain why "
+            "your neighbours should support it."
+        ),
+    },
+    {
+        "id": "debate",
+        "topic": "society",
+        "communicative_goal": "argue",
+        "discourse_type": "argumentative",
+        "social_relation": "audience",
+        "time_reference": "present",
+        "register": "formal",
+        "interaction_type": "dialogue",
+        "cefr": "C1",
+        "difficulty_vector": {
+            "lexical": 4,
+            "syntax": 4,
+            "discourse": 5,
+            "interaction": 4,
+        },
+        "lexical_environment": "abstract",
+        "syntactic_focus": "complex_subordination",
+        "prompt": (
+            "Take a position on a social issue and defend it against an "
+            "opposing view."
+        ),
+    },
+    {
+        "id": "review",
+        "topic": "culture",
+        "communicative_goal": "evaluate",
+        "discourse_type": "evaluative",
+        "social_relation": "audience",
+        "time_reference": "past",
+        "register": "formal",
+        "interaction_type": "monologue",
+        "cefr": "C1",
+        "difficulty_vector": {
+            "lexical": 4,
+            "syntax": 4,
+            "discourse": 5,
+            "interaction": 2,
+        },
+        "lexical_environment": "cultural",
+        "syntactic_focus": "complex_subordination",
+        "prompt": (
+            "Review a film or a book you have recently experienced, weighing "
+            "its strengths and weaknesses."
+        ),
+    },
+    {
+        "id": "mediation",
+        "topic": "interpersonal_conflict",
+        "communicative_goal": "mediate",
+        "discourse_type": "explanatory",
+        "social_relation": "group",
+        "time_reference": "past",
+        "register": "formal",
+        "interaction_type": "dialogue",
+        "cefr": "C1",
+        "difficulty_vector": {
+            "lexical": 4,
+            "syntax": 5,
+            "discourse": 5,
+            "interaction": 5,
+        },
+        "lexical_environment": "professional",
+        "syntactic_focus": "complex_subordination",
+        "prompt": (
+            "Two people you know disagree. Explain each side to the other and "
+            "help them reach an understanding."
+        ),
+    },
+    {
+        "id": "academic",
+        "topic": "research",
+        "communicative_goal": "justify",
+        "discourse_type": "academic",
+        "social_relation": "expert",
+        "time_reference": "present",
+        "register": "formal",
+        "interaction_type": "dialogue",
+        "cefr": "C2",
+        "difficulty_vector": {
+            "lexical": 5,
+            "syntax": 5,
+            "discourse": 5,
+            "interaction": 4,
+        },
+        "lexical_environment": "academic",
+        "syntactic_focus": "passive",
+        "prompt": (
+            "Present an argument from a field you know well and respond to a "
+            "critical question about your evidence."
+        ),
+    },
+    {
+        "id": "negotiation",
+        "topic": "high_stakes",
+        "communicative_goal": "negotiate",
+        "discourse_type": "negotiation",
+        "social_relation": "expert",
+        "time_reference": "future",
+        "register": "formal",
+        "interaction_type": "dialogue",
+        "cefr": "C2",
+        "difficulty_vector": {
+            "lexical": 5,
+            "syntax": 5,
+            "discourse": 5,
+            "interaction": 5,
+        },
+        "lexical_environment": "professional",
+        "syntactic_focus": "conditionals",
+        "prompt": (
+            "Negotiate the terms of an agreement with a counterpart who wants "
+            "something different, and justify the concessions you are willing "
+            "to make."
+        ),
+    },
+    {
+        "id": "keynote",
+        "topic": "abstract_ideas",
+        "communicative_goal": "present",
+        "discourse_type": "academic",
+        "social_relation": "audience",
+        "time_reference": "present",
+        "register": "formal",
+        "interaction_type": "monologue",
+        "cefr": "C2",
+        "difficulty_vector": {
+            "lexical": 5,
+            "syntax": 5,
+            "discourse": 5,
+            "interaction": 1,
+        },
+        "lexical_environment": "abstract",
+        "syntactic_focus": "passive",
+        "prompt": (
+            "Deliver a short keynote on an abstract theme and use concrete "
+            "examples to make it persuasive."
+        ),
     },
 )
 
@@ -474,28 +829,87 @@ def context_attributes(context: object) -> dict[str, str]:
     return _as_attributes(context)
 
 
-def context_dimensions(context_ids: object) -> dict[str, list[str]]:
-    """Valores DISTINTOS por dimensión de una colección de contextos (V3.43).
+def _normalize_dimensions(dimensions: object) -> tuple[str, ...]:
+    """Ejes de atributos válidos para medir variedad (V3.48, pura).
+
+    Acepta un iterable de nombres de dimensión; filtra vacíos y cae a
+    `CONTEXT_DIMENSIONS` si no queda ninguno (o si el valor no es iterable). Es
+    el punto único que permite reutilizar `context_dimensions` tanto para el gate
+    (ejes core) como para la variedad informativa. Nunca lanza.
+    """
+    if isinstance(dimensions, str):
+        candidates: tuple = (dimensions,)
+    elif isinstance(dimensions, (list, tuple, set, frozenset)):
+        candidates = tuple(dimensions)
+    else:
+        return CONTEXT_DIMENSIONS
+    axes = tuple(
+        str(dimension).strip()
+        for dimension in candidates
+        if str(dimension or "").strip()
+    )
+    return axes or CONTEXT_DIMENSIONS
+
+
+def context_dimensions(
+    context_ids: object,
+    *,
+    dimensions: object = CONTEXT_DIMENSIONS,
+) -> dict[str, list[str]]:
+    """Valores DISTINTOS por dimensión de una colección de contextos (V3.43 → V3.48).
 
     Devuelve `{dimension: [valores ordenados]}`. Los contextos no reconocidos y
     las dimensiones sin valor se ignoran. Determinista: las listas van
-    ordenadas alfabéticamente. Nunca lanza.
+    ordenadas alfabéticamente. `dimensions` permite medir otros ejes (V3.48:
+    `CONTEXT_VARIETY_DIMENSIONS`) sin duplicar la lógica; sin él se usan los ejes
+    core del gate. Nunca lanza.
     """
-    values: dict[str, set[str]] = {dimension: set() for dimension in CONTEXT_DIMENSIONS}
+    axes = _normalize_dimensions(dimensions)
+    values: dict[str, set[str]] = {dimension: set() for dimension in axes}
     try:
         iterable = list(context_ids or ())
     except TypeError:
         iterable = []
     for raw in iterable:
         attributes = _as_attributes(raw)
-        for dimension in CONTEXT_DIMENSIONS:
+        for dimension in axes:
             value = (attributes.get(dimension) or "").strip()
             if value:
                 values[dimension].add(value)
     return {
         dimension: sorted(values[dimension])
-        for dimension in CONTEXT_DIMENSIONS
+        for dimension in axes
         if values[dimension]
+    }
+
+
+def context_variety(context_ids: object) -> dict:
+    """Variedad INFORMATIVA de una colección de contextos (V3.48, pura).
+
+    Gemela de `context_diversity` sobre `CONTEXT_VARIETY_DIMENSIONS`
+    (`register`/`lexical_environment`/`syntactic_focus`). NO alimenta el gate de
+    evidencia, que sigue midiéndose sobre los ejes core: es explicabilidad y
+    reporte. Devuelve:
+
+    - `dimensions` — `{dimensión: [valores distintos]}`;
+    - `varied_dimensions` — nº de ejes con >= 2 valores distintos;
+    - `score` — `varied_dimensions / len(dimensions)` (0.0 sin dimensiones).
+
+    Nunca lanza.
+    """
+    dimensions = context_dimensions(
+        context_ids, dimensions=CONTEXT_VARIETY_DIMENSIONS
+    )
+    varied_dimensions = sum(
+        1 for values in dimensions.values() if len(values) >= 2
+    )
+    score = (
+        round(varied_dimensions / len(dimensions), 4) if dimensions else 0.0
+    )
+    return {
+        "dimensions": dimensions,
+        "varied_dimensions": varied_dimensions,
+        "score": score,
     }
 
 
@@ -525,7 +939,10 @@ def context_diversity(context_ids: object) -> dict:
     - `distinct_contexts` — nº de contextos reconocidos distintos;
     - `dimensions` — `{dimension: [valores distintos]}` (`context_dimensions`);
     - `diverse_dimensions` — nº de dimensiones con >= 2 valores distintos;
-    - `score` — `diverse_dimensions / len(dimensions)` (0.0 sin dimensiones).
+    - `score` — `diverse_dimensions / len(dimensions)` (0.0 sin dimensiones);
+    - `variety` — V3.48: variedad informativa sobre `CONTEXT_VARIETY_DIMENSIONS`
+      (`context_variety`). NO entra en el gate: el umbral sigue siendo
+      `diverse_dimensions`.
 
     Nunca lanza: una entrada no iterable se trata como «sin contextos».
     """
@@ -552,6 +969,8 @@ def context_diversity(context_ids: object) -> dict:
         "dimensions": dimensions,
         "diverse_dimensions": diverse_dimensions,
         "score": score,
+        # V3.48: variedad informativa (no entra en el gate de evidencia).
+        "variety": context_variety(iterable),
     }
 
 

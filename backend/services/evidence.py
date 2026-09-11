@@ -450,7 +450,8 @@ def context_signals(rows: list[dict]) -> dict:
       una función incompatible con su POS). Solo los éxitos limpios avanzan la
       transferencia;
     - `context_diversity` (V3.43, P1-03): diversidad contextual REAL de los
-      contextos con éxito limpio (`transfer.context_diversity`);
+      contextos con éxito limpio (`transfer.context_diversity`). V3.48 añade su
+      clave informativa `variety` (no entra en el gate);
     - `transfer` — `True` si hay éxito LIMPIO en >= `CONTEXT_TRANSFER_MIN`
       contextos distintos **y** diversidad contextual real
       (`diverse_dimensions >= CONTEXT_DIVERSITY_MIN`). Antes bastaba con dos
@@ -1197,6 +1198,8 @@ def empty_summary() -> dict:
             "dimensions": {},
             "diverse_dimensions": 0,
             "score": 0.0,
+            # V3.48: variedad informativa (mismo contrato que `context_variety`).
+            "variety": {"dimensions": {}, "varied_dimensions": 0, "score": 0.0},
         },
         "transfer": False,
         # V3.46: condición de recuperación ({} = sin datos de condición, se

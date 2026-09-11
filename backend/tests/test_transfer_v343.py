@@ -117,6 +117,8 @@ def test_context_diversity_requires_real_dimension_change():
         "dimensions": {},
         "diverse_dimensions": 0,
         "score": 0.0,
+        # V3.48: la variedad informativa viaja con la diversidad (no es el gate).
+        "variety": {"dimensions": {}, "varied_dimensions": 0, "score": 0.0},
     }
     # Un `context_id` no reconocido no aporta dimensiones ni diversidad.
     only_unknown = transfer.context_diversity(["lexicon:writing", "drill:recall"])

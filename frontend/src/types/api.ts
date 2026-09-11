@@ -357,6 +357,14 @@ export interface ContextDiversity {
   dimensions: Record<string, string[]>;
   diverse_dimensions: number;
   score: number;
+  // V3.48 (Context Bank 2.0): variedad informativa sobre ejes adicionales
+  // (register/lexical_environment/syntactic_focus). NO entra en el gate de
+  // evidencia: es explicabilidad/reporte.
+  variety?: {
+    dimensions: Record<string, string[]>;
+    varied_dimensions: number;
+    score: number;
+  };
 }
 
 export interface LexicalItem {

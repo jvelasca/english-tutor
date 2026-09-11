@@ -5,6 +5,39 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.48.0 (Context Bank 2.0 + diversidad 2.0)** —
+> release **v3.48.0**, ADITIVA, **sin migración de BD** y sin tocar la escalera
+> `transfer_state`, el scoring ni FSRS, que cierra los dos P2 abiertos por la
+> auditoría externa de V3.43.0 sobre la transferencia. **(A) Context Bank 2.0:**
+> `services/transfer.py` amplía `TRANSFER_CONTEXTS` de **6 a 20 contextos** —14
+> nuevos (`introductions`, `routine`, `directions`, `shopping`, `health`,
+> `travel_plan`, `work_problem`, `community`, `debate`, `review`, `mediation`,
+> `academic`, `negotiation`, `keynote`)— con cobertura **A1:3 / A2:4 / B1:4 /
+> B2:3 / C1:3 / C2:3**; cada contexto declara los 6 atributos core, `cefr`,
+> `difficulty_vector` (`lexical`/`syntax`/`discourse`/`interaction`, 1..5) y los
+> ejes de variedad, y ningún `prompt` contiene `{word}` (la consigna da un
+> escenario, nunca el target). Los **6 contextos originales quedan congelados**
+> (mismos `id` y valores core; guardia por test) para no reinterpretar la
+> evidencia histórica que referencia sus `context_id`. **(B) Diversidad 2.0
+> informativa:** nuevos `CONTEXT_VARIETY_DIMENSIONS` (`register`/
+> `lexical_environment`/`syntactic_focus`), función pura `context_variety`
+> (`{dimensions, varied_dimensions, score}`) y `context_dimensions(...,
+> dimensions=...)` generalizada vía `_normalize_dimensions`; `context_diversity`
+> conserva sus cuatro claves históricas y añade `variety`. **El gate NO cambia:**
+> `CONTEXT_DIMENSIONS`, `context_distance`, `_novelty_score` y
+> `diverse_dimensions` mantienen la semántica de V3.47 y `CONTEXT_DIVERSITY_MIN
+> = 2` se conserva (la distancia mínima entre pares del banco ampliado es `>= 2`);
+> `empty_summary()["context_diversity"]` gana el default `variety` por paridad
+> pura↔SQL. Contrato aditivo (`ContextDiversity.variety` en `types/api.ts`).
+> **Sin cambio de UI.** Tests: pytest **2075 passed** (+12: nuevo
+> `test_context_bank_v348.py`; ajustes en `test_transfer_v343.py` y
+> `test_learning_evidence_v336.py`), vitest **72 ficheros/623 tests** (sin
+> cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
+> `check_release_consistency` **3.48.0** exit 0. Fuera de alcance (V3.49+):
+> TTS/offline (auto-descarga implícita de voces), Sense Engine 2.0,
+> `transfer_state` enriquecido (`confidence`/`recency`) y
+> `expected_learning_value` / Adaptive Planner 2.0.
+>
 > **Nota (2026-09-11):** **V3.47.0 (Transfer Evidence 2.0 + CEFR/`difficulty_vector`
 > del contexto)** — release **v3.47.0**, doble y ADITIVA, **sin migración de BD**
 > y sin tocar el scoring ni FSRS, que cierra los dos P1 abiertos por la auditoría

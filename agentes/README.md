@@ -5,7 +5,7 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.47.0`** — ver `docs/RELEVO.md` (nota superior
+> **Estado actual (2026-09-11): `v3.48.0`** — ver `docs/RELEVO.md` (nota superior
 > y sección 0 "START HERE").
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
@@ -20,6 +20,12 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v348-context-bank.md` — **V3.48 (ejecutado, 2026-09-11, v3.48.0)**:
+  Context Bank 2.0 (banco de 6 → 20 contextos con cobertura A1–C2, 6 originales
+  congelados) + diversidad 2.0 informativa (`register`/`lexical_environment`/
+  `syntactic_focus` en `context_diversity.variety`, sin entrar en el gate de
+  evidencia). Cierra los P2-04/P2-05 de la auditoría de V3.43.0. **Histórico,
+  hecho**; ver `release-notes-v3.48.0.md`.
 - `agentes/v347-transfer-evidence-cefr.md` — **V3.47 (ejecutado, 2026-09-11,
   v3.47.0)**: Transfer Evidence 2.0 (escalera endurecida: ≥2 éxitos no andamiados
   para `transfer_demonstrated`, 3 días + 2 objetivos para `transfer_stable`) +
