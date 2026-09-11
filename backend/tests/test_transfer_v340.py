@@ -371,9 +371,10 @@ def test_transfer_attempt_failure_is_recorded_and_never_accredits(
     assert rows[0]["skill"] == "spontaneous_use"
 
 
-def test_two_diverse_contexts_need_an_unscaffolded_success(monkeypatch, tmp_path):
-    """V3.46 (P1-03): dos contextos distintos con ayuda NO demuestran
-    transferencia; hace falta un éxito limpio SIN andamiaje (`open_context`)."""
+def test_two_diverse_contexts_need_two_unscaffolded_successes(monkeypatch, tmp_path):
+    """V3.46 (P1-03) → V3.47 (P1-02): dos contextos distintos con ayuda NO
+    demuestran transferencia; hacen falta DOS éxitos limpios SIN andamiaje
+    (`open_context`), no uno."""
     uid = _setup(monkeypatch, tmp_path)
     _seed_word(uid, "travel")
 
@@ -413,7 +414,7 @@ def test_two_diverse_contexts_need_an_unscaffolded_success(monkeypatch, tmp_path
         assert planner.transfer_gap(scaffolded) is True
 
         # Estado `contextualized` → el drill sirve `open_context`, que NO exige la
-        # unidad: un éxito limpio aquí sí acredita la transferencia.
+        # unidad: un éxito limpio aquí es el PRIMER uso sin ayuda (aún no basta).
         served = client.get(
             "/api/vocabulary/drill/transfer-context",
             params={"word": "travel", "user_id": uid},
@@ -428,8 +429,28 @@ def test_two_diverse_contexts_need_an_unscaffolded_success(monkeypatch, tmp_path
             served["context_id"],
         )
 
+        one = evidence_repo.summarize_by_target(
+            uid, target_type="lexicon"
+        )["travel"]
+        assert one["unscaffolded_clean_successes"] == 1
+        assert transfer_state(one) == "contextualized"
+
+        # Un SEGUNDO contexto abierto con éxito limpio completa la demostración.
+        second = client.get(
+            "/api/vocabulary/drill/transfer-context",
+            params={"word": "travel", "user_id": uid},
+        ).json()
+        assert second["condition"] == "open_context"
+        _post_transfer(
+            client,
+            uid,
+            "travel",
+            "I will travel to Chile again next winter.",
+            second["context_id"],
+        )
+
     summary = evidence_repo.summarize_by_target(uid, target_type="lexicon")["travel"]
-    assert summary["unscaffolded_clean_successes"] == 1
+    assert summary["unscaffolded_clean_successes"] == 2
     assert summary["success_conditions"] == ["cued_context", "open_context"]
     assert transfer_state(summary) == "transfer_demonstrated"
     assert planner.transfer_gap(summary) is False

@@ -37,6 +37,14 @@ DERIVA de la evidencia (nunca la declara el cliente) y es lo que permite
 endurecer `transfer_demonstrated`: un éxito en una tarea andamiada no acredita
 transferencia no andamiada.
 
+V3.47 añade el **nivel y la carga del contexto**: cada contexto del banco declara
+su `cefr` (`services.cefr.CEFR_LEVELS`) y su `difficulty_vector`
+(`lexical`/`syntax`/`discourse`/`interaction`, enteros 1..5, misma convención que
+listening/speaking), y `context_for` acepta un `level` opcional para no servir un
+contexto por encima del alcance del alumno si hay uno alcanzable (si no, cae al
+nivel más cercano). Todo es aditivo: sin `level` el comportamiento es el de
+V3.46.
+
 No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
 contextos ya registrados en el ledger (`context_id`), así que la misma evidencia
@@ -46,6 +54,8 @@ produce siempre la misma consigna.
 from __future__ import annotations
 
 import zlib
+
+from services.cefr import CEFR_LEVELS
 
 # Prefijo del `context_id` del ledger para esta actividad. Distingue la
 # transferencia de los contextos de práctica (`lexicon:<canal>`, `objective:*`).
@@ -67,6 +77,79 @@ CONTEXT_DIMENSIONS: tuple[str, ...] = (
 # contextos con éxito limpio para declarar diversidad real. Declarado y
 # calibrable; dos contextos distintos suelen diferir en >= 2 dimensiones.
 CONTEXT_DIVERSITY_MIN = 2
+
+# V3.47: dimensiones de CARGA del contexto de transferencia (misma convención que
+# el `difficulty_vector` de listening/speaking: enteros 1..5). No entran en la
+# diversidad contextual (son dificultad, no atributo de variedad).
+TRANSFER_DIFFICULTY_KEYS: tuple[str, ...] = (
+    "lexical",
+    "syntax",
+    "discourse",
+    "interaction",
+)
+
+# Orden del Marco para comparar niveles (Pre-A1 y valores desconocidos quedan
+# fuera: `cefr_index` devuelve -1 y no filtran).
+_CEFR_ORDER: dict[str, int] = {
+    level: index for index, level in enumerate(CEFR_LEVELS)
+}
+
+
+def cefr_index(value: object) -> int:
+    """Índice ordinal de un nivel CEFR (`-1` si no se reconoce) (V3.47, pura).
+
+    Permite comparar niveles sin depender del orden alfabético (`A1`..`C2`).
+    """
+    return _CEFR_ORDER.get(str(value or "").strip().upper(), -1)
+
+
+def difficulty_from_vector(vector: object) -> int:
+    """Escalar de dificultad (1..6) como la media redondeada del vector (V3.47).
+
+    Misma regla que `services.listening.difficulty_from_vector` y
+    `services.speaking.difficulty_from_vector`: `round` de Python y clamp a [1, 6].
+    Un vector vacío o inválido se trata como dificultad mínima. Nunca lanza.
+    """
+    if not isinstance(vector, dict) or not vector:
+        return 1
+    values = [
+        value
+        for value in vector.values()
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    if not values:
+        return 1
+    mean = round(sum(values) / len(values))
+    return max(1, min(6, mean))
+
+
+def _within_level(pool: list[dict], level: object) -> list[dict]:
+    """Contextos alcanzables para un nivel CEFR (V3.47, pura).
+
+    Sin nivel reconocible devuelve el pool tal cual (retrocompatibilidad). Con
+    nivel, prefiere los contextos de nivel igual o inferior; si NINGUNO es
+    alcanzable (todos por encima del alumno), cae a los del nivel más cercano por
+    arriba, de modo que nunca deja al alumno sin tarea. Nunca lanza.
+    """
+    index = cefr_index(level)
+    if index < 0:
+        return pool
+    reachable = [
+        context
+        for context in pool
+        if 0 <= cefr_index(context.get("cefr")) <= index
+    ]
+    if reachable:
+        return reachable
+    known = [
+        (cefr_index(context.get("cefr")), context)
+        for context in pool
+        if cefr_index(context.get("cefr")) >= 0
+    ]
+    if not known:
+        return pool
+    nearest = min(rank for rank, _ in known)
+    return [context for rank, context in known if rank == nearest]
 
 # ---------------------------------------------------------------------------
 # V3.46 (P1-03 de la auditoría de V3.43.0): CONDICIÓN DE RECUPERACIÓN.
@@ -144,6 +227,14 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "time_reference": "past",
         "register": "neutral",
         "interaction_type": "monologue",
+        # V3.47: nivel y carga declarados (convención listening/speaking).
+        "cefr": "A2",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 2,
+            "discourse": 2,
+            "interaction": 1,
+        },
         "prompt": (
             "Tell a short story about something that happened to you recently."
         ),
@@ -157,6 +248,14 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "time_reference": "present",
         "register": "neutral",
         "interaction_type": "dialogue",
+        # V3.47: el contexto más simple del banco (una pregunta a un amigo).
+        "cefr": "A1",
+        "difficulty_vector": {
+            "lexical": 1,
+            "syntax": 1,
+            "discourse": 1,
+            "interaction": 2,
+        },
         "prompt": "Write a question you would like to ask a friend.",
     },
     {
@@ -168,6 +267,13 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "time_reference": "present",
         "register": "neutral",
         "interaction_type": "monologue",
+        "cefr": "B1",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 2,
+            "discourse": 3,
+            "interaction": 2,
+        },
         "prompt": (
             "You have a new job. Describe something interesting about your "
             "first week to a colleague."
@@ -182,6 +288,13 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "time_reference": "future",
         "register": "neutral",
         "interaction_type": "monologue",
+        "cefr": "A2",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 2,
+            "discourse": 2,
+            "interaction": 1,
+        },
         "prompt": "Talk about your plans for next year.",
     },
     {
@@ -193,6 +306,13 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "time_reference": "present",
         "register": "neutral",
         "interaction_type": "monologue",
+        "cefr": "B1",
+        "difficulty_vector": {
+            "lexical": 3,
+            "syntax": 3,
+            "discourse": 3,
+            "interaction": 1,
+        },
         "prompt": (
             "Give your opinion about something you feel strongly about, and "
             "say why."
@@ -207,12 +327,19 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "time_reference": "past",
         "register": "neutral",
         "interaction_type": "monologue",
+        "cefr": "B1",
+        "difficulty_vector": {
+            "lexical": 2,
+            "syntax": 3,
+            "discourse": 3,
+            "interaction": 1,
+        },
         "prompt": "Describe a small problem you had and how you solved it.",
     },
 )
 
 # Índice por `id` para resoluciones de atributos en O(1) (derivado del banco).
-_CONTEXTS_BY_ID: dict[str, dict[str, str]] = {
+_CONTEXTS_BY_ID: dict[str, dict] = {
     context["id"]: context for context in TRANSFER_CONTEXTS
 }
 
@@ -322,11 +449,20 @@ def _bare_context_id(context_id: object) -> str:
 def _as_attributes(context: object) -> dict[str, str]:
     """Atributos de un contexto a partir de su dict, su `id` o su `context_id`."""
     if isinstance(context, dict):
-        if "id" in context:
-            return dict(context)
-        return {}
-    ident = _bare_context_id(context)
-    return dict(_CONTEXTS_BY_ID[ident]) if ident else {}
+        if "id" not in context:
+            return {}
+        attributes = dict(context)
+    else:
+        ident = _bare_context_id(context)
+        if not ident:
+            return {}
+        attributes = dict(_CONTEXTS_BY_ID[ident])
+    # V3.47: el `difficulty_vector` es un dict anidado; se copia para no exponer
+    # (ni permitir mutar) el del banco.
+    vector = attributes.get("difficulty_vector")
+    if isinstance(vector, dict):
+        attributes["difficulty_vector"] = dict(vector)
+    return attributes
 
 
 def context_attributes(context: object) -> dict[str, str]:
@@ -448,21 +584,26 @@ def context_for(
     *,
     success_context_ids: object = (),
     condition: object = "",
+    level: object = "",
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.46, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.47, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
-    unscaffolded}`. La consigna es la del banco; el escenario **no contiene la
-    unidad objetivo** salvo en la condición `prompted` (V3.43/P1-01 y V3.46).
-    `condition` (V3.46) es la condición de recuperación SERVIDA: la deriva el
-    llamador del estado de evidencia (`condition_for_state`) y aquí se compone el
-    enunciado con su instrucción (`CONDITION_INSTRUCTIONS`).
+    unscaffolded, cefr, difficulty_vector, difficulty}`. La consigna es la del
+    banco; el escenario **no contiene la unidad objetivo** salvo en la condición
+    `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46) es la condición de
+    recuperación SERVIDA: la deriva el llamador del estado de evidencia
+    (`condition_for_state`) y aquí se compone el enunciado con su instrucción
+    (`CONDITION_INSTRUCTIONS`).
 
     Elección, determinista y estable:
 
     1. se filtra el banco a los contextos cuyo `context_id` no esté en
        `used_context_ids` (contextos que el ítem ya registró en el ledger);
+    1b. V3.47: con un `level` CEFR reconocible se prefieren los contextos de
+       nivel igual o inferior (y, si ninguno es alcanzable, los del nivel más
+       cercano por arriba). Sin `level` el comportamiento es el de V3.46;
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
        (el más novedoso pedagógicamente, V3.43/P1-03); los empates los resuelve
@@ -501,6 +642,8 @@ def context_for(
     exhausted = not pool
     if exhausted:
         pool = list(TRANSFER_CONTEXTS)
+    # V3.47: ajusta al nivel del alumno (sin nivel reconocible, pool intacto).
+    pool = _within_level(pool, level)
     if not pool:  # banco vacío: no se inventa contenido
         return {
             "word": unit,
@@ -514,6 +657,9 @@ def context_for(
             "condition": served,
             "required_target": requires_target(served),
             "unscaffolded": is_unscaffolded(served),
+            "cefr": "",
+            "difficulty_vector": {},
+            "difficulty": 0,
         }
     if success:
         best = max(_novelty_score(context, success) for context in pool)
@@ -521,6 +667,7 @@ def context_for(
         # función del pool, así que un empate no depende del orden del dict.
         pool = [c for c in pool if _novelty_score(c, success) == best]
     context = pool[_stable_index(unit, len(pool))]
+    vector = dict(context.get("difficulty_vector") or {})
     return {
         "word": unit,
         "context_id": context_id_for(context),
@@ -533,6 +680,10 @@ def context_for(
         "condition": served,
         "required_target": requires_target(served),
         "unscaffolded": is_unscaffolded(served),
+        # V3.47: nivel y carga del contexto servido (aditivos).
+        "cefr": context.get("cefr", ""),
+        "difficulty_vector": vector,
+        "difficulty": difficulty_from_vector(vector),
     }
 
 

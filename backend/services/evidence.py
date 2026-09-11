@@ -465,6 +465,16 @@ def context_signals(rows: list[dict]) -> dict:
       `unscaffolded_clean_successes` cuenta los éxitos limpios en condiciones NO
       andamiadas — lo que `transfer_state` exige para declarar transferencia
       demostrada.
+    - `unscaffolded_clean_success_contexts` / `unscaffolded_clean_success_days`
+      (V3.47): contextos y días distintos con éxito limpio NO andamiado, la
+      evidencia fina que la escalera endurecida exige (>= 2 éxitos no
+      andamiados para `transfer_demonstrated`).
+    - `clean_success_goals` (V3.47): objetivos comunicativos distintos de los
+      contextos con éxito limpio, derivados del banco (`communicative_goal`).
+    - `last_clean_success_at` / `last_unscaffolded_clean_success_at` (V3.47):
+      marca ISO del éxito limpio (y no andamiado) más reciente, para
+      explicabilidad. La decisión de `transfer_state` NO usa reloj: solo la
+      evidencia registrada.
 
     Reutilizada tal cual por el resumen SQL (paridad por construcción). Nunca
     lanza: filas incompletas se ignoran donde corresponda.
@@ -474,6 +484,12 @@ def context_signals(rows: list[dict]) -> dict:
     clean_days: set[str] = set()
     condition_attempts: dict[str, int] = {}
     condition_clean: dict[str, int] = {}
+    # V3.47: evidencia fina de la escalera endurecida (contextos/días/timestamps
+    # de los éxitos limpios NO andamiados).
+    unscaffolded_contexts: set[str] = set()
+    unscaffolded_days: set[str] = set()
+    clean_timestamps: list[str] = []
+    unscaffolded_timestamps: list[str] = []
     for row in rows:
         context = (row.get("context_id") or "").strip()
         condition = transfer.normalize_condition(row.get("transfer_condition"))
@@ -494,11 +510,22 @@ def context_signals(rows: list[dict]) -> dict:
             # cuenta como limpio: no destruye evidencia léxica.
             continue
         clean_successes[context] = clean_successes.get(context, 0) + 1
-        day = (row.get("occurred_at") or "")[:10]
+        at = (row.get("occurred_at") or "").strip()
+        day = at[:10]
         if day:
             clean_days.add(day)
+        if at:
+            clean_timestamps.append(at)
         if condition:
             condition_clean[condition] = condition_clean.get(condition, 0) + 1
+            if transfer.is_unscaffolded(condition):
+                # V3.47: éxito limpio SIN andamiaje. Es lo que la escalera
+                # endurecida exige (>= 2) para declarar transferencia.
+                unscaffolded_contexts.add(context)
+                if day:
+                    unscaffolded_days.add(day)
+                if at:
+                    unscaffolded_timestamps.append(at)
     success_contexts = sorted(
         context for context, bucket in buckets.items() if bucket["successes"] > 0
     )
@@ -545,6 +572,22 @@ def context_signals(rows: list[dict]) -> dict:
             condition_clean.get(condition, 0)
             for condition in transfer.UNSCAFFOLDED_CONDITIONS
         ),
+        # V3.47: evidencia fina de la escalera endurecida (contextos/días/última
+        # marca de los éxitos limpios no andamiados) y objetivos comunicativos
+        # distintos de los contextos con éxito limpio.
+        "unscaffolded_clean_success_contexts": sorted(unscaffolded_contexts),
+        "unscaffolded_clean_success_days": len(unscaffolded_days),
+        "clean_success_goals": list(
+            transfer.context_dimensions(clean_success_contexts).get(
+                "communicative_goal", []
+            )
+        ),
+        "last_clean_success_at": (
+            max(clean_timestamps) if clean_timestamps else ""
+        ),
+        "last_unscaffolded_clean_success_at": (
+            max(unscaffolded_timestamps) if unscaffolded_timestamps else ""
+        ),
     }
 
 
@@ -557,13 +600,15 @@ def _int(value: object) -> int:
 
 
 def _unscaffolded_transfer_ok(evidence: dict) -> bool:
-    """¿La transferencia está acreditada SIN andamiaje? (V3.46, pura).
+    """¿La transferencia está acreditada SIN andamiaje? (V3.46 → V3.47, pura).
 
     V3.43 declaraba `transfer_demonstrated` con «2 contextos limpios y diversidad
     real», sin mirar CÓMO se había usado la unidad: un éxito en tareas que
     nombran o insinúan el objetivo (`prompted`/`cued_context`) bastaba. V3.46
-    exige además >= 1 éxito limpio en condición NO andamiada
-    (`open_context`/`free_choice`/`naturally_emergent`).
+    empezó a exigir >= 1 éxito limpio en condición NO andamiada
+    (`open_context`/`free_choice`/`naturally_emergent`); V3.47 endurece el
+    requisito a `TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED` (2), porque un único
+    acierto sin ayuda no demuestra que la unidad se transfiera de forma estable.
 
     Sin datos de condición (resumen legacy/parcial, o transferencia registrada
     antes de V3.46) devuelve True: no se puede afirmar que falte el requisito, así
@@ -572,7 +617,10 @@ def _unscaffolded_transfer_ok(evidence: dict) -> bool:
     conditions = evidence.get("transfer_conditions")
     if not (isinstance(conditions, dict) and conditions):
         return True
-    return _int(evidence.get("unscaffolded_clean_successes")) > 0
+    return (
+        _int(evidence.get("unscaffolded_clean_successes"))
+        >= TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED
+    )
 
 
 # V3.43 (P1-04): estados del eje de transferencia. Un booleano `transfer = true`
@@ -591,10 +639,17 @@ TRANSFER_STATES: tuple[str, ...] = (
 # `planner.TRANSFER_MIN_SUCCESSES`; ambos se mantienen en 2).
 TRANSFER_MIN_SUCCESSES = 2
 
-# Estabilidad: exige variedad (más contextos) Y tiempo (días distintos con éxito
-# limpio). Un solo día demuestra transferencia, no estabilidad.
+# V3.47 (P1-02): éxitos limpios NO andamiados exigidos para declarar
+# `transfer_demonstrated`. V3.46 bastaba con 1; un único acierto sin ayuda no
+# demuestra que la unidad se recupere de forma estable, así que se exigen 2.
+TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED = 2
+
+# Estabilidad: exige variedad (más contextos), tiempo (días distintos con éxito
+# limpio) y variedad de OBJETIVO comunicativo. Un solo día (o un único tipo de
+# producción) demuestra transferencia, no estabilidad.
 TRANSFER_STABLE_MIN_CONTEXTS = 3
-TRANSFER_STABLE_MIN_DAYS = 2
+TRANSFER_STABLE_MIN_DAYS = 3
+TRANSFER_STABLE_MIN_GOALS = 2
 
 # Estados que cuentan como transferencia DEMOSTRADA (los lee
 # `planner.has_contextual_transfer`).
@@ -605,26 +660,44 @@ TRANSFER_DEMONSTRATED_STATES: tuple[str, ...] = (
 )
 
 
+def _clean_success_goals(evidence: dict, contexts: list[str]) -> list[str]:
+    """Objetivos comunicativos distintos de los contextos con éxito limpio (V3.47).
+
+    Prefiere el campo declarado en el resumen (`clean_success_goals`, que ya
+    computa `context_signals`); si un resumen parcial no lo trae, lo deriva del
+    banco con `transfer.context_dimensions`, la única fuente de verdad de los
+    atributos de un contexto. Nunca lanza.
+    """
+    declared = evidence.get("clean_success_goals")
+    if isinstance(declared, list):
+        return [str(goal).strip() for goal in declared if str(goal).strip()]
+    return list(
+        transfer.context_dimensions(contexts).get("communicative_goal", [])
+    )
+
+
 def transfer_state(evidence: dict | None) -> str:
-    """Estado del eje de TRANSFERENCIA contextual (V3.43, pura y determinista).
+    """Estado del eje de TRANSFERENCIA contextual (V3.43 → V3.47, pura).
 
     Sustituye la lectura booleana `transfer = true` por un estado gradual:
 
     - `not_ready` — sin éxitos limpios suficientes (< `TRANSFER_MIN_SUCCESSES`);
     - `emerging` — éxito limpio en 1 contexto;
     - `contextualized` — >= 2 contextos limpios pero diversidad insuficiente
-      (casi el mismo tipo de producción: no es transferencia real) **o** toda la
-      evidencia limpia proviene de condiciones andamiadas (V3.46: falta el uso
-      sin andamiaje);
+      (casi el mismo tipo de producción: no es transferencia real) **o** menos de
+      `TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED` éxitos limpios sin andamiaje
+      (V3.46 pedía 1; V3.47 exige 2);
     - `transfer_demonstrated` — >= 2 contextos limpios, diversidad real **y**
-      >= 1 éxito limpio no andamiado (V3.46);
-    - `transfer_stable` — además >= 3 contextos y >= 2 días con éxito limpio;
+      >= `TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED` éxitos limpios no andamiados;
+    - `transfer_stable` — además >= `TRANSFER_STABLE_MIN_CONTEXTS` contextos,
+      >= `TRANSFER_STABLE_MIN_DAYS` días con éxito limpio y
+      >= `TRANSFER_STABLE_MIN_GOALS` objetivos comunicativos distintos;
     - `automatic` — estable y la modalidad `spontaneous_use` ya es automática.
 
     Acepta resúmenes parciales o legacy (cae a `success_contexts`/`successes` y
     respeta el booleano `transfer` cuando no traen los campos de V3.43; sin datos
-    de condición de V3.46 se conserva la regla anterior). No usa LLM. Nunca
-    lanza.
+    de condición de V3.46 se conserva la regla anterior). No usa LLM ni reloj.
+    Nunca lanza.
     """
     ev = evidence or {}
     has_v43_fields = (
@@ -642,7 +715,8 @@ def transfer_state(evidence: dict | None) -> str:
     contexts = ev.get("clean_success_contexts")
     if not isinstance(contexts, list):
         contexts = ev.get("success_contexts") or []
-    distinct = len({str(c).strip() for c in contexts if str(c).strip()})
+    context_values = [str(c).strip() for c in contexts if str(c).strip()]
+    distinct = len(set(context_values))
     clean_successes = _int(ev.get("clean_successes"))
     if not clean_successes:
         # Resumen parcial/legacy sin el contador limpio: se usa el total.
@@ -674,13 +748,15 @@ def transfer_state(evidence: dict | None) -> str:
         diverse_dimensions < transfer.CONTEXT_DIVERSITY_MIN
         or not _unscaffolded_transfer_ok(ev)
     ):
-        # Diversidad insuficiente O exito limpio solo en condiciones andamiadas:
-        # la unidad se usa en contextos distintos, pero aún no se ha demostrado
-        # que se recupere SIN ayuda (V3.46).
+        # Diversidad insuficiente O menos de 2 éxitos limpios sin andamiaje: la
+        # unidad se usa en contextos distintos, pero aún no se ha demostrado que
+        # se recupere SIN ayuda (V3.46 pedía 1; V3.47 exige 2).
         return "contextualized"
     if (
         distinct >= TRANSFER_STABLE_MIN_CONTEXTS
         and days >= TRANSFER_STABLE_MIN_DAYS
+        and len(_clean_success_goals(ev, context_values))
+        >= TRANSFER_STABLE_MIN_GOALS
     ):
         return "automatic" if automatic else "transfer_stable"
     return "transfer_demonstrated"
@@ -1128,6 +1204,13 @@ def empty_summary() -> dict:
         "transfer_conditions": {},
         "success_conditions": [],
         "unscaffolded_clean_successes": 0,
+        # V3.47: evidencia fina de la escalera endurecida (mismos defaults neutros
+        # que un resumen real sin éxitos limpios no andamiados).
+        "unscaffolded_clean_success_contexts": [],
+        "unscaffolded_clean_success_days": 0,
+        "clean_success_goals": [],
+        "last_clean_success_at": "",
+        "last_unscaffolded_clean_success_at": "",
     })
 
 

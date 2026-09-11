@@ -791,6 +791,10 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     `cued_context` por defecto (comportamiento de V3.43) y `open_context` cuando
     la unidad ya se usa en contextos distintos — el escenario abierto que no
     exige la palabra y única condición que acredita transferencia demostrada.
+
+    V3.47: pasa el nivel CEFR declarado del ítem (`row["cefr"]`) a
+    `context_for`, de modo que no se sirve un contexto por encima del alcance del
+    alumno si hay uno alcanzable.
     """
     summaries = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
@@ -799,8 +803,16 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     used = (summary.get("contexts") or {}).keys()
     success = summary.get("success_contexts") or []
     condition = _transfer_condition_for(summary)
+    # V3.47: el nivel declarado del ítem ajusta el contexto servido (sin nivel se
+    # mantiene el comportamiento de V3.46).
+    rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    row = _row_for_word(rows, word) or {}
     return transfer.context_for(
-        word, used, success_context_ids=success, condition=condition
+        word,
+        used,
+        success_context_ids=success,
+        condition=condition,
+        level=row.get("cefr") or "",
     )
 
 
@@ -864,6 +876,7 @@ async def submit_transfer_attempt(
             (summary.get("contexts") or {}).keys(),
             success_context_ids=summary.get("success_contexts") or [],
             condition=condition,
+            level=row.get("cefr") or "",
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)
     written = (text or "").strip()

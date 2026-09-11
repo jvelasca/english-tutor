@@ -246,8 +246,8 @@ def test_transfer_state_transitions():
     stable = _evidence(
         [
             _clean_row("transfer:story", "2026-01-01"),
-            _clean_row("transfer:future", "2026-01-01"),
-            _clean_row("transfer:work", "2026-01-02"),
+            _clean_row("transfer:future", "2026-01-02"),
+            _clean_row("transfer:work", "2026-01-03"),
         ]
     )
     assert stable["transfer_state"] == "transfer_stable"

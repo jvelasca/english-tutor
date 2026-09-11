@@ -5,7 +5,7 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.46.0`** — ver `docs/RELEVO.md` (nota superior
+> **Estado actual (2026-09-11): `v3.47.0`** — ver `docs/RELEVO.md` (nota superior
 > y sección 0 "START HERE").
 > Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
@@ -20,6 +20,12 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v347-transfer-evidence-cefr.md` — **V3.47 (ejecutado, 2026-09-11,
+  v3.47.0)**: Transfer Evidence 2.0 (escalera endurecida: ≥2 éxitos no andamiados
+  para `transfer_demonstrated`, 3 días + 2 objetivos para `transfer_stable`) +
+  CEFR/`difficulty_vector` del contexto (banco etiquetado y `context_for(level)`).
+  Cierra los dos P1 de la auditoría de V3.46.0. **Histórico, hecho**; ver
+  `release-notes-v3.47.0.md`.
 - `agentes/v346-transfer-condition.md` — **V3.46 (ejecutado, 2026-09-11,
   v3.46.0)**: condición de recuperación en la transferencia
   (`prompted`/`cued_context`/`open_context`/`free_choice`/`naturally_emergent`),

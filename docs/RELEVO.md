@@ -5,6 +5,40 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11):** **V3.47.0 (Transfer Evidence 2.0 + CEFR/`difficulty_vector`
+> del contexto)** — release **v3.47.0**, doble y ADITIVA, **sin migración de BD**
+> y sin tocar el scoring ni FSRS, que cierra los dos P1 abiertos por la auditoría
+> de V3.46.0 sobre la transferencia. **(A) Transfer Evidence 2.0:** la escalera
+> `transfer_state` deja de acreditar transferencia con un único éxito no
+> andamiado. `services/evidence.py` define `TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED
+> = 2` (2 éxitos limpios en condiciones NO andamiadas para
+> `transfer_demonstrated`), `TRANSFER_STABLE_MIN_DAYS` `2 → 3` y
+> `TRANSFER_STABLE_MIN_GOALS = 2` (objetivos comunicativos distintos);
+> `TRANSFER_STABLE_MIN_CONTEXTS = 3` se mantiene. `context_signals` expone la
+> evidencia fina (`unscaffolded_clean_success_contexts`/`_days`,
+> `clean_success_goals` derivados de `communicative_goal`,
+> `last_clean_success_at`/`last_unscaffolded_clean_success_at`; la decisión NO usa
+> reloj) y `empty_summary` los defaults neutros. Fallback legacy intacto (sin
+> datos de condición se conserva la regla anterior) y paridad pura↔SQL por
+> construcción. **(B) CEFR/`difficulty_vector`:** los 6 contextos de
+> `services/transfer.py` declaran `cefr` (`services.cefr.CEFR_LEVELS`) y
+> `difficulty_vector` (`lexical`/`syntax`/`discourse`/`interaction`, 1..5,
+> convención listening/speaking); nuevos helpers puros `difficulty_from_vector`
+> (media redondeada, clamp 1..6) y `cefr_index`; `context_for(..., level="")`
+> (retrocompatible) prefiere contextos de nivel ≤ al del alumno y, si ninguno es
+> alcanzable, cae al nivel más cercano por arriba; el contrato devuelve
+> `cefr`/`difficulty_vector`/`difficulty` (`TransferContextOut` y
+> `DrillTransferContext`). `domain/vocabulary.py` pasa `level=row.get("cefr")`.
+> **Sin cambio de UI.** Tests: pytest **2063 passed** (+16; nuevos
+> `test_transfer_evidence_v347.py` y `test_transfer_cefr_v347.py`; ajustes en
+> `test_transfer_v340.py`/`v343.py`/`test_transfer_condition_v346.py` y
+> `test_learning_evidence_v336.py`), vitest **72 ficheros/623 tests** (sin
+> cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
+> `check_release_consistency` **3.47.0** exit 0. Fuera de alcance
+> (V3.47.1/V3.48): TTS/offline (auto-descarga implícita de voces), Sense Engine
+> 2.0, Context Bank 2.0, `transfer_state` enriquecido (`confidence`/`recency`) y
+> `expected_learning_value` / Adaptive Planner 2.0.
+>
 > **Nota (2026-09-11):** **V3.46.0 (Condición de recuperación en la
 > transferencia — `transfer_condition`)** — release **v3.46.0** que cierra el P1
 > `transfer_condition` de la auditoría de V3.43.0, **aditiva y sin migración

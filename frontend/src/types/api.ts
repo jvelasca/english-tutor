@@ -522,6 +522,10 @@ export interface DrillTransferContext {
   condition?: string;
   required_target?: boolean;
   unscaffolded?: boolean;
+  // V3.47: nivel CEFR del contexto servido y su carga declarada (aditivos).
+  cefr?: string;
+  difficulty_vector?: Record<string, number>;
+  difficulty?: number;
 }
 
 export interface DrillTransferAttempt {

@@ -250,7 +250,7 @@ def test_context_signals_aggregate_conditions():
     assert signals["unscaffolded_clean_successes"] == 1
 
 
-def test_transfer_state_requires_an_unscaffolded_clean_success():
+def test_transfer_state_requires_two_unscaffolded_clean_successes():
     scaffolded = _summary(
         [
             _row("transfer:story", condition="cued_context"),
@@ -261,14 +261,27 @@ def test_transfer_state_requires_an_unscaffolded_clean_success():
     assert scaffolded["unscaffolded_clean_successes"] == 0
     assert transfer_state(scaffolded) == "contextualized"
 
-    opened = _summary(
+    # V3.47 (P1-02): UN solo éxito no andamiado ya no acredita transferencia.
+    one_unscaffolded = _summary(
         [
             _row("transfer:story", condition="cued_context"),
             _row("transfer:future", condition="cued_context"),
             _row("transfer:work", condition="open_context"),
         ]
     )
-    assert opened["unscaffolded_clean_successes"] == 1
+    assert one_unscaffolded["unscaffolded_clean_successes"] == 1
+    assert transfer_state(one_unscaffolded) == "contextualized"
+
+    # Con DOS éxitos limpios no andamiados en contextos distintos sí se demuestra.
+    opened = _summary(
+        [
+            _row("transfer:story", condition="cued_context"),
+            _row("transfer:future", condition="cued_context"),
+            _row("transfer:work", condition="open_context"),
+            _row("transfer:opinion", condition="open_context"),
+        ]
+    )
+    assert opened["unscaffolded_clean_successes"] == 2
     assert transfer_state(opened) == "transfer_demonstrated"
 
 
@@ -325,6 +338,7 @@ def test_summarize_by_target_matches_the_pure_contract_with_conditions(
     _seed_transfer_evidence(uid, "travel", "transfer:story", condition="cued_context")
     _seed_transfer_evidence(uid, "travel", "transfer:future", condition="cued_context")
     _seed_transfer_evidence(uid, "travel", "transfer:work", condition="open_context")
+    _seed_transfer_evidence(uid, "travel", "transfer:opinion", condition="open_context")
 
     sql = evidence_repo.summarize_by_target(uid, target_type="lexicon")["travel"]
     pure = summarize_evidence(evidence_repo.list_evidence(uid, "travel"))
@@ -332,10 +346,15 @@ def test_summarize_by_target_matches_the_pure_contract_with_conditions(
         "transfer_conditions",
         "success_conditions",
         "unscaffolded_clean_successes",
+        "unscaffolded_clean_success_contexts",
+        "unscaffolded_clean_success_days",
+        "clean_success_goals",
+        "last_clean_success_at",
+        "last_unscaffolded_clean_success_at",
         "transfer_state",
     ):
         assert sql[key] == pure[key]
-    assert sql["unscaffolded_clean_successes"] == 1
+    assert sql["unscaffolded_clean_successes"] == 2
     assert sql["transfer_state"] == "transfer_demonstrated"
 
 
@@ -407,7 +426,25 @@ def test_api_serves_open_context_and_does_not_record_an_optional_miss(
         summary = evidence_repo.summarize_by_target(
             uid, target_type="lexicon"
         )["travel"]
+        # V3.47 (P1-02): UN éxito no andamiado aún no demuestra transferencia.
         assert summary["unscaffolded_clean_successes"] == 1
+        assert transfer_state(summary) == "contextualized"
+
+        # Un SEGUNDO contexto abierto con éxito limpio completa la demostración.
+        second = _get_context(client, uid, "travel")
+        assert second["condition"] == "open_context"
+        second_hit = _post(
+            client,
+            uid,
+            "travel",
+            "I will travel to Chile again next winter.",
+            second["context_id"],
+        )
+        assert second_hit["passed"] is True
+        summary = evidence_repo.summarize_by_target(
+            uid, target_type="lexicon"
+        )["travel"]
+        assert summary["unscaffolded_clean_successes"] == 2
         assert transfer_state(summary) == "transfer_demonstrated"
 
 

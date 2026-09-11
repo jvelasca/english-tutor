@@ -712,7 +712,7 @@ class WriteAttemptOut(BaseModel):
 
 
 class TransferContextOut(BaseModel):
-    """Consigna de TRANSFERENCIA a un contexto nuevo (V3.40 → V3.43, solo lectura).
+    """Consigna de TRANSFERENCIA a un contexto nuevo (V3.40 → V3.47, solo lectura).
 
     El contexto (`context_id`) es el del ledger: se registra con el intento y es
     lo que permite acreditar la transferencia real. `available` es siempre `True`
@@ -721,6 +721,9 @@ class TransferContextOut(BaseModel):
     V3.43 (P1-01): la consigna da un ESCENARIO y un objetivo comunicativo, y
     NUNCA contiene la unidad objetivo. `communicative_goal`/`discourse_type`
     (aditivos) explican el tipo de producción pedida.
+
+    V3.47: `cefr`/`difficulty_vector`/`difficulty` (aditivos) declaran el nivel y
+    la carga del contexto servido.
     """
 
     word: str
@@ -738,6 +741,12 @@ class TransferContextOut(BaseModel):
     condition: str = ""
     required_target: bool = True
     unscaffolded: bool = False
+    # V3.47: nivel CEFR del contexto servido y su carga declarada
+    # (`lexical`/`syntax`/`discourse`/`interaction`), más el escalar derivado.
+    # Aditivos: sirven para explicar la elección y ajustarla al alumno.
+    cefr: str = ""
+    difficulty_vector: dict[str, int] = Field(default_factory=dict)
+    difficulty: int = 0
 
 
 class TransferAttemptIn(BaseModel):

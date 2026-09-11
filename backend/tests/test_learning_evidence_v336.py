@@ -407,6 +407,12 @@ def test_empty_summary_matches_the_extended_contract():
         "transfer_conditions": {},
         "success_conditions": [],
         "unscaffolded_clean_successes": 0,
+        # V3.47 (P1-02): evidencia fina de la escalera endurecida (aditivos).
+        "unscaffolded_clean_success_contexts": [],
+        "unscaffolded_clean_success_days": 0,
+        "clean_success_goals": [],
+        "last_clean_success_at": "",
+        "last_unscaffolded_clean_success_at": "",
         "transfer_state": "not_ready",
     }
 
