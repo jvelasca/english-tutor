@@ -9,10 +9,16 @@ razonar sobre QUÉ dimensión exigía el contexto.
 
 Este módulo sustituye ese escalar por una comparación VECTOR contra VECTOR:
 
-- `CEFR_CAPACITY` declara la capacidad de reto de cada nivel CEFR por dimensión
-  (1..5), calibrada con la distribución real del banco de transferencia (en A1–B1
-  la `interaction` va por detrás del resto). Es una tabla DECLARATIVA y
-  calibrable, no un modelo aprendido.
+- `CEFR_CAPACITY` declara la carga máxima que el banco de transferencia usa en
+  cada nivel CEFR por dimensión (1..5): es el ENVELOPE monótono de los
+  `difficulty_vector` reales del banco, verificado por test
+  (`test_capacity_is_the_monotone_envelope_of_the_bank`) para que tabla y banco
+  no puedan divergir en silencio. La envolvente (y no el máximo del nivel a
+  secas) es lo que la hace monótona no decreciente por dimensión aunque un nivel
+  tenga un contexto puntual más plano que el anterior (B1 declara `interaction`
+  2 y A2 tiene contextos con 3). Es una calibración del BANCO, no una escala
+  CEFR normativa: la tabla describe lo que el contenido exige, no lo que «debería»
+  exigir.
 - `challenge_vector(item_level, learner_level)` da el reto objetivo como el
   MÁXIMO por dimensión entre la capacidad del ítem (techo lingüístico: hasta
   dónde llega el contenido) y la del alumno (suelo de reto: lo que ya domina).
@@ -44,25 +50,37 @@ DIFFICULTY_DIMENSIONS: tuple[str, ...] = (
 _MIN_LOAD = 1
 _MAX_LOAD = 5
 
-# Capacidad de reto DECLARADA por nivel CEFR y dimensión (1..5). Monótona no
-# decreciente por dimensión: un nivel superior nunca tiene menos capacidad. La
-# `interaction` crece más despacio en A1–B1 (por detrás de léxico/sintaxis),
-# fiel a la distribución del banco: los contextos dialogados sencillos no suben
-# la exigencia interactiva al mismo ritmo que la carga léxica. Calibrable.
+# Carga máxima que el banco de transferencia usa por nivel y dimensión (1..5).
+# Es el ENVELOPE MONÓTONO de los `difficulty_vector` reales del banco: por
+# dimensión, `CEFR_CAPACITY[nivel]` = máximo del banco hasta ese nivel inclusive.
+# Monótona no decreciente por dimensión POR CONSTRUCCIÓN, aunque un nivel
+# concreto sea más plano que el anterior (B1 declara `interaction` 2 y A2 tiene
+# contextos con 3: la envolvente sube a 2 y B1 queda en 3). Un test
+# (`test_capacity_is_the_monotone_envelope_of_the_bank`) recalcula la envolvente
+# desde `TRANSFER_CONTEXTS` y falla si la tabla se desvía: fue el P2-01 de la
+# auditoría Q de V3.52.1 (la tabla declarada se quedaba corta en la `interaction`
+# de A1/A2 y larga en el léxico/sintaxis de B2/C1, y con la tolerancia estricta
+# excluía contextos del propio nivel). Calibración del BANCO, no escala CEFR.
 CEFR_CAPACITY: dict[str, dict[str, int]] = {
-    "A1": {"lexical": 1, "syntax": 1, "discourse": 1, "interaction": 1},
-    "A2": {"lexical": 2, "syntax": 2, "discourse": 2, "interaction": 1},
-    "B1": {"lexical": 3, "syntax": 3, "discourse": 3, "interaction": 2},
-    "B2": {"lexical": 4, "syntax": 4, "discourse": 4, "interaction": 3},
-    "C1": {"lexical": 5, "syntax": 5, "discourse": 5, "interaction": 4},
+    "A1": {"lexical": 1, "syntax": 1, "discourse": 2, "interaction": 2},
+    "A2": {"lexical": 2, "syntax": 2, "discourse": 2, "interaction": 3},
+    "B1": {"lexical": 3, "syntax": 3, "discourse": 3, "interaction": 3},
+    "B2": {"lexical": 3, "syntax": 3, "discourse": 4, "interaction": 3},
+    "C1": {"lexical": 4, "syntax": 5, "discourse": 5, "interaction": 5},
     "C2": {"lexical": 5, "syntax": 5, "discourse": 5, "interaction": 5},
 }
 
 # Tolerancia de EXCESO (`overshoot`) admisible sobre la capacidad de reto.
 # `DIFFICULTY_TOLERANCE` se aplica cuando el suelo procede de un nivel
-# DEMOSTRADO (certificación: máxima confianza, margen estricto);
+# DEMOSTRADO (certificación: máxima confianza) y
 # `DIFFICULTY_TOLERANCE_ESTIMATED` cuando procede de un nivel estimado o
-# declarado (proxy: menos confianza, más margen). Declaradas y calibrables.
+# declarado (proxy: menos confianza). Ojo con la intuición: un margen MAYOR no
+# es «más conservador» en el sentido de exigir menos — admite más `overshoot`, es
+# decir deja entrar contextos que EXCEDEN el reto (más exigencia). Ambos son una
+# RED DE SEGURIDAD para bancos que declaren cargas por encima de la envolvente:
+# sobre el banco actual ningún contexto de un nivel supera `CEFR_CAPACITY` de su
+# nivel, así que la tolerancia no cambia hoy ninguna selección (lo fija
+# `test_tolerance_bites_only_when_a_context_declares_above_the_envelope`).
 DIFFICULTY_TOLERANCE = 1
 DIFFICULTY_TOLERANCE_ESTIMATED = 2
 
@@ -275,8 +293,13 @@ def tolerance_for(source: object) -> int:
     """Tolerancia según la FUENTE del suelo de dificultad (V3.52, pura).
 
     Solo un nivel DEMOSTRADO (certificación formal) usa el margen estricto; un
-    nivel estimado, declarado o ausente usa el margen amplio. Es deliberadamente
-    conservador: ante la duda, más margen en lugar de más exigencia. Nunca lanza.
+    nivel estimado, declarado o ausente usa el margen amplio. Un margen mayor
+    admite más `overshoot` (contextos que exceden el reto), así que la tolerancia
+    estricta es la que MENOS exceso deja pasar: al certificar se pide que el
+    contexto no se pase del reto objetivo más de `DIFFICULTY_TOLERANCE`. Sobre el
+    banco actual (envolvente monótona, ningún contexto supera la capacidad de su
+    nivel) la tolerancia no cambia ninguna selección: es una red de seguridad
+    para bancos que declaren cargas por encima de la envolvente. Nunca lanza.
     """
     text = str(source or "").strip().lower()
     if text == "demonstrated":

@@ -5,18 +5,23 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.52.1`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.52.1 es un **hotfix de producto** (usuarios
-> fantasma «Visual Tester», «RUTA ACTUAL» de Listening y bucle A/B) que además
-> cierra el **P1-01** de la auditoría externa de V3.52 sin cambiar el
-> comportamiento real del motor de dificultad. Release verificada: **CI 6/6 en
-> verde** (run
+> **Estado actual (2026-09-11): `v3.52.2`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.52.2 cierra los **dos P2 de la auditoría externa
+> Q** (`docs/audit/Q-AUDITORIA-TOTAL-V352.md`): `CEFR_CAPACITY` pasa a ser el
+> **envelope monótono** del banco real (con el invariante «todo contexto del banco
+> encaja en su propio nivel con tolerancia estricta») y la tolerancia queda
+> documentada como red de seguridad con test de inercia y de discriminación
+> sintética; la etiqueta `v3.52.1` ya está creada. La release V3.52.1 sigue siendo
+> el **hotfix de producto** (usuarios fantasma «Visual Tester», «RUTA ACTUAL» de
+> Listening y bucle A/B) que cerró el **P1-01** de la auditoría de V3.52. Release
+> verificada: **CI 6/6 en verde** (runs
 > [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
-> sobre `89eff0b`). La
-> **auditoría externa de V3.52 está lista para lanzar**
-> (`agentes/auditoria-externa-v352.md`, apuntando al commit `23cbad7`). El
-> siguiente incremento (V3.53+: P1-02 Learner Skill State 2.0 /
-> `observed_difficulty` y P1-03 Planner 2.0 / Expected Learning Value, además de
+> sobre `89eff0b` y [34623244239](https://github.com/jvelasca/english-tutor/actions/runs/34623244239)
+> sobre `bdaaff9`). La **auditoría externa de V3.52 ya está ejecutada** (informe Q,
+> sin P0/P1) y su briefing se conserva como histórico del método. Los P3-01/P3-02
+> quedan abiertos y aceptados. El siguiente incremento (V3.53+: P1-02 Learner Skill
+> State 2.0 / `observed_difficulty` y P1-03 Planner 2.0 / Expected Learning Value,
+> además de
 > Sense Engine 2.0, `assessed_skill`→planner y `skill_priorities`→`select_task`
 > (V3.55) y la entrega oral real del transfer) aún no tiene briefing. Antes de
 > lanzar cualquier subagente, lee esa sección para no partir de un estado obsoleto
@@ -32,6 +37,13 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v3522-cierre-p2-auditoria-q.md` — **no existe**: V3.52.2 (**ejecutado
+  directamente por el gerente**, 2026-09-11) se resolvió sin briefing separado,
+  como V3.38.1 y las FASES 1–5. Cierra los **dos P2** de la auditoría Q
+  (`CEFR_CAPACITY` = envelope monótono del banco + invariante de encaje por
+  nivel; tolerancia documentada como red de seguridad con test de inercia y de
+  discriminación sintética) y crea la etiqueta `v3.52.1`. **Histórico, hecho**;
+  ver `release-notes-v3.52.2.md` y `docs/audit/Q-AUDITORIA-TOTAL-V352.md`.
 - `agentes/v3521-hotfix.md` — **V3.52.1 (ejecutado, 2026-09-11, v3.52.1)**: hotfix
   de producto (usuarios fantasma «Visual Tester» con guarda `users.is_test`,
   «RUTA ACTUAL» de Listening y bucle A/B) + cierre del P1-01 de la auditoría

@@ -20,6 +20,27 @@ P3** (etiqueta semántica de filas legacy, robustez latente de `_context_vector`
 está etiquetada). Ninguno exige rehacer la release; sí conviene atender P2-01 y
 P2-02 en V3.53.
 
+> **Resolución (2026-09-11, V3.52.2).** Los dos P2 de este informe quedaron
+> **cerrados** en la release **v3.52.2** (`release-notes-v3.52.2.md`): (P2-01)
+> `CEFR_CAPACITY` es ahora el **envelope monótono** del banco, con
+> `test_capacity_is_the_monotone_envelope_of_the_bank` y
+> `test_every_bank_context_fits_its_own_level_under_strict_tolerance` (el impacto
+> medido son 15 de 48 combinaciones con reto reconocible —7 niveles de ítem × 7
+> de alumno menos el caso sin ningún nivel— que cambian de contexto servido: el
+> alumno A2 demostrado pasa a `directions`/`shopping` en vez de
+> `story`/`future`, el C1 de `academic` (C2) a `mediation` (C1), y los empates
+> «diluidos» por la tabla inflada se estrechan); (P2-02) la
+> justificación de la tolerancia está corregida y el bloque queda documentado
+> como red de seguridad, con `test_tolerance_bites_only_when_a_context_declares_above_the_envelope`
+> que fija la inercia (0 de 48) y comprueba que SÍ discrimina con un contexto
+> sintético. El P3-04 (proceso) se resolvió creando y empujando la etiqueta
+> `v3.52.1` sobre `89eff0b`. El impacto medido del P2-01 son **15 de 48
+> combinaciones** con reto reconocible (7 niveles de ítem × 7 de alumno, menos el
+> caso sin ningún nivel) que cambian de contexto servido —el alumno A2 demostrado
+> pasa a `directions`/`shopping` en vez de `story`/`future`; el C1, de `academic`
+> (C2) a `mediation` (C1)—, reproducido con la tabla antigua y la nueva. P3-01,
+> P3-02 y P3-03 siguen **aceptados** (sin impacto de comportamiento) para V3.53+.
+
 | Métrica | V3.52.0 | V3.52.1 | Juicio |
 | --- | --- | --- | --- |
 | P1 abiertos de la auditoría anterior (V3.51) | 2 | 0 | 🟢 CERRADOS |
@@ -130,12 +151,12 @@ Comprobado con datos reales:
 
 | # | Sev. | Hallazgo | Evidencia | Recomendación | Estado |
 | --- | --- | --- | --- | --- | --- |
-| P2-01 | media | `CEFR_CAPACITY` no cuadra con el banco que dice calibrar: la `interaction` declarada en A1/A2 queda **por debajo** del banco (1 vs máximo real 2/3) y el léxico/sintaxis de B2/C1 **por encima** (4/4 y 5/5 vs máximo real 3/4). Con la tolerancia ESTRICTA, un alumno A2 **demostrado** excluye 2 de los 4 contextos A2 del banco. | Ver §3.1 | Derivar/validar la tabla contra el banco y añadir test de consistencia | abierto |
-| P2-02 | media | La distinción `DIFFICULTY_TOLERANCE`/`_ESTIMATED` es **inerte** en el banco real (0 de 48 combinaciones) y su justificación declarada está invertida: un margen mayor admite **más** exceso, no menos exigencia. | Ver §3.2 | Corregir el docstring y decidir: ejercitar la tolerancia (calibrar) o documentarla como perilla prospectiva con test que fije la inercia | abierto |
+| P2-01 | media | `CEFR_CAPACITY` no cuadra con el banco que dice calibrar: la `interaction` declarada en A1/A2 queda **por debajo** del banco (1 vs máximo real 2/3) y el léxico/sintaxis de B2/C1 **por encima** (4/4 y 5/5 vs máximo real 3/4). Con la tolerancia ESTRICTA, un alumno A2 **demostrado** excluye 2 de los 4 contextos A2 del banco. | Ver §3.1 | Derivar/validar la tabla contra el banco y añadir test de consistencia | **cerrado en V3.52.2** |
+| P2-02 | media | La distinción `DIFFICULTY_TOLERANCE`/`_ESTIMATED` es **inerte** en el banco real (0 de 48 combinaciones) y su justificación declarada está invertida: un margen mayor admite **más** exceso, no menos exigencia. | Ver §3.2 | Corregir el docstring y decidir: ejercitar la tolerancia (calibrar) o documentarla como perilla prospectiva con test que fije la inercia | **cerrado en V3.52.2** |
 | P3-01 | menor | Una fila legacy de V3.51 (`cefr_level` con el **estimado** cacheado, columnas nuevas en `''`) se reporta con `floor_source = "practice"` («declarado») en vez de «estimated». El comportamiento es idéntico (`tolerance_for` da 2 en ambos), solo difiere la etiqueta. | `_learner_level_state` pasa `cefr_level` como `practice_level`; `test_legacy_profile_column_still_feeds_the_drill` | Mapear legacy → `estimated` o comentar la equivalencia | aceptado |
-| P3-02 | menor | `_context_vector` trata un contexto **sin** `difficulty_vector` como si el propio dict fuera el vector: unas metadatos que usaran un nombre de dimensión canónico se leerían como carga. Latente (el banco no colisiona). | `services/difficulty.py` `_context_vector` | Devolver `{}` para dicts «de contexto» sin la clave | abierto |
+| P3-02 | menor | `_context_vector` trata un contexto **sin** `difficulty_vector` como si el propio dict fuera el vector: unas metadatos que usaran un nombre de dimensión canónico se leerían como carga. Latente (el banco no colisiona). | `services/difficulty.py` `_context_vector` | Devolver `{}` para dicts «de contexto» sin la clave | aceptado |
 | P3-03 | menor | `is_test` es **marcable por el cliente** en `POST /api/users` (app local sin auth): un perfil creado con `is_test: true` queda invisible en app y lanzador. No es frontera de seguridad, pero la guarda es declarativa. | `routers/users.py` + `schemas/users.py` | Aceptar y documentar, o asignar el flag solo en servidor | aceptado |
-| P3-04 | proceso | La release **no está etiquetada**: `git tag --list` llega a `v3.52.0`; el árbol auditado solo se referencia por commit. | `git tag --list`; briefings usan `git checkout v3.52.0` | Crear y empujar `v3.52.1` sobre `bdaaff9` | abierto |
+| P3-04 | proceso | La release **no está etiquetada**: `git tag --list` llega a `v3.52.0`; el árbol auditado solo se referencia por commit. | `git tag --list`; briefings usan `git checkout v3.52.0` | Crear y empujar `v3.52.1` sobre `89eff0b` | **cerrado en V3.52.2** |
 
 > Nota de honestidad: P3-01 y P3-03 se registran como **aceptados** (no generan
 > comportamiento incorrecto hoy). P3-04 es de proceso, no de código.
@@ -320,13 +341,14 @@ borde). Todos en verde.
 
 El informe **desbloquea V3.53**: no hay P0/P1 que exija un hotfix inmediato.
 
-- **Antes o con V3.53 (barato):** atender **P2-01** (derivar/validar
-  `CEFR_CAPACITY` contra el banco + test de consistencia) y **P2-02** (corregir la
-  justificación de la tolerancia y decidir si se ejercita o se documenta como
-  perilla prospectiva). Son ~1 test y un ajuste de tabla/docstrings, y dejan el
-  motor listo para reutilizarse en speaking (2 dims) / listening (0 dims).
-- **P3:** P3-04 (etiquetar `v3.52.1`) es inmediato; P3-02 puede esperar a tocar
-  `_context_vector` por otro motivo.
+- **Cerrado en V3.52.2:** **P2-01** (`CEFR_CAPACITY` = envelope monótono del
+  banco + invariante de encaje por nivel), **P2-02** (justificación de la
+  tolerancia corregida y documentada como red de seguridad, con test de inercia y
+  de discriminación sintética) y **P3-04** (etiqueta `v3.52.1` creada y empujada).
+  Deja el motor listo para reutilizarse en speaking (2 dims) / listening (0 dims).
+- **P3 restantes:** P3-02 puede esperar a tocar `_context_vector` por otro motivo;
+  P3-01 (etiqueta semántica de filas legacy) y P3-03 (`is_test` marcable por el
+  cliente) se aceptan tal cual, sin impacto de comportamiento.
 - **Candidatos ya documentados para V3.53+** (sin cambios por este informe):
   P1-02 (Learner Skill State 2.0 + `observed_difficulty`), P1-03 (Planner 2.0 /
   Expected Learning Value), Sense Engine 2.0, deuda de planner (`assessed_skill` →

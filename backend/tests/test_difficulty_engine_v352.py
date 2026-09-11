@@ -91,14 +91,74 @@ def test_capacity_is_monotonic_non_decreasing_per_dimension():
             assert upper[dimension] >= lower[dimension], dimension
 
 
-def test_interaction_lags_behind_the_other_dimensions_at_low_levels():
-    # Calibración declarada: en A1–B1 la exigencia interactiva va por detrás.
-    for level in ("A1", "A2", "B1"):
-        vector = difficulty.CEFR_CAPACITY[level]
-        others = max(
-            vector[dimension] for dimension in ("lexical", "syntax", "discourse")
+def test_capacity_is_the_monotone_envelope_of_the_bank():
+    # P2-01 de la auditoría Q de V3.52.1: la tabla declarada se quedaba corta en
+    # la `interaction` de A1/A2 y larga en el léxico/sintaxis de B2/C1, y con la
+    # tolerancia ESTRICTA excluía contextos del propio nivel (un alumno A2
+    # demostrado no podía recibir `directions`/`shopping`, que el banco etiqueta
+    # A2). La tabla es ahora el envelope monótono (máximo acumulado) de los
+    # `difficulty_vector` reales: este test lo recalcula y falla si divergen.
+    bank_max: dict[str, dict[str, int]] = {}
+    for level in CEFR_LEVELS:
+        vectors = [
+            context["difficulty_vector"]
+            for context in transfer.TRANSFER_CONTEXTS
+            if context.get("cefr") == level
+        ]
+        assert vectors, level
+        bank_max[level] = {
+            dimension: max(vector[dimension] for vector in vectors)
+            for dimension in difficulty.DIFFICULTY_DIMENSIONS
+        }
+    running = dict.fromkeys(difficulty.DIFFICULTY_DIMENSIONS, 0)
+    for level in CEFR_LEVELS:
+        running = {
+            dimension: max(running[dimension], bank_max[level][dimension])
+            for dimension in difficulty.DIFFICULTY_DIMENSIONS
+        }
+        assert difficulty.CEFR_CAPACITY[level] == running, level
+
+
+def test_every_bank_context_fits_its_own_level_under_strict_tolerance():
+    # La consecuencia operativa del envelope: con la tolerancia ESTRICTA (suelo
+    # demostrado) ningún contexto del banco puede quedar fuera del reto de su
+    # propio nivel, que era el fallo medido en la auditoría.
+    for context in transfer.TRANSFER_CONTEXTS:
+        level = context["cefr"]
+        fit = difficulty.fit(
+            context["difficulty_vector"],
+            difficulty.challenge_vector(level, level),
+            tolerance=difficulty.DIFFICULTY_TOLERANCE,
         )
-        assert vector["interaction"] <= others, level
+        assert fit["within"], (context["id"], fit)
+        assert fit["max_overshoot"] == 0, context["id"]
+
+
+def test_tolerance_bites_only_when_a_context_declares_above_the_envelope():
+    # P2-02: sobre el banco actual (envelope) la tolerancia NO cambia ninguna
+    # selección; es una red de seguridad para bancos que declaren por encima de
+    # la envolvente. Este test documenta ambas cosas.
+    levels = ("", *CEFR_LEVELS)
+    for item in levels:
+        for learner in levels:
+            challenge = difficulty.challenge_vector(item, learner)
+            if not challenge:
+                continue
+            pool = transfer._within_level(list(transfer.TRANSFER_CONTEXTS), item)
+            strict = difficulty.select_by_difficulty(pool, challenge, tolerance=1)
+            wide = difficulty.select_by_difficulty(pool, challenge, tolerance=2)
+            assert strict == wide, (item, learner)
+
+    # Y con un contexto SINTÉTICO que excede el reto, sí discrimina.
+    challenge = {"lexical": 2, "syntax": 2, "discourse": 2, "interaction": 2}
+    over = {
+        "id": "over",
+        "difficulty_vector": dict.fromkeys(difficulty.DIFFICULTY_DIMENSIONS, 4),
+    }
+    strict = difficulty.fit(over["difficulty_vector"], challenge, tolerance=1)
+    wide = difficulty.fit(over["difficulty_vector"], challenge, tolerance=2)
+    assert not strict["within"]
+    assert wide["within"]
 
 
 def test_capacity_for_returns_a_copy_and_unknown_is_empty():

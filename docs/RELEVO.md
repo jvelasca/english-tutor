@@ -5,6 +5,34 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11): V3.52.2 (cierre de los P2 de la auditoría Q)** — release
+> **v3.52.2**, SIN migración de BD y SIN cambios de contrato, que recalibra el
+> Difficulty Engine al banco real. **(A) P2-01:** `CEFR_CAPACITY` pasa a ser el
+> **envelope monótono** de los `difficulty_vector` del banco (A1 `interaction`
+> 1→2, A2 1→3, B1 2→3, B2 léxico/sintaxis 4→3, C1 léxico 5→4); antes se quedaba
+> corta en A1/A2 y larga en B2/C1 pese a afirmar que estaba «calibrada con el
+> banco», y con la tolerancia ESTRICTA un alumno A2 **certificado** quedaba fuera
+> de `directions`/`shopping` (2 de los 4 contextos A2), de modo que el alumno con
+> más confianza recibía el conjunto más plano. Nuevos tests
+> `test_capacity_is_the_monotone_envelope_of_the_bank` y
+> `test_every_bank_context_fits_its_own_level_under_strict_tolerance`. **Impacto
+> medido: 15 de 48 combinaciones (nivel de ítem × nivel de alumno; 49 posibles,
+> una sin reto) cambian de contexto servido y el patrón es el esperado por el
+> envelope**: el alumno A2 **demostrado** pasa por fin a `directions`/`shopping`
+> (interaction 3) en vez de `story`/`future` (interaction 1), el alumno C1 pasa
+> de `academic` (C2) a `mediation` (C1) y los empates que la tabla inflada
+> «diluía» se estrechan al contexto que encaja exacto (B1 4→1, B2 3→1, C1 2→1).
+> **(B) P2-02:** corregida la
+> justificación de la tolerancia (un margen mayor admite MÁS `overshoot`, no
+> menos exigencia) y documentada como **red de seguridad** para bancos por encima
+> de la envolvente, con test que fija la inercia actual (0 de 48) y verifica que
+> SÍ discrimina con un contexto sintético. **(C)** etiqueta `v3.52.1` creada y
+> empujada (P3-04). Tests: pytest **2166 passed** en local (+2 netos), `ruff`
+> limpio, vitest **76 ficheros/651 tests**, `tsc` en verde y
+> `check_release_consistency` **3.52.2** exit 0. Ver
+> `release-notes-v3.52.2.md` y, para el contexto de los hallazgos,
+> `docs/audit/Q-AUDITORIA-TOTAL-V352.md`.
+>
 > **Nota (2026-09-11): V3.52.1 (hotfix de producto + cierre del P1-01)** — release
 > **v3.52.1**, ADITIVA (una columna de BD, `users.is_test`) y determinista. NO
 > cambia la escalera `transfer_state`, el scoring ni FSRS, y tampoco el
