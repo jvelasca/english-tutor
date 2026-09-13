@@ -834,6 +834,13 @@ class TransferAttemptOut(BaseModel):
     lexical_transfer: bool = False
     semantic_fit: bool | None = None
     adequacy: str = ""
+    # V3.58 (Sense Engine 2.0): SENTIDO resuelto del uso, ADITIVO. La adecuación
+    # no cambia (la glosa decide el sentido, nunca el veredicto); esto es lo que
+    # permite explicar QUÉ sentido se entendió y con cuánta confianza léxica.
+    sense_index: int | None = None
+    sense_pos: str = ""
+    sense_gloss: str = ""
+    sense_score: int = 0
     # V3.46 (P1-03): condición de recuperación aplicada al intento (derivada por
     # el servidor) y si la unidad era obligatoria. En `open_context`
     # (`required_target=False`) no usarla NO es un fallo ni se registra como

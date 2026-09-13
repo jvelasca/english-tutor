@@ -5,6 +5,73 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-13 (UTC+2).
 >
+> **Nota (2026-09-13): V3.58.0 (Sense Engine 2.0 — `surface → lemma → sense → semantic_fit`)**
+> — release **v3.58.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`
+> y SIN cambios de UI**, que cierra la mitad que **V3.44** dejó abierta. Desde
+> V3.44 el diccionario **declara** los SENTIDOS de la unidad (`[{pos, gloss}]`,
+> generados por el modelo local como CONTENIDO, premisa 21) y los **cachea**,
+> pero el juicio sobre el uso comparaba **FAMILIAS POS**: la `gloss` no la leía
+> **nadie** —dato **INERTE**—. Con `bank` declarando dos sentidos de la MISMA
+> familia («financial place» / «river side»), el motor no podía separar «el banco
+> del río» de «el banco financiero»: era un **límite del contrato**, no de los
+> datos.
+> **FRONTERA DECLARADA Y PROBADA (invariante conservador):** la glosa decide el
+> **SENTIDO**, **nunca el VEREDICTO**. `semantic_adequacy` conserva la adecuación
+> de V3.44 **EXACTA** —solo `incorrect` bloquea el clean success y **no se
+> amplía**— porque la **AUSENCIA de solapamiento no demuestra
+> incompatibilidad** (`"The bank is closed"` no comparte ni una palabra con «a
+> financial place» y es un uso correcto). El solapamiento es **CONFIANZA**, no
+> prueba.
+> **(A) `surface → lemma` (`services/semantics.py`):** `lemma_of` (morfología
+> REGULAR **declarada**, sin diccionario, sin lematizador y sin LLM: plural/3ª
+> persona `-s`/`-ies`, sibilantes `-ches`/`-shes`/`-xes`/`-zes`, pasado `-ed` y
+> gerundio `-ing` con consonante doble `running`→`run`; **por debajo de 4
+> caracteres no se toca** —`go`, `was`, `is`— y `closes`→`close`, **no** `clos`)
+> y `lemma_variants` (superficie + lema + la variante con la **`e` muda**
+> restaurada, `making`→`make`, que es lo que permite que una glosa-etiqueta
+> solape con texto flexionado). Es deliberadamente **PARCIAL** (las irregulares
+> `went`/`gone` no se tocan) porque solo alimenta una señal **SUAVE** que no
+> decide el veredicto: una forma no reconocida no puede contaminar la evidencia.
+> **(B) `lemma → sense`:** `gloss_tokens` (tokens de CONTENIDO de la glosa con
+> `GLOSS_STOPWORDS` declaradas), `context_window` (`CONTEXT_WINDOW = 4` a cada
+> lado, recortada en los bordes), `sense_overlap` (**parecido medido entre
+> VARIANTES DE LEMA de las dos partes**, así `decides` solapa con «to decide», y
+> **cero NO es contradicción**) y `select_sense` con clave de orden **declarada y
+> estable**: familia del **rol sintáctico** (señal **MAYOR**: la gramática manda)
+> → solapamiento con la glosa (**DESEMPATE dentro de la misma familia: el hueco
+> que V3.44 no podía cubrir**) → **orden declarado** (empate real: gana el
+> primero). Devuelve `{index, pos, gloss, score, role, strength, reasons}`; sin
+> sentidos, `index` es `None`.
+> **(C) `sense_fit` y la no-divergencia:** `_adequacy` es la regla **LITERAL** de
+> V3.44 **extraída sin cambios de comportamiento** y `semantic_adequacy` **delega
+> en ella** (firma, taxonomía y veredicto idénticos: las dos rutas no pueden
+> divergir); `sense_fit` añade **ADITIVAMENTE** el sentido resuelto por (familia,
+> solapamiento, orden) entre **todas** las ocurrencias. La invariante se prueba
+> **parametrizada contra los literales históricos** de V3.44, no contra la
+> implementación.
+> **(D) Contrato aditivo:** `score_transfer_attempt` expone `sense_index`/
+> `sense_pos`/`sense_gloss`/`sense_score` **sin alterar** `passed`,
+> `lexical_transfer`, `adequacy`, `semantic_fit` ni `error_type`;
+> `TransferAttemptOut` los declara con espejo **opcional** en
+> `frontend/src/types/api.ts`, así que **el sentido resuelto deja de ser dato
+> inerte y viaja en la respuesta HTTP** (sin cambio de UI).
+> **(E) Sin migración ni regeneración:** la `gloss` **ya estaba cacheada** con
+> `GENERATOR_VERSION = "1.4.0"` (V3.44); V3.58 la **RE-INTERPRETA**, exactamente
+> el patrón de V3.57 con `skill_priorities`. Sin migración, sin bump de generador
+> y sin invalidar caché.
+> **NO cambia:** `semantic_adequacy` (firma y veredictos), `families_from_senses`,
+> `occurrence_role`/`unit_positions`/`pos_family`, la frontera de `incorrect`,
+> `GENERATOR_VERSION`, `normalize_senses`, `transfer_state` y sus umbrales,
+> `context_signals`, `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS, el
+> planner ni el Difficulty Engine. Tests: nuevo
+> `test_semantics_sense_engine_v358.py` (30), `pytest` **2296 passed** en local,
+> launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.58.0**. **CI: pendiente de ejecución tras el
+> push.** Ver `release-notes-v3.58.0.md`.
+> **Siguiente paso:** V3.59 — el **Context Engine 3.0**, y después el
+> contrato/prompt de generación de sentidos y la ponderación de la adecuación en
+> `transfer_confidence`.
+>
 > **Nota (2026-09-13): V3.57.0 (Planner 2.0 — argmax `(skill, actividad)` sobre ELV)**
 > — release **v3.57.0**, **SIN migración de BD y SIN cambios de UI**, que cierra
 > la segunda mitad del Planner 2.0: el planner deja de **solo ordenar** la cola

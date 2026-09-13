@@ -5,38 +5,44 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.57.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.57 (**Planner 2.0: argmax `(skill, actividad)`
-> sobre ELV**, ejecutada directamente por el gerente) es una release **SIN
-> migración de BD y SIN cambios de UI** que cierra la segunda mitad del Planner
-> 2.0: el planner deja de **solo ordenar** la cola por valor esperado de
-> aprendizaje (V3.56) y pasa a **ELEGIR** la tarea, entre las candidatas
-> admisibles, por **argmax de ELV**. Es **CONSERVADORA**: el argmax solo actúa
-> **con estado del alumno**; **sin él la decisión es EXACTAMENTE la de V3.56.0**
-> (`select_task`). Resuelve además dos deudas del planner: el `value` **por
-> modalidad** (`skill_priorities`) en lugar del `priority_score` global, y el
-> **doble conteo de `written_production`** (el EJE de `transfer`, que se entrega
-> por texto y se evalúa como producción escrita, frente al CANAL que `write` y
-> `transfer` realmente miden: con `capacity_skill`, ambos son **una misma
-> LECTURA**). NO toca `transfer_state`, sus umbrales, `context_signals`,
-> `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS ni el Difficulty Engine.
-> Tests: nuevo `test_planner_argmax_v357.py` (24), `pytest` **2266 passed** en
-> local, launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
-> `check_release_consistency` **3.57.0**. **CI 6/6 en verde** (run
-> [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640)
-> sobre `a40b58d`: Backend, Frontend, Playwright E2E, Release consistency, Beta
-> V3.0 gate y Content validation), con la etiqueta anotada `v3.57.0` creada y
-> empujada. La V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que
-> ordena) sigue inmediatamente detrás; la V3.55 (**Task Difficulty 3.0**, tres
-> columnas de BD) es el último cambio de ledger; la V3.54 como **Student Skill
-> State 3.0** (P2-03), la V3.53.1 como **Observed CEFR Safety Gate** (P1-01 de
-> V3.53.0), la V3.53.0 como **Learner Skill State 2.0 + `observed_difficulty`**
-> (P1-02), la V3.52.2 como **cierre de los dos P2 de la auditoría externa Q** y
-> la V3.52.1 como el **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y
-> aceptados. El siguiente incremento es **V3.58**: el **Sense Engine 2.0**
-> (`surface→lemma→sense→semantic_fit`). El **Context Engine 3.0** sigue como
-> candidato. El briefing de V3.57 vive en `agentes/v357-argmax-elv.md`. Antes de
-> lanzar cualquier subagente, lee esa sección para no partir de un estado
+> **Estado actual (2026-09-13): `v3.58.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.58 (**Sense Engine 2.0:
+> `surface → lemma → sense → semantic_fit`**) es una release **SIN migración de
+> BD, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI** que cierra la mitad
+> que V3.44 dejó abierta: desde V3.44 el diccionario **declara** los SENTIDOS de
+> la unidad (`[{pos, gloss}]`, generados por el modelo local como CONTENIDO) y los
+> **cachea**, pero el juicio sobre el uso comparaba **FAMILIAS POS** y la `gloss`
+> no la leía **nadie** —dato **INERTE**—: con `bank` declarando dos sentidos de la
+> MISMA familia («financial place» / «river side») el motor no podía separar «el
+> banco del río» de «el banco financiero». V3.58 añade `lemma_of`/
+> `lemma_variants` (**surface → lemma**, morfología regular declarada, sin
+> diccionario ni lematizador) y `select_sense` (**lemma → sense**: familia del rol
+> sintáctico → solapamiento con la glosa → orden declarado), y **FRONTERA
+> DECLARADA**: la glosa decide el **SENTIDO**, **nunca el VEREDICTO**
+> (`semantic_adequacy` conserva la adecuación de V3.44 **EXACTA**; solo
+> `incorrect` bloquea el clean success y **no se amplía**, porque la AUSENCIA de
+> solapamiento no demuestra incompatibilidad). El sentido resuelto entra **ADITIVO**
+> en el payload del transfer y en `TransferAttemptOut`, así que **ya no es dato
+> inerte**. NO toca `transfer_state`, sus umbrales, `context_signals`,
+> `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS, el planner ni el
+> Difficulty Engine. Tests: nuevo `test_semantics_sense_engine_v358.py` (30, con
+> equivalencia parametrizada contra los literales históricos de V3.44 y
+> end-to-end HTTP), `pytest` **2296 passed** en local, launcher **75 passed**,
+> `ruff` limpio, `tsc` OK, `vitest` **651** y `check_release_consistency`
+> **3.58.0**. **CI: pendiente de ejecución tras el push.** La V3.57 (**Planner
+> 2.0: argmax `(skill, actividad)` sobre ELV**) sigue inmediatamente detrás; la
+> V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que ordena) la
+> precede; la V3.55 (**Task Difficulty 3.0**, tres columnas de BD) es el último
+> cambio de ledger; la V3.54 como **Student Skill State 3.0** (P2-03), la V3.53.1
+> como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como
+> **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
+> **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
+> **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
+> siguiente incremento es **V3.59**: el **Context Engine 3.0**, y después el
+> contrato/prompt de generación de sentidos y la ponderación de la adecuación en
+> `transfer_confidence`. El briefing de V3.58 vive en
+> `agentes/v358-sense-engine-2.md` (y el de V3.57 en `agentes/v357-argmax-elv.md`).
+> Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
@@ -49,6 +55,27 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v358-sense-engine-2.md` — **V3.58 (EJECUTADO, 2026-09-13, v3.58.0)**:
+  **Sense Engine 2.0 — `surface → lemma → sense → semantic_fit`**. Cierra la
+  mitad que V3.44 dejó abierta: los sentidos `[{pos, gloss}]` se declaraban y se
+  cacheaban, pero el juicio comparaba **FAMILIAS POS** y la `gloss` no la leía
+  nadie (**dato INERTE**); con dos sentidos de la MISMA familia
+  (`bank` = «financial place» / «river side») el motor no podía separarlos.
+  Añade `lemma_of`/`lemma_variants` (**surface → lemma**, morfología regular
+  declarada, sin diccionario ni lematizador), `gloss_tokens`/`context_window`/
+  `sense_overlap` y `select_sense` (**lemma → sense**: familia del rol sintáctico
+  → solapamiento con la glosa → orden declarado). **FRONTERA DECLARADA Y
+  PROBADA:** la glosa decide el **SENTIDO**, **nunca el VEREDICTO** —
+  `semantic_adequacy` conserva la adecuación de V3.44 **EXACTA** (`_adequacy` es
+  la regla literal extraída) y **no se amplía `incorrect`**, porque la AUSENCIA
+  de solapamiento no demuestra incompatibilidad. El sentido resuelto entra
+  **ADITIVO** en `score_transfer_attempt` y en `TransferAttemptOut` (espejo TS
+  opcional), así que **deja de ser dato inerte**. **SIN migración de BD, SIN bump
+  de `GENERATOR_VERSION`** (la glosa ya estaba cacheada con 1.4.0: se
+  RE-INTERPRETA, mismo patrón que V3.57 con `skill_priorities`) **y SIN cambios de
+  UI**. NO toca `transfer_state`, sus umbrales, `context_signals`,
+  `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS, el planner ni el
+  Difficulty Engine. **Ejecutado**; ver `release-notes-v3.58.0.md`.
 - `agentes/v357-argmax-elv.md` — **V3.57 (EJECUTADO, 2026-09-13, v3.57.0)**:
   **Planner 2.0 — argmax `(skill, actividad)` sobre ELV**. Cierra la segunda
   mitad del Planner 2.0: el planner **elige** la tarea por argmax de valor

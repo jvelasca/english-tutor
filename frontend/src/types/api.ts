@@ -622,6 +622,14 @@ export interface DrillTransferAttempt {
   lexical_transfer?: boolean;
   semantic_fit?: boolean | null;
   adequacy?: "fit" | "suspect" | "incorrect" | "unknown" | string;
+  // V3.58 (Sense Engine 2.0): SENTIDO resuelto del uso, aditivo. La adecuación no
+  // cambia (la glosa decide el sentido, nunca el veredicto); `sense_gloss` es la
+  // etiqueta del sentido entendido y `sense_score` su confianza léxica (tokens de
+  // la glosa presentes en la ventana de contexto).
+  sense_index?: number | null;
+  sense_pos?: string;
+  sense_gloss?: string;
+  sense_score?: number;
   // V3.46 (P1-03): condición de recuperación aplicada al intento y si la palabra
   // era obligatoria. En `open_context` (`required_target=false`) no usarla NO es
   // un fallo: el servidor no lo registra como evidencia.

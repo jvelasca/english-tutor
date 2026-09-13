@@ -420,9 +420,13 @@ WRITE_MIN_WORDS = 4
 # y devuelve `fit`/`suspect`/`incorrect`/`unknown`. Conservador a propósito: el
 # proxy INFORMA y separa la señal léxica de la semántica; solo `incorrect`
 # bloquea el clean success y nunca declara dominio.
-def _semantic_fit(pos: str, word: str, text: str, senses: object = ()) -> str:
-    """Adecuación semántica determinista del uso de la unidad (delegada, pura)."""
-    return semantics.semantic_adequacy(word, text, senses=senses, pos=pos)
+def _semantic_fit(pos: str, word: str, text: str, senses: object = ()) -> dict:
+    """Sentido resuelto + adecuación semántica de la unidad (delegada, pura).
+
+    V3.58: devuelve el payload de `semantics.sense_fit` (adecuación de V3.44 +
+    sentido resuelto). El veredicto no cambia; el sentido es ADITIVO.
+    """
+    return semantics.sense_fit(word, text, senses=senses, pos=pos)
 
 
 def _score_production_text(word: str, text: str, min_words: int) -> dict:
@@ -510,10 +514,17 @@ def score_transfer_attempt(
     - `unknown` — sin datos suficientes (nunca bloquea).
 
     `pos` es la categoría declarada del ítem y actúa de FALLBACK cuando no hay
-    sentidos (retrocompatible con el contrato de V3.43). Nunca lanza.
+    sentidos (retrocompatible con el contrato de V3.43).
+
+    V3.58 (Sense Engine 2.0) añade, ADITIVOS, `sense_pos`/`sense_gloss`/
+    `sense_index`: el SENTIDO que la ocurrencia expresa, resuelto por función
+    sintáctica y solapamiento con la glosa (`semantics.sense_fit`). La adecuación
+    y el bloqueo del clean success NO cambian: la glosa decide el sentido, nunca
+    el veredicto. Nunca lanza.
     """
     scored = _score_production_text(word, text, WRITE_MIN_WORDS)
-    adequacy = _semantic_fit(pos, word, text, senses)
+    resolved = _semantic_fit(pos, word, text, senses)
+    adequacy = resolved["adequacy"]
     if scored["passed"]:
         if adequacy == semantics.SENSE_INCORRECT:
             scored["error_type"] = SEMANTIC_MISMATCH_ERROR
@@ -526,6 +537,10 @@ def score_transfer_attempt(
         else adequacy == semantics.SENSE_FIT
     )
     scored["adequacy"] = adequacy
+    scored["sense_index"] = resolved["sense_index"]
+    scored["sense_pos"] = resolved["sense_pos"]
+    scored["sense_gloss"] = resolved["sense_gloss"]
+    scored["sense_score"] = resolved["sense_score"]
     return scored
 
 
