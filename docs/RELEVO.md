@@ -42,8 +42,13 @@
 > gate de cobertura de V3.54, `CEFR_CAPACITY`, `transfer_state` y sus umbrales,
 > `context_signals`, `context_diversity`, el scoring, el planner ni FSRS. Tests:
 > nuevo `test_task_difficulty_v355.py` (17), `pytest` **2223 passed** en local,
-> `ruff` limpio y `check_release_consistency` **3.55.0**. En CI se esperan
-> **2221 passed + 2 skipped**. Ver `release-notes-v3.55.0.md`.
+> `ruff` limpio, `tsc` OK, `vitest` **651** y `check_release_consistency`
+> **3.55.0**. **CI 6/6 en verde** (run
+> [34757345417](https://github.com/jvelasca/english-tutor/actions/runs/34757345417)
+> sobre `e9b5689`: Backend **2221 passed + 2 skipped**, Frontend tsc + vitest
+> **651** + build, Playwright **23 passed + 22 skipped**, Release consistency
+> **3.55.0**, Content validation y Beta V3.0 gate) con la etiqueta anotada
+> `v3.55.0` creada y empujada. Ver `release-notes-v3.55.0.md`.
 > **Siguiente paso:** V3.56 — el **Planner 2.0 / `expected_learning_value`**
 > (P1-03), y después el Sense Engine 2.0 y el Context Engine 3.0.
 >

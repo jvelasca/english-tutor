@@ -72,7 +72,14 @@ gate CEFR global de V3.53.1, `observed_skill_capacity`, `learner_capacity`,
   perfil con capacidad léxica de `written_production`, migración idempotente y
   paridad pura↔SQL.
 - `pytest -q` **2223 passed** en local (cero regresión; el bloque V3.51-V3.54 da
-  236 verdes), `ruff check` limpio, `check_release_consistency` (**3.55.0**).
+  236 verdes), `ruff check` limpio, `tsc` OK, `vitest` **651 passed** y
+  `check_release_consistency` (**3.55.0**).
+- **CI 6/6 en verde** (run
+  [34757345417](https://github.com/jvelasca/english-tutor/actions/runs/34757345417)
+  sobre `e9b5689`: Backend **2221 passed + 2 skipped**, Frontend tsc + vitest
+  **651** + build, Playwright **23 passed + 22 skipped**, Release consistency
+  **3.55.0**, Content validation y Beta V3.0 gate) con la etiqueta anotada
+  `v3.55.0` creada y empujada.
 
 ## Fuera de alcance (V3.56+)
 
