@@ -70,8 +70,12 @@
 > `skill_priorities` del ítem se conservan. Tests: nuevo
 > `test_planner_argmax_v357.py` (24), `pytest` **2266 passed** en local, launcher
 > **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
-> `check_release_consistency` **3.57.0**. **CI: pendiente de ejecución tras el
-> push.** Ver `release-notes-v3.57.0.md`.
+> `check_release_consistency` **3.57.0**. **CI 6/6 en verde** (run
+> [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640)
+> sobre `a40b58d`: Backend (ruff + pytest), Frontend (tsc + vitest + build),
+> Playwright E2E (visual), Release consistency, Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.57.0` creada y empujada. Ver
+> `release-notes-v3.57.0.md`.
 > **Siguiente paso:** V3.58 — el **Sense Engine 2.0**
 > (`surface→lemma→sense→semantic_fit`) y, después, el Context Engine 3.0.
 >
@@ -129,8 +133,10 @@
 > Difficulty Engine; sin migraciones ni columnas nuevas. Tests: nuevo
 > `test_expected_learning_value_v356.py` (19), `pytest` **2242 passed** en local,
 > launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
-> `check_release_consistency` **3.56.0**. **CI: pendiente de ejecución tras el
-> push.** Ver `release-notes-v3.56.0.md`.
+> `check_release_consistency` **3.56.0**. **CI 6/6 en verde** (run
+> [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640),
+> el mismo que cerró V3.57.0: su commit viajó en el push siguiente), con la
+> etiqueta anotada `v3.56.0` creada y empujada. Ver `release-notes-v3.56.0.md`.
 > **Siguiente paso:** V3.57 — el **argmax `(skill, actividad)` sobre ELV** (el
 > planner elige la tarea, no solo la ordena) y, después, el Sense Engine 2.0 y el
 > Context Engine 3.0.

@@ -159,9 +159,9 @@ porque `domain.academy` importa `domain.vocabulary` y se crearía el ciclo
 - `ruff` limpio (backend y launcher); launcher **75 passed**; `tsc --noEmit` OK;
   `vitest` **651 passed** (76 archivos); `npm run build` OK;
   `check_release_consistency` (**3.56.0**) exit 0.
-- **CI: pendiente de ejecución tras el push** (6/6 esperado: Backend ruff +
-  pytest, Frontend tsc + vitest + build, Release consistency **3.56.0**, Beta
-  V3.0 gate, Content validation y Playwright).
+- **CI 6/6 en verde** (run [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640); el
+  commit de esta release viajó en el push siguiente, junto al de V3.57.0) con la
+  etiqueta anotada `v3.56.0` creada y empujada.
 
 ## Fuera de alcance (V3.57+)
 

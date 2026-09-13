@@ -22,8 +22,11 @@ pedir más contexto.
 > `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS ni el Difficulty Engine.
 > Tests: nuevo `test_planner_argmax_v357.py` (24), `pytest` **2266 passed** en
 > local, launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
-> `check_release_consistency` **3.57.0**. **CI: pendiente de ejecución tras el
-> push.** La V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que
+> `check_release_consistency` **3.57.0**. **CI 6/6 en verde** (run
+> [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640)
+> sobre `a40b58d`: Backend, Frontend, Playwright E2E, Release consistency, Beta
+> V3.0 gate y Content validation), con la etiqueta anotada `v3.57.0` creada y
+> empujada. La V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que
 > ordena) sigue inmediatamente detrás; la V3.55 (**Task Difficulty 3.0**, tres
 > columnas de BD) es el último cambio de ledger; la V3.54 como **Student Skill
 > State 3.0** (P2-03), la V3.53.1 como **Observed CEFR Safety Gate** (P1-01 de

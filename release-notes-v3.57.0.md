@@ -169,7 +169,7 @@ Nuevo `backend/tests/test_planner_argmax_v357.py` (**24**):
 | `vitest` | **651 passed** |
 | `npm run build` | OK |
 | `check_release_consistency` | **3.57.0** |
-| CI (6/6) | pendiente tras el push |
+| CI (6/6) | verde — [run 34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640) sobre `a40b58d` |
 
 Cero regresión en el bloque V3.51–V3.56 (incluye los 19 tests de V3.56 y su
 invariante de orden) y en el resto de la suite.
