@@ -16,7 +16,10 @@ pedir más contexto.
 > `transfer_state`, sus umbrales, `context_signals`, `context_diversity`, el
 > scoring, el planner ni FSRS; con `observed_capacity` vacío el comportamiento es
 > idéntico a V3.52.2. Tests: pytest **2185 passed** en local (+19), `ruff` y
-> `tsc` limpios, `check_release_consistency` **3.53.0** exit 0. La V3.52.2 sigue
+> `tsc` limpios, `check_release_consistency` **3.53.0** exit 0 y **CI 6/6 en verde**
+> (run [34747380090](https://github.com/jvelasca/english-tutor/actions/runs/34747380090)
+> sobre `e4bd577`: pytest **2183 passed + 2 skipped**, vitest **651**, Playwright
+> **23**) con la etiqueta anotada `v3.53.0` creada y empujada. La V3.52.2 sigue
 > como **cierre de los dos P2 de la auditoría externa Q** (`CEFR_CAPACITY` =
 > envelope monótono del banco y tolerancia como red de seguridad) y V3.52.1 como
 > el **hotfix de producto** que cerró el **P1-01** de la auditoría de V3.52. La

@@ -33,7 +33,11 @@
 > `observed_capacity` (espejo opcional en `types/api.ts`). **(D)** corregido el
 > comentario obsoleto de B1 `interaction` (P3). Tests: pytest **2185 passed** en
 > local (+19), `ruff` y `tsc` limpios, `check_release_consistency` **3.53.0**
-> exit 0. Ver `release-notes-v3.53.0.md`. **Siguiente paso:** V3.54 (Sense Engine
+> exit 0. **CI 6/6 en verde** (run
+> [34747380090](https://github.com/jvelasca/english-tutor/actions/runs/34747380090)
+> sobre `e4bd577`, pytest **2183 passed + 2 skipped**, vitest 651 y Playwright 23)
+> con la etiqueta anotada `v3.53.0` creada y empujada. Ver
+> `release-notes-v3.53.0.md`. **Siguiente paso:** V3.54 (Sense Engine
 > 2.0); el Planner 2.0 / `expected_learning_value` (V3.55/V3.56) todavía **no**
 > tiene briefing y sigue siendo el P1-03.
 >

@@ -111,10 +111,18 @@ Sin cambio funcional.
   las combinaciones (nivel de ítem × nivel de alumno × fuente de suelo).
 - **Paridad pura↔SQL** del estado observado verificada en
   `test_summarize_by_target_matches_the_pure_observed_signals`.
-- Frontend: `tsc --noEmit` en verde (espejo de tipos aditivo, sin cambios de
-  comportamiento).
+- Frontend: `tsc --noEmit` en verde (espejo de tipos aditivo, sin cambios de comportamiento).
 - Scripts: `check_release_consistency.py` (**3.53.0**), `check_beta_v3.py`,
   `content_validation.py` y `check_i18n_coverage` exit 0.
+- **CI 6/6 en verde** (run
+  [34747380090](https://github.com/jvelasca/english-tutor/actions/runs/34747380090)
+  sobre `e4bd577`): Backend (ruff + pytest, **2183 passed + 2 skipped**),
+  Frontend (tsc + vitest **76 ficheros/651 tests** + build), Release consistency,
+  Beta V3.0 gate, Content validation y Playwright E2E (visual, **23 passed**). Los
+  2 skipped son `backend/tests/test_stt_asr_integration.py` (modelo Whisper no
+  descargado en el runner, opt-in); con el modelo disponible en local el mismo
+  árbol da 2185 passed. Etiqueta anotada `v3.53.0` creada y empujada sobre
+  `e4bd577`.
 
 ## Qué NO cambia
 
