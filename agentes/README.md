@@ -5,31 +5,35 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.53.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.53.0 (**ejecutada directamente por el gerente**)
-> cierra el **P1-02** diferido: **Learner Skill State 2.0 + `observed_difficulty`**
-> (Parte A: el vector de la TAREA servida se persiste por evento en
-> `learning_evidence.observed_difficulty`; Parte B: capacidad OBSERVADA por
-> dimensión con muestra espaciada, fuente `observed` en `LEVEL_SOURCES` y caché
-> O(1) en `learning_profile`) más el P3 del comentario obsoleto de B1. Release
-> ADITIVA (tres columnas de BD) que **NO toca** `CEFR_CAPACITY`, la escalera
+> **Estado actual (2026-09-13): `v3.53.1`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.53.1 (**Observed CEFR Safety Gate**, ejecutada
+> directamente por el gerente) es un patch SIN migración de BD ni cambios de
+> contrato que cierra el **P1-01** de la auditoría de V3.53.0:
+> `services.learner_skill.level_from_capacity` iteraba las dimensiones CON
+> muestra y una sin muestra «no bloqueaba», así que
+> `observed_capacity = {"lexical": 5}` producía un `observed_level = "C2"` (una
+> capacidad léxica compatible con C2 convertida en un CEFR GLOBAL). Ahora recorre
+> las dimensiones que exige el NIVEL candidato, cuenta 0 en las sin muestra y
+> exige **cobertura dimensional COMPLETA**: `observed_capacity` sigue siendo la
+> fuente de verdad por dimensión y `observed_level` es un RESUMEN DERIVADO. NO
+> toca `observed_capacity`, `learner_capacity`, `CEFR_CAPACITY`, la escalera
 > `transfer_state`, sus umbrales, `context_signals`, `context_diversity`, el
-> scoring, el planner ni FSRS; con `observed_capacity` vacío el comportamiento es
-> idéntico a V3.52.2. Tests: pytest **2185 passed** en local (+19), `ruff` y
-> `tsc` limpios, `check_release_consistency` **3.53.0** exit 0 y **CI 6/6 en verde**
-> (run [34747380090](https://github.com/jvelasca/english-tutor/actions/runs/34747380090)
-> sobre `e4bd577`: pytest **2183 passed + 2 skipped**, vitest **651**, Playwright
-> **23**) con la etiqueta anotada `v3.53.0` creada y empujada. La V3.52.2 sigue
-> como **cierre de los dos P2 de la auditoría externa Q** (`CEFR_CAPACITY` =
-> envelope monótono del banco y tolerancia como red de seguridad) y V3.52.1 como
-> el **hotfix de producto** que cerró el **P1-01** de la auditoría de V3.52. La
-> **auditoría externa de V3.52 ya está ejecutada** (informe Q, sin P0/P1) y su
-> briefing se conserva como histórico del método. Los P3-02/P3-03 quedan abiertos
-> y aceptados. El siguiente incremento es **V3.54 (Sense Engine 2.0)** y, tras él,
-> **V3.55/V3.56 (Planner 2.0 / Expected Learning Value)**: cablear la capacidad
-> observada al planner es el P1-03 y **todavía NO tiene briefing**. Antes de
-> lanzar cualquier subagente, lee esa sección para no partir de un estado obsoleto
-> (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
+> scoring, el planner ni FSRS. Tests: pytest **2187 passed** en local, `ruff` y
+> `tsc` limpios, `check_release_consistency` **3.53.1** exit 0 y **CI 6/6 en verde**
+> (run [34748988008](https://github.com/jvelasca/english-tutor/actions/runs/34748988008)
+> sobre `6d8af47`: pytest **2185 passed + 2 skipped**, vitest **651**, Playwright
+> **23**) con la etiqueta anotada `v3.53.1` creada y empujada. La V3.53.0 sigue
+> como **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
+> **cierre de los dos P2 de la auditoría externa Q** (`CEFR_CAPACITY` = envelope
+> monótono del banco y tolerancia como red de seguridad) y la V3.52.1 como el
+> **hotfix de producto** que cerró el **P1-01** de la auditoría de V3.52. Los
+> P3-02/P3-03 quedan abiertos y aceptados. El siguiente incremento es **V3.54**: la
+> nota superior del relevo marca **Planner 2.0 / `expected_learning_value`**
+> (P1-03, cablear el skill state al planner) y, con él, los P2-01/P2-02/P2-03 del
+> skill state; el **Sense Engine 2.0** (`surface→lemma→sense→semantic_fit`) sigue
+> como candidato y **V3.54 todavía NO tiene briefing**. Antes de lanzar cualquier
+> subagente, lee esa sección para no partir de un estado obsoleto (premisa 8 y 12:
+> relevo al saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
 
@@ -41,6 +45,12 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v3531-observed-cefr-gate.md` — **no existe**: V3.53.1 (**ejecutado
+  directamente por el gerente**, 2026-09-13) se resolvió sin briefing separado,
+  como V3.52.2/V3.38.1. Cierra el **P1-01** de la auditoría de V3.53.0: `level_from_capacity`
+  exige cobertura dimensional COMPLETA (una sola dimensión ya no produce un CEFR
+  global), sin migración de BD ni cambios de contrato. **Histórico, hecho**; ver
+  `release-notes-v3.53.1.md`.
 - `agentes/v353-learner-skill-state.md` — **V3.53 (EJECUTADO, 2026-09-11,
   v3.53.0)**: cierra el candidato **P1-02** (Learner Skill State 2.0 +
   `observed_difficulty` persistido por evento). Parte A: persiste el

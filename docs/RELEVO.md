@@ -21,7 +21,11 @@
 > reto solo donde hay evidencia y sin bajar el suelo declarado. Tests:
 > `test_level_from_capacity_requires_full_dimensional_coverage` (reescrito) +
 > aceptación multidimensional y no-regresión; sin cambios de esquema, contratos
-> ni UI. Ver `release-notes-v3.53.1.md`. **Siguiente paso:** V3.54 (Planner 2.0 /
+> ni UI. **CI 6/6 en verde** (run
+> [34748988008](https://github.com/jvelasca/english-tutor/actions/runs/34748988008)
+> sobre `6d8af47`, pytest **2185 passed + 2 skipped**, vitest 651 y Playwright 23)
+> con la etiqueta anotada `v3.53.1` creada y empujada. Ver
+> `release-notes-v3.53.1.md`. **Siguiente paso:** V3.54 (Planner 2.0 /
 > `expected_learning_value`, P1-03) y, con él, P2-01/P2-02/P2-03 del skill state.
 >
 > **Nota (2026-09-11): V3.53.0 (Learner Skill State 2.0 + `observed_difficulty`)**

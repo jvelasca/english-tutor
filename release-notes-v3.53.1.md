@@ -78,6 +78,15 @@ las dimensiones demostradas siguen elevando el reto.
 - `ruff` y `pytest` en verde; `frontend` `vitest`/`tsc`/`build`; y
   `check_release_consistency` (**3.53.1**), `check_beta_v3`,
   `content_validation` y `check_i18n_coverage` exit 0.
+- **CI 6/6 en verde** (run
+  [34748988008](https://github.com/jvelasca/english-tutor/actions/runs/34748988008)
+  sobre `6d8af47`): Backend (ruff + pytest, **2185 passed + 2 skipped**),
+  Frontend (tsc + vitest **76 ficheros/651 tests** + build), Release consistency,
+  Beta V3.0 gate, Content validation y Playwright E2E (visual, **23 passed**). Los
+  2 skipped son `backend/tests/test_stt_asr_integration.py` (modelo Whisper no
+  descargado en el runner, opt-in); con el modelo disponible en local el mismo
+  árbol da **2187 passed**. Etiqueta anotada `v3.53.1` creada y empujada sobre
+  `6d8af47`.
 
 ## Fuera de alcance (V3.54+)
 
