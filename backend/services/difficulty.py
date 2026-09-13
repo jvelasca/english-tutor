@@ -54,8 +54,9 @@ _MAX_LOAD = 5
 # Es el ENVELOPE MONÓTONO de los `difficulty_vector` reales del banco: por
 # dimensión, `CEFR_CAPACITY[nivel]` = máximo del banco hasta ese nivel inclusive.
 # Monótona no decreciente por dimensión POR CONSTRUCCIÓN, aunque un nivel
-# concreto sea más plano que el anterior (B1 declara `interaction` 2 y A2 tiene
-# contextos con 3: la envolvente sube a 2 y B1 queda en 3). Un test
+# concreto sea más plano que el anterior (A2 tiene contextos con `interaction`
+# 3 y la envolvente sube con el nivel, no con el ordinal: la tabla es la del
+# contenido real, no una escala CEFR). Un test
 # (`test_capacity_is_the_monotone_envelope_of_the_bank`) recalcula la envolvente
 # desde `TRANSFER_CONTEXTS` y falla si la tabla se desvía: fue el P2-01 de la
 # auditoría Q de V3.52.1 (la tabla declarada se quedaba corta en la `interaction`
@@ -138,6 +139,60 @@ def normalize_level(level: object) -> str:
     """Nivel CEFR canónico en mayúsculas ("" si no está en la tabla) (pura)."""
     text = str(level or "").strip().upper()
     return text if text in _CAPACITY_BY_LEVEL else ""
+
+
+# Separador de la serialización canónica de un vector de carga (V3.53). Es un
+# detalle de FORMATO del ledger, no del algoritmo: `format_vector`/`parse_vector`
+# son inversas y el vocabulario de dimensiones sigue siendo el único canónico.
+_VECTOR_SEPARATOR = ","
+
+
+def format_vector(vector: object) -> str:
+    """Serializa un vector de carga a texto canónico (V3.53, pura).
+
+    Formato `dim:load,dim:load` en el ORDEN de `DIFFICULTY_DIMENSIONS` y solo
+    con las dimensiones presentes (normalizadas a 1..5). Sirve para persistir la
+    dificultad de la TAREA servida en el ledger sin colapsar el vector a una
+    media escalar (el P1 que cerraron V3.52/V3.52.2). Un vector vacío o inválido
+    se serializa como `""` = dificultad NO declarada. Nunca lanza.
+    """
+    normalized = normalize_vector(vector)
+    return _VECTOR_SEPARATOR.join(
+        f"{dimension}:{normalized[dimension]}"
+        for dimension in DIFFICULTY_DIMENSIONS
+        if dimension in normalized
+    )
+
+
+def parse_vector(text: object) -> dict[str, int]:
+    """Vector de carga desde su serialización canónica (V3.53, pura).
+
+    Inversa de `format_vector`. Tolerante a propósito (filas legacy y datos
+    externos): ignora pares mal formados, claves fuera del vocabulario y cargas
+    fuera de 1..5, y devuelve `{}` con entradas vacías o basura. Acepta también
+    un `Mapping` por comodidad (`normalize_vector`). Nunca lanza.
+    """
+    if isinstance(text, Mapping):
+        return normalize_vector(text)
+    raw = str(text or "")
+    if not raw.strip():
+        return {}
+    parsed: dict[str, int] = {}
+    for part in raw.split(_VECTOR_SEPARATOR):
+        key, separator, value = part.partition(":")
+        if not separator:
+            continue
+        dimension = key.strip().lower()
+        if dimension not in DIFFICULTY_DIMENSIONS:
+            continue
+        try:
+            numeric = float(value.strip())
+        except (TypeError, ValueError):
+            continue
+        load = _as_load(numeric)
+        if load is not None:
+            parsed[dimension] = load
+    return parsed
 
 
 def capacity_for(level: object) -> dict[str, int]:

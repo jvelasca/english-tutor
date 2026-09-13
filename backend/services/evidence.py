@@ -33,7 +33,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 
-from services import transfer
+from services import difficulty, transfer
 
 # Roles del ledger de eventos (V3.35). `evidence` = señal que puede acreditar
 # aprendizaje; `informative` = señal que informa pero no acredita (p. ej. el MCQ
@@ -59,6 +59,7 @@ EVIDENCE_FIELDS: tuple[str, ...] = (
     "success",
     "support_level",
     "difficulty",
+    "observed_difficulty",
     "response_time_ms",
     "error_type",
     "interval_since_last_evidence",
@@ -1088,6 +1089,57 @@ def _classify_multi_word_error(exp: str, got: str) -> str:
     return "multiple_word_error"
 
 
+def observed_signals(rows: list[dict]) -> dict:
+    """Capacidad OBSERVADA por modalidad y dimensión (V3.53, pura).
+
+    Deriva del ledger la carga que el alumno ha SUPERADO de verdad a partir del
+    vector de la TAREA servida (`observed_difficulty`, serializado por
+    `services.difficulty.format_vector`). Para cada modalidad canónica
+    (`LEXICAL_SKILLS`) y cada dimensión canónica acumula:
+
+    - `observed_samples` — nº de ÉXITOS que declararon esa dimensión;
+    - `observed_days` — días naturales distintos con ese éxito;
+    - `observed_capacity` — mayor carga superada.
+
+    La atribución es `assessed_skill` con caída a `skill` (la modalidad que la
+    tarea REALMENTE evaluó; misma convención que el resto de histogramas). Solo
+    cuentan ÉXITOS con vector declarado: un fallo o un drill sin banco de
+    contextos (`observed_difficulty == ''`) no acredita capacidad. Las
+    modalidades/dimensiones sin muestra no aparecen (determinista y estable).
+    Nunca lanza.
+    """
+    samples: dict[str, dict[str, int]] = {}
+    day_sets: dict[str, dict[str, set[str]]] = {}
+    capacity: dict[str, dict[str, int]] = {}
+    for row in rows:
+        if not _truthy(row.get("success")):
+            continue
+        vector = difficulty.parse_vector(row.get("observed_difficulty"))
+        if not vector:
+            continue
+        assessed = (row.get("assessed_skill") or "").strip().lower()
+        skill = assessed or (row.get("skill") or "").strip().lower()
+        if skill not in LEXICAL_SKILLS:
+            continue
+        day = (row.get("occurred_at") or "")[:10]
+        for dimension, load in vector.items():
+            bucket = samples.setdefault(skill, {})
+            bucket[dimension] = bucket.get(dimension, 0) + 1
+            if day:
+                day_sets.setdefault(skill, {}).setdefault(dimension, set()).add(day)
+            cap = capacity.setdefault(skill, {})
+            if load > cap.get(dimension, 0):
+                cap[dimension] = load
+    return {
+        "observed_samples": samples,
+        "observed_days": {
+            skill: {dim: len(days) for dim, days in bucket.items()}
+            for skill, bucket in day_sets.items()
+        },
+        "observed_capacity": capacity,
+    }
+
+
 def summarize_evidence(rows: list[dict]) -> dict:
     """Resumen longitudinal de una lista de filas de `learning_evidence`.
 
@@ -1327,6 +1379,10 @@ def summarize_evidence(rows: list[dict]) -> dict:
         # V3.40 (Fase 4): transferencia contextual por `context_id` (misma
         # función pura que el resumen SQL).
         **context_signals(rows),
+        # V3.53 (Learner Skill State 2.0): capacidad OBSERVADA por modalidad y
+        # dimensión desde la dificultad de la TAREA servida (misma función pura
+        # que el resumen SQL).
+        **observed_signals(rows),
     })
 
 
@@ -1397,6 +1453,10 @@ def empty_summary() -> dict:
         "clean_success_goals": [],
         "last_clean_success_at": "",
         "last_unscaffolded_clean_success_at": "",
+        # V3.53 (Learner Skill State 2.0): sin eventos no hay capacidad observada.
+        "observed_samples": {},
+        "observed_days": {},
+        "observed_capacity": {},
     })
 
 

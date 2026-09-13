@@ -228,16 +228,36 @@ def _filter_skill(pool: list[dict], skill: object) -> list[dict]:
 
 
 def _challenge_and_tolerance(
-    level: object, learner_level: object, learner_level_source: object
+    level: object,
+    learner_level: object,
+    learner_level_source: object,
+    learner_capacity: object = None,
 ) -> tuple[dict[str, int], int]:
-    """Reto objetivo por dimensión y tolerancia aplicable (V3.52, pura).
+    """Reto objetivo por dimensión y tolerancia aplicable (V3.52 → V3.53, pura).
 
     `challenge` es el MÁXIMO por dimensión entre la capacidad del ítem (techo
     lingüístico) y la del alumno (suelo de reto); `{}` si no se reconoce ningún
     nivel (el selector no filtra). La tolerancia es estricta solo con un suelo
-    DEMOSTRADO; estimado/declarado/ausente usan el margen amplio. Nunca lanza.
+    DEMOSTRADO; estimado/declarado/`observed`/ausente usan el margen amplio.
+
+    V3.53: un `learner_capacity` explícito (capacidad OBSERVADA por dimensión,
+    `services.learner_skill`) SUSTITUYE al `capacity_for(learner_level)` como
+    suelo del alumno, pero conserva el máximo con la capacidad del ítem: sube el
+    reto solo en las dimensiones demostradas y nunca inventa nivel. Con `None`
+    o `{}` el cálculo es exactamente el de V3.52.2. Nunca lanza.
     """
     challenge = difficulty.challenge_vector(level, learner_level)
+    override = difficulty.normalize_vector(learner_capacity)
+    if override:
+        item_capacity = difficulty.capacity_for(level)
+        challenge = {
+            dimension: max(
+                item_capacity.get(dimension, 0),
+                override.get(dimension, 0),
+            )
+            for dimension in difficulty.DIFFICULTY_DIMENSIONS
+            if dimension in item_capacity or dimension in override
+        }
     return challenge, difficulty.tolerance_for(learner_level_source)
 
 
@@ -1057,6 +1077,20 @@ def context_skills(context: object) -> tuple[str, ...]:
     return tuple(skill for skill in CONTEXT_SKILLS if skill in wanted)
 
 
+def context_difficulty(context: object) -> dict[str, int]:
+    """Carga DECLARADA por un contexto del banco, por dimensión (V3.53, pura).
+
+    Acepta el dict del banco, un `id` (`"story"`) o un `context_id` de ledger
+    (`"transfer:story"`), igual que `context_skills`. Devuelve el
+    `difficulty_vector` normalizado al vocabulario canónico (1..5) o `{}` si el
+    contexto no se reconoce o no declara carga. Es la señal que el ledger
+    persiste por evento (`observed_difficulty`): la dificultad de la TAREA
+    servida, no la del ítem léxico. Nunca lanza.
+    """
+    attributes = _as_attributes(context)
+    return difficulty.normalize_vector(attributes.get("difficulty_vector"))
+
+
 def _normalize_dimensions(dimensions: object) -> tuple[str, ...]:
     """Ejes de atributos válidos para medir variedad (V3.48, pura).
 
@@ -1235,18 +1269,19 @@ def context_for(
     skill: object = "",
     learner_level: object = "",
     learner_level_source: object = "",
+    learner_capacity: object = None,
     skill_priorities: object = None,
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.52, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.53, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
     unscaffolded, cefr, difficulty_vector, difficulty, skills, target_skill,
     assessed_skill, assessment_mode, item_level, learner_level,
-    learner_level_source, difficulty_fit, skill_priorities}`. La consigna es
-    la del banco; el escenario **no contiene la unidad objetivo** salvo en la
-    condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46) es la
-    condición de recuperación SERVIDA: la deriva el llamador del estado de
+    learner_level_source, learner_capacity, difficulty_fit, skill_priorities}`.
+    La consigna es la del banco; el escenario **no contiene la unidad objetivo**
+    salvo en la condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46)
+    es la condición de recuperación SERVIDA: la deriva el llamador del estado de
     evidencia (`condition_for_state`) y aquí se compone el enunciado con su
     instrucción (`CONDITION_INSTRUCTIONS`).
 
@@ -1265,7 +1300,9 @@ def context_for(
        contra VECTOR por dimensión con el Difficulty Engine 2.0
        (`services.difficulty`); `learner_level_source` fija la tolerancia
        (estricta solo si el suelo es DEMOSTRADO). Sin niveles reconocibles el
-       comportamiento es el de V3.46/V3.47. `skill_priorities` es informativo
+       comportamiento es el de V3.46/V3.47. V3.53: un `learner_capacity`
+       explícito (capacidad OBSERVADA) sustituye al suelo declarado del nivel,
+       conservando el máximo con el ítem. `skill_priorities` es informativo
        (se devuelve tal cual para explicar la elección);
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
@@ -1311,8 +1348,10 @@ def context_for(
     # el Difficulty Engine 2.0 sobre ese pool. El reto objetivo solo depende de
     # los niveles (ítem/alumno), así que filtrar por modalidad no lo rebaja.
     pool = _filter_skill(pool, skill)
+    # V3.53: capacidad observada del alumno (aditiva). Con {} es V3.52.2 exacto.
+    capacity_override = difficulty.normalize_vector(learner_capacity)
     challenge, tolerance = _challenge_and_tolerance(
-        level, learner_level, learner_level_source
+        level, learner_level, learner_level_source, capacity_override
     )
     pool = difficulty.select_by_difficulty(pool, challenge, tolerance=tolerance)
     # V3.51: dimensiones semánticas de la tarea (idénticas en todos los retornos).
@@ -1359,7 +1398,9 @@ def context_for(
             "item_level": item_level,
             "learner_level": learner,
             # V3.52: origen del suelo y encaje del reto (aditivos).
+            # V3.53: capacidad observada que elevó el suelo ({} si no hay).
             "learner_level_source": level_source,
+            "learner_capacity": dict(capacity_override),
             "difficulty_fit": _difficulty_fit_for(None, challenge, tolerance),
             "skill_priorities": priorities,
         }
@@ -1399,7 +1440,9 @@ def context_for(
         "learner_level": learner,
         # V3.52 (P1-02): origen del suelo y encaje VECTOR a VECTOR del contexto
         # servido contra el reto objetivo (aditivos).
+        # V3.53: capacidad observada que elevó el suelo ({} si no hay).
         "learner_level_source": level_source,
+        "learner_capacity": dict(capacity_override),
         "difficulty_fit": _difficulty_fit_for(context, challenge, tolerance),
         "skill_priorities": priorities,
     }

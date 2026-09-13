@@ -270,6 +270,8 @@ def init_db() -> None:
                 cefr_level TEXT NOT NULL DEFAULT 'A1',
                 estimated_level TEXT NOT NULL DEFAULT '',
                 demonstrated_level TEXT NOT NULL DEFAULT '',
+                observed_level TEXT NOT NULL DEFAULT '',
+                observed_capacity TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -281,12 +283,17 @@ def init_db() -> None:
         # son aditivos; `cefr_level` se conserva intacto por compatibilidad y las
         # filas legacy quedan en '' (el siguiente `/api/profile` reescribe la
         # caché con ambos). Migración idempotente columna a columna.
+        # V3.53: `observed_level`/`observed_capacity` cachean la capacidad
+        # OBSERVADA por dimensión (Learner Skill State 2.0) que deriva
+        # `domain.profile` del ledger; el drill la lee en O(1).
         profile_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_profile)")
         }
         for _col, _type in (
             ("estimated_level", "TEXT NOT NULL DEFAULT ''"),
             ("demonstrated_level", "TEXT NOT NULL DEFAULT ''"),
+            ("observed_level", "TEXT NOT NULL DEFAULT ''"),
+            ("observed_capacity", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in profile_cols:
                 conn.execute(
@@ -1032,6 +1039,7 @@ def init_db() -> None:
                 interval_since_last_evidence REAL,
                 event_role TEXT NOT NULL DEFAULT 'evidence',
                 transfer_condition TEXT NOT NULL DEFAULT '',
+                observed_difficulty TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
@@ -1044,6 +1052,10 @@ def init_db() -> None:
         # transferencia) se añade por el mismo camino aditivo.
         # V3.51: `assessed_skill` (modalidad REALMENTE evaluada por la tarea;
         # `services.task_semantics`) usa el mismo camino aditivo.
+        # V3.53: `observed_difficulty` (vector de carga de la TAREA servida,
+        # serializado por `services.difficulty.format_vector`) es la señal del
+        # Learner Skill State 2.0. '' = dificultad no declarada (drills sin
+        # banco de contextos).
         evidence_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_evidence)")
         }
@@ -1056,6 +1068,7 @@ def init_db() -> None:
             ("error_type", "TEXT NOT NULL DEFAULT ''"),
             ("transfer_condition", "TEXT NOT NULL DEFAULT ''"),
             ("assessed_skill", "TEXT NOT NULL DEFAULT ''"),
+            ("observed_difficulty", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in evidence_cols:
                 conn.execute(

@@ -5,29 +5,26 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-11): `v3.52.2`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.52.2 cierra los **dos P2 de la auditoría externa
-> Q** (`docs/audit/Q-AUDITORIA-TOTAL-V352.md`): `CEFR_CAPACITY` pasa a ser el
-> **envelope monótono** del banco real (con el invariante «todo contexto del banco
-> encaja en su propio nivel con tolerancia estricta») y la tolerancia queda
-> documentada como red de seguridad con test de inercia y de discriminación
-> sintética; la etiqueta `v3.52.1` ya está creada. La release V3.52.1 sigue siendo
-> el **hotfix de producto** (usuarios fantasma «Visual Tester», «RUTA ACTUAL» de
-> Listening y bucle A/B) que cerró el **P1-01** de la auditoría de V3.52. Release
-> verificada: **CI 6/6 en verde** (runs
-> [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
-> sobre `89eff0b` y [34623244239](https://github.com/jvelasca/english-tutor/actions/runs/34623244239)
-> sobre `bdaaff9`). V3.52.2 también verificada: **CI 6/6 en verde** (run
-> [34627238005](https://github.com/jvelasca/english-tutor/actions/runs/34627238005)
-> sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). La **auditoría externa de
-> V3.52 ya está ejecutada** (informe Q,
-> sin P0/P1) y su briefing se conserva como histórico del método. Los P3-01/P3-02
-> quedan abiertos y aceptados. El siguiente incremento es **V3.53 (P1-02 Learner
-> Skill State 2.0 + `observed_difficulty` persistido por evento) y su briefing YA
-> ESTÁ ESCRITO Y LISTO PARA LANZAR**: `agentes/v353-learner-skill-state.md`
-> (2026-09-11). Sin briefing todavía: P1-03 (Planner 2.0 / Expected Learning
-> Value), Sense Engine 2.0, `assessed_skill`→planner y `skill_priorities`→
-> `select_task` (V3.55) y la entrega oral real del transfer. Antes de
+> **Estado actual (2026-09-11): `v3.53.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.53.0 (**ejecutada directamente por el gerente**)
+> cierra el **P1-02** diferido: **Learner Skill State 2.0 + `observed_difficulty`**
+> (Parte A: el vector de la TAREA servida se persiste por evento en
+> `learning_evidence.observed_difficulty`; Parte B: capacidad OBSERVADA por
+> dimensión con muestra espaciada, fuente `observed` en `LEVEL_SOURCES` y caché
+> O(1) en `learning_profile`) más el P3 del comentario obsoleto de B1. Release
+> ADITIVA (tres columnas de BD) que **NO toca** `CEFR_CAPACITY`, la escalera
+> `transfer_state`, sus umbrales, `context_signals`, `context_diversity`, el
+> scoring, el planner ni FSRS; con `observed_capacity` vacío el comportamiento es
+> idéntico a V3.52.2. Tests: pytest **2185 passed** en local (+19), `ruff` y
+> `tsc` limpios, `check_release_consistency` **3.53.0** exit 0. La V3.52.2 sigue
+> como **cierre de los dos P2 de la auditoría externa Q** (`CEFR_CAPACITY` =
+> envelope monótono del banco y tolerancia como red de seguridad) y V3.52.1 como
+> el **hotfix de producto** que cerró el **P1-01** de la auditoría de V3.52. La
+> **auditoría externa de V3.52 ya está ejecutada** (informe Q, sin P0/P1) y su
+> briefing se conserva como histórico del método. Los P3-02/P3-03 quedan abiertos
+> y aceptados. El siguiente incremento es **V3.54 (Sense Engine 2.0)** y, tras él,
+> **V3.55/V3.56 (Planner 2.0 / Expected Learning Value)**: cablear la capacidad
+> observada al planner es el P1-03 y **todavía NO tiene briefing**. Antes de
 > lanzar cualquier subagente, lee esa sección para no partir de un estado obsoleto
 > (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
@@ -41,9 +38,9 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
-- `agentes/v353-learner-skill-state.md` — **V3.53 (LISTO PARA LANZAR, escrito
-  2026-09-11 sobre `v3.52.2`)**: cierra el candidato **P1-02** (Learner Skill
-  State 2.0 + `observed_difficulty` persistido por evento). Parte A: persistir el
+- `agentes/v353-learner-skill-state.md` — **V3.53 (EJECUTADO, 2026-09-11,
+  v3.53.0)**: cierra el candidato **P1-02** (Learner Skill State 2.0 +
+  `observed_difficulty` persistido por evento). Parte A: persiste el
   `difficulty_vector` del contexto SERVIDO en el evento de transferencia
   (columna aditiva `learning_evidence.observed_difficulty`, vector canónico con
   `format_vector`/`parse_vector` puros). Parte B: capacidad observada por
@@ -52,7 +49,8 @@ pedir más contexto.
   fuente `observed` en `LEVEL_SOURCES` (entre `demonstrated` y `estimated`) y
   caché O(1) en `learning_profile`, con **no-regresión exhaustiva** cuando no hay
   datos. NO toca `CEFR_CAPACITY`, la escalera, el scoring ni FSRS; el planner no
-  la consume (eso es P1-03). **Pendiente de ejecutar.**
+  la consume (eso es P1-03). **Histórico, hecho**; ver
+  `release-notes-v3.53.0.md`.
 - `agentes/v3522-cierre-p2-auditoria-q.md` — **no existe**: V3.52.2 (**ejecutado
   directamente por el gerente**, 2026-09-11) se resolvió sin briefing separado,
   como V3.38.1 y las FASES 1–5. Cierra los **dos P2** de la auditoría Q

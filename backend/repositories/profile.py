@@ -13,11 +13,14 @@ def get_profile(user_id: str) -> dict | None:
 
     V3.52: además de `cefr_level` (compatibilidad) expone `estimated_level` y
     `demonstrated_level` (niveles SEPARADOS de la caché del Student Model).
+    V3.53: expone `observed_level` y `observed_capacity` (capacidad observada
+    serializada; la parsea el drill con `services.difficulty.parse_vector`).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT user_id, cefr_level, estimated_level, demonstrated_level, "
-            "updated_at FROM learning_profile WHERE user_id = ?",
+            "observed_level, observed_capacity, updated_at "
+            "FROM learning_profile WHERE user_id = ?",
             (user_id,),
         ).fetchone()
     return dict(row) if row is not None else None
@@ -29,13 +32,18 @@ def set_level_state(
     estimated_level: str,
     demonstrated_level: str,
     cefr_level: str | None = None,
+    observed_level: str = "",
+    observed_capacity: str = "",
 ) -> dict | None:
-    """Persiste (upsert) el estado de nivel del usuario (V3.52).
+    """Persiste (upsert) el estado de nivel del usuario (V3.52 → V3.53).
 
     `estimated_level` es la banda de práctica continua (lo que históricamente
     guardaba `cefr_level`) y `demonstrated_level` el nivel certificado ("" hasta
     la primera certificación). `cefr_level` se conserva por compatibilidad: si no
-    se aporta, toma el valor del estimado. Devuelve None si el usuario no existe.
+    se aporta, toma el valor del estimado. V3.53 añade `observed_level` (nivel
+    equivalente de la capacidad observada) y `observed_capacity` (vector
+    serializado por dimensión; `""` = sin muestra). Devuelve None si el usuario
+    no existe.
     """
     if get_user(user_id) is None:
         return None
@@ -44,20 +52,33 @@ def set_level_state(
     with closing(_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO learning_profile "
-            "(user_id, cefr_level, estimated_level, demonstrated_level, updated_at) "
-            "VALUES (?, ?, ?, ?, ?) "
+            "(user_id, cefr_level, estimated_level, demonstrated_level, "
+            "observed_level, observed_capacity, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET "
             "cefr_level = excluded.cefr_level, "
             "estimated_level = excluded.estimated_level, "
             "demonstrated_level = excluded.demonstrated_level, "
+            "observed_level = excluded.observed_level, "
+            "observed_capacity = excluded.observed_capacity, "
             "updated_at = excluded.updated_at",
-            (user_id, legacy, estimated_level, demonstrated_level, now),
+            (
+                user_id,
+                legacy,
+                estimated_level,
+                demonstrated_level,
+                observed_level,
+                observed_capacity,
+                now,
+            ),
         )
     return {
         "user_id": user_id,
         "cefr_level": legacy,
         "estimated_level": estimated_level,
         "demonstrated_level": demonstrated_level,
+        "observed_level": observed_level,
+        "observed_capacity": observed_capacity,
         "updated_at": now,
     }
 
@@ -68,8 +89,8 @@ def set_cefr(user_id: str, level: str) -> dict | None:
     Wrapper histórico de V3.51: antes escribía solo `cefr_level`, que en realidad
     cachaba el nivel ESTIMADO. En V3.52 delega en `set_level_state` para que la
     caché quede coherente (`cefr_level` y `estimated_level` con el mismo valor)
-    sin pisar un `demonstrated_level` ya certificado. Devuelve None si el usuario
-    no existe.
+    sin pisar un `demonstrated_level` ya certificado. V3.53 conserva también el
+    estado OBSERVADO cacheado. Devuelve None si el usuario no existe.
     """
     existing = get_profile(user_id) or {}
     demonstrated = str(existing.get("demonstrated_level") or "")
@@ -78,6 +99,8 @@ def set_cefr(user_id: str, level: str) -> dict | None:
         estimated_level=level,
         demonstrated_level=demonstrated,
         cefr_level=level,
+        observed_level=str(existing.get("observed_level") or ""),
+        observed_capacity=str(existing.get("observed_capacity") or ""),
     )
 
 

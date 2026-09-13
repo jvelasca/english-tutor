@@ -74,6 +74,7 @@ def record_evidence(
     success: bool = False,
     support_level: str = "",
     difficulty: float = 0.0,
+    observed_difficulty: str = "",
     response_time_ms: int | None = None,
     error_type: str = "",
     transfer_condition: str = "",
@@ -104,6 +105,10 @@ def record_evidence(
     contrato histórico (el gate de transferencia sigue leyendo
     `spontaneous_use`), mientras que `assessed_skill` dice qué se evaluó. Las
     filas legacy quedan con '' (no se inventa semántica hacia atrás).
+
+    V3.53 añade `observed_difficulty` (vector de carga de la TAREA servida,
+    serializado por `services.difficulty.format_vector`): la señal del Learner
+    Skill State 2.0. Aditiva y observacional; '' = no declarada.
     """
     if get_user(user_id) is None:
         return None
@@ -124,9 +129,10 @@ def record_evidence(
             "(user_id, occurred_at, skill, assessed_skill, target_type, "
             "target_id, surface_form, lexical_unit, task, activity, "
             "activity_id, context_id, success, support_level, difficulty, "
-            "response_time_ms, error_type, transfer_condition, "
-            "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "observed_difficulty, response_time_ms, error_type, "
+            "transfer_condition, interval_since_last_evidence, event_role) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+            "?, ?)",
             (
                 user_id,
                 now,
@@ -143,6 +149,7 @@ def record_evidence(
                 1 if success else 0,
                 support_level,
                 float(difficulty or 0.0),
+                str(observed_difficulty or ""),
                 response_time_ms,
                 error_type,
                 transfer_condition,
@@ -167,6 +174,7 @@ def record_evidence(
         "success": bool(success),
         "support_level": support_level,
         "difficulty": float(difficulty or 0.0),
+        "observed_difficulty": str(observed_difficulty or ""),
         "response_time_ms": response_time_ms,
         "error_type": error_type,
         "transfer_condition": transfer_condition,
@@ -266,6 +274,7 @@ def record_evidence_bulk(
                     1 if entry.get("success") else 0,
                     entry.get("support_level", ""),
                     float(entry.get("difficulty") or 0.0),
+                    str(entry.get("observed_difficulty") or ""),
                     entry.get("response_time_ms"),
                     entry.get("error_type", ""),
                     entry.get("transfer_condition", ""),
@@ -278,9 +287,10 @@ def record_evidence_bulk(
             "(user_id, occurred_at, skill, assessed_skill, target_type, "
             "target_id, surface_form, lexical_unit, task, activity, "
             "activity_id, context_id, success, support_level, difficulty, "
-            "response_time_ms, error_type, transfer_condition, "
-            "interval_since_last_evidence, event_role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "observed_difficulty, response_time_ms, error_type, "
+            "transfer_condition, interval_since_last_evidence, event_role) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+            "?, ?)",
             rows,
         )
     return len(rows)
@@ -317,13 +327,34 @@ def list_evidence(
             "SELECT id, user_id, occurred_at, skill, assessed_skill, "
             "target_type, target_id, surface_form, lexical_unit, task, "
             "activity, activity_id, context_id, success, support_level, "
-            "difficulty, response_time_ms, error_type, transfer_condition, "
-            "interval_since_last_evidence, event_role "
+            "difficulty, observed_difficulty, response_time_ms, error_type, "
+            "transfer_condition, interval_since_last_evidence, event_role "
             "FROM learning_evidence "
             f"WHERE {' AND '.join(clauses)} "
             "ORDER BY occurred_at DESC, id DESC "
             "LIMIT ? OFFSET ?",
             params,
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_observed_rows(user_id: str, *, target_type: str = "lexicon") -> list[dict]:
+    """Filas de ÉXITO con dificultad de tarea declarada (V3.53, aditiva).
+
+    Alimenta el agregado por USUARIO de la capacidad observada
+    (`services.evidence.observed_signals` → `services.learner_skill`) que
+    `domain.profile` cachea en `learning_profile`. Devuelve solo las columnas que
+    la función pura necesita y solo los eventos que aportan señal (éxito y
+    `observed_difficulty` no vacía). Fuera del camino caliente del drill.
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT occurred_at, skill, assessed_skill, success, "
+            "observed_difficulty FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? AND success = 1 "
+            "AND observed_difficulty != '' "
+            "ORDER BY occurred_at ASC, id ASC",
+            (user_id, target_type),
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -389,6 +420,7 @@ def summarize_by_target(
         LEXICAL_SKILLS,
         RECALL_RUNG_EVIDENCE,
         context_signals,
+        observed_signals,
         recall_rung_from_activity,
         recency_signals,
         with_transfer_state,
@@ -525,7 +557,8 @@ def summarize_by_target(
         # (`recency_signals`), no con un segundo dialecto en SQL.
         detail_rows = conn.execute(
             "SELECT target_id, id, occurred_at, success, error_type, "
-            "response_time_ms, context_id, transfer_condition "
+            "response_time_ms, context_id, transfer_condition, "
+            "skill, assessed_skill, observed_difficulty "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? "
             "ORDER BY target_id, occurred_at ASC, id ASC",
@@ -654,6 +687,10 @@ def summarize_by_target(
             # V3.40 (Fase 4): transferencia contextual por `context_id` (misma
             # función pura que `summarize_evidence`).
             **context_signals(detail_by_target.get(row["target_id"], [])),
+            # V3.53 (Learner Skill State 2.0): capacidad observada por modalidad
+            # y dimensión (misma función pura que `summarize_evidence`, paridad
+            # por construcción).
+            **observed_signals(detail_by_target.get(row["target_id"], [])),
         })
         for row in rows
     }

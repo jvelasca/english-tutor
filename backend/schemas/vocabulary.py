@@ -731,6 +731,9 @@ class TransferContextOut(BaseModel):
     V3.52: `learner_level_source` y `difficulty_fit` (aditivos) explican de dónde
     viene el suelo de dificultad y cómo encaja el contexto servido contra el reto
     por dimensión.
+
+    V3.53: `learner_capacity` (aditivo) declara la capacidad OBSERVADA por
+    dimensión que elevó el suelo del alumno.
     """
 
     word: str
@@ -774,6 +777,10 @@ class TransferContextOut(BaseModel):
     # `max_overshoot`, `within`, `tolerance`). Aditivos y solo explicativos.
     learner_level_source: str = ""
     difficulty_fit: dict = Field(default_factory=dict)
+    # V3.53 (Learner Skill State 2.0): capacidad OBSERVADA por dimensión que
+    # elevó el suelo de reto del alumno ({} si no hay muestra). Aditivo y solo
+    # explicativo: `difficulty_fit["challenge"]` ya refleja el reto resultante.
+    learner_capacity: dict[str, int] = Field(default_factory=dict)
 
 
 class TransferAttemptIn(BaseModel):

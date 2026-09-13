@@ -23,8 +23,10 @@ from services import (
     dictionary_content,
     dictionary_mcq,
     dictionary_reverse,
+    difficulty,
     example_sentences,
     fsrs,
+    learner_skill,
     lexicon,
     planner,
     recall,
@@ -746,6 +748,11 @@ async def _record_transfer_evidence(
     `support_level` sigue declarando el andamiaje de la ACTIVIDAD
     (`spontaneous`); la condición es la dimensión fina que permite ponderar el
     acierto (un éxito en `cued_context` no acredita transferencia no andamiada).
+
+    V3.53 (Parte A): `observed_difficulty` persiste el VECTOR de carga del
+    contexto SERVIDO (`services.transfer.context_difficulty` serializado por
+    `services.difficulty.format_vector`); el resto de drills lo dejan `''`
+    (no declaran banco de contextos).
     """
     try:
         await run_in_threadpool(
@@ -768,6 +775,13 @@ async def _record_transfer_evidence(
             success=bool(scored["passed"]),
             support_level="spontaneous",
             difficulty=lexicon.cefr_difficulty(row),
+            # V3.53 (Parte A): se persiste la dificultad de la TAREA servida (el
+            # vector del contexto del banco), no la del ítem léxico. Es la señal
+            # del Learner Skill State 2.0 (capacidad OBSERVADA por dimensión);
+            # una media escalar volvería a colapsar las dimensiones.
+            observed_difficulty=difficulty.format_vector(
+                transfer.context_difficulty(context_id)
+            ),
             response_time_ms=response_time_ms,
             error_type=scored["error_type"] or "partial",
             transfer_condition=condition,
@@ -851,30 +865,44 @@ def _transfer_target_skill(
 
 
 async def _learner_level_state(user_id: str) -> dict:
-    """Estado de nivel del alumno desde la caché del Student Model (V3.52).
+    """Estado de nivel del alumno desde la caché del Student Model (V3.52 → V3.53).
 
     Lee `learning_profile` (fila única, coste O(1)) y aplica
     `student_state.level_state`: la caché guarda los niveles SEPARADOS que
     escribe `domain.profile.get_profile_summary` — `estimated_level` (banda de
-    práctica continua) y `demonstrated_level` (certificación con retención) — y
-    conserva `cefr_level` como nivel DECLARADO/legacy (filas migradas de V3.51).
+    práctica continua), `demonstrated_level` (certificación con retención) y
+    `observed_level`/`observed_capacity` (V3.53: capacidad OBSERVADA por
+    dimensión) — y conserva `cefr_level` como nivel DECLARADO/legacy (filas
+    migradas de V3.51).
 
-    Devuelve `{practice_level, estimated_cefr, demonstrated_cefr, floor_level,
-    floor_source}`. El suelo prioriza lo DEMOSTRADO sobre lo estimado y lo
-    declarado; sin nivel conocido devuelve el estado vacío y el drill conserva el
-    comportamiento de V3.46/V3.47 (el motor de dificultad no filtra). NO se
-    recalcula el Student Model en el camino caliente del drill. Nunca lanza.
+    Devuelve `{practice_level, estimated_cefr, demonstrated_cefr, observed_cefr,
+    floor_level, floor_source, observed_capacity, learner_capacity}`. El suelo
+    prioriza lo DEMOSTRADO, luego lo OBSERVADO, luego lo estimado y lo declarado;
+    sin nivel conocido devuelve el estado vacío y el drill conserva el
+    comportamiento de V3.46/V3.47 (el motor de dificultad no filtra).
+    `learner_capacity` es el suelo efectivo por dimensión (máximo entre el nivel
+    y lo observado) que eleva el reto solo donde hay evidencia. NO se recalcula
+    el Student Model en el camino caliente del drill. Nunca lanza.
     """
     try:
         row = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — preferencia no bloqueante
-        return student_state.empty_state()
+        return {**student_state.empty_state(), **learner_skill.empty_state()}
     row = row or {}
-    return student_state.level_state(
+    observed_capacity = difficulty.parse_vector(row.get("observed_capacity"))
+    state = student_state.level_state(
         practice_level=row.get("cefr_level") or "",
         estimated_cefr=row.get("estimated_level") or "",
         demonstrated_cefr=row.get("demonstrated_level") or "",
+        observed_cefr=row.get("observed_level") or "",
     )
+    return {
+        **state,
+        "observed_capacity": observed_capacity,
+        "learner_capacity": learner_skill.learner_capacity(
+            state["floor_level"], observed_capacity
+        ),
+    }
 
 
 async def _learner_level(user_id: str) -> str:
@@ -938,6 +966,7 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
         skill=skill,
         learner_level=learner_state["floor_level"],
         learner_level_source=learner_state["floor_source"],
+        learner_capacity=learner_state["learner_capacity"],
         skill_priorities=priorities,
     )
 
@@ -1010,6 +1039,7 @@ async def submit_transfer_attempt(
             skill=_transfer_target_skill(row, summary, priorities),
             learner_level=learner_state["floor_level"],
             learner_level_source=learner_state["floor_source"],
+            learner_capacity=learner_state["learner_capacity"],
             skill_priorities=priorities,
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)

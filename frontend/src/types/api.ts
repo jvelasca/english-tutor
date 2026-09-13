@@ -229,6 +229,12 @@ export interface LearningProfile {
   user_id: string;
   current_level: string;
   estimated_level: EstimatedLevel;
+  /** V3.52: nivel DEMOSTRADO (certificación con retención); null si no existe. */
+  demonstrated_level?: string | null;
+  /** V3.53: nivel equivalente de la capacidad observada ("" sin muestra). */
+  observed_level?: string;
+  /** V3.53: capacidad observada por dimensión que respalda ese nivel. */
+  observed_capacity?: Record<string, number>;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
   estimated_confidence: number;
@@ -569,6 +575,9 @@ export interface DrillTransferContext {
   // contexto servido contra el reto por dimensión (aditivos, solo explicativos).
   learner_level_source?: string;
   difficulty_fit?: DrillDifficultyFit;
+  // V3.53 (Learner Skill State 2.0): capacidad observada por dimensión que
+  // elevó el suelo de reto (aditivo; {} si no hay muestra).
+  learner_capacity?: Record<string, number>;
 }
 
 export interface DrillDifficultyFit {

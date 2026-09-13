@@ -434,6 +434,10 @@ def test_empty_summary_matches_the_extended_contract():
             },
             "recency_days": None,
         },
+        # V3.53 (Learner Skill State 2.0): capacidad observada (aditiva).
+        "observed_samples": {},
+        "observed_days": {},
+        "observed_capacity": {},
     }
 
 

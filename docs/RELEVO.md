@@ -5,6 +5,38 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-11 (UTC+2).
 >
+> **Nota (2026-09-11): V3.53.0 (Learner Skill State 2.0 + `observed_difficulty`)**
+> — release **v3.53.0**, ADITIVA (tres columnas de BD), que cierra el **P1-02**
+> diferido desde V3.52 y monta el primer Student Skill State OBSERVADO sin tocar
+> `CEFR_CAPACITY`, la escalera `transfer_state`, sus umbrales, `context_signals`,
+> `context_diversity`, el scoring, el planner ni FSRS. **(A) `observed_difficulty`
+> por evento:** nueva columna `learning_evidence.observed_difficulty` con el
+> VECTOR de la TAREA servida (serializado con `difficulty.format_vector` /
+> `parse_vector` puros, `''` = no declarada) —antes `difficulty` guardaba la carga
+> LÉXICA del ítem—; `transfer.context_difficulty` resuelve dict/`id`/`context_id`
+> y el drill de transferencia escribe el vector del contexto SERVIDO (el resto de
+> drills lo dejan `''`). **(B) Capacidad OBSERVADA:** nuevo puro
+> `services/learner_skill.py` (`observed_capacity` con muestra espaciada 2 éxitos
+> en 2 días naturales distintos, `level_from_capacity` conservador sobre la
+> envolvente del banco y `learner_capacity` = máximo por dimensión sin bajar el
+> suelo declarado); nuevo puro `evidence.observed_signals`
+> (`observed_samples`/`observed_days`/`observed_capacity`, atribución
+> `assessed_skill`→`skill`, solo ÉXITOS con vector) con claves en
+> `summarize_evidence`/`empty_summary` y paridad pura↔SQL por construcción.
+> **(C) Suelo y contrato:** `student_state.LEVEL_SOURCES` inserta `observed` entre
+> `demonstrated` y `estimated` (`CERTIFIED_SOURCES` no cambia: usa el margen
+> amplio); `learning_profile.observed_level`/`observed_capacity` aditivas,
+> derivadas del ledger y cacheadas en `get_profile_summary`, leídas en O(1) y
+> pasadas a `context_for(..., learner_capacity=...)` en GET y POST; con
+> `None`/`{}` el resultado es EXACTAMENTE V3.52.2. Contratos aditivos
+> `TransferContextOut.learner_capacity` y `LearningProfile.observed_level`/
+> `observed_capacity` (espejo opcional en `types/api.ts`). **(D)** corregido el
+> comentario obsoleto de B1 `interaction` (P3). Tests: pytest **2185 passed** en
+> local (+19), `ruff` y `tsc` limpios, `check_release_consistency` **3.53.0**
+> exit 0. Ver `release-notes-v3.53.0.md`. **Siguiente paso:** V3.54 (Sense Engine
+> 2.0); el Planner 2.0 / `expected_learning_value` (V3.55/V3.56) todavía **no**
+> tiene briefing y sigue siendo el P1-03.
+>
 > **Nota (2026-09-11): V3.52.2 (cierre de los P2 de la auditoría Q)** — release
 > **v3.52.2**, SIN migración de BD y SIN cambios de contrato, que recalibra el
 > Difficulty Engine al banco real. **(A) P2-01:** `CEFR_CAPACITY` pasa a ser el

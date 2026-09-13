@@ -20,11 +20,15 @@ formaliza junto a una tercera:
   matrícula completada **y** `certification_gate` certificado (retención
   retardada). Es la única fuente con garantía; `""` hasta la primera
   certificación.
+- ``observed_cefr`` — V3.53: el nivel EQUIVALENTE de la capacidad OBSERVADA
+  (`services.learner_skill`), derivada de la dificultad de las tareas que el
+  alumno ha superado de verdad. Es más fuerte que una estimación y menos que una
+  certificación.
 
 La política de suelo de dificultad es deliberadamente conservadora: SOLO el
-nivel demostrado se usa con la máxima confianza; el estimado y el declarado son
-proxies de menor confianza (el motor de dificultad les da más margen de
-tolerancia, ver `services.difficulty`).
+nivel demostrado se usa con la máxima confianza; el observado, el estimado y el
+declarado son proxies de menor confianza (el motor de dificultad les da más
+margen de tolerancia, ver `services.difficulty`).
 
 Módulo PURO: sin I/O, sin reloj, sin aleatoriedad. Nunca lanza.
 """
@@ -37,6 +41,7 @@ from services import transfer
 # un orden alfabético ni de nivel: es el orden en el que `floor_level` elige.
 LEVEL_SOURCES: tuple[str, ...] = (
     "demonstrated",
+    "observed",
     "estimated",
     "practice",
     "none",
@@ -44,12 +49,16 @@ LEVEL_SOURCES: tuple[str, ...] = (
 
 # Fuentes cuya evidencia es una CERTIFICACIÓN formal (retención demostrada). Son
 # las únicas que merecen la tolerancia estricta del motor de dificultad.
+# V3.53: `observed` NO entra aquí a propósito — la capacidad observada es un
+# desempeño medido, más fuerte que una estimación pero menos que una
+# certificación; usa el margen amplio (`DIFFICULTY_TOLERANCE_ESTIMATED`).
 CERTIFIED_SOURCES: frozenset[str] = frozenset({"demonstrated"})
 
 _EMPTY_STATE: dict[str, str] = {
     "practice_level": "",
     "estimated_cefr": "",
     "demonstrated_cefr": "",
+    "observed_cefr": "",
     "floor_level": "",
     "floor_source": "none",
 }
@@ -65,16 +74,23 @@ def floor_level(
     practice_level: object = "",
     estimated_cefr: object = "",
     demonstrated_cefr: object = "",
+    observed_cefr: object = "",
 ) -> tuple[str, str]:
-    """Nivel que actúa de SUELO de dificultad y su FUENTE (V3.52, pura).
+    """Nivel que actúa de SUELO de dificultad y su FUENTE (V3.52 → V3.53, pura).
 
-    Prioridad: demostrado > estimado > declarado (nivel de práctica) > ninguno.
+    Prioridad: demostrado > observado > estimado > declarado (nivel de práctica)
+    > ninguno. V3.53 intercala `observed` (capacidad medida por la evidencia,
+    `services.learner_skill`) por debajo de la certificación y por encima de la
+    estimación: un desempeño medido es más fuerte que una intuición, pero una
+    certificación con retención sigue siendo la garantía máxima.
+
     Devuelve `(nivel, fuente)` con fuente en `LEVEL_SOURCES`. Un valor no CEFR
     (o `None`) no participa: no se inventa un suelo con datos que no se
     reconocen. Nunca lanza.
     """
     candidates = (
         ("demonstrated", demonstrated_cefr),
+        ("observed", observed_cefr),
         ("estimated", estimated_cefr),
         ("practice", practice_level),
     )
@@ -90,23 +106,26 @@ def level_state(
     practice_level: object = "",
     estimated_cefr: object = "",
     demonstrated_cefr: object = "",
+    observed_cefr: object = "",
 ) -> dict[str, str]:
-    """Estado de nivel del alumno con el suelo ya derivado (V3.52, pura).
+    """Estado de nivel del alumno con el suelo ya derivado (V3.52 → V3.53, pura).
 
-    Devuelve `{practice_level, estimated_cefr, demonstrated_cefr, floor_level,
-    floor_source}` con los tres niveles normalizados ("" si no se reconocen) y
-    el resultado de `floor_level`. Un estado vacío es válido: significa "sin
-    nivel conocido" y deja el comportamiento en el de V3.46/V3.47 (el motor de
-    dificultad no filtra). Nunca lanza.
+    Devuelve `{practice_level, estimated_cefr, demonstrated_cefr, observed_cefr,
+    floor_level, floor_source}` con los cuatro niveles normalizados ("" si no se
+    reconocen) y el resultado de `floor_level`. Un estado vacío es válido:
+    significa "sin nivel conocido" y deja el comportamiento en el de
+    V3.46/V3.47 (el motor de dificultad no filtra). Nunca lanza.
     """
     practice = _normalize_level(practice_level)
     estimated = _normalize_level(estimated_cefr)
     demonstrated = _normalize_level(demonstrated_cefr)
-    floor, source = floor_level(practice, estimated, demonstrated)
+    observed = _normalize_level(observed_cefr)
+    floor, source = floor_level(practice, estimated, demonstrated, observed)
     return {
         "practice_level": practice,
         "estimated_cefr": estimated,
         "demonstrated_cefr": demonstrated,
+        "observed_cefr": observed,
         "floor_level": floor,
         "floor_source": source,
     }

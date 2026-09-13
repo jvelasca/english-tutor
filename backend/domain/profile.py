@@ -4,12 +4,14 @@ from __future__ import annotations
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
+from repositories import evidence as evidence_repo
 from repositories import grammar as grammar_repo
 from repositories import listening as listening_repo
 from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
+from services import difficulty, learner_skill
 from services.cefr import (
     CEFR_MODEL_VERSION,
     heuristic_band,
@@ -18,6 +20,7 @@ from services.cefr import (
 )
 from services.competence import competence_states
 from services.curriculum import CURRICULUM_VERSION
+from services.evidence import observed_signals
 from services.evidence_depth import evidence_depth_report
 from services.vocabulary import classify
 
@@ -141,6 +144,16 @@ async def _compute_profile(user_id: str) -> dict | None:
     stats = await _activity_stats(user_id)
     student_model = await academy_service.build_student_model(user_id)
 
+    # V3.53 (Learner Skill State 2.0): capacidad OBSERVADA por dimensión desde la
+    # dificultad de la TAREA servida en el ledger léxico. Se deriva aquí (una vez
+    # por refresco de perfil) y se cachea en `learning_profile`; el camino
+    # caliente del drill solo lee la fila única. Sin muestra queda vacío y todo
+    # se comporta como V3.52.2.
+    observed_rows = await run_in_threadpool(
+        evidence_repo.list_observed_rows, user_id
+    )
+    observed = learner_skill.observed_state(observed_signals(observed_rows))
+
     skills = _skill_states(student_model["skills"])
     bands = _bands_from_skills(student_model["skills"])
     level = student_model["estimated_level"]
@@ -170,6 +183,10 @@ async def _compute_profile(user_id: str) -> dict | None:
         # V3.52 (P1-01): el nivel DEMOSTRADO se expone aparte del estimado. Es
         # `None` mientras no haya certificación con retención (nunca hipotético).
         "demonstrated_level": student_model["demonstrated_level"],
+        # V3.53 (Learner Skill State 2.0): estado OBSERVADO (nivel equivalente y
+        # capacidad por dimensión) derivado de la evidencia de dificultad.
+        "observed_level": observed["observed_level"],
+        "observed_capacity": observed["observed_capacity"],
         "estimated_bands": bands,
         "estimated_descriptor": level_descriptor(level),
         "estimated_confidence": student_model["confidence"],
@@ -231,12 +248,16 @@ async def get_profile_summary(user_id: str) -> dict | None:
     # V3.52 (P1-01): la caché guarda AMBOS niveles. `cefr_level` se mantiene con
     # el estimado por compatibilidad; el suelo del drill lee `demonstrated_level`
     # (certificación) y cae al estimado solo si no existe.
+    # V3.53: además se cachea el estado OBSERVADO (`observed_level` +
+    # `observed_capacity`, vector serializado) para el suelo del drill en O(1).
     await run_in_threadpool(
         profile_repo.set_level_state,
         user_id,
         estimated_level=profile["estimated_level"],
         demonstrated_level=profile["demonstrated_level"] or "",
         cefr_level=profile["estimated_level"],
+        observed_level=profile["observed_level"] or "",
+        observed_capacity=difficulty.format_vector(profile["observed_capacity"]),
     )
     await _maybe_record_snapshot(user_id, profile)
     history = await run_in_threadpool(profile_repo.list_cefr_history, user_id)

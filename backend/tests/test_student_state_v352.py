@@ -50,6 +50,7 @@ def _setup(monkeypatch, tmp_path):
 def test_level_sources_are_the_canonical_priority_order():
     assert student_state.LEVEL_SOURCES == (
         "demonstrated",
+        "observed",
         "estimated",
         "practice",
         "none",
@@ -86,6 +87,7 @@ def test_level_state_shape_and_normalization():
         "practice_level": "A2",
         "estimated_cefr": "B1",
         "demonstrated_cefr": "",
+        "observed_cefr": "",
         "floor_level": "B1",
         "floor_source": "estimated",
     }
@@ -218,7 +220,12 @@ def test_learner_level_state_uses_legacy_cefr_as_declared_level(monkeypatch, tmp
 def test_learner_level_state_without_profile_is_neutral(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     state = asyncio.run(vocabulary_domain._learner_level_state(uid))
-    assert state == student_state.empty_state()
+    # V3.53: el estado neutro añade la capacidad observada (vacía sin muestra).
+    assert state == {
+        **student_state.empty_state(),
+        "observed_capacity": {},
+        "learner_capacity": {},
+    }
 
 
 # ------------------------------------------------------------- contrato HTTP

@@ -109,6 +109,10 @@ class LearningProfile(BaseModel):
     # V3.52 (P1-01): nivel DEMOSTRADO (certificación con retención). `None`
     # mientras no exista; NUNCA se rellena con el estimado.
     demonstrated_level: str | None = None
+    # V3.53 (Learner Skill State 2.0): nivel EQUIVALENTE de la capacidad
+    # observada ("" sin muestra) y la capacidad por dimensión que la respalda.
+    observed_level: str = ""
+    observed_capacity: dict[str, int] = Field(default_factory=dict)
     estimated_bands: EstimatedBands
     estimated_descriptor: str
     estimated_confidence: float
