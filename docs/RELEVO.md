@@ -50,7 +50,11 @@
 > **3.55.0**, Content validation y Beta V3.0 gate) con la etiqueta anotada
 > `v3.55.0` creada y empujada. Ver `release-notes-v3.55.0.md`.
 > **Siguiente paso:** V3.56 — el **Planner 2.0 / `expected_learning_value`**
-> (P1-03), y después el Sense Engine 2.0 y el Context Engine 3.0.
+> (P1-03), con briefing **LISTO PARA LANZAR** en `agentes/v356-planner-2.md`
+> (alcance cerrado: núcleo puro ELV + orden de la cola, `select_task` intacto,
+> argmax `(skill, actividad)` a V3.57, SIN migración y con degradación neutra
+> exacta `p = 0.5` → `ELV = priority`). Después, el Sense Engine 2.0 y el
+> Context Engine 3.0.
 >
 > **Nota (2026-09-13): V3.54.0 (Student Skill State 3.0)**
 > — release **v3.54.0**, **ADITIVA (una columna de BD)**, que conserva la

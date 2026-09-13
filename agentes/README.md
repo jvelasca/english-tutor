@@ -33,8 +33,12 @@ pedir más contexto.
 > Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
 > los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de
 > producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El siguiente
-> incremento es **V3.56**: el **Planner 2.0 / `expected_learning_value`** (P1-03);
-> el **Sense Engine 2.0** (`surface→lemma→sense→semantic_fit`) y el Context
+> incremento es **V3.56**: el **Planner 2.0 / `expected_learning_value`** (P1-03),
+> con briefing **LISTO PARA LANZAR** en `agentes/v356-planner-2.md` (alcance
+> cerrado con el gerente: núcleo ELV + orden de la cola por ELV, `select_task`
+> intacto, argmax `(skill, actividad)` a V3.57, SIN migración y con degradación
+> neutra exacta). El **Sense Engine 2.0**
+> (`surface→lemma→sense→semantic_fit`) y el Context
 > Engine siguen como candidatos. El briefing de V3.55 vive en
 > `agentes/v355-task-difficulty-3.md`. Antes de lanzar cualquier subagente,
 > lee esa sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al
@@ -50,6 +54,23 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v356-planner-2.md` — **V3.56 (LISTO PARA LANZAR, escrito 2026-09-13
+  sobre `v3.55.0` / `afb13ff`)**: **Planner 2.0 / `expected_learning_value`**
+  (P1-03 de la auditoría de V3.52, el último candidato grande abierto). Convierte
+  la prioridad del planner de una **suma de urgencia** en un **valor esperado de
+  aprendizaje**: `ELV = dificultad_deseable(p) × value`, con `p = P(éxito)`
+  derivada de una **tabla declarada por tramos** (`SUCCESS_BY_MARGIN`) sobre el
+  MARGEN entre la capacidad del alumno en la modalidad que la tarea evalúa
+  (`learner_skill.skill_capacity`) y la dificultad declarada del ítem
+  (`difficulty.declared_difficulty`), y `value = priority_score` (mismos pesos
+  declarados). Alcance CERRADO con el gerente: **núcleo ELV + orden de la cola
+  por ELV**, con `select_task` (la cascada de razones) **intacto** y el argmax
+  `(skill, actividad)` diferido a **V3.57**; **SIN migración de BD** y con
+  **degradación neutra exacta** (`p = 0.5` → `desirabilidad = 1.0` →
+  `ELV = priority` →
+  orden IDÉNTICO al de V3.55.0 cuando no hay estado del alumno). NO toca
+  `transfer_state`, sus umbrales, `context_signals`, `context_diversity`,
+  `CEFR_CAPACITY`, el scoring ni FSRS. **Pendiente de ejecución.**
 - `agentes/v355-task-difficulty-3.md` — **V3.55 (EJECUTADO, 2026-09-13,
   v3.55.0)**: **Task Difficulty 3.0**. Release ADITIVA (tres columnas de BD,
   `learning_evidence.declared_difficulty`/`served_difficulty`/
