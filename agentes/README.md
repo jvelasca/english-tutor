@@ -5,44 +5,38 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.55.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.55 (**Task Difficulty 3.0**, ejecutada
-> directamente por el gerente) es una release **ADITIVA (tres columnas de BD)**
-> que da nombres honestos a la dificultad de la TAREA (`declared`/`served`/
-> `observed_task_difficulty`), hace que la capacidad observada acredite lo
-> SUPERADO y no lo SERVIDO (descuento por andamiaje: `guided` −2, `cued` −1,
-> `independent`/`spontaneous` completo, `copied`/desconocido sin crédito) y
-> cablea la dificultad en las CUATRO vías del drill léxico (Word/Sentence,
-> Recall, Write y Transfer); hasta V3.54 solo Transfer la escribía, así que
-> `written_production`, `spoken_production` y `recall` no acumulaban capacidad.
-> `observed_difficulty` se conserva como proyección legacy de `served_difficulty`.
-> Cierra los P2-01 y P2-02 de la auditoría de V3.53.1. NO toca
-> `level_from_capacity`, el gate CEFR global de V3.53.1, `observed_skill_capacity`,
-> `learner_capacity`, `CEFR_CAPACITY`, la escalera `transfer_state`, sus
-> umbrales, `context_signals`, `context_diversity`, el scoring, el planner ni
-> FSRS. Tests: nuevo `test_task_difficulty_v355.py` (17), `pytest` **2223 passed**
-> en local, `ruff` limpio y `check_release_consistency` **3.55.0** exit 0. **CI
-> 6/6 en verde** (run
-> [34757345417](https://github.com/jvelasca/english-tutor/actions/runs/34757345417)
-> sobre `e9b5689`: Backend **2221 passed + 2 skipped**, Frontend tsc + vitest
-> **651** + build, Playwright **23**, Release consistency **3.55.0**, Content
-> validation y Beta V3.0 gate) con la etiqueta anotada `v3.55.0` creada y
-> empujada. La
-> V3.54 sigue como **Student Skill State 3.0** (P2-03), la V3.53.1 como
-> **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como **Learner
-> Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
-> los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de
-> producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El siguiente
-> incremento es **V3.56**: el **Planner 2.0 / `expected_learning_value`** (P1-03),
-> con briefing **LISTO PARA LANZAR** en `agentes/v356-planner-2.md` (alcance
-> cerrado con el gerente: núcleo ELV + orden de la cola por ELV, `select_task`
-> intacto, argmax `(skill, actividad)` a V3.57, SIN migración y con degradación
-> neutra exacta). El **Sense Engine 2.0**
-> (`surface→lemma→sense→semantic_fit`) y el Context
-> Engine siguen como candidatos. El briefing de V3.55 vive en
-> `agentes/v355-task-difficulty-3.md`. Antes de lanzar cualquier subagente,
-> lee esa sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al
-> saturar y ancla contra la alucinación).
+> **Estado actual (2026-09-13): `v3.56.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.56 (**Planner 2.0 /
+> `expected_learning_value`**, ejecutada directamente por el gerente) es una
+> release **SIN migración de BD y SIN cambios de UI** que convierte la prioridad
+> del planner de una **suma de urgencia** en un **valor esperado de aprendizaje**
+> (`ELV = dificultad_deseable(P) × value`) y ordena la cola de repaso por ELV:
+> `P(éxito)` sale del **margen** entre la capacidad del alumno en la modalidad
+> que la tarea evalúa (`learner_skill.skill_capacity`) y la dificultad declarada
+> del ítem (`difficulty.declared_difficulty`) por una **tabla declarada**
+> (`SUCCESS_BY_MARGIN`), `value = priority_score` (mismos pesos) y la degradación
+> sin estado del alumno es **exacta** (`p = 0.5` → `desirability = 1.0` →
+> `ELV = priority` → orden IDÉNTICO al de V3.55.0). `select_task` (la cascada de
+> razones) queda **intacto** y el argmax `(skill, actividad)` es el candidato de
+> **V3.57**. La lectura O(1) del estado del alumno se unifica en
+> `domain/learner_state.py` (la comparten cola y drill). NO toca
+> `transfer_state`, sus umbrales, `context_signals`, `context_diversity`,
+> `CEFR_CAPACITY`, el scoring, FSRS ni el Difficulty Engine. Tests: nuevo
+> `test_expected_learning_value_v356.py` (19), `pytest` **2242 passed** en local,
+> launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.56.0**. **CI: pendiente de ejecución tras el
+> push.** La V3.55 (**Task Difficulty 3.0**, tres columnas de BD) sigue como el
+> último cambio de ledger; la V3.54 como **Student Skill State 3.0** (P2-03), la
+> V3.53.1 como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como
+> **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
+> **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
+> **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
+> siguiente incremento es **V3.57**: el **argmax `(skill, actividad)` sobre ELV**
+> (el planner elige la tarea, no solo la ordena). El **Sense Engine 2.0**
+> (`surface→lemma→sense→semantic_fit`) y el Context Engine siguen como
+> candidatos. El briefing de V3.56 vive en `agentes/v356-planner-2.md`. Antes de
+> lanzar cualquier subagente, lee esa sección para no partir de un estado
+> obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
 
@@ -54,8 +48,8 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
-- `agentes/v356-planner-2.md` — **V3.56 (LISTO PARA LANZAR, escrito 2026-09-13
-  sobre `v3.55.0` / `afb13ff`)**: **Planner 2.0 / `expected_learning_value`**
+- `agentes/v356-planner-2.md` — **V3.56 (EJECUTADO, 2026-09-13, v3.56.0)**:
+  **Planner 2.0 / `expected_learning_value`**
   (P1-03 de la auditoría de V3.52, el último candidato grande abierto). Convierte
   la prioridad del planner de una **suma de urgencia** en un **valor esperado de
   aprendizaje**: `ELV = dificultad_deseable(p) × value`, con `p = P(éxito)`
@@ -70,7 +64,8 @@ pedir más contexto.
   `ELV = priority` →
   orden IDÉNTICO al de V3.55.0 cuando no hay estado del alumno). NO toca
   `transfer_state`, sus umbrales, `context_signals`, `context_diversity`,
-  `CEFR_CAPACITY`, el scoring ni FSRS. **Pendiente de ejecución.**
+  `CEFR_CAPACITY`, el scoring ni FSRS. **Histórico, hecho**; ver
+  `release-notes-v3.56.0.md`.
 - `agentes/v355-task-difficulty-3.md` — **V3.55 (EJECUTADO, 2026-09-13,
   v3.55.0)**: **Task Difficulty 3.0**. Release ADITIVA (tres columnas de BD,
   `learning_evidence.declared_difficulty`/`served_difficulty`/

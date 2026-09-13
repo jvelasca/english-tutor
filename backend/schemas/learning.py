@@ -60,6 +60,13 @@ class ReviewQueueItem(BaseModel):
     # la producen (explicables), explicación legible y modalidades en las que el
     # ítem ya es automático (P1-03). Aditivos.
     priority: float = 0.0
+    # V3.56 (Planner 2.0): valor ESPERADO de aprendizaje (`desirability(P) ×
+    # priority`), la clave de orden de la cola, y su payload explicable
+    # (`{expected_learning_value, p_success, desirability, value, margin,
+    # skill}`). Aditivos: `priority` se conserva exacto como desempate y sin
+    # estado del alumno el ELV degrada a la propia prioridad.
+    expected_learning_value: float = 0.0
+    learning_value: dict = Field(default_factory=dict)
     signals: dict | None = None
     why: str = ""
     automatic_skills: list[str] = Field(default_factory=list)

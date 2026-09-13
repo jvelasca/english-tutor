@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
+from domain import learner_state as learner_state_domain
 from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
@@ -46,10 +47,24 @@ REVIEW_QUEUE_CANDIDATE_LIMIT = 500
 
 
 def _queue_sort_key(item: dict) -> tuple:
-    """Orden de la cola: prioridad, urgencia del scheduler, palabra (V3.38.1)."""
+    """Orden de la cola: ELV, prioridad, urgencia del scheduler, palabra.
+
+    V3.56 (Planner 2.0): manda el valor ESPERADO de aprendizaje
+    (`expected_learning_value`), que combina la urgencia con la probabilidad de
+    éxito de la tarea. `priority` se conserva como primer desempate (misma
+    decisión de urgencia de V3.55) y el scheduler (menor retrievability) y la
+    palabra cierran. Un ítem legacy sin `expected_learning_value` cae a su
+    `priority`: con la degradación neutra de V3.56 ambos coinciden, así que el
+    orden de V3.55.0 se reproduce exactamente.
+    """
     retrievability = item.get("retrievability")
+    priority = float(item.get("priority") or 0.0)
+    learning_value = item.get("expected_learning_value")
+    if learning_value is None:
+        learning_value = priority
     return (
-        -float(item.get("priority") or 0.0),
+        -float(learning_value or 0.0),
+        -priority,
         retrievability if retrievability is not None else 1.0,
         item.get("word") or "",
     )
@@ -75,6 +90,13 @@ async def get_review_queue(
     solo acota por `REVIEW_QUEUE_CANDIDATE_LIMIT`; el recorte de presentación
     (`limit`) se aplica DESPUÉS del ranking global por prioridad, de modo que la
     "siguiente tarea óptima" ya no es "la mejor del subconjunto de FSRS".
+
+    V3.56 (Planner 2.0): el ranking pasa a ser el valor ESPERADO de aprendizaje
+    (`expected_learning_value`), que combina la urgencia con la probabilidad de
+    éxito de la tarea para el estado del alumno; `priority` queda como primer
+    desempate. El estado del alumno se lee UNA vez (O(1), caché del Student
+    Model) y sin perfil el ELV degrada EXACTAMENTE a la prioridad, así que el
+    orden de V3.55.0 se conserva.
 
     Nunca es una puerta (D5/E3): informa de lo que toca repasar; la actividad y
     su contenido los sirve el peldaño correspondiente (y el GET de ese peldaño
@@ -109,6 +131,10 @@ async def get_review_queue(
     evidence_by_word = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
     )
+    # V3.56 (Planner 2.0): el estado del alumno se lee UNA vez por cola (O(1),
+    # caché del Student Model) y se pasa a las DOS pasadas de `review_queue_item`
+    # (ranking y servido), para que orden y payload no puedan divergir.
+    learner_state = await learner_state_domain.learner_level_state(user_id)
     # V3.38.1: primera pasada SIN disponibilidad de contenido. La PRIORIDAD no
     # depende del cue recomendado, así que basta para el ranking global; así el
     # coste de resolver el cue (que consulta el corpus por palabra, P2 de V3.38)
@@ -129,6 +155,7 @@ async def get_review_queue(
             unit_surfaces=surfaces_by_unit.get(
                 lexicon.lexical_unit(row) or "", None
             ),
+            learner_state=learner_state,
         )
         for row, card in candidates
     ]
@@ -159,6 +186,7 @@ async def get_review_queue(
                 unit_surfaces=surfaces_by_unit.get(
                     lexicon.lexical_unit(row) or "", None
                 ),
+                learner_state=learner_state,
             )
         )
     return {

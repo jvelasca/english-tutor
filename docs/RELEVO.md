@@ -5,6 +5,66 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-13 (UTC+2).
 >
+> **Nota (2026-09-13): V3.56.0 (Planner 2.0 — `expected_learning_value`)**
+> — release **v3.56.0**, **SIN migración de BD y SIN cambios de UI**, que
+> convierte la prioridad del planner de una **suma de urgencia** en un **VALOR
+> ESPERADO DE APRENDIZAJE** y pasa a ordenar la cola de repaso por ELV. Es el
+> **P1-03** de la lista «V3.53+» que dejó abierta la auditoría externa de V3.52.
+> **Alcance CERRADO con el gerente:** el ELV **puntúa y ordena**, no elige la
+> tarea; `select_task` (la cascada de razones) queda **intacto** y el argmax
+> `(skill, actividad)` es el candidato de **V3.57**.
+> **(A) Núcleo puro (`services/planner.py`):** tabla DECLARADA
+> `SUCCESS_BY_MARGIN` (monótona no decreciente y acotada en `(0,1)`: margen
+> `−3…+3` → `p` `0.05…0.95`), `success_probability(margin)` (clamp fuera de
+> rango; neutro `P_SUCCESS_UNKNOWN = 0.5` sin dato y ante entradas no
+> numéricas/bool), `capacity_margin(task_difficulty, learner_capacity)` (el
+> **MÍNIMO** de las dimensiones declaradas por la tarea que existen en la
+> capacidad — el eslabón más débil manda; una dimensión sin capacidad NO se
+> cuenta como 0 y sin comparables devuelve `None`), `desirability(p) = 4·p·(1−p)`
+> acotado (máximo exacto `1.0` en `p = 0.5`: zona de desarrollo próximo) y
+> `expected_learning_value(signals, *, skill, task_difficulty, learner_capacity)`
+> → `{expected_learning_value, p_success, desirability, value, margin, skill}`
+> con `value = priority_score(signals)` (los MISMOS pesos declarados).
+> **(B) Degradación neutra EXACTA:** sin estado del alumno (o sin dificultad
+> declarada del ítem) `p = 0.5` → `desirability = 1.0` → `ELV = priority`, así
+> que el orden de la cola es **IDÉNTICO al de V3.55.0**, clave por clave; es el
+> invariante de no-regresión del incremento. **(C) Cableado del ítem
+> (`services/lexicon.review_queue_item`):** parámetro opcional `learner_state`;
+> resuelve la modalidad que la tarea evalúa (`task["skill"]` con caída a
+> `limiting_skill`), el suelo de ESA modalidad (`student_state.skill_floor`), la
+> capacidad (`learner_skill.skill_capacity`) y la dificultad declarada del ítem
+> (`difficulty.declared_difficulty` sobre su CEFR léxico). Expone, **aditivos**,
+> `expected_learning_value` y `learning_value`, sin alterar `priority`,
+> `signals`, `why`, `task` ni `skill_priorities`; `explain_priority` gana frases
+> aditivas de capacidad solo cuando la predicción existe (`P_SUCCESS_LOW`/
+> `P_SUCCESS_HIGH`). **Limitación documentada:** en `transfer` el vector real es
+> el del CONTEXTO, todavía no elegido en la cola, así que se usa la dificultad
+> léxica declarada del ítem. **(D) Una sola lectura del estado del alumno:**
+> nuevo `domain/learner_state.py` con la lectura O(1) de la caché del Student
+> Model, compartida por la cola y el drill (premisa 10); `domain/vocabulary`
+> delega y `_skill_floor` pasa a `services.student_state.skill_floor`. No se
+> ubica en `domain.profile` porque `domain.academy` importa `domain.vocabulary` y
+> se crearía el ciclo `vocabulary → profile → academy → vocabulary`. **(E) Orden
+> de la cola (`domain/review.py`):** `_queue_sort_key =
+> (-expected_learning_value, -priority, retrievability, word)`; el estado del
+> alumno se lee UNA vez por cola y se pasa a las DOS pasadas de
+> `review_queue_item` (ranking y servido), de modo que orden y payload no pueden
+> divergir. **(F) Contrato aditivo:** `ReviewQueueItem.expected_learning_value`/
+> `learning_value` (`schemas/learning.py`) con espejo opcional en
+> `frontend/src/types/api.ts`; sin cambio de UI ni del número de ítems/`due_count`.
+> **NO cambia:** `select_task`/`ACTIVITY_FOR_SKILL`/`EVIDENCE_REASON_ORDER`,
+> `PRIORITY_WEIGHTS`, los umbrales de
+> `transfer_state`/`context_signals`/`context_diversity`/`CEFR_CAPACITY`/
+> `DIFFICULTY_TOLERANCE*`/`SUPPORT_DISCOUNT_STEPS`, el scoring, FSRS ni el
+> Difficulty Engine; sin migraciones ni columnas nuevas. Tests: nuevo
+> `test_expected_learning_value_v356.py` (19), `pytest` **2242 passed** en local,
+> launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.56.0**. **CI: pendiente de ejecución tras el
+> push.** Ver `release-notes-v3.56.0.md`.
+> **Siguiente paso:** V3.57 — el **argmax `(skill, actividad)` sobre ELV** (el
+> planner elige la tarea, no solo la ordena) y, después, el Sense Engine 2.0 y el
+> Context Engine 3.0.
+>
 > **Nota (2026-09-13): V3.55.0 (Task Difficulty 3.0)**
 > — release **v3.55.0**, **ADITIVA (tres columnas de BD)**, que da nombres
 > honestos a la dificultad de la TAREA y hace que la capacidad observada acredite

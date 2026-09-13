@@ -896,6 +896,11 @@ export interface ReviewQueueItem {
   // V3.38 (planner / Optimal Next Task): prioridad combinada 0..1, señales que
   // la producen, explicación legible y modalidades ya automáticas (P1-03).
   priority?: number;
+  // V3.56 (Planner 2.0): valor esperado de aprendizaje (`desirability(P) ×
+  // priority`) y su payload explicable. Aditivos: sin estado del alumno el ELV
+  // coincide con `priority`.
+  expected_learning_value?: number;
+  learning_value?: Record<string, unknown>;
   signals?: Record<string, unknown> | null;
   why?: string;
   automatic_skills?: string[];

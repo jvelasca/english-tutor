@@ -37,7 +37,16 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timezone
 
-from services import forgetting, fsrs, mastery, planner, semantics
+from services import (
+    difficulty,
+    forgetting,
+    fsrs,
+    learner_skill,
+    mastery,
+    planner,
+    semantics,
+    student_state,
+)
 from services.curriculum import CEFR_ORDER
 from services.evidence import (
     CONTEXT_TRANSFER_MIN,
@@ -594,6 +603,7 @@ def review_queue_item(
     evidence: dict | None = None,
     available_cues: object | None = None,
     unit_surfaces: list[str] | None = None,
+    learner_state: dict | None = None,
 ) -> dict:
     """Ítem de la cola de repaso lexica (V3.35), pura y determinista.
 
@@ -649,6 +659,23 @@ def review_queue_item(
 
     - `transfer_confidence` — confianza explicable del eje de transferencia
       (`score`/`level`/`drivers`), derivada de la misma evidencia fina.
+
+    V3.56 (Planner 2.0) añade, aditivos y sin cambiar ningún campo previo:
+
+    - `expected_learning_value` — valor ESPERADO de aprendizaje
+      (`planner.expected_learning_value`): `desirability(P) × priority`. Con
+      `learner_state=None` (o sin dificultad declarada del ítem) degrada de forma
+      EXACTA a `priority`, así que el orden de V3.55.0 no cambia;
+    - `learning_value` — el payload explicable de esa predicción (`p_success`,
+      `desirability`, `value`, `margin`, `skill`). `learner_state` es el estado
+      O(1) del alumno (`domain.learner_state.learner_level_state`, compartido con
+      el drill): de él salen el suelo de la modalidad que la tarea evalúa y la
+      capacidad por dimensión.
+
+    Limitación documentada: para la tarea `transfer` el vector real es el del
+    CONTEXTO, que aún no está elegido en la cola (lo elige el GET del peldaño);
+    aquí se usa la dificultad léxica DECLARADA del ítem, igual que en los demás
+    drills de ítem.
     """
     matrix = item_competence_matrix(row)
     summary = evidence if evidence is not None else {}
@@ -666,6 +693,8 @@ def review_queue_item(
     signals = planner.planned_signals(
         summary, matrix, retrievability=retrievability
     )
+    task = _task_decision(matrix, summary, signals, recommendation)
+    learning_value = _learning_value(row, task, signals, learner_state)
     recommended_cue = ""
     if recommendation["activity"] == "recall":
         ideal = (
@@ -693,15 +722,22 @@ def review_queue_item(
         "automatic": is_automatic(summary),
         "automatic_skills": automatic_skills(summary),
         "priority": planner.priority_score(signals),
+        # V3.56 (Planner 2.0): valor ESPERADO de aprendizaje (aditivo). `priority`
+        # se conserva exacto y sigue siendo el primer desempate; el ELV manda en
+        # el orden y `learning_value` explica la predicción de éxito.
+        "expected_learning_value": learning_value["expected_learning_value"],
+        "learning_value": learning_value,
         "signals": signals,
-        "why": planner.explain_priority(signals, recommendation["reason"]),
+        "why": planner.explain_priority(
+            signals, recommendation["reason"], learning_value
+        ),
         # V3.39 (Fase 3): decisión de tarea óptima (skill limitante + actividad
         # + apoyo declarado). Aditivo: `activity`/`reason` conservan su
         # semántica y `task` la explica.
         "limiting_skill": planner.limiting_skill(signals),
         # V3.51: vector completo de prioridad por modalidad (aditivo).
         "skill_priorities": planner.skill_priorities(signals),
-        "task": _task_decision(matrix, summary, signals, recommendation),
+        "task": task,
         "competence": matrix,
         # V3.40 (Fase 4): estado a nivel de UNIDAD (formas hermanas) y
         # transferencia contextual. Aditivos: el drill sigue practicando `word`.
@@ -744,6 +780,37 @@ def _task_decision(
         "reason": recommendation.get("reason") or "",
         "support_level": planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
     }
+
+
+def _learning_value(
+    row: dict,
+    task: dict,
+    signals: dict,
+    learner_state: dict | None,
+) -> dict:
+    """Predicción de éxito de la tarea del ítem (V3.56, puro).
+
+    Resuelve la modalidad que la tarea evalúa (`task["skill"]`, con caída a la
+    modalidad limitante), el suelo de ESA modalidad (`student_state.skill_floor`,
+    misma política que el drill), la capacidad por dimensión
+    (`learner_skill.skill_capacity`) y la dificultad DECLARADA del ítem
+    (`difficulty.declared_difficulty` sobre su CEFR léxico). Sin
+    `learner_state` o sin dificultad declarada devuelve el neutro exacto
+    (`ELV = priority`). Nunca lanza.
+    """
+    skill = (task or {}).get("skill") or planner.limiting_skill(signals)
+    state = learner_state if isinstance(learner_state, dict) else {}
+    floor, _ = student_state.skill_floor(state, skill)
+    capacity = learner_skill.skill_capacity(
+        floor, state.get("observed_skill_capacity"), skill
+    )["capacity"]
+    task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
+    return planner.expected_learning_value(
+        signals,
+        skill=skill,
+        task_difficulty=task_difficulty,
+        learner_capacity=capacity,
+    )
 
 
 # Canales de producción registrados en columnas `<channel>_prod` de la tabla

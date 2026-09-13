@@ -177,6 +177,27 @@ def floor_level_for_skill(
     return floor_level(practice_level, estimated_cefr, "", observed_cefr)
 
 
+def skill_floor(learner_state: object, skill: object) -> tuple[str, str]:
+    """Suelo (nivel, fuente) de la modalidad que la tarea mide (V3.56, pura).
+
+    Lee `floor_level_by_skill`/`floor_source_by_skill` del estado del alumno y
+    cae al suelo GLOBAL si el skill no está en el mapa (caché legacy o skill no
+    canónico): es la misma política que usaba el drill (`domain.vocabulary`),
+    movida a un único sitio para que la cola de repaso y el drill no puedan
+    divergir (premisa 10). V3.56 la consume también el planner del léxico, que no
+    puede importar capas de dominio. Nunca lanza.
+    """
+    state = learner_state if isinstance(learner_state, Mapping) else {}
+    key = str(skill or "")
+    by_skill = state.get("floor_level_by_skill")
+    source_by_skill = state.get("floor_source_by_skill")
+    by_skill = by_skill if isinstance(by_skill, Mapping) else {}
+    source_by_skill = source_by_skill if isinstance(source_by_skill, Mapping) else {}
+    floor = str(by_skill.get(key) or state.get("floor_level") or "")
+    source = str(source_by_skill.get(key) or state.get("floor_source") or "")
+    return floor, source
+
+
 def empty_state() -> dict[str, str]:
     """Estado neutro (sin nivel conocido). Dict nuevo en cada llamada."""
     return dict(_EMPTY_STATE)

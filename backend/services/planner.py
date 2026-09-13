@@ -31,6 +31,7 @@ ya calculados. Nunca lanza.
 
 from __future__ import annotations
 
+from services import difficulty
 from services.evidence import (
     LEXICAL_SKILLS,
     RECALL_SKILL,
@@ -58,6 +59,43 @@ SLOW_RECALL_MS = 8000.0
 
 # Techo de normalización de la latencia (ms): por encima, `latency` = 1.0.
 LATENCY_CEILING_MS = 20000.0
+
+# ---------------------------------------------------------------------------
+# V3.56 (Planner 2.0): valor ESPERADO de aprendizaje.
+#
+# Hasta V3.55 el planner solo sabía cuánto URGE repasar un ítem (suma ponderada
+# de olvido, hueco, debilidad, apoyo y latencia). No predecía si el alumno PODRÁ
+# con la tarea. El ELV combina las dos mitades:
+#
+#   P(éxito)   ← margen de CAPACIDAD (capacidad del alumno − dificultad declarada
+#                de la tarea, en la dimensión limitante);
+#   V(valor)   ← `priority_score` (mismos pesos declarados; no se añade ninguno);
+#   ELV        = dificultad_deseable(P) × V   (máximo en P ≈ 0.5).
+#
+# La curva `SUCCESS_BY_MARGIN` es una tabla DECLARADA, monótona no decreciente y
+# acotada en (0, 1): nada de parámetros estimados por datos ni de meterse
+# `retrievability` en `p` (el olvido sigue pesando donde ya pesaba, dentro del
+# valor). El margen se declara en PASOS de carga (1..5): −1 significa que la
+# tarea pide una unidad más que la capacidad del alumno en su eslabón más débil.
+SUCCESS_BY_MARGIN: dict[int, float] = {
+    -3: 0.05,
+    -2: 0.15,
+    -1: 0.35,
+    0: 0.55,
+    1: 0.75,
+    2: 0.90,
+    3: 0.95,
+}
+
+# Sin capacidad del alumno o sin dificultad declarada del ítem la predicción es
+# NEUTRA: `p = 0.5` → `desirability(0.5) = 1.0` → `ELV = priority`. Es el
+# invariante de no-regresión de V3.56: la cola queda idéntica a la de V3.55.0.
+P_SUCCESS_UNKNOWN = 0.5
+
+# Umbrales DECLARADOS de la explicación (`why`): por debajo, la tarea está por
+# encima de la capacidad observada; por encima, sobra. Aditivos.
+P_SUCCESS_LOW = 0.35
+P_SUCCESS_HIGH = 0.75
 
 # Fallos "otra palabra" (NO errata) que exigen volver a practicar el ítem: una
 # errata dice que el alumno sabe la palabra; `wrong_word` dice que no.
@@ -155,6 +193,111 @@ def _ratio(part: int, total: int) -> float:
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
+
+
+# ---------------------------------------------------------------------------
+# V3.56: núcleo puro del valor esperado de aprendizaje (Planner 2.0).
+# ---------------------------------------------------------------------------
+
+
+def success_probability(margin: object) -> float:
+    """Probabilidad de éxito por MARGEN de capacidad (V3.56, pura).
+
+    `margin` es `capacidad − dificultad` en la dimensión limitante (ver
+    `capacity_margin`). `None` (sin capacidad o sin dificultad declarada) y
+    cualquier entrada no numérica degradan al NEUTRO `P_SUCCESS_UNKNOWN`: no se
+    inventa predicción sin datos. Fuera de la tabla se recorta al extremo más
+    cercano (clamp), de modo que un margen enorme nunca sale de (0, 1) ni lanza.
+    """
+    if margin is None or isinstance(margin, bool):
+        return P_SUCCESS_UNKNOWN
+    try:
+        value = int(margin)
+    except (TypeError, ValueError):
+        return P_SUCCESS_UNKNOWN
+    low = min(SUCCESS_BY_MARGIN)
+    high = max(SUCCESS_BY_MARGIN)
+    if value < low:
+        return SUCCESS_BY_MARGIN[low]
+    if value > high:
+        return SUCCESS_BY_MARGIN[high]
+    return SUCCESS_BY_MARGIN[value]
+
+
+def capacity_margin(task_difficulty: object, learner_capacity: object) -> int | None:
+    """Margen de capacidad de la tarea: mínimo de las dimensiones comparables.
+
+    Normaliza ambos vectores (`difficulty.normalize_vector`) y devuelve el
+    MÍNIMO margen de las dimensiones que la TAREA declara y existen en la
+    capacidad: la tarea falla por su eslabón más débil, así que la restricción
+    limitante manda.
+
+    Una dimensión declarada por la tarea pero SIN capacidad no se cuenta como 0
+    (no se inventa un margen negativo sin evidencia). Sin ninguna dimensión
+    comparable, o sin dificultad declarada, devuelve `None` (predicción neutra).
+    Nunca lanza.
+    """
+    task = difficulty.normalize_vector(task_difficulty)
+    capacity = difficulty.normalize_vector(learner_capacity)
+    if not task or not capacity:
+        return None
+    margins = [
+        capacity[dimension] - load
+        for dimension, load in task.items()
+        if dimension in capacity
+    ]
+    if not margins:
+        return None
+    return min(margins)
+
+
+def desirability(p_success: object) -> float:
+    """Factor de dificultad DESEABLE (zona de desarrollo próximo) (V3.56, pura).
+
+    `4·p·(1−p)` acotado a [0, 1]: máximo exacto en `p = 0.5` (ni trivial ni
+    inalcanzable valen poco) y 0 en los extremos. Con el neutro `p = 0.5` da
+    `1.0`, que es lo que hace que la degradación sin estado sea exacta
+    (`ELV = priority`). Nunca lanza.
+    """
+    try:
+        value = _clamp(float(p_success))
+    except (TypeError, ValueError):
+        value = P_SUCCESS_UNKNOWN
+    return round(_clamp(4.0 * value * (1.0 - value)), 4)
+
+
+def expected_learning_value(
+    signals: dict,
+    *,
+    skill: str = "",
+    task_difficulty: object = None,
+    learner_capacity: object = None,
+) -> dict:
+    """Valor ESPERADO de aprendizaje de la tarea (V3.56, puro y determinista).
+
+    Combina el valor pedagógico declarado (`priority_score(signals)`, los MISMOS
+    pesos) con la probabilidad de éxito por margen de capacidad:
+
+        ELV = desirability(p_success) × value
+
+    Devuelve `{expected_learning_value, p_success, desirability, value, margin,
+    skill}`. Sin capacidad ni dificultad declarada: `margin = None`,
+    `p_success = 0.5`, `desirability = 1.0` y `ELV = value` (degradación neutra
+    EXACTA de la cola). `skill` es la modalidad que la tarea evalúa (explicable).
+    Nunca lanza.
+    """
+    value = priority_score(signals)
+    margin = capacity_margin(task_difficulty, learner_capacity)
+    p_success = success_probability(margin)
+    desirability_factor = desirability(p_success)
+    return {
+        "expected_learning_value": round(desirability_factor * value, 4),
+        "p_success": p_success,
+        "desirability": desirability_factor,
+        "value": value,
+        "margin": margin,
+        "skill": skill,
+    }
 
 
 def error_prone(evidence: dict | None) -> bool:
@@ -646,12 +789,43 @@ def priority_score(signals: dict) -> float:
     return round(_clamp(total), 4)
 
 
-def explain_priority(signals: dict, reason: str = "") -> str:
+def _capacity_phrases(learning_value: dict | None) -> list[str]:
+    """Frases ADITIVAS de capacidad para `why` (V3.56, pura).
+
+    Solo cuando hay predicción (`learning_value` con `margin` no `None`): sin
+    margen no se inventa explicación de capacidad. Los umbrales son declarados
+    (`P_SUCCESS_LOW`/`P_SUCCESS_HIGH`). Nunca lanza.
+    """
+    if not isinstance(learning_value, dict):
+        return []
+    if learning_value.get("margin") is None:
+        return []
+    try:
+        p_success = float(learning_value.get("p_success"))
+    except (TypeError, ValueError):
+        return []
+    if p_success <= P_SUCCESS_LOW:
+        return ["currently above your observed capacity"]
+    if p_success >= P_SUCCESS_HIGH:
+        return ["well within your observed capacity"]
+    return [
+        f"challenging but achievable (about {round(p_success * 100)}%"
+        " expected success)"
+    ]
+
+
+def explain_priority(
+    signals: dict, reason: str = "", learning_value: dict | None = None
+) -> str:
     """Explicación legible (inglés) de por qué esta tarea es la siguiente.
 
     Mismo registro que `services.adaptive.explain_priority`: frases cortas
     separadas por `; `, deterministas y en inglés (el contrato `why` del
-    proyecto). Nunca lanza.
+    proyecto). V3.56 añade frases ADITIVAS de capacidad cuando la predicción
+    existe (`learning_value` con `margin` no `None`): por debajo de
+    `P_SUCCESS_LOW` la tarea está por encima de lo observado, por encima de
+    `P_SUCCESS_HIGH` sobra, y en medio se explica el porcentaje esperado. Sin
+    predicción, las frases son exactamente las de V3.55. Nunca lanza.
     """
     parts: list[str] = []
     if reason == "weak_recognition":
@@ -674,6 +848,7 @@ def explain_priority(signals: dict, reason: str = "") -> str:
         parts.append("used in one context only; time to transfer it")
     if reason == "automatic_maintenance":
         parts.append("automatic: spaced independent success")
+    parts.extend(_capacity_phrases(learning_value))
     try:
         forgetting = float(signals.get("forgetting") or 0.0)
     except (TypeError, ValueError):
