@@ -21,7 +21,10 @@ pedir más contexto.
 > FSRS. Contratos aditivos `LearningProfile.observed_skill_capacity`/
 > `observed_skill_level`/`skill_coverage` y `TransferContextOut.capacity_skill`
 > (con espejo TS). Tests: nuevo `test_learner_skill_v354.py` (19), `ruff` limpio
-> y `check_release_consistency` **3.54.0** exit 0. La V3.53.1 sigue como
+> y `check_release_consistency` **3.54.0** exit 0. **CI 6/6 en verde** (run
+> [34755745179](https://github.com/jvelasca/english-tutor/actions/runs/34755745179)
+> sobre `b2929e1`: pytest **2204 passed + 2 skipped**, vitest **651**, Playwright
+> **23**) con la etiqueta anotada `v3.54.0` creada y empujada. La V3.53.1 sigue como
 > **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como **Learner
 > Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
 > los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de

@@ -103,6 +103,15 @@ la caché legacy (sin estado por skill) delega en el comportamiento de V3.53.1.
   `test_difficulty_engine_v352.py`, `test_task_semantics_v351.py` y
   `test_transfer_*.py`.
 - `ruff` limpio; `check_release_consistency` (**3.54.0**).
+- **CI 6/6 en verde** (run
+  [34755745179](https://github.com/jvelasca/english-tutor/actions/runs/34755745179)
+  sobre `b2929e1`): Backend (ruff + pytest, **2204 passed + 2 skipped**), Frontend
+  (tsc + vitest **76 ficheros/651 tests** + build), Release consistency
+  (**3.54.0**), Beta V3.0 gate, Content validation y Playwright E2E (visual,
+  **23 passed**). Los 2 skipped son `backend/tests/test_stt_asr_integration.py`
+  (modelo Whisper no descargado en el runner, opt-in); con el modelo disponible en
+  local el mismo árbol da **2206 passed**. Etiqueta anotada `v3.54.0` creada y
+  empujada sobre `b2929e1`.
 
 ## Fuera de alcance (V3.55+)
 

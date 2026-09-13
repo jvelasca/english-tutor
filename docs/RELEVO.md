@@ -35,7 +35,11 @@
 > `CEFR_CAPACITY`, `transfer_state` y sus umbrales, `context_signals`,
 > `context_diversity`, el scoring, el planner ni FSRS. Tests: nuevo
 > `test_learner_skill_v354.py` (19) + ajuste del estado neutro; `ruff` limpio y
-> `check_release_consistency` **3.54.0**. Ver `release-notes-v3.54.0.md`.
+> `check_release_consistency` **3.54.0**. **CI 6/6 en verde** (run
+> [34755745179](https://github.com/jvelasca/english-tutor/actions/runs/34755745179)
+> sobre `b2929e1`: pytest **2204 passed + 2 skipped**, vitest **651**, Playwright
+> **23**) con la etiqueta anotada `v3.54.0` creada y empujada. Ver
+> `release-notes-v3.54.0.md`.
 > **Siguiente paso:** V3.55 (P2-01 `declared`/`served`/`observed_task_difficulty`
 > y P2-02 capacidad con apoyo/independencia/latencia) y, con ellos, el
 > **Planner 2.0 / `expected_learning_value`** (P1-03).
