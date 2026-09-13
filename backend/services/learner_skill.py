@@ -1,4 +1,4 @@
-"""Learner Skill State 2.0: capacidad OBSERVADA por dimensión (V3.53).
+"""Learner Skill State 2.0: capacidad OBSERVADA por dimensión (V3.53 → V3.53.1).
 
 V3.52 formalizó el estado del alumno como un NIVEL CEFR con su fuente
 (`practice`/`estimated`/`demonstrated`, ver `services.student_state`), pero ese
@@ -17,10 +17,12 @@ TAREA servida) en una capacidad por dimensión:
   `independent_success_days`/`recall_rung_days`. Se toma el máximo entre las
   modalidades que cumplen, así que no se inventa capacidad donde no hay muestra.
 - `level_from_capacity` — nivel CEFR EQUIVALENTE: el mayor cuya envolvente del
-  banco (`services.difficulty.CEFR_CAPACITY`) queda DOMINADA por la capacidad
-  observada en las dimensiones CON muestra. Una dimensión sin muestra no bloquea
-  (no se sabe nada de ella), pero tampoco asciende: la función es conservadora
-  por construcción.
+  banco (`services.difficulty.CEFR_CAPACITY`) queda DOMINADA en TODAS sus
+  dimensiones por la capacidad observada. Es un RESUMEN DERIVADO, nunca la fuente
+  de verdad: `observed_capacity` es la fuente primaria (por dimensión) y la
+  etiqueta global solo se declara con COBERTURA DIMENSIONAL COMPLETA, porque un
+  nivel CEFR exige capacidades multidimensionales (V3.53.1, P1-01: antes una
+  sola dimensión podía producir un CEFR global excesivamente alto).
 - `learner_capacity` — SUELO efectivo por dimensión para el Difficulty Engine:
   el máximo entre la capacidad del nivel de suelo declarado y la observada. Sube
   el reto solo donde hay evidencia y NUNCA baja el suelo declarado.
@@ -29,6 +31,10 @@ Alternativas rechazadas (documentadas para que no se reintroduzcan):
 
 - persistir una media escalar del vector: colapsaría las dimensiones, el P1 que
   cerraron V3.52/V3.52.2;
+- declarar un nivel global con cobertura dimensional parcial (o con una dimensión
+  sin muestra): convierte «capacidad léxica compatible con C2» en «nivel C2»,
+  que es exactamente la afirmación que cierra V3.53.1 (P1-01 de la auditoría de
+  V3.53.0);
 - ascender con un solo éxito o con dos el mismo día: confunde volumen con
   retención (premisa del ledger longitudinal);
 - reescribir `CEFR_CAPACITY`: es la tabla del BANCO (envelope monótono,
@@ -92,9 +98,13 @@ def level_from_capacity(observed: object) -> str:
     """Nivel CEFR EQUIVALENTE de una capacidad observada por dimensión (pura).
 
     Devuelve el mayor nivel cuya `CEFR_CAPACITY` (envolvente del banco) queda
-    dominada por `observed` en las dimensiones CON muestra. Las dimensiones sin
-    muestra no bloquean (no hay señal que las contradiga) pero tampoco ascienden:
-    sin ninguna muestra devuelve `""` (no se inventa nivel). Nunca lanza.
+    dominada por `observed` en TODAS sus dimensiones: es un resumen DERIVADO con
+    COBERTURA DIMENSIONAL COMPLETA. Se recorren las dimensiones que exige el
+    NIVEL candidato (no las observadas), así que una dimensión sin muestra cuenta
+    0 y BLOQUEA la etiqueta global (V3.53.1, P1-01): un `observed_capacity` de
+    una sola dimensión nunca se convierte en un CEFR global. `observed_capacity`
+    sigue siendo la fuente de verdad por dimensión. Sin ninguna muestra devuelve
+    `""` (no se inventa nivel). Nunca lanza.
     """
     capacity = difficulty.normalize_vector(observed)
     if not capacity:
@@ -104,12 +114,10 @@ def level_from_capacity(observed: object) -> str:
         target = difficulty.capacity_for(level)
         if not target:
             continue
-        dominated = all(
-            capacity[dimension] >= target[dimension]
-            for dimension in capacity
-            if dimension in target
-        )
-        if dominated:
+        if all(
+            capacity.get(dimension, 0) >= load
+            for dimension, load in target.items()
+        ):
             best = level
     return best
 

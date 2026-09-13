@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.53.1] — 2026-09-13
+
+**Observed CEFR Safety Gate. Patch SIN migración de BD, SIN cambios de contrato y SIN tocar `observed_capacity`, `learner_capacity`, `CEFR_CAPACITY`, el planner ni FSRS. Determinista, sin LLM.**
+
+Versión de app `3.53.0 → 3.53.1`. Backend (`services/learner_skill.py`, `tests/test_learner_skill_v353.py`) + release notes y docs.
+
+- **P1-01 de la auditoría de V3.53.0 — `level_from_capacity()` podía inflar el CEFR global.** La derivación iteraba las dimensiones CON muestra y una dimensión sin muestra «no bloqueaba», así que `observed_capacity = {"lexical": 5}` producía un `observed_level = "C2"`: convertía «capacidad léxica compatible con C2» en un nivel CEFR GLOBAL que exige capacidades multidimensionales. Ahora `level_from_capacity` recorre las dimensiones que exige el NIVEL candidato (no las observadas), cuenta 0 en las que no tienen muestra y exige **cobertura dimensional COMPLETA** para cualquier etiqueta global. `observed_capacity` sigue siendo la fuente de verdad por dimensión y `observed_level` pasa a ser un RESUMEN DERIVADO (nunca la fuente de verdad).
+- **Casos de aceptación.** `{"lexical": 5}` → `""` (antes `"C2"`); `{"lexical": 5, "syntax": 3, "discourse": 4, "interaction": 3}` → `"B2"`; envolvente completa de C1 → `"C1"` (C2 bloqueado por `lexical 4 < 5`); cobertura 3/4 → `""`. La capacidad rica por dimensión se conserva y `learner_capacity` sigue subiendo el reto SOLO en las dimensiones observadas, sin bajar el suelo declarado.
+- **Sin cambios de esquema ni de contrato.** No se tocan `learning_profile.observed_level`/`observed_capacity` (las columnas siguen igual), `TransferContextOut`/`LearningProfile` ni el espejo TS. La corrección es puramente de derivación del resumen.
+- **Tests.** Reescrito `test_level_from_capacity_is_conservative` como `test_level_from_capacity_requires_full_dimensional_coverage`, con dos tests nuevos de aceptación multidimensional y uno de no-regresión (`observed_capacity` intacta y `learner_capacity` subiendo solo lo observado en cobertura parcial). Cero regresión en `test_difficulty_engine_v352.py`, `test_student_state_v352.py`, `test_observed_difficulty_v353.py`, `test_transfer_*.py` y `test_user_profile.py`.
+- **Fuera de alcance (V3.54+).** Renombrar/desdoblar `observed_difficulty` en `served_difficulty`/`observed_task_difficulty` (P2-01), enriquecer la capacidad observada con apoyo/transfer/latencia/errores (P2-02), el Student Skill State `skill × dimension` (P2-03) y la residual «fuga» del nivel global a `learner_capacity` con cobertura parcial; todos van con el Planner 2.0 / `expected_learning_value` (P1-03).
+
 ## [3.53.0] — 2026-09-11
 
 **Learner Skill State 2.0 + `observed_difficulty`. Release ADITIVA (tres columnas de BD) que cierra el P1-02 diferido desde V3.52 y monta el primer Student Skill State OBSERVADO, SIN tocar `transfer_state`, sus umbrales, `context_signals`, `context_diversity`, `score_transfer_attempt`, el planner ni FSRS. Determinista, sin LLM.**

@@ -107,21 +107,52 @@ def test_observed_capacity_takes_the_max_across_qualifying_modalities():
     assert learner_skill.observed_capacity(signals) == {"lexical": 3, "syntax": 2}
 
 
-def test_level_from_capacity_is_conservative():
+def test_level_from_capacity_requires_full_dimensional_coverage():
     # Sin muestra no hay nivel.
     assert learner_skill.level_from_capacity({}) == ""
     assert learner_skill.level_from_capacity(None) == ""
-    # Solo con léxico alto no se declara un nivel altísimo: las dimensiones sin
-    # muestra no bloquean, pero el nivel se decide por las que SÍ la tienen.
-    assert learner_skill.level_from_capacity({"lexical": 1}) == "A1"
-    # Dominar todas las dimensiones de A2 en adelante acredita A2.
+    # V3.53.1 (P1-01): una sola dimensión NO produce un CEFR global. Una
+    # capacidad léxica compatible con C2 no es un nivel C2: el resto de
+    # dimensiones del nivel no tiene muestra y bloquean la etiqueta global.
+    assert learner_skill.level_from_capacity({"lexical": 1}) == ""
+    assert learner_skill.level_from_capacity({"lexical": 5}) == ""
+    assert learner_skill.level_from_capacity({"discourse": 2}) == ""
+    assert learner_skill.level_from_capacity({"discourse": 3}) == ""
+    # Cobertura PARCIAL (3 de 4 dimensiones) tampoco declara nivel global.
+    assert learner_skill.level_from_capacity(
+        {"lexical": 5, "syntax": 5, "discourse": 5}
+    ) == ""
+    # Con cobertura COMPLETA el nivel se decide por la dimensión LIMITANTE.
     a2 = difficulty.capacity_for("A2")
     assert learner_skill.level_from_capacity(a2) == "A2"
-    # Un nivel superior exige dominar al menos las dimensiones con muestra.
-    # `discourse` 2 domina A2 (interaction 3 queda sin muestra y no bloquea),
-    # pero no B1 (discourse 3).
-    assert learner_skill.level_from_capacity({"discourse": 2}) == "A2"
-    assert learner_skill.level_from_capacity({"discourse": 3}) == "B1"
+
+
+def test_level_from_capacity_cases_are_multidimensional():
+    # Caso 1: solo léxico C2 -> sin nivel global (la capacidad se conserva).
+    assert learner_skill.level_from_capacity({"lexical": 5}) == ""
+    # Caso 2: léxico C2 con el resto en B2 (interaction 3 < C1 5) -> B2.
+    assert learner_skill.level_from_capacity(
+        {"lexical": 5, "syntax": 3, "discourse": 4, "interaction": 3}
+    ) == "B2"
+    # Caso 3: la envolvente completa de C1 (lexical 4, resto 5) -> C1; C2
+    # queda bloqueado por el léxico (4 < 5).
+    assert learner_skill.level_from_capacity(difficulty.capacity_for("C1")) == "C1"
+    assert learner_skill.level_from_capacity(difficulty.capacity_for("C2")) == "C2"
+
+
+def test_partial_coverage_keeps_capacity_and_raises_only_observed_dimensions():
+    # La corrección NO destruye `observed_capacity` (fuente de verdad) ni la
+    # subida por dimensión: sin nivel global, `learner_capacity` sigue subiendo
+    # el reto SOLO donde hay evidencia y conserva el suelo declarado.
+    partial = {"lexical": 5}
+    assert learner_skill.level_from_capacity(partial) == ""
+    raised = learner_skill.learner_capacity("B1", partial)
+    floor = difficulty.capacity_for("B1")
+    assert raised["lexical"] == 5
+    assert raised["syntax"] == floor["syntax"]
+    assert raised["discourse"] == floor["discourse"]
+    assert raised["interaction"] == floor["interaction"]
+
 
 
 def test_learner_capacity_never_lowers_the_declared_floor():

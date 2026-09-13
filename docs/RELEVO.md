@@ -3,7 +3,26 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-11 (UTC+2).
+> Actualizado por última vez: 2026-09-13 (UTC+2).
+>
+> **Nota (2026-09-13): V3.53.1 (Observed CEFR Safety Gate)**
+> — patch **v3.53.1**, SIN migración de BD y SIN cambios de contrato, que cierra
+> el **P1-01** de la auditoría de V3.53.0. `services.learner_skill.
+> level_from_capacity` iteraba las dimensiones CON muestra y trataba una sin
+> muestra como «no bloquea», así que `observed_capacity = {"lexical": 5}`
+> producía un `observed_level = "C2"` (capacidad léxica compatible con C2
+> convertida en un CEFR GLOBAL). Ahora recorre las dimensiones que exige el
+> NIVEL candidato (no las observadas), cuenta 0 en las sin muestra y exige
+> **cobertura dimensional COMPLETA**: `observed_capacity` sigue siendo la fuente
+> de verdad por dimensión y `observed_level` es un RESUMEN DERIVADO. Casos:
+> `{"lexical": 5}` → `""`; `{"lexical": 5, "syntax": 3, "discourse": 4,
+> "interaction": 3}` → `"B2"`; envolvente de C1 → `"C1"` (C2 bloqueado por
+> `lexical 4 < 5`); cobertura 3/4 → `""`. `learner_capacity` sigue subiendo el
+> reto solo donde hay evidencia y sin bajar el suelo declarado. Tests:
+> `test_level_from_capacity_requires_full_dimensional_coverage` (reescrito) +
+> aceptación multidimensional y no-regresión; sin cambios de esquema, contratos
+> ni UI. Ver `release-notes-v3.53.1.md`. **Siguiente paso:** V3.54 (Planner 2.0 /
+> `expected_learning_value`, P1-03) y, con él, P2-01/P2-02/P2-03 del skill state.
 >
 > **Nota (2026-09-11): V3.53.0 (Learner Skill State 2.0 + `observed_difficulty`)**
 > — release **v3.53.0**, ADITIVA (tres columnas de BD), que cierra el **P1-02**
