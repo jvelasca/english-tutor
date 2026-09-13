@@ -75,6 +75,18 @@ tolerancia. El retorno gana `difficulty_fit` (reto objetivo + distancia +
 overshoot) y `learner_level_source`, aditivos; `difficulty` y
 `difficulty_vector` se conservan por compatibilidad.
 
+V3.59 (**Context Engine 3.0: Context Bank Family/Instance**) separa FAMILIA de
+INSTANCIA: la familia (los 20 contextos, `id` incluido) sigue siendo la identidad
+pedagógica y la unidad de EVIDENCIA, y cada familia declara ahora superficies
+ADICIONALES (`instances`) de la MISMA identidad —otra redacción del mismo
+escenario— que se sirven por ROTACIÓN de intentos (`attempts_by_context`: el
+intento N recibe la superficie `N % nº_superficies`). El objetivo es que el banco
+finito no se memorice (el alumno reciclaba la misma consigna al agotarlo). La
+superficie 0 es la consigna histórica de la familia: sin evidencia el payload es
+el de V3.58 salvo `context_instance`/`instance_index`/`instance_count` (aditivos),
+y la superficie no entra en el pool, la novedad, la distancia ni la dificultad,
+así que la familia servida y toda la evidencia/umbrales quedan intactos.
+
 No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
 contextos ya registrados en el ledger (`context_id`), así que la misma evidencia
@@ -120,6 +132,16 @@ CONTEXT_VARIETY_DIMENSIONS: tuple[str, ...] = (
 # contextos con éxito limpio para declarar diversidad real. Declarado y
 # calibrable; dos contextos distintos suelen diferir en >= 2 dimensiones.
 CONTEXT_DIVERSITY_MIN = 2
+
+# V3.59 (Context Engine 3.0): claves que puede declarar una INSTANCIA de familia.
+# Es una lista BLANCA a propósito: la instancia solo puede aportar su etiqueta y
+# su consigna, nunca la identidad pedagógica (que es la unidad de evidencia).
+CONTEXT_INSTANCE_KEYS: tuple[str, ...] = ("instance", "prompt")
+
+# V3.59: nº mínimo de superficies ADICIONALES que debe declarar cada familia. Es
+# el invariante anti-memorización de la release y está verificado por test: con
+# una sola superficie declarada la rotación sería inerte.
+CONTEXT_INSTANCES_MIN = 2
 
 # V3.47: dimensiones de CARGA del contexto de transferencia (misma convención que
 # el `difficulty_vector` de listening/speaking: enteros 1..5). No entran en la
@@ -410,6 +432,22 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "Tell a short story about something that happened to you recently."
         ),
+        # V3.59: superficies declaradas de la MISMA familia (ver `context_instances`).
+        "instances": (
+            {
+                "instance": "a_journey",
+                "prompt": (
+                    "Tell a short story about a journey that did not go as "
+                    "planned."
+                ),
+            },
+            {
+                "instance": "a_surprise",
+                "prompt": (
+                    "Tell a short story about a surprise you had one day."
+                ),
+            },
+        ),
     },
     {
         "id": "question",
@@ -436,6 +474,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "lexical_environment": "concrete_everyday",
         "syntactic_focus": "questions",
         "prompt": "Write a question you would like to ask a friend.",
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "about_the_weekend",
+                "prompt": (
+                    "Write a question you would like to ask a friend about "
+                    "their weekend."
+                ),
+            },
+            {
+                "instance": "about_their_family",
+                "prompt": (
+                    "Write a question you would like to ask a friend about "
+                    "their family."
+                ),
+            },
+        ),
     },
     {
         "id": "work",
@@ -463,6 +518,22 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "You have a new job. Describe something interesting about your "
             "first week to a colleague."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_new_workplace",
+                "prompt": (
+                    "You have changed offices. Describe your new workplace to "
+                    "a colleague."
+                ),
+            },
+            {
+                "instance": "a_daily_task",
+                "prompt": (
+                    "Describe one task you do every day at work to a colleague."
+                ),
+            },
+        ),
     },
     {
         "id": "future",
@@ -487,6 +558,17 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "lexical_environment": "personal_experience",
         "syntactic_focus": "future_forms",
         "prompt": "Talk about your plans for next year.",
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "next_summer",
+                "prompt": "Talk about your plans for next summer.",
+            },
+            {
+                "instance": "next_month",
+                "prompt": "Talk about your plans for next month.",
+            },
+        ),
     },
     {
         "id": "opinion",
@@ -515,6 +597,22 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "Give your opinion about something you feel strongly about, and "
             "say why."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_school_subject",
+                "prompt": (
+                    "Give your opinion about a school subject you liked or "
+                    "disliked, and say why."
+                ),
+            },
+            {
+                "instance": "city_life",
+                "prompt": (
+                    "Give your opinion about living in a big city, and say why."
+                ),
+            },
+        ),
     },
     {
         "id": "problem",
@@ -539,6 +637,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "lexical_environment": "concrete_everyday",
         "syntactic_focus": "past_narrative",
         "prompt": "Describe a small problem you had and how you solved it.",
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "at_home",
+                "prompt": (
+                    "Describe a problem you had at home one day and how you "
+                    "solved it."
+                ),
+            },
+            {
+                "instance": "on_a_trip",
+                "prompt": (
+                    "Describe something that went wrong on a trip and how you "
+                    "dealt with it."
+                ),
+            },
+        ),
     },
     # --- V3.48 (Context Bank 2.0): 14 contextos nuevos, cobertura A1–C2 ---
     {
@@ -568,6 +683,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "You meet someone new at a class. Introduce yourself and say where "
             "you are from."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "at_a_club",
+                "prompt": (
+                    "You meet someone new at a sports club. Introduce yourself "
+                    "and say what you like doing."
+                ),
+            },
+            {
+                "instance": "at_a_party",
+                "prompt": (
+                    "You meet someone new at a party. Introduce yourself and "
+                    "say what you do."
+                ),
+            },
+        ),
     },
     {
         "id": "routine",
@@ -592,6 +724,17 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "lexical_environment": "concrete_everyday",
         "syntactic_focus": "simple_present",
         "prompt": "Describe what you usually do on a normal morning at home.",
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "an_evening",
+                "prompt": "Describe what you usually do on a normal evening at home.",
+            },
+            {
+                "instance": "a_weekend",
+                "prompt": "Describe what you usually do at the weekend.",
+            },
+        ),
     },
     {
         "id": "directions",
@@ -618,6 +761,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "You are lost in a new city. Ask a passer-by how to get to the "
             "station."
+        ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "the_market",
+                "prompt": (
+                    "You are looking for the market in a city you do not know. "
+                    "Ask a passer-by how to get there."
+                ),
+            },
+            {
+                "instance": "a_pharmacy",
+                "prompt": (
+                    "You need a pharmacy in a town you do not know. Ask a "
+                    "passer-by where to find one."
+                ),
+            },
         ),
     },
     {
@@ -646,6 +806,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "You are in a shop and cannot find what you need. Ask an assistant "
             "for help."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "the_wrong_size",
+                "prompt": (
+                    "You like something in a shop but it is the wrong size. "
+                    "Ask an assistant for help."
+                ),
+            },
+            {
+                "instance": "the_price",
+                "prompt": (
+                    "You cannot find the price of something in a shop. Ask an "
+                    "assistant for help."
+                ),
+            },
+        ),
     },
     {
         "id": "health",
@@ -672,6 +849,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "You do not feel well. Explain your symptoms to a doctor and answer "
             "their questions."
+        ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_bad_cough",
+                "prompt": (
+                    "You have a bad cough. Explain it to a pharmacist and "
+                    "answer their questions."
+                ),
+            },
+            {
+                "instance": "a_check_up",
+                "prompt": (
+                    "You are at a check-up. Explain how you have been feeling "
+                    "lately and answer the doctor's questions."
+                ),
+            },
         ),
     },
     {
@@ -701,6 +895,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "Plan a weekend away with a friend: suggest where to go and why, "
             "and agree on the details."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_longer_trip",
+                "prompt": (
+                    "Plan a longer trip with a friend: suggest where to go and "
+                    "why, and agree on the details."
+                ),
+            },
+            {
+                "instance": "a_family_visit",
+                "prompt": (
+                    "Plan a visit to family with a friend: suggest when to go "
+                    "and why, and agree on the details."
+                ),
+            },
+        ),
     },
     {
         "id": "work_problem",
@@ -728,6 +939,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "Something went wrong on a project at work. Explain to a colleague "
             "what happened and how you fixed it."
+        ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_late_delivery",
+                "prompt": (
+                    "A delivery arrived late on a project at work. Explain to a "
+                    "colleague what happened and how you fixed it."
+                ),
+            },
+            {
+                "instance": "a_missing_file",
+                "prompt": (
+                    "An important file was missing at work. Explain to a "
+                    "colleague what happened and how you fixed it."
+                ),
+            },
         ),
     },
     {
@@ -757,6 +985,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "Propose one change to improve your neighbourhood and explain why "
             "your neighbours should support it."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_greener_neighbourhood",
+                "prompt": (
+                    "Propose one change to make your neighbourhood greener and "
+                    "explain why your neighbours should support it."
+                ),
+            },
+            {
+                "instance": "a_shared_space",
+                "prompt": (
+                    "Propose one change to the shared spaces of your building "
+                    "and explain why your neighbours should support it."
+                ),
+            },
+        ),
     },
     {
         "id": "debate",
@@ -784,6 +1029,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "Take a position on a social issue and defend it against an "
             "opposing view."
+        ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "work_and_private_life",
+                "prompt": (
+                    "Take a position on the balance between work and private "
+                    "life and defend it against an opposing view."
+                ),
+            },
+            {
+                "instance": "technology_and_privacy",
+                "prompt": (
+                    "Take a position on technology and personal privacy and "
+                    "defend it against an opposing view."
+                ),
+            },
         ),
     },
     {
@@ -813,6 +1075,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "Review a film or a book you have recently experienced, weighing "
             "its strengths and weaknesses."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_series",
+                "prompt": (
+                    "Review a series you have recently watched, weighing its "
+                    "strengths and weaknesses."
+                ),
+            },
+            {
+                "instance": "an_exhibition",
+                "prompt": (
+                    "Review an exhibition or a concert you have recently "
+                    "visited, weighing its strengths and weaknesses."
+                ),
+            },
+        ),
     },
     {
         "id": "mediation",
@@ -841,6 +1120,25 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "Two people you know disagree. Explain each side to the other and "
             "help them reach an understanding."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_family_disagreement",
+                "prompt": (
+                    "Two members of your family disagree about a decision. "
+                    "Explain each side to the other and help them reach an "
+                    "understanding."
+                ),
+            },
+            {
+                "instance": "a_team_disagreement",
+                "prompt": (
+                    "Two colleagues disagree about how to organise some work. "
+                    "Explain each side to the other and help them reach an "
+                    "understanding."
+                ),
+            },
+        ),
     },
     {
         "id": "academic",
@@ -868,6 +1166,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "Present an argument from a field you know well and respond to a "
             "critical question about your evidence."
+        ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_method",
+                "prompt": (
+                    "Explain and defend a method you use in a field you know "
+                    "well, and respond to a critical question about it."
+                ),
+            },
+            {
+                "instance": "a_counterexample",
+                "prompt": (
+                    "Present a claim from a field you know well and respond to "
+                    "a counterexample an expert raises."
+                ),
+            },
         ),
     },
     {
@@ -898,6 +1213,24 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
             "something different, and justify the concessions you are willing "
             "to make."
         ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "a_budget",
+                "prompt": (
+                    "Negotiate a budget with a counterpart who wants to spend "
+                    "more, and justify the concessions you are willing to make."
+                ),
+            },
+            {
+                "instance": "a_deadline",
+                "prompt": (
+                    "Negotiate a deadline with a counterpart who wants it "
+                    "sooner, and justify the concessions you are willing to "
+                    "make."
+                ),
+            },
+        ),
     },
     {
         "id": "keynote",
@@ -925,6 +1258,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "prompt": (
             "Deliver a short keynote on an abstract theme and use concrete "
             "examples to make it persuasive."
+        ),
+        # V3.59: superficies declaradas de la MISMA familia.
+        "instances": (
+            {
+                "instance": "how_people_learn",
+                "prompt": (
+                    "Deliver a short keynote on how people learn and use "
+                    "concrete examples to make it persuasive."
+                ),
+            },
+            {
+                "instance": "how_teams_change",
+                "prompt": (
+                    "Deliver a short keynote on how teams change over time and "
+                    "use concrete examples to make it persuasive."
+                ),
+            },
         ),
     },
 )
@@ -1096,6 +1446,99 @@ def context_difficulty(context: object) -> dict[str, int]:
     """
     attributes = _as_attributes(context)
     return difficulty.normalize_vector(attributes.get("difficulty_vector"))
+
+
+# ---------------------------------------------------------------------------
+# V3.59 (Context Engine 3.0): FAMILIA vs INSTANCIA.
+#
+# Una familia (los 20 contextos del banco) es la identidad pedagógica y la
+# unidad de EVIDENCIA: su `id` es el `context_id` del ledger. Una INSTANCIA es
+# una superficie DECLARADA de esa misma familia: otra redacción del MISMO
+# escenario, con la misma identidad (nadie puede declararle otra cosa, ver
+# `CONTEXT_INSTANCE_KEYS`). El ledger, los umbrales, `context_distance`,
+# `context_diversity`, la novedad y el ajuste de dificultad siguen leyendo la
+# FAMILIA, así que ampliar las superficies no reinterpreta evidencia pasada.
+# ---------------------------------------------------------------------------
+
+
+def _count(value: object) -> int:
+    """Nº de intentos a partir de un valor del ledger, tolerante (V3.59, pura).
+
+    Acepta un entero, su forma textual y el bucket `{"attempts": n}` del resumen
+    de evidencia. Cualquier otra cosa (incluidos `bool`, negativos y `None`)
+    vale 0: la superficie histórica. Nunca lanza.
+    """
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value if value > 0 else 0
+    if isinstance(value, str):
+        text = value.strip()
+        return int(text) if text.isdigit() else 0
+    if isinstance(value, Mapping):
+        return _count(value.get("attempts"))
+    return 0
+
+
+def context_instances(context: object) -> tuple[dict[str, str], ...]:
+    """Superficies servibles de una familia (V3.59, pura).
+
+    Devuelve `({"instance": "", "prompt": <consigna histórica>}, *declaradas)`:
+    la propia `prompt` de la familia es SIEMPRE la superficie 0 (byte a byte la
+    histórica, así que sin evidencia el resultado es el de V3.58) y cada
+    `instances` declarada añade una superficie nueva de la MISMA identidad.
+    Acepta el dict del banco, un `id` o un `context_id`. Normaliza (recorta y
+    descarta superficies sin consigna o no-dict) y nunca lanza.
+    """
+    attributes = _as_attributes(context)
+    surfaces: list[dict[str, str]] = []
+    family_prompt = str(attributes.get("prompt") or "").strip()
+    if family_prompt:
+        surfaces.append({"instance": "", "prompt": family_prompt})
+    declared = attributes.get("instances")
+    if isinstance(declared, (list, tuple)):
+        for raw in declared:
+            if not isinstance(raw, Mapping):
+                continue
+            prompt = str(raw.get("prompt") or "").strip()
+            if not prompt:
+                continue
+            surfaces.append(
+                {"instance": str(raw.get("instance") or "").strip(), "prompt": prompt}
+            )
+    return tuple(surfaces)
+
+
+def context_instance_index(context: object, attempts: object = 0) -> int:
+    """Superficie que toca servir, por ROTACIÓN de intentos (V3.59, pura).
+
+    `attempts` son los intentos ya registrados en ESA familia para el ítem (el
+    resumen de evidencia los cuenta por `context_id`), de modo que el intento N
+    recibe la superficie `N % nº_superficies`: la primera estancia sirve la
+    consigna histórica y las siguientes no repiten redacción, que es lo que
+    evita que el alumno memorice la estructura en lugar de transferir. Sin
+    intentos (o con un valor no reconocible) devuelve 0, es decir, la superficie
+    de V3.58 exacta. Una familia sin superficies declaradas devuelve 0 siempre
+    (rotación inerte). Nunca lanza.
+    """
+    count = len(context_instances(context))
+    if count <= 1:
+        return 0
+    return _count(attempts) % count
+
+
+def _attempts_for(attempts_by_context: object, context_id: str) -> int:
+    """Intentos del ítem en una familia (V3.59, pura y tolerante).
+
+    Acepta el mapa `contexts` del resumen de evidencia (`{context_id: {attempts,
+    successes}}`), un mapa de enteros o nada. Prueba el `context_id` del ledger
+    y, si no, el `id` desnudo. Nunca lanza.
+    """
+    if not isinstance(attempts_by_context, Mapping):
+        return 0
+    if context_id in attempts_by_context:
+        return _count(attempts_by_context[context_id])
+    return _count(attempts_by_context.get(_bare_context_id(context_id)))
 
 
 def _normalize_dimensions(dimensions: object) -> tuple[str, ...]:
@@ -1280,15 +1723,16 @@ def context_for(
     learner_skill_capacity: object = None,
     capacity_skill: object = "",
     skill_priorities: object = None,
+    attempts_by_context: object = None,
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.53, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.59, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
     unscaffolded, cefr,     difficulty_vector, difficulty, skills, target_skill,
     assessed_skill, assessment_mode, item_level, learner_level,
     learner_level_source, learner_capacity, capacity_skill, difficulty_fit,
-    skill_priorities}`.
+    skill_priorities, context_instance, instance_index, instance_count}`.
     La consigna es la del banco; el escenario **no contiene la unidad objetivo**
     salvo en la condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46)
     es la condición de recuperación SERVIDA: la deriva el llamador del estado de
@@ -1322,6 +1766,14 @@ def context_for(
        de `services.difficulty` solo aplica la subida a los contextos cuyas
        dimensiones están cubiertas; el resto se evalúa contra el suelo declarado.
        Sin `learner_skill_capacity` el comportamiento es el de V3.53;
+    1f. V3.59 (Context Engine 3.0): elegida la FAMILIA, se resuelve su SUPERFICIE
+       con `attempts_by_context` (el mapa `contexts` del resumen de evidencia):
+       el intento N del ítem en esa familia sirve la superficie
+       `N % nº_superficies` (`context_instance_index`), de modo que la primera
+       estancia sirve la consigna histórica y las siguientes no repiten
+       redacción. Sin ese dato la superficie es la 0, EXACTA a V3.58. La
+       superficie NO entra en el pool, la novedad, la distancia ni la dificultad:
+       la familia servida es la misma que en V3.58;
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
        (el más novedoso pedagógicamente, V3.43/P1-03); los empates los resuelve
@@ -1455,6 +1907,10 @@ def context_for(
             "capacity_skill": capacity_skill_key,
             "difficulty_fit": _difficulty_fit_for(None, challenge, tolerance),
             "skill_priorities": priorities,
+            # V3.59: banco vacío → no hay familia ni superficie que servir.
+            "context_instance": "",
+            "instance_index": 0,
+            "instance_count": 0,
         }
     if success:
         best = max(_novelty_score(context, success) for context in pool)
@@ -1463,11 +1919,20 @@ def context_for(
         pool = [c for c in pool if _novelty_score(c, success) == best]
     context = pool[_stable_index(unit, len(pool))]
     vector = dict(context.get("difficulty_vector") or {})
+    # V3.59: la FAMILIA ya está elegida (misma que V3.58); ahora se resuelve su
+    # SUPERFICIE por rotación de intentos sobre esa familia.
+    instances = context_instances(context)
+    instance_index = context_instance_index(
+        context, _attempts_for(attempts_by_context, context_id_for(context))
+    )
+    instance = {"instance": "", "prompt": ""}
+    if instances:
+        instance = instances[instance_index]
     return {
         "word": unit,
         "context_id": context_id_for(context),
         "topic": context.get("topic", ""),
-        "prompt": _compose_prompt(context.get("prompt", ""), served, unit),
+        "prompt": _compose_prompt(instance["prompt"], served, unit),
         "available": True,
         "exhausted": exhausted,
         "communicative_goal": context.get("communicative_goal", ""),
@@ -1508,6 +1973,11 @@ def context_for(
             tolerance,
         ),
         "skill_priorities": priorities,
+        # V3.59 (Context Engine 3.0): superficie declarada servida de la familia
+        # ("" = la histórica), su índice y cuántas tiene la familia.
+        "context_instance": instance["instance"],
+        "instance_index": instance_index,
+        "instance_count": len(instances),
     }
 
 

@@ -5,49 +5,49 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.58.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.58 (**Sense Engine 2.0:
-> `surface → lemma → sense → semantic_fit`**) es una release **SIN migración de
-> BD, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI** que cierra la mitad
-> que V3.44 dejó abierta: desde V3.44 el diccionario **declara** los SENTIDOS de
-> la unidad (`[{pos, gloss}]`, generados por el modelo local como CONTENIDO) y los
-> **cachea**, pero el juicio sobre el uso comparaba **FAMILIAS POS** y la `gloss`
-> no la leía **nadie** —dato **INERTE**—: con `bank` declarando dos sentidos de la
-> MISMA familia («financial place» / «river side») el motor no podía separar «el
-> banco del río» de «el banco financiero». V3.58 añade `lemma_of`/
-> `lemma_variants` (**surface → lemma**, morfología regular declarada, sin
-> diccionario ni lematizador) y `select_sense` (**lemma → sense**: familia del rol
-> sintáctico → solapamiento con la glosa → orden declarado), y **FRONTERA
-> DECLARADA**: la glosa decide el **SENTIDO**, **nunca el VEREDICTO**
-> (`semantic_adequacy` conserva la adecuación de V3.44 **EXACTA**; solo
-> `incorrect` bloquea el clean success y **no se amplía**, porque la AUSENCIA de
-> solapamiento no demuestra incompatibilidad). El sentido resuelto entra **ADITIVO**
-> en el payload del transfer y en `TransferAttemptOut`, así que **ya no es dato
-> inerte**. NO toca `transfer_state`, sus umbrales, `context_signals`,
-> `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS, el planner ni el
-> Difficulty Engine. Tests: nuevo `test_semantics_sense_engine_v358.py` (30, con
-> equivalencia parametrizada contra los literales históricos de V3.44 y
-> end-to-end HTTP), `pytest` **2296 passed** en local, launcher **75 passed**,
-> `ruff` limpio, `tsc` OK, `vitest` **651** y `check_release_consistency`
-> **3.58.0**. **CI 6/6 en verde** (run
-> [34780694687](https://github.com/jvelasca/english-tutor/actions/runs/34780694687)
-> sobre `82f17c4`: Release consistency, Backend, Frontend, Playwright E2E, Beta
-> V3.0 gate y Content validation), con la etiqueta anotada `v3.58.0` creada y
-> empujada. La V3.57 (**Planner
-> 2.0: argmax `(skill, actividad)` sobre ELV**) sigue inmediatamente detrás; la
-> V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que ordena) la
-> precede; la V3.55 (**Task Difficulty 3.0**, tres columnas de BD) es el último
+> **Estado actual (2026-09-13): `v3.59.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.59 (**Context Engine 3.0: Context Bank
+> Family/Instance**) es una release **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION`, SIN cambios de UI y SIN tocar el ledger** que cierra el
+> candidato diferido desde V3.48 y el hallazgo **P2-04** de la auditoría de V3.43:
+> un banco finito de consignas **FIJAS** se **MEMORIZA** —agotado el banco, el
+> alumno repite la misma redacción y puede reciclar una respuesta aprendida en
+> lugar de transferir—. V3.59 separa **FAMILIA** de **INSTANCIA**: la **familia**
+> (los 20 contextos, su `id` incluido) sigue siendo la identidad pedagógica y la
+> **unidad de EVIDENCIA** —el `id` es el `context_id` del ledger—, así que el
+> banco **no se fragmenta** y no cambian los umbrales, la escalera
+> `transfer_state`, `context_distance`, `context_diversity`, la novedad ni el
+> Difficulty Engine; la **instancia** es una superficie **DECLARADA** de la misma
+> familia (otra redacción del mismo escenario) y la superficie **0** es SIEMPRE la
+> consigna **histórica**, byte a byte. La rotación es `N % nº_superficies` sobre
+> los **intentos** del ítem en esa familia: sin evidencia la degradación es
+> **EXACTA** a V3.58 y con intentos cada estancia cambia la redacción.
+> `CONTEXT_INSTANCE_KEYS` es **lista blanca** (una instancia no puede tocar la
+> identidad) y `CONTEXT_INSTANCES_MIN = 2`: el banco pasa de **20 consignas a 60
+> superficies** sin fragmentar el ledger. El contrato gana **3 claves aditivas**
+> (`context_instance`/`instance_index`/`instance_count`) y las **25 de V3.58**
+> quedan intactas y fijadas por test. NO toca `transfer_state`, sus umbrales,
+> `context_signals`, `CEFR_CAPACITY`, el scoring, FSRS, el planner ni el Sense
+> Engine. Tests: nuevo `test_context_engine_v359.py` (16, con end-to-end HTTP de
+> la rotación con el pool agotado), `pytest` **2312 passed** en local, launcher
+> **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.59.0**. La V3.58 (**Sense Engine 2.0:
+> `surface → lemma → sense → semantic_fit`**) sigue inmediatamente detrás; la
+> V3.57 (**Planner 2.0: argmax `(skill, actividad)` sobre ELV**) la precede, con
+> la V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que ordena)
+> antes; la V3.55 (**Task Difficulty 3.0**, tres columnas de BD) es el último
 > cambio de ledger; la V3.54 como **Student Skill State 3.0** (P2-03), la V3.53.1
-> como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como
-> **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
-> **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
-> **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
-> siguiente incremento es **V3.59**: el **Context Engine 3.0**, y después el
-> contrato/prompt de generación de sentidos y la ponderación de la adecuación en
-> `transfer_confidence`. El briefing de V3.58 vive en
-> `agentes/v358-sense-engine-2.md` (y el de V3.57 en `agentes/v357-argmax-elv.md`).
-> Antes de lanzar cualquier subagente, lee esa sección para no partir de un estado
-> obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
+> como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como **Learner
+> Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
+> los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de
+> producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El siguiente incremento
+> es **V3.60**: el contrato/prompt de generación de sentidos y la ponderación de la
+> adecuación en `transfer_confidence`. El briefing de V3.59 vive en
+> `agentes/v359-context-engine-3.md` (V3.58 en `agentes/v358-sense-engine-2.md` y
+> V3.57 en `agentes/v357-argmax-elv.md`), y su auditoría externa se prepara en
+> `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier subagente, lee esa
+> sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al saturar y
+> ancla contra la alucinación).
 
 ## Cómo usar un subagente
 

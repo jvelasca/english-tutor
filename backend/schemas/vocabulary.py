@@ -737,6 +737,11 @@ class TransferContextOut(BaseModel):
 
     V3.54: `capacity_skill` (aditivo) declara la modalidad cuya capacidad
     observada se aplicó; el reto ya no mezcla modalidades.
+
+    V3.59: `context_instance`/`instance_index`/`instance_count` (aditivos)
+    declaran la SUPERFICIE servida de la familia: la consigna histórica es la
+    superficie 0 y las siguientes se sirven por rotación de intentos. La familia
+    (el `context_id`, unidad de evidencia) no cambia.
     """
 
     word: str
@@ -788,6 +793,12 @@ class TransferContextOut(BaseModel):
     # aplicó ("" sin muestra). El reto ya NO mezcla modalidades: la evidencia
     # escrita no eleva una tarea oral.
     capacity_skill: str = ""
+    # V3.59 (Context Engine 3.0): superficie DECLARADA de la familia servida
+    # ("" = la consigna histórica), su índice y cuántas declara la familia. La
+    # evidencia sigue contando la FAMILIA (`context_id`), no la superficie.
+    context_instance: str = ""
+    instance_index: int = 0
+    instance_count: int = 0
 
 
 class TransferAttemptIn(BaseModel):

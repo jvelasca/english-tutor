@@ -5,6 +5,62 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-13 (UTC+2).
 >
+> **Nota (2026-09-13): V3.59.0 (Context Engine 3.0 — Context Bank Family/Instance)**
+> — release **v3.59.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`,
+> SIN cambios de UI y SIN tocar el ledger**, que cierra el candidato diferido
+> desde **V3.48** y el hallazgo **P2-04** de la auditoría de V3.43: un banco
+> finito de consignas **FIJAS** se **MEMORIZA**. Agotado el banco
+> (`exhausted=True`), el motor rotaba sobre las **mismas 20 redacciones**, así que
+> un alumno podía **reciclar una respuesta aprendida** en lugar de transferir la
+> unidad — y la evidencia lo registraba como transferencia.
+> **FRONTERA DECLARADA Y PROBADA (invariante de no-fragmentación):** una
+> **FAMILIA** es la identidad pedagógica **y la unidad de EVIDENCIA** (su `id` es
+> el `context_id` del ledger); una **INSTANCIA** es una superficie **DECLARADA**
+> de esa misma familia (otra redacción del mismo escenario). V3.59 **no añade
+> familias**: añade superficies **dentro** de las 20 existentes, así que la
+> evidencia no se fragmenta, la escalera de `transfer_state` no se reescala y los
+> umbrales no se reinterpretan. Sin esto, ampliar el banco «a lo bruto» habría
+> movido el ledger retroactivamente.
+> **(A) La superficie 0 es la consigna histórica.** `context_instances` devuelve
+> SIEMPRE la consigna de V3.58 como primera superficie y, sin intentos, la
+> degradación es **EXACTA** a V3.58 (byte a byte en los seis contextos
+> **congelados**, que un test fija). La invariante «misma evidencia → misma
+> consigna» se mantiene.
+> **(B) Rotación por intentos de la FAMILIA** (`N % nº_superficies`) en
+> `context_instance_index`, no por hash ni aleatoriedad: determinista y
+> explicable, y el ítem recibe una redacción distinta en cada estancia hasta
+> agotar la familia. `_count`/`_attempts_for` son **tolerantes** a la forma del
+> resumen de evidencia (int, str, dict o basura) y **solo** leen
+> `{"attempts": n}`: no interpretan notación nueva.
+> **(C) La identidad no se puede tocar.** `CONTEXT_INSTANCE_KEYS` es **lista
+> blanca** (`prompt` + etiqueta): una instancia **no puede** declarar
+> `cefr`/`difficulty_vector`/dimensiones core, y `context_instances` **normaliza y
+> descarta** entradas inválidas. `CONTEXT_INSTANCES_MIN = 2` (superficies
+> adicionales) se verifica en el banco: el banco pasa de **20 consignas a 60
+> superficies** sin fragmentar el ledger.
+> **(D) Contrato aditivo:** `context_for` acepta `attempts_by_context` y devuelve
+> `context_instance`/`instance_index`/`instance_count`; las **25 claves de
+> V3.58** quedan **intactas** y fijadas por test, con espejo **opcional** en
+> `frontend/src/types/api.ts`. El cableado pasa el mapa de intentos en los **dos**
+> caminos de `domain/vocabulary.py` (GET de la consigna y POST del intento), y el
+> test de no-regresión compara el payload con y sin intentos para probar que la
+> **decisión de familia no cambia**.
+> **(E) Sin migración ni regeneración:** las superficies son **contenido
+> declarado** dentro de la estructura existente del banco, no columnas nuevas ni
+> contenido generado. Sin migración, sin bump de generador y sin invalidar caché.
+> **NO cambia:** la selección de familia (selección por novedad, distancia,
+> diversidad y CEFR intacta), `transfer_state` y sus umbrales, `context_signals`,
+> `context_distance`/`context_diversity`/`CONTEXT_DIVERSITY_MIN`,
+> `_novelty_score`, `difficulty.py`, `CEFR_CAPACITY`, el scoring, FSRS, el planner
+> y el Sense Engine. Tests: nuevo `test_context_engine_v359.py` (16, con
+> end-to-end HTTP de la rotación con el pool agotado), `pytest` **2312 passed** en
+> local, launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651**,
+> `npm run build` OK y `check_release_consistency` **3.59.0**. Ver
+> `release-notes-v3.59.0.md`.
+> **Siguiente paso:** V3.60 — el contrato/prompt de generación de sentidos y la
+> ponderación de la adecuación en `transfer_confidence`. La **auditoría externa
+> R** audita V3.59 y su punto de entrada es `agentes/auditoria-externa-v359.md`.
+>
 > **Nota (2026-09-13): V3.58.0 (Sense Engine 2.0 — `surface → lemma → sense → semantic_fit`)**
 > — release **v3.58.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`
 > y SIN cambios de UI**, que cierra la mitad que **V3.44** dejó abierta. Desde
@@ -2384,14 +2440,15 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-13):** `v3.55.0` **Task Difficulty 3.0** (release
-ADITIVA de tres columnas que da nombres honestos a la dificultad de la tarea
-—`declared`/`served`/`observed_task`—, hace que la capacidad observada acredite
-lo superado y no lo servido mediante descuento por andamiaje, y cablea la
-dificultad en las cuatro vías del drill léxico); las **notas de la cabecera** de
-este documento son la fuente de verdad más reciente. El incremento anterior fue
-`v3.54.0` **Student Skill State 3.0**. La sección siguiente se conserva como
-histórico del hilo V3.38 (fecha original 2026-09-10, `v3.38.1`).
+**Posición actual (2026-09-13):** `v3.59.0` **Context Engine 3.0** (release
+ADITIVA que separa la FAMILIA de la INSTANCIA en el banco de contextos —20
+consignas → 60 superficies, ledger y evidencia intactos, rotación determinista
+por intentos de la familia—); las **notas de la cabecera** de este documento son
+la fuente de verdad más reciente y detallan también la `v3.58.0` **Sense Engine
+2.0**, la `v3.57.0` **Planner 2.0 (argmax `(skill, actividad)` sobre ELV)**, la
+`v3.56.0` **Planner 2.0 (`expected_learning_value`)** y la `v3.55.0` **Task
+Difficulty 3.0**. La sección siguiente se conserva como histórico del hilo V3.38
+(fecha original 2026-09-10, `v3.38.1`).
 
 **Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra

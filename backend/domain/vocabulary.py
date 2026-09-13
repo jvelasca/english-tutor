@@ -1020,6 +1020,9 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
         learner_skill_capacity=learner_state["observed_skill_capacity"],
         capacity_skill=assessed,
         skill_priorities=priorities,
+        # V3.59: los intentos por familia del resumen resuelven la SUPERFICIE
+        # servida (rotación anti-memorización); la familia no cambia.
+        attempts_by_context=summary.get("contexts") or {},
     )
 
 
@@ -1097,6 +1100,8 @@ async def submit_transfer_attempt(
             learner_skill_capacity=learner_state["observed_skill_capacity"],
             capacity_skill=assessed,
             skill_priorities=priorities,
+            # V3.59: mismo insumo que el GET para que la superficie sea la misma.
+            attempts_by_context=summary.get("contexts") or {},
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)
     written = (text or "").strip()

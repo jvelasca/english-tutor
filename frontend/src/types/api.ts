@@ -587,6 +587,12 @@ export interface DrillTransferContext {
   // V3.54 (Student Skill State 3.0): modalidad cuya capacidad observada se
   // aplicó ("" sin muestra): el reto ya no mezcla modalidades.
   capacity_skill?: string;
+  // V3.59 (Context Engine 3.0): superficie declarada de la familia servida
+  // ("" = consigna histórica), su índice y cuántas declara la familia. La
+  // evidencia sigue contando la FAMILIA (context_id), no la superficie.
+  context_instance?: string;
+  instance_index?: number;
+  instance_count?: number;
 }
 
 export interface DrillDifficultyFit {
