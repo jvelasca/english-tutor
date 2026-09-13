@@ -534,6 +534,8 @@ def recommend_review_activity(
     competence: dict | None = None,
     now: str = "",
     evidence: dict | None = None,
+    capacity_by_skill: dict | None = None,
+    task_difficulty: object = None,
 ) -> dict:
     """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
 
@@ -585,8 +587,12 @@ def recommend_review_activity(
         return {"activity": "recall", "reason": "no_recall_evidence"}
     if matrix.get("production_gap"):
         return {"activity": "sentence", "reason": "production_gap"}
-    planned = planner.select_task(
-        matrix, evidence, planner.planned_signals(evidence, matrix)
+    planned = planner.select_task_by_elv(
+        matrix,
+        evidence,
+        planner.planned_signals(evidence, matrix),
+        capacity_by_skill=capacity_by_skill,
+        task_difficulty=task_difficulty,
     )
     if planned["activity"]:
         return {"activity": planned["activity"], "reason": planned["reason"]}
@@ -679,8 +685,19 @@ def review_queue_item(
     """
     matrix = item_competence_matrix(row)
     summary = evidence if evidence is not None else {}
+    # V3.57: la dificultad declarada del ítem y la capacidad por CANAL evaluado
+    # se calculan UNA vez y son las MISMAS para las dos rutas de decisión
+    # (actividad del ítem y `task`) y para la predicción servida: así el argmax y
+    # el `learning_value` no pueden divergir.
+    task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
+    capacity_by_skill = _capacity_by_skill(learner_state)
     recommendation = recommend_review_activity(
-        row, matrix, now=now, evidence=summary
+        row,
+        matrix,
+        now=now,
+        evidence=summary,
+        capacity_by_skill=capacity_by_skill,
+        task_difficulty=task_difficulty,
     )
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
@@ -693,8 +710,22 @@ def review_queue_item(
     signals = planner.planned_signals(
         summary, matrix, retrievability=retrievability
     )
-    task = _task_decision(matrix, summary, signals, recommendation)
-    learning_value = _learning_value(row, task, signals, learner_state)
+    task = _task_decision(
+        matrix,
+        summary,
+        signals,
+        recommendation,
+        capacity_by_skill=capacity_by_skill,
+        task_difficulty=task_difficulty,
+    )
+    learning_value = _learning_value(
+        row,
+        task,
+        signals,
+        learner_state,
+        capacity_by_skill=capacity_by_skill,
+        task_difficulty=task_difficulty,
+    )
     recommended_cue = ""
     if recommendation["activity"] == "recall":
         ideal = (
@@ -756,21 +787,52 @@ def review_queue_item(
     }
 
 
+def _capacity_by_skill(learner_state: dict | None) -> dict[str, dict]:
+    """Capacidad por CANAL evaluado desde el estado O(1) del alumno (V3.57).
+
+    Es la entrada común del argmax y de la predicción del ítem: `{}` sin estado
+    (la decisión degrada EXACTA a `select_task`) y, con estado, la capacidad por
+    dimensión de CADA modalidad canónica (`learner_skill.skill_capacity` sobre su
+    suelo de `student_state.skill_floor`). Nunca lanza.
+    """
+    state = learner_state if isinstance(learner_state, dict) else {}
+    if not state:
+        return {}
+    observed = state.get("observed_skill_capacity")
+    result: dict[str, dict] = {}
+    for skill in LEXICAL_SKILLS:
+        floor, _ = student_state.skill_floor(state, skill)
+        result[skill] = learner_skill.skill_capacity(floor, observed, skill)[
+            "capacity"
+        ]
+    return result
+
+
 def _task_decision(
     matrix: dict,
     evidence: dict,
     signals: dict,
     recommendation: dict,
+    *,
+    capacity_by_skill: dict | None = None,
+    task_difficulty: object = None,
 ) -> dict:
-    """Decisión de tarea expuesta en la cola (V3.39, puro).
+    """Decisión de tarea expuesta en la cola (V3.39 → V3.57, puro).
 
-    Si la evidencia dirige la tarea (`planner.select_task`), esa es la decisión;
-    si no, la modalidad limitante con la actividad y la razón de la escalera. El
-    `support_level` se declara siempre a partir de la actividad
-    (`planner.ACTIVITY_SUPPORT_LEVEL`), para que el cliente sepa con cuánto
-    andamiaje se espera el intento.
+    Si la evidencia dirige la tarea, esa es la decisión: `planner.select_task`
+    (la cascada) SIN capacidad del alumno y `planner.select_task_by_elv` (el
+    argmax de V3.57) CON ella. Si no hay directriz, la modalidad limitante con la
+    actividad y la razón de la escalera. El `support_level` se declara siempre a
+    partir de la actividad (`planner.ACTIVITY_SUPPORT_LEVEL`), para que el cliente
+    sepa con cuánto andamiaje se espera el intento.
     """
-    planned = planner.select_task(matrix, evidence, signals)
+    planned = planner.select_task_by_elv(
+        matrix,
+        evidence,
+        signals,
+        capacity_by_skill=capacity_by_skill,
+        task_difficulty=task_difficulty,
+    )
     if planned["activity"]:
         return planned
     activity = recommendation.get("activity") or ""
@@ -787,29 +849,35 @@ def _learning_value(
     task: dict,
     signals: dict,
     learner_state: dict | None,
+    *,
+    capacity_by_skill: dict | None = None,
+    task_difficulty: object = None,
 ) -> dict:
-    """Predicción de éxito de la tarea del ítem (V3.56, puro).
+    """Predicción de éxito de la tarea del ítem (V3.56 → V3.57, puro).
 
-    Resuelve la modalidad que la tarea evalúa (`task["skill"]`, con caída a la
-    modalidad limitante), el suelo de ESA modalidad (`student_state.skill_floor`,
-    misma política que el drill), la capacidad por dimensión
-    (`learner_skill.skill_capacity`) y la dificultad DECLARADA del ítem
-    (`difficulty.declared_difficulty` sobre su CEFR léxico). Sin
-    `learner_state` o sin dificultad declarada devuelve el neutro exacto
+    Resuelve la modalidad de EJE que la tarea evalúa (`task["skill"]`, con caída
+    a la modalidad limitante), el CANAL EVALUADO que de verdad la mide
+    (`planner.capacity_skill`: el transfer declara eje `spontaneous_use`, pero se
+    entrega por texto y se mide como producción ESCRITA) y la capacidad por
+    dimensión de ESE canal (`_capacity_by_skill`, con el suelo de su modalidad).
+    `row` solo se usa para la dificultad DECLARADA del ítem cuando el llamador no
+    la aporta.
+
+    Sin `learner_state` (o sin dificultad declarada) devuelve el neutro exacto
     (`ELV = priority`). Nunca lanza.
     """
     skill = (task or {}).get("skill") or planner.limiting_skill(signals)
-    state = learner_state if isinstance(learner_state, dict) else {}
-    floor, _ = student_state.skill_floor(state, skill)
-    capacity = learner_skill.skill_capacity(
-        floor, state.get("observed_skill_capacity"), skill
-    )["capacity"]
-    task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
+    channel = planner.capacity_skill(skill)
+    if capacity_by_skill is None:
+        capacity_by_skill = _capacity_by_skill(learner_state)
+    if task_difficulty is None:
+        task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
     return planner.expected_learning_value(
         signals,
         skill=skill,
         task_difficulty=task_difficulty,
-        learner_capacity=capacity,
+        learner_capacity=capacity_by_skill.get(channel),
+        capacity_skill=channel,
     )
 
 

@@ -5,36 +5,34 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.56.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.56 (**Planner 2.0 /
-> `expected_learning_value`**, ejecutada directamente por el gerente) es una
-> release **SIN migración de BD y SIN cambios de UI** que convierte la prioridad
-> del planner de una **suma de urgencia** en un **valor esperado de aprendizaje**
-> (`ELV = dificultad_deseable(P) × value`) y ordena la cola de repaso por ELV:
-> `P(éxito)` sale del **margen** entre la capacidad del alumno en la modalidad
-> que la tarea evalúa (`learner_skill.skill_capacity`) y la dificultad declarada
-> del ítem (`difficulty.declared_difficulty`) por una **tabla declarada**
-> (`SUCCESS_BY_MARGIN`), `value = priority_score` (mismos pesos) y la degradación
-> sin estado del alumno es **exacta** (`p = 0.5` → `desirability = 1.0` →
-> `ELV = priority` → orden IDÉNTICO al de V3.55.0). `select_task` (la cascada de
-> razones) queda **intacto** y el argmax `(skill, actividad)` es el candidato de
-> **V3.57**. La lectura O(1) del estado del alumno se unifica en
-> `domain/learner_state.py` (la comparten cola y drill). NO toca
-> `transfer_state`, sus umbrales, `context_signals`, `context_diversity`,
-> `CEFR_CAPACITY`, el scoring, FSRS ni el Difficulty Engine. Tests: nuevo
-> `test_expected_learning_value_v356.py` (19), `pytest` **2242 passed** en local,
-> launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
-> `check_release_consistency` **3.56.0**. **CI: pendiente de ejecución tras el
-> push.** La V3.55 (**Task Difficulty 3.0**, tres columnas de BD) sigue como el
-> último cambio de ledger; la V3.54 como **Student Skill State 3.0** (P2-03), la
-> V3.53.1 como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como
-> **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
-> **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
-> **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
-> siguiente incremento es **V3.57**: el **argmax `(skill, actividad)` sobre ELV**
-> (el planner elige la tarea, no solo la ordena). El **Sense Engine 2.0**
-> (`surface→lemma→sense→semantic_fit`) y el Context Engine siguen como
-> candidatos. El briefing de V3.56 vive en `agentes/v356-planner-2.md`. Antes de
+> **Estado actual (2026-09-13): `v3.57.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.57 (**Planner 2.0: argmax `(skill, actividad)`
+> sobre ELV**, ejecutada directamente por el gerente) es una release **SIN
+> migración de BD y SIN cambios de UI** que cierra la segunda mitad del Planner
+> 2.0: el planner deja de **solo ordenar** la cola por valor esperado de
+> aprendizaje (V3.56) y pasa a **ELEGIR** la tarea, entre las candidatas
+> admisibles, por **argmax de ELV**. Es **CONSERVADORA**: el argmax solo actúa
+> **con estado del alumno**; **sin él la decisión es EXACTAMENTE la de V3.56.0**
+> (`select_task`). Resuelve además dos deudas del planner: el `value` **por
+> modalidad** (`skill_priorities`) en lugar del `priority_score` global, y el
+> **doble conteo de `written_production`** (el EJE de `transfer`, que se entrega
+> por texto y se evalúa como producción escrita, frente al CANAL que `write` y
+> `transfer` realmente miden: con `capacity_skill`, ambos son **una misma
+> LECTURA**). NO toca `transfer_state`, sus umbrales, `context_signals`,
+> `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS ni el Difficulty Engine.
+> Tests: nuevo `test_planner_argmax_v357.py` (24), `pytest` **2266 passed** en
+> local, launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.57.0**. **CI: pendiente de ejecución tras el
+> push.** La V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que
+> ordena) sigue inmediatamente detrás; la V3.55 (**Task Difficulty 3.0**, tres
+> columnas de BD) es el último cambio de ledger; la V3.54 como **Student Skill
+> State 3.0** (P2-03), la V3.53.1 como **Observed CEFR Safety Gate** (P1-01 de
+> V3.53.0), la V3.53.0 como **Learner Skill State 2.0 + `observed_difficulty`**
+> (P1-02), la V3.52.2 como **cierre de los dos P2 de la auditoría externa Q** y
+> la V3.52.1 como el **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y
+> aceptados. El siguiente incremento es **V3.58**: el **Sense Engine 2.0**
+> (`surface→lemma→sense→semantic_fit`). El **Context Engine 3.0** sigue como
+> candidato. El briefing de V3.57 vive en `agentes/v357-argmax-elv.md`. Antes de
 > lanzar cualquier subagente, lee esa sección para no partir de un estado
 > obsoleto (premisa 8 y 12: relevo al saturar y ancla contra la alucinación).
 
@@ -48,6 +46,20 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v357-argmax-elv.md` — **V3.57 (EJECUTADO, 2026-09-13, v3.57.0)**:
+  **Planner 2.0 — argmax `(skill, actividad)` sobre ELV**. Cierra la segunda
+  mitad del Planner 2.0: el planner **elige** la tarea por argmax de valor
+  esperado entre las candidatas admisibles (`task_candidates`), con el `value`
+  **por modalidad** (`skill_priorities`) y el margen medido sobre el **CANAL**
+  que la actividad mide (`capacity_skill`: `transfer` declara eje
+  `spontaneous_use` pero se evalúa como producción ESCRITA). Alcance CERRADO con
+  el gerente: **CONSERVADOR** — el argmax solo actúa **con estado del alumno**;
+  **sin él la decisión es EXACTAMENTE la de V3.56.0** (`select_task`). Resuelve
+  las deudas `skill_priorities`→`select_task` y el doble conteo de
+  `written_production`. **SIN migración de BD** y sin cambios de UI. NO toca
+  `transfer_state`, sus umbrales, `context_signals`, `context_diversity`,
+  `CEFR_CAPACITY`, el scoring ni FSRS. **Histórico, hecho**; ver
+  `release-notes-v3.57.0.md`.
 - `agentes/v356-planner-2.md` — **V3.56 (EJECUTADO, 2026-09-13, v3.56.0)**:
   **Planner 2.0 / `expected_learning_value`**
   (P1-03 de la auditoría de V3.52, el último candidato grande abierto). Convierte

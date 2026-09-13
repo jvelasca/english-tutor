@@ -5,6 +5,76 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-13 (UTC+2).
 >
+> **Nota (2026-09-13): V3.57.0 (Planner 2.0 — argmax `(skill, actividad)` sobre ELV)**
+> — release **v3.57.0**, **SIN migración de BD y SIN cambios de UI**, que cierra
+> la segunda mitad del Planner 2.0: el planner deja de **solo ordenar** la cola
+> por valor esperado de aprendizaje (V3.56) y pasa a **ELEGIR** la tarea, entre
+> las candidatas admisibles, por **argmax de ELV**. Es el candidato que V3.56
+> dejó explícitamente diferido. **Alcance CERRADO con el gerente (conservador):
+> el argmax SOLO actúa con estado del alumno; sin él la decisión es EXACTAMENTE
+> la de V3.56.0 (`select_task`).** Incluye resolver **dos deudas** del planner:
+> el `value` **por modalidad** (`skill_priorities`) en lugar del `priority_score`
+> global, y el **doble conteo de `written_production`** (EJE de `transfer` vs.
+> CANAL que la actividad MIDE).
+> **(A) Núcleo puro (`services/planner.py`):** `capacity_skill(skill)` mapea el
+> EJE de la tarea al CANAL que la actividad **MIDE** vía
+> `task_semantics.assessed_skill_for` (`transfer` tiene eje `spontaneous_use`,
+> pero se entrega por texto y se evalúa como producción ESCRITA,
+> `written_production`); sin actividad declarada cae al propio eje (**no se
+> inventa canal**) y vacío devuelve `""`. `task_candidates(matrix, evidence)` da
+> las tareas **ADMISIBLES hoy** en orden canónico: `error_prone` (gana sobre
+> `slow_recall`) → `recall`; cada hueco de producción accionable en
+> `GAP_CANDIDATE_ORDER` (`spoken_production` **antes** que `written_production`;
+> la preferencia histórica de V3.38.1, para que el desempate no dependa del orden
+> de `PRODUCTION_SKILLS`) → `skill_gap`; y `transfer_gap` → `spontaneous_use`
+> (solo con su propio gate). Una candidata por modalidad, `support_level`
+> declarado por la actividad (mismo contrato que `select_task`), `[]` sin
+> directriz y nunca lanza. `select_task_by_elv(...)` puntúa cada candidata con
+> `expected_learning_value` y devuelve la de mayor ELV:
+> `value = skill_priorities(signals)[skill]` (con el `priority_score` global como
+> respaldo) y el margen se mide sobre el CANAL (`capacity_skill`). **Solo
+> compiten las candidatas con margen COMPARABLE**: una modalidad sin datos tiene
+> `p = 0.5` → deseabilidad `1.0`, el MÁXIMO, y competiría **premiada por
+> ignorancia**. El empate lo rompe el orden canónico de `task_candidates`
+> (`>` estricto). `expected_learning_value` gana `value`/`capacity_skill`
+> **opcionales** y su payload gana `capacity_skill` (informativo); los
+> llamadores de V3.56 **no cambian**. **(B) Degradación neutra EXACTA
+> (invariante):** sin `capacity_by_skill`, sin candidatas o sin **ningún** margen
+> comparable, `select_task_by_elv` devuelve `select_task` **clave por clave**; sin
+> estado del alumno (o sin dificultad declarada del ítem) el `p` es `0.5` →
+> `desirability = 1.0` → `ELV = value`, así que **la tarea servida sin perfil es
+> la de V3.56.0**; se prueba parametrizada sobre varios pares matriz/evidencia.
+> **(C) Deuda 1:** el ELV del argmax usa la prioridad **POR modalidad** que el
+> planner ya calculaba y que `select_task` no consumía en la elección. **(D)
+> Deuda 2:** EJE (lo que la tarea quiere provocar: `value` y hueco) y CANAL (lo
+> que la actividad MIDE: capacidad y margen) se separan, así que `write` y
+> `transfer` **no** son dos mediciones de `written_production` sino **una misma
+> LECTURA**; sin la separación, un éxito de `transfer` habría engordado la
+> capacidad del eje `spontaneous_use` (que el ledger no acredita por canal) y la
+> prioridad del eje escrito se habría contado dos veces. **(E) Cableado
+> (`services/lexicon.py`):** `_capacity_by_skill(learner_state)` calcula UNA vez
+> la capacidad por dimensión de cada modalidad canónica
+> (`learner_skill.skill_capacity` sobre su suelo de `student_state.skill_floor`;
+> `{}` sin estado); `review_queue_item` calcula UNA vez la dificultad declarada
+> del ítem y la capacidad por canal y las pasa a las DOS rutas de decisión
+> (actividad del ítem y `task`) y a la predicción servida, de modo que argmax y
+> `learning_value` **no pueden divergir**; `_task_decision` usa
+> `select_task_by_elv` (que sin estado colapsa a `select_task`) y
+> `_learning_value` resuelve el canal con `capacity_skill` y reporta el
+> `capacity_skill` medido (**aditivo**). **NO cambia:** `select_task` y la
+> cascada de razones, `ACTIVITY_FOR_SKILL`, `EVIDENCE_REASON_ORDER`,
+> `PRIORITY_WEIGHTS`, `transfer_state` y sus umbrales, `context_signals`,
+> `context_diversity`, `CEFR_CAPACITY`, `DIFFICULTY_TOLERANCE*`,
+> `SUPPORT_DISCOUNT_STEPS`, el scoring, FSRS ni el Difficulty Engine; sin
+> migraciones ni columnas nuevas; `priority`/`signals`/`why`/`task`/
+> `skill_priorities` del ítem se conservan. Tests: nuevo
+> `test_planner_argmax_v357.py` (24), `pytest` **2266 passed** en local, launcher
+> **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.57.0**. **CI: pendiente de ejecución tras el
+> push.** Ver `release-notes-v3.57.0.md`.
+> **Siguiente paso:** V3.58 — el **Sense Engine 2.0**
+> (`surface→lemma→sense→semantic_fit`) y, después, el Context Engine 3.0.
+>
 > **Nota (2026-09-13): V3.56.0 (Planner 2.0 — `expected_learning_value`)**
 > — release **v3.56.0**, **SIN migración de BD y SIN cambios de UI**, que
 > convierte la prioridad del planner de una **suma de urgencia** en un **VALOR

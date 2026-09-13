@@ -31,7 +31,7 @@ ya calculados. Nunca lanza.
 
 from __future__ import annotations
 
-from services import difficulty
+from services import difficulty, task_semantics
 from services.evidence import (
     LEXICAL_SKILLS,
     RECALL_SKILL,
@@ -104,6 +104,11 @@ ERROR_PRONE_MIN_WRONG = 2
 # Modalidades de PRODUCCIÓN: su ausencia en el ledger es el hueco que cierra la
 # actividad `sentence`.
 PRODUCTION_SKILLS: tuple[str, ...] = ("written_production", "spoken_production")
+
+# V3.57: orden canónico de las candidatas de PRODUCCIÓN del argmax. El hueco
+# ORAL se propone antes que el escrito: es la preferencia histórica de V3.38.1 y
+# hace que el desempate del argmax no dependa del orden de `PRODUCTION_SKILLS`.
+GAP_CANDIDATE_ORDER: tuple[str, ...] = ("spoken_production", "written_production")
 
 # V3.38.1 (P1-03): modalidad que la actividad `sentence` SÍ puede cerrar — la
 # producción ORAL. El hueco parcial `written ✓ / spoken ✗` debe ser accionable;
@@ -272,8 +277,10 @@ def expected_learning_value(
     skill: str = "",
     task_difficulty: object = None,
     learner_capacity: object = None,
+    value: float | None = None,
+    capacity_skill: str = "",
 ) -> dict:
-    """Valor ESPERADO de aprendizaje de la tarea (V3.56, puro y determinista).
+    """Valor ESPERADO de aprendizaje de la tarea (V3.56 → V3.57, puro).
 
     Combina el valor pedagógico declarado (`priority_score(signals)`, los MISMOS
     pesos) con la probabilidad de éxito por margen de capacidad:
@@ -281,23 +288,56 @@ def expected_learning_value(
         ELV = desirability(p_success) × value
 
     Devuelve `{expected_learning_value, p_success, desirability, value, margin,
-    skill}`. Sin capacidad ni dificultad declarada: `margin = None`,
-    `p_success = 0.5`, `desirability = 1.0` y `ELV = value` (degradación neutra
-    EXACTA de la cola). `skill` es la modalidad que la tarea evalúa (explicable).
-    Nunca lanza.
+    skill, capacity_skill}`. Sin capacidad ni dificultad declarada: `margin =
+    None`, `p_success = 0.5`, `desirability = 1.0` y `ELV = value` (degradación
+    neutra EXACTA de la cola). `skill` es la modalidad (EJE) que la tarea
+    evalúa y `capacity_skill` el CANAL cuyo margen se midió (V3.57: aditivo,
+    vacío cuando no se declaró). Nunca lanza.
+
+    V3.57 añade dos parámetros OPCIONALES y aditivos: `value` (por defecto
+    `None`, que reproduce el `priority_score` global de V3.56; el argmax de
+    tarea pasa el valor POR MODALIDAD de `skill_priorities`) y `capacity_skill`
+    (informativo). Los llamadores de V3.56 no cambian.
     """
-    value = priority_score(signals)
+    if value is None:
+        base = priority_score(signals)
+    else:
+        try:
+            base = round(_clamp(float(value)), 4)
+        except (TypeError, ValueError):
+            base = priority_score(signals)
     margin = capacity_margin(task_difficulty, learner_capacity)
     p_success = success_probability(margin)
     desirability_factor = desirability(p_success)
     return {
-        "expected_learning_value": round(desirability_factor * value, 4),
+        "expected_learning_value": round(desirability_factor * base, 4),
         "p_success": p_success,
         "desirability": desirability_factor,
-        "value": value,
+        "value": base,
         "margin": margin,
         "skill": skill,
+        "capacity_skill": str(capacity_skill or ""),
     }
+
+
+def capacity_skill(skill: object) -> str:
+    """Canal EVALUADO cuyo margen mide esta modalidad de EJE (V3.57, pura).
+
+    El ELV necesita la capacidad de lo que la actividad MIDE, no de lo que su
+    eje QUIERE provocar: `transfer` tiene eje `spontaneous_use`, pero se entrega
+    por texto y evalúa producción ESCRITA (`task_semantics`). Sin esta
+    separación, el eje `spontaneous_use` no tendría capacidad observada (el
+    ledger la acredita por canal) y `write`/`transfer` se leerían como dos
+    mediciones distintas de `written_production` en lugar de una misma LECTURA.
+    Una modalidad sin actividad declarada cae al propio eje (no se inventa
+    canal) y vacío devuelve "". Nunca lanza.
+    """
+    text = str(skill or "").strip().lower()
+    if not text:
+        return ""
+    activity = ACTIVITY_FOR_SKILL.get(text, "")
+    assessed = task_semantics.assessed_skill_for(activity) if activity else ""
+    return assessed or text
 
 
 def error_prone(evidence: dict | None) -> bool:
@@ -666,6 +706,103 @@ def select_task(
     except Exception:  # noqa: BLE001 — el planner nunca rompe la cola
         return {"skill": "", "activity": "", "reason": "", "support_level": ""}
     return {"skill": "", "activity": "", "reason": "", "support_level": ""}
+
+
+def task_candidates(matrix: dict | None, evidence: dict | None) -> list[dict]:
+    """Tareas ADMISIBLES hoy, en orden canónico (V3.57, pura y determinista).
+
+    Es el conjunto sobre el que V3.57 hace el argmax: las MISMAS razones que la
+    cascada `select_task` ya sabe justificar, sin inventar tareas.
+
+    1. `error_prone` (gana sobre `slow_recall`) → `recall`;
+    2. cada modalidad de producción SIN éxito (`skill_gap`) que la matriz declare
+       accionable, en el orden canónico `GAP_CANDIDATE_ORDER` (oral antes que
+       escrita);
+    3. `transfer_gap` → `spontaneous_use` (solo con su propio gate: base previa y
+       menos contextos de los exigidos).
+
+    Sin directriz devuelve `[]` (la escalera de V3.35 decide). Nunca lanza: una
+    candidata por modalidad (sin duplicados) y `support_level` declarado por la
+    actividad, de modo que el argmax devuelva el mismo contrato que `select_task`.
+    """
+    mx = matrix if isinstance(matrix, dict) else {}
+    try:
+        candidates: list[dict] = []
+        seen: set[str] = set()
+
+        def _add(skill: str, reason: str) -> None:
+            if not skill or skill in seen:
+                return
+            seen.add(skill)
+            candidates.append(_task(skill, reason))
+
+        if error_prone(evidence):
+            _add(RECALL_SKILL, "error_prone")
+        elif is_slow_recall(evidence):
+            _add(RECALL_SKILL, "slow_recall")
+        if mx.get("production"):
+            gaps = skill_gaps(evidence)
+            for skill in GAP_CANDIDATE_ORDER:
+                if skill in gaps and skill in ACTIVITY_FOR_SKILL:
+                    _add(skill, "skill_gap")
+        if transfer_gap(evidence):
+            _add(TRANSFER_SKILL, "transfer_gap")
+        return candidates
+    except Exception:  # noqa: BLE001 — el planner nunca rompe la cola
+        return []
+
+
+def select_task_by_elv(
+    matrix: dict | None,
+    evidence: dict | None,
+    signals: dict | None = None,
+    *,
+    capacity_by_skill: dict | None = None,
+    task_difficulty: object = None,
+) -> dict:
+    """Tarea ÓPTIMA por argmax de ELV entre las candidatas admisibles (V3.57).
+
+    Función PURA y determinista. Con `capacity_by_skill` (capacidad por CANAL
+    evaluado, calculada por el llamador desde el estado O(1) del alumno) puntúa
+    cada candidata con `expected_learning_value` — `value` POR MODALIDAD
+    (`skill_priorities`) y margen del CANAL que la actividad mide
+    (`capacity_skill`) — y devuelve la de mayor valor esperado.
+
+    Invariante de no-regresión: **solo compiten las candidatas con margen
+    comparable** (una modalidad sin datos tiene `p = 0.5` → deseabilidad `1.0`,
+    el MÁXIMO, y competiría premiada por ignorancia). Sin capacidad, sin
+    candidatas o sin ningún margen comparable devuelve `select_task` EXACTO: sin
+    estado del alumno la tarea servida es la de V3.56.0. El empate lo rompe el
+    orden canónico de `task_candidates` (`>` estricto). Nunca lanza.
+    """
+    if not isinstance(capacity_by_skill, dict) or not capacity_by_skill:
+        return select_task(matrix, evidence, signals)
+    candidates = task_candidates(matrix, evidence)
+    if not candidates:
+        return select_task(matrix, evidence, signals)
+    priorities = skill_priorities(signals or {})
+    base_value = priority_score(signals or {})
+    best: dict | None = None
+    best_value = -1.0
+    for candidate in candidates:
+        skill = candidate.get("skill") or ""
+        channel = capacity_skill(skill)
+        payload = expected_learning_value(
+            signals or {},
+            skill=skill,
+            task_difficulty=task_difficulty,
+            learner_capacity=capacity_by_skill.get(channel),
+            value=priorities.get(skill, base_value),
+            capacity_skill=channel,
+        )
+        if payload["margin"] is None:
+            continue
+        if payload["expected_learning_value"] > best_value:
+            best_value = payload["expected_learning_value"]
+            best = candidate
+    if best is None:
+        return select_task(matrix, evidence, signals)
+    return best
 
 
 def evidence_reason(matrix: dict | None, evidence: dict | None) -> str:
