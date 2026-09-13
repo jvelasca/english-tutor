@@ -29,7 +29,11 @@ pedir más contexto.
 > equivalencia parametrizada contra los literales históricos de V3.44 y
 > end-to-end HTTP), `pytest` **2296 passed** en local, launcher **75 passed**,
 > `ruff` limpio, `tsc` OK, `vitest` **651** y `check_release_consistency`
-> **3.58.0**. **CI: pendiente de ejecución tras el push.** La V3.57 (**Planner
+> **3.58.0**. **CI 6/6 en verde** (run
+> [34780694687](https://github.com/jvelasca/english-tutor/actions/runs/34780694687)
+> sobre `82f17c4`: Release consistency, Backend, Frontend, Playwright E2E, Beta
+> V3.0 gate y Content validation), con la etiqueta anotada `v3.58.0` creada y
+> empujada. La V3.57 (**Planner
 > 2.0: argmax `(skill, actividad)` sobre ELV**) sigue inmediatamente detrás; la
 > V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad que ordena) la
 > precede; la V3.55 (**Task Difficulty 3.0**, tres columnas de BD) es el último

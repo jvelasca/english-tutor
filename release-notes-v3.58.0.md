@@ -143,7 +143,7 @@ Nuevo `backend/tests/test_semantics_sense_engine_v358.py` (**30**):
 | `vitest` | **651 passed** |
 | `npm run build` | OK |
 | `check_release_consistency` | **3.58.0** |
-| CI (6/6) | pendiente tras el push |
+| CI (6/6) | verde — [run 34780694687](https://github.com/jvelasca/english-tutor/actions/runs/34780694687) sobre `82f17c4` |
 
 Cero regresión en el bloque V3.43/V3.44 (sentidos y scoring semántico) y en el
 resto de la suite.

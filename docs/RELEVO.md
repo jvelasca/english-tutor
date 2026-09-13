@@ -66,8 +66,12 @@
 > planner ni el Difficulty Engine. Tests: nuevo
 > `test_semantics_sense_engine_v358.py` (30), `pytest` **2296 passed** en local,
 > launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
-> `check_release_consistency` **3.58.0**. **CI: pendiente de ejecución tras el
-> push.** Ver `release-notes-v3.58.0.md`.
+> `check_release_consistency` **3.58.0**. **CI 6/6 en verde** (run
+> [34780694687](https://github.com/jvelasca/english-tutor/actions/runs/34780694687)
+> sobre `82f17c4`: Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.58.0` creada y empujada. Ver
+> `release-notes-v3.58.0.md`.
 > **Siguiente paso:** V3.59 — el **Context Engine 3.0**, y después el
 > contrato/prompt de generación de sentidos y la ponderación de la adecuación en
 > `transfer_confidence`.
