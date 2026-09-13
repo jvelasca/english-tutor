@@ -5,6 +5,41 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-13 (UTC+2).
 >
+> **Nota (2026-09-13): V3.54.0 (Student Skill State 3.0)**
+> — release **v3.54.0**, **ADITIVA (una columna de BD)**, que conserva la
+> MODALIDAD en la capacidad observada (`skill × dimensión`) para que la evidencia
+> de una modalidad no eleve el reto de otra y una capacidad PARCIAL no desbloquee
+> tareas multidimensionales. **Núcleo puro** (`services/learner_skill.py`):
+> `observed_skill_capacity` (`{skill: {dimension: load}}`, muestra espaciada por
+> skill × dimensión) es la **fuente de verdad** y `observed_capacity` pasa a ser
+> una **proyección legacy** (máximo entre skills); `level_from_skill_capacity`
+> aplica la regla de cobertura **COMPLETA** de V3.53.1 por skill (una capacidad
+> escrita no fabrica un nivel oral) y `skill_coverage`/`skill_capacity` exponen
+> `none`/`partial`/`full` y las `covered_dimensions`. **Suelo por modalidad**
+> (`services/student_state.py`): `floor_level_for_skill` —
+> `demostrado > observado del SKILL > estimado > declarado` — no hereda el
+> observado global de otra modalidad. **Gate de cobertura**
+> (`services/difficulty.py`): `challenge_for` + `select_by_difficulty(...,
+> covered_dimensions, floor_challenge)` solo aplican la subida observada a los
+> contextos cuyas dimensiones son SUBCONJUNTO de las cubiertas; el resto se
+> evalúan contra el suelo declarado. **Cableado** (`services/transfer.py`,
+> `domain/vocabulary.py`): `context_for(..., learner_skill_capacity,
+> capacity_skill)` resuelve la capacidad de la modalidad que la tarea mide y el
+> drill expone el suelo por skill, con paridad GET↔POST intacta. **Persistencia
+> y contrato aditivos:** `learning_profile.observed_skill_capacity` (CREATE +
+> `ALTER TABLE` idempotente, JSON determinista) cacheada en `get_profile_summary`
+> y preservada por `set_cefr`; `LearningProfile.observed_skill_capacity`/
+> `observed_skill_level`/`skill_coverage` y `TransferContextOut.capacity_skill`,
+> con espejo TS. **NO cambia:** `level_from_capacity` (gate CEFR global de
+> V3.53.1), `observed_capacity` (proyección), `learner_capacity`,
+> `CEFR_CAPACITY`, `transfer_state` y sus umbrales, `context_signals`,
+> `context_diversity`, el scoring, el planner ni FSRS. Tests: nuevo
+> `test_learner_skill_v354.py` (19) + ajuste del estado neutro; `ruff` limpio y
+> `check_release_consistency` **3.54.0**. Ver `release-notes-v3.54.0.md`.
+> **Siguiente paso:** V3.55 (P2-01 `declared`/`served`/`observed_task_difficulty`
+> y P2-02 capacidad con apoyo/independencia/latencia) y, con ellos, el
+> **Planner 2.0 / `expected_learning_value`** (P1-03).
+>
 > **Nota (2026-09-13): V3.53.1 (Observed CEFR Safety Gate)**
 > — patch **v3.53.1**, SIN migración de BD y SIN cambios de contrato, que cierra
 > el **P1-01** de la auditoría de V3.53.0. `services.learner_skill.
@@ -2087,7 +2122,13 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
+**Posición actual (2026-09-13):** `v3.54.0` **Student Skill State 3.0** (release
+ADITIVA de una columna que conserva la modalidad en la capacidad observada, con
+suelo por skill y gate de cobertura); las **notas de la cabecera** de este
+documento son la fuente de verdad más reciente. La sección siguiente se conserva
+como histórico del hilo V3.38 (fecha original 2026-09-10, `v3.38.1`).
+
+**Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra
 sus 4 P1 (planner globalmente óptimo, señales por modalidad, `skill_gap` parcial
 accionable y automaticidad robusta), endurece `situation` (nuevo módulo puro

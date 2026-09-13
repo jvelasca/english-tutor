@@ -35,6 +35,7 @@ from repositories import db
 from repositories import profile as profile_repo
 from repositories import users as users_repo
 from services import student_state
+from services.evidence import LEXICAL_SKILLS
 
 
 def _setup(monkeypatch, tmp_path):
@@ -221,10 +222,16 @@ def test_learner_level_state_without_profile_is_neutral(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     state = asyncio.run(vocabulary_domain._learner_level_state(uid))
     # V3.53: el estado neutro añade la capacidad observada (vacía sin muestra).
+    # V3.54: además el estado por skill × dimensión y el suelo por modalidad.
     assert state == {
         **student_state.empty_state(),
         "observed_capacity": {},
         "learner_capacity": {},
+        "observed_skill_capacity": {},
+        "observed_skill_level": {},
+        "skill_coverage": {},
+        "floor_level_by_skill": {skill: "" for skill in LEXICAL_SKILLS},
+        "floor_source_by_skill": {skill: "none" for skill in LEXICAL_SKILLS},
     }
 
 

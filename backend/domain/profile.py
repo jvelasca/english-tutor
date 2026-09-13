@@ -1,6 +1,8 @@
 """Servicio de dominio del perfil de aprendizaje."""
 from __future__ import annotations
 
+import json
+
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
@@ -149,10 +151,12 @@ async def _compute_profile(user_id: str) -> dict | None:
     # por refresco de perfil) y se cachea en `learning_profile`; el camino
     # caliente del drill solo lee la fila única. Sin muestra queda vacío y todo
     # se comporta como V3.52.2.
+    # V3.54 (Learner Skill State 3.0): además se conserva la modalidad, `skill ×
+    # dimensión` (fuente de verdad); `observed_capacity` es la proyección legacy.
     observed_rows = await run_in_threadpool(
         evidence_repo.list_observed_rows, user_id
     )
-    observed = learner_skill.observed_state(observed_signals(observed_rows))
+    observed = learner_skill.observed_skill_state(observed_signals(observed_rows))
 
     skills = _skill_states(student_model["skills"])
     bands = _bands_from_skills(student_model["skills"])
@@ -185,8 +189,14 @@ async def _compute_profile(user_id: str) -> dict | None:
         "demonstrated_level": student_model["demonstrated_level"],
         # V3.53 (Learner Skill State 2.0): estado OBSERVADO (nivel equivalente y
         # capacidad por dimensión) derivado de la evidencia de dificultad.
+        # V3.54 (Learner Skill State 3.0): además por SKILL × dimensión (fuente
+        # de verdad) con su cobertura y nivel por skill; `observed_capacity` se
+        # conserva como proyección legacy.
         "observed_level": observed["observed_level"],
         "observed_capacity": observed["observed_capacity"],
+        "observed_skill_capacity": observed["observed_skill_capacity"],
+        "observed_skill_level": observed["observed_skill_level"],
+        "skill_coverage": observed["skill_coverage"],
         "estimated_bands": bands,
         "estimated_descriptor": level_descriptor(level),
         "estimated_confidence": student_model["confidence"],
@@ -250,6 +260,8 @@ async def get_profile_summary(user_id: str) -> dict | None:
     # (certificación) y cae al estimado solo si no existe.
     # V3.53: además se cachea el estado OBSERVADO (`observed_level` +
     # `observed_capacity`, vector serializado) para el suelo del drill en O(1).
+    # V3.54: `observed_skill_capacity` guarda la capacidad por skill × dimensión
+    # (JSON determinista) que el drill lee para no mezclar modalidades.
     await run_in_threadpool(
         profile_repo.set_level_state,
         user_id,
@@ -258,6 +270,9 @@ async def get_profile_summary(user_id: str) -> dict | None:
         cefr_level=profile["estimated_level"],
         observed_level=profile["observed_level"] or "",
         observed_capacity=difficulty.format_vector(profile["observed_capacity"]),
+        observed_skill_capacity=json.dumps(
+            profile["observed_skill_capacity"], ensure_ascii=False, sort_keys=True
+        ),
     )
     await _maybe_record_snapshot(user_id, profile)
     history = await run_in_threadpool(profile_repo.list_cefr_history, user_id)

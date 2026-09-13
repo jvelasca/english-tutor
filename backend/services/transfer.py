@@ -84,8 +84,9 @@ produce siempre la misma consigna.
 from __future__ import annotations
 
 import zlib
+from collections.abc import Mapping
 
-from services import difficulty, task_semantics
+from services import difficulty, learner_skill, task_semantics
 from services.cefr import CEFR_LEVELS
 
 # Prefijo del `context_id` del ledger para esta actividad. Distingue la
@@ -232,8 +233,8 @@ def _challenge_and_tolerance(
     learner_level: object,
     learner_level_source: object,
     learner_capacity: object = None,
-) -> tuple[dict[str, int], int]:
-    """Reto objetivo por dimensión y tolerancia aplicable (V3.52 → V3.53, pura).
+) -> tuple[dict[str, int], dict[str, int], int]:
+    """Reto objetivo, reto de suelo y tolerancia aplicable (V3.52 → V3.54, pura).
 
     `challenge` es el MÁXIMO por dimensión entre la capacidad del ítem (techo
     lingüístico) y la del alumno (suelo de reto); `{}` si no se reconoce ningún
@@ -244,9 +245,15 @@ def _challenge_and_tolerance(
     `services.learner_skill`) SUSTITUYE al `capacity_for(learner_level)` como
     suelo del alumno, pero conserva el máximo con la capacidad del ítem: sube el
     reto solo en las dimensiones demostradas y nunca inventa nivel. Con `None`
-    o `{}` el cálculo es exactamente el de V3.52.2. Nunca lanza.
+    o `{}` el cálculo es exactamente el de V3.52.2.
+
+    V3.54: devuelve también `floor_challenge`, el reto SIN la subida observada
+    (el de V3.52.2 sobre el suelo declarado), que el gate de cobertura usa para
+    los contextos cuyas dimensiones quedan fuera de la capacidad observada.
+    Nunca lanza.
     """
-    challenge = difficulty.challenge_vector(level, learner_level)
+    floor_challenge = difficulty.challenge_vector(level, learner_level)
+    challenge = floor_challenge
     override = difficulty.normalize_vector(learner_capacity)
     if override:
         item_capacity = difficulty.capacity_for(level)
@@ -258,7 +265,7 @@ def _challenge_and_tolerance(
             for dimension in difficulty.DIFFICULTY_DIMENSIONS
             if dimension in item_capacity or dimension in override
         }
-    return challenge, difficulty.tolerance_for(learner_level_source)
+    return challenge, floor_challenge, difficulty.tolerance_for(learner_level_source)
 
 
 def _difficulty_fit_for(
@@ -1270,15 +1277,18 @@ def context_for(
     learner_level: object = "",
     learner_level_source: object = "",
     learner_capacity: object = None,
+    learner_skill_capacity: object = None,
+    capacity_skill: object = "",
     skill_priorities: object = None,
 ) -> dict:
     """Contexto de transferencia que toca practicar (V3.40 → V3.53, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
-    unscaffolded, cefr, difficulty_vector, difficulty, skills, target_skill,
+    unscaffolded, cefr,     difficulty_vector, difficulty, skills, target_skill,
     assessed_skill, assessment_mode, item_level, learner_level,
-    learner_level_source, learner_capacity, difficulty_fit, skill_priorities}`.
+    learner_level_source, learner_capacity, capacity_skill, difficulty_fit,
+    skill_priorities}`.
     La consigna es la del banco; el escenario **no contiene la unidad objetivo**
     salvo en la condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46)
     es la condición de recuperación SERVIDA: la deriva el llamador del estado de
@@ -1304,6 +1314,14 @@ def context_for(
        explícito (capacidad OBSERVADA) sustituye al suelo declarado del nivel,
        conservando el máximo con el ítem. `skill_priorities` es informativo
        (se devuelve tal cual para explicar la elección);
+    1e. V3.54 (Student Skill State 3.0): `learner_skill_capacity` (capacidad
+       observada por SKILL × dimensión, `services.learner_skill`) resuelve la
+       capacidad de la modalidad que ESTA tarea puede medir (`capacity_skill`,
+       por defecto el `assessed_skill` del transfer): la evidencia de otra
+       modalidad ya no eleva su reto. Con cobertura dimensional PARCIAL, el gate
+       de `services.difficulty` solo aplica la subida a los contextos cuyas
+       dimensiones están cubiertas; el resto se evalúa contra el suelo declarado.
+       Sin `learner_skill_capacity` el comportamiento es el de V3.53;
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
        (el más novedoso pedagógicamente, V3.43/P1-03); los empates los resuelve
@@ -1349,11 +1367,43 @@ def context_for(
     # los niveles (ítem/alumno), así que filtrar por modalidad no lo rebaja.
     pool = _filter_skill(pool, skill)
     # V3.53: capacidad observada del alumno (aditiva). Con {} es V3.52.2 exacto.
-    capacity_override = difficulty.normalize_vector(learner_capacity)
-    challenge, tolerance = _challenge_and_tolerance(
+    # V3.54: la capacidad por SKILL × dimensión tiene prioridad y resuelve la
+    # modalidad que esta tarea mide; el gate de cobertura restringe la subida a
+    # los contextos cuyas dimensiones están cubiertas.
+    capacity_skill_key = (
+        str(capacity_skill or "").strip().lower()
+        or task_semantics.assessed_skill_for("transfer")
+    )
+    covered_dimensions = None
+    nested = (
+        learner_skill_capacity
+        if isinstance(learner_skill_capacity, Mapping)
+        else {}
+    )
+    if nested:
+        measured = learner_skill.skill_capacity(
+            learner_level, nested, capacity_skill_key
+        )
+        if measured["coverage"] == learner_skill.COVERAGE_NONE:
+            # El skill de la tarea no tiene muestra: no se eleva el reto con la
+            # capacidad observada de OTRA modalidad (P1 de V3.54).
+            capacity_override: dict[str, int] = {}
+        else:
+            capacity_override = difficulty.normalize_vector(measured["capacity"])
+        if measured["coverage"] == learner_skill.COVERAGE_PARTIAL:
+            covered_dimensions = list(measured["covered_dimensions"])
+    else:
+        capacity_override = difficulty.normalize_vector(learner_capacity)
+    challenge, floor_challenge, tolerance = _challenge_and_tolerance(
         level, learner_level, learner_level_source, capacity_override
     )
-    pool = difficulty.select_by_difficulty(pool, challenge, tolerance=tolerance)
+    pool = difficulty.select_by_difficulty(
+        pool,
+        challenge,
+        tolerance=tolerance,
+        covered_dimensions=covered_dimensions,
+        floor_challenge=floor_challenge,
+    )
     # V3.51: dimensiones semánticas de la tarea (idénticas en todos los retornos).
     # `target_skill` es lo que la tarea quiere provocar: la modalidad limitante
     # que pidió el llamador si la hay, o el eje propio del transfer. Los niveles
@@ -1401,6 +1451,8 @@ def context_for(
             # V3.53: capacidad observada que elevó el suelo ({} si no hay).
             "learner_level_source": level_source,
             "learner_capacity": dict(capacity_override),
+            # V3.54: modalidad cuya capacidad observada se aplicó ("" sin skill).
+            "capacity_skill": capacity_skill_key,
             "difficulty_fit": _difficulty_fit_for(None, challenge, tolerance),
             "skill_priorities": priorities,
         }
@@ -1443,7 +1495,18 @@ def context_for(
         # V3.53: capacidad observada que elevó el suelo ({} si no hay).
         "learner_level_source": level_source,
         "learner_capacity": dict(capacity_override),
-        "difficulty_fit": _difficulty_fit_for(context, challenge, tolerance),
+        # V3.54: modalidad cuya capacidad observada se aplicó ("" sin skill).
+        "capacity_skill": capacity_skill_key,
+        "difficulty_fit": _difficulty_fit_for(
+            context,
+            difficulty.challenge_for(
+                vector,
+                challenge,
+                covered_dimensions=covered_dimensions,
+                floor_challenge=floor_challenge,
+            ),
+            tolerance,
+        ),
         "skill_priorities": priorities,
     }
 

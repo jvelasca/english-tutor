@@ -15,11 +15,14 @@ def get_profile(user_id: str) -> dict | None:
     `demonstrated_level` (niveles SEPARADOS de la caché del Student Model).
     V3.53: expone `observed_level` y `observed_capacity` (capacidad observada
     serializada; la parsea el drill con `services.difficulty.parse_vector`).
+    V3.54: expone `observed_skill_capacity` (capacidad por skill × dimensión en
+    JSON; la normaliza `services.learner_skill.normalize_skill_capacity`).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT user_id, cefr_level, estimated_level, demonstrated_level, "
-            "observed_level, observed_capacity, updated_at "
+            "observed_level, observed_capacity, observed_skill_capacity, "
+            "updated_at "
             "FROM learning_profile WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -34,6 +37,7 @@ def set_level_state(
     cefr_level: str | None = None,
     observed_level: str = "",
     observed_capacity: str = "",
+    observed_skill_capacity: str = "",
 ) -> dict | None:
     """Persiste (upsert) el estado de nivel del usuario (V3.52 → V3.53).
 
@@ -42,8 +46,9 @@ def set_level_state(
     la primera certificación). `cefr_level` se conserva por compatibilidad: si no
     se aporta, toma el valor del estimado. V3.53 añade `observed_level` (nivel
     equivalente de la capacidad observada) y `observed_capacity` (vector
-    serializado por dimensión; `""` = sin muestra). Devuelve None si el usuario
-    no existe.
+    serializado por dimensión; `""` = sin muestra). V3.54 añade
+    `observed_skill_capacity` (por skill × dimensión, JSON). Devuelve None si el
+    usuario no existe.
     """
     if get_user(user_id) is None:
         return None
@@ -53,14 +58,16 @@ def set_level_state(
         conn.execute(
             "INSERT INTO learning_profile "
             "(user_id, cefr_level, estimated_level, demonstrated_level, "
-            "observed_level, observed_capacity, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "observed_level, observed_capacity, observed_skill_capacity, "
+            "updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET "
             "cefr_level = excluded.cefr_level, "
             "estimated_level = excluded.estimated_level, "
             "demonstrated_level = excluded.demonstrated_level, "
             "observed_level = excluded.observed_level, "
             "observed_capacity = excluded.observed_capacity, "
+            "observed_skill_capacity = excluded.observed_skill_capacity, "
             "updated_at = excluded.updated_at",
             (
                 user_id,
@@ -69,6 +76,7 @@ def set_level_state(
                 demonstrated_level,
                 observed_level,
                 observed_capacity,
+                observed_skill_capacity,
                 now,
             ),
         )
@@ -79,6 +87,7 @@ def set_level_state(
         "demonstrated_level": demonstrated_level,
         "observed_level": observed_level,
         "observed_capacity": observed_capacity,
+        "observed_skill_capacity": observed_skill_capacity,
         "updated_at": now,
     }
 
@@ -101,6 +110,9 @@ def set_cefr(user_id: str, level: str) -> dict | None:
         cefr_level=level,
         observed_level=str(existing.get("observed_level") or ""),
         observed_capacity=str(existing.get("observed_capacity") or ""),
+        observed_skill_capacity=str(
+            existing.get("observed_skill_capacity") or ""
+        ),
     )
 
 

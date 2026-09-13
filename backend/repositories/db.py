@@ -272,6 +272,7 @@ def init_db() -> None:
                 demonstrated_level TEXT NOT NULL DEFAULT '',
                 observed_level TEXT NOT NULL DEFAULT '',
                 observed_capacity TEXT NOT NULL DEFAULT '',
+                observed_skill_capacity TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -286,6 +287,10 @@ def init_db() -> None:
         # V3.53: `observed_level`/`observed_capacity` cachean la capacidad
         # OBSERVADA por dimensión (Learner Skill State 2.0) que deriva
         # `domain.profile` del ledger; el drill la lee en O(1).
+        # V3.54: `observed_skill_capacity` cachea la misma capacidad por
+        # SKILL × dimensión (JSON) para que la evidencia de una modalidad no
+        # eleve el reto de otra; es la fuente de verdad y `observed_capacity`
+        # queda como proyección legacy.
         profile_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_profile)")
         }
@@ -294,6 +299,7 @@ def init_db() -> None:
             ("demonstrated_level", "TEXT NOT NULL DEFAULT ''"),
             ("observed_level", "TEXT NOT NULL DEFAULT ''"),
             ("observed_capacity", "TEXT NOT NULL DEFAULT ''"),
+            ("observed_skill_capacity", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in profile_cols:
                 conn.execute(

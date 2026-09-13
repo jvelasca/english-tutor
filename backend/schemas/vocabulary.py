@@ -734,6 +734,9 @@ class TransferContextOut(BaseModel):
 
     V3.53: `learner_capacity` (aditivo) declara la capacidad OBSERVADA por
     dimensión que elevó el suelo del alumno.
+
+    V3.54: `capacity_skill` (aditivo) declara la modalidad cuya capacidad
+    observada se aplicó; el reto ya no mezcla modalidades.
     """
 
     word: str
@@ -781,6 +784,10 @@ class TransferContextOut(BaseModel):
     # elevó el suelo de reto del alumno ({} si no hay muestra). Aditivo y solo
     # explicativo: `difficulty_fit["challenge"]` ya refleja el reto resultante.
     learner_capacity: dict[str, int] = Field(default_factory=dict)
+    # V3.54 (Student Skill State 3.0): modalidad cuya capacidad observada se
+    # aplicó ("" sin muestra). El reto ya NO mezcla modalidades: la evidencia
+    # escrita no eleva una tarea oral.
+    capacity_skill: str = ""
 
 
 class TransferAttemptIn(BaseModel):

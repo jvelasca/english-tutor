@@ -25,7 +25,12 @@ Este módulo sustituye ese escalar por una comparación VECTOR contra VECTOR:
   Generaliza el `max(item_index, learner_index)` de V3.51 SIN mezclar escalas.
 - `fit(context_vector, challenge)` mide la DISTANCIA por dimensión y el mayor
   exceso (`overshoot`) sobre el reto objetivo.
-- `select_by_difficulty(pool, challenge, tolerance)` conserva los contextos que
+- `challenge_for(context_vector, challenge, covered_dimensions, floor_challenge)`
+  (V3.54) resuelve el reto aplicable a UN contexto: la subida observada solo
+  vale si las dimensiones que el contexto declara son SUBCONJUNTO de las
+  dimensiones observadas; si no, el contexto se evalúa contra el suelo declarado.
+- `select_by_difficulty(pool, challenge, tolerance, covered_dimensions,
+  floor_challenge)` conserva los contextos que
   no se pasan del reto (`within`) y, entre ellos, los de MENOR distancia; si
   ninguno encaja, degrada a los de menor distancia del pool completo. Nunca deja
   el pool vacío y nunca sirve el más difícil «por defecto».
@@ -297,11 +302,61 @@ def _context_vector(context: object) -> object:
     return {}
 
 
+def _covered_set(dimensions: object) -> frozenset[str] | None:
+    """Conjunto de dimensiones cubiertas, o None si no hay gate (V3.54, pura).
+
+    `None` significa «sin gate»: el reto elevado aplica a todos los contextos
+    (comportamiento de V3.53.1). Un iterable devuelve el conjunto normalizado a
+    minúsculas; un tipo no iterable o una cadena se tratan como «sin gate» para
+    no inventar una restricción a partir de datos mal formados. Nunca lanza.
+    """
+    if dimensions is None or isinstance(dimensions, (str, bytes)):
+        return None
+    try:
+        return frozenset(
+            str(dimension).strip().lower()
+            for dimension in dimensions
+            if str(dimension).strip()
+        )
+    except TypeError:
+        return None
+
+
+def challenge_for(
+    context_vector: object,
+    challenge: object,
+    *,
+    covered_dimensions: object = None,
+    floor_challenge: object = None,
+) -> dict[str, int]:
+    """Reto aplicable a UN contexto según su cobertura observada (V3.54, pura).
+
+    Con `covered_dimensions` (dimensiones con muestra espaciada de la modalidad
+    que la tarea mide) la subida observada solo aplica a los contextos cuyas
+    dimensiones declaradas son SUBCONJUNTO de las cubiertas: una capacidad
+    léxica parcial no debe elevar el reto de una tarea que también exige sintaxis,
+    discurso e interacción (P1 de V3.54). Los contextos fuera de la cobertura se
+    evalúan contra `floor_challenge` (el reto sin subida observada); si no se
+    aporta, contra el propio `challenge`. Sin `covered_dimensions` devuelve el
+    reto tal cual (V3.53.1). Nunca lanza.
+    """
+    target = normalize_vector(challenge)
+    covered = _covered_set(covered_dimensions)
+    if covered is None:
+        return target
+    context = normalize_vector(context_vector)
+    if set(context) <= covered:
+        return target
+    return normalize_vector(floor_challenge) or target
+
+
 def select_by_difficulty(
     pool: Iterable[dict],
     challenge: object,
     *,
     tolerance: int = DIFFICULTY_TOLERANCE,
+    covered_dimensions: object = None,
+    floor_challenge: object = None,
 ) -> list[dict]:
     """Contextos más cercanos al reto sin pasarse de la tolerancia (V3.52, pura).
 
@@ -311,16 +366,32 @@ def select_by_difficulty(
     menor `distance` (V3.52.1: antes bastaba la distancia, así que un contexto
     sin `difficulty_vector` ganaba con `distance=0`). Nunca deja el pool vacío:
     sin reto reconocible o sin pool devuelve el pool intacto. Determinista:
-    preserva el orden de entrada. Nunca lanza.
+    preserva el orden de entrada.
+
+    V3.54: `covered_dimensions` y `floor_challenge` activan el GATE de cobertura
+    (ver `challenge_for`): cada contexto se evalúa contra el reto que le
+    corresponde según las dimensiones que declara. Sin ellos el comportamiento
+    es exactamente el de V3.52/V3.53. Nunca lanza.
     """
     contexts = list(pool)
     target = normalize_vector(challenge)
     if not contexts or not target:
         return contexts
-    results = [
-        fit(_context_vector(context), target, tolerance=tolerance)
-        for context in contexts
-    ]
+    results = []
+    for context in contexts:
+        vector = _context_vector(context)
+        results.append(
+            fit(
+                vector,
+                challenge_for(
+                    vector,
+                    target,
+                    covered_dimensions=covered_dimensions,
+                    floor_challenge=floor_challenge,
+                ),
+                tolerance=tolerance,
+            )
+        )
     within = [index for index, result in enumerate(results) if result["within"]]
     if within:
         best = min(results[index]["distance"] for index in within)

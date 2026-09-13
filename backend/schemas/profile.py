@@ -113,6 +113,13 @@ class LearningProfile(BaseModel):
     # observada ("" sin muestra) y la capacidad por dimensión que la respalda.
     observed_level: str = ""
     observed_capacity: dict[str, int] = Field(default_factory=dict)
+    # V3.54 (Learner Skill State 3.0): capacidad por SKILL × dimensión (fuente de
+    # verdad, no colapsa la modalidad), su nivel CEFR por skill y la cobertura
+    # dimensional observada (none/partial/full). `observed_capacity` se conserva
+    # como proyección legacy.
+    observed_skill_capacity: dict[str, dict[str, int]] = Field(default_factory=dict)
+    observed_skill_level: dict[str, str] = Field(default_factory=dict)
+    skill_coverage: dict[str, str] = Field(default_factory=dict)
     estimated_bands: EstimatedBands
     estimated_descriptor: str
     estimated_confidence: float

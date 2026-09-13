@@ -35,6 +35,8 @@ Módulo PURO: sin I/O, sin reloj, sin aleatoriedad. Nunca lanza.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from services import transfer
 
 # Orden de PRIORIDAD de las fuentes de suelo (de mayor a menor confianza). No es
@@ -134,6 +136,45 @@ def level_state(
 def is_certified(source: object) -> bool:
     """¿La fuente del suelo es una certificación formal demostrada? (V3.52)."""
     return str(source or "").strip().lower() in CERTIFIED_SOURCES
+
+
+def floor_level_for_skill(
+    skill: object,
+    *,
+    practice_level: object = "",
+    estimated_cefr: object = "",
+    demonstrated_cefr: object = "",
+    observed_skill_level: object = None,
+    observed_cefr: object = "",
+) -> tuple[str, str]:
+    """Suelo de dificultad de UN skill y su fuente (V3.54, pura).
+
+    Misma política que `floor_level`, pero con el nivel OBSERVADO de la
+    modalidad: demostrado > observado del SKILL > estimado > declarado. Un skill
+    sin capacidad observada NO hereda el nivel observado de otra modalidad
+    (P1-01 de V3.54): una producción escrita B2 no puede elevar el suelo de una
+    tarea oral. Cuando el estado por skill no está disponible (caché legacy sin
+    `observed_skill_level`), delega en `floor_level` con el `observed_cefr`
+    global, que es exactamente el comportamiento de V3.53.1.
+
+    Devuelve `(nivel, fuente)` con fuente en `LEVEL_SOURCES`. Nunca lanza.
+    """
+    demonstrated = _normalize_level(demonstrated_cefr)
+    if demonstrated:
+        return demonstrated, "demonstrated"
+    by_skill = observed_skill_level if isinstance(observed_skill_level, Mapping) else {}
+    if by_skill:
+        key = str(skill or "")
+        measured = by_skill.get(key)
+        if measured is None and key:
+            measured = by_skill.get(key.strip().lower())
+        observed = _normalize_level(measured)
+        if observed:
+            return observed, "observed"
+        # Estado por skill disponible y esta modalidad sin muestra: NO se hereda
+        # el observado global de otra modalidad.
+        return floor_level(practice_level, estimated_cefr, "", "")
+    return floor_level(practice_level, estimated_cefr, "", observed_cefr)
 
 
 def empty_state() -> dict[str, str]:

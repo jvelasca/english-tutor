@@ -36,6 +36,7 @@ from services import (
 )
 from services.evidence import (
     DRILL_SKILL,
+    LEXICAL_SKILLS,
     RECALL_SKILL,
     classify_recall_error,
     production_skill,
@@ -864,8 +865,28 @@ def _transfer_target_skill(
     return max(candidates, key=lambda skill: priorities[skill])
 
 
+def _empty_learner_level_state() -> dict:
+    """Estado de nivel neutro (sin caché): MISMA forma que el camino normal.
+
+    Une el estado neutro de nivel (`student_state.empty_state`) con el observado
+    (`learner_skill.empty_state`, V3.54) y añade las claves derivadas del drill,
+    para que el contrato no cambie de forma entre el camino con perfil y el
+    camino degradado. Dict nuevo en cada llamada. Nunca lanza.
+    """
+    return {
+        **student_state.empty_state(),
+        "observed_capacity": {},
+        "learner_capacity": {},
+        "observed_skill_capacity": {},
+        "observed_skill_level": {},
+        "skill_coverage": {},
+        "floor_level_by_skill": {skill: "" for skill in LEXICAL_SKILLS},
+        "floor_source_by_skill": {skill: "none" for skill in LEXICAL_SKILLS},
+    }
+
+
 async def _learner_level_state(user_id: str) -> dict:
-    """Estado de nivel del alumno desde la caché del Student Model (V3.52 → V3.53).
+    """Estado de nivel del alumno desde la caché del Student Model (V3.52 → V3.54).
 
     Lee `learning_profile` (fila única, coste O(1)) y aplica
     `student_state.level_state`: la caché guarda los niveles SEPARADOS que
@@ -876,32 +897,63 @@ async def _learner_level_state(user_id: str) -> dict:
     migradas de V3.51).
 
     Devuelve `{practice_level, estimated_cefr, demonstrated_cefr, observed_cefr,
-    floor_level, floor_source, observed_capacity, learner_capacity}`. El suelo
-    prioriza lo DEMOSTRADO, luego lo OBSERVADO, luego lo estimado y lo declarado;
-    sin nivel conocido devuelve el estado vacío y el drill conserva el
-    comportamiento de V3.46/V3.47 (el motor de dificultad no filtra).
-    `learner_capacity` es el suelo efectivo por dimensión (máximo entre el nivel
-    y lo observado) que eleva el reto solo donde hay evidencia. NO se recalcula
-    el Student Model en el camino caliente del drill. Nunca lanza.
+    floor_level, floor_source, observed_capacity, learner_capacity,
+    observed_skill_capacity, observed_skill_level, skill_coverage,
+    floor_level_by_skill, floor_source_by_skill}`. El suelo global prioriza lo
+    DEMOSTRADO, luego lo OBSERVADO, luego lo estimado y lo declarado; sin nivel
+    conocido devuelve el estado vacío y el drill conserva el comportamiento de
+    V3.46/V3.47 (el motor de dificultad no filtra). `learner_capacity` es el
+    suelo efectivo por dimensión (proyección legacy).
+
+    V3.54 (Learner Skill State 3.0): `observed_skill_capacity` (skill ×
+    dimensión, JSON cacheado) es la fuente de verdad por modalidad y
+    `floor_level_by_skill`/`floor_source_by_skill` dan el suelo de CADA skill
+    (una capacidad escrita NO eleva el suelo oral). NO se recalcula el Student
+    Model en el camino caliente del drill. Nunca lanza.
     """
     try:
         row = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — preferencia no bloqueante
-        return {**student_state.empty_state(), **learner_skill.empty_state()}
+        return _empty_learner_level_state()
     row = row or {}
     observed_capacity = difficulty.parse_vector(row.get("observed_capacity"))
+    observed_skill_capacity = learner_skill.normalize_skill_capacity(
+        row.get("observed_skill_capacity")
+    )
+    observed_skill_level = learner_skill.level_from_skill_capacity(
+        observed_skill_capacity
+    )
+    coverage = learner_skill.skill_coverage(observed_skill_capacity)
     state = student_state.level_state(
         practice_level=row.get("cefr_level") or "",
         estimated_cefr=row.get("estimated_level") or "",
         demonstrated_cefr=row.get("demonstrated_level") or "",
         observed_cefr=row.get("observed_level") or "",
     )
+    floor_by_skill: dict[str, str] = {}
+    source_by_skill: dict[str, str] = {}
+    for skill in LEXICAL_SKILLS:
+        level, source = student_state.floor_level_for_skill(
+            skill,
+            practice_level=state["practice_level"],
+            estimated_cefr=state["estimated_cefr"],
+            demonstrated_cefr=state["demonstrated_cefr"],
+            observed_skill_level=observed_skill_level,
+            observed_cefr=state["observed_cefr"],
+        )
+        floor_by_skill[skill] = level
+        source_by_skill[skill] = source
     return {
         **state,
         "observed_capacity": observed_capacity,
         "learner_capacity": learner_skill.learner_capacity(
             state["floor_level"], observed_capacity
         ),
+        "observed_skill_capacity": observed_skill_capacity,
+        "observed_skill_level": observed_skill_level,
+        "skill_coverage": coverage,
+        "floor_level_by_skill": floor_by_skill,
+        "floor_source_by_skill": source_by_skill,
     }
 
 
@@ -913,6 +965,26 @@ async def _learner_level(user_id: str) -> str:
     """
     state = await _learner_level_state(user_id)
     return state["floor_level"]
+
+
+def _skill_floor(learner_state: dict, skill: object) -> tuple[str, str]:
+    """Suelo (nivel, fuente) de la modalidad que la tarea mide (V3.54, pura).
+
+    Lee `floor_level_by_skill`/`floor_source_by_skill` del estado del alumno y cae
+    al suelo global si el skill no está en el mapa (caché legacy o skill no
+    canónico): así el drill conserva el comportamiento de V3.53.1 cuando no hay
+    estado por modalidad. Nunca lanza.
+    """
+    key = str(skill or "")
+    by_skill = learner_state.get("floor_level_by_skill")
+    source_by_skill = learner_state.get("floor_source_by_skill")
+    by_skill = by_skill if isinstance(by_skill, dict) else {}
+    source_by_skill = source_by_skill if isinstance(source_by_skill, dict) else {}
+    floor = str(by_skill.get(key) or learner_state.get("floor_level") or "")
+    source = str(
+        source_by_skill.get(key) or learner_state.get("floor_source") or ""
+    )
+    return floor, source
 
 
 async def get_transfer_context(user_id: str, word: str) -> dict:
@@ -957,6 +1029,10 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
     priorities = _transfer_priorities(row, summary)
     skill = _transfer_target_skill(row, summary, priorities)
     learner_state = await _learner_level_state(user_id)
+    # V3.54: el suelo y la capacidad observada se resuelven por la modalidad que
+    # el transfer puede MEDIR (escrita), no por un vector global colapsado.
+    assessed = task_semantics.assessed_skill_for("transfer")
+    floor, floor_source = _skill_floor(learner_state, assessed)
     return transfer.context_for(
         word,
         used,
@@ -964,9 +1040,11 @@ async def get_transfer_context(user_id: str, word: str) -> dict:
         condition=condition,
         level=row.get("cefr") or "",
         skill=skill,
-        learner_level=learner_state["floor_level"],
-        learner_level_source=learner_state["floor_source"],
+        learner_level=floor,
+        learner_level_source=floor_source,
         learner_capacity=learner_state["learner_capacity"],
+        learner_skill_capacity=learner_state["observed_skill_capacity"],
+        capacity_skill=assessed,
         skill_priorities=priorities,
     )
 
@@ -1030,6 +1108,8 @@ async def submit_transfer_attempt(
     priorities = _transfer_priorities(row, summary)
     if not context_id:
         learner_state = await _learner_level_state(user_id)
+        assessed = task_semantics.assessed_skill_for("transfer")
+        floor, floor_source = _skill_floor(learner_state, assessed)
         context_id = transfer.context_for(
             word,
             (summary.get("contexts") or {}).keys(),
@@ -1037,9 +1117,11 @@ async def submit_transfer_attempt(
             condition=condition,
             level=row.get("cefr") or "",
             skill=_transfer_target_skill(row, summary, priorities),
-            learner_level=learner_state["floor_level"],
-            learner_level_source=learner_state["floor_source"],
+            learner_level=floor,
+            learner_level_source=floor_source,
             learner_capacity=learner_state["learner_capacity"],
+            learner_skill_capacity=learner_state["observed_skill_capacity"],
+            capacity_skill=assessed,
             skill_priorities=priorities,
         ).get("context_id", "")
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)

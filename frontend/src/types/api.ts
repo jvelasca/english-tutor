@@ -235,6 +235,12 @@ export interface LearningProfile {
   observed_level?: string;
   /** V3.53: capacidad observada por dimensión que respalda ese nivel. */
   observed_capacity?: Record<string, number>;
+  /** V3.54: capacidad observada por SKILL × dimensión (fuente de verdad). */
+  observed_skill_capacity?: Record<string, Record<string, number>>;
+  /** V3.54: nivel CEFR equivalente por skill ("" sin cobertura completa). */
+  observed_skill_level?: Record<string, string>;
+  /** V3.54: cobertura dimensional observada por skill (none/partial/full). */
+  skill_coverage?: Record<string, string>;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
   estimated_confidence: number;
@@ -578,6 +584,9 @@ export interface DrillTransferContext {
   // V3.53 (Learner Skill State 2.0): capacidad observada por dimensión que
   // elevó el suelo de reto (aditivo; {} si no hay muestra).
   learner_capacity?: Record<string, number>;
+  // V3.54 (Student Skill State 3.0): modalidad cuya capacidad observada se
+  // aplicó ("" sin muestra): el reto ya no mezcla modalidades.
+  capacity_skill?: string;
 }
 
 export interface DrillDifficultyFit {

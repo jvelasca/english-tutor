@@ -5,35 +5,36 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.53.1`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.53.1 (**Observed CEFR Safety Gate**, ejecutada
-> directamente por el gerente) es un patch SIN migración de BD ni cambios de
-> contrato que cierra el **P1-01** de la auditoría de V3.53.0:
-> `services.learner_skill.level_from_capacity` iteraba las dimensiones CON
-> muestra y una sin muestra «no bloqueaba», así que
-> `observed_capacity = {"lexical": 5}` producía un `observed_level = "C2"` (una
-> capacidad léxica compatible con C2 convertida en un CEFR GLOBAL). Ahora recorre
-> las dimensiones que exige el NIVEL candidato, cuenta 0 en las sin muestra y
-> exige **cobertura dimensional COMPLETA**: `observed_capacity` sigue siendo la
-> fuente de verdad por dimensión y `observed_level` es un RESUMEN DERIVADO. NO
-> toca `observed_capacity`, `learner_capacity`, `CEFR_CAPACITY`, la escalera
-> `transfer_state`, sus umbrales, `context_signals`, `context_diversity`, el
-> scoring, el planner ni FSRS. Tests: pytest **2187 passed** en local, `ruff` y
-> `tsc` limpios, `check_release_consistency` **3.53.1** exit 0 y **CI 6/6 en verde**
-> (run [34748988008](https://github.com/jvelasca/english-tutor/actions/runs/34748988008)
-> sobre `6d8af47`: pytest **2185 passed + 2 skipped**, vitest **651**, Playwright
-> **23**) con la etiqueta anotada `v3.53.1` creada y empujada. La V3.53.0 sigue
-> como **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
-> **cierre de los dos P2 de la auditoría externa Q** (`CEFR_CAPACITY` = envelope
-> monótono del banco y tolerancia como red de seguridad) y la V3.52.1 como el
-> **hotfix de producto** que cerró el **P1-01** de la auditoría de V3.52. Los
-> P3-02/P3-03 quedan abiertos y aceptados. El siguiente incremento es **V3.54**: la
-> nota superior del relevo marca **Planner 2.0 / `expected_learning_value`**
-> (P1-03, cablear el skill state al planner) y, con él, los P2-01/P2-02/P2-03 del
-> skill state; el **Sense Engine 2.0** (`surface→lemma→sense→semantic_fit`) sigue
-> como candidato y **V3.54 todavía NO tiene briefing**. Antes de lanzar cualquier
-> subagente, lee esa sección para no partir de un estado obsoleto (premisa 8 y 12:
-> relevo al saturar y ancla contra la alucinación).
+> **Estado actual (2026-09-13): `v3.54.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.54 (**Student Skill State 3.0**, ejecutada
+> directamente por el gerente) es una release **ADITIVA (una columna de BD)** que
+> conserva la MODALIDAD en la capacidad observada (`skill × dimensión`): nueva
+> `observed_skill_capacity` como FUENTE de verdad, `level_from_skill_capacity`
+> con la regla de cobertura COMPLETA por skill (V3.53.1 intacta para el resumen
+> global), `skill_coverage`/`skill_capacity`, `floor_level_for_skill` (una
+> modalidad sin muestra NO hereda el observado de otra) y un gate de cobertura
+> en `difficulty.challenge_for`/`select_by_difficulty` y en
+> `transfer.context_for` que impide que una capacidad PARCIAL eleve tareas
+> multidimensionales. NO toca `level_from_capacity`, `observed_capacity`
+> (proyección legacy), `CEFR_CAPACITY`, la escalera `transfer_state`, sus
+> umbrales, `context_signals`, `context_diversity`, el scoring, el planner ni
+> FSRS. Contratos aditivos `LearningProfile.observed_skill_capacity`/
+> `observed_skill_level`/`skill_coverage` y `TransferContextOut.capacity_skill`
+> (con espejo TS). Tests: nuevo `test_learner_skill_v354.py` (19), `ruff` limpio
+> y `check_release_consistency` **3.54.0** exit 0. La V3.53.1 sigue como
+> **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como **Learner
+> Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
+> los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de
+> producto** que cerró el **P1-01** de la auditoría de V3.52. Los P3-02/P3-03
+> quedan abiertos y aceptados. El siguiente incremento es **V3.55**: los P2-01
+> (`declared`/`served`/`observed_task_difficulty`) y P2-02 (capacidad con
+> apoyo/independencia/latencia) del skill state y, con ellos, el **Planner 2.0 /
+> `expected_learning_value`** (P1-03); el **Sense Engine 2.0**
+> (`surface→lemma→sense→semantic_fit`) y el Context Engine siguen como
+> candidatos. El briefing de V3.54 vive en
+> `agentes/v354-student-skill-state-3.md`. Antes de lanzar cualquier subagente,
+> lee esa sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al
+> saturar y ancla contra la alucinación).
 
 ## Cómo usar un subagente
 
@@ -45,6 +46,21 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v354-student-skill-state-3.md` — **V3.54 (EJECUTADO, 2026-09-13,
+  v3.54.0)**: **Student Skill State 3.0**. Release ADITIVA (una columna de BD,
+  `learning_profile.observed_skill_capacity`) que conserva la MODALIDAD en la
+  capacidad observada (`skill × dimensión`): `observed_skill_capacity` (fuente de
+  verdad) + `observed_capacity` (proyección legacy), `level_from_skill_capacity`
+  (cobertura dimensional COMPLETA por skill, regla de V3.53.1 intacta para el
+  resumen global), `skill_coverage`/`skill_capacity`, `floor_level_for_skill`
+  (demostrado > observado del SKILL > estimado > declarado, sin herencia entre
+  modalidades) y gate de cobertura en `difficulty.challenge_for`/
+  `select_by_difficulty` y `transfer.context_for` (una capacidad PARCIAL no eleva
+  tareas multidimensionales). Contratos aditivos
+  `LearningProfile.observed_skill_capacity`/`observed_skill_level`/`skill_coverage`
+  y `TransferContextOut.capacity_skill`, con espejo TS. NO toca
+  `level_from_capacity`, `CEFR_CAPACITY`, la escalera, el scoring, el planner ni
+  FSRS. **Histórico, hecho**; ver `release-notes-v3.54.0.md`.
 - `agentes/v3531-observed-cefr-gate.md` — **no existe**: V3.53.1 (**ejecutado
   directamente por el gerente**, 2026-09-13) se resolvió sin briefing separado,
   como V3.52.2/V3.38.1. Cierra el **P1-01** de la auditoría de V3.53.0: `level_from_capacity`
