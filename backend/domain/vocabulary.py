@@ -111,7 +111,16 @@ async def _record_production_evidence(
     ser el vocabulario declarado de `LEXICAL_SKILLS` (`production_skill`): el
     canal concreto no se pierde (sigue en `context_id`/`activity_id`), pero la
     automaticidad ya puede segmentarse por modalidad en lugar de mezclar
-    producción escrita y oral."""
+    producción escrita y oral.
+
+    V3.55 (Task Difficulty 3.0) — FUERA DE ALCANCE: este volcado no declara las
+    tres dificultades. Recibe solo las FORMAS producidas (no las filas del
+    diccionario), así que calcular la carga léxica declarada exigiría una
+    consulta extra por palabra en el camino caliente del chat libre. El evento
+    queda con `declared`/`served`/`observed_task` en `''` (la producción en
+    conversación no acredita capacidad observada todavía); se abordará cuando el
+    volcado disponga de las filas sin coste.
+    """
     if not words:
         return
     support_level = _PRODUCTION_SUPPORT.get(channel, "independent")
@@ -378,6 +387,29 @@ def _duration_ms(duration_seconds: float | None) -> int | None:
         return None
 
 
+def _item_task_difficulty(
+    row: dict, support_level: str, success: bool
+) -> dict[str, str]:
+    """Tres dificultades de un drill de ÍTEM (V3.55, pura).
+
+    El ítem léxico declara su carga (`declared_difficulty` = su CEFR en la
+    dimensión `lexical`) y el drill la sirve TAL CUAL (no hay banco de contextos
+    que ajuste al alumno, así que `served` coincide con lo declarado). La carga
+    que el alumno ACREDITA la descuenta el andamiaje declarado por el peldaño
+    (`difficulty.observed_task_difficulty`). Devuelve las tres cadenas canónicas
+    listas para `evidence_repo.record_evidence`, con `observed_task_difficulty`
+    vacía en el fallo. Centraliza la decisión para que las cuatro vías del drill
+    no puedan divergir. Nunca lanza.
+    """
+    declared = difficulty.declared_difficulty(lexicon.cefr_difficulty(row))
+    return difficulty.task_difficulty_vectors(
+        declared=declared,
+        served=declared,
+        support_level=support_level,
+        success=success,
+    )
+
+
 async def _record_retrieval(
     user_id: str,
     word: str,
@@ -441,6 +473,10 @@ async def _record_retrieval(
                 success=True,
                 support_level="guided",
                 difficulty=lexicon.cefr_difficulty(row),
+                # V3.55 (Task Difficulty 3.0): las tres dificultades del evento.
+                # El peldaño dice la palabra o la frase tras un modelo (`guided`),
+                # así que la carga ACREDITADA va descontada por el andamiaje.
+                **_item_task_difficulty(row, "guided", True),
                 response_time_ms=response_time_ms,
                 error_type="correct",
                 event_role="evidence",
@@ -654,6 +690,10 @@ async def _record_write_evidence(
             success=bool(scored["passed"]),
             support_level="independent",
             difficulty=lexicon.cefr_difficulty(row),
+            # V3.55 (Task Difficulty 3.0): frase PROPIA sin modelo
+            # (`independent`), así que la carga acreditada es la declarada por el
+            # ítem; en el fallo la observada queda vacía.
+            **_item_task_difficulty(row, "independent", bool(scored["passed"])),
             response_time_ms=response_time_ms,
             error_type=scored["error_type"] or "partial",
             event_role="evidence",
@@ -754,6 +794,13 @@ async def _record_transfer_evidence(
     contexto SERVIDO (`services.transfer.context_difficulty` serializado por
     `services.difficulty.format_vector`); el resto de drills lo dejan `''`
     (no declaran banco de contextos).
+
+    V3.55 (Task Difficulty 3.0): el evento desdobla la dificultad en las TRES
+    (`declared_difficulty` = carga léxica que declara el ÍTEM,
+    `served_difficulty` = vector del contexto SERVIDO, `observed_task_difficulty`
+    = lo ACREDITADO, que con apoyo `spontaneous` coincide con lo servido y queda
+    `''` en el fallo). `observed_difficulty` se conserva como proyección legacy
+    de `served_difficulty` (paridad V3.53).
     """
     try:
         await run_in_threadpool(
@@ -780,8 +827,19 @@ async def _record_transfer_evidence(
             # vector del contexto del banco), no la del ítem léxico. Es la señal
             # del Learner Skill State 2.0 (capacidad OBSERVADA por dimensión);
             # una media escalar volvería a colapsar las dimensiones.
-            observed_difficulty=difficulty.format_vector(
-                transfer.context_difficulty(context_id)
+            # V3.55 (Task Difficulty 3.0): se desdobla en las tres dificultades.
+            # El ítem DECLARA su carga léxica, la actividad SIRVE el vector del
+            # contexto elegido y el alumno ACREDITA lo servido descontado por el
+            # andamiaje (`spontaneous` = sin descuento; la consigna da un
+            # escenario nuevo, no ayuda con la unidad). `observed_difficulty` se
+            # mantiene como proyección legacy de lo servido (paridad V3.53).
+            **difficulty.task_difficulty_vectors(
+                declared=difficulty.declared_difficulty(
+                    lexicon.cefr_difficulty(row)
+                ),
+                served=transfer.context_difficulty(context_id),
+                support_level="spontaneous",
+                success=bool(scored["passed"]),
             ),
             response_time_ms=response_time_ms,
             error_type=scored["error_type"] or "partial",
@@ -1459,6 +1517,11 @@ async def submit_recall_attempt(
         success=correct,
         support_level=support_level,
         difficulty=lexicon.cefr_difficulty(row_before),
+        # V3.55 (Task Difficulty 3.0): el recall se teclea tras un cue graduado
+        # (`RECALL_CUE_SUPPORT`: traducción/definición → `cued`, cloze/situación →
+        # `guided`), así que la carga que ACREDITA va descontada por ese
+        # andamiaje; en el fallo la observada queda vacía.
+        **_item_task_difficulty(row_before, support_level, correct),
         response_time_ms=response_time_ms,
         error_type=error_type,
         event_role="evidence",

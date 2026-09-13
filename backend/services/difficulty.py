@@ -200,6 +200,146 @@ def parse_vector(text: object) -> dict[str, int]:
     return parsed
 
 
+# ---------------------------------------------------------------------------
+# V3.55 (Task Difficulty 3.0): las TRES dificultades de un evento.
+#
+# Hasta V3.54 el ledger guardaba UNA: `observed_difficulty` (V3.53), que en
+# realidad contenía la dificultad de la tarea SERVIDA — el vector del contexto
+# que el alumno tenía delante, no la carga que había SUPERADO — y solo la
+# escribía el drill de Transfer. El P2-01 de la auditoría de V3.53.1 pidió
+# desdoblar esa señal en tres, con nombres honestos:
+#
+#   declared  — lo que DECLARA el ítem o la actividad por diseño (el CEFR léxico
+#               del ítem; en Transfer el vector del contexto del banco);
+#   served    — lo que la actividad SIRVIÓ de verdad (en los drills de ítem
+#               coincide con lo declarado: no hay banco que ajuste);
+#   observed  — lo que el alumno ACREDITÓ: lo servido DESCONTADO por el
+#               andamiaje que la actividad le dio.
+#
+# El descuento es la pieza del P2-02: un éxito `guided` (repetir tras un modelo)
+# no puede acreditar la misma carga que uno `spontaneous`, y hasta V3.54 el
+# ledger los sumaba igual. Tabla DECLARADA, monótona con la escalera canónica de
+# `services.evidence.EVIDENCE_SUPPORT_LEVELS`
+# (`copied → guided → cued → independent → spontaneous`): cada PASO descuenta
+# una unidad de carga por dimensión y una dimensión que cae por debajo de
+# `_MIN_LOAD` no acredita nada. Los niveles FUERA de la tabla (`copied` y
+# cualquier valor legacy/desconocido) no acreditan carga: sin apoyo declarado no
+# se inventa capacidad (misma política que el resto del motor).
+SUPPORT_DISCOUNT_STEPS: dict[str, int] = {
+    "guided": 2,
+    "cued": 1,
+    "independent": 0,
+    "spontaneous": 0,
+}
+
+
+def declared_difficulty(lexical_load: object) -> dict[str, int]:
+    """Carga que DECLARA un ítem léxico: solo la dimensión `lexical` (pura).
+
+    Un ítem declara su CEFR (la dificultad léxica del diccionario), no el
+    discurso ni la interacción de una tarea: devuelve `{lexical: load}` con la
+    carga recortada a 1..5, o `{}` si no hay dificultad declarada. La cobertura
+    PARCIAL que produce es justamente la que el gate de V3.54 sabe tratar (una
+    capacidad léxica no eleva tareas multidimensionales). Nunca lanza.
+
+    Ojo al 0: `lexicon.cefr_difficulty` devuelve `0.0` cuando la fila no declara
+    CEFR, y `_as_load` recortaría ese 0 a la carga mínima 1 — se declara `{}` en
+    su lugar (un ítem sin CEFR no declara nada, no «un poco»).
+
+    V3.55: es la mitad `declared` de las tres dificultades; en los drills de ítem
+    (recall/word/sentence/write) `served` coincide con ella.
+    """
+    if isinstance(lexical_load, bool):
+        return {}
+    try:
+        numeric = float(lexical_load)
+    except (TypeError, ValueError):
+        return {}
+    if numeric <= 0:
+        return {}
+    load = _as_load(numeric)
+    return {"lexical": load} if load is not None else {}
+
+
+def observed_task_difficulty(
+    served: object, support_level: object
+) -> dict[str, int]:
+    """Carga que el alumno ACREDITA tras descontar el andamiaje (V3.55, pura).
+
+    Aplica `SUPPORT_DISCOUNT_STEPS` al vector SERVIDO: resta los pasos del nivel
+    de apoyo declarado y descarta las dimensiones que quedan por debajo de la
+    carga mínima. `copied` y cualquier apoyo desconocido devuelven `{}` (quien
+    repite un modelo no acredita tarea; sin dato no se inventa). Un vector
+    servido vacío no acredita nada. Nunca lanza.
+    """
+    vector = normalize_vector(served)
+    if not vector:
+        return {}
+    steps = SUPPORT_DISCOUNT_STEPS.get(str(support_level or "").strip().lower())
+    if steps is None:
+        return {}
+    return {
+        dimension: load - steps
+        for dimension, load in vector.items()
+        if load - steps >= _MIN_LOAD
+    }
+
+
+def task_difficulty_vectors(
+    *,
+    declared: object,
+    served: object,
+    support_level: object,
+    success: bool,
+) -> dict[str, str]:
+    """Serializa las TRES dificultades de un evento del ledger (V3.55, pura).
+
+    Devuelve `{declared_difficulty, served_difficulty, observed_task_difficulty,
+    observed_difficulty}` ya en el formato canónico de `format_vector`:
+
+    - `declared`/`served` son HECHOS de la tarea y se guardan siempre (también en
+      el fallo: declaran qué se pidió, no qué se logró);
+    - `observed_task_difficulty` es lo ACREDITADO y solo se guarda en el ÉXITO
+      (`''` en el fallo): un intento no superado no acredita carga;
+    - `observed_difficulty` es la PROYECCIÓN LEGACY de lo servido, que V3.53/V3.54
+      leían como la propia señal de capacidad. Se emite aquí para que no pueda
+      divergir de `served_difficulty` (paridad exacta con el comportamiento
+      anterior).
+
+    Centralizar aquí la serialización garantiza que las vías de escritura del
+    ledger producen el MISMO contrato. Nunca lanza.
+    """
+    served_vector = normalize_vector(served)
+    served_text = format_vector(served_vector)
+    return {
+        "declared_difficulty": format_vector(normalize_vector(declared)),
+        "served_difficulty": served_text,
+        "observed_task_difficulty": (
+            format_vector(observed_task_difficulty(served_vector, support_level))
+            if success
+            else ""
+        ),
+        # Proyección legacy: hasta V3.55 era la única columna y guardaba lo
+        # servido, así que se conserva EXACTAMENTE igual.
+        "observed_difficulty": served_text,
+    }
+
+
+def earned_difficulty(row: Mapping[str, object]) -> dict[str, int]:
+    """Vector ACREDITADO de una fila del ledger (V3.55, pura).
+
+    `served_difficulty` no vacía marca una fila de V3.55: entonces lo acreditado
+    es EXACTAMENTE `observed_task_difficulty` (aunque sea `''`, p. ej. un éxito
+    `copied`). Sin esa marca la fila es legacy (V3.53/V3.54) y se cae a
+    `observed_difficulty`, que entonces se acreditaba completa (el drill de
+    Transfer siempre declara apoyo `spontaneous`, así que la equivalencia es
+    exacta). Nunca lanza.
+    """
+    if str(row.get("served_difficulty") or "").strip():
+        return parse_vector(row.get("observed_task_difficulty"))
+    return parse_vector(row.get("observed_difficulty"))
+
+
 def capacity_for(level: object) -> dict[str, int]:
     """Capacidad de reto declarada de un nivel CEFR (V3.52, pura).
 

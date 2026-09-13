@@ -5,6 +5,48 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-13 (UTC+2).
 >
+> **Nota (2026-09-13): V3.55.0 (Task Difficulty 3.0)**
+> — release **v3.55.0**, **ADITIVA (tres columnas de BD)**, que da nombres
+> honestos a la dificultad de la TAREA y hace que la capacidad observada acredite
+> lo **superado**, no lo **servido**. Cierra los **P2-01** y **P2-02** de la
+> auditoría de V3.53.1. **(A) P2-01 — tres dificultades:** hasta V3.54
+> `learning_evidence.observed_difficulty` guardaba el vector del contexto
+> **SERVIDO** (no lo superado) y solo lo escribía el drill de Transfer:
+> `recall`/`sentence`/`write` lo dejaban `''`, así que `written_production`,
+> `spoken_production` y `recall` **no acumulaban capacidad nunca**. Nuevas
+> columnas aditivas (`CREATE` + `ALTER TABLE` idempotente)
+> `declared_difficulty` (lo que declara el ÍTEM — su CEFR en la única dimensión
+> que puede declarar, `lexical` — o la actividad), `served_difficulty` (lo que la
+> actividad sirvió: el vector del contexto elegido en Transfer) y
+> `observed_task_difficulty` (lo ACREDITADO, solo en el éxito);
+> `observed_difficulty` se conserva **escrita como proyección legacy de
+> `served_difficulty`**, así que V3.53/V3.54 leen exactamente lo mismo.
+> **(B) P2-02 — descuento por andamiaje:** `SUPPORT_DISCOUNT_STEPS` (pura,
+> monótona con la escalera canónica `copied → guided → cued → independent →
+> spontaneous`) — `guided` resta 2 pasos por dimensión, `cued` 1,
+> `independent`/`spontaneous` acreditan la carga completa y `copied`/apoyo
+> desconocido no acreditan nada; `evidence.observed_signals` lee la carga
+> acreditada (`difficulty.earned_difficulty`, con `served_difficulty` como marca
+> de fila V3.55 y `observed_difficulty` como fallback legacy), sin cambiar el
+> contrato del resumen y con la paridad pura↔SQL intacta. **(C) Núcleo puro:**
+> `difficulty.declared_difficulty` (el `0` de `lexicon.cefr_difficulty` = no
+> declarado, no carga 1), `observed_task_difficulty`, `task_difficulty_vectors`
+> (serializa las tres + la proyección legacy en un solo sitio) y
+> `earned_difficulty`. **(D) Cableado:** Word/Sentence (`guided`, −2), Recall
+> (`cued`/`guided` según `RECALL_CUE_SUPPORT`), Write (`independent`) y Transfer
+> (`spontaneous`, con `declared` = carga léxica del ítem y `served` = vector del
+> contexto), vía el helper `domain.vocabulary._item_task_difficulty`; el volcado
+> de producción del chat libre queda fuera de alcance (recibe formas, no filas) y
+> documentado. **NO cambia:** `level_from_capacity` y el gate CEFR global de
+> V3.53.1, `observed_skill_capacity`/`observed_capacity`/`learner_capacity` y el
+> gate de cobertura de V3.54, `CEFR_CAPACITY`, `transfer_state` y sus umbrales,
+> `context_signals`, `context_diversity`, el scoring, el planner ni FSRS. Tests:
+> nuevo `test_task_difficulty_v355.py` (17), `pytest` **2223 passed** en local,
+> `ruff` limpio y `check_release_consistency` **3.55.0**. En CI se esperan
+> **2221 passed + 2 skipped**. Ver `release-notes-v3.55.0.md`.
+> **Siguiente paso:** V3.56 — el **Planner 2.0 / `expected_learning_value`**
+> (P1-03), y después el Sense Engine 2.0 y el Context Engine 3.0.
+>
 > **Nota (2026-09-13): V3.54.0 (Student Skill State 3.0)**
 > — release **v3.54.0**, **ADITIVA (una columna de BD)**, que conserva la
 > MODALIDAD en la capacidad observada (`skill × dimensión`) para que la evidencia
@@ -2126,11 +2168,14 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-13):** `v3.54.0` **Student Skill State 3.0** (release
-ADITIVA de una columna que conserva la modalidad en la capacidad observada, con
-suelo por skill y gate de cobertura); las **notas de la cabecera** de este
-documento son la fuente de verdad más reciente. La sección siguiente se conserva
-como histórico del hilo V3.38 (fecha original 2026-09-10, `v3.38.1`).
+**Posición actual (2026-09-13):** `v3.55.0` **Task Difficulty 3.0** (release
+ADITIVA de tres columnas que da nombres honestos a la dificultad de la tarea
+—`declared`/`served`/`observed_task`—, hace que la capacidad observada acredite
+lo superado y no lo servido mediante descuento por andamiaje, y cablea la
+dificultad en las cuatro vías del drill léxico); las **notas de la cabecera** de
+este documento son la fuente de verdad más reciente. El incremento anterior fue
+`v3.54.0` **Student Skill State 3.0**. La sección siguiente se conserva como
+histórico del hilo V3.38 (fecha original 2026-09-10, `v3.38.1`).
 
 **Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra

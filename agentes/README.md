@@ -5,37 +5,32 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.54.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.54 (**Student Skill State 3.0**, ejecutada
-> directamente por el gerente) es una release **ADITIVA (una columna de BD)** que
-> conserva la MODALIDAD en la capacidad observada (`skill × dimensión`): nueva
-> `observed_skill_capacity` como FUENTE de verdad, `level_from_skill_capacity`
-> con la regla de cobertura COMPLETA por skill (V3.53.1 intacta para el resumen
-> global), `skill_coverage`/`skill_capacity`, `floor_level_for_skill` (una
-> modalidad sin muestra NO hereda el observado de otra) y un gate de cobertura
-> en `difficulty.challenge_for`/`select_by_difficulty` y en
-> `transfer.context_for` que impide que una capacidad PARCIAL eleve tareas
-> multidimensionales. NO toca `level_from_capacity`, `observed_capacity`
-> (proyección legacy), `CEFR_CAPACITY`, la escalera `transfer_state`, sus
+> **Estado actual (2026-09-13): `v3.55.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.55 (**Task Difficulty 3.0**, ejecutada
+> directamente por el gerente) es una release **ADITIVA (tres columnas de BD)**
+> que da nombres honestos a la dificultad de la TAREA (`declared`/`served`/
+> `observed_task_difficulty`), hace que la capacidad observada acredite lo
+> SUPERADO y no lo SERVIDO (descuento por andamiaje: `guided` −2, `cued` −1,
+> `independent`/`spontaneous` completo, `copied`/desconocido sin crédito) y
+> cablea la dificultad en las CUATRO vías del drill léxico (Word/Sentence,
+> Recall, Write y Transfer); hasta V3.54 solo Transfer la escribía, así que
+> `written_production`, `spoken_production` y `recall` no acumulaban capacidad.
+> `observed_difficulty` se conserva como proyección legacy de `served_difficulty`.
+> Cierra los P2-01 y P2-02 de la auditoría de V3.53.1. NO toca
+> `level_from_capacity`, el gate CEFR global de V3.53.1, `observed_skill_capacity`,
+> `learner_capacity`, `CEFR_CAPACITY`, la escalera `transfer_state`, sus
 > umbrales, `context_signals`, `context_diversity`, el scoring, el planner ni
-> FSRS. Contratos aditivos `LearningProfile.observed_skill_capacity`/
-> `observed_skill_level`/`skill_coverage` y `TransferContextOut.capacity_skill`
-> (con espejo TS). Tests: nuevo `test_learner_skill_v354.py` (19), `ruff` limpio
-> y `check_release_consistency` **3.54.0** exit 0. **CI 6/6 en verde** (run
-> [34755745179](https://github.com/jvelasca/english-tutor/actions/runs/34755745179)
-> sobre `b2929e1`: pytest **2204 passed + 2 skipped**, vitest **651**, Playwright
-> **23**) con la etiqueta anotada `v3.54.0` creada y empujada. La V3.53.1 sigue como
+> FSRS. Tests: nuevo `test_task_difficulty_v355.py` (17), `pytest` **2223 passed**
+> en local, `ruff` limpio y `check_release_consistency` **3.55.0** exit 0. La
+> V3.54 sigue como **Student Skill State 3.0** (P2-03), la V3.53.1 como
 > **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como **Learner
 > Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
 > los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de
-> producto** que cerró el **P1-01** de la auditoría de V3.52. Los P3-02/P3-03
-> quedan abiertos y aceptados. El siguiente incremento es **V3.55**: los P2-01
-> (`declared`/`served`/`observed_task_difficulty`) y P2-02 (capacidad con
-> apoyo/independencia/latencia) del skill state y, con ellos, el **Planner 2.0 /
-> `expected_learning_value`** (P1-03); el **Sense Engine 2.0**
-> (`surface→lemma→sense→semantic_fit`) y el Context Engine siguen como
-> candidatos. El briefing de V3.54 vive en
-> `agentes/v354-student-skill-state-3.md`. Antes de lanzar cualquier subagente,
+> producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El siguiente
+> incremento es **V3.56**: el **Planner 2.0 / `expected_learning_value`** (P1-03);
+> el **Sense Engine 2.0** (`surface→lemma→sense→semantic_fit`) y el Context
+> Engine siguen como candidatos. El briefing de V3.55 vive en
+> `agentes/v355-task-difficulty-3.md`. Antes de lanzar cualquier subagente,
 > lee esa sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al
 > saturar y ancla contra la alucinación).
 
@@ -49,6 +44,16 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v355-task-difficulty-3.md` — **V3.55 (EJECUTADO, 2026-09-13,
+  v3.55.0)**: **Task Difficulty 3.0**. Release ADITIVA (tres columnas de BD,
+  `learning_evidence.declared_difficulty`/`served_difficulty`/
+  `observed_task_difficulty`) que da nombres honestos a la dificultad de la
+  tarea, hace que la capacidad observada acredite lo SUPERADO y no lo SERVIDO
+  (descuento por andamiaje) y cablea la dificultad en las cuatro vías del drill
+  léxico. Cierra los P2-01 y P2-02 de la auditoría de V3.53.1. NO toca
+  `level_from_capacity`, `observed_skill_capacity`, `learner_capacity`,
+  `CEFR_CAPACITY`, la escalera, el scoring, el planner ni FSRS. **Histórico,
+  hecho**; ver `release-notes-v3.55.0.md`.
 - `agentes/v354-student-skill-state-3.md` — **V3.54 (EJECUTADO, 2026-09-13,
   v3.54.0)**: **Student Skill State 3.0**. Release ADITIVA (una columna de BD,
   `learning_profile.observed_skill_capacity`) que conserva la MODALIDAD en la

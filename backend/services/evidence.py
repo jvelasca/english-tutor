@@ -60,6 +60,9 @@ EVIDENCE_FIELDS: tuple[str, ...] = (
     "support_level",
     "difficulty",
     "observed_difficulty",
+    "declared_difficulty",
+    "served_difficulty",
+    "observed_task_difficulty",
     "response_time_ms",
     "error_type",
     "interval_since_last_evidence",
@@ -1090,12 +1093,10 @@ def _classify_multi_word_error(exp: str, got: str) -> str:
 
 
 def observed_signals(rows: list[dict]) -> dict:
-    """Capacidad OBSERVADA por modalidad y dimensión (V3.53, pura).
+    """Capacidad OBSERVADA por modalidad y dimensión (V3.53 → V3.55, pura).
 
-    Deriva del ledger la carga que el alumno ha SUPERADO de verdad a partir del
-    vector de la TAREA servida (`observed_difficulty`, serializado por
-    `services.difficulty.format_vector`). Para cada modalidad canónica
-    (`LEXICAL_SKILLS`) y cada dimensión canónica acumula:
+    Deriva del ledger la carga que el alumno ha SUPERADO de verdad. Para cada
+    modalidad canónica (`LEXICAL_SKILLS`) y cada dimensión canónica acumula:
 
     - `observed_samples` — nº de ÉXITOS que declararon esa dimensión;
     - `observed_days` — días naturales distintos con ese éxito;
@@ -1104,9 +1105,18 @@ def observed_signals(rows: list[dict]) -> dict:
     La atribución es `assessed_skill` con caída a `skill` (la modalidad que la
     tarea REALMENTE evaluó; misma convención que el resto de histogramas). Solo
     cuentan ÉXITOS con vector declarado: un fallo o un drill sin banco de
-    contextos (`observed_difficulty == ''`) no acredita capacidad. Las
-    modalidades/dimensiones sin muestra no aparecen (determinista y estable).
-    Nunca lanza.
+    contextos no acredita capacidad. Las modalidades/dimensiones sin muestra no
+    aparecen (determinista y estable). Nunca lanza.
+
+    V3.55 (Task Difficulty 3.0): la carga que se acredita **no** es la servida
+    sino la OBSERVADA (`difficulty.earned_difficulty`), es decir la servida
+    DESCONTADA por el andamiaje que declaró el evento (`guided` resta 2 pasos,
+    `cued` 1, `copied`/desconocido no acredita; `independent`/`spontaneous`
+    acreditan la carga completa). Las filas legacy (V3.53/V3.54, sin
+    `served_difficulty`) se leen por la proyección `observed_difficulty` como
+    hasta ahora, así que su capacidad no cambia. Es el P2-02 de la auditoría de
+    V3.53.1: hasta V3.54 un éxito `guided` acreditaba lo mismo que uno
+    `spontaneous`.
     """
     samples: dict[str, dict[str, int]] = {}
     day_sets: dict[str, dict[str, set[str]]] = {}
@@ -1114,7 +1124,7 @@ def observed_signals(rows: list[dict]) -> dict:
     for row in rows:
         if not _truthy(row.get("success")):
             continue
-        vector = difficulty.parse_vector(row.get("observed_difficulty"))
+        vector = difficulty.earned_difficulty(row)
         if not vector:
             continue
         assessed = (row.get("assessed_skill") or "").strip().lower()
@@ -1454,6 +1464,9 @@ def empty_summary() -> dict:
         "last_clean_success_at": "",
         "last_unscaffolded_clean_success_at": "",
         # V3.53 (Learner Skill State 2.0): sin eventos no hay capacidad observada.
+        # V3.55 (Task Difficulty 3.0): la capacidad se deriva de la dificultad
+        # ACREDITADA (servida descontada por el andamiaje), pero el contrato del
+        # resumen no cambia: mismas claves.
         "observed_samples": {},
         "observed_days": {},
         "observed_capacity": {},

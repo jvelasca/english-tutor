@@ -75,6 +75,9 @@ def record_evidence(
     support_level: str = "",
     difficulty: float = 0.0,
     observed_difficulty: str = "",
+    declared_difficulty: str = "",
+    served_difficulty: str = "",
+    observed_task_difficulty: str = "",
     response_time_ms: int | None = None,
     error_type: str = "",
     transfer_condition: str = "",
@@ -109,6 +112,15 @@ def record_evidence(
     V3.53 añade `observed_difficulty` (vector de carga de la TAREA servida,
     serializado por `services.difficulty.format_vector`): la señal del Learner
     Skill State 2.0. Aditiva y observacional; '' = no declarada.
+
+    V3.55 (Task Difficulty 3.0) añade las TRES dificultades con nombres
+    honestos: `declared_difficulty` (lo que declara el ítem o la actividad),
+    `served_difficulty` (lo que la actividad sirvió) y
+    `observed_task_difficulty` (lo que el alumno ACREDITÓ tras descontar el
+    andamiaje; solo en el éxito). `observed_difficulty` se conserva escrita como
+    PROYECCIÓN LEGACY de `served_difficulty`, de modo que V3.53/V3.54 siguen
+    leyendo exactamente lo mismo. Todas aditivas y observacionales: no cambian
+    el scoring ni la escalera.
     """
     if get_user(user_id) is None:
         return None
@@ -129,10 +141,11 @@ def record_evidence(
             "(user_id, occurred_at, skill, assessed_skill, target_type, "
             "target_id, surface_form, lexical_unit, task, activity, "
             "activity_id, context_id, success, support_level, difficulty, "
-            "observed_difficulty, response_time_ms, error_type, "
+            "observed_difficulty, declared_difficulty, served_difficulty, "
+            "observed_task_difficulty, response_time_ms, error_type, "
             "transfer_condition, interval_since_last_evidence, event_role) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "?, ?)",
+            "?, ?, ?, ?, ?)",
             (
                 user_id,
                 now,
@@ -150,6 +163,9 @@ def record_evidence(
                 support_level,
                 float(difficulty or 0.0),
                 str(observed_difficulty or ""),
+                str(declared_difficulty or ""),
+                str(served_difficulty or ""),
+                str(observed_task_difficulty or ""),
                 response_time_ms,
                 error_type,
                 transfer_condition,
@@ -175,6 +191,9 @@ def record_evidence(
         "support_level": support_level,
         "difficulty": float(difficulty or 0.0),
         "observed_difficulty": str(observed_difficulty or ""),
+        "declared_difficulty": str(declared_difficulty or ""),
+        "served_difficulty": str(served_difficulty or ""),
+        "observed_task_difficulty": str(observed_task_difficulty or ""),
         "response_time_ms": response_time_ms,
         "error_type": error_type,
         "transfer_condition": transfer_condition,
@@ -194,7 +213,9 @@ def record_evidence_bulk(
     existe o no hay entradas). Cada entrada admite `target_type`, `target_id`,
     `skill`, `assessed_skill` (V3.51), `surface_form`, `lexical_unit`, `task`,
     `activity`, `success`, `event_role` y `occurred_at` (por entrada; si falta,
-    el `occurred_at` del lote o `_now()`).
+    el `occurred_at` del lote o `_now()`), más las tres dificultades de V3.55
+    (`declared_difficulty`/`served_difficulty`/`observed_task_difficulty`) y la
+    proyección legacy `observed_difficulty`.
 
     V3.35.1 (P2-02): el contrato del ledger se blinda contra lotes degenerados:
 
@@ -275,6 +296,9 @@ def record_evidence_bulk(
                     entry.get("support_level", ""),
                     float(entry.get("difficulty") or 0.0),
                     str(entry.get("observed_difficulty") or ""),
+                    str(entry.get("declared_difficulty") or ""),
+                    str(entry.get("served_difficulty") or ""),
+                    str(entry.get("observed_task_difficulty") or ""),
                     entry.get("response_time_ms"),
                     entry.get("error_type", ""),
                     entry.get("transfer_condition", ""),
@@ -287,10 +311,11 @@ def record_evidence_bulk(
             "(user_id, occurred_at, skill, assessed_skill, target_type, "
             "target_id, surface_form, lexical_unit, task, activity, "
             "activity_id, context_id, success, support_level, difficulty, "
-            "observed_difficulty, response_time_ms, error_type, "
+            "observed_difficulty, declared_difficulty, served_difficulty, "
+            "observed_task_difficulty, response_time_ms, error_type, "
             "transfer_condition, interval_since_last_evidence, event_role) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "?, ?)",
+            "?, ?, ?, ?, ?)",
             rows,
         )
     return len(rows)
@@ -327,8 +352,10 @@ def list_evidence(
             "SELECT id, user_id, occurred_at, skill, assessed_skill, "
             "target_type, target_id, surface_form, lexical_unit, task, "
             "activity, activity_id, context_id, success, support_level, "
-            "difficulty, observed_difficulty, response_time_ms, error_type, "
-            "transfer_condition, interval_since_last_evidence, event_role "
+            "difficulty, observed_difficulty, declared_difficulty, "
+            "served_difficulty, observed_task_difficulty, response_time_ms, "
+            "error_type, transfer_condition, interval_since_last_evidence, "
+            "event_role "
             "FROM learning_evidence "
             f"WHERE {' AND '.join(clauses)} "
             "ORDER BY occurred_at DESC, id DESC "
@@ -345,14 +372,21 @@ def list_observed_rows(user_id: str, *, target_type: str = "lexicon") -> list[di
     (`services.evidence.observed_signals` → `services.learner_skill`) que
     `domain.profile` cachea en `learning_profile`. Devuelve solo las columnas que
     la función pura necesita y solo los eventos que aportan señal (éxito y
-    `observed_difficulty` no vacía). Fuera del camino caliente del drill.
+    alguna dificultad declarada). Fuera del camino caliente del drill.
+
+    V3.55: además de la proyección legacy `observed_difficulty` se leen
+    `served_difficulty` (marca de fila V3.55) y `observed_task_difficulty` (la
+    carga ACREDITADA). Una fila V3.55 con `observed_task_difficulty` vacía (un
+    éxito `copied`, que no acredita nada) entra igual: la función pura la
+    descarta sin inventar capacidad.
     """
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT occurred_at, skill, assessed_skill, success, "
-            "observed_difficulty FROM learning_evidence "
+            "observed_difficulty, served_difficulty, observed_task_difficulty "
+            "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? AND success = 1 "
-            "AND observed_difficulty != '' "
+            "AND (observed_task_difficulty != '' OR observed_difficulty != '') "
             "ORDER BY occurred_at ASC, id ASC",
             (user_id, target_type),
         ).fetchall()
@@ -558,7 +592,8 @@ def summarize_by_target(
         detail_rows = conn.execute(
             "SELECT target_id, id, occurred_at, success, error_type, "
             "response_time_ms, context_id, transfer_condition, "
-            "skill, assessed_skill, observed_difficulty "
+            "skill, assessed_skill, observed_difficulty, served_difficulty, "
+            "observed_task_difficulty "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? "
             "ORDER BY target_id, occurred_at ASC, id ASC",

@@ -1046,6 +1046,9 @@ def init_db() -> None:
                 event_role TEXT NOT NULL DEFAULT 'evidence',
                 transfer_condition TEXT NOT NULL DEFAULT '',
                 observed_difficulty TEXT NOT NULL DEFAULT '',
+                declared_difficulty TEXT NOT NULL DEFAULT '',
+                served_difficulty TEXT NOT NULL DEFAULT '',
+                observed_task_difficulty TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
@@ -1062,6 +1065,13 @@ def init_db() -> None:
         # serializado por `services.difficulty.format_vector`) es la señal del
         # Learner Skill State 2.0. '' = dificultad no declarada (drills sin
         # banco de contextos).
+        # V3.55 (Task Difficulty 3.0): `observed_difficulty` se conserva como
+        # PROYECCIÓN LEGACY de `served_difficulty` (se sigue escribiendo igual,
+        # así que V3.53/V3.54 no cambian) y el evento gana las tres dificultades
+        # con nombres honestos: `declared_difficulty` (lo que declara el ítem o
+        # la actividad), `served_difficulty` (lo que se sirvió) y
+        # `observed_task_difficulty` (lo que el alumno ACREDITÓ tras descontar el
+        # andamiaje; solo en el éxito). Mismo camino aditivo e idempotente.
         evidence_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_evidence)")
         }
@@ -1075,6 +1085,9 @@ def init_db() -> None:
             ("transfer_condition", "TEXT NOT NULL DEFAULT ''"),
             ("assessed_skill", "TEXT NOT NULL DEFAULT ''"),
             ("observed_difficulty", "TEXT NOT NULL DEFAULT ''"),
+            ("declared_difficulty", "TEXT NOT NULL DEFAULT ''"),
+            ("served_difficulty", "TEXT NOT NULL DEFAULT ''"),
+            ("observed_task_difficulty", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in evidence_cols:
                 conn.execute(
