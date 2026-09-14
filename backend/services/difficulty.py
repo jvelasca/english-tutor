@@ -140,6 +140,85 @@ def normalize_vector(vector: object) -> dict[str, int]:
     return normalized
 
 
+# ---------------------------------------------------------------------------
+# V3.60 (Context Engine 4.0): el AJUSTE declarado de una SUPERFICIE de instancia
+# respecto de su FAMILIA.
+#
+# Una familia declara su vector de carga ABSOLUTO (`difficulty_vector`); una
+# instancia no puede declararlo (sería reinterpretar la identidad), pero sí
+# puede declarar un DELTA por dimensión: cuánto MÁS o MENOS exige esa redacción
+# concreta dentro del mismo escenario. El rango es simétrico y corto (±2) a
+# propósito: describe MATICES de la misma familia, no otro nivel CEFR, y el
+# resultado se recorta al envelope canónico 1..5.
+# ---------------------------------------------------------------------------
+_DELTA_MIN = -2
+_DELTA_MAX = 2
+
+
+def _as_delta(value: object) -> int | None:
+    """Delta ENTERO de una dimensión (None si no es un número entero útil).
+
+    Acepta enteros y flotantes ENTEROS (2.0); rechaza `bool`, NaN, infinitos y
+    fracciones (`0.5`, que no describe un paso de carga). Nunca lanza.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if isinstance(value, float) and not value.is_integer():
+        return None
+    return int(value)
+
+
+def normalize_delta(
+    vector: object,
+    *,
+    minimum: int = _DELTA_MIN,
+    maximum: int = _DELTA_MAX,
+) -> dict[str, int]:
+    """Delta de carga restringido a las dimensiones canónicas (V3.60, pura).
+
+    Ignora claves desconocidas y valores no numéricos o fraccionarios, y recorta
+    cada delta al rango declarado (por defecto ±2, acotado a su vez por los
+    límites canónicos del vocabulario). Devuelve `{}` si no queda ninguna
+    dimensión válida, o si el valor no es un `Mapping`: sin delta declarado el
+    ajuste es NULO, nunca un ajuste inventado. Nunca lanza.
+    """
+    if not isinstance(vector, Mapping):
+        return {}
+    low = max(_DELTA_MIN, min(int(minimum), int(maximum)))
+    high = min(_DELTA_MAX, max(int(minimum), int(maximum)))
+    normalized: dict[str, int] = {}
+    for dimension in DIFFICULTY_DIMENSIONS:
+        delta = _as_delta(vector.get(dimension))
+        if delta is None:
+            continue
+        delta = max(low, min(high, delta))
+        if delta:
+            normalized[dimension] = delta
+    return normalized
+
+
+def apply_delta(vector: object, delta: object) -> dict[str, int]:
+    """Vector EFECTIVO de una superficie: base + delta, recortado a 1..5 (V3.60).
+
+    Suma el delta declarado por dimensión sobre el vector BASE (la familia, que
+    es la única que declara carga) y recorta el resultado al envelope canónico
+    `_MIN_LOAD.._MAX_LOAD`. Un delta que apunte a una dimensión que la base no
+    declara se IGNORA: no se inventa carga donde la familia no la declaró.
+    Con un delta vacío o inválido el resultado es `normalize_vector(vector)`
+    EXACTO, que es la garantía de degradación de la release. Nunca lanza.
+    """
+    base = normalize_vector(vector)
+    adjustment = normalize_delta(delta)
+    if not adjustment:
+        return base
+    return {
+        dimension: max(
+            _MIN_LOAD, min(_MAX_LOAD, load + adjustment.get(dimension, 0))
+        )
+        for dimension, load in base.items()
+    }
+
+
 def normalize_level(level: object) -> str:
     """Nivel CEFR canónico en mayúsculas ("" si no está en la tabla) (pura)."""
     text = str(level or "").strip().upper()

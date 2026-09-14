@@ -593,6 +593,19 @@ export interface DrillTransferContext {
   context_instance?: string;
   instance_index?: number;
   instance_count?: number;
+  // V3.60 (Context Engine 4.0): metadatos no identitarios de la superficie
+  // (situación, objetivo y registro en palabras), su ajuste de carga sobre la
+  // familia, la carga EFECTIVA servida, las competencias efectivas y si la
+  // superficie la generó la especificación paramétrica. Aditivos y solo
+  // explicativos: `difficulty_vector` sigue siendo la carga de la FAMILIA.
+  instance_scenario?: string;
+  instance_goal?: string;
+  instance_register?: string;
+  instance_difficulty_delta?: Record<string, number>;
+  instance_difficulty_vector?: Record<string, number>;
+  instance_difficulty?: number;
+  instance_skills?: string[];
+  instance_generated?: boolean;
 }
 
 export interface DrillDifficultyFit {

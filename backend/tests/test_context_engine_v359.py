@@ -68,8 +68,8 @@ FAMILY_KEYS = (
 )
 
 # Contrato EXACTO del payload de `context_for` en V3.58 (25 claves) más los tres
-# campos aditivos de V3.59. Fija por escrito que la release no quita ni renombra
-# nada (contrato aditivo, premisa 9).
+# campos aditivos de V3.59 y los ocho de V3.60. Fija por escrito que las releases
+# no quitan ni renombran nada (contrato aditivo, premisa 9).
 V358_KEYS = frozenset(
     {
         "word",
@@ -101,8 +101,25 @@ V358_KEYS = frozenset(
 )
 V359_KEYS = V358_KEYS | {"context_instance", "instance_index", "instance_count"}
 
+# V3.60 (Context Engine 4.0): los ocho campos de la superficie parametrizada.
+V360_INSTANCE_KEYS = frozenset(
+    {
+        "instance_scenario",
+        "instance_goal",
+        "instance_register",
+        "instance_difficulty_delta",
+        "instance_difficulty_vector",
+        "instance_difficulty",
+        "instance_skills",
+        "instance_generated",
+    }
+)
+V360_KEYS = V359_KEYS | V360_INSTANCE_KEYS
+
 # Campos del payload que la rotación SÍ puede cambiar (el resto debe ser idéntico).
-VOLATILE_KEYS = frozenset({"prompt", "context_instance", "instance_index"})
+VOLATILE_KEYS = frozenset(
+    {"prompt", "context_instance", "instance_index"}
+) | V360_INSTANCE_KEYS
 
 
 def _setup(monkeypatch, tmp_path):
@@ -187,7 +204,11 @@ def test_the_family_surface_keeps_the_historical_prompt_byte_identical():
 
 def test_an_instance_cannot_declare_the_family_identity():
     for context in BANK:
-        assert set(context) <= set(FAMILY_KEYS) | {"instances"}, context["id"]
+        # V3.60: la familia declara además su ESPACIO paramétrico (`instance_space`).
+        assert set(context) <= set(FAMILY_KEYS) | {
+            "instances",
+            "instance_space",
+        }, context["id"]
         for raw in context["instances"]:
             assert set(raw) <= set(transfer.CONTEXT_INSTANCE_KEYS), context["id"]
 
@@ -267,7 +288,9 @@ def test_context_instances_accepts_ids_and_never_raises():
 
 def test_context_instance_index_advances_one_surface_per_attempt():
     count = len(transfer.context_instances("story"))
-    assert count == 1 + transfer.CONTEXT_INSTANCES_MIN
+    # V3.60: el espacio de la familia ya no son solo las declaradas (1 + MIN),
+    # así que la cota es inferior: lo que se fija aquí es la ROTACIÓN exacta.
+    assert count >= 1 + transfer.CONTEXT_INSTANCES_MIN
     assert transfer.context_instance_index("story", 0) == 0
     for attempt in range(2 * count):
         assert transfer.context_instance_index("story", attempt) == attempt % count
@@ -282,7 +305,8 @@ def test_context_instance_index_degrades_to_the_family_surface():
     for value in (None, "", "x", -1, -7, True, False, 0.5, [], {}):
         assert transfer.context_instance_index("story", value) == 0, value
     # El bucket `{"attempts": n}` del resumen de evidencia también vale.
-    assert transfer.context_instance_index("story", {"attempts": 4}) == 1
+    count = len(transfer.context_instances("story"))
+    assert transfer.context_instance_index("story", {"attempts": 4}) == 4 % count
     # Una familia con una sola superficie no rota nunca.
     single = {"id": "x", "prompt": "Only one."}
     assert transfer.context_instances(single) == (
@@ -328,11 +352,16 @@ def test_context_for_never_raises_with_garbage_attempts():
 def test_without_evidence_the_payload_is_v3_58_plus_three_additive_fields():
     got = transfer.context_for("travel", level="B1")
     surfaces = transfer.context_instances(got["context_id"])
-    assert set(got) == set(V359_KEYS)
+    assert set(got) == set(V360_KEYS)
     assert got["context_instance"] == ""
     assert got["instance_index"] == 0
     assert got["instance_count"] == len(surfaces)
     assert got["prompt"] == surfaces[0]["prompt"]
+    # V3.60: sin intentos la superficie es la 0, así que sus metadatos y su
+    # ajuste de carga son NULOS y la carga efectiva es la de la FAMILIA.
+    assert got["instance_difficulty_delta"] == {}
+    assert got["instance_generated"] is False
+    assert got["instance_difficulty_vector"] == got["difficulty_vector"]
 
 
 def test_the_served_surface_matches_the_index_and_the_attempts():
@@ -357,10 +386,13 @@ def test_the_empty_bank_return_carries_the_instance_defaults(monkeypatch):
     monkeypatch.setattr(transfer, "TRANSFER_CONTEXTS", ())
     got = transfer.context_for("travel")
     assert got["available"] is False
-    assert set(got) == set(V359_KEYS)
+    assert set(got) == set(V360_KEYS)
     assert got["context_instance"] == ""
     assert got["instance_index"] == 0
     assert got["instance_count"] == 0
+    assert got["instance_difficulty_vector"] == {}
+    assert got["instance_skills"] == []
+    assert got["instance_generated"] is False
 
 
 # --------------------------------------------------------------- contrato HTTP

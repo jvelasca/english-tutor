@@ -5,10 +5,67 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-13): `v3.59.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.59 (**Context Engine 3.0: Context Bank
-> Family/Instance**) es una release **SIN migración de BD, SIN bump de
-> `GENERATOR_VERSION`, SIN cambios de UI y SIN tocar el ledger** que cierra el
+> **Estado actual (2026-09-14): `v3.60.0`** — ver `docs/RELEVO.md` (nota superior
+> y sección 0 "START HERE"). V3.60 (**Context Engine 4.0: Instance Specification →
+> Parameterized Instance**) es una release **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION` y SIN cambios de UI** que cierra los cuatro hallazgos de la
+> auditoría externa **R** de V3.59 (**P1-1** «3 superficies deterministas siguen
+> siendo memorizables», **P1-2** «la instancia puede cambiar la dificultad real sin
+> poder declararlo», **P2-6** «Context Engine todavía manual/finito», **P2-7** «la
+> instancia no genera dificultad»): sustituye las **60 consignas escritas a mano**
+> por un **ESPACIO de instancias PARAMETRIZADO** por familia (**FAMILIA →
+> ESPECIFICACIÓN → INSTANCIA**). La **familia** sigue siendo la identidad
+> pedagógica y la **unidad de EVIDENCIA** (`context_id` del ledger), así que **el
+> ledger no se fragmenta** y no cambian los umbrales, la escalera `transfer_state`,
+> `context_distance`, `context_diversity`, la novedad, `CEFR_CAPACITY` ni el
+> Difficulty Engine; la **instancia** pasa a declarar metadatos **NO
+> identitarios** (`scenario`/`goal`/`register`/`difficulty_delta`/`skill_delta`) y
+> `CONTEXT_INSTANCE_KEYS` crece de 2 a 7 claves (la intersección con la identidad
+> de familia sigue siendo `{"prompt"}`). El contenido sigue siendo **DECLARADO**
+> (no hay LLM en el camino de la evidencia: se genera la COMBINACIÓN de valores
+> declarados, no el texto) y la expansión es **determinista** (producto cartesiano
+> en orden declarado, cap `CONTEXT_INSTANCE_SPACE_MAX = 96`, dedup, `_slug` sin
+> `hash()`). `CONTEXT_INSTANCE_SPACE_MIN = 12` superficies TOTALES por familia es
+> el invariante anti-memorización: **el banco pasa de 60 a 358 superficies** con
+> las dos `instances` de V3.59 conservadas byte a byte en los índices 1–2 y la
+> superficie 0 **histórica**. La **carga de la superficie servida** pasa a ser
+> explícita (`difficulty.normalize_delta`/`apply_delta`, delta ±2 y clamp 1..5) y
+> **persistida** de forma aditiva: `domain/vocabulary.py` escribe
+> `transfer.served_difficulty(context_id, summary["contexts"])` —el MISMO mapa que
+> el GET/POST— en las columnas de V3.55, así que la dificultad guardada
+> corresponde a la tarea **realmente servida**. Contrato **+8 claves**
+> (`instance_scenario`/`instance_goal`/`instance_register`/
+> `instance_difficulty_delta`/`instance_difficulty_vector`/`instance_difficulty`/
+> `instance_skills`/`instance_generated`), **36 en total**, con espejo TS opcional;
+> las **28 de V3.59** quedan intactas y fijadas por test. Tests: nuevo
+> `test_context_engine_v360.py` (23, con **equivalencia pedagógica** de las
+> superficies de una familia y end-to-end HTTP de la superficie generada con el
+> vector efectivo persistido), `pytest` **2335 passed** en local, launcher
+> **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651**, `npm run build` OK y
+> `check_release_consistency` **3.60.0**. La V3.59 (**Context Engine 3.0: Context
+> Bank Family/Instance**) sigue inmediatamente detrás; y antes, la V3.58
+> (**Sense Engine 2.0**), la V3.57 (**Planner 2.0: argmax `(skill, actividad)`
+> sobre ELV**), la V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad
+> que ordena), la V3.55 (**Task Difficulty 3.0**, tres columnas de BD, el último
+> cambio de ledger), la V3.54 como **Student Skill State 3.0** (P2-03), la V3.53.1
+> como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como
+> **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
+> **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
+> **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
+> siguiente incremento es **V3.61**: el **motor de política de instancia**
+> (cuándo repetir una superficie, cuándo forzar una nueva, cómo pesa el fallo) y la
+> **evidencia instance-aware** como decisión aparte, con migración declarada si
+> toca el ledger. El briefing de V3.60 vive en
+> `agentes/v360-context-engine-4.md` (V3.59 en `agentes/v359-context-engine-3.md`,
+> V3.58 en `agentes/v358-sense-engine-2.md` y V3.57 en
+> `agentes/v357-argmax-elv.md`), y la auditoría externa de V3.59 se prepara en
+> `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier subagente, lee esa
+> sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al saturar y
+> ancla contra la alucinación).
+
+> **Nota histórica (2026-09-13): `v3.59.0`.** V3.59 (**Context Engine 3.0: Context
+> Bank Family/Instance**) fue una release **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION`, SIN cambios de UI y SIN tocar el ledger** que cerró el
 > candidato diferido desde V3.48 y el hallazgo **P2-04** de la auditoría de V3.43:
 > un banco finito de consignas **FIJAS** se **MEMORIZA** —agotado el banco, el
 > alumno repite la misma redacción y puede reciclar una respuesta aprendida en
@@ -40,14 +97,11 @@ pedir más contexto.
 > como **Observed CEFR Safety Gate** (P1-01 de V3.53.0), la V3.53.0 como **Learner
 > Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como **cierre de
 > los dos P2 de la auditoría externa Q** y la V3.52.1 como el **hotfix de
-> producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El siguiente incremento
-> es **V3.60**: el contrato/prompt de generación de sentidos y la ponderación de la
-> adecuación en `transfer_confidence`. El briefing de V3.59 vive en
-> `agentes/v359-context-engine-3.md` (V3.58 en `agentes/v358-sense-engine-2.md` y
-> V3.57 en `agentes/v357-argmax-elv.md`), y su auditoría externa se prepara en
-> `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier subagente, lee esa
-> sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al saturar y
-> ancla contra la alucinación).
+> producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El incremento que siguió
+> fue **V3.60** (Context Engine 4.0; ver la nota superior). El briefing de V3.59
+> vive en `agentes/v359-context-engine-3.md` (V3.58 en
+> `agentes/v358-sense-engine-2.md` y V3.57 en `agentes/v357-argmax-elv.md`), y su
+> auditoría externa se prepara en `agentes/auditoria-externa-v359.md`.
 
 ## Cómo usar un subagente
 
@@ -59,6 +113,45 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/v360-context-engine-4.md` — **V3.60 (EJECUTADO, 2026-09-14, v3.60.0)**:
+  **Context Engine 4.0 — Instance Specification → Parameterized Instance**.
+  Sustituye las **60 consignas escritas a mano** por un **ESPACIO de instancias
+  PARAMETRIZADO** por familia (**FAMILIA → ESPECIFICACIÓN → INSTANCIA**) sin tocar
+  la identidad de evidencia (`context_id` sigue siendo la familia) y **sin
+  migración de BD**. Cierra los cuatro hallazgos de la auditoría externa **R** de
+  V3.59: **P1-1** (3 superficies deterministas siguen siendo memorizables),
+  **P1-2** (la instancia puede cambiar la dificultad real sin poder declararlo),
+  **P2-6** (Context Engine todavía manual/finito) y **P2-7** (la instancia no
+  genera dificultad). La lista blanca de instancia crece de 2 a 7 claves con
+  metadatos **NO identitarios** (`scenario`/`goal`/`register`/`difficulty_delta`/
+  `skill_delta`; la intersección con la identidad de familia sigue siendo
+  `{"prompt"}`), `CONTEXT_INSTANCE_SPACE_MIN = 12` es el invariante
+  anti-memorización (**el banco pasa de 60 a 358 superficies**, con las `instances`
+  de V3.59 byte a byte en los índices 1–2 y la superficie 0 histórica) y el
+  **contenido sigue siendo DECLARADO** (sin LLM: se genera la COMBINACIÓN de
+  valores declarados, no el texto). La **carga de la superficie servida** pasa a
+  ser explícita (`difficulty.normalize_delta`/`apply_delta`, delta ±2, clamp 1..5)
+  y **persistida de forma aditiva** con `transfer.served_difficulty(context_id,
+  summary["contexts"])` en las columnas de V3.55: la dificultad guardada
+  corresponde a la tarea **realmente servida**. Contrato **+8 claves** (36 en
+  total) con espejo TS opcional y las 28 de V3.59 intactas y fijadas por test.
+  **SIN bump de `GENERATOR_VERSION` y SIN cambios de UI.** NO toca
+  `transfer_state`, sus umbrales, `context_signals`, `context_diversity`,
+  `CEFR_CAPACITY`, el scoring, FSRS, el planner ni el Sense Engine. **Ejecutado**;
+  ver `release-notes-v3.60.0.md`.
+- `agentes/v359-context-engine-3.md` — **V3.59 (EJECUTADO, 2026-09-13, v3.59.0)**:
+  **Context Engine 3.0 — Context Bank Family/Instance**. Separa **FAMILIA** de
+  **INSTANCIA**: la familia sigue siendo la identidad pedagógica y la **unidad de
+  EVIDENCIA** (`context_id` del ledger) y cada familia declara superficies
+  ADICIONALES de la MISMA identidad, servidas por **rotación de intentos**
+  (`N % nº_superficies`), con la superficie **0** SIEMPRE la consigna histórica
+  (byte a byte). `CONTEXT_INSTANCE_KEYS = ("instance", "prompt")` es lista blanca
+  y `CONTEXT_INSTANCES_MIN = 2` el mínimo por familia: el banco pasa de 20
+  consignas a **60 superficies** sin fragmentar el ledger. Contrato **+3 claves**
+  (28 en total) con espejo TS opcional. **SIN migración, SIN bump de
+  `GENERATOR_VERSION` y SIN cambios de UI.** NO toca `transfer_state`, sus
+  umbrales, `context_signals`, `CEFR_CAPACITY`, el scoring, FSRS, el planner ni el
+  Sense Engine. **Histórico, hecho**; ver `release-notes-v3.59.0.md`.
 - `agentes/v358-sense-engine-2.md` — **V3.58 (EJECUTADO, 2026-09-13, v3.58.0)**:
   **Sense Engine 2.0 — `surface → lemma → sense → semantic_fit`**. Cierra la
   mitad que V3.44 dejó abierta: los sentidos `[{pos, gloss}]` se declaraban y se

@@ -3,7 +3,100 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-13 (UTC+2).
+> Actualizado por última vez: 2026-09-14 (UTC+2).
+>
+> **Nota (2026-09-14): V3.60.0 (Context Engine 4.0 — Instance Specification →
+> Parameterized Instance)**
+> — release **v3.60.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` y
+> SIN cambios de UI**, que cierra los **cuatro hallazgos** de la **auditoría
+> externa R** de V3.59: **P1-1** «3 superficies deterministas siguen siendo
+> memorizables» (una familia se agotaba en **tres intentos**), **P1-2** «la
+> instancia puede cambiar la dificultad real sin poder declararlo»
+> (`CONTEXT_INSTANCE_KEYS = ("instance", "prompt")` no dejaba expresar
+> escenario/objetivo/registro/delta), **P2-6** «Context Engine todavía
+> manual/finito» (20 × 3 = **60 consignas escritas a mano**) y **P2-7** «la
+> instancia no genera dificultad» (la superficie era solo `presentation_surface`).
+> **FRONTERA DECLARADA Y PROBADA (invariante de no-fragmentación):** V3.60 **no
+> añade redacciones a mano NI usa un LLM en el camino de la evidencia** (premisa
+> 21): parametriza la **COMBINACIÓN de contenido DECLARADO**. La **FAMILIA** sigue
+> siendo la identidad pedagógica **y la unidad de EVIDENCIA** (su `id` es el
+> `context_id` del ledger) y la **INSTANCIA** es una superficie concreta de esa
+> MISMA identidad, derivada de una **ESPECIFICACIÓN** declarada:
+> **FAMILIA → ESPECIFICACIÓN → INSTANCIA**. Ninguna clave nueva entra en
+> `CONTEXT_DIMENSIONS`, `context_distance`, `context_diversity`,
+> `_novelty_score`, `transfer_state` ni sus umbrales, y `context_difficulty()`
+> (la carga de la FAMILIA) **no cambia**.
+> **(A) Lista blanca ampliada, NO identitaria.** `CONTEXT_INSTANCE_KEYS` pasa de 2
+> a 7 claves (`scenario`/`goal`/`register`/`difficulty_delta`/`skill_delta`): una
+> superficie puede describir **qué situación concreta** sirve, con qué registro, y
+> el **AJUSTE** de carga o las competencias que **añade**, pero **sigue sin poder
+> tocar la identidad** (`id`, las seis dimensiones core, `cefr`,
+> `difficulty_vector`, `skills`, `lexical_environment`, `syntactic_focus`). Un
+> test fija que la intersección con las claves de familia es **exactamente
+> `{"prompt"}`** y `_surface_details` **lee solo** esas siete claves (descarta el
+> resto): es la garantía de que el ledger no se fragmenta.
+> **(B) Espacio mínimo y techo.** `CONTEXT_INSTANCE_SPACE_MIN = 12` superficies
+> **TOTALES** por familia es el invariante anti-memorización (con 3 redacciones el
+> alumno agotaba la familia en 3 intentos) y `CONTEXT_INSTANCE_SPACE_MAX = 96` el
+> techo: el recorte deja un **PREFIJO** del producto cartesiano en orden
+> declarado. **El banco pasa de 60 a 358 superficies** (16–19 por familia) sin
+> tocar ninguna `id`.
+> **(C) Especificación → superficie (núcleo puro y determinista).**
+> `context_instance_spec` normaliza el `instance_space` declarado y lo declara
+> **INSERVIBLE** (`{}`) si la plantilla no tiene placeholders válidos o si algún
+> placeholder no tiene valores; `_instance_value` exige `value` (**OBLIGATORIA**:
+> sin texto el valor se DESCARTA, no se inventa contenido); `_skill_delta`
+> restringe las competencias añadidas al vocabulario `CONTEXT_SKILLS`;
+> `_expand_spec` recorre el producto cartesiano en el orden de `selection`, suma
+> los deltas por dimensión, deriva la etiqueta con `_slug` (**estable entre
+> ejecuciones: nunca `hash()`**) y descarta lo que no se pueda renderizar.
+> `context_instance_details` devuelve el espacio COMPLETO en un único orden
+> (**histórica → declaradas de V3.59 → generadas**, dedup por consigna, claves
+> siempre presentes) y `context_instances` se conserva como **vista de 2 claves**
+> sobre él, para no romper el contrato puro de V3.59.
+> **(D) Dificultad efectiva (`services/difficulty.py`).** `normalize_delta`
+> (deltas ENTEROS por dimensión canónica, clamp **±2**, ignora basura) y
+> `apply_delta` (base + delta recortado al envelope **1..5**; un delta sobre una
+> dimensión que la base no declara se **IGNORA**; con delta vacío devuelve
+> `normalize_vector(vector)` **EXACTO**). La familia declara la carga **ABSOLUTA**
+> y la superficie solo el **MATIZ**: es la frontera que impide reinterpretar la
+> identidad.
+> **(E) Degradación EXACTA.** Sin intentos la superficie es la **0** (consigna
+> histórica, byte a byte) y el delta efectivo es `{}`; `space[:3]` reproduce byte
+> a byte las **tres superficies de V3.59** (la rotación no cambia, se PROLONGA) y
+> la familia servida es idéntica con y sin `attempts_by_context` (test clave por
+> clave). `context_difficulty()` NO cambia: los llamadores de solo lectura quedan
+> intactos.
+> **(F) Banco.** `instance_space` en las 20 familias con `template` + 2 slots y
+> deltas **solo donde son reales** (`discourse +1` en
+> `debate`/`mediation`/`academic`, `interaction +1` con audiencia crítica,
+> `skill_delta: written_production` en la contribución escrita formal). Las dos
+> `instances` de V3.59 se conservan tal cual en los índices **1 y 2** y el
+> `template` no contiene la unidad objetivo (la consigna sigue dando ESCENARIO, no
+> palabra) ni deja llaves sueltas.
+> **(G) Ledger, sin migración.** `_record_transfer_evidence` persiste
+> `transfer.served_difficulty(context_id, attempts_by_context)` —con el **MISMO
+> resumen** de evidencia que el GET/POST— en las columnas aditivas de V3.55, así
+> que la carga guardada corresponde a la tarea **REALMENTE servida**, incluida su
+> superficie. `observed_difficulty` sigue siendo la proyección legacy y las
+> superficies sin delta (incluida siempre la 0) escriben **bytes idénticos** a
+> V3.59.
+> **(H) Contrato aditivo:** `context_for` gana **8 claves** en TODOS los retornos,
+> incluido el de banco vacío; **36 en total** y las **28 de V3.59** intactas y
+> fijadas por test, con espejo **opcional** en `frontend/src/types/api.ts`.
+> **NO cambia:** la selección de familia (novedad, distancia, diversidad, CEFR),
+> `transfer_state` y sus umbrales, `context_signals`, `CEFR_CAPACITY`, el
+> Difficulty Engine de V3.52–V3.55, el scoring, FSRS, el planner y el Sense
+> Engine. Tests: nuevo `test_context_engine_v360.py` (23, con **equivalencia
+> pedagógica** de las superficies de una familia, robustez de
+> `details`/`metadata` y end-to-end HTTP de la superficie generada con el vector
+> efectivo persistido), `pytest` **2335 passed** en local, launcher **75 passed**,
+> `ruff` limpio, `tsc` OK, `vitest` **651**, `npm run build` OK y
+> `check_release_consistency` **3.60.0**. Ver `release-notes-v3.60.0.md`.
+> **Siguiente paso:** V3.61 — el **motor de política de instancia** (cuándo
+> repetir una superficie, cuándo forzar una nueva, cómo pesa el fallo) y la
+> **evidencia instance-aware** (`context_instance` en el ledger) como decisión
+> aparte, con migración declarada si toca el ledger.
 >
 > **Nota (2026-09-13): V3.59.0 (Context Engine 3.0 — Context Bank Family/Instance)**
 > — release **v3.59.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`,
@@ -55,11 +148,15 @@
 > y el Sense Engine. Tests: nuevo `test_context_engine_v359.py` (16, con
 > end-to-end HTTP de la rotación con el pool agotado), `pytest` **2312 passed** en
 > local, launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651**,
-> `npm run build` OK y `check_release_consistency` **3.59.0**. Ver
+> `npm run build` OK y `check_release_consistency` **3.59.0**. **CI 6/6 en verde**
+> (run [34782482120](https://github.com/jvelasca/english-tutor/actions/runs/34782482120)
+> sobre `e721fce`: Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.59.0` creada y empujada. Ver
 > `release-notes-v3.59.0.md`.
-> **Siguiente paso:** V3.60 — el contrato/prompt de generación de sentidos y la
-> ponderación de la adecuación en `transfer_confidence`. La **auditoría externa
-> R** audita V3.59 y su punto de entrada es `agentes/auditoria-externa-v359.md`.
+> **Siguiente paso (ya ejecutado):** V3.60 — **Context Engine 4.0** (Instance
+> Specification → Parameterized Instance), que cierra los P1-1/P1-2/P2-6/P2-7 de
+> la auditoría externa **R** de V3.59. Ver la nota superior.
 >
 > **Nota (2026-09-13): V3.58.0 (Sense Engine 2.0 — `surface → lemma → sense → semantic_fit`)**
 > — release **v3.58.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`
@@ -2440,12 +2537,16 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-13):** `v3.59.0` **Context Engine 3.0** (release
-ADITIVA que separa la FAMILIA de la INSTANCIA en el banco de contextos —20
-consignas → 60 superficies, ledger y evidencia intactos, rotación determinista
-por intentos de la familia—); las **notas de la cabecera** de este documento son
-la fuente de verdad más reciente y detallan también la `v3.58.0` **Sense Engine
-2.0**, la `v3.57.0` **Planner 2.0 (argmax `(skill, actividad)` sobre ELV)**, la
+**Posición actual (2026-09-14):** `v3.60.0` **Context Engine 4.0** (release
+SIN migración de BD, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI que
+sustituye las 60 consignas escritas a mano por un ESPACIO de instancias
+PARAMETRIZADO por familia: FAMILIA → ESPECIFICACIÓN → INSTANCIA, con la
+identidad de evidencia intacta —`context_id` sigue siendo la familia—, el banco
+de 60 a 358 superficies y la carga de la superficie servida explícita y
+persistida de forma aditiva); las **notas de la cabecera** de este documento son
+la fuente de verdad más reciente y detallan también la `v3.59.0` **Context
+Engine 3.0 (Context Bank Family/Instance)**, la `v3.58.0` **Sense Engine 2.0**,
+la `v3.57.0` **Planner 2.0 (argmax `(skill, actividad)` sobre ELV)**, la
 `v3.56.0` **Planner 2.0 (`expected_learning_value`)** y la `v3.55.0` **Task
 Difficulty 3.0**. La sección siguiente se conserva como histórico del hilo V3.38
 (fecha original 2026-09-10, `v3.38.1`).

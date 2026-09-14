@@ -742,6 +742,15 @@ class TransferContextOut(BaseModel):
     declaran la SUPERFICIE servida de la familia: la consigna histórica es la
     superficie 0 y las siguientes se sirven por rotación de intentos. La familia
     (el `context_id`, unidad de evidencia) no cambia.
+
+    V3.60 (Context Engine 4.0): `instance_scenario`/`instance_goal`/
+    `instance_register` documentan la situación y el objetivo de esa superficie,
+    `instance_difficulty_delta` es su AJUSTE de carga sobre la familia,
+    `instance_difficulty_vector`/`instance_difficulty` son la carga EFECTIVA que
+    se está sirviendo, `instance_skills` las competencias efectivas y
+    `instance_generated` distingue una superficie generada por el espacio
+    paramétrico de una declarada. Todo aditivo y solo explicativo: la familia
+    servida (y por tanto la evidencia) no cambia.
     """
 
     word: str
@@ -799,6 +808,19 @@ class TransferContextOut(BaseModel):
     context_instance: str = ""
     instance_index: int = 0
     instance_count: int = 0
+    # V3.60 (Context Engine 4.0): metadatos NO identitarios de la superficie
+    # (situación, objetivo y registro en palabras), su ajuste de carga sobre la
+    # familia, la carga EFECTIVA servida, las competencias efectivas y si la
+    # superficie la generó la especificación paramétrica. Aditivos y solo
+    # explicativos: `difficulty_vector` sigue siendo la carga de la FAMILIA.
+    instance_scenario: str = ""
+    instance_goal: str = ""
+    instance_register: str = ""
+    instance_difficulty_delta: dict[str, int] = Field(default_factory=dict)
+    instance_difficulty_vector: dict[str, int] = Field(default_factory=dict)
+    instance_difficulty: int = 0
+    instance_skills: list[str] = Field(default_factory=list)
+    instance_generated: bool = False
 
 
 class TransferAttemptIn(BaseModel):

@@ -91,10 +91,28 @@ No usa LLM ni aleatoriedad con estado: la rotación se deriva de un hash ESTABLE
 (`zlib.crc32`, no el `hash()` de Python, que va sembrado por proceso) y de los
 contextos ya registrados en el ledger (`context_id`), así que la misma evidencia
 produce siempre la misma consigna.
+
+V3.60 (**Context Engine 4.0: Instance Specification → Parameterized Instance**)
+cierra el P1 que la auditoría de V3.59 dejó abierto: tres redacciones por familia
+se agotan en tres intentos y el alumno puede prepararlas de memoria. En lugar de
+añadir consignas a mano, cada familia declara un ESPACIO paramétrico
+(`instance_space`: una `template` con slots y sus valores) del que se GENERAN
+superficies deterministas de la MISMA identidad: la familia sigue siendo la
+unidad de EVIDENCIA y el contenido sigue siendo declarado, porque lo que se
+genera es la COMBINACIÓN de valores, no el texto. La superficie 0 sigue siendo
+la consigna histórica y `space[:3]` reproduce byte a byte las tres superficies
+de V3.59, así que la rotación no cambia: se prolonga. Una superficie puede
+declarar metadatos NO identitarios (`scenario`/`goal`/`register`), las
+competencias que añade (`skill_delta`) y un AJUSTE de carga (`difficulty_delta`)
+que hace explícita la dificultad EFECTIVA de la tarea servida —el P2 «las
+instancias cambian la dificultad sin poder declararlo»—, sin tocar
+`context_difficulty` (la familia), los umbrales ni el ledger: sin delta la
+degradación es exacta a V3.59.
 """
 
 from __future__ import annotations
 
+import re
 import zlib
 from collections.abc import Mapping
 
@@ -133,15 +151,42 @@ CONTEXT_VARIETY_DIMENSIONS: tuple[str, ...] = (
 # calibrable; dos contextos distintos suelen diferir en >= 2 dimensiones.
 CONTEXT_DIVERSITY_MIN = 2
 
-# V3.59 (Context Engine 3.0): claves que puede declarar una INSTANCIA de familia.
-# Es una lista BLANCA a propósito: la instancia solo puede aportar su etiqueta y
-# su consigna, nunca la identidad pedagógica (que es la unidad de evidencia).
-CONTEXT_INSTANCE_KEYS: tuple[str, ...] = ("instance", "prompt")
+# V3.59 (Context Engine 3.0) → V3.60 (Context Engine 4.0): claves que puede
+# declarar una INSTANCIA de familia. Sigue siendo una lista BLANCA, ampliada con
+# METADATOS NO IDENTITARIOS: además de su etiqueta y su consigna, una superficie
+# puede describir su `scenario`/`goal`/`register` (qué situación concreta y con
+# qué registro sirve) y el AJUSTE de carga que introduce (`difficulty_delta`) o
+# las competencias que añade (`skill_delta`). Lo que sigue PROHIBIDO es la
+# identidad: `id`, las seis dimensiones core, `cefr`, `difficulty_vector`,
+# `skills`, `lexical_environment` y `syntactic_focus` no se pueden declarar en
+# una instancia (lo fija un test: la intersección con las claves de familia es
+# exactamente `{"prompt"}`, porque la consigna es la única clave compartida).
+CONTEXT_INSTANCE_KEYS: tuple[str, ...] = (
+    "instance",
+    "prompt",
+    "scenario",
+    "goal",
+    "register",
+    "difficulty_delta",
+    "skill_delta",
+)
 
 # V3.59: nº mínimo de superficies ADICIONALES que debe declarar cada familia. Es
 # el invariante anti-memorización de la release y está verificado por test: con
 # una sola superficie declarada la rotación sería inerte.
 CONTEXT_INSTANCES_MIN = 2
+
+# V3.60 (Context Engine 4.0): nº mínimo de superficies TOTALES por familia (la 0
+# histórica, las declaradas y las GENERADAS por la especificación paramétrica).
+# Es el invariante anti-memorización de Context Engine 4.0: con tres redacciones
+# el alumno agotaba la familia en tres intentos; con >=12 la rotación no se
+# puede aprender de memoria y sigue siendo determinista y explicable.
+CONTEXT_INSTANCE_SPACE_MIN = 12
+
+# V3.60: TECHO del espacio de una familia. La expansión es determinista (el
+# producto cartesiano se recorre en orden declarado y se corta aquí), así que el
+# espacio no puede crecer sin control al añadir slots al banco.
+CONTEXT_INSTANCE_SPACE_MAX = 96
 
 # V3.47: dimensiones de CARGA del contexto de transferencia (misma convención que
 # el `difficulty_vector` de listening/speaking: enteros 1..5). No entran en la
@@ -448,6 +493,28 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60 (Context Engine 4.0): ESPACIO paramétrico de superficies de la
+        # MISMA familia (ver `context_instance_details`). La plantilla se combina
+        # con los slots en el orden de `selection`; las superficies generadas
+        # ocupan los índices siguientes a las declaradas arriba.
+        "instance_space": {
+            "template": "Tell a short story about {what} that happened {when}.",
+            "selection": ("what", "when"),
+            "slots": {
+                "what": (
+                    {"value": "a journey", "scenario": "a journey in the past"},
+                    {"value": "a surprise", "scenario": "an unexpected event"},
+                    {"value": "a mistake", "scenario": "something that went wrong"},
+                    {"value": "a coincidence", "scenario": "an unlikely coincidence"},
+                ),
+                "when": (
+                    "last year",
+                    "at the weekend",
+                    "during a holiday",
+                    "when you were younger",
+                ),
+            },
+        },
     },
     {
         "id": "question",
@@ -491,6 +558,28 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Write a question to ask a friend {moment}. "
+                "You want to know about {topic}."
+            ),
+            "selection": ("topic", "moment"),
+            "slots": {
+                "topic": (
+                    {"value": "their weekend", "scenario": "a friend's weekend"},
+                    {"value": "their family", "scenario": "a friend's family"},
+                    {"value": "their new job", "scenario": "a friend's new job"},
+                    {"value": "their holiday plans", "scenario": "a friend's plans"},
+                ),
+                "moment": (
+                    "when you meet them",
+                    "on the phone",
+                    "in a message",
+                    "after a long time",
+                ),
+            },
+        },
     },
     {
         "id": "work",
@@ -534,6 +623,28 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        # El `change` es la SITUACIÓN y el `focus` lo que se describe: es el
+        # P1 de la auditoría de V3.59 (una instancia puede cambiar el escenario
+        # real) hecho declarable sin tocar la identidad de la familia.
+        "instance_space": {
+            "template": "You have {change}. Describe {focus} to a colleague.",
+            "selection": ("change", "focus"),
+            "slots": {
+                "change": (
+                    {"value": "a new job", "scenario": "a first week in a new job"},
+                    {"value": "changed offices", "scenario": "a new workplace"},
+                    {"value": "started a new project", "scenario": "a new project"},
+                    {"value": "a new manager", "scenario": "a change of manager"},
+                ),
+                "focus": (
+                    "something interesting about your first week",
+                    "your new workplace",
+                    "one task you do every day",
+                    "the people you work with",
+                ),
+            },
+        },
     },
     {
         "id": "future",
@@ -569,6 +680,25 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 "prompt": "Talk about your plans for next month.",
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": "Talk about your plans for {period} {detail}.",
+            "selection": ("period", "detail"),
+            "slots": {
+                "period": (
+                    {"value": "next month", "scenario": "short-term plans"},
+                    {"value": "next summer", "scenario": "summer plans"},
+                    {"value": "next year", "scenario": "the year ahead"},
+                    {"value": "the next few weeks", "scenario": "the near future"},
+                ),
+                "detail": (
+                    "and say why",
+                    "and who you will be with",
+                    "and what you need to do first",
+                    "and how you will prepare",
+                ),
+            },
+        },
     },
     {
         "id": "opinion",
@@ -613,6 +743,34 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": "Give your opinion about {topic} to {audience}, and say why.",
+            "selection": ("topic", "audience"),
+            "slots": {
+                "topic": (
+                    {
+                        "value": "a school subject you liked or disliked",
+                        "scenario": "school and learning",
+                    },
+                    {"value": "living in a big city", "scenario": "city life"},
+                    {
+                        "value": "learning languages online",
+                        "scenario": "online learning",
+                    },
+                    {
+                        "value": "how much homework students get",
+                        "scenario": "homework and school work",
+                    },
+                ),
+                "audience": (
+                    "a friend",
+                    "your classmates",
+                    "a teacher",
+                    "someone who disagrees with you",
+                ),
+            },
+        },
     },
     {
         "id": "problem",
@@ -654,6 +812,23 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Describe a problem you had {where} {when} "
+                "and how you solved it."
+            ),
+            "selection": ("where", "when"),
+            "slots": {
+                "where": (
+                    {"value": "at home", "scenario": "a problem at home"},
+                    {"value": "on a trip", "scenario": "a problem while travelling"},
+                    {"value": "at work", "scenario": "a problem at work"},
+                    {"value": "at school", "scenario": "a problem at school"},
+                ),
+                "when": ("last month", "last week", "recently", "a few years ago"),
+            },
+        },
     },
     # --- V3.48 (Context Bank 2.0): 14 contextos nuevos, cobertura A1–C2 ---
     {
@@ -700,6 +875,28 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "You meet someone new at {place}. "
+                "Introduce yourself and {info}."
+            ),
+            "selection": ("place", "info"),
+            "slots": {
+                "place": (
+                    {"value": "a class", "scenario": "a new class"},
+                    {"value": "a party", "scenario": "a social event"},
+                    {"value": "a sports club", "scenario": "a sports club"},
+                    {"value": "a new job", "scenario": "a first day at work"},
+                ),
+                "info": (
+                    "say where you are from",
+                    "say what you do",
+                    "say what you like doing",
+                    "say why you are there",
+                ),
+            },
+        },
     },
     {
         "id": "routine",
@@ -735,6 +932,25 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 "prompt": "Describe what you usually do at the weekend.",
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": "Describe what you usually do {when} {where}.",
+            "selection": ("when", "where"),
+            "slots": {
+                "when": (
+                    {"value": "on a normal morning", "scenario": "a morning routine"},
+                    {"value": "on a normal evening", "scenario": "an evening routine"},
+                    {"value": "at the weekend", "scenario": "a weekend routine"},
+                    {"value": "on a day off", "scenario": "a day off"},
+                ),
+                "where": (
+                    "at home",
+                    "before school or work",
+                    "with your family",
+                    "when you have some free time",
+                ),
+            },
+        },
     },
     {
         "id": "directions",
@@ -779,6 +995,31 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "You need to get to {place} in a city you do not know. "
+                "Ask a passer-by {how}."
+            ),
+            "selection": ("place", "how"),
+            "slots": {
+                "place": (
+                    {"value": "the station", "scenario": "finding the station"},
+                    {"value": "the market", "scenario": "finding the market"},
+                    {"value": "a pharmacy", "scenario": "finding a pharmacy"},
+                    {"value": "the nearest bank", "scenario": "finding a bank"},
+                ),
+                "how": (
+                    {"value": "how to get there", "goal": "ask for directions"},
+                    {"value": "which way to go", "goal": "ask for directions"},
+                    {
+                        "value": "where you can find it",
+                        "goal": "ask for the location of a place",
+                    },
+                    {"value": "if it is far from here", "goal": "ask about distance"},
+                ),
+            },
+        },
     },
     {
         "id": "shopping",
@@ -823,6 +1064,25 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": "You are in {place} and {problem}. Ask an assistant for help.",
+            "selection": ("place", "problem"),
+            "slots": {
+                "place": (
+                    {"value": "a clothes shop", "scenario": "buying clothes"},
+                    {"value": "a supermarket", "scenario": "doing the shopping"},
+                    {"value": "a bookshop", "scenario": "buying a book"},
+                    {"value": "a shoe shop", "scenario": "buying shoes"},
+                ),
+                "problem": (
+                    "cannot find what you need",
+                    "like something but it is the wrong size",
+                    "cannot find the price of something",
+                    "want to change something you bought",
+                ),
+            },
+        },
     },
     {
         "id": "health",
@@ -867,6 +1127,29 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        # El `symptom` es la SITUACIÓN concreta (la auditoría de V3.59 observó que
+        # las superficies cambian de escenario sin poder declararlo).
+        "instance_space": {
+            "template": (
+                "You {symptom}. Explain it to {who} and answer their questions."
+            ),
+            "selection": ("symptom", "who"),
+            "slots": {
+                "symptom": (
+                    {"value": "do not feel well", "scenario": "feeling unwell"},
+                    {"value": "have a bad cough", "scenario": "a bad cough"},
+                    {"value": "have a headache", "scenario": "a headache"},
+                    {"value": "have trouble sleeping", "scenario": "sleep problems"},
+                ),
+                "who": (
+                    "a doctor",
+                    "a pharmacist",
+                    "a nurse",
+                    "a doctor at a check-up",
+                ),
+            },
+        },
     },
     {
         "id": "travel_plan",
@@ -912,6 +1195,28 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "{plan} with a friend: suggest where to go and why, "
+                "and {agree}."
+            ),
+            "selection": ("plan", "agree"),
+            "slots": {
+                "plan": (
+                    {"value": "Plan a weekend away", "scenario": "a short trip"},
+                    {"value": "Plan a longer trip", "scenario": "a long trip"},
+                    {"value": "Plan a visit to family", "scenario": "visiting family"},
+                    {"value": "Plan a day out", "scenario": "a day out"},
+                ),
+                "agree": (
+                    "agree on the details",
+                    "agree on the dates",
+                    "agree on how much to spend",
+                    "agree on who to invite",
+                ),
+            },
+        },
     },
     {
         "id": "work_problem",
@@ -957,6 +1262,34 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "{incident} on a project at work. Explain to a colleague "
+                "what happened and {action}."
+            ),
+            "selection": ("incident", "action"),
+            "slots": {
+                "incident": (
+                    {"value": "Something went wrong", "scenario": "an unclear problem"},
+                    {"value": "A delivery arrived late", "scenario": "a late delivery"},
+                    {
+                        "value": "An important file was missing",
+                        "scenario": "a missing file",
+                    },
+                    {
+                        "value": "A client changed the plan",
+                        "scenario": "a change requested by a client",
+                    },
+                ),
+                "action": (
+                    "how you fixed it",
+                    "what you did next",
+                    "how the team reacted",
+                    "what you learned from it",
+                ),
+            },
+        },
     },
     {
         "id": "community",
@@ -1002,6 +1335,41 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Propose one change to {change} and explain why {who} "
+                "should support it."
+            ),
+            "selection": ("change", "who"),
+            "slots": {
+                "change": (
+                    {
+                        "value": "improve your neighbourhood",
+                        "scenario": "the neighbourhood",
+                    },
+                    {
+                        "value": "make your neighbourhood greener",
+                        "scenario": "green spaces",
+                    },
+                    {
+                        "value": "the shared spaces of your building",
+                        "scenario": "shared spaces",
+                    },
+                    {"value": "make your street safer", "scenario": "street safety"},
+                ),
+                "who": (
+                    "your neighbours",
+                    "the people in your building",
+                    "other families in the area",
+                    {
+                        "value": "the local council",
+                        "goal": "persuade an institution",
+                        "difficulty_delta": {"interaction": 1},
+                    },
+                ),
+            },
+        },
     },
     {
         "id": "debate",
@@ -1047,6 +1415,53 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        # El `qualifier` es la primera superficie que declara AJUSTE de carga y
+        # competencias: la dificultad EFECTIVA pasa a ser explícita.
+        "instance_space": {
+            "template": (
+                "Take a position on {issue} and defend it against an "
+                "opposing view {qualifier}."
+            ),
+            "selection": ("issue", "qualifier"),
+            "slots": {
+                "issue": (
+                    {"value": "a social issue", "scenario": "an open social issue"},
+                    {
+                        "value": "the balance between work and private life",
+                        "scenario": "work and private life",
+                    },
+                    {
+                        "value": "technology and personal privacy",
+                        "scenario": "technology and privacy",
+                    },
+                    {
+                        "value": "the cost of higher education",
+                        "scenario": "higher education",
+                    },
+                ),
+                "qualifier": (
+                    {"value": "in a discussion", "goal": "argue orally"},
+                    {
+                        "value": "in front of a critical audience",
+                        "scenario": "a critical audience",
+                        "goal": "argue orally",
+                        "difficulty_delta": {"interaction": 1},
+                    },
+                    {
+                        "value": "in a short written contribution",
+                        "goal": "argue in writing",
+                        "register": "formal",
+                        "skill_delta": ("written_production",),
+                    },
+                    {
+                        "value": "and respond to a counterargument",
+                        "goal": "rebut a counterargument",
+                        "difficulty_delta": {"discourse": 1},
+                    },
+                ),
+            },
+        },
     },
     {
         "id": "review",
@@ -1092,6 +1507,42 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Review {work} you have recently experienced, weighing its "
+                "strengths and weaknesses {angle}."
+            ),
+            "selection": ("work", "angle"),
+            "slots": {
+                "work": (
+                    {"value": "a film or a book", "scenario": "a film or a book"},
+                    {"value": "a series", "scenario": "a series"},
+                    {
+                        "value": "an exhibition or a concert",
+                        "scenario": "an exhibition",
+                    },
+                    {"value": "a play or a musical", "scenario": "a play or a musical"},
+                ),
+                "angle": (
+                    {
+                        "value": "from the point of view of its audience",
+                        "goal": "evaluate for an audience",
+                    },
+                    {
+                        "value": "and comparing it with something similar",
+                        "goal": "compare two works",
+                        "difficulty_delta": {"discourse": 1},
+                    },
+                    {"value": "focusing on its message", "goal": "interpret"},
+                    {
+                        "value": "and recommending it to a specific audience",
+                        "goal": "recommend",
+                        "difficulty_delta": {"interaction": 1},
+                    },
+                ),
+            },
+        },
     },
     {
         "id": "mediation",
@@ -1139,6 +1590,41 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "{parties} disagree {about}. Explain each side to the other "
+                "and help them reach an understanding."
+            ),
+            "selection": ("parties", "about"),
+            "slots": {
+                "parties": (
+                    {"value": "Two people you know", "scenario": "two acquaintances"},
+                    {
+                        "value": "Two members of your family",
+                        "scenario": "a family conflict",
+                    },
+                    {"value": "Two colleagues", "scenario": "a conflict at work"},
+                    {
+                        "value": "Two of your neighbours",
+                        "scenario": "a conflict between neighbours",
+                    },
+                ),
+                "about": (
+                    {"value": "about a decision", "scenario": "a decision"},
+                    {
+                        "value": "about how to organise some work",
+                        "scenario": "organising work",
+                    },
+                    {"value": "about money", "scenario": "a disagreement about money"},
+                    {
+                        "value": "about who should do what",
+                        "scenario": "a disagreement about responsibilities",
+                        "difficulty_delta": {"interaction": 1},
+                    },
+                ),
+            },
+        },
     },
     {
         "id": "academic",
@@ -1184,6 +1670,42 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Present {thing} from a field you know well and respond "
+                "to {question}."
+            ),
+            "selection": ("thing", "question"),
+            "slots": {
+                "thing": (
+                    {"value": "an argument", "scenario": "an argument"},
+                    {"value": "a method you use", "scenario": "a method"},
+                    {"value": "a claim", "scenario": "a claim"},
+                    {"value": "a result from a study", "scenario": "a study result"},
+                ),
+                "question": (
+                    {
+                        "value": "a critical question about your evidence",
+                        "goal": "justify the evidence",
+                    },
+                    {
+                        "value": "a counterexample an expert raises",
+                        "goal": "rebut a counterexample",
+                        "difficulty_delta": {"interaction": 1},
+                    },
+                    {
+                        "value": "a question about your method",
+                        "goal": "justify the method",
+                    },
+                    {
+                        "value": "a question about how your claim applies elsewhere",
+                        "goal": "generalise a claim",
+                        "difficulty_delta": {"discourse": 1},
+                    },
+                ),
+            },
+        },
     },
     {
         "id": "negotiation",
@@ -1231,6 +1753,35 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Negotiate {term} with a counterpart who {demand}, and "
+                "justify the concessions you are willing to make."
+            ),
+            "selection": ("term", "demand"),
+            "slots": {
+                "term": (
+                    {"value": "the terms of an agreement", "scenario": "an agreement"},
+                    {"value": "a budget", "scenario": "a budget"},
+                    {"value": "a deadline", "scenario": "a deadline"},
+                    {"value": "the scope of a project", "scenario": "a project scope"},
+                ),
+                "demand": (
+                    {
+                        "value": "wants something different",
+                        "scenario": "different terms",
+                    },
+                    {"value": "wants to spend more", "scenario": "a bigger budget"},
+                    {"value": "wants it sooner", "scenario": "an earlier deadline"},
+                    {
+                        "value": "wants a longer commitment",
+                        "scenario": "a longer commitment",
+                        "difficulty_delta": {"discourse": 1},
+                    },
+                ),
+            },
+        },
     },
     {
         "id": "keynote",
@@ -1276,6 +1827,42 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                 ),
             },
         ),
+        # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
+        "instance_space": {
+            "template": (
+                "Deliver a short keynote {occasion} on {theme} and use "
+                "concrete examples to make it persuasive."
+            ),
+            "selection": ("theme", "occasion"),
+            "slots": {
+                "theme": (
+                    {"value": "an abstract theme", "scenario": "an abstract theme"},
+                    {"value": "how people learn", "scenario": "how people learn"},
+                    {
+                        "value": "how teams change over time",
+                        "scenario": "how teams change",
+                    },
+                    {
+                        "value": "how technology changes the way we work",
+                        "scenario": "technology and work",
+                        "difficulty_delta": {"lexical": 1},
+                    },
+                ),
+                "occasion": (
+                    {
+                        "value": "to a professional audience",
+                        "goal": "persuade professionals",
+                    },
+                    {"value": "to a small expert group", "goal": "persuade experts"},
+                    {"value": "to a general audience", "goal": "explain to everyone"},
+                    {
+                        "value": "at a company event",
+                        "register": "neutral",
+                        "difficulty_delta": {"interaction": 1},
+                    },
+                ),
+            },
+        },
     },
 )
 
@@ -1480,37 +2067,398 @@ def _count(value: object) -> int:
     return 0
 
 
-def context_instances(context: object) -> tuple[dict[str, str], ...]:
-    """Superficies servibles de una familia (V3.59, pura).
+# ---------------------------------------------------------------------------
+# V3.60 (Context Engine 4.0): ESPECIFICACIÓN → INSTANCIA PARAMETRIZADA.
+#
+# V3.59 separó FAMILIA de INSTANCIA pero dejó el banco finito: 20 familias × 3
+# redacciones escritas a mano, agotables en tres intentos (el P1 de la auditoría
+# de V3.59). V3.60 no añade redacciones a mano: añade un ESPACIO paramétrico por
+# familia (`instance_space`) del que se GENERAN superficies deterministas de la
+# MISMA identidad. La familia sigue siendo la unidad de evidencia y el contenido
+# sigue siendo declarado (no generado por LLM): lo que se genera es la
+# COMBINACIÓN de valores declarados, no el texto.
+#
+# Invariantes (probadas por test):
+#   (a) la superficie 0 es SIEMPRE la consigna histórica y `space[:3]` reproduce
+#       byte a byte las tres superficies de V3.59 (la rotación no cambia, se
+#       prolonga);
+#   (b) ninguna clave nueva entra en `CONTEXT_DIMENSIONS`, `context_distance`,
+#       `context_diversity`, `_novelty_score` ni el `transfer_state`: la familia
+#       elegida es EXACTAMENTE la de V3.59 con la misma evidencia;
+#   (c) sin intentos la degradación es exacta (superficie 0 y delta nulo);
+#   (d) sin LLM ni aleatoriedad con estado: la expansión recorre el producto
+#       cartesiano en orden declarado y la rotación es `attempts % len(space)`.
+# ---------------------------------------------------------------------------
 
-    Devuelve `({"instance": "", "prompt": <consigna histórica>}, *declaradas)`:
-    la propia `prompt` de la familia es SIEMPRE la superficie 0 (byte a byte la
-    histórica, así que sin evidencia el resultado es el de V3.58) y cada
-    `instances` declarada añade una superficie nueva de la MISMA identidad.
-    Acepta el dict del banco, un `id` o un `context_id`. Normaliza (recorta y
-    descarta superficies sin consigna o no-dict) y nunca lanza.
+# Placeholder de una plantilla de consigna: `{nombre_slot}` en minúsculas.
+_TEMPLATE_FIELD = re.compile(r"\{([a-z][a-z0-9_]*)\}")
+
+# Claves de una superficie NORMALIZADA (`context_instance_details`): la lista
+# blanca de instancia más `generated`, que distingue una superficie declarada de
+# una generada por el espacio paramétrico (explicabilidad; no entra en ninguna
+# decisión).
+CONTEXT_INSTANCE_DETAIL_KEYS: tuple[str, ...] = (*CONTEXT_INSTANCE_KEYS, "generated")
+
+
+def _slug(value: object) -> str:
+    """Etiqueta canónica de una superficie: minúsculas y `_` (V3.60, pura).
+
+    Se deriva del CONTENIDO declarado (el valor del slot), nunca del orden del
+    diccionario ni del `hash()` de Python (sembrado por proceso), así que es
+    estable entre ejecuciones. Devuelve "" para lo vacío. Nunca lanza.
+    """
+    text = str(value or "").strip().lower()
+    slug = "".join(
+        character if character.isalnum() else "_" for character in text
+    )
+    return "_".join(part for part in slug.split("_") if part)
+
+
+def _skill_delta(raw: object) -> tuple[str, ...]:
+    """Competencias que AÑADE una superficie, en orden canónico (V3.60, pura).
+
+    Solo admite valores del vocabulario `CONTEXT_SKILLS` (deduplicados y
+    ordenados por él); cualquier otra cosa (una cadena suelta, basura) devuelve
+    `()`: una superficie no puede inventar competencias. Nunca lanza.
+    """
+    if isinstance(raw, str) or not isinstance(
+        raw, (list, tuple, set, frozenset)
+    ):
+        return ()
+    wanted = {str(skill or "").strip().lower() for skill in raw}
+    return tuple(skill for skill in CONTEXT_SKILLS if skill in wanted)
+
+
+def _instance_value(raw: object) -> dict[str, object]:
+    """Valor de un SLOT del espacio de instancias, normalizado (V3.60, pura).
+
+    Un valor se declara como texto (`"a longer trip"`) o como dict
+    `{"value": str, "scenario": str, "goal": str, "register": str,
+    "difficulty_delta": {...}, "skill_delta": (...)}`. `value` es OBLIGATORIA
+    (es lo que se interpola en la consigna): sin texto el valor se DESCARTA, no
+    se inventa contenido. Devuelve `{}` para lo inválido. Nunca lanza.
+    """
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return {}
+        return {
+            "value": text,
+            "slug": _slug(text),
+            "scenario": "",
+            "goal": "",
+            "register": "",
+            "difficulty_delta": {},
+            "skill_delta": (),
+        }
+    if not isinstance(raw, Mapping):
+        return {}
+    text = str(raw.get("value") or "").strip()
+    if not text:
+        return {}
+    return {
+        "value": text,
+        "slug": _slug(text),
+        "scenario": str(raw.get("scenario") or "").strip(),
+        "goal": str(raw.get("goal") or "").strip(),
+        "register": str(raw.get("register") or "").strip(),
+        "difficulty_delta": difficulty.normalize_delta(
+            raw.get("difficulty_delta")
+        ),
+        "skill_delta": _skill_delta(raw.get("skill_delta")),
+    }
+
+
+def _template_fields(template: str) -> tuple[str, ...]:
+    """Nombres de slot que interpola una plantilla de consigna (V3.60, pura).
+
+    Los placeholders son `{nombre}` en minúsculas. Una plantilla sin ningún
+    placeholder, o con llaves que no forman uno válido (`{`, `}`, `{}`,
+    `{Word}`), devuelve `()`: la especificación es INSERVIBLE y la familia se
+    queda con sus superficies declaradas. Los nombres repetidos se deduplican
+    conservando su orden. Nunca lanza.
+    """
+    fields = _TEMPLATE_FIELD.findall(template)
+    leftover = _TEMPLATE_FIELD.sub("", template)
+    if "{" in leftover or "}" in leftover:
+        return ()
+    return tuple(dict.fromkeys(fields))
+
+
+def _slot_order(selection: object, fields: tuple[str, ...]) -> tuple[str, ...]:
+    """Orden en que se MEZCLAN los slots del espacio (V3.60, pura).
+
+    `selection` es la lista ordenada de slots que la familia considera
+    principales: se recorren primero y, por tanto, son los que entran siempre
+    que el techo `CONTEXT_INSTANCE_SPACE_MAX` recorte el producto cartesiano.
+    Los nombres desconocidos se ignoran y los slots no nombrados se AÑADEN
+    detrás en su orden de declaración: nada se cae en silencio. Nunca lanza.
+    """
+    if isinstance(selection, (list, tuple)) and not isinstance(selection, str):
+        wanted = [str(name or "").strip().lower() for name in selection]
+    else:
+        wanted = []
+    ordered = [name for name in wanted if name in fields]
+    seen = set(ordered)
+    ordered.extend(name for name in fields if name not in seen)
+    return tuple(ordered)
+
+
+def context_instance_spec(context: object) -> dict:
+    """Especificación PARAMÉTRICA de instancias de una familia (V3.60, pura).
+
+    Normaliza el `instance_space` que declara la familia:
+
+        {"template": "... {when} ...", "selection": ("when", "who"),
+         "slots": {"when": [valores], "who": [valores]},
+         "difficulty_delta": {...}}
+
+    donde cada valor es texto o un dict (ver `_instance_value`). Se valida que
+    la plantilla tenga placeholders VÁLIDOS y que TODOS ellos tengan un slot con
+    al menos un valor utilizable: si algo falta, la especificación se considera
+    INSERVIBLE y devuelve `{}` (la familia conserva sus superficies declaradas).
+    Los slots que la plantilla NO interpola se ignoran, porque no producirían
+    consignas distintas. Acepta el dict del banco, un `id` o un `context_id`;
+    una familia sin `instance_space` devuelve `{}`. Nunca lanza.
     """
     attributes = _as_attributes(context)
-    surfaces: list[dict[str, str]] = []
-    family_prompt = str(attributes.get("prompt") or "").strip()
-    if family_prompt:
-        surfaces.append({"instance": "", "prompt": family_prompt})
-    declared = attributes.get("instances")
-    if isinstance(declared, (list, tuple)):
-        for raw in declared:
-            if not isinstance(raw, Mapping):
+    raw = attributes.get("instance_space")
+    if not isinstance(raw, Mapping):
+        return {}
+    template = str(raw.get("template") or "").strip()
+    if not template:
+        return {}
+    fields = _template_fields(template)
+    if not fields:
+        return {}
+    declared = raw.get("slots")
+    if not isinstance(declared, Mapping):
+        return {}
+    slots: dict[str, tuple[dict[str, object], ...]] = {}
+    for name in fields:
+        values = declared.get(name)
+        if isinstance(values, str) or not isinstance(values, (list, tuple)):
+            return {}
+        normalized: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for item in values:
+            value = _instance_value(item)
+            slug = str(value.get("slug") or "")
+            if not value or slug in seen:
                 continue
-            prompt = str(raw.get("prompt") or "").strip()
-            if not prompt:
-                continue
-            surfaces.append(
-                {"instance": str(raw.get("instance") or "").strip(), "prompt": prompt}
-            )
+            seen.add(slug)
+            normalized.append(value)
+        if not normalized:
+            return {}
+        slots[name] = tuple(normalized)
+    return {
+        "template": template,
+        "slots": slots,
+        "order": _slot_order(raw.get("selection"), fields),
+        "difficulty_delta": difficulty.normalize_delta(
+            raw.get("difficulty_delta")
+        ),
+    }
+
+
+def _merge_partial(
+    name: str, value: Mapping, partial: Mapping
+) -> dict:
+    """Combina un valor de slot con una combinación parcial (V3.60, pura).
+
+    Acumula la etiqueta del valor, el texto a interpolar, los deltas (se SUMAN
+    por dimensión), el `scenario` (se concatenan los declarados) y las
+    competencias (unión en orden canónico). `register` y `goal` son singulares:
+    gana el último declarado no vacío. Nunca lanza.
+    """
+    delta = dict(partial.get("delta") or {})
+    for dimension, load in (value.get("difficulty_delta") or {}).items():
+        delta[dimension] = delta.get(dimension, 0) + load
+    wanted = set(partial.get("skills") or ()) | set(value.get("skill_delta") or ())
+    scenario = "; ".join(
+        part
+        for part in (
+            str(partial.get("scenario") or ""),
+            str(value.get("scenario") or ""),
+        )
+        if part
+    )
+    return {
+        "labels": (*partial.get("labels", ()), value.get("slug") or ""),
+        "values": {
+            **dict(partial.get("values") or {}),
+            name: value.get("value") or "",
+        },
+        "delta": delta,
+        "scenario": scenario,
+        "goal": str(value.get("goal") or "") or str(partial.get("goal") or ""),
+        "register": str(value.get("register") or "")
+        or str(partial.get("register") or ""),
+        "skills": tuple(skill for skill in CONTEXT_SKILLS if skill in wanted),
+    }
+
+
+def _render_template(template: str, values: Mapping) -> str:
+    """Plantilla con sus valores interpolados ("" si no se puede) (V3.60, pura)."""
+    try:
+        return template.format(**values).strip()
+    except (KeyError, IndexError, ValueError):
+        return ""
+
+
+def _expand_spec(spec: Mapping) -> tuple[dict[str, object], ...]:
+    """Superficies GENERADAS por la especificación, en orden estable (V3.60).
+
+    Producto cartesiano de los slots en el orden de `spec["order"]`, cortado a
+    `CONTEXT_INSTANCE_SPACE_MAX` (el recorte deja un PREFIJO del producto, así
+    que es determinista y favorece los slots principales de `selection`). Cada
+    superficie declara su consigna (el `template` interpolado), su etiqueta
+    (slug estable de los valores elegidos) y los metadatos que APORTAN esos
+    valores (`scenario`/`goal`/`register`/`difficulty_delta`/`skill_delta`) más
+    el delta base declarado por la familia. Una combinación cuya plantilla no se
+    puede renderizar se descarta. Nunca lanza.
+    """
+    slots = spec.get("slots") or {}
+    order = spec.get("order") or tuple(slots)
+    template = str(spec.get("template") or "")
+    if not order or not template:
+        return ()
+    partials: list[dict] = [
+        {
+            "labels": (),
+            "values": {},
+            "delta": {},
+            "scenario": "",
+            "goal": "",
+            "register": "",
+            "skills": (),
+        }
+    ]
+    for name in order:
+        values = slots.get(name) or ()
+        if not values:
+            continue
+        expanded: list[dict] = []
+        capped = False
+        for partial in partials:
+            for value in values:
+                if len(expanded) >= CONTEXT_INSTANCE_SPACE_MAX:
+                    capped = True
+                    break
+                expanded.append(_merge_partial(name, value, partial))
+            if capped:
+                break
+        if not expanded:
+            return ()
+        partials = expanded
+    base_delta = difficulty.normalize_delta(spec.get("difficulty_delta"))
+    surfaces: list[dict[str, object]] = []
+    for partial in partials:
+        prompt = _render_template(template, partial["values"])
+        if not prompt:
+            continue
+        delta = dict(base_delta)
+        for dimension, load in partial["delta"].items():
+            delta[dimension] = delta.get(dimension, 0) + load
+        surfaces.append(
+            {
+                "instance": "_".join(partial["labels"]) or "generated",
+                "prompt": prompt,
+                "scenario": partial["scenario"],
+                "goal": partial["goal"],
+                "register": partial["register"],
+                "difficulty_delta": difficulty.normalize_delta(delta),
+                "skill_delta": partial["skills"],
+                "generated": True,
+            }
+        )
     return tuple(surfaces)
 
 
+def _surface_details(raw: object) -> dict[str, object]:
+    """Superficie normalizada desde su declaración (V3.60, pura).
+
+    Lee SOLO las claves de `CONTEXT_INSTANCE_KEYS`: cualquier otra declaración
+    (la identidad de la familia) se IGNORA, que es la garantía de
+    no-fragmentación del ledger. Todas las claves de
+    `CONTEXT_INSTANCE_DETAIL_KEYS` están siempre presentes, con `""`/`{}`/`()`
+    cuando la superficie no aporta nada. Nunca lanza.
+    """
+    if not isinstance(raw, Mapping):
+        raw = {}
+    return {
+        "instance": str(raw.get("instance") or "").strip(),
+        "prompt": str(raw.get("prompt") or "").strip(),
+        "scenario": str(raw.get("scenario") or "").strip(),
+        "goal": str(raw.get("goal") or "").strip(),
+        "register": str(raw.get("register") or "").strip(),
+        "difficulty_delta": difficulty.normalize_delta(
+            raw.get("difficulty_delta")
+        ),
+        "skill_delta": _skill_delta(raw.get("skill_delta")),
+        "generated": bool(raw.get("generated")),
+    }
+
+
+def context_instance_details(context: object) -> tuple[dict[str, object], ...]:
+    """Espacio COMPLETO de superficies de una familia, en orden (V3.59 → V3.60).
+
+    Devuelve, en este orden y sin repetir consigna (deduplicado por texto):
+
+    0. la consigna HISTÓRICA de la familia, byte a byte (sin evidencia la
+       degradación es exacta a V3.58);
+    1. las superficies DECLARADAS de V3.59 (`instances`, en su orden), que
+       ocupan por tanto los mismos índices que antes;
+    2. las superficies GENERADAS por la especificación paramétrica
+       (`instance_space`), en orden determinista.
+
+    Acepta el dict del banco, un `id` o un `context_id`; una entrada no
+    reconocible devuelve `()`. Nunca lanza.
+    """
+    attributes = _as_attributes(context)
+    details: list[dict[str, object]] = []
+    seen: set[str] = set()
+
+    def _add(surface: object) -> None:
+        normalized = _surface_details(surface)
+        prompt = str(normalized.get("prompt") or "")
+        if not prompt or prompt in seen:
+            return
+        seen.add(prompt)
+        details.append(normalized)
+
+    if attributes:
+        _add({"prompt": attributes.get("prompt")})
+        declared = attributes.get("instances")
+        if isinstance(declared, (list, tuple)):
+            for raw in declared:
+                if isinstance(raw, Mapping):
+                    _add(raw)
+        spec = context_instance_spec(attributes)
+        if spec:
+            for surface in _expand_spec(spec):
+                _add(surface)
+    return tuple(details)
+
+
+def context_instances(context: object) -> tuple[dict[str, str], ...]:
+    """Superficies servibles de una familia, en orden de rotación (V3.59, pura).
+
+    V3.60: es la VISTA de dos claves (`{"instance", "prompt"}`) del espacio
+    completo (`context_instance_details`), que ahora incluye las superficies
+    GENERADAS. Se conserva con esta forma porque es el contrato puro que fijó
+    V3.59 (rotación, degradación a la superficie histórica y equivalencia entre
+    `id` y `context_id`). La superficie 0 es SIEMPRE la consigna histórica.
+    Normaliza (recorta y descarta superficies sin consigna) y nunca lanza.
+    """
+    return tuple(
+        {"instance": str(detail["instance"]), "prompt": str(detail["prompt"])}
+        for detail in context_instance_details(context)
+    )
+
+
 def context_instance_index(context: object, attempts: object = 0) -> int:
-    """Superficie que toca servir, por ROTACIÓN de intentos (V3.59, pura).
+    """Superficie que toca servir, por ROTACIÓN de intentos (V3.59 → V3.60, pura).
 
     `attempts` son los intentos ya registrados en ESA familia para el ítem (el
     resumen de evidencia los cuenta por `context_id`), de modo que el intento N
@@ -1521,10 +2469,75 @@ def context_instance_index(context: object, attempts: object = 0) -> int:
     de V3.58 exacta. Una familia sin superficies declaradas devuelve 0 siempre
     (rotación inerte). Nunca lanza.
     """
-    count = len(context_instances(context))
+    count = len(context_instance_details(context))
     if count <= 1:
         return 0
-    return _count(attempts) % count
+    total = _count(attempts)
+    return total % count if total > 0 else 0
+
+
+def context_instance_metadata(context: object, index: object = 0) -> dict:
+    """Metadatos de la superficie `index` de una familia (V3.60, pura).
+
+    Devuelve las claves de `CONTEXT_INSTANCE_DETAIL_KEYS` más `skills`: la unión
+    entre las competencias de la FAMILIA (`context_skills`) y las que la
+    superficie AÑADE (`skill_delta`), en el orden canónico de `CONTEXT_SKILLS`.
+    Es EXPLICABILIDAD de la superficie: no cambia la modalidad que la tarea
+    evalúa (`assessed_skill`, que sigue siendo `written_production`). Un índice
+    fuera de rango cae a la superficie 0 y una familia sin espacio devuelve los
+    valores por defecto. Nunca lanza.
+    """
+    details = context_instance_details(context)
+    if not details:
+        return {**_surface_details({}), "skills": ()}
+    position = _count(index)
+    if position >= len(details):
+        position = 0
+    detail = details[position]
+    wanted = set(context_skills(context)) | set(detail["skill_delta"])
+    return {
+        **detail,
+        "skills": tuple(skill for skill in CONTEXT_SKILLS if skill in wanted),
+    }
+
+
+def context_instance_difficulty(
+    context: object, index: object = 0
+) -> dict[str, int]:
+    """Vector de carga EFECTIVO de la superficie `index` (V3.60, pura).
+
+    Es el vector de la FAMILIA (`context_difficulty`, que NO cambia) más el
+    `difficulty_delta` que declara la superficie, recortado al envelope 1..5.
+    Sin delta declarado devuelve el vector de la familia EXACTO, que es la
+    garantía de degradación de la release. Nunca lanza.
+    """
+    metadata = context_instance_metadata(context, index)
+    return difficulty.apply_delta(
+        context_difficulty(context), metadata["difficulty_delta"]
+    )
+
+
+def served_difficulty(
+    context_id: object, attempts_by_context: object = None
+) -> dict[str, int]:
+    """Carga de la superficie que TOCA SERVIRSE en una familia (V3.60, pura).
+
+    Resuelve la familia (`context_id` del ledger, `id` o dict del banco), cuenta
+    sus intentos con `_attempts_for` —el MISMO insumo que la rotación de
+    `context_for`— y devuelve la dificultad EFECTIVA de la superficie que ese
+    intento sirve. Es lo que el ledger persiste por evento, así que la carga
+    guardada corresponde a la tarea realmente servida, incluida su superficie.
+    Una familia no reconocible devuelve `{}`: sin banco no se declara carga.
+    Nunca lanza.
+    """
+    attributes = _as_attributes(context_id)
+    if not attributes:
+        return {}
+    index = context_instance_index(
+        attributes,
+        _attempts_for(attempts_by_context, context_id_for(attributes)),
+    )
+    return context_instance_difficulty(attributes, index)
 
 
 def _attempts_for(attempts_by_context: object, context_id: str) -> int:
@@ -1725,14 +2738,17 @@ def context_for(
     skill_priorities: object = None,
     attempts_by_context: object = None,
 ) -> dict:
-    """Contexto de transferencia que toca practicar (V3.40 → V3.59, puro).
+    """Contexto de transferencia que toca practicar (V3.40 → V3.60, puro).
 
     Devuelve `{word, context_id, topic, prompt, available, exhausted,
     communicative_goal, discourse_type, condition, required_target,
     unscaffolded, cefr,     difficulty_vector, difficulty, skills, target_skill,
     assessed_skill, assessment_mode, item_level, learner_level,
     learner_level_source, learner_capacity, capacity_skill, difficulty_fit,
-    skill_priorities, context_instance, instance_index, instance_count}`.
+    skill_priorities, context_instance, instance_index, instance_count,
+    instance_scenario, instance_goal, instance_register,
+    instance_difficulty_delta, instance_difficulty_vector, instance_difficulty,
+    instance_skills, instance_generated}`.
     La consigna es la del banco; el escenario **no contiene la unidad objetivo**
     salvo en la condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46)
     es la condición de recuperación SERVIDA: la deriva el llamador del estado de
@@ -1774,6 +2790,12 @@ def context_for(
        redacción. Sin ese dato la superficie es la 0, EXACTA a V3.58. La
        superficie NO entra en el pool, la novedad, la distancia ni la dificultad:
        la familia servida es la misma que en V3.58;
+    1g. V3.60 (Context Engine 4.0): el espacio de superficies de la familia ya no
+       son solo las declaradas a mano, sino las que genera su especificación
+       paramétrica (`context_instance_details`), con la MISMA regla de rotación.
+       Si la superficie declara un `difficulty_delta`, la carga EFECTIVA
+       (`instance_difficulty_vector`) es la de la familia más ese ajuste; sin
+       delta (incluida siempre la superficie 0) es idéntica a V3.59;
     2. entre los candidatos, si se aportan los contextos ya logrados con éxito
        (`success_context_ids`), se prefiere el de mayor DISTANCIA mínima a ellos
        (el más novedoso pedagógicamente, V3.43/P1-03); los empates los resuelve
@@ -1911,6 +2933,16 @@ def context_for(
             "context_instance": "",
             "instance_index": 0,
             "instance_count": 0,
+            # V3.60: sin familia no hay superficie, así que los metadatos y la
+            # dificultad de la superficie quedan vacíos (siempre presentes).
+            "instance_scenario": "",
+            "instance_goal": "",
+            "instance_register": "",
+            "instance_difficulty_delta": {},
+            "instance_difficulty_vector": {},
+            "instance_difficulty": 0,
+            "instance_skills": [],
+            "instance_generated": False,
         }
     if success:
         best = max(_novelty_score(context, success) for context in pool)
@@ -1921,18 +2953,29 @@ def context_for(
     vector = dict(context.get("difficulty_vector") or {})
     # V3.59: la FAMILIA ya está elegida (misma que V3.58); ahora se resuelve su
     # SUPERFICIE por rotación de intentos sobre esa familia.
-    instances = context_instances(context)
+    # V3.60: el espacio de superficies incluye las GENERADAS por la
+    # especificación paramétrica de la familia, y la superficie puede declarar
+    # metadatos (escenario, registro) y un AJUSTE de carga.
+    details = context_instance_details(context)
     instance_index = context_instance_index(
         context, _attempts_for(attempts_by_context, context_id_for(context))
     )
-    instance = {"instance": "", "prompt": ""}
-    if instances:
-        instance = instances[instance_index]
+    detail = details[instance_index] if details else _surface_details({})
+    # Carga EFECTIVA de la superficie servida (la de la familia si no declara
+    # ajuste): es la que explica el reto REAL de esta estancia.
+    effective = difficulty.apply_delta(
+        context_difficulty(context), detail["difficulty_delta"]
+    )
+    instance_skills = tuple(
+        skill
+        for skill in CONTEXT_SKILLS
+        if skill in set(context_skills(context)) | set(detail["skill_delta"])
+    )
     return {
         "word": unit,
         "context_id": context_id_for(context),
         "topic": context.get("topic", ""),
-        "prompt": _compose_prompt(instance["prompt"], served, unit),
+        "prompt": _compose_prompt(detail["prompt"], served, unit),
         "available": True,
         "exhausted": exhausted,
         "communicative_goal": context.get("communicative_goal", ""),
@@ -1973,11 +3016,24 @@ def context_for(
             tolerance,
         ),
         "skill_priorities": priorities,
-        # V3.59 (Context Engine 3.0): superficie declarada servida de la familia
-        # ("" = la histórica), su índice y cuántas tiene la familia.
-        "context_instance": instance["instance"],
+        # V3.59 (Context Engine 3.0): superficie servida de la familia
+        # ("" = la histórica), su índice y cuántas superficies tiene el espacio.
+        "context_instance": detail["instance"],
         "instance_index": instance_index,
-        "instance_count": len(instances),
+        "instance_count": len(details),
+        # V3.60 (Context Engine 4.0): metadatos NO identitarios de la superficie
+        # (escenario, objetivo y registro concretos), su AJUSTE de carga, la
+        # carga EFECTIVA que se está sirviendo, las competencias efectivas y si
+        # la superficie la generó la especificación paramétrica. Todo aditivo y
+        # solo explicativo: la familia servida y la evidencia no cambian.
+        "instance_scenario": detail["scenario"],
+        "instance_goal": detail["goal"],
+        "instance_register": detail["register"],
+        "instance_difficulty_delta": dict(detail["difficulty_delta"]),
+        "instance_difficulty_vector": dict(effective),
+        "instance_difficulty": difficulty_from_vector(effective),
+        "instance_skills": list(instance_skills),
+        "instance_generated": bool(detail["generated"]),
     }
 
 

@@ -767,6 +767,7 @@ async def _record_transfer_evidence(
     *,
     condition: str = "",
     response_time_ms: int | None = None,
+    attempts_by_context: object = None,
 ) -> None:
     """Evento de evidencia del paso Transfer (V3.40 → V3.46), éxito Y fallo.
 
@@ -799,6 +800,12 @@ async def _record_transfer_evidence(
     = lo ACREDITADO, que con apoyo `spontaneous` coincide con lo servido y queda
     `''` en el fallo). `observed_difficulty` se conserva como proyección legacy
     de `served_difficulty` (paridad V3.53).
+
+    V3.60 (Context Engine 4.0): lo servido se resuelve con
+    `transfer.served_difficulty(context_id, attempts_by_context)`, es decir la
+    SUPERFICIE que toca servir de esa familia (que puede declarar un
+    `difficulty_delta`), no la familia a secas. Con la superficie 0 —o cualquiera
+    sin ajuste— el vector es EXACTAMENTE el de V3.55.
     """
     try:
         await run_in_threadpool(
@@ -831,11 +838,16 @@ async def _record_transfer_evidence(
             # andamiaje (`spontaneous` = sin descuento; la consigna da un
             # escenario nuevo, no ayuda con la unidad). `observed_difficulty` se
             # mantiene como proyección legacy de lo servido (paridad V3.53).
+            # V3.60 (Context Engine 4.0): lo SERVIDO es la superficie concreta de
+            # la familia (`served_difficulty`), no solo su familia: si la
+            # superficie declara un `difficulty_delta`, la carga guardada lo
+            # incluye. Sin delta (incluida siempre la superficie 0) el vector es
+            # el de V3.55, byte a byte.
             **difficulty.task_difficulty_vectors(
                 declared=difficulty.declared_difficulty(
                     lexicon.cefr_difficulty(row)
                 ),
-                served=transfer.context_difficulty(context_id),
+                served=transfer.served_difficulty(context_id, attempts_by_context),
                 support_level="spontaneous",
                 success=bool(scored["passed"]),
             ),
@@ -1126,6 +1138,9 @@ async def submit_transfer_attempt(
             context_id,
             condition=condition,
             response_time_ms=response_time_ms,
+            # V3.60: el MISMO mapa de intentos que resuelve la superficie
+            # servida, para que la carga persistida sea la de esa superficie.
+            attempts_by_context=summary.get("contexts") or {},
         )
     return {
         "word": word,
