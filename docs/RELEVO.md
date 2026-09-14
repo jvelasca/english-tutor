@@ -2641,7 +2641,20 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-14):** `v3.60.0` **Context Engine 4.0** (release
+**Posición actual (2026-09-14):** `v3.61.0` **Instance-aware Evidence +
+Anti-spoiler Guard** (release SIN migración explícita de BD —columna aditiva
+idempotente en `learning_evidence`—, SIN bump de `GENERATOR_VERSION` y SIN
+cambios de UI que cierra los **dos defectos funcionales** de la auditoría `T` de
+V3.60 y la parte determinista de los P1 de `S`: guard anti-spoiler sobre la
+superficie SERVIDA, identidad inmutable de instancia GET→POST,
+`context_instance` aditivo en el ledger manteniendo `context_id = FAMILIA`,
+cap estratificado, rotación no secuencial y validador de contenido; banco
+**358 → 1020** superficies). **CERRADA**: commit `1b4af42`, **CI 6/6** (run
+[34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926))
+y etiqueta anotada `v3.61.0` empujada. **Siguiente incremento: V3.62 — Student
+Skill State 4.0 (modalidad × competencia)**, con el relevo escrito en
+`agentes/v362-student-skill-state-4.md`. Antes, `v3.60.0` **Context Engine 4.0**
+(release
 SIN migración de BD, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI que
 sustituye las 60 consignas escritas a mano por un ESPACIO de instancias
 PARAMETRIZADO por familia: FAMILIA → ESPECIFICACIÓN → INSTANCIA, con la
