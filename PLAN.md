@@ -1403,7 +1403,8 @@
 | Auditoría EXTERNA de V3.52.0 | `agentes/auditoria-externa-v352.md` | ✔ hecho (dossier `docs/audit/Q-AUDITORIA-TOTAL-V352.md`) |
 | Auditorías de V3.60 | `agentes/auditoria-externa-v360.md`, `agentes/auditoria-externa-v359.md` | ✔ archivadas (`docs/audit/S-…` y `T-…`; la `R` de V3.59 sigue sin publicar) |
 | Auditoría profunda de V3.62 + entrada externa | `docs/audit/U-AUDITORIA-TOTAL-V362.md`, `agentes/auditoria-externa-v362.md` | ✔ archivada (9,5/10 APROBADA); informe externo esperado en `docs/audit/V-AUDITORIA-TOTAL-V362.md` |
-| V3.63 Observed Task Difficulty 2.0 + honestidad del modelo | `agentes/v363-observed-task-difficulty-2.md` | ⏳ briefing listo; **siguiente incremento** |
+| V3.63 Observed Task Difficulty 2.0 + honestidad del modelo | `agentes/v363-observed-task-difficulty-2.md` | ✔ hecho (2026-09-14; release `v3.63.0`) |
+| V3.64 Decision Projection + Planner 3.0 (cierre de P1-01) | pendiente de briefing | ⏳ **siguiente incremento** |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1411,24 +1412,33 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.63 — Observed Task Difficulty 2.0 y honestidad del Student Skill State**:
-  briefing autocontenido `agentes/v363-observed-task-difficulty-2.md`. Origen: la
-  auditoría profunda de V3.62 (`docs/audit/U-AUDITORIA-TOTAL-V362.md`, 9,5/10
-  APROBADA) y su punto de entrada externo (`agentes/auditoria-externa-v362.md`).
-  Alcance: dificultad **empírica** de la tarea (`declared → served → outcome →
-  observed`) con tablas declaradas sobre las filas canónicas, **identidad de
+- **⏳ V3.64 — Decision Projection + Planner 3.0 (cierre de P1-01)**: **siguiente
+  incremento**, pendiente de briefing autocontenido. Origen: la auditoría profunda
+  de V3.62 (`docs/audit/U-AUDITORIA-TOTAL-V362.md`, 9,5/10 APROBADA) y su punto de
+  entrada externo (`agentes/auditoria-externa-v362.md`). Alcance comprometido:
+  el **puente** `Student Skill State → Decision Projection → Planner` (nunca
+  `skill_state → planner` directamente), calculado desde las **MISMAS filas
+  canónicas** que el estado (**nunca desde la caché**, para que la caché sea una
+  optimización y no una segunda verdad) y con el «recomputar una sola vez si la
+  caché está vieja» que V3.63 ya sabe detectar (`skill_state_is_fresh`). Cierra
+  **P1-01**: hasta V3.64 el estado nuevo **no gobierna ninguna tarea**.
+
+- **✅ V3.63 — Observed Task Difficulty 2.0 y honestidad del Student Skill State**
+  (**release `v3.63.0`, 2026-09-14**): briefing autocontenido y ejecutado
+  `agentes/v363-observed-task-difficulty-2.md`. Origen: la auditoría profunda de
+  V3.62 (`docs/audit/U-AUDITORIA-TOTAL-V362.md`, 9,5/10 APROBADA) y su punto de
+  entrada externo (`agentes/auditoria-externa-v362.md`). Alcance entregado:
+  dificultad **empírica** de la tarea (`declared → served → outcome → observed`)
+  con tablas declaradas sobre las filas canónicas, **identidad de
   evidencia y ocasiones** (observaciones vs ocasiones independientes), **canal
   observado** (P1-02: `spontaneous_use` escrito → `interaction`, oral → `speaking`),
   **confianza de evaluación** separada de la estadística, **criterio declarado de
   pronunciación** (lo que la ruta ya puntúa, sin inventar rúbrica), **eje declarado
   de capas de listening** (reutilizando `SKILL_LAYER`), **frescura de la caché del
   estado** (fingerprint + columna aditiva `skill_state_source`) y el **seam de
-  política del gate**. **La decisión de tareas sigue intacta** (ELV, planner,
+  política del gate**. **La decisión de tareas siguió intacta** (ELV, planner,
   `difficulty` y `transfer.context_for` byte-idénticos; guard estructural de V3.62
-  verde). **Compromiso fechado: P1-01 se cierra en V3.64** con **Decision
-  Projection + Planner 3.0**, calculada desde las **MISMAS filas canónicas** que el
-  estado (nunca desde la caché), para que la caché sea una optimización y no una
-  segunda verdad.
+  verde **sin tocarse**). Detalle en `release-notes-v3.63.0.md`.
 
 - **⏳ V3.53+ — candidatos abiertos (histórico; auditoría externa de V3.52 EJECUTADA
   y sus P2 CERRADOS en V3.52.2)**: informe en `docs/audit/Q-AUDITORIA-TOTAL-V352.md`

@@ -22,7 +22,10 @@ pedir más contexto.
 > estructural de V3.62 sigue verde **sin tocarse**. Verificación local: `pytest`
 > **2430 passed**, `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**,
 > `build` OK, `check_release_consistency` **3.63.0**,
-> `check_beta_v3`/`content_validation` OK y `transfer_validation` OK. Briefing y
+> `check_beta_v3`/`content_validation` OK y `transfer_validation` OK.
+> **CERRADA:** commit de release `73cebb4`, **CI 6/6** (run
+> [34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
+> y etiqueta anotada `v3.63.0` creada y empujada. Briefing y
 > detalle en `agentes/v363-observed-task-difficulty-2.md` y
 > `release-notes-v3.63.0.md`.
 > **Siguiente incremento esperado: V3.64 — Decision Projection + Planner 3.0**
@@ -254,6 +257,9 @@ pedir más contexto.
   y el guard estructural de V3.62 sigue verde **sin tocarse**. **Compromiso
   fechado que sigue abierto: P1-01 se cierra en V3.64** con **Decision Projection +
   Planner 3.0**, calculada desde las **MISMAS filas canónicas** que el estado.
+  **Cerrada:** commit de release `73cebb4`, **CI 6/6** (run
+  [34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
+  y etiqueta anotada `v3.63.0` empujada. Ver `release-notes-v3.63.0.md`.
 - `agentes/v362-student-skill-state-4.md` — **V3.62 (EJECUTADA, 2026-09-14,
   v3.62.0)**: **Student Skill State 4.0 — modalidad × competencia**. Cierra el
   **P1-03** de la auditoría `S` de V3.60: hoy conviven **DOS** modelos del alumno

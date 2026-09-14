@@ -206,6 +206,16 @@ backend:  python backend/scripts/content_validation.py  → OK=True quality=True
 backend:  python -m scripts.transfer_validation         → OK=True (esta release NO toca el banco)
 ```
 
+## Cierre
+
+**V3.63.0 CERRADA y publicada (2026-09-14):** commit de release `73cebb4`, **CI
+6/6** en el run
+[34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056)
+—Release consistency `3.63.0`, Backend (`ruff` + `pytest` + el paso
+`python -m scripts.transfer_validation`), Frontend (`tsc` + `vitest` **76
+ficheros/651 tests** + `build`), Playwright E2E, Beta V3.0 gate y Content
+validation— y etiqueta anotada `v3.63.0` creada y empujada.
+
 ## Honestidad: qué NO cierra V3.63
 
 - **El estado nuevo sigue SIN gobernar la tarea.** ELV, planner, `difficulty` y

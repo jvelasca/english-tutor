@@ -2729,7 +2729,10 @@ tareas sigue BYTE-IDÉNTICA** y el guard estructural de V3.62 sigue verde sin
 tocarse. **Verificada en local** (`pytest` **2430 passed**, `ruff` limpio, launcher
 **75**, `tsc` OK, `vitest` **651**, `build` OK, `check_release_consistency`
 **3.63.0**, `check_beta_v3`/`content_validation` OK y `transfer_validation` OK).
-Detalle en `release-notes-v3.63.0.md`. Antes, `v3.62.0` **Student Skill State 4.0
+**CERRADA:** commit de release `73cebb4`, **CI 6/6** (run
+[34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
+y etiqueta anotada `v3.63.0` creada y empujada. Detalle en
+`release-notes-v3.63.0.md`. Antes, `v3.62.0` **Student Skill State 4.0
 (modalidad × competencia)** (release SIN migración explícita de BD —columna aditiva
 idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN cambios de
 UI que unificó los dos modelos del alumno en **UN** estado `{modalidad:
@@ -2879,7 +2882,10 @@ como **documentado, no verificado de forma independiente** (P3-02).
 > `test_skill_state_v362.py` sigue verde **sin tocarse**. Verificación local:
 > `pytest` **2430 passed**, `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**
 > (76 ficheros), `build` OK, `check_release_consistency` **3.63.0**, `check_beta_v3`
-> y `content_validation` OK y `transfer_validation` OK. **Compromiso fechado que
+> y `content_validation` OK y `transfer_validation` OK. **CERRADA:** commit de
+> release `73cebb4`, **CI 6/6** (run
+> [34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
+> y etiqueta anotada `v3.63.0` creada y empujada. **Compromiso fechado que
 > sigue abierto:** **P1-01** se cierra en **V3.64** con **Decision Projection +
 > Planner 3.0**, y la proyección se calculará desde las **MISMAS filas canónicas**
 > que el estado (nunca desde la caché).

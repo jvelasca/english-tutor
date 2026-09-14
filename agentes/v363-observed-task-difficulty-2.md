@@ -1,12 +1,17 @@
 # Briefing de subagente — V3.63 (Observed Task Difficulty 2.0 y honestidad del Student Skill State)
 
-> **Estado:** briefing entregado 2026-09-14; implementación en curso por el gerente.
+> **Estado:** briefing entregado 2026-09-14; **EJECUTADO y CERRADO** como
+> **release `v3.63.0`** (2026-09-14).
 > **Qué cierra:** la deuda de honestidad que dejó V3.62 declarada por escrito, más
 > los hallazgos P1-02 y P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20 de la auditoría
 > profunda de V3.62 (`docs/audit/U-AUDITORIA-TOTAL-V362.md`).
 > **Qué NO cierra (compromiso fechado):** **P1-01** — el recableado de la decisión
 > de tareas — es **V3.64**, con **Decision Projection + Planner 3.0**.
-> **Verificación local:** se registra en `release-notes-v3.63.0.md` al cerrar.
+> **Verificación local:** `pytest` **2430 passed**, `ruff` limpio, launcher **75**,
+> `tsc` OK, `vitest` **651** (76 ficheros), `build` OK,
+> `check_release_consistency` **3.63.0**, `check_beta_v3`/`content_validation` OK y
+> `transfer_validation` OK (esta release NO toca el banco). Registrada en
+> `release-notes-v3.63.0.md`.
 
 ## Rol
 
@@ -232,3 +237,23 @@ espejo de tipos en `frontend/src/types/api.ts`, el test nuevo
 documental de cierre (release notes, `CHANGELOG`, `PLAN`, `docs/RELEVO.md`,
 `agentes/README.md`). En el resumen: qué se cerró, qué se degradó de forma exacta y
 qué queda **explícitamente** para V3.64.
+
+## Cierre
+
+**V3.63.0 CERRADA y publicada (2026-09-14):** commit de release `73cebb4`, **CI
+6/6** en el run
+[34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056)
+(Release consistency `3.63.0`, Backend con `ruff` + `pytest` + el paso
+`python -m scripts.transfer_validation`, Frontend con `tsc` + `vitest` **76
+ficheros/651 tests** + `build`, Playwright E2E, Beta V3.0 gate y Content
+validation) y etiqueta anotada `v3.63.0` creada y empujada.
+
+**Nota de honestidad sobre el alcance de V3.63 (repetida a propósito):** este
+incremento hace el estado **más honesto** (ocasiones, canal observado, confianza de
+evaluación, dificultad empírica y frescura), pero **no hace que gobierne ninguna
+tarea**. ELV, planner, `difficulty` y `transfer.context_for` quedan
+**byte-idénticos** y el guard estructural de V3.62 sigue verde **sin tocarse**. El
+estado es **descriptivo**: volverlo **decisional** es exactamente **P1-01**, y su
+cierre está comprometido a **V3.64** con **Decision Projection + Planner 3.0**,
+calculada desde las **MISMAS filas canónicas** que el estado (nunca desde la
+caché), de forma que la caché sea una optimización y no una segunda verdad.
