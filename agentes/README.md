@@ -5,8 +5,22 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-14): `v3.60.0`** — ver `docs/RELEVO.md` (nota superior
-> y sección 0 "START HERE"). V3.60 (**Context Engine 4.0: Instance Specification →
+> **Estado actual (2026-09-14): `v3.60.0` en `main`; `3.61.0` IMPLEMENTADA y
+> verificada en local (pendiente de push, CI y etiqueta).** Ver `docs/RELEVO.md`
+> (nota superior y sección 0 "START HERE"). **V3.61 — Instance-aware Evidence +
+> Anti-spoiler Guard** cierra los **2 defectos funcionales** de la auditoría `T` de
+> V3.60 (**fuga del target** en una superficie generada de `shopping` e **identidad
+> de instancia no inmutable** en el POST) y la parte determinista de los **P1** de
+> la auditoría `S` (cap **estratificado**, rotación no secuencial y **validador de
+> contenido** del `instance_space`): guard anti-spoiler por unidad objetivo,
+> identidad inmutable de instancia GET→POST, **`context_instance` aditivo en el
+> ledger** (columna idempotente, sin migración explícita y manteniendo
+> `context_id = FAMILIA`) y banco **358 → 1020 superficies**. Verificación local:
+> `pytest` **2373 passed**, `ruff` limpio, launcher **75**, `tsc` OK, `vitest`
+> **651**, `build` OK, `check_release_consistency` **3.61.0**,
+> `check_beta_v3`/`content_validation` OK y `transfer_validation` **20 familias /
+> 1020 superficies / 0 errores**. Detalle en `release-notes-v3.61.0.md`. V3.60
+> (**Context Engine 4.0: Instance Specification →
 > Parameterized Instance**) es una release **SIN migración de BD, SIN bump de
 > `GENERATOR_VERSION` y SIN cambios de UI** que cierra los cuatro hallazgos de la
 > auditoría externa **R** de V3.59 (**P1-1** «3 superficies deterministas siguen
@@ -55,18 +69,27 @@ pedir más contexto.
 > **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
 > **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
 > **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
-> siguiente incremento es **V3.61**: el **motor de política de instancia**
-> (cuándo repetir una superficie, cuándo forzar una nueva, cómo pesa el fallo) y la
-> **evidencia instance-aware** como decisión aparte, con migración declarada si
-> toca el ledger. El briefing de V3.60 vive en
+> siguiente incremento es **V3.61 — Instance-aware Evidence + Anti-spoiler
+> Guard** (**implementada**, ver arriba), que cierra los **2 defectos funcionales**
+> de la auditoría `T` de V3.60
+> (**fuga del target** en una superficie generada de `shopping`,
+> `backend/services/transfer.py:1074`/`:2978`, e **identidad de instancia no
+> inmutable** en el POST, `backend/schemas/vocabulary.py:826` +
+> `backend/domain/vocabulary.py:850`) y la parte determinista de los **P1** de la
+> auditoría `S` (cap **estratificado**, rotación no secuencial y **validador de
+> contenido** del `instance_space`): guard anti-spoiler por unidad objetivo,
+> identidad inmutable de instancia GET→POST y **`context_instance` aditivo en el
+> ledger** sin migración y manteniendo `context_id = FAMILIA`. Las dos auditorías
+> están archivadas en `docs/audit/S-AUDITORIA-TOTAL-V360.md` y
+> `docs/audit/T-AUDITORIA-TOTAL-V360.md`, y el veredicto consolidado en la nota
+> superior de `docs/RELEVO.md`. El briefing de V3.60 vive en
 > `agentes/v360-context-engine-4.md` (V3.59 en `agentes/v359-context-engine-3.md`,
 > V3.58 en `agentes/v358-sense-engine-2.md` y V3.57 en
-> `agentes/v357-argmax-elv.md`). La **auditoría externa de V3.60** se prepara en
-> `agentes/auditoria-externa-v360.md` (informe esperado en
-> `docs/audit/S-AUDITORIA-TOTAL-V360.md`) y la de V3.59 sigue pendiente de informe
-> en `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier subagente, lee esa
-> sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al saturar y
-> ancla contra la alucinación).
+> `agentes/v357-argmax-elv.md`); el punto de entrada de la auditoría externa de
+> V3.60 sigue en `agentes/auditoria-externa-v360.md` y la de V3.59 sigue pendiente
+> de informe en `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier
+> subagente, lee esa sección para no partir de un estado obsoleto (premisa 8 y 12:
+> relevo al saturar y ancla contra la alucinación).
 
 > **Nota histórica (2026-09-13): `v3.59.0`.** V3.59 (**Context Engine 3.0: Context
 > Bank Family/Instance**) fue una release **SIN migración de BD, SIN bump de

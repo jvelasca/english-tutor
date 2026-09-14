@@ -108,6 +108,31 @@ que hace explícita la dificultad EFECTIVA de la tarea servida —el P2 «las
 instancias cambian la dificultad sin poder declararlo»—, sin tocar
 `context_difficulty` (la familia), los umbrales ni el ledger: sin delta la
 degradación es exacta a V3.59.
+
+V3.61 (**Instance-aware Evidence + Anti-spoiler Guard**) cierra los dos defectos
+funcionales que la auditoría `T` de V3.60 reprodujo:
+
+- **T-01, fuga del target.** V3.60 garantizaba el invariante de V3.43 (la
+  consigna da ESCENARIO, nunca la unidad objetivo) sobre la PLANTILLA, pero no
+  sobre los VALORES de slot: la familia `shopping` servía en su índice 7 «You are
+  in a supermarket and cannot find what you need…». `available_instance_details`
+  retira de la rotación toda superficie que NOMBRE la unidad (`_reveals_target`,
+  léxico y determinista), `context_for` retira del pool las familias sin
+  superficie segura y declara `instance_suppressed`/`instance_guarded`.
+- **T-02, identidad de instancia.** `serve_instance` resuelve la superficie que el
+  alumno **respondió** por su slug inmutable (`context_instance`, derivado del
+  contenido), de modo que la carga que el ledger persiste es la de ESA superficie
+  y no la de la siguiente rotación.
+
+Además aborda la parte determinista de los P1 de la auditoría `S`: la rotación
+deja de ser el orden declarado a partir del tercer intento (semilla
+`(familia, unidad)`, biyección del tramo), `_expand_spec` reparte el techo
+`CONTEXT_INSTANCE_SPACE_MAX` de forma estratificada en lugar de por prefijo, cada
+familia declara un TERCER eje (`constraint`) que sube el banco de **358 a 1020
+superficies** (51 por familia) y `services/transfer_audit.py` valida el contenido
+del espacio (deltas justificados, `register` coherente con la familia, competencias
+canónicas, ausencia de callejones sin salida para una unidad objetivo) con avisos
+heurísticos de equivalencia pedagógica.
 """
 
 from __future__ import annotations
@@ -183,10 +208,20 @@ CONTEXT_INSTANCES_MIN = 2
 # puede aprender de memoria y sigue siendo determinista y explicable.
 CONTEXT_INSTANCE_SPACE_MIN = 12
 
-# V3.60: TECHO del espacio de una familia. La expansión es determinista (el
-# producto cartesiano se recorre en orden declarado y se corta aquí), así que el
-# espacio no puede crecer sin control al añadir slots al banco.
+# V3.60: TECHO del espacio de una familia. La expansión es determinista. V3.61:
+# cuando el producto cartesiano excede este techo el recorte es ESTRATIFICADO
+# (reparto equiespaciado, `_stratified_indices`), no un prefijo: ningún eje queda
+# con un subconjunto fijo de valores. El banco real (4 × 4 × 3 = 48 combinaciones
+# por familia) queda muy por debajo del techo.
 CONTEXT_INSTANCE_SPACE_MAX = 96
+
+# V3.61 (P1-01): el banco declara un TERCER eje (`constraint`: qué debe hacer la
+# respuesta) en cada familia, así que el espacio real pasa de 16 a 48
+# combinaciones (51 superficies contando la histórica y las declaradas) por
+# familia y el banco de **358 a 1020 superficies** sin escribir ninguna consigna a
+# mano: sigue siendo contenido DECLARADO. Reduce la memorizabilidad (el alumno ya
+# no puede enumerar el conjunto), aunque no la elimina: el cierre real es el
+# `Instance Generator 2.0` (V3.65).
 
 # V3.47: dimensiones de CARGA del contexto de transferencia (misma convención que
 # el `difficulty_vector` de listening/speaking: enteros 1..5). No entran en la
@@ -498,9 +533,20 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         # con los slots en el orden de `selection`; las superficies generadas
         # ocupan los índices siguientes a las declaradas arriba.
         "instance_space": {
-            "template": "Tell a short story about {what} that happened {when}.",
+            "template": (
+                "Tell a short story about {what} that happened {when}. "
+                "{constraint}"
+            ),
             "selection": ("what", "when"),
+            # V3.61 (P1-01): tercer eje declarado (`constraint`). Sube el espacio
+            # real de 16 a 48 combinaciones por familia sin superar el techo y sin
+            # generar texto: sigue siendo contenido DECLARADO.
             "slots": {
+                "constraint": (
+                    "Keep it short so the listener can follow.",
+                    "Make the ending clear.",
+                    "Say how the people felt.",
+                ),
                 "what": (
                     {"value": "a journey", "scenario": "a journey in the past"},
                     {"value": "a surprise", "scenario": "an unexpected event"},
@@ -562,10 +608,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Write a question to ask a friend {moment}. "
-                "You want to know about {topic}."
+                "You want to know about {topic}. {constraint}"
             ),
             "selection": ("topic", "moment"),
             "slots": {
+                "constraint": (
+                    "Ask only one question.",
+                    "Say why you want to know.",
+                    "Offer to help in return.",
+                ),
                 "topic": (
                     {"value": "their weekend", "scenario": "a friend's weekend"},
                     {"value": "their family", "scenario": "a friend's family"},
@@ -628,9 +679,17 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         # P1 de la auditoría de V3.59 (una instancia puede cambiar el escenario
         # real) hecho declarable sin tocar la identidad de la familia.
         "instance_space": {
-            "template": "You have {change}. Describe {focus} to a colleague.",
+            "template": (
+                "You have {change}. Describe {focus} to a colleague. "
+                "{constraint}"
+            ),
             "selection": ("change", "focus"),
             "slots": {
+                "constraint": (
+                    "Say what changed in your routine.",
+                    "Mention one benefit and one difficulty.",
+                    "Explain how long it took to get used to it.",
+                ),
                 "change": (
                     {"value": "a new job", "scenario": "a first week in a new job"},
                     {"value": "changed offices", "scenario": "a new workplace"},
@@ -682,9 +741,14 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         ),
         # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
         "instance_space": {
-            "template": "Talk about your plans for {period} {detail}.",
+            "template": "Talk about your plans for {period} {detail}. {constraint}",
             "selection": ("period", "detail"),
             "slots": {
+                "constraint": (
+                    "Explain the reason for your choice.",
+                    "Say what you need to prepare.",
+                    "Mention one possible problem.",
+                ),
                 "period": (
                     {"value": "next month", "scenario": "short-term plans"},
                     {"value": "next summer", "scenario": "summer plans"},
@@ -745,9 +809,17 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         ),
         # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
         "instance_space": {
-            "template": "Give your opinion about {topic} to {audience}, and say why.",
+            "template": (
+                "Give your opinion about {topic} to {audience}, and say why. "
+                "{constraint}"
+            ),
             "selection": ("topic", "audience"),
             "slots": {
+                "constraint": (
+                    "Give one reason and one example.",
+                    "Acknowledge the other side.",
+                    "End with a clear recommendation.",
+                ),
                 "topic": (
                     {
                         "value": "a school subject you liked or disliked",
@@ -816,10 +888,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Describe a problem you had {where} {when} "
-                "and how you solved it."
+                "and how you solved it. {constraint}"
             ),
             "selection": ("where", "when"),
             "slots": {
+                "constraint": (
+                    "Say what you tried first.",
+                    "Explain how you felt at the time.",
+                    "Mention what you learnt from it.",
+                ),
                 "where": (
                     {"value": "at home", "scenario": "a problem at home"},
                     {"value": "on a trip", "scenario": "a problem while travelling"},
@@ -879,10 +956,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "You meet someone new at {place}. "
-                "Introduce yourself and {info}."
+                "Introduce yourself and {info}. {constraint}"
             ),
             "selection": ("place", "info"),
             "slots": {
+                "constraint": (
+                    "Mention one thing you have in common.",
+                    "Ask one question back.",
+                    "Say how you would like to keep in touch.",
+                ),
                 "place": (
                     {"value": "a class", "scenario": "a new class"},
                     {"value": "a party", "scenario": "a social event"},
@@ -934,9 +1016,14 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         ),
         # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
         "instance_space": {
-            "template": "Describe what you usually do {when} {where}.",
+            "template": "Describe what you usually do {when} {where}. {constraint}",
             "selection": ("when", "where"),
             "slots": {
+                "constraint": (
+                    "Say how often you do it.",
+                    "Mention one thing you would change.",
+                    "Explain why it matters to you.",
+                ),
                 "when": (
                     {"value": "on a normal morning", "scenario": "a morning routine"},
                     {"value": "on a normal evening", "scenario": "an evening routine"},
@@ -999,10 +1086,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "You need to get to {place} in a city you do not know. "
-                "Ask a passer-by {how}."
+                "Ask a passer-by {how}. {constraint}"
             ),
             "selection": ("place", "how"),
             "slots": {
+                "constraint": (
+                    "Repeat the route back to check it.",
+                    "Ask the person to speak slowly.",
+                    "Thank them and confirm one detail.",
+                ),
                 "place": (
                     {"value": "the station", "scenario": "finding the station"},
                     {"value": "the market", "scenario": "finding the market"},
@@ -1066,9 +1158,17 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         ),
         # V3.60: espacio paramétrico de la familia (ver `context_instance_details`).
         "instance_space": {
-            "template": "You are in {place} and {problem}. Ask an assistant for help.",
+            "template": (
+                "You are in {place} and {problem}. Ask an assistant for "
+                "help. {constraint}"
+            ),
             "selection": ("place", "problem"),
             "slots": {
+                "constraint": (
+                    "Explain what you have already tried.",
+                    "Ask whether there is a cheaper option.",
+                    "Say how much time you have.",
+                ),
                 "place": (
                     {"value": "a clothes shop", "scenario": "buying clothes"},
                     {"value": "a supermarket", "scenario": "doing the shopping"},
@@ -1132,10 +1232,16 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         # las superficies cambian de escenario sin poder declararlo).
         "instance_space": {
             "template": (
-                "You {symptom}. Explain it to {who} and answer their questions."
+                "You {symptom}. Explain it to {who} and answer their questions. "
+                "{constraint}"
             ),
             "selection": ("symptom", "who"),
             "slots": {
+                "constraint": (
+                    "Say how long you have felt like this.",
+                    "Mention what you have already taken.",
+                    "Ask what you should avoid.",
+                ),
                 "symptom": (
                     {"value": "do not feel well", "scenario": "feeling unwell"},
                     {"value": "have a bad cough", "scenario": "a bad cough"},
@@ -1199,10 +1305,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "{plan} with a friend: suggest where to go and why, "
-                "and {agree}."
+                "and {agree}. {constraint}"
             ),
             "selection": ("plan", "agree"),
             "slots": {
+                "constraint": (
+                    "Mention the budget.",
+                    "Agree on one thing and disagree on another.",
+                    "Set a date before you finish.",
+                ),
                 "plan": (
                     {"value": "Plan a weekend away", "scenario": "a short trip"},
                     {"value": "Plan a longer trip", "scenario": "a long trip"},
@@ -1266,10 +1377,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "{incident} on a project at work. Explain to a colleague "
-                "what happened and {action}."
+                "what happened and {action}. {constraint}"
             ),
             "selection": ("incident", "action"),
             "slots": {
+                "constraint": (
+                    "Say what you need from your colleague.",
+                    "Explain the effect on the deadline.",
+                    "Suggest one way to prevent it next time.",
+                ),
                 "incident": (
                     {"value": "Something went wrong", "scenario": "an unclear problem"},
                     {"value": "A delivery arrived late", "scenario": "a late delivery"},
@@ -1339,10 +1455,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Propose one change to {change} and explain why {who} "
-                "should support it."
+                "should support it. {constraint}"
             ),
             "selection": ("change", "who"),
             "slots": {
+                "constraint": (
+                    "Mention what it would cost.",
+                    "Answer one likely objection.",
+                    "Say who should act first.",
+                ),
                 "change": (
                     {
                         "value": "improve your neighbourhood",
@@ -1421,10 +1542,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Take a position on {issue} and defend it against an "
-                "opposing view {qualifier}."
+                "opposing view {qualifier}. {constraint}"
             ),
             "selection": ("issue", "qualifier"),
             "slots": {
+                "constraint": (
+                    "Concede one point before you answer.",
+                    "Support your view with one example.",
+                    "Close with a direct challenge.",
+                ),
                 "issue": (
                     {"value": "a social issue", "scenario": "an open social issue"},
                     {
@@ -1511,10 +1637,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Review {work} you have recently experienced, weighing its "
-                "strengths and weaknesses {angle}."
+                "strengths and weaknesses {angle}. {constraint}"
             ),
             "selection": ("work", "angle"),
             "slots": {
+                "constraint": (
+                    "Give one example from your own experience.",
+                    "Say who would enjoy it most.",
+                    "End with a clear verdict.",
+                ),
                 "work": (
                     {"value": "a film or a book", "scenario": "a film or a book"},
                     {"value": "a series", "scenario": "a series"},
@@ -1594,10 +1725,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "{parties} disagree {about}. Explain each side to the other "
-                "and help them reach an understanding."
+                "and help them reach an understanding. {constraint}"
             ),
             "selection": ("parties", "about"),
             "slots": {
+                "constraint": (
+                    "Stay neutral throughout.",
+                    "Summarise one point from each side.",
+                    "Propose one first step.",
+                ),
                 "parties": (
                     {"value": "Two people you know", "scenario": "two acquaintances"},
                     {
@@ -1674,10 +1810,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Present {thing} from a field you know well and respond "
-                "to {question}."
+                "to {question}. {constraint}"
             ),
             "selection": ("thing", "question"),
             "slots": {
+                "constraint": (
+                    "Define one key term.",
+                    "Give an example from outside your field.",
+                    "Mention one limitation.",
+                ),
                 "thing": (
                     {"value": "an argument", "scenario": "an argument"},
                     {"value": "a method you use", "scenario": "a method"},
@@ -1757,10 +1898,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Negotiate {term} with a counterpart who {demand}, and "
-                "justify the concessions you are willing to make."
+                "justify the concessions you are willing to make. {constraint}"
             ),
             "selection": ("term", "demand"),
             "slots": {
+                "constraint": (
+                    "Make one concession conditional.",
+                    "Ask for something in return.",
+                    "Summarise the agreement at the end.",
+                ),
                 "term": (
                     {"value": "the terms of an agreement", "scenario": "an agreement"},
                     {"value": "a budget", "scenario": "a budget"},
@@ -1831,10 +1977,15 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
         "instance_space": {
             "template": (
                 "Deliver a short keynote {occasion} on {theme} and use "
-                "concrete examples to make it persuasive."
+                "concrete examples to make it persuasive. {constraint}"
             ),
             "selection": ("theme", "occasion"),
             "slots": {
+                "constraint": (
+                    "Open with a concrete example.",
+                    "Keep the main message in one sentence.",
+                    "End with a call to action.",
+                ),
                 "theme": (
                     {"value": "an abstract theme", "scenario": "an abstract theme"},
                     {"value": "how people learn", "scenario": "how people learn"},
@@ -1857,7 +2008,7 @@ TRANSFER_CONTEXTS: tuple[dict[str, str], ...] = (
                     {"value": "to a general audience", "goal": "explain to everyone"},
                     {
                         "value": "at a company event",
-                        "register": "neutral",
+                        "goal": "address a mixed company audience",
                         "difficulty_delta": {"interaction": 1},
                     },
                 ),
@@ -2129,6 +2280,102 @@ def _skill_delta(raw: object) -> tuple[str, ...]:
     return tuple(skill for skill in CONTEXT_SKILLS if skill in wanted)
 
 
+# ---------------------------------------------------------------------------
+# V3.61 (Instance-aware Evidence): GUARD ANTI-SPOILER de la superficie servida.
+#
+# V3.60 garantizaba que la PLANTILLA no contiene la unidad objetivo (V3.43/P1-01)
+# pero no comprobaba los VALORES de slot, que son texto declarado nuevo: la
+# auditoría T de V3.60 reprodujo que la familia `shopping` sirve en el índice 7
+# «You are in a supermarket and cannot find what you need…» — si la unidad es
+# `supermarket`, la respuesta está a la vista. El guard es determinista y
+# léxico (sin LLM ni WSD, premisa 21): una superficie que NOMBRA la unidad
+# objetivo no se sirve, y la rotación sigue sobre las que sí dan ESCENARIO.
+# ---------------------------------------------------------------------------
+
+# Longitud mínima de una unidad objetivo para aplicar el guard: con menos
+# caracteres (o con funcionales) la coincidencia sería ruido, no fuga.
+_TARGET_GUARD_MIN_LEN = 3
+
+# Token léxico de una consigna: lo que separa la coincidencia de palabra de una
+# coincidencia de subcadena (`supermarket` no debe casar con `supermarketing`).
+_TARGET_TOKEN = re.compile(r"[a-z0-9']+")
+
+
+def _target_forms(target: object) -> tuple[str, ...]:
+    """Formas que DELATAN la unidad objetivo en un texto (V3.61, pura).
+
+    Devuelve la forma base y un juego acotado de variantes inflexivas
+    deterministas (`-s`/`-es`/`-d`/`-ed`/`-ing`/`-er`/`-ers` y su recorte) para
+    no exigir un lematizador. Una unidad de menos de `_TARGET_GUARD_MIN_LEN`
+    caracteres devuelve `()`: no se aplica guard (evita suprimir medio banco por
+    una palabra funcional). Nunca lanza.
+    """
+    text = " ".join(str(target or "").strip().lower().split())
+    if len(text) < _TARGET_GUARD_MIN_LEN:
+        return ()
+    forms = [text]
+    if " " not in text:
+        forms.extend(text + suffix for suffix in ("s", "es", "d", "ed", "ing",
+                                                  "er", "ers"))
+        for suffix in ("s", "es", "ed", "ing", "d"):
+            if text.endswith(suffix) and len(text) > len(suffix) + 2:
+                forms.append(text[: -len(suffix)])
+    return tuple(dict.fromkeys(forms))
+
+
+def _reveals_target(text: object, target: object) -> bool:
+    """¿El texto NOMBRA la unidad objetivo? (V3.61, pura y conservadora).
+
+    Compara por TOKEN (frontera de palabra) cuando la unidad es una sola
+    palabra, y por subcadena normalizada cuando es una expresión de varias: una
+    consigna que nombra la unidad es producción guiada, no recuperación
+    espontánea (V3.43/P1-01). Nunca lanza.
+    """
+    haystack = " ".join(str(text or "").strip().lower().split())
+    if not haystack:
+        return False
+    forms = _target_forms(target)
+    if not forms:
+        return False
+    if " " in forms[0]:
+        return any(form in haystack for form in forms)
+    tokens = set(_TARGET_TOKEN.findall(haystack))
+    return bool(tokens.intersection(forms))
+
+
+def _surface_reveals_target(surface: Mapping, target: object) -> bool:
+    """¿Algún campo visible/metadata de la superficie delata la unidad? (V3.61).
+
+    Se comprueban la consigna y los metadatos que el contrato expone
+    (`scenario`/`goal`/`register`): todos describen la situación servida y
+    ninguno debe nombrar la unidad objetivo. Nunca lanza.
+    """
+    return any(
+        _reveals_target(surface.get(key), target)
+        for key in ("prompt", "scenario", "goal", "register")
+    )
+
+
+def reveals_target(text: object, target: object) -> bool:
+    """Fachada PÚBLICA del guard anti-spoiler (V3.61, pura).
+
+    La usa el validador de contenido (`services.transfer_audit`) para auditar el
+    banco sin depender de un nombre privado. Nunca lanza.
+    """
+    return _reveals_target(text, target)
+
+
+def surface_reveals_target(surface: object, target: object) -> bool:
+    """Fachada PÚBLICA de la comprobación por superficie (V3.61, pura).
+
+    Acepta cualquier mapping con `prompt`/`scenario`/`goal`/`register` (una
+    superficie normalizada de `context_instance_details`). Nunca lanza.
+    """
+    return _surface_reveals_target(
+        surface if isinstance(surface, Mapping) else {}, target
+    )
+
+
 def _instance_value(raw: object) -> dict[str, object]:
     """Valor de un SLOT del espacio de instancias, normalizado (V3.60, pura).
 
@@ -2306,13 +2553,70 @@ def _render_template(template: str, values: Mapping) -> str:
         return ""
 
 
+def _empty_partial() -> dict:
+    """Combinación parcial VACÍA del producto cartesiano (V3.60, pura)."""
+    return {
+        "labels": (),
+        "values": {},
+        "delta": {},
+        "scenario": "",
+        "goal": "",
+        "register": "",
+        "skills": (),
+    }
+
+
+def _stratified_indices(total: int, limit: int) -> tuple[int, ...]:
+    """Posiciones del producto cartesiano repartidas de forma equilibrada.
+
+    V3.61 (P1-01). V3.60 recortaba el producto por PREFIJO, así que con más
+    combinaciones que el techo las últimas variables quedaban con un subconjunto
+    fijo de valores (sesgo estructural, inerte hoy con 16–19 superficies). Aquí
+    se toman `limit` posiciones equiespaciadas sobre el producto COMPLETO: cada
+    eje recibe cobertura repartida, el resultado sigue siendo determinista y el
+    producto no se materializa (solo se decodifican las posiciones elegidas).
+    Nunca lanza.
+    """
+    if limit <= 0 or total <= 0:
+        return ()
+    if total <= limit:
+        return tuple(range(total))
+    return tuple((position * total) // limit for position in range(limit))
+
+
+def _partial_at(
+    axes: list[tuple[str, tuple]], lengths: list[int], index: int
+) -> dict:
+    """Combinación del producto cartesiano en la posición `index` (V3.61, pura).
+
+    Decodifica `index` en base mixta con el ÚLTIMO eje variando más rápido (el
+    mismo orden que recorrían los bucles anidados de V3.60), de modo que la
+    posición 0 sigue siendo la combinación de los primeros valores de cada slot y
+    el orden de las combinaciones con espacio pequeño no cambia. Nunca lanza.
+    """
+    digits: list[int] = []
+    remainder = index
+    for length in reversed(lengths):
+        if length <= 0:
+            return {}
+        digits.append(remainder % length)
+        remainder //= length
+    digits.reverse()
+    partial = _empty_partial()
+    for (name, values), digit in zip(axes, digits, strict=False):
+        partial = _merge_partial(name, values[digit], partial)
+    return partial
+
+
 def _expand_spec(spec: Mapping) -> tuple[dict[str, object], ...]:
     """Superficies GENERADAS por la especificación, en orden estable (V3.60).
 
     Producto cartesiano de los slots en el orden de `spec["order"]`, cortado a
-    `CONTEXT_INSTANCE_SPACE_MAX` (el recorte deja un PREFIJO del producto, así
-    que es determinista y favorece los slots principales de `selection`). Cada
-    superficie declara su consigna (el `template` interpolado), su etiqueta
+    `CONTEXT_INSTANCE_SPACE_MAX`. V3.61 (P1-01): cuando el producto excede el
+    techo, el recorte es ESTRATIFICADO (`_stratified_indices`) y no un prefijo,
+    así que ningún eje queda con un subconjunto fijo de valores; con el espacio
+    por debajo del techo (el banco real) el orden es EXACTAMENTE el de V3.60.
+    Cada superficie declara su consigna (el `template` interpolado), su etiqueta
     (slug estable de los valores elegidos) y los metadatos que APORTAN esos
     valores (`scenario`/`goal`/`register`/`difficulty_delta`/`skill_delta`) más
     el delta base declarado por la familia. Una combinación cuya plantilla no se
@@ -2323,37 +2627,25 @@ def _expand_spec(spec: Mapping) -> tuple[dict[str, object], ...]:
     template = str(spec.get("template") or "")
     if not order or not template:
         return ()
-    partials: list[dict] = [
-        {
-            "labels": (),
-            "values": {},
-            "delta": {},
-            "scenario": "",
-            "goal": "",
-            "register": "",
-            "skills": (),
-        }
-    ]
+    axes: list[tuple[str, tuple]] = []
+    lengths: list[int] = []
     for name in order:
         values = slots.get(name) or ()
         if not values:
             continue
-        expanded: list[dict] = []
-        capped = False
-        for partial in partials:
-            for value in values:
-                if len(expanded) >= CONTEXT_INSTANCE_SPACE_MAX:
-                    capped = True
-                    break
-                expanded.append(_merge_partial(name, value, partial))
-            if capped:
-                break
-        if not expanded:
-            return ()
-        partials = expanded
+        axes.append((name, values))
+        lengths.append(len(values))
+    if not axes:
+        return ()
+    total = 1
+    for length in lengths:
+        total *= length
     base_delta = difficulty.normalize_delta(spec.get("difficulty_delta"))
     surfaces: list[dict[str, object]] = []
-    for partial in partials:
+    for index in _stratified_indices(total, CONTEXT_INSTANCE_SPACE_MAX):
+        partial = _partial_at(axes, lengths, index)
+        if not partial:
+            continue
         prompt = _render_template(template, partial["values"])
         if not prompt:
             continue
@@ -2441,6 +2733,32 @@ def context_instance_details(context: object) -> tuple[dict[str, object], ...]:
     return tuple(details)
 
 
+def available_instance_details(
+    context: object, target: object = ""
+) -> tuple[dict[str, object], ...]:
+    """Superficies SERVIDAS de una familia, sin delatar la unidad (V3.61, pura).
+
+    Es `context_instance_details` con el guard anti-spoiler aplicado: se
+    descartan las superficies que NOMBRAN la unidad objetivo (`target`) en su
+    consigna o en sus metadatos. La rotación, la dificultad efectiva y lo que el
+    ledger persiste se resuelven sobre ESTA lista cuando hay unidad objetivo, de
+    modo que el índice servido y la carga servida hablan siempre de la misma
+    superficie.
+
+    Sin `target` (o con uno demasiado corto para ser señal) devuelve el espacio
+    completo: es la degradación EXACTA a V3.60 de todos los llamadores que no
+    declaran unidad. Nunca lanza.
+    """
+    details = context_instance_details(context)
+    if not _target_forms(target):
+        return details
+    return tuple(
+        detail
+        for detail in details
+        if not _surface_reveals_target(detail, target)
+    )
+
+
 def context_instances(context: object) -> tuple[dict[str, str], ...]:
     """Superficies servibles de una familia, en orden de rotación (V3.59, pura).
 
@@ -2457,8 +2775,14 @@ def context_instances(context: object) -> tuple[dict[str, str], ...]:
     )
 
 
-def context_instance_index(context: object, attempts: object = 0) -> int:
-    """Superficie que toca servir, por ROTACIÓN de intentos (V3.59 → V3.60, pura).
+def context_instance_index(
+    context: object,
+    attempts: object = 0,
+    *,
+    target: object = "",
+    unit: object = "",
+) -> int:
+    """Superficie que toca servir, por ROTACIÓN de intentos (V3.59 → V3.61, pura).
 
     `attempts` son los intentos ya registrados en ESA familia para el ítem (el
     resumen de evidencia los cuenta por `context_id`), de modo que el intento N
@@ -2468,16 +2792,53 @@ def context_instance_index(context: object, attempts: object = 0) -> int:
     intentos (o con un valor no reconocible) devuelve 0, es decir, la superficie
     de V3.58 exacta. Una familia sin superficies declaradas devuelve 0 siempre
     (rotación inerte). Nunca lanza.
+
+    V3.61 (P1-01): con `target` declarado la rotación corre sobre las superficies
+    SERVIDAS (`available_instance_details`), así que una consigna que nombra la
+    unidad objetivo no entra en el ciclo. A partir del TERCER intento la posición
+    se permuta de forma determinista con una semilla `(familia, `unit`)`: el
+    ciclo deja de ser el orden declarado y difiere entre ítems. Los intentos
+    0/1/2 conservan las superficies 0/1/2 (contrato V3.59/V3.60) y con menos de
+    cuatro superficies el comportamiento es el de V3.60 exacto. Sin `target` ni
+    `unit` la degradación es EXACTA a V3.60.
     """
-    count = len(context_instance_details(context))
+    count = len(available_instance_details(context, target))
     if count <= 1:
         return 0
     total = _count(attempts)
-    return total % count if total > 0 else 0
+    if total <= 0:
+        return 0
+    position = total % count if total > 0 else 0
+    if count < 4 or position < 3:
+        return position
+    return _rotated_index(context_id_for(context), unit, count, position)
 
 
-def context_instance_metadata(context: object, index: object = 0) -> dict:
-    """Metadatos de la superficie `index` de una familia (V3.60, pura).
+def _rotated_index(
+    family_id: object, unit: object, count: int, position: int
+) -> int:
+    """Posición del ciclo, permutada de forma determinista (V3.61, pura).
+
+    Conserva las TRES primeras posiciones (las superficies 0–2 son la histórica y
+    las declaradas de V3.59) y reparte el resto del ciclo con un desplazamiento
+    derivado de `(familia, unidad)`: el ciclo deja de coincidir con el orden
+    declarado y cambia entre ítems, sin `random()` ni `hash()` sembrado por
+    proceso. El desplazamiento es una biyección del tramo, así que el ciclo sigue
+    visitando TODO el espacio. Nunca lanza.
+    """
+    tail = count - 3
+    if tail <= 1:
+        return position
+    seed = zlib.crc32(
+        f"{str(family_id or '').strip().lower()}:{unit or ''}".encode("utf-8")
+    )
+    return 3 + ((position - 3 + seed) % tail)
+
+
+def context_instance_metadata(
+    context: object, index: object = 0, *, target: object = ""
+) -> dict:
+    """Metadatos de la superficie `index` de una familia (V3.60 → V3.61, pura).
 
     Devuelve las claves de `CONTEXT_INSTANCE_DETAIL_KEYS` más `skills`: la unión
     entre las competencias de la FAMILIA (`context_skills`) y las que la
@@ -2485,9 +2846,10 @@ def context_instance_metadata(context: object, index: object = 0) -> dict:
     Es EXPLICABILIDAD de la superficie: no cambia la modalidad que la tarea
     evalúa (`assessed_skill`, que sigue siendo `written_production`). Un índice
     fuera de rango cae a la superficie 0 y una familia sin espacio devuelve los
-    valores por defecto. Nunca lanza.
+    valores por defecto. V3.61: con `target` declarado el índice se interpreta
+    sobre las superficies SERVIDAS (guard anti-spoiler). Nunca lanza.
     """
-    details = context_instance_details(context)
+    details = available_instance_details(context, target)
     if not details:
         return {**_surface_details({}), "skills": ()}
     position = _count(index)
@@ -2502,23 +2864,28 @@ def context_instance_metadata(context: object, index: object = 0) -> dict:
 
 
 def context_instance_difficulty(
-    context: object, index: object = 0
+    context: object, index: object = 0, *, target: object = ""
 ) -> dict[str, int]:
-    """Vector de carga EFECTIVO de la superficie `index` (V3.60, pura).
+    """Vector de carga EFECTIVO de la superficie `index` (V3.60 → V3.61, pura).
 
     Es el vector de la FAMILIA (`context_difficulty`, que NO cambia) más el
     `difficulty_delta` que declara la superficie, recortado al envelope 1..5.
     Sin delta declarado devuelve el vector de la familia EXACTO, que es la
-    garantía de degradación de la release. Nunca lanza.
+    garantía de degradación de la release. V3.61: `target` resuelve el índice
+    sobre las superficies servidas. Nunca lanza.
     """
-    metadata = context_instance_metadata(context, index)
+    metadata = context_instance_metadata(context, index, target=target)
     return difficulty.apply_delta(
         context_difficulty(context), metadata["difficulty_delta"]
     )
 
 
 def served_difficulty(
-    context_id: object, attempts_by_context: object = None
+    context_id: object,
+    attempts_by_context: object = None,
+    *,
+    target: object = "",
+    unit: object = "",
 ) -> dict[str, int]:
     """Carga de la superficie que TOCA SERVIRSE en una familia (V3.60, pura).
 
@@ -2528,7 +2895,10 @@ def served_difficulty(
     intento sirve. Es lo que el ledger persiste por evento, así que la carga
     guardada corresponde a la tarea realmente servida, incluida su superficie.
     Una familia no reconocible devuelve `{}`: sin banco no se declara carga.
-    Nunca lanza.
+
+    V3.61: `target` (la unidad objetivo) aplica el guard anti-spoiler y `unit`
+    alimenta la semilla de la rotación no secuencial; el llamador que quiere la
+    degradación exacta a V3.60 no declara ninguno de los dos. Nunca lanza.
     """
     attributes = _as_attributes(context_id)
     if not attributes:
@@ -2536,8 +2906,110 @@ def served_difficulty(
     index = context_instance_index(
         attributes,
         _attempts_for(attempts_by_context, context_id_for(attributes)),
+        target=target,
+        unit=unit,
     )
-    return context_instance_difficulty(attributes, index)
+    return context_instance_difficulty(attributes, index, target=target)
+
+
+def serve_instance(
+    context_id: object,
+    context_instance: object = "",
+    attempts_by_context: object = None,
+    *,
+    target: object = "",
+    unit: object = "",
+) -> dict[str, object]:
+    """Superficie que el alumno RESPONDIÓ y su carga efectiva (V3.61, pura).
+
+    Cierra el defecto T-02 de la auditoría de V3.60: el POST no debe recalcular
+    la superficie con el contador actual (que puede haber avanzado por una
+    respuesta simultánea o un reintento de red), sino resolver la que el cliente
+    **recibió** y **respondió**. La identidad inmutable es el **slug** de la
+    superficie (`context_instance`), estable porque se deriva del contenido
+    declarado y no del orden (`_slug`).
+
+    Devuelve `{instance, index, count, matched, difficulty, suppressed}`:
+
+    - `matched=True` si el slug existe en la familia (tras el guard anti-spoiler)
+      y `difficulty` es la carga de ESA superficie;
+    - `matched=False` si el slug falta o ya no existe (familia cambiada, cliente
+      legacy, superficie retirada): se cae a la rotación actual —degradación
+      exacta a V3.60— y se declara para que el ledger no mienta;
+    - `count` es el nº de superficies servidas y `suppressed` cuántas descartó
+      el guard anti-spoiler.
+
+    Nunca lanza.
+    """
+    attributes = _as_attributes(context_id)
+    if not attributes:
+        return {
+            "instance": "",
+            "index": 0,
+            "count": 0,
+            "matched": False,
+            "difficulty": {},
+            "suppressed": 0,
+        }
+    declared = context_instance_details(attributes)
+    details = available_instance_details(attributes, target)
+    suppressed = len(declared) - len(details)
+    slug = str(context_instance or "").strip()
+    index = -1
+    if slug:
+        for position, detail in enumerate(details):
+            if detail["instance"] == slug:
+                index = position
+                break
+    matched = index >= 0
+    if not matched:
+        index = context_instance_index(
+            attributes,
+            _attempts_for(
+                attempts_by_context, context_id_for(attributes)
+            ),
+            target=target,
+            unit=unit,
+        )
+    served = (
+        difficulty.apply_delta(
+            context_difficulty(attributes), details[index]["difficulty_delta"]
+        )
+        if details
+        else {}
+    )
+    return {
+        "instance": details[index]["instance"] if details else "",
+        "index": index,
+        "count": len(details),
+        "matched": matched,
+        "difficulty": served,
+        "suppressed": suppressed,
+    }
+
+
+def served_difficulty_for_instance(
+    context_id: object,
+    context_instance: object = "",
+    attempts_by_context: object = None,
+    *,
+    target: object = "",
+    unit: object = "",
+) -> dict[str, int]:
+    """Carga EFECTIVA de la superficie RESPONDIDA (V3.61, pura).
+
+    Fachada de `serve_instance` para el ledger: devuelve solo el vector servido
+    (el de la superficie que el alumno respondió si el slug la identifica; el de
+    la rotación actual si no). Con la superficie 0 —o cualquiera sin ajuste—
+    escribe bytes idénticos a V3.60. Nunca lanza.
+    """
+    return serve_instance(
+        context_id,
+        context_instance,
+        attempts_by_context,
+        target=target,
+        unit=unit,
+    )["difficulty"]
 
 
 def _attempts_for(attempts_by_context: object, context_id: str) -> int:
@@ -2748,7 +3220,8 @@ def context_for(
     skill_priorities, context_instance, instance_index, instance_count,
     instance_scenario, instance_goal, instance_register,
     instance_difficulty_delta, instance_difficulty_vector, instance_difficulty,
-    instance_skills, instance_generated}`.
+    instance_skills, instance_generated, instance_suppressed,
+    instance_guarded}`.
     La consigna es la del banco; el escenario **no contiene la unidad objetivo**
     salvo en la condición `prompted` (V3.43/P1-01 y V3.46). `condition` (V3.46)
     es la condición de recuperación SERVIDA: la deriva el llamador del estado de
@@ -2943,7 +3416,24 @@ def context_for(
             "instance_difficulty": 0,
             "instance_skills": [],
             "instance_generated": False,
+            # V3.61: sin familia no hay superficie que el guard pueda retirar.
+            "instance_suppressed": 0,
+            "instance_guarded": False,
         }
+    # V3.61 (anti-spoiler de la superficie SERVIDA): una familia cuya superficie
+    # nombra la unidad objetivo no puede servirla —el alumno leería la respuesta
+    # y la evidencia acreditaría producción GUIADA en lugar de recuperación
+    # espontánea (V3.43/P1-01)—. Se descarta del pool SOLO si queda alternativa
+    # segura; con TODAS las familias delatando la unidad (banco patológico) se
+    # degrada a V3.60 y se declara con `instance_guarded=False`.
+    safe_pool = [
+        context for context in pool if available_instance_details(context, unit)
+    ]
+    guarded = bool(safe_pool)
+    if guarded:
+        pool = safe_pool
+    # Familia elegida: la MISMA que V3.59 salvo que el guard haya retirado
+    # familias que delatan la unidad.
     if success:
         best = max(_novelty_score(context, success) for context in pool)
         # Se conserva el orden del banco dentro del empate: `_stable_index` es
@@ -2956,9 +3446,16 @@ def context_for(
     # V3.60: el espacio de superficies incluye las GENERADAS por la
     # especificación paramétrica de la familia, y la superficie puede declarar
     # metadatos (escenario, registro) y un AJUSTE de carga.
-    details = context_instance_details(context)
+    # V3.61: la rotación corre sobre las superficies SERVIDAS (sin las que
+    # delatan la unidad) y su semilla incluye la unidad, así que el ciclo no es
+    # el orden declarado ni coincide entre ítems.
+    guard_target = unit if guarded else ""
+    details = available_instance_details(context, guard_target)
     instance_index = context_instance_index(
-        context, _attempts_for(attempts_by_context, context_id_for(context))
+        context,
+        _attempts_for(attempts_by_context, context_id_for(context)),
+        target=guard_target,
+        unit=unit,
     )
     detail = details[instance_index] if details else _surface_details({})
     # Carga EFECTIVA de la superficie servida (la de la familia si no declara
@@ -3034,6 +3531,14 @@ def context_for(
         "instance_difficulty": difficulty_from_vector(effective),
         "instance_skills": list(instance_skills),
         "instance_generated": bool(detail["generated"]),
+        # V3.61 (anti-spoiler de la superficie servida): cuántas superficies
+        # retiró el guard por nombrar la unidad objetivo y si la familia servida
+        # pasó por él (`False` = se degradó a V3.60 porque NINGUNA familia tenía
+        # una superficie segura para esa unidad). Aditivo y solo explicativo.
+        "instance_suppressed": max(
+            len(context_instance_details(context)) - len(details), 0
+        ),
+        "instance_guarded": guarded,
     }
 
 

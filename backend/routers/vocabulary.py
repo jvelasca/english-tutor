@@ -307,6 +307,7 @@ async def drill_transfer_attempt(
         body.text,
         context_id=body.context_id,
         response_time_ms=body.response_time_ms,
+        context_instance=body.context_instance,
     )
     outcome = "ok" if result["passed"] else "ko"
     await learning_service.record_event(

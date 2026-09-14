@@ -606,6 +606,12 @@ export interface DrillTransferContext {
   instance_difficulty?: number;
   instance_skills?: string[];
   instance_generated?: boolean;
+  // V3.61 (anti-spoiler de la superficie servida): cuántas superficies de la
+  // familia se retiraron por NOMBRAR la unidad objetivo y si el guard se aplicó
+  // (false = ninguna familia tenía superficie segura y se degradó a la rotación
+  // de V3.60). Aditivos y solo explicativos.
+  instance_suppressed?: number;
+  instance_guarded?: boolean;
 }
 
 export interface DrillDifficultyFit {
@@ -659,6 +665,16 @@ export interface DrillTransferAttempt {
   target_skill?: string;
   assessed_skill?: string;
   assessment_mode?: string;
+  // V3.61 (Instance-aware Evidence): la SUPERFICIE respondida (slug inmutable
+  // que sirvió el GET), su índice, cuántas superficies sirve la familia, si el
+  // slug casó con una superficie y cuántas retiró el guard anti-spoiler.
+  // Aditivos y solo explicativos: la evidencia sigue siendo de FAMILIA
+  // (`context_id`).
+  context_instance?: string;
+  instance_index?: number;
+  instance_count?: number;
+  instance_matched?: boolean;
+  instance_suppressed?: number;
 }
 
 // V3.30: diccionario de consulta con marca de uso/aprendizaje. La consulta es

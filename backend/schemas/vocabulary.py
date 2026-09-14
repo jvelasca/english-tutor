@@ -821,18 +821,31 @@ class TransferContextOut(BaseModel):
     instance_difficulty: int = 0
     instance_skills: list[str] = Field(default_factory=list)
     instance_generated: bool = False
+    # V3.61 (anti-spoiler de la superficie servida): cuántas superficies de la
+    # familia se retiraron porque NOMBRABAN la unidad objetivo y si el guard se
+    # aplicó (`False` = ninguna familia tenía superficie segura para esa unidad y
+    # se degradó a la rotación de V3.60). Aditivos y solo explicativos.
+    instance_suppressed: int = 0
+    instance_guarded: bool = False
 
 
 class TransferAttemptIn(BaseModel):
-    """Intento del paso Transfer (V3.40).
+    """Intento del paso Transfer (V3.40 → V3.61).
 
     `context_id` es el contexto servido por `TransferContextOut` (si falta, el
     servidor lo deriva del banco: nunca queda sin contexto).
+
+    V3.61 (Instance-aware Evidence): `context_instance` es el SLUG inmutable de la
+    superficie que el alumno recibió (`TransferContextOut.context_instance`), que
+    es lo que permite persistir la dificultad de la tarea REALMENTE respondida y
+    no la de la siguiente rotación (defecto T-02 de la auditoría de V3.60). Es
+    opcional: sin él el servidor degrada a la rotación actual de V3.60.
     """
 
     word: str = Field(min_length=1, max_length=120)
     text: str = Field(default="", max_length=MAX_WRITE_CHARS)
     context_id: str = Field(default="", max_length=120)
+    context_instance: str = Field(default="", max_length=200)
     response_time_ms: int | None = Field(default=None, ge=0, le=600_000)
 
 
@@ -886,3 +899,12 @@ class TransferAttemptOut(BaseModel):
     target_skill: str = ""
     assessed_skill: str = ""
     assessment_mode: str = ""
+    # V3.61 (Instance-aware Evidence): la INSTANCIA que se sirvió/respondió, su
+    # carga efectiva y si el slug del cliente casó con una superficie de la
+    # familia. Aditivo y solo explicativo: la unidad de EVIDENCIA sigue siendo la
+    # FAMILIA (`context_id`) y `context_instance` es solo la SUPERFICIE.
+    context_instance: str = ""
+    instance_index: int = 0
+    instance_count: int = 0
+    instance_matched: bool = False
+    instance_suppressed: int = 0

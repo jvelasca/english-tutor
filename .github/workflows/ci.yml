@@ -27,6 +27,8 @@ jobs:
         run: python -m ruff check .
       - name: Test (pytest)
         run: python -m pytest tests/ -q
+      - name: Validate the transfer instance space (V3.61)
+        run: python -m scripts.transfer_validation
 
   frontend:
     name: Frontend (tsc + vitest + build)

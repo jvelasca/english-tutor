@@ -1037,6 +1037,7 @@ def init_db() -> None:
                 activity TEXT NOT NULL DEFAULT '',
                 activity_id TEXT NOT NULL DEFAULT '',
                 context_id TEXT NOT NULL DEFAULT '',
+                context_instance TEXT NOT NULL DEFAULT '',
                 success INTEGER NOT NULL DEFAULT 0,
                 support_level TEXT NOT NULL DEFAULT '',
                 difficulty REAL NOT NULL DEFAULT 0,
@@ -1072,12 +1073,17 @@ def init_db() -> None:
         # la actividad), `served_difficulty` (lo que se sirvió) y
         # `observed_task_difficulty` (lo que el alumno ACREDITÓ tras descontar el
         # andamiaje; solo en el éxito). Mismo camino aditivo e idempotente.
+        # V3.61 (Instance-aware Evidence): `context_instance` guarda el SLUG de la
+        # superficie RESPONDIDA dentro de la familia (`context_id`), sin cambiar
+        # la identidad de evidencia: '' en las filas legacy y en los drills que no
+        # declaran banco de contextos.
         evidence_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_evidence)")
         }
         for _col, _type in (
             ("activity_id", "TEXT NOT NULL DEFAULT ''"),
             ("context_id", "TEXT NOT NULL DEFAULT ''"),
+            ("context_instance", "TEXT NOT NULL DEFAULT ''"),
             ("support_level", "TEXT NOT NULL DEFAULT ''"),
             ("difficulty", "REAL NOT NULL DEFAULT 0"),
             ("response_time_ms", "INTEGER"),

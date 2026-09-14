@@ -71,6 +71,7 @@ def record_evidence(
     activity: str = "",
     activity_id: str = "",
     context_id: str = "",
+    context_instance: str = "",
     success: bool = False,
     support_level: str = "",
     difficulty: float = 0.0,
@@ -121,6 +122,11 @@ def record_evidence(
     PROYECCIÓN LEGACY de `served_difficulty`, de modo que V3.53/V3.54 siguen
     leyendo exactamente lo mismo. Todas aditivas y observacionales: no cambian
     el scoring ni la escalera.
+
+    V3.61 (Instance-aware Evidence) añade `context_instance` (el slug de la
+    SUPERFICIE respondida dentro de la familia `context_id`). Aditiva y
+    observacional: '' en las filas legacy y en los drills que no declaran banco
+    de contextos, y la unidad de EVIDENCIA sigue siendo la FAMILIA.
     """
     if get_user(user_id) is None:
         return None
@@ -140,12 +146,13 @@ def record_evidence(
             "INSERT INTO learning_evidence "
             "(user_id, occurred_at, skill, assessed_skill, target_type, "
             "target_id, surface_form, lexical_unit, task, activity, "
-            "activity_id, context_id, success, support_level, difficulty, "
-            "observed_difficulty, declared_difficulty, served_difficulty, "
-            "observed_task_difficulty, response_time_ms, error_type, "
-            "transfer_condition, interval_since_last_evidence, event_role) "
+            "activity_id, context_id, context_instance, success, support_level, "
+            "difficulty, observed_difficulty, declared_difficulty, "
+            "served_difficulty, observed_task_difficulty, response_time_ms, "
+            "error_type, transfer_condition, interval_since_last_evidence, "
+            "event_role) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "?, ?, ?, ?, ?)",
+            "?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 now,
@@ -159,6 +166,7 @@ def record_evidence(
                 activity,
                 activity_id,
                 context_id,
+                str(context_instance or ""),
                 1 if success else 0,
                 support_level,
                 float(difficulty or 0.0),
@@ -187,6 +195,7 @@ def record_evidence(
         "activity": activity,
         "activity_id": activity_id,
         "context_id": context_id,
+        "context_instance": str(context_instance or ""),
         "success": bool(success),
         "support_level": support_level,
         "difficulty": float(difficulty or 0.0),
@@ -214,8 +223,9 @@ def record_evidence_bulk(
     `skill`, `assessed_skill` (V3.51), `surface_form`, `lexical_unit`, `task`,
     `activity`, `success`, `event_role` y `occurred_at` (por entrada; si falta,
     el `occurred_at` del lote o `_now()`), más las tres dificultades de V3.55
-    (`declared_difficulty`/`served_difficulty`/`observed_task_difficulty`) y la
-    proyección legacy `observed_difficulty`.
+    (`declared_difficulty`/`served_difficulty`/`observed_task_difficulty`), la
+    proyección legacy `observed_difficulty` y, desde V3.61, `context_instance`
+    (el slug de la superficie respondida dentro de la familia `context_id`).
 
     V3.35.1 (P2-02): el contrato del ledger se blinda contra lotes degenerados:
 
@@ -292,6 +302,7 @@ def record_evidence_bulk(
                     entry.get("activity", ""),
                     entry.get("activity_id", ""),
                     entry.get("context_id", ""),
+                    str(entry.get("context_instance") or ""),
                     1 if entry.get("success") else 0,
                     entry.get("support_level", ""),
                     float(entry.get("difficulty") or 0.0),
@@ -310,12 +321,13 @@ def record_evidence_bulk(
             "INSERT INTO learning_evidence "
             "(user_id, occurred_at, skill, assessed_skill, target_type, "
             "target_id, surface_form, lexical_unit, task, activity, "
-            "activity_id, context_id, success, support_level, difficulty, "
-            "observed_difficulty, declared_difficulty, served_difficulty, "
-            "observed_task_difficulty, response_time_ms, error_type, "
-            "transfer_condition, interval_since_last_evidence, event_role) "
+            "activity_id, context_id, context_instance, success, support_level, "
+            "difficulty, observed_difficulty, declared_difficulty, "
+            "served_difficulty, observed_task_difficulty, response_time_ms, "
+            "error_type, transfer_condition, interval_since_last_evidence, "
+            "event_role) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "?, ?, ?, ?, ?)",
+            "?, ?, ?, ?, ?, ?)",
             rows,
         )
     return len(rows)
@@ -351,8 +363,8 @@ def list_evidence(
         rows = conn.execute(
             "SELECT id, user_id, occurred_at, skill, assessed_skill, "
             "target_type, target_id, surface_form, lexical_unit, task, "
-            "activity, activity_id, context_id, success, support_level, "
-            "difficulty, observed_difficulty, declared_difficulty, "
+            "activity, activity_id, context_id, context_instance, success, "
+            "support_level, difficulty, observed_difficulty, declared_difficulty, "
             "served_difficulty, observed_task_difficulty, response_time_ms, "
             "error_type, transfer_condition, interval_since_last_evidence, "
             "event_role "

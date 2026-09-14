@@ -767,6 +767,7 @@ async def _record_transfer_evidence(
     *,
     condition: str = "",
     response_time_ms: int | None = None,
+    context_instance: str = "",
     attempts_by_context: object = None,
 ) -> None:
     """Evento de evidencia del paso Transfer (V3.40 → V3.46), éxito Y fallo.
@@ -806,6 +807,13 @@ async def _record_transfer_evidence(
     SUPERFICIE que toca servir de esa familia (que puede declarar un
     `difficulty_delta`), no la familia a secas. Con la superficie 0 —o cualquiera
     sin ajuste— el vector es EXACTAMENTE el de V3.55.
+
+    V3.61 (Instance-aware Evidence): lo servido se resuelve con la SUPERFICIE que
+    el alumno RESPONDIÓ (`context_instance`, el slug inmutable que sirvió el GET)
+    y con el MISMO guard anti-spoiler (`target=word`) y la MISMA semilla de
+    rotación (`unit=word`) que la consigna, así que la carga persistida es la de
+    esa superficie y no la de la siguiente rotación. `context_id` sigue siendo la
+    FAMILIA (el `context_instance` es solo la SUPERFICIE).
     """
     try:
         await run_in_threadpool(
@@ -825,6 +833,10 @@ async def _record_transfer_evidence(
             activity="drill",
             activity_id="drill:transfer",
             context_id=context_id,
+            # V3.61: la SUPERFICIE concreta respondida ('' = la histórica o el
+            # drill sin banco). NO fragmenta la identidad: el ledger sigue
+            # contando la FAMILIA por `context_id`.
+            context_instance=context_instance,
             success=bool(scored["passed"]),
             support_level="spontaneous",
             difficulty=lexicon.cefr_difficulty(row),
@@ -847,7 +859,15 @@ async def _record_transfer_evidence(
                 declared=difficulty.declared_difficulty(
                     lexicon.cefr_difficulty(row)
                 ),
-                served=transfer.served_difficulty(context_id, attempts_by_context),
+                # V3.61: la superficie RESPONDIDA (slug) con el guard anti-spoiler
+                # y la misma semilla de rotación que la consigna servida.
+                served=transfer.served_difficulty_for_instance(
+                    context_id,
+                    context_instance,
+                    attempts_by_context,
+                    target=word,
+                    unit=word,
+                ),
                 support_level="spontaneous",
                 success=bool(scored["passed"]),
             ),
@@ -1044,6 +1064,7 @@ async def submit_transfer_attempt(
     text: str,
     context_id: str = "",
     response_time_ms: int | None = None,
+    context_instance: str = "",
 ) -> dict:
     """Puntúa la actividad `transfer` del micro-drill (V3.40 → V3.46).
 
@@ -1115,6 +1136,18 @@ async def submit_transfer_attempt(
             # V3.59: mismo insumo que el GET para que la superficie sea la misma.
             attempts_by_context=summary.get("contexts") or {},
         ).get("context_id", "")
+    # V3.61 (Instance-aware Evidence): se resuelve la superficie que el alumno
+    # RESPONDIÓ por su slug inmutable (con el guard anti-spoiler y la misma
+    # semilla de rotación que el GET), en lugar de recalcularla con el contador
+    # actual —que puede haber avanzado por una respuesta simultánea o un
+    # reintento de red—. Sin slug la degradación es la rotación de V3.60.
+    served_instance = transfer.serve_instance(
+        context_id,
+        context_instance,
+        summary.get("contexts") or {},
+        target=word,
+        unit=word,
+    )
     scored = lexicon.score_transfer_attempt(word, text, pos=pos, senses=senses)
     written = (text or "").strip()
     required = transfer.requires_target(condition)
@@ -1138,6 +1171,9 @@ async def submit_transfer_attempt(
             context_id,
             condition=condition,
             response_time_ms=response_time_ms,
+            # V3.61: la SUPERFICIE respondida viaja al ledger ('' si el cliente
+            # no la declara: degradación exacta a V3.60).
+            context_instance=served_instance["instance"],
             # V3.60: el MISMO mapa de intentos que resuelve la superficie
             # servida, para que la carga persistida sea la de esa superficie.
             attempts_by_context=summary.get("contexts") or {},
@@ -1154,6 +1190,14 @@ async def submit_transfer_attempt(
         "target_skill": task_semantics.target_skill_for("transfer"),
         "assessed_skill": task_semantics.assessed_skill_for("transfer"),
         "assessment_mode": task_semantics.assessment_mode_for("transfer"),
+        # V3.61 (Instance-aware Evidence): la superficie respondida y su
+        # resolución (aditivos y solo explicativos; la evidencia sigue siendo de
+        # FAMILIA por `context_id`).
+        "context_instance": served_instance["instance"],
+        "instance_index": served_instance["index"],
+        "instance_count": served_instance["count"],
+        "instance_matched": served_instance["matched"],
+        "instance_suppressed": served_instance["suppressed"],
         **scored,
     }
 

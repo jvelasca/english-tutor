@@ -106,6 +106,9 @@ V360_KEYS = V359_KEYS | {
     "instance_skills",
     "instance_generated",
 }
+# V3.61 (Instance-aware Evidence): guard anti-spoiler de la superficie servida y
+# su explicabilidad. Aditivos: las 36 claves de V3.60 quedan intactas.
+V361_KEYS = V360_KEYS | {"instance_suppressed", "instance_guarded"}
 
 # Claves del payload que la rotación de superficie SÍ puede cambiar.
 VOLATILE_KEYS = frozenset({"prompt", "context_instance", "instance_index"}) | {
@@ -309,7 +312,8 @@ def test_pedagogical_equivalence_of_the_surfaces_of_a_family():
     base = transfer.context_for("travel")
     family = base["context_id"]
     others = [context_id for context_id in BANK_IDS if context_id != family]
-    count = len(transfer.context_instances(family))
+    # V3.61: el espacio SERVIDO (sin las superficies que delatan la unidad).
+    count = len(transfer.available_instance_details(family, "travel"))
     assert count >= transfer.CONTEXT_INSTANCE_SPACE_MIN
     identity = (
         "context_id",
@@ -332,7 +336,12 @@ def test_pedagogical_equivalence_of_the_surfaces_of_a_family():
             attempts_by_context={family: {"attempts": attempt}},
         )
         assert got["context_id"] == family
-        assert got["instance_index"] == attempt
+        # V3.61 (P1-01): la rotación deja de ser el orden declarado a partir del
+        # tercer intento, así que la posición se resuelve con la MISMA función y
+        # los mismos argumentos que el motor (unidad objetivo y unidad sembrada).
+        assert got["instance_index"] == transfer.context_instance_index(
+            family, attempt, target="travel", unit="travel"
+        )
         for key in identity:
             assert got[key] == base[key], (attempt, key)
         # La superficie puede ajustar la carga, pero nunca salir del envelope.
@@ -399,7 +408,8 @@ def test_the_selection_sets_the_mix_order_and_the_cap_truncates_it():
         detail["instance"]
         for detail in transfer.context_instance_details(default_order)
     ] == ["", "a1_b1", "a1_b2", "a2_b1", "a2_b2"]
-    # El techo corta el producto en un PREFIJO determinista.
+    # V3.61 (P1-01): el techo ya NO corta un prefijo, sino que reparte el
+    # producto completo de forma estratificada y determinista.
     huge = {
         "id": "huge",
         "prompt": "Base.",
@@ -416,7 +426,13 @@ def test_the_selection_sets_the_mix_order_and_the_cap_truncates_it():
     generated = [detail for detail in details if detail["generated"]]
     assert len(generated) == transfer.CONTEXT_INSTANCE_SPACE_MAX
     assert generated[0]["prompt"] == "a0 b0 c0"
-    assert generated[-1]["prompt"] == "a0 b9 c5"
+    # V3.61 (P1-01): el recorte es ESTRATIFICADO, no un PREFIJO. Con 10×10×10 y
+    # techo 96, un prefijo habría fijado `a` en a0 (y en unas pocas más) dejando
+    # `c` casi constante; el reparto equiespaciado da cobertura a los TRES ejes.
+    prompts = [detail["prompt"].split() for detail in generated]
+    for position in range(3):
+        assert len({row[position] for row in prompts}) >= 5, position
+    assert len({tuple(row) for row in prompts}) == len(prompts)
 
 
 def test_the_specification_normalizes_slots_values_and_delta():
@@ -486,16 +502,27 @@ def test_an_unusable_specification_leaves_the_family_surfaces_only():
 def test_the_index_rotates_over_the_whole_space():
     for context in BANK:
         space = len(transfer.context_instances(context))
-        for attempt in range(3 * space):
-            assert (
-                transfer.context_instance_index(context, attempt) == attempt % space
-            ), context["id"]
+        # V3.61 (P1-01): los tres primeros intentos son las superficies 0/1/2 y a
+        # partir del tercero el ciclo se permuta con semilla `(familia, unidad)`;
+        # la garantía es que sigue siendo una biyección del espacio completo.
+        for attempt in range(3):
+            assert transfer.context_instance_index(context, attempt) == attempt
+        for cycle in range(3):
+            visited = {
+                transfer.context_instance_index(context, cycle * space + attempt)
+                for attempt in range(space)
+            }
+            assert visited == set(range(space)), context["id"]
         for value in (None, "", "x", -1, -7, True, False, 0.5, [], {}):
             assert transfer.context_instance_index(context, value) == 0, value
         # Estabilidad: la misma evidencia produce siempre la misma superficie.
         assert transfer.context_instance_index(
             context, 5
         ) == transfer.context_instance_index(context, 5)
+        # Determinismo entre ítems: la permutación depende de la unidad sembrada.
+        assert transfer.context_instance_index(
+            context, 5, unit="travel"
+        ) == transfer.context_instance_index(context, 5, unit="travel")
 
 
 def test_details_accept_ids_and_never_raise():
@@ -613,9 +640,9 @@ def test_served_difficulty_matches_the_surface_that_context_for_serves():
             assert got["instance_difficulty"] == transfer.difficulty_from_vector(
                 got["instance_difficulty_vector"]
             )
-            assert transfer.served_difficulty(family, attempts) == got[
-                "instance_difficulty_vector"
-            ], (context["id"], attempt)
+            assert transfer.served_difficulty(
+                family, attempts, unit="travel"
+            ) == got["instance_difficulty_vector"], (context["id"], attempt)
             if got["instance_difficulty_delta"]:
                 families_with_delta += 1
     # El ajuste de carga no es decorativo: hay superficies del banco que lo usan.
@@ -661,7 +688,7 @@ def test_the_family_choice_is_untouched_by_the_generated_space():
 
 def test_the_payload_is_additive_over_v3_59():
     got = transfer.context_for("travel", level="B1")
-    assert set(got) == set(V360_KEYS)
+    assert set(got) == set(V361_KEYS)
     # Degradación exacta: sin intentos, la superficie es la 0 y suelta delta nulo.
     assert got["context_instance"] == ""
     assert got["instance_index"] == 0
@@ -683,7 +710,7 @@ def test_the_empty_bank_return_carries_the_surface_defaults(monkeypatch):
     monkeypatch.setattr(transfer, "TRANSFER_CONTEXTS", ())
     got = transfer.context_for("travel")
     assert got["available"] is False
-    assert set(got) == set(V360_KEYS)
+    assert set(got) == set(V361_KEYS)
     assert got["instance_count"] == 0
     assert got["instance_difficulty_vector"] == {}
     assert got["instance_difficulty"] == 0
@@ -712,19 +739,25 @@ def test_api_exposes_the_generated_surfaces(monkeypatch, tmp_path):
         body = _get_context(client, uid, "travel")
         while not body["instance_difficulty_delta"]:
             assert body["context_id"] == family
-            assert body["instance_index"] == attempts % body["instance_count"]
+            # V3.61 (P1-01): el ciclo se permuta desde el tercer intento, así que
+            # la posición se resuelve con la MISMA función que el motor.
+            assert body["instance_index"] == transfer.context_instance_index(
+                family, attempts, target="travel", unit="travel"
+            )
             _record_attempt(uid, "travel", family, success=False)
             attempts += 1
             body = _get_context(client, uid, "travel")
         assert attempts < body["instance_count"]
         assert body["context_id"] == family
-        assert body["instance_index"] == attempts % body["instance_count"]
+        assert body["instance_index"] == transfer.context_instance_index(
+            family, attempts, target="travel", unit="travel"
+        )
         # El 4º intento ya está en el espacio GENERADO (índices 0..2 son V3.59).
         assert body["instance_generated"] is True
         assert body["instance_index"] > transfer.CONTEXT_INSTANCES_MIN
         served = body["instance_difficulty_vector"]
         assert served == transfer.served_difficulty(
-            family, {family: {"attempts": attempts}}
+            family, {family: {"attempts": attempts}}, unit="travel"
         )
 
         # El POST persiste EXACTAMENTE la carga de la superficie servida.

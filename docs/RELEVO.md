@@ -101,13 +101,80 @@
 > **Auditoría externa:** el punto de entrada es
 > `agentes/auditoria-externa-v360.md` (autocontenido: tag `v3.60.0` → `2c79040`,
 > diff `e721fce..2c79040`, run `34814504063`, 11 afirmaciones a falsar y 10
-> preguntas de alto valor) y su informe se espera en
-> `docs/audit/S-AUDITORIA-TOTAL-V360.md` (la `R` sigue reservada para el informe
-> pendiente de V3.59).
-> **Siguiente paso:** V3.61 — el **motor de política de instancia** (cuándo
-> repetir una superficie, cuándo forzar una nueva, cómo pesa el fallo) y la
-> **evidencia instance-aware** (`context_instance` en el ledger) como decisión
-> aparte, con migración declarada si toca el ledger.
+> preguntas de alto valor).
+> **Auditorías recibidas (2026-09-14).** Se han archivado **dos** informes con
+> veredictos que **no coinciden**:
+> `docs/audit/S-AUDITORIA-TOTAL-V360.md` (auditoría profunda: **9,6/10,
+> APROBADA**, 0 P0, 3 P1, 5 P2, 2 P3) y
+> `docs/audit/T-AUDITORIA-TOTAL-V360.md` (verificación funcional:
+> **2 defectos**, uno **alta** y otro **media**).
+> **Veredicto consolidado:** `S` acierta en la arquitectura y se equivoca en el
+> **alcance** del anti-spoiler; `T` acierta en el defecto. `S` validó el
+> anti-spoiler sobre el `template` y las claves del `instance_space`, pero **no**
+> sobre cada **valor de slot** contra la unidad objetivo: de ahí el defecto.
+> **(T-01, alta)** la familia `shopping` sirve en el índice 7 la consigna «You are
+> in **a supermarket** and cannot find what you need…»
+> (`backend/services/transfer.py:1074`, servida en `:2978`): si la unidad es
+> `supermarket`, la respuesta está a la vista y la evidencia de transferencia
+> queda contaminada. **(T-02, media)** `TransferAttemptIn` no identifica la
+> superficie emitida (`backend/schemas/vocabulary.py:826`) y el POST recalcula la
+> dificultad con el contador actual (`backend/domain/vocabulary.py:850`), así que
+> el ledger puede persistir el vector de la superficie **siguiente**. El **CI
+> 6/6** de V3.60 se mantiene como **documentado, no verificado de forma
+> independiente** (la consulta directa al run `34814504063` no devuelve los
+> workflow runs; coincide con el P3-03 de `S`). Los **P1 de `S`** (espacio aún
+> memorizable, equivalencia pedagógica no demostrada, Student Skill State
+> agregado) se aceptan como **siguiente escalón**, no como defecto de V3.60.
+> **Siguiente paso (ya planificado):** **V3.61 — Instance-aware Evidence +
+> Anti-spoiler Guard**, que cierra **T-01** y **T-02**: guard anti-spoiler por
+> unidad objetivo en la superficie servida (`available_instance_details`), guard
+> de **identidad inmutable** de instancia en el GET que el POST valida para
+> persistir **su** dificultad servida, y **evidencia instance-aware**
+> (`context_instance` aditivo en el ledger, **sin migración** y manteniendo
+> `context_id = FAMILIA`, es decir sin fragmentar la identidad pedagógica). Incluye
+> los P1 de `S` en su parte determinista: cap **estratificado** en `_expand_spec`
+> (hoy es un prefijo del producto cartesiano), rotación no secuencial a partir del
+> tercer intento y un **validador de contenido** del `instance_space`. La deuda
+> declarada sigue igual: **Student Skill State 3.0** (V3.62), **Observed Task
+> Difficulty 2.0** (V3.63), **Planner 3.0** y rotación adaptativa (V3.64),
+> **Instance Generator 2.0** (V3.65) y WSD real.
+>
+> **Estado (2026-09-14): V3.61.0 IMPLEMENTADA y verificada en local** — `VERSION`
+> `3.61.0` (app `3.60.0 → 3.61.0`), **columna aditiva idempotente** en
+> `learning_evidence` (sin migración explícita) y **sin bump de
+> `GENERATOR_VERSION`**. **(A) Guard:** `reveals_target` +
+> `available_instance_details` (token/fronteras + variantes inflexivas, sin LLM)
+> retiran del espacio las superficies que NOMBRAN la unidad; `context_for` solo
+> retira del pool las familias sin superficie servible **si queda alternativa
+> segura** y, con el banco patológico, degrada a V3.60 declarándolo
+> (`instance_guarded=False`); en el banco real `shopping` retira **12** superficies
+> con la unidad `supermarket` y conserva **39** servibles. **(B) Identidad
+> inmutable:** `TransferAttemptIn.context_instance` + `serve_instance(...)` →
+> `{instance, index, count, matched, difficulty, suppressed}` y
+> `served_difficulty_for_instance` en el ledger: el POST persiste la carga de la
+> superficie **respondida** aunque el contador avance. **(C) Ledger:**
+> `context_instance TEXT NOT NULL DEFAULT ''` (kw-only en `record_evidence`/
+> `record_evidence_bulk`, devuelta por `list_evidence`) manteniendo
+> `context_id = transfer:<id>` — **nunca** `transfer:<id>:<slug>`. **(D) P1-01:**
+> cap **estratificado** (`_stratified_indices`/`_partial_at`, idéntico por debajo
+> del techo), rotación **no secuencial** desde el 3.er intento sembrada por
+> `(familia, unidad)` con `zlib.crc32` (biyección: se visita todo el espacio) y
+> **banco 358 → 1020 superficies** (tercer eje `constraint`). **(E) P1-02:**
+> `services/transfer_audit.py` + CLI `python -m scripts.transfer_validation`
+> (paso extra del job Backend en `ci.yml`): deltas justificados con
+> `scenario`/`goal`, `register` de instancia = familia, `skill_delta` del
+> vocabulario, tarea asegurada para la unidad y perfil de demanda advisory.
+> **(F) Contrato:** 38 claves en `TransferContextOut` y cinco nuevas en
+> `TransferAttemptOut`, espejo TS y `context_instance` en la petición del drill
+> (sin cambio visual ni de i18n). Verificación local: `pytest` **2373 passed**,
+> `ruff` limpio, launcher **75 passed**, `tsc` OK, `vitest` **651** (76
+> ficheros), `npm run build` OK, `check_release_consistency` **3.61.0**,
+> `check_beta_v3` OK, `content_validation` OK y `transfer_validation` **20
+> familias / 1020 superficies / 0 errores**. Auditorías archivadas en
+> `docs/audit/S-AUDITORIA-TOTAL-V360.md` y `docs/audit/T-AUDITORIA-TOTAL-V360.md`.
+> Pendiente: commit/push, **CI** sobre el nuevo commit (con el paso de validación
+> del espacio) y etiqueta anotada `v3.61.0`; el detalle está en
+> `release-notes-v3.61.0.md`.
 >
 > **Nota (2026-09-13): V3.59.0 (Context Engine 3.0 — Context Bank Family/Instance)**
 > — release **v3.59.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`,
@@ -2561,6 +2628,33 @@ la `v3.57.0` **Planner 2.0 (argmax `(skill, actividad)` sobre ELV)**, la
 `v3.56.0` **Planner 2.0 (`expected_learning_value`)** y la `v3.55.0` **Task
 Difficulty 3.0**. La sección siguiente se conserva como histórico del hilo V3.38
 (fecha original 2026-09-10, `v3.38.1`).
+
+**Auditorías de V3.60 recibidas y aplicadas (2026-09-14).** Hay **dos** informes
+archivados con veredictos **divergentes**: `docs/audit/S-AUDITORIA-TOTAL-V360.md`
+(profunda: **9,6/10 APROBADA**, 0 P0, 3 P1, 5 P2, 2 P3) y
+`docs/audit/T-AUDITORIA-TOTAL-V360.md` (funcional: **2 defectos**, uno alta y otro
+media). El consolidado está en la **nota superior** de este documento: `S` acierta
+en la arquitectura pero acotó el anti-spoiler al `template` y no a los **valores
+de slot**, y ahí `T` encontró la **fuga del target** (`shopping`, índice 7 sirve
+«You are in **a supermarket**…», `backend/services/transfer.py:1074` y `:2978`) y
+la **identidad de instancia no inmutable** (`TransferAttemptIn` sin superficie,
+`backend/schemas/vocabulary.py:826`; POST que recalcula con el contador actual,
+`backend/domain/vocabulary.py:850`). El **CI 6/6** de V3.60 queda como
+**documentado, no verificado de forma independiente**. **V3.61 — Instance-aware
+Evidence + Anti-spoiler Guard** cierra ambos defectos más la parte determinista de
+los P1 de `S` (guard anti-spoiler por unidad objetivo, identidad inmutable de
+instancia GET→POST, `context_instance` aditivo en el ledger sin migración,
+cap **estratificado** en `_expand_spec`, rotación no secuencial a partir del tercer
+intento y **validador de contenido** del `instance_space`) y está
+**IMPLEMENTADA y verificada en local** (`VERSION` `3.61.0`; `pytest` **2373
+passed**, `ruff` limpio, launcher **75 passed**, `tsc` OK, `vitest` **651**,
+`build` OK, `check_release_consistency` **3.61.0**, `check_beta_v3`/`content_validation`
+OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores**). Banco
+**358 → 1020 superficies**; en `shopping` el guard retira **12** superficies con la
+unidad `supermarket` y conserva **39** servibles. **Pendiente:** commit/push, **CI**
+sobre el nuevo commit (con el paso de validación del espacio añadido al job
+Backend) y etiqueta anotada `v3.61.0`. Detalle en `release-notes-v3.61.0.md`
+(la nota superior de este documento tiene el resumen completo de V3.61).
 
 **Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra

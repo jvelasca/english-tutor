@@ -240,11 +240,14 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     expect(screen.queryByText("river")).toBeNull();
   });
 
-  it("un acierto envía el context_id y avisa al padre", async () => {
+  it("un acierto envía el context_id, el slug de la superficie y avisa al padre", async () => {
     const onProduced = vi.fn();
     mocks.getDrillTransferContext.mockResolvedValue({
       word: "river",
       context_id: "transfer:story",
+      // V3.61: la superficie servida viaja con slug inmutable y debe reenviarse
+      // en el POST para que el ledger guarde la dificultad de ESA superficie.
+      context_instance: "story:instance_02",
       topic: "personal_experience",
       prompt: "Tell a short story about something that happened to you recently.",
       available: true,
@@ -277,6 +280,8 @@ describe("WordDrill paso Transfer (V3.40)", () => {
         "Yesterday I walked by the river with my sister.",
         "transfer:story",
         expect.any(Number),
+        // V3.61: el slug inmutable de la superficie respondida.
+        "story:instance_02",
       ),
     );
     expect(

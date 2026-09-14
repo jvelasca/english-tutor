@@ -249,6 +249,11 @@ export function submitDrillTransferAttempt(
   text: string,
   contextId: string,
   responseTimeMs?: number,
+  // V3.61 (Instance-aware Evidence): slug INMUTABLE de la superficie que el
+  // alumno respondió (`DrillTransferContext.context_instance`). El servidor
+  // persiste la dificultad de ESA superficie y no la de la siguiente rotación.
+  // Opcional: sin él el servidor degrada a la rotación de V3.60.
+  contextInstance?: string,
 ): Promise<DrillTransferAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillTransferAttempt>(
@@ -257,6 +262,7 @@ export function submitDrillTransferAttempt(
       word,
       text,
       context_id: contextId,
+      context_instance: contextInstance ?? "",
       response_time_ms: responseTimeMs ?? null,
     },
   );

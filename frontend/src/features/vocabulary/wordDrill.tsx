@@ -538,6 +538,10 @@ export function WordDrill({
         transferAnswer,
         transfer.context_id,
         responseTimeMs,
+        // V3.61: el slug inmutable de la superficie servida, para que el POST
+        // registre la dificultad de ESA superficie (no la de la siguiente
+        // rotación). Vacío si el servidor no dio ninguna (superficie histórica).
+        transfer.context_instance ?? "",
       );
       setTransferOutcome(outcome);
       if (outcome.passed) onProduced();

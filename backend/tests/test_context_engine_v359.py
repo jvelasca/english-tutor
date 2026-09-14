@@ -116,6 +116,10 @@ V360_INSTANCE_KEYS = frozenset(
 )
 V360_KEYS = V359_KEYS | V360_INSTANCE_KEYS
 
+# V3.61 (Instance-aware Evidence): el guard anti-spoiler de la superficie servida
+# y su explicabilidad. Aditivos: las 36 claves de V3.60 quedan intactas.
+V361_KEYS = V360_KEYS | {"instance_suppressed", "instance_guarded"}
+
 # Campos del payload que la rotación SÍ puede cambiar (el resto debe ser idéntico).
 VOLATILE_KEYS = frozenset(
     {"prompt", "context_instance", "instance_index"}
@@ -292,8 +296,19 @@ def test_context_instance_index_advances_one_surface_per_attempt():
     # así que la cota es inferior: lo que se fija aquí es la ROTACIÓN exacta.
     assert count >= 1 + transfer.CONTEXT_INSTANCES_MIN
     assert transfer.context_instance_index("story", 0) == 0
-    for attempt in range(2 * count):
-        assert transfer.context_instance_index("story", attempt) == attempt % count
+    # V3.61 (P1-01): los tres primeros intentos conservan las superficies 0/1/2
+    # (contrato V3.59/V3.60) y a partir del tercero el ciclo se PERMUTA con una
+    # semilla `(familia, unidad)`: deja de ser el orden declarado, pero sigue
+    # siendo una BIYECCIÓN del tramo 3..count-1, así que cada ciclo visita todo el
+    # espacio exactamente una vez.
+    for attempt in range(3):
+        assert transfer.context_instance_index("story", attempt) == attempt
+    for cycle in range(3):
+        visited = {
+            transfer.context_instance_index("story", cycle * count + attempt)
+            for attempt in range(count)
+        }
+        assert visited == set(range(count))
     # Estabilidad: la misma evidencia produce siempre la misma superficie.
     assert transfer.context_instance_index("story", 2) == (
         transfer.context_instance_index("story", 2)
@@ -306,7 +321,13 @@ def test_context_instance_index_degrades_to_the_family_surface():
         assert transfer.context_instance_index("story", value) == 0, value
     # El bucket `{"attempts": n}` del resumen de evidencia también vale.
     count = len(transfer.context_instances("story"))
-    assert transfer.context_instance_index("story", {"attempts": 4}) == 4 % count
+    # V3.61: a partir del tercer intento el ciclo se permuta (semilla
+    # `(familia, unidad)`), así que la garantía es el RANGO y la estabilidad, no
+    # la posición literal del orden declarado.
+    assert 0 <= transfer.context_instance_index("story", {"attempts": 4}) < count
+    assert transfer.context_instance_index("story", {"attempts": 4}) == (
+        transfer.context_instance_index("story", 4)
+    )
     # Una familia con una sola superficie no rota nunca.
     single = {"id": "x", "prompt": "Only one."}
     assert transfer.context_instances(single) == (
@@ -352,7 +373,7 @@ def test_context_for_never_raises_with_garbage_attempts():
 def test_without_evidence_the_payload_is_v3_58_plus_three_additive_fields():
     got = transfer.context_for("travel", level="B1")
     surfaces = transfer.context_instances(got["context_id"])
-    assert set(got) == set(V360_KEYS)
+    assert set(got) == set(V361_KEYS)
     assert got["context_instance"] == ""
     assert got["instance_index"] == 0
     assert got["instance_count"] == len(surfaces)
@@ -386,7 +407,7 @@ def test_the_empty_bank_return_carries_the_instance_defaults(monkeypatch):
     monkeypatch.setattr(transfer, "TRANSFER_CONTEXTS", ())
     got = transfer.context_for("travel")
     assert got["available"] is False
-    assert set(got) == set(V360_KEYS)
+    assert set(got) == set(V361_KEYS)
     assert got["context_instance"] == ""
     assert got["instance_index"] == 0
     assert got["instance_count"] == 0
