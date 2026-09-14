@@ -125,7 +125,7 @@
 > workflow runs; coincide con el P3-03 de `S`). Los **P1 de `S`** (espacio aún
 > memorizable, equivalencia pedagógica no demostrada, Student Skill State
 > agregado) se aceptan como **siguiente escalón**, no como defecto de V3.60.
-> **Siguiente paso (ya planificado):** **V3.61 — Instance-aware Evidence +
+> **Cierre aplicado (V3.61):** **Instance-aware Evidence +
 > Anti-spoiler Guard**, que cierra **T-01** y **T-02**: guard anti-spoiler por
 > unidad objetivo en la superficie servida (`available_instance_details`), guard
 > de **identidad inmutable** de instancia en el GET que el POST valida para
@@ -135,11 +135,12 @@
 > los P1 de `S` en su parte determinista: cap **estratificado** en `_expand_spec`
 > (hoy es un prefijo del producto cartesiano), rotación no secuencial a partir del
 > tercer intento y un **validador de contenido** del `instance_space`. La deuda
-> declarada sigue igual: **Student Skill State 3.0** (V3.62), **Observed Task
+> declarada sigue igual: **Student Skill State 4.0** (V3.62; la auditoría `S` lo
+> llama «3.0», pero ese nombre ya es V3.54), **Observed Task
 > Difficulty 2.0** (V3.63), **Planner 3.0** y rotación adaptativa (V3.64),
 > **Instance Generator 2.0** (V3.65) y WSD real.
 >
-> **Estado (2026-09-14): V3.61.0 IMPLEMENTADA y verificada en local** — `VERSION`
+> **Estado (2026-09-14): V3.61.0 CERRADA y publicada** — `VERSION`
 > `3.61.0` (app `3.60.0 → 3.61.0`), **columna aditiva idempotente** en
 > `learning_evidence` (sin migración explícita) y **sin bump de
 > `GENERATOR_VERSION`**. **(A) Guard:** `reveals_target` +
@@ -172,9 +173,34 @@
 > `check_beta_v3` OK, `content_validation` OK y `transfer_validation` **20
 > familias / 1020 superficies / 0 errores**. Auditorías archivadas en
 > `docs/audit/S-AUDITORIA-TOTAL-V360.md` y `docs/audit/T-AUDITORIA-TOTAL-V360.md`.
-> Pendiente: commit/push, **CI** sobre el nuevo commit (con el paso de validación
-> del espacio) y etiqueta anotada `v3.61.0`; el detalle está en
-> `release-notes-v3.61.0.md`.
+> **Cerrada:** commit de release `1b4af42`, **CI 6/6** (run
+> [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
+> con el paso nuevo `python -m scripts.transfer_validation` **en verde** dentro del
+> job Backend) y etiqueta anotada `v3.61.0` creada y empujada. El detalle está en
+> `release-notes-v3.61.0.md` y el registro del incremento en
+> `agentes/v361-instance-aware-evidence.md`.
+>
+> **Siguiente incremento (relevo ya escrito): V3.62 — Student Skill State 4.0
+> (modalidad × competencia)** — `agentes/v362-student-skill-state-4.md`. Cierra el
+> **P1-03** de la auditoría `S`: hoy conviven **dos** modelos del alumno que nunca
+> se tocan (el **adaptativo léxico**, `LEXICAL_SKILLS` × `DIFFICULTY_DIMENSIONS`,
+> cuya única fuente es `learning_evidence` y que alimenta el ELV/planner/
+> `transfer.context_for`; y el **curricular**, `MASTERY_SKILLS` × 4 estados
+> pedagógicos, Student Model, que solo llega a `/api/profile`), las cuatro
+> «dimensiones» del primero son **CARGA de contenido, no competencia**
+> (`syntax` ≠ `grammar`, y no hay eje fonológico, ortográfico ni pragmático) y
+> toda la evidencia no léxica (grammar, listening por subdestreza, pronunciation,
+> reading, writing, speaking) es **inerte** para el estado. V3.62 los unifica en un
+> estado **{modalidad: {competencia: …}}** alimentado por **las cuatro** fuentes
+> con el **mismo** rigor de muestra espaciada, **reutiliza** el gate de
+> `services/competence.py` (sin umbrales nuevos) y es **aditivo** (columna
+> idempotente + `LearningProfile.skill_state` + espejo TS). **Alcance cerrado con
+> el gerente:** la decisión de tareas queda **intacta** y se prueba **byte a
+> byte**; el recableado del planner es V3.63/V3.64. Ojo con el matiz: el cierre de
+> V3.54 (una capacidad **escrita** no eleva una tarea **oral**) sigue vigente y
+> **no** se re-reclama. Deuda declarada tras V3.62: **Observed Task Difficulty
+> 2.0** (V3.63), **Planner 3.0** y rotación adaptativa (V3.64), **Instance
+> Generator 2.0** (V3.65) y WSD real.
 >
 > **Nota (2026-09-13): V3.59.0 (Context Engine 3.0 — Context Bank Family/Instance)**
 > — release **v3.59.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`,
@@ -2645,16 +2671,29 @@ Evidence + Anti-spoiler Guard** cierra ambos defectos más la parte determinista
 los P1 de `S` (guard anti-spoiler por unidad objetivo, identidad inmutable de
 instancia GET→POST, `context_instance` aditivo en el ledger sin migración,
 cap **estratificado** en `_expand_spec`, rotación no secuencial a partir del tercer
-intento y **validador de contenido** del `instance_space`) y está
-**IMPLEMENTADA y verificada en local** (`VERSION` `3.61.0`; `pytest` **2373
+intento y **validador de contenido** del `instance_space`) y quedó **CERRADA**
+(`VERSION` `3.61.0`; `pytest` **2373
 passed**, `ruff` limpio, launcher **75 passed**, `tsc` OK, `vitest` **651**,
 `build` OK, `check_release_consistency` **3.61.0**, `check_beta_v3`/`content_validation`
 OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores**). Banco
 **358 → 1020 superficies**; en `shopping` el guard retira **12** superficies con la
-unidad `supermarket` y conserva **39** servibles. **Pendiente:** commit/push, **CI**
-sobre el nuevo commit (con el paso de validación del espacio añadido al job
-Backend) y etiqueta anotada `v3.61.0`. Detalle en `release-notes-v3.61.0.md`
+unidad `supermarket` y conserva **39** servibles. **Cerrada** con el commit de
+release `1b4af42`, **CI 6/6** (run
+[34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
+con el paso de validación del espacio **en verde** en el job Backend) y etiqueta
+anotada `v3.61.0` creada y empujada. Detalle en `release-notes-v3.61.0.md`
 (la nota superior de este documento tiene el resumen completo de V3.61).
+
+**Relevo para el siguiente agente (2026-09-14): V3.62 — Student Skill State 4.0
+(modalidad × competencia).** El briefing autocontenido está en
+`agentes/v362-student-skill-state-4.md`: unifica los **dos** modelos del alumno que
+hoy no se tocan (adaptativo léxico y curricular) en un estado
+**{modalidad: {competencia: …}}** alimentado por las **cuatro** fuentes de
+evidencia (`learning_evidence`, `academy_evidence`, `listening_attempts`,
+`pronunciation_attempts`) con el mismo rigor de muestra espaciada, reutilizando el
+gate de `services/competence.py`, **sin** traducir carga a competencia y **sin**
+recablear la decisión de tareas (que se prueba byte a byte). Verifica el estado
+real del árbol antes de empezar (premisas 8 y 12).
 
 **Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra

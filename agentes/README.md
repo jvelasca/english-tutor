@@ -5,10 +5,18 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-14): `v3.60.0` en `main`; `3.61.0` IMPLEMENTADA y
-> verificada en local (pendiente de push, CI y etiqueta).** Ver `docs/RELEVO.md`
+> **Estado actual (2026-09-14): `v3.61.0` CERRADA en `main`** (commit `1b4af42`,
+> **CI 6/6** en el run
+> [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
+> etiqueta anotada `v3.61.0` creada y empujada). **Siguiente incremento: V3.62 —
+> Student Skill State 4.0 (modalidad × competencia)**, con briefing autocontenido
+> listo para lanzar en `agentes/v362-student-skill-state-4.md`: cierra el
+> **P1-03** de la auditoría `S` de V3.60 (el estado del alumno **no tiene eje de
+> competencia** y toda la evidencia no léxica —grammar, listening por
+> subdestreza, pronunciation, reading, writing, speaking— es **inerte**) **sin
+> recablear** todavía la decisión de tareas (eso es V3.63/V3.64). Ver `docs/RELEVO.md`
 > (nota superior y sección 0 "START HERE"). **V3.61 — Instance-aware Evidence +
-> Anti-spoiler Guard** cierra los **2 defectos funcionales** de la auditoría `T` de
+> Anti-spoiler Guard** cerró los **2 defectos funcionales** de la auditoría `T` de
 > V3.60 (**fuga del target** en una superficie generada de `shopping` e **identidad
 > de instancia no inmutable** en el POST) y la parte determinista de los **P1** de
 > la auditoría `S` (cap **estratificado**, rotación no secuencial y **validador de
@@ -69,8 +77,8 @@ pedir más contexto.
 > **Learner Skill State 2.0 + `observed_difficulty`** (P1-02), la V3.52.2 como
 > **cierre de los dos P2 de la auditoría externa Q** y la V3.52.1 como el
 > **hotfix de producto**. Los P3-02/P3-03 quedan abiertos y aceptados. El
-> siguiente incremento es **V3.61 — Instance-aware Evidence + Anti-spoiler
-> Guard** (**implementada**, ver arriba), que cierra los **2 defectos funcionales**
+> incremento cerrado fue **V3.61 — Instance-aware Evidence + Anti-spoiler
+> Guard** (**cerrada**, ver arriba, con **CI 6/6**), que cerraba los **2 defectos funcionales**
 > de la auditoría `T` de V3.60
 > (**fuga del target** en una superficie generada de `shopping`,
 > `backend/services/transfer.py:1074`/`:2978`, e **identidad de instancia no
@@ -82,7 +90,11 @@ pedir más contexto.
 > ledger** sin migración y manteniendo `context_id = FAMILIA`. Las dos auditorías
 > están archivadas en `docs/audit/S-AUDITORIA-TOTAL-V360.md` y
 > `docs/audit/T-AUDITORIA-TOTAL-V360.md`, y el veredicto consolidado en la nota
-> superior de `docs/RELEVO.md`. El briefing de V3.60 vive en
+> superior de `docs/RELEVO.md`. El **relevo a V3.62** está escrito en
+> `agentes/v362-student-skill-state-4.md` (modelo unificado **modalidad ×
+> competencia** con las **cuatro** fuentes de evidencia y el **mismo** rigor de
+> muestra espaciada; aditivo, con la decisión de tareas **intacta**) y el de V3.61
+> en `agentes/v361-instance-aware-evidence.md`. El briefing de V3.60 vive en
 > `agentes/v360-context-engine-4.md` (V3.59 en `agentes/v359-context-engine-3.md`,
 > V3.58 en `agentes/v358-sense-engine-2.md` y V3.57 en
 > `agentes/v357-argmax-elv.md`); el punto de entrada de la auditoría externa de
@@ -165,6 +177,41 @@ pedir más contexto.
   (`e721fce`, run 34782482120), con 9 afirmaciones a falsar y 8 preguntas de alto
   valor; su informe se esperaba en `docs/audit/R-AUDITORIA-TOTAL-V359.md` (letra
   `R`) y **no está publicado** todavía. Se conserva como histórico del método.
+- `agentes/v362-student-skill-state-4.md` — **V3.62 (RELEVO LISTO, POR
+  EJECUTAR)**: **Student Skill State 4.0 — modalidad × competencia**. Cierra el
+  **P1-03** de la auditoría `S` de V3.60: hoy conviven **DOS** modelos del alumno
+  que nunca se tocan — el **adaptativo léxico** (`LEXICAL_SKILLS` ×
+  `DIFFICULTY_DIMENSIONS`, única fuente `learning_evidence`, alimenta
+  ELV/planner/`transfer.context_for`) y el **curricular** (`MASTERY_SKILLS` × 4
+  estados pedagógicos, Student Model, solo `/api/profile`) — y las cuatro
+  «dimensiones» del primero son **CARGA de contenido, no competencia**
+  (`syntax` ≠ `grammar`, y no hay eje fonológico, ortográfico ni pragmático). El
+  incremento unifica los dos en un estado **{modalidad: {competencia: …}}**
+  alimentado por **las cuatro** fuentes (`learning_evidence`, `academy_evidence`,
+  `listening_attempts`, `pronunciation_attempts`) con el **mismo** rigor de
+  muestra espaciada (`OBSERVED_MIN_SAMPLES`/`OBSERVED_MIN_DAYS`), **reutiliza** el
+  gate de `services/competence.py` (sin umbrales nuevos), **no traduce** carga a
+  competencia (mapear `syntax→grammar` inventaría evidencia) y es **aditivo**
+  (columna idempotente + `LearningProfile.skill_state` + espejo TS). **Alcance
+  cerrado con el gerente:** la decisión de tareas (ELV/planner/`difficulty`/
+  `transfer.context_for`) queda **intacta** y se prueba **byte a byte**; el
+  recableado es V3.63/V3.64. Nota de nomenclatura: la auditoría lo llama «3.0»,
+  pero ese nombre ya es V3.54.
+- `agentes/v361-instance-aware-evidence.md` — **V3.61 (EJECUTADA, 2026-09-14,
+  v3.61.0)**: **Instance-aware Evidence + Anti-spoiler Guard**. Cierra los **2
+  defectos funcionales** de la auditoría `T` de V3.60 (**fuga del target**: la
+  superficie servida podía NOMBRAR la unidad objetivo —`shopping` servía «You are
+  in a supermarket…» con `supermarket` como unidad—; **identidad de instancia no
+  inmutable**: el POST recalculaba la rotación y podía persistir la carga de OTRA
+  superficie) y la parte **determinista** de los P1 de `S` (cap **estratificado**,
+  rotación **no secuencial** para intentos ≥ 3 y **validador de contenido** del
+  `instance_space`, con CLI dentro del job Backend). Guard léxico determinista (sin
+  LLM ni WSD: frontera de palabra + variantes inflexivas acotadas), identidad
+  inmutable GET→POST (`serve_instance`/`served_difficulty_for_instance`),
+  `context_instance` **aditivo** en el ledger (manteniendo `context_id = FAMILIA`,
+  sin fragmentar la evidencia) y banco **358 → 1020** superficies. **CI 6/6** (run
+  [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926)).
+  Ver `release-notes-v3.61.0.md`.
 - `agentes/v360-context-engine-4.md` — **V3.60 (EJECUTADO, 2026-09-14, v3.60.0)**:
   **Context Engine 4.0 — Instance Specification → Parameterized Instance**.
   Sustituye las **60 consignas escritas a mano** por un **ESPACIO de instancias
