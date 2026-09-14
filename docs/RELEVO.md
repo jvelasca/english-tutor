@@ -180,8 +180,7 @@
 > `release-notes-v3.61.0.md` y el registro del incremento en
 > `agentes/v361-instance-aware-evidence.md`.
 >
-> **Estado (2026-09-14): V3.62.0 IMPLEMENTADA y verificada en local (pendiente
-> commit, CI y tag)** — `VERSION` `3.62.0` (app `3.61.0 → 3.62.0`), **columna
+> **Estado (2026-09-14): V3.62.0 CERRADA y publicada** — `VERSION` `3.62.0` (app `3.61.0 → 3.62.0`), **columna
 > aditiva idempotente** en `learning_profile` (`skill_state`) y **sin bump de
 > `GENERATOR_VERSION`**. **(A) Taxonomía:** nuevo `services/skill_axis.py` con
 > `SKILL_MODALITIES` (9), `MODALITY_BY_VOCABULARY` (mapa preciso por vocabulario,
@@ -217,7 +216,10 @@
 > `vitest` **651** (76 ficheros), `npm run build` OK,
 > `check_release_consistency` **3.62.0**, `check_beta_v3` OK, `content_validation`
 > OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores** (la
-> release NO toca el banco). Detalle en `release-notes-v3.62.0.md`.
+> release NO toca el banco). **Cerrada:** commit de release `f4bcee2`, **CI 6/6**
+> (run [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
+> y etiqueta anotada `v3.62.0` creada y empujada. Detalle en
+> `release-notes-v3.62.0.md`.
 >
 > **Incremento aplicado (relevo ejecutado): V3.62 — Student Skill State 4.0
 > (modalidad × competencia)** — `agentes/v362-student-skill-state-4.md`. Cierra el
@@ -2692,8 +2694,11 @@ de tareas sigue leyendo EXACTAMENTE el estado de V3.61 y se prueba byte a byte).
 **Verificada en local** (`pytest` **2404 passed**, `ruff` limpio, launcher **75**,
 `tsc` OK, `vitest` **651**, `build` OK, `check_release_consistency` **3.62.0**,
 `check_beta_v3`/`content_validation` OK y `transfer_validation` **20 familias /
-1020 superficies / 0 errores**); **pendiente de commit, CI 6/6 y tag** `v3.62.0`.
-Detalle en `release-notes-v3.62.0.md`. Antes, `v3.61.0` **Instance-aware Evidence +
+1020 superficies / 0 errores**). **CERRADA**: commit de release `f4bcee2`, **CI
+6/6** (run
+[34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
+y etiqueta anotada `v3.62.0` creada y empujada. Detalle en
+`release-notes-v3.62.0.md`. Antes, `v3.61.0` **Instance-aware Evidence +
 Anti-spoiler Guard** (release SIN migración explícita de BD —columna aditiva
 idempotente en `learning_evidence`—, SIN bump de `GENERATOR_VERSION` y SIN
 cambios de UI que cierra los **dos defectos funcionales** de la auditoría `T` de

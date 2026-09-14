@@ -16,8 +16,10 @@
 > `tsc` OK, `vitest` **651** (76 ficheros), `npm run build` OK,
 > `check_release_consistency` **3.62.0**, `check_beta_v3` OK, `content_validation`
 > OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores** (esta
-> release NO toca el banco). **Pendiente en el momento de escribir esto:** commit
-> de release, **CI 6/6** y tag anotado `v3.62.0`.
+> release NO toca el banco). **CERRADA:** commit de release `f4bcee2`, **CI 6/6**
+> (run
+> [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
+> y etiqueta anotada `v3.62.0` creada y empujada.
 >
 > **Nota de nomenclatura (importante).** La auditoría externa `S` de V3.60 pide
 > «V3.62 — Student Skill State **3.0**», pero **ese nombre ya está usado**: V3.54
@@ -339,6 +341,16 @@ el payload del drill devuelven **exactamente** lo de V3.61.
   ciega al eje nuevo; el estado en sí no cambia ninguna tarea todavía).
 - Si algo del briefing no cuadra con el árbol real, **para y repórtalo** antes de
   implementar (premisa 8).
+
+## Cierre
+
+**V3.62.0 CERRADA y publicada (2026-09-14):** commit de release `f4bcee2`, **CI
+6/6** en el run
+[34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611)
+(Release consistency `3.62.0`, Backend con `ruff` + `pytest` + el paso
+`python -m scripts.transfer_validation`, Frontend con `tsc` + `vitest` **76
+ficheros/651 tests** + `build`, Playwright E2E, Beta V3.0 gate y Content
+validation) y etiqueta anotada `v3.62.0` creada y empujada.
 
 ## Resultado de la ejecución (2026-09-14)
 

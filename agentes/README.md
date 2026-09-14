@@ -6,7 +6,7 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 pedir más contexto.
 
 > **Estado actual (2026-09-14): `v3.62.0` Student Skill State 4.0 (modalidad ×
-> competencia) IMPLEMENTADA y verificada en local** — unifica los dos modelos del
+> competencia) CERRADA en `main`** — unifica los dos modelos del
 > alumno en **UN** estado `{modalidad: {competencia: entry}}` alimentado por las
 > **cuatro** fuentes de evidencia con la **misma** puerta espaciada y el gate
 > **reutilizado** de `services/competence.py`, sin umbrales nuevos, y es
@@ -14,8 +14,10 @@ pedir más contexto.
 > V3.61 (probado **byte a byte**). Verificación local: `pytest` **2404 passed**,
 > `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**, `build` OK,
 > `check_release_consistency` **3.62.0**, `check_beta_v3`/`content_validation` OK y
-> `transfer_validation` **20 familias / 1020 superficies / 0 errores**;
-> **pendiente commit, CI 6/6 y tag** `v3.62.0`. Briefing y detalle en
+> `transfer_validation` **20 familias / 1020 superficies / 0 errores**.
+> **CERRADA:** commit de release `f4bcee2`, **CI 6/6** (run
+> [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
+> y etiqueta anotada `v3.62.0` creada y empujada. Briefing y detalle en
 > `agentes/v362-student-skill-state-4.md` y `release-notes-v3.62.0.md`.
 > **Siguiente incremento esperado: V3.63 — Observed Task Difficulty 2.0**
 > (el **recableado** de la decisión de tareas al eje de competencia es
@@ -214,8 +216,10 @@ pedir más contexto.
   pero ese nombre ya es V3.54. **Verificación local:** `pytest` **2404 passed**,
   `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**, `build` OK,
   `check_release_consistency` **3.62.0**, `check_beta_v3`/`content_validation` OK y
-  `transfer_validation` **20 familias / 1020 superficies / 0 errores**;
-  **pendiente commit, CI 6/6 y tag**. Ver `release-notes-v3.62.0.md`.
+  `transfer_validation` **20 familias / 1020 superficies / 0 errores**. **CERRADA:**
+  commit de release `f4bcee2`, **CI 6/6** (run
+  [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
+  y etiqueta anotada `v3.62.0` empujada. Ver `release-notes-v3.62.0.md`.
 - `agentes/v361-instance-aware-evidence.md` — **V3.61 (EJECUTADA, 2026-09-14,
   v3.61.0)**: **Instance-aware Evidence + Anti-spoiler Guard**. Cierra los **2
   defectos funcionales** de la auditoría `T` de V3.60 (**fuga del target**: la

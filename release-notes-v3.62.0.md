@@ -238,6 +238,16 @@ backend:  python backend/scripts/content_validation.py  → OK=True quality=True
 backend:  python -m scripts.transfer_validation         → 20 familias / 1020 superficies / 0 errores
 ```
 
+## Cierre
+
+**V3.62.0 CERRADA y publicada (2026-09-14):** commit de release `f4bcee2`, **CI
+6/6** en el run
+[34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611)
+—Release consistency `3.62.0`, Backend (`ruff` + `pytest` + el paso
+`python -m scripts.transfer_validation`), Frontend (`tsc` + `vitest` **76
+ficheros/651 tests** + `build`), Playwright E2E, Beta V3.0 gate y Content
+validation— y etiqueta anotada `v3.62.0` creada y empujada.
+
 No-op probado del camino de decisión: con un `skill_state` **rico** persistido
 (ajeno a la evidencia real) `learner_level_state`, el payload del drill, el argmax
 de ELV y `transfer.context_for` devuelven **exactamente** lo de V3.61; los tests
