@@ -125,6 +125,14 @@ class LearningProfile(BaseModel):
     # evidencia con la MISMA puerta espaciada de V3.54, y su resumen derivado por
     # modalidad. Aditivo: ninguna decisión de tareas lo lee todavía (el ELV, el
     # planner y `transfer.context_for` siguen leyendo el estado de V3.61).
+    # V3.63 (Observed Task Difficulty 2.0): cada entrada gana claves ADITIVAS —
+    # `observations`, `occasions` (muestras ≠ mediciones independientes),
+    # `assessment_confidence` ({band, reasons}, distinta de `confidence`) y
+    # `observed_task_difficulty_2` (la capa EMPÍRICA de dificultad)—; el resumen
+    # gana `layers` para la modalidad que declara capas (hoy listening). Se
+    # conserva `dict` genérico porque el estado es extensible por diseño y su
+    # normalizador (`services.skill_state.normalize_skill_state`) ya valida la
+    # forma: tipar cada clave aquí acoplaría el contrato al agregador.
     skill_state: dict[str, dict[str, dict]] = Field(default_factory=dict)
     skill_state_summary: dict[str, dict] = Field(default_factory=dict)
     estimated_bands: EstimatedBands

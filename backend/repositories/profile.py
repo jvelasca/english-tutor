@@ -19,12 +19,14 @@ def get_profile(user_id: str) -> dict | None:
     JSON; la normaliza `services.learner_skill.normalize_skill_capacity`).
     V3.62: expone `skill_state` (estado unificado {modalidad: {competencia:
     entry}} en JSON; lo normaliza `services.skill_state.normalize_skill_state`).
+    V3.63: expone `skill_state_source` (el sello de frescura de esa caché; `""`
+    en las cachés legacy, que por eso nunca se reportan frescas).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT user_id, cefr_level, estimated_level, demonstrated_level, "
             "observed_level, observed_capacity, observed_skill_capacity, "
-            "skill_state, updated_at "
+            "skill_state, skill_state_source, updated_at "
             "FROM learning_profile WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -94,8 +96,10 @@ def set_level_state(
     }
 
 
-def set_skill_state(user_id: str, skill_state: str) -> dict | None:
-    """Persiste SOLO la columna aditiva `skill_state` (V3.62).
+def set_skill_state(
+    user_id: str, skill_state: str, source: str = ""
+) -> dict | None:
+    """Persiste SOLO las columnas aditivas `skill_state`/`skill_state_source`.
 
     Escritor DEDICADO: el estado unificado por modalidad × competencia se calcula
     en `domain.profile` en cada refresco del perfil y se cachea aquí como JSON
@@ -103,20 +107,59 @@ def set_skill_state(user_id: str, skill_state: str) -> dict | None:
     `observed_skill_capacity`, que sigue siendo la fuente de verdad del drill) y
     no altera la firma del escritor caliente `set_level_state`. Devuelve None si
     el usuario no existe.
+
+    V3.63 (P2-18): `source` es el SELLO de frescura — la huella de las cuatro
+    fuentes (`repositories.evidence.evidence_fingerprint`) en el momento de
+    escribir la caché. Es OPCIONAL con default `""` para no romper llamadores: una
+    caché sin sello (o con sello `""`) NUNCA se reporta como fresca
+    (`skill_state_is_fresh`), que es la degradación honesta.
     """
     if get_user(user_id) is None:
         return None
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
-            "INSERT INTO learning_profile (user_id, updated_at, skill_state) "
-            "VALUES (?, ?, ?) "
+            "INSERT INTO learning_profile "
+            "(user_id, updated_at, skill_state, skill_state_source) "
+            "VALUES (?, ?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET "
             "skill_state = excluded.skill_state, "
+            "skill_state_source = excluded.skill_state_source, "
             "updated_at = excluded.updated_at",
-            (user_id, now, skill_state),
+            (user_id, now, skill_state, str(source or "")),
         )
-    return {"user_id": user_id, "skill_state": skill_state, "updated_at": now}
+    return {
+        "user_id": user_id,
+        "skill_state": skill_state,
+        "skill_state_source": str(source or ""),
+        "updated_at": now,
+    }
+
+
+def skill_state_is_fresh(user_id: str) -> bool:
+    """¿La caché de `skill_state` describe TODAVÍA las cuatro fuentes? (V3.63).
+
+    Compara el sello guardado con `evidence_fingerprint(user_id)`. Devuelve
+    `False` cuando no hay caché, cuando la caché está VACÍA, cuando no tiene sello
+    (legacy de V3.62) o cuando el sello ya no coincide. Invariante: una caché vieja
+    NUNCA se reporta como fresca. Esta función solo RESPONDE; recomputar la caché
+    cuando está vieja es responsabilidad del llamador (V3.64).
+    """
+    from repositories.evidence import evidence_fingerprint
+
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT skill_state, skill_state_source FROM learning_profile "
+            "WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        return False
+    cached = str(row["skill_state"] or "").strip()
+    source = str(row["skill_state_source"] or "").strip()
+    if not cached or not source:
+        return False
+    return source == evidence_fingerprint(user_id)
 
 
 def set_cefr(user_id: str, level: str) -> dict | None:

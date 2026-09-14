@@ -296,6 +296,10 @@ def init_db() -> None:
         # unificado {modalidad: {competencia: entry}} que agrega las CUATRO
         # fuentes de evidencia con la misma puerta espaciada. Aditivo: ninguna
         # decisión de tareas lo lee todavía (eso es V3.63/V3.64).
+        # V3.63: `skill_state_source` guarda el SELLO de frescura de esa caché (la
+        # huella de las cuatro fuentes en el momento de escribirla). Una caché SIN
+        # sello (legacy) o con un sello que ya no coincide con las fuentes NUNCA se
+        # reporta como fresca: la caché es una optimización, no una segunda verdad.
         profile_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_profile)")
         }
@@ -306,6 +310,7 @@ def init_db() -> None:
             ("observed_capacity", "TEXT NOT NULL DEFAULT ''"),
             ("observed_skill_capacity", "TEXT NOT NULL DEFAULT ''"),
             ("skill_state", "TEXT NOT NULL DEFAULT ''"),
+            ("skill_state_source", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in profile_cols:
                 conn.execute(

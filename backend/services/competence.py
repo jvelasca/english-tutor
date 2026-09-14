@@ -24,6 +24,8 @@ El módulo es puro y determinista; la proyección se construye en
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from services.adaptive import (
     READINESS_DEFAULT_MINIMUM,
     READINESS_MIN_CONFIDENCE,
@@ -32,6 +34,7 @@ from services.adaptive import (
 )
 from services.cefr import heuristic_band
 from services.evidence_depth import evidence_depth_report
+from services.learner_skill import OBSERVED_MIN_DAYS, OBSERVED_MIN_SAMPLES
 from services.mastery import MASTERY_SKILLS
 
 # Orden creciente de los 4 estados (para combinar formal + ruta).
@@ -48,7 +51,71 @@ SUPPORT_SKILLS: tuple[str, ...] = ("vocabulary",)
 
 
 def _rank(state: str) -> int:
+    """Rango de un estado en `STATE_ORDER` (0 si no se reconoce)."""
     return STATE_ORDER.index(state) if state in STATE_ORDER else 0
+
+
+# ---------------------------------------------------------------------------
+# Seam de POLÍTICA de la puerta (V3.63, P2-14)
+# ---------------------------------------------------------------------------
+
+# La auditoría de V3.62 (P2-14) señala que el estado `functional`/`demonstrated`
+# sale de una regla GENERAL que no tiene exactamente la misma semántica en toda
+# pareja (modalidad, competencia): `writing:orthography` no se demuestra igual
+# que `speaking:interaction`. V3.63 declara el SEAM para poder parametrizarla sin
+# inventar umbrales, pero **no cambia ninguna política**: `gate_for` devuelve
+# SIEMPRE la puerta por defecto de V3.54/V3.62.
+#
+# Invariante declarado: para sesgar una pareja hay que AÑADIR una entrada a
+# `COMPETENCE_GATE_POLICIES` **y** actualizar este docstring; el test
+# `test_only_the_default_gate_policy_is_declared` fija que la tabla está vacía, de
+# modo que cualquier política nueva es una decisión explícita y no un descuido.
+@dataclass(frozen=True)
+class CompetenceGate:
+    """Puerta declarada de una pareja (modalidad, competencia), estructura CONGELADA.
+
+    `min_samples`/`min_days` son los de la puerta espaciada única del proyecto
+    (`learner_skill.OBSERVED_MIN_SAMPLES`/`OBSERVED_MIN_DAYS`): NO se declaran
+    números nuevos, se REUTILIZAN los mismos que el estado léxico de V3.53/V3.54.
+    """
+
+    modality: str
+    competence: str
+    min_samples: int
+    min_days: int
+    # La retención `delayed` la sigue exigiendo `competence_state` para el estado
+    # `demonstrated` (no se toca): aquí queda declarado para que la política sea
+    # explícita y auditable.
+    requires_retention: bool = True
+
+
+DEFAULT_COMPETENCE_GATE = CompetenceGate(
+    modality="",
+    competence="",
+    min_samples=OBSERVED_MIN_SAMPLES,
+    min_days=OBSERVED_MIN_DAYS,
+)
+
+# Políticas ALTERNATIVAS declaradas: VACÍO por diseño en V3.63.
+COMPETENCE_GATE_POLICIES: dict[tuple[str, str], CompetenceGate] = {}
+
+
+def gate_for(
+    modality: object, competence: object, source: object = ""
+) -> CompetenceGate:
+    """Puerta declarada de una pareja (modalidad, competencia) (V3.63, pura).
+
+    Devuelve SIEMPRE `DEFAULT_COMPETENCE_GATE` mientras no exista una política
+    alternativa declarada en `COMPETENCE_GATE_POLICIES` (vacía en V3.63). El
+    `source` se acepta para que la política pueda declarar por tipo de evidencia
+    el día que haga falta, sin cambiar la firma. Nunca lanza.
+    """
+    del source  # declarado para la firma de la política futura; hoy no decide.
+    key = (
+        str(modality or "").strip().lower(),
+        str(competence or "").strip().lower(),
+    )
+    return COMPETENCE_GATE_POLICIES.get(key, DEFAULT_COMPETENCE_GATE)
 
 
 def _score_floor(skill: str) -> float:

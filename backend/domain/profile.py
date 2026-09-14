@@ -309,10 +309,20 @@ async def get_profile_summary(user_id: str) -> dict | None:
     # V3.62: el estado unificado se cachea con un escritor DEDICADO (columna
     # aditiva) en JSON determinista (`sort_keys=True`), para que el contrato sea
     # estable entre refrescos y el drill no pague el coste de recomputarlo.
+    # V3.63 (P2-18): la caché se SELLA con la huella de las cuatro fuentes, para
+    # que `repositories.profile.skill_state_is_fresh` pueda distinguir una caché
+    # vigente de una vieja. La huella se toma DESPUÉS de leer las fuentes: si
+    # entrara evidencia en medio, el sello sería más nuevo que el estado y la
+    # caché se reportaría (correctamente) como NO fresca. El payload servido por
+    # `/api/profile` no cambia: el sello solo se persiste.
+    skill_state_source = await run_in_threadpool(
+        evidence_repo.evidence_fingerprint, user_id
+    )
     await run_in_threadpool(
         profile_repo.set_skill_state,
         user_id,
         json.dumps(profile["skill_state"], ensure_ascii=False, sort_keys=True),
+        skill_state_source,
     )
     await _maybe_record_snapshot(user_id, profile)
     history = await run_in_threadpool(profile_repo.list_cefr_history, user_id)

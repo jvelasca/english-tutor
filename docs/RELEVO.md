@@ -243,6 +243,34 @@
 > 2.0** (V3.63), **Planner 3.0** y rotación adaptativa (V3.64), **Instance
 > Generator 2.0** (V3.65) y WSD real.
 >
+> **Nota (2026-09-14): auditorías de V3.62.0 recibidas.** Se archiva el informe
+> profundo como `docs/audit/U-AUDITORIA-TOTAL-V362.md` (**9,5 / 10 APROBADA**; 0
+> P0, **2 P1**, 5 P2, 2 P3; letra `U` porque la `R` sigue **reservada** al informe
+> nunca publicado de V3.59) y el punto de entrada de la auditoría externa como
+> `agentes/auditoria-externa-v362.md` (su informe se espera en
+> `docs/audit/V-AUDITORIA-TOTAL-V362.md`). Veredicto: V3.62 **sí** cierra el
+> problema arquitectónico abierto (ya no hay dos modelos del alumno aislados) y
+> evita tres errores graves (no convierte dificultad en competencia, no inventa
+> competencias y no mezcla modalidades), pero **el estado nuevo todavía no
+> gobierna la decisión de tareas**. Los dos P1 son los que importan: **P1-01** (el
+> Skill State es DESCRIPTIVO, no DECISIONAL: el puente debe ser `Student Skill
+> State → Decision Projection → Planner`, nunca `skill_state → planner`
+> directamente) y **P1-02** (la semántica `spontaneous_use → interaction` debe
+> evolucionar cuando exista conversación oral real, para distinguir interacción
+> escrita y oral según el CANAL observado, no según la skill). Los P2 aceptados
+> como deuda del siguiente escalón: competencia de pronunciación (P2-11), eje
+> declarado de capas de listening (P2-12), granularidad por duplicación de
+> competencias (P2-13), semántica del gate por pareja (P2-14), **frescura/caché del
+> estado** (P2-18), **confianza de evaluación vs confianza estadística** (P2-19) y
+> **dificultad empírica de la tarea** (P2-20). El **CI 6/6** de V3.62 queda como
+> **documentado, no verificado de forma independiente** (la consulta directa de
+> `status`/`workflow_runs` de `f4bcee2` no devuelve runs: coincide con el P3-02).
+> **Orden de trabajo decidido:** primero **V3.63 — Observed Task Difficulty 2.0**
+> (más la honestidad del modelo: canal, identidad de evidencia, capas, confianza de
+> evaluación y frescura), y **después** el recableado (**V3.64 Decision Projection
+> + Planner 3.0**), porque precipitar el recableado convertiría el Student Skill
+> State en otra capa de heurísticas superpuestas.
+>
 > **Nota (2026-09-13): V3.59.0 (Context Engine 3.0 — Context Bank Family/Instance)**
 > — release **v3.59.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`,
 > SIN cambios de UI y SIN tocar el ledger**, que cierra el candidato diferido
@@ -2682,20 +2710,34 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-14):** `v3.62.0` **Student Skill State 4.0 (modalidad ×
-competencia)** (release SIN migración explícita de BD —columna aditiva idempotente
-en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI que
-unifica los dos modelos del alumno en **UN** estado `{modalidad: {competencia:
-entry}}` alimentado por las CUATRO fuentes de evidencia —`learning_evidence`,
-`academy_evidence`, `listening_attempts`, `pronunciation_attempts`— con la MISMA
+**Posición actual (2026-09-14):** `v3.63.0` **Observed Task Difficulty 2.0 y
+honestidad del Student Skill State** (release SIN migración destructiva —una columna
+aditiva idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN
+cambios de UI que cierra la deuda de **honestidad** que V3.62 dejó declarada por
+escrito más el **P1-02** y los **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la
+auditoría `U`: **identidad de evidencia y OCASIONES** (una evaluación expandida a N
+competencias es UNA ocasión y el dedup solo puede acreditar menos), **canal
+OBSERVADO** del evento por actividad declarada (`spontaneous_use` escrito →
+`interaction`; oral → `speaking`), **dificultad EMPÍRICA** en el módulo puro
+`services/observed_difficulty.py` (techos servido/acreditado, dependencia de
+andamiaje, carga experimentada y la MISMA puerta espaciada de V3.54),
+**confianza de EVALUACIÓN** separada de la estadística, **criterio declarado** de
+pronunciación, **capas declaradas** de listening reutilizando `SKILL_LAYER`, **seam
+de política** del gate (tabla vacía, cero umbrales nuevos) y **frescura** de la
+caché del estado —una caché vieja NUNCA se sirve como fresca—). **La decisión de
+tareas sigue BYTE-IDÉNTICA** y el guard estructural de V3.62 sigue verde sin
+tocarse. **Verificada en local** (`pytest` **2430 passed**, `ruff` limpio, launcher
+**75**, `tsc` OK, `vitest` **651**, `build` OK, `check_release_consistency`
+**3.63.0**, `check_beta_v3`/`content_validation` OK y `transfer_validation` OK).
+Detalle en `release-notes-v3.63.0.md`. Antes, `v3.62.0` **Student Skill State 4.0
+(modalidad × competencia)** (release SIN migración explícita de BD —columna aditiva
+idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN cambios de
+UI que unificó los dos modelos del alumno en **UN** estado `{modalidad:
+{competencia: entry}}` alimentado por las CUATRO fuentes de evidencia con la MISMA
 puerta espaciada de V3.54 y el gate REUTILIZADO de `services/competence.py`, sin un
-solo umbral nuevo; cierra el P1-03 de `S` y es estrictamente ADITIVA: la decisión
-de tareas sigue leyendo EXACTAMENTE el estado de V3.61 y se prueba byte a byte).
-**Verificada en local** (`pytest` **2404 passed**, `ruff` limpio, launcher **75**,
-`tsc` OK, `vitest` **651**, `build` OK, `check_release_consistency` **3.62.0**,
-`check_beta_v3`/`content_validation` OK y `transfer_validation` **20 familias /
-1020 superficies / 0 errores**). **CERRADA**: commit de release `f4bcee2`, **CI
-6/6** (run
+solo umbral nuevo; cierra el P1-03 de `S` y es estrictamente ADITIVA: la decisión de
+tareas sigue leyendo EXACTAMENTE el estado de V3.61 y se prueba byte a byte).
+**CERRADA**: commit de release `f4bcee2`, **CI 6/6** (run
 [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
 y etiqueta anotada `v3.62.0` creada y empujada. Detalle en
 `release-notes-v3.62.0.md`. Antes, `v3.61.0` **Instance-aware Evidence +
@@ -2754,16 +2796,106 @@ con el paso de validación del espacio **en verde** en el job Backend) y etiquet
 anotada `v3.61.0` creada y empujada. Detalle en `release-notes-v3.61.0.md`
 (la nota superior de este documento tiene el resumen completo de V3.61).
 
-**Relevo para el siguiente agente (2026-09-14): V3.62 — Student Skill State 4.0
-(modalidad × competencia).** El briefing autocontenido está en
-`agentes/v362-student-skill-state-4.md`: unifica los **dos** modelos del alumno que
-hoy no se tocan (adaptativo léxico y curricular) en un estado
-**{modalidad: {competencia: …}}** alimentado por las **cuatro** fuentes de
-evidencia (`learning_evidence`, `academy_evidence`, `listening_attempts`,
-`pronunciation_attempts`) con el mismo rigor de muestra espaciada, reutilizando el
-gate de `services/competence.py`, **sin** traducir carga a competencia y **sin**
-recablear la decisión de tareas (que se prueba byte a byte). Verifica el estado
-real del árbol antes de empezar (premisas 8 y 12).
+**Auditorías de V3.62 recibidas (2026-09-14).** Se archivan el informe profundo
+`docs/audit/U-AUDITORIA-TOTAL-V362.md` (**9,5 / 10 APROBADA**: 0 P0, **2 P1**, 5
+P2, 2 P3; letra `U`, porque la `R` sigue reservada al informe pendiente de V3.59) y
+el punto de entrada de la auditoría externa
+`agentes/auditoria-externa-v362.md` (informe esperado en
+`docs/audit/V-AUDITORIA-TOTAL-V362.md`). V3.62 **sí** cierra el problema
+arquitectónico (ya no hay dos modelos del alumno aislados) y evita tres errores
+graves (no convierte dificultad en competencia, no inventa competencias, no mezcla
+modalidades), pero **el estado nuevo todavía no gobierna la decisión de tareas**.
+Los dos P1: **P1-01** el Skill State es DESCRIPTIVO y debe volverse DECISIONAL por
+una capa intermedia (`Student Skill State → Decision Projection → Planner`, nunca
+`skill_state → planner` directamente), y **P1-02** la semántica
+`spontaneous_use → interaction` debe evolucionar cuando exista conversación oral
+real (distinguir interacción escrita y oral según el **CANAL** observado, no según
+la skill). Deuda P2 aceptada: competencia de pronunciación (P2-11), eje declarado de
+capas de listening (P2-12), granularidad por duplicación (P2-13), semántica del gate
+por pareja (P2-14), frescura de la caché del estado (P2-18), confianza de evaluación
+vs estadística (P2-19) y dificultad empírica (P2-20). El **CI 6/6** de V3.62 queda
+como **documentado, no verificado de forma independiente** (P3-02).
+
+> **Nota (2026-09-14): V3.63.0 (Observed Task Difficulty 2.0 y honestidad del
+> Student Skill State)** — release **v3.63.0**, **SIN migración destructiva** (una
+> columna aditiva idempotente más, `learning_profile.skill_state_source`), **SIN
+> bump de `GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI**, que cierra
+> la deuda de **honestidad** que V3.62 dejó declarada por escrito y los hallazgos
+> **P1-02** y **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la auditoría `U`.
+> **La invariante central de V3.62 se mantiene:** la decisión de tareas queda
+> **byte-idéntica** (ELV, planner, `difficulty` y `transfer.context_for`) y el guard
+> estructural (`test_skill_state_v362.py`, **sin tocarse**) sigue verde: V3.63 hace
+> el estado más **honesto**, no más **decisivo**.
+> **(A) Identidad y OCASIONES (P2-13).** La fila canónica gana `evidence_id`,
+> `activity_id`, `assessment_id` y `occasion_key`: una evaluación que se expande a
+> N competencias son **N muestras y UNA ocasión**. La entrada expone `observations`
+> (filas) y `occasions` (mediciones independientes) y el dedup **solo puede
+> acreditar menos**, nunca más; sin identidad declarada por la fuente la degradación
+> es **EXACTA** a V3.62 (`occasions == samples`).
+> **(B) Canal OBSERVADO (P1-02).** `MODALITIES_BY_ASSESSED_CHANNEL` se **deriva** de
+> `LEXICAL_MODALITY` × `ASSESSMENT_MODE_MODALITY` (sin vocabulario nuevo) y declara
+> dos entradas explícitas: `("spontaneous_use", "written") → interaction` (el
+> `chat`/transfer de hoy) y `("spontaneous_use", "spoken") → speaking` (el canal que
+> V3.62 no podía expresar). El canal sale de la actividad **declarada** en el evento
+> (`task_semantics.assessment_mode_for` sobre `activity_from_activity_id`) y solo se
+> cae al mapa por skill cuando la fila no declara canal: un evento oral alimenta el
+> canal evaluado por **expansión declarada**, nunca por reinterpretación.
+> **(C) Observed Task Difficulty 2.0 empírica (P2-20, núcleo).** Nuevo módulo
+> **puro** `services/observed_difficulty.py` (sin I/O, sin reloj, sin `hash()` ni
+> `random()`): `served_ceiling` (lo pedido), `credited_ceiling` (lo logrado),
+> `scaffolding_gap` (su distancia = dependencia de andamiaje), `experienced_load`
+> (carga servida modulada por coste OBSERVADO y ya persistido, con tablas
+> DECLARADAS y monótonas y las constantes `planner.SLOW_RECALL_MS`/
+> `LATENCY_CEILING_MS`) y `observed_task_difficulty_2(rows)` con la **MISMA puerta
+> espaciada** de V3.54: sin 2 éxitos en 2 días **no se declara ninguna medida**. Las
+> tres dificultades de V3.55 eran HECHOS de la tarea; esta cuarta pata mira el
+> RESULTADO y un coste desconocido **no modula** (no se imputa nada).
+> **(D) Confianza de EVALUACIÓN (P2-19).** `assessment_confidence` (banda mínima +
+> motivos) se deriva SOLO de hechos ya persistidos (canal, `support_level`,
+> transcripción, audio ralentizado, repeticiones, instancia de transferencia no
+> declarada) y queda **separada** de la `confidence` **estadística**, que no cambia
+> de fórmula: eran dos cosas y ahora se llaman distinto.
+> **(E) Pronunciación con criterio DECLARADO (P2-11).** `_academy_rows` usa `item_id`
+> como competencia cuando la ruta ya puntúa un criterio de rúbrica (sin expandir por
+> subdestrezas del objetivo ni inventar rúbrica); la **práctica libre** mantiene la
+> competencia `""` con el motivo escrito (`PRONUNCIATION_PRACTICE_REASON`).
+> **(F) Capas declaradas de listening (P2-12).** `COMPETENCE_LAYERS_BY_MODALITY`
+> **reutiliza** `services.listening.SKILL_LAYER`/`LISTENING_LAYERS` sin añadir una
+> sola cadena (16 de 18 competencias; `dictation`/`shadowing` fuera con motivo:
+> son PRODUCCIÓN) y `skill_state_summary` gana `layers`.
+> **(G) Seam de política del gate (P2-14).** `CompetenceGate` + `gate_for(...)` con
+> `COMPETENCE_GATE_POLICIES` **vacía** y un test que lo fija: parametrizar la puerta
+> por pareja es ahora una decisión explícita, **sin umbrales nuevos**.
+> **(H) Frescura del estado (P2-18).** `evidence_fingerprint(user_id)` sella las
+> cuatro fuentes, `skill_state_source` guarda el sello al escribir la caché y
+> `skill_state_is_fresh(user_id)` lo compara: una caché vieja, vacía o **sin sello**
+> (legacy) **NUNCA** se reporta como fresca. El «recomputar una vez si está vieja»
+> del camino de decisión es **V3.64**.
+> **Contrato aditivo:** la entrada gana `observations`, `occasions`,
+> `assessment_confidence` y `observed_task_difficulty_2`; el resumen gana `layers`;
+> **todas** las claves de V3.62 siguen ahí y con el mismo significado. Tests: nuevo
+> `backend/tests/test_observed_task_difficulty_v363.py` (**26**, escrito **antes**
+> del código) más un e2e HTTP de `/api/profile` que fija que el contrato es aditivo;
+> `test_skill_state_v362.py` sigue verde **sin tocarse**. Verificación local:
+> `pytest` **2430 passed**, `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**
+> (76 ficheros), `build` OK, `check_release_consistency` **3.63.0**, `check_beta_v3`
+> y `content_validation` OK y `transfer_validation` OK. **Compromiso fechado que
+> sigue abierto:** **P1-01** se cierra en **V3.64** con **Decision Projection +
+> Planner 3.0**, y la proyección se calculará desde las **MISMAS filas canónicas**
+> que el estado (nunca desde la caché).
+>
+> **Relevo para el siguiente agente (2026-09-14): V3.64 — Decision Projection +
+Planner 3.0 (cierre de P1-01).** El briefing de V3.63 queda archivado en
+`agentes/v363-observed-task-difficulty-2.md` como referencia del estado del modelo.
+El siguiente incremento cierra **P1-01**: el Skill State es **descriptivo** y debe
+volverse **decisional** por una capa intermedia —`Student Skill State → Decision
+Projection → Planner`—, **nunca** `skill_state → planner` directamente, para no
+convertir el modelo en otra capa de heurísticas superpuestas. La proyección se
+calcula desde las **MISMAS filas canónicas** que el estado (nunca desde la caché
+persistida), de modo que la caché sea una optimización y **no una segunda verdad**;
+`skill_state_is_fresh` (V3.63) es la pieza que permite recomputar una sola vez
+cuando la caché esté vieja. Verifica el estado real del árbol antes de empezar
+(premisas 8 y 12).
 
 **Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra

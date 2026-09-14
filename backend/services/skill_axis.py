@@ -72,7 +72,7 @@ from functools import lru_cache
 
 from services.curriculum import CANONICAL_SKILLS, SUBSKILLS, load_all_levels
 from services.evidence import LEXICAL_SKILLS, PRODUCTION_CHANNEL_SKILL
-from services.listening import LISTENING_SUBSKILLS, SKILL_LAYER
+from services.listening import LISTENING_LAYERS, LISTENING_SUBSKILLS, SKILL_LAYER
 from services.mastery import MASTERY_SKILLS
 from services.pronunciation import PRONUNCIATION_CRITERIA
 from services.speaking import SPEAKING_CRITERIA
@@ -113,6 +113,46 @@ ASSESSMENT_MODE_MODALITY: dict[str, str] = {
     "written": "writing",
     "spoken": "speaking",
 }
+
+# ---------------------------------------------------------------------------
+# Canal OBSERVADO del evento (V3.63, P1-02)
+# ---------------------------------------------------------------------------
+
+# Modalidad declarada de un evento por (SKILL DEL EVENTO, CANAL OBSERVADO). Hasta
+# V3.62 la modalidad salía de un mapa duro skill → modalidad y `spontaneous_use`
+# caía SIEMPRE en `interaction`, porque su único emisor era `chat` (TEXTO). Eso
+# es correcto hoy, pero la auditoría de V3.62 (P1-02) avisa de que el día que
+# exista conversación ORAL real el mismo concepto debe distinguir interacción
+# escrita y oral por el CANAL realmente observado, no por la skill.
+#
+# El mapa se DERIVA de `LEXICAL_MODALITY` × `ASSESSMENT_MODE_MODALITY` (no se
+# inventa vocabulario) y declara DOS entradas explícitas para `spontaneous_use`:
+# escrito → `interaction` (el `chat`/transfer de hoy) y oral → `speaking` (el
+# canal que V3.62 no podía expresar). El valor es una TUPLA para que el día que
+# una actividad declare a la vez canal y eje se pueda expandir por declaración
+# (nunca por reinterpretación); hoy toda entrada declara exactamente una.
+MODALITIES_BY_ASSESSED_CHANNEL: dict[tuple[str, str], tuple[str, ...]] = {
+    (skill, mode): (modality,)
+    for skill, modality in LEXICAL_MODALITY.items()
+    for mode in ASSESSMENT_MODE_MODALITY
+}
+MODALITIES_BY_ASSESSED_CHANNEL[("spontaneous_use", "written")] = ("interaction",)
+MODALITIES_BY_ASSESSED_CHANNEL[("spontaneous_use", "spoken")] = ("speaking",)
+
+
+def modalities_by_assessed_channel(skill: object, channel: object) -> tuple[str, ...]:
+    """Modalidades declaradas de un evento por su skill y su CANAL observado.
+
+    Sin canal declarado devuelve la tupla VACÍA: el llamador debe caer al mapa
+    por skill (`LEXICAL_MODALITY`), que es la degradación EXACTA a V3.62. Nunca
+    lanza.
+    """
+    key = (
+        str(skill or "").strip().lower(),
+        str(channel or "").strip().lower(),
+    )
+    return MODALITIES_BY_ASSESSED_CHANNEL.get(key, ())
+
 
 # Motivo escrito de cada canal de observación declarado SIN modalidad. Un canal
 # nuevo sin modalidad Y sin motivo rompe el import (no puede colarse en silencio).
@@ -263,6 +303,57 @@ def competence_key(modality: object, competence: object) -> str:
     left = str(modality or "").strip().lower()
     right = str(competence or "").strip().lower()
     return f"{left}:{right}"
+
+
+# ---------------------------------------------------------------------------
+# Eje DECLARADO de capas (V3.63, P2-12)
+# ---------------------------------------------------------------------------
+
+# Capas cognitivas declaradas por modalidad. Se REUTILIZA el vocabulario del
+# motor de listening (`services.listening.LISTENING_LAYERS`) SIN añadir ni una
+# cadena nueva: la auditoría de V3.62 (P2-12) pide distinguir la competencia
+# OPERACIONAL (p. ej. `numbers`, que es decodificación) de la CURRICULAR, no
+# renombrar nada. Hoy solo listening declara capas.
+LAYERS_BY_MODALITY: dict[str, tuple[str, ...]] = {"listening": LISTENING_LAYERS}
+
+# Competencia → capa, por modalidad (subconjunto DECLARADO de las competencias).
+COMPETENCE_LAYERS_BY_MODALITY: dict[str, dict[str, str]] = {
+    "listening": {
+        competence: layer
+        for competence, layer in SKILL_LAYER.items()
+        if competence in _union(SUBSKILLS["listening"], LISTENING_SUBSKILLS)
+    }
+}
+
+# Subdestrezas de listening DECLARADAS fuera del eje de capas, con motivo: son
+# tareas de PRODUCCIÓN (`services.listening.skill_layer` devuelve `None`), no
+# comprensión receptiva, así que reportarlas por capa mentiría sobre el proceso.
+UNLAYERED_COMPETENCE_REASONS: dict[str, str] = {
+    "dictation": (
+        "tarea de PRODUCCIÓN (transcribir), no de comprensión receptiva: "
+        "`services.listening.skill_layer` la declara fuera de la taxonomía"
+    ),
+    "shadowing": (
+        "tarea de PRODUCCIÓN (repetir), no de comprensión receptiva: "
+        "`services.listening.skill_layer` la declara fuera de la taxonomía"
+    ),
+}
+
+
+def layer_for(modality: object, competence: object) -> str:
+    """Capa declarada de una competencia ("" si la modalidad no la declara).
+
+    Una competencia fuera del eje (o una modalidad sin capas) devuelve "": no se
+    inventa una capa, se declara que no pertenece a ninguna.
+    """
+    key = str(modality or "").strip().lower()
+    text = str(competence or "").strip().lower()
+    return COMPETENCE_LAYERS_BY_MODALITY.get(key, {}).get(text, "")
+
+
+def layers_for(modality: object) -> tuple[str, ...]:
+    """Capas declaradas de una modalidad (tupla vacía si no declara ninguna)."""
+    return LAYERS_BY_MODALITY.get(str(modality or "").strip().lower(), ())
 
 
 @lru_cache(maxsize=1)

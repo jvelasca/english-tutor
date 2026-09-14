@@ -5,34 +5,48 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-14): `v3.62.0` Student Skill State 4.0 (modalidad ×
-> competencia) CERRADA en `main`** — unifica los dos modelos del
-> alumno en **UN** estado `{modalidad: {competencia: entry}}` alimentado por las
-> **cuatro** fuentes de evidencia con la **misma** puerta espaciada y el gate
-> **reutilizado** de `services/competence.py`, sin umbrales nuevos, y es
-> **aditiva**: la decisión de tareas sigue leyendo **exactamente** el estado de
-> V3.61 (probado **byte a byte**). Verificación local: `pytest` **2404 passed**,
-> `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**, `build` OK,
-> `check_release_consistency` **3.62.0**, `check_beta_v3`/`content_validation` OK y
-> `transfer_validation` **20 familias / 1020 superficies / 0 errores**.
-> **CERRADA:** commit de release `f4bcee2`, **CI 6/6** (run
-> [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
-> y etiqueta anotada `v3.62.0` creada y empujada. Briefing y detalle en
-> `agentes/v362-student-skill-state-4.md` y `release-notes-v3.62.0.md`.
-> **Siguiente incremento esperado: V3.63 — Observed Task Difficulty 2.0**
-> (el **recableado** de la decisión de tareas al eje de competencia es
-> V3.63/V3.64). **V3.61.0 `Instance-aware Evidence + Anti-spoiler Guard` está
+> **Estado actual (2026-09-14): `v3.63.0` Observed Task Difficulty 2.0 y
+> honestidad del Student Skill State** — cierra la deuda de **honestidad** que
+> V3.62 dejó declarada por escrito y los hallazgos **P1-02** y
+> **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la auditoría `U`: **identidad
+> de evidencia y OCASIONES** (una evaluación expandida a N competencias es UNA
+> ocasión y el dedup solo puede acreditar menos), **canal OBSERVADO** del evento
+> (escrito → `interaction`; oral → `speaking`), **dificultad EMPÍRICA** en el
+> módulo puro `services/observed_difficulty.py`, **confianza de EVALUACIÓN**
+> separada de la estadística, **criterio declarado** de pronunciación, **capas
+> declaradas** de listening, **seam de política** del gate (tabla vacía, cero
+> umbrales nuevos) y **frescura** de la caché (una caché vieja NUNCA se sirve como
+> fresca). Una columna aditiva más (`learning_profile.skill_state_source`), sin
+> migración destructiva, sin bump de `GENERATOR_VERSION`, sin tocar el banco y sin
+> cambios de UI. **La decisión de tareas sigue BYTE-IDÉNTICA** y el guard
+> estructural de V3.62 sigue verde **sin tocarse**. Verificación local: `pytest`
+> **2430 passed**, `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**,
+> `build` OK, `check_release_consistency` **3.63.0**,
+> `check_beta_v3`/`content_validation` OK y `transfer_validation` OK. Briefing y
+> detalle en `agentes/v363-observed-task-difficulty-2.md` y
+> `release-notes-v3.63.0.md`.
+> **Siguiente incremento esperado: V3.64 — Decision Projection + Planner 3.0**
+> (cierre de **P1-01**: el puente `Student Skill State → Decision Projection →
+> Planner`, **nunca** `skill_state → planner` directamente, calculado desde las
+> **MISMAS filas canónicas** que el estado y no desde la caché).
+> **Auditorías de V3.62 archivadas (2026-09-14):**
+> `docs/audit/U-AUDITORIA-TOTAL-V362.md` (**9,5 / 10 APROBADA**, 0 P0, **2 P1**, 5
+> P2, 2 P3) y el punto de entrada `agentes/auditoria-externa-v362.md` (informe
+> esperado en `docs/audit/V-AUDITORIA-TOTAL-V362.md`; la `R` sigue reservada al
+> informe pendiente de V3.59). **P1-01** sigue abierto y **comprometido a V3.64**.
+> **V3.62.0 `Student Skill State 4.0 (modalidad × competencia)` está CERRADA en
+> `main`** (commit de release `f4bcee2`, **CI 6/6** en el run
+> [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611),
+> etiqueta anotada `v3.62.0` creada y empujada): unificó los dos modelos del alumno
+> en **UN** estado `{modalidad: {competencia: entry}}` alimentado por las **cuatro**
+> fuentes con la **misma** puerta espaciada y el gate reutilizado, **sin recablear**
+> la decisión de tareas. Briefing en `agentes/v362-student-skill-state-4.md`.
+> **V3.61.0 `Instance-aware Evidence + Anti-spoiler Guard` está
 > CERRADA en `main`** (commit `1b4af42`,
 > **CI 6/6** en el run
 > [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
-> etiqueta anotada `v3.61.0` creada y empujada). **V3.62 — Student Skill State 4.0
-> (modalidad × competencia)** cierra el
-> **P1-03** de la auditoría `S` de V3.60 (el estado del alumno **no tiene eje de
-> competencia** y toda la evidencia no léxica —grammar, listening por
-> subdestreza, pronunciation, reading, writing, speaking— es **inerte**) **sin
-> recablear** todavía la decisión de tareas (eso es V3.63/V3.64), con briefing
-> autocontenido en `agentes/v362-student-skill-state-4.md`. Ver `docs/RELEVO.md`
-> (nota superior y sección 0 "START HERE"). **V3.61 — Instance-aware Evidence +
+> etiqueta anotada `v3.61.0` creada y empujada).
+> **V3.61 — Instance-aware Evidence +
 > Anti-spoiler Guard** cerró los **2 defectos funcionales** de la auditoría `T` de
 > V3.60 (**fuga del target** en una superficie generada de `shopping` e **identidad
 > de instancia no inmutable** en el POST) y la parte determinista de los **P1** de
@@ -170,6 +184,32 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/auditoria-externa-v362.md` — **auditoría EXTERNA de V3.62.0 (entregada,
+  2026-09-14; informe PENDIENTE)**: prompt autocontenido para un auditor que **solo
+  ve GitHub**. Punto de entrada: tag anotado **`v3.62.0`** → commit `f4bcee2`, base
+  tag `v3.61.0` → `1b4af42`, delta `1b4af42..f4bcee2` (**19 ficheros, +2642 / −25**,
+  3 commits) y run de CI declarado **6/6**
+  ([34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611)).
+  Declara **11 afirmaciones a falsar** (forma del estado con todas las modalidades,
+  cuatro fuentes sin agregarse entre sí, `canonical_competence` sin fuzzy matching,
+  el aplanado que nunca resuelve competencia, la puerta 2/2 reutilizada, paridad
+  exacta del léxico con `observed_skill_capacity`, columna aditiva idempotente,
+  contrato aditivo de `/api/profile`, camino de decisión byte-idéntico, guard
+  estructural y números de verificación) y **10 preguntas de alto valor** (vocabulario
+  nuevo, actividad que acredita varias competencias, fila sin objetivo resoluble,
+  mezcla de usuarios, caché obsoleta servida como fresca, confianza estadística vs de
+  evaluación, dificultad declarada vs empírica, cambio indirecto de la selección de
+  tareas, reinterpretación de evidencia histórica y modalidades sin competencias).
+  Informe esperado: `docs/audit/V-AUDITORIA-TOTAL-V362.md` (la **`R` sigue reservada**
+  al informe nunca publicado de V3.59).
+- `docs/audit/U-AUDITORIA-TOTAL-V362.md` — **auditoría profunda de V3.62.0
+  ARCHIVADA (2026-09-14)**: **9,5 / 10 APROBADA**; 0 P0, **2 P1** (el estado todavía
+  no gobierna la decisión de tareas; la semántica de `spontaneous_use` debe seguir al
+  CANAL cuando exista voz), 5 P2 (competencia de pronunciación, eje de capas de
+  listening, granularidad por duplicación, semántica del gate por pareja, frescura de
+  la caché, confianza de evaluación y dificultad empírica) y 2 P3. Su roadmap fija el
+  orden **V3.63 (Observed Task Difficulty 2.0) → V3.64 (Decision Projection + Planner
+  3.0)**.
 - `agentes/auditoria-externa-v360.md` — **auditoría EXTERNA de V3.60.0 (lista para
   lanzar, 2026-09-14)**: prompt autocontenido para un auditor que **solo ve
   GitHub**. Punto de entrada: repo público, tag anotado **`v3.60.0`** → commit
@@ -194,6 +234,26 @@ pedir más contexto.
   (`e721fce`, run 34782482120), con 9 afirmaciones a falsar y 8 preguntas de alto
   valor; su informe se esperaba en `docs/audit/R-AUDITORIA-TOTAL-V359.md` (letra
   `R`) y **no está publicado** todavía. Se conserva como histórico del método.
+- `agentes/v363-observed-task-difficulty-2.md` — **V3.63 (EJECUTADA, 2026-09-14,
+  v3.63.0)**: **Observed Task Difficulty 2.0 y honestidad del Student Skill
+  State**. Cierra la deuda de honestidad que V3.62 dejó declarada por escrito más
+  el **P1-02** y los **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la auditoría
+  `U`: identidad de evidencia y **OCASIONES** (una evaluación expandida a N
+  competencias es UNA ocasión y el dedup solo puede acreditar menos), **canal
+  OBSERVADO** del evento (escrito → `interaction`; oral → `speaking`), **dificultad
+  EMPÍRICA** en el módulo puro `services/observed_difficulty.py` (`served_ceiling`,
+  `credited_ceiling`, `scaffolding_gap`, `experienced_load` y
+  `observed_task_difficulty_2` con la MISMA puerta espaciada de V3.54),
+  **confianza de EVALUACIÓN** separada de la estadística, **criterio declarado** de
+  pronunciación, **capas declaradas** de listening reutilizando `SKILL_LAYER`,
+  **seam de política** del gate (tabla vacía: cero umbrales nuevos) y **frescura**
+  de la caché (`evidence_fingerprint` + `skill_state_source` +
+  `skill_state_is_fresh`: una caché vieja nunca se sirve como fresca). Una columna
+  aditiva más, sin migración destructiva, sin bump de `GENERATOR_VERSION`, sin
+  tocar el banco y sin cambios de UI; **la decisión de tareas sigue byte-idéntica**
+  y el guard estructural de V3.62 sigue verde **sin tocarse**. **Compromiso
+  fechado que sigue abierto: P1-01 se cierra en V3.64** con **Decision Projection +
+  Planner 3.0**, calculada desde las **MISMAS filas canónicas** que el estado.
 - `agentes/v362-student-skill-state-4.md` — **V3.62 (EJECUTADA, 2026-09-14,
   v3.62.0)**: **Student Skill State 4.0 — modalidad × competencia**. Cierra el
   **P1-03** de la auditoría `S` de V3.60: hoy conviven **DOS** modelos del alumno

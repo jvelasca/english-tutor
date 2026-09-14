@@ -391,11 +391,19 @@ def list_observed_rows(user_id: str, *, target_type: str = "lexicon") -> list[di
     carga ACREDITADA). Una fila V3.55 con `observed_task_difficulty` vacía (un
     éxito `copied`, que no acredita nada) entra igual: la función pura la
     descarta sin inventar capacidad.
+
+    V3.63: se leen además la IDENTIDAD (`id`) y los hechos ya persistidos de la
+    actividad (`activity_id`, `context_instance`, `support_level`,
+    `response_time_ms`, `error_type`) que el estado necesita para declarar
+    ocasiones, canal observado y confianza de evaluación. Son columnas que YA
+    existían; ninguna decisión de tareas las lee por aquí.
     """
     with closing(_conn()) as conn:
         rows = conn.execute(
-            "SELECT occurred_at, skill, assessed_skill, success, "
-            "observed_difficulty, served_difficulty, observed_task_difficulty "
+            "SELECT id, occurred_at, skill, assessed_skill, success, "
+            "observed_difficulty, served_difficulty, observed_task_difficulty, "
+            "activity_id, context_instance, support_level, response_time_ms, "
+            "error_type "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? AND success = 1 "
             "AND (observed_task_difficulty != '' OR observed_difficulty != '') "
@@ -403,6 +411,34 @@ def list_observed_rows(user_id: str, *, target_type: str = "lexicon") -> list[di
             (user_id, target_type),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def evidence_fingerprint(user_id: str) -> str:
+    """Huella de FRESCURA de las cuatro fuentes de evidencia (V3.63, aditiva).
+
+    Una consulta por fuente con `COUNT(*)` y `MAX(id)` — las dos cosas que solo
+    CRECEN cuando entra evidencia nueva (las tablas son append-only) — y las
+    concatena en una cadena determinista. NO mira el contenido ni el reloj: es un
+    sello barato para responder "¿la caché que tengo sigue describiendo estas
+    fuentes?". Nunca lanza por un usuario sin filas (devuelve los ceros).
+    """
+    parts: list[str] = []
+    with closing(_conn()) as conn:
+        for table in (
+            "learning_evidence",
+            "academy_evidence",
+            "listening_attempts",
+            "pronunciation_attempts",
+        ):
+            row = conn.execute(
+                f"SELECT COUNT(*) AS total, COALESCE(MAX(id), 0) AS latest "
+                f"FROM {table} WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            parts.append(
+                f"{table}:{int(row['total'] or 0)}:{int(row['latest'] or 0)}"
+            )
+    return "|".join(parts)
 
 
 def summarize_by_target(

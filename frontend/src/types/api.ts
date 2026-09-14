@@ -245,9 +245,17 @@ export interface LearningProfile {
    * V3.62: estado unificado `{modalidad: {competencia: entry}}` alimentado por
    * las cuatro fuentes de evidencia con la misma puerta espaciada (aditivo: la
    * decisión de tareas sigue leyendo el estado de V3.61).
+   *
+   * V3.63: cada entrada gana claves aditivas — `observations`, `occasions`
+   * (muestras ≠ mediciones independientes), `assessment_confidence`
+   * (`{band, reasons}`, distinta de la confianza estadística `confidence`) y
+   * `observed_task_difficulty_2` (la capa empírica de dificultad).
    */
   skill_state?: Record<string, Record<string, Record<string, unknown>>>;
-  /** V3.62: resumen derivado por modalidad (state/competencias/cobertura). */
+  /**
+   * V3.62: resumen derivado por modalidad (state/competencias/cobertura).
+   * V3.63: gana `layers` en las modalidades que DECLARAN capas (hoy listening).
+   */
   skill_state_summary?: Record<string, Record<string, unknown>>;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
