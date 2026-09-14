@@ -92,7 +92,12 @@
 > `details`/`metadata` y end-to-end HTTP de la superficie generada con el vector
 > efectivo persistido), `pytest` **2335 passed** en local, launcher **75 passed**,
 > `ruff` limpio, `tsc` OK, `vitest` **651**, `npm run build` OK y
-> `check_release_consistency` **3.60.0**. Ver `release-notes-v3.60.0.md`.
+> `check_release_consistency` **3.60.0**. **CI 6/6 en verde** (run
+> [34814504063](https://github.com/jvelasca/english-tutor/actions/runs/34814504063)
+> sobre `2c79040`: Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.60.0` creada y empujada. Ver
+> `release-notes-v3.60.0.md`.
 > **Siguiente paso:** V3.61 — el **motor de política de instancia** (cuándo
 > repetir una superficie, cuándo forzar una nueva, cómo pesa el fallo) y la
 > **evidencia instance-aware** (`context_instance` en el ledger) como decisión

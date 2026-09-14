@@ -42,8 +42,11 @@ pedir más contexto.
 > superficies de una familia y end-to-end HTTP de la superficie generada con el
 > vector efectivo persistido), `pytest` **2335 passed** en local, launcher
 > **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651**, `npm run build` OK y
-> `check_release_consistency` **3.60.0**. La V3.59 (**Context Engine 3.0: Context
-> Bank Family/Instance**) sigue inmediatamente detrás; y antes, la V3.58
+> `check_release_consistency` **3.60.0**. **CI 6/6 en verde** (run
+> [34814504063](https://github.com/jvelasca/english-tutor/actions/runs/34814504063)
+> sobre `2c79040`), con la etiqueta anotada `v3.60.0` creada y empujada. La V3.59
+> (**Context Engine 3.0: Context Bank Family/Instance**) sigue inmediatamente
+> detrás; y antes, la V3.58
 > (**Sense Engine 2.0**), la V3.57 (**Planner 2.0: argmax `(skill, actividad)`
 > sobre ELV**), la V3.56 (**Planner 2.0 / `expected_learning_value`**, la mitad
 > que ordena), la V3.55 (**Task Difficulty 3.0**, tres columnas de BD, el último

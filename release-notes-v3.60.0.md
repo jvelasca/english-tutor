@@ -272,7 +272,28 @@ npx tsc --noEmit                              OK
 npm test                                      76 ficheros / 651 tests
 npm run build                                 OK
 python scripts/check_release_consistency.py   3.60.0
+python scripts/check_beta_v3.py               OK
+python backend/scripts/content_validation.py  OK
 ```
+
+## CI
+
+**CI 6/6 en verde** (run
+[34814504063](https://github.com/jvelasca/english-tutor/actions/runs/34814504063)
+sobre `2c79040`):
+
+| Job | Resultado |
+| --- | --- |
+| Release consistency | **3.60.0** |
+| Backend (ruff + pytest) | **2333 passed + 2 skipped** (178,3 s) |
+| Frontend (tsc + vitest + build) | tsc OK, **76 ficheros / 651 tests**, build OK |
+| Playwright E2E (visual) | **23 passed** |
+| Beta V3.0 gate | OK |
+| Content validation | OK |
+
+Los 2 skipped son `backend/tests/test_stt_asr_integration.py` (modelo Whisper no
+descargado en el runner, opt-in); en local el mismo árbol da **2335 passed**.
+Etiqueta anotada `v3.60.0` creada y empujada sobre `2c79040`.
 
 ## Fuera de alcance (V3.61+)
 
