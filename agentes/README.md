@@ -61,8 +61,10 @@ pedir más contexto.
 > toca el ledger. El briefing de V3.60 vive en
 > `agentes/v360-context-engine-4.md` (V3.59 en `agentes/v359-context-engine-3.md`,
 > V3.58 en `agentes/v358-sense-engine-2.md` y V3.57 en
-> `agentes/v357-argmax-elv.md`), y la auditoría externa de V3.59 se prepara en
-> `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier subagente, lee esa
+> `agentes/v357-argmax-elv.md`). La **auditoría externa de V3.60** se prepara en
+> `agentes/auditoria-externa-v360.md` (informe esperado en
+> `docs/audit/S-AUDITORIA-TOTAL-V360.md`) y la de V3.59 sigue pendiente de informe
+> en `agentes/auditoria-externa-v359.md`. Antes de lanzar cualquier subagente, lee esa
 > sección para no partir de un estado obsoleto (premisa 8 y 12: relevo al saturar y
 > ancla contra la alucinación).
 
@@ -116,6 +118,30 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/auditoria-externa-v360.md` — **auditoría EXTERNA de V3.60.0 (lista para
+  lanzar, 2026-09-14)**: prompt autocontenido para un auditor que **solo ve
+  GitHub**. Punto de entrada: repo público, tag anotado **`v3.60.0`** → commit
+  `2c79040`, diff `e721fce..2c79040` (18 ficheros, +2854 / −78) y run de CI
+  [34814504063](https://github.com/jvelasca/english-tutor/actions/runs/34814504063)
+  (debe estar **6/6**). Declara las **11 afirmaciones a falsar** (frontera de
+  identidad de 7 claves, `space[:3]` byte a byte de V3.59, determinismo sin
+  `hash()`/LLM, `CONTEXT_INSTANCE_SPACE_MIN = 12` y banco de **358 superficies**,
+  especificación inservible, delta ±2 con clamp 1..5, degradación exacta sin
+  intentos, elección de familia intacta, **+8 claves aditivas**, ledger con
+  `served_difficulty` sin migración y números de verificación) y **10 preguntas de
+  alto valor** (equivalencia pedagógica real, si el delta puede escalar al Student
+  Model, si el GET y el POST pueden divergir, anti-spoiler de la unidad objetivo,
+  dedup/colisiones, sesgo del cap, coste en el camino caliente, aditividad del
+  contrato, determinismo y si los tests prueban la invariante o la
+  implementación). Informe esperado: `docs/audit/S-AUDITORIA-TOTAL-V360.md` (la
+  `R` sigue reservada para el informe pendiente de V3.59). Ojo: declara también la
+  **re-priorización** de V3.60 (las notas de V3.59 anunciaban generación de
+  sentidos) para que no se reporte como hallazgo nuevo.
+- `agentes/auditoria-externa-v359.md` — **auditoría EXTERNA de V3.59.0 (ENTREGADA
+  la entrada, informe PENDIENTE)**: prompt autocontenido sobre el tag `v3.59.0`
+  (`e721fce`, run 34782482120), con 9 afirmaciones a falsar y 8 preguntas de alto
+  valor; su informe se esperaba en `docs/audit/R-AUDITORIA-TOTAL-V359.md` (letra
+  `R`) y **no está publicado** todavía. Se conserva como histórico del método.
 - `agentes/v360-context-engine-4.md` — **V3.60 (EJECUTADO, 2026-09-14, v3.60.0)**:
   **Context Engine 4.0 — Instance Specification → Parameterized Instance**.
   Sustituye las **60 consignas escritas a mano** por un **ESPACIO de instancias

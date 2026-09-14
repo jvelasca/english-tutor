@@ -98,6 +98,12 @@
 > (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
 > validation), con la etiqueta anotada `v3.60.0` creada y empujada. Ver
 > `release-notes-v3.60.0.md`.
+> **Auditoría externa:** el punto de entrada es
+> `agentes/auditoria-externa-v360.md` (autocontenido: tag `v3.60.0` → `2c79040`,
+> diff `e721fce..2c79040`, run `34814504063`, 11 afirmaciones a falsar y 10
+> preguntas de alto valor) y su informe se espera en
+> `docs/audit/S-AUDITORIA-TOTAL-V360.md` (la `R` sigue reservada para el informe
+> pendiente de V3.59).
 > **Siguiente paso:** V3.61 — el **motor de política de instancia** (cuándo
 > repetir una superficie, cuándo forzar una nueva, cómo pesa el fallo) y la
 > **evidencia instance-aware** (`context_instance` en el ledger) como decisión
