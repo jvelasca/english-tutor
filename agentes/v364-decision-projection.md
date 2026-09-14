@@ -1,6 +1,7 @@
 # Briefing de subagente — V3.64 (Decision Projection + Planner 3.0)
 
-> **Estado:** briefing entregado 2026-09-14; **EN EJECUCIÓN**.
+> **Estado:** briefing entregado 2026-09-14; **EJECUTADA y CERRADA** (2026-09-15,
+> `v3.64.0`, commit `aa52d55`, CI 6/6).
 > **Qué cierra:** **P1-01** de la auditoría `U` de V3.62 —el Skill State es
 > DESCRIPTIVO y debe volverse DECISIONAL por una capa intermedia
 > (`Student Skill State → Decision Projection → Planner`, **nunca**
@@ -13,7 +14,11 @@
 > declarada. **No hay V3.63.1.**
 > **Auditoría que lo motiva:** `docs/audit/W-AUDITORIA-TOTAL-V363.md`
 > (**9,6 / 10 APROBADA**, 0 P0, 1 P1 conceptual, 4 P2, 2 P3).
-> **Verificación:** pendiente de la ejecución (ver «Cierre»).
+> **Verificación:** `pytest` **2458 passed**, `ruff` limpio, launcher **75**, `tsc`
+> OK, `vitest` **653**, `build` OK, `check_release_consistency` **3.64.0**,
+> `check_beta_v3`/`content_validation` OK y `transfer_validation` OK. **CI 6/6** en
+> el run
+> [34903883846](https://github.com/jvelasca/english-tutor/actions/runs/34903883846).
 
 ## Rol
 
@@ -225,7 +230,9 @@ recomputa; vieja/legacy → recomputa **una vez** y re-sella); explicabilidad
 
 ## Cierre
 
-Pendiente de ejecución: bump a `3.64.0` en los seis orígenes que valida
-`scripts/check_release_consistency.py`, `release-notes-v3.64.0.md`, nota superior
-en `docs/RELEVO.md`, relevo a V3.65 y commit de release con **CI 6/6** y etiqueta
-anotada `v3.64.0`.
+**V3.64.0 CERRADA y publicada (2026-09-15):** commit de release `aa52d55`, **CI
+6/6** en el run
+[34903883846](https://github.com/jvelasca/english-tutor/actions/runs/34903883846)
+y etiqueta anotada `v3.64.0` creada y empujada. Bump a `3.64.0` en los seis
+orígenes, `release-notes-v3.64.0.md`, nota superior en `docs/RELEVO.md` y relevo a
+V3.65 — Observed Difficulty 3.0.

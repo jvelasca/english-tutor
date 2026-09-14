@@ -28,6 +28,9 @@ pedir más contexto.
 > pierde señal. Verificación local: `pytest` **2458 passed**, `ruff` limpio, launcher
 > **75**, `tsc` OK, `vitest` **653**, `build` OK, `check_release_consistency`
 > **3.64.0**, `check_beta_v3`/`content_validation` OK y `transfer_validation` OK.
+> **CERRADA (2026-09-15):** commit de release `aa52d55`, **CI 6/6** (run
+> [34903883846](https://github.com/jvelasca/english-tutor/actions/runs/34903883846))
+> y etiqueta anotada `v3.64.0` creada y empujada.
 > Briefing y detalle en `agentes/v364-decision-projection.md` y
 > `release-notes-v3.64.0.md`.
 > **Siguiente incremento esperado: V3.65 — Observed Difficulty 3.0** (convertir
@@ -308,8 +311,10 @@ pedir más contexto.
   de V3.62 y V3.57 verdes **sin tocarse**. Su único cambio de UI es **declarado**:
   la cola de repaso muestra una línea con las bandas de la proyección (encaje,
   hueco, transferencia, retención, esfuerzo y confianza de evaluación) con i18n
-  en/es, y **nada** cuando el estado no declara medida. Ver
-  `release-notes-v3.64.0.md`.
+  en/es, y **nada** cuando el estado no declara medida. **CERRADA (2026-09-15):**
+  commit de release `aa52d55`, **CI 6/6** (run
+  [34903883846](https://github.com/jvelasca/english-tutor/actions/runs/34903883846))
+  y etiqueta anotada `v3.64.0` empujada. Ver `release-notes-v3.64.0.md`.
   **Deuda declarada: V3.65 — Observed Difficulty 3.0.**
 - `agentes/v363-observed-task-difficulty-2.md` — **V3.63 (EJECUTADA, 2026-09-14,
   v3.63.0)**: **Observed Task Difficulty 2.0 y honestidad del Student Skill

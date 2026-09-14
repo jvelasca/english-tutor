@@ -2996,6 +2996,9 @@ como **documentado, no verificado de forma independiente** (P3-02).
 > **75**, `tsc` OK, `vitest` **653** (76 ficheros), `build` OK,
 > `check_release_consistency` **3.64.0**, `check_beta_v3`/`content_validation` OK y
 > `transfer_validation` OK (la release NO toca el banco).
+> **CERRADA (2026-09-15):** commit de release `aa52d55`, **CI 6/6** (run
+> [34903883846](https://github.com/jvelasca/english-tutor/actions/runs/34903883846))
+> y etiqueta anotada `v3.64.0` creada y empujada.
 > **Honestidad (deuda declarada de V3.64):** `observed_task_difficulty_2` **no** se
 > convierte en `P(éxito | alumno, tarea)` empírica (V3.65), `highest_demonstrated_load`
 > **no** es dificultad empírica (P2-04), la proyección **solo gobierna cuando el
