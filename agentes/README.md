@@ -5,16 +5,31 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-14): `v3.61.0` CERRADA en `main`** (commit `1b4af42`,
+> **Estado actual (2026-09-14): `v3.62.0` Student Skill State 4.0 (modalidad ×
+> competencia) IMPLEMENTADA y verificada en local** — unifica los dos modelos del
+> alumno en **UN** estado `{modalidad: {competencia: entry}}` alimentado por las
+> **cuatro** fuentes de evidencia con la **misma** puerta espaciada y el gate
+> **reutilizado** de `services/competence.py`, sin umbrales nuevos, y es
+> **aditiva**: la decisión de tareas sigue leyendo **exactamente** el estado de
+> V3.61 (probado **byte a byte**). Verificación local: `pytest` **2404 passed**,
+> `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**, `build` OK,
+> `check_release_consistency` **3.62.0**, `check_beta_v3`/`content_validation` OK y
+> `transfer_validation` **20 familias / 1020 superficies / 0 errores**;
+> **pendiente commit, CI 6/6 y tag** `v3.62.0`. Briefing y detalle en
+> `agentes/v362-student-skill-state-4.md` y `release-notes-v3.62.0.md`.
+> **Siguiente incremento esperado: V3.63 — Observed Task Difficulty 2.0**
+> (el **recableado** de la decisión de tareas al eje de competencia es
+> V3.63/V3.64). **V3.61.0 `Instance-aware Evidence + Anti-spoiler Guard` está
+> CERRADA en `main`** (commit `1b4af42`,
 > **CI 6/6** en el run
 > [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
-> etiqueta anotada `v3.61.0` creada y empujada). **Siguiente incremento: V3.62 —
-> Student Skill State 4.0 (modalidad × competencia)**, con briefing autocontenido
-> listo para lanzar en `agentes/v362-student-skill-state-4.md`: cierra el
+> etiqueta anotada `v3.61.0` creada y empujada). **V3.62 — Student Skill State 4.0
+> (modalidad × competencia)** cierra el
 > **P1-03** de la auditoría `S` de V3.60 (el estado del alumno **no tiene eje de
 > competencia** y toda la evidencia no léxica —grammar, listening por
 > subdestreza, pronunciation, reading, writing, speaking— es **inerte**) **sin
-> recablear** todavía la decisión de tareas (eso es V3.63/V3.64). Ver `docs/RELEVO.md`
+> recablear** todavía la decisión de tareas (eso es V3.63/V3.64), con briefing
+> autocontenido en `agentes/v362-student-skill-state-4.md`. Ver `docs/RELEVO.md`
 > (nota superior y sección 0 "START HERE"). **V3.61 — Instance-aware Evidence +
 > Anti-spoiler Guard** cerró los **2 defectos funcionales** de la auditoría `T` de
 > V3.60 (**fuga del target** en una superficie generada de `shopping` e **identidad
@@ -177,8 +192,8 @@ pedir más contexto.
   (`e721fce`, run 34782482120), con 9 afirmaciones a falsar y 8 preguntas de alto
   valor; su informe se esperaba en `docs/audit/R-AUDITORIA-TOTAL-V359.md` (letra
   `R`) y **no está publicado** todavía. Se conserva como histórico del método.
-- `agentes/v362-student-skill-state-4.md` — **V3.62 (RELEVO LISTO, POR
-  EJECUTAR)**: **Student Skill State 4.0 — modalidad × competencia**. Cierra el
+- `agentes/v362-student-skill-state-4.md` — **V3.62 (EJECUTADA, 2026-09-14,
+  v3.62.0)**: **Student Skill State 4.0 — modalidad × competencia**. Cierra el
   **P1-03** de la auditoría `S` de V3.60: hoy conviven **DOS** modelos del alumno
   que nunca se tocan — el **adaptativo léxico** (`LEXICAL_SKILLS` ×
   `DIFFICULTY_DIMENSIONS`, única fuente `learning_evidence`, alimenta
@@ -196,7 +211,11 @@ pedir más contexto.
   cerrado con el gerente:** la decisión de tareas (ELV/planner/`difficulty`/
   `transfer.context_for`) queda **intacta** y se prueba **byte a byte**; el
   recableado es V3.63/V3.64. Nota de nomenclatura: la auditoría lo llama «3.0»,
-  pero ese nombre ya es V3.54.
+  pero ese nombre ya es V3.54. **Verificación local:** `pytest` **2404 passed**,
+  `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**, `build` OK,
+  `check_release_consistency` **3.62.0**, `check_beta_v3`/`content_validation` OK y
+  `transfer_validation` **20 familias / 1020 superficies / 0 errores**;
+  **pendiente commit, CI 6/6 y tag**. Ver `release-notes-v3.62.0.md`.
 - `agentes/v361-instance-aware-evidence.md` — **V3.61 (EJECUTADA, 2026-09-14,
   v3.61.0)**: **Instance-aware Evidence + Anti-spoiler Guard**. Cierra los **2
   defectos funcionales** de la auditoría `T` de V3.60 (**fuga del target**: la

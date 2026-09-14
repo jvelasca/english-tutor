@@ -273,6 +273,7 @@ def init_db() -> None:
                 observed_level TEXT NOT NULL DEFAULT '',
                 observed_capacity TEXT NOT NULL DEFAULT '',
                 observed_skill_capacity TEXT NOT NULL DEFAULT '',
+                skill_state TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -291,6 +292,10 @@ def init_db() -> None:
         # SKILL × dimensión (JSON) para que la evidencia de una modalidad no
         # eleve el reto de otra; es la fuente de verdad y `observed_capacity`
         # queda como proyección legacy.
+        # V3.62 (Student Skill State 4.0): `skill_state` cachea el estado
+        # unificado {modalidad: {competencia: entry}} que agrega las CUATRO
+        # fuentes de evidencia con la misma puerta espaciada. Aditivo: ninguna
+        # decisión de tareas lo lee todavía (eso es V3.63/V3.64).
         profile_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(learning_profile)")
         }
@@ -300,6 +305,7 @@ def init_db() -> None:
             ("observed_level", "TEXT NOT NULL DEFAULT ''"),
             ("observed_capacity", "TEXT NOT NULL DEFAULT ''"),
             ("observed_skill_capacity", "TEXT NOT NULL DEFAULT ''"),
+            ("skill_state", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in profile_cols:
                 conn.execute(

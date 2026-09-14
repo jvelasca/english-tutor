@@ -120,6 +120,13 @@ class LearningProfile(BaseModel):
     observed_skill_capacity: dict[str, dict[str, int]] = Field(default_factory=dict)
     observed_skill_level: dict[str, str] = Field(default_factory=dict)
     skill_coverage: dict[str, str] = Field(default_factory=dict)
+    # V3.62 (Student Skill State 4.0): estado unificado
+    # `{modalidad: {competencia: entry}}` alimentado por las CUATRO fuentes de
+    # evidencia con la MISMA puerta espaciada de V3.54, y su resumen derivado por
+    # modalidad. Aditivo: ninguna decisión de tareas lo lee todavía (el ELV, el
+    # planner y `transfer.context_for` siguen leyendo el estado de V3.61).
+    skill_state: dict[str, dict[str, dict]] = Field(default_factory=dict)
+    skill_state_summary: dict[str, dict] = Field(default_factory=dict)
     estimated_bands: EstimatedBands
     estimated_descriptor: str
     estimated_confidence: float

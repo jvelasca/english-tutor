@@ -1,11 +1,23 @@
 # Briefing de subagente — V3.62 (Student Skill State 4.0: modalidad × competencia)
 
-> **Estado:** incremento **POR EJECUTAR**. Escrito sobre el árbol de `v3.61.0`
-> (commit de release `1b4af42`, tag anotado `v3.61.0`).
+> **Estado:** V3.62 **EJECUTADA** (2026-09-14, `v3.62.0`), escrita sobre el árbol de
+> `v3.61.0` (commit de release `1b4af42`, tag anotado `v3.61.0`). Este documento
+> registra el alcance, las decisiones de diseño y la verificación del incremento; se
+> conserva como **histórico del método** (premisa 8: verifica siempre el estado real
+> del árbol antes de asumir que un nombre o una línea siguen existiendo).
 >
-> **Antes de empezar, verifica el estado real del árbol** (premisas 8 y 12):
-> los nombres, líneas y cifras de abajo se citan del árbol de `v3.61.0` y pueden
-> haber cambiado. Nada de lo que dice este documento sustituye a leer el código.
+> **Qué cierra:** el **P1-03** («Student Skill State demasiado agregado») de la
+> auditoría `S` de V3.60, con el matiz declarado de que la mitad ya estaba cerrada
+> en V3.54 (una capacidad escrita no eleva una tarea oral). Detalle completo en
+> `release-notes-v3.62.0.md`; estado del proyecto en `docs/RELEVO.md`.
+>
+> **Verificación local (2026-09-14):** `pytest` **2404 passed** (nuevo
+> `tests/test_skill_state_v362.py`, **31**), `ruff` limpio, launcher **75 passed**,
+> `tsc` OK, `vitest` **651** (76 ficheros), `npm run build` OK,
+> `check_release_consistency` **3.62.0**, `check_beta_v3` OK, `content_validation`
+> OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores** (esta
+> release NO toca el banco). **Pendiente en el momento de escribir esto:** commit
+> de release, **CI 6/6** y tag anotado `v3.62.0`.
 >
 > **Nota de nomenclatura (importante).** La auditoría externa `S` de V3.60 pide
 > «V3.62 — Student Skill State **3.0**», pero **ese nombre ya está usado**: V3.54
@@ -327,3 +339,36 @@ el payload del drill devuelven **exactamente** lo de V3.61.
   ciega al eje nuevo; el estado en sí no cambia ninguna tarea todavía).
 - Si algo del briefing no cuadra con el árbol real, **para y repórtalo** antes de
   implementar (premisa 8).
+
+## Resultado de la ejecución (2026-09-14)
+
+Entregado tal cual el plan, con estas precisiones nacidas de leer el árbol real:
+
+- **Ficheros nuevos:** `backend/services/skill_axis.py`,
+  `backend/services/skill_state.py` y `backend/tests/test_skill_state_v362.py`
+  (**31** tests, escritos antes del código).
+- **Ficheros tocados:** `repositories/db.py` (columna aditiva),
+  `repositories/profile.py` (`set_skill_state` + lectura en `get_profile`),
+  `repositories/pronunciation.py` (lector nuevo `list_attempts`),
+  `domain/profile.py` (las cuatro fuentes y el cálculo del estado una vez por
+  refresco), `schemas/profile.py` y `frontend/src/types/api.ts` (espejo).
+  `services/evidence.py` **no** se modifica: `observed_signals` se **consume**.
+- **Corrección de una cifra del briefing:** `LISTENING_SUBSKILLS` tiene **18**
+  entradas (el briefing citaba 23) frente a las **19** de `SUBSKILLS["listening"]`.
+  La unión sigue siendo la resolución declarada y el test fija las que solo declara
+  cada lado (`numbers`/`note_taking`/`prediction`/`sequencing` vs
+  `accents`/`real_world`).
+- **Tres claves ADITIVAS en la fila canónica** respecto al briefing: `score` (por
+  fila, no solo el agregado), `kind` y `production`. Existen porque el gate
+  reutilizado de `competence.competence_state` lee `evidence_by_kind` (retención
+  `delayed`) y `production_count` (R5: Recognition ≠ Production): sin declararlas
+  por fila, el gate no podría aplicarse sin inventar semántica.
+- **Hallazgo de frontera (documentado, no parcheado):** una fila de
+  `academy_evidence` **sin objetivo resoluble** (`objective_id=''`, el hueco F-K3 de
+  speaking assessment y misión) no declara umbral, así que **no acredita éxito** y
+  no cruza la puerta espaciada. Es la MISMA frontera que tiene hoy el Student Model
+  (esas filas tampoco mueven el mastery por objetivo), no una regla nueva de V3.62.
+- **Honestidad:** V3.62 construye, persiste y expone el modelo unificado, pero **no
+  cambia ninguna decisión de tareas** — es el alcance cerrado con el gerente. El
+  recableado (ELV/planner/ELU por modalidad) es V3.63/V3.64.
+

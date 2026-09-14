@@ -17,12 +17,14 @@ def get_profile(user_id: str) -> dict | None:
     serializada; la parsea el drill con `services.difficulty.parse_vector`).
     V3.54: expone `observed_skill_capacity` (capacidad por skill × dimensión en
     JSON; la normaliza `services.learner_skill.normalize_skill_capacity`).
+    V3.62: expone `skill_state` (estado unificado {modalidad: {competencia:
+    entry}} en JSON; lo normaliza `services.skill_state.normalize_skill_state`).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT user_id, cefr_level, estimated_level, demonstrated_level, "
             "observed_level, observed_capacity, observed_skill_capacity, "
-            "updated_at "
+            "skill_state, updated_at "
             "FROM learning_profile WHERE user_id = ?",
             (user_id,),
         ).fetchone()
@@ -90,6 +92,31 @@ def set_level_state(
         "observed_skill_capacity": observed_skill_capacity,
         "updated_at": now,
     }
+
+
+def set_skill_state(user_id: str, skill_state: str) -> dict | None:
+    """Persiste SOLO la columna aditiva `skill_state` (V3.62).
+
+    Escritor DEDICADO: el estado unificado por modalidad × competencia se calcula
+    en `domain.profile` en cada refresco del perfil y se cachea aquí como JSON
+    determinista (`sort_keys=True`). No toca ninguna otra columna (ni
+    `observed_skill_capacity`, que sigue siendo la fuente de verdad del drill) y
+    no altera la firma del escritor caliente `set_level_state`. Devuelve None si
+    el usuario no existe.
+    """
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO learning_profile (user_id, updated_at, skill_state) "
+            "VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET "
+            "skill_state = excluded.skill_state, "
+            "updated_at = excluded.updated_at",
+            (user_id, now, skill_state),
+        )
+    return {"user_id": user_id, "skill_state": skill_state, "updated_at": now}
 
 
 def set_cefr(user_id: str, level: str) -> dict | None:

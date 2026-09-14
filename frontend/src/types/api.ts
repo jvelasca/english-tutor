@@ -241,6 +241,14 @@ export interface LearningProfile {
   observed_skill_level?: Record<string, string>;
   /** V3.54: cobertura dimensional observada por skill (none/partial/full). */
   skill_coverage?: Record<string, string>;
+  /**
+   * V3.62: estado unificado `{modalidad: {competencia: entry}}` alimentado por
+   * las cuatro fuentes de evidencia con la misma puerta espaciada (aditivo: la
+   * decisión de tareas sigue leyendo el estado de V3.61).
+   */
+  skill_state?: Record<string, Record<string, Record<string, unknown>>>;
+  /** V3.62: resumen derivado por modalidad (state/competencias/cobertura). */
+  skill_state_summary?: Record<string, Record<string, unknown>>;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
   estimated_confidence: number;

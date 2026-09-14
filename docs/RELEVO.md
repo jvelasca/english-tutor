@@ -180,7 +180,46 @@
 > `release-notes-v3.61.0.md` y el registro del incremento en
 > `agentes/v361-instance-aware-evidence.md`.
 >
-> **Siguiente incremento (relevo ya escrito): V3.62 — Student Skill State 4.0
+> **Estado (2026-09-14): V3.62.0 IMPLEMENTADA y verificada en local (pendiente
+> commit, CI y tag)** — `VERSION` `3.62.0` (app `3.61.0 → 3.62.0`), **columna
+> aditiva idempotente** en `learning_profile` (`skill_state`) y **sin bump de
+> `GENERATOR_VERSION`**. **(A) Taxonomía:** nuevo `services/skill_axis.py` con
+> `SKILL_MODALITIES` (9), `MODALITY_BY_VOCABULARY` (mapa preciso por vocabulario,
+> totalidad de `LEXICAL_SKILLS` verificada en import), el aplanado `MODALITY_OF`
+> con `AMBIGUOUS_STRINGS` explícitas (el estado NUNCA resuelve competencia con el
+> aplanado: `register`/`discourse`/`nuance`/`pragmatics` pertenecen a VARIAS
+> destrezas), `COMPETENCES_BY_MODALITY` (derivadas de `curriculum.SUBSKILLS` +
+> rúbricas), `canonical_competence` (casefold + strip, **sin** fuzzy matching) y
+> `objective_competences_index()` con `lru_cache`. Decisiones escritas:
+> `spontaneous_use → interaction` (su único emisor es `chat`, que es TEXTO),
+> `interaction`/`mediation` sin competencias, `receptive` en `UNMAPPED` con motivo
+> y la discrepancia `LISTENING_SUBSKILLS` (18) vs `SUBSKILLS["listening"]` (19)
+> resuelta como **unión** probada. **(B) Agregador:** nuevo
+> `services/skill_state.py`: las CUATRO fuentes (léxico, `academy_evidence`,
+> `listening_attempts`, `pronunciation_attempts`) → filas canónicas → **misma**
+> puerta espaciada de V3.54 (2 éxitos en 2 días) → `{modalidad: {competencia:
+> entry}}` con el gate **reutilizado** de `competence.competence_state` (sin un
+> umbral nuevo); el camino léxico aporta entradas de modalidad con `dimensions`
+> (paridad EXACTA con `observed_skill_capacity`) y **sin** competencia, y la
+> competencia solo existe si la FUENTE la declara (subdestrezas del objetivo
+> restringidas a la modalidad, subdestreza de listening; una fila de academia sin
+> objetivo resoluble no acredita éxito: mismo hueco F-K3 del Student Model).
+> **(C) Persistencia y contrato:** `learning_profile.skill_state` por el camino
+> idempotente de `ALTER TABLE`, escritor dedicado `set_skill_state`, lector nuevo
+> `pronunciation.list_attempts`, `LearningProfile.skill_state`/`skill_state_summary`
+> y espejo TS (sin cambio visual ni de i18n); JSON con `sort_keys=True` y sin reloj
+> en la función pura. **(D) La invariante central:** con un `skill_state` rico
+> persistido, `learner_level_state`, el payload del drill (con su `learning_value`),
+> `select_task_by_elv` + `expected_learning_value` y `transfer.context_for`
+> devuelven **exactamente** lo de V3.61, y un test estructural fija que ningún
+> módulo del camino de decisión menciona el estado nuevo. Verificación local:
+> `pytest` **2404 passed**, `ruff` limpio, launcher **75 passed**, `tsc` OK,
+> `vitest` **651** (76 ficheros), `npm run build` OK,
+> `check_release_consistency` **3.62.0**, `check_beta_v3` OK, `content_validation`
+> OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores** (la
+> release NO toca el banco). Detalle en `release-notes-v3.62.0.md`.
+>
+> **Incremento aplicado (relevo ejecutado): V3.62 — Student Skill State 4.0
 > (modalidad × competencia)** — `agentes/v362-student-skill-state-4.md`. Cierra el
 > **P1-03** de la auditoría `S`: hoy conviven **dos** modelos del alumno que nunca
 > se tocan (el **adaptativo léxico**, `LEXICAL_SKILLS` × `DIFFICULTY_DIMENSIONS`,
@@ -2641,7 +2680,20 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-14):** `v3.61.0` **Instance-aware Evidence +
+**Posición actual (2026-09-14):** `v3.62.0` **Student Skill State 4.0 (modalidad ×
+competencia)** (release SIN migración explícita de BD —columna aditiva idempotente
+en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI que
+unifica los dos modelos del alumno en **UN** estado `{modalidad: {competencia:
+entry}}` alimentado por las CUATRO fuentes de evidencia —`learning_evidence`,
+`academy_evidence`, `listening_attempts`, `pronunciation_attempts`— con la MISMA
+puerta espaciada de V3.54 y el gate REUTILIZADO de `services/competence.py`, sin un
+solo umbral nuevo; cierra el P1-03 de `S` y es estrictamente ADITIVA: la decisión
+de tareas sigue leyendo EXACTAMENTE el estado de V3.61 y se prueba byte a byte).
+**Verificada en local** (`pytest` **2404 passed**, `ruff` limpio, launcher **75**,
+`tsc` OK, `vitest` **651**, `build` OK, `check_release_consistency` **3.62.0**,
+`check_beta_v3`/`content_validation` OK y `transfer_validation` **20 familias /
+1020 superficies / 0 errores**); **pendiente de commit, CI 6/6 y tag** `v3.62.0`.
+Detalle en `release-notes-v3.62.0.md`. Antes, `v3.61.0` **Instance-aware Evidence +
 Anti-spoiler Guard** (release SIN migración explícita de BD —columna aditiva
 idempotente en `learning_evidence`—, SIN bump de `GENERATOR_VERSION` y SIN
 cambios de UI que cierra los **dos defectos funcionales** de la auditoría `T` de
@@ -2651,9 +2703,9 @@ superficie SERVIDA, identidad inmutable de instancia GET→POST,
 cap estratificado, rotación no secuencial y validador de contenido; banco
 **358 → 1020** superficies). **CERRADA**: commit `1b4af42`, **CI 6/6** (run
 [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926))
-y etiqueta anotada `v3.61.0` empujada. **Siguiente incremento: V3.62 — Student
-Skill State 4.0 (modalidad × competencia)**, con el relevo escrito en
-`agentes/v362-student-skill-state-4.md`. Antes, `v3.60.0` **Context Engine 4.0**
+y etiqueta anotada `v3.61.0` empujada. Las **notas de la cabecera** de este
+documento son la fuente de verdad más reciente y detallan también la `v3.60.0`
+**Context Engine 4.0**
 (release
 SIN migración de BD, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI que
 sustituye las 60 consignas escritas a mano por un ESPACIO de instancias

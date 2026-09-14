@@ -23,6 +23,22 @@ def record_pronunciation(
     return True
 
 
+def list_attempts(user_id: str) -> list[dict]:
+    """Intentos de pronunciación del usuario en orden de creación (V3.62).
+
+    Alimenta el estado por modalidad × competencia (`services.skill_state`), que
+    lee `score` (0..100 en este esquema) y `created_at`. Solo lectura: la tabla no
+    se migra ni se toca.
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT expected, heard, score, level, created_at "
+            "FROM pronunciation_attempts WHERE user_id = ? ORDER BY id ASC",
+            (user_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_progress(user_id: str) -> dict:
     """Agrega el progreso del alumno: conversaciones, mensajes, modos y
     pronunciación."""

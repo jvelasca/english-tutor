@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
+from repositories import academy as academy_repo
 from repositories import evidence as evidence_repo
 from repositories import grammar as grammar_repo
 from repositories import listening as listening_repo
@@ -13,7 +15,8 @@ from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services import difficulty, learner_skill
+from services import difficulty, learner_skill, skill_axis
+from services import skill_state as skill_state_service
 from services.cefr import (
     CEFR_MODEL_VERSION,
     heuristic_band,
@@ -158,6 +161,31 @@ async def _compute_profile(user_id: str) -> dict | None:
     )
     observed = learner_skill.observed_skill_state(observed_signals(observed_rows))
 
+    # V3.62 (Student Skill State 4.0): UN modelo del alumno por modalidad ×
+    # competencia, alimentado por las CUATRO fuentes de evidencia (ledger léxico,
+    # `academy_evidence`, `listening_attempts` y `pronunciation_attempts`) con la
+    # MISMA puerta espaciada. Es ADITIVO: ninguna decisión de tareas lo lee (el
+    # drill, el ELV, el planner y `transfer.context_for` siguen leyendo el estado
+    # de V3.61), y `dimensions` del camino léxico es idéntico a
+    # `observed_skill_capacity` (test de paridad).
+    academy_rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
+    listening_rows = await run_in_threadpool(listening_repo.list_attempts, user_id)
+    pronunciation_rows = await run_in_threadpool(
+        pronunciation_repo.list_attempts, user_id
+    )
+    state_rows = skill_state_service.skill_state_sources(
+        lexicon=observed_rows,
+        academy=academy_rows,
+        listening=listening_rows,
+        pronunciation=pronunciation_rows,
+        objectives=skill_axis.objective_competences_index(),
+    )
+    state = skill_state_service.skill_state(
+        state_rows,
+        level=student_model["current_level"],
+        now=datetime.now(timezone.utc).isoformat(),
+    )
+
     skills = _skill_states(student_model["skills"])
     bands = _bands_from_skills(student_model["skills"])
     level = student_model["estimated_level"]
@@ -197,6 +225,10 @@ async def _compute_profile(user_id: str) -> dict | None:
         "observed_skill_capacity": observed["observed_skill_capacity"],
         "observed_skill_level": observed["observed_skill_level"],
         "skill_coverage": observed["skill_coverage"],
+        # V3.62 (Student Skill State 4.0): estado unificado por modalidad ×
+        # competencia y su resumen derivado. Aditivo: no cambia ninguna decisión.
+        "skill_state": state,
+        "skill_state_summary": skill_state_service.skill_state_summary(state),
         "estimated_bands": bands,
         "estimated_descriptor": level_descriptor(level),
         "estimated_confidence": student_model["confidence"],
@@ -273,6 +305,14 @@ async def get_profile_summary(user_id: str) -> dict | None:
         observed_skill_capacity=json.dumps(
             profile["observed_skill_capacity"], ensure_ascii=False, sort_keys=True
         ),
+    )
+    # V3.62: el estado unificado se cachea con un escritor DEDICADO (columna
+    # aditiva) en JSON determinista (`sort_keys=True`), para que el contrato sea
+    # estable entre refrescos y el drill no pague el coste de recomputarlo.
+    await run_in_threadpool(
+        profile_repo.set_skill_state,
+        user_id,
+        json.dumps(profile["skill_state"], ensure_ascii=False, sort_keys=True),
     )
     await _maybe_record_snapshot(user_id, profile)
     history = await run_in_threadpool(profile_repo.list_cefr_history, user_id)
