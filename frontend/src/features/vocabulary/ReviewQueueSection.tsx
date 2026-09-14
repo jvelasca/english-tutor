@@ -17,6 +17,7 @@ import { CalendarClock, RefreshCw } from "lucide-react";
 import { getReviewQueue } from "../../api/learning";
 import type {
   ReviewActivity,
+  ReviewDecision,
   ReviewQueue,
   ReviewQueueItem,
 } from "../../types/api";
@@ -59,6 +60,63 @@ const CONFIDENCE_TONE: Record<string, string> = {
  * un escenario, así que mostrar el target rompería la medida de transferencia. */
 function showsWord(activity: ReviewActivity): boolean {
   return activity === "recognition" || activity === "write";
+}
+
+/**
+ * V3.64 (Planner 3.0): motivos DECLARADOS de la decisión, en el idioma de la
+ * interfaz. Son bandas y hechos del estado proyectado (`Decision Projection`),
+ * nunca probabilidades: la traza completa vive en `GET /api/learning/review` y
+ * aquí solo se muestra el porqué del encaje, sin revelar la forma esperada.
+ */
+function decisionSignals(
+  decision: ReviewDecision,
+  t: (key: string) => string,
+): string[] {
+  const drivers = decision.drivers ?? {};
+  const labels: string[] = [];
+  if (decision.difficulty_fit !== "unknown") {
+    labels.push(t(`dictionary.review.decision.fit.${decision.difficulty_fit}`));
+  }
+  // Sin medida declarada el estado calla: no se inventa ningún motivo (P2-04).
+  if (!drivers.measured) return labels;
+  if (drivers.gap) {
+    labels.push(t(`dictionary.review.decision.gap.${drivers.gap}`));
+  }
+  if (drivers.transfer_gap) {
+    labels.push(t(`dictionary.review.decision.transfer.${drivers.transfer_gap}`));
+  }
+  if (drivers.retention_due) {
+    labels.push(t("dictionary.review.decision.retention"));
+  }
+  if (drivers.effort && drivers.effort !== "none") {
+    labels.push(t(`dictionary.review.decision.effort.${drivers.effort}`));
+  }
+  if (drivers.assessment_confidence) {
+    labels.push(
+      t(`dictionary.review.decision.confidence.${drivers.assessment_confidence}`),
+    );
+  }
+  return labels;
+}
+
+/** V3.64: línea de motivos declarados. Nada si el estado no declara nada. */
+function DecisionSignals({
+  decision,
+  t,
+}: {
+  decision: ReviewDecision;
+  t: (key: string) => string;
+}) {
+  const signals = decisionSignals(decision, t);
+  if (signals.length === 0) return null;
+  return (
+    <p
+      className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
+      title={t("dictionary.review.decision.scope")}
+    >
+      {signals.join(" · ")}
+    </p>
+  );
 }
 
 interface ReviewQueueSectionProps {
@@ -173,6 +231,9 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
                   <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                     {t(`dictionary.review.reason.${entry.reason}`)}
                   </p>
+                  {entry.decision && (
+                    <DecisionSignals decision={entry.decision} t={t} />
+                  )}
                 </div>
                 <button
                   type="button"

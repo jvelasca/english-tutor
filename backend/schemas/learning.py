@@ -79,6 +79,12 @@ class ReviewQueueItem(BaseModel):
     # información que el argmax descartaba.
     skill_priorities: dict[str, float] = Field(default_factory=dict)
     task: dict | None = None
+    # V3.64 (Planner 3.0, cierre de P1-01): bloque ADITIVO y explicable de la
+    # decisión del argmax ELV (`{expected_learning_value, p_success, margin,
+    # drivers, alternatives, skill}`), derivado de la Decision Projection. Solo
+    # está presente cuando la cola se construye CON proyección (el camino sin
+    # ella queda BYTE-IDÉNTICO a V3.63 y este campo se omite).
+    decision: dict | None = None
     competence: dict | None = None
     # V3.40 (Fase 4, gobierno por unidad léxica): formas superficiales de la
     # unidad y transferencia contextual demostrada (éxito en contextos distintos).

@@ -5,7 +5,37 @@ lanzas desde tus propios agentes locales. Cada subagente es un archivo Markdown
 **autocontenido**: incluye todo lo que el agente necesita para trabajar sin
 pedir más contexto.
 
-> **Estado actual (2026-09-14): `v3.63.0` Observed Task Difficulty 2.0 y
+> **Estado actual (2026-09-14): `v3.64.0` Decision Projection + Planner 3.0 — P1-01 CERRADO.**
+> Release **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN tocar el
+> banco y SIN umbrales nuevos** (el único cambio de UI es la línea de motivos
+> DECLARADOS en la cola de repaso, con i18n en/es) que CIERRA el **P1-01**
+> (heredado de V3.62 y de la auditoría `W`) y, por contrato, los
+> **P2-02/P2-03/P2-04**. El Student Skill State deja de ser **descriptivo** y
+> **gobierna la decisión de tareas** SIEMPRE por la capa declarada
+> `Student Skill State → DECISION PROJECTION → Planner 3.0`, **nunca**
+> `skill_state → planner`: el planner sigue **puro** y **ciego** al estado
+> persistido. Nuevo módulo puro `services/decision_projection.py` (carga ≠ esfuerzo,
+> error de tarea ≠ incertidumbre de medida, `capacity_by_skill` como reemplazo
+> directo con celdas provisionales fuera de la comparabilidad, `skill_values` con
+> pesos declarados y `drivers` explicables), hechos **aditivos** en el estado
+> (`kinds`/`production_count`/`last_evidence`/`contexts`/`error_types`/`review_due`),
+> Planner 3.0 aditivo (`decision`, `explain_drivers`, `difficulty_fit`) y nuevo
+> `domain/decision.py` (caché **solo** si `skill_state_is_fresh` la valida; si está
+> vieja, vacía o sin sello, **recomputa UNA vez** desde las cuatro fuentes canónicas
+> con el helper `canonical_sources` compartido con `domain/profile.py`, y la
+> re-sella). **Degradación declarada:** si la proyección no declara capacidad
+> comparable, la decisión es la de V3.54/V3.63 byte a byte, así que ninguna petición
+> pierde señal. Verificación local: `pytest` **2458 passed**, `ruff` limpio, launcher
+> **75**, `tsc` OK, `vitest` **653**, `build` OK, `check_release_consistency`
+> **3.64.0**, `check_beta_v3`/`content_validation` OK y `transfer_validation` OK.
+> Briefing y detalle en `agentes/v364-decision-projection.md` y
+> `release-notes-v3.64.0.md`.
+> **Siguiente incremento esperado: V3.65 — Observed Difficulty 3.0** (convertir
+> `observed_task_difficulty_2` en una estimación **empírica** `P(éxito | alumno,
+> tarea)`, cerrando la frontera que V3.64 dejó declarada: la proyección gobierna solo
+> cuando el estado tiene algo que decir), después V3.66 Adaptive Instance Selection
+> y V3.67+ Sense Engine 2.0.
+> **Histórico inmediato (2026-09-14): `v3.63.0` Observed Task Difficulty 2.0 y
 > honestidad del Student Skill State** — cierra la deuda de **honestidad** que
 > V3.62 dejó declarada por escrito y los hallazgos **P1-02** y
 > **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la auditoría `U`: **identidad
@@ -28,10 +58,17 @@ pedir más contexto.
 > y etiqueta anotada `v3.63.0` creada y empujada. Briefing y
 > detalle en `agentes/v363-observed-task-difficulty-2.md` y
 > `release-notes-v3.63.0.md`.
-> **Siguiente incremento esperado: V3.64 — Decision Projection + Planner 3.0**
-> (cierre de **P1-01**: el puente `Student Skill State → Decision Projection →
-> Planner`, **nunca** `skill_state → planner` directamente, calculado desde las
-> **MISMAS filas canónicas** que el estado y no desde la caché).
+> **V3.64 P1-01 CERRADO (2026-09-14):** el estado nuevo **ya gobierna** la decisión
+> por la Decision Projection/Planner 3.0, con la degradación declarada a V3.54/V3.63
+> cuando no declara capacidad comparable.
+> **Auditoría de V3.63 archivada (2026-09-14):**
+> `docs/audit/W-AUDITORIA-TOTAL-V363.md` (**9,6 / 10 APROBADA**, 0 P0, **1 P1**, 4
+> P2, 2 P3; letra `W`, porque la `R` sigue reservada al informe nunca publicado de
+> V3.59 y la `V` al informe externo de V3.62). Su P1 es **conceptual y no se
+> parchea** (no hay V3.63.1): `observed_task_difficulty_2()` mezcla dificultad con
+> esfuerzo y su corrección corresponde a la Decision Projection/Planner 3.0 y a
+> Observed Difficulty 3.0; su P3-01 es el **P1-01 heredado** (el estado nuevo aún no
+> gobierna el Planner), **comprometido a V3.64**.
 > **Auditorías de V3.62 archivadas (2026-09-14):**
 > `docs/audit/U-AUDITORIA-TOTAL-V362.md` (**9,5 / 10 APROBADA**, 0 P0, **2 P1**, 5
 > P2, 2 P3) y el punto de entrada `agentes/auditoria-externa-v362.md` (informe
@@ -205,6 +242,16 @@ pedir más contexto.
   tareas, reinterpretación de evidencia histórica y modalidades sin competencias).
   Informe esperado: `docs/audit/V-AUDITORIA-TOTAL-V362.md` (la **`R` sigue reservada**
   al informe nunca publicado de V3.59).
+- `docs/audit/W-AUDITORIA-TOTAL-V363.md` — **auditoría profunda de V3.63.0
+  ARCHIVADA (2026-09-14)**: **9,6 / 10 APROBADA**; 0 P0, **1 P1** conceptual (la
+  `observed_task_difficulty_2()` mide *carga máxima demostrada bajo puerta
+  espaciada* y **mezcla dificultad con esfuerzo**; **no se parchea**, se corrige con
+  la Decision Projection/Planner 3.0 y Observed Difficulty 3.0), 4 P2 (fingerprint
+  `COUNT+MAX(id)`, coste vs dificultad, `error_type` homogéneo, máximo por dimensión)
+  y 2 P3 (el estado nuevo aún no gobierna el Planner; el CI 6/6 queda documental). Su
+  veredicto reconoce que V3.63 cierra la **honestidad epistemológica** del Student
+  Model. Su roadmap confirma **V3.64 (Decision Projection + Planner 3.0) → V3.65
+  (Observed Difficulty 3.0)**.
 - `docs/audit/U-AUDITORIA-TOTAL-V362.md` — **auditoría profunda de V3.62.0
   ARCHIVADA (2026-09-14)**: **9,5 / 10 APROBADA**; 0 P0, **2 P1** (el estado todavía
   no gobierna la decisión de tareas; la semántica de `spontaneous_use` debe seguir al
@@ -237,6 +284,33 @@ pedir más contexto.
   (`e721fce`, run 34782482120), con 9 afirmaciones a falsar y 8 preguntas de alto
   valor; su informe se esperaba en `docs/audit/R-AUDITORIA-TOTAL-V359.md` (letra
   `R`) y **no está publicado** todavía. Se conserva como histórico del método.
+- `agentes/v364-decision-projection.md` — **V3.64 (EJECUTADA, 2026-09-14,
+  v3.64.0)**: **Decision Projection + Planner 3.0 (cierre del P1-01)**. El Student
+  Skill State deja de ser descriptivo y **gobierna la decisión de tareas** por la
+  capa declarada `Student Skill State → Decision Projection → Planner 3.0`, **nunca**
+  `skill_state → planner`: nuevo módulo **puro** `services/decision_projection.py`
+  (carga vs esfuerzo separados, error de tarea vs incertidumbre de medida,
+  `capacity_by_skill` como reemplazo directo con celdas **provisionales** fuera de
+  la comparabilidad, `skill_values` con pesos declarados que suman 1.0 y `drivers`
+  explicables), hechos **aditivos** del estado (`kinds`, `production_count`,
+  `last_evidence`, `contexts`, `error_types`, `review_due`), Planner 3.0 **aditivo**
+  (`decision` con `difficulty_fit`/alternativas, `explain_drivers`; **byte-idéntico
+  sin proyección**) y nuevo `domain/decision.py` (caché **solo** si
+  `skill_state_is_fresh` la valida; si está vieja, vacía o sin sello, **recomputa
+  UNA vez** desde las cuatro fuentes canónicas con el helper `canonical_sources`
+  **compartido** con `domain/profile.py`, y la re-sella). **Degradación declarada y
+  probada:** sin capacidad comparable la decisión es la de V3.54/V3.63 byte a byte,
+  así que ninguna petición pierde señal. Sin migración, sin bump de
+  `GENERATOR_VERSION`, sin tocar el banco y **sin umbrales nuevos** (el único
+  cambio de UI es la línea de motivos DECLARADOS en la cola de repaso, con i18n
+  en/es); cierra además, por contrato, los **P2-02/P2-03/P2-04** de la auditoría
+  `W`. Nuevo `backend/tests/test_decision_projection_v364.py` (**27**) y los guards
+  de V3.62 y V3.57 verdes **sin tocarse**. Su único cambio de UI es **declarado**:
+  la cola de repaso muestra una línea con las bandas de la proyección (encaje,
+  hueco, transferencia, retención, esfuerzo y confianza de evaluación) con i18n
+  en/es, y **nada** cuando el estado no declara medida. Ver
+  `release-notes-v3.64.0.md`.
+  **Deuda declarada: V3.65 — Observed Difficulty 3.0.**
 - `agentes/v363-observed-task-difficulty-2.md` — **V3.63 (EJECUTADA, 2026-09-14,
   v3.63.0)**: **Observed Task Difficulty 2.0 y honestidad del Student Skill
   State**. Cierra la deuda de honestidad que V3.62 dejó declarada por escrito más
@@ -254,9 +328,9 @@ pedir más contexto.
   `skill_state_is_fresh`: una caché vieja nunca se sirve como fresca). Una columna
   aditiva más, sin migración destructiva, sin bump de `GENERATOR_VERSION`, sin
   tocar el banco y sin cambios de UI; **la decisión de tareas sigue byte-idéntica**
-  y el guard estructural de V3.62 sigue verde **sin tocarse**. **Compromiso
-  fechado que sigue abierto: P1-01 se cierra en V3.64** con **Decision Projection +
-  Planner 3.0**, calculada desde las **MISMAS filas canónicas** que el estado.
+  y el guard estructural de V3.62 sigue verde **sin tocarse**. **P1-01 quedó
+  comprometido a V3.64** (**Decision Projection + Planner 3.0**, calculada desde las
+  **MISMAS filas canónicas** que el estado) y **se cerró allí** (`v3.64.0`).
   **Cerrada:** commit de release `73cebb4`, **CI 6/6** (run
   [34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
   y etiqueta anotada `v3.63.0` empujada. Ver `release-notes-v3.63.0.md`.

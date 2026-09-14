@@ -38,6 +38,7 @@ import re
 from datetime import date, datetime, timezone
 
 from services import (
+    decision_projection,
     difficulty,
     forgetting,
     fsrs,
@@ -551,6 +552,8 @@ def recommend_review_activity(
     evidence: dict | None = None,
     capacity_by_skill: dict | None = None,
     task_difficulty: object = None,
+    skill_values: dict | None = None,
+    drivers: dict | None = None,
 ) -> dict:
     """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
 
@@ -608,6 +611,8 @@ def recommend_review_activity(
         planner.planned_signals(evidence, matrix),
         capacity_by_skill=capacity_by_skill,
         task_difficulty=task_difficulty,
+        skill_values=skill_values,
+        drivers=drivers,
     )
     if planned["activity"]:
         return {"activity": planned["activity"], "reason": planned["reason"]}
@@ -625,6 +630,7 @@ def review_queue_item(
     available_cues: object | None = None,
     unit_surfaces: list[str] | None = None,
     learner_state: dict | None = None,
+    projection: dict | None = None,
 ) -> dict:
     """Ítem de la cola de repaso lexica (V3.35), pura y determinista.
 
@@ -704,8 +710,30 @@ def review_queue_item(
     # se calculan UNA vez y son las MISMAS para las dos rutas de decisión
     # (actividad del ítem y `task`) y para la predicción servida: así el argmax y
     # el `learning_value` no pueden divergir.
+    # V3.64: con la Decision Projection la capacidad y el VALOR por eje salen de
+    # la proyección (estado unificado); sin ella, EXACTAMENTE de V3.57.
     task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
-    capacity_by_skill = _capacity_by_skill(learner_state)
+    projection = projection if isinstance(projection, dict) else None
+    if projection is not None:
+        capacity_by_skill = projection.get("capacity_by_skill")
+        # Degradación DECLARADA (V3.64): la Decision Projection solo gobierna el
+        # argmax cuando declara capacidad comparable (el estado unificado habla
+        # con su puerta espaciada y una celda provisional no compite). Mientras
+        # calla, se conserva EXACTAMENTE el camino de V3.54/V3.63 —capacidad del
+        # estimador anterior, `skill_priorities` como valor y sin bloque
+        # `decision`—: así ninguna petición pierde señal ni cambia de tarea por
+        # el solo hecho de existir la proyección.
+        if decision_projection.has_comparable_capacity(capacity_by_skill):
+            skill_values = projection.get("skill_values")
+            drivers = projection.get("drivers")
+        else:
+            capacity_by_skill = _capacity_by_skill(learner_state)
+            skill_values = None
+            drivers = None
+    else:
+        capacity_by_skill = _capacity_by_skill(learner_state)
+        skill_values = None
+        drivers = None
     recommendation = recommend_review_activity(
         row,
         matrix,
@@ -713,6 +741,8 @@ def review_queue_item(
         evidence=summary,
         capacity_by_skill=capacity_by_skill,
         task_difficulty=task_difficulty,
+        skill_values=skill_values,
+        drivers=drivers,
     )
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
@@ -725,13 +755,15 @@ def review_queue_item(
     signals = planner.planned_signals(
         summary, matrix, retrievability=retrievability
     )
-    task = _task_decision(
+    task, decision = _task_decision(
         matrix,
         summary,
         signals,
         recommendation,
         capacity_by_skill=capacity_by_skill,
         task_difficulty=task_difficulty,
+        skill_values=skill_values,
+        drivers=drivers,
     )
     learning_value = _learning_value(
         row,
@@ -740,6 +772,7 @@ def review_queue_item(
         learner_state,
         capacity_by_skill=capacity_by_skill,
         task_difficulty=task_difficulty,
+        skill_values=skill_values,
     )
     recommended_cue = ""
     if recommendation["activity"] == "recall":
@@ -775,7 +808,10 @@ def review_queue_item(
         "learning_value": learning_value,
         "signals": signals,
         "why": planner.explain_priority(
-            signals, recommendation["reason"], learning_value
+            signals,
+            recommendation["reason"],
+            learning_value,
+            (decision or {}).get("drivers"),
         ),
         # V3.39 (Fase 3): decisión de tarea óptima (skill limitante + actividad
         # + apoyo declarado). Aditivo: `activity`/`reason` conservan su
@@ -784,6 +820,7 @@ def review_queue_item(
         # V3.51: vector completo de prioridad por modalidad (aditivo).
         "skill_priorities": planner.skill_priorities(signals),
         "task": task,
+        **({"decision": decision} if decision is not None else {}),
         "competence": matrix,
         # V3.40 (Fase 4): estado a nivel de UNIDAD (formas hermanas) y
         # transferencia contextual. Aditivos: el drill sigue practicando `word`.
@@ -831,8 +868,10 @@ def _task_decision(
     *,
     capacity_by_skill: dict | None = None,
     task_difficulty: object = None,
-) -> dict:
-    """Decisión de tarea expuesta en la cola (V3.39 → V3.57, puro).
+    skill_values: dict | None = None,
+    drivers: dict | None = None,
+) -> tuple[dict, dict | None]:
+    """Decisión de tarea expuesta en la cola (V3.39 → V3.64, puro).
 
     Si la evidencia dirige la tarea, esa es la decisión: `planner.select_task`
     (la cascada) SIN capacidad del alumno y `planner.select_task_by_elv` (el
@@ -840,6 +879,11 @@ def _task_decision(
     actividad y la razón de la escalera. El `support_level` se declara siempre a
     partir de la actividad (`planner.ACTIVITY_SUPPORT_LEVEL`), para que el cliente
     sepa con cuánto andamiaje se espera el intento.
+
+    V3.64: devuelve `(task, decision)`. `task` conserva EXACTAMENTE el contrato
+    `{skill, activity, reason, support_level}` de V3.39 y `decision` (o `None` si
+    el llamador no aporta la Decision Projection) es el bloque ADITIVO y
+    explicable del Planner 3.0, que el ítem expone aparte.
     """
     planned = planner.select_task_by_elv(
         matrix,
@@ -847,16 +891,27 @@ def _task_decision(
         signals,
         capacity_by_skill=capacity_by_skill,
         task_difficulty=task_difficulty,
+        skill_values=skill_values,
+        drivers=drivers,
     )
-    if planned["activity"]:
-        return planned
+    decision = None
+    if isinstance(planned.get("decision"), dict):
+        decision = planned["decision"]
+        task = {key: value for key, value in planned.items() if key != "decision"}
+    else:
+        task = planned
+    if task["activity"]:
+        return task, decision
     activity = recommendation.get("activity") or ""
-    return {
-        "skill": planner.limiting_skill(signals),
-        "activity": activity,
-        "reason": recommendation.get("reason") or "",
-        "support_level": planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
-    }
+    return (
+        {
+            "skill": planner.limiting_skill(signals),
+            "activity": activity,
+            "reason": recommendation.get("reason") or "",
+            "support_level": planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
+        },
+        decision,
+    )
 
 
 def _learning_value(
@@ -867,6 +922,7 @@ def _learning_value(
     *,
     capacity_by_skill: dict | None = None,
     task_difficulty: object = None,
+    skill_values: dict | None = None,
 ) -> dict:
     """Predicción de éxito de la tarea del ítem (V3.56 → V3.57, puro).
 
@@ -880,6 +936,11 @@ def _learning_value(
 
     Sin `learner_state` (o sin dificultad declarada) devuelve el neutro exacto
     (`ELV = priority`). Nunca lanza.
+
+    V3.64: con `skill_values` (el valor proyectado por eje de la Decision
+    Projection) el `value` de la predicción es el MISMO que el del argmax, para
+    que la tarea elegida y su ELV servido no puedan divergir. Sin él la lectura
+    es EXACTAMENTE la de V3.57.
     """
     skill = (task or {}).get("skill") or planner.limiting_skill(signals)
     channel = planner.capacity_skill(skill)
@@ -887,11 +948,15 @@ def _learning_value(
         capacity_by_skill = _capacity_by_skill(learner_state)
     if task_difficulty is None:
         task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
+    value = None
+    if isinstance(skill_values, dict):
+        value = skill_values.get(skill)
     return planner.expected_learning_value(
         signals,
         skill=skill,
         task_difficulty=task_difficulty,
         learner_capacity=capacity_by_skill.get(channel),
+        value=value,
         capacity_skill=channel,
     )
 

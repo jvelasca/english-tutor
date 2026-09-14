@@ -5,9 +5,9 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1468,
- "literal_uses": 1017,
- "referenced_keys": 1165,
+ "defined": 1486,
+ "literal_uses": 1019,
+ "referenced_keys": 1167,
  "dynamic_prefixes": [
   "appearance.accent.",
   "appearance.density.",
@@ -18,6 +18,11 @@
   "crossSkill.channel.",
   "dictionary.drill.recallCue.",
   "dictionary.review.activity.",
+  "dictionary.review.decision.confidence.",
+  "dictionary.review.decision.effort.",
+  "dictionary.review.decision.fit.",
+  "dictionary.review.decision.gap.",
+  "dictionary.review.decision.transfer.",
   "dictionary.review.hidden.",
   "dictionary.review.reason.",
   "dictionary.status.",

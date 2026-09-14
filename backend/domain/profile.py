@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
-from repositories import academy as academy_repo
+from domain import decision as decision_domain
 from repositories import evidence as evidence_repo
 from repositories import grammar as grammar_repo
 from repositories import listening as listening_repo
@@ -15,7 +15,7 @@ from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from repositories import users as users_repo
 from repositories import vocabulary as vocabulary_repo
-from services import difficulty, learner_skill, skill_axis
+from services import difficulty, learner_skill
 from services import skill_state as skill_state_service
 from services.cefr import (
     CEFR_MODEL_VERSION,
@@ -156,32 +156,22 @@ async def _compute_profile(user_id: str) -> dict | None:
     # se comporta como V3.52.2.
     # V3.54 (Learner Skill State 3.0): además se conserva la modalidad, `skill ×
     # dimensión` (fuente de verdad); `observed_capacity` es la proyección legacy.
-    observed_rows = await run_in_threadpool(
-        evidence_repo.list_observed_rows, user_id
+    # V3.64: la secuencia "leer las CUATRO fuentes → filas canónicas" vive en el
+    # helper compartido `domain.decision.canonical_sources`, que la decisión
+    # reutiliza para recomputar el estado sin duplicarla.
+    sources = await decision_domain.canonical_sources(user_id)
+    observed = learner_skill.observed_skill_state(
+        observed_signals(sources["lexicon"])
     )
-    observed = learner_skill.observed_skill_state(observed_signals(observed_rows))
 
     # V3.62 (Student Skill State 4.0): UN modelo del alumno por modalidad ×
     # competencia, alimentado por las CUATRO fuentes de evidencia (ledger léxico,
     # `academy_evidence`, `listening_attempts` y `pronunciation_attempts`) con la
-    # MISMA puerta espaciada. Es ADITIVO: ninguna decisión de tareas lo lee (el
-    # drill, el ELV, el planner y `transfer.context_for` siguen leyendo el estado
-    # de V3.61), y `dimensions` del camino léxico es idéntico a
-    # `observed_skill_capacity` (test de paridad).
-    academy_rows = await run_in_threadpool(academy_repo.list_evidence, user_id)
-    listening_rows = await run_in_threadpool(listening_repo.list_attempts, user_id)
-    pronunciation_rows = await run_in_threadpool(
-        pronunciation_repo.list_attempts, user_id
-    )
-    state_rows = skill_state_service.skill_state_sources(
-        lexicon=observed_rows,
-        academy=academy_rows,
-        listening=listening_rows,
-        pronunciation=pronunciation_rows,
-        objectives=skill_axis.objective_competences_index(),
-    )
+    # MISMA puerta espaciada. Desde V3.64 el estado **sí** gobierna la decisión de
+    # tareas, pero SIEMPRE por la Decision Projection (`domain.decision`), nunca
+    # leyéndolo directamente.
     state = skill_state_service.skill_state(
-        state_rows,
+        sources["state_rows"],
         level=student_model["current_level"],
         now=datetime.now(timezone.utc).isoformat(),
     )
@@ -229,6 +219,11 @@ async def _compute_profile(user_id: str) -> dict | None:
         # competencia y su resumen derivado. Aditivo: no cambia ninguna decisión.
         "skill_state": state,
         "skill_state_summary": skill_state_service.skill_state_summary(state),
+        # V3.64 (Decision Projection + Planner 3.0): proyección ADITIVA del
+        # estado que se acaba de calcular. El perfil ya tiene el estado en la
+        # mano, así que proyectarlo aquí es determinista y gratis (mismo
+        # `project_state` puro que la cola) y no relee ninguna fuente.
+        "decision_projection": decision_domain.project_state(state, source="profile"),
         "estimated_bands": bands,
         "estimated_descriptor": level_descriptor(level),
         "estimated_confidence": student_model["confidence"],

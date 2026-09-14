@@ -31,6 +31,8 @@ ya calculados. Nunca lanza.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from services import difficulty, task_semantics
 from services.evidence import (
     LEXICAL_SKILLS,
@@ -759,6 +761,8 @@ def select_task_by_elv(
     *,
     capacity_by_skill: dict | None = None,
     task_difficulty: object = None,
+    skill_values: dict | None = None,
+    drivers: dict | None = None,
 ) -> dict:
     """Tarea ÓPTIMA por argmax de ELV entre las candidatas admisibles (V3.57).
 
@@ -774,16 +778,38 @@ def select_task_by_elv(
     candidatas o sin ningún margen comparable devuelve `select_task` EXACTO: sin
     estado del alumno la tarea servida es la de V3.56.0. El empate lo rompe el
     orden canónico de `task_candidates` (`>` estricto). Nunca lanza.
+
+    V3.64 (Planner 3.0, ADITIVO) añade dos argumentos OPCIONALES que vienen de la
+    **Decision Projection** (`services.decision_projection`), nunca del estado
+    persistido:
+
+    - `skill_values` — valor pedagógico PROYECTADO por eje (`{skill: 0..1}`), que
+      sustituye a `skill_priorities` como `value` de la ELV. Incorpora la
+      retención, la transferencia y el esfuerzo observado como señales de primera
+      clase;
+    - `drivers` — `{skill: drivers}` de la proyección, para explicar la decisión.
+
+    Con ellos, la respuesta gana una clave ADITIVA `decision`
+    (`expected_learning_value`, `p_success`, `margin`, `capacity_skill`, `value`,
+    `drivers`, `why` y las alternativas puntuadas). **Sin** ellos la respuesta es
+    **byte-idéntica** a V3.63. Nunca lanza.
     """
     if not isinstance(capacity_by_skill, dict) or not capacity_by_skill:
-        return select_task(matrix, evidence, signals)
+        return _attach_decision(
+            select_task(matrix, evidence, signals),
+            _cascade_decision(matrix, evidence, signals, skill_values, drivers),
+        )
     candidates = task_candidates(matrix, evidence)
     if not candidates:
-        return select_task(matrix, evidence, signals)
+        return _attach_decision(
+            select_task(matrix, evidence, signals),
+            _cascade_decision(matrix, evidence, signals, skill_values, drivers),
+        )
     priorities = skill_priorities(signals or {})
     base_value = priority_score(signals or {})
     best: dict | None = None
     best_value = -1.0
+    scored: list[dict] = []
     for candidate in candidates:
         skill = candidate.get("skill") or ""
         channel = capacity_skill(skill)
@@ -792,8 +818,20 @@ def select_task_by_elv(
             skill=skill,
             task_difficulty=task_difficulty,
             learner_capacity=capacity_by_skill.get(channel),
-            value=priorities.get(skill, base_value),
+            value=_projected_value(skill_values, priorities, skill, base_value),
             capacity_skill=channel,
+        )
+        scored.append(
+            {
+                "skill": skill,
+                "activity": candidate.get("activity") or "",
+                "expected_learning_value": payload["expected_learning_value"],
+                "p_success": payload["p_success"],
+                "margin": payload["margin"],
+                "value": payload["value"],
+                "capacity_skill": channel,
+                "comparable": payload["margin"] is not None,
+            }
         )
         if payload["margin"] is None:
             continue
@@ -801,8 +839,152 @@ def select_task_by_elv(
             best_value = payload["expected_learning_value"]
             best = candidate
     if best is None:
-        return select_task(matrix, evidence, signals)
-    return best
+        return _attach_decision(
+            select_task(matrix, evidence, signals),
+            _cascade_decision(
+                matrix, evidence, signals, skill_values, drivers, scored
+            ),
+        )
+    return _attach_decision(
+        best,
+        (
+            _decision_block(best, scored, signals, skill_values, drivers)
+            if _has_projection(skill_values, drivers)
+            else None
+        ),
+    )
+
+
+def _has_projection(skill_values: object, drivers: object) -> bool:
+    """¿El llamador aportó la Decision Projection? (V3.64, puro).
+
+    Es la condición de la NO-REGRESIÓN de V3.57: sin proyección no se añade
+    ninguna clave y `select_task_by_elv` es byte-idéntico a V3.63. Nunca lanza.
+    """
+    return isinstance(skill_values, Mapping) or isinstance(drivers, Mapping)
+
+
+def _projected_value(
+    skill_values: dict | None,
+    priorities: Mapping,
+    skill: str,
+    base_value: float,
+) -> float:
+    """`value` de la ELV: proyectado si lo hay, `skill_priorities` si no (V3.64).
+
+    Nunca lanza: un valor proyectado no numérico cae al de V3.57.
+    """
+    if not isinstance(skill_values, Mapping):
+        return priorities.get(skill, base_value)
+    projected = skill_values.get(skill)
+    try:
+        return round(_clamp(float(projected)), 4)
+    except (TypeError, ValueError):
+        return priorities.get(skill, base_value)
+
+
+def _driver_of(drivers: object, skill: str) -> dict:
+    """Drivers declarados de una skill ({} si no hay; nunca lanza)."""
+    if not isinstance(drivers, Mapping):
+        return {}
+    declared = drivers.get(skill)
+    return dict(declared) if isinstance(declared, Mapping) else {}
+
+
+def _decision_block(
+    chosen: Mapping,
+    scored: list[dict],
+    signals: dict,
+    skill_values: object,
+    drivers: object,
+) -> dict:
+    """Bloque `decision` de la tarea elegida (V3.64, puro y aditivo)."""
+    skill = str(chosen.get("skill") or "")
+    entry = next(
+        (item for item in scored if item.get("skill") == skill),
+        {
+            "skill": skill,
+            "activity": chosen.get("activity") or "",
+            "expected_learning_value": 0.0,
+            "p_success": P_SUCCESS_UNKNOWN,
+            "margin": None,
+            "value": priority_score(signals or {}),
+            "capacity_skill": capacity_skill(skill),
+            "comparable": False,
+        },
+    )
+    driver = _driver_of(drivers, skill)
+    return {
+        **entry,
+        "source": "argmax",
+        "projected": isinstance(skill_values, Mapping),
+        # Punto 26 del informe: el encaje de la tarea en la capacidad observada
+        # (`difficulty_fit`) depende de la dificultad de la TAREA, así que vive
+        # aquí (el planner ya mide el `margin`) y NO en la proyección del estado.
+        "difficulty_fit": difficulty_fit(entry.get("p_success"), entry.get("margin")),
+        "drivers": driver,
+        "why": explain_drivers(driver),
+        "alternatives": list(scored),
+    }
+
+
+def difficulty_fit(p_success: object, margin: object = None) -> str:
+    """Encaje DECLARADO de la tarea en la capacidad observada (V3.64, puro).
+
+    `"above"` (la tarea está por encima de lo observado), `"in_zone"` (zona de
+    desarrollo próximo), `"below"` (por debajo: sobra capacidad) y `"unknown"`
+    cuando no hay margen comparable. Reutiliza las bandas YA declaradas de V3.56
+    (`P_SUCCESS_LOW`/`P_SUCCESS_HIGH`): **no** introduce umbrales nuevos. Nunca
+    lanza.
+    """
+    if margin is None:
+        return "unknown"
+    try:
+        probability = float(p_success)
+    except (TypeError, ValueError):
+        return "unknown"
+    if probability <= P_SUCCESS_LOW:
+        return "above"
+    if probability >= P_SUCCESS_HIGH:
+        return "below"
+    return "in_zone"
+
+
+def _cascade_decision(
+    matrix: dict | None,
+    evidence: dict | None,
+    signals: dict | None,
+    skill_values: object,
+    drivers: object,
+    scored: list[dict] | None = None,
+) -> dict | None:
+    """Bloque `decision` de la DEGRADACIÓN a la cascada (V3.64, puro).
+
+    Solo se construye cuando el llamador ha pasado la proyección: sin ella la
+    respuesta debe seguir siendo **byte-idéntica** a V3.63, así que no se añade
+    ninguna clave. Nunca lanza.
+    """
+    if not _has_projection(skill_values, drivers):
+        return None
+    planned = select_task(matrix, evidence, signals)
+    skill = str(planned.get("skill") or "")
+    return {
+        **_decision_block(planned, scored or [], signals or {}, skill_values, drivers),
+        "source": "cascade",
+        "skill": skill,
+        "activity": planned.get("activity") or "",
+    }
+
+
+def _attach_decision(task: dict, decision: dict | None) -> dict:
+    """Respuesta del planner con el bloque `decision` SOLO si procede (V3.64).
+
+    Sin proyección (`decision is None`) devuelve `task` **tal cual**: la
+    invariante de no-regresión de V3.57 exige byte-identidad.
+    """
+    if decision is None:
+        return task
+    return {**task, "decision": decision}
 
 
 def evidence_reason(matrix: dict | None, evidence: dict | None) -> str:
@@ -951,8 +1133,48 @@ def _capacity_phrases(learning_value: dict | None) -> list[str]:
     ]
 
 
+def explain_drivers(driver: Mapping | None) -> list[str]:
+    """Frases ADITIVAS (inglés) de los drivers de la proyección (V3.64, pura).
+
+    Mismo registro que `explain_priority`: frases cortas, deterministas y en
+    inglés, el contrato `why` del proyecto. Un driver VACÍO no aporta ninguna
+    frase (nunca se inventa explicación): solo un driver medido o declarado como
+    no medido produce texto. Nunca lanza.
+    """
+    if not isinstance(driver, Mapping) or not driver:
+        return []
+    if driver.get("measured") is False:
+        return ["no spaced evidence yet"]
+    parts: list[str] = []
+    gap = str(driver.get("gap") or "")
+    if gap == "high":
+        parts.append("large competence gap in the limiting modality")
+    elif gap == "medium":
+        parts.append("competence gap still open")
+    if driver.get("retention_due"):
+        parts.append("review is due")
+    transfer_gap = str(driver.get("transfer_gap") or "")
+    if transfer_gap == "high":
+        parts.append("no contextual transfer yet")
+    elif transfer_gap == "medium":
+        parts.append("transfer only partly demonstrated")
+    effort = str(driver.get("effort") or "")
+    if effort == "high":
+        parts.append("success so far needed heavy support")
+    elif effort == "some":
+        parts.append("success so far needed some support")
+    if driver.get("recent_failure"):
+        parts.append("recent task errors in this modality")
+    if str(driver.get("assessment_confidence") or "") == "low":
+        parts.append("assessment coverage is low")
+    return parts
+
+
 def explain_priority(
-    signals: dict, reason: str = "", learning_value: dict | None = None
+    signals: dict,
+    reason: str = "",
+    learning_value: dict | None = None,
+    drivers: Mapping | None = None,
 ) -> str:
     """Explicación legible (inglés) de por qué esta tarea es la siguiente.
 
@@ -963,6 +1185,10 @@ def explain_priority(
     `P_SUCCESS_LOW` la tarea está por encima de lo observado, por encima de
     `P_SUCCESS_HIGH` sobra, y en medio se explica el porcentaje esperado. Sin
     predicción, las frases son exactamente las de V3.55. Nunca lanza.
+
+    V3.64 añade `drivers` (OPCIONAL) y, con él, las frases de la Decision
+    Projection al final de la explicación: sin `drivers` la salida es
+    **byte-idéntica** a V3.63.
     """
     parts: list[str] = []
     if reason == "weak_recognition":
@@ -998,6 +1224,8 @@ def explain_priority(
                 parts.append("successes still depend on support")
         except (TypeError, ValueError):
             pass
+    # V3.64: frases de la Decision Projection (aditivas; nada sin `drivers`).
+    parts.extend(explain_drivers(drivers))
     if not parts:
         parts.append("scheduled maintenance")
     return "; ".join(parts)

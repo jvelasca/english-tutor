@@ -257,6 +257,13 @@ export interface LearningProfile {
    * V3.63: gana `layers` en las modalidades que DECLARAN capas (hoy listening).
    */
   skill_state_summary?: Record<string, Record<string, unknown>>;
+  /**
+   * V3.64 (Decision Projection + Planner 3.0, cierre de P1-01): proyección
+   * ADITIVA del estado anterior, `{state, projection, capacity_by_skill,
+   * skill_values, drivers, source, sealed}`. Es la única vía por la que el
+   * Student Skill State gobierna la decisión (nunca `skill_state → planner`).
+   */
+  decision_projection?: Record<string, unknown> | null;
   estimated_bands: EstimatedBands;
   estimated_descriptor: string;
   estimated_confidence: number;
@@ -936,6 +943,82 @@ export interface ReviewTask {
   support_level: string;
 }
 
+/**
+ * V3.64 (Planner 3.0, cierre de P1-01): bloque explicable del argmax ELV.
+ *
+ * `drivers` son los de la Decision Projection (el estado unificado SÍ gobierna
+ * la decisión, pero siempre a través de la proyección, nunca leyendo el estado
+ * persistido) y `alternatives` las candidatas puntuadas por el argmax.
+ */
+export interface ReviewDecision {
+  skill: string;
+  activity: ReviewActivity | "";
+  expected_learning_value: number;
+  p_success: number | null;
+  margin: number | null;
+  value: number;
+  capacity_skill: string;
+  comparable: boolean;
+  /** "argmax" si decidió el ELV; "cascade" si degradó a la cascada de V3.39. */
+  source: string;
+  /** true si la ELV usó el `value` proyectado por la Decision Projection. */
+  projected: boolean;
+  /**
+   * Encaje declarado de la tarea en la capacidad observada (punto 26 del
+   * informe): "above" | "in_zone" | "below" | "unknown" (sin margen comparable).
+   */
+  difficulty_fit: DifficultyFit;
+  drivers: ReviewDecisionDrivers;
+  why: string[];
+  alternatives: ReviewDecisionAlternative[];
+}
+
+/**
+ * V3.64: motivos DECLARADOS de la Decision Projection que acompañan a la
+ * decisión. Son BANDAS y hechos derivados de la evidencia del alumno, nunca
+ * probabilidades estimadas ni una declaración de dominio. `measured: false`
+ * significa que el estado todavía no declara nada comparable para ese eje (y por
+ * eso el planner no usó la proyección para decidir).
+ */
+export interface ReviewDecisionDrivers {
+  skill?: string;
+  modality?: string;
+  value?: number;
+  components?: Record<string, number>;
+  weights?: Record<string, number>;
+  measured?: boolean;
+  /** Hueco de competencia declarado: "none" | "low" | "medium" | "high". */
+  gap?: string;
+  /** Hueco de transferencia contextual: "none" | "low" | "medium" | "high". */
+  transfer_gap?: string;
+  /** La evidencia espaciada está vencida (señal de retención). */
+  retention_due?: boolean;
+  /** Coste observado declarado: "none" | "some" | "high". */
+  effort?: string;
+  /** Banda de confianza de EVALUACIÓN: "" | "low" | "medium" | "high". */
+  assessment_confidence?: string;
+  recent_failure?: boolean;
+  novelty?: number;
+  contexts?: number;
+}
+
+export interface ReviewDecisionAlternative {
+  skill: string;
+  activity: ReviewActivity | "";
+  expected_learning_value: number;
+  p_success: number | null;
+  margin: number | null;
+  value: number;
+  capacity_skill: string;
+  comparable: boolean;
+}
+
+/**
+ * V3.64: encaje declarado de la tarea en la capacidad observada. Reutiliza las
+ * bandas de éxito de V3.56 (no introduce umbrales nuevos).
+ */
+export type DifficultyFit = "above" | "in_zone" | "below" | "unknown";
+
 export interface ReviewQueueItem {
   word: string;
   lexical_unit: string;
@@ -969,6 +1052,11 @@ export interface ReviewQueueItem {
   // es su argmax).
   skill_priorities?: Record<string, number>;
   task?: ReviewTask | null;
+  // V3.64 (Planner 3.0): bloque ADITIVO y explicable del argmax ELV
+  // (`{expected_learning_value, p_success, margin, drivers, alternatives,
+  // skill}`) derivado de la Decision Projection. Ausente en el camino sin
+  // proyección (idéntico a V3.63).
+  decision?: ReviewDecision | null;
   competence?: LexicalCompetence | null;
   // V3.40 (Fase 4): gobierno por unidad léxica. `unit_surfaces` son las formas
   // hermanas (go/went/gone/going) y `transfer`/`success_contexts` la

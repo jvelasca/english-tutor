@@ -496,6 +496,81 @@ const STRINGS: Record<string, Entry> = {
     en: "Contextual transfer shown under the internal protocol (clean, unscaffolded successes in different contexts). It does not mean the word is used everywhere.",
     es: "Transferencia contextual demostrada bajo el protocolo interno (éxitos limpios sin apoyo en contextos distintos). No significa que la palabra se use en todas partes.",
   },
+  // V3.64 (Decision Projection + Planner 3.0): motivos DECLARADOS de la decisión.
+  // Son BANDAS y hechos del estado proyectado, nunca probabilidades estimadas; el
+  // alcance lo aclara `scope` para no confundir explicabilidad con dominio.
+  "dictionary.review.decision.scope": {
+    en: "Why the planner picked this task: declared bands from your own evidence — not probabilities, and not a claim of mastery.",
+    es: "Por qué el planner eligió esta tarea: bandas declaradas a partir de tu propia evidencia — no son probabilidades ni una declaración de dominio.",
+  },
+  "dictionary.review.decision.fit.above": {
+    en: "Above what you have shown",
+    es: "Por encima de lo que has demostrado",
+  },
+  "dictionary.review.decision.fit.in_zone": {
+    en: "In your growth zone",
+    es: "En tu zona de desarrollo",
+  },
+  "dictionary.review.decision.fit.below": {
+    en: "Below what you have shown",
+    es: "Por debajo de lo que has demostrado",
+  },
+  "dictionary.review.decision.gap.none": {
+    en: "No gap",
+    es: "Sin hueco",
+  },
+  "dictionary.review.decision.gap.low": {
+    en: "Small gap",
+    es: "Hueco pequeño",
+  },
+  "dictionary.review.decision.gap.medium": {
+    en: "Medium gap",
+    es: "Hueco medio",
+  },
+  "dictionary.review.decision.gap.high": {
+    en: "Large gap",
+    es: "Hueco grande",
+  },
+  "dictionary.review.decision.transfer.none": {
+    en: "Transfer: no gap",
+    es: "Transferencia: sin hueco",
+  },
+  "dictionary.review.decision.transfer.low": {
+    en: "Transfer: early",
+    es: "Transferencia: inicial",
+  },
+  "dictionary.review.decision.transfer.medium": {
+    en: "Transfer: building",
+    es: "Transferencia: en progreso",
+  },
+  "dictionary.review.decision.transfer.high": {
+    en: "Transfer: pending",
+    es: "Transferencia: pendiente",
+  },
+  "dictionary.review.decision.retention": {
+    en: "Due for review",
+    es: "Repaso vencido",
+  },
+  "dictionary.review.decision.effort.some": {
+    en: "Costly recall",
+    es: "Recuperación costosa",
+  },
+  "dictionary.review.decision.effort.high": {
+    en: "High effort",
+    es: "Esfuerzo alto",
+  },
+  "dictionary.review.decision.confidence.low": {
+    en: "Assessment confidence: low",
+    es: "Confianza de evaluación: baja",
+  },
+  "dictionary.review.decision.confidence.medium": {
+    en: "Assessment confidence: medium",
+    es: "Confianza de evaluación: media",
+  },
+  "dictionary.review.decision.confidence.high": {
+    en: "Assessment confidence: high",
+    es: "Confianza de evaluación: alta",
+  },
   "dictionary.loadError": {
     en: "Could not load your dictionary. ",
     es: "No se pudo cargar tu diccionario. ",

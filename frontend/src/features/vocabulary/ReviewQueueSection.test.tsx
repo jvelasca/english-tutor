@@ -369,4 +369,110 @@ describe("ReviewQueueSection (V3.35)", () => {
     await screen.findByText("Word hidden — recall from meaning");
     expect(screen.queryByText("No transfer evidence yet")).toBeNull();
   });
+
+  it("muestra los motivos DECLARADOS de la decisión cuando hay proyección (V3.64)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "write",
+            reason: "skill_gap",
+            decision: {
+              skill: "written_production",
+              activity: "write",
+              expected_learning_value: 0.62,
+              p_success: 0.5,
+              margin: 0,
+              value: 0.8,
+              capacity_skill: "written_production",
+              comparable: true,
+              source: "argmax",
+              projected: true,
+              difficulty_fit: "in_zone",
+              drivers: {
+                measured: true,
+                gap: "high",
+                transfer_gap: "medium",
+                retention_due: true,
+                effort: "some",
+                assessment_confidence: "medium",
+              },
+              why: ["Large gap in this skill"],
+              alternatives: [],
+            },
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    const line = await screen.findByText(/In your growth zone/);
+    // Bandas declaradas, en el idioma de la interfaz y en una sola línea.
+    expect(line.textContent).toContain("Large gap");
+    expect(line.textContent).toContain("Transfer: building");
+    expect(line.textContent).toContain("Due for review");
+    expect(line.textContent).toContain("Costly recall");
+    expect(line.textContent).toContain("Assessment confidence: medium");
+    // El alcance declarado viaja en el `title` (no es una promesa de dominio).
+    expect(line.getAttribute("title")).toContain("not a claim of mastery");
+  });
+
+  it("no inventa motivos cuando el estado no declara medida (V3.64)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "recall",
+            reason: "no_recall_evidence",
+            decision: {
+              skill: "",
+              activity: "recall",
+              expected_learning_value: 0.1,
+              p_success: null,
+              margin: null,
+              value: 0.1,
+              capacity_skill: "",
+              comparable: false,
+              source: "cascade",
+              projected: true,
+              difficulty_fit: "unknown",
+              drivers: { measured: false, gap: "high", transfer_gap: "high" },
+              why: [],
+              alternatives: [],
+            },
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    await screen.findByText("Word hidden — recall from meaning");
+    // Ni encaje ni bandas: sin medida declarada no hay nada que explicar.
+    expect(screen.queryByText(/growth zone/)).toBeNull();
+    expect(screen.queryByText(/Large gap/)).toBeNull();
+  });
 });

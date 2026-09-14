@@ -2890,18 +2890,137 @@ como **documentado, no verificado de forma independiente** (P3-02).
 > Planner 3.0**, y la proyección se calculará desde las **MISMAS filas canónicas**
 > que el estado (nunca desde la caché).
 >
-> **Relevo para el siguiente agente (2026-09-14): V3.64 — Decision Projection +
-Planner 3.0 (cierre de P1-01).** El briefing de V3.63 queda archivado en
-`agentes/v363-observed-task-difficulty-2.md` como referencia del estado del modelo.
-El siguiente incremento cierra **P1-01**: el Skill State es **descriptivo** y debe
-volverse **decisional** por una capa intermedia —`Student Skill State → Decision
-Projection → Planner`—, **nunca** `skill_state → planner` directamente, para no
-convertir el modelo en otra capa de heurísticas superpuestas. La proyección se
-calcula desde las **MISMAS filas canónicas** que el estado (nunca desde la caché
-persistida), de modo que la caché sea una optimización y **no una segunda verdad**;
-`skill_state_is_fresh` (V3.63) es la pieza que permite recomputar una sola vez
-cuando la caché esté vieja. Verifica el estado real del árbol antes de empezar
-(premisas 8 y 12).
+> **Nota (2026-09-14): auditoría `W` de V3.63.0 archivada.** Se archiva el informe
+> profundo como `docs/audit/W-AUDITORIA-TOTAL-V363.md` (**9,6 / 10 APROBADA**; 0 P0,
+> **1 P1**, 4 P2, 2 P3; letra `W` porque la `R` sigue reservada al informe nunca
+> publicado de V3.59 y la `V` al informe externo de V3.62). Veredicto: V3.63 es una
+> de las releases **arquitectónicamente más importantes** del proyecto porque, más
+> allá de `observed_difficulty.py`, cierra la deuda de **honestidad epistemológica**
+> del Student Model (`NO SABEMOS → no inventamos`; una observación **no** es una
+> ocasión independiente; un éxito **no** implica confianza de evaluación alta; lo
+> ESCRITO **no** se convierte en `speaking`; la carga SERVIDA **no** se confunde con
+> competencia). **El P1-01 nuevo es conceptual y NO se parchea** (no hay V3.63.1):
+> `observed_task_difficulty_2()` sigue siendo *máxima carga servida/experimentada
+> superada bajo puerta espaciada* y **mezcla dificultad con esfuerzo**
+> (`DIFFICULTY ≠ EFFORT`); el seam creado (módulo puro, determinista, sin I/O, sin
+> reloj, sin `random()`, sin LLM y sin umbrales nuevos) es **el correcto**, así que
+> la solución definitiva corresponde a la **Decision Projection/Planner 3.0**
+> (V3.64) y a **Observed Difficulty 3.0** (V3.65), no a otra tabla de heurísticas
+> aislada. P2 aceptados como deuda del siguiente escalón: fingerprint `COUNT(*) +
+> MAX(id)` (P2-01; suficiente si las tablas son append-only por contrato),
+> `experienced_load()` mezcla coste con dificultad (P2-02), `error_type` como coste
+> homogéneo (P2-03; `ASR low_confidence` es incertidumbre de MEDIDA, no dificultad)
+> y el máximo por dimensión sobreestima capacidad (P2-04; formalizar
+> `highest_demonstrated_load` ≠ `empirical_task_difficulty`). P3: el estado nuevo
+> sigue **sin gobernar** el Planner (P3-01, el P1-01 heredado, comprometido a V3.64)
+> y el **CI 6/6** de V3.63 queda como **documentado, no verificado de forma
+> independiente** (la API devuelve `statuses: []`; P3-02). **Roadmap confirmado por
+> el auditor:** V3.64 → **V3.65 Observed Difficulty 3.0** → V3.66 Adaptive Instance
+> Selection → V3.67+ Sense Engine 2.0.
+>
+> **Nota (2026-09-14): V3.64.0 (Decision Projection + Planner 3.0) — P1-01 CERRADO.**
+> Release **v3.64.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco y SIN umbrales nuevos** (el único cambio de UI es la línea de
+> motivos DECLARADOS en la cola de repaso, con i18n en/es). Cierra el **P1-01** (heredado de las auditorías
+> de V3.62 y `W` de V3.63) y, por contrato, los **P2-02/P2-03/P2-04** del informe
+> `W`. **La invariante cambia aquí, pero con una frontera declarada:** el Student
+> Skill State deja de ser **descriptivo** y **gobierna la decisión de tareas**
+> SIEMPRE por la capa explícita `Student Skill State → DECISION PROJECTION →
+> Planner 3.0` y **NUNCA** `skill_state → planner`; el planner sigue **puro** y
+> **ciego** al estado persistido (recibe `capacity_by_skill`/`skill_values`/
+> `drivers`, que son proyecciones).
+> **(A) Módulo puro `services/decision_projection.py` (nuevo).** Mismo contrato que
+> `observed_difficulty.py` (sin I/O, sin reloj, sin `random()`/`hash()`, nunca
+> lanza). `project(state)` separa **carga** (`highest_demonstrated_load` —nombrado
+> como lo que es, P2-04—, `served_ceiling`, `credited_ceiling`,
+> `scaffolding_gap = servido − acreditado`) de **esfuerzo** (nivel declarado + carga
+> EXTRA `experimentado − servido`) (P2-02), con `confidence` (estadística) y
+> `assessment_confidence` (banda + motivos) **sin fusionar** y `retention`/
+> `transfer`/`novelty` como señales de primera clase. `error_type` se reparte con
+> una tabla DECLARADA en error de TAREA (señal de dificultad) e INCERTIDUMBRE DE
+> MEDIDA (baja la confianza de evaluación y **nunca** sube la carga: `low_confidence`
+> de ASR, `empty`, `semantic_doubt`) (P2-03). `capacity_by_skill` es el
+> **reemplazo directo** de `lexicon._capacity_by_skill` (mismas cuatro claves de
+> `LEXICAL_SKILLS`) con una celda PROVISIONAL **fuera de la comparabilidad** (el
+> argmax de V3.57 no premia la ignorancia); `skill_values` pondera
+> `gap`/`retention`/`transfer`/`effort` con pesos DECLARADOS que suman 1.0
+> (`assessment_confidence` **no** es un peso: es un filtro); `drivers` es el bloque
+> explicable del punto 26 del informe y `has_comparable_capacity` declara la
+> condición de degradación.
+> **(B) Hechos ADITIVOS del estado (`services/skill_state.py`).** `_entry` expone lo
+> que YA calculaba y no publicaba —`kinds`, `production_count`, `last_evidence`,
+> `contexts`, `error_types` y `review_due`— con **cero recálculo y cero cambio de
+> semántica**: el estado solo DECLARA los hechos; clasificarlos es de la proyección.
+> **(C) Planner 3.0 aditivo (`services/planner.py`).** `select_task_by_elv` gana
+> `skill_values`/`drivers` OPCIONALES y devuelve el bloque aditivo `decision`
+> (`expected_learning_value`, `p_success`, `margin`, `value`, `capacity_skill`,
+> `comparable`, `source` `argmax`/`cascade`, `projected`, `difficulty_fit` —encaje
+> declarado con las bandas YA existentes de V3.56, sin umbrales nuevos—, `drivers`,
+> `why` y las alternativas puntuadas), más `explain_drivers` y `explain_priority`
+> extendido de forma aditiva. **Invariante: sin `skill_values`/`drivers` NO se añade
+> ninguna clave y la respuesta es byte-idéntica a V3.63** (`_has_projection` lo fija
+> en el código).
+> **(D) `domain/decision.py` (nuevo, I/O).** `decision_projection(user_id, level,
+> now)` lee el perfil (que ya trae `skill_state` y su sello), usa la caché SOLO si
+> `skill_state_is_fresh` la valida y, si está VIEJA, vacía o es **legacy sin sello**,
+> **recomputa UNA vez** desde las CUATRO fuentes canónicas con el helper
+> `canonical_sources` **compartido** con `domain/profile.py` (la secuencia vive en un
+> solo sitio y no puede divergir del perfil) y la **re-sella**. `source`
+> (`cached`/`recomputed`) hace el comportamiento auditable. `project_state` es el
+> único punto donde el payload se ensambla (puro) y el perfil lo reutiliza.
+> **(E) Recableado declarado y degradable (`domain/review.py` + `services/lexicon.py`).**
+> La cola construye la proyección **UNA vez** y la pasa a sus DOS pasadas; con
+> proyección, `review_queue_item` usa su capacidad/valores/drivers y añade `decision`
+> al ítem. **Degradación declarada y probada:** si la proyección **no declara
+> capacidad comparable** (el estado calla), se conserva **EXACTAMENTE** el camino de
+> V3.54/V3.63 (estimador anterior, `skill_priorities` como valor y **sin** bloque
+> `decision`), de modo que **ninguna petición pierde señal ni cambia de tarea por el
+> solo hecho de existir la proyección**; sin `projection` el camino es el de V3.63,
+> byte a byte. `_queue_sort_key` no cambia: solo cambia **de dónde sale el ELV**.
+> **(F) Contrato aditivo.** `schemas/learning.py` (ítem → `decision`),
+> `schemas/profile.py` (`/api/profile` → `decision_projection`) y espejo en
+> `frontend/src/types/api.ts` (`ReviewDecision`, `ReviewDecisionAlternative`,
+> `ReviewDecisionDrivers`, `DifficultyFit`); **UI mínima declarada:** la cola de
+> repaso muestra una línea con las bandas de la proyección (encaje, hueco,
+> transferencia, retención, esfuerzo y confianza de evaluación) con su alcance en
+> el `title` y **nada** cuando el estado no declara medida, con claves i18n
+> `dictionary.review.decision.*` en en/es.
+> **Tests:** nuevo `backend/tests/test_decision_projection_v364.py` (**27**) que fija
+> pureza/determinismo, la forma de la proyección (carga vs esfuerzo, error vs
+> incertidumbre), la paridad y el filtro de comparabilidad de la capacidad, la
+> retención como señal de primera clase, los drivers, la degradación EXACTA a V3.63,
+> la **contraprueba positiva de que el estado AHORA SÍ gobierna** (la tarea servida
+> cambia y se explica), la frescura/recompute-once y el contrato aditivo e2e HTTP.
+> **`test_skill_state_v362.py` y `test_planner_argmax_v357.py` siguen verdes SIN
+> TOCARSE.** Verificación local: `pytest` **2458 passed**, `ruff` limpio, launcher
+> **75**, `tsc` OK, `vitest` **653** (76 ficheros), `build` OK,
+> `check_release_consistency` **3.64.0**, `check_beta_v3`/`content_validation` OK y
+> `transfer_validation` OK (la release NO toca el banco).
+> **Honestidad (deuda declarada de V3.64):** `observed_task_difficulty_2` **no** se
+> convierte en `P(éxito | alumno, tarea)` empírica (V3.65), `highest_demonstrated_load`
+> **no** es dificultad empírica (P2-04), la proyección **solo gobierna cuando el
+> estado tiene algo que decir** (degradación visible en `decision.source`), el
+> fingerprint de frescura sigue siendo `COUNT(*) + MAX(id)` (P2-01) y el gate sigue
+> sin parametrizar por pareja.
+>
+> **Relevo para el siguiente agente (2026-09-14): V3.65 — Observed Difficulty 3.0.**
+> V3.64 dejó el **P1-01 cerrado** y la frontera declarada por escrito: la proyección
+> ya gobierna, pero **cuando el estado calla la decisión sigue siendo la de
+> V3.54/V3.63**. El siguiente incremento convierte la **medida** declarada
+> (`observed_task_difficulty_2`: techos servido/acreditado/experimentado bajo puerta
+> espaciada) en una estimación **empírica** `P(éxito | alumno, tarea)` con la que
+> cerrar esa frontera — con dos reglas que la auditoría `W` dejó escritas y que
+> **no** se pueden relajar: (1) la carga máxima DEMOSTRADA
+> (`highest_demonstrated_load`) **no** es dificultad empírica y no debe renombrarse
+> como si lo fuera; (2) la estimación debe seguir separando **dificultad** de
+> **esfuerzo** y **error de tarea** de **incertidumbre de medida** (P2-02/P2-03), y
+> no puede introducir umbrales nuevos sin declararlos. Puntos de apoyo ya en el
+> árbol: `services/decision_projection.py` (celdas `load`/`effort`/`assessment_
+> confidence` y `has_comparable_capacity`), `services/observed_difficulty.py` (las
+> tres capas y sus tablas declaradas), `domain/decision.py` (caché validada +
+> recompute-una-vez) y el bloque `decision` del Planner 3.0, que es donde la
+> estimación tendría que entrar **sin** romper el invariante de no-regresión.
+> Verifica el estado real del árbol antes de empezar (premisas 8 y 12).
 
 **Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
 Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra

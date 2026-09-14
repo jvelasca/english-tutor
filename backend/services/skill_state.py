@@ -230,6 +230,25 @@ def occasion_key(row: Mapping) -> str:
     return ""
 
 
+def _facts_of(row: Mapping) -> Mapping:
+    """Hechos declarados de una fila canónica ({} si no los declara)."""
+    facts = row.get("facts")
+    return facts if isinstance(facts, Mapping) else {}
+
+
+def _row_context(row: Mapping) -> str:
+    """CONTEXTO declarado por una fila canónica ("" si no declara ninguno).
+
+    Prefiere la INSTANCIA de transferencia (`context_instance`, V3.61) sobre la
+    familia (`context_id`): es el hecho más específico ya persistido. Solo LEE lo
+    que la fuente declaró; nunca construye un contexto por defecto (V3.64).
+    """
+    facts = _facts_of(row)
+    return str(
+        facts.get("context_instance") or facts.get("context_id") or ""
+    ).strip()
+
+
 def _declared_channel(row: Mapping) -> str:
     """Canal OBSERVADO declarado por la actividad del evento ("" si no declara).
 
@@ -641,6 +660,20 @@ def _entry(
         if kind in by_kind:
             by_kind[kind] += 1
     production_count = sum(1 for row in rows if row.get("production"))
+    # V3.64: CONTEXTOS declarados por las filas (instancia de transferencia con
+    # preferencia sobre familia), contados como hechos YA persistidos. Es ADITIVO y
+    # de solo lectura: sirve a la Decision Projection para `transfer`/`novelty` sin
+    # reinterpretar la evidencia. Una fila sin contexto no aporta ninguno.
+    context_set = {
+        context for context in (_row_context(row) for row in rows) if context
+    }
+    # V3.64: TIPOS DE ERROR declarados por las filas (dedup, orden determinista).
+    # El estado solo los DECLARA; su clasificación en error de tarea e
+    # incertidumbre de medida es responsabilidad de la Decision Projection.
+    error_set = {
+        str(_facts_of(row).get("error_type") or "").strip()
+        for row in rows
+    } - {""}
     # `review_due` solo si el llamador aporta reloj; si las marcas de la fuente no
     # son comparables con `now` (naive vs aware) NO se inventa vencimiento.
     try:
@@ -679,6 +712,22 @@ def _entry(
         "observed_task_difficulty_2": (
             observed_difficulty.observed_task_difficulty_2(rows)
         ),
+        # V3.64 (aditivo): HECHOS ya calculados que la Decision Projection necesita
+        # y que hasta ahora no se exponían. Cero recálculo y cero cambio de
+        # semántica: `kinds` es el `by_kind` del gate, `production_count` y
+        # `last_evidence` ya alimentaban `competence_state`, y `contexts`/
+        # `error_types` son hechos DECLARADOS por las filas (dedup, orden
+        # determinista). Clasificarlos es de la proyección, no del estado.
+        "kinds": dict(by_kind),
+        "production_count": production_count,
+        "last_evidence": last,
+        "contexts": sorted(context_set),
+        "error_types": sorted(error_set),
+        # V3.64 (aditivo): VENCIMIENTO ya calculado arriba (`gate_entry`) y que
+        # hasta ahora solo consumía `competence_state` internamente. La Decision
+        # Projection lo necesita como señal de RETENCIÓN de primera clase. Sigue
+        # siendo `False` sin reloj (`now`) del llamador: el estado no lo inventa.
+        "review_due": review_due,
     }
 
 

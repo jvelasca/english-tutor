@@ -135,6 +135,13 @@ class LearningProfile(BaseModel):
     # forma: tipar cada clave aquí acoplaría el contrato al agregador.
     skill_state: dict[str, dict[str, dict]] = Field(default_factory=dict)
     skill_state_summary: dict[str, dict] = Field(default_factory=dict)
+    # V3.64 (Decision Projection + Planner 3.0): proyección de decisión derivada
+    # del estado anterior (`{state, capacity_by_skill, skill_values, drivers,
+    # source, sealed}`; `projection` completa por celda). Aditiva y de solo
+    # lectura: sirve a la auditoría externa y fija por e2e que el estado SÍ
+    # gobierna la decisión. `None` si no se pudo proyectar (la cola degrada al
+    # camino de V3.63).
+    decision_projection: dict | None = None
     estimated_bands: EstimatedBands
     estimated_descriptor: str
     estimated_confidence: float

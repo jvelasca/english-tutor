@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from starlette.concurrency import run_in_threadpool
 
 from domain import academy as academy_service
+from domain import decision as decision_domain
 from domain import learner_state as learner_state_domain
 from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
@@ -135,6 +136,16 @@ async def get_review_queue(
     # caché del Student Model) y se pasa a las DOS pasadas de `review_queue_item`
     # (ranking y servido), para que orden y payload no puedan divergir.
     learner_state = await learner_state_domain.learner_level_state(user_id)
+    # V3.64 (cierre de P1-01): la Decision Projection se construye UNA vez por
+    # cola desde las MISMAS filas canónicas que el estado (caché sellada validada
+    # por frescura; si está vieja se recomputa UNA vez y se re-sella) y se pasa a
+    # las DOS pasadas. Es el único punto por el que el Student Skill State
+    # gobierna la decisión: el planner sigue sin leerlo.
+    projection = await decision_domain.decision_projection(
+        user_id,
+        level=learner_state.get("practice_level") or "",
+        now=now_iso,
+    )
     # V3.38.1: primera pasada SIN disponibilidad de contenido. La PRIORIDAD no
     # depende del cue recomendado, así que basta para el ranking global; así el
     # coste de resolver el cue (que consulta el corpus por palabra, P2 de V3.38)
@@ -156,6 +167,7 @@ async def get_review_queue(
                 lexicon.lexical_unit(row) or "", None
             ),
             learner_state=learner_state,
+            projection=projection,
         )
         for row, card in candidates
     ]
@@ -187,6 +199,7 @@ async def get_review_queue(
                     lexicon.lexical_unit(row) or "", None
                 ),
                 learner_state=learner_state,
+                projection=projection,
             )
         )
     return {
