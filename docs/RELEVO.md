@@ -5,6 +5,50 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-15 (UTC+2).
 >
+> **Nota (2026-09-15): auditoría total de V3.68.0 (`Y`) recibida — motor
+> adaptativo CONGELADO y confirmado, V3.69 pasa a ser VALIDACIÓN E2E.**
+> — El dossier externo `docs/audit/Y-AUDITORIA-TOTAL-V368.md` audita el salto
+> `v3.67.0` `150186a` → `v3.68.0` `8acee38` (commit de documentación `d5311cc`)
+> y da el veredicto **9,3 / 10 GLOBAL** con **0 P0 · 0 P1 · 6 P2 · 5 P3**. Es la
+> **primera auditoría de la serie sin ningún P1**: confirma los **tres P1 de
+> segunda generación de V3.67** como **CERRADOS** (Task Definition vs Task
+> Instance, FSM real del lifecycle y ownership/integridad del provenance), el
+> **P2-08** (`unclear`/`abandoned` fuera de la calibración) como cerrado, y
+> declara textualmente que **no encuentra ningún P1 que justifique otra gran
+> modificación arquitectónica del Adaptive Engine**. **El diseño del motor
+> adaptativo queda CONGELADO y confirmado por la auditoría externa.**
+> **Lo que cambia respecto al plan anterior (único cambio de roadmap):** V3.69
+> deja de ser «E2E Adaptive Engine (10 casos)» y pasa a ser **«E2E + Adaptive
+> Engine Validation»**: **validación experimental, NO capacidad nueva**, con la
+> batería obligatoria **E01–E16** (E16 es el **determinismo del Planner**: mismo
+> estado + fingerprint + candidatos + política → mismo task, `p_success`, ELV,
+> razón y `decision_id`, siempre). **Regla dura declarada:** *V3.69 no debe
+> introducir arquitectura nueva salvo que una prueba E2E demuestre que la
+> arquitectura actual es insuficiente.* Briefing ejecutable en
+> `agentes/v369-e2e-adaptive-validation.md`. El resto del roadmap
+> (`V3.70` pedagógica/CEFR → `V3.71` runtime/offline/instalación → `V3.72`
+> UX/product completion → `V3.73` auditoría final → **`V4.0` «English Tutor,
+> primera versión completa y estable»** y a partir de ahí `V4.0.x` de
+> mantenimiento y calibración) **no cambia**.
+> **Deuda P2/P3 aceptada en el backlog** (ver el dossier `Y` §30): el lifecycle
+> sigue siendo **best-effort** y falta el *provenance failure rate* como release
+> health metric (P2-01); `decision_records` sigue mezclando DECISION / SERVING /
+> ATTEMPT / OUTCOME sin normalizar (P2-02); `decision_id` **no** identifica un
+> serving y falta la identidad lógica `serving_id`/`attempt_id` (P2-03); la
+> reapertura conserva el `decision_id` y el registro representa el estado final,
+> no la historia (P2-04 · solución futura `decision_events` append-only); la
+> calibración sigue siendo **descriptiva** por bandas de 0,2 y se aplaza a
+> propósito (P2-05); el Planner sigue usando tasas **sin recencia** y sin
+> **Expected Learning Gain real** (P2-06 · pertenece a **Planner 4.0**, no a
+> V3.69). P3: `activity_match` sin métrica agregada (`planner_execution_fidelity`),
+> `target_id` frente al **Sense Engine** (deuda histórica pendiente),
+> **CI 6/6 declarado por el release y NO verificado de forma independiente** por
+> el auditor, y el barrido `close_stale` solo en la construcción de cola.
+> **Correcciones documentales aplicadas con esta nota:** nueva nota de cabecera
+> (esta), corrección de la sección **«0. START HERE»** (declaraba `v3.65.0`,
+> desfasada desde V3.66), `PLAN.md` (tablero de briefings, bloque de «Siguiente
+> incremento» con E01–E16 y M13) y nuevo briefing de V3.69.
+>
 > **Nota (2026-09-15): V3.68.0 (Adaptive Engine Hardening & Integrity)**
 > — release **v3.68.0**, **SIN migración destructiva** (migración ADITIVA e
 > idempotente: dos columnas nuevas en `decision_records`), **SIN bump de
@@ -2908,17 +2952,29 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-15):** `v3.65.0` **Observed Difficulty 3.0
-(`P(éxito | alumno, tarea)` empírica)** (release SIN migración de BD, SIN bump de
-`GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI que convierte la
-dificultad observada de medida DECLARADA en una ESTIMACIÓN EMPÍRICA por pareja que,
-cuando existe, gobierna el `p_success` del Planner 3.0 —byte-idéntico sin
-estimación—). **Verificada en local** (`pytest` backend **2478 passed**, launcher
-**75**, `ruff` limpio, `tsc`/`vitest`/`build` OK, `check_release_consistency`
-**3.65.0**, `check_beta_v3`/`content_validation`/`transfer_validation` OK).
-**CERRADA:** commit + tag `v3.65.0` + push. Detalle en `release-notes-v3.65.0.md`.
-Antes, `v3.64.1` **Consistencia snapshot/fingerprint** (patch de re-sellado,
-P1-01/P1-02) y `v3.64.0` **Decision Projection + Planner 3.0** (cierre de P1-01).
+**Posición actual (2026-09-15):** `v3.68.0` **Adaptive Engine Hardening &
+Integrity** (release **SIN migración destructiva** —migración ADITIVA e
+idempotente de dos columnas en `decision_records`—, **SIN bump de
+`GENERATOR_VERSION`, SIN tocar el banco y SIN capacidad pedagógica nueva**, que
+cierra los **tres P1 de segunda generación** de la auditoría de V3.67 más el
+**P2-08** y es la primera release de la serie que toca el frontend por un motivo
+de **MEDICIÓN** y no de UI). **Auditada externamente** por el dossier
+`docs/audit/Y-AUDITORIA-TOTAL-V368.md`: **9,3 / 10 GLOBAL**, **0 P0 · 0 P1 · 6 P2
+· 5 P3**, con los tres P1 de V3.67 confirmados como **cerrados** y **el diseño
+del motor adaptativo declarado CONGELADO**. **Verificada en local** (`pytest`
+backend **2532 passed**, launcher **75**, `ruff` limpio, `tsc`/`vitest`/**659**/
+`build` OK, `check_release_consistency` **3.68.0**,
+`check_beta_v3`/`content_validation`/`transfer_validation` OK). **CERRADA:**
+commit `8acee38` + tag `v3.68.0` + push (**CI 6/6** run `34964205252`, declarado
+por el release). Detalle en `release-notes-v3.68.0.md`.
+**Siguiente incremento:** `V3.69` **E2E + Adaptive Engine Validation**
+(**validación, no capacidad nueva**), batería **E01–E16**; briefing
+`agentes/v369-e2e-adaptive-validation.md`.
+Antes, `v3.67.0` **Task Identity 2.0 + Decision Lifecycle + Provenance
+Analytics** (cierre de los dos P1 de V3.66), `v3.66.0` **Task-Level Empirical
+Success + Decision Provenance**, `v3.65.0` **Observed Difficulty 3.0**
+(`P(éxito | alumno, tarea)` empírica), `v3.64.1` **Consistencia
+snapshot/fingerprint** y `v3.64.0` **Decision Projection + Planner 3.0**.
 Antes, `v3.63.0` **Observed Task Difficulty 2.0 y
 honestidad del Student Skill State** (release SIN migración destructiva —una columna
 aditiva idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN

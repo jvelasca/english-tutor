@@ -1319,13 +1319,19 @@
 - Arquitectura congelada; solo se añade rigor pedagógico a lo ya medido (ver
   `docs/PLAN-ETAPA-PEDAGOGICA.md`).
 - **Cierre del motor adaptativo (V3.68, 2026-09-15):** tras V3.68 el **diseño**
-  del motor adaptativo queda **CONGELADO** (decisión de la auditoría de V3.67).
-  El camino declarado hasta el producto terminado ya **no** añade capas
-  arquitectónicas: **V3.68** cierre de la arquitectura adaptativa (hecho) →
-  **V3.69** E2E del circuito completo → **V3.70** auditoría pedagógica →
+  del motor adaptativo queda **CONGELADO** (decisión de la auditoría de V3.67,
+  **confirmada por la auditoría externa `Y` de V3.68**: 9,3/10, **0 P1**, y
+  ningún hallazgo que justifique otra gran modificación arquitectónica del
+  Adaptive Engine). El camino declarado hasta el producto terminado ya **no**
+  añade capas arquitectónicas: **V3.68** cierre de la arquitectura adaptativa
+  (hecho) → **V3.69** **E2E + Adaptive Engine Validation** (validación
+  experimental del circuito, batería **E01–E16**; **no** capacidad nueva ni
+  arquitectura nueva salvo que una prueba E2E demuestre que la actual es
+  insuficiente) → **V3.70** auditoría pedagógica (CEFR/competencias) →
   **V3.71** runtime/offline/instalación → **V3.72** UX/product completion →
-  **V3.73** auditoría final técnica → **V4.0** release final (a partir de ahí,
-  mantenimiento, calibración y pruebas con alumnos reales).
+  **V3.73** auditoría final técnica → **V4.0** release final —«English Tutor,
+  primera versión completa y estable»— y a partir de ahí `V4.0.x` de
+  mantenimiento (bug fixes, calibración, UX, contenido, rendimiento).
 - Tracks (un subagente a la vez): P1 política pedagógica formal, P2 error mastery,
   P3 vocabulario exposure/production/mastery, P4 listening como competencia, P5 CEFR basado
   en evidencia, P6 pronunciación fonémica.
@@ -1428,7 +1434,8 @@
 | V3.65 Observed Difficulty 3.0 (`P(éxito | alumno, tarea)` empírica) | `agentes/v365-observed-difficulty-3.md` | ✔ hecho (2026-09-15; release `v3.65.0`) |
 | V3.66 Task-Level Empirical Success + Decision Provenance | directo del gerente | ✔ hecho (2026-09-15; release `v3.66.0`) |
 | V3.67 Task Identity 2.0 + Decision Lifecycle + Provenance Analytics | directo del gerente | ✔ hecho (2026-09-15; release `v3.67.0`) |
-| V3.68 Adaptive Engine Hardening & Integrity (cierre de los P1 de 2.ª generación + P2-08) | directo del gerente (plan Cursor `v3.68_adaptive_engine_hardening`) | ✔ hecho (2026-09-15; release `v3.68.0`) |
+| V3.68 Adaptive Engine Hardening & Integrity (cierre de los P1 de 2.ª generación + P2-08) | directo del gerente (plan Cursor `v3.68_adaptive_engine_hardening`) | ✔ hecho (2026-09-15; release `v3.68.0`; auditada por `docs/audit/Y-AUDITORIA-TOTAL-V368.md`: 9,3/10, 0 P1) |
+| V3.69 E2E + Adaptive Engine Validation (batería E01–E16; validación, no capacidad nueva) | `agentes/v369-e2e-adaptive-validation.md` | ⏳ siguiente |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1436,22 +1443,39 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.69 — E2E Adaptive Engine (circuito completo)**: **siguiente
-  incremento** (roadmap acordado en la auditoría de V3.67, tras **congelar el
-  diseño del motor adaptativo** en V3.68). La prioridad ya **no** es añadir una
-  capa teórica, sino **probar el circuito completo end-to-end**:
-  `alumno nuevo → evidencia → Student State → Planner → decision_id → cola →
-  tarea → intento → outcome → learning evidence → Student State actualizado →
-  siguiente decisión`. Casos declarados a cubrir: (1) alumno sin historial,
-  (2) recall fuerte / speaking débil, (3) alta dependencia de apoyo,
-  (4) mala retención, (5) fallos repetidos, (6) domina una tarea pero no
-  transfiere, (7) ASR `unclear`, (8) dos usuarios simultáneos, (9) refresh
-  repetido de la cola, (10) evidencia entrando DURANTE la decisión. Sin
-  briefing todavía. Roadmap posterior declarado:
-  **V3.70** auditoría pedagógica → **V3.71** runtime/offline/instalación →
+- **⏳ V3.69 — E2E + Adaptive Engine Validation (el circuito completo de una
+  pieza)**: **siguiente incremento** (roadmap acordado en la auditoría `X` de
+  V3.67 y **revisado por la auditoría `Y` de V3.68**, tras **congelar el diseño
+  del motor adaptativo**: 0 P1 y ningún hallazgo que justifique otra capa
+  arquitectónica). La prioridad **no** es añadir funcionalidad, sino
+  **demostrar experimentalmente** que el circuito funciona como uno solo:
+  `Evidence → Student State → Decision Projection → Task selection → Decision →
+  Serving → Attempt → Outcome → Evidence`.
+  **Regla dura declarada (auditoría `Y` §28):** *V3.69 no debe introducir
+  arquitectura nueva salvo que una prueba E2E demuestre que la arquitectura
+  actual es insuficiente.*
+  **Batería obligatoria E01–E16** (briefing ejecutable
+  `agentes/v369-e2e-adaptive-validation.md`): E01 alumno nuevo · E02 skill débil
+  (`speaking` débil/`writing` fuerte) · E03 retención (`mastered` → review due →
+  repaso) · E04 brecha de transferencia (reconocimiento/recall fuertes y
+  producción débil) · E05 transferencia de contexto (misma tarea, dos contextos →
+  `task_key` igual, `task_instance_key` distinto) · E06 fallo (`ok, ok, ko` →
+  cambia el `p_success`) · E07 incertidumbre ASR (`unclear` no penaliza mastery,
+  no entra en calibración, conserva provenance) · E08 abandono (no contamina
+  `ko`) · E09 refresh (`GET ×3` → un solo `decision_id`, sin duplicar decisiones)
+  · E10 doble submit (idempotente) · E11 submit contradictorio (rechazado) · E12
+  usuario ajeno (no modifica nada) · E13 target ajeno (rechazado) · E14
+  transición inválida (`computed → completed`, rechazada) · E15 serving stale
+  (`> 24 h` → `abandoned`) · **E16 determinismo del Planner** (mismo estado +
+  fingerprint + candidatos + política → mismo task, `p_success`, ELV, razón y
+  `decision_id`, **siempre**). Se cierra además el endpoint huérfano
+  `GET /api/learning/decisions` (calibración + provenance health), hoy sin
+  cobertura HTTP. Roadmap posterior declarado (**sin cambios**):
+  **V3.70** auditoría pedagógica/CEFR → **V3.71** runtime/offline/instalación →
   **V3.72** UX/product completion → **V3.73** auditoría final técnica →
-  **V4.0** release final (a partir de ahí, mantenimiento y calibración, **no**
-  construcción del núcleo).
+  **V4.0** release final («English Tutor, primera versión completa y estable») y
+  a partir de ahí `V4.0.x` (mantenimiento y calibración, **no** construcción del
+  núcleo).
 
 - **✅ V3.68 — Adaptive Engine Hardening & Integrity**
   (**release `v3.68.0`, 2026-09-15**): plan Cursor
@@ -1481,12 +1505,16 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   (`p_success` empírico cuando la pareja lo declara, **byte-idéntico** si no).
   Detalle en `release-notes-v3.65.0.md`.
 
-- **⏳ V3.66 — Adaptive Instance Selection**:
-  **siguiente incremento**, sin briefing todavía. Usa la granularidad fina por
-  pareja que V3.65 dejó disponible (`empirical_success` por `target_id`) para
-  elegir el ÍTEM concreto dentro del eje, no solo la skill. Candidatos abiertos
-  también: Sense Engine 2.0 (V3.67+), Decision Provenance completo, P2 de
-  calibración pedagógica y P2-01/P2-14.
+- **🗄️ V3.66 — Adaptive Instance Selection (histórico, superado por V3.67)**:
+  bloque **obsoleto** conservado solo como traza del plan: V3.66 se entregó
+  finalmente como **Task-Level Empirical Success + Decision Provenance**
+  (`release-notes-v3.66.0.md`) y la **selección adaptativa de instancia** quedó
+  declarada **fuera de alcance** en V3.68 (el nivel de instancia se **nombra,
+  deriva y observa** con `task_instance_key`/`empirical_success_by_task_instance`,
+  pero **no puntúa el argmax**). Candidatos que siguen abiertos de aquella lista:
+  el **Sense Engine** (`surface ≠ sense`), el **Decision Provenance completo**
+  (identidad lógica `serving_id`/`attempt_id`, P2-03/P2-04 de la auditoría `Y`) y
+  la **calibración real** con datos (P2-05).
 
 - **✅ V3.63 — Observed Task Difficulty 2.0 y honestidad del Student Skill State**
   (**release `v3.63.0`, 2026-09-14**): briefing autocontenido y ejecutado
