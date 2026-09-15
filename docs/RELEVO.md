@@ -90,6 +90,11 @@
 > **Fuera de alcance (V3.68+):** Adaptive Instance Selection (elegir la INSTANCIA
 > dentro de la tarea), Sense Engine 2.0 y los P2 de calibración pedagógica. Ver
 > `release-notes-v3.67.0.md`.
+> **CIERRE (2026-09-15):** commit `ded2498`, tag `v3.67.0` publicado en `main` y
+> **CI 6/6 verde** (run `34956513808`: Backend ruff+pytest, Frontend tsc+vitest+build,
+> Release consistency, Beta V3.0 gate, Content validation y Playwright E2E).
+> Gates locales: ruff limpio, **2503 passed**, `transfer_validation` OK,
+> `content_validation` OK, `check_beta_v3` OK y `check_release_consistency` OK.
 >
 > **Nota (2026-09-14): V3.60.0 (Context Engine 4.0 — Instance Specification →
 > Parameterized Instance)**
