@@ -764,3 +764,61 @@ def test_review_queue_and_profile_are_additive_with_the_decision(
     assert set(exposed["skill_values"]) == set(LEXICAL_SKILLS)
     assert set(exposed["drivers"]) == set(LEXICAL_SKILLS)
     assert exposed["state"] == profile["skill_state"]
+
+
+# ---------------------------------------------------------------------------
+# J · V3.64.1 — sellado estable y snapshot fingerprint (P1-01/P1-02)
+# ---------------------------------------------------------------------------
+
+
+def test_recompute_reseals_only_a_stable_snapshot(monkeypatch, tmp_path):
+    """La carrera del sellado (P1-01): si la huella cambia durante la lectura,
+    se reintenta hasta devolver un sello ESTABLE; nunca un sello más nuevo que el
+    estado (el par `before == after` es el que autoriza sellar)."""
+    uid = _setup(monkeypatch, tmp_path)
+    _seed_evidence(
+        uid, "written_production", ["2026-01-01", "2026-01-02"], "lexical:4"
+    )
+    stable = evidence_repo.evidence_fingerprint(uid)
+
+    calls: list[str] = []
+    flip = {"on": True}
+
+    def flapping(user_id):
+        # Primera lectura devuelve una huella ANTERIOR: el par (before, after)
+        # difiere y el sellado debe reintentar en vez de sellar estado viejo
+        # con huella nueva.
+        if flip["on"]:
+            flip["on"] = False
+            calls.append("stale")
+            return "stale-before"
+        calls.append("stable")
+        return stable
+
+    monkeypatch.setattr(evidence_repo, "evidence_fingerprint", flapping)
+
+    _, seal = asyncio.run(decision_domain._recompute(uid, level="", now=NOW))
+    assert seal == stable
+    # before(stale) + after(stable) del intento fallido, y before/after del
+    # intento estable: exactamente un reintento.
+    assert calls == ["stale", "stable", "stable", "stable"]
+
+
+def test_decision_payload_declares_the_observed_snapshot_fingerprint(
+    monkeypatch, tmp_path
+):
+    """P1-02: la decisión declara la huella observada al INICIO (snapshot
+    trazable); el camino del perfil (proyección aditiva, no decisión) la deja
+    vacía."""
+    uid = _setup(monkeypatch, tmp_path)
+    _seed_evidence(
+        uid, "written_production", ["2026-01-01", "2026-01-02"], "lexical:4"
+    )
+    asyncio.run(profile_domain.get_profile_summary(uid))
+
+    expected = evidence_repo.evidence_fingerprint(uid)
+    payload = asyncio.run(decision_domain.decision_projection(uid, level="", now=NOW))
+    assert payload["snapshot_fingerprint"] == expected
+
+    profile = asyncio.run(profile_domain.get_profile_summary(uid))
+    assert profile["decision_projection"]["snapshot_fingerprint"] == ""

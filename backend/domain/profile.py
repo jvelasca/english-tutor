@@ -279,6 +279,15 @@ async def get_profile_summary(user_id: str) -> dict | None:
     """Compone el perfil del alumno, persiste el nivel estimado como caché y un
     snapshot histórico si cambió de forma material. Devuelve None si el usuario no
     existe."""
+    # V3.64.1 (P1-01): el SELLO de la caché del estado se lee ANTES de
+    # `_compute_profile`, para garantizar que la huella guardada sea ≤ (en
+    # evidencia) a todo lo que `_compute_profile` lee y agrega. Leerla DESPUÉS
+    # abría la carrera inversa (estado viejo sellado con huella nueva) que
+    # `skill_state_is_fresh` NO podría detectar. El sello se conserva aunque el
+    # usuario no exista, pero solo se persiste si hay perfil.
+    skill_state_source = await run_in_threadpool(
+        evidence_repo.evidence_fingerprint, user_id
+    )
     profile = await _compute_profile(user_id)
     if profile is None:
         return None
@@ -306,13 +315,10 @@ async def get_profile_summary(user_id: str) -> dict | None:
     # estable entre refrescos y el drill no pague el coste de recomputarlo.
     # V3.63 (P2-18): la caché se SELLA con la huella de las cuatro fuentes, para
     # que `repositories.profile.skill_state_is_fresh` pueda distinguir una caché
-    # vigente de una vieja. La huella se toma DESPUÉS de leer las fuentes: si
-    # entrara evidencia en medio, el sello sería más nuevo que el estado y la
-    # caché se reportaría (correctamente) como NO fresca. El payload servido por
-    # `/api/profile` no cambia: el sello solo se persiste.
-    skill_state_source = await run_in_threadpool(
-        evidence_repo.evidence_fingerprint, user_id
-    )
+    # vigente de una vieja. V3.64.1 (P1-01): la huella se toma ANTES de leer las
+    # fuentes (véase `get_profile_summary`), de modo que el sello nunca es más
+    # nuevo que el estado sellado. El payload servido por `/api/profile` no
+    # cambia: el sello solo se persiste.
     await run_in_threadpool(
         profile_repo.set_skill_state,
         user_id,

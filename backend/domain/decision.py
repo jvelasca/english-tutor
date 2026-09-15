@@ -80,26 +80,58 @@ def _seal_state(state: dict) -> str:
     return json.dumps(state, ensure_ascii=False, sort_keys=True)
 
 
+# Reintentos acotados del sellado estable (V3.64.1). El sello solo se acepta
+# cuando la huella de las fuentes es IDÉNTICA antes y después de leer/calcular el
+# estado: así el estado sellado describe EXACTAMENTE la evidencia del sello.
+_SEAL_MAX_ATTEMPTS = 3
+
+
 async def _recompute(user_id: str, *, level: str, now: str) -> tuple[dict, str]:
     """Recomputa el estado desde las cuatro fuentes y lo re-sella (V3.64).
 
-    Devuelve `(estado, sello)`. La huella se toma DESPUÉS de leer las fuentes: si
-    entrara evidencia en medio, el sello sería más nuevo que el estado y la caché
-    se reportaría (correctamente) como no fresca.
+    Devuelve `(estado, sello)`. El invariante de sellado es: el sello guardado
+    debe ser ≤ (en evidencia) el estado, NUNCA mayor. Por eso la huella se toma
+    ANTES y DESPUÉS de leer las fuentes: si entrara evidencia en medio (huella
+    distinta), se reintenta; si tras agotar los reintentos siguen sin coincidir,
+    se devuelve el sello ANTERIOR (más viejo que el estado), de modo que la caché
+    se reportará NO fresca y se recomputará, en lugar de servir un estado viejo
+    sellado con una huella nueva.
     """
-    sources = await canonical_sources(user_id)
-    state = skill_state_service.skill_state(sources["state_rows"], level=level, now=now)
-    seal = await run_in_threadpool(evidence_repo.evidence_fingerprint, user_id)
-    return state, seal
+    for _ in range(_SEAL_MAX_ATTEMPTS):
+        seal_before = await run_in_threadpool(
+            evidence_repo.evidence_fingerprint, user_id
+        )
+        sources = await canonical_sources(user_id)
+        state = skill_state_service.skill_state(
+            sources["state_rows"], level=level, now=now
+        )
+        seal_after = await run_in_threadpool(
+            evidence_repo.evidence_fingerprint, user_id
+        )
+        if seal_before == seal_after:
+            return state, seal_after
+    return state, seal_before
 
 
-def project_state(state: dict, *, source: str = "", sealed: bool = False) -> dict:
+def project_state(
+    state: dict,
+    *,
+    source: str = "",
+    sealed: bool = False,
+    snapshot_fingerprint: str = "",
+) -> dict:
     """Proyecta un estado YA calculado a un payload de decisión (V3.64, puro).
 
     Único punto donde el payload `{state, projection, capacity_by_skill,
-    skill_values, drivers, source, sealed}` se ensambla, para que el camino de la
-    cola (`decision_projection`, con I/O) y el del perfil (que ya tiene el estado
-    en la mano y no debe releerlo) no puedan divergir.
+    skill_values, drivers, source, sealed, snapshot_fingerprint}` se ensambla,
+    para que el camino de la cola (`decision_projection`, con I/O) y el del perfil
+    (que ya tiene el estado en la mano y no debe releerlo) no puedan divergir.
+
+    `snapshot_fingerprint` (V3.64.1, P1-02) es la huella de las cuatro fuentes
+    observada al INICIO de la decisión: identifica el snapshot de evidencia sobre
+    el que se tomó. Es un token de trazabilidad, NO el sello de caché (que sigue
+    gestionando `skill_state_is_fresh`). El camino del perfil lo deja vacío porque
+    no es una decisión.
     """
     projection = projection_service.project(state)
     return {
@@ -113,6 +145,7 @@ def project_state(state: dict, *, source: str = "", sealed: bool = False) -> dic
         },
         "source": source,
         "sealed": sealed,
+        "snapshot_fingerprint": snapshot_fingerprint,
     }
 
 
@@ -122,7 +155,7 @@ async def decision_projection(
     """Proyección de decisión del alumno (V3.64, I/O; nunca lanza).
 
     Devuelve `{state, projection, capacity_by_skill, skill_values, drivers,
-    source, sealed}`:
+    source, sealed, snapshot_fingerprint}`:
 
     - `state` — el estado unificado `{modalidad: {competencia: entry}}` desde el
       que se proyecta (caché fresca validada o recálculo sellado);
@@ -134,11 +167,17 @@ async def decision_projection(
     - `drivers` — `{skill: drivers}` explicables;
     - `source` — `"cached"` si la caché sellada era fresca, `"recomputed"` si hubo
       que recalcular desde las filas canónicas;
-    - `sealed` — si el recálculo se persistió (una caché legible por O(1)).
+    - `sealed` — si el recálculo se persistió (una caché legible por O(1));
+    - `snapshot_fingerprint` — huella de las cuatro fuentes observada al INICIO de
+      la decisión (V3.64.1, P1-02): la decisión se toma sobre el snapshot de
+      evidencia vigente en ese instante, formalizado y trazable.
 
     `level`/`now` los aporta el llamador: este módulo NO lee el reloj (el camino
     caliente ya lo lee una vez) ni recalcula el Student Model.
     """
+    snapshot_fingerprint = await run_in_threadpool(
+        evidence_repo.evidence_fingerprint, user_id
+    )
     try:
         profile = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — la proyección nunca rompe la cola
@@ -175,7 +214,12 @@ async def decision_projection(
                 sealed = True
             except Exception:  # noqa: BLE001 — el sello es una optimización
                 sealed = False
-    return project_state(state, source=source, sealed=sealed)
+    return project_state(
+        state,
+        source=source,
+        sealed=sealed,
+        snapshot_fingerprint=snapshot_fingerprint,
+    )
 
 
 def empty_projection() -> dict:

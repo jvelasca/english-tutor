@@ -2918,6 +2918,29 @@ como **documentado, no verificado de forma independiente** (P3-02).
 > el auditor:** V3.64 → **V3.65 Observed Difficulty 3.0** → V3.66 Adaptive Instance
 > Selection → V3.67+ Sense Engine 2.0.
 >
+> **Nota (2026-09-15): V3.64.1 (Consistencia snapshot/fingerprint) — P1-01/P1-02 del re-sellado CERRADOS.**
+> Patch **v3.64.1**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco y SIN cambios de UI**. Corrige los dos **P1** de la auditoría de
+> V3.64: **(P1-01)** la carrera durante el recálculo/sellado del estado —la huella
+> se tomaba DESPUÉS de leer las fuentes, así que una evidencia que entrara en la
+> ventana quedaba representada en el sello pero **no** en el estado sellado, y
+> `skill_state_is_fresh()` podía servir estado viejo como fresco—; **(P1-02)** el
+> TOCTOU de la caché, formalizado declarando la huella observada al inicio de la
+> decisión. **(A) Sellado estable (`domain/decision.py`):** `_recompute` toma la
+> huella ANTES y DESPUÉS de leer/calcular el estado y solo sella si coinciden
+> (reintento acotado `_SEAL_MAX_ATTEMPTS = 3`); si no coinciden devuelve la huella
+> ANTERIOR (más vieja que el estado), de modo que la caché se reporta **no fresca**
+> y se recomputa. **(B) Sello del perfil (`domain/profile.py`):** el sello se lee
+> ANTES de `_compute_profile` (garantiza huella ≤ estado) y se corrige el
+> comentario que razonaba la carrera al revés. **(C) Snapshot de decisión**
+> (`domain/decision.py`): `project_state`/`decision_projection` exponen
+> `snapshot_fingerprint` —la huella de las cuatro fuentes observada al INICIO de la
+> decisión—: token de trazabilidad, **no** el sello de caché; el camino del perfil
+> lo deja vacío. **Tests:** sellado estable y snapshot fingerprint en
+> `test_decision_projection_v364.py`; los 27 existentes verdes. **Honestidad:** no
+> es V3.65 (Observed Difficulty 3.0) ni Decision Provenance; los P2 de calibración
+> pedagógica quedan para V3.65+.
+
 > **Nota (2026-09-14): V3.64.0 (Decision Projection + Planner 3.0) — P1-01 CERRADO.**
 > Release **v3.64.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
 > tocar el banco y SIN umbrales nuevos** (el único cambio de UI es la línea de

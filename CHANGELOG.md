@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.64.1] — 2026-09-15
+
+**Consistencia snapshot/fingerprint del re-sellado del Student Skill State. Patch SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI que corrige los dos P1 de la auditoría de V3.64: (P1-01) la carrera durante el recálculo/sellado del estado —la huella se tomaba DESPUÉS de leer las fuentes, así que una evidencia que entrara en esa ventana quedaba representada en el sello pero no en el estado sellado, y `skill_state_is_fresh()` podía servir estado viejo como fresco— y (P1-02) el TOCTOU de la caché, formalizado declarando la huella de evidencia observada al inicio de la decisión.**
+
+Versión de app `3.64.0 → 3.64.1`. Backend (`domain/decision.py`, `domain/profile.py`) + tests y docs.
+
+- **A · Sellado estable (`domain/decision.py`).** `_recompute` toma la huella ANTES y DESPUÉS de leer/calcular el estado y solo sella cuando coinciden (doble comprobación con reintento acotado `_SEAL_MAX_ATTEMPTS = 3`). Si tras agotar los reintentos siguen sin coincidir, devuelve la huella ANTERIOR (más vieja que el estado), de modo que la caché se reporta NO fresca y se recomputa — nunca un estado viejo sellado con huella nueva. El invariante queda declarado: el sello guardado es ≤ (en evidencia) al estado, NUNCA mayor.
+- **B · Sello del perfil (`domain/profile.py`).** `get_profile_summary` lee el sello ANTES de `_compute_profile`, garantizando que la huella persistida sea ≤ a todo lo que el perfil lee y agrega. Se corrige además el comentario que razonaba la carrera al revés («sello más nuevo que el estado → no fresca» era el caso peligroso, no el seguro).
+- **C · Snapshot de decisión (`domain/decision.py`).** `project_state`/`decision_projection` exponen `snapshot_fingerprint`: la huella de las cuatro fuentes observada al INICIO de la decisión. Formaliza el P1-02: la decisión se toma sobre el snapshot de evidencia vigente en ese instante, identificado y trazable. Es un token de trazabilidad, NO el sello de caché. El camino del perfil (`source="profile"`) lo deja vacío.
+- **Tests.** Nuevos en `test_decision_projection_v364.py`: sellado estable (la huella que cambia durante la lectura provoca reintento y el sello devuelto es el estable) y snapshot fingerprint (la decisión declara la huella observada al inicio; el perfil la deja vacía). Los 27 tests existentes siguen verdes.
+- **Fuera de alcance (V3.65).** Observed Difficulty 3.0 (`P(éxito | alumno, tarea)` empírica), Decision Provenance completo y los P2 de calibración pedagógica.
+
 ## [3.64.0] — 2026-09-14
 
 **Decision Projection + Planner 3.0 (cierre del P1-01) y honestidad declarada de la decisión. Release SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco, SIN umbrales nuevos (el único cambio de UI es la línea de motivos DECLARADOS en la cola de repaso, con i18n en/es) que CIERRA el P1-01 de las auditorías de V3.62/V3.63 y, por contrato, los P2-02/P2-03/P2-04 de la auditoría `W` de V3.63: el Student Skill State deja de ser DESCRIPTIVO y pasa a GOBERNAR la decisión de tareas, pero SIEMPRE por la capa declarada `Student Skill State → DECISION PROJECTION → Planner 3.0`, NUNCA `skill_state → planner` (el planner sigue siendo un módulo PURO y CIEGO al estado persistido). NO convierte `observed_task_difficulty_2` en `P(éxito | alumno, tarea)` empírica (eso es V3.65 — Observed Difficulty 3.0), NO parametriza el gate por pareja, NO toca el banco ni `GENERATOR_VERSION` y NO introduce umbrales nuevos: reutiliza las bandas y puertas YA declaradas.**
