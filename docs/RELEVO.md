@@ -105,6 +105,12 @@
 > adaptativo CONGELADO):** V3.69 E2E completo → V3.70 auditoría pedagógica →
 > V3.71 runtime/offline/instalación → V3.72 UX/product completion → V3.73
 > auditoría final → V4.0 producto terminado. Ver `release-notes-v3.68.0.md`.
+> **CIERRE (2026-09-15):** commit `8acee38`, tag `v3.68.0` publicado en `main` y
+> **CI 6/6 verde** (run `34964205252`: Backend ruff+pytest, Frontend tsc+vitest+build,
+> Release consistency, Beta V3.0 gate, Content validation y Playwright E2E).
+> Gates locales: ruff limpio, **2532 passed**, `transfer_validation` OK, `tsc` limpio,
+> **659 passed** en vitest, `build` OK, `content_validation` OK, `check_beta_v3` OK y
+> `check_release_consistency` OK (3.68.0).
 >
 > **Nota (2026-09-15): V3.67.0 (Task Identity 2.0 + Decision Lifecycle +
 > Provenance Analytics)**
