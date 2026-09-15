@@ -77,6 +77,12 @@
 > skipped**: las **+2 specs nuevas** entran verdes), Release consistency
 > (**3.69.0**), Beta V3.0 gate y Content validation. El run confirma además que
 > la intermitencia local de `resize.spec.ts` **no** ocurre en el runner del CI.
+> **Auditoría externa de esta release:** punto de entrada autocontenido en
+> `agentes/auditoria-externa-release-v369.md` (informe esperado en
+> `docs/audit/Z2-AUDITORIA-RELEASE-V369.md`), con **15 afirmaciones falsables**,
+> comandos de reproducción y la instrucción de dictaminar los **5 hallazgos** de
+> §C uno a uno. Su pareja de diseño es `agentes/auditoria-externa-v369.md`
+> (informe `Z`).
 > **Roadmap:** **V3.70** auditoría pedagógica/CEFR (siguiente) → **V3.71**
 > runtime/offline/instalación → **V3.72** UX/product completion → **V3.73**
 > auditoría final técnica → **V4.0** («English Tutor, primera versión completa y

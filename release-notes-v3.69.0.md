@@ -239,6 +239,11 @@ referencia válida.
   (entrada `## [3.69.0]` en cabecera) · `PLAN.md` (bullet de «Estado actual», M13
   y tablero de briefings) · `docs/RELEVO.md` (nota nueva + «0. START HERE»).
 - `release-notes-v3.69.0.md` (este documento).
+- `agentes/auditoria-externa-release-v369.md`: punto de entrada de la **auditoría
+  externa de ESTA release** (informe esperado en
+  `docs/audit/Z2-AUDITORIA-RELEASE-V369.md`), con 15 afirmaciones falsables y los
+  comandos de reproducción. Su pareja de diseño es
+  `agentes/auditoria-externa-v369.md` (informe `Z`).
 - Commit de release `9a4e70a` + tag anotado `v3.69.0` + push a `main`; run de CI
   [`34978215154`](https://github.com/jvelasca/english-tutor/actions/runs/34978215154)
   registrado con **6/6** jobs verdes.
