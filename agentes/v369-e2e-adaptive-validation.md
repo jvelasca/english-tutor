@@ -172,7 +172,7 @@ propio y **auto-declara `served`** antes de cerrar (`:361-370`).
    capacidad a **V3.70+**. **Nunca** al revés (no se diseña para que el test
    pase).
 2. **La batería se escribe antes de cualquier corrección** (premisa 12): primero
-   los 16 escenarios en rojo/verde que describan el comportamiento **correcto**
+   los 19 escenarios en rojo/verde que describan el comportamiento **correcto**
    según el contrato declarado; solo entonces, y solo si hace falta, el arreglo
    mínimo.
 3. **Los tests son de contrato, no de implementación:** se afirma sobre la

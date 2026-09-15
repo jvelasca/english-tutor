@@ -623,7 +623,7 @@ y el P2-08 quedan cerrados y confirmados por la auditoría.
 
 | Elemento | Antes | Ahora |
 |---|---|---|
-| Naturaleza de V3.69 | «E2E Adaptive Engine (circuito completo)», 10 casos, **sin briefing** | **«E2E + Adaptive Engine Validation»**: **validación experimental**, batería **E01–E16**, con briefing `agentes/v369-e2e-adaptive-validation.md` |
+| Naturaleza de V3.69 | «E2E Adaptive Engine (circuito completo)», 10 casos, **sin briefing** | **«E2E + Adaptive Engine Validation»**: **validación experimental**, batería **E01–E19** (ampliada desde E01–E16 tras el cruce de cobertura con los 10 casos de la auditoría `X`; ver más abajo), con briefing `agentes/v369-e2e-adaptive-validation.md` |
 | Regla dura | — | **V3.69 no introduce arquitectura nueva salvo que un escenario E2E demuestre que la arquitectura actual es insuficiente** |
 | Diseño del motor adaptativo | congelado tras V3.68 (declarado) | **congelado y confirmado por la auditoría externa** |
 | Resto del roadmap | `V3.70` pedagógica → `V3.71` runtime/offline → `V3.72` UX → `V3.73` auditoría final → `V4.0` | **sin cambios** |
