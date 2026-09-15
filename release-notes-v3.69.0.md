@@ -171,13 +171,21 @@ falla en tandas completas. Se ha reproducido **excluyendo** la spec nueva
 (`npx playwright test --grep-invert decision_id` → 1 failed: el mismo
 `resize.spec.ts`), así que **no** lo provoca esta release. Es sensible a la
 carga de la máquina y al estado del dev server local (el backend :8000 no está
-levantado y el proxy devuelve `ECONNREFUSED`). La referencia válida es el job
-`playwright` del CI, en runner limpio, cuyo resultado se registra con su run id
-en `docs/RELEVO.md`.
-- **CI:** 6/6 workflows verdes en el commit de release, **registrado con su run
-  id** en `docs/RELEVO.md`. Igual que en las auditorías anteriores, esto es un
-  resultado **declarado por el release**, no una verificación independiente del
-  auditor.
+levantado y el proxy devuelve `ECONNREFUSED`). El job `playwright` del CI **sí
+ha salido verde en el run de release** (**25 passed + 26 skipped**, sin fallos),
+así que la intermitencia queda **acotada al entorno local** y el CI es la
+referencia válida.
+- **CI (medido, con enlace verificable):** commit `9a4e70a`, tag anotado
+  `v3.69.0`, **6/6 workflows verdes** en el run
+  [34978215154](https://github.com/jvelasca/english-tutor/actions/runs/34978215154):
+  Backend ruff + pytest (**2550 passed + 2 skipped**), Frontend tsc + vitest
+  (**76 ficheros / 659 tests**) + build, Playwright E2E (**25 passed + 26
+  skipped**: las **+2 specs nuevas**, verdes), Release consistency (**3.69.0**),
+  Beta V3.0 gate y Content validation. Los 2 `skipped` son
+  `test_stt_asr_integration.py` (modelo Whisper opt-in no descargado en el
+  runner); en local el mismo árbol da **2552 passed**. Es un resultado **del
+  run**, comprobable por su enlace: sigue **sin ser una verificación
+  independiente del auditor**.
 
 ## Honestidad
 
@@ -225,4 +233,6 @@ en `docs/RELEVO.md`.
   (entrada `## [3.69.0]` en cabecera) · `PLAN.md` (bullet de «Estado actual», M13
   y tablero de briefings) · `docs/RELEVO.md` (nota nueva + «0. START HERE»).
 - `release-notes-v3.69.0.md` (este documento).
-- Commit de release + tag anotado `v3.69.0` + push; run de CI registrado.
+- Commit de release `9a4e70a` + tag anotado `v3.69.0` + push a `main`; run de CI
+  [`34978215154`](https://github.com/jvelasca/english-tutor/actions/runs/34978215154)
+  registrado con **6/6** jobs verdes.

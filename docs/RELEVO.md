@@ -56,10 +56,27 @@
 > que una prueba E2E demostrara que la actual es insuficiente*; **ningún
 > escenario lo demostró**, así que no se tocó producción y los hallazgos se
 > registran en vez de «arreglarse» a costa del alcance.
-> **Verificación:** `pytest` backend **2552 passed** (2532 → +20), `ruff` limpio,
-> `vitest` **659** (sin cambios), `tsc`/`build` OK, launcher OK, los cuatro gates
-> de script OK y `check_release_consistency` **3.69.0**. **CI 6/6** registrado
-> como resultado **del release** (no verificado de forma independiente).
+> **Verificación (medida, en secuencia):** `ruff check .` limpio, `pytest` backend
+> **2552 passed** (2532 → +20) **en local** (en CI: **2550 passed + 2 skipped**,
+> los dos `skipped` de `test_stt_asr_integration.py`: modelo Whisper opt-in no
+> descargado en el runner), `transfer_validation` OK, `vitest` **659** (sin
+> cambios), `tsc`/`build` OK, launcher **75 passed**, los gates de script OK y
+> `check_release_consistency` **3.69.0** en los 6 sitios. **Dos honestidades sobre
+> lo que NO se declara limpio:** (i) `ruff format --check` **no** es gate del CI
+> (`ci.yml` corre solo `ruff check .`) y arrastra deriva de formato
+> **preexistente** en ficheros que V3.69 **no ha tocado** (verificado contra el
+> árbol sin cambios); se deja como está y se **registra** en vez de declararlo
+> limpio; (ii) `resize.spec.ts` (preexistente) es **intermitente en local** (pasa
+> aislado y falla en tandas; se reproduce **excluyendo** la spec nueva con
+> `--grep-invert decision_id`), así que la referencia válida es el CI.
+> **CIERRE (2026-09-15):** commit `9a4e70a`, tag anotado `v3.69.0` publicado en
+> `main` y **CI 6/6 verde** — run
+> [34978215154](https://github.com/jvelasca/english-tutor/actions/runs/34978215154):
+> Backend ruff + pytest (**2550 passed + 2 skipped**), Frontend tsc + vitest
+> (**76 ficheros / 659 tests**) + build, Playwright E2E (**25 passed + 26
+> skipped**: las **+2 specs nuevas** entran verdes), Release consistency
+> (**3.69.0**), Beta V3.0 gate y Content validation. El run confirma además que
+> la intermitencia local de `resize.spec.ts` **no** ocurre en el runner del CI.
 > **Roadmap:** **V3.70** auditoría pedagógica/CEFR (siguiente) → **V3.71**
 > runtime/offline/instalación → **V3.72** UX/product completion → **V3.73**
 > auditoría final técnica → **V4.0** («English Tutor, primera versión completa y
