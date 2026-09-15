@@ -413,6 +413,32 @@ def list_observed_rows(user_id: str, *, target_type: str = "lexicon") -> list[di
     return [dict(r) for r in rows]
 
 
+def list_attempt_rows(
+    user_id: str, *, target_type: str = "lexicon"
+) -> list[dict]:
+    """Filas COMPLETAS del ledger (éxitos Y fallos) con identidad de ítem (V3.65).
+
+    Complementa `list_observed_rows` (que sigue alimentando V3.53/V3.54 con solo
+    éxitos) para la telemetría EMPÍRICA de V3.65: el estado unificado necesita
+    contar los fallos como INTENTOS y la identidad del ítem (`target_id`/
+    `surface_form`) para estimar `P(éxito | alumno, tarea)` por pareja. No filtra
+    `success = 1`; selecciona además `target_id`/`surface_form` (columnas que YA
+    existían). Fuera del camino caliente del drill, igual que `list_observed_rows`.
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT id, occurred_at, skill, assessed_skill, success, "
+            "target_id, surface_form, observed_difficulty, served_difficulty, "
+            "observed_task_difficulty, activity_id, context_instance, "
+            "support_level, response_time_ms, error_type "
+            "FROM learning_evidence "
+            "WHERE user_id = ? AND target_type = ? "
+            "ORDER BY occurred_at ASC, id ASC",
+            (user_id, target_type),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def evidence_fingerprint(user_id: str) -> str:
     """Huella de FRESCURA de las cuatro fuentes de evidencia (V3.63, aditiva).
 

@@ -218,6 +218,23 @@ def _effort(entry: Mapping) -> dict:
     return {"level": level, "reasons": sorted(set(declared_reasons))}
 
 
+def _empirical_success(entry: Mapping) -> dict:
+    """Estimación EMPÍRICA de éxito de la celda (V3.65, pura y aditiva).
+
+    Deriva de la `confidence` (tasa empírica éxitos / intentos) que el estado ya
+    calcula, más los intentos/éxitos/días observados. `declared` indica que la
+    puerta espaciada respalda la celda (una celda solo existe si la cruzó, 2/2).
+    NO se confunde con `assessment_confidence` (banda + motivos, otra cosa).
+    """
+    return {
+        "attempts": _int(entry.get("observations")),
+        "successes": _int(entry.get("samples")),
+        "p_success": _number(entry.get("confidence")) or 0.0,
+        "days": _int(entry.get("days")),
+        "declared": True,
+    }
+
+
 def _cell(modality: str, competence: str, entry: Mapping) -> dict:
     """Celda proyectada de (modalidad, competencia) — pura y nunca lanza.
 
@@ -263,6 +280,7 @@ def _cell(modality: str, competence: str, entry: Mapping) -> dict:
         "days": _int(entry.get("days")),
         "confidence": _number(entry.get("confidence")) or 0.0,
         "assessment_confidence": {"band": band, "reasons": reasons},
+        "empirical_success": _empirical_success(entry),
         "declared_channel": declared_channel,
         # CAPACIDAD medida (la misma lectura que el estado acredita). El filtro de
         # comparabilidad se aplica en `capacity_by_skill`, no aquí: la proyección
@@ -347,6 +365,22 @@ def capacity_by_skill(projection: object) -> dict[str, dict]:
         result[skill] = (
             _dimensions(cell.get("capacity")) if cell.get("comparable") else {}
         )
+    return result
+
+
+def empirical_success_by_skill(projection: object) -> dict[str, dict]:
+    """Estimación empírica por eje léxico desde la proyección (V3.65, pura).
+
+    Devuelve `{skill: empirical_success}` con las CUATRO claves canónicas
+    (`LEXICAL_SKILLS`), leyendo la celda `(LEXICAL_MODALITY[skill], "")`. Un eje
+    sin celda (sin muestra espaciada) devuelve `{}`: la estimación no existe y el
+    llamador degrada exactamente a V3.64. Nunca lanza.
+    """
+    result: dict[str, dict] = {}
+    for skill in LEXICAL_SKILLS:
+        cell = _cell_of(projection, LEXICAL_MODALITY.get(skill, ""), "")
+        declared = cell.get("empirical_success")
+        result[skill] = dict(declared) if isinstance(declared, Mapping) else {}
     return result
 
 

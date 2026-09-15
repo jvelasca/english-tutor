@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-14 (UTC+2).
+> Actualizado por última vez: 2026-09-15 (UTC+2).
 >
 > **Nota (2026-09-14): V3.60.0 (Context Engine 4.0 — Instance Specification →
 > Parameterized Instance)**
@@ -2710,7 +2710,18 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-14):** `v3.63.0` **Observed Task Difficulty 2.0 y
+**Posición actual (2026-09-15):** `v3.65.0` **Observed Difficulty 3.0
+(`P(éxito | alumno, tarea)` empírica)** (release SIN migración de BD, SIN bump de
+`GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI que convierte la
+dificultad observada de medida DECLARADA en una ESTIMACIÓN EMPÍRICA por pareja que,
+cuando existe, gobierna el `p_success` del Planner 3.0 —byte-idéntico sin
+estimación—). **Verificada en local** (`pytest` backend **2478 passed**, launcher
+**75**, `ruff` limpio, `tsc`/`vitest`/`build` OK, `check_release_consistency`
+**3.65.0**, `check_beta_v3`/`content_validation`/`transfer_validation` OK).
+**CERRADA:** commit + tag `v3.65.0` + push. Detalle en `release-notes-v3.65.0.md`.
+Antes, `v3.64.1` **Consistencia snapshot/fingerprint** (patch de re-sellado,
+P1-01/P1-02) y `v3.64.0` **Decision Projection + Planner 3.0** (cierre de P1-01).
+Antes, `v3.63.0` **Observed Task Difficulty 2.0 y
 honestidad del Student Skill State** (release SIN migración destructiva —una columna
 aditiva idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN
 cambios de UI que cierra la deuda de **honestidad** que V3.62 dejó declarada por
@@ -2918,6 +2929,40 @@ como **documentado, no verificado de forma independiente** (P3-02).
 > el auditor:** V3.64 → **V3.65 Observed Difficulty 3.0** → V3.66 Adaptive Instance
 > Selection → V3.67+ Sense Engine 2.0.
 >
+> **Nota (2026-09-15): V3.65.0 (Observed Difficulty 3.0) — `P(éxito | alumno, tarea)` EMPÍRICA.**
+> Release **v3.65.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco y SIN cambios de UI**. Convierte la dificultad observada de MEDIDA
+> **DECLARADA** (V3.63) en una ESTIMACIÓN **EMPÍRICA** por pareja que, cuando existe,
+> gobierna el `p_success` del Planner 3.0 —sin romper la pureza del planner ni la
+> degradación byte-idéntica—. Hasta V3.64 el léxico devolvía SIEMPRE
+> `success_rate = 1.0` (`list_observed_rows` filtraba `success = 1` y `_lexicon_rows`
+> fijaba `success = True`): V3.65 cierra ese hueco con tres piezas ADITIVAS.
+> **(A) Telemetría completa (`repositories/evidence.py`):** nuevo lector
+> `list_attempt_rows` (éxitos Y fallos + identidad `target_id`/`surface_form`);
+> `list_observed_rows` queda **intacto** (sigue alimentando V3.53/V3.54 con solo
+> éxitos). **(B) Fila canónica (`services/skill_state.py`):** `_row` gana `target_id`
+> (aditivo) y `_lexicon_rows` procesa el fallo como INTENTO (`score 0.0`,
+> `dimensions {}`); la puerta espaciada del estado sigue leyendo SOLO `success`
+> (2/2 no cambia). **(C) Estimador puro (`services/observed_difficulty.py`):**
+> `empirical_success(rows)` agrupa por clave de tarea
+> (`target_id`/`actividad`/`dificultad servida`) → `{successes, attempts, p_success,
+> days}` reutilizando la MISMA puerta espaciada de V3.54; puro, determinista, sin
+> reloj/random/hash, sin umbrales nuevos; sin muestra espaciada NO declara.
+> **(D) Decision Projection (`services/decision_projection.py` + `domain/decision.py`):**
+> la celda expone `empirical_success` (derivado de la `confidence` YA calculada, que
+> NO se confunde con `assessment_confidence`) y `empirical_success_by_skill` por eje
+> léxico; `project_state` añade la clave aditiva `empirical_success`. **(E) Planner 3.0**
+> (`services/planner.py` + `services/lexicon.py`): `expected_learning_value` y
+> `select_task_by_elv` ganan el parámetro opcional `empirical_success` que, si es
+> válido (0..1), gobierna `p_success` (marcado `p_success_empirical`); sin él (o
+> inválido), la predicción es EXACTAMENTE la de V3.64 (margen declarado). **Tests:**
+> `test_observed_difficulty_v365.py` (**18**, test-first) fija la tasa empírica < 1.0
+> con fallos (premisa 12), la agrupación por tarea, la pureza, el `p_success`
+> acotado y la degradación byte-idéntica sin estimación. **Honestidad:** la
+> estimación se inyecta al NIVEL DE SKILL (cómo decide el planner), no por ítem; la
+> granularidad fina por pareja (`empirical_success` por `target_id`) queda
+> DISPONIBLE para V3.66 (Adaptive Instance Selection).
+
 > **Nota (2026-09-15): V3.64.1 (Consistencia snapshot/fingerprint) — P1-01/P1-02 del re-sellado CERRADOS.**
 > Patch **v3.64.1**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
 > tocar el banco y SIN cambios de UI**. Corrige los dos **P1** de la auditoría de

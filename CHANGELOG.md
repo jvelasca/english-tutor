@@ -4,6 +4,20 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.65.0] — 2026-09-15
+
+**Observed Difficulty 3.0: `P(éxito | alumno, tarea)` empírica. Release SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI que convierte la dificultad observada de MEDIDA DECLARADA (V3.63) en una ESTIMACIÓN EMPÍRICA por pareja que, cuando existe, gobierna el `p_success` del Planner 3.0 — sin romper la pureza del planner ni la degradación byte-idéntica.**
+
+Versión de app `3.64.1 → 3.65.0`. Backend puro (`repositories/evidence.py`, `services/skill_state.py`, `services/observed_difficulty.py`, `services/decision_projection.py`, `services/planner.py`, `services/lexicon.py`, `domain/decision.py`) + tests. Sin cambios de UI.
+
+- **A · Telemetría completa del léxico (`repositories/evidence.py`).** Nuevo lector `list_attempt_rows` (éxitos Y fallos, con identidad `target_id`/`surface_form`); `list_observed_rows` queda intacto (sigue alimentando V3.53/V3.54 con solo éxitos). Hasta V3.64 el léxico devolvía SIEMPRE `success_rate = 1.0` porque los fallos se descartaban.
+- **B · Identidad de tarea y fallos en la fila canónica (`services/skill_state.py`).** `_row` gana `target_id` (aditivo); `_lexicon_rows` procesa fallos como INTENTOS (`score 0.0`, `dimensions {}`). La puerta espaciada del estado sigue leyendo SOLO `success` (2/2 no cambia).
+- **C · Estimador puro por pareja (`services/observed_difficulty.py`).** `empirical_success(rows)` agrupa por clave de tarea (`target_id`/`actividad`/`dificultad servida`) y devuelve `{successes, attempts, p_success, days}`, reutilizando la MISMA puerta espaciada de V3.54. Sin muestra espaciada no declara. Puro, determinista, sin reloj/random/hash.
+- **D · Seam aditivo en la Decision Projection (`services/decision_projection.py`).** Cada celda expone `empirical_success` (derivado de la `confidence` ya calculada, que NO se confunde con `assessment_confidence`); `empirical_success_by_skill(projection)` mapea por eje léxico. `domain/decision.py::project_state` añade la clave aditiva `empirical_success`.
+- **E · Seam aditivo en el Planner 3.0 (`services/planner.py`).** `expected_learning_value` y `select_task_by_elv` ganan el parámetro opcional `empirical_success`: si la estimación es válida (0..1), gobierna `p_success` (marcado con `p_success_empirical`); si no, la predicción es EXACTAMENTE la de V3.64 (margen declarado). `services/lexicon.py` lo propaga desde la proyección en la rama con capacidad comparable.
+- **Tests.** Nuevo `test_observed_difficulty_v365.py` (18 tests, escrito antes del código): tasa empírica < 1.0 con fallos (premisa 12), agrupación por tarea, puerta espaciada reutilizada, pureza, `p_success` acotado, degradación byte-idéntica sin estimación y no-regresión de guardas.
+- **Fuera de alcance (V3.66+).** Adaptive Instance Selection, Sense Engine 2.0, Decision Provenance completo, P2 de calibración pedagógica y P2-01/P2-14.
+
 ## [3.64.1] — 2026-09-15
 
 **Consistencia snapshot/fingerprint del re-sellado del Student Skill State. Patch SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI que corrige los dos P1 de la auditoría de V3.64: (P1-01) la carrera durante el recálculo/sellado del estado —la huella se tomaba DESPUÉS de leer las fuentes, así que una evidencia que entrara en esa ventana quedaba representada en el sello pero no en el estado sellado, y `skill_state_is_fresh()` podía servir estado viejo como fresco— y (P1-02) el TOCTOU de la caché, formalizado declarando la huella de evidencia observada al inicio de la decisión.**

@@ -55,6 +55,12 @@ async def canonical_sources(user_id: str) -> dict:
     y las filas canónicas ya ensambladas del estado unificado.
     """
     lexicon = await run_in_threadpool(evidence_repo.list_observed_rows, user_id)
+    # V3.65: telemetría COMPLETA (éxitos Y fallos, con identidad de ítem) para el
+    # estado unificado. `lexicon` (solo éxitos) sigue alimentando el estado legacy
+    # de V3.53/V3.54 (`observed_signals`); el fallo es un INTENTO del estado nuevo.
+    lexicon_attempts = await run_in_threadpool(
+        evidence_repo.list_attempt_rows, user_id
+    )
     academy = await run_in_threadpool(academy_repo.list_evidence, user_id)
     listening = await run_in_threadpool(listening_repo.list_attempts, user_id)
     pronunciation = await run_in_threadpool(
@@ -66,7 +72,7 @@ async def canonical_sources(user_id: str) -> dict:
         "listening": listening,
         "pronunciation": pronunciation,
         "state_rows": skill_state_service.skill_state_sources(
-            lexicon=lexicon,
+            lexicon=lexicon_attempts,
             academy=academy,
             listening=listening,
             pronunciation=pronunciation,
@@ -143,6 +149,12 @@ def project_state(
             skill: projection_service.drivers(projection, skill)
             for skill in LEXICAL_SKILLS
         },
+        # V3.65 (aditivo): la estimación EMPÍRICA de P(éxito) por eje léxico,
+        # derivada de la `confidence` de la celda. Sin celda la clave por eje es
+        # `{}` y el planner degrada exactamente a V3.64.
+        "empirical_success": projection_service.empirical_success_by_skill(
+            projection
+        ),
         "source": source,
         "sealed": sealed,
         "snapshot_fingerprint": snapshot_fingerprint,

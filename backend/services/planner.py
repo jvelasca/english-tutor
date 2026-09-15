@@ -273,6 +273,32 @@ def desirability(p_success: object) -> float:
     return round(_clamp(4.0 * value * (1.0 - value)), 4)
 
 
+def _empirical_p_success(value: object) -> float | None:
+    """`p_success` empírico VÁLIDO (0..1) o None si no se declara (V3.65, puro).
+
+    Acepta un número o un `Mapping` con la clave `p_success` (el payload de la
+    celda). Fuera de [0, 1], no numérico o ausente devuelve `None`: el llamador
+    conserva la predicción por margen de V3.64. Nunca lanza.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, Mapping):
+        value = value.get("p_success")
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    # VÁLIDA solo en [0, 1]: fuera de rango la estimación se IGNORA (no se
+    # recorta), para degradar EXACTAMENTE a la predicción por margen de V3.64.
+    if not 0.0 <= number <= 1.0:
+        return None
+    return number
+
+
 def expected_learning_value(
     signals: dict,
     *,
@@ -281,6 +307,7 @@ def expected_learning_value(
     learner_capacity: object = None,
     value: float | None = None,
     capacity_skill: str = "",
+    empirical_success: object = None,
 ) -> dict:
     """Valor ESPERADO de aprendizaje de la tarea (V3.56 → V3.57, puro).
 
@@ -310,8 +337,14 @@ def expected_learning_value(
             base = priority_score(signals)
     margin = capacity_margin(task_difficulty, learner_capacity)
     p_success = success_probability(margin)
+    # V3.65 (aditivo): cuando el llamador aporta una estimación EMPÍRICA válida
+    # (la tasa P(éxito) por pareja), esa es la que gobierna `p_success`. Sin ella
+    # (o inválida) la predicción es EXACTAMENTE la de V3.64 (margen declarado).
+    empirical = _empirical_p_success(empirical_success)
+    if empirical is not None:
+        p_success = empirical
     desirability_factor = desirability(p_success)
-    return {
+    result = {
         "expected_learning_value": round(desirability_factor * base, 4),
         "p_success": p_success,
         "desirability": desirability_factor,
@@ -320,6 +353,9 @@ def expected_learning_value(
         "skill": skill,
         "capacity_skill": str(capacity_skill or ""),
     }
+    if empirical is not None:
+        result["p_success_empirical"] = True
+    return result
 
 
 def capacity_skill(skill: object) -> str:
@@ -763,6 +799,7 @@ def select_task_by_elv(
     task_difficulty: object = None,
     skill_values: dict | None = None,
     drivers: dict | None = None,
+    empirical_success: object = None,
 ) -> dict:
     """Tarea ÓPTIMA por argmax de ELV entre las candidatas admisibles (V3.57).
 
@@ -793,6 +830,12 @@ def select_task_by_elv(
     (`expected_learning_value`, `p_success`, `margin`, `capacity_skill`, `value`,
     `drivers`, `why` y las alternativas puntuadas). **Sin** ellos la respuesta es
     **byte-idéntica** a V3.63. Nunca lanza.
+
+    V3.65 (Observed Difficulty 3.0, ADITIVO) añade `empirical_success`
+    (`{skill: estimación}`): cuando una candidata aporta una estimación EMPÍRICA
+    válida (`P(éxito)` 0..1 por pareja), esa gobierna su `p_success`; sin ella (o
+    inválida) la predicción es EXACTAMENTE la de V3.64. La salida marca el hecho
+    con la clave `p_success_empirical`. Nunca lanza.
     """
     if not isinstance(capacity_by_skill, dict) or not capacity_by_skill:
         return _attach_decision(
@@ -820,6 +863,7 @@ def select_task_by_elv(
             learner_capacity=capacity_by_skill.get(channel),
             value=_projected_value(skill_values, priorities, skill, base_value),
             capacity_skill=channel,
+            empirical_success=_empirical_for(empirical_success, skill),
         )
         scored.append(
             {
@@ -827,6 +871,7 @@ def select_task_by_elv(
                 "activity": candidate.get("activity") or "",
                 "expected_learning_value": payload["expected_learning_value"],
                 "p_success": payload["p_success"],
+                "p_success_empirical": bool(payload.get("p_success_empirical")),
                 "margin": payload["margin"],
                 "value": payload["value"],
                 "capacity_skill": channel,
@@ -881,6 +926,18 @@ def _projected_value(
         return round(_clamp(float(projected)), 4)
     except (TypeError, ValueError):
         return priorities.get(skill, base_value)
+
+
+def _empirical_for(empirical_success: object, skill: str) -> object:
+    """Estimación empírica de un eje (`None` si no la hay; pura y nunca lanza).
+
+    `empirical_success` es `{skill: estimación}`. Un eje sin estimación (o sin
+    clave `p_success` válida) devuelve `None`, de modo que la predicción degrada
+    EXACTAMENTE a V3.64 (margen declarado).
+    """
+    if not isinstance(empirical_success, Mapping):
+        return None
+    return empirical_success.get(skill)
 
 
 def _driver_of(drivers: object, skill: str) -> dict:

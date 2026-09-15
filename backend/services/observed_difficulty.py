@@ -233,3 +233,41 @@ def observed_task_difficulty_2(rows: Sequence[Mapping]) -> dict:
         [experienced_load(row) for row in successes]
     )
     return result
+
+
+def empirical_success(rows: Sequence[Mapping], *, now: str = "") -> dict[str, dict]:
+    """Estimación EMPÍRICA de `P(éxito | alumno, tarea)` por CLAVE DE TAREA (V3.65).
+
+    Agrupa las filas canónicas por clave de tarea
+    `(target_id, actividad, dificultad servida declarada)` y devuelve por clave
+    `{successes, attempts, p_success, days}`. Reutiliza la MISMA puerta espaciada
+    de V3.54 (`OBSERVED_MIN_SAMPLES`/`OBSERVED_MIN_DAYS`): sin muestra espaciada
+    la clave NO aparece (no se declara estimación). El `p_success` es la tasa
+    empírica CRUDA acotada a [0, 1]: sin umbrales nuevos.
+
+    Sin reloj: `now` se acepta por contrato pero no se usa — los días son los que
+    declaran las filas (`occurred_on`). Pura y determinista, byte a byte; nunca
+    lanza.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        target = str(row.get("target_id") or "").strip()
+        activity = str(row.get("activity_id") or "").strip()
+        served = difficulty.format_vector(_served_vector(row))
+        grouped.setdefault(f"{target}|{activity}|{served}", []).append(dict(row))
+    result: dict[str, dict] = {}
+    for key, group in grouped.items():
+        successes = [row for row in group if _truthy(row.get("success"))]
+        days = {_day(row) for row in successes if _day(row)}
+        if len(successes) < OBSERVED_MIN_SAMPLES or len(days) < OBSERVED_MIN_DAYS:
+            continue
+        attempts = len(group)
+        result[key] = {
+            "successes": len(successes),
+            "attempts": attempts,
+            "p_success": round(len(successes) / attempts, 3),
+            "days": len(days),
+        }
+    return result

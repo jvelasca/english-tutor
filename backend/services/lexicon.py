@@ -554,6 +554,7 @@ def recommend_review_activity(
     task_difficulty: object = None,
     skill_values: dict | None = None,
     drivers: dict | None = None,
+    empirical_success: object = None,
 ) -> dict:
     """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
 
@@ -613,6 +614,7 @@ def recommend_review_activity(
         task_difficulty=task_difficulty,
         skill_values=skill_values,
         drivers=drivers,
+        empirical_success=empirical_success,
     )
     if planned["activity"]:
         return {"activity": planned["activity"], "reason": planned["reason"]}
@@ -726,14 +728,20 @@ def review_queue_item(
         if decision_projection.has_comparable_capacity(capacity_by_skill):
             skill_values = projection.get("skill_values")
             drivers = projection.get("drivers")
+            # V3.65: la estimación EMPÍRICA de P(éxito) por eje, de la MISMA
+            # proyección. Sin ella (proyección legacy o eje sin muestra) la clave
+            # por eje es `{}` y el planner degrada exactamente a V3.64.
+            empirical_success = projection.get("empirical_success")
         else:
             capacity_by_skill = _capacity_by_skill(learner_state)
             skill_values = None
             drivers = None
+            empirical_success = None
     else:
         capacity_by_skill = _capacity_by_skill(learner_state)
         skill_values = None
         drivers = None
+        empirical_success = None
     recommendation = recommend_review_activity(
         row,
         matrix,
@@ -743,6 +751,7 @@ def review_queue_item(
         task_difficulty=task_difficulty,
         skill_values=skill_values,
         drivers=drivers,
+        empirical_success=empirical_success,
     )
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
@@ -764,6 +773,7 @@ def review_queue_item(
         task_difficulty=task_difficulty,
         skill_values=skill_values,
         drivers=drivers,
+        empirical_success=empirical_success,
     )
     learning_value = _learning_value(
         row,
@@ -773,6 +783,7 @@ def review_queue_item(
         capacity_by_skill=capacity_by_skill,
         task_difficulty=task_difficulty,
         skill_values=skill_values,
+        empirical_success=empirical_success,
     )
     recommended_cue = ""
     if recommendation["activity"] == "recall":
@@ -870,6 +881,7 @@ def _task_decision(
     task_difficulty: object = None,
     skill_values: dict | None = None,
     drivers: dict | None = None,
+    empirical_success: object = None,
 ) -> tuple[dict, dict | None]:
     """Decisión de tarea expuesta en la cola (V3.39 → V3.64, puro).
 
@@ -893,6 +905,7 @@ def _task_decision(
         task_difficulty=task_difficulty,
         skill_values=skill_values,
         drivers=drivers,
+        empirical_success=empirical_success,
     )
     decision = None
     if isinstance(planned.get("decision"), dict):
@@ -923,6 +936,7 @@ def _learning_value(
     capacity_by_skill: dict | None = None,
     task_difficulty: object = None,
     skill_values: dict | None = None,
+    empirical_success: object = None,
 ) -> dict:
     """Predicción de éxito de la tarea del ítem (V3.56 → V3.57, puro).
 
@@ -958,6 +972,11 @@ def _learning_value(
         learner_capacity=capacity_by_skill.get(channel),
         value=value,
         capacity_skill=channel,
+        empirical_success=(
+            empirical_success.get(skill)
+            if isinstance(empirical_success, dict)
+            else None
+        ),
     )
 
 

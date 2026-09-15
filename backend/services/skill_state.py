@@ -185,13 +185,16 @@ def _row(
     evidence_id: object = "",
     activity_id: object = "",
     assessment_id: object = "",
+    target_id: object = "",
     facts: Mapping | None = None,
 ) -> dict:
     """Fila canónica del estado (una por HECHO observable; nunca agrega fuentes).
 
-    La IDENTIDAD (`evidence_id`/`activity_id`/`assessment_id`) y los `facts` son
-    ADITIVOS de V3.63 y los declara la fuente: si no los declara van vacíos (nunca
-    se inventa una identidad que permita acreditar de más).
+    La IDENTIDAD (`evidence_id`/`activity_id`/`assessment_id`/`target_id`) y los
+    `facts` son ADITIVOS de V3.63/V3.65 y los declara la fuente: si no los
+    declara van vacíos (nunca se inventa una identidad que permita acreditar de
+    más). `target_id` (V3.65) es la identidad de la TAREA (el ítem), base de la
+    estimación empírica por pareja; las fuentes que no la declaran la dejan vacía.
     """
     return {
         "modality": modality,
@@ -207,6 +210,7 @@ def _row(
         "evidence_id": _stamp(evidence_id),
         "activity_id": _stamp(activity_id),
         "assessment_id": _stamp(assessment_id),
+        "target_id": _stamp(target_id),
         "facts": dict(facts or {}),
     }
 
@@ -283,10 +287,12 @@ def _lexicon_modality(skill: str, channel: str) -> str:
 def _lexicon_rows(rows: Sequence[Mapping]) -> list[dict]:
     """Ledger léxico (`learning_evidence`) → filas de modalidad, sin competencia.
 
-    Proyección EXACTA de `services.evidence.observed_signals`: misma lectura de la
-    carga acreditada (`difficulty.earned_difficulty`) y mismo descarte de fallos y
-    de filas sin vector. El lector `list_observed_rows` entrega SOLO éxitos
-    (filtro SQL de V3.53), de ahí `success=True`.
+    Proyección de `services.evidence.observed_signals`: misma lectura de la carga
+    acreditada (`difficulty.earned_difficulty`). V3.65 añade la telemetría
+    COMPLETA: el lector `list_attempt_rows` entrega éxitos Y fallos, así que un
+    fallo entra como INTENTO (su carga acreditada es `{}` y su `score` 0.0) y
+    propaga la identidad del ítem (`target_id`/`surface_form`). La puerta
+    espaciada del estado sigue leyendo SOLO `success`, exactamente como antes.
     """
     result: list[dict] = []
     for row in rows:
@@ -299,21 +305,27 @@ def _lexicon_rows(rows: Sequence[Mapping]) -> list[dict]:
         modality = _lexicon_modality(skill, channel)
         if not modality:
             continue
+        success = _truthy(row.get("success"))
         vector = difficulty.earned_difficulty(row)
-        if not vector:
+        if success and not vector:
+            # Un ÉXITO sin carga acreditada (p. ej. `copied`) no aporta nada al
+            # estado: misma frontera que V3.63. Un FALLO sí entra (es un intento).
             continue
+        if not success:
+            vector = {}
         result.append(
             _row(
                 modality=modality,
                 competence="",
                 occurred_at=row.get("occurred_at"),
-                success=True,
-                score=1.0,
+                success=success,
+                score=1.0 if success else 0.0,
                 dimensions=vector,
                 source="lexicon",
                 production=skill in _LEXICAL_PRODUCTION_SKILLS,
                 evidence_id=row.get("id"),
                 activity_id=row.get("activity_id"),
+                target_id=row.get("target_id") or row.get("surface_form") or "",
                 facts={
                     "assessment_mode": channel,
                     "served_load": difficulty.parse_vector(
