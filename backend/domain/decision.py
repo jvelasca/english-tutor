@@ -38,7 +38,7 @@ from repositories import listening as listening_repo
 from repositories import profile as profile_repo
 from repositories import pronunciation as pronunciation_repo
 from services import decision_projection as projection_service
-from services import skill_axis
+from services import observed_difficulty, skill_axis
 from services import skill_state as skill_state_service
 from services.evidence import LEXICAL_SKILLS
 
@@ -79,6 +79,20 @@ async def canonical_sources(user_id: str) -> dict:
             objectives=skill_axis.objective_competences_index(),
         ),
     }
+
+
+async def _task_empirical_success(user_id: str) -> dict[str, dict]:
+    """Mapa EMPÍRICO por ITEM (`target_id`) desde el ledger léxico (V3.66, I/O).
+
+    Lee `list_attempt_rows` (éxitos Y fallos con identidad de ítem) y deriva las
+    filas canónicas léxicas con `skill_state_sources`, para aplicar después la
+    granularidad fina de `observed_difficulty.empirical_success_by_target`. Es una
+    lectura INDEPENDIENTE de la caché del estado (un read por construcción de la
+    proyección): el mapa describe el ledger del candidato, no la celda agregada.
+    """
+    attempts = await run_in_threadpool(evidence_repo.list_attempt_rows, user_id)
+    rows = skill_state_service.skill_state_sources(lexicon=attempts)
+    return observed_difficulty.empirical_success_by_target(rows)
 
 
 def _seal_state(state: dict) -> str:
@@ -125,6 +139,8 @@ def project_state(
     source: str = "",
     sealed: bool = False,
     snapshot_fingerprint: str = "",
+    state_fingerprint: str = "",
+    empirical_success_by_task: dict[str, dict] | None = None,
 ) -> dict:
     """Proyecta un estado YA calculado a un payload de decisión (V3.64, puro).
 
@@ -133,11 +149,23 @@ def project_state(
     para que el camino de la cola (`decision_projection`, con I/O) y el del perfil
     (que ya tiene el estado en la mano y no debe releerlo) no puedan divergir.
 
-    `snapshot_fingerprint` (V3.64.1, P1-02) es la huella de las cuatro fuentes
-    observada al INICIO de la decisión: identifica el snapshot de evidencia sobre
-    el que se tomó. Es un token de trazabilidad, NO el sello de caché (que sigue
-    gestionando `skill_state_is_fresh`). El camino del perfil lo deja vacío porque
-    no es una decisión.
+    V3.66 (P1-02) separa DOS huellas en vez de una sola mal etiquetada:
+
+    - `snapshot_fingerprint` / `decision_start_fingerprint` — la huella de las
+      cuatro fuentes observada al INICIO de la decisión (lo que V3.64.1 llamaba
+      `snapshot_fingerprint`). Es el token de trazabilidad del snapshot sobre el
+      que se empezó a decidir.
+    - `state_fingerprint` — la huella que DESCRIBE el estado efectivamente
+      proyectado (el sello de la caché fresca validada, o el sello del recálculo).
+      El invariante es que `state_fingerprint` representa el MISMO conjunto de
+      evidencia que `state`.
+
+    El camino del perfil (no es una decisión) deja ambas huellas vacías.
+
+    `empirical_success_by_task` (V3.66, P1-01) es el mapa `{target_id:
+    estimación empírica}` POR ITEM (la granularidad `P(éxito | alumno, tarea)` que
+    V3.65 aún colapsaba a skill). El camino del perfil lo deja vacío porque no es
+    una decisión.
     """
     projection = projection_service.project(state)
     return {
@@ -155,9 +183,21 @@ def project_state(
         "empirical_success": projection_service.empirical_success_by_skill(
             projection
         ),
+        # V3.66 (aditivo): la estimación EMPÍRICA por ITEM (target_id). Sin mapa
+        # (o sin estimación por ítem) la clave es `{}` y el planner degrada a la
+        # granularidad por skill de V3.65.
+        "empirical_success_by_task": (
+            dict(empirical_success_by_task)
+            if isinstance(empirical_success_by_task, dict)
+            else {}
+        ),
         "source": source,
         "sealed": sealed,
         "snapshot_fingerprint": snapshot_fingerprint,
+        # V3.66 (P1-02): las DOS huellas explícitas. `snapshot_fingerprint` se
+        # conserva como alias retrocompatible de `decision_start_fingerprint`.
+        "decision_start_fingerprint": snapshot_fingerprint,
+        "state_fingerprint": state_fingerprint,
     }
 
 
@@ -180,9 +220,11 @@ async def decision_projection(
     - `source` — `"cached"` si la caché sellada era fresca, `"recomputed"` si hubo
       que recalcular desde las filas canónicas;
     - `sealed` — si el recálculo se persistió (una caché legible por O(1));
-    - `snapshot_fingerprint` — huella de las cuatro fuentes observada al INICIO de
-      la decisión (V3.64.1, P1-02): la decisión se toma sobre el snapshot de
-      evidencia vigente en ese instante, formalizado y trazable.
+    - `snapshot_fingerprint` / `decision_start_fingerprint` — huella de las cuatro
+      fuentes observada al INICIO de la decisión (V3.64.1 → V3.66 P1-02): la
+      decisión se toma sobre el snapshot de evidencia vigente en ese instante;
+    - `state_fingerprint` — huella que describe el estado efectivamente proyectado
+      (sello de la caché fresca validada o sello del recálculo; V3.66 P1-02).
 
     `level`/`now` los aporta el llamador: este módulo NO lee el reloj (el camino
     caliente ya lo lee una vez) ni recalcula el Student Model.
@@ -191,10 +233,15 @@ async def decision_projection(
         evidence_repo.evidence_fingerprint, user_id
     )
     try:
+        empirical_success_by_task = await _task_empirical_success(user_id)
+    except Exception:  # noqa: BLE001 — sin mapa por ítem se degrada a skill
+        empirical_success_by_task = {}
+    try:
         profile = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — la proyección nunca rompe la cola
         return None
     sealed = False
+    state_fingerprint = ""
     if profile is not None:
         try:
             if await run_in_threadpool(profile_repo.skill_state_is_fresh, user_id):
@@ -202,6 +249,9 @@ async def decision_projection(
                     profile.get("skill_state")
                 )
                 source = "cached"
+                # V3.66 (P1-02): la huella del estado proyectado es el sello de la
+                # caché fresca validada — describe EXACTAMENTE el estado servido.
+                state_fingerprint = str(profile.get("skill_state_source") or "")
             else:
                 source = "recomputed"
         except Exception:  # noqa: BLE001 — preferencia no bloqueante
@@ -214,6 +264,9 @@ async def decision_projection(
             state, seal = await _recompute(user_id, level=level, now=now)
         except Exception:  # noqa: BLE001 — sin estado la cola degrada a V3.63
             return None
+        # V3.66 (P1-02): la huella del estado proyectado es el sello del
+        # recálculo (el que describe el estado devuelto), NO la huella inicial.
+        state_fingerprint = seal
         # Solo se persiste si hay fila de perfil: sin ella no se inventa caché.
         if profile is not None:
             try:
@@ -231,6 +284,8 @@ async def decision_projection(
         source=source,
         sealed=sealed,
         snapshot_fingerprint=snapshot_fingerprint,
+        state_fingerprint=state_fingerprint,
+        empirical_success_by_task=empirical_success_by_task,
     )
 
 

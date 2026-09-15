@@ -308,6 +308,7 @@ def expected_learning_value(
     value: float | None = None,
     capacity_skill: str = "",
     empirical_success: object = None,
+    task_empirical_success: object = None,
 ) -> dict:
     """Valor ESPERADO de aprendizaje de la tarea (V3.56 → V3.57, puro).
 
@@ -327,6 +328,14 @@ def expected_learning_value(
     `None`, que reproduce el `priority_score` global de V3.56; el argmax de
     tarea pasa el valor POR MODALIDAD de `skill_priorities`) y `capacity_skill`
     (informativo). Los llamadores de V3.56 no cambian.
+
+    V3.66 (aditivo) añade `task_empirical_success` (la estimación EMPÍRICA por
+    ITEM) y la política de resolución declarada: la tasa por ITEM gobierna si
+    existe; si no, la tasa por SKILL (`empirical_success`); si no, el margen
+    declarado de V3.64. El payload añade `p_success_source`
+    (`task_empirical` | `skill_empirical` | `margin`) y `task_p_success` (la tasa
+    por ítem cuando está declarada). Sin estimación la salida es EXACTAMENTE la de
+    V3.64/V3.65.
     """
     if value is None:
         base = priority_score(signals)
@@ -337,12 +346,19 @@ def expected_learning_value(
             base = priority_score(signals)
     margin = capacity_margin(task_difficulty, learner_capacity)
     p_success = success_probability(margin)
-    # V3.65 (aditivo): cuando el llamador aporta una estimación EMPÍRICA válida
-    # (la tasa P(éxito) por pareja), esa es la que gobierna `p_success`. Sin ella
-    # (o inválida) la predicción es EXACTAMENTE la de V3.64 (margen declarado).
+    # V3.66 (aditivo): política de resolución de `p_success` por granularidad.
+    # 1) tasa empírica por ITEM (la observación más específica);
+    # 2) tasa empírica por SKILL (base rate de V3.65);
+    # 3) margen declarado de capacidad (V3.64).
+    task_empirical = _empirical_p_success(task_empirical_success)
     empirical = _empirical_p_success(empirical_success)
-    if empirical is not None:
+    p_success_source = "margin"
+    if task_empirical is not None:
+        p_success = task_empirical
+        p_success_source = "task_empirical"
+    elif empirical is not None:
         p_success = empirical
+        p_success_source = "skill_empirical"
     desirability_factor = desirability(p_success)
     result = {
         "expected_learning_value": round(desirability_factor * base, 4),
@@ -352,8 +368,13 @@ def expected_learning_value(
         "margin": margin,
         "skill": skill,
         "capacity_skill": str(capacity_skill or ""),
+        # V3.66 (aditivo): la FUENTE de `p_success` y la tasa por ITEM cuando
+        # está declarada (auditabilidad del Planner 3.0). No altera V3.64/V3.65.
+        "p_success_source": p_success_source,
     }
-    if empirical is not None:
+    if task_empirical is not None:
+        result["task_p_success"] = task_empirical
+    if empirical is not None or task_empirical is not None:
         result["p_success_empirical"] = True
     return result
 
@@ -800,6 +821,7 @@ def select_task_by_elv(
     skill_values: dict | None = None,
     drivers: dict | None = None,
     empirical_success: object = None,
+    task_empirical_success: object = None,
 ) -> dict:
     """Tarea ÓPTIMA por argmax de ELV entre las candidatas admisibles (V3.57).
 
@@ -836,6 +858,13 @@ def select_task_by_elv(
     válida (`P(éxito)` 0..1 por pareja), esa gobierna su `p_success`; sin ella (o
     inválida) la predicción es EXACTAMENTE la de V3.64. La salida marca el hecho
     con la clave `p_success_empirical`. Nunca lanza.
+
+    V3.66 (Task-Level Empirical Success, ADITIVO) añade `task_empirical_success`
+    (una única estimación EMPÍRICA por ITEM, la del candidato concreto): cuando
+    es válida, esa gobierna `p_success` por delante de la tasa por skill. Es la
+    observación más específica; la tasa por skill queda como base rate. La salida
+    añade `p_success_source` (`task_empirical` | `skill_empirical` | `margin`) y
+    `task_p_success`. Sin ella la salida es EXACTAMENTE la de V3.65.
     """
     if not isinstance(capacity_by_skill, dict) or not capacity_by_skill:
         return _attach_decision(
@@ -864,6 +893,7 @@ def select_task_by_elv(
             value=_projected_value(skill_values, priorities, skill, base_value),
             capacity_skill=channel,
             empirical_success=_empirical_for(empirical_success, skill),
+            task_empirical_success=task_empirical_success,
         )
         scored.append(
             {
@@ -872,12 +902,15 @@ def select_task_by_elv(
                 "expected_learning_value": payload["expected_learning_value"],
                 "p_success": payload["p_success"],
                 "p_success_empirical": bool(payload.get("p_success_empirical")),
+                "p_success_source": payload["p_success_source"],
                 "margin": payload["margin"],
                 "value": payload["value"],
                 "capacity_skill": channel,
                 "comparable": payload["margin"] is not None,
             }
         )
+        if payload.get("task_p_success") is not None:
+            scored[-1]["task_p_success"] = payload["task_p_success"]
         if payload["margin"] is None:
             continue
         if payload["expected_learning_value"] > best_value:

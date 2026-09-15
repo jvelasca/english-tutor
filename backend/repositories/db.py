@@ -97,6 +97,33 @@ def init_db() -> None:
             )
             """
         )
+        # V3.66 (Decision Provenance): registro append-only de CADA decisión de
+        # tarea servida, para poder reconstruir qué evidencia y qué política
+        # gobernaron el `p_success` de una carta. Nunca se actualiza ni se borra.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS decision_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                decision_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                target_id TEXT NOT NULL DEFAULT '',
+                evidence_fingerprint TEXT NOT NULL DEFAULT '',
+                decision_start_fingerprint TEXT NOT NULL DEFAULT '',
+                state_fingerprint TEXT NOT NULL DEFAULT '',
+                policy_version TEXT NOT NULL DEFAULT '',
+                selected_skill TEXT NOT NULL DEFAULT '',
+                selected_activity TEXT NOT NULL DEFAULT '',
+                selected_reason TEXT NOT NULL DEFAULT '',
+                p_success REAL,
+                p_success_source TEXT NOT NULL DEFAULT '',
+                expected_learning_value REAL,
+                candidates_json TEXT NOT NULL DEFAULT '',
+                drivers_json TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS vocabulary (

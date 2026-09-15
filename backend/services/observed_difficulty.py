@@ -271,3 +271,44 @@ def empirical_success(rows: Sequence[Mapping], *, now: str = "") -> dict[str, di
             "days": len(days),
         }
     return result
+
+
+def empirical_success_by_target(
+    rows: Sequence[Mapping], *, now: str = ""
+) -> dict[str, dict]:
+    """Estimación EMPÍRICA por ITEM (`target_id`) (V3.66).
+
+    Variante de `empirical_success` que agrupa SOLO por `target_id` (el ítem),
+    sin colapsar por actividad ni dificultad servida: es la granularidad
+    `P(éxito | alumno, tarea)` por pareja que gobernará el Planner 3.0. Reutiliza
+    la MISMA puerta espaciada de V3.54 (`OBSERVED_MIN_SAMPLES`/`OBSERVED_MIN_DAYS`)
+    y devuelve por ítem `{successes, attempts, p_success, days}`. Sin muestra
+    espaciada el ítem NO aparece (no se declara estimación). Un ítem sin
+    `target_id` (fuente que no declara identidad) no aporta clave: no se inventa.
+
+    Sin reloj: `now` se acepta por contrato pero no se usa — los días son los que
+    declaran las filas (`occurred_on`). Pura y determinista, byte a byte; nunca
+    lanza.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        target = str(row.get("target_id") or "").strip()
+        if not target:
+            continue
+        grouped.setdefault(target, []).append(dict(row))
+    result: dict[str, dict] = {}
+    for target, group in grouped.items():
+        successes = [row for row in group if _truthy(row.get("success"))]
+        days = {_day(row) for row in successes if _day(row)}
+        if len(successes) < OBSERVED_MIN_SAMPLES or len(days) < OBSERVED_MIN_DAYS:
+            continue
+        attempts = len(group)
+        result[target] = {
+            "successes": len(successes),
+            "attempts": attempts,
+            "p_success": round(len(successes) / attempts, 3),
+            "days": len(days),
+        }
+    return result

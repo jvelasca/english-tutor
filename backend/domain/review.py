@@ -26,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from domain import academy as academy_service
 from domain import decision as decision_domain
 from domain import learner_state as learner_state_domain
+from repositories import decision_records as decision_records_repo
 from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
@@ -202,6 +203,12 @@ async def get_review_queue(
                 projection=projection,
             )
         )
+    # V3.66 (Decision Provenance): registro append-only de CADA decisión servida.
+    # Best-effort: un fallo de escritura nunca rompe la cola.
+    if isinstance(projection, dict):
+        await _record_decision_provenance(
+            user_id, projection, served_items, by_candidate_word
+        )
     return {
         "due_count": len(served_items),
         "items": served_items,
@@ -211,6 +218,54 @@ async def get_review_queue(
         # la evidencia por forma (cada intento sigue siendo de su `surface_form`).
         "units": lexicon.unit_evidence(rows, evidence_by_word),
     }
+
+
+async def _record_decision_provenance(
+    user_id: str,
+    projection: dict,
+    served_items: list[dict],
+    by_candidate_word: dict[str, tuple[dict, dict]],
+) -> None:
+    """Registra una fila de PROVENANCE por decisión servida (V3.66, best-effort).
+
+    Solo para los ítems que traen el bloque `decision` del Planner 3.0 (es decir,
+    cuando la Decision Projection gobernó el argmax). Cada fila captura la tarea
+    elegida, el `p_success` y su FUENTE, el ELV, las alternativas puntuadas y los
+    drivers, junto con las DOS huellas de fingerprint de la decisión.
+    """
+    evidence_fingerprint = str(
+        projection.get("decision_start_fingerprint") or ""
+    )
+    state_fingerprint = str(projection.get("state_fingerprint") or "")
+    for item in served_items:
+        decision = item.get("decision")
+        if not isinstance(decision, dict):
+            continue
+        word = item.get("word") or ""
+        _, card = by_candidate_word.get(word, ({}, {}))
+        target_id = str((card or {}).get("target_id") or "") or word
+        task = item.get("task") or {}
+        try:
+            await run_in_threadpool(
+                decision_records_repo.record_decision,
+                user_id,
+                target_id=target_id,
+                evidence_fingerprint=evidence_fingerprint,
+                decision_start_fingerprint=evidence_fingerprint,
+                state_fingerprint=state_fingerprint,
+                selected_skill=str(task.get("skill") or ""),
+                selected_activity=str(task.get("activity") or ""),
+                selected_reason=str(task.get("reason") or ""),
+                p_success=decision.get("p_success"),
+                p_success_source=str(decision.get("p_success_source") or ""),
+                expected_learning_value=decision.get(
+                    "expected_learning_value"
+                ),
+                candidates=decision.get("alternatives"),
+                drivers=decision.get("drivers"),
+            )
+        except Exception:  # noqa: BLE001 — el provenance nunca rompe la cola
+            continue
 
 
 async def _available_recall_cues(words: list[str]) -> dict[str, set[str]]:
