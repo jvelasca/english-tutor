@@ -20,7 +20,7 @@
 > **Lo que cambia respecto al plan anterior (único cambio de roadmap):** V3.69
 > deja de ser «E2E Adaptive Engine (10 casos)» y pasa a ser **«E2E + Adaptive
 > Engine Validation»**: **validación experimental, NO capacidad nueva**, con la
-> batería obligatoria **E01–E16** (E16 es el **determinismo del Planner**: mismo
+> batería obligatoria **E01–E19** (E16 es el **determinismo del Planner**: mismo
 > estado + fingerprint + candidatos + política → mismo task, `p_success`, ELV,
 > razón y `decision_id`, siempre). **Regla dura declarada:** *V3.69 no debe
 > introducir arquitectura nueva salvo que una prueba E2E demuestre que la
@@ -35,13 +35,19 @@
 > (V3.69 **no existe todavía**: `VERSION` sigue en `3.68.0`, sin tag ni release
 > note). Punto de entrada: `agentes/auditoria-externa-v369.md`; informe esperado
 > en `docs/audit/Z-AUDITORIA-DISENO-V369.md` (letra `Z`). Objeto: el briefing,
-> la batería **E01–E16**, el **criterio de derivación P2/P3** del dossier `Y` §30
-> y las afirmaciones sobre el estado de partida. **Huecos declarados por el
-> propio proyecto y sometidos a dictamen:** el caso (3) «alta dependencia de
-> apoyo» y el caso (10) «evidencia entrando DURANTE la decisión» de los 10 casos
-> originales de la auditoría `X` **no tienen escenario** en E01–E16, y el caso
-> (8) «dos usuarios simultáneos» solo queda **parcialmente** cubierto por E12
-> (propiedad ajena rechazada, no coexistencia de dos alumnos activos).
+> la batería **E01–E19**, el **criterio de derivación P2/P3** del dossier `Y` §30
+> y las afirmaciones sobre el estado de partida. **Huecos cerrados antes de
+> lanzarla:** al preparar la auditoría se detectó que la batería inicial
+> (E01–E16) **no cubría** el caso (3) «alta dependencia de apoyo» ni el caso (10)
+> «evidencia entrando DURANTE la decisión» de los 10 casos originales de la
+> auditoría `X`, y solo cubría **parcialmente** el caso (8) «dos usuarios
+> simultáneos»; se añadieron **E17** (hueco servido − acreditado → penalización
+> declarada, aserción **diferencial**), **E18** (frescura por HTTP + reproducción
+> determinista del TOCTOU de V3.64.1) y **E19** (coexistencia de dos alumnos
+> activos sin mezcla, en ambas direcciones), de modo que el mapeo con los 10
+> casos es ahora **completo**. Las tres decisiones discutibles de E17/E18/E19
+> (aserción diferencial, la mitad que toca internals en E18 y la relación
+> E12/E19) quedan **sometidas a dictamen del auditor**.
 > **Deuda P2/P3 aceptada en el backlog** (ver el dossier `Y` §30): el lifecycle
 > sigue siendo **best-effort** y falta el *provenance failure rate* como release
 > health metric (P2-01); `decision_records` sigue mezclando DECISION / SERVING /
@@ -59,7 +65,7 @@
 > **Correcciones documentales aplicadas con esta nota:** nueva nota de cabecera
 > (esta), corrección de la sección **«0. START HERE»** (declaraba `v3.65.0`,
 > desfasada desde V3.66), `PLAN.md` (tablero de briefings, bloque de «Siguiente
-> incremento» con E01–E16 y M13) y nuevo briefing de V3.69.
+> incremento» con E01–E19 y M13) y nuevo briefing de V3.69.
 >
 > **Nota (2026-09-15): V3.68.0 (Adaptive Engine Hardening & Integrity)**
 > — release **v3.68.0**, **SIN migración destructiva** (migración ADITIVA e
@@ -2980,7 +2986,7 @@ backend **2532 passed**, launcher **75**, `ruff` limpio, `tsc`/`vitest`/**659**/
 commit `8acee38` + tag `v3.68.0` + push (**CI 6/6** run `34964205252`, declarado
 por el release). Detalle en `release-notes-v3.68.0.md`.
 **Siguiente incremento:** `V3.69` **E2E + Adaptive Engine Validation**
-(**validación, no capacidad nueva**), batería **E01–E16**; briefing
+(**validación, no capacidad nueva**), batería **E01–E19**; briefing
 `agentes/v369-e2e-adaptive-validation.md`.
 Antes, `v3.67.0` **Task Identity 2.0 + Decision Lifecycle + Provenance
 Analytics** (cierre de los dos P1 de V3.66), `v3.66.0` **Task-Level Empirical

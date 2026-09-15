@@ -639,6 +639,27 @@ siendo la deuda histórica pendiente.
 **Correcciones documentales aplicadas en esta actualización:** nota de cabecera
 de `docs/RELEVO.md` (P3-04: nota nueva de esta auditoría y corrección de
 «START HERE», que declaraba `v3.65.0`), `PLAN.md` (tablero de briefings, bloque
-de «Siguiente incremento» con E01–E16 y M13) y briefing de V3.69.
+de «Siguiente incremento» con E01–E19 y M13) y briefing de V3.69.
+
+**Ampliación de la batería tras revisar la cobertura (2026-09-15, del proyecto).**
+Al preparar la **auditoría de diseño** de V3.69
+(`agentes/auditoria-externa-v369.md`) se cruzó la batería derivada de §20 de este
+informe con los **10 casos** declarados en la auditoría `X` de V3.67 (§16), y se
+detectó que la batería inicial (**E01–E16**) **no cubría** el caso (3) «alta
+dependencia de apoyo» ni el caso (10) «evidencia entrando **durante** la
+decisión» —este último es justamente el TOCTOU/snapshot que cerraron V3.64.1 y
+V3.68—, y solo cubría **parcialmente** el caso (8) «dos usuarios simultáneos»
+(E12 prueba el rechazo de propiedad ajena, no la coexistencia de dos alumnos
+activos). **Ampliación acordada antes de lanzar la auditoría:** **E17**
+(dependencia de apoyo: hueco servido − acreditado → penalización declarada, con
+aserción **diferencial** porque el hueco no se expone en el contrato de la cola),
+**E18** (evidencia durante la decisión: frescura por HTTP **más** reproducción
+determinista del TOCTOU) y **E19** (dos alumnos activos: coexistencia sin mezcla,
+verificada **en ambas direcciones**). La batería de V3.69 es por tanto
+**E01–E19**, con mapeo **completo** frente a los 10 casos de `X`. Las tres
+decisiones discutibles (la aserción diferencial de E17, la mitad de E18 que toca
+internals y la relación E12/E19) quedan **sometidas a dictamen del auditor de
+diseño**. El texto de §20 de este dossier se conserva **sin modificar** como
+traza fiel del informe recibido.
 
 Detalle de la ejecución de V3.68 en `release-notes-v3.68.0.md`.

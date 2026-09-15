@@ -1325,7 +1325,7 @@
   Adaptive Engine). El camino declarado hasta el producto terminado ya **no**
   añade capas arquitectónicas: **V3.68** cierre de la arquitectura adaptativa
   (hecho) → **V3.69** **E2E + Adaptive Engine Validation** (validación
-  experimental del circuito, batería **E01–E16**; **no** capacidad nueva ni
+  experimental del circuito, batería **E01–E19**; **no** capacidad nueva ni
   arquitectura nueva salvo que una prueba E2E demuestre que la actual es
   insuficiente) → **V3.70** auditoría pedagógica (CEFR/competencias) →
   **V3.71** runtime/offline/instalación → **V3.72** UX/product completion →
@@ -1435,8 +1435,8 @@
 | V3.66 Task-Level Empirical Success + Decision Provenance | directo del gerente | ✔ hecho (2026-09-15; release `v3.66.0`) |
 | V3.67 Task Identity 2.0 + Decision Lifecycle + Provenance Analytics | directo del gerente | ✔ hecho (2026-09-15; release `v3.67.0`) |
 | V3.68 Adaptive Engine Hardening & Integrity (cierre de los P1 de 2.ª generación + P2-08) | directo del gerente (plan Cursor `v3.68_adaptive_engine_hardening`) | ✔ hecho (2026-09-15; release `v3.68.0`; auditada por `docs/audit/Y-AUDITORIA-TOTAL-V368.md`: 9,3/10, 0 P1) |
-| V3.69 E2E + Adaptive Engine Validation (batería E01–E16; validación, no capacidad nueva) | `agentes/v369-e2e-adaptive-validation.md` | ⏳ siguiente |
-| Auditoría EXTERNA de DISEÑO de V3.69 (pre-implementación: briefing + batería E01–E16 + derivación P2/P3) | `agentes/auditoria-externa-v369.md` | ⏳ lanzada (informe esperado en `docs/audit/Z-AUDITORIA-DISENO-V369.md`) |
+| V3.69 E2E + Adaptive Engine Validation (batería E01–E19; validación, no capacidad nueva) | `agentes/v369-e2e-adaptive-validation.md` | ⏳ siguiente (auditoría de diseño en curso) |
+| Auditoría EXTERNA de DISEÑO de V3.69 (pre-implementación: briefing + batería E01–E19 + derivación P2/P3) | `agentes/auditoria-externa-v369.md` | ⏳ lanzada (informe esperado en `docs/audit/Z-AUDITORIA-DISENO-V369.md`) |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1455,7 +1455,7 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   **Regla dura declarada (auditoría `Y` §28):** *V3.69 no debe introducir
   arquitectura nueva salvo que una prueba E2E demuestre que la arquitectura
   actual es insuficiente.*
-  **Batería obligatoria E01–E16** (briefing ejecutable
+  **Batería obligatoria E01–E19** (briefing ejecutable
   `agentes/v369-e2e-adaptive-validation.md`): E01 alumno nuevo · E02 skill débil
   (`speaking` débil/`writing` fuerte) · E03 retención (`mastered` → review due →
   repaso) · E04 brecha de transferencia (reconocimiento/recall fuertes y
@@ -1469,7 +1469,15 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   transición inválida (`computed → completed`, rechazada) · E15 serving stale
   (`> 24 h` → `abandoned`) · **E16 determinismo del Planner** (mismo estado +
   fingerprint + candidatos + política → mismo task, `p_success`, ELV, razón y
-  `decision_id`, **siempre**). Se cierra además el endpoint huérfano
+  `decision_id`, **siempre**) · **E17 dependencia de apoyo** (hueco servido −
+  acreditado → penalización declarada `SCAFFOLDING_PENALTY = 0.2`, aserción
+  **diferencial**) · **E18 evidencia entrando DURANTE la decisión** (frescura por
+  HTTP + reproducción determinista del TOCTOU de V3.64.1) · **E19 dos alumnos
+  activos** (coexistencia sin mezcla de estado/cola/`decision_id`, **en ambas
+  direcciones**; E12 cubre el rechazo de propiedad ajena). Con E17/E18/E19 el
+  mapeo con los **10 casos originales** de la auditoría `X` queda **completo**
+  (casos (3), (8) y (10), que la batería inicial no cubría o cubría solo
+  parcialmente). Se cierra además el endpoint huérfano
   `GET /api/learning/decisions` (calibración + provenance health), hoy sin
   cobertura HTTP. Roadmap posterior declarado (**sin cambios**):
   **V3.70** auditoría pedagógica/CEFR → **V3.71** runtime/offline/instalación →

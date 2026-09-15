@@ -23,14 +23,20 @@
 > incremento» de `PLAN.md`.
 > **Regla dura declarada:** *V3.69 no debe introducir arquitectura nueva salvo que
 > una prueba E2E demuestre que la arquitectura actual es insuficiente.*
+> **Batería:** **E01–E19** (19 escenarios), que sustituyen y amplían los diez
+> casos de la auditoría `X` de V3.67 **sin dejar ninguno fuera** (ver §G para el
+> mapeo completo; E17/E18/E19 cierran los casos (3), (10) y (8)).
+> **Auditoría de diseño previa:** el plan se somete a auditoría externa
+> **antes** de implementarse (`agentes/auditoria-externa-v369.md`; informe
+> esperado en `docs/audit/Z-AUDITORIA-DISENO-V369.md`).
 > **Base de partida:** árbol `v3.68.0` (commit `8acee38`, tag `v3.68.0`, commit de
-> documentación `d5311cc`).
+> documentación `d5311cc`; HEAD documental `b2b9be0`).
 
 ## Rol
 
 **Backend de validación + contrato de frontend.** Un módulo de tests E2E nuevo
 (`backend/tests/test_adaptive_e2e_v369.py`) que recorre el circuito completo por
-**HTTP real** (`TestClient` sobre `main.app`) con **batería E01–E16**, y —solo si
+**HTTP real** (`TestClient` sobre `main.app`) con **batería E01–E19**, y —solo si
 un escenario lo exige— las **correcciones mínimas** que no cambien arquitectura.
 **Sin** migración destructiva, **sin** bump de `GENERATOR_VERSION`, **sin** tocar
 el banco, **sin** capacidad pedagógica nueva, **sin** tocar el argmax del Planner
@@ -191,7 +197,7 @@ propio y **auto-declara `served`** antes de cerrar (`:361-370`).
 
 Cabecera con el `_setup` canónico + helpers propios (`_seed_word`,
 `_due_lexicon_card`, `_seed_evidence`, `_fake_transcribe`, `_queue(uid)`,
-`_complete(uid, decision_id, outcome)`), y **16 tests**:
+`_complete(uid, decision_id, outcome)`), y **19 tests**:
 
 | Id | Nombre del test | Escenario y aserción principal |
 |---|---|---|
@@ -211,6 +217,9 @@ Cabecera con el `_setup` canónico + helpers propios (`_seed_word`,
 | **E14** | `test_e14_invalid_transition_is_rejected` | `computed → completed` (sin `served`) → **rechazado** y `transition_health.invalid_transition` sube. |
 | **E15** | `test_e15_stale_serving_becomes_abandoned` | Fila `served` con `COALESCE(served_at, created_at)` **anterior a 24 h** → la siguiente construcción de cola la deja en **`abandoned`** (`DECISION_ABANDON_AFTER_HOURS = 24`), **nunca** en `completed`. |
 | **E16** | `test_e16_planner_is_deterministic` | Con estado, fingerprint, candidatos y política **idénticos**: `N` repeticiones (p. ej. 5) producen **el mismo `selected task`, `p_success`, `ELV`, `why` y `decision_id`**, comparados **byte a byte**. Se comprueba a **los dos niveles**: la función pura (`select_task_by_elv` + `expected_learning_value` con entradas fijas) y la **proyección por HTTP** (misma cola repetida). |
+| **E17** | `test_e17_scaffolding_gap_penalizes_the_task` | **Dependencia de apoyo** (caso (3) de la auditoría `X`). Dos alumnos **idénticos salvo** por el hueco servido−acreditado (`served_ceiling > credited_ceiling`) → el que tiene hueco recibe la **penalización declarada** (`SCAFFOLDING_PENALTY = 0.2`, `services/decision_projection.py:83`): menor `expected_learning_value`/`priority` y/o `why` que lo declara. **Aserción diferencial** (ver nota), con el respaldo puro `scaffolding_gap(rows)` (`services/observed_difficulty.py:170`). |
+| **E18** | `test_e18_evidence_arriving_during_the_decision_is_not_sealed_stale` | **Evidencia entrando DURANTE la decisión** (caso (10) de la auditoría `X`): el TOCTOU de snapshot/fingerprint que cerraron V3.64.1 y V3.68. **Dos mitades** (ver nota): (a) por HTTP, evidencia nueva entre dos lecturas **cambia** la decisión y el sello; (b) **reproducción determinista** del TOCTOU insertando una fila **durante** la lectura, y el sello **NUNCA** se declara fresco con huella desajustada (`_SEAL_MAX_ATTEMPTS = 3`, `domain/decision.py:114`). |
+| **E19** | `test_e19_two_active_learners_do_not_mix_state` | **Dos alumnos simultáneos** (caso (8) de la auditoría `X`), en su mitad fuerte. A y B con evidencia **distinta** sobre la **misma BD**, intercalando `cola(A) → cola(B) → completo(A) → completo(B)`: cada cola contiene **solo** lo suyo, los `decision_id` son **distintos**, la evidencia de A **no** aparece en el estado ni en la cola de B, y `decisions`/`calibration` filtradas por usuario **no se mezclan** en ninguna de las dos direcciones. **E12** queda como está (rechazo de propiedad ajena): son dos mitades distintas y complementarias. |
 
 **Notas de implementación por escenario:**
 
@@ -232,10 +241,45 @@ Cabecera con el `_setup` canónico + helpers propios (`_seed_word`,
   `before_iso` anterior a 24 h respecto de la hora real del test (o usar el
   `before_iso` explícito del repositorio si el test llama al barrido
   directamente); **no** se introducen relojes inyectables nuevos.
+- **E17 · la aserción es DIFERENCIAL, y hay un motivo.** El hueco servido −
+  acreditado **sí** gobierna la decisión (penalización declarada
+  `SCAFFOLDING_PENALTY = 0.2` en el grupo `desirability`), pero el ítem de la cola
+  expone `served_load` como `dict(task_difficulty)`
+  (`services/lexicon.py:949`), **no** el bloque `load` de la proyección donde vive
+  `scaffolding_gap` (`services/decision_projection.py:298`). Por tanto el test
+  **no** puede leer el hueco por HTTP: debe montar **dos escenarios gemelos** que
+  solo difieran en `served_ceiling` vs `credited_ceiling` y afirmar la
+  **diferencia** observable (`expected_learning_value`/`priority`/`why`), con el
+  respaldo puro `observed_difficulty.scaffolding_gap(rows)` (precedente:
+  `test_observed_task_difficulty_v363.py:352`) y el de la proyección
+  (`test_decision_projection_v364.py:287`). **Se declara como candidato a
+  hallazgo** para el auditor: ¿debería exponerse el hueco servido − acreditado en
+  el contrato de la cola, o basta con que gobierne la decisión?
+- **E18 · es el único escenario con una mitad que toca internals, y se declara.**
+  La mitad (a) es HTTP puro: leer la cola, sembrar evidencia nueva, volver a leer
+  y comprobar que la decisión **cambia** y que el sello no es el mismo. La mitad
+  (b) **no** es alcanzable por HTTP de forma determinista (haría falta
+  intercalar en el punto exacto de la lectura), así que se reproduce el TOCTOU
+  **en proceso** con `monkeypatch` del lector de evidencia para que inserte una
+  fila **durante** la lectura, y se afirma la regla de V3.64.1: con huella
+  anterior ≠ posterior el sello **no** se declara fresco (se devuelve la huella
+  ANTERIOR, más vieja que el estado). Piezas públicas para montarlo:
+  `evidence_fingerprint(user_id)` (`repositories/evidence.py:443`),
+  `_SEAL_MAX_ATTEMPTS = 3` y el camino de sellado de `domain/decision.py:114-117`
+  y `:279` (`state_fingerprint` = `profile["skill_state_source"]`). **Regla:** si
+  esta mitad obligara a cambiar producción, **no** se implementa y se registra
+  como hallazgo; el escenario no justifica romper la regla dura.
+- **E19 · reutiliza el patrón de E12 pero invierte el objetivo.** E12 pregunta «¿se
+  rechaza lo ajeno?»; E19 pregunta «¿coexisten dos alumnos sin contaminarse?». Se
+  intercalan las cuatro operaciones **en ese orden** para que cualquier mezcla de
+  estado, cola o `decision_id` entre A y B se manifieste. La comprobación de
+  `decisions`/`calibration` se hace **en ambas direcciones** (no basta verificar
+  que B no ve lo de A: hay que verificar que A sigue viendo lo suyo tras la
+  actividad de B).
 
 ### B · Cobertura del endpoint huérfano `GET /api/learning/decisions`
 
-Además de servir de observabilidad a E07–E15, un test propio
+Además de servir de observabilidad a E07–E15 y E18–E19, un test propio
 (`test_e16b_decisions_endpoint_reports_calibration_and_health` o equivalente)
 fija el **contrato completo** del endpoint: `{decisions, calibration,
 provenance_health}`, con `calibration` exponiendo `completed_count`,
@@ -293,11 +337,36 @@ navegador) que fije, **con `page.route` y respuestas simuladas**, que:
 Se hace con **mocks** porque el job `playwright` de CI
 (`.github/workflows/ci.yml:107-125`) arranca solo el dev server de Vite
 (`frontend/playwright.config.ts` `webServer`) y **no** levanta el backend; la
-verificación real del round-trip contra backend es la que hacen E01–E16.
+verificación real del round-trip contra backend es la que hacen E01–E19.
+
+### G · Cobertura frente a los 10 casos de la auditoría `X`
+
+La batería **sustituye y amplía** los diez casos declarados en la auditoría `X`
+de V3.67 (§16). Mapeo **completo** tras cerrar los tres huecos detectados al
+preparar la auditoría de diseño:
+
+| Caso original (auditoría `X` §16) | Escenario | Cómo queda cubierto |
+|---|---|---|
+| (1) alumno nuevo / sin historial | **E01** | circuito completo de un extremo al otro |
+| (2) recall fuerte / speaking débil | **E02** | orden relativo de `skill_priorities` |
+| (3) **alta dependencia de apoyo** | **E17** | hueco servido − acreditado → penalización declarada |
+| (4) mala retención | **E03** | FSRS vencido → el Planner elige repaso |
+| (5) fallos repetidos | **E06** | `ok, ok, ko` → el `p_success` baja |
+| (6) domina una tarea pero no transfiere | **E04** | aparece la actividad de producción |
+| (7) ASR `unclear` | **E07** | no penaliza mastery, fuera de calibración |
+| (8) **dos usuarios simultáneos** | **E12 + E19** | E12 = propiedad ajena **rechazada**; E19 = **coexistencia** sin mezcla, en ambas direcciones |
+| (9) refresh repetido de la cola | **E09** | mismo `decision_id`, una sola fila |
+| (10) **evidencia entrando DURANTE la decisión** | **E18** | frescura por HTTP + reproducción determinista del TOCTOU |
+
+**Aportaciones nuevas** sobre los diez casos: `E05` (task vs task instance por
+HTTP), `E08` (abandono sin contaminar `ko`), `E10` (doble submit idempotente),
+`E11` (submit contradictorio rechazado), `E13` (target ajeno), `E14` (transición
+inválida), `E15` (serving stale) y `E16` (determinismo del Planner), todas
+exigidas por las auditorías `X`/`Y`.
 
 ## Tests
 
-- **Nuevo:** `backend/tests/test_adaptive_e2e_v369.py` con **E01–E16** (16 tests,
+- **Nuevo:** `backend/tests/test_adaptive_e2e_v369.py` con **E01–E19** (19 tests,
   uno por escenario, más el del endpoint de decisions) — **escritos antes** de
   cualquier corrección.
 - **Nuevo (si aplica):** spec de contrato de frontend (§F).
@@ -315,7 +384,7 @@ verificación real del round-trip contra backend es la que hacen E01–E16.
 
 ## Criterios de salida
 
-1. **E01–E16 verdes**, cada uno con su nombre `test_eXX_...`, y el mapeo
+1. **E01–E19 verdes**, cada uno con su nombre `test_eXX_...`, y el mapeo
    escenario↔test documentado en la release note.
 2. **Ningún cambio de arquitectura** no justificado por un hallazgo: si existe,
    está en la tabla §E con su motivo.
@@ -363,7 +432,7 @@ nueva **arriba**):
    arriba) + fecha de «Actualizado por última vez» + refrescar la posición de
    **«0. START HERE»**.
 8. `release-notes-v3.69.0.md` (nuevo, raíz) con: alcance, contexto, la **tabla
-   E01–E16**, la **tabla de hallazgos §E**, tests, §«Honestidad» y §«Fuera de
+   E01–E19**, la **tabla de hallazgos §E**, tests, §«Honestidad» y §«Fuera de
    alcance».
 9. **No** tocar `DECISION_POLICY_VERSION`
    (`backend/repositories/decision_records.py:61`) ni `GENERATOR_VERSION`: la
