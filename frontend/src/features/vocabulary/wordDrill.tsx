@@ -32,6 +32,8 @@ import {
   getDrillRecognitionQuestion,
   getDrillSentenceContext,
   getDrillTransferContext,
+  markDrillAbandoned,
+  markDrillStarted,
   submitDrillRecallAttempt,
   submitDrillRecognitionAttempt,
   submitDrillSentenceAttempt,
@@ -195,6 +197,12 @@ export interface WordDrillProps {
   /** V3.35: peldaño inicial de la escalera. Por defecto Recognition (V3.33.1);
    * la cola de repaso abre en la actividad recomendada por hueco. */
   initialStep?: DrillStep;
+  /** V3.68 (P1-02): id de la decisión servida por la cola de repaso. Es el
+   * eslabón que hace REAL el ciclo de vida del provenance: viaja en cada GET y
+   * POST del peldaño (round-trip) y dispara `started`/`abandoned` al montar y
+   * desmontar el drill. Ausente cuando el drill se abre desde el diccionario
+   * (`Practicar esta palabra`), donde no hay decisión que declarar. */
+  decisionId?: string;
 }
 
 type DrillOutcome = DrillAttempt | DrillSentenceAttempt;
@@ -226,13 +234,17 @@ export function isSentenceAttempt(
  * V3.34: el peldaño Recall pasa a ser recuperación por TEXTO (se retira el
  * paso oral de palabra suelta): el micrófono queda solo para Sentence y
  * `onProduced` solo lo dispara Sentence (un recall correcto deja señal léxica
- * de recall, no producción). Si Recall no tiene cue, degrada a Sentence. */
+ * de recall, no producción). Si Recall no tiene cue, degrada a Sentence.
+ * V3.68 (P1-02): con `decisionId` (drill abierto desde la cola de repaso) el
+ * ciclo de vida del provenance se ejecuta de verdad: el id viaja en TODOS los
+ * GET/POST y el montaje/desmontaje declara `started`/`abandoned`. */
 export function WordDrill({
   userId,
   word,
   onProduced,
   onClose,
   initialStep = "recognition",
+  decisionId,
 }: WordDrillProps) {
   const { t } = useI18n();
   // V3.33.1: el drill abre en el primer peldaño (Recognition) salvo que la cola
@@ -287,6 +299,9 @@ export function WordDrill({
   // (cue → envío) se manda como `response_time_ms` del evento de evidencia; es
   // observacional (no cambia la puntuación) y opcional (sin cue no hay medida).
   const recallShownAtRef = useRef<number | null>(null);
+  // V3.68 (P1-02): `started` se declara UNA vez por peldaño servido (el GET ya
+  // lo marcó `served`), no en cada cambio de estado del render.
+  const startedDeclaredRef = useRef(false);
   // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
   const recordingSession = useRecordingSession(recording, {
     onAutoStop: () => {
@@ -300,12 +315,12 @@ export function WordDrill({
   /** Carga la frase de contexto del paso Sentence (determinista en servidor). */
   const loadSentence = useCallback(() => {
     setSentenceError(null);
-    getDrillSentenceContext(userId, word)
+    getDrillSentenceContext(userId, word, decisionId)
       .then((ctx) => setSentence(ctx))
       .catch((e) =>
         setSentenceError(t("dictionary.drill.error").concat((e as Error).message)),
       );
-  }, [userId, word, t]);
+  }, [userId, word, decisionId, t]);
 
   /** Carga el cue del paso Recall (V3.34). Si no hay cue utilizable
    * (`available=false`), degrada a Sentence sin romper la escalera y sin pisar
@@ -315,7 +330,7 @@ export function WordDrill({
     setRecallAnswer("");
     setRecallOutcome(null);
     recallShownAtRef.current = null;
-    getDrillRecallPrompt(userId, word)
+    getDrillRecallPrompt(userId, word, undefined, decisionId)
       .then((prompt) => {
         setRecall(prompt);
         // V3.36: el reloj de la latencia arranca cuando el cue es utilizable
@@ -334,7 +349,7 @@ export function WordDrill({
           t("dictionary.drill.error").concat((e as Error).message),
         ),
       );
-  }, [userId, word, t, loadSentence]);
+  }, [userId, word, t, loadSentence, decisionId]);
 
   /** Pide una pregunta de Recognition (V3.33.1): cada intento recibe un
    * `question_id` nuevo, así que la posición de la correcta cambia entre
@@ -344,7 +359,7 @@ export function WordDrill({
     setRecognitionError(null);
     setRecognitionSelected(null);
     setRecognitionOutcome(null);
-    getDrillRecognitionQuestion(userId, word)
+    getDrillRecognitionQuestion(userId, word, decisionId)
       .then((question) => {
         setRecognition(question);
         if (!question.available) {
@@ -362,7 +377,7 @@ export function WordDrill({
           t("dictionary.drill.error").concat((e as Error).message),
         ),
       );
-  }, [userId, word, t, loadRecall]);
+  }, [userId, word, t, loadRecall, decisionId]);
 
   /** Carga la consigna del paso Transfer (V3.40): contexto NUEVO elegido por el
    * servidor entre los que el ítem aún no usó. Si no hay consigna
@@ -372,7 +387,7 @@ export function WordDrill({
     setTransferAnswer("");
     setTransferOutcome(null);
     transferShownAtRef.current = null;
-    getDrillTransferContext(userId, word)
+    getDrillTransferContext(userId, word, decisionId)
       .then((ctx) => {
         setTransfer(ctx);
         transferShownAtRef.current = ctx.available ? Date.now() : null;
@@ -382,7 +397,7 @@ export function WordDrill({
           t("dictionary.drill.error").concat((e as Error).message),
         ),
       );
-  }, [userId, word, t]);
+  }, [userId, word, decisionId, t]);
 
   // V3.33.1 / V3.35: el drill arranca en el peldaño pedido (`initialStep`,
   // Recognition por defecto) y limpia el intento anterior al montar o cambiar
@@ -415,6 +430,52 @@ export function WordDrill({
       loadRecognition();
     }
   }, [loadRecognition, loadRecall, loadSentence, loadTransfer, initialStep]);
+
+  // V3.68 (P1-02): el ciclo de vida REAL del provenance (el eslabón que faltaba
+  // desde V3.67).
+  //
+  // ORDEN DECLARADO: `served` lo declara el GET del peldaño (lo sirve el
+  // servidor al responder) y SOLO DESPUÉS tiene sentido declarar `started`: la
+  // FSM rechaza `computed → started`, así que declarar el inicio al montar
+  // competiría con el GET y el evento se perdería por una carrera. Por eso
+  // `started` se dispara cuando el peldaño ya está CARGADO (el GET resolvió), que
+  // es el momento en que el alumno lo ve y puede empezar. El peldaño `write` no
+  // tiene GET (su consigna es la propia palabra): su `served` lo declara el
+  // propio POST del intento, así que ahí no hay `started` que declarar.
+  //
+  // ABANDONO: al desmontar (salir sin completar o cambiar de palabra) se declara
+  // `abandoned`. La FSM del SERVIDOR decide si vale: si la decisión ya está
+  // `completed` (el intento se midió) la rechaza y no borra nada, así que el
+  // cliente no necesita saber si hubo medición.
+  //
+  // Sin `decisionId` (drill abierto desde el diccionario) no hay decisión que
+  // declarar. La actividad NO se declara aquí: la declaran los GET, que son
+  // quienes saben qué peldaño se sirvió de verdad.
+  const rungLoaded =
+    step === "recognition"
+      ? recognition !== null
+      : step === "recall"
+        ? recall !== null
+        : step === "sentence"
+          ? sentence !== null
+          : step === "transfer"
+            ? transfer !== null
+            : false;
+  useEffect(() => {
+    if (!decisionId || !rungLoaded || startedDeclaredRef.current) return;
+    startedDeclaredRef.current = true;
+    void markDrillStarted(userId, decisionId, { targetId: word });
+  }, [decisionId, rungLoaded, userId, word]);
+
+  useEffect(() => {
+    if (!decisionId) return;
+    return () => {
+      // La próxima sesión (otra palabra o un remontaje) vuelve a declarar su
+      // propio `started`.
+      startedDeclaredRef.current = false;
+      void markDrillAbandoned(userId, decisionId, { targetId: word });
+    };
+  }, [userId, word, decisionId]);
 
   function chooseStep(next: DrillStep) {
     if (next === step || recording || processing) return;
@@ -467,6 +528,7 @@ export function WordDrill({
         word,
         recognitionSelected,
         recognition.question_id,
+        decisionId,
       );
       setRecognitionOutcome(outcome);
     } catch (e) {
@@ -491,6 +553,7 @@ export function WordDrill({
         recallAnswer,
         responseTimeMs,
         recall.cue_kind || undefined,
+        decisionId,
       );
       setRecallOutcome(outcome);
     } catch (e) {
@@ -513,6 +576,7 @@ export function WordDrill({
         word,
         writeAnswer,
         responseTimeMs,
+        decisionId,
       );
       setWriteOutcome(outcome);
       if (outcome.passed) onProduced();
@@ -542,6 +606,7 @@ export function WordDrill({
         // registre la dificultad de ESA superficie (no la de la siguiente
         // rotación). Vacío si el servidor no dio ninguna (superficie histórica).
         transfer.context_instance ?? "",
+        decisionId,
       );
       setTransferOutcome(outcome);
       if (outcome.passed) onProduced();
@@ -583,7 +648,12 @@ export function WordDrill({
         try {
           // V3.34: el micrófono queda reservado al paso Sentence (la escalera
           // ya no tiene un paso oral de palabra suelta).
-          const attempt = await submitDrillSentenceAttempt(userId, word, blob);
+          const attempt = await submitDrillSentenceAttempt(
+            userId,
+            word,
+            blob,
+            decisionId,
+          );
           setResult(attempt);
           if (attempt.passed) onProduced();
         } catch (e) {

@@ -88,7 +88,7 @@ async def _empirical_maps(user_id: str) -> tuple[dict, dict]:
     deriva las filas canónicas léxicas con `skill_state_sources`, para aplicar
     después las DOS granularidades de V3.67:
 
-    - `empirical_success_by_task` — por `task_signature` (la TAREA completa);
+    - `empirical_success_by_task` — por `task_key` (la DEFINICIÓN de la tarea);
     - `empirical_success_by_target` — por `target_id` (el ITEM; Nivel A).
 
     Es una lectura INDEPENDIENTE de la caché del estado (un read por construcción
@@ -179,9 +179,12 @@ def project_state(
 
     El camino del perfil (no es una decisión) deja ambas huellas vacías.
 
-    `empirical_success_by_task` (V3.67, P1-01) es el mapa `{task_signature:
+    `empirical_success_by_task` (V3.67 → V3.68, P1-01) es el mapa `{task_key:
     estimación empírica}` POR TAREA (la granularidad `P(éxito | alumno, tarea)`
-    con la FIRMA completa, que V3.66 aún colapsaba a `target_id`).
+    con la DEFINICIÓN: ítem, actividad, apoyo, carga servida y competencia
+    evaluada, **sin contexto**). V3.68 cierra así el P1-01 de V3.67: el nivel de
+    tarea deja de incluir la instancia, de modo que existe ANTES de elegirla y el
+    candidato del Planner (que la desconoce) casa con el ledger.
     `empirical_success_by_target` es el mapa `{target_id: estimación}` POR ITEM
     (Nivel A de la jerarquía). El camino del perfil los deja vacíos porque no es
     una decisión.

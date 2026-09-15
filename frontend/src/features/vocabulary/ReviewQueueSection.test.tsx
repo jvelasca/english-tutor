@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   getDrillRecallPrompt: vi.fn(),
   getDrillSentenceContext: vi.fn(),
   getDrillTransferContext: vi.fn(),
+  markDrillStarted: vi.fn(),
+  markDrillAbandoned: vi.fn(),
 }));
 
 vi.mock("../../api/learning", () => ({
@@ -26,6 +28,9 @@ vi.mock("../../api/vocabulary", () => ({
   getDrillRecallPrompt: mocks.getDrillRecallPrompt,
   getDrillSentenceContext: mocks.getDrillSentenceContext,
   getDrillTransferContext: mocks.getDrillTransferContext,
+  // V3.68 (P1-02): el ciclo de vida del provenance que dispara el drill.
+  markDrillStarted: mocks.markDrillStarted,
+  markDrillAbandoned: mocks.markDrillAbandoned,
   submitDrillRecognitionAttempt: vi.fn(),
   submitDrillRecallAttempt: vi.fn(),
   submitDrillSentenceAttempt: vi.fn(),
@@ -163,6 +168,9 @@ describe("ReviewQueueSection (V3.35)", () => {
             elapsed_days: 9,
             activity: "recall",
             reason: "no_recall_evidence",
+            // V3.68 (P1-02): el id determinista de la decisión servida viaja al
+            // drill y termina en los GET/POST del peldaño.
+            decision_id: "d-recall",
             competence: null,
             evidence: null,
           },
@@ -181,7 +189,12 @@ describe("ReviewQueueSection (V3.35)", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Review word" }),
     );
-    expect(mocks.getDrillRecallPrompt).toHaveBeenCalledWith("u1", "river");
+    expect(mocks.getDrillRecallPrompt).toHaveBeenCalledWith(
+      "u1",
+      "river",
+      undefined,
+      "d-recall",
+    );
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(await screen.findByText("río")).toBeTruthy();
   });
@@ -247,6 +260,7 @@ describe("ReviewQueueSection (V3.35)", () => {
             elapsed_days: 9,
             activity: "transfer",
             reason: "transfer_gap",
+            decision_id: "d-transfer",
             limiting_skill: "spontaneous_use",
             task: {
               skill: "spontaneous_use",
@@ -286,7 +300,11 @@ describe("ReviewQueueSection (V3.35)", () => {
     expect(screen.getByText("Use it in a new situation")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Review word" }));
 
-    expect(mocks.getDrillTransferContext).toHaveBeenCalledWith("u1", "river");
+    expect(mocks.getDrillTransferContext).toHaveBeenCalledWith(
+      "u1",
+      "river",
+      "d-transfer",
+    );
     expect(
       await screen.findByText(/Tell a short story about something/),
     ).toBeTruthy();

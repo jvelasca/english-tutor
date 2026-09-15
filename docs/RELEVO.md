@@ -5,6 +5,107 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-15 (UTC+2).
 >
+> **Nota (2026-09-15): V3.68.0 (Adaptive Engine Hardening & Integrity)**
+> — release **v3.68.0**, **SIN migración destructiva** (migración ADITIVA e
+> idempotente: dos columnas nuevas en `decision_records`), **SIN bump de
+> `GENERATOR_VERSION`, SIN tocar el banco, SIN capacidad pedagógica nueva y SIN
+> tocar el argmax del Planner**, que cierra los **TRES P1 de segunda generación**
+> de la auditoría de V3.67 más el **P2-08**. Es la **primera release de la serie
+> que toca el frontend por un motivo de MEDICIÓN y no de UI**.
+> **(A) Task Definition vs Task Instance (P1-01,
+> `services/observed_difficulty.py`).** `task_key_parts(target_id, activity,
+> support_level, served_difficulty, assessed_skill)` es la identidad de la
+> **DEFINICIÓN** (cinco componentes, **sin contexto**) — lo que el Planner puede
+> calcular **antes** de elegir instancia — y `task_instance_key_parts(...,
+> context)` la del caso concreto; `empirical_success_by_task(rows)` agrupa por
+> **`task_key`** y se añade `empirical_success_by_task_instance(rows)`;
+> `task_signature_parts`/`task_signature` se **eliminan** (rename, no alias).
+> **Cierre del P1-01:** hasta V3.67 la firma incluía el contexto mientras el
+> candidato del Planner lo construía vacío (`context=""`), así que una tarea de
+> transferencia del ledger **NUNCA** resolvía
+> `p_success_source = "task_empirical"`.
+> **(B) FSM real del ciclo de vida (P1-02,
+> `repositories/decision_records.py`).** Tabla **DECLARADA**
+> `_ALLOWED_TRANSITIONS`: `computed → served`; `served → served`/`started`/
+> `completed`/`abandoned`; `started → started`/`completed`/`abandoned`;
+> `completed → completed` **solo con `outcome` idéntico**; `abandoned →
+> abandoned`; todo lo demás (`computed → started/completed/abandoned`,
+> `completed → *`, `abandoned → *`) se **rechaza con contador**.
+> `served → completed` es válida **a propósito** (best-effort: sin declaración de
+> inicio no se pierde el outcome). `_transition()` pasa de `UPDATE` ciego a
+> **compare-and-set** racional (`decision_id + user_id + estados de origen
+> válidos`): `rowcount > 0` → `"ok"`; `0` → diagnóstico + contador.
+> `close_stale(user_id, *, before_iso)` barre `served`/`started` con
+> `COALESCE(served_at, created_at) < before_iso` a `abandoned` (nunca `computed`,
+> `completed` ni `abandoned`).
+> **(C) Integridad y propiedad (P1-03).** Guardas de `user_id` (propiedad) y
+> `target_id` con fallo **best-effort NO-OP silencioso + contador**: nunca rompe
+> la cola ni el drill y el rechazo se ve en `transition_health()`
+> (`missing`, `wrong_owner`, `target_mismatch`, `invalid_transition`,
+> `closed_decision`, `duplicate_outcome`). La **actividad NO es puerta**: se
+> **registra** como hecho (`executed_activity`) y se deriva `activity_match`,
+> porque el drill degrada peldaños legítimamente (recognition → recall →
+> sentence) y rechazarla perdería medición.
+> **(D) Re-servicio y `provenance_status` vivo.** Como el `decision_id` es
+> determinista, una decisión puede re-servirse: el upsert **REABRE** una fila
+> terminal **sin outcome medible** (`abandoned`, o `completed` con
+> `unclear`/`''`) a `computed` con `provenance_status = "reopened"`, mientras que
+> una fila con **medición real** (`ok`/`ko`) **NO se sobrescribe** (la medición
+> manda) y el nuevo servicio cuenta como `closed_decision`.
+> `build_decision_id` hashea `task_key` (definición) en vez de la firma de
+> instancia y `DECISION_POLICY_VERSION = "v3.68.0"`: **cambia el hash**, así que
+> los `decision_id` nuevos no coinciden con los de V3.67 (las filas de V3.67
+> quedan en `computed`, que es su estado real; **no se migran a la fuerza**).
+> **(E) Migración aditiva (`repositories/db.py`).** Dos columnas con defaults vía
+> `PRAGMA table_info`: `task_key TEXT NOT NULL DEFAULT ''` y
+> `executed_activity TEXT NOT NULL DEFAULT ''`.
+> **(F) Calibración honesta (P2-08, `calibration_report`).** Solo entran en las
+> bandas las filas **MEDIDAS** (`outcome ∈ {ok, ko}`): `unclear` y `abandoned`
+> quedan **fuera del denominador** y del `calibration_error`. Contadores
+> explícitos `completed_count`/`measured_count`/`unclear_count`/
+> `abandoned_count`; `list_decisions` expone `task_key`, `task_instance_key`,
+> `executed_activity`, `activity_match` y `outcome_measured`.
+> **(G) Barrido y salud (`domain/review.py`).** `DECISION_ABANDON_AFTER_HOURS =
+> 24` y `close_stale(...)` **una vez por construcción de cola**, best-effort (un
+> fallo nunca rompe la cola); `provenance_health()` devuelve
+> `{"record_failures", "transition_health"}`.
+> **(H) Endpoints (`routers/vocabulary.py` + esquemas).** Los helpers
+> `_mark_served`/`_mark_completed` llevan `user["id"]`, el `target_id` y la
+> `activity` servida; `drill_transfer_context` mueve su `mark_served`
+> **DESPUÉS** de resolver el contexto (declara `context_id`/`context_instance` de
+> la instancia realmente servida); `drill_write_attempt` declara `served` al
+> inicio (no tiene GET); nuevo `POST /api/vocabulary/drill/decision-lifecycle`
+> (`DecisionLifecycleIn {decision_id, event}`, `event ∈ {"started","abandoned"}`
+> validado por `Literal`). Todo best-effort.
+> **(I) Frontend, el eslabón que hace REAL el ciclo.** Hasta V3.67 el cliente
+> **NUNCA** devolvía `decision_id` (cero ocurrencias en `frontend/src`): en
+> producción el ciclo de vida era **código muerto** y la calibración daba
+> siempre `completed_count = 0`. `types/api.ts` gana `decision_id?`/`task_key?`/
+> `task_instance_key?` en `ReviewQueueItem`; **todas** las funciones del drill de
+> `api/vocabulary.ts` aceptan `decisionId?` y lo reenvían (query en los GET,
+> body/FormData en los POST); nuevas `markDrillStarted`/`markDrillAbandoned`;
+> `wordDrill.tsx` declara `started` **cuando el peldaño YA está cargado** (la FSM
+> rechaza `computed → started`: declararlo al montar competiría con el GET y el
+> evento se perdería por una carrera) y `abandoned` **al desmontar**;
+> `ReviewQueueSection.tsx` pasa `decisionId={active.decision_id}`. Sin
+> `decisionId` (drill abierto desde el diccionario) no se declara nada, y la
+> **terminalidad la decide la FSM del servidor**, no el cliente.
+> **Tests:** `backend/tests/test_decision_v368.py` (**29**, test-first) fija el
+> `task_key`/`task_instance_key` con la **regresión del P1-01** (una entrada de
+> tarea con `attempts = 2` y el candidato del Planner casando), la FSM completa
+> con rechazos contados e idempotencia, la propiedad y el target, el re-servicio,
+> el barrido, la calibración honesta y el round-trip del router; actualizados
+> `test_decision_v367.py`/`test_decision_v366.py` y los tests de frontend
+> (`vocabulary.test.ts`, `wordDrill.test.tsx`, `ReviewQueueSection.test.tsx`).
+> **Fuera de alcance (declarado):** Adaptive Instance Selection (el nivel de
+> instancia se **nombra, deriva y observa** pero **no puntúa** el argmax),
+> `decision → serving → attempt` en tablas separadas (se resuelve con la regla de
+> re-servicio y **un outcome por decisión**: el del PRIMER intento de la sesión),
+> snapshot único y calibración real (ML). **Roadmap declarado (diseño del motor
+> adaptativo CONGELADO):** V3.69 E2E completo → V3.70 auditoría pedagógica →
+> V3.71 runtime/offline/instalación → V3.72 UX/product completion → V3.73
+> auditoría final → V4.0 producto terminado. Ver `release-notes-v3.68.0.md`.
+>
 > **Nota (2026-09-15): V3.67.0 (Task Identity 2.0 + Decision Lifecycle +
 > Provenance Analytics)**
 > — release **v3.67.0**, **SIN migración destructiva** (migración ADITIVA e

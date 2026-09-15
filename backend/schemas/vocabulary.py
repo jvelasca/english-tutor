@@ -509,6 +509,40 @@ class SentenceContextOut(BaseModel):
     level: str
 
 
+class DecisionLifecycleIn(BaseModel):
+    """Evento del ciclo de vida de una decisión servida (V3.68, P1-02).
+
+    El `decision_id` de la cola viaja con cada ítem y el drill lo reenvía. Los
+    pasos que NO son un intento puntuado —el alumno ABRE el peldaño y lo ABANDONA
+    sin completarlo— se declaran por este canal, porque son los dos estados del
+    ciclo de vida que ningún POST de intento puede observar:
+
+    - `started`   — el peldaño quedó visible para el alumno (empezó el intento);
+    - `abandoned` — el alumno salió del peldaño sin completarlo.
+
+    Es best-effort: la decisión no existe, ya está cerrada o es de otro usuario y
+    el servidor NO rompe el drill (la FSM rechaza la transición y lo contabiliza).
+    """
+
+    decision_id: str = Field(default="", max_length=64)
+    event: Literal["started", "abandoned"]
+    target_id: str = Field(default="", max_length=120)
+    activity: str = Field(default="", max_length=32)
+
+
+class DecisionLifecycleOut(BaseModel):
+    """Acuse del evento del ciclo de vida (V3.68, P1-02).
+
+    `applied` dice si la FSM aceptó la transición (con lo que el estado cambió);
+    `False` es la respuesta normal de un evento que llegó tarde o de una decisión
+    ya cerrada, y NUNCA es un error para el cliente.
+    """
+
+    applied: bool = False
+    decision_id: str = ""
+    event: str = ""
+
+
 class SentenceAttemptOut(BaseModel):
     """Resultado del paso "Sentence" del micro-drill (V3.21/F6.1).
 

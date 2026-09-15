@@ -635,15 +635,17 @@ def _task_empirical_by_activity(
     task_target: str,
     task_difficulty: object,
 ) -> dict:
-    """Mapa `{activity: estimación empírica por tarea}` para el candidato (V3.67).
+    """Mapa `{activity: estimación empírica por tarea}` para el candidato (V3.68).
 
-    La estimación por TAREA se indexa por la FIRMA completa
-    (`observed_difficulty.task_signature`), no por el `target_id` (P1-01 de
-    V3.66). Aquí se resuelve, para CADA actividad posible del drill, la firma del
-    candidato con sus parámetros conocidos en la cola (ítem, apoyo declarado por
-    actividad, carga declarada y modalidad evaluada); el contexto se resuelve
-    vacío porque se elige en el GET del peldaño. Devuelve un dict (puede ser
-    vacío). Nunca lanza.
+    La estimación por TAREA se indexa por la DEFINICIÓN de la tarea
+    (`observed_difficulty.task_key`: ítem, actividad, apoyo, carga servida y
+    competencia evaluada), NO por el `target_id` (P1-01 de V3.66) ni por la
+    instancia. Aquí se resuelve, para CADA actividad posible del drill, la clave
+    del candidato con sus parámetros conocidos en la cola. La DEFINICIÓN no
+    incluye el contexto (que se elige en el GET del peldaño), así que esta
+    resolución **sí** casa con el ledger de las tareas contextuales (V3.68 cierra
+    la limitación que V3.67 declaraba). Devuelve un dict (puede ser vacío). Nunca
+    lanza.
     """
     if not isinstance(by_task, Mapping) or not by_task:
         return {}
@@ -651,30 +653,30 @@ def _task_empirical_by_activity(
     for activity in planner.ACTIVITY_FOR_SKILL.values():
         if not activity or activity in result:
             continue
-        signature = observed_difficulty.task_signature_parts(
+        key = observed_difficulty.task_key_parts(
             target_id=task_target,
             activity=activity,
             support_level=planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
             served_difficulty=task_difficulty,
-            context="",
             assessed_skill=task_semantics.assessed_skill_for(activity),
         )
-        estimate = by_task.get(signature)
+        estimate = by_task.get(key)
         if estimate is not None:
             result[activity] = estimate
     return result
 
 
-def _task_signature_for(
+def _task_key_for(
     task_target: str,
     task: dict,
     task_difficulty: object,
 ) -> str:
-    """Firma canónica de la tarea FINAL servida (V3.67, pura y determinista).
+    """Clave de TAREA (definición) de la tarea FINAL servida (V3.68, pura).
 
-    Es la MISMA firma que agrupa el ledger (`observed_difficulty.task_signature`),
-    de modo que el provenance de la decisión y la evidencia empírica hablen el
-    mismo idioma. El contexto se deja vacío (se elige en el GET del peldaño).
+    Es la MISMA clave que agrupa el ledger (`observed_difficulty.task_key`), de
+    modo que el provenance de la decisión y la evidencia empírica hablen el mismo
+    idioma. NO incluye el contexto: la definición es lo que el Planner conoce
+    antes de elegir la instancia.
     """
     activity = (task or {}).get("activity") or ""
     support = (task or {}).get("support_level") or planner.ACTIVITY_SUPPORT_LEVEL.get(
@@ -683,12 +685,11 @@ def _task_signature_for(
     assessed = task_semantics.assessed_skill_for(activity) or (task or {}).get(
         "skill"
     ) or ""
-    return observed_difficulty.task_signature_parts(
+    return observed_difficulty.task_key_parts(
         target_id=task_target,
         activity=activity,
         support_level=support,
         served_difficulty=task_difficulty,
-        context="",
         assessed_skill=assessed,
     )
 
@@ -866,6 +867,9 @@ def review_queue_item(
         task_empirical_success=task_empirical_success,
         target_empirical_success=target_empirical_success,
     )
+    # V3.68 (P1-01): la DEFINICIÓN de la tarea servida se calcula UNA vez, ya con
+    # la tarea elegida, y es la MISMA para el provenance y para la INSTANCIA.
+    task_key = _task_key_for(task_target, task, task_difficulty)
     learning_value = _learning_value(
         row,
         task,
@@ -924,10 +928,24 @@ def review_queue_item(
         # V3.51: vector completo de prioridad por modalidad (aditivo).
         "skill_priorities": planner.skill_priorities(signals),
         "task": task,
-        # V3.67 (P1-01/P2-04): identidad COMPLETA de la tarea servida y los
-        # hechos que el provenance registra (carga servida y canal observado).
-        # El `decision_id` lo calcula el llamador (necesita el `user_id`).
-        "task_signature": _task_signature_for(task_target, task, task_difficulty),
+        # V3.67 (P1-01) → V3.68 (P1-01): identidad COMPLETA de la tarea servida,
+        # separada en DEFINICIÓN e INSTANCIA.
+        #
+        # `task_key` es la DEFINICIÓN (ítem, actividad, apoyo, carga servida y
+        # competencia evaluada): la identidad que el Planner CONOCE antes de
+        # elegir instancia y la que gobierna el nivel `task_empirical`. NO incluye
+        # el contexto, y por eso la búsqueda empírica del candidato SÍ casa con el
+        # ledger (lo que V3.67 no conseguía en las tareas contextuales).
+        #
+        # `task_instance_key` es la INSTANCIA (definición + contexto). En la cola
+        # el contexto aún no existe (se elige en el GET del peldaño), así que sale
+        # con el contexto vacío; `mark_served` la completa con el contexto servido.
+        #
+        # Los hechos que el provenance registra (carga servida y canal observado)
+        # acompañan. El `decision_id` lo calcula el llamador (necesita el
+        # `user_id`).
+        "task_key": task_key,
+        "task_instance_key": observed_difficulty.task_instance_key_from(task_key),
         "served_load": dict(task_difficulty),
         "assessment_mode": task_semantics.assessment_mode_for(
             task.get("activity") or ""

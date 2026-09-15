@@ -158,6 +158,14 @@ def init_db() -> None:
             ("completed_at", "TEXT NOT NULL DEFAULT ''"),
             ("outcome", "TEXT NOT NULL DEFAULT ''"),
             ("provenance_status", "TEXT NOT NULL DEFAULT 'recorded'"),
+            # V3.68 (P1-01): la DEFINICIÓN de la tarea (identidad que el Planner
+            # conoce antes de elegir instancia) se separa de la INSTANCIA
+            # (`task_signature` = definición + contexto). `executed_activity`
+            # registra la actividad que el servidor EJECUTÓ (puede diferir de la
+            # decidida si el drill degradó de peldaño) para auditar al Planner sin
+            # rechazar medición.
+            ("task_key", "TEXT NOT NULL DEFAULT ''"),
+            ("executed_activity", "TEXT NOT NULL DEFAULT ''"),
         ):
             if _col not in decision_cols:
                 conn.execute(

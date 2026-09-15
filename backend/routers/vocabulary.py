@@ -12,6 +12,8 @@ from domain import learning as learning_service
 from domain import vocabulary as vocabulary_service
 from repositories import decision_records as decision_records_repo
 from schemas.vocabulary import (
+    DecisionLifecycleIn,
+    DecisionLifecycleOut,
     DictionaryEntryOut,
     DictionaryLookupRequest,
     DrillAttemptOut,
@@ -42,31 +44,100 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _mark_served(decision_id: str) -> None:
-    """Round-trip V3.67 (P1-02): marca la decisión como SERVIDA (best-effort).
+async def _mark_served(
+    user_id: str,
+    decision_id: str,
+    *,
+    target_id: str = "",
+    activity: str = "",
+    context_id: str = "",
+    context_instance: str = "",
+) -> None:
+    """Round-trip V3.67 → V3.68 (P1-02/P1-03): marca la decisión como SERVIDA.
 
-    El `decision_id` llega del ítem de la cola y el cliente lo devuelve en el
-    GET del peldaño. Un fallo de escritura nunca rompe el GET.
-    """
-    if not decision_id:
-        return
-    try:
-        await run_in_threadpool(decision_records_repo.mark_served, decision_id)
-    except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
-        logger.debug("mark_served falló para %s", decision_id, exc_info=True)
-
-
-async def _mark_completed(decision_id: str, outcome: str) -> None:
-    """Round-trip V3.67 (P1-02): cierra la decisión con el resultado (best-effort).
-
-    El `outcome` es el veredicto del intento (`ok`/`ko`/`unclear`), la pieza que
-    habilita la calibración "¿el Planner acertó?" del Bloque D.
+    El `decision_id` llega del ítem de la cola y el cliente lo devuelve en el GET
+    del peldaño. V3.68 exige además el `user_id` (propiedad de la fila) y el
+    `target_id` + la actividad EJECUTADA, y permite declarar la INSTANCIA servida
+    (`context_id`/`context_instance`) cuando el peldaño la conoce. Un fallo de
+    escritura nunca rompe el GET: la FSM rechaza y lo contabiliza.
     """
     if not decision_id:
         return
     try:
         await run_in_threadpool(
-            decision_records_repo.mark_completed, decision_id, outcome
+            decision_records_repo.mark_served,
+            user_id,
+            decision_id,
+            target_id=target_id,
+            activity=activity,
+            context_id=context_id,
+            context_instance=context_instance,
+        )
+    except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
+        logger.debug("mark_served falló para %s", decision_id, exc_info=True)
+
+
+async def _mark_started(
+    user_id: str, decision_id: str, *, target_id: str = "", activity: str = ""
+) -> None:
+    """Round-trip V3.68 (P1-02): marca la decisión como INICIADA (best-effort)."""
+    if not decision_id:
+        return
+    try:
+        await run_in_threadpool(
+            decision_records_repo.mark_started,
+            user_id,
+            decision_id,
+            target_id=target_id,
+            activity=activity,
+        )
+    except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
+        logger.debug("mark_started falló para %s", decision_id, exc_info=True)
+
+
+async def _mark_abandoned(
+    user_id: str, decision_id: str, *, target_id: str = "", activity: str = ""
+) -> None:
+    """Round-trip V3.68 (P1-02): marca la decisión como ABANDONADA (best-effort)."""
+    if not decision_id:
+        return
+    try:
+        await run_in_threadpool(
+            decision_records_repo.mark_abandoned,
+            user_id,
+            decision_id,
+            target_id=target_id,
+            activity=activity,
+        )
+    except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
+        logger.debug("mark_abandoned falló para %s", decision_id, exc_info=True)
+
+
+async def _mark_completed(
+    user_id: str,
+    decision_id: str,
+    outcome: str,
+    *,
+    target_id: str = "",
+    activity: str = "",
+) -> None:
+    """Round-trip V3.67 → V3.68 (P1-02/P1-03): cierra la decisión con el resultado.
+
+    El `outcome` es el veredicto del intento (`ok`/`ko`/`unclear`), la pieza que
+    habilita la calibración "¿el Planner acertó?" del Bloque D. V3.68 exige el
+    `user_id` (propiedad) y el `target_id` ejecutado, y solo `ok`/`ko` puntúan en
+    la calibración (`unclear` es incertidumbre de MEDICIÓN, no fallo de dominio).
+    """
+    if not decision_id:
+        return
+    try:
+        await run_in_threadpool(
+            decision_records_repo.mark_completed,
+            user_id,
+            decision_id,
+            outcome,
+            target_id=target_id,
+            activity=activity,
         )
     except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
         logger.debug("mark_completed falló para %s", decision_id, exc_info=True)
@@ -201,7 +272,9 @@ async def drill_sentence_context(
 ) -> dict:
     """Frase de contexto del paso Sentence del drill (V3.21/F6.1): determinista,
     sin LLM (banco de frases de pronunciación del nivel o plantilla simple)."""
-    await _mark_served(decision_id)
+    await _mark_served(
+        user["id"], decision_id, target_id=word, activity="sentence"
+    )
     return await vocabulary_service.get_sentence_context(user["id"], word)
 
 
@@ -252,7 +325,13 @@ async def drill_sentence_attempt(
         if asr_status != "ok"
         else ("ok" if result["passed"] else "ko")
     )
-    await _mark_completed(decision_id, outcome)
+    await _mark_completed(
+        user["id"],
+        decision_id,
+        outcome,
+        target_id=word,
+        activity="sentence",
+    )
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{word}:sentence:{outcome}"
     )
@@ -276,7 +355,17 @@ async def drill_write_attempt(
     evidencia `activity_id="drill:write"` — es lo que cierra el hueco
     `spoken ✓ / written ✗` que el motor de tarea óptima detecta. En fallo
     también se registra el intento clasificado. El paso no graba recuperación
-    ni FSRS y no declara dominio (D5/E3)."""
+    ni FSRS y no declara dominio (D5/E3).
+
+    V3.68 (P1-02): este es el ÚNICO peldaño sin GET propio (su consigna es la
+    propia palabra objetivo), así que el POST declara el `served` antes de
+    cerrar: la llegada del intento con `decision_id` es la prueba de que el
+    peldaño se sirvió. Sin esa declaración la FSM rechazaría
+    `computed → completed` y la medición se perdería. Es idempotente cuando el
+    peldaño ya venía `served`."""
+    await _mark_served(
+        user["id"], body.decision_id, target_id=body.word, activity="write"
+    )
     result = await vocabulary_service.submit_write_attempt(
         user["id"],
         body.word,
@@ -284,7 +373,9 @@ async def drill_write_attempt(
         response_time_ms=body.response_time_ms,
     )
     outcome = "ok" if result["passed"] else "ko"
-    await _mark_completed(body.decision_id, outcome)
+    await _mark_completed(
+        user["id"], body.decision_id, outcome, target_id=body.word, activity="write"
+    )
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{body.word}:write:{outcome}"
     )
@@ -314,8 +405,20 @@ async def drill_transfer_context(
         raise HTTPException(
             status_code=422, detail="La palabra buscada no es válida"
         )
-    await _mark_served(decision_id)
-    return await vocabulary_service.get_transfer_context(user["id"], normalized)
+    # V3.68 (P1-01/P1-02): la consigna se sirve ANTES de marcar el peldaño para
+    # poder declarar la INSTANCIA realmente servida (`context_id` y su slug, que
+    # es lo que completa la clave de instancia de la decisión). Marcar el peldaño
+    # nunca rompe el GET (best-effort).
+    context = await vocabulary_service.get_transfer_context(user["id"], normalized)
+    await _mark_served(
+        user["id"],
+        decision_id,
+        target_id=normalized,
+        activity="transfer",
+        context_id=str(context.get("context_id") or ""),
+        context_instance=str(context.get("context_instance") or ""),
+    )
+    return context
 
 
 @router.post(
@@ -348,7 +451,13 @@ async def drill_transfer_attempt(
         context_instance=body.context_instance,
     )
     outcome = "ok" if result["passed"] else "ko"
-    await _mark_completed(body.decision_id, outcome)
+    await _mark_completed(
+        user["id"],
+        body.decision_id,
+        outcome,
+        target_id=body.word,
+        activity="transfer",
+    )
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{body.word}:transfer:{outcome}"
     )
@@ -374,7 +483,9 @@ async def drill_recognition_question(
     `available=false` con `options=[]` (degradación controlada, sin evento). La
     respuesta NUNCA incluye la opción correcta: el POST es quien puntúa."""
     try:
-        await _mark_served(decision_id)
+        await _mark_served(
+            user["id"], decision_id, target_id=word, activity="recognition"
+        )
         return await vocabulary_service.get_recognition_question(
             user["id"], word
         )
@@ -415,7 +526,13 @@ async def drill_recognition_attempt(
             detail="La palabra ya no tiene pregunta de reconocimiento",
         ) from None
     outcome = "ok" if result["correct"] else "ko"
-    await _mark_completed(body.decision_id, outcome)
+    await _mark_completed(
+        user["id"],
+        body.decision_id,
+        outcome,
+        target_id=str(result["word"]),
+        activity="recognition",
+    )
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{result['word']}:recognition:{outcome}"
     )
@@ -443,7 +560,9 @@ async def drill_recall_prompt(
     defecto de V3.34 (traducción y, si no, definición). Un `cue` no soportado
     responde 422 sin evento."""
     try:
-        await _mark_served(decision_id)
+        await _mark_served(
+            user["id"], decision_id, target_id=word, activity="recall"
+        )
         return await vocabulary_service.get_recall_prompt(
             user["id"], word, cue or None
         )
@@ -492,8 +611,62 @@ async def drill_recall_attempt(
             detail="La palabra ya no tiene pregunta de recall",
         ) from None
     outcome = "ok" if result["correct"] else "ko"
-    await _mark_completed(body.decision_id, outcome)
+    await _mark_completed(
+        user["id"],
+        body.decision_id,
+        outcome,
+        target_id=str(result["word"]),
+        activity="recall",
+    )
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{result['word']}:recall:{outcome}"
     )
     return result
+
+
+@router.post(
+    "/api/vocabulary/drill/decision-lifecycle",
+    response_model=DecisionLifecycleOut,
+)
+async def drill_decision_lifecycle(
+    body: DecisionLifecycleIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Evento del ciclo de vida de una decisión servida (V3.68, P1-02).
+
+    Cierra los dos estados que NINGÚN POST de intento puede observar:
+
+    - `started`   — el alumno abrió el peldaño (el intento empezó de verdad);
+    - `abandoned` — el alumno salió sin completarlo.
+
+    La FSM del provenance decide si la transición es válida: si llega tarde (la
+    decisión ya está `completed`), si es de otro usuario o si el `target_id` no
+    cuadra, la rechaza y lo CONTABILIZA, pero responde `applied=false` sin error.
+    El drill nunca puede romperse por esto: es telemetría del ciclo de vida.
+
+    `applied` es el acuse honesto: `True` solo si el estado cambió de verdad.
+    """
+    if not body.decision_id:
+        return {"applied": False, "decision_id": "", "event": body.event}
+    applied = False
+    if body.event == "started":
+        applied = await run_in_threadpool(
+            decision_records_repo.mark_started,
+            user["id"],
+            body.decision_id,
+            target_id=body.target_id,
+            activity=body.activity,
+        )
+    else:
+        applied = await run_in_threadpool(
+            decision_records_repo.mark_abandoned,
+            user["id"],
+            body.decision_id,
+            target_id=body.target_id,
+            activity=body.activity,
+        )
+    return {
+        "applied": bool(applied),
+        "decision_id": body.decision_id,
+        "event": body.event,
+    }

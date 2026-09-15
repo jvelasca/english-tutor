@@ -438,7 +438,10 @@ def test_record_decision_persists_a_row(monkeypatch, tmp_path):
     row = decision_records_repo.record_decision(
         uid,
         target_id="apple",
-        task_signature="apple|recall|cued|lexical:3||recall",
+        # V3.68 (P1-01): DEFINICIÓN (5 componentes, sin contexto) e INSTANCIA
+        # (definición + contexto).
+        task_key="apple|recall|cued|lexical:3|recall",
+        task_signature="apple|recall|cued|lexical:3|recall|",
         served_load={"lexical": 3},
         support_level="cued",
         assessment_mode="written",
@@ -456,12 +459,15 @@ def test_record_decision_persists_a_row(monkeypatch, tmp_path):
     assert row is not None
     assert row["policy_version"] == decision_records_repo.DECISION_POLICY_VERSION
     assert row["target_id"] == "apple"
-    assert row["task_signature"] == "apple|recall|cued|lexical:3||recall"
-    # V3.67 (P1-02): `decision_id` es determinista (hash estable de la identidad).
+    assert row["task_key"] == "apple|recall|cued|lexical:3|recall"
+    # V3.68 (P1-01): la INSTANCIA es la DEFINICIÓN + el contexto declarado.
+    assert row["task_instance_key"] == "apple|recall|cued|lexical:3|recall|"
+    # V3.67 (P1-02) → V3.68 (P1-01): `decision_id` es determinista y hashea la
+    # DEFINICIÓN de la tarea (el contexto se elige en el GET del peldaño).
     assert row["decision_id"] == decision_records_repo.build_decision_id(
         uid,
         target_id="apple",
-        task_signature="apple|recall|cued|lexical:3||recall",
+        task_key="apple|recall|cued|lexical:3|recall",
         decision_start_fingerprint="F1",
     )
 

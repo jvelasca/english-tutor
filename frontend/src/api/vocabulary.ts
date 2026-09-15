@@ -88,15 +88,19 @@ export async function submitDrillAttempt(
 
 /** Contexto del paso Sentence del micro-drill (V3.21/F6.1): frase determinista
  * que contiene la palabra objetivo. El servidor la deriva del banco oficial de
- * read-aloud del nivel (o plantilla simple). */
+ * read-aloud del nivel (o plantilla simple).
+ *
+ * V3.68 (P1-02): `decisionId` declara el servicio del peldaño en el servidor
+ * (marca `served` y registra la actividad EJECUTADA). Sin él la petición es
+ * idéntica a V3.67. */
 export function getDrillSentenceContext(
   userId: string,
   word: string,
+  decisionId?: string,
 ): Promise<DrillSentenceContext> {
-  const query = new URLSearchParams({
-    user_id: userId,
-    word,
-  }).toString();
+  const params: Record<string, string> = { user_id: userId, word };
+  if (decisionId) params.decision_id = decisionId;
+  const query = new URLSearchParams(params).toString();
   return getJson<DrillSentenceContext>(
     `/api/vocabulary/drill/sentence-context?${query}`,
   );
@@ -104,15 +108,19 @@ export function getDrillSentenceContext(
 
 /** Intento del paso Sentence del drill (V3.21/F6.1): sube el audio de la frase.
  * Acredita la palabra solo si quedó alineada dentro de una frase superada
- * (`passed`). */
+ * (`passed`).
+ *
+ * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export async function submitDrillSentenceAttempt(
   userId: string,
   word: string,
   audio: Blob,
+  decisionId?: string,
 ): Promise<DrillSentenceAttempt> {
   const form = new FormData();
   form.append("file", audio, "audio.webm");
   form.append("word", word);
+  if (decisionId) form.append("decision_id", decisionId);
 
   const query = new URLSearchParams({ user_id: userId }).toString();
   const res = await fetch(`/api/vocabulary/drill/sentence-attempt?${query}`, {
@@ -133,15 +141,17 @@ export async function submitDrillSentenceAttempt(
  * la degradación controlada cuando la palabra aún no tiene significado cacheado
  * o no hay distractores: el peldaño muestra aviso y no rompe la escalera.
  * V3.33.1: `question_id` es un nonce por intento que hay que reenviar en el POST
- * (rebaraja la posición de la correcta; no es la respuesta). */
+ * (rebaraja la posición de la correcta; no es la respuesta).
+ *
+ * V3.68 (P1-02): `decisionId` declara el servicio del peldaño. */
 export function getDrillRecognitionQuestion(
   userId: string,
   word: string,
+  decisionId?: string,
 ): Promise<DrillRecognitionQuestion> {
-  const query = new URLSearchParams({
-    user_id: userId,
-    word,
-  }).toString();
+  const params: Record<string, string> = { user_id: userId, word };
+  if (decisionId) params.decision_id = decisionId;
+  const query = new URLSearchParams(params).toString();
   return getJson<DrillRecognitionQuestion>(
     `/api/vocabulary/drill/recognition?${query}`,
   );
@@ -151,17 +161,25 @@ export function getDrillRecognitionQuestion(
  * el servidor puntúa recomponiendo la pregunta (nunca se declara acierto en el
  * cliente). V3.33.1: reenvía el `questionId` servido por el GET para reconstruir
  * la misma permutación. Evidencia SOLO informativa: el acierto NO dispara
- * `onProduced`. */
+ * `onProduced`.
+ *
+ * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillRecognitionAttempt(
   userId: string,
   word: string,
   selectedIndex: number,
   questionId: string,
+  decisionId?: string,
 ): Promise<DrillRecognitionAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecognitionAttempt>(
     `/api/vocabulary/drill/recognition-attempt?${query}`,
-    { word, selected_index: selectedIndex, question_id: questionId },
+    {
+      word,
+      selected_index: selectedIndex,
+      question_id: questionId,
+      decision_id: decisionId ?? "",
+    },
   );
 }
 
@@ -173,14 +191,18 @@ export function submitDrillRecognitionAttempt(
  * `available=false` con `cue=""` es la degradación controlada (palabra sin
  * entrada, cue circular o peldaño sin contenido): el peldaño muestra aviso y no
  * rompe Sentence. `cue` pide un peldaño concreto (`translation`/`definition`/
- * `cloze`); sin él el servidor conserva la escalera por defecto de V3.34. */
+ * `cloze`); sin él el servidor conserva la escalera por defecto de V3.34.
+ *
+ * V3.68 (P1-02): `decisionId` declara el servicio del peldaño. */
 export function getDrillRecallPrompt(
   userId: string,
   word: string,
   cue?: string,
+  decisionId?: string,
 ): Promise<DrillRecallPrompt> {
   const params: Record<string, string> = { user_id: userId, word };
   if (cue) params.cue = cue;
+  if (decisionId) params.decision_id = decisionId;
   const query = new URLSearchParams(params).toString();
   return getJson<DrillRecallPrompt>(`/api/vocabulary/drill/recall?${query}`);
 }
@@ -190,18 +212,27 @@ export function getDrillRecallPrompt(
  * Un acierto deja señal léxica propia (recall + FSRS) pero NUNCA acredita
  * producción: no dispara `onProduced`.
  * V3.37: `cue` declara el peldaño que el cliente dice que le sirvieron
- * (premisa 21); el servidor lo re-deriva y puntúa igual. */
+ * (premisa 21); el servidor lo re-deriva y puntúa igual.
+ *
+ * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillRecallAttempt(
   userId: string,
   word: string,
   answer: string,
   responseTimeMs?: number,
   cue?: string,
+  decisionId?: string,
 ): Promise<DrillRecallAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecallAttempt>(
     `/api/vocabulary/drill/recall-attempt?${query}`,
-    { word, answer, cue: cue ?? "", response_time_ms: responseTimeMs ?? null },
+    {
+      word,
+      answer,
+      cue: cue ?? "",
+      response_time_ms: responseTimeMs ?? null,
+      decision_id: decisionId ?? "",
+    },
   );
 }
 
@@ -210,29 +241,45 @@ export function submitDrillRecallAttempt(
  * determinista (unidad alineada + longitud mínima, premisa 21). Un acierto
  * acredita la modalidad `written_production` (cierra el hueco `spoken ✓ /
  * written ✗` del motor de tarea óptima) y dispara `onProduced`; el fallo se
- * registra clasificado y nunca acredita. */
+ * registra clasificado y nunca acredita.
+ *
+ * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillWriteAttempt(
   userId: string,
   word: string,
   text: string,
   responseTimeMs?: number,
+  decisionId?: string,
 ): Promise<DrillWriteAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillWriteAttempt>(
     `/api/vocabulary/drill/write-attempt?${query}`,
-    { word, text, response_time_ms: responseTimeMs ?? null },
+    {
+      word,
+      text,
+      response_time_ms: responseTimeMs ?? null,
+      decision_id: decisionId ?? "",
+    },
   );
 }
 
 /** Consigna del paso Transfer del drill (V3.40, Fase 4): contexto NUEVO en el
  * que usar la unidad, elegido por el servidor entre los que el ítem aún no ha
  * usado. Solo lectura: no escribe evidencia. La consigna nunca da la forma
- * esperada (eso sería `sentence`), solo el escenario. */
+ * esperada (eso sería `sentence`), solo el escenario.
+ *
+ * V3.68 (P1-01/P1-02): `decisionId` declara el servicio del peldaño. El servidor
+ * marca `served` DESPUÉS de resolver el contexto, para poder declarar la
+ * INSTANCIA realmente servida (`context_id`/`context_instance`) y completar así
+ * la clave de instancia de la decisión. */
 export function getDrillTransferContext(
   userId: string,
   word: string,
+  decisionId?: string,
 ): Promise<DrillTransferContext> {
-  const query = new URLSearchParams({ user_id: userId, word }).toString();
+  const params: Record<string, string> = { user_id: userId, word };
+  if (decisionId) params.decision_id = decisionId;
+  const query = new URLSearchParams(params).toString();
   return getJson<DrillTransferContext>(
     `/api/vocabulary/drill/transfer-context?${query}`,
   );
@@ -242,7 +289,9 @@ export function getDrillTransferContext(
  * contexto servido. El servidor la puntúa (unidad alineada + longitud mínima) y
  * registra la evidencia como `spontaneous_use` con el `context_id` del contexto
  * nuevo: el éxito en >= 2 contextos distintos demuestra transferencia real. Un
- * acierto dispara `onProduced`; el fallo se registra clasificado. */
+ * acierto dispara `onProduced`; el fallo se registra clasificado.
+ *
+ * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillTransferAttempt(
   userId: string,
   word: string,
@@ -254,6 +303,7 @@ export function submitDrillTransferAttempt(
   // persiste la dificultad de ESA superficie y no la de la siguiente rotación.
   // Opcional: sin él el servidor degrada a la rotación de V3.60.
   contextInstance?: string,
+  decisionId?: string,
 ): Promise<DrillTransferAttempt> {
   const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillTransferAttempt>(
@@ -264,6 +314,61 @@ export function submitDrillTransferAttempt(
       context_id: contextId,
       context_instance: contextInstance ?? "",
       response_time_ms: responseTimeMs ?? null,
+      decision_id: decisionId ?? "",
     },
   );
+}
+
+/** Evento del ciclo de vida de una decisión servida (V3.68, P1-02).
+ *
+ * Cubre los DOS estados que ningún POST de intento puede observar: el alumno
+ * ABRE el peldaño (`started`) y lo ABANDONA sin completarlo (`abandoned`). La
+ * FSM del servidor decide si la transición es válida: `applied=false` es la
+ * respuesta normal de un evento que llega tarde (la decisión ya está
+ * `completed`) y NUNCA es un error — el drill no puede romperse por telemetría
+ * del ciclo de vida. */
+export async function markDrillDecisionEvent(
+  userId: string,
+  decisionId: string,
+  event: "started" | "abandoned",
+  options: { targetId?: string; activity?: string } = {},
+): Promise<boolean> {
+  if (!decisionId) return false;
+  const query = new URLSearchParams({ user_id: userId }).toString();
+  try {
+    const out = await postJson<{ applied?: boolean }>(
+      `/api/vocabulary/drill/decision-lifecycle?${query}`,
+      {
+        decision_id: decisionId,
+        event,
+        target_id: options.targetId ?? "",
+        activity: options.activity ?? "",
+      },
+    );
+    return Boolean(out?.applied);
+  } catch {
+    // Best-effort declarado: un fallo de red no rompe el drill.
+    return false;
+  }
+}
+
+/** El alumno abrió el peldaño (V3.68, P1-02): `served → started`. */
+export function markDrillStarted(
+  userId: string,
+  decisionId: string,
+  options: { targetId?: string; activity?: string } = {},
+): Promise<boolean> {
+  return markDrillDecisionEvent(userId, decisionId, "started", options);
+}
+
+/** El alumno salió del peldaño sin completarlo (V3.68, P1-02):
+ * `served|started → abandoned`. El servidor RECHAZA el abandono si la decisión
+ * ya está `completed` (la terminalidad la decide la FSM, no el cliente), de modo
+ * que un cierre tardío nunca borra una medición. */
+export function markDrillAbandoned(
+  userId: string,
+  decisionId: string,
+  options: { targetId?: string; activity?: string } = {},
+): Promise<boolean> {
+  return markDrillDecisionEvent(userId, decisionId, "abandoned", options);
 }

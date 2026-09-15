@@ -85,11 +85,17 @@ class ReviewQueueItem(BaseModel):
     # está presente cuando la cola se construye CON proyección (el camino sin
     # ella queda BYTE-IDÉNTICO a V3.63 y este campo se omite).
     decision: dict | None = None
-    # V3.67 (P1-01/P2-04): identidad COMPLETA de la tarea servida (firma
-    # canónica), la carga servida (vector de dificultad) y el canal observado
+    # V3.67 (P1-01) → V3.68 (P1-01): identidad de la tarea servida, separada en
+    # DEFINICIÓN (`task_key`: ítem, actividad, apoyo, carga servida y competencia
+    # evaluada, SIN contexto) e INSTANCIA (`task_instance_key`: definición +
+    # contexto). La definición es lo que el Planner conoce antes de elegir la
+    # instancia y la que gobierna `P(éxito | alumno, tarea)`; la instancia sale
+    # con el contexto vacío en la cola y la completa el GET del peldaño. Además,
+    # la carga servida (vector de dificultad) y el canal observado
     # (`assessment_mode`). Aditivos: alimentan el provenance y el cliente los
     # ignora si no los usa.
-    task_signature: str = ""
+    task_key: str = ""
+    task_instance_key: str = ""
     served_load: dict | None = None
     assessment_mode: str = ""
     # V3.67 (P1-02): id DETERMINISTA de la decisión servida (hash de la

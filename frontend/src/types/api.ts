@@ -1057,6 +1057,18 @@ export interface ReviewQueueItem {
   // skill}`) derivado de la Decision Projection. Ausente en el camino sin
   // proyección (idéntico a V3.63).
   decision?: ReviewDecision | null;
+  // V3.67 (P1-01) → V3.68 (P1-01): identidad de la tarea servida, separada en
+  // DEFINICIÓN (`task_key`: ítem, actividad, apoyo, carga servida y competencia
+  // evaluada, SIN contexto) e INSTANCIA (`task_instance_key`: definición +
+  // contexto). Aditivos.
+  task_key?: string;
+  task_instance_key?: string;
+  // V3.67 (P1-02): id DETERMINISTA de la decisión servida. El cliente lo guarda
+  // y lo devuelve en TODOS los GET/POST del drill (V3.68 lo hace real: sin este
+  // round-trip el ciclo de vida del provenance nunca se ejecutaba) para que el
+  // servidor recorra `computed → served → started → completed/abandoned`.
+  // Vacío cuando el ítem no trae bloque `decision` (camino sin proyección).
+  decision_id?: string;
   competence?: LexicalCompetence | null;
   // V3.40 (Fase 4): gobierno por unidad léxica. `unit_surfaces` son las formas
   // hermanas (go/went/gone/going) y `transfer`/`success_contexts` la

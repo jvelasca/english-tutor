@@ -51,9 +51,9 @@ LOAD_MAX = 5
 # histórico sin inventar una tendencia.
 RECENT_ATTEMPTS = 5
 
-# Separador canónico de la firma de tarea (`task_signature`): detalle de FORMATO,
-# no de identidad. Nunca se expone como contrato.
-_TASK_SIGNATURE_SEPARATOR = "|"
+# Separador canónico de las claves de tarea (`task_key` / `task_instance_key`):
+# detalle de FORMATO, no de identidad. Nunca se expone como contrato.
+_TASK_KEY_SEPARATOR = "|"
 
 # Tabla DECLARADA y MONÓTONA: pasos que la latencia observada suma a la carga
 # servida. Se reutilizan las constantes declaradas del planner (no se inventan
@@ -283,23 +283,29 @@ def empirical_success(rows: Sequence[Mapping], *, now: str = "") -> dict[str, di
     return result
 
 
-def task_signature_parts(
+def task_key_parts(
     target_id: object,
     activity: object,
     support_level: object,
     served_difficulty: object,
-    context: object = "",
     assessed_skill: object = "",
 ) -> str:
-    """Firma canónica de TAREA (V3.67, pura): identidad completa de la tarea.
+    """Clave canónica de TAREA (V3.68, pura): identidad de la DEFINICIÓN.
 
-    Cierra el P1-01 de la auditoría de V3.66: `target_id` no es una identidad de
-    tarea completa (el MISMO ítem con distinta actividad, apoyo o carga servida es
-    OTRA tarea). La firma combina los SEIS componentes que distinguen una tarea de
-    otra:
+    Cierra el P1-01 de la auditoría de V3.67. La distinción declarada es:
 
-        (target_id, activity, support_level, served_difficulty, context,
-         assessed_skill)
+        TASK DEFINITION  →  (target_id, activity, support_level,
+                             served_difficulty, assessed_skill)
+        TASK INSTANCE    →  definición + contexto
+
+    La DEFINICIÓN es lo que el Planner CONOCE antes de servir la tarea (el ítem,
+    la actividad, el apoyo declarado por la actividad, la carga declarada y la
+    competencia evaluada): por eso **NO incluye el contexto**, que se elige en el
+    GET del peldaño. La INSTANCIA (`task_instance_key_parts`) sí lo incluye.
+
+    Con esta separación `P(éxito | alumno, tarea)` existe ANTES de elegir la
+    instancia y la firma del candidato (contexto desconocido) puede CASAR con la
+    del ledger, que en V3.67 no casaba para las tareas de transferencia.
 
     Cada componente se normaliza (`""` cuando falta o no se declara): la clave es
     estable, determinista byte a byte y nunca lanza. `served_difficulty` se
@@ -309,36 +315,99 @@ def task_signature_parts(
     act = str(activity or "").strip().lower()
     support = str(support_level or "").strip().lower()
     served = difficulty.format_vector(served_difficulty)
-    ctx = str(context or "").strip()
     assessed = str(assessed_skill or "").strip().lower()
-    return _TASK_SIGNATURE_SEPARATOR.join(
-        (target, act, support, served, ctx, assessed)
+    return _TASK_KEY_SEPARATOR.join((target, act, support, served, assessed))
+
+
+def task_instance_key_parts(
+    target_id: object,
+    activity: object,
+    support_level: object,
+    served_difficulty: object,
+    context: object = "",
+    assessed_skill: object = "",
+) -> str:
+    """Clave canónica de INSTANCIA de tarea (V3.68, pura).
+
+    Es la DEFINICIÓN (`task_key_parts`) más el SEXTO componente, el CONTEXTO
+    declarado por la fila (`context_instance` de transferencia, o su familia
+    `context_id`). Dos superficies de la MISMA definición son instancias
+    distintas y se observan por separado; la definición las agrupa.
+    """
+    return task_instance_key_from(
+        task_key_parts(
+            target_id=target_id,
+            activity=activity,
+            support_level=support_level,
+            served_difficulty=served_difficulty,
+            assessed_skill=assessed_skill,
+        ),
+        context,
     )
 
 
-def task_signature(row: Mapping) -> str:
-    """Firma canónica de una FILA del estado (V3.67, pura).
+def task_instance_key_from(task_key: object, context: object = "") -> str:
+    """Clave de INSTANCIA a partir de una DEFINICIÓN ya calculada (V3.68, pura).
+
+    `task_key + separador + contexto`. Es la operación que el repositorio de
+    provenance necesita cuando ya tiene la definición persistida (la que conoció
+    el Planner) y solo le falta el contexto que declara el peldaño servido. Pura,
+    determinista y nunca lanza.
+    """
+    return _TASK_KEY_SEPARATOR.join(
+        (str(task_key or ""), str(context or "").strip())
+    )
+
+
+def _row_task_parts(row: Mapping) -> tuple[dict, str]:
+    """Componentes comunes de la clave de una FILA del estado (V3.68, pura).
 
     Lee los hechos YA proyectados por `skill_state._lexicon_rows`
-    (`facts.activity`, `facts.support_level`, `facts.served_load` y
-    `facts.context_instance`/`facts.context_id`) y la modalidad evaluada.
-    La skill evaluada se deriva de la ACTIVIDAD (`task_semantics.assessed_skill_for`),
-    NO del `modality` canónico del estado (que habla otro vocabulario:
-    `vocabulary`/`writing`/`speaking`): así la firma del ledger y la del candidato
-    (`services.lexicon`) usan el MISMO idioma y la búsqueda empírica por firma
-    puede CASAR. Nunca lanza; una fila no-Mapping devuelve `""`.
+    (`facts.activity`, `facts.support_level` y `facts.served_load`) y deriva la
+    skill evaluada de la ACTIVIDAD (`task_semantics.assessed_skill_for`), NO del
+    `modality` canónico del estado (que habla otro vocabulario:
+    `vocabulary`/`writing`/`speaking`): así la clave del ledger y la del candidato
+    (`services.lexicon`) usan el MISMO idioma y la búsqueda empírica puede CASAR.
+
+    Devuelve `(componentes, contexto)`. Nunca lanza.
+    """
+    facts = _facts(row)
+    return (
+        {
+            "target_id": row.get("target_id"),
+            "activity": facts.get("activity"),
+            "support_level": facts.get("support_level"),
+            "served_difficulty": facts.get("served_load"),
+            "assessed_skill": task_semantics.assessed_skill_for(
+                facts.get("activity")
+            ),
+        },
+        str(
+            facts.get("context_instance") or facts.get("context_id") or ""
+        ).strip(),
+    )
+
+
+def task_key(row: Mapping) -> str:
+    """Clave de TAREA (definición) de una FILA del estado (V3.68, pura).
+
+    Nunca lanza; una fila no-Mapping devuelve `""`.
     """
     if not isinstance(row, Mapping):
         return ""
-    facts = _facts(row)
-    return task_signature_parts(
-        target_id=row.get("target_id"),
-        activity=facts.get("activity"),
-        support_level=facts.get("support_level"),
-        served_difficulty=facts.get("served_load"),
-        context=facts.get("context_instance") or facts.get("context_id"),
-        assessed_skill=task_semantics.assessed_skill_for(facts.get("activity")),
-    )
+    parts, _context = _row_task_parts(row)
+    return task_key_parts(**parts)
+
+
+def task_instance_key(row: Mapping) -> str:
+    """Clave de INSTANCIA (definición + contexto) de una FILA (V3.68, pura).
+
+    Nunca lanza; una fila no-Mapping devuelve `""`.
+    """
+    if not isinstance(row, Mapping):
+        return ""
+    parts, context = _row_task_parts(row)
+    return task_instance_key_parts(**parts, context=context)
 
 
 def _empirical_entry(rows: Sequence[Mapping]) -> dict | None:
@@ -420,28 +489,20 @@ def empirical_success_by_target(
     return result
 
 
-def empirical_success_by_task(
-    rows: Sequence[Mapping], *, now: str = ""
-) -> dict[str, dict]:
-    """Estimación EMPÍRICA por TAREA (`task_signature`) (V3.67, P1-01).
+def _empirical_by_key(rows: Sequence[Mapping], key_of) -> dict[str, dict]:
+    """Agrupa intentos por CLAVE derivada y aplica la puerta espaciada (pura).
 
-    La granularidad que V3.66 buscaba y no alcanzó: agrupa por la FIRMA canónica de
-    tarea (`task_signature`), de modo que el MISMO `target_id` con distinta
-    actividad, apoyo o carga servida produce una estimación DISTINTA. Es el Nivel
-    `task_empirical` de la jerarquía de resolución `task → target → skill →
-    margin`. Reutiliza la MISMA puerta espaciada de V3.54; sin muestra espaciada la
-    firma NO aparece. Una fila sin identidad de tarea (firma vacía) no aporta
-    clave.
+    `key_of` deriva UNA clave por fila. Sin muestra espaciada la clave NO
+    aparece; una clave vacía (sin identidad) no aporta.
 
-    Sin reloj: `now` se acepta por contrato pero no se usa. Pura y determinista,
-    byte a byte; nunca lanza.
+    Sin reloj, sin aleatoriedad y sin I/O: determinista byte a byte; nunca lanza.
     """
     grouped: dict[str, list[dict]] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        key = task_signature(row)
-        if not key.strip(_TASK_SIGNATURE_SEPARATOR):
+        key = key_of(row)
+        if not str(key or "").strip(_TASK_KEY_SEPARATOR):
             continue
         grouped.setdefault(key, []).append(dict(row))
     result: dict[str, dict] = {}
@@ -450,3 +511,41 @@ def empirical_success_by_task(
         if entry is not None:
             result[key] = entry
     return result
+
+
+def empirical_success_by_task(
+    rows: Sequence[Mapping], *, now: str = ""
+) -> dict[str, dict]:
+    """Estimación EMPÍRICA por TAREA (`task_key`) (V3.67 → V3.68, P1-01).
+
+    Agrupa por la DEFINICIÓN de la tarea (`task_key`: `target_id`, actividad,
+    apoyo, carga servida y skill evaluada), de modo que el MISMO `target_id` con
+    distinta actividad, apoyo o carga servida produce una estimación DISTINTA. Es
+    el Nivel `task_empirical` de la jerarquía `task → target → skill → margin`.
+
+    V3.68 (P1-01): la agrupación deja de incluir el CONTEXTO. En V3.67 la firma
+    tenía seis componentes y el candidato del Planner la construía con el contexto
+    vacío (el contexto se elige en el GET del peldaño), así que las tareas
+    contextuales NUNCA casaban. Ahora la DEFINICIÓN no tiene contexto y el
+    candidato **sí** casa; la INSTANCIA se observa aparte
+    (`empirical_success_by_task_instance`).
+
+    Reutiliza la MISMA puerta espaciada de V3.54; sin muestra espaciada la clave
+    NO aparece. Sin reloj: `now` se acepta por contrato pero no se usa. Pura y
+    determinista, byte a byte; nunca lanza.
+    """
+    return _empirical_by_key(rows, task_key)
+
+
+def empirical_success_by_task_instance(
+    rows: Sequence[Mapping], *, now: str = ""
+) -> dict[str, dict]:
+    """Estimación EMPÍRICA por INSTANCIA de tarea (V3.68, pura).
+
+    Misma lectura que `empirical_success_by_task`, pero agrupando por
+    `task_instance_key` (definición **+ contexto**): es la granularidad
+    `P(éxito | alumno, instancia)` que la identidad anterior confundía con la
+    tarea. Misma puerta espaciada de V3.54, mismo payload de `_empirical_entry`.
+    Pura, determinista y nunca lanza.
+    """
+    return _empirical_by_key(rows, task_instance_key)

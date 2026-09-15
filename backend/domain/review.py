@@ -19,7 +19,8 @@ scheduler aporta la urgencia (`due_queue`: menor retrievability primero).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 
 from starlette.concurrency import run_in_threadpool
 
@@ -33,6 +34,8 @@ from repositories import vocabulary as vocabulary_repo
 from services import fsrs, lexicon, recall
 from services.evidence import empty_summary as empty_evidence
 from services.example_sentences import example_for_many
+
+logger = logging.getLogger(__name__)
 
 # Tope de ítems por defecto/ máximo de la cola de repaso (límite de PRESENTACIÓN).
 REVIEW_QUEUE_DEFAULT_LIMIT = 20
@@ -53,15 +56,59 @@ REVIEW_QUEUE_CANDIDATE_LIMIT = 500
 # expone en el informe de analítica del Bloque D) sin persistir nada.
 _PROVENANCE_RECORD_FAILURES = 0
 
+# V3.68 (P1-02): antigüedad a partir de la cual una decisión SERVIDA y nunca
+# completada ni abandonada se cierra como `abandoned` por el barrido de higiene.
+# Sin ventana declarada, esas filas quedarían en `served` para siempre y
+# ensuciarían la lectura del provenance (no se sabría si el alumno sigue en el
+# peldaño o lo dejó). 24 h es un múltiplo holgado de una sesión de estudio.
+DECISION_ABANDON_AFTER_HOURS = 24
+
 
 def provenance_health() -> dict:
-    """Señal de salud del registro de decisiones (V3.67, P3-10; puro).
+    """Señal de salud del registro de decisiones (V3.67 → V3.68; puro).
 
-    Devuelve el número de decisiones que NO se pudieron registrar desde que el
-    proceso arrancó (pérdida silenciosa por excepción best-effort). `0` es lo
-    sano; un valor creciente alerta de un fallo persistente de escritura.
+    Devuelve la pérdida silenciosa del registro (decisiones que NO se pudieron
+    escribir desde que el proceso arrancó) y la salud de la FSM del ciclo de vida
+    (`decision_records.transition_health`: transiciones aplicadas, reaperturas,
+    re-servicios de decisiones ya medidas y rechazos por motivo). `0` es lo sano
+    en `record_failures`; un valor creciente en `transition_health.rejections`
+    alerta de un `decision_id` ajeno, de un target que no cuadra o de una
+    transición imposible.
     """
-    return {"record_failures": _PROVENANCE_RECORD_FAILURES}
+    return {
+        "record_failures": _PROVENANCE_RECORD_FAILURES,
+        "transition_health": decision_records_repo.transition_health(),
+    }
+
+
+def _stale_before() -> str:
+    """Instante (ISO) de corte del barrido de decisiones abandonadas (V3.68).
+
+    Puro respecto al llamador: lee el reloj UNA vez con la misma utilidad del
+    repositorio y resta la ventana declarada.
+    """
+    return (
+        datetime.now(timezone.utc)
+        - timedelta(hours=DECISION_ABANDON_AFTER_HOURS)
+    ).isoformat()
+
+
+async def close_stale_decisions(user_id: str) -> int:
+    """Barrido best-effort de decisiones servidas y nunca cerradas (V3.68, P1-02).
+
+    Cierra como `abandoned` las decisiones del alumno que quedaron en
+    `served`/`started` más allá de la ventana declarada. Es higiene del
+    provenance: un fallo NUNCA rompe la cola (devuelve 0).
+    """
+    try:
+        return await run_in_threadpool(
+            decision_records_repo.close_stale,
+            user_id,
+            before_iso=_stale_before(),
+        )
+    except Exception:  # noqa: BLE001 — el barrido es higiene, no camino crítico
+        logger.debug("close_stale falló para %s", user_id, exc_info=True)
+        return 0
 
 
 def _queue_sort_key(item: dict) -> tuple:
@@ -121,6 +168,11 @@ async def get_review_queue(
     sigue sin exponer la forma esperada).
     """
     now_iso = datetime.now(timezone.utc).isoformat()
+    # V3.68 (P1-02): barrido de higiene del ciclo de vida ANTES de servir. Cierra
+    # como `abandoned` las decisiones que quedaron `served`/`started` más allá de
+    # la ventana declarada, para que la lectura del provenance no arrastre filas
+    # cuyo destino ya no puede cambiar. Best-effort: nunca rompe la cola.
+    await close_stale_decisions(user_id)
     cards = await academy_service.sync_fsrs_cards(user_id, now=now_iso)
     lexicon_cards = [
         card
@@ -242,13 +294,19 @@ async def _record_decision_provenance(
     served_items: list[dict],
     by_candidate_word: dict[str, tuple[dict, dict]],
 ) -> None:
-    """Registra una fila de PROVENANCE por decisión servida (V3.66 → V3.67).
+    """Registra una fila de PROVENANCE por decisión servida (V3.66 → V3.68).
 
     Solo para los ítems que traen el bloque `decision` del Planner 3.0 (es decir,
     cuando la Decision Projection gobernó el argmax). Cada fila captura la tarea
     elegida, el `p_success` y su FUENTE, el ELV, las alternativas puntuadas y los
-    drivers, junto con la metadata de la TAREA (firma canónica, carga servida,
-    apoyo y canal observado) y las DOS huellas de fingerprint de la decisión.
+    drivers, junto con la metadata de la TAREA (la DEFINICIÓN `task_key` y la
+    INSTANCIA `task_instance_key`, la carga servida, el apoyo y el canal
+    observado) y las DOS huellas de fingerprint de la decisión.
+
+    V3.68 (P1-01): la DEFINICIÓN viaja en `task_key` y la INSTANCIA (definición +
+    contexto) en `task_instance_key`. En la cola el contexto aún no existe, así
+    que la instancia sale con el contexto vacío y la completa `mark_served`
+    cuando el GET del peldaño declara el contexto servido.
 
     V3.67 (P1-02): el `decision_id` devuelto por el upsert idempotente se EXPONE
     en cada ítem servido (`item["decision_id"]`), para que el cliente lo conserve
@@ -272,7 +330,8 @@ async def _record_decision_provenance(
                 decision_records_repo.record_decision,
                 user_id,
                 target_id=target_id,
-                task_signature=str(item.get("task_signature") or ""),
+                task_key=str(item.get("task_key") or ""),
+                task_signature=str(item.get("task_instance_key") or ""),
                 served_load=item.get("served_load"),
                 support_level=str(task.get("support_level") or ""),
                 assessment_mode=str(item.get("assessment_mode") or ""),

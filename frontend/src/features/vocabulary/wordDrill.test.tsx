@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   getDrillRecallPrompt: vi.fn(),
   getDrillSentenceContext: vi.fn(),
   getDrillTransferContext: vi.fn(),
+  markDrillStarted: vi.fn(),
+  markDrillAbandoned: vi.fn(),
   submitDrillRecallAttempt: vi.fn(),
   submitDrillWriteAttempt: vi.fn(),
   submitDrillTransferAttempt: vi.fn(),
@@ -23,6 +25,9 @@ vi.mock("../../api/vocabulary", () => ({
   getDrillRecallPrompt: mocks.getDrillRecallPrompt,
   getDrillSentenceContext: mocks.getDrillSentenceContext,
   getDrillTransferContext: mocks.getDrillTransferContext,
+  // V3.68 (P1-02): el ciclo de vida del provenance.
+  markDrillStarted: mocks.markDrillStarted,
+  markDrillAbandoned: mocks.markDrillAbandoned,
   submitDrillRecognitionAttempt: vi.fn(),
   submitDrillRecallAttempt: mocks.submitDrillRecallAttempt,
   submitDrillSentenceAttempt: vi.fn(),
@@ -30,9 +35,16 @@ vi.mock("../../api/vocabulary", () => ({
   submitDrillTransferAttempt: mocks.submitDrillTransferAttempt,
 }));
 
+/** Decision id de la cola de repaso con el que se abre el drill en los tests.
+ * V3.68 (P1-02): con él el drill hace round-trip de la decisión en cada
+ * GET/POST y declara `started`/`abandoned`. */
+const DECISION = "d1";
+
 function renderDrill(
   initialStep?: "recognition" | "recall" | "sentence" | "write" | "transfer",
   onProduced: () => void = () => {},
+  // `null` = drill sin decisión (abierto desde el diccionario).
+  decisionId: string | null = DECISION,
 ) {
   return render(
     <I18nProvider lang="en" setLang={() => {}}>
@@ -40,6 +52,7 @@ function renderDrill(
         userId="u1"
         word="river"
         initialStep={initialStep}
+        decisionId={decisionId ?? undefined}
         onProduced={onProduced}
         onClose={() => {}}
       />
@@ -61,7 +74,12 @@ describe("WordDrill initialStep (V3.35)", () => {
       options: ["río", "mar"],
     });
     renderDrill();
-    expect(mocks.getDrillRecognitionQuestion).toHaveBeenCalledWith("u1", "river");
+    // V3.68 (P1-02): el id de la decisión servida viaja en el GET.
+    expect(mocks.getDrillRecognitionQuestion).toHaveBeenCalledWith(
+      "u1",
+      "river",
+      DECISION,
+    );
     expect(await screen.findByText("río")).toBeTruthy();
     expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
     expect(mocks.getDrillSentenceContext).not.toHaveBeenCalled();
@@ -76,7 +94,12 @@ describe("WordDrill initialStep (V3.35)", () => {
     });
     renderDrill("recall");
 
-    expect(mocks.getDrillRecallPrompt).toHaveBeenCalledWith("u1", "river");
+    expect(mocks.getDrillRecallPrompt).toHaveBeenCalledWith(
+      "u1",
+      "river",
+      undefined,
+      DECISION,
+    );
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(await screen.findByText("río")).toBeTruthy();
   });
@@ -88,7 +111,11 @@ describe("WordDrill initialStep (V3.35)", () => {
     });
     renderDrill("sentence");
 
-    expect(mocks.getDrillSentenceContext).toHaveBeenCalledWith("u1", "river");
+    expect(mocks.getDrillSentenceContext).toHaveBeenCalledWith(
+      "u1",
+      "river",
+      DECISION,
+    );
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(await screen.findByText("I swim in the river.")).toBeTruthy();
   });
@@ -133,6 +160,7 @@ describe("WordDrill initialStep (V3.35)", () => {
         "river",
         expect.any(Number),
         "cloze",
+        DECISION,
       ),
     );
   });
@@ -178,6 +206,7 @@ describe("WordDrill paso Write (V3.39)", () => {
         "river",
         "I swim in the river every summer.",
         expect.any(Number),
+        DECISION,
       ),
     );
     expect(
@@ -226,7 +255,11 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     });
     renderDrill("transfer");
 
-    expect(mocks.getDrillTransferContext).toHaveBeenCalledWith("u1", "river");
+    expect(mocks.getDrillTransferContext).toHaveBeenCalledWith(
+      "u1",
+      "river",
+      DECISION,
+    );
     expect(mocks.getDrillRecognitionQuestion).not.toHaveBeenCalled();
     expect(mocks.getDrillRecallPrompt).not.toHaveBeenCalled();
     expect(mocks.getDrillSentenceContext).not.toHaveBeenCalled();
@@ -282,6 +315,7 @@ describe("WordDrill paso Transfer (V3.40)", () => {
         expect.any(Number),
         // V3.61: el slug inmutable de la superficie respondida.
         "story:instance_02",
+        DECISION,
       ),
     );
     expect(
@@ -451,5 +485,93 @@ describe("WordDrill paso Transfer (V3.40)", () => {
     expect(await screen.findByText(/wasn't required here/)).toBeTruthy();
     expect(screen.queryByText(/must use the word/)).toBeNull();
     expect(onProduced).not.toHaveBeenCalled();
+  });
+});
+
+describe("WordDrill ciclo de vida del provenance (V3.68, P1-02)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("declara `started` cuando el peldaño ya está servido y `abandoned` al desmontar", async () => {
+    mocks.getDrillRecallPrompt.mockResolvedValue({
+      word: "river",
+      available: true,
+      cue: "río",
+      cue_kind: "translation",
+    });
+    const { unmount } = renderDrill("recall");
+
+    // ORDEN DECLARADO: la FSM rechaza `computed → started`, así que el inicio se
+    // declara DESPUÉS de que el GET del peldaño lo marque `served`.
+    await screen.findByText("río");
+    await waitFor(() =>
+      expect(mocks.markDrillStarted).toHaveBeenCalledWith("u1", DECISION, {
+        targetId: "river",
+      }),
+    );
+    // `started` se declara UNA vez, no en cada render.
+    expect(mocks.markDrillStarted).toHaveBeenCalledTimes(1);
+    expect(mocks.markDrillAbandoned).not.toHaveBeenCalled();
+
+    // Salir del peldaño sin completarlo: el SERVIDOR decide si el abandono vale
+    // (si la decisión ya está `completed`, lo rechaza y no borra la medición).
+    unmount();
+    await waitFor(() =>
+      expect(mocks.markDrillAbandoned).toHaveBeenCalledWith("u1", DECISION, {
+        targetId: "river",
+      }),
+    );
+  });
+
+  it("un intento cerrado no impide que el desmontaje declare el abandono (lo rechaza la FSM)", async () => {
+    mocks.getDrillRecallPrompt.mockResolvedValue({
+      word: "river",
+      available: true,
+      cue: "río",
+      cue_kind: "translation",
+    });
+    mocks.submitDrillRecallAttempt.mockResolvedValue({
+      word: "river",
+      correct: true,
+      expected: "river",
+      delayed: false,
+      recall_days: 1,
+      error_type: "correct",
+    });
+    const { unmount } = renderDrill("recall");
+
+    fireEvent.change(await screen.findByLabelText("Type the word"), {
+      target: { value: "river" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    await waitFor(() =>
+      expect(mocks.submitDrillRecallAttempt).toHaveBeenCalledTimes(1),
+    );
+
+    unmount();
+    // El cliente NO decide la terminalidad: declara el abandono y es la FSM
+    // (`completed → abandoned` inválida) la que lo rechaza sin tocar la medición.
+    await waitFor(() =>
+      expect(mocks.markDrillAbandoned).toHaveBeenCalledWith("u1", DECISION, {
+        targetId: "river",
+      }),
+    );
+  });
+
+  it("sin decisionId (drill del diccionario) no se declara NADA", async () => {
+    mocks.getDrillRecallPrompt.mockResolvedValue({
+      word: "river",
+      available: true,
+      cue: "río",
+      cue_kind: "translation",
+    });
+    const { unmount } = renderDrill("recall", () => {}, null);
+
+    await screen.findByText("río");
+    unmount();
+    expect(mocks.markDrillStarted).not.toHaveBeenCalled();
+    expect(mocks.markDrillAbandoned).not.toHaveBeenCalled();
   });
 });

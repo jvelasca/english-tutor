@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getDrillCandidates,
+  getDrillRecallPrompt,
   getDrillSentenceContext,
   getLexicon,
   lookupDictionaryWord,
+  markDrillAbandoned,
+  markDrillStarted,
   submitDrillAttempt,
+  submitDrillRecallAttempt,
   submitDrillSentenceAttempt,
   submitDrillWriteAttempt,
 } from "./vocabulary";
@@ -97,7 +101,7 @@ describe("vocabulary api", () => {
     expect(form.get("file")).not.toBeNull();
   });
 
-  it("submitDrillWriteAttempt envía la frase propia y la latencia (V3.39)", async () => {
+  it("submitDrillWriteAttempt envía la frase propia, la latencia y la decisión (V3.39/V3.68)", async () => {
     const fn = mockFetch({
       word: "travel",
       used_word: true,
@@ -109,14 +113,73 @@ describe("vocabulary api", () => {
       "travel",
       "I usually travel by train in summer.",
       4200,
+      "decision-1",
     );
     const [url, init] = fn.mock.calls[0];
     expect(url).toBe("/api/vocabulary/drill/write-attempt?user_id=u1");
     expect(init.method).toBe("POST");
+    // V3.68 (P1-02): el `decision_id` viaja siempre (vacío sin decisión servida).
     expect(JSON.parse(init.body as string)).toEqual({
       word: "travel",
       text: "I usually travel by train in summer.",
       response_time_ms: 4200,
+      decision_id: "decision-1",
     });
+  });
+
+  it("el drill marca la decisión servida y cierra el ciclo con el id (V3.68)", async () => {
+    const fn = mockFetch({ word: "travel", phrase: "I travel." });
+    await getDrillSentenceContext("u1", "travel", "decision-1");
+    await getDrillRecallPrompt("u1", "travel", "definition", "decision-1");
+    await submitDrillRecallAttempt(
+      "u1",
+      "travel",
+      "travel",
+      1000,
+      "definition",
+      "decision-1",
+    );
+    // El `decision_id` viaja en los GET (query) y en los POST (body).
+    const calls = fn.mock.calls.map(([url, init]) => ({
+      url: String(url),
+      body: init?.body ? String(init.body) : "",
+    }));
+    expect(calls[0].url).toContain("decision_id=decision-1");
+    expect(calls[1].url).toContain("decision_id=decision-1");
+    expect(calls[2].body).toContain("decision-1");
+  });
+
+  it("sin decisionId el drill no declara nada (diccionario) (V3.68)", async () => {
+    const fn = mockFetch({ word: "travel", phrase: "I travel.", source: "template" });
+    await getDrillSentenceContext("u1", "travel");
+    const [url] = fn.mock.calls[0];
+    expect(String(url)).not.toContain("decision_id");
+  });
+
+  it("markDrillStarted/Abandoned postean el evento y tragan el fallo (V3.68)", async () => {
+    const fn = mockFetch({ applied: true });
+    const applied = await markDrillStarted("u1", "decision-1", {
+      targetId: "travel",
+    });
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/drill/decision-lifecycle?user_id=u1");
+    expect(JSON.parse(init.body as string)).toEqual({
+      decision_id: "decision-1",
+      event: "started",
+      target_id: "travel",
+      activity: "",
+    });
+    expect(applied).toBe(true);
+    // Best-effort: el ciclo de vida nunca rompe el drill.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("offline")),
+    );
+    expect(await markDrillAbandoned("u1", "decision-1")).toBe(false);
+    // Sin decisión no hay llamada (drill abierto desde el diccionario).
+    const empty = vi.fn();
+    vi.stubGlobal("fetch", empty);
+    expect(await markDrillStarted("u1", "")).toBe(false);
+    expect(empty).not.toHaveBeenCalled();
   });
 });

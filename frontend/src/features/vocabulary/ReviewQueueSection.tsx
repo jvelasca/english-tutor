@@ -261,6 +261,11 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
             userId={userId}
             word={active.word}
             initialStep={active.activity}
+            // V3.68 (P1-02): el `decision_id` que sirvió la cola viaja al drill,
+            // que lo devuelve en cada GET/POST del peldaño y declara el ciclo de
+            // vida (`started`/`abandoned`). Sin él (drill abierto desde el
+            // diccionario) no hay decisión que declarar.
+            decisionId={active.decision_id}
             onProduced={() => undefined}
             onClose={() => {
               setActive(null);

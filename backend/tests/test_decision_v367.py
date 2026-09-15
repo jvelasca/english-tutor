@@ -3,8 +3,9 @@
 Cierra los dos P1 de la auditoría de V3.66 y los P2/P3 asociados:
 
 - **P1-01** — `target_id` no era una identidad de tarea completa. Aquí se
-  introduce `task_signature` (seis componentes) y `empirical_success_by_task`,
-  con la jerarquía `task → target → skill → margin`.
+  introduce la firma de SEIS componentes (hoy `task_instance_key`, tras el
+  rename de V3.68) y `empirical_success_by_task`, con la jerarquía
+  `task → target → skill → margin`.
 - **P1-02** — el provenance era append-only y se escribía en el GET. Aquí el
   `decision_id` es DETERMINISTA, el registro es UPSERT idempotente y hay ciclo
   de vida `computed → served → started → completed`.
@@ -83,34 +84,31 @@ def _rows(*rows: dict) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_task_signature_parts_distinguish_activity_support_and_difficulty():
+def test_task_key_parts_distinguish_activity_support_and_difficulty():
     base = dict(
         target_id="apple",
         activity="recall",
         support_level="cued",
         served_difficulty={"lexical": 3},
-        context="",
         assessed_skill="recall",
     )
-    a = observed_difficulty.task_signature_parts(**base)
-    assert a == observed_difficulty.task_signature_parts(**base)  # determinista
-    assert a != observed_difficulty.task_signature_parts(
+    a = observed_difficulty.task_key_parts(**base)
+    assert a == observed_difficulty.task_key_parts(**base)  # determinista
+    assert a != observed_difficulty.task_key_parts(
         **{**base, "activity": "write"}
     )
-    assert a != observed_difficulty.task_signature_parts(
+    assert a != observed_difficulty.task_key_parts(
         **{**base, "support_level": "independent"}
     )
-    assert a != observed_difficulty.task_signature_parts(
+    assert a != observed_difficulty.task_key_parts(
         **{**base, "served_difficulty": {"lexical": 5}}
     )
 
 
-def test_task_signature_parts_normalizes_missing_components():
-    # Componentes ausentes se normalizan a "" sin lanzar: la firma es estable.
-    sig = observed_difficulty.task_signature_parts(
-        None, None, None, None, None, None
-    )
-    assert sig == "|||||"
+def test_task_key_parts_normalizes_missing_components():
+    # Componentes ausentes se normalizan a "" sin lanzar: la clave es estable.
+    sig = observed_difficulty.task_key_parts(None, None, None, None, None)
+    assert sig == "||||"
 
 
 def test_empirical_success_by_task_distinguishes_activity_of_same_target():
@@ -150,17 +148,17 @@ def test_empirical_success_by_task_distinguishes_activity_of_same_target():
         ),
     )
     by_task = observed_difficulty.empirical_success_by_task(rows)
-    recall_sig = observed_difficulty.task_signature_parts(
-        "apple", "recall", "cued", {"lexical": 3}, "", "recall"
+    recall_key = observed_difficulty.task_key_parts(
+        "apple", "recall", "cued", {"lexical": 3}, "recall"
     )
-    write_sig = observed_difficulty.task_signature_parts(
-        "apple", "write", "independent", {"lexical": 3}, "", "written_production"
+    write_key = observed_difficulty.task_key_parts(
+        "apple", "write", "independent", {"lexical": 3}, "written_production"
     )
-    assert set(by_task) == {recall_sig, write_sig}
-    assert by_task[recall_sig]["p_success"] == 1.0
-    assert by_task[write_sig]["p_success"] == 0.9
+    assert set(by_task) == {recall_key, write_key}
+    assert by_task[recall_key]["p_success"] == 1.0
+    assert by_task[write_key]["p_success"] == 0.9
     # MISMO target, DISTINTA actividad → estimaciones DISTINTAS (cierre P1-01).
-    assert by_task[recall_sig]["p_success"] != by_task[write_sig]["p_success"]
+    assert by_task[recall_key]["p_success"] != by_task[write_key]["p_success"]
 
 
 def test_empirical_success_by_task_without_spaced_sample_declares_nothing():
@@ -302,7 +300,7 @@ def test_record_decision_persists_task_metadata(monkeypatch, tmp_path):
     )
     (row,) = decision_records_repo.list_decisions(uid)
     assert (
-        row["task_signature"]
+        row["task_instance_key"]
         == "apple|write|independent|lexical:4||written_production"
     )
     assert row["served_load"] == {"lexical": 4, "syntax": 2}
@@ -317,15 +315,15 @@ def test_decision_lifecycle_transitions(monkeypatch, tmp_path):
         uid, target_id="apple", task_signature="sig", decision_start_fingerprint="F1"
     )
     decision_id = record["decision_id"]
-    assert decision_records_repo.mark_served(decision_id) is True
-    assert decision_records_repo.mark_completed(decision_id, "ok") is True
+    assert decision_records_repo.mark_served(uid, decision_id) is True
+    assert decision_records_repo.mark_completed(uid, decision_id, "ok") is True
     (row,) = decision_records_repo.list_decisions(uid)
     assert row["decision_status"] == "completed"
     assert row["outcome"] == "ok"
     assert row["served_at"] != ""
     assert row["completed_at"] != ""
     # Transición sobre un id inexistente → no actualiza nada.
-    assert decision_records_repo.mark_served("missing-id") is False
+    assert decision_records_repo.mark_served(uid, "missing-id") is False
 
 
 def test_calibration_report_predicted_vs_observed(monkeypatch, tmp_path):
@@ -339,9 +337,14 @@ def test_calibration_report_predicted_vs_observed(monkeypatch, tmp_path):
             p_success=p,
             p_success_source="target_empirical",
         )
-        decision_records_repo.mark_completed(record["decision_id"], outcome)
+        decision_records_repo.mark_served(uid, record["decision_id"])
+        decision_records_repo.mark_completed(uid, record["decision_id"], outcome)
     report = decision_records_repo.calibration_report(uid)
     assert report["completed_count"] == 2
+    # Ambos outcomes son MEDIBLES (`ok`/`ko`): el denominador coincide.
+    assert report["measured_count"] == 2
+    assert report["unclear_count"] == 0
+    assert report["abandoned_count"] == 0
     bands = {band["band"]: band for band in report["bands"]}
     assert bands[0.2]["observed_success_rate"] == 0.0
     assert bands[0.8]["observed_success_rate"] == 1.0
