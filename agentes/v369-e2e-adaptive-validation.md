@@ -1,6 +1,14 @@
 # Briefing de subagente — V3.69 (E2E + Adaptive Engine Validation)
 
-> **Estado:** briefing entregado 2026-09-15; **pendiente de ejecución**.
+> **Estado:** **EJECUTADO** (2026-09-15 → release `v3.69.0`). Batería
+> **E01–E19** escrita y verde en `backend/tests/test_adaptive_e2e_v369.py`
+> (**20 tests**; backend **2552 passed**, 2532 → +20) más el contrato de
+> frontend de §F en `frontend/tests/visual/drillProvenance.spec.ts` (2 specs de
+> navegador). **Diff de código de producto: CERO** (ningún escenario demostró
+> que la arquitectura fuese insuficiente). Los cinco hallazgos medidos
+> (E01(a), E08, E15, E17 y el nuevo **§F-1**: `abandoned` prematuro por doble
+> montaje de `StrictMode`) están en la tabla §C de `release-notes-v3.69.0.md`,
+> **todos aceptados como deuda declarada**.
 > **Qué es:** una release de **VALIDACIÓN**, no de capacidad. **No** añade
 > arquitectura ni pedagogía: **demuestra experimentalmente** que el circuito
 > adaptativo construido en V3.55–V3.68 funciona **como una sola pieza**.

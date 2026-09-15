@@ -5,6 +5,66 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-15 (UTC+2).
 >
+> **Nota (2026-09-15): V3.69.0 (E2E + Adaptive Engine Validation) — release de
+> validación, con el diff de PRODUCTO en CERO.** Release **`v3.69.0`**, **SIN
+> migración, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco, SIN capacidad
+> pedagógica nueva y SIN tocar el argmax del Planner**: lo que entra son
+> **tests** y **documentación**. Convierte en evidencia lo que la auditoría
+> externa `Y` de V3.68 (§19–§20) pedía antes de entrar en cualquier componente
+> probabilístico: que la cadena `Evidence → Student State → Decision Projection →
+> Task selection → Decision → Serving → Attempt → Outcome → Evidence` funciona
+> como **una sola pieza**.
+> **(A) Batería E2E (`backend/tests/test_adaptive_e2e_v369.py`, 20 tests por
+> HTTP real):** E01 alumno nuevo (arranque en frío **sin** provenance + circuito
+> completo con estado medible) · E02 skill débil · E03 retención/repaso · E04
+> hueco de transferencia · E05 misma tarea en dos contextos (`task_key` igual,
+> `task_instance_key` distinto, ya por HTTP) · E06 `ok, ok, ko` baja el
+> `p_success` · E07 `unclear` fuera de la calibración · E08 abandono sin
+> contaminar `ko` · E09 refresh sin duplicar · E10 doble submit idempotente · E11
+> submit contradictorio rechazado · E12 usuario ajeno · E13 target ajeno · E14
+> transición inválida · E15 servida caducada (nunca `completed`) · E16
+> **determinismo del Planner** en los dos niveles (puro y HTTP, byte a byte) ·
+> E16b **contrato completo** de `GET /api/learning/decisions` (calibración,
+> `provenance_health`, filtros y paginación), que era el **endpoint huérfano** ·
+> E17 hueco de andamiaje (aserción **diferencial**) · E18 evidencia entrando
+> DURANTE la decisión (+ TOCTOU determinista) · E19 dos alumnos activos sin
+> mezcla **en ambas direcciones**.
+> **(B) Contrato de frontend con red mockeada
+> (`frontend/tests/visual/drillProvenance.spec.ts`, 2 specs):** sobre el
+> navegador real y con el job `playwright` (que corre sin backend) fija que el
+> `decision_id` viaja en la query del GET del peldaño y en el body del POST del
+> intento, que `started` se declara **después** de cargar el peldaño, que
+> `abandoned` se declara al desmontar y que **sin** `decision_id` no se declara
+> nada.
+> **(C) Cinco hallazgos MEDIDOS y aceptados como deuda declarada** (tabla §C de
+> `release-notes-v3.69.0.md`): **E01(a)** el arranque en frío no tiene
+> provenance (degradación declarada de V3.64: `has_comparable_capacity`);
+> **E08** el `abandoned_count` del informe cuenta filas `completed` con
+> `outcome = "abandoned"` (hoy inalcanzables), así que el abandono del lifecycle
+> queda fuera del denominador —correcto— pero **invisible** en el informe;
+> **E15** una servida caducada se cierra como `abandoned` y la siguiente cola la
+> **reabre** (`provenance_status = "reopened"`): el registro representa el estado
+> final, no la historia (P2-04); **E17** `SCAFFOLDING_PENALTY` **suma** al hueco
+> de la modalidad limitante, de modo que el alumno **con** dependencia de apoyo
+> recibe un ELV **MAYOR**, no menor (problema de nombre/semántica, candidato a
+> **Planner 4.0**); **§F-1** el doble montaje de `StrictMode` (el launcher sirve
+> `npm run dev`, así que **ocurre en el producto**) declara un `abandoned`
+> prematuro que la FSM **rechaza** y contabiliza como `invalid_transition` (no
+> corrompe la fila, pero ensucia un contador de salud; arreglo mínimo propuesto
+> para V3.70).
+> **Regla dura respetada:** *V3.69 no debía introducir arquitectura nueva salvo
+> que una prueba E2E demostrara que la actual es insuficiente*; **ningún
+> escenario lo demostró**, así que no se tocó producción y los hallazgos se
+> registran en vez de «arreglarse» a costa del alcance.
+> **Verificación:** `pytest` backend **2552 passed** (2532 → +20), `ruff` limpio,
+> `vitest` **659** (sin cambios), `tsc`/`build` OK, launcher OK, los cuatro gates
+> de script OK y `check_release_consistency` **3.69.0**. **CI 6/6** registrado
+> como resultado **del release** (no verificado de forma independiente).
+> **Roadmap:** **V3.70** auditoría pedagógica/CEFR (siguiente) → **V3.71**
+> runtime/offline/instalación → **V3.72** UX/product completion → **V3.73**
+> auditoría final técnica → **V4.0** («English Tutor, primera versión completa y
+> estable»).
+>
 > **Nota (2026-09-15): auditoría total de V3.68.0 (`Y`) recibida — motor
 > adaptativo CONGELADO y confirmado, V3.69 pasa a ser VALIDACIÓN E2E.**
 > — El dossier externo `docs/audit/Y-AUDITORIA-TOTAL-V368.md` audita el salto
@@ -2970,7 +3030,32 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-15):** `v3.68.0` **Adaptive Engine Hardening &
+**Posición actual (2026-09-15):** `v3.69.0` **E2E + Adaptive Engine Validation**
+(release de **VALIDACIÓN, no de capacidad**: **SIN migración**, **SIN bump de
+`GENERATOR_VERSION`**, **SIN tocar el banco**, **SIN tocar el argmax del Planner**
+y con el **diff de código de PRODUCTO en CERO** — solo tests y documentación).
+Demuestra **por HTTP** que la cadena
+`Evidence → Student State → Decision Projection → Task selection → Decision →
+Serving → Attempt → Outcome → Evidence` funciona como **una sola pieza**, con la
+batería **E01–E19** (`backend/tests/test_adaptive_e2e_v369.py`, **20 tests**,
+incluido el contrato del endpoint huérfano `GET /api/learning/decisions`) y el
+contrato de frontend con red mockeada
+(`frontend/tests/visual/drillProvenance.spec.ts`, **2 specs** de navegador).
+**Ningún escenario demostró que la arquitectura sea insuficiente ⇒ no se tocó
+producción.** **Cinco hallazgos medidos, aceptados como deuda declarada**
+(E01(a) arranque en frío sin provenance · E08 `abandoned_count` no cuenta el
+abandono del lifecycle · E15 la servida caducada se reabre · E17
+`SCAFFOLDING_PENALTY` suma al hueco en vez de penalizar la tarea · §F-1
+`abandoned` prematuro por doble montaje de `StrictMode`; tabla completa en
+`release-notes-v3.69.0.md` §C). **Verificada en local:** `pytest` backend
+**2552 passed** (+20), `ruff` limpio, `vitest` **659**, `tsc`/`build` OK,
+launcher OK, `check_release_consistency` **3.69.0**,
+`check_beta_v3`/`content_validation`/`transfer_validation` OK. **CERRADA:**
+commit `COMMIT_PENDIENTE` + tag `v3.69.0` + push (**CI 6/6** run
+`RUN_PENDIENTE`, declarado por el release).
+**Siguiente incremento:** `V3.70` **auditoría pedagógica (CEFR/competencias)**
+(tracks P1–P6 de M13), con el motor adaptativo **cerrado y validado**.
+Antes, `v3.68.0` **Adaptive Engine Hardening &
 Integrity** (release **SIN migración destructiva** —migración ADITIVA e
 idempotente de dos columnas en `decision_records`—, **SIN bump de
 `GENERATOR_VERSION`, SIN tocar el banco y SIN capacidad pedagógica nueva**, que
@@ -2979,15 +3064,9 @@ cierra los **tres P1 de segunda generación** de la auditoría de V3.67 más el
 de **MEDICIÓN** y no de UI). **Auditada externamente** por el dossier
 `docs/audit/Y-AUDITORIA-TOTAL-V368.md`: **9,3 / 10 GLOBAL**, **0 P0 · 0 P1 · 6 P2
 · 5 P3**, con los tres P1 de V3.67 confirmados como **cerrados** y **el diseño
-del motor adaptativo declarado CONGELADO**. **Verificada en local** (`pytest`
-backend **2532 passed**, launcher **75**, `ruff` limpio, `tsc`/`vitest`/**659**/
-`build` OK, `check_release_consistency` **3.68.0**,
-`check_beta_v3`/`content_validation`/`transfer_validation` OK). **CERRADA:**
-commit `8acee38` + tag `v3.68.0` + push (**CI 6/6** run `34964205252`, declarado
-por el release). Detalle en `release-notes-v3.68.0.md`.
-**Siguiente incremento:** `V3.69` **E2E + Adaptive Engine Validation**
-(**validación, no capacidad nueva**), batería **E01–E19**; briefing
-`agentes/v369-e2e-adaptive-validation.md`.
+del motor adaptativo declarado CONGELADO**. Commit `8acee38` + tag `v3.68.0`
+(**CI 6/6** run `34964205252`, declarado por el release). Detalle en
+`release-notes-v3.68.0.md`.
 Antes, `v3.67.0` **Task Identity 2.0 + Decision Lifecycle + Provenance
 Analytics** (cierre de los dos P1 de V3.66), `v3.66.0` **Task-Level Empirical
 Success + Decision Provenance**, `v3.65.0` **Observed Difficulty 3.0**
