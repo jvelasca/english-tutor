@@ -67,34 +67,34 @@
   },
   {
    "level": "C1",
-   "objectives": 14,
+   "objectives": 20,
    "units": 4,
-   "checks_per_objective": 3.21,
-   "activities_per_objective": 4.86,
+   "checks_per_objective": 3.15,
+   "activities_per_objective": 4.9,
    "objectives_with_listening": 4,
-   "objectives_with_scenario": 8,
+   "objectives_with_scenario": 10,
    "phases": {
-    "practice": 14,
-    "retrieve": 14,
-    "transfer": 14,
-    "review": 13,
-    "assess": 13
+    "practice": 20,
+    "retrieve": 20,
+    "transfer": 20,
+    "review": 19,
+    "assess": 19
    }
   },
   {
    "level": "C2",
-   "objectives": 14,
+   "objectives": 20,
    "units": 3,
-   "checks_per_objective": 2.71,
-   "activities_per_objective": 4.86,
+   "checks_per_objective": 2.85,
+   "activities_per_objective": 4.9,
    "objectives_with_listening": 4,
-   "objectives_with_scenario": 8,
+   "objectives_with_scenario": 9,
    "phases": {
-    "practice": 14,
-    "retrieve": 14,
-    "transfer": 14,
-    "review": 13,
-    "assess": 13
+    "practice": 20,
+    "retrieve": 20,
+    "transfer": 20,
+    "review": 19,
+    "assess": 19
    }
   }
  ]

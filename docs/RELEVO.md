@@ -5,6 +5,139 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-15 (UTC+2).
 >
+> **Nota (2026-09-15): V3.70.0 (Auditoría pedagógica + CEFR) — release de
+> MEDICIÓN, con cero líneas de lógica de PRODUCTO (solo bumps de versión).**
+> Release **`v3.70.0`**, **SIN migración, SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco, SIN tocar el currículum, SIN capacidad pedagógica nueva y SIN
+> tocar el argmax del Planner**: lo que entra son **cinco subcomandos NUEVOS y de
+> SOLO LECTURA** en `backend/scripts/audit_dossier.py`, **tests** y
+> **documentación**. Igual que V3.69 validó la **arquitectura** del motor
+> adaptativo, V3.70 mide la **pedagogía real** del contenido y de los
+> instrumentos: ¿el contenido A1..C2 **es** de su nivel?, ¿están cubiertas todas
+> las destrezas?, ¿se corrige de verdad?, ¿«demostrado» significa lo que dice?,
+> ¿los instrumentos de nivelación funcionan?
+> **Regla dura respetada (declarada en el briefing):** *V3.70 es una auditoría,
+> no una release de capacidad*; **no se corrige nada** aunque se encuentre, y
+> cada hallazgo se **asigna a una fase** en vez de arreglarse a costa del alcance.
+> **Los cinco ejes (AA→AE) más la síntesis (AF):**
+> **(A) AA · Adecuación CEFR del contenido (`docs/audit/AA-PED-CONTENIDO-CEFR.md`).**
+> **Un P0: el 89,4 % de los 368 checks del currículum tiene la respuesta correcta
+> en la posición 0** (329/368) — un alumno que marque siempre la primera opción
+> acierta casi 9 de cada 10; el corpus de listening sí está equilibrado (~25 % por
+> posición). P1: A1 entero por encima de su banda de velocidad (86/200 por encima
+> del techo de 115 wpm) y C1/C2 casi enteros por debajo (18/20 y 19/20) ·
+> `connected_speech: true` sin ninguna reducción real en la transcripción en
+> **C1 14/14 y C2 20/20**. P2: escalera de velocidad no monótona (el máximo de B2,
+> 185 wpm, supera al de C1, 170) · 4 de los 5 ítems `inference` de A2 se resuelven
+> con una palabra literal · sesgo de longitud. **P3: deriva documental
+> corregida** — `docs/audit/generated/` estaba desincronizado con el disco
+> (`curriculum-stats` declaraba C1 = 14 y C2 = 14 objetivos frente a los **20 y
+> 20** reales) y las auditorías previas se apoyaron en esas cifras. **Limpio: 0 de
+> 490 ítems fuera de su banda de DIFICULTAD**, 116 objetivos · 368 checks · 512
+> actividades, 0 objetivos sin actividades o sin checks y 0 checks fuera de las
+> `skills` de su objetivo.
+> **(B) AB · Cobertura de destrezas (`docs/audit/AB-PED-COBERTURA.md`).** P1:
+> corpus de listening **B1–C2 al 13,9–20,0 %** de su objetivo declarado
+> (`LISTENING_CORPUS_TARGETS`) · `reading` declara 15 objetivos y 18 checks pero
+> **no existe `backend/services/reading.py`** · **el manifest de la biblioteca de
+> audio humano está versionado y vacío** (`entries: []`: todo el listening es TTS)
+> · `mediation` **no tiene competencias, ni corpus, ni canal, ni scorer, ni UI**.
+> P2: `interaction` sin competencias y sin canal pese a tener módulo, corpus de 66
+> ítems y UI · escenarios de speaking con **1** en A1 y **1** en C1. P3: `pre-a1`
+> sin curso (0/7 celdas) · `pronunciation` fuera de la matriz a propósito.
+> **(C) AC · Feedback y corrección (`docs/audit/AC-PED-FEEDBACK.md`).** P1: **4 de
+> las 7 reglas de grammar nunca pueden confirmarse** (su `confidence` está por
+> debajo de `CONFIRMED_THRESHOLD = 0.8`) · **5 de las 7 no tienen patrón de uso
+> correcto**, así que solo 2 pueden alcanzar `MASTERY_STREAK = 3` · `reading` y
+> `mediation` sin ningún canal de corrección. P2: `listening`, `pronunciation`,
+> `vocabulary` e `interaction` tienen corrección **solo de puntuación**, sin
+> mensaje · el error detectado dentro de las rúbricas solo resta nota
+> (`1.0 − 0.25·len(errors)`) y **no genera la explicación**, que siempre la redacta
+> el LLM desde el prompt. **Correcto y fijado por test:** 5 categorías formales de
+> corrección, guía para los 7 niveles (incluida Pre-A1) y **la nota la decide el
+> scorer determinista, nunca el LLM** (verificado ejecutando
+> `score_writing`/`score_speaking` sin modelo).
+> **(D) AD · Validez de la afirmación de maestría (`docs/audit/AD-PED-MAESTRIA.md`).**
+> P1: **tres registros con tres tamaños para el mismo concepto** de destreza
+> evaluable (9 modalidades · 8 en matriz · 7 canales) y **`interaction` y
+> `mediation` no pueden acreditar evidencia por ninguna vía** aunque la matriz les
+> exija requisitos en los 6 niveles. P2: **`novel_required = 0` en las 48 celdas**
+> pese a que el emisor real de `novel` existe desde V3.26 (**el briefing asumía que
+> no existía y la verificación lo corrigió**: la señal existe, la exigencia no) ·
+> **las filas sin `objective_id` resoluble no acreditan éxito**, medido
+> conductualmente (`result 1,0` → `success False`), lo que deja fuera del gate
+> espaciado a speaking assessment y misión (F-K3). **Correcto y fijado:** sin
+> evidencia no se afirma nada (9/9 modalidades en `not_started`, banda `—`) y
+> `transfer_required` crece 0 → 4.
+> **(E) AE · Instrumentos de nivelación (`docs/audit/AE-PED-INSTRUMENTOS.md`).**
+> P1: **el criterio de parada por precisión del placement es inalcanzable** — pide
+> `SE < 0,5` y la mejor cota con los 8 ítems declarados es `0,7071` (**cota
+> analítica** del modelo 1PL declarado, no simulación) · **el examen de B1 tiene
+> los 12 ítems en dificultad 1**, igual que el de A1, así que no se escala ·
+> **cuatro de seis niveles sin examen final** (A2, B2, C1, C2). P2: el placement
+> mide reconocimiento o meta-lenguaje para listening/speaking/writing/pronunciation
+> (lo declara su propio docstring) · sesgo de forma (correcta = más larga única en
+> el **50 %** y más larga o empatada en el **75 %**; **70,8 %** en la posición 1 y
+> la posición 3 **nunca** correcta) · umbrales de banda triplicados y sub-bandas
+> `+` que ningún estimador emite. **Correcto y fijado:** los tres estimadores
+> coinciden en toda la rejilla (0 desacuerdos) y el banco de placement no tiene
+> huecos de dificultad (4 ítems por cada nivel 1..6).
+> **(F) AF · Síntesis (`docs/audit/AF-SINTESIS-PEDAGOGICA-V370.md`).** Matriz
+> consolidada: **1 P0 · 15 P1 · 12 P2 · 5 P3** (33 hallazgos abiertos) y **4
+> propiedades positivas** verificadas. Cinco cruces que solo se ven mirando los
+> cinco ejes juntos: `reading` roto en tres planos (contenido/corrección/
+> remediación) y `mediation` en cinco; **la forma de los ítems es el patrón más
+> extendido** (checks, corpus y placement comparten el mismo defecto de autoría);
+> **lo declarado supera a lo realizado en cinco instancias** (`connected_speech`,
+> `novel_required`, sub-bandas, biblioteca de audio, `mediation`); y **el producto
+> está más completo donde el alumno empieza que donde debería llegar** (A1/A2 al
+> 100 % de su objetivo de corpus y únicos niveles con examen, frente a B1–C2 al
+> 14–20 %).
+> **(G) Tests:** cinco ficheros nuevos, **48 tests** —
+> `test_ped_content_cefr_v370.py` (8), `test_ped_coverage_v370.py` (10),
+> `test_ped_feedback_v370.py` (10), `test_ped_mastery_v370.py` (10),
+> `test_ped_instruments_v370.py` (10). Cada test fija un hallazgo **medido**: si
+> alguien cierra un hueco, el test **falla** y obliga a re-auditar el eje.
+> **Backend 2600 passed** (2552 → **+48**).
+> **Instrumentos de medición (nuevos, solo lectura):** `cefr-adequacy`,
+> `skill-coverage`, `feedback-coverage`, `mastery-claims` y
+> `assessment-instruments` en `backend/scripts/audit_dossier.py`, con el mismo
+> patrón que los cinco existentes (`_write_generated`, salida regenerable en
+> `docs/audit/generated/`) y **sin escribir nunca en `data/` ni en
+> `curriculum/`**. Declarados honestamente como **herramienta de medición, no
+> ruta de producto**.
+> **Honestidad (lo que V3.70 NO demuestra):** (i) **no** demuestra eficacia
+> pedagógica: mide **adecuación declarada frente a un criterio interno**
+> (`docs/audit/CEFR-REFERENCE.md`, que **no** es un documento CEFR normativo), no
+> aprendizaje de ningún alumno; (ii) **no** valida el nivel real de un alumno (el
+> placement se auditó como instrumento, no contra una evaluación externa); (iii)
+> **no** audita la calidad acústica de un solo ítem (no hay audio humano grabado:
+> todo el análisis de listening es sobre **metadatos declarados**) ni el texto que
+> produce el LLM en ejecución (se auditó la **política declarada**); (iv) **no**
+> audita el frontend; (v) **no** cierra los **6 P2 de la auditoría de V3.69**, que
+> siguen abiertos por decisión de alcance; (vi) la cota del placement es
+> **analítica**, no empírica; (vii) **no corrige nada**: las 33 insuficiencias
+> quedan declaradas y asignadas a fase (**contenido → V4.0.x · motor y
+> acreditación → Planner 4.0 · instrumentos → V4.0.x/V3.72**). El valor de V3.70
+> es que **dejan de ser opinión**. Ver `release-notes-v3.70.0.md`.
+> **Verificación local (medida, en secuencia, 2026-09-15):** `python -m ruff check .`
+> en **`backend/`** (el gate real del CI, `working-directory: backend`) **limpio** ·
+> `pytest` backend **2600 passed** (2552 → **+48**) · `vitest` **76 ficheros / 659
+> tests** · `tsc --noEmit` y `npm run build` **OK** · launcher **75 passed** ·
+> `check_release_consistency` **3.70.0** en los **6 sitios** · `check_beta_v3`,
+> `content_validation` (`OK=True quality=True`) y `transfer_validation` (**0
+> errores**; 7 warnings `demand_spread` *advisory*) exit 0 · **regeneración
+> determinista**: los **10 subcomandos** de `audit_dossier.py` (5 existentes + 5
+> nuevos) se re-ejecutan y **no cambian ni un byte** de `docs/audit/generated/`.
+> **Honestidad sobre la verificación:** invocar `ruff` desde la **RAÍZ** del repo
+> **no** es el gate del CI y reporta **1 `DTZ005` preexistente** en
+> `scripts/purge_virtual_testers.py:198` (`datetime.now()` sin `tz`), un fichero
+> **no tocado** por V3.70 (último cambio: `release(v3.52.1)`); se **registra** en
+> lugar de declararlo limpio.
+> **Roadmap:** **V3.71** runtime/offline/instalación (siguiente) → **V3.72**
+> UX/product completion → **V3.73** auditoría final técnica → **V4.0** («English
+> Tutor, primera versión completa y estable»).
+>
 > **Nota (2026-09-15): V3.69.0 (E2E + Adaptive Engine Validation) — release de
 > validación, con cero líneas de lógica de PRODUCTO (solo bumps de versión).** Release **`v3.69.0`**, **SIN
 > migración, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco, SIN capacidad
@@ -3053,11 +3186,56 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-15):** `v3.69.0` **E2E + Adaptive Engine Validation**
-(release de **VALIDACIÓN, no de capacidad**: **SIN migración**, **SIN bump de
-`GENERATOR_VERSION`**, **SIN tocar el banco**, **SIN tocar el argmax del Planner**
-y con **cero líneas de lógica de PRODUCTO** — solo tests, bumps de versión y documentación).
-Demuestra **por HTTP** que la cadena
+**Posición actual (2026-09-15):** `v3.70.0` **Auditoría pedagógica + CEFR**
+(release de **MEDICIÓN, no de capacidad**: **SIN migración**, **SIN bump de
+`GENERATOR_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum**, **SIN
+tocar el argmax del Planner** y con **cero líneas de lógica de PRODUCTO** — solo
+**5 subcomandos de medición de SOLO LECTURA** en `backend/scripts/audit_dossier.py`,
+tests, bumps de versión y documentación). Igual que V3.69 validó la
+**arquitectura** del motor, V3.70 mide la **pedagogía real** en **cinco ejes**
+(AA→AE) más una síntesis (AF):
+**(AA) contenido/CEFR** (`docs/audit/AA-PED-CONTENIDO-CEFR.md`): **un P0, el
+89,4 % de los 368 checks tiene la correcta en la posición 0** (329/368); A1
+entero por encima de su banda de velocidad (86/200) y C1/C2 casi enteros por
+debajo (18/20, 19/20); `connected_speech: true` sin reducción real en C1 14/14 y
+C2 20/20; **deriva de `docs/audit/generated/` corregida** (declaraba C1 = 14 y
+C2 = 14 objetivos frente a **20 y 20**). **Limpio: 0/490 ítems fuera de banda de
+dificultad.** **(AB) cobertura** (`AB-PED-COBERTURA.md`): corpus B1–C2 al
+**13,9–20,0 %** de su objetivo; `reading` sin `services/reading.py`; **manifest de
+audio humano versionado y vacío** (`entries: []`); `mediation` sin competencias,
+corpus, canal, scorer ni UI. **(AC) feedback** (`AC-PED-FEEDBACK.md`): **4 de 7
+reglas de grammar nunca pueden confirmarse** y **solo 2 alcanzan la racha de
+dominio**; `reading`/`mediation` sin canal; fijado por test que **la nota la decide
+el scorer determinista, nunca el LLM**. **(AD) maestría**
+(`AD-PED-MAESTRIA.md`): **9 modalidades · 8 en matriz · 7 canales**; `interaction`
+y `mediation` **no pueden acreditar evidencia por ninguna vía**;
+**`novel_required = 0` en las 48 celdas**; las filas sin `objective_id` **no
+acreditan éxito** (medido: `result 1,0` → `success False`). **(AE) instrumentos**
+(`AE-PED-INSTRUMENTOS.md`): el criterio de parada del placement **es inalcanzable**
+(`SE ≥ 0,7071 > 0,5`, cota analítica del 1PL); el **examen de B1 tiene los 12
+ítems en dificultad 1** igual que el de A1; **cuatro de seis niveles sin examen
+final**; sesgo de forma del placement (posición 3 **nunca** correcta).
+**(AF) síntesis** (`AF-SINTESIS-PEDAGOGICA-V370.md`): **1 P0 · 15 P1 · 12 P2 · 5
+P3** (33 hallazgos abiertos) y **4 propiedades positivas**.
+**V3.70 NO CORRIGE NADA**: cada insuficiencia queda declarada y asignada a fase
+(**contenido → V4.0.x · motor y acreditación → Planner 4.0 · instrumentos →
+V4.0.x/V3.72**). **Los 6 P2 de la auditoría de V3.69 siguen abiertos** por
+decisión de alcance. **Tests:** **+48** (5 ficheros `test_ped_*_v370.py`), backend
+**2600 passed**. **Instrumentos nuevos:** `cefr-adequacy`, `skill-coverage`,
+`feedback-coverage`, `mastery-claims` y `assessment-instruments` (salida
+regenerable en `docs/audit/generated/`, **sin escribir nunca en `data/` ni en
+`curriculum/`**). **Honestidad:** no demuestra eficacia pedagógica (criterio
+interno `docs/audit/CEFR-REFERENCE.md`, **no normativo**), no valida el nivel real
+de un alumno, no audita la calidad acústica (todo el listening es **metadato
+declarado**) ni el texto del LLM en ejecución, no audita el frontend, y la cota
+del placement es **analítica**. Ver `release-notes-v3.70.0.md`.
+**Siguiente incremento:** `V3.71` **runtime/offline/instalación** (los tracks
+P1–P6 de M13 quedan **medidos y acotados, no cerrados**).
+
+Antes, `v3.69.0` **E2E + Adaptive Engine Validation** (release de **VALIDACIÓN,
+no de capacidad**: **SIN migración**, **SIN bump de `GENERATOR_VERSION`**, **SIN
+tocar el banco**, **SIN tocar el argmax del Planner** y con **cero líneas de
+lógica de PRODUCTO**). Demuestra **por HTTP** que la cadena
 `Evidence → Student State → Decision Projection → Task selection → Decision →
 Serving → Attempt → Outcome → Evidence` funciona como **una sola pieza**, con la
 batería **E01–E19** (`backend/tests/test_adaptive_e2e_v369.py`, **20 tests**,
@@ -3074,10 +3252,8 @@ abandono del lifecycle · E15 la servida caducada se reabre · E17
 **2552 passed** (+20), `ruff` limpio, `vitest` **659**, `tsc`/`build` OK,
 launcher OK, `check_release_consistency` **3.69.0**,
 `check_beta_v3`/`content_validation`/`transfer_validation` OK. **CERRADA:**
-commit `COMMIT_PENDIENTE` + tag `v3.69.0` + push (**CI 6/6** run
-`RUN_PENDIENTE`, declarado por el release).
-**Siguiente incremento:** `V3.70` **auditoría pedagógica (CEFR/competencias)**
-(tracks P1–P6 de M13), con el motor adaptativo **cerrado y validado**.
+commit `9a4e70a` + tag anotado `v3.69.0` + push (**CI 6/6** run
+[34978215154](https://github.com/jvelasca/english-tutor/actions/runs/34978215154)).
 Antes, `v3.68.0` **Adaptive Engine Hardening &
 Integrity** (release **SIN migración destructiva** —migración ADITIVA e
 idempotente de dos columnas en `decision_records`—, **SIN bump de

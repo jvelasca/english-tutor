@@ -1,0 +1,277 @@
+{
+ "area": "skill-coverage",
+ "modalities": {
+  "vocabulary": {
+   "competences": 8,
+   "declared_in_matrix": true,
+   "evidence_channel": "written",
+   "scorer_module": "lexicon.py",
+   "scorer_exists": true,
+   "ui_feature": "vocabulary",
+   "ui_exists": true,
+   "objectives": 110,
+   "checks": 180,
+   "corpus": 0
+  },
+  "grammar": {
+   "competences": 11,
+   "declared_in_matrix": true,
+   "evidence_channel": "written",
+   "scorer_module": "grammar.py",
+   "scorer_exists": true,
+   "ui_feature": "grammar",
+   "ui_exists": true,
+   "objectives": 56,
+   "checks": 104,
+   "corpus": 0
+  },
+  "pronunciation": {
+   "competences": 10,
+   "declared_in_matrix": false,
+   "evidence_channel": "spoken",
+   "scorer_module": "pronunciation.py",
+   "scorer_exists": true,
+   "ui_feature": "pronunciation",
+   "ui_exists": true,
+   "objectives": 38,
+   "checks": 0,
+   "corpus": 120
+  },
+  "listening": {
+   "competences": 24,
+   "declared_in_matrix": true,
+   "evidence_channel": "receptive",
+   "scorer_module": "listening.py",
+   "scorer_exists": true,
+   "ui_feature": "listening",
+   "ui_exists": true,
+   "objectives": 38,
+   "checks": 66,
+   "corpus": 490
+  },
+  "speaking": {
+   "competences": 18,
+   "declared_in_matrix": true,
+   "evidence_channel": "spoken",
+   "scorer_module": "speaking.py",
+   "scorer_exists": true,
+   "ui_feature": "speaking",
+   "ui_exists": true,
+   "objectives": 70,
+   "checks": 0,
+   "corpus": 174
+  },
+  "reading": {
+   "competences": 10,
+   "declared_in_matrix": true,
+   "evidence_channel": "receptive",
+   "scorer_module": "reading.py",
+   "scorer_exists": false,
+   "ui_feature": "reading",
+   "ui_exists": true,
+   "objectives": 15,
+   "checks": 18,
+   "corpus": 0
+  },
+  "writing": {
+   "competences": 15,
+   "declared_in_matrix": true,
+   "evidence_channel": "written",
+   "scorer_module": "writing.py",
+   "scorer_exists": true,
+   "ui_feature": "writing",
+   "ui_exists": true,
+   "objectives": 67,
+   "checks": 0,
+   "corpus": 0
+  },
+  "interaction": {
+   "competences": 0,
+   "declared_in_matrix": true,
+   "evidence_channel": null,
+   "scorer_module": "interaction.py",
+   "scorer_exists": true,
+   "ui_feature": "conversation",
+   "ui_exists": true,
+   "objectives": 0,
+   "checks": 0,
+   "corpus": 66
+  },
+  "mediation": {
+   "competences": 0,
+   "declared_in_matrix": true,
+   "evidence_channel": null,
+   "scorer_module": null,
+   "scorer_exists": false,
+   "ui_feature": null,
+   "ui_exists": false,
+   "objectives": 0,
+   "checks": 0,
+   "corpus": 0
+  }
+ },
+ "gaps": [
+  {
+   "modality": "reading",
+   "reason": "sin scorer propio"
+  },
+  {
+   "modality": "interaction",
+   "reason": "sin canal de evidencia"
+  },
+  {
+   "modality": "mediation",
+   "reason": "sin competencias ni corpus"
+  },
+  {
+   "modality": "mediation",
+   "reason": "sin canal de evidencia"
+  },
+  {
+   "modality": "mediation",
+   "reason": "sin scorer propio"
+  },
+  {
+   "modality": "mediation",
+   "reason": "sin feature de UI"
+  }
+ ],
+ "matrix_version": "2.1.0",
+ "matrix_skills": [
+  "grammar",
+  "interaction",
+  "listening",
+  "mediation",
+  "reading",
+  "speaking",
+  "vocabulary",
+  "writing"
+ ],
+ "audio_library": {
+  "manifest_version": "1.2.0",
+  "recorded_entries": 0,
+  "content_stats": {
+   "total_validated_learning_items": 539,
+   "total_curriculum_coverage": {
+    "populated_cells": 42,
+    "total_cells": 49,
+    "coverage_pct": 85.7,
+    "by_level": {
+     "pre-a1": {
+      "populated": 0,
+      "total": 7
+     },
+     "a1": {
+      "populated": 7,
+      "total": 7
+     },
+     "a2": {
+      "populated": 7,
+      "total": 7
+     },
+     "b1": {
+      "populated": 7,
+      "total": 7
+     },
+     "b2": {
+      "populated": 7,
+      "total": 7
+     },
+     "c1": {
+      "populated": 7,
+      "total": 7
+     },
+     "c2": {
+      "populated": 7,
+      "total": 7
+     }
+    },
+    "by_section": {
+     "vocabulary": {
+      "populated": 6,
+      "total": 7
+     },
+     "grammar": {
+      "populated": 6,
+      "total": 7
+     },
+     "listening": {
+      "populated": 6,
+      "total": 7
+     },
+     "speaking": {
+      "populated": 6,
+      "total": 7
+     },
+     "interaction": {
+      "populated": 6,
+      "total": 7
+     },
+     "review": {
+      "populated": 6,
+      "total": 7
+     },
+     "assessment": {
+      "populated": 6,
+      "total": 7
+     }
+    }
+   },
+   "listening": {
+    "total": 513,
+    "corpus": 490,
+    "legacy_tts": 23,
+    "with_audio_id": 499
+   },
+   "speaking_scenarios": 26,
+   "levels": [
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1",
+    "C2"
+   ]
+  }
+ },
+ "listening_targets": {
+  "A1": {
+   "declared": 200,
+   "target": 200,
+   "pct": 100.0
+  },
+  "A2": {
+   "declared": 200,
+   "target": 200,
+   "pct": 100.0
+  },
+  "B1": {
+   "declared": 25,
+   "target": 180,
+   "pct": 13.9
+  },
+  "B2": {
+   "declared": 25,
+   "target": 160,
+   "pct": 15.6
+  },
+  "C1": {
+   "declared": 20,
+   "target": 120,
+   "pct": 16.7
+  },
+  "C2": {
+   "declared": 20,
+   "target": 100,
+   "pct": 20.0
+  }
+ },
+ "scenarios_by_level": {
+  "A2": 6,
+  "B1": 7,
+  "B2": 5,
+  "A1": 1,
+  "C1": 1,
+  "C2": 6
+ }
+}

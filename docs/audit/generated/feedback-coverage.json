@@ -1,0 +1,107 @@
+{
+ "area": "feedback-coverage",
+ "modalities": {
+  "grammar": {
+   "deterministic": "services/grammar.py (regex + confidence)",
+   "llm": "policy.CORRECTNESS_GUIDANCE via context.build_system_prompt",
+   "has_deterministic": true,
+   "has_llm": true
+  },
+  "writing": {
+   "deterministic": "services/writing.py (rubrica)",
+   "llm": "services/writing_llm.py (solo extrae evidencia)",
+   "has_deterministic": true,
+   "has_llm": true
+  },
+  "speaking": {
+   "deterministic": "services/speaking.py (rubrica)",
+   "llm": "services/speaking_llm.py (solo extrae evidencia)",
+   "has_deterministic": true,
+   "has_llm": true
+  },
+  "pronunciation": {
+   "deterministic": "services/phonetics.py + pronunciation.py",
+   "llm": null,
+   "has_deterministic": true,
+   "has_llm": false
+  },
+  "listening": {
+   "deterministic": "scoring por respuesta (MC)",
+   "llm": null,
+   "has_deterministic": true,
+   "has_llm": false
+  },
+  "vocabulary": {
+   "deterministic": "lexicon/evidence (ledger lexico)",
+   "llm": null,
+   "has_deterministic": true,
+   "has_llm": false
+  },
+  "reading": {
+   "deterministic": null,
+   "llm": null,
+   "has_deterministic": false,
+   "has_llm": false
+  },
+  "interaction": {
+   "deterministic": "services/interaction.py (telemetria)",
+   "llm": null,
+   "has_deterministic": true,
+   "has_llm": false
+  },
+  "mediation": {
+   "deterministic": null,
+   "llm": null,
+   "has_deterministic": false,
+   "has_llm": false
+  }
+ },
+ "without_channel": [
+  "mediation",
+  "reading"
+ ],
+ "score_only": [
+  "interaction",
+  "listening",
+  "pronunciation",
+  "vocabulary"
+ ],
+ "grammar_rules": 7,
+ "grammar_confirmed_threshold": 0.8,
+ "grammar_mastery_streak": 3,
+ "writing_criteria": [
+  "task_completion",
+  "grammatical_accuracy",
+  "lexical_resource",
+  "organization",
+  "coherence",
+  "register"
+ ],
+ "speaking_criteria": [
+  "task_achievement",
+  "grammatical_control",
+  "lexical_resource",
+  "fluency",
+  "pronunciation",
+  "coherence",
+  "interaction"
+ ],
+ "correctness_guidance_levels": [
+  "A1",
+  "A2",
+  "B1",
+  "B2",
+  "C1",
+  "C2",
+  "Pre-A1"
+ ],
+ "correctness_guidance_missing": [],
+ "feedback_categories": [
+  "CORRECT",
+  "NATURAL",
+  "OPTIONAL",
+  "PRONUNCIATION",
+  "STYLE"
+ ],
+ "feedback_categories_count": 5
+}

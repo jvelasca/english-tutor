@@ -1,0 +1,125 @@
+{
+ "area": "assessment-instruments",
+ "placement": {
+  "items": 24,
+  "skills": [
+   "grammar",
+   "listening",
+   "pronunciation",
+   "reading",
+   "speaking",
+   "vocabulary",
+   "writing"
+  ],
+  "difficulties": {
+   "1": 4,
+   "2": 4,
+   "3": 4,
+   "4": 4,
+   "5": 4,
+   "6": 4
+  },
+  "mc": {
+   "n": 24,
+   "correct_is_longest": 12,
+   "correct_is_longest_pct": 50.0,
+   "positions": {
+    "0": 6,
+    "1": 17,
+    "2": 1
+   }
+  },
+  "max_items": 8,
+  "min_items": 4,
+  "se_threshold": 0.5,
+  "se_best_case_with_max_items": 0.7071,
+  "se_threshold_reachable": false
+ },
+ "exams": {
+  "A1": {
+   "exam_id": "a1",
+   "items": 10,
+   "skills": [
+    "grammar",
+    "listening",
+    "reading",
+    "vocabulary"
+   ],
+   "min_per_skill": 0.75,
+   "difficulties": {
+    "1": 10
+   }
+  },
+  "B1": {
+   "exam_id": "b1",
+   "items": 12,
+   "skills": [
+    "grammar",
+    "listening",
+    "reading",
+    "vocabulary"
+   ],
+   "min_per_skill": 0.75,
+   "difficulties": {
+    "1": 12
+   }
+  }
+ },
+ "levels_without_exam": [
+  "A2",
+  "B2",
+  "C1",
+  "C2"
+ ],
+ "remediation": {
+  "grammar": 6,
+  "vocabulary": 6,
+  "reading": 3,
+  "listening": 5,
+  "speaking": 6
+ },
+ "unit_sections": [
+  "vocabulary",
+  "grammar",
+  "listening",
+  "speaking",
+  "interaction",
+  "review",
+  "assessment"
+ ],
+ "unit_gate_thresholds": {
+  "vocabulary": 0.8,
+  "grammar": 0.8,
+  "listening": 0.75,
+  "speaking": 0.7
+ },
+ "band_thresholds": {
+  "levels_emitted": [
+   "A1",
+   "A2",
+   "B1",
+   "B2",
+   "C1",
+   "C2"
+  ],
+  "disagreements": [],
+  "ladder_bands_emitted": [
+   "a1",
+   "a2",
+   "a2+",
+   "b1",
+   "b1+",
+   "b2",
+   "b2+",
+   "c1",
+   "c2",
+   "pre-a1"
+  ],
+  "plus_bands_declared": [
+   "a2+",
+   "b1+",
+   "b2+"
+  ],
+  "plus_bands_emitted_by_estimators": []
+ }
+}

@@ -1,0 +1,447 @@
+{
+ "area": "cefr-adequacy",
+ "levels": {
+  "A1": {
+   "n": 200,
+   "difficulty_band": [
+    1,
+    2
+   ],
+   "difficulty_mean": 1.21,
+   "difficulty_min": 1,
+   "difficulty_max": 2,
+   "difficulty_out_of_band": 0,
+   "difficulty_out_of_band_ids": [],
+   "wpm_band": [
+    80,
+    115
+   ],
+   "wpm_mean": 117.22,
+   "wpm_min": 115.0,
+   "wpm_max": 125.0,
+   "wpm_out_of_band": 86,
+   "wpm_out_of_band_ids": [
+    "c001",
+    "c003",
+    "c004",
+    "c005",
+    "c006",
+    "c007",
+    "c008",
+    "c010",
+    "c042",
+    "c043",
+    "c045",
+    "c046",
+    "c047",
+    "c049",
+    "c051",
+    "c052",
+    "c055",
+    "c143",
+    "c145",
+    "c151"
+   ],
+   "connected_speech_declared": 0,
+   "connected_speech_realized": 0,
+   "connected_speech_unrealized_ids": [],
+   "inference_items": 0,
+   "inference_requiring_integration": 0,
+   "speakers": 10,
+   "accents": 11
+  },
+  "A2": {
+   "n": 200,
+   "difficulty_band": [
+    2,
+    3
+   ],
+   "difficulty_mean": 2.23,
+   "difficulty_min": 2,
+   "difficulty_max": 3,
+   "difficulty_out_of_band": 0,
+   "difficulty_out_of_band_ids": [],
+   "wpm_band": [
+    110,
+    135
+   ],
+   "wpm_mean": 130.85,
+   "wpm_min": 130.0,
+   "wpm_max": 135.0,
+   "wpm_out_of_band": 0,
+   "wpm_out_of_band_ids": [],
+   "connected_speech_declared": 0,
+   "connected_speech_realized": 0,
+   "connected_speech_unrealized_ids": [],
+   "inference_items": 5,
+   "inference_requiring_integration": 1,
+   "speakers": 10,
+   "accents": 11
+  },
+  "B1": {
+   "n": 25,
+   "difficulty_band": [
+    2,
+    4
+   ],
+   "difficulty_mean": 2.92,
+   "difficulty_min": 2,
+   "difficulty_max": 3,
+   "difficulty_out_of_band": 0,
+   "difficulty_out_of_band_ids": [],
+   "wpm_band": [
+    130,
+    160
+   ],
+   "wpm_mean": 143.4,
+   "wpm_min": 130.0,
+   "wpm_max": 175.0,
+   "wpm_out_of_band": 2,
+   "wpm_out_of_band_ids": [
+    "c023",
+    "c074"
+   ],
+   "connected_speech_declared": 4,
+   "connected_speech_realized": 4,
+   "connected_speech_unrealized_ids": [],
+   "inference_items": 2,
+   "inference_requiring_integration": 1,
+   "speakers": 9,
+   "accents": 8
+  },
+  "B2": {
+   "n": 25,
+   "difficulty_band": [
+    3,
+    5
+   ],
+   "difficulty_mean": 4.04,
+   "difficulty_min": 3,
+   "difficulty_max": 5,
+   "difficulty_out_of_band": 0,
+   "difficulty_out_of_band_ids": [],
+   "wpm_band": [
+    150,
+    185
+   ],
+   "wpm_mean": 162.4,
+   "wpm_min": 150.0,
+   "wpm_max": 185.0,
+   "wpm_out_of_band": 0,
+   "wpm_out_of_band_ids": [],
+   "connected_speech_declared": 11,
+   "connected_speech_realized": 3,
+   "connected_speech_unrealized_ids": [
+    "c031",
+    "c033",
+    "c037",
+    "c039",
+    "c040",
+    "c086",
+    "c089",
+    "c100"
+   ],
+   "inference_items": 5,
+   "inference_requiring_integration": 4,
+   "speakers": 9,
+   "accents": 8
+  },
+  "C1": {
+   "n": 20,
+   "difficulty_band": [
+    4,
+    5
+   ],
+   "difficulty_mean": 4.0,
+   "difficulty_min": 4,
+   "difficulty_max": 4,
+   "difficulty_out_of_band": 0,
+   "difficulty_out_of_band_ids": [],
+   "wpm_band": [
+    165,
+    195
+   ],
+   "wpm_mean": 156.15,
+   "wpm_min": 150.0,
+   "wpm_max": 170.0,
+   "wpm_out_of_band": 18,
+   "wpm_out_of_band_ids": [
+    "c101",
+    "c102",
+    "c103",
+    "c105",
+    "c106",
+    "c107",
+    "c108",
+    "c109",
+    "c110",
+    "c111",
+    "c112",
+    "c113",
+    "c114",
+    "c115",
+    "c116",
+    "c117",
+    "c119",
+    "c120"
+   ],
+   "connected_speech_declared": 14,
+   "connected_speech_realized": 0,
+   "connected_speech_unrealized_ids": [
+    "c101",
+    "c102",
+    "c103",
+    "c104",
+    "c105",
+    "c106",
+    "c107",
+    "c109",
+    "c110",
+    "c113",
+    "c114",
+    "c115",
+    "c117",
+    "c118"
+   ],
+   "inference_items": 3,
+   "inference_requiring_integration": 3,
+   "speakers": 10,
+   "accents": 10
+  },
+  "C2": {
+   "n": 20,
+   "difficulty_band": [
+    4,
+    6
+   ],
+   "difficulty_mean": 4.35,
+   "difficulty_min": 4,
+   "difficulty_max": 5,
+   "difficulty_out_of_band": 0,
+   "difficulty_out_of_band_ids": [],
+   "wpm_band": [
+    175,
+    200
+   ],
+   "wpm_mean": 164.35,
+   "wpm_min": 159.0,
+   "wpm_max": 175.0,
+   "wpm_out_of_band": 19,
+   "wpm_out_of_band_ids": [
+    "c121",
+    "c122",
+    "c123",
+    "c124",
+    "c125",
+    "c126",
+    "c127",
+    "c128",
+    "c129",
+    "c130",
+    "c131",
+    "c132",
+    "c133",
+    "c134",
+    "c135",
+    "c136",
+    "c137",
+    "c139",
+    "c140"
+   ],
+   "connected_speech_declared": 20,
+   "connected_speech_realized": 0,
+   "connected_speech_unrealized_ids": [
+    "c121",
+    "c122",
+    "c123",
+    "c124",
+    "c125",
+    "c126",
+    "c127",
+    "c128",
+    "c129",
+    "c130",
+    "c131",
+    "c132",
+    "c133",
+    "c134",
+    "c135",
+    "c136",
+    "c137",
+    "c138",
+    "c139",
+    "c140"
+   ],
+   "inference_items": 3,
+   "inference_requiring_integration": 3,
+   "speakers": 10,
+   "accents": 10
+  }
+ },
+ "monotonic_max_wpm": false,
+ "monotonic_mean_difficulty": false,
+ "mc": {
+  "corpus": {
+   "n": 490,
+   "correct_is_longest": 195,
+   "correct_is_longest_pct": 39.8,
+   "positions": {
+    "0": 125,
+    "1": 121,
+    "2": 122,
+    "3": 122
+   }
+  },
+  "curriculum_checks": {
+   "n": 368,
+   "correct_is_longest": 144,
+   "correct_is_longest_pct": 39.1,
+   "positions": {
+    "0": 329,
+    "1": 37,
+    "2": 2
+   }
+  },
+  "exams": {
+   "n": 22,
+   "correct_is_longest": 8,
+   "correct_is_longest_pct": 36.4,
+   "positions": {
+    "0": 14,
+    "1": 8
+   }
+  },
+  "placement": {
+   "n": 24,
+   "correct_is_longest": 12,
+   "correct_is_longest_pct": 50.0,
+   "positions": {
+    "0": 6,
+    "1": 17,
+    "2": 1
+   }
+  }
+ },
+ "objectives": {
+  "A1": {
+   "modules": 10,
+   "units": 10,
+   "objectives": 28,
+   "checks": 105,
+   "activities": 86,
+   "production_checks": 6,
+   "phases": {
+    "practice": 28,
+    "retrieve": 15,
+    "transfer": 15,
+    "review": 14,
+    "assess": 14
+   },
+   "objectives_without_activities": 0,
+   "objectives_without_checks": 0,
+   "objectives_with_listening": 11,
+   "objectives_with_scenario": 22,
+   "checks_out_of_objective_skills": 0
+  },
+  "A2": {
+   "modules": 7,
+   "units": 7,
+   "objectives": 17,
+   "checks": 55,
+   "activities": 83,
+   "production_checks": 6,
+   "phases": {
+    "practice": 17,
+    "retrieve": 17,
+    "transfer": 17,
+    "review": 16,
+    "assess": 16
+   },
+   "objectives_without_activities": 0,
+   "objectives_without_checks": 0,
+   "objectives_with_listening": 7,
+   "objectives_with_scenario": 12,
+   "checks_out_of_objective_skills": 0
+  },
+  "B1": {
+   "modules": 4,
+   "units": 4,
+   "objectives": 18,
+   "checks": 53,
+   "activities": 84,
+   "production_checks": 6,
+   "phases": {
+    "practice": 18,
+    "retrieve": 17,
+    "transfer": 17,
+    "review": 16,
+    "assess": 16
+   },
+   "objectives_without_activities": 0,
+   "objectives_without_checks": 0,
+   "objectives_with_listening": 7,
+   "objectives_with_scenario": 11,
+   "checks_out_of_objective_skills": 0
+  },
+  "B2": {
+   "modules": 3,
+   "units": 3,
+   "objectives": 13,
+   "checks": 35,
+   "activities": 63,
+   "production_checks": 6,
+   "phases": {
+    "practice": 13,
+    "retrieve": 13,
+    "transfer": 13,
+    "review": 12,
+    "assess": 12
+   },
+   "objectives_without_activities": 0,
+   "objectives_without_checks": 0,
+   "objectives_with_listening": 5,
+   "objectives_with_scenario": 4,
+   "checks_out_of_objective_skills": 0
+  },
+  "C1": {
+   "modules": 4,
+   "units": 4,
+   "objectives": 20,
+   "checks": 63,
+   "activities": 98,
+   "production_checks": 6,
+   "phases": {
+    "practice": 20,
+    "retrieve": 20,
+    "transfer": 20,
+    "review": 19,
+    "assess": 19
+   },
+   "objectives_without_activities": 0,
+   "objectives_without_checks": 0,
+   "objectives_with_listening": 4,
+   "objectives_with_scenario": 10,
+   "checks_out_of_objective_skills": 0
+  },
+  "C2": {
+   "modules": 3,
+   "units": 3,
+   "objectives": 20,
+   "checks": 57,
+   "activities": 98,
+   "production_checks": 4,
+   "phases": {
+    "practice": 20,
+    "retrieve": 20,
+    "transfer": 20,
+    "review": 19,
+    "assess": 19
+   },
+   "objectives_without_activities": 0,
+   "objectives_without_checks": 0,
+   "objectives_with_listening": 4,
+   "objectives_with_scenario": 9,
+   "checks_out_of_objective_skills": 0
+  }
+ }
+}
