@@ -4,7 +4,8 @@
 > **E01–E19** escrita y verde en `backend/tests/test_adaptive_e2e_v369.py`
 > (**20 tests**; backend **2552 passed**, 2532 → +20) más el contrato de
 > frontend de §F en `frontend/tests/visual/drillProvenance.spec.ts` (2 specs de
-> navegador). **Diff de código de producto: CERO** (ningún escenario demostró
+> navegador). **Diff de lógica de producto: CERO** (solo los bumps de versión;
+> ningún escenario demostró
 > que la arquitectura fuese insuficiente). Los cinco hallazgos medidos
 > (E01(a), E08, E15, E17 y el nuevo **§F-1**: `abandoned` prematuro por doble
 > montaje de `StrictMode`) están en la tabla §C de `release-notes-v3.69.0.md`,

@@ -2,9 +2,11 @@
 
 > **Release de VALIDACIÓN, no de capacidad.** **SIN migración**, **SIN bump de
 > `GENERATOR_VERSION`**, **SIN tocar el banco**, **SIN capacidad pedagógica
-> nueva**, **SIN tocar el argmax del Planner** y **con el diff de código de
-> producto en CERO**: lo que entra son **tests** (20 escenarios E2E por HTTP +
-> 2 specs de navegador) y **documentación**. No cierra ningún P de la auditoría
+> nueva**, **SIN tocar el argmax del Planner** y **con cero líneas de LÓGICA de
+> producto** (el único diff en rutas de producto son los **bumps de versión**:
+> `backend/config.py` y `frontend/package.json` + `package-lock.json`): lo que
+> entra son **tests** (20 escenarios E2E por HTTP + 2 specs de navegador) y
+> **documentación**. No cierra ningún P de la auditoría
 > `Y` de V3.68; **convierte en evidencia** lo que hasta ahora era una
 > afirmación: que la cadena `Evidence → Student State → Decision Projection →
 > Task selection → Decision → Serving → Attempt → Outcome → Evidence` funciona
@@ -189,7 +191,11 @@ referencia válida.
 
 ## Honestidad
 
-- **No se ha tocado una sola línea de código de producto.** El valor de esta
+- **No se ha tocado una sola línea de LÓGICA de producto.** Verificado sobre el
+  árbol publicado: `git diff v3.68.0 v3.69.0 --stat -- backend frontend
+  ':!backend/tests' ':!frontend/tests'` → **2 ficheros, 2 líneas**, y son los
+  **bumps de versión** (`backend/config.py` `3.68.0 → 3.69.0` y
+  `frontend/package.json`, más su `package-lock.json`). El valor de esta
   release está en lo que **mide** y en lo que **declara**, no en lo que añade: si
   esta release se juzgara por su diff de producto, sería vacía; si se juzga por
   lo que su batería demuestra y por los cinco hallazgos que destapa, es la

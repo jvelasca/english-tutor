@@ -6,7 +6,7 @@
 > Actualizado por última vez: 2026-09-15 (UTC+2).
 >
 > **Nota (2026-09-15): V3.69.0 (E2E + Adaptive Engine Validation) — release de
-> validación, con el diff de PRODUCTO en CERO.** Release **`v3.69.0`**, **SIN
+> validación, con cero líneas de lógica de PRODUCTO (solo bumps de versión).** Release **`v3.69.0`**, **SIN
 > migración, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco, SIN capacidad
 > pedagógica nueva y SIN tocar el argmax del Planner**: lo que entra son
 > **tests** y **documentación**. Convierte en evidencia lo que la auditoría
@@ -3050,7 +3050,7 @@
 **Posición actual (2026-09-15):** `v3.69.0` **E2E + Adaptive Engine Validation**
 (release de **VALIDACIÓN, no de capacidad**: **SIN migración**, **SIN bump de
 `GENERATOR_VERSION`**, **SIN tocar el banco**, **SIN tocar el argmax del Planner**
-y con el **diff de código de PRODUCTO en CERO** — solo tests y documentación).
+y con **cero líneas de lógica de PRODUCTO** — solo tests, bumps de versión y documentación).
 Demuestra **por HTTP** que la cadena
 `Evidence → Student State → Decision Projection → Task selection → Decision →
 Serving → Attempt → Outcome → Evidence` funciona como **una sola pieza**, con la

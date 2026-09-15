@@ -1,5 +1,38 @@
 # Auditoría EXTERNA de DISEÑO de V3.69 — punto de entrada (listo para lanzar)
 
+> **⚠️ ACTUALIZACIÓN (2026-09-15, tras el cierre de la release).** V3.69 **ya
+> está implementada y publicada**, así que los apartados que decían «`v3.69.0`
+> todavía no existe» / «auditarse como diseño, no como release» **quedan
+> superados**: el diseño se auditó y **se implementó sin cambios de alcance**.
+> Estado de entrega para el auditor externo:
+>
+> - **Release commit:** `9a4e70a` (`release(v3.69.0): E2E + Adaptive Engine
+>   Validation`) · **tag anotado `v3.69.0`** publicado en `main`.
+> - **Cierre documental:** `8b41d7d` (`docs(v3.69.0): registrar el cierre`).
+> - **CI 6/6 verde:** run
+>   [34978215154](https://github.com/jvelasca/english-tutor/actions/runs/34978215154)
+>   — Backend ruff + pytest (**2550 passed + 2 skipped**), Frontend tsc + vitest
+>   (**76 ficheros / 659 tests**) + build, Playwright E2E (**25 passed + 26
+>   skipped**, con las **+2 specs nuevas** verdes), Release consistency
+>   (**3.69.0**), Beta V3.0 gate y Content validation.
+> - **Artefactos nuevos:** `backend/tests/test_adaptive_e2e_v369.py` (20 tests
+>   E01–E19 + E16b), `frontend/tests/visual/drillProvenance.spec.ts` (2 specs),
+>   `release-notes-v3.69.0.md` (incluye la tabla §C con los **cinco hallazgos
+>   medidos**) y las notas de cabecera de `docs/RELEVO.md`.
+> - **Lo que debe hacer la auditoría `Z`:** dictaminar el **diseño** (apartados
+>   siguientes, siguen siendo válidos como preguntas) **y además** comprobar las
+>   afirmaciones del release **contra el código publicado** — en particular la
+>   regla dura (**diff de código de producto CERO**), la tabla de cobertura
+>   frente a los 10 casos de `X`, la calidad de la aserción de cada escenario y
+>   la honestidad de los cinco hallazgos aceptados como deuda.
+> - **Punto de partida recomendado:** `v3.69.0` (`9a4e70a`) contra `v3.68.0`
+>   (`8acee38`). El `diff` en rutas de producto debe ser **exactamente los bumps
+>   de versión, con CERO líneas de lógica**:
+>   `git diff v3.68.0 v3.69.0 --stat -- backend frontend ':!backend/tests'
+>   ':!frontend/tests'` → **2 ficheros / 2 líneas** (`backend/config.py` y
+>   `frontend/package.json`); cualquier otra línea de producto es **hallazgo
+>   P1**.
+>
 > **Qué es este archivo.** El prompt **autocontenido** para que un auditor externo
 > (que **solo ve el repositorio público** de GitHub) audite el **DISEÑO** del
 > siguiente incremento **antes de que se implemente**. La revisión es **de solo
