@@ -797,7 +797,9 @@ def test_recompute_reseals_only_a_stable_snapshot(monkeypatch, tmp_path):
 
     monkeypatch.setattr(evidence_repo, "evidence_fingerprint", flapping)
 
-    _, seal = asyncio.run(decision_domain._recompute(uid, level="", now=NOW))
+    _, seal, _, _ = asyncio.run(
+        decision_domain._recompute(uid, level="", now=NOW)
+    )
     assert seal == stable
     # before(stale) + after(stable) del intento fallido, y before/after del
     # intento estable: exactamente un reintento.

@@ -37,13 +37,23 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from services import difficulty
+from services import difficulty, task_semantics
 from services.learner_skill import OBSERVED_MIN_DAYS, OBSERVED_MIN_SAMPLES
 from services.planner import LATENCY_CEILING_MS, SLOW_RECALL_MS
 
 # Rango declarado de carga por dimensión (el mismo de `difficulty`).
 LOAD_MIN = 1
 LOAD_MAX = 5
+
+# Ventana de RECENCIA (V3.67): nº de INTENTOS más recientes que describen la
+# tasa `recent_rate`. Es descriptiva (sin ML ni suavizado): solo la tasa cruda de
+# la cola reciente, para que el informe de calibración distinga lo reciente de lo
+# histórico sin inventar una tendencia.
+RECENT_ATTEMPTS = 5
+
+# Separador canónico de la firma de tarea (`task_signature`): detalle de FORMATO,
+# no de identidad. Nunca se expone como contrato.
+_TASK_SIGNATURE_SEPARATOR = "|"
 
 # Tabla DECLARADA y MONÓTONA: pasos que la latencia observada suma a la carga
 # servida. Se reutilizan las constantes declaradas del planner (no se inventan
@@ -273,16 +283,120 @@ def empirical_success(rows: Sequence[Mapping], *, now: str = "") -> dict[str, di
     return result
 
 
+def task_signature_parts(
+    target_id: object,
+    activity: object,
+    support_level: object,
+    served_difficulty: object,
+    context: object = "",
+    assessed_skill: object = "",
+) -> str:
+    """Firma canónica de TAREA (V3.67, pura): identidad completa de la tarea.
+
+    Cierra el P1-01 de la auditoría de V3.66: `target_id` no es una identidad de
+    tarea completa (el MISMO ítem con distinta actividad, apoyo o carga servida es
+    OTRA tarea). La firma combina los SEIS componentes que distinguen una tarea de
+    otra:
+
+        (target_id, activity, support_level, served_difficulty, context,
+         assessed_skill)
+
+    Cada componente se normaliza (`""` cuando falta o no se declara): la clave es
+    estable, determinista byte a byte y nunca lanza. `served_difficulty` se
+    serializa con `difficulty.format_vector` (mismo formato canónico del ledger).
+    """
+    target = str(target_id or "").strip()
+    act = str(activity or "").strip().lower()
+    support = str(support_level or "").strip().lower()
+    served = difficulty.format_vector(served_difficulty)
+    ctx = str(context or "").strip()
+    assessed = str(assessed_skill or "").strip().lower()
+    return _TASK_SIGNATURE_SEPARATOR.join(
+        (target, act, support, served, ctx, assessed)
+    )
+
+
+def task_signature(row: Mapping) -> str:
+    """Firma canónica de una FILA del estado (V3.67, pura).
+
+    Lee los hechos YA proyectados por `skill_state._lexicon_rows`
+    (`facts.activity`, `facts.support_level`, `facts.served_load` y
+    `facts.context_instance`/`facts.context_id`) y la modalidad evaluada.
+    La skill evaluada se deriva de la ACTIVIDAD (`task_semantics.assessed_skill_for`),
+    NO del `modality` canónico del estado (que habla otro vocabulario:
+    `vocabulary`/`writing`/`speaking`): así la firma del ledger y la del candidato
+    (`services.lexicon`) usan el MISMO idioma y la búsqueda empírica por firma
+    puede CASAR. Nunca lanza; una fila no-Mapping devuelve `""`.
+    """
+    if not isinstance(row, Mapping):
+        return ""
+    facts = _facts(row)
+    return task_signature_parts(
+        target_id=row.get("target_id"),
+        activity=facts.get("activity"),
+        support_level=facts.get("support_level"),
+        served_difficulty=facts.get("served_load"),
+        context=facts.get("context_instance") or facts.get("context_id"),
+        assessed_skill=task_semantics.assessed_skill_for(facts.get("activity")),
+    )
+
+
+def _empirical_entry(rows: Sequence[Mapping]) -> dict | None:
+    """Estimación EMPÍRICA de un grupo de intentos (pura; `None` sin muestra).
+
+    Devuelve `{successes, attempts, p_success, p_success_observed, raw_rate,
+    recent_rate, long_term_rate, days}` o `None` si el grupo no cruza la puerta
+    espaciada de V3.54 (`OBSERVED_MIN_SAMPLES` éxitos en `OBSERVED_MIN_DAYS` días
+    naturales distintos).
+
+    V3.67 (honestidad estadística, P2-06/07):
+    - `p_success_observed` es el nombre honesto de la tasa observada;
+    - `p_success` se CONSERVA como alias retrocompatible de V3.66 (retirada cuando
+      exista una capa calibrada que reclame ese nombre);
+    - `raw_rate` = `long_term_rate` = tasa global cruda del grupo;
+    - `recent_rate` = tasa de los últimos `RECENT_ATTEMPTS` intentos (descriptiva).
+
+    Sin ML ni suavizado: todas son tasas CRUDAS. Nunca lanza.
+    """
+    ordered = sorted(
+        (row for row in rows if isinstance(row, Mapping)),
+        key=lambda r: (
+            str(r.get("occurred_at") or ""),
+            str(r.get("id") or r.get("evidence_id") or ""),
+        ),
+    )
+    if not ordered:
+        return None
+    successes = [row for row in ordered if _truthy(row.get("success"))]
+    days = {_day(row) for row in successes if _day(row)}
+    if len(successes) < OBSERVED_MIN_SAMPLES or len(days) < OBSERVED_MIN_DAYS:
+        return None
+    attempts = len(ordered)
+    rate = round(len(successes) / attempts, 3)
+    recent = ordered[-RECENT_ATTEMPTS:]
+    recent_successes = [row for row in recent if _truthy(row.get("success"))]
+    return {
+        "successes": len(successes),
+        "attempts": attempts,
+        "p_success": rate,
+        "p_success_observed": rate,
+        "raw_rate": rate,
+        "recent_rate": round(len(recent_successes) / len(recent), 3),
+        "long_term_rate": rate,
+        "days": len(days),
+    }
+
+
 def empirical_success_by_target(
     rows: Sequence[Mapping], *, now: str = ""
 ) -> dict[str, dict]:
-    """Estimación EMPÍRICA por ITEM (`target_id`) (V3.66).
+    """Estimación EMPÍRICA por ITEM (`target_id`) (V3.66 → V3.67, Nivel A).
 
-    Variante de `empirical_success` que agrupa SOLO por `target_id` (el ítem),
-    sin colapsar por actividad ni dificultad servida: es la granularidad
-    `P(éxito | alumno, tarea)` por pareja que gobernará el Planner 3.0. Reutiliza
-    la MISMA puerta espaciada de V3.54 (`OBSERVED_MIN_SAMPLES`/`OBSERVED_MIN_DAYS`)
-    y devuelve por ítem `{successes, attempts, p_success, days}`. Sin muestra
+    Agrupa SOLO por `target_id` (el ítem), sin colapsar por actividad ni
+    dificultad servida: es la granularidad `P(éxito | alumno, target)` (Nivel A =
+    target empirical de la jerarquía V3.67). Reutiliza la MISMA puerta espaciada de
+    V3.54 y devuelve por ítem el payload de `_empirical_entry` (con
+    `p_success_observed`, `raw_rate`, `recent_rate`, `long_term_rate`). Sin muestra
     espaciada el ítem NO aparece (no se declara estimación). Un ítem sin
     `target_id` (fuente que no declara identidad) no aporta clave: no se inventa.
 
@@ -300,15 +414,39 @@ def empirical_success_by_target(
         grouped.setdefault(target, []).append(dict(row))
     result: dict[str, dict] = {}
     for target, group in grouped.items():
-        successes = [row for row in group if _truthy(row.get("success"))]
-        days = {_day(row) for row in successes if _day(row)}
-        if len(successes) < OBSERVED_MIN_SAMPLES or len(days) < OBSERVED_MIN_DAYS:
+        entry = _empirical_entry(group)
+        if entry is not None:
+            result[target] = entry
+    return result
+
+
+def empirical_success_by_task(
+    rows: Sequence[Mapping], *, now: str = ""
+) -> dict[str, dict]:
+    """Estimación EMPÍRICA por TAREA (`task_signature`) (V3.67, P1-01).
+
+    La granularidad que V3.66 buscaba y no alcanzó: agrupa por la FIRMA canónica de
+    tarea (`task_signature`), de modo que el MISMO `target_id` con distinta
+    actividad, apoyo o carga servida produce una estimación DISTINTA. Es el Nivel
+    `task_empirical` de la jerarquía de resolución `task → target → skill →
+    margin`. Reutiliza la MISMA puerta espaciada de V3.54; sin muestra espaciada la
+    firma NO aparece. Una fila sin identidad de tarea (firma vacía) no aporta
+    clave.
+
+    Sin reloj: `now` se acepta por contrato pero no se usa. Pura y determinista,
+    byte a byte; nunca lanza.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
             continue
-        attempts = len(group)
-        result[target] = {
-            "successes": len(successes),
-            "attempts": attempts,
-            "p_success": round(len(successes) / attempts, 3),
-            "days": len(days),
-        }
+        key = task_signature(row)
+        if not key.strip(_TASK_SIGNATURE_SEPARATOR):
+            continue
+        grouped.setdefault(key, []).append(dict(row))
+    result: dict[str, dict] = {}
+    for key, group in grouped.items():
+        entry = _empirical_entry(group)
+        if entry is not None:
+            result[key] = entry
     return result

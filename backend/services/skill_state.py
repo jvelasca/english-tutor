@@ -331,12 +331,16 @@ def _lexicon_rows(rows: Sequence[Mapping]) -> list[dict]:
                     "served_load": difficulty.parse_vector(
                         row.get("served_difficulty")
                     ),
+                    "declared_load": difficulty.parse_vector(
+                        row.get("declared_difficulty")
+                    ),
                     "support_level": str(row.get("support_level") or "").strip(),
                     "response_time_ms": row.get("response_time_ms"),
                     "error_type": str(row.get("error_type") or "").strip(),
                     "context_instance": str(
                         row.get("context_instance") or ""
                     ).strip(),
+                    "context_id": str(row.get("context_id") or "").strip(),
                     "activity": activity_from_activity_id(row.get("activity_id")),
                 },
             )

@@ -47,6 +47,22 @@ REVIEW_QUEUE_MAX_LIMIT = 50
 # memoria, no una decisión pedagógica (volumen doméstico, SQLite).
 REVIEW_QUEUE_CANDIDATE_LIMIT = 500
 
+# V3.67 (P3-10): contador LOCAL de pérdida silenciosa del provenance. Cuando el
+# upsert de `record_decision` falla (excepción capturada) la cola no rompe, pero
+# la decisión queda SIN registrar; este contador monotónico lo hace visible (se
+# expone en el informe de analítica del Bloque D) sin persistir nada.
+_PROVENANCE_RECORD_FAILURES = 0
+
+
+def provenance_health() -> dict:
+    """Señal de salud del registro de decisiones (V3.67, P3-10; puro).
+
+    Devuelve el número de decisiones que NO se pudieron registrar desde que el
+    proceso arrancó (pérdida silenciosa por excepción best-effort). `0` es lo
+    sano; un valor creciente alerta de un fallo persistente de escritura.
+    """
+    return {"record_failures": _PROVENANCE_RECORD_FAILURES}
+
 
 def _queue_sort_key(item: dict) -> tuple:
     """Orden de la cola: ELV, prioridad, urgencia del scheduler, palabra.
@@ -226,14 +242,20 @@ async def _record_decision_provenance(
     served_items: list[dict],
     by_candidate_word: dict[str, tuple[dict, dict]],
 ) -> None:
-    """Registra una fila de PROVENANCE por decisión servida (V3.66, best-effort).
+    """Registra una fila de PROVENANCE por decisión servida (V3.66 → V3.67).
 
     Solo para los ítems que traen el bloque `decision` del Planner 3.0 (es decir,
     cuando la Decision Projection gobernó el argmax). Cada fila captura la tarea
     elegida, el `p_success` y su FUENTE, el ELV, las alternativas puntuadas y los
-    drivers, junto con las DOS huellas de fingerprint de la decisión.
+    drivers, junto con la metadata de la TAREA (firma canónica, carga servida,
+    apoyo y canal observado) y las DOS huellas de fingerprint de la decisión.
+
+    V3.67 (P1-02): el `decision_id` devuelto por el upsert idempotente se EXPONE
+    en cada ítem servido (`item["decision_id"]`), para que el cliente lo conserve
+    y haga round-trip en los GET/POST del drill. Best-effort: un fallo de
+    escritura nunca rompe la cola (el ítem sale sin `decision_id`).
     """
-    evidence_fingerprint = str(
+    decision_start_fingerprint = str(
         projection.get("decision_start_fingerprint") or ""
     )
     state_fingerprint = str(projection.get("state_fingerprint") or "")
@@ -246,12 +268,15 @@ async def _record_decision_provenance(
         target_id = str((card or {}).get("target_id") or "") or word
         task = item.get("task") or {}
         try:
-            await run_in_threadpool(
+            record = await run_in_threadpool(
                 decision_records_repo.record_decision,
                 user_id,
                 target_id=target_id,
-                evidence_fingerprint=evidence_fingerprint,
-                decision_start_fingerprint=evidence_fingerprint,
+                task_signature=str(item.get("task_signature") or ""),
+                served_load=item.get("served_load"),
+                support_level=str(task.get("support_level") or ""),
+                assessment_mode=str(item.get("assessment_mode") or ""),
+                decision_start_fingerprint=decision_start_fingerprint,
                 state_fingerprint=state_fingerprint,
                 selected_skill=str(task.get("skill") or ""),
                 selected_activity=str(task.get("activity") or ""),
@@ -265,7 +290,11 @@ async def _record_decision_provenance(
                 drivers=decision.get("drivers"),
             )
         except Exception:  # noqa: BLE001 — el provenance nunca rompe la cola
+            global _PROVENANCE_RECORD_FAILURES
+            _PROVENANCE_RECORD_FAILURES += 1
             continue
+        if isinstance(record, dict) and record.get("decision_id"):
+            item["decision_id"] = record["decision_id"]
 
 
 async def _available_recall_cues(words: list[str]) -> dict[str, set[str]]:

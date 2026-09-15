@@ -85,6 +85,18 @@ class ReviewQueueItem(BaseModel):
     # está presente cuando la cola se construye CON proyección (el camino sin
     # ella queda BYTE-IDÉNTICO a V3.63 y este campo se omite).
     decision: dict | None = None
+    # V3.67 (P1-01/P2-04): identidad COMPLETA de la tarea servida (firma
+    # canónica), la carga servida (vector de dificultad) y el canal observado
+    # (`assessment_mode`). Aditivos: alimentan el provenance y el cliente los
+    # ignora si no los usa.
+    task_signature: str = ""
+    served_load: dict | None = None
+    assessment_mode: str = ""
+    # V3.67 (P1-02): id DETERMINISTA de la decisión servida (hash de la
+    # identidad de la tarea + snapshot). El cliente lo conserva y lo devuelve en
+    # los GET/POST del drill para el round-trip del ciclo de vida. Vacío cuando
+    # el ítem no trae bloque `decision` (camino sin proyección).
+    decision_id: str = ""
     competence: dict | None = None
     # V3.40 (Fase 4, gobierno por unidad léxica): formas superficiales de la
     # unidad y transferencia contextual demostrada (éxito en contextos distintos).

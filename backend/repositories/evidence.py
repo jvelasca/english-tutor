@@ -429,8 +429,9 @@ def list_attempt_rows(
         rows = conn.execute(
             "SELECT id, occurred_at, skill, assessed_skill, success, "
             "target_id, surface_form, observed_difficulty, served_difficulty, "
-            "observed_task_difficulty, activity_id, context_instance, "
-            "support_level, response_time_ms, error_type "
+            "observed_task_difficulty, activity_id, context_id, "
+            "context_instance, declared_difficulty, support_level, "
+            "response_time_ms, error_type "
             "FROM learning_evidence "
             "WHERE user_id = ? AND target_type = ? "
             "ORDER BY occurred_at ASC, id ASC",

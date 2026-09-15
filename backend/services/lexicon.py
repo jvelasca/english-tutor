@@ -35,6 +35,7 @@ sigue exponiendo `next_review_days` como estimación ligera del léxico.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from datetime import date, datetime, timezone
 
 from services import (
@@ -44,9 +45,11 @@ from services import (
     fsrs,
     learner_skill,
     mastery,
+    observed_difficulty,
     planner,
     semantics,
     student_state,
+    task_semantics,
 )
 from services.curriculum import CEFR_ORDER
 from services.evidence import (
@@ -556,6 +559,7 @@ def recommend_review_activity(
     drivers: dict | None = None,
     empirical_success: object = None,
     task_empirical_success: object = None,
+    target_empirical_success: object = None,
 ) -> dict:
     """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
 
@@ -617,12 +621,76 @@ def recommend_review_activity(
         drivers=drivers,
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
+        target_empirical_success=target_empirical_success,
     )
     if planned["activity"]:
         return {"activity": planned["activity"], "reason": planned["reason"]}
     if evidence is not None and is_automatic(evidence):
         return {"activity": "recall", "reason": "automatic_maintenance"}
     return {"activity": "recall", "reason": "maintenance"}
+
+
+def _task_empirical_by_activity(
+    by_task: object,
+    task_target: str,
+    task_difficulty: object,
+) -> dict:
+    """Mapa `{activity: estimación empírica por tarea}` para el candidato (V3.67).
+
+    La estimación por TAREA se indexa por la FIRMA completa
+    (`observed_difficulty.task_signature`), no por el `target_id` (P1-01 de
+    V3.66). Aquí se resuelve, para CADA actividad posible del drill, la firma del
+    candidato con sus parámetros conocidos en la cola (ítem, apoyo declarado por
+    actividad, carga declarada y modalidad evaluada); el contexto se resuelve
+    vacío porque se elige en el GET del peldaño. Devuelve un dict (puede ser
+    vacío). Nunca lanza.
+    """
+    if not isinstance(by_task, Mapping) or not by_task:
+        return {}
+    result: dict = {}
+    for activity in planner.ACTIVITY_FOR_SKILL.values():
+        if not activity or activity in result:
+            continue
+        signature = observed_difficulty.task_signature_parts(
+            target_id=task_target,
+            activity=activity,
+            support_level=planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
+            served_difficulty=task_difficulty,
+            context="",
+            assessed_skill=task_semantics.assessed_skill_for(activity),
+        )
+        estimate = by_task.get(signature)
+        if estimate is not None:
+            result[activity] = estimate
+    return result
+
+
+def _task_signature_for(
+    task_target: str,
+    task: dict,
+    task_difficulty: object,
+) -> str:
+    """Firma canónica de la tarea FINAL servida (V3.67, pura y determinista).
+
+    Es la MISMA firma que agrupa el ledger (`observed_difficulty.task_signature`),
+    de modo que el provenance de la decisión y la evidencia empírica hablen el
+    mismo idioma. El contexto se deja vacío (se elige en el GET del peldaño).
+    """
+    activity = (task or {}).get("activity") or ""
+    support = (task or {}).get("support_level") or planner.ACTIVITY_SUPPORT_LEVEL.get(
+        activity, ""
+    )
+    assessed = task_semantics.assessed_skill_for(activity) or (task or {}).get(
+        "skill"
+    ) or ""
+    return observed_difficulty.task_signature_parts(
+        target_id=task_target,
+        activity=activity,
+        support_level=support,
+        served_difficulty=task_difficulty,
+        context="",
+        assessed_skill=assessed,
+    )
 
 
 def review_queue_item(
@@ -718,6 +786,7 @@ def review_queue_item(
     # la proyección (estado unificado); sin ella, EXACTAMENTE de V3.57.
     task_difficulty = difficulty.declared_difficulty(cefr_difficulty(row))
     projection = projection if isinstance(projection, dict) else None
+    task_target = card.get("target_id") or row.get("word") or ""
     if projection is not None:
         capacity_by_skill = projection.get("capacity_by_skill")
         # Degradación DECLARADA (V3.64): la Decision Projection solo gobierna el
@@ -734,27 +803,32 @@ def review_queue_item(
             # proyección. Sin ella (proyección legacy o eje sin muestra) la clave
             # por eje es `{}` y el planner degrada exactamente a V3.64.
             empirical_success = projection.get("empirical_success")
-            # V3.66: la estimación EMPÍRICA por ITEM (target_id). La granularidad
-            # fina se resuelve AQUÍ, en el candidato concreto: la clave del mapa
-            # es el `target_id` de la carta/ítem. Sin mapa (o sin clave para este
-            # ítem) el planner degrada a la granularidad por skill de V3.65.
+            # V3.67 (P1-01): DOS granularidades con nombres honestos. La por TAREA
+            # (firma completa, `empirical_success_by_task`) se resuelve por
+            # ACTIVIDAD en `_task_empirical_by_activity`; la por ITEM
+            # (`empirical_success_by_target`) es el Nivel A de la jerarquía.
             by_task = projection.get("empirical_success_by_task") or {}
-            task_target = card.get("target_id") or row.get("word") or ""
-            task_empirical_success = (
-                by_task.get(task_target) if isinstance(by_task, dict) else None
+            by_target = projection.get("empirical_success_by_target") or {}
+            task_empirical_success = _task_empirical_by_activity(
+                by_task, task_target, task_difficulty
+            )
+            target_empirical_success = (
+                by_target.get(task_target) if isinstance(by_target, dict) else None
             )
         else:
             capacity_by_skill = _capacity_by_skill(learner_state)
             skill_values = None
             drivers = None
             empirical_success = None
-            task_empirical_success = None
+            task_empirical_success = {}
+            target_empirical_success = None
     else:
         capacity_by_skill = _capacity_by_skill(learner_state)
         skill_values = None
         drivers = None
         empirical_success = None
-        task_empirical_success = None
+        task_empirical_success = {}
+        target_empirical_success = None
     recommendation = recommend_review_activity(
         row,
         matrix,
@@ -766,6 +840,7 @@ def review_queue_item(
         drivers=drivers,
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
+        target_empirical_success=target_empirical_success,
     )
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
@@ -789,6 +864,7 @@ def review_queue_item(
         drivers=drivers,
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
+        target_empirical_success=target_empirical_success,
     )
     learning_value = _learning_value(
         row,
@@ -800,6 +876,7 @@ def review_queue_item(
         skill_values=skill_values,
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
+        target_empirical_success=target_empirical_success,
     )
     recommended_cue = ""
     if recommendation["activity"] == "recall":
@@ -847,6 +924,14 @@ def review_queue_item(
         # V3.51: vector completo de prioridad por modalidad (aditivo).
         "skill_priorities": planner.skill_priorities(signals),
         "task": task,
+        # V3.67 (P1-01/P2-04): identidad COMPLETA de la tarea servida y los
+        # hechos que el provenance registra (carga servida y canal observado).
+        # El `decision_id` lo calcula el llamador (necesita el `user_id`).
+        "task_signature": _task_signature_for(task_target, task, task_difficulty),
+        "served_load": dict(task_difficulty),
+        "assessment_mode": task_semantics.assessment_mode_for(
+            task.get("activity") or ""
+        ),
         **({"decision": decision} if decision is not None else {}),
         "competence": matrix,
         # V3.40 (Fase 4): estado a nivel de UNIDAD (formas hermanas) y
@@ -899,6 +984,7 @@ def _task_decision(
     drivers: dict | None = None,
     empirical_success: object = None,
     task_empirical_success: object = None,
+    target_empirical_success: object = None,
 ) -> tuple[dict, dict | None]:
     """Decisión de tarea expuesta en la cola (V3.39 → V3.64, puro).
 
@@ -924,6 +1010,7 @@ def _task_decision(
         drivers=drivers,
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
+        target_empirical_success=target_empirical_success,
     )
     decision = None
     if isinstance(planned.get("decision"), dict):
@@ -956,6 +1043,7 @@ def _learning_value(
     skill_values: dict | None = None,
     empirical_success: object = None,
     task_empirical_success: object = None,
+    target_empirical_success: object = None,
 ) -> dict:
     """Predicción de éxito de la tarea del ítem (V3.56 → V3.57, puro).
 
@@ -984,6 +1072,11 @@ def _learning_value(
     value = None
     if isinstance(skill_values, dict):
         value = skill_values.get(skill)
+    # V3.67 (P1-01): la estimación por TAREA se resuelve por la ACTIVIDAD de la
+    # tarea final (`planner._task_empirical_for`), no por el ítem.
+    task_emp = planner._task_empirical_for(
+        task_empirical_success, (task or {}).get("activity") or ""
+    )
     return planner.expected_learning_value(
         signals,
         skill=skill,
@@ -996,7 +1089,8 @@ def _learning_value(
             if isinstance(empirical_success, dict)
             else None
         ),
-        task_empirical_success=task_empirical_success,
+        task_empirical_success=task_emp,
+        target_empirical_success=target_empirical_success,
     )
 
 

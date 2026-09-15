@@ -283,7 +283,9 @@ def _empirical_p_success(value: object) -> float | None:
     if value is None or isinstance(value, bool):
         return None
     if isinstance(value, Mapping):
-        value = value.get("p_success")
+        # V3.67: `p_success_observed` es el nombre honesto de la tasa observada;
+        # `p_success` se conserva como alias retrocompatible de V3.66.
+        value = value.get("p_success_observed", value.get("p_success"))
     if value is None or isinstance(value, bool):
         return None
     try:
@@ -309,8 +311,9 @@ def expected_learning_value(
     capacity_skill: str = "",
     empirical_success: object = None,
     task_empirical_success: object = None,
+    target_empirical_success: object = None,
 ) -> dict:
-    """Valor ESPERADO de aprendizaje de la tarea (V3.56 → V3.57, puro).
+    """Valor ESPERADO de aprendizaje de la tarea (V3.56 → V3.67, puro).
 
     Combina el valor pedagógico declarado (`priority_score(signals)`, los MISMOS
     pesos) con la probabilidad de éxito por margen de capacidad:
@@ -329,12 +332,21 @@ def expected_learning_value(
     tarea pasa el valor POR MODALIDAD de `skill_priorities`) y `capacity_skill`
     (informativo). Los llamadores de V3.56 no cambian.
 
-    V3.66 (aditivo) añade `task_empirical_success` (la estimación EMPÍRICA por
-    ITEM) y la política de resolución declarada: la tasa por ITEM gobierna si
-    existe; si no, la tasa por SKILL (`empirical_success`); si no, el margen
-    declarado de V3.64. El payload añade `p_success_source`
-    (`task_empirical` | `skill_empirical` | `margin`) y `task_p_success` (la tasa
-    por ítem cuando está declarada). Sin estimación la salida es EXACTAMENTE la de
+    V3.66 (aditivo) añadió `task_empirical_success` (la estimación EMPÍRICA por
+    ITEM). V3.67 reetiqueta esa granularidad con honestidad y cierra el P1-01 con
+    la jerarquía de CUATRO niveles:
+
+        1) `task_empirical_success`    — P(éxito | alumno, TAREA) (la firma
+                                          completa; la observación más específica);
+        2) `target_empirical_success`  — P(éxito | alumno, TARGET) (lo que V3.66
+                                          llamaba erróneamente "task");
+        3) `empirical_success`         — P(éxito | alumno, SKILL) (base rate de
+                                          V3.65);
+        4) margen declarado de capacidad (V3.64).
+
+    `p_success_source` toma `task_empirical` | `target_empirical` |
+    `skill_empirical` | `margin`; `task_p_success` y `target_p_success` se añaden
+    cuando su nivel está declarado. Sin estimación la salida es EXACTAMENTE la de
     V3.64/V3.65.
     """
     if value is None:
@@ -346,16 +358,17 @@ def expected_learning_value(
             base = priority_score(signals)
     margin = capacity_margin(task_difficulty, learner_capacity)
     p_success = success_probability(margin)
-    # V3.66 (aditivo): política de resolución de `p_success` por granularidad.
-    # 1) tasa empírica por ITEM (la observación más específica);
-    # 2) tasa empírica por SKILL (base rate de V3.65);
-    # 3) margen declarado de capacidad (V3.64).
+    # V3.67 (P1-01): jerarquía de resolución de `p_success` por granularidad.
     task_empirical = _empirical_p_success(task_empirical_success)
+    target_empirical = _empirical_p_success(target_empirical_success)
     empirical = _empirical_p_success(empirical_success)
     p_success_source = "margin"
     if task_empirical is not None:
         p_success = task_empirical
         p_success_source = "task_empirical"
+    elif target_empirical is not None:
+        p_success = target_empirical
+        p_success_source = "target_empirical"
     elif empirical is not None:
         p_success = empirical
         p_success_source = "skill_empirical"
@@ -368,13 +381,18 @@ def expected_learning_value(
         "margin": margin,
         "skill": skill,
         "capacity_skill": str(capacity_skill or ""),
-        # V3.66 (aditivo): la FUENTE de `p_success` y la tasa por ITEM cuando
-        # está declarada (auditabilidad del Planner 3.0). No altera V3.64/V3.65.
+        # La FUENTE de `p_success` (auditabilidad del Planner 3.0).
         "p_success_source": p_success_source,
     }
     if task_empirical is not None:
         result["task_p_success"] = task_empirical
-    if empirical is not None or task_empirical is not None:
+    if target_empirical is not None:
+        result["target_p_success"] = target_empirical
+    if (
+        empirical is not None
+        or task_empirical is not None
+        or target_empirical is not None
+    ):
         result["p_success_empirical"] = True
     return result
 
@@ -822,6 +840,7 @@ def select_task_by_elv(
     drivers: dict | None = None,
     empirical_success: object = None,
     task_empirical_success: object = None,
+    target_empirical_success: object = None,
 ) -> dict:
     """Tarea ÓPTIMA por argmax de ELV entre las candidatas admisibles (V3.57).
 
@@ -865,6 +884,15 @@ def select_task_by_elv(
     observación más específica; la tasa por skill queda como base rate. La salida
     añade `p_success_source` (`task_empirical` | `skill_empirical` | `margin`) y
     `task_p_success`. Sin ella la salida es EXACTAMENTE la de V3.65.
+
+    V3.67 (P1-01, ADITIVO) reetiqueta esa granularidad con honestidad:
+    `task_empirical_success` pasa a ser `{activity: estimación}` (la firma
+    COMPLETA de tarea, resuelta por actividad) y se añade
+    `target_empirical_success` (la estimación por ITEM, lo que V3.66 llamaba
+    "task"). La jerarquía queda `task → target → skill → margin`; la salida puede
+    marcar `p_success_source = "target_empirical"` y añadir `target_p_success`. Un
+    `task_empirical_success` con forma de payload escalar (con `p_success`/
+    `p_success_observed`) se sigue aceptando por retrocompatibilidad. Nunca lanza.
     """
     if not isinstance(capacity_by_skill, dict) or not capacity_by_skill:
         return _attach_decision(
@@ -885,6 +913,7 @@ def select_task_by_elv(
     for candidate in candidates:
         skill = candidate.get("skill") or ""
         channel = capacity_skill(skill)
+        activity = candidate.get("activity") or ""
         payload = expected_learning_value(
             signals or {},
             skill=skill,
@@ -893,12 +922,15 @@ def select_task_by_elv(
             value=_projected_value(skill_values, priorities, skill, base_value),
             capacity_skill=channel,
             empirical_success=_empirical_for(empirical_success, skill),
-            task_empirical_success=task_empirical_success,
+            task_empirical_success=_task_empirical_for(
+                task_empirical_success, activity
+            ),
+            target_empirical_success=target_empirical_success,
         )
         scored.append(
             {
                 "skill": skill,
-                "activity": candidate.get("activity") or "",
+                "activity": activity,
                 "expected_learning_value": payload["expected_learning_value"],
                 "p_success": payload["p_success"],
                 "p_success_empirical": bool(payload.get("p_success_empirical")),
@@ -911,6 +943,8 @@ def select_task_by_elv(
         )
         if payload.get("task_p_success") is not None:
             scored[-1]["task_p_success"] = payload["task_p_success"]
+        if payload.get("target_p_success") is not None:
+            scored[-1]["target_p_success"] = payload["target_p_success"]
         if payload["margin"] is None:
             continue
         if payload["expected_learning_value"] > best_value:
@@ -971,6 +1005,25 @@ def _empirical_for(empirical_success: object, skill: str) -> object:
     if not isinstance(empirical_success, Mapping):
         return None
     return empirical_success.get(skill)
+
+
+def _task_empirical_for(task_empirical_success: object, activity: str) -> object:
+    """Estimación empírica POR TAREA de una actividad (`None` si no hay; pura).
+
+    V3.67 (P1-01): `task_empirical_success` es `{activity: estimación}` — la clave
+    es la actividad del drill (`recall`/`write`/`sentence`/`transfer`), no el
+    `target_id`. Un `Mapping` que YA sea un payload escalar (lleva `p_success` o
+    `p_success_observed`) se devuelve tal cual (retrocompatibilidad V3.66); un
+    valor no-Mapping también (degradación tolerante). Nunca lanza.
+    """
+    if not isinstance(task_empirical_success, Mapping):
+        return task_empirical_success
+    if (
+        "p_success" in task_empirical_success
+        or "p_success_observed" in task_empirical_success
+    ):
+        return task_empirical_success
+    return task_empirical_success.get(activity)
 
 
 def _driver_of(drivers: object, skill: str) -> dict:

@@ -572,6 +572,9 @@ class RecognitionAttemptIn(BaseModel):
     word: str = Field(min_length=1, max_length=120)
     selected_index: int = Field(ge=0)
     question_id: str = Field(default="", max_length=64)
+    # V3.67 (P1-02): id de la decisión servida en la cola (round-trip del
+    # ciclo de vida). Opcional: sin él el intento se registra igual.
+    decision_id: str = Field(default="", max_length=64)
 
 
 class RecognitionAttemptOut(BaseModel):
@@ -643,6 +646,8 @@ class RecallAttemptIn(BaseModel):
     response_time_ms: int | None = Field(
         default=None, ge=0, le=600_000
     )
+    # V3.67 (P1-02): id de la decisión servida en la cola (round-trip).
+    decision_id: str = Field(default="", max_length=64)
 
 
 class RecallAttemptOut(BaseModel):
@@ -687,6 +692,8 @@ class WriteAttemptIn(BaseModel):
     word: str = Field(min_length=1, max_length=120)
     text: str = Field(default="", max_length=MAX_WRITE_CHARS)
     response_time_ms: int | None = Field(default=None, ge=0, le=600_000)
+    # V3.67 (P1-02): id de la decisión servida en la cola (round-trip).
+    decision_id: str = Field(default="", max_length=64)
 
 
 class WriteAttemptOut(BaseModel):
@@ -847,6 +854,8 @@ class TransferAttemptIn(BaseModel):
     context_id: str = Field(default="", max_length=120)
     context_instance: str = Field(default="", max_length=200)
     response_time_ms: int | None = Field(default=None, ge=0, le=600_000)
+    # V3.67 (P1-02): id de la decisión servida en la cola (round-trip).
+    decision_id: str = Field(default="", max_length=64)
 
 
 class TransferAttemptOut(BaseModel):

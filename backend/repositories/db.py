@@ -97,9 +97,12 @@ def init_db() -> None:
             )
             """
         )
-        # V3.66 (Decision Provenance): registro append-only de CADA decisión de
-        # tarea servida, para poder reconstruir qué evidencia y qué política
-        # gobernaron el `p_success` de una carta. Nunca se actualiza ni se borra.
+        # V3.66 (Decision Provenance): registro de CADA decisión de tarea servida,
+        # para poder reconstruir qué evidencia y qué política gobernaron el
+        # `p_success` de una carta. V3.67 (P1-02) pasa de append-only a UPSERT por
+        # `decision_id` determinista (la misma decisión no duplica filas) y añade
+        # el CICLO DE VIDA (computed → served → started → completed/abandoned) y
+        # la metadata de tarea (firma, contexto, carga servida, apoyo, canal).
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS decision_records (
@@ -108,7 +111,6 @@ def init_db() -> None:
                 decision_id TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 target_id TEXT NOT NULL DEFAULT '',
-                evidence_fingerprint TEXT NOT NULL DEFAULT '',
                 decision_start_fingerprint TEXT NOT NULL DEFAULT '',
                 state_fingerprint TEXT NOT NULL DEFAULT '',
                 policy_version TEXT NOT NULL DEFAULT '',
@@ -123,6 +125,49 @@ def init_db() -> None:
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
+        )
+        # Migración aditiva e idempotente de V3.67 (P1-02/P2-04/P3): identidad
+        # completa de la TAREA, ciclo de vida y señal de best-effort. Las filas
+        # legacy quedan con los defaults (status `computed`, timestamps vacíos).
+        decision_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(decision_records)")
+        }
+        # P3-09: eliminar el alias confuso `evidence_fingerprint` (V3.66). El
+        # valor era idéntico a `decision_start_fingerprint` (se escribían
+        # duplicados): la columna legacy se descarta sin perder información.
+        # Guardado: SQLite < 3.35 no soporta DROP COLUMN, y la columna sobrante
+        # es inofensiva (ya no se lee ni se escribe).
+        if "evidence_fingerprint" in decision_cols:
+            try:
+                conn.execute(
+                    "ALTER TABLE decision_records DROP COLUMN evidence_fingerprint"
+                )
+                decision_cols.discard("evidence_fingerprint")
+            except Exception:  # noqa: BLE001 — SQLite viejo conserva la columna
+                pass
+        for _col, _type in (
+            ("task_signature", "TEXT NOT NULL DEFAULT ''"),
+            ("context_id", "TEXT NOT NULL DEFAULT ''"),
+            ("context_instance", "TEXT NOT NULL DEFAULT ''"),
+            ("served_load_json", "TEXT NOT NULL DEFAULT ''"),
+            ("support_level", "TEXT NOT NULL DEFAULT ''"),
+            ("assessment_mode", "TEXT NOT NULL DEFAULT ''"),
+            ("decision_status", "TEXT NOT NULL DEFAULT 'computed'"),
+            ("served_at", "TEXT NOT NULL DEFAULT ''"),
+            ("started_at", "TEXT NOT NULL DEFAULT ''"),
+            ("completed_at", "TEXT NOT NULL DEFAULT ''"),
+            ("outcome", "TEXT NOT NULL DEFAULT ''"),
+            ("provenance_status", "TEXT NOT NULL DEFAULT 'recorded'"),
+        ):
+            if _col not in decision_cols:
+                conn.execute(
+                    f"ALTER TABLE decision_records ADD COLUMN {_col} {_type}"
+                )
+        # `decision_id` es la clave de idempotencia: la misma decisión (mismo
+        # hash) no puede duplicar fila. Las filas V3.66 usaban uuid4 (ya únicas).
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_decision_records_decision_id "
+            "ON decision_records(decision_id)"
         )
         conn.execute(
             """

@@ -10,6 +10,7 @@ import config
 from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
 from domain import vocabulary as vocabulary_service
+from repositories import decision_records as decision_records_repo
 from schemas.vocabulary import (
     DictionaryEntryOut,
     DictionaryLookupRequest,
@@ -39,6 +40,36 @@ from services.stt import exceeds_max_duration, transcribe_with_timing
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _mark_served(decision_id: str) -> None:
+    """Round-trip V3.67 (P1-02): marca la decisión como SERVIDA (best-effort).
+
+    El `decision_id` llega del ítem de la cola y el cliente lo devuelve en el
+    GET del peldaño. Un fallo de escritura nunca rompe el GET.
+    """
+    if not decision_id:
+        return
+    try:
+        await run_in_threadpool(decision_records_repo.mark_served, decision_id)
+    except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
+        logger.debug("mark_served falló para %s", decision_id, exc_info=True)
+
+
+async def _mark_completed(decision_id: str, outcome: str) -> None:
+    """Round-trip V3.67 (P1-02): cierra la decisión con el resultado (best-effort).
+
+    El `outcome` es el veredicto del intento (`ok`/`ko`/`unclear`), la pieza que
+    habilita la calibración "¿el Planner acertó?" del Bloque D.
+    """
+    if not decision_id:
+        return
+    try:
+        await run_in_threadpool(
+            decision_records_repo.mark_completed, decision_id, outcome
+        )
+    except Exception:  # noqa: BLE001 — el ciclo de vida es best-effort
+        logger.debug("mark_completed falló para %s", decision_id, exc_info=True)
 
 
 @router.post("/api/vocabulary/analyze", response_model=VocabularyAnalyzeResponse)
@@ -165,10 +196,12 @@ async def drill_attempt(
 @router.get("/api/vocabulary/drill/sentence-context", response_model=SentenceContextOut)
 async def drill_sentence_context(
     word: str = Query(..., min_length=1, max_length=120),
+    decision_id: str = Query("", max_length=64),
     user: dict = Depends(current_user),
 ) -> dict:
     """Frase de contexto del paso Sentence del drill (V3.21/F6.1): determinista,
     sin LLM (banco de frases de pronunciación del nivel o plantilla simple)."""
+    await _mark_served(decision_id)
     return await vocabulary_service.get_sentence_context(user["id"], word)
 
 
@@ -179,6 +212,7 @@ async def drill_sentence_context(
 async def drill_sentence_attempt(
     word: str = Form(..., max_length=120),
     file: UploadFile = File(...),
+    decision_id: str = Form(""),
     user: dict = Depends(current_user),
 ) -> dict:
     """Intento del paso Sentence del drill (V3.21/F6.1): repite la frase de
@@ -218,6 +252,7 @@ async def drill_sentence_attempt(
         if asr_status != "ok"
         else ("ok" if result["passed"] else "ko")
     )
+    await _mark_completed(decision_id, outcome)
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{word}:sentence:{outcome}"
     )
@@ -249,6 +284,7 @@ async def drill_write_attempt(
         response_time_ms=body.response_time_ms,
     )
     outcome = "ok" if result["passed"] else "ko"
+    await _mark_completed(body.decision_id, outcome)
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{body.word}:write:{outcome}"
     )
@@ -261,6 +297,7 @@ async def drill_write_attempt(
 )
 async def drill_transfer_context(
     word: str = Query(..., min_length=1, max_length=120),
+    decision_id: str = Query("", max_length=64),
     user: dict = Depends(current_user),
 ) -> dict:
     """Consigna de TRANSFERENCIA del drill (V3.40 → V3.43).
@@ -277,6 +314,7 @@ async def drill_transfer_context(
         raise HTTPException(
             status_code=422, detail="La palabra buscada no es válida"
         )
+    await _mark_served(decision_id)
     return await vocabulary_service.get_transfer_context(user["id"], normalized)
 
 
@@ -310,6 +348,7 @@ async def drill_transfer_attempt(
         context_instance=body.context_instance,
     )
     outcome = "ok" if result["passed"] else "ko"
+    await _mark_completed(body.decision_id, outcome)
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{body.word}:transfer:{outcome}"
     )
@@ -321,6 +360,7 @@ async def drill_transfer_attempt(
 )
 async def drill_recognition_question(
     word: str = Query(..., min_length=1, max_length=120),
+    decision_id: str = Query("", max_length=64),
     user: dict = Depends(current_user),
 ) -> dict:
     """Pregunta del paso Recognition del drill (V3.33, eslabón 2 del puente).
@@ -334,6 +374,7 @@ async def drill_recognition_question(
     `available=false` con `options=[]` (degradación controlada, sin evento). La
     respuesta NUNCA incluye la opción correcta: el POST es quien puntúa."""
     try:
+        await _mark_served(decision_id)
         return await vocabulary_service.get_recognition_question(
             user["id"], word
         )
@@ -374,6 +415,7 @@ async def drill_recognition_attempt(
             detail="La palabra ya no tiene pregunta de reconocimiento",
         ) from None
     outcome = "ok" if result["correct"] else "ko"
+    await _mark_completed(body.decision_id, outcome)
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{result['word']}:recognition:{outcome}"
     )
@@ -384,6 +426,7 @@ async def drill_recognition_attempt(
 async def drill_recall_prompt(
     word: str = Query(..., min_length=1, max_length=120),
     cue: str = Query("", max_length=32),
+    decision_id: str = Query("", max_length=64),
     user: dict = Depends(current_user),
 ) -> dict:
     """Cue del paso Recall del drill (V3.34; peldaños graduados en V3.37).
@@ -400,6 +443,7 @@ async def drill_recall_prompt(
     defecto de V3.34 (traducción y, si no, definición). Un `cue` no soportado
     responde 422 sin evento."""
     try:
+        await _mark_served(decision_id)
         return await vocabulary_service.get_recall_prompt(
             user["id"], word, cue or None
         )
@@ -448,6 +492,7 @@ async def drill_recall_attempt(
             detail="La palabra ya no tiene pregunta de recall",
         ) from None
     outcome = "ok" if result["correct"] else "ko"
+    await _mark_completed(body.decision_id, outcome)
     await learning_service.record_event(
         user["id"], "exercise", f"drill:{result['word']}:recall:{outcome}"
     )

@@ -5,6 +5,92 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-15 (UTC+2).
 >
+> **Nota (2026-09-15): V3.67.0 (Task Identity 2.0 + Decision Lifecycle +
+> Provenance Analytics)**
+> — release **v3.67.0**, **SIN migración destructiva** (migración ADITIVA e
+> idempotente sobre `decision_records`), **SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco y SIN cambios de UI**, que cierra los **DOS P1** de la auditoría
+> de V3.66: **P1-01** la identidad de tarea deja de ser el `target_id` y pasa a
+> ser `task_signature` (la firma canónica de **SEIS** componentes), de modo que el
+> MISMO ítem con distinta actividad, apoyo o carga servida es **OTRA** tarea; y
+> **P1-02** el Decision Provenance deja de ser append-only escrito en el GET y
+> pasa a ser un **UPSERT idempotente** con `decision_id` DETERMINISTA y **ciclo de
+> vida** `computed → served → started → completed/abandoned`, con round-trip del
+> cliente por los GET/POST del drill.
+> **(A) Task Identity 2.0 (`services/observed_difficulty.py`).**
+> `task_signature_parts()` (pura, determinista) combina `(target_id, activity,
+> support_level, served_difficulty, context, assessed_skill)` con
+> `difficulty.format_vector` y normaliza los componentes ausentes a `""`;
+> `task_signature(row)` deriva la firma de una FILA del estado usando
+> `task_semantics.assessed_skill_for(activity)` (**NO** el `modality` canónico del
+> estado, que habla otro vocabulario) para que la firma del **ledger** y la del
+> **candidato** CASEN; nueva `empirical_success_by_task(rows)` que agrupa por
+> FIRMA (Nivel `task_empirical`) con la MISMA puerta espaciada de V3.54.
+> **(B) Estadística honesta (P2-06/07).** `_empirical_entry()` devuelve
+> `p_success_observed` (nombre honesto), `raw_rate` = `long_term_rate` (tasa
+> global CRUDA) y `recent_rate` (últimos `RECENT_ATTEMPTS = 5` intentos,
+> **descriptiva**: no es una tendencia ni hay suavizado); `p_success` se CONSERVA
+> como alias retrocompatible de V3.66.
+> **(C) Jerarquía de CUATRO niveles (`services/planner.py`).**
+> `expected_learning_value`/`select_task_by_elv` ganan `target_empirical_success` y
+> resuelven `p_success` con el orden `task_empirical` > `target_empirical` >
+> `skill_empirical` > `margin`; `_task_empirical_for(by_activity, activity)`
+> resuelve la tasa por TAREA por ACTIVIDAD del drill (y acepta un payload escalar
+> retrocompatible); el payload añade `p_success_source = "target_empirical"` y
+> `target_p_success`. Sin estimación la salida es EXACTAMENTE la de V3.64/V3.65.
+> **(D) Decision Lifecycle (P1-02, `repositories/decision_records.py` + `db.py`).**
+> `decision_id` pasa de `uuid4` a hash determinista (`build_decision_id`: sha256
+> de `user_id`/`target_id`/`task_signature`/`decision_start_fingerprint`/
+> `policy_version`) y `record_decision()` pasa de INSERT a **UPSERT**
+> (`ON CONFLICT(decision_id) DO UPDATE`) con índice único
+> `idx_decision_records_decision_id` — el ciclo GET→GET→GET ya **no duplica
+> filas**; transiciones `mark_served`/`mark_started`/`mark_completed(decision_id,
+> outcome)` sobre `computed`/`served`/`started`/`completed`/`abandoned`;
+> `DECISION_POLICY_VERSION = "v3.67.0"`.
+> **(E) Migración aditiva e idempotente (`db.py`).** Se elimina el alias confuso
+> `evidence_fingerprint` (P3-09: duplicaba `decision_start_fingerprint`) con guarda
+> para SQLite sin `DROP COLUMN`, y se añaden 12 columnas con defaults
+> (`task_signature`, `context_id`, `context_instance`, `served_load_json`,
+> `support_level`, `assessment_mode`, `decision_status`, `served_at`,
+> `started_at`, `completed_at`, `outcome`, `provenance_status`); las filas legacy
+> quedan con los defaults (status `computed`).
+> **(F) Snapshot coherente (P2, `domain/decision.py`).** `_recompute()` devuelve el
+> estado y AMBOS mapas empíricos **DENTRO del mismo lazo de sellado**, de modo que
+> `state_fingerprint` y el mapa describen el MISMO snapshot de evidencia;
+> `review.py` (P3-10) expone `provenance_health()` con el contador local de
+> pérdida silenciosa del registro.
+> **(G) Léxico (`services/lexicon.py`).** `_task_empirical_by_activity()` resuelve
+> la firma del candidato para cada actividad posible y `_task_signature_for()`
+> produce la firma de la tarea FINAL servida (la MISMA que agrupa el ledger); el
+> ítem servido expone `task_signature`/`served_load`/`assessment_mode`.
+> **(H) Round-trip del ciclo de vida (`domain/review.py` + `routers/vocabulary.py`
+> + esquemas).** El `decision_id` se propaga a cada ítem servido; los GET de
+> peldaño llaman `mark_served` y los POST de intento
+> `mark_completed(decision_id, outcome)` (`ok`/`ko`/`unclear`); los esquemas de
+> intento ganan `decision_id` opcional. Todo **best-effort** (nunca rompe la cola
+> ni el drill).
+> **(I) Analítica del provenance (P3-10/11/12).** Nuevo
+> `GET /api/learning/decisions` (solo lectura) con `list_decisions` (filtros
+> `status`/`target_id`, paginación) y `calibration_report` (predicted vs observed
+> por bandas de 0.2 sobre las filas `completed`, con `calibration_error` medio
+> ponderado).
+> **Tests:** `backend/tests/test_decision_v367.py` (**12**, test-first) fija el
+> determinismo y la sensibilidad de la firma, la firma distinguiendo **DOS
+> actividades del MISMO `target_id`** (el cierre del P1-01), la puerta espaciada,
+> las tasas `raw`/`recent`/`long_term`, la jerarquía completa, la idempotencia del
+> UPSERT, la metadata de tarea, las transiciones del ciclo de vida y el informe de
+> calibración; actualizados `test_decision_v366.py` (ítem → `target_empirical`) y
+> `test_decision_projection_v364.py` (nueva aridad de `_recompute`).
+> **Honestidad:** la identidad de tarea es AHORA la firma completa (P1-01 cerrado)
+> y el provenance es idempotente con ciclo de vida (P1-02 cerrado); el informe de
+> calibración es **descriptivo** (sin ML ni suavizado) y `recent_rate` es una tasa
+> cruda de la cola reciente, no una tendencia. La firma del candidato resuelve el
+> contexto **vacío** (se elige en el GET del peldaño): casa con el ledger en los
+> cinco componentes restantes.
+> **Fuera de alcance (V3.68+):** Adaptive Instance Selection (elegir la INSTANCIA
+> dentro de la tarea), Sense Engine 2.0 y los P2 de calibración pedagógica. Ver
+> `release-notes-v3.67.0.md`.
+>
 > **Nota (2026-09-14): V3.60.0 (Context Engine 4.0 — Instance Specification →
 > Parameterized Instance)**
 > — release **v3.60.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` y

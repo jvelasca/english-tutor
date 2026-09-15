@@ -81,18 +81,26 @@ async def canonical_sources(user_id: str) -> dict:
     }
 
 
-async def _task_empirical_success(user_id: str) -> dict[str, dict]:
-    """Mapa EMPÍRICO por ITEM (`target_id`) desde el ledger léxico (V3.66, I/O).
+async def _empirical_maps(user_id: str) -> tuple[dict, dict]:
+    """Mapas EMPÍRICOS por TAREA y por ITEM desde el ledger léxico (V3.67, I/O).
 
-    Lee `list_attempt_rows` (éxitos Y fallos con identidad de ítem) y deriva las
-    filas canónicas léxicas con `skill_state_sources`, para aplicar después la
-    granularidad fina de `observed_difficulty.empirical_success_by_target`. Es una
-    lectura INDEPENDIENTE de la caché del estado (un read por construcción de la
-    proyección): el mapa describe el ledger del candidato, no la celda agregada.
+    Lee `list_attempt_rows` (éxitos Y fallos con identidad de ítem y contexto) y
+    deriva las filas canónicas léxicas con `skill_state_sources`, para aplicar
+    después las DOS granularidades de V3.67:
+
+    - `empirical_success_by_task` — por `task_signature` (la TAREA completa);
+    - `empirical_success_by_target` — por `target_id` (el ITEM; Nivel A).
+
+    Es una lectura INDEPENDIENTE de la caché del estado (un read por construcción
+    de la proyección): el mapa describe el ledger del candidato, no la celda
+    agregada. Devuelve `(by_task, by_target)`.
     """
     attempts = await run_in_threadpool(evidence_repo.list_attempt_rows, user_id)
     rows = skill_state_service.skill_state_sources(lexicon=attempts)
-    return observed_difficulty.empirical_success_by_target(rows)
+    return (
+        observed_difficulty.empirical_success_by_task(rows),
+        observed_difficulty.empirical_success_by_target(rows),
+    )
 
 
 def _seal_state(state: dict) -> str:
@@ -106,31 +114,39 @@ def _seal_state(state: dict) -> str:
 _SEAL_MAX_ATTEMPTS = 3
 
 
-async def _recompute(user_id: str, *, level: str, now: str) -> tuple[dict, str]:
-    """Recomputa el estado desde las cuatro fuentes y lo re-sella (V3.64).
+async def _recompute(
+    user_id: str, *, level: str, now: str
+) -> tuple[dict, str, dict, dict]:
+    """Recomputa el estado desde las cuatro fuentes y lo re-sella (V3.64 → V3.67).
 
-    Devuelve `(estado, sello)`. El invariante de sellado es: el sello guardado
-    debe ser ≤ (en evidencia) el estado, NUNCA mayor. Por eso la huella se toma
-    ANTES y DESPUÉS de leer las fuentes: si entrara evidencia en medio (huella
-    distinta), se reintenta; si tras agotar los reintentos siguen sin coincidir,
-    se devuelve el sello ANTERIOR (más viejo que el estado), de modo que la caché
-    se reportará NO fresca y se recomputará, en lugar de servir un estado viejo
-    sellado con una huella nueva.
+    Devuelve `(estado, sello, by_task, by_target)`. El invariante de sellado es:
+    el sello guardado debe ser ≤ (en evidencia) el estado, NUNCA mayor. Por eso la
+    huella se toma ANTES y DESPUÉS de leer las fuentes: si entrara evidencia en
+    medio (huella distinta), se reintenta; si tras agotar los reintentos siguen
+    sin coincidir, se devuelve el sello ANTERIOR (más viejo que el estado), de
+    modo que la caché se reportará NO fresca y se recomputará, en lugar de servir
+    un estado viejo sellado con una huella nueva.
+
+    V3.67 (P2, snapshot coherente): los mapas empíricos (`by_task`/`by_target`) se
+    derivan de las MISMAS filas canónicas que el estado, DENTRO del mismo lazo de
+    sellado. Así `state_fingerprint` y el mapa empírico describen el MISMO
+    snapshot de evidencia (la decisión es válida contra `state_fingerprint`).
     """
     for _ in range(_SEAL_MAX_ATTEMPTS):
         seal_before = await run_in_threadpool(
             evidence_repo.evidence_fingerprint, user_id
         )
         sources = await canonical_sources(user_id)
-        state = skill_state_service.skill_state(
-            sources["state_rows"], level=level, now=now
-        )
+        rows = sources["state_rows"]
+        state = skill_state_service.skill_state(rows, level=level, now=now)
+        by_task = observed_difficulty.empirical_success_by_task(rows)
+        by_target = observed_difficulty.empirical_success_by_target(rows)
         seal_after = await run_in_threadpool(
             evidence_repo.evidence_fingerprint, user_id
         )
         if seal_before == seal_after:
-            return state, seal_after
-    return state, seal_before
+            return state, seal_after, by_task, by_target
+    return state, seal_before, by_task, by_target
 
 
 def project_state(
@@ -141,6 +157,7 @@ def project_state(
     snapshot_fingerprint: str = "",
     state_fingerprint: str = "",
     empirical_success_by_task: dict[str, dict] | None = None,
+    empirical_success_by_target: dict[str, dict] | None = None,
 ) -> dict:
     """Proyecta un estado YA calculado a un payload de decisión (V3.64, puro).
 
@@ -162,9 +179,11 @@ def project_state(
 
     El camino del perfil (no es una decisión) deja ambas huellas vacías.
 
-    `empirical_success_by_task` (V3.66, P1-01) es el mapa `{target_id:
-    estimación empírica}` POR ITEM (la granularidad `P(éxito | alumno, tarea)` que
-    V3.65 aún colapsaba a skill). El camino del perfil lo deja vacío porque no es
+    `empirical_success_by_task` (V3.67, P1-01) es el mapa `{task_signature:
+    estimación empírica}` POR TAREA (la granularidad `P(éxito | alumno, tarea)`
+    con la FIRMA completa, que V3.66 aún colapsaba a `target_id`).
+    `empirical_success_by_target` es el mapa `{target_id: estimación}` POR ITEM
+    (Nivel A de la jerarquía). El camino del perfil los deja vacíos porque no es
     una decisión.
     """
     projection = projection_service.project(state)
@@ -183,12 +202,17 @@ def project_state(
         "empirical_success": projection_service.empirical_success_by_skill(
             projection
         ),
-        # V3.66 (aditivo): la estimación EMPÍRICA por ITEM (target_id). Sin mapa
-        # (o sin estimación por ítem) la clave es `{}` y el planner degrada a la
-        # granularidad por skill de V3.65.
+        # V3.67 (aditivo): DOS mapas empíricos con nombres honestos — por TAREA
+        # (firma completa) y por ITEM (target_id). Sin mapa la clave es `{}` y el
+        # planner degrada a la granularidad por skill de V3.65.
         "empirical_success_by_task": (
             dict(empirical_success_by_task)
             if isinstance(empirical_success_by_task, dict)
+            else {}
+        ),
+        "empirical_success_by_target": (
+            dict(empirical_success_by_target)
+            if isinstance(empirical_success_by_target, dict)
             else {}
         ),
         "source": source,
@@ -233,15 +257,13 @@ async def decision_projection(
         evidence_repo.evidence_fingerprint, user_id
     )
     try:
-        empirical_success_by_task = await _task_empirical_success(user_id)
-    except Exception:  # noqa: BLE001 — sin mapa por ítem se degrada a skill
-        empirical_success_by_task = {}
-    try:
         profile = await run_in_threadpool(profile_repo.get_profile, user_id)
     except Exception:  # noqa: BLE001 — la proyección nunca rompe la cola
         return None
     sealed = False
     state_fingerprint = ""
+    empirical_by_task: dict = {}
+    empirical_by_target: dict = {}
     if profile is not None:
         try:
             if await run_in_threadpool(profile_repo.skill_state_is_fresh, user_id):
@@ -261,7 +283,12 @@ async def decision_projection(
         source = "recomputed"
     if source == "recomputed":
         try:
-            state, seal = await _recompute(user_id, level=level, now=now)
+            # V3.67 (P2, snapshot coherente): el estado y los mapas empíricos
+            # salen del MISMO lazo de sellado, de modo que `state_fingerprint` y
+            # el mapa empírico describen el MISMO snapshot de evidencia.
+            state, seal, empirical_by_task, empirical_by_target = await _recompute(
+                user_id, level=level, now=now
+            )
         except Exception:  # noqa: BLE001 — sin estado la cola degrada a V3.63
             return None
         # V3.66 (P1-02): la huella del estado proyectado es el sello del
@@ -279,13 +306,21 @@ async def decision_projection(
                 sealed = True
             except Exception:  # noqa: BLE001 — el sello es una optimización
                 sealed = False
+    else:
+        # Caché fresca: los mapas se derivan del ledger ACTUAL (coherente con el
+        # sello que validó la frescura). Best-effort: sin mapa se degrada a skill.
+        try:
+            empirical_by_task, empirical_by_target = await _empirical_maps(user_id)
+        except Exception:  # noqa: BLE001 — sin mapa se degrada a skill
+            empirical_by_task = empirical_by_target = {}
     return project_state(
         state,
         source=source,
         sealed=sealed,
         snapshot_fingerprint=snapshot_fingerprint,
         state_fingerprint=state_fingerprint,
-        empirical_success_by_task=empirical_success_by_task,
+        empirical_success_by_task=empirical_by_task,
+        empirical_success_by_target=empirical_by_target,
     )
 
 

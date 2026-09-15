@@ -286,11 +286,11 @@ def test_review_queue_item_distinguishes_a_and_b_by_task_empirical():
     state = skill_state_service.skill_state(rows)
     by_target = observed_difficulty.empirical_success_by_target(rows)
     payload = decision_domain.project_state(
-        state, source="test", empirical_success_by_task=by_target
+        state, source="test", empirical_success_by_target=by_target
     )
-    # El mapa por ítem está presente y la celda agregada por skill es la mezcla.
-    assert payload["empirical_success_by_task"]["apple"]["p_success"] == 0.2
-    assert payload["empirical_success_by_task"]["banana"]["p_success"] == 0.9
+    # El mapa por ITEM está presente y la celda agregada por skill es la mezcla.
+    assert payload["empirical_success_by_target"]["apple"]["p_success"] == 0.2
+    assert payload["empirical_success_by_target"]["banana"]["p_success"] == 0.9
 
     evidence = {
         "error_types": {"wrong_word": 2},
@@ -311,9 +311,9 @@ def test_review_queue_item_distinguishes_a_and_b_by_task_empirical():
         projection=payload,
     )
     assert item_a["decision"]["p_success"] == 0.2
-    assert item_a["decision"]["p_success_source"] == "task_empirical"
+    assert item_a["decision"]["p_success_source"] == "target_empirical"
     assert item_b["decision"]["p_success"] == 0.9
-    assert item_b["decision"]["p_success_source"] == "task_empirical"
+    assert item_b["decision"]["p_success_source"] == "target_empirical"
     # El Planner YA distingue A y B: sus p_success son distintos.
     assert item_a["decision"]["p_success"] != item_b["decision"]["p_success"]
 
@@ -433,12 +433,15 @@ def test_decision_projection_recomputed_state_fingerprint_is_the_seal(
 # ---------------------------------------------------------------------------
 
 
-def test_record_decision_persists_an_append_only_row(monkeypatch, tmp_path):
+def test_record_decision_persists_a_row(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     row = decision_records_repo.record_decision(
         uid,
         target_id="apple",
-        evidence_fingerprint="F1",
+        task_signature="apple|recall|cued|lexical:3||recall",
+        served_load={"lexical": 3},
+        support_level="cued",
+        assessment_mode="written",
         decision_start_fingerprint="F1",
         state_fingerprint="F2",
         selected_skill="recall",
@@ -453,6 +456,14 @@ def test_record_decision_persists_an_append_only_row(monkeypatch, tmp_path):
     assert row is not None
     assert row["policy_version"] == decision_records_repo.DECISION_POLICY_VERSION
     assert row["target_id"] == "apple"
+    assert row["task_signature"] == "apple|recall|cued|lexical:3||recall"
+    # V3.67 (P1-02): `decision_id` es determinista (hash estable de la identidad).
+    assert row["decision_id"] == decision_records_repo.build_decision_id(
+        uid,
+        target_id="apple",
+        task_signature="apple|recall|cued|lexical:3||recall",
+        decision_start_fingerprint="F1",
+    )
 
 
 def test_record_decision_returns_none_for_unknown_user(monkeypatch, tmp_path):
