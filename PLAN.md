@@ -1416,16 +1416,23 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 ## Siguiente incremento (planificado)
 
-- **⏳ V3.64 — Decision Projection + Planner 3.0 (cierre de P1-01)**: **siguiente
-  incremento**, pendiente de briefing autocontenido. Origen: la auditoría profunda
-  de V3.62 (`docs/audit/U-AUDITORIA-TOTAL-V362.md`, 9,5/10 APROBADA) y su punto de
-  entrada externo (`agentes/auditoria-externa-v362.md`). Alcance comprometido:
-  el **puente** `Student Skill State → Decision Projection → Planner` (nunca
-  `skill_state → planner` directamente), calculado desde las **MISMAS filas
-  canónicas** que el estado (**nunca desde la caché**, para que la caché sea una
-  optimización y no una segunda verdad) y con el «recomputar una sola vez si la
-  caché está vieja» que V3.63 ya sabe detectar (`skill_state_is_fresh`). Cierra
-  **P1-01**: hasta V3.64 el estado nuevo **no gobierna ninguna tarea**.
+- **⏳ V3.65 — Observed Difficulty 3.0 (`P(éxito | alumno, tarea)` empírica)**:
+  **siguiente incremento**, con briefing autocontenido **listo para lanzar**:
+  `agentes/v365-observed-difficulty-3.md`. Origen: el roadmap de la auditoría
+  `W` de V3.63 (`docs/audit/W-AUDITORIA-TOTAL-V363.md`) y
+  `release-notes-v3.64.0.md` §«Honestidad». Alcance comprometido (P1): convertir
+  `observed_task_difficulty_2` (medida **DECLARADA**) en una estimación **empírica**
+  por pareja —un módulo puro nuevo que agrupe por `(alumno, ítem, actividad,
+  dificultad servida)` con la puerta espaciada de V3.54, un lector de telemetría
+  **completa** (éxitos + fallos + `target_id`) que hoy `list_observed_rows` recorta
+  a `success = 1`, y un **seam aditivo** que inyecte la estimación en la Decision
+  Projection y en el Planner 3.0 (`p_success` empírico cuando la pareja lo declara,
+  **byte-idéntico** si no)—. **Sin** romper la pureza del planner, **sin** umbrales
+  nuevos y **sin** renombrar `highest_demonstrated_load` (P2-04). Test que falla
+  hoy: sembrar un fallo + un éxito léxicos y afirmar `success_rate < 1.0` (hoy el
+  léxico siempre da `1.0`). Fuera de alcance: V3.66 Adaptive Instance Selection,
+  V3.67+ Sense Engine 2.0, Decision Provenance completo, P2 de calibración
+  pedagógica y P2-01/P2-14.
 
 - **✅ V3.63 — Observed Task Difficulty 2.0 y honestidad del Student Skill State**
   (**release `v3.63.0`, 2026-09-14**): briefing autocontenido y ejecutado
