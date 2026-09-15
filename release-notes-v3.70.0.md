@@ -304,6 +304,30 @@ reproducción, en `docs/audit/AF-SINTESIS-PEDAGOGICA-V370.md`.
 **no tocado** por V3.70 (último cambio: `release(v3.52.1)`); se **registra** en
 lugar de declararlo limpio.
 
+**Deriva de formato, medida (no estimada):** `ruff format --check .` sobre
+`backend/` reporta **317 de 377 ficheros (84,1 %) que se reformatearían** y solo
+**60 ya formateados**. `ruff format --check` **no es un gate del CI** (`ci.yml`
+corre únicamente `ruff check .`), la deriva es **preexistente** y **V3.70 no la
+introduce ni la agrava**: sus 5 ficheros de test y sus 5 subcomandos nacen de
+`ruff check` limpio, y **no se reformatea el árbol** porque haría el diff de la
+release inauditable. Queda **cuantificada** para decidir su fase de limpieza.
+
+**Intermitencias del entorno local, declaradas (no ocultadas):**
+
+1. **Primera ejecución de la suite completa tras el reinicio de la máquina:**
+   *access violation* del intérprete (`0xC0000005`, con volcado de hilos en
+   `main.py::_auto_backup_daemon`) tras 32 tests, en un árbol cuyo diff **no toca
+   hilos ni base de datos**. **No reproducible**: la ejecución inmediatamente
+   posterior dio **2560 passed** (los 48 nuevos incluidos) y la final **2600
+   passed**, ambas sin fallos. Se acota al **entorno local**.
+2. **`resize.spec.ts`**: V3.69 lo registró como intermitente en local y verde en
+   el CI. **Re-medido en V3.70: 3/3 verde** en ejecuciones aisladas (7,7 s, 7,8 s
+   y 12,2 s) con el backend apagado (`ECONNREFUSED 127.0.0.1:8000` en el proxy,
+   esperado: la spec corre sin backend). Es decir, **no se reproduce de forma
+   determinista en aislamiento**: si aparece, viene de la ejecución **conjunta**
+   de la suite (paralelismo/recursos), no de la spec. Queda **acotado y con
+   medición**, no como afirmación heredada.
+
 ## Roadmap
 
 **V3.71** runtime/offline/instalación (**siguiente**; los tracks P1–P6 de M13
