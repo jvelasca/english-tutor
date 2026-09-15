@@ -1436,6 +1436,7 @@
 | V3.67 Task Identity 2.0 + Decision Lifecycle + Provenance Analytics | directo del gerente | ✔ hecho (2026-09-15; release `v3.67.0`) |
 | V3.68 Adaptive Engine Hardening & Integrity (cierre de los P1 de 2.ª generación + P2-08) | directo del gerente (plan Cursor `v3.68_adaptive_engine_hardening`) | ✔ hecho (2026-09-15; release `v3.68.0`; auditada por `docs/audit/Y-AUDITORIA-TOTAL-V368.md`: 9,3/10, 0 P1) |
 | V3.69 E2E + Adaptive Engine Validation (batería E01–E16; validación, no capacidad nueva) | `agentes/v369-e2e-adaptive-validation.md` | ⏳ siguiente |
+| Auditoría EXTERNA de DISEÑO de V3.69 (pre-implementación: briefing + batería E01–E16 + derivación P2/P3) | `agentes/auditoria-externa-v369.md` | ⏳ lanzada (informe esperado en `docs/audit/Z-AUDITORIA-DISENO-V369.md`) |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.

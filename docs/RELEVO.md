@@ -30,6 +30,18 @@
 > UX/product completion → `V3.73` auditoría final → **`V4.0` «English Tutor,
 > primera versión completa y estable»** y a partir de ahí `V4.0.x` de
 > mantenimiento y calibración) **no cambia**.
+> **Auditoría de DISEÑO de V3.69 (2026-09-15):** antes de implementar V3.69 se
+> lanza una revisión externa **de solo lectura sobre el plan**, no sobre código
+> (V3.69 **no existe todavía**: `VERSION` sigue en `3.68.0`, sin tag ni release
+> note). Punto de entrada: `agentes/auditoria-externa-v369.md`; informe esperado
+> en `docs/audit/Z-AUDITORIA-DISENO-V369.md` (letra `Z`). Objeto: el briefing,
+> la batería **E01–E16**, el **criterio de derivación P2/P3** del dossier `Y` §30
+> y las afirmaciones sobre el estado de partida. **Huecos declarados por el
+> propio proyecto y sometidos a dictamen:** el caso (3) «alta dependencia de
+> apoyo» y el caso (10) «evidencia entrando DURANTE la decisión» de los 10 casos
+> originales de la auditoría `X` **no tienen escenario** en E01–E16, y el caso
+> (8) «dos usuarios simultáneos» solo queda **parcialmente** cubierto por E12
+> (propiedad ajena rechazada, no coexistencia de dos alumnos activos).
 > **Deuda P2/P3 aceptada en el backlog** (ver el dossier `Y` §30): el lifecycle
 > sigue siendo **best-effort** y falta el *provenance failure rate* como release
 > health metric (P2-01); `decision_records` sigue mezclando DECISION / SERVING /
