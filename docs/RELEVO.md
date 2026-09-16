@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-15 (UTC+2).
+> Actualizado por última vez: 2026-09-16 (UTC+2).
 >
 > **Nota (2026-09-15): V3.70.0 (Auditoría pedagógica + CEFR) — release de
 > MEDICIÓN, con cero líneas de lógica de PRODUCTO (solo bumps de versión).**
@@ -137,6 +137,24 @@
 > **Roadmap:** **V3.71** runtime/offline/instalación (siguiente) → **V3.72**
 > UX/product completion → **V3.73** auditoría final técnica → **V4.0** («English
 > Tutor, primera versión completa y estable»).
+> **CIERRE (2026-09-16):** commit de release `9ba9c49` (`release(v3.70.0):
+> auditoria pedagogica + CEFR`) y documental `2db93ba` (`docs(v3.70.0)`)
+> publicados en `main` con el **tag anotado `v3.70.0`** (objeto `219038f`), y
+> **CI 6/6 verde** — run
+> [35062382562](https://github.com/jvelasca/english-tutor/actions/runs/35062382562):
+> Backend ruff + pytest (**2598 passed + 2 skipped**; los `2 skipped` son el
+> opt-in de Whisper, igual que en V3.69), Frontend tsc + vitest (**76 ficheros /
+> 659 tests**) + build, Playwright E2E (**25 passed + 26 skipped**), Release
+> consistency (**3.70.0**), Beta V3.0 gate y Content validation. **Registro
+> honesto:** el push llevó los dos commits juntos (el release y su documentación
+> no se habían publicado cuando el agente anterior se detuvo), así que el run de
+> CI es el del HEAD documental `2db93ba`, que **incluye** `9ba9c49`; **no** hay
+> run separado del commit de release. **Auditoría externa:** V3.70 se entregó
+> como auditoría **INTERNA** por decisión declarada en su briefing (a diferencia
+> de V3.69), así que **no** existe punto de entrada externo de V3.70; la entrega
+> son los seis dossiers `AA`–`AF` más los **48 tests** que fijan cada hallazgo.
+> **Roadmap (sin cambios):** **V3.71** runtime/offline/instalación (siguiente) →
+> **V3.72** UX/product completion → **V3.73** auditoría final técnica → **V4.0**.
 >
 > **Nota (2026-09-15): V3.69.0 (E2E + Adaptive Engine Validation) — release de
 > validación, con cero líneas de lógica de PRODUCTO (solo bumps de versión).** Release **`v3.69.0`**, **SIN
@@ -3231,6 +3249,12 @@ declarado**) ni el texto del LLM en ejecución, no audita el frontend, y la cota
 del placement es **analítica**. Ver `release-notes-v3.70.0.md`.
 **Siguiente incremento:** `V3.71` **runtime/offline/instalación** (los tracks
 P1–P6 de M13 quedan **medidos y acotados, no cerrados**).
+**CERRADA (2026-09-16):** commit de release `9ba9c49` (+ documental `2db93ba`),
+tag anotado `v3.70.0` publicado en `main` y **CI 6/6** verde (run
+[35062382562](https://github.com/jvelasca/english-tutor/actions/runs/35062382562):
+Backend **2598 passed + 2 skipped**, Frontend **659 tests** + build, Playwright
+**25 passed + 26 skipped**). **Auditoría interna** por decisión de alcance (sin
+punto de entrada externo).
 
 Antes, `v3.69.0` **E2E + Adaptive Engine Validation** (release de **VALIDACIÓN,
 no de capacidad**: **SIN migración**, **SIN bump de `GENERATOR_VERSION`**, **SIN
