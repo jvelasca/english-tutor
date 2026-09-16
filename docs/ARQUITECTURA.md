@@ -281,15 +281,21 @@ frontend/src/
 ```
 launcher/
 ├── launcher.py          # PUNTO DE ENTRADA: GUI mínima (tkinter), arranca/para la app
-├── ui.py                # paleta, iconos, dots de estado y lectura de logs (puro)
+├── ui.py                # paleta, iconos, dots de estado y lectura de logs (puro, sin tkinter)
 ├── core.py              # lógica pura: rutas, comandos de arranque, normalización de estado
 ├── process_manager.py   # subprocesos: arrancar/parar backend (uvicorn) y frontend (Vite)
 ├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
+├── browser_cookies.py   # diagnóstico de cookies de Chrome/Edge/Brave/Vivaldi/Opera/Firefox
+├── state_store.py       # persistencia visual: tamaño/posición de ventana y paneles
 ├── make_icon.ps1        # genera icon.ico (System.Drawing, Windows)
 ├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
+├── allow-firewall.ps1   # abre TCP 5173/8000 en el firewall (requiere admin)
 ├── icon.ico             # icono del acceso directo
 ├── pyproject.toml       # configuración de ruff (mismas reglas que el backend)
-└── tests/               # pytest (conftest.py + test_core/test_status/test_process_manager/test_ui)
+├── logs/                # logs de backend/frontend (gitignored)
+├── state.json           # estado de la UI persistido (gitignored)
+└── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
+                         #         test_ui/test_state_store/test_process_manager) — 75 tests, en CI (job `launcher`)
 ```
 
 ### Responsabilidades launcher
@@ -303,7 +309,12 @@ launcher/
   matado del árbol de procesos en Windows (`taskkill /T /F`).
 - **`status.py`**: obtiene el estado real: `/api/health/dependencies` (HTTP) y consultas de
   solo lectura a la BD SQLite (contadores globales y usuarios).
-- **`*.ps1`**: utilidades de Windows para generar el icono y crear el acceso directo.
+- **`browser_cookies.py`**: diagnóstico (solo lectura) de las cookies de los navegadores
+  soportados, para orientar problemas de acceso local.
+- **`state_store.py`**: persistencia de la disposición visual (tamaño/posición de ventana y
+  paneles colapsados) en `state.json`.
+- **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
+  puerto en el firewall.
 
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en

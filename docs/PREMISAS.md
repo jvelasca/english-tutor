@@ -17,7 +17,7 @@ completo.
 ## 3. Stack (fijado)
 - **Backend:** Python + FastAPI + Pydantic (tipado fuerte).
 - **Frontend:** Vite + React + TypeScript (modo estricto).
-- **LLM:** Ollama (servicio local). Modelo inicial: `qwen3.5:9b`.
+- **LLM:** Ollama (servicio local). Modelo por defecto: `llama3.1:8b` (`backend/config.py::DEFAULT_MODEL`); `qwen3.5:9b` está **vetado** en el código (`UNUSABLE_MODELS`).
 
 ## 4. Voz local (fijado)
 - **Oído (STT):** `faster-whisper`, modelo `small`, en CPU.

@@ -151,10 +151,28 @@
 > CI es el del HEAD documental `2db93ba`, que **incluye** `9ba9c49`; **no** hay
 > run separado del commit de release. **Auditoría externa:** V3.70 se entregó
 > como auditoría **INTERNA** por decisión declarada en su briefing (a diferencia
-> de V3.69), así que **no** existe punto de entrada externo de V3.70; la entrega
-> son los seis dossiers `AA`–`AF` más los **48 tests** que fijan cada hallazgo.
+> de V3.69); la entrega son los seis dossiers `AA`–`AF` más los **48 tests** que
+> fijan cada hallazgo. **Añadido (2026-09-16, incremento V3.71):** sí existe ya
+> un **punto de entrada EXTERNO** de la RELEASE de V3.70
+> (`agentes/auditoria-externa-release-v370.md`; informe esperado en
+> `docs/audit/AG-AUDITORIA-RELEASE-V370.md`), así que la afirmación «**no** existe
+> punto de entrada externo de V3.70» queda **corregida**.
 > **Roadmap (sin cambios):** **V3.71** runtime/offline/instalación (siguiente) →
 > **V3.72** UX/product completion → **V3.73** auditoría final técnica → **V4.0**.
+>
+> **🔄 EN CURSO (2026-09-16): V3.71 (runtime/offline/instalación) — eje RE cerrado.**
+> Briefing `agentes/v371-runtime-offline-instalacion.md` con las **cuatro
+> decisiones de alcance ya resueltas** (medir y declarar la frontera de
+> `npm run dev` · verificar y guiar el bootstrap de Ollama · corregir la
+> documentación a favor de `config.py` · job del launcher en CI). **Eje RE
+> (gates/CI/deriva documental) CERRADO:** el CI pasa a **7/7 jobs** (entra
+> `launcher` con sus 75 tests), las **cuatro derivas documentales** quedan
+> corregidas y **fijadas por 8 tests** (`backend/tests/test_docs_drift_v371.py`)
+> que fallan si vuelven, con evidencia en `docs/audit/RE-GATES-DERIVA.md`
+> (P0 = 0 · P1 = 0 · P2 = 2 · P3 = 4, 1 deuda aceptada). **G5 (matriz de
+> dispositivos) queda declarado ABIERTO.** Suite backend: **2608 passed**. Ejes
+> **RA/RB/RC/RD/RF pendientes**. **Sin bump de versión** (el incremento sigue
+> abierto: `3.70.0`).
 >
 > **Nota (2026-09-15): V3.69.0 (E2E + Adaptive Engine Validation) — release de
 > validación, con cero líneas de lógica de PRODUCTO (solo bumps de versión).** Release **`v3.69.0`**, **SIN

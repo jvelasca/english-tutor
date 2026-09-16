@@ -1464,7 +1464,8 @@
 | Auditoría EXTERNA de V3.69 (post-implementación, sobre el código y los 5 hallazgos) | `agentes/auditoria-externa-release-v369.md` | ⏳ **lanzada** (informe esperado en `docs/audit/Z2-AUDITORIA-RELEASE-V369.md`): punto de entrada autocontenido con el estado de entrega (commit `9a4e70a`, tag `v3.69.0`, CI 6/6 `34978215154`), **15 afirmaciones falsables** con `archivo:línea`, comandos de reproducción y **13 preguntas de alto valor**; instruye a dictaminar los 5 hallazgos de §C uno a uno y a distinguir «el test no demuestra» de «el motor no cumple» |
 | Auditoría EXTERNA de la RELEASE de V3.70 (post-implementación, sobre los cinco ejes AA–AF, los 48 tests y los 5 subcomandos de medición) | `agentes/auditoria-externa-release-v370.md` | ⏳ **entregada (2026-09-16)** (informe esperado en `docs/audit/AG-AUDITORIA-RELEASE-V370.md`; el prefijo `AG` evita colisión con los dossiers `AA`–`AF` del propio incremento): punto de entrada autocontenido con el estado de entrega (commit `9ba9c49`, tag `v3.70.0`, CI 6/6 `35062382562`), **12 afirmaciones falsables** con `archivo:línea`, comandos de reproducción (incluida la regeneración determinista de los 10 subcomandos) y **10 preguntas de alto valor**; instruye a dictaminar los 48 tests (demuestran vs describen), el P0 y las 4 propiedades positivas |
 | Seguimiento de las auditorías EXTERNAS de V3.69 (`Z` y `Z2`, sin informe recibido) | `agentes/auditoria-externa-v369-seguimiento.md` | ⏳ **entregado (2026-09-16)**: registro del estado, verificación del hueco (`Z`/`Z2` no existen), objeto de cada informe, **texto de reclamo listo para enviar** y protocolo de acuse/triaje |
-| V3.71 Runtime real, offline verificado e instalación limpia (ejes RA–RF; verificación con endurecimiento mínimo) | `agentes/v371-runtime-offline-instalacion.md` | ⏳ **briefing redactado (2026-09-16)**, **pendiente de las 4 decisiones de alcance** del gerente (servir `frontend/dist` vs declararlo · bootstrap de Ollama · modelo por defecto `config.py` vs docs · job del launcher en CI) |
+| V3.71 Runtime real, offline verificado e instalación limpia (ejes RA–RF; verificación con endurecimiento mínimo) | `agentes/v371-runtime-offline-instalacion.md` | 🔄 **en curso (2026-09-16)**: briefing redactado y **cuatro decisiones de alcance resueltas** por el gerente (medir y declarar la frontera de `npm run dev` · verificar y guiar el bootstrap de Ollama · corregir la documentación a favor de `config.py` · añadir el job del launcher al CI). **Eje RE cerrado** (el más barato y de efecto inmediato): job `launcher` en CI, 4 derivas documentales corregidas, 8 tests que las fijan (`docs/audit/RE-GATES-DERIVA.md`) |
+| Eje RE de V3.71 (gates/CI/deriva documental) — evidencia interna | `docs/audit/RE-GATES-DERIVA.md` | ✅ **cerrado (2026-09-16)**: 7/7 jobs de CI (entra `launcher` con los 75 tests), derivas D1–D4 corregidas y **pinchadas por test** (`backend/tests/test_docs_drift_v371.py`, 8 tests), nota de corrección en `docs/BETA_GATES.md` y **G5 declarado abierto**; hallazgos P0 = 0 · P1 = 0 · P2 = 2 · P3 = 4 (1 deuda aceptada) |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1490,16 +1491,28 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   V4.0.x · motor y acreditación → Planner 4.0 · instrumentos → V4.0.x/V3.72).
   Dossiers: `docs/audit/AA-PED-CONTENIDO-CEFR.md` … `AF-SINTESIS-PEDAGOGICA-V370.md`.
 
-- **⏳ V3.71 — Runtime / offline / instalación**: **siguiente incremento**
+- **🔄 V3.71 — Runtime / offline / instalación**: **incremento en curso**
   declarado por el roadmap (**sin cambios**; auditoría `X` de V3.67, confirmada
   por la `Y` de V3.68). **Briefing redactado (2026-09-16)** en
   `agentes/v371-runtime-offline-instalacion.md` (seis ejes **RA–RF**: offline real
   con red desconectada · instalación limpia desde cero · runtime de producto y
   salud honesta · dependencias ocultas y degradación · gates/CI/deriva documental
-  · síntesis), **pendiente del visto bueno del gerente en cuatro decisiones de
-  alcance** (servir `frontend/dist` vs declararlo · bootstrapping de Ollama ·
-  modelo por defecto `config.py` vs docs · job del launcher en CI) antes de
-  arrancar. Los tracks **P1–P6 de M13** (política pedagógica formal,
+  · síntesis), con las **cuatro decisiones de alcance ya resueltas** por el
+  gerente: **(A)** medir y **declarar** la frontera de `npm run dev` (servir
+  `frontend/dist` solo si la verificación demuestra un bloqueo duro) · **(B)**
+  verificar y **guiar** el bootstrap de Ollama (descarga explícita opcional; la
+  descarga inicial es la única excepción admitida) · **(C)** corregir la
+  documentación **a favor de `config.py`** (fuente de verdad) y declarar la
+  política · **(D)** añadir el **job del launcher al CI**.
+  **Eje RE cerrado (2026-09-16)**: el launcher deja de ser el único subsistema
+  sin gate (el CI pasa a **7/7 jobs**) y las **cuatro derivas documentales** (árbol
+  del launcher en `ARQUITECTURA.md`, modelo por defecto en `PREMISAS.md`/`README.md`,
+  los ✅ falsos de `BETA_GATES.md` y la fecha/versión del mismo documento) quedan
+  corregidas, **anotadas sin reescribir el histórico** y **fijadas por 8 tests**
+  (`backend/tests/test_docs_drift_v371.py`) que fallan si vuelven; evidencia en
+  `docs/audit/RE-GATES-DERIVA.md`. **G5 (matriz de dispositivos) queda declarado
+  ABIERTO** (acción humana). Los ejes **RA/RB/RC/RD/RF siguen pendientes**. Los
+  tracks **P1–P6 de M13** (política pedagógica formal,
   error mastery, vocabulario exposure/production/mastery, listening como
   competencia, CEFR basado en evidencia y pronunciación fonémica) quedan
   **medidos y acotados** por V3.70 pero **no cerrados**: su corrección se asignó

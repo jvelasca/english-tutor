@@ -11,6 +11,16 @@ Fecha de evaluación: 2026-08-31. Versión: `2.0.0`.
 > **V3.0 Beta freeze** (2026-09-02): tras V2.7–V2.12 el stack pedagógico está
 > cerrado. Gates pedagógicos G6–G9, checklist post-freeze y gate CI en
 > [`docs/BETA_V3.md`](BETA_V3.md) (`scripts/check_beta_v3.py`). Versión `3.0.0`.
+>
+> **V3.71 — corrección de derivas documentales (2026-09-16).** Tres afirmaciones de
+> esta evaluación habían quedado desactualizadas; se corrigen sin reescribir el
+> histórico: (i) **«CI completa»** incluye ya el job **`launcher`** (añadido en
+> V3.71), de modo que los **75 tests** del launcher dejan de ejecutarse solo en
+> local; (ii) **«Matriz de dispositivos ✅»** era **incorrecta**:
+> `docs/DEVICE_MATRIX.md` está **10/10 en ⬜** (pendiente de hardware real;
+> `docs/BETA_V3.md` §4.4 y `docs/audit/G-DEVICES.md`) ⇒ **G5 no está cerrado**;
+> (iii) la fecha y la versión de cabecera (`2026-08-31` · `2.0.0`) corresponden a
+> la evaluación original, no al árbol actual.
 
 ---
 
@@ -22,9 +32,9 @@ Infraestructura local-first, reproducible y protegida.
 |---|---|---|
 | Backend FastAPI + Pydantic, 100% local | ✅ | `backend/` con routers/services/schemas/domain; sin OAuth/cloud (premisa 2) |
 | SQLite local (perfiles, progreso, evidencia, settings, mastery) | ✅ | `repositories/db.py::DB_PATH`, migraciones idempotentes no destructivas |
-| Launcher de escritorio | ✅ | `launcher/` (tkinter) con icono y acceso directo |
+| Launcher de escritorio | ✅ | `launcher/` (tkinter) con icono y acceso directo; **75 tests** en el job `launcher` del CI (V3.71) |
 | LAN/HTTPS/mDNS | ✅ | `vite.config.ts` (`basicSsl`, `host: true`), `local_url_available`, QR de conexión |
-| CI completa | ✅ | `.github/workflows/ci.yml`: `ruff` + `pytest` + `tsc` + `vitest` + `build` + `content-validation` + `playwright` + `release-consistency` |
+| CI completa | ✅ | `.github/workflows/ci.yml`: `ruff` + `pytest` + `tsc` + `vitest` + `build` + `content-validation` + `playwright` + `release-consistency` + `launcher` (V3.71) |
 | Seguridad LAN | ✅ | `security.py::SecurityMiddleware` (origin-check CSRF-like + rate limiting por IP) |
 | Backup/restore/export + auto-backup | ✅ | `services/backup.py` + `routers/system.py`; auto-backup diario (keep 7) |
 | Higiene de release | ✅ | `scripts/check_release_consistency.py` (fuente única de verdad `config.py::VERSION`) |
@@ -96,12 +106,17 @@ Experiencia pulida, accesible, responsive y de rendimiento controlado.
 | a11y | ✅ | skip-link, `lang` sincronizado, `:focus-visible`, `aria-*`, `prefers-reduced-motion` |
 | Performance | ✅ | Code-splitting + `manualChunks` (React/motion/iconos); bundle principal ~393 kB |
 | Recuperación de permisos (mic) | ✅ | `useAudioCapabilities` + `MicrophoneTest` + `ConnectDeviceCard` |
-| Matriz de dispositivos | ✅ | `docs/DEVICE_MATRIX.md` (PC/Android/iPhone/iPad) |
+| Matriz de dispositivos | ⬜ pendiente | `docs/DEVICE_MATRIX.md` **10/10 en ⬜** (hardware real, `docs/BETA_V3.md` §4.4) — **G5 no cerrado** (nota V3.71) |
 
-**Score: 10/10.** UX terminada y fiable en escritorio y móvil.
+**Score: 10/10 (histórico) — 9/10 con la matriz de dispositivos pendiente.** UX terminada y fiable en escritorio y móvil, pendiente de validación en hardware real (nota V3.71).
 
 ---
 
 ## Veredicto
 
-Los 5 gates alcanzan **10/10**. El producto está listo para **Beta 1.0** (v2.0.0).
+Los 5 gates alcanzaban **10/10** en la evaluación original (`2.0.0`). **Veredicto
+histórico.**
+
+> **Nota V3.71 (2026-09-16):** con la corrección de derivas documentales, **G5
+> queda pendiente** de la matriz de dispositivos en hardware real; el resto sigue
+> en verde.
