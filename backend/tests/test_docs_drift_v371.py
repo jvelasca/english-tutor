@@ -1,11 +1,11 @@
-"""Deriva documental de gates/CI (V3.71, eje RE).
+"""Deriva documental de gates/CI (eje RE) y runtime de producto (eje RC) (V3.71).
 
-Cada test fija **una** de las derivas corregidas en el eje RE y **falla si vuelve
-a aparecer**, de modo que el CI avisa en lugar de dejar que la documentación se
-separe del código otra vez. La fuente de verdad es siempre el **código**
-(`backend/config.py`, `.github/workflows/ci.yml`) y las **medidas reales**
-(ficheros del launcher, filas de la matriz de dispositivos), nunca la
-documentación.
+Cada test fija **una** de las derivas corregidas en los ejes RE y RC y **falla si
+vuelve a aparecer**, de modo que el CI avisa en lugar de dejar que la
+documentación se separe del código otra vez. La fuente de verdad es siempre el
+**código** (`backend/config.py`, `launcher/core.py`, `.github/workflows/ci.yml`)
+y las **medidas reales** (ficheros del launcher, filas de la matriz de
+dispositivos), nunca la documentación.
 
 Derivas fijadas:
 1. `docs/PREMISAS.md` / `README.md` declaraban `qwen3.5:9b` como modelo por
@@ -16,6 +16,9 @@ Derivas fijadas:
    declaraba «CI completa» igualmente.
 4. `docs/BETA_GATES.md` declaraba verde la matriz de dispositivos mientras
    `docs/DEVICE_MATRIX.md` estaba 10/10 en ⬜.
+5. (RC) Nadie declaraba **quién sirve la UI** ni que `frontend/dist` no lo sirve
+   nadie: el runtime de producto es el dev server de Vite, y Node + npm son
+   requisito de **ejecución**.
 """
 
 from __future__ import annotations
@@ -209,3 +212,86 @@ def test_beta_gates_no_declara_verde_una_matriz_de_dispositivos_pendiente():
         f"BETA_GATES dice {'verde' if verde else 'pendiente'} y la matriz tiene "
         f"{len(pendientes)}/{len(rows)} filas sin probar"
     )
+
+
+# --- Deriva RC: quién sirve la UI (V3.71, eje RC) ---------------------------
+
+
+def _launcher_function_source(name: str) -> str:
+    """Cuerpo de una función de `launcher/core.py`, leído como TEXTO.
+
+    A propósito no se importa el módulo: `core` y `status` son nombres genéricos
+    y meterlos en `sys.modules` desde la suite del backend podría ensombrecer
+    otros imports. El fuente es la misma fuente de verdad y no tiene ese riesgo.
+    """
+    lines = _read(LAUNCHER / "core.py").splitlines()
+    start = next(
+        (i for i, line in enumerate(lines) if line.startswith(f"def {name}(")),
+        None,
+    )
+    assert start is not None, f"launcher/core.py no define {name}()"
+    body: list[str] = []
+    for line in lines[start:]:
+        if body and line and not line.startswith((" ", "\t")):
+            break  # siguiente definición de nivel de módulo
+        body.append(line)
+    return "\n".join(body)
+
+
+def _backend_python_sources() -> list[Path]:
+    """Fuentes del backend, excluyendo tests (que citan las clases por nombre)."""
+    return [
+        p
+        for p in (ROOT / "backend").rglob("*.py")
+        if ".venv" not in p.parts and "tests" not in p.parts
+    ]
+
+
+def test_la_ui_la_sirve_el_dev_server_de_vite_y_no_un_artefacto_de_produccion():
+    """RC-01: el runtime declarado debe ser el que el launcher arranca de verdad.
+
+    Si alguien cambia el comando del launcher o monta `frontend/dist` en el
+    backend, este test obliga a actualizar la declaración (`PREMISAS.md` §3 y
+    `ARQUITECTURA.md`) en lugar de dejar la documentación mintiendo.
+    """
+    frontend = _launcher_function_source("frontend_command")
+    assert '"run"' in frontend and '"dev"' in frontend, (
+        "el launcher ya no arranca `npm run dev`: actualiza la declaración del "
+        "runtime de producto (PREMISAS.md §3 y ARQUITECTURA.md)"
+    )
+
+    offenses = [
+        str(p.relative_to(ROOT))
+        for p in _backend_python_sources()
+        if "StaticFiles" in _read(p) or "FileResponse" in _read(p)
+    ]
+    assert offenses == [], (
+        "el backend sirve ahora el artefacto de producción "
+        f"({offenses}): la declaración «nadie sirve frontend/dist» (RC-01) y su "
+        "condición de salida deben actualizarse"
+    )
+
+
+def _normalized(path: Path) -> str:
+    """Texto con los espacios colapsados.
+
+    Las frases declaradas no deben dejar de encontrarse por un salto de línea a
+    mitad (que es justo lo que pasó al escribir la de RC-01).
+    """
+    return " ".join(_read(path).split())
+
+
+def test_docs_declaran_la_frontera_del_runtime_de_producto():
+    """RC-01: la frontera medida (Node como requisito de ejecución) está escrita."""
+    for doc in (DOCS / "PREMISAS.md", DOCS / "ARQUITECTURA.md"):
+        text = _normalized(doc)
+        assert "npm run dev" in text, f"{doc.name} no declara `npm run dev`"
+        assert "frontend/dist" in text, (
+            f"{doc.name} no declara el `dist` que nadie sirve"
+        )
+        assert "**Node + npm son requisito de EJECUCIÓN**" in text, (
+            f"{doc.name} no declara Node + npm como requisito de EJECUCIÓN"
+        )
+        assert "RC-RUNTIME-PRODUCTO.md" in text, (
+            f"{doc.name} no enlaza la condición de salida del eje RC"
+        )

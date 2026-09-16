@@ -316,6 +316,22 @@ launcher/
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
   puerto en el firewall.
 
+### Runtime de producto (declarado en V3.71, eje RC)
+
+El producto se ejecuta como **dos procesos** que arranca el launcher:
+
+| Pieza | Se sirve con | Dónde |
+|---|---|---|
+| API | `uvicorn main:app --host 0.0.0.0 --port 8000` (un solo proceso, **sin** `--reload`) | `launcher/core.py::backend_command` |
+| UI | **dev server de Vite** (`npm run dev`, puerto 5173) | `launcher/core.py::frontend_command` |
+
+- `npm run build` (`tsc && vite build`) sí produce `frontend/dist`, pero **nadie lo
+  sirve**: el backend no monta `StaticFiles` ni `FileResponse` sobre él.
+- **Consecuencia declarada:** **Node + npm son requisito de EJECUCIÓN** del
+  producto, no solo de compilación. Es deuda con fase y condición de salida en
+  `docs/audit/RC-RUNTIME-PRODUCTO.md` (RC-01), a reevaluar en V3.72/V3.73.
+- Fijado por test en `backend/tests/test_docs_drift_v371.py` (clase RC).
+
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en
 > `main.py` ni en `App.tsx`. Un archivo = una responsabilidad.

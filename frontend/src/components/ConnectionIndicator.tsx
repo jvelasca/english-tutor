@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { getHealth } from "../api/health";
+import {
+  connectionState,
+  getDependencies,
+  type ConnectionState,
+} from "../api/health";
 import { useI18n } from "../hooks/useI18n";
 import { cn } from "@/lib/utils";
 import { SystemStatus } from "./SystemStatus";
 
 /** Periodo de sondeo del estado del servidor (ms). */
 const POLL_INTERVAL_MS = 15_000;
+
+/** Tono del punto y clave i18n por estado real de la app. */
+const STATE_VIEW: Record<ConnectionState, { dot: string; label: string }> = {
+  connected: { dot: "status-dot--ok", label: "status.connected" },
+  degraded: { dot: "status-dot--warn", label: "status.degraded" },
+  disconnected: { dot: "status-dot--off", label: "status.disconnected" },
+};
 
 /**
  * Indicador de conexión con el servidor integrado en la CABECERA (V3.38.1).
@@ -15,21 +26,26 @@ const POLL_INTERVAL_MS = 15_000;
  * abre un popover con el panel completo `<SystemStatus />` (que sigue viviendo
  * también en Ajustes), de modo que no se pierde información y se gana espacio
  * útil en la parte inferior de la app.
+ *
+ * V3.71 (eje RC): pregunta por las DEPENDENCIAS, no por `/api/health` (que
+ * responde 200 siempre que el proceso esté vivo) y distingue **tres** estados.
+ * Con Ollama o la base de datos caídos ahora dice «Degradado» en lugar de
+ * mantener un «Conectado» que no era cierto.
  */
 export function ConnectionIndicator() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [online, setOnline] = useState<boolean | null>(null);
+  const [state, setState] = useState<ConnectionState | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function check() {
       try {
-        await getHealth();
-        if (!cancelled) setOnline(true);
+        const deps = await getDependencies();
+        if (!cancelled) setState(connectionState(deps));
       } catch {
-        if (!cancelled) setOnline(false);
+        if (!cancelled) setState("disconnected");
       }
     }
     void check();
@@ -58,18 +74,11 @@ export function ConnectionIndicator() {
     };
   }, [open]);
 
-  const tone =
-    online === null
-      ? "status-dot--unknown"
-      : online
-        ? "status-dot--ok"
-        : "status-dot--off";
+  const tone = state === null ? "status-dot--unknown" : STATE_VIEW[state].dot;
   const label =
-    online === null
+    state === null
       ? t("status.connectionChecking")
-      : online
-        ? t("status.connected")
-        : t("status.disconnected");
+      : t(STATE_VIEW[state].label);
 
   return (
     <div className="relative" ref={ref}>

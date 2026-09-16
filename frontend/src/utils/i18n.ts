@@ -1154,6 +1154,7 @@ const STRINGS: Record<string, Entry> = {
   // V3.38.1: indicador de conexión integrado en la cabecera (sustituye a la
   // barra de estado inferior, que se retiró junto con su "status.ready").
   "status.connected": { en: "Connected", es: "Conectado" },
+  "status.degraded": { en: "Degraded", es: "Degradado" },
   "status.disconnected": { en: "Disconnected", es: "Desconectado" },
   "status.connectionChecking": { en: "Checking…", es: "Comprobando…" },
   "status.systemStatus": { en: "System status", es: "Estado del sistema" },

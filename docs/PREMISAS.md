@@ -18,6 +18,12 @@ completo.
 - **Backend:** Python + FastAPI + Pydantic (tipado fuerte).
 - **Frontend:** Vite + React + TypeScript (modo estricto).
 - **LLM:** Ollama (servicio local). Modelo por defecto: `llama3.1:8b` (`backend/config.py::DEFAULT_MODEL`); `qwen3.5:9b` está **vetado** en el código (`UNUSABLE_MODELS`).
+- **Runtime de producto (V3.71, eje RC):** el launcher arranca **dos** procesos: la API
+  con `uvicorn` (un solo proceso, sin `--reload`) y la UI con el **dev server de Vite**
+  (`npm run dev`). El backend **no** sirve `frontend/dist`: el artefacto de producción
+  existe (`npm run build`) pero nadie lo sirve. Consecuencia declarada: **Node + npm son
+  requisito de EJECUCIÓN**, no solo de compilación. Deuda con fase y condición de salida
+  en `docs/audit/RC-RUNTIME-PRODUCTO.md` (RC-01); se reevalúa en V3.72/V3.73.
 
 ## 4. Voz local (fijado)
 - **Oído (STT):** `faster-whisper`, modelo `small`, en CPU.
