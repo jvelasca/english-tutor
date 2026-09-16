@@ -1462,6 +1462,9 @@
 | V3.70 Auditoría pedagógica + CEFR (cinco ejes AA–AE + síntesis AF; medición, no capacidad nueva) | `agentes/v370-auditoria-pedagogica.md` + `agentes/v370-a1-contenido-cefr.md`, `v370-a2-cobertura-destrezas.md`, `v370-a3-feedback-correccion.md`, `v370-a4-validez-maestria.md`, `v370-a5-instrumentos-nivelacion.md` | ✔ hecho (2026-09-15; release `v3.70.0`; **5 subcomandos de medición solo lectura** en `audit_dossier.py` + 6 dossiers `AA…AF` + **48 tests** nuevos; diff de producto **CERO en lógica**); hallazgos: **1 P0 · 15 P1 · 12 P2 · 5 P3** y 4 propiedades positivas. **Publicada (2026-09-16):** commit `9ba9c49` (+ docs `2db93ba`), tag `v3.70.0`, **CI 6/6** run `35062382562` |
 | Auditoría EXTERNA de DISEÑO de V3.69 (pre-implementación: briefing + batería E01–E19 + derivación P2/P3) | `agentes/auditoria-externa-v369.md` | ⏳ lanzada (informe esperado en `docs/audit/Z-AUDITORIA-DISENO-V369.md`); **la implementación ya está cerrada** (commit `9a4e70a`, tag `v3.69.0`, CI 6/6 en `34978215154`), así que el dictamen se aplicará como corrección documental o se trasladará a V3.70+, y el punto de entrada de `agentes/auditoria-externa-v369.md` lleva un bloque **ACTUALIZACIÓN** con el estado de entrega para poder falsar el diseño **contra el código publicado** |
 | Auditoría EXTERNA de V3.69 (post-implementación, sobre el código y los 5 hallazgos) | `agentes/auditoria-externa-release-v369.md` | ⏳ **lanzada** (informe esperado en `docs/audit/Z2-AUDITORIA-RELEASE-V369.md`): punto de entrada autocontenido con el estado de entrega (commit `9a4e70a`, tag `v3.69.0`, CI 6/6 `34978215154`), **15 afirmaciones falsables** con `archivo:línea`, comandos de reproducción y **13 preguntas de alto valor**; instruye a dictaminar los 5 hallazgos de §C uno a uno y a distinguir «el test no demuestra» de «el motor no cumple» |
+| Auditoría EXTERNA de la RELEASE de V3.70 (post-implementación, sobre los cinco ejes AA–AF, los 48 tests y los 5 subcomandos de medición) | `agentes/auditoria-externa-release-v370.md` | ⏳ **entregada (2026-09-16)** (informe esperado en `docs/audit/AG-AUDITORIA-RELEASE-V370.md`; el prefijo `AG` evita colisión con los dossiers `AA`–`AF` del propio incremento): punto de entrada autocontenido con el estado de entrega (commit `9ba9c49`, tag `v3.70.0`, CI 6/6 `35062382562`), **12 afirmaciones falsables** con `archivo:línea`, comandos de reproducción (incluida la regeneración determinista de los 10 subcomandos) y **10 preguntas de alto valor**; instruye a dictaminar los 48 tests (demuestran vs describen), el P0 y las 4 propiedades positivas |
+| Seguimiento de las auditorías EXTERNAS de V3.69 (`Z` y `Z2`, sin informe recibido) | `agentes/auditoria-externa-v369-seguimiento.md` | ⏳ **entregado (2026-09-16)**: registro del estado, verificación del hueco (`Z`/`Z2` no existen), objeto de cada informe, **texto de reclamo listo para enviar** y protocolo de acuse/triaje |
+| V3.71 Runtime real, offline verificado e instalación limpia (ejes RA–RF; verificación con endurecimiento mínimo) | `agentes/v371-runtime-offline-instalacion.md` | ⏳ **briefing redactado (2026-09-16)**, **pendiente de las 4 decisiones de alcance** del gerente (servir `frontend/dist` vs declararlo · bootstrap de Ollama · modelo por defecto `config.py` vs docs · job del launcher en CI) |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1489,7 +1492,14 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
 
 - **⏳ V3.71 — Runtime / offline / instalación**: **siguiente incremento**
   declarado por el roadmap (**sin cambios**; auditoría `X` de V3.67, confirmada
-  por la `Y` de V3.68). Los tracks **P1–P6 de M13** (política pedagógica formal,
+  por la `Y` de V3.68). **Briefing redactado (2026-09-16)** en
+  `agentes/v371-runtime-offline-instalacion.md` (seis ejes **RA–RF**: offline real
+  con red desconectada · instalación limpia desde cero · runtime de producto y
+  salud honesta · dependencias ocultas y degradación · gates/CI/deriva documental
+  · síntesis), **pendiente del visto bueno del gerente en cuatro decisiones de
+  alcance** (servir `frontend/dist` vs declararlo · bootstrapping de Ollama ·
+  modelo por defecto `config.py` vs docs · job del launcher en CI) antes de
+  arrancar. Los tracks **P1–P6 de M13** (política pedagógica formal,
   error mastery, vocabulario exposure/production/mastery, listening como
   competencia, CEFR basado en evidencia y pronunciación fonémica) quedan
   **medidos y acotados** por V3.70 pero **no cerrados**: su corrección se asignó
