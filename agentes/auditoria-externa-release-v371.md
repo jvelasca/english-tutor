@@ -45,6 +45,17 @@
 - **Nota para el auditor:** el run se disparó con el **push de `main`**; el tag
   `v3.71.0` se publicó en el mismo push y apunta al mismo commit. En la API de
   GitHub se pueden comprobar los **7** jobs y el objeto del tag.
+- **Aviso de `HEAD`:** `main` va **por delante** del commit auditado con commits
+  **solo documentales** (`docs/RELEVO.md`, `PLAN.md` y este mismo archivo): el
+  primero fue `a7d9934` (cierre), el segundo `af145fc` (alta en `PLAN.md`) y **este
+  propio aviso añade uno más**, así que el recuento crece por diseño y **no debe
+  tomarse como referencia**. Lo que sí es estable y obligatorio es el invariante:
+  el árbol de producto **no cambia** entre el tag y `main`, y se falsifica con
+  ```bash
+  git diff --stat v3.71.0..main -- backend frontend launcher scripts
+  ```
+  que debe salir **vacío**. Es decir: da igual clonar `main` o hacer
+  `git checkout v3.71.0`; el código citado por este documento es el mismo.
 
 **Artefactos nuevos de la release (objeto de la auditoría):**
 
