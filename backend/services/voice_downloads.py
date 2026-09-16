@@ -49,6 +49,18 @@ class PiperVoiceSpec:
 
 
 CATALOG: list[PiperVoiceSpec] = [
+    # V3.71 (eje RB): la voz INGLESA POR DEFECTO (`config.PIPER_VOICE`) tiene que
+    # estar en el catálogo. No lo estaba, así que `spec_for(PIPER_VOICE)` devolvía
+    # `None` y `ensure_voice_for_language("en")` salía por ahí **sin descargar**:
+    # en una instalación limpia, la voz con la que la app da clase solo se podía
+    # obtener por `download_models.py` (o a mano), mientras el español sí se
+    # auto-descargaba. Con la voz en el catálogo, las dos vías (bootstrap y
+    # descarga en caliente) usan la MISMA lista.
+    PiperVoiceSpec(
+        "en_US-lessac-medium",
+        "American English · Lessac (default de la app)",
+        "en/en_US/lessac/medium",
+    ),
     PiperVoiceSpec(
         "en_GB-alan-medium",
         "British English · Alan (male)",

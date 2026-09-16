@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.70.0**.
+- Última versión estable: **v3.71.0**.
 
 ## Estructura
 
@@ -170,7 +170,30 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 cd backend
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe download_models.py   # descarga Whisper + voz Piper (solo la 1ª vez)
+```
+
+### Modelos de voz (solo la 1.ª vez, requiere internet)
+```powershell
+cd backend
+.venv\Scripts\python.exe download_models.py --check   # ver qué falta (no descarga nada)
+.venv\Scripts\python.exe download_models.py           # descargar lo que falte
+```
+La primera vez descarga las voces Piper por defecto (inglés + español, ~60 MB por
+voz en `.onnx`/`.onnx.json`) y la caché de Whisper (~930 MB). **No** se versionan
+(`backend/models/` está en `.gitignore`), así que en un clon limpio hay que
+ejecutar este paso. La verificación previa distingue lo que es **descarga** de lo
+que es **local** (la base de datos, que se crea sola al arrancar).
+
+### Modelo de Ollama (solo la 1.ª vez, requiere internet)
+```powershell
+ollama pull llama3.1:8b    # el modelo por defecto (backend/config.py::DEFAULT_MODEL)
+```
+Este paso es **manual y explícito** a propósito: el modelo lo gestiona el servicio
+de Ollama, no el proyecto (no se descarga solo). Compruébalo con `ollama list`.
+
+### Arranque del backend
+```powershell
+cd backend
 .venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
 ```
 
@@ -187,6 +210,10 @@ Abre **http://localhost:5173** y empieza a conversar.
 
 - [Ollama](https://ollama.com) instalado y corriendo en `http://127.0.0.1:11434`.
 - Python 3.11+ y Node.js 18+.
+- **Node y npm son requisito de EJECUCIÓN**, no solo de compilación: la UI la sirve
+  el dev server de Vite (`npm run dev`). El `npm run build` produce
+  `frontend/dist`, pero hoy nadie lo sirve (ver
+  `docs/audit/RC-RUNTIME-PRODUCTO.md`, RC-01).
 
 ## Tests
 

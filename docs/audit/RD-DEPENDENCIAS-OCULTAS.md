@@ -140,7 +140,7 @@ no solo en teoría.
 | **RD-03** | **P2** | **Lo descargado no se verificaba**: bastaba 1 byte, o una página de error con `200`, para dar una voz por instalada | E3 | **cerrado** (RD-02) |
 | **RD-04** | **P2** | **La UI no avisa de la descarga ni la consiente.** El vector «UI» del P1: el alumno no sabe que se están bajando ~60 MB ni cuál es la voz que suena (pese a existir ya `X-TTS-Degraded`) | E2; `frontend/src/api/voz.ts` (sin timeout ni aviso) | **re-declarado con fase → V3.72** (UX/product completion) |
 | **RD-05** | **P3 (deuda)** | **La caché negativa sigue siendo volátil** (`_VOICE_ENSURE_FAILED`, 300 s, en memoria): se pierde en cada reinicio del proceso. Persistirla exigiría almacenamiento y no entra en un endurecimiento mínimo | `services/tts.py:56-57,176-179` | **aceptado** (coste acotado por RD-01) |
-| **RD-06** | **P3 (deuda)** | El **bootstrap** `download_models.py` sigue usando `urlretrieve` **sin timeout**: si Hugging Face no responde, la instalación se queda colgada sin decir nada. Además `PIPER_VOICE` (`en_US-lessac-medium`) **no está en el catálogo curado**, así que la voz inglesa por defecto solo se obtiene por este script o a mano | `download_models.py:24`; `services/voice_downloads.py:CATALOG` | **trasladado a RB** (instalación limpia) |
+| **RD-06** | **P3 (deuda)** | El **bootstrap** `download_models.py` usaba `urlretrieve` **sin timeout**: si Hugging Face no respondía, la instalación quedaba colgada sin decir nada. Además `PIPER_VOICE` (`en_US-lessac-medium`) **no estaba en el catálogo curado**, así que la voz inglesa por defecto **no podía auto-descargarse** (`spec_for` devolvía `None` y `ensure_voice_for_language` salía sin intentarlo) | `download_models.py:24`; `services/voice_downloads.py:CATALOG` | **Cerrado en el eje RB** (RB-01/RB-02): la voz entra en el catálogo y el bootstrap delega en él (timeout real + integridad) | **cerrado (RB)** |
 | **RD-07** | **P3 (positivo)** | El resto de vectores del P1 **no aplicaba**: la descarga **ya era atómica** (`.part` → `replace`), y el fallo de red **nunca** devolvía 500 (`ensure_voice_for_language` no lanza: degrada) | `services/voice_downloads.py:130-133`; `services/tts.py:169` | **verificado** |
 
 ## Cierre del P1 de TTS/offline
@@ -175,9 +175,16 @@ y verificación**.
 | Timeout y robustez sin red | 9,5/10 (timeout real y acotado, con verificación de integridad) |
 | Honestidad de la degradación | 9/10 (log + cabeceras + CORS; falta que la UI lo lea) |
 | Cobertura de la descarga real | 9/10 (era 0: ningún test tocaba `_download_file`) |
-| Bootstrap de instalación | **sin evaluar** (RD-06, es RB) |
+| Bootstrap de instalación | **evaluado y cerrado por el eje RB** (RD-06: la voz inglesa por defecto no podía auto-descargarse y el bootstrap descargaba sin timeout) |
 
-**Hallazgos: P0 = 0 · P1 = 1 (cerrado) · P2 = 3 (2 cerrados, 1 re-declarado con fase) · P3 = 3 (1 aceptado, 1 trasladado, 1 positivo).**
+**Hallazgos: P0 = 0 · P1 = 1 (cerrado) · P2 = 3 (2 cerrados, 1 re-declarado con fase) · P3 = 3 (1 aceptado, 1 cerrado por RB, 1 positivo).**
+
+> **Actualización (2026-09-16, eje RB):** **RD-06** queda **cerrado** por RB-01
+> (la voz inglesa por defecto `en_US-lessac-medium` entra en el catálogo curado,
+> así que `ensure_voice_for_language("en")` ya puede instalarla: antes salía
+> **sin intentarlo**) y RB-02 (el bootstrap delega en el catálogo y hereda el
+> timeout real y la verificación de integridad). Ver
+> `docs/audit/RB-INSTALACION.md`.
 
 ## Regenerar / Verificar
 

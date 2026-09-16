@@ -1347,10 +1347,14 @@ RUNTIME_TOUCHPOINTS: tuple[dict[str, object], ...] = (
     },
     {
         "file": "download_models.py",
-        "needle": "urllib.request.urlretrieve",
+        "needle": "from services.voice_downloads import download_voice, spec_for",
         "kind": "internet",
         "hidden": False,
-        "note": "Bootstrap EXPLICITO: voz Piper inglesa",
+        "note": (
+            "Bootstrap EXPLICITO: voces Piper por defecto. V3.71 (eje RB): delega "
+            "en el catalogo curado en vez de tener URL y urlretrieve propios; la "
+            "primitiva de red vive en services/voice_downloads.py (timeout real)"
+        ),
     },
     {
         "file": "download_models.py",
