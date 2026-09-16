@@ -122,6 +122,62 @@
 - **Los tres estimadores de banda coinciden en toda la rejilla** (0 desacuerdos) y
   el banco de placement **no tiene huecos de dificultad**.
 
+## V3.71 — runtime, offline e instalación (P0 = 0 · P1 = 1 cerrado · P2 = 15 · P3 = 14)
+
+> Origen: `docs/audit/RF-SINTESIS-RUNTIME-V371.md` (síntesis de los seis ejes
+> `RE`–`RF`). Aquí va lo que V3.71 **deja sin cerrar a propósito**, con su fase o
+> su acción. **Lo cerrado en V3.71 no se aparca**: ya no es deuda.
+
+### Acción humana (no es trabajo del proyecto: requiere a una persona)
+
+- **RA-05 · Corte de red real.** Los 12 flujos de `Y` §22 tienen veredicto
+  **estático**; falta ejecutar el protocolo de `docs/audit/RA-RUNTIME-OFFLINE.md` §5
+  con la red **desconectada** (no basta con desactivar el DNS: se buscan
+  dependencias de Internet, no resolución de nombres). En CI es **imposible** por
+  la premisa 12, así que cualquier «offline verde» en CI sería **simulado**.
+- **RB-05 · Máquina físicamente limpia.** Existen el runbook (README) y la
+  verificación previa (`download_models.py --check`), y ambos están fijados por
+  test; falta **ejecutarlos en un clon/sistema recién instalado**. Es la diferencia
+  entre «el runbook es correcto» y «el runbook funciona».
+- **G5 · Matriz de dispositivos** (hardware real) y **variabilidad LLM de speaking**
+  con Ollama real (ya aparcados arriba, siguen aquí).
+
+### Abierto sin fase asignada (decisión pendiente)
+
+- **RA-02 · El endpoint de Ollama no está declarado en `config.py`.** Se delega en
+  el default de la librería (`127.0.0.1:11434`); un usuario con `OLLAMA_HOST` en
+  otro puerto no está contemplado ni documentado. Caben dos cierres: declararlo en
+  `config.py` o documentar explícitamente que se delega.
+
+### Con fase asignada
+
+- **RD-04 · Vector UI del P1 de TTS/offline → V3.72.** Aviso de descarga, progreso y
+  **consentimiento** del usuario, y consumo de `X-TTS-Voice`/`X-TTS-Degraded`. El
+  backend **ya expone** el dato; el P1 quedó cerrado en sus otros dos vectores
+  (timeout y degradación) y este **no puede volver al olvido** porque está fechado.
+- **RC-01 · Servido de `frontend/dist` → V3.72/V3.73.** Hoy la UI la sirve el dev
+  server de Vite y **Node + npm son requisito de EJECUCIÓN**; se declaró con
+  condición de salida en lugar de implementarse (decisión A del briefing de V3.71)
+  porque la pregunta «¿qué debe tener instalado el usuario?» se responde con el eje
+  RB y el empaquetado está vetado.
+
+### Deuda aceptada (declarada, no se arregla sin datos o sin decisión)
+
+- **RD-05 · Caché negativa de voces volátil** (300 s, en memoria): un reinicio la
+  olvida. Aceptada: el timeout ya es real y acotado, así que el reintento no
+  cuelga.
+- **RA-07 · La medición de red es estática.** El instrumento no puede demostrar que
+  un camino concreto no haga red **en tiempo de ejecución** (solo que no contiene
+  primitivas conocidas): un `import` dinámico o una librería de terceros que llame
+  a casa no aparecería. La parte dinámica la cubre el protocolo de RA-05.
+- **RC-04 · `ready` no exige la biblioteca de audio.** Deliberado: la biblioteca de
+  audio es **opcional por diseño** (el corpus usa TTS), así que `ready` significa
+  «la app puede dar clase», no «todo el catálogo está».
+- **`ollama pull` es un paso manual que el proyecto no verifica.** El informe de
+  instalación lo declara `exists=None` a propósito (el modelo lo gestiona el
+  servicio de Ollama). Si el usuario no lo ejecuta, la app degrada en el chat y el
+  runtime no puede evitarlo.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Aplicar (tras tu aprobación) el **fix mecánico del sesgo posicional** en

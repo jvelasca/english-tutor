@@ -5,6 +5,97 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-16 (UTC+2).
 >
+> **Nota (2026-09-16): V3.71.0 (Runtime real, offline verificado e instalación
+> limpia) — release de VERIFICACIÓN con endurecimiento mínimo.** Release
+> **`v3.71.0`**, **SIN migración, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN
+> capacidad pedagógica nueva**. V3.69 validó la **arquitectura** del motor
+> adaptativo y V3.70 midió su **pedagogía**; V3.71 baja al **suelo físico**: qué
+> necesita la máquina, qué toca Internet y qué le dice la app al usuario sobre sí
+> misma cuando algo de eso falla. Se organiza en **seis ejes** (`RE` gates/CI/
+> deriva · `RA` offline real · `RB` instalación limpia · `RC` runtime de producto y
+> salud honesta · `RD` dependencias ocultas y degradación · `RF` síntesis), con las
+> **cuatro decisiones de alcance** del gerente aplicadas: **(A)** medir y declarar
+> la frontera de `npm run dev` · **(B)** verificar y guiar el bootstrap de Ollama ·
+> **(C)** corregir la documentación a favor de `config.py` · **(D)** añadir el job
+> del launcher al CI. **Regla del incremento:** medir antes de tocar, endurecer lo
+> mínimo, y **re-declarar con fase lo que no se cierra** en vez de cerrarlo en
+> falso; cada endurecimiento trae un **test que falla sin el cambio**.
+> **(A) RE · Gates, CI y deriva documental (`docs/audit/RE-GATES-DERIVA.md`).** El
+> launcher era el **único subsistema sin gate** (sus **75 tests** no corrían en CI
+> y `docs/BETA_GATES.md` daba ✅ a «Launcher de escritorio» y «CI completa» igual):
+> nuevo job `launcher` con los mismos pins que el backend ⇒ **CI 7/7**. **Cuatro
+> derivas corregidas y anotadas sin reescribir el histórico**: árbol del launcher
+> en `ARQUITECTURA.md`; **modelo por defecto** (`PREMISAS.md`/`README.md`
+> declaraban `qwen3.5:9b`, que el código **veta**: es `llama3.1:8b`); los ✅ de
+> `BETA_GATES.md`; y la matriz de dispositivos declarada verde con
+> `DEVICE_MATRIX.md` **10/10 en ⬜** (**G5 queda ABIERTO**). **8 tests**
+> (`test_docs_drift_v371.py`) fallan si una deriva vuelve.
+> **(B) RD · El P1 de TTS/offline, cerrado (diferido 4 veces desde V3.46)
+> (`docs/audit/RD-DEPENDENCIAS-OCULTAS.md`).** **El hallazgo central:** el
+> `timeout` de la descarga de voces era **código muerto** —`urlretrieve` **no
+> acepta** `timeout`—, así que la **única dependencia de Internet en ruta de
+> producto** (un `POST /api/tts` de un idioma sin voz instalada) estaba **sin
+> límite** y su degradación era **muda**. Ahora: `urlopen` con timeout **real**
+> (15 s por operación de socket), descarga **atómica** y verificación del tamaño
+> contra `Content-Length`, con degradación **observable** (log + cabeceras
+> `X-TTS-Voice`/`X-TTS-Degraded`, expuestas por CORS). De los **tres vectores** del
+> P1 quedan **2 cerrados** y el de **UI re-declarado con fase a V3.72**; con ello
+> caen **RA-03** y parte de **RA-01**. **6 tests nuevos.**
+> **(C) RC · Runtime de producto y salud honesta
+> (`docs/audit/RC-RUNTIME-PRODUCTO.md`).** Medida la frontera real: la UI la sirve
+> el **dev server de Vite** y el backend **no** sirve `frontend/dist` ⇒ por la
+> decisión **(A)** se **declara con condición de salida** que **Node + npm son
+> requisito de EJECUCIÓN** (fijado por test), y se reevalúa en V3.72/V3.73. Caen
+> dos defectos reales: **(RC-02)** el sondeo de Ollama **no tenía cota** y el
+> launcher solo espera **1,5 s**, así que un Ollama **lento** se disfrazaba de
+> «backend caído» → `LLM_PING_TIMEOUT_SECONDS = 1.0`; **(RC-03)** el indicador de
+> cabecera leía `/api/health`, que responde **200 siempre**, así que decía
+> «Conectado» con la BD o el modelo caídos → ahora **Conectado / Degradado /
+> Desconectado** leyendo la dependencia que gatea `/ready`.
+> **(D) RB · Instalación limpia desde cero (`docs/audit/RB-INSTALACION.md`).**
+> Absorbe **RA-04** y **RD-06**. **(RB-01)** La **voz con la que la app da clase**
+> (`en_US-lessac-medium`) **no estaba en el catálogo curado**, así que
+> `ensure_voice_for_language("en")` **salía sin intentar la descarga**: en una
+> instalación limpia el **español sí se auto-descargaba y el inglés no**, en
+> silencio (falsado empíricamente: antes `False` sin descargar, ahora `True`).
+> **(RB-02)** El bootstrap deja de usar `urlretrieve` y URLs propias: delega en el
+> catálogo y hereda el endurecimiento de RD (efecto colateral: el manifiesto del
+> eje RA se actualizó y se regeneró su par, **mismo censo: 6 puntos de internet**).
+> **(RB-03)** Nueva **verificación previa de solo lectura** (`download_models.py
+> --check`/`--json`) que dice **qué falta y distingue descarga de local**; Ollama se
+> declara `exists=None` a propósito porque este script **no puede** comprobarlo.
+> **(RB-04)** El `README.md` gana el **`ollama pull llama3.1:8b`** explícito y la
+> nota de que `backend/models/` no se versiona (~1,1 GB). **13 tests.**
+> **(E) RA · Offline real: instrumento y protocolo
+> (`docs/audit/RA-RUNTIME-OFFLINE.md`).** Nuevo subcomando **de solo lectura**
+> `runtime-audit` en `scripts/audit_dossier.py` (determinista, con guard por test
+> de que no escribe en `data/` ni en `curriculum/`) + **protocolo de los 12
+> flujos**. Identifica **3 dependencias de Internet no declaradas que se disparan
+> EN TIEMPO DE USO** (voz en caliente, Whisper y su disparador en `/api/tts`): la
+> promesa «100 % local con la descarga inicial como única excepción» **no las
+> cubría**. Propiedades positivas medidas: el frontend **no** tiene CDN ni
+> websockets externos y **no hay ninguna otra primitiva de red** en producto.
+> **11 tests.** **El eje queda entregado pero ABIERTO: falta el corte de red real
+> (RA-05).**
+> **(F) RF · Síntesis (`docs/audit/RF-SINTESIS-RUNTIME-V371.md`).** **P0 = 0 ·
+> P1 = 1 (cerrado) · P2 = 15 · P3 = 14.** De los 15 P2: **8 cerrados**, **3
+> declarados con fase o condición de salida**, **3 abiertos que exigen acción
+> humana** (RA-02 endpoint de Ollama sin declarar en `config.py`, RA-05 corte de
+> red, G5 matriz de dispositivos) y **1 parcial** (RA-01, con la mitad de UI
+> fechada en V3.72).
+> **Tests y gates:** backend **2643 passed** (2600 → **+43**), frontend **661**
+> (76 ficheros), launcher **75** y **ahora en CI**, `ruff` limpio en backend y
+> launcher, `tsc` limpio, `check_release_consistency` verde en los 6 orígenes.
+> **Honestidad (leer antes que el veredicto):** **no hay verificación offline en
+> vivo** (los 12 flujos son estáticos; en CI es **imposible** por la premisa 12, así
+> que cualquier «offline verde» en CI sería **simulado**); **no se ha probado en
+> una máquina físicamente limpia** (RB-05); **no se prueba hardware móvil real**;
+> **no se mide calidad acústica**; y «offline verificado» debe leerse como «sin
+> dependencias de Internet declaradas», **NO** como «producto empaquetado y
+> distribuible» (**el runtime sigue siendo el de desarrollo**, RC-01). El detalle
+> completo está en `release-notes-v3.71.0.md`.
+>
 > **Nota (2026-09-15): V3.70.0 (Auditoría pedagógica + CEFR) — release de
 > MEDICIÓN, con cero líneas de lógica de PRODUCTO (solo bumps de versión).**
 > Release **`v3.70.0`**, **SIN migración, SIN bump de `GENERATOR_VERSION`, SIN
@@ -3222,51 +3313,89 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-15):** `v3.70.0` **Auditoría pedagógica + CEFR**
-(release de **MEDICIÓN, no de capacidad**: **SIN migración**, **SIN bump de
-`GENERATOR_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum**, **SIN
-tocar el argmax del Planner** y con **cero líneas de lógica de PRODUCTO** — solo
-**5 subcomandos de medición de SOLO LECTURA** en `backend/scripts/audit_dossier.py`,
-tests, bumps de versión y documentación). Igual que V3.69 validó la
-**arquitectura** del motor, V3.70 mide la **pedagogía real** en **cinco ejes**
-(AA→AE) más una síntesis (AF):
-**(AA) contenido/CEFR** (`docs/audit/AA-PED-CONTENIDO-CEFR.md`): **un P0, el
-89,4 % de los 368 checks tiene la correcta en la posición 0** (329/368); A1
-entero por encima de su banda de velocidad (86/200) y C1/C2 casi enteros por
-debajo (18/20, 19/20); `connected_speech: true` sin reducción real en C1 14/14 y
-C2 20/20; **deriva de `docs/audit/generated/` corregida** (declaraba C1 = 14 y
-C2 = 14 objetivos frente a **20 y 20**). **Limpio: 0/490 ítems fuera de banda de
-dificultad.** **(AB) cobertura** (`AB-PED-COBERTURA.md`): corpus B1–C2 al
-**13,9–20,0 %** de su objetivo; `reading` sin `services/reading.py`; **manifest de
-audio humano versionado y vacío** (`entries: []`); `mediation` sin competencias,
-corpus, canal, scorer ni UI. **(AC) feedback** (`AC-PED-FEEDBACK.md`): **4 de 7
-reglas de grammar nunca pueden confirmarse** y **solo 2 alcanzan la racha de
-dominio**; `reading`/`mediation` sin canal; fijado por test que **la nota la decide
-el scorer determinista, nunca el LLM**. **(AD) maestría**
-(`AD-PED-MAESTRIA.md`): **9 modalidades · 8 en matriz · 7 canales**; `interaction`
-y `mediation` **no pueden acreditar evidencia por ninguna vía**;
-**`novel_required = 0` en las 48 celdas**; las filas sin `objective_id` **no
-acreditan éxito** (medido: `result 1,0` → `success False`). **(AE) instrumentos**
-(`AE-PED-INSTRUMENTOS.md`): el criterio de parada del placement **es inalcanzable**
-(`SE ≥ 0,7071 > 0,5`, cota analítica del 1PL); el **examen de B1 tiene los 12
-ítems en dificultad 1** igual que el de A1; **cuatro de seis niveles sin examen
-final**; sesgo de forma del placement (posición 3 **nunca** correcta).
-**(AF) síntesis** (`AF-SINTESIS-PEDAGOGICA-V370.md`): **1 P0 · 15 P1 · 12 P2 · 5
-P3** (33 hallazgos abiertos) y **4 propiedades positivas**.
-**V3.70 NO CORRIGE NADA**: cada insuficiencia queda declarada y asignada a fase
+**Posición actual (2026-09-16):** `v3.71.0` **Runtime real, offline verificado e
+instalación limpia** (release de **VERIFICACIÓN con endurecimiento mínimo**:
+**SIN migración**, **SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**,
+**SIN tocar el banco**, **SIN tocar el currículum** y **SIN capacidad pedagógica
+nueva**). V3.69 validó la **arquitectura** del motor adaptativo y V3.70 midió su
+**pedagogía**; V3.71 baja al **suelo físico**: qué necesita la máquina, qué toca
+Internet y qué le dice la app al usuario sobre sí misma cuando algo falla. **Seis
+ejes** (`RE` gates/CI/deriva · `RA` offline real · `RB` instalación limpia · `RC`
+runtime de producto y salud honesta · `RD` dependencias ocultas y degradación ·
+`RF` síntesis), con las **cuatro decisiones de alcance** del gerente aplicadas:
+**(A)** medir y **declarar** la frontera de `npm run dev` · **(B)** verificar y
+**guiar** el bootstrap de Ollama · **(C)** corregir la documentación **a favor de
+`config.py`** · **(D)** añadir el **job del launcher al CI**.
+
+**Lo que cambia de verdad en el producto** (todo con test que falla sin el cambio):
+**(RE)** el launcher deja de ser el único subsistema sin gate ⇒ **CI 7/7**, y las
+**4 derivas documentales** quedan corregidas y pinchadas por test (incluido el
+**modelo por defecto**: la documentación declaraba `qwen3.5:9b`, que el código
+**veta**; es `llama3.1:8b`). **(RD)** se cierra el **P1 de TTS/offline diferido 4
+veces desde V3.46**: el `timeout` de la descarga de voces era **código muerto**
+(`urlretrieve` no lo acepta), así que la **única dependencia de Internet en ruta de
+producto** estaba **sin límite** y su degradación era **muda**; ahora hay timeout
+**real** (15 s por operación de socket), descarga **atómica**, verificación de
+tamaño y degradación **observable** (`X-TTS-Voice`/`X-TTS-Degraded`). **(RC)** la
+**salud de la UI deja de mentir** (tres estados: **Conectado / Degradado /
+Desconectado**; antes decía «Conectado» con la BD o el modelo caídos porque leía
+`/api/health`, que responde **200 siempre**) y el **sondeo de Ollama queda acotado**
+(un Ollama **lento** se disfrazaba de «backend caído»). **(RB)** la **voz con la que
+la app da clase** se vuelve alcanzable por la vía de producto (antes
+`ensure_voice_for_language("en")` **salía sin intentar la descarga**: el español sí
+se auto-descargaba y el inglés no), el bootstrap deja de descargar sin timeout y
+gana una **verificación previa de solo lectura** (`--check`). **(RA)** nuevo
+instrumento de runtime **de solo lectura y determinista** + protocolo de los 12
+flujos.
+
+**Hallazgos: P0 = 0 · P1 = 1 (cerrado) · P2 = 15 · P3 = 14** (dossier de síntesis:
+`docs/audit/RF-SINTESIS-RUNTIME-V371.md`). De los 15 P2: **8 cerrados**, **3
+declarados con fase o condición de salida**, **3 abiertos que exigen ACCIÓN
+HUMANA** y **1 parcial**. **Tests:** backend **2643 passed** (2600 → **+43**),
+frontend **661**, launcher **75** y **ahora en CI**, `ruff` limpio.
+
+**Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar):**
+
+1. **RA-05 — corte de red real (ACCIÓN HUMANA).** Los 12 flujos tienen veredicto
+   **estático**. En CI es **imposible** por la premisa 12, así que «offline verde»
+   en CI sería **simulado**. Hay que ejecutar el protocolo de
+   `docs/audit/RA-RUNTIME-OFFLINE.md` §5 con la red desconectada.
+2. **RB-05 — máquina físicamente limpia (ACCIÓN HUMANA).** Existen el runbook y la
+   verificación previa, pero nadie los ha ejecutado en un sistema recién instalado.
+3. **RA-02 — el endpoint de Ollama no está declarado en `config.py`** (se delega en
+   el default de la librería y `OLLAMA_HOST` no se contempla).
+4. **G5 — matriz de dispositivos** sigue **10/10 en ⬜**.
+5. **RD-04 / mitad de RA-01 — UI/consentimiento de la descarga de voces.** Fase
+   **V3.72**; el backend **ya expone** el dato (`X-TTS-Degraded`).
+6. **RC-01 — Node + npm son requisito de EJECUCIÓN** (la UI la sirve el dev server
+   de Vite y `dist` no lo sirve nadie). Declarado con **condición de salida**: se
+   reevalúa en **V3.72/V3.73**.
+
+**Honestidad:** «offline verificado» = «**sin dependencias de Internet
+declaradas**», **NO** «producto empaquetado y distribuible» (**el runtime sigue
+siendo el de desarrollo**); no se mide calidad acústica ni hardware móvil real. Ver
+`release-notes-v3.71.0.md`.
+
+**Siguiente incremento:** `V3.72` **UX / product completion** (recoge el **vector
+UI del P1 de TTS/offline** y la **reevaluación de RC-01**; los tracks P1–P6 de M13
+quedan **medidos y acotados, no cerrados**).
+
+**PENDIENTE INMEDIATO:** los commits de este incremento (`RE`, `RA`, `RD`, `RC`,
+`RB`, `RF`) y el **tag `v3.71.0`** deben estar **publicados en `main`** para que la
+**auditoría externa desde GITHUB** pueda leerlos; el punto de entrada para el
+auditor está en `agentes/auditoria-externa-release-v371.md`.
+
+**Anterior:** `v3.70.0` **Auditoría pedagógica + CEFR** (release de **MEDICIÓN, no
+de capacidad**): **cinco ejes** AA→AE más síntesis AF, **1 P0 · 15 P1 · 12 P2 · 5
+P3** (33 hallazgos abiertos) y **4 propiedades positivas**; **cero líneas de lógica
+de producto** (solo **5 subcomandos de medición de SOLO LECTURA** en
+`backend/scripts/audit_dossier.py`, tests, bumps de versión y documentación).
+**V3.70 no corrige nada**: cada insuficiencia queda declarada y asignada a fase
 (**contenido → V4.0.x · motor y acreditación → Planner 4.0 · instrumentos →
-V4.0.x/V3.72**). **Los 6 P2 de la auditoría de V3.69 siguen abiertos** por
-decisión de alcance. **Tests:** **+48** (5 ficheros `test_ped_*_v370.py`), backend
-**2600 passed**. **Instrumentos nuevos:** `cefr-adequacy`, `skill-coverage`,
-`feedback-coverage`, `mastery-claims` y `assessment-instruments` (salida
-regenerable en `docs/audit/generated/`, **sin escribir nunca en `data/` ni en
-`curriculum/`**). **Honestidad:** no demuestra eficacia pedagógica (criterio
-interno `docs/audit/CEFR-REFERENCE.md`, **no normativo**), no valida el nivel real
-de un alumno, no audita la calidad acústica (todo el listening es **metadato
-declarado**) ni el texto del LLM en ejecución, no audita el frontend, y la cota
-del placement es **analítica**. Ver `release-notes-v3.70.0.md`.
-**Siguiente incremento:** `V3.71` **runtime/offline/instalación** (los tracks
-P1–P6 de M13 quedan **medidos y acotados, no cerrados**).
+V4.0.x/V3.72**). **Los 6 P2 de la auditoría de V3.69 siguen abiertos** por decisión
+de alcance. **Tests:** **+48** (5 ficheros `test_ped_*_v370.py`), backend **2600
+passed**. Detalle completo en `release-notes-v3.70.0.md` y en la nota de la
+cabecera de este documento.
 **CERRADA (2026-09-16):** commit de release `9ba9c49` (+ documental `2db93ba`),
 tag anotado `v3.70.0` publicado en `main` y **CI 6/6** verde (run
 [35062382562](https://github.com/jvelasca/english-tutor/actions/runs/35062382562):
