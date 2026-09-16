@@ -23,12 +23,28 @@
 ## Punto de entrada
 
 - Repositorio: `jvelasca/english-tutor` (**público**), rama `main`.
-- **Release auditada:** commit **`<RELEASE_COMMIT>`** (`release(v3.71.0): runtime
-  real, offline verificado e instalacion limpia`) con el **tag anotado `v3.71.0`**.
-  *(El hash y el run id de CI se rellenan al publicar; ver §«Cierre».)*
+- **Release auditada:** commit **`2eff6ea`** (`2eff6eadc9e5dd13df26e3892d2e508167def649`,
+  `release(v3.71.0): runtime real, offline verificado e instalacion limpia`) con el
+  **tag anotado `v3.71.0`** (objeto **`6ac22db`**, `6ac22db9cb3190fb55627ab41045d5a25d5b1ab8`,
+  que apunta a `2eff6ea`).
 - **Base de comparación:** `v3.70.0` → release **`9ba9c49`**, tag `v3.70.0`, cierre
   documental `2db93ba`/`f93499d`.
 - **Los números de línea citados** corresponden al árbol publicado en `v3.71.0`.
+
+**Estado de publicación (verificado, no declarado):**
+
+- **CI 7/7 verde** en
+  [run 35136141089](https://github.com/jvelasca/english-tutor/actions/runs/35136141089)
+  (HEAD `2eff6ea`, `success`), con el **job nuevo incluido** —es decir, la decisión
+  **D** del briefing está verificada **en GitHub**, no solo en local—:
+  - `Launcher (ruff + pytest)` `104928880868` ← **el job que añade V3.71**
+  - `Backend (ruff + pytest)` `104928881073` · `Frontend (tsc + vitest + build)`
+    `104928880539` · `Playwright E2E (visual)` `104928880854` · `Content validation`
+    `104928880771` · `Beta V3.0 gate` `104928880924` · `Release consistency`
+    `104928880910`.
+- **Nota para el auditor:** el run se disparó con el **push de `main`**; el tag
+  `v3.71.0` se publicó en el mismo push y apunta al mismo commit. En la API de
+  GitHub se pueden comprobar los **7** jobs y el objeto del tag.
 
 **Artefactos nuevos de la release (objeto de la auditoría):**
 
@@ -139,11 +155,17 @@ incremento declara:
 
 ## Cierre
 
-Al publicar, rellenar en la cabecera de este archivo:
+**CERRADO (2026-09-16).** Verificado contra GitHub, no contra el árbol local:
 
-- hash del commit de release y objeto del tag anotado `v3.71.0`;
-- **run de CI** que lo contiene (se esperan **7/7** jobs: entra `launcher`), con la
-  URL y los ids de cada job;
-- confirmación de que `check_release_consistency.py` sale verde en **6 orígenes**.
+- **Commit de release:** `2eff6ea` (`2eff6eadc9e5dd13df26e3892d2e508167def649`).
+- **Tag anotado:** `v3.71.0` (objeto `6ac22db`), apuntando a `2eff6ea`.
+- **CI 7/7 verde** en
+  [run 35136141089](https://github.com/jvelasca/english-tutor/actions/runs/35136141089):
+  `Launcher (ruff + pytest)` `104928880868` · `Backend (ruff + pytest)`
+  `104928881073` · `Frontend (tsc + vitest + build)` `104928880539` ·
+  `Playwright E2E (visual)` `104928880854` · `Content validation` `104928880771` ·
+  `Beta V3.0 gate` `104928880924` · `Release consistency` `104928880910`.
+- **Consistencia de versión:** `check_release_consistency.py` verde en los **6
+  orígenes**, y el job `Release consistency` del CI también.
 
 **Informe esperado:** `docs/audit/AH-AUDITORIA-RELEASE-V371.md`.

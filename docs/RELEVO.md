@@ -3380,10 +3380,21 @@ siendo el de desarrollo**); no se mide calidad acústica ni hardware móvil real
 UI del P1 de TTS/offline** y la **reevaluación de RC-01**; los tracks P1–P6 de M13
 quedan **medidos y acotados, no cerrados**).
 
-**PENDIENTE INMEDIATO:** los commits de este incremento (`RE`, `RA`, `RD`, `RC`,
-`RB`, `RF`) y el **tag `v3.71.0`** deben estar **publicados en `main`** para que la
-**auditoría externa desde GITHUB** pueda leerlos; el punto de entrada para el
-auditor está en `agentes/auditoria-externa-release-v371.md`.
+**PENDIENTE INMEDIATO:** lanzar la **auditoría externa desde GITHUB**. El punto de
+entrada autocontenido para el auditor está en
+**`agentes/auditoria-externa-release-v371.md`** (con el commit, el tag y el run de
+CI ya rellenados). El informe esperado es
+`docs/audit/AH-AUDITORIA-RELEASE-V371.md`.
+
+**CERRADA (2026-09-16):** commit de release **`2eff6ea`**, tag anotado **`v3.71.0`**
+(objeto `6ac22db`) publicado en `main` y **CI 7/7 verde** en
+[run 35136141089](https://github.com/jvelasca/english-tutor/actions/runs/35136141089)
+—incluido el **job nuevo `Launcher (ruff + pytest)`**
+(`104928880868`), que es la decisión **D** verificada en GitHub—, con `Backend`
+`104928881073`, `Frontend` `104928880539`, `Playwright` `104928880854`,
+`Content validation` `104928880771`, `Beta V3.0 gate` `104928880924` y
+`Release consistency` `104928880910`. **Auditoría externa de RELEASE** entregada
+como punto de entrada (informe `AH` pendiente de recibir).
 
 **Anterior:** `v3.70.0` **Auditoría pedagógica + CEFR** (release de **MEDICIÓN, no
 de capacidad**): **cinco ejes** AA→AE más síntesis AF, **1 P0 · 15 P1 · 12 P2 · 5
