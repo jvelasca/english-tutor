@@ -29,10 +29,10 @@
   },
   {
    "file": "services/voice_downloads.py",
-   "needle": "urllib.request.urlretrieve",
+   "needle": "urllib.request.urlopen",
    "kind": "internet",
    "hidden": false,
-   "note": "Descarga de voces Piper desde huggingface.co (rhasspy/piper-voices)",
+   "note": "Descarga de voces Piper desde huggingface.co (rhasspy/piper-voices). V3.71 (eje RD): usa urlopen con timeout REAL y verifica el Content-Length",
    "exists": true,
    "match": true
   },

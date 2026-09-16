@@ -10,7 +10,7 @@ from dependencies import current_user_optional, read_audio_limited
 from domain import settings as settings_service
 from schemas.voz import TranscribeResponse, TTSRequest
 from services.stt import transcribe as transcribe_audio
-from services.tts import ensure_voice_for_language, resolve_voice
+from services.tts import ensure_voice_for_language, resolve_voice, voice_language
 from services.tts import synthesize as synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,11 @@ async def tts(
     default del idioma (p. ej. `es_ES-davefx-medium`) antes de resolver; si la
     descarga falla (sin red) se sigue con el fallback, nunca se devuelve 500 por
     ese motivo.
+
+    V3.71 (eje RD): la degradación deja de ser **silenciosa**. Si no hay voz del
+    idioma pedido, `resolve_voice` cae al fallback global (leer español con voz
+    inglesa); ahora eso se registra en el log y se declara al cliente en las
+    cabeceras `X-TTS-Voice` (voz realmente usada) y `X-TTS-Degraded` (0/1).
     """
     language = (req.language or "en").strip().lower()[:2] or "en"
     await run_in_threadpool(ensure_voice_for_language, language)
@@ -65,4 +70,18 @@ async def tts(
         raise HTTPException(
             status_code=500, detail="No se pudo sintetizar la voz"
         ) from None
-    return Response(content=wav, media_type="audio/wav")
+    degraded = bool(voice) and voice_language(voice) != language
+    if degraded:
+        logger.warning(
+            "TTS en %s servido con una voz de otro idioma (%s): degradación",
+            language,
+            voice,
+        )
+    return Response(
+        content=wav,
+        media_type="audio/wav",
+        headers={
+            "X-TTS-Voice": voice or "",
+            "X-TTS-Degraded": "1" if degraded else "0",
+        },
+    )

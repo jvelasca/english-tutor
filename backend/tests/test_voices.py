@@ -465,3 +465,124 @@ def test_tts_endpoint_auto_downloads_missing_language_voice(monkeypatch, tmp_pat
         r = client.post("/api/tts", json={"text": "Hola", "language": "es"})
     assert r.status_code == 200
     assert captured["voice"] == "es_ES-davefx-medium"
+
+
+# --- V3.71 (eje RD): el timeout es real y la degradación es explícita --------
+
+
+class _FakeResponse:
+    """Respuesta mínima de `urlopen` para `_download_file`."""
+
+    def __init__(self, body: bytes, content_length: str | None):
+        self._body = body
+        self.headers = (
+            {} if content_length is None else {"Content-Length": content_length}
+        )
+
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            chunk, self._body = self._body, b""
+            return chunk
+        chunk, self._body = self._body[:size], self._body[size:]
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_download_file_pasa_el_timeout_real_a_urlopen(monkeypatch, tmp_path):
+    """RD-01: el `timeout` deja de ser código muerto.
+
+    Hasta V3.70 se declaraba `timeout=300.0` pero se llamaba a `urlretrieve`,
+    que no lo acepta: la descarga quedaba sin límite alguno.
+    """
+    captured: dict = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["timeout"] = timeout
+        return _FakeResponse(b"x", "1")
+
+    monkeypatch.setattr(voice_downloads.urllib.request, "urlopen", fake_urlopen)
+    voice_downloads._download_file(
+        "https://example.invalid/v.onnx", tmp_path / "v.onnx"
+    )
+
+    assert captured["timeout"] == voice_downloads.VOICE_DOWNLOAD_TIMEOUT_SECONDS
+    assert (tmp_path / "v.onnx").read_bytes() == b"x"
+
+
+def test_el_timeout_de_descarga_es_acotado():
+    """Un timeout `None` o enorme volvería a permitir el cuelgue sin red."""
+    timeout = voice_downloads.VOICE_DOWNLOAD_TIMEOUT_SECONDS
+    assert timeout is not None
+    assert 0 < timeout <= 60
+
+
+def test_download_file_rechaza_descarga_truncada(monkeypatch, tmp_path):
+    """RD-02: no se acepta una descarga incompleta (ni una página de error)."""
+    monkeypatch.setattr(
+        voice_downloads.urllib.request,
+        "urlopen",
+        lambda request, timeout=None: _FakeResponse(b"abc", "9999"),
+    )
+    dest = tmp_path / "v.onnx"
+
+    with pytest.raises(RuntimeError, match="incompleta"):
+        voice_downloads._download_file("https://example.invalid/v.onnx", dest)
+
+    assert not dest.exists()
+    assert not (tmp_path / "v.onnx.part").exists()  # sin restos a medio bajar
+
+
+def test_download_file_rechaza_descarga_vacia(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        voice_downloads.urllib.request,
+        "urlopen",
+        lambda request, timeout=None: _FakeResponse(b"", None),
+    )
+    dest = tmp_path / "v.onnx"
+
+    with pytest.raises(RuntimeError, match="vacía"):
+        voice_downloads._download_file("https://example.invalid/v.onnx", dest)
+
+    assert not dest.exists()
+    assert not (tmp_path / "v.onnx.part").exists()
+
+
+def test_tts_declara_la_voz_usada_y_si_hubo_degradacion(monkeypatch, tmp_path):
+    """RD-03: sin voz del idioma, la degradación se declara (no es silenciosa)."""
+    _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)  # solo inglés
+    monkeypatch.setattr(
+        "routers.voz.ensure_voice_for_language", lambda language: False
+    )
+    monkeypatch.setattr(
+        "routers.voz.synthesize_speech",
+        lambda text, scale=1.0, voice=None: b"RIFFfake",
+    )
+
+    with TestClient(app) as client:
+        r = client.post("/api/tts", json={"text": "Hola", "language": "es"})
+
+    assert r.status_code == 200
+    assert r.headers["X-TTS-Voice"] == tts.DEFAULT_VOICE
+    assert r.headers["X-TTS-Degraded"] == "1"
+
+
+def test_tts_no_declara_degradacion_cuando_la_voz_es_del_idioma(monkeypatch, tmp_path):
+    _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "es_ES-davefx-medium")
+    monkeypatch.setattr(
+        "routers.voz.synthesize_speech",
+        lambda text, scale=1.0, voice=None: b"RIFFfake",
+    )
+
+    with TestClient(app) as client:
+        r = client.post("/api/tts", json={"text": "Hola", "language": "es"})
+
+    assert r.status_code == 200
+    assert r.headers["X-TTS-Voice"] == "es_ES-davefx-medium"
+    assert r.headers["X-TTS-Degraded"] == "0"

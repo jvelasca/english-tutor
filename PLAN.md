@@ -1466,7 +1466,8 @@
 | Seguimiento de las auditorías EXTERNAS de V3.69 (`Z` y `Z2`, sin informe recibido) | `agentes/auditoria-externa-v369-seguimiento.md` | ⏳ **entregado (2026-09-16)**: registro del estado, verificación del hueco (`Z`/`Z2` no existen), objeto de cada informe, **texto de reclamo listo para enviar** y protocolo de acuse/triaje |
 | V3.71 Runtime real, offline verificado e instalación limpia (ejes RA–RF; verificación con endurecimiento mínimo) | `agentes/v371-runtime-offline-instalacion.md` | 🔄 **en curso (2026-09-16)**: briefing redactado y **cuatro decisiones de alcance resueltas** por el gerente (medir y declarar la frontera de `npm run dev` · verificar y guiar el bootstrap de Ollama · corregir la documentación a favor de `config.py` · añadir el job del launcher al CI). **Eje RE cerrado** (el más barato y de efecto inmediato): job `launcher` en CI, 4 derivas documentales corregidas, 8 tests que las fijan (`docs/audit/RE-GATES-DERIVA.md`) |
 | Eje RE de V3.71 (gates/CI/deriva documental) — evidencia interna | `docs/audit/RE-GATES-DERIVA.md` | ✅ **cerrado (2026-09-16)**: 7/7 jobs de CI (entra `launcher` con los 75 tests), derivas D1–D4 corregidas y **pinchadas por test** (`backend/tests/test_docs_drift_v371.py`, 8 tests), nota de corrección en `docs/BETA_GATES.md` y **G5 declarado abierto**; hallazgos P0 = 0 · P1 = 0 · P2 = 2 · P3 = 4 (1 deuda aceptada) |
-| Eje RA de V3.71 (runtime y offline real) — evidencia interna | `docs/audit/RA-RUNTIME-OFFLINE.md` | 🔄 **instrumento + protocolo entregados (2026-09-16)**; **eje ABIERTO**: falta ejecutar los 12 flujos de `Y` §22 con la red cortada (RA-05). Hallazgos P0 = 0 · P1 = 0 · **P2 = 5** (1 trasladado a RB, 1 bloquea el cierre) · P3 = 2. Nuevo subcomando de solo lectura `runtime-audit` (determinista, con guard por test de 11 tests) y **3 dependencias de Internet no declaradas en ruta de producto** (RA-01) |
+| Eje RA de V3.71 (runtime y offline real) — evidencia interna | `docs/audit/RA-RUNTIME-OFFLINE.md` | 🔄 **instrumento + protocolo entregados (2026-09-16)**; **eje ABIERTO**: falta ejecutar los 12 flujos de `Y` §22 con la red cortada (RA-05). Hallazgos P0 = 0 · P1 = 0 · **P2 = 5** (2 cerrados por RD, 1 trasladado a RB, 1 abierto, 1 bloquea el cierre) · P3 = 2. Nuevo subcomando de solo lectura `runtime-audit` (determinista, con guard por test de 11 tests) y **3 dependencias de Internet no declaradas en ruta de producto** (RA-01) |
+| Eje RD de V3.71 (dependencias ocultas y degradación) — evidencia interna | `docs/audit/RD-DEPENDENCIAS-OCULTAS.md` | ✅ **cerrado con alcance acotado (2026-09-16)**: cierra el **P1 de TTS/offline** diferido en 4 sitios desde V3.46 (**2 de 3 vectores**; el de UI se re-declara con fase a V3.72) y con él **RA-03** y parte de **RA-01**. Hallazgos P0 = 0 · **P1 = 1 (cerrado)** · P2 = 3 (2 cerrados, 1 con fase) · P3 = 3. El hallazgo central: el `timeout` de la descarga de voces era **código muerto** (`urlretrieve` no lo acepta) ⇒ la única dependencia de Internet en ruta de producto estaba **sin límite**; ahora es real y acotado, con verificación de tamaño y degradación declarada (`X-TTS-Voice`/`X-TTS-Degraded`). **6 tests nuevos**, todos fallan sin el cambio |
 
 **Regla de proceso (premisa 5 y 12):** todo trabajo se descompone en subagentes
 autocontenidos (`agentes/*.md`), vigilando la saturación de contexto de todos los agentes.
@@ -1512,7 +1513,16 @@ Antes de alucinar, se reinicia el contexto apoyándose en `docs/`.
   corregidas, **anotadas sin reescribir el histórico** y **fijadas por 8 tests**
   (`backend/tests/test_docs_drift_v371.py`) que fallan si vuelven; evidencia en
   `docs/audit/RE-GATES-DERIVA.md`. **G5 (matriz de dispositivos) queda declarado
-  ABIERTO** (acción humana). Los ejes **RA/RB/RC/RD/RF siguen pendientes**. Los
+  ABIERTO** (acción humana). **Eje RD cerrado (2026-09-16)**: se cierra el
+  **P1 de TTS/offline** diferido en 4 sitios desde V3.46 — su `timeout` de
+  descarga era **código muerto**, así que la única dependencia de Internet en
+  ruta de producto estaba **sin límite**; ahora es real y acotado, con
+  verificación de tamaño y degradación declarada (`X-TTS-Voice`/`X-TTS-Degraded`),
+  y con ello caen **RA-03** y parte de **RA-01** (6 tests nuevos); evidencia en
+  `docs/audit/RD-DEPENDENCIAS-OCULTAS.md`. **Eje RA entregado pero ABIERTO**
+  (instrumento `runtime-audit` de solo lectura + protocolo de los 12 flujos;
+  falta el corte de red real): `docs/audit/RA-RUNTIME-OFFLINE.md`. Los ejes
+  **RB/RC/RF siguen pendientes**. Los
   tracks **P1–P6 de M13** (política pedagógica formal,
   error mastery, vocabulario exposure/production/mastery, listening como
   competencia, CEFR basado en evidencia y pronunciación fonémica) quedan

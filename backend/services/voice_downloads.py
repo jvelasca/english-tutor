@@ -15,6 +15,7 @@ UI, pero si se colocan a mano en `models/piper` se siguen detectando.
 from __future__ import annotations
 
 import dataclasses
+import shutil
 import threading
 import urllib.error
 import urllib.request
@@ -23,6 +24,15 @@ from config import PIPER_DIR
 
 # Base del repo oficial de voces Piper (solo lectura, sin auth).
 _HF_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+
+# V3.71 (eje RD): timeout REAL de la descarga. Se aplica por OPERACIÓN de socket
+# (la conexión y cada lectura), no al total, así que un valor corto **no** corta
+# una descarga lenta que progresa: solo evita quedarse colgado cuando el host no
+# responde. Hasta V3.70 el `timeout` se declaraba pero se pasaba a
+# `urlretrieve`, que **no acepta timeout**: la descarga quedaba sin límite.
+VOICE_DOWNLOAD_TIMEOUT_SECONDS = 15.0
+
+_USER_AGENT = "english-tutor (descarga de voces Piper)"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -110,16 +120,34 @@ def _url(spec: PiperVoiceSpec, suffix: str) -> str:
     return f"{_HF_BASE}{spec.path}/{spec.id}{suffix}"
 
 
-def _download_file(url: str, dest, timeout: float = 300.0) -> None:
+def _download_file(url: str, dest, timeout: float | None = None) -> None:
     """Descarga a un fichero temporal y lo mueve al destino (atómico).
 
     El temporal (`*.part`) garantiza que un fichero a medio descargar nunca se
     detecte como voz instalada ni se sirva a Piper.
+
+    V3.71 (eje RD): el `timeout` es **real**. Hasta V3.70 se declaraba pero se
+    pasaba a `urllib.request.urlretrieve`, que **no acepta timeout**, así que la
+    descarga se quedaba sin límite y sin red podía colgarse indefinidamente.
+    Ahora se usa `urlopen(timeout=...)`. Además se comprueba lo recibido contra
+    el `Content-Length` declarado (cuando el servidor lo dice) para no aceptar
+    una página de error como si fuera un `.onnx`.
     """
+    if timeout is None:
+        timeout = VOICE_DOWNLOAD_TIMEOUT_SECONDS
     tmp = dest.with_suffix(dest.suffix + ".part")
     try:
-        urllib.request.urlretrieve(url, tmp)  # noqa: S310 - URL de HF fija del catálogo
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        request = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # URL fija
+            declared = resp.headers.get("Content-Length")
+            with open(tmp, "wb") as fh:
+                shutil.copyfileobj(resp, fh)
+        written = tmp.stat().st_size
+        if written == 0:
+            raise OSError("descarga vacía")
+        if declared is not None and int(declared) != written:
+            raise OSError(f"descarga incompleta: {written} de {declared} bytes")
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
         tmp.unlink(missing_ok=True)
         raise RuntimeError(f"No se pudo descargar {dest.name}: {exc}") from exc
     tmp.replace(dest)

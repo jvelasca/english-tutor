@@ -1306,12 +1306,13 @@ RUNTIME_TOUCHPOINTS: tuple[dict[str, object], ...] = (
     },
     {
         "file": "services/voice_downloads.py",
-        "needle": "urllib.request.urlretrieve",
+        "needle": "urllib.request.urlopen",
         "kind": "internet",
         "hidden": False,
         "note": (
             "Descarga de voces Piper desde huggingface.co "
-            "(rhasspy/piper-voices)"
+            "(rhasspy/piper-voices). V3.71 (eje RD): usa urlopen con timeout "
+            "REAL y verifica el Content-Length"
         ),
     },
     {

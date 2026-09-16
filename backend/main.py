@@ -127,6 +127,9 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    # V3.71 (eje RD): el TTS declara la voz usada y si hubo degradación; sin
+    # exponerlas, el navegador no puede leerlas desde otro origen.
+    expose_headers=["X-TTS-Voice", "X-TTS-Degraded"],
 )
 
 # Protección de origen (CSRF) + rate limiting (V1.41).
