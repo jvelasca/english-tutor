@@ -1,0 +1,137 @@
+{
+ "touchpoints": [
+  {
+   "file": "services/llm.py",
+   "needle": "ollama.AsyncClient()",
+   "kind": "loopback",
+   "hidden": false,
+   "note": "Cliente Ollama SIN argumentos: el endpoint es el default de la libreria (127.0.0.1:11434), no una constante de config.py",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "services/network.py",
+   "needle": "sock.connect((\"8.8.8.8\", 80))",
+   "kind": "lan",
+   "hidden": false,
+   "note": "Socket UDP 'connect' perezoso: fuerza la interfaz de salida SIN enviar paquetes, asi que funciona sin Internet real",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "services/network.py",
+   "needle": "socket.getaddrinfo",
+   "kind": "lan",
+   "hidden": false,
+   "note": "Resolucion mDNS real de <host>.local; sin respondedor devuelve False y la UI cae a la URL por IP",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "services/voice_downloads.py",
+   "needle": "urllib.request.urlretrieve",
+   "kind": "internet",
+   "hidden": false,
+   "note": "Descarga de voces Piper desde huggingface.co (rhasspy/piper-voices)",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "services/tts.py",
+   "needle": "from services import voice_downloads",
+   "kind": "internet",
+   "hidden": true,
+   "note": "DEPENDENCIA OCULTA: el TTS importa el descargador de voces en la descarga perezosa; el disparador real esta en routers/voz.py",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "routers/voz.py",
+   "needle": "ensure_voice_for_language",
+   "kind": "internet",
+   "hidden": true,
+   "note": "DEPENDENCIA OCULTA EN RUTA DE PRODUCTO: un POST /api/tts de un idioma sin voz instalada dispara una descarga en caliente",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "services/stt.py",
+   "needle": "download_root=str(WHISPER_DIR)",
+   "kind": "internet",
+   "hidden": true,
+   "note": "DEPENDENCIA OCULTA: si el modelo Whisper no esta en disco, faster_whisper lo descarga en la primera transcripcion",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "download_models.py",
+   "needle": "urllib.request.urlretrieve",
+   "kind": "internet",
+   "hidden": false,
+   "note": "Bootstrap EXPLICITO: voz Piper inglesa",
+   "exists": true,
+   "match": true
+  },
+  {
+   "file": "download_models.py",
+   "needle": "download_root=str(WHISPER_DIR)",
+   "kind": "internet",
+   "hidden": false,
+   "note": "Bootstrap EXPLICITO: modelo Whisper",
+   "exists": true,
+   "match": true
+  }
+ ],
+ "kinds": {
+  "loopback": 1,
+  "lan": 2,
+  "internet": 6
+ },
+ "hidden_internet": [
+  "services/tts.py:from services import voice_downloads",
+  "routers/voz.py:ensure_voice_for_language",
+  "services/stt.py:download_root=str(WHISPER_DIR)"
+ ],
+ "drifted": [],
+ "manifest": [
+  {
+   "id": "piper:en_US-lessac-medium.onnx",
+   "label": "Piper · voz inglesa por defecto (.onnx)",
+   "path": "backend/models/piper/en_US-lessac-medium.onnx",
+   "exists": true,
+   "mb": 60.3
+  },
+  {
+   "id": "piper:en_US-lessac-medium.onnx.json",
+   "label": "Piper · voz inglesa por defecto (.onnx.json)",
+   "path": "backend/models/piper/en_US-lessac-medium.onnx.json",
+   "exists": true,
+   "mb": 0.0
+  },
+  {
+   "id": "piper:es_ES-davefx-medium.onnx",
+   "label": "Piper · voz espanola por defecto (.onnx)",
+   "path": "backend/models/piper/es_ES-davefx-medium.onnx",
+   "exists": true,
+   "mb": 60.3
+  },
+  {
+   "id": "piper:es_ES-davefx-medium.onnx.json",
+   "label": "Piper · voz espanola por defecto (.onnx.json)",
+   "path": "backend/models/piper/es_ES-davefx-medium.onnx.json",
+   "exists": true,
+   "mb": 0.0
+  },
+  {
+   "id": "whisper:small",
+   "label": "faster-whisper `small` (cache en disco)",
+   "path": "backend/models/whisper",
+   "exists": true,
+   "mb": 927.4,
+   "files": 11
+  }
+ ],
+ "missing_artifacts": [],
+ "ollama": null,
+ "default_model": "llama3.1:8b"
+}

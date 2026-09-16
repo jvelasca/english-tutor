@@ -1257,6 +1257,314 @@ def assessment_instruments_markdown(data: dict) -> str:
     return "\n".join(lines)
 
 
+# =============================================================================
+# V3.71 · Eje RA — auditoría de offline real (SOLO LECTURA)
+# =============================================================================
+# Instrumento del eje RA: NO es ruta de producto. No abre conexiones salientes,
+# no descarga nada y no escribe en `data/` ni en `curriculum/`: lee codigo y
+# disco, y sondea Ollama por loopback (que es justo lo que hace la app).
+#
+# Mide las dos preguntas del eje:
+#   1. que puntos tocan la red y de que tipo son (loopback / lan / internet).
+#      Los que importan son los `hidden`: dependencias que NO son un paso de
+#      instalacion explicito y que pueden dispararse en TIEMPO DE USO.
+#   2. si esta TODO lo que hace falta para funcionar sin Internet (manifiesto de
+#      modelos: Piper ingles/espanol, Whisper y el modelo por defecto de Ollama).
+
+# `kind`: loopback (misma maquina) · lan (red local) · internet (fuera).
+# `hidden=True`: no es paso de instalacion, puede dispararse en tiempo de uso.
+RUNTIME_TOUCHPOINTS: tuple[dict[str, object], ...] = (
+    {
+        "file": "services/llm.py",
+        "needle": "ollama.AsyncClient()",
+        "kind": "loopback",
+        "hidden": False,
+        "note": (
+            "Cliente Ollama SIN argumentos: el endpoint es el default de la "
+            "libreria (127.0.0.1:11434), no una constante de config.py"
+        ),
+    },
+    {
+        "file": "services/network.py",
+        "needle": 'sock.connect(("8.8.8.8", 80))',
+        "kind": "lan",
+        "hidden": False,
+        "note": (
+            "Socket UDP 'connect' perezoso: fuerza la interfaz de salida SIN "
+            "enviar paquetes, asi que funciona sin Internet real"
+        ),
+    },
+    {
+        "file": "services/network.py",
+        "needle": "socket.getaddrinfo",
+        "kind": "lan",
+        "hidden": False,
+        "note": (
+            "Resolucion mDNS real de <host>.local; sin respondedor devuelve "
+            "False y la UI cae a la URL por IP"
+        ),
+    },
+    {
+        "file": "services/voice_downloads.py",
+        "needle": "urllib.request.urlretrieve",
+        "kind": "internet",
+        "hidden": False,
+        "note": (
+            "Descarga de voces Piper desde huggingface.co "
+            "(rhasspy/piper-voices)"
+        ),
+    },
+    {
+        "file": "services/tts.py",
+        "needle": "from services import voice_downloads",
+        "kind": "internet",
+        "hidden": True,
+        "note": (
+            "DEPENDENCIA OCULTA: el TTS importa el descargador de voces en la "
+            "descarga perezosa; el disparador real esta en routers/voz.py"
+        ),
+    },
+    {
+        "file": "routers/voz.py",
+        "needle": "ensure_voice_for_language",
+        "kind": "internet",
+        "hidden": True,
+        "note": (
+            "DEPENDENCIA OCULTA EN RUTA DE PRODUCTO: un POST /api/tts de un "
+            "idioma sin voz instalada dispara una descarga en caliente"
+        ),
+    },
+    {
+        "file": "services/stt.py",
+        "needle": "download_root=str(WHISPER_DIR)",
+        "kind": "internet",
+        "hidden": True,
+        "note": (
+            "DEPENDENCIA OCULTA: si el modelo Whisper no esta en disco, "
+            "faster_whisper lo descarga en la primera transcripcion"
+        ),
+    },
+    {
+        "file": "download_models.py",
+        "needle": "urllib.request.urlretrieve",
+        "kind": "internet",
+        "hidden": False,
+        "note": "Bootstrap EXPLICITO: voz Piper inglesa",
+    },
+    {
+        "file": "download_models.py",
+        "needle": "download_root=str(WHISPER_DIR)",
+        "kind": "internet",
+        "hidden": False,
+        "note": "Bootstrap EXPLICITO: modelo Whisper",
+    },
+)
+
+# Endpoint de Ollama: no vive en `config.py`, es el DEFAULT de la libreria. Se
+# declara aqui para poder afirmarlo y para sondearlo (solo lectura).
+OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
+
+
+def network_touchpoints() -> list[dict]:
+    """Puntos de red del backend, con su tipo y si el codigo sigue cuadrando.
+
+    `match=False` significa que la declaracion DERIVO del codigo: el instrumento
+    se autocomprueba en lugar de afirmar cosas que el arbol ya no dice.
+    """
+    out: list[dict] = []
+    for declared in RUNTIME_TOUCHPOINTS:
+        rel = str(declared["file"])
+        path = BACKEND_DIR / rel
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        out.append(
+            {
+                **declared,
+                "exists": path.is_file(),
+                "match": str(declared["needle"]) in text,
+            }
+        )
+    return out
+
+
+def _artifact(artifact_id: str, label: str, path: Path) -> dict:
+    size = path.stat().st_size if path.is_file() else 0
+    try:
+        rel = str(path.relative_to(REPO_DIR))
+    except ValueError:
+        rel = str(path)
+    return {
+        "id": artifact_id,
+        "label": label,
+        "path": rel.replace("\\", "/"),
+        "exists": size > 0,
+        "mb": round(size / 1_048_576, 1),
+    }
+
+
+def model_manifest() -> list[dict]:
+    """Artefactos que deben estar EN DISCO para funcionar con la red cortada."""
+    from config import (  # noqa: PLC0415 - import perezoso del backend
+        PIPER_DIR,
+        PIPER_VOICE,
+        SPANISH_VOICE,
+        WHISPER_DIR,
+        WHISPER_SIZE,
+    )
+
+    items: list[dict] = []
+    for voice_id, label in (
+        (PIPER_VOICE, "Piper · voz inglesa por defecto"),
+        (SPANISH_VOICE, "Piper · voz espanola por defecto"),
+    ):
+        for suffix in (".onnx", ".onnx.json"):
+            items.append(
+                _artifact(
+                    f"piper:{voice_id}{suffix}",
+                    f"{label} ({suffix})",
+                    PIPER_DIR / f"{voice_id}{suffix}",
+                )
+            )
+    whisper_files = (
+        sorted(p for p in WHISPER_DIR.rglob("*") if p.is_file())
+        if WHISPER_DIR.is_dir()
+        else []
+    )
+    whisper_bytes = sum(p.stat().st_size for p in whisper_files)
+    try:
+        whisper_rel = str(WHISPER_DIR.relative_to(REPO_DIR)).replace("\\", "/")
+    except ValueError:
+        whisper_rel = str(WHISPER_DIR)
+    items.append(
+        {
+            "id": f"whisper:{WHISPER_SIZE}",
+            "label": f"faster-whisper `{WHISPER_SIZE}` (cache en disco)",
+            "path": whisper_rel,
+            "exists": len(whisper_files) > 0,
+            "mb": round(whisper_bytes / 1_048_576, 1),
+            "files": len(whisper_files),
+        }
+    )
+    return items
+
+
+def ollama_probe(timeout: float = 1.0) -> dict:
+    """Sondea `/api/tags` por loopback. Sin Ollama en marcha, lo dice y sigue."""
+    import urllib.error  # noqa: PLC0415
+    import urllib.request  # noqa: PLC0415
+
+    try:
+        with urllib.request.urlopen(OLLAMA_TAGS_URL, timeout=timeout) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        return {
+            "url": OLLAMA_TAGS_URL,
+            "reachable": False,
+            "error": type(exc).__name__,
+            "models": [],
+        }
+    models = sorted(str(m.get("name", "")) for m in payload.get("models", []))
+    return {"url": OLLAMA_TAGS_URL, "reachable": True, "error": None, "models": models}
+
+
+def runtime_audit(probe_ollama: bool = False) -> dict:
+    """Medicion del eje RA (solo lectura).
+
+    Por defecto es **determinista**: no sondea Ollama, asi que su par en
+    `docs/audit/generated/` se regenera byte a byte. El sondeo en vivo de Ollama
+    es una medicion aparte y explicita (`--probe-ollama`) porque su resultado
+    depende de la maquina.
+    """
+    from config import DEFAULT_MODEL  # noqa: PLC0415
+
+    touchpoints = network_touchpoints()
+    manifest = model_manifest()
+    return {
+        "touchpoints": touchpoints,
+        "kinds": dict(Counter(str(t["kind"]) for t in touchpoints)),
+        "hidden_internet": [
+            f"{t['file']}:{t['needle']}"
+            for t in touchpoints
+            if t["hidden"] and t["kind"] == "internet"
+        ],
+        "drifted": [
+            f"{t['file']}:{t['needle']}" for t in touchpoints if not t["match"]
+        ],
+        "manifest": manifest,
+        "missing_artifacts": [a["id"] for a in manifest if not a["exists"]],
+        "ollama": ollama_probe() if probe_ollama else None,
+        "default_model": DEFAULT_MODEL,
+    }
+
+
+def runtime_audit_markdown(data: dict) -> str:
+    lines = [
+        "# Manifiesto de runtime y offline (eje RA de V3.71)",
+        "",
+        "> Generado por `python -m scripts.audit_dossier runtime-audit`.",
+        "> Instrumento de SOLO LECTURA: no descarga ni escribe en `data/`.",
+        "",
+        "## 1. Puntos de red del backend",
+        "",
+        "| Fichero | needle | tipo | oculto | cuadra | nota |",
+        "|---|---|---|---|---|---|",
+    ]
+    for t in data["touchpoints"]:
+        lines.append(
+            f"| `{t['file']}` | `{t['needle']}` | {t['kind']} | "
+            f"{'SI' if t['hidden'] else 'no'} | {'si' if t['match'] else 'NO'} | "
+            f"{t['note']} |"
+        )
+    lines += [
+        "",
+        f"- Reparto por tipo: {data['kinds']}",
+        "- Dependencias de Internet NO declaradas (ocultas): "
+        f"**{len(data['hidden_internet'])}**",
+    ]
+    for item in data["hidden_internet"]:
+        lines.append(f"  - `{item}`")
+    drifted = data["drifted"] or "ninguna"
+    lines.append(f"- Declaraciones que ya NO cuadran con el codigo: {drifted}")
+    lines += [
+        "",
+        "## 2. Manifiesto de modelos (debe estar en disco sin Internet)",
+        "",
+        "| id | artefacto | ruta | presente | MB |",
+        "|---|---|---|---|---|",
+    ]
+    for a in data["manifest"]:
+        lines.append(
+            f"| `{a['id']}` | {a['label']} | `{a['path']}` | "
+            f"{'si' if a['exists'] else 'NO'} | {a['mb']} |"
+        )
+    missing = data["missing_artifacts"]
+    lines += [
+        "",
+        f"- Ausentes: **{len(missing)}**"
+        + (f" -> {missing}" if missing else " (nada que descargar)"),
+        "",
+        "## 3. Ollama (loopback)",
+        "",
+        "- Endpoint: `http://127.0.0.1:11434` (default de la libreria `ollama`, "
+        "**no** declarado en `config.py`)",
+    ]
+    ollama = data["ollama"]
+    if ollama is None:
+        lines.append(
+            "- Estado: **no sondeado** (medicion determinista). El sondeo en vivo "
+            "es `runtime-audit --probe-ollama`."
+        )
+    else:
+        lines += [
+            f"- Alcanzable: {'si' if ollama['reachable'] else 'NO'}"
+            + (f" ({ollama['error']})" if ollama["error"] else ""),
+            f"- Modelo por defecto `{data['default_model']}` instalado: "
+            f"{'si' if data['default_model'] in ollama['models'] else 'NO'}",
+            f"- Modelos visibles: {ollama['models'] or 'ninguno'}",
+        ]
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Utilidades de dossier de auditoría.")
     sub = parser.add_subparsers(dest="command")
@@ -1297,6 +1605,16 @@ def main() -> int:
     sub.add_parser(
         "assessment-instruments",
         help="placement, exámenes y umbrales de banda (V3.70 · eje 5)",
+    )
+    # V3.71 · eje RA — manifiesto de runtime y offline (solo lectura).
+    p_ra = sub.add_parser(
+        "runtime-audit",
+        help="puntos de red y manifiesto de modelos offline (V3.71 · eje RA)",
+    )
+    p_ra.add_argument(
+        "--probe-ollama",
+        action="store_true",
+        help="sondea Ollama por loopback (rompe el determinismo del par generado)",
     )
     args = parser.parse_args()
 
@@ -1402,6 +1720,13 @@ def main() -> int:
         md = assessment_instruments_markdown(data)
         print(md)
         _write_generated("assessment-instruments", md, data)
+        return 0
+
+    if args.command == "runtime-audit":
+        data = runtime_audit(probe_ollama=args.probe_ollama)
+        md = runtime_audit_markdown(data)
+        print(md)
+        _write_generated("runtime-audit", md, data)
         return 0
 
     parser.print_help()
