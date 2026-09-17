@@ -97,8 +97,8 @@ dos cifras en circulación.
 ```powershell
 # Backend
 cd backend
-.venv\Scripts\python.exe -m pytest tests/ -q      # 2796 passed, 2 skipped (2798 casos) en el worktree limpio
-                                                    # 2798 passed (0 skipped, mismos 2798 casos) en el árbol de trabajo
+.venv\Scripts\python.exe -m pytest tests/ -q      # 2798 casos SIEMPRE; el reparto passed/skipped
+                                                    # depende de artefactos no versionados (ver errata al pie)
 .venv\Scripts\python.exe -m ruff check .           # limpio
 
 # Frontend (esta release NO toca producto: se comprueba que no ha derivado)
@@ -126,6 +126,15 @@ passed · 2 skipped** (2798 casos), medida en el `git worktree` sobre el tag en 
 **pre-vuelo**; los 2 saltos son condicionales del banco de escenario, que en el
 worktree no tiene la BD local (no versionada). En el árbol de trabajo la misma suite
 da **2798 passed** (0 skipped): mismos 2798 casos, sin BD que los condicione.
+
+> **Errata (V3.73.6).** La cifra correcta de este párrafo es el **invariante: 2798
+> casos**; el reparto depende de **artefactos no versionados**, no del banco. Un
+> **clon limpio de GitHub** da **2795 + 3** —salta `frontend/dist` en
+> `test_serve_frontend_v372.py:173` y el **modelo Whisper opt-in** en
+> `test_stt_asr_integration.py:44,55`—, ese clon tras `npm run build` da **2796 + 2** y
+> el árbol completo **2798 + 0**. El «2796 + 2» de arriba se midió en un worktree que
+> **sí** tenía `dist` construido y se presentó como la cifra del checkout limpio. Ver
+> `release-notes-v3.73.6.md`.
 Además, en ese worktree el **manifiesto offline** y la **identidad del árbol** se
 comprobaron con valores reales:
 

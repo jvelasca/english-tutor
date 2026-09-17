@@ -4,6 +4,19 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.73.6] — 2026-09-17
+
+**Precisión documental del punto de entrada de la auditoría. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (el backend de producto, el frontend de producto y el launcher quedan intactos, y el arnés de validación, sus tests y el contrato de los 7 gates **no se tocan**: el diff es **documentación**). Ninguna capacidad pedagógica nueva.
+
+Esta release nace de un **pre-vuelo del auditor**: clonar el repositorio **desde GitHub** y ejecutar, uno por uno, los comandos que el punto de entrada le manda ejecutar. Encontró **una cifra no reproducible**.
+
+- **La cifra no reproducible.** El documento declaraba `pytest tests/ -q # 2796 passed + 2 skipped (2798 casos) en el worktree limpio`. Medido en tres entornos: **clon limpio de GitHub → 2795 + 3**; ese clon tras `npm run build` → 2796 + 2; árbol con `dist`, modelos y BD → 2798 + 0. El **total (2798 casos) era correcto y es el invariante**; lo que fallaba era el **reparto** y su causa.
+- **La causa estaba mal atribuida.** El documento decía «condicionales del banco de escenario»; los saltos reales son de **artefactos no versionados**: `frontend/dist` (1 en `test_serve_frontend_v372.py:173`) y el **modelo Whisper opt-in** (2 en `test_stt_asr_integration.py:44,55`). La cifra de 2796 se midió en un worktree que **sí** tenía `dist` construido —de ahí que allí no apareciera el salto del artefacto— y se presentó como la del checkout limpio, que es la autoridad.
+- **Por qué importaba.** Un auditor recién clonado ve **2795 + 3**, lee `2796 + 2` y abre una incidencia que **no** es un defecto del producto: una ronda de auditoría gastada en un falso positivo. El pre-vuelo existe exactamente para eso.
+- **El arreglo.** El documento declara ahora el **invariante** (2798 casos) y el **reparto por entorno** con los motivos exactos medidos, más el aviso de que **2795 + 3 en un clon sin compilar no es un hallazgo**. La corrección se marca como **errata (V3.73.6)** dentro del documento y con una línea de errata en las notas de V3.73.4 y V3.73.5, **sin reescribir el histórico**: las releases anteriores quedan como registro de lo que declararon.
+- **Auditabilidad por `grep`.** Los nombres de los **11 jobs** del CI iban partidos entre líneas (`Release⏎consistency`) y una búsqueda literal fallaba; pasan a ir **uno por línea**.
+- **Verificación.** Pre-vuelo completo sobre un clon **nuevo desde GitHub**: `main` == tag, `git diff --stat v3.73.5..main -- backend frontend launcher scripts` **vacío**, run del commit del tag `success` con **11/11**, `check_release_consistency` OK y los recuentos declarados comprobados uno a uno (43/19/23/19 = **104**; launcher **113** y **13+7=20**). Detalles en `release-notes-v3.73.6.md`.
+
 ## [3.73.5] — 2026-09-17
 
 **Cierre documental del punto de entrada de la auditoría externa. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (el backend de producto, el frontend de producto y el launcher quedan intactos: el diff es **documentación**). Ninguna capacidad pedagógica nueva.

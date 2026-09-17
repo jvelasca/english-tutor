@@ -5,6 +5,32 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-17 (UTC+2).
 >
+> **Nota (2026-09-17): V3.73.6 (reproducibilidad de las cifras declaradas) —
+> release de PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.6`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos**, y **sin
+> tocar el arnés de validación, sus tests ni el contrato de los 7 gates** (el diff es
+> **documentación**). Nace de un **pre-vuelo del auditor**: clonar el repositorio
+> **desde GitHub** y ejecutar los comandos que el punto de entrada manda ejecutar.
+> Encontró **una cifra no reproducible**: el documento declaraba `2796 passed · 2
+> skipped` como el recuento del **checkout limpio**, y un clon recién hecho da **2795
+> · 3**. El **invariante** (los **2798 casos**) nunca estuvo mal; lo que fallaba era el
+> **reparto** y su **causa**: los saltos **no** son «del banco de escenario», sino de
+> **artefactos no versionados** —`frontend/dist` (1) y el **modelo Whisper opt-in**
+> (2)—, y la cifra de 2796 se había medido en un worktree que **sí** tenía `dist`
+> construido. Corregido: el documento declara **invariante y reparto por entorno**
+> (clon limpio **2795 + 3**; tras `npm run build` **2796 + 2**; árbol completo **2798 +
+> 0**), marca la corrección como **errata** sin reescribir el histórico y pone los **11
+> nombres de job** uno por línea para que un `grep` literal funcione. **Verificación
+> (clon nuevo desde GitHub):** `main` == tag, `git diff --stat v3.73.6..main -- backend
+> frontend launcher scripts` **vacío**, run del commit del tag **11/11**,
+> `check_release_consistency` en los **6 orígenes** (`3.73.6`), recuentos declarados
+> comprobados uno a uno (43/19/23/19 = **104**; launcher **113** y **13 + 7 = 20**),
+> frontend vitest **712**, `ruff`/`tsc` limpios. **Los 7 gates siguen `pending`**: el
+> siguiente hito sigue siendo ejecutar físicamente G1–G7. Ver
+> `release-notes-v3.73.6.md`.
+>
 > **Nota (2026-09-17): V3.73.5 (ancla del punto de entrada de la auditoría) —
 > release de PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
 > Release **`v3.73.5`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
@@ -25,8 +51,8 @@
 > `main`** (`git diff --stat v3.73.5..main -- backend frontend launcher scripts`
 > debe salir vacío). **Verificación:** `check_release_consistency` en los **6
 > orígenes** (`3.73.5`); sin cambios de producto, las cifras de test son las de
-> V3.73.4 (backend **2796 passed · 2 skipped** en el worktree limpio, frontend vitest
-> **712**, launcher **113**), `ruff`/`tsc` limpios, i18n `--strict` **0/0/0** y
+> V3.73.4 (frontend vitest **712**, launcher **113**; el recuento del backend se
+> **corrige en la nota de V3.73.6**, arriba), `ruff`/`tsc` limpios, i18n `--strict` **0/0/0** y
 > `validation_gate.py auto --require-dist` **10/10** con el informe regenerado
 > idéntico. **Los 7 gates siguen `pending`**: el siguiente hito sigue siendo
 > ejecutar físicamente G1–G7. Ver `release-notes-v3.73.5.md`.
@@ -46,10 +72,13 @@
 > no trae `head_sha` o si el `head_sha`/`ci_run` tienen formato inválido. Además
 > `Gate.human` se declara gate a gate y vale `True` en los **7** (el instrumento no
 > ejecuta ningún flujo de la app), lo que zanja la doble cifra «7 gates (5 de ellos
-> acción humana)» de notas históricas. **Tests:** backend **2796 passed · 2 skipped**
-> (2798 casos) en el `git worktree` limpio del pre-vuelo y **2798 passed** (0 skipped,
-> mismos 2798 casos) en el árbol de trabajo —los 2 saltos son condicionales del banco
-> de escenario, que en el worktree no tiene la BD local no versionada—
+> acción humana)» de notas históricas. **Tests:** backend **2798 casos** (el
+> invariante); el reparto `passed`/`skipped` depende de artefactos **no versionados**:
+> **2795 + 3** en un clon limpio sin `npm run build`, **2796 + 2** tras compilarlo y
+> **2798 + 0** con `dist`, modelos Whisper y BD local. **Errata (V3.73.6):** aquí se
+> declaró «**2796 passed · 2 skipped** en el worktree limpio» y se atribuyeron los
+> saltos al banco de escenario —la cifra se midió con `dist` ya construido, y los
+> saltos reales son del `frontend/dist` (1) y del **modelo Whisper opt-in** (2)—
 > (`test_validation_gate_v373.py` 29 → **43**), `ruff` limpio; frontend
 > sin cambios de producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK);
 > launcher **113**; `check_release_consistency` en los **6 orígenes** (`3.73.4`);
@@ -3690,7 +3719,26 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.5` **ancla del punto de entrada de la
+**Posición actual (2026-09-17):** `v3.73.6` **reproducibilidad de las cifras
+declaradas de la auditoría** (release de **PARCHE**, sin cambios de producto —ver la
+nota de cabecera—). Corrige la única cifra del punto de entrada que **no era
+reproducible en el entorno del auditor**: el recuento del backend. El **invariante
+son 2798 casos**; el reparto depende de artefactos **no versionados** (**2795 + 3** en
+un clon limpio sin `npm run build`, **2796 + 2** tras compilarlo, **2798 + 0** con
+`dist`, modelos Whisper y BD local), y los saltos son del `frontend/dist` (1) y del
+**modelo Whisper opt-in** (2), **no** «del banco de escenario» como se declaraba. El
+documento declara ahora invariante y reparto, marca la corrección como **errata** sin
+reescribir el histórico y pone los **11 nombres de job** uno por línea para que un
+`grep` literal funcione. **Verificación:** clon **nuevo desde GitHub** — `main` == tag,
+`git diff --stat v3.73.6..main -- backend frontend launcher scripts` **vacío**, run
+del commit del tag **11/11**, `check_release_consistency` en los **6 orígenes**
+(`3.73.6`), recuentos declarados comprobados uno a uno (43/19/23/19 = **104**;
+launcher **113** y **13 + 7 = 20**), frontend vitest **712 passed**, `ruff`/`tsc`
+limpios. **El código sigue congelado:** los 7 gates siguen en `pending` y **V4.0 no se
+declara** hasta que `status --strict` (y, con el árbol congelado, `status --strict
+--same-tree`) salga 0. Ver la nota de cabecera y `release-notes-v3.73.6.md`.
+
+**Release anterior — `v3.73.5` ancla del punto de entrada de la
 auditoría** (release de **PARCHE**: **SIN migración de BD**, **SIN bump de
 `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN
 tocar el currículum** y **SIN cambios de PRODUCTO**: backend de producto, frontend de
@@ -3710,8 +3758,8 @@ El invariante del código se enuncia **entre el tag y `main`** (`git diff --stat
 v3.73.5..main -- backend frontend launcher scripts` debe salir **vacío**), que es lo que
 el auditor puede comprobar al ejecutarlo. **Verificación:** `check_release_consistency`
 en los **6 orígenes** (`3.73.5`); sin cambios de producto, las cifras de test son las de
-V3.73.4 (backend **2796 passed · 2 skipped** (2798 casos) en el `git worktree` limpio,
-frontend vitest **712 passed**, launcher **113**), `ruff`/`tsc` limpios, i18n `--strict`
+V3.73.4 (frontend vitest **712 passed**, launcher **113**; el recuento del backend se
+**corrige en V3.73.6** —ver la nota de cabecera—), `ruff`/`tsc` limpios, i18n `--strict`
 **0/0/0** y `auto --require-dist` **10/10**. **El código sigue congelado:** los 7 gates
 siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` (y, con el
 árbol congelado, `status --strict --same-tree`) salga 0. Ver la nota de cabecera y
@@ -3742,8 +3790,10 @@ V3.72) queda explicada en el runbook. **(E) Documentación:** el kit y el runboo
 qué sella la evidencia, la regla del `pass` con commit, `--same-tree` y la tabla de
 identidad (`VERSION`/`HEAD`/run) del pre-vuelo; los 7 comandos `record` de la planilla
 llevan `--ci-run <run>`. **(F) Verificación:** `test_validation_gate_v373.py` 29 → **43**;
-backend **2796 passed · 2 skipped** (2798 casos) en el `git worktree` limpio del pre-vuelo
-sobre el tag y **2798 passed** (0 skipped, mismos 2798 casos) en el árbol de trabajo;
+backend **2798 casos** (invariante): **2795 + 3** en un clon limpio, **2796 + 2** tras
+`npm run build` y **2798 + 0** con `dist`, modelos Whisper y BD local —**errata
+(V3.73.6):** aquí se declaró «2796 passed · 2 skipped» y saltos «del banco de
+escenario»; ver `release-notes-v3.73.6.md`—;
 `ruff` limpio; frontend sin cambios de producto (`tsc` limpio, vitest **712 passed**,
 `npm run build` OK); launcher **113**;
 `check_release_consistency` en los **6 orígenes** (`3.73.4`); i18n `--strict` **0/0/0**;
