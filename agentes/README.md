@@ -227,6 +227,29 @@ pedir más contexto.
 
 ## Estado de la biblioteca de briefings
 
+- `agentes/auditoria-total-externa-v373.md` — **auditoría EXTERNA de CIERRE del
+  producto, anclada en `v3.73.0` (entregada, 2026-09-17; informe PENDIENTE)**:
+  prompt autocontenido para un auditor que **solo ve GitHub**, con **alcance total**
+  (no incremental) porque es el material con el que se decide el salto a **V4.0**.
+  Punto de entrada **verificado contra GitHub**: commit de release `859c6c2`, tag
+  anotado `v3.73.0` (objeto `8196ab7`), `main` `9d81581`, base `v3.72.0` (`096dcc4`)
+  y CI **11/11** en
+  [35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
+  (publicación) y
+  [35205022773](https://github.com/jvelasca/english-tutor/actions/runs/35205022773)
+  (cierre). Declara el **invariante** `git diff --stat v3.73.0..main -- backend
+  frontend launcher scripts` = vacío, **43 preguntas falsables** en 7 áreas
+  (backend · Adaptive Engine/evidencia · pedagogía/contenido · listening · GUI ·
+  runtime/instalación · CI-CD), una **matriz de cierre de 15 áreas** para rellenar
+  por el auditor, **7 reglas duras** y una sección de honestidad que le obliga a
+  pronunciarse sobre los 7 gates en `pending` y sobre las discrepancias declaradas
+  (hub de Aprender con **4** tarjetas, no 6; y los **7** gates marcados `human` en
+  el código frente al «5» de la documentación). Informe esperado:
+  `docs/audit/AI-AUDITORIA-CIERRE-V373.md` (el prefijo **`AI`** es el primero libre:
+  `AA`–`AF` son los dossiers de V3.70 y `AG`/`AH` siguen reservados por los puntos
+  de entrada de V3.70/V3.71, **sin informe recibido**). **Cubre además el hueco del
+  punto de entrada de `v3.72.0`, que nunca llegó a elaborarse.**
+
 - `agentes/auditoria-externa-v362.md` — **auditoría EXTERNA de V3.62.0 (entregada,
   2026-09-14; informe PENDIENTE)**: prompt autocontenido para un auditor que **solo
   ve GitHub**. Punto de entrada: tag anotado **`v3.62.0`** → commit `f4bcee2`, base

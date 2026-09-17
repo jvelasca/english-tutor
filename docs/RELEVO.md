@@ -3492,8 +3492,21 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.72.0` **UX / product completion** (release de
-**PRODUCTO**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+**Posición actual (2026-09-17):** `v3.73.0` **Validation release** (release de
+**VALIDACIÓN**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum**,
+**SIN capacidad pedagógica nueva** y **SIN tocar el frontend**). Cierra el
+endurecimiento mínimo que el dictamen externo de V3.72 dejó como P2/P3 —**runtime de
+producto fail-closed** y **descubrimiento de la LAN sin direcciones públicas**— y
+construye el **arnés de los 7 gates** (`scripts/validation_gate.py`), que convierte
+una validación física que **nadie ha ejecutado todavía** en **estado registrado y
+exigible**: los 7 gates están en `pending` y **V4.0 no se declara** hasta que
+`status --strict` salga 0. Ver la nota de cabecera de este documento y
+`release-notes-v3.73.0.md` (commit de release `859c6c2`, tag anotado `v3.73.0`,
+CI 11/11 en el run `35204203522`).
+
+**Release anterior — `v3.72.0` UX / product completion** (release de **PRODUCTO**:
+**SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
 `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
 **SIN capacidad pedagógica nueva**). V3.69 validó la **arquitectura** del motor
 adaptativo, V3.70 midió su **pedagogía** y V3.71 el **suelo físico**; V3.72 cierra
@@ -3575,14 +3588,16 @@ pantalla de nivelación (con la divulgación de `AE-04` que su candado ya exige)
 progreso real de descarga, `RA-02` y, si el gerente lo prioriza, el paquete
 distribuible que haría literal el «sin Node».
 
-**PENDIENTE INMEDIATO:** **auditoría externa de release de `v3.73.0`** (misma
-mecánica que en `v3.71.0`, cuyo punto de entrada sigue en
-`agentes/auditoria-externa-release-v371.md` y su informe `AH` pendiente de
-recibir). El punto de entrada de `v3.73.0` se elabora con el commit, el tag y el
-run de CI ya rellenados: commit de release `859c6c2`, tag anotado `v3.73.0`
-(objeto `8196ab7`) y
-[run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
-(**CI 11/11**).
+**PENDIENTE INMEDIATO:** **auditoría externa de CIERRE del producto (antes de
+V4.0)**, anclada en `v3.73.0`. El punto de entrada **ya está elaborado y
+entregado**: `agentes/auditoria-total-externa-v373.md` (commit de release
+`859c6c2`, tag anotado `v3.73.0` objeto `8196ab7`, CI **11/11** en el
+[run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)),
+con **43 preguntas falsables** en 7 áreas y una **matriz de cierre de 15 áreas**.
+**Informe esperado:** `docs/audit/AI-AUDITORIA-CIERRE-V373.md` (el prefijo `AI` es
+el primero libre: `AG`/`AH` siguen reservados por los puntos de entrada de
+V3.70/V3.71, ambos **sin informe recibido**). Sustituye al punto de entrada de
+`v3.72.0`, que nunca llegó a elaborarse.
 
 **CERRADA (2026-09-17) · v3.73.0:** commit de release **`859c6c2`**, tag anotado
 **`v3.73.0`** (objeto `8196ab7`) publicado en `main` —`origin/main` y el commit
