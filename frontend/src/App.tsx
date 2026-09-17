@@ -18,6 +18,8 @@ import {
 } from "./router/learnHub";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ProfileGate } from "./components/ProfileGate";
+import { DegradedVoiceNotice } from "./components/DegradedVoiceNotice";
+import { VoiceDownloadDialog } from "./components/VoiceDownloadDialog";
 import { completeSessionStep } from "./api/academy";
 import type { Section } from "./utils/sections";
 import type { NextBestActivity, SessionStep, TutorMode } from "./types/api";
@@ -295,6 +297,12 @@ export default function App() {
           refreshKey={sessionVersion}
         />
       </AppShell>
+
+      {/* V3.72 (RD-04): avisos globales de voz — uno solo para toda la app. El
+          aviso de degradación no bloquea nada; el diálogo pide consentimiento
+          antes de descargar una voz que falta (~60 MB). */}
+      <DegradedVoiceNotice />
+      <VoiceDownloadDialog />
 
       {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
           cookie recordada y varios perfiles, o todavía sin perfiles), se pide

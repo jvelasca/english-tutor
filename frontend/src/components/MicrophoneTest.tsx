@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { speak } from "../api/voz";
+import { speakWithVoice } from "../hooks/useVoiceDownload";
 import { useI18n } from "../hooks/useI18n";
 import {
   getMicrophoneStream,
@@ -112,7 +112,7 @@ export function MicrophoneTest() {
   async function testPlayback() {
     setPlayback("playing");
     try {
-      await speak(t("micTest.playbackSample"));
+      await speakWithVoice(t("micTest.playbackSample"));
       setPlayback("ok");
     } catch {
       setPlayback("error");

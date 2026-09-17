@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { speak, transcribe } from "../api/voz";
+import { transcribe } from "../api/voz";
+import { speakWithVoice } from "./useVoiceDownload";
 import {
   MAX_CHUNK_MS,
   MIN_SPEECH_MS,
@@ -221,7 +222,7 @@ export function useHandsFree(
 
     setStatus("speaking");
     try {
-      await speak(reply);
+      await speakWithVoice(reply);
     } catch {
       /* un fallo de TTS no detiene el bucle */
     }

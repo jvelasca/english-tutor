@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { speak } from "../api/voz";
+import { speakWithVoice } from "../hooks/useVoiceDownload";
 import { useI18n } from "../hooks/useI18n";
 
 export function SpeakButton({ text }: { text: string }) {
@@ -9,7 +9,7 @@ export function SpeakButton({ text }: { text: string }) {
   async function onClick() {
     setLoading(true);
     try {
-      await speak(text);
+      await speakWithVoice(text);
     } catch (e) {
       alert(t("speak.error") + (e as Error).message);
     } finally {

@@ -11,10 +11,10 @@
  * Es una utilidad auxiliar: NO registra evidencia ni intentos de aprendizaje.
  */
 import { useEffect, useState } from "react";
-import { RefreshCw, Trash2 } from "lucide-react";
-import { downloadVoice, getVoices } from "../../api/voices";
+import { Trash2 } from "lucide-react";
 import { translateText } from "../../api/translate";
-import { speak, type VoiceLanguage } from "../../api/voz";
+import type { VoiceLanguage } from "../../api/voz";
+import { speakWithVoice } from "../../hooks/useVoiceDownload";
 import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
 import {
@@ -29,8 +29,6 @@ const CONVERSATION_LIMIT = 12;
 
 type TextSize = "sm" | "base" | "lg";
 const TEXT_SIZES: TextSize[] = ["sm", "base", "lg"];
-
-type VoiceState = "idle" | "preparing" | "error";
 
 function isTurn(value: unknown): value is ConversationTurn {
   if (typeof value !== "object" || value === null) return false;
@@ -73,7 +71,6 @@ export function ConversationTranslator({ userId }: ConversationTranslatorProps) 
   const [size, setSize] = useState<TextSize>("base");
   const [busyLang, setBusyLang] = useState<VoiceLanguage | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -86,29 +83,6 @@ export function ConversationTranslator({ userId }: ConversationTranslatorProps) 
       /* almacenamiento no disponible: el historial es best-effort */
     }
   }, [turns]);
-
-  // V3.45: si falta la voz española, se descarga en segundo plano la primera
-  // vez (una sola vez por montaje); si falla, se avisa sin bloquear el uso.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = await getVoices(userId);
-        const esDefault = data.defaults?.es;
-        if (!esDefault) return;
-        const installed = data.voices.some((v) => v.id.startsWith("es_"));
-        if (installed) return;
-        setVoiceState("preparing");
-        await downloadVoice(esDefault);
-        if (!cancelled) setVoiceState("idle");
-      } catch {
-        if (!cancelled) setVoiceState("error");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
 
   async function handleTurn(speaker: VoiceLanguage, text: string) {
     const targetLang: VoiceLanguage = speaker === "es" ? "en" : "es";
@@ -128,7 +102,7 @@ export function ConversationTranslator({ userId }: ConversationTranslatorProps) 
       setTurns((prev) => [turn, ...prev].slice(0, CONVERSATION_LIMIT));
       setLatest((prev) => ({ ...prev, [speaker]: turn.id }));
       if (autoPlay) {
-        void speak(translation, userId, targetLang).catch(() => {
+        void speakWithVoice(translation, userId, targetLang).catch(() => {
           /* TTS no disponible: el turno ya está en pantalla */
         });
       }
@@ -198,20 +172,6 @@ export function ConversationTranslator({ userId }: ConversationTranslatorProps) 
         </div>
       </div>
 
-      {voiceState === "preparing" && (
-        <p
-          role="status"
-          className="flex items-center gap-2 text-xs text-muted-foreground"
-        >
-          <RefreshCw className="size-3.5 animate-spin" aria-hidden="true" />
-          {t("translator.conversation.voicePreparing")}
-        </p>
-      )}
-      {voiceState === "error" && (
-        <p role="status" className="text-xs text-destructive">
-          {t("translator.conversation.voiceError")}
-        </p>
-      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}

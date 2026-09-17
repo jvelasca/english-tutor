@@ -111,7 +111,10 @@ describe("TranslatorScreen · V3.39 traductor de viaje", () => {
     speakMock.mockReset();
     getVoicesMock.mockReset();
     translateMock.mockResolvedValue("Where is the hotel?");
-    speakMock.mockResolvedValue(undefined);
+    speakMock.mockResolvedValue({
+      voice: "en_US-lessac-medium",
+      degraded: false,
+    });
     getVoicesMock.mockResolvedValue(voicesInstalled());
   });
 

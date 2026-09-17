@@ -58,7 +58,7 @@ import {
   getSpeakingRouteExtrasJob,
 } from "../../api/speakingRoutes";
 import { getSpeakingLevel } from "../../api/academy";
-import { speak } from "../../api/voz";
+import { speakWithVoice } from "../../hooks/useVoiceDownload";
 import { criterionLabel } from "../../utils/speaking";
 import { cn } from "../../lib/utils";
 import type {
@@ -315,12 +315,12 @@ export function SpeakingScene({
       audio.onerror = () => {
         audio.onerror = null;
         setPlaying(null);
-        void speak(text);
+        void speakWithVoice(text);
       };
     } catch {
       setPlaying(null);
       try {
-        await speak(text);
+        await speakWithVoice(text);
       } catch {
         /* sin voz: el alumno puede responder igualmente */
       }

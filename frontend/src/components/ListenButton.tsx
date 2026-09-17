@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2, Volume2 } from "lucide-react";
-import { speak, type VoiceLanguage } from "../api/voz";
+import type { VoiceLanguage } from "../api/voz";
+import { speakWithVoice } from "../hooks/useVoiceDownload";
 import { cn } from "../lib/utils";
 
 interface ListenButtonProps {
@@ -18,7 +19,8 @@ interface ListenButtonProps {
 
 /**
  * Altavoz compacto (TTS) para escuchar una frase en pantallas de práctica y
- * resultados. Reutiliza `speak()` y muestra un spinner mientras suena. Los
+ * resultados. Reutiliza `speakWithVoice()` (consentimiento/descarga de voz y
+ * aviso global de degradación, V3.72) y muestra un spinner mientras suena. Los
  * fallos de voz son silenciosos: nunca bloquean el flujo.
  */
 export function ListenButton({
@@ -36,7 +38,7 @@ export function ListenButton({
     if (!canPlay) return;
     setBusy(true);
     try {
-      await speak(text, userId, language);
+      await speakWithVoice(text, userId, language);
     } catch {
       /* TTS no disponible: se ignora, no rompe el resultado */
     } finally {

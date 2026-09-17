@@ -47,7 +47,6 @@ const STRINGS: Record<string, Entry> = {
   },
   "learn.recommended": { en: "Recommended for you", es: "Recomendado para ti" },
   "learn.back": { en: "Back to Learn", es: "Volver a Aprender" },
-  "learn.conversation": { en: "Conversation", es: "Conversation" },
   "learn.switchActivity": {
     en: "Switch activity",
     es: "Cambiar de actividad",
@@ -59,14 +58,6 @@ const STRINGS: Record<string, Entry> = {
   "learn.desc.speaking": {
     en: "One Speaking area: micro-conversations, accent drills and guided dialogues with honest feedback.",
     es: "Un área Speaking: micro-conversaciones, ejercicios de acento y diálogos guiados con feedback honesto.",
-  },
-  "learn.desc.pronunciation": {
-    en: "Read aloud and get instant feedback on your accent.",
-    es: "Lee en voz alta y recibe feedback inmediato sobre tu acento.",
-  },
-  "learn.desc.conversation": {
-    en: "Guided mini-dialogues level by level; free chat is one tap away.",
-    es: "Mini-diálogos guiados nivel a nivel; el chat libre está a un toque.",
   },
   "learn.desc.vocabulary": {
     en: "Routes A1–C2 of word checks, with your personal dictionary close at hand.",
@@ -147,6 +138,9 @@ const STRINGS: Record<string, Entry> = {
     es: "Ahora mismo no se ha podido cargar tu siguiente paso.",
   },
   "home.retry": { en: "Try again", es: "Reintentar" },
+  // V3.72 (F3): ancla textual «estás aquí» + posición en la ruta (nivel meta).
+  "home.youAreHere": { en: "You are here", es: "Estás aquí" },
+  "home.yourTarget": { en: "Goal: {level}", es: "Meta: {level}" },
   "home.todayGoal": {
     en: "Your goal today",
     es: "Tu objetivo de hoy",
@@ -773,10 +767,6 @@ const STRINGS: Record<string, Entry> = {
     en: "No meaning available for this word yet — try the Word step.",
     es: "Aún no hay significado disponible para esta palabra — prueba el paso Palabra.",
   },
-  "dictionary.drill.prompt": {
-    en: "Listen to the word, then record yourself saying it aloud.",
-    es: "Escucha la palabra y luego grábate diciéndola en voz alta.",
-  },
   "dictionary.drill.sentencePrompt": {
     en: "Listen to the sentence, then record yourself repeating it aloud.",
     es: "Escucha la frase y luego grábate repitiéndola en voz alta.",
@@ -1083,14 +1073,6 @@ const STRINGS: Record<string, Entry> = {
     es: "Todavía no ha dicho nada.",
   },
   "translator.conversation.clear": { en: "Clear", es: "Borrar" },
-  "translator.conversation.voicePreparing": {
-    en: "Preparing the Spanish voice… (first time only)",
-    es: "Preparando la voz en español… (solo la primera vez)",
-  },
-  "translator.conversation.voiceError": {
-    en: "The Spanish voice is not ready. You can install it in Settings → Voices.",
-    es: "La voz en español no está lista. Puedes instalarla en Ajustes → Voces.",
-  },
 
   // Settings
   "settings.title": { en: "Settings", es: "Ajustes" },
@@ -1280,6 +1262,10 @@ const STRINGS: Record<string, Entry> = {
   // Común
   "common.loading": { en: "Loading…", es: "Cargando…" },
   "common.retry": { en: "Try again", es: "Reintentar" },
+  "common.unavailable": {
+    en: "Couldn't load this panel right now.",
+    es: "Ahora mismo no se ha podido cargar este panel.",
+  },
   "common.close": { en: "Close", es: "Cerrar" },
   "common.done": { en: "Done", es: "Hecho" },
   "common.cancel": { en: "Cancel", es: "Cancelar" },
@@ -1585,6 +1571,27 @@ const STRINGS: Record<string, Entry> = {
   "speak.phrase": { en: "Listen to the phrase", es: "Escuchar la frase" },
   "speak.answer": { en: "Listen to the answer", es: "Escuchar la respuesta" },
   "speak.error": { en: "Error playing: ", es: "Error al reproducir: " },
+  // V3.72 (RD-04): la degradación del TTS deja de ser silenciosa en la UI.
+  "tts.degradedNotice": {
+    en: "There is no {lang} voice installed: this is playing with “{voice}”. You can download one in Settings → Voices.",
+    es: "No hay voz de {lang} instalada: se reproduce con «{voice}». Puedes descargar una en Ajustes → Voces.",
+  },
+  "tts.downloadTitle": { en: "Download voice", es: "Descargar voz" },
+  "tts.downloadBody": {
+    en: "“{name}” is not installed yet. It takes about {size} MB, needs Internet and is downloaded only once (all profiles on this computer share it).",
+    es: "«{name}» aún no está instalada. Ocupa unos {size} MB, necesita Internet y se descarga una sola vez (la comparten todos los perfiles de este equipo).",
+  },
+  "tts.downloadConfirm": { en: "Download and listen", es: "Descargar y escuchar" },
+  "tts.downloadCancel": { en: "Not now", es: "Ahora no" },
+  "tts.downloadProgress": {
+    en: "Downloading the voice… this can take a few minutes.",
+    es: "Descargando la voz… puede tardar unos minutos.",
+  },
+  "tts.downloadError": {
+    en: "The voice could not be downloaded: ",
+    es: "No se pudo descargar la voz: ",
+  },
+  "tts.downloadRetry": { en: "Retry", es: "Reintentar" },
 
   // Chat / barra lateral
   "chat.new": { en: "New chat", es: "Nuevo chat" },
@@ -2630,10 +2637,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Show transcript",
     es: "Ver transcripción",
   },
-  "listening.flow.hideTranscript": {
-    en: "Hide transcript",
-    es: "Ocultar transcripción",
-  },
   "listening.flow.continue": {
     en: "Continue",
     es: "Continuar",
@@ -2746,27 +2749,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Answer a few more questions to build your profile.",
     es: "Responde unas cuantas preguntas más para construir tu perfil.",
   },
-  "listening.profile.reason.recognition": {
-    en: "Recognition is your weakest layer.",
-    es: "El reconocimiento es tu capa más débil.",
-  },
-  "listening.profile.reason.comprehension": {
-    en: "Comprehension is your weakest layer.",
-    es: "La comprensión es tu capa más débil.",
-  },
-  "listening.profile.reason.inference": {
-    en: "Inference is your weakest layer.",
-    es: "La inferencia es tu capa más débil.",
-  },
-  "listening.profile.reason.connected_speech": {
-    en: "Connected speech is the condition you struggle with.",
-    es: "La cadena hablada es la condición que te cuesta.",
-  },
-  "listening.profile.reason.natural_speech": {
-    en: "Natural speech is the condition you struggle with.",
-    es: "El habla natural es la condición que te cuesta.",
-  },
-
   // Learning profile
   "profile.globalAbility": { en: "Global ability", es: "Capacidad global" },
   "profile.globalAbilityTitle": {

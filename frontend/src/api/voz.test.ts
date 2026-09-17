@@ -3,13 +3,24 @@
  * Vitest de la API de voz (V3.39, Fase 2): `transcribe` acepta el idioma del
  * audio y `speak` lo envía al TTS para que el Traductor use voces españolas.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { speak, transcribe } from "./voz";
 
 function mockFetch(data: unknown) {
   const fn = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => data,
+    blob: async () => new Blob(["wav"], { type: "audio/wav" }),
+  });
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
+/** Respuesta con cabeceras reales (`Headers`), como la del endpoint de TTS. */
+function mockTtsResponse(headers: Record<string, string>) {
+  const fn = vi.fn().mockResolvedValue({
+    ok: true,
+    headers: new Headers(headers),
     blob: async () => new Blob(["wav"], { type: "audio/wav" }),
   });
   vi.stubGlobal("fetch", fn);
@@ -81,5 +92,75 @@ describe("api/voz · V3.39 idioma de la voz", () => {
       text: "Hello",
       language: "en",
     });
+  });
+});
+
+describe("api/voz · V3.72 (RD-04) voz declarada y degradación", () => {
+  beforeEach(() => {
+    vi.stubGlobal("Audio", FakeAudio);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:fake");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("devuelve la voz realmente usada y sin degradación", async () => {
+    mockTtsResponse({
+      "X-TTS-Voice": "es_ES-davefx-medium",
+      "X-TTS-Degraded": "0",
+    });
+
+    await expect(speak("hola", null, "es")).resolves.toEqual({
+      voice: "es_ES-davefx-medium",
+      degraded: false,
+    });
+  });
+
+  it("marca la degradación cuando el backend sirvió otro idioma", async () => {
+    mockTtsResponse({
+      "X-TTS-Voice": "en_US-hfc_female-medium",
+      "X-TTS-Degraded": "1",
+    });
+
+    await expect(speak("hola", null, "es")).resolves.toEqual({
+      voice: "en_US-hfc_female-medium",
+      degraded: true,
+    });
+  });
+
+  it("sin cabeceras no inventa degradación (fail-open)", async () => {
+    mockTtsResponse({});
+
+    await expect(speak("hello")).resolves.toEqual({
+      voice: "",
+      degraded: false,
+    });
+  });
+
+  it("`AbortController`: la petición se aborta si el backend no responde", async () => {
+    vi.useFakeTimers();
+    // El `fetch` real rechaza al abortar el signal; el mock lo imita para
+    // comprobar que `speak` **pasa** el signal (hoy no lo hacía: `withTimeout`
+    // no abortaba la petición y el botón quedaba "sonando" para siempre).
+    const fn = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          );
+        }),
+    );
+    vi.stubGlobal("fetch", fn);
+
+    const pending = speak("hello", null, "en", { timeoutMs: 5_000 });
+    const assertion = expect(pending).rejects.toThrow(/Timeout \(TTS\)/);
+    await vi.advanceTimersByTimeAsync(5_001);
+    await assertion;
+
+    expect(fn.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });

@@ -45,7 +45,7 @@ import {
 } from "./listeningSession";
 import { audioTypeKey, retentionBucketKey } from "../../utils/listeningLabels";
 import { ListeningLevelPanel } from "./ListeningLevelPanel";
-import { speak, transcribe } from "../../api/voz";
+import { transcribe } from "../../api/voz";
 import { getVoices } from "../../api/voices";
 import {
   getMicrophoneStream,
@@ -66,6 +66,7 @@ import type {
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
 import { ListenButton } from "../../components/ListenButton";
+import { speakWithVoice } from "../../hooks/useVoiceDownload";
 import { InfoDisclosure } from "../../components/InfoDisclosure";
 import {
   PhraseTranslateButton,
@@ -672,7 +673,7 @@ export function ListeningPractice({
     if (!question || speakingQuestion) return;
     setSpeakingQuestion(true);
     try {
-      await speak(question.question, userId);
+      await speakWithVoice(question.question, userId);
     } catch {
       // TTS de la pregunta no disponible: se ignora, no bloquea la práctica.
     } finally {
@@ -759,7 +760,7 @@ export function ListeningPractice({
         // Degradación: TTS en vivo con el script del ítem (o sin API Audio).
         setTtsLivePlaying(true);
         try {
-          await speak(question.script, userId);
+          await speakWithVoice(question.script, userId);
         } finally {
           setTtsLivePlaying(false);
         }
