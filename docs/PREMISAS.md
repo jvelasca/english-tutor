@@ -30,6 +30,20 @@ completo.
   `navigator.mediaDevices` y se rompe el micrófono desde otro equipo de la LAN.
   Cierre y evidencia en `docs/audit/RC-RUNTIME-PRODUCTO.md` (RC-01); fijado por test en
   `backend/tests/test_docs_drift_v372.py`.
+- **Fail-closed del runtime de producto (V3.73):** el launcher arranca el backend con
+  `ENGLISH_TUTOR_REQUIRE_UI=1` y **no lo arranca** si falta `frontend/dist/index.html`.
+  Con la variable activa, la ausencia del artefacto es un **error explícito** en el
+  montaje de la UI, no una app que parece lista y se ve vacía. Un `uvicorn main:app`
+  manual (sin la variable) sigue siendo **fail-open** a propósito: es el modo
+  desarrollo, donde un clon limpio conserva la API. Fijado por test en
+  `backend/tests/test_serve_frontend_v373.py` y `launcher/tests/test_preflight_v373.py`.
+- **Descubrimiento de la IP de LAN sin referencias externas (V3.73):** la IP con la que
+  se anuncia la app se obtiene enumerando las direcciones del propio equipo
+  (`backend/services/net_interfaces.py`, algoritmo puro `select_lan_ipv4`), **sin
+  consultar ninguna dirección pública** (hasta V3.72 se usaba un socket UDP «connect» a
+  `8.8.8.8`, perezoso pero con una referencia externa dentro de una app 100 % local).
+  Override declarado: `ENGLISH_TUTOR_LAN_IP`. Fijado por test en
+  `backend/tests/test_net_interfaces_v373.py` y `launcher/tests/test_lan_ip_v373.py`.
 
 ## 4. Voz local (fijado)
 - **Oído (STT):** `faster-whisper`, modelo `small`, en CPU.

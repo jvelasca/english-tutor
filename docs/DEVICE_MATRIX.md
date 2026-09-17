@@ -10,14 +10,20 @@ se puede confirmar en hardware físico. Marca cada celda con:
 - `—` no aplica
 - `⬜` pendiente de probar
 
+> **V3.73:** el producto sirve la UI y la API en **un solo origen HTTPS, el
+> puerto `8000`** (`RC-01`, V3.72). El puerto `5173` es el **dev server de Vite**
+> y no forma parte del runtime de producto: si aparece en una prueba, se está
+> probando otro artefacto. Este gate es `G4 dispositivos` de
+> `docs/audit/VALIDATION-RELEASE-V373.md`.
+
 ## Cómo probar
 
-1. Arranca la app con el launcher y anota la URL LAN (`https://<ip>:5173`).
+1. Arranca la app con el launcher y anota la URL LAN (`https://<ip>:8000`).
 2. En el dispositivo, abre la URL. La primera vez: confía el certificado
    (Ayuda → Conectar un dispositivo).
 3. Verifica en el estado del sistema (barra inferior → "Ready"):
    - **HTTPS**: la URL se abre con candado/aviso aceptado y la página carga.
-   - **mDNS**: `https://<hostname>.local:5173` resuelve (solo si el SO difunde
+     - **mDNS**: `https://<hostname>.local:8000` resuelve (solo si el SO difunde
      mDNS; en Windows sin Bonjour usa la IP).
    - **Micrófono**: `Test microphone` (habla y observa el nivel de entrada).
    - **Reproducción**: `Test playback`.
@@ -39,6 +45,30 @@ se puede confirmar en hardware físico. Marca cada celda con:
 | iPhone | Safari | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | iPhone | Chrome | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | iPad | Safari | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
+
+## Matriz de interacción (V3.73)
+
+Las columnas de arriba miden capacidades de hardware. Estas miden la **capa de
+interacción** en pantallas táctiles y ventanas pequeñas, que es donde una web de
+escritorio suele romperse. Tampoco se puede certificar con capturas.
+
+| Dispositivo | Touch / tap targets | Viewport y scroll | Teclado en pantalla | Orientación (vertical/horizontal) | Notas |
+|---|---|---|---|---|---|
+| Android | ⬜ | ⬜ | ⬜ | ⬜ | |
+| iPhone | ⬜ | ⬜ | ⬜ | ⬜ | |
+| iPad | ⬜ | ⬜ | ⬜ | ⬜ | |
+| Windows (ventana estrecha) | — | ⬜ | — | — | |
+
+Puntos concretos a comprobar en cada uno:
+
+- **Touch**: los controles de las prácticas (opciones, botones de escucha y de
+  grabación) responden al primer toque y no exigen hover.
+- **Viewport**: no hay scroll horizontal; los paneles (`FSRS`,
+  `EvidenceGraph`, `AssessmentLadder`) se leen sin recortes.
+- **Teclado**: al enfocar un campo, el teclado no tapa el enunciado ni el botón
+  de envío.
+- **Orientación**: girar el dispositivo no pierde estado ni deja la actividad a
+  medias.
 
 ## Checklist V3.0 Beta (pruebas reales)
 

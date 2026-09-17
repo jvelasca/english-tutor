@@ -3,23 +3,19 @@ from __future__ import annotations
 
 import socket
 
+from services.net_interfaces import lan_ipv4
+
 
 def get_lan_ip() -> str:
     """IP IPv4 de la LAN desde la que se sirve la app.
 
-    Usa un socket UDP "connect" hacia una IP pública: es perezoso (no envía
-    paquetes) y solo fuerza al SO a elegir la ruta/interfaz de salida, por lo
-    que funciona incluso sin Internet real. Devuelve ``127.0.0.1`` como último
-    recurso si no se puede resolver.
+    V3.73: delega en ``services.net_interfaces``, que enumera las direcciones del
+    propio equipo **sin consultar ninguna dirección externa** (hasta V3.72 se
+    usaba un socket UDP a ``8.8.8.8``, perezoso pero con una referencia pública
+    dentro de una app que se declara 100 % local). Devuelve ``127.0.0.1`` como
+    último recurso si no se puede resolver.
     """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.connect(("8.8.8.8", 80))
-        return sock.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        sock.close()
+    return lan_ipv4()
 
 
 def get_lan_hostname() -> str:

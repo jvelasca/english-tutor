@@ -295,7 +295,9 @@ launcher/
 ├── logs/                # logs de backend/UI (gitignored)
 ├── state.json           # estado de la UI persistido (gitignored)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
-                         #         test_ui/test_state_store/test_process_manager) — 93 tests, en CI (job `launcher`)
+                         #         test_ui/test_state_store/test_process_manager/
+                         #         test_preflight_v373/test_lan_ip_v373) — 108 funciones
+                         #         de test (113 casos con parametrización), en CI (job `launcher`)
 ```
 
 ### Responsabilidades launcher
@@ -333,9 +335,26 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
   EJECUCIÓN**. `RC-01` queda **cerrado**; ver `docs/audit/RC-RUNTIME-PRODUCTO.md`.
 - `npm run dev` (dev server de Vite en `:5173` con proxy `/api`) se conserva como **modo de
   desarrollo** con HMR (`.vscode/launch.json`), no como runtime de producto.
-- El montaje es **fail-open**: sin `dist` el backend arranca igual (solo API) y el launcher
-  lo muestra como «Interfaz no compilada».
-- Fijado por test en `backend/tests/test_docs_drift_v372.py`.
+- **Modo desarrollo vs. producto (V3.73):** sin `dist` el backend arranca igual (solo API)
+  **cuando se lanza a mano** (`uvicorn main:app`, fail-open). El launcher, en cambio,
+  arranca el producto con `ENGLISH_TUTOR_REQUIRE_UI=1` y **no lo arranca** si falta el
+  artefacto: es **fail-closed** y no puede parecer listo sin interfaz.
+- Fijado por test en `backend/tests/test_docs_drift_v372.py`,
+  `backend/tests/test_serve_frontend_v373.py` y `launcher/tests/test_preflight_v373.py`.
+
+### Red local declarada (V3.73)
+
+- **Descubrimiento de la IP de LAN:** `backend/services/net_interfaces.py` enumera
+  las direcciones del propio equipo (`getaddrinfo`/`gethostbyname_ex` del nombre
+  local) y `select_lan_ipv4` elige la primera utilizable prefiriendo rangos
+  privados. **No consulta ninguna dirección pública**: hasta V3.72 se usaba un
+  socket UDP «connect» a `8.8.8.8`, perezoso y sin paquetes, pero con una
+  referencia externa dentro de una app 100 % local. Override declarado:
+  `ENGLISH_TUTOR_LAN_IP` (equipos con varias NIC o VPN).
+- Delegan en él `services/network.py::get_lan_ip` y `services/tls_cert.py::_local_ip`;
+  el launcher replica el algoritmo puro (no puede importar el backend).
+- Fijado por test en `backend/tests/test_net_interfaces_v373.py`,
+  `launcher/tests/test_lan_ip_v373.py` y `backend/tests/test_docs_drift_v373.py`.
 
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en

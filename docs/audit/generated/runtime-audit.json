@@ -10,11 +10,11 @@
    "match": true
   },
   {
-   "file": "services/network.py",
-   "needle": "sock.connect((\"8.8.8.8\", 80))",
+   "file": "services/net_interfaces.py",
+   "needle": "socket.getaddrinfo",
    "kind": "lan",
    "hidden": false,
-   "note": "Socket UDP 'connect' perezoso: fuerza la interfaz de salida SIN enviar paquetes, asi que funciona sin Internet real",
+   "note": "V3.73: descubrimiento de la IP de LAN enumerando las direcciones del propio equipo. SIN salida a Internet (antes: socket UDP perezoso a 8.8.8.8, retirado en V3.73)",
    "exists": true,
    "match": true
   },

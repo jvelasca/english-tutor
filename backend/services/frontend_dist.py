@@ -8,8 +8,11 @@ HTTPS**, con Node como requisito solo de **compilación**.
 
 Reglas del montaje:
 
-- **Fail-open**: si el artefacto no existe, no se monta nada y el arranque no se
-  rompe (un clon limpio sin `npm run build` sigue teniendo API).
+- **Fail-open en desarrollo**: sin artefacto no se monta nada y el arranque no se
+  rompe (un clon limpio sin `npm run build` sigue teniendo API útil).
+- **Fail-closed en producto (V3.73)**: el launcher arranca el backend con
+  `ENGLISH_TUTOR_REQUIRE_UI=1`; en ese modo la falta del artefacto es un error
+  **explícito**, no una app que parece lista y se ve vacía.
 - **Prioridad de la API**: los routers se registran antes, así que `/api/*` gana;
   el *fallback* SPA además responde **404** a cualquier `api/...` sin ruta, para
   no enmascarar un endpoint inexistente con un `index.html`.
@@ -19,6 +22,7 @@ Reglas del montaje:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -27,8 +31,33 @@ from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
 
+# Variable de entorno con la que el launcher declara que esto es un runtime de
+# **producto**: la UI compilada es obligatoria y su ausencia es un fallo.
+REQUIRE_UI_ENV = "ENGLISH_TUTOR_REQUIRE_UI"
+_TRUTHY = frozenset({"1", "true", "yes", "on", "si", "sí"})
+
 # `<repo>/frontend/dist` (este módulo vive en `<repo>/backend/services/`).
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+
+def require_ui_from_env(env: dict[str, str] | None = None) -> bool:
+    """True si el proceso debe tratar la UI compilada como obligatoria.
+
+    Lo activa el launcher (runtime de producto). Un `uvicorn main:app` manual, sin
+    la variable, queda en modo desarrollo: sigue siendo fail-open a propósito.
+    """
+    source = os.environ if env is None else env
+    return str(source.get(REQUIRE_UI_ENV, "")).strip().lower() in _TRUTHY
+
+
+def build_missing_message(root: Path) -> str:
+    """Mensaje accionable cuando el producto arranca sin la UI compilada."""
+    return (
+        "El runtime de producto exige la UI compilada y no se encontró "
+        f"{root / 'index.html'}. Construye el artefacto con `npm run build` en "
+        "`frontend/` (o arranca con el launcher, que lo compila la primera vez) "
+        "antes de servir el producto."
+    )
 
 
 def dist_dir() -> Path:
@@ -60,15 +89,26 @@ def resolve_static_file(relative: str, path: Path | None = None) -> Path | None:
     return candidate if candidate.is_file() else None
 
 
-def mount_frontend(app: FastAPI, path: Path | None = None) -> bool:
+def mount_frontend(
+    app: FastAPI, path: Path | None = None, require_ui: bool | None = None
+) -> bool:
     """Monta los assets y el *fallback* SPA del artefacto. True si lo sirvió.
 
     Debe llamarse **después** de registrar los routers, para que ninguna ruta
     catch-all eclipse a la API.
+
+    ``require_ui`` distingue los dos runtime (V3.73): en **desarrollo** (default,
+    o ``ENGLISH_TUTOR_REQUIRE_UI`` ausente) la falta del artefacto es fail-open y
+    la API arranca igual; en **producto** (el launcher lo activa) la falta del
+    artefacto eleva ``RuntimeError`` — la app no puede parecer lista sin UI.
     """
     root = path if path is not None else dist_dir()
+    if require_ui is None:
+        require_ui = require_ui_from_env()
     index = root / "index.html"
     if not index.is_file():
+        if require_ui:
+            raise RuntimeError(build_missing_message(root))
         logger.info(
             "frontend/dist no encontrado en %s: la API arranca sin servir la UI "
             "(ejecuta `npm run build` para generarlo)",

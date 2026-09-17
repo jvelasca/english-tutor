@@ -46,7 +46,7 @@ from routers.vocabulary_routes import router as vocabulary_routes_router
 from routers.voices import router as voices_router
 from routers.voz import router as voz_router
 from security import SecurityMiddleware
-from services.frontend_dist import mount_frontend
+from services.frontend_dist import mount_frontend, require_ui_from_env
 
 logger = logging.getLogger(__name__)
 
@@ -171,4 +171,7 @@ app.include_router(speaking_routes_router)
 # final a propósito: los routers registrados arriba tienen prioridad y el
 # *fallback* SPA nunca puede eclipsar un `/api/*`. Sin artefacto (clon limpio sin
 # `npm run build`) el arranque no se rompe: simplemente no se sirve UI.
-mount_frontend(app)
+# V3.73: el launcher arranca el producto con `ENGLISH_TUTOR_REQUIRE_UI=1`, y en
+# ese modo la falta del artefacto es **fail-closed** (no una app vacía que parece
+# lista). Un `uvicorn main:app` manual sigue siendo fail-open (modo desarrollo).
+mount_frontend(app, require_ui=require_ui_from_env())

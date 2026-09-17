@@ -6,6 +6,7 @@ sin lanzar nada.
 """
 from __future__ import annotations
 
+import ipaddress
 import os
 import socket
 from pathlib import Path
@@ -57,6 +58,27 @@ def backend_python() -> Path:
 def npm_command() -> str:
     """Ejecutable de npm (solo se usa para COMPILAR la UI o en desarrollo)."""
     return "npm.cmd" if os.name == "nt" else "npm"
+
+
+# V3.73: el launcher declara el runtime de **producto** al backend. Con esta
+# variable activa, la falta de `frontend/dist` es un error explícito (fail-closed)
+# en vez de una app que arranca sin interfaz y parece lista.
+REQUIRE_UI_ENV = "ENGLISH_TUTOR_REQUIRE_UI"
+
+# V3.73: override declarado de la IP de LAN (equipos con varias NIC o VPN, donde
+# la elección automática puede no ser la interfaz de la app).
+LAN_IP_ENV = "ENGLISH_TUTOR_LAN_IP"
+
+
+def backend_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Entorno del proceso de producto: exige la UI compilada.
+
+    Se copia el entorno (``os.environ`` o ``base``) para no perder PATH ni las
+    variables del usuario; solo se añade la exigencia de la UI.
+    """
+    env = dict(os.environ) if base is None else dict(base)
+    env[REQUIRE_UI_ENV] = "1"
+    return env
 
 
 def backend_command() -> list[str]:
@@ -118,16 +140,72 @@ def frontend_url() -> str:
 
 
 def lan_ip() -> str:
-    """IP IPv4 de la LAN desde la que se sirve la app (o 127.0.0.1)."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    """IP IPv4 de la LAN desde la que se sirve la app (o 127.0.0.1).
+
+    V3.73: se enumeran las direcciones del propio equipo, sin consultar ninguna
+    dirección externa (hasta V3.72 se usaba un socket UDP a `8.8.8.8`, perezoso
+    pero con una referencia pública). El launcher no puede importar el backend
+    (son proyectos separados), así que el algoritmo se replica aquí; el contrato
+    compartido lo fija `launcher/tests/test_preflight_v373.py`.
+    """
+    override = os.environ.get(LAN_IP_ENV, "").strip()
+    if override and is_usable_lan_address(override):
+        return override
+    return select_lan_ipv4(candidate_addresses())
+
+
+def is_usable_lan_address(value: str) -> bool:
+    """True si la dirección sirve para anunciar la app en la LAN.
+
+    Descarta loopback, link-local (`169.254/16`), `0.0.0.0` y multicast.
+    """
     try:
-        # UDP connect es perezoso: no envía paquetes, solo elige la ruta.
-        sock.connect(("8.8.8.8", 80))
-        return sock.getsockname()[0]
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    if address.version != 4:
+        return False
+    return not (
+        address.is_loopback
+        or address.is_link_local
+        or address.is_unspecified
+        or address.is_multicast
+    )
+
+
+def select_lan_ipv4(addresses: list[str]) -> str:
+    """Primera IPv4 utilizable, prefiriendo rangos privados. Nunca vacío."""
+    usable = [value for value in addresses if is_usable_lan_address(value)]
+    for value in usable:
+        if ipaddress.ip_address(value).is_private:
+            return value
+    if usable:
+        return usable[0]
+    return "127.0.0.1"
+
+
+def candidate_addresses(hostname: str | None = None) -> list[str]:
+    """Direcciones IPv4 que el sistema asocia a este equipo (solo local)."""
+    name = hostname if hostname is not None else socket.gethostname()
+    seen: list[str] = []
+
+    def _add(value: object) -> None:
+        text = str(value).strip()
+        if text and text not in seen:
+            seen.append(text)
+
+    try:
+        for info in socket.getaddrinfo(name, None, socket.AF_INET):
+            _add(info[4][0])
     except OSError:
-        return "127.0.0.1"
-    finally:
-        sock.close()
+        pass
+    try:
+        _, _, addresses = socket.gethostbyname_ex(name)
+        for value in addresses:
+            _add(value)
+    except OSError:
+        pass
+    return seen
 
 
 def lan_hostname() -> str:

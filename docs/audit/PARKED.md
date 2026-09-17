@@ -222,6 +222,62 @@
   entrega consentimiento + aviso + progreso **indeterminado**.
 - **Empaquetado/instalador** (vetado) y **multiplataforma** (el launcher es Windows).
 
+## V3.73 — release de validación
+
+> Origen: el dictamen externo de V3.72 (9,7/10) y su propuesta de **V3.73 como
+> release de validación**. Aquí va lo que V3.73 **cierra** y lo que **deja
+> declarado a propósito**. Lo cerrado no se aparca.
+
+### Cerrado en V3.73 (deja de ser deuda)
+
+- **Fail-closed del runtime de producto (P2 del dictamen).** El launcher arranca
+  el backend con `ENGLISH_TUTOR_REQUIRE_UI=1` y **no lo arranca** si falta
+  `frontend/dist/index.html`; con la variable activa, la falta del artefacto es un
+  `RuntimeError` accionable en `mount_frontend`. Un `uvicorn main:app` manual
+  sigue siendo fail-open (modo desarrollo). Candados:
+  `backend/tests/test_serve_frontend_v373.py`,
+  `launcher/tests/test_preflight_v373.py`.
+- **RA-08 · Descubrimiento de la IP de LAN sin referencias externas (P3 del
+  dictamen).** Se retira el socket UDP «connect» a `8.8.8.8` de
+  `services/network.py`, `services/tls_cert.py` y `launcher/core.py`. Ahora
+  `backend/services/net_interfaces.py` enumera las direcciones del propio equipo
+  con un algoritmo **puro** (`select_lan_ipv4`) y un override declarado
+  (`ENGLISH_TUTOR_LAN_IP`). Cascada del instrumento RA actualizada
+  (`docs/audit/RA-RUNTIME-OFFLINE.md`, par generado regenerado). Candados:
+  `backend/tests/test_net_interfaces_v373.py`, `launcher/tests/test_lan_ip_v373.py`.
+- **Cobertura CI en Windows (bloque C del dictamen).** El CI pasa de 8 a 11 jobs:
+  `launcher-windows` (bloqueante) y `product-origin-windows` (informativo a
+  propósito: instalar `requirements-dev.txt` en Windows depende de ruedas nativas
+  que no se pueden verificar desde Linux; el criterio de promoción está en las
+  notas de release). Además `validation-gate` corre las comprobaciones estáticas.
+- **Drift documental del runtime de producto.** `docs/DEVICE_MATRIX.md` seguía
+  documentando `https://<ip>:5173` y el dev server de Vite como runtime, contra lo
+  que V3.72 declaró. Corregido a `:8000` y ampliado con la matriz de interacción
+  (touch, viewport, teclado, orientación).
+
+### Instrumento nuevo (no es código de producto)
+
+- **`scripts/validation_gate.py`** — los 7 gates de validación física como estado
+  registrado (`auto` / `record` / `status --strict`), con evidencia en
+  `docs/audit/validation-evidence.json` y runbook en
+  `docs/audit/VALIDATION-RELEASE-V373.md`. `status --strict` es la puerta real de
+  V4.0: falla mientras algún gate no esté en `pass`. Candados:
+  `backend/tests/test_validation_gate_v373.py` y
+  `backend/tests/test_docs_drift_v373.py`.
+
+### Sigue pendiente (acción humana) y sigue abierto
+
+- **`RA-05` corte de red real**, **`RB-05` máquina físicamente limpia**, **`G5`
+  matriz de dispositivos**, prueba en **Windows real** y **audio real**: son los
+  gates `G1`–`G7` del arnés. V3.73 los convierte en estado registrado, **no** los
+  ejecuta.
+- **`RA-02` endpoint de Ollama sin declarar en `config.py`: sigue abierto.**
+- **`RA-07`** (la medición de red es estática) y **`RD-05`** (caché negativa
+  volátil) siguen como deuda aceptada.
+- **Progreso real de descarga de voces** y **pantalla de nivelación** (con la
+  divulgación de `AE-04`): → V4.0.x.
+- **Empaquetado/instalador** (vetado por premisa) y **launcher para macOS/Linux**.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Aplicar (tras tu aprobación) el **fix mecánico del sesgo posicional** en

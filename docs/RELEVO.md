@@ -5,6 +5,105 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-17 (UTC+2).
 >
+> **Nota (2026-09-17): V3.73.0 (Validation release) — release de VALIDACIÓN, sin
+> capacidad pedagógica nueva.**
+> Release **`v3.73.0`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN
+> tocar el frontend**. Cierra el endurecimiento mínimo que el dictamen externo de
+> V3.72 dejó como P2/P3 y construye el **instrumento de certificación** de los 7
+> gates de validación física. **Lo que V3.73 vale es el arnés, no una validación
+> fingida: la release se publica con los 7 gates en `pending` por diseño.**
+> **(A) Fail-closed del runtime de producto (P2).** El hueco medido: el launcher
+> **sí** elevaba `PreparationError` si `npm run build` fallaba, pero el backend era
+> **siempre fail-open**, así que el producto arrancaba **pareciendo listo y sin
+> interfaz**. Ahora `mount_frontend(app, path, require_ui)` distingue los dos
+> runtime: en **producto** (el launcher inyecta `ENGLISH_TUTOR_REQUIRE_UI=1` con
+> `core.backend_env()`) la falta de `frontend/dist/index.html` eleva
+> `RuntimeError` accionable (`npm run build`); en **desarrollo** conserva el
+> `return False`. `main.py` declara el modo explícitamente, `start_backend()` **no
+> arranca** sin artefacto y `ensure_frontend_dist()` distingue «el build falló» de
+> «el build dijo OK y no dejó artefacto». Un `uvicorn main:app` manual sigue siendo
+> fail-open: es el modo desarrollo. Candados:
+> `backend/tests/test_serve_frontend_v373.py` (19) y
+> `launcher/tests/test_preflight_v373.py` (7), que además fijan el **contrato
+> compartido** de la variable (el launcher no puede importar el backend).
+> **(B) Descubrimiento de la IP de LAN sin referencias externas (RA-08, P3).** La
+> IP se obtenía con un socket UDP «connect» a `8.8.8.8:80` en **tres** sitios
+> (`services/network.py`, `services/tls_cert.py`, `launcher/core.py`): técnicamente
+> correcto (el `connect` UDP es **perezoso**, elige la interfaz de salida y **no
+> envía paquetes**, así que funciona sin Internet) pero es una **referencia
+> pública** en el descubrimiento de una app 100 % local. Nuevo
+> `backend/services/net_interfaces.py`: `select_lan_ipv4` es **puro** (descarta
+> loopback/link-local/`0.0.0.0`/multicast, prefiere privadas, determinista, nunca
+> devuelve vacío: último recurso `127.0.0.1`), `candidate_addresses()` enumera el
+> propio equipo por **dos vías** (`getaddrinfo` + `gethostbyname_ex`, porque en
+> algunos Windows el nombre solo aparece en una) y hay override declarado
+> `ENGLISH_TUTOR_LAN_IP` para equipos con varias NIC o VPN. Delegan `network.py` y
+> `tls_cert.py`; el launcher **replica el algoritmo puro**. **Cascada obligatoria
+> del instrumento de V3.71**: `RUNTIME_TOUCHPOINTS` cambia el punto `lan` de
+> `network.py` (UDP) por `net_interfaces.py`, el par determinista
+> `docs/audit/generated/runtime-audit.{md,json}` se **regenera** y el dossier RA
+> cierra **RA-08** (y anota que **RA-06** pierde su excepción (iii)). Candados:
+> `backend/tests/test_net_interfaces_v373.py` (23), `launcher/tests/test_lan_ip_v373.py`
+> (13) y un guard que escanea el **AST** (no la prosa: los docstrings se excluyen) y
+> falla si una IP pública vuelve al código de los cuatro ficheros.
+> **(C) Cobertura CI en Windows (bloque C del dictamen).** Los 8 jobs corrían en
+> `ubuntu-latest`, así que el launcher (utilidad **de Windows**) y el certificado
+> (`cryptography` + rutas de Windows) **nunca se ejercitaban en su sistema real**.
+> Ahora son **11 jobs**: `launcher-windows` (**bloqueante**, stdlib: `ruff` + los
+> **113 casos** del launcher en Windows real, con los mismos pins que el job
+> `backend`), `product-origin-windows` (**informativo declarado**:
+> `continue-on-error: true` porque instalar `requirements-dev.txt` en Windows
+> depende de **ruedas nativas** —`piper-tts`, `faster-whisper`/`ctranslate2`— que no
+> se pueden verificar desde Linux; su criterio de promoción a bloqueante está
+> escrito en las notas) y `validation-gate` (estático, stdlib, sin instalar nada).
+> **(D) Arnés de validación (el instrumento).** `scripts/validation_gate.py`,
+> **stdlib pura**, con tres subcomandos: `auto` (10 comprobaciones **estáticas**:
+> versión consistente, i18n `--strict`, fail-closed cableado, LAN sin IPs públicas,
+> jobs Windows, `DEVICE_MATRIX` en `:8000`, instrumento de red sin deriva, los 7
+> gates declarados, artefacto de UI —`skip` sin `--require-dist`— y evidencia
+> íntegra; escribe `docs/audit/generated/release-validation.{md,json}` y sale 1 si
+> algo falla), `record <gate> <pass|fail|skip> --notes` (evidencia en
+> `docs/audit/validation-evidence.json`; **sin notas no hay registro**, un gate
+> desconocido o un estado inventado se rechazan; guarda estado, notas, fecha y la
+> `VERSION` del árbol) y `status [--strict]` (**la puerta real de V4.0**: sale 1
+> mientras algún gate no esté en `pass`). Los 7 gates (`offline-fisico`,
+> `maquina-limpia`, `launcher-windows`, `dispositivos`, `audio-stt-tts`,
+> `journeys`, `pedagogia`) **referencian su protocolo existente** (`RA-RUNTIME-OFFLINE.md`
+> §5, runbook de `RB-INSTALACION.md`, `DEVICE_MATRIX.md`, `F-UX-JOURNEY.md`,
+> `CONSTITUCION-PEDAGOGICA.md`) en vez de duplicarlo, con runbook en
+> `docs/audit/VALIDATION-RELEASE-V373.md`. **`--strict` NO corre en CI** (los gates
+> humanos están `pending` por diseño; un CI que los exigiera sería rojo para
+> siempre). Candados: `backend/tests/test_validation_gate_v373.py` (24).
+> **(E) Drift documental y frontera.** `docs/DEVICE_MATRIX.md` seguía documentando
+> `https://<ip>:5173` y **Vite como runtime**, contra lo que V3.72 declaró: corregido
+> a **`:8000`** y ampliado con una **matriz de interacción** (touch/tap targets,
+> viewport y scroll, teclado en pantalla y orientación) porque es donde una web de
+> escritorio se rompe y **no se puede certificar con capturas**. `PREMISAS.md`,
+> `ARQUITECTURA.md` y `README.md` declaran las dos fronteras nuevas (con el módulo,
+> la variable y el override); `RC-RUNTIME-PRODUCTO.md` recoge el fail-closed como
+> cierre completo del P2; `PARKED.md` mueve lo cerrado a «deja de ser deuda».
+> Candados: `backend/tests/test_docs_drift_v373.py` (19).
+> **Tests:** backend **2779 passed** (2694 → **+85** en 4 ficheros `*_v373.py`:
+> 19+23+24+19), frontend **699** (83 ficheros, **sin cambios**: V3.73 no toca
+> producto; `tsc` limpio y `npm run build` OK), launcher **113** (93 → **+20**:
+> 7+13), `ruff` limpio en backend y launcher, `check_release_consistency` en los
+> **6 orígenes** (`3.73.0`), i18n `--strict` con **0 huérfanas**, `check_beta_v3` OK
+> y el CI con **11 jobs**. Humo local del arnés: `auto --require-dist` **10/10**,
+> `status` **7 pending** y `status --strict` **exit 1** (correcto: es la puerta).
+> **Honestidad:** los **7 gates siguen en `pending`** — V3.73 construye el
+> instrumento y hace el endurecimiento, **no** la validación física (corte de red
+> real **RA-05**, máquina físicamente limpia **RB-05**, Windows real, móvil real y
+> audio real siguen siendo **acción humana**); `product-origin-windows` es
+> **informativo**, no bloqueante, y así se declara; el fail-closed cubre el
+> **arranque**, no la ejecución degradada (si el artefacto desaparece después de
+> arrancar, el proceso sigue sirviendo lo montado); el descubrimiento local **cambia
+> de técnica, no de garantía** (`getaddrinfo` puede devolver solo loopback en
+> Windows mal configurados: por eso hay dos vías, override y último recurso); `auto`
+> es **estático** y **no sustituye a nada**; y **RA-02** (endpoint de Ollama sin
+> declarar en `config.py`), **RA-07** y **RD-05** siguen abiertos. V4.0 se declara
+> cuando `status --strict` salga 0. Ver `release-notes-v3.73.0.md`.
+>
 > **Nota (2026-09-17): V3.72.0 (UX / product completion) — release de PRODUCTO.**
 > Release **`v3.72.0`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
 > `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**. Cierra

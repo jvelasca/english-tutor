@@ -68,6 +68,23 @@ jobs:
       - name: Check release consistency
         run: python scripts/check_release_consistency.py
 
+  # V3.73: comprobaciones estáticas del arnés de validación (fail-closed del
+  # runtime de producto, descubrimiento de LAN sin referencias externas, jobs
+  # Windows, matriz de dispositivos en :8000, instrumento de red sin deriva).
+  # Stdlib pura: no necesita instalar dependencias. `--strict` NO corre aquí a
+  # propósito: los 7 gates de validación física son acción humana y estarán
+  # `pending` por diseño hasta que se ejecuten.
+  validation-gate:
+    name: Validation gate (checks automáticos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Automatic validation checks
+        run: python scripts/validation_gate.py auto
+
   beta-v3-gate:
     name: Beta V3.0 gate
     runs-on: ubuntu-latest
@@ -206,3 +223,110 @@ jobs:
           test "$code" = "404" \
             || { echo "ERROR: /api inexistente devolvió $code (esperaba 404)"; exit 1; }
           echo "OK: la UI compilada se sirve por HTTPS en el origen de producto"
+
+  # V3.73 (bloque C de la auditoría de V3.72): todo el CI corría en Linux, así que
+  # el launcher de Windows y el certificado TLS nunca se ejercitaban en su sistema
+  # real. Este job no pretende sustituir a la prueba en una máquina Windows (es el
+  # gate G3, acción humana): reduce el riesgo de que el launcher rote solo en Linux.
+  # Solo necesita stdlib + pytest/ruff, así que es determinista y **bloqueante**.
+  launcher-windows:
+    name: Launcher (Windows, ruff + pytest)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: launcher
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Las MISMAS versiones que el gate de `backend`.
+          python -m pip install pytest==8.4.2 ruff==0.16.3
+      - name: Lint (ruff)
+        run: python -m ruff check .
+      - name: Test (pytest)
+        run: python -m pytest tests/ -q
+
+  # V3.73: el humo del origen de producto, pero en Windows (donde vive el
+  # launcher) y a través de PowerShell. Se estrena como **informativo**
+  # (`continue-on-error`) a propósito: instalar `requirements-dev.txt` en Windows
+  # depende de ruedas nativas (`piper-tts`, `faster-whisper`) que no se pueden
+  # verificar desde Linux. El criterio de promoción a bloqueante está declarado en
+  # `release-notes-v3.73.0.md`: pasa a `continue-on-error: false` cuando acumule
+  # runs verdes consecutivos.
+  product-origin-windows:
+    name: Product origin (Windows, informativo)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Build the UI artifact
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Serve the artifact over HTTPS and check the product origin
+        working-directory: backend
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m scripts.ensure_tls_cert
+          if ($LASTEXITCODE -ne 0) { throw "ensure_tls_cert falló" }
+          $server = Start-Process -FilePath "python" -PassThru -NoNewWindow `
+            -ArgumentList @(
+              "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000",
+              "--ssl-certfile", "data/certs/cert.pem",
+              "--ssl-keyfile", "data/certs/key.pem"
+            )
+          try {
+            $ready = $false
+            foreach ($attempt in 1..30) {
+              try {
+                Invoke-WebRequest -Uri "https://127.0.0.1:8000/api/health" `
+                  -SkipCertificateCheck -TimeoutSec 2 | Out-Null
+                $ready = $true
+                break
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+            if (-not $ready) { throw "el producto no respondió en :8000" }
+            $root = Invoke-WebRequest -Uri "https://127.0.0.1:8000/" `
+              -SkipCertificateCheck -TimeoutSec 5
+            if ($root.Content -notmatch "(?i)<html") {
+              throw "la raíz no sirve el HTML de la UI"
+            }
+            $health = Invoke-WebRequest -Uri "https://127.0.0.1:8000/api/health" `
+              -SkipCertificateCheck -TimeoutSec 5
+            if ($health.Content -notmatch "version") {
+              throw "la API no responde en el origen de producto"
+            }
+            $missing = Invoke-WebRequest -Uri "https://127.0.0.1:8000/api/no-existe" `
+              -SkipCertificateCheck -SkipHttpErrorCheck -TimeoutSec 5
+            if ($missing.StatusCode -ne 404) {
+              throw "/api inexistente devolvió $($missing.StatusCode) (esperaba 404)"
+            }
+            Write-Host "OK: la UI compilada se sirve por HTTPS en Windows"
+          } finally {
+            if ($server -and -not $server.HasExited) {
+              Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+            }
+          }

@@ -58,7 +58,7 @@
 | tipo | cuántos | ficheros |
 |---|---|---|
 | `loopback` | 1 | `services/llm.py` (`ollama.AsyncClient()`) |
-| `lan` | 2 | `services/network.py` (socket UDP a `8.8.8.8:80` · `getaddrinfo` mDNS) |
+| `lan` | 2 | `services/net_interfaces.py` (`getaddrinfo` del propio equipo) · `services/network.py` (`getaddrinfo` mDNS) |
 | `internet` | 6 | `services/voice_downloads.py`, `services/tts.py`, `routers/voz.py`, `services/stt.py`, `download_models.py` (×2) |
 
 - **Declaraciones que han derivado del código: ninguna** (`cuadra=si` en las 9).
@@ -151,7 +151,8 @@ suite sería lenta e inestable en lugar de tardar ~5 min de forma estable.
 | **RA-03** | **P2** | **La caché negativa de voces es volátil (300 s, en memoria).** Con la red cortada y una voz ausente, cada reintento vuelve a intentar la descarga con un timeout declarado de 300 s: la petición de TTS puede quedarse **colgada** en lugar de fallar rápido, y el olvido se produce en cada reinicio del proceso | `services/tts.py:56-57,176-179`; `services/voice_downloads.py:113` (antes) | Cachear el fallo de forma persistente o usar un timeout corto para el intento optimista; devolver error explícito y ofrecer la descarga como acción del usuario | **cerrado por RD** (`docs/audit/RD-DEPENDENCIAS-OCULTAS.md`): el timeout declarado era **código muerto**, así que el cuelgue era **ilimitado**; ahora es real y acotado (RD-01). La volatilidad de la caché queda como deuda aceptada (RD-05) |
 | **RA-04** | **P2** | **En un clon limpio el manifiesto está VACÍO y no había runbook que lo dijera.** `backend/models/` está en `.gitignore`, así que hacen falta ~1,1 GB de descargas (Piper EN+ES 120 MB, Whisper 927 MB) más el `ollama pull` del modelo por defecto. Sin ellos, RA-01 convierte el primer uso en descargas implícitas | `.gitignore:15`; E3 (`Ausentes: 0` **solo** en este equipo) | **Cerrado en el eje RB** (RB-03/RB-04): `download_models.py --check` (solo lectura, distingue descarga de local) + runbook en `README.md` con el `ollama pull` explícito | **cerrado (RB)** |
 | **RA-05** | **P2** | **La ejecución en vivo con la red cortada está pendiente**, así que el eje no se puede cerrar. Los veredictos de E5 son **estáticos** | §5 (protocolo) | Ejecutar el protocolo de §5 en la máquina (o una VM) con la red desconectada y volcar los 12 resultados | **abierto (bloquea el cierre del eje)** |
-| **RA-06** | **P3 (positivo)** | Propiedades positivas medidas: (i) el frontend **no** tiene CDN, fuentes ni websockets externos; (ii) **no existe ninguna otra primitiva de red en código de producto** (E1); (iii) el `get_lan_ip()` que conecta a `8.8.8.8:80` es un socket UDP «connect» **perezoso que no envía paquetes**, declarado como tal | E1, E2; `services/network.py:14-21` | Ninguna; registrarlo como propiedad verificada | **verificado** |
+| **RA-06** | **P3 (positivo)** | Propiedades positivas medidas: (i) el frontend **no** tiene CDN, fuentes ni websockets externos; (ii) **no existe ninguna otra primitiva de red en código de producto** (E1) | E1, E2 | Ninguna; registrarlo como propiedad verificada | **verificado** |
+| **RA-08** | **P3** | **Referencia externa en el descubrimiento de la IP de LAN.** `get_lan_ip()` usaba un socket UDP «connect» a una IP pública (`8.8.8.8:80`) en **tres** sitios (`services/network.py`, `services/tls_cert.py`, `launcher/core.py`). No hay dependencia de Internet (el `connect` UDP es perezoso), pero es una referencia pública en la lógica de descubrimiento de una app 100 % local | `services/network.py:17`; `services/tls_cert.py:64`; `launcher/core.py:125` | Descubrir la IP enumerando las interfaces del sistema, sin direcciones externas | **cerrado en V3.73**: `services/net_interfaces.py` (algoritmo puro `select_lan_ipv4` + enumeración del propio equipo + override declarado `ENGLISH_TUTOR_LAN_IP`); los tres consumidores delegan o replican; candado anti-deriva en `backend/tests/test_net_interfaces_v373.py` |
 | **RA-07** | **P3 (deuda)** | El instrumento mide **estáticamente**: no puede demostrar que un camino concreto no haga red en tiempo de ejecución (solo que no contiene primitivas conocidas). Un `import` dinámico o una librería de terceros que llame a casa no aparecería | E1 (alcance del escáner) | Declararlo como límite; la parte dinámica la cubre el protocolo de §5 | **aceptado** |
 
 ## 5. Protocolo de los 12 flujos (pendiente de ejecutar)
@@ -234,6 +235,20 @@ de un error claro (RA-03).
 > bootstrap, así que la declaración `RUNTIME_TOUCHPOINTS` se actualizó (la
 > primitiva vive ahora en `services/voice_downloads.py`) y el par generado se
 > regeneró: el reparto por tipo sigue siendo **6 puntos de internet**.
+>
+> **Actualización (2026-09-17, V3.73):** **RA-08** queda **cerrado**. El
+> descubrimiento de la IP de LAN deja de usar el socket UDP a `8.8.8.8`: ahora
+> `services/net_interfaces.py` enumera las direcciones del propio equipo
+> (`getaddrinfo`/`gethostbyname_ex` del nombre local) y `select_lan_ipv4` es
+> **puro** (se prueba sin red). Hay un override declarado
+> (`ENGLISH_TUTOR_LAN_IP`) para equipos con varias NIC o VPN.
+> **Cascada del instrumento:** `RUNTIME_TOUCHPOINTS` cambia el punto `lan` de
+> `services/network.py` (UDP) por uno en `services/net_interfaces.py`; el reparto
+> por tipo sigue siendo **1 loopback · 2 lan · 6 internet** y el par generado se
+> regeneró. **RA-06** conserva las propiedades positivas (i) y (ii); su punto
+> (iii) pasa a ser RA-08 y deja de ser una excepción declarada.
+> **RA-05 sigue bloqueando el cierre del eje**: la ejecución en vivo con la red
+> cortada sigue pendiente.
 
 ## Regenerar / Verificar
 

@@ -21,6 +21,7 @@ from core import (
     BACKEND_DIR,
     FRONTEND_DIR,
     backend_command,
+    backend_env,
     ensure_cert_command,
     frontend_build_command,
     frontend_dist_available,
@@ -90,7 +91,7 @@ class ProcessManager:
         if frontend_dist_available():
             return False
         with open(self._log_path("frontend"), "ab") as log:
-            log.write(b"\n=== npm run build (V3.72) ===\n")
+            log.write(b"\n=== npm run build (V3.73) ===\n")
             log.flush()
             try:
                 result = subprocess.run(
@@ -111,10 +112,17 @@ class ProcessManager:
                     "La compilación de la interfaz tardó demasiado "
                     f"(>{_BUILD_TIMEOUT_S}s). Revisa el log de la UI."
                 ) from exc
-        if result.returncode != 0 or not frontend_dist_available():
+        if result.returncode != 0:
             raise PreparationError(
                 "No se pudo compilar la interfaz (`npm run build`). Revisa el log "
                 "de la UI para ver el error."
+            )
+        # V3.73: doble condición explícita. Un build con código 0 que no deja el
+        # artefacto (o que lo deja a medias) no puede arrancar el producto.
+        if not frontend_dist_available():
+            raise PreparationError(
+                "`npm run build` terminó sin error pero no dejó el artefacto de "
+                "la UI (`frontend/dist/index.html`). Revisa el log de la UI."
             )
         return True
 
@@ -126,12 +134,24 @@ class ProcessManager:
     def start_backend(self) -> None:
         if self.backend_running():
             return
+        # V3.73: guardia de última hora. `prepare()` ya compila el artefacto y
+        # eleva si no puede, pero arrancar sin UI debe ser imposible por diseño:
+        # el producto es fail-closed y no puede parecer listo sin interfaz.
+        if not frontend_dist_available():
+            raise PreparationError(
+                "La interfaz no está compilada (falta `frontend/dist/index.html`). "
+                "Compílala con `npm run build` en `frontend/` (o pulsa «Iniciar "
+                "app», que la compila la primera vez)."
+            )
         with open(self._log_path("backend"), "ab") as log:
             self.backend = subprocess.Popen(
                 backend_command(),
                 cwd=str(BACKEND_DIR),
                 stdout=log,
                 stderr=subprocess.STDOUT,
+                # El backend exige la UI compilada: mismo contrato que la guardia
+                # de arriba, pero del lado del servidor (V3.73).
+                env=backend_env(),
             )
 
     def stop_all(self) -> None:

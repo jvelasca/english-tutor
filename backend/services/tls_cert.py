@@ -9,10 +9,10 @@ la UI al backend (RC-01), el TLS tiene que venir con él.
 
 **Propiedades.** Generación **idempotente** (si el certificado existe y cubre los
 SANs requeridos no se toca) y **determinista** en su decisión (misma entrada →
-mismo resultado: `created` o no). No usa red salvo para descubrir la IP local
-—una consulta de ruta UDP perezosa, sin paquetes— y **no escribe** fuera de
-`backend/data/certs/`, que está ignorado por git: el certificado es un artefacto
-de máquina, no un fichero versionado.
+mismo resultado: `created` o no). **No usa la red**: la IP de la LAN se descubre
+enumerando las direcciones del propio equipo (`services/net_interfaces.py`,
+V3.73) y **no escribe** fuera de `backend/data/certs/`, que está ignorado por
+git: el certificado es un artefacto de máquina, no un fichero versionado.
 
 El certificado es **autofirmado**, así que el navegador pedirá aceptarlo una vez
 (igual que hacía el dev server de Vite). No se pretende sustituir a una CA: es
@@ -57,16 +57,13 @@ def _local_hostname() -> str:
 def _local_ip() -> str:
     """IP IPv4 de la LAN desde la que se sirve la app (o 127.0.0.1).
 
-    El ``connect`` UDP es perezoso: elige la ruta de salida sin enviar paquetes.
+    V3.73: la descubre ``services.net_interfaces`` enumerando las direcciones del
+    propio equipo, sin ninguna referencia externa (antes: socket UDP perezoso a
+    ``8.8.8.8``).
     """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.connect(("8.8.8.8", 80))
-        return sock.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        sock.close()
+    from services.net_interfaces import lan_ipv4
+
+    return lan_ipv4()
 
 
 def required_sans(

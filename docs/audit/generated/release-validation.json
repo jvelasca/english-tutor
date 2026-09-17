@@ -1,0 +1,65 @@
+{
+ "version": "3.73.0",
+ "checks": [
+  {
+   "id": "release-consistency",
+   "title": "La versión es consistente en todos los orígenes",
+   "status": "pass",
+   "detail": "OK: Release consistency (3.73.0) en todos los orígenes"
+  },
+  {
+   "id": "i18n-strict",
+   "title": "i18n sin claves huérfanas ni sin definir",
+   "status": "pass",
+   "detail": "  -> docs/audit/generated/i18n-report.{json,md}"
+  },
+  {
+   "id": "fail-closed-producto",
+   "title": "El producto no arranca sin la UI compilada",
+   "status": "pass",
+   "detail": "fail-closed cableado en launcher y backend"
+  },
+  {
+   "id": "lan-sin-referencias-externas",
+   "title": "El descubrimiento de la LAN no usa direcciones públicas",
+   "status": "pass",
+   "detail": "net_interfaces.py enumera el propio equipo"
+  },
+  {
+   "id": "ci-windows",
+   "title": "El CI prueba el launcher y el origen de producto en Windows",
+   "status": "pass",
+   "detail": "2 jobs en windows-latest"
+  },
+  {
+   "id": "device-matrix",
+   "title": "La matriz de dispositivos apunta al origen de producto",
+   "status": "pass",
+   "detail": ":8000 y sin rastro del dev server"
+  },
+  {
+   "id": "runtime-audit",
+   "title": "Instrumento de red sin deriva",
+   "status": "pass",
+   "detail": "9 puntos declarados y vigentes"
+  },
+  {
+   "id": "gates-declarados",
+   "title": "Los 7 gates están definidos y documentados",
+   "status": "pass",
+   "detail": "7 gates declarados"
+  },
+  {
+   "id": "dist-artifact",
+   "title": "El artefacto de la UI está construido",
+   "status": "pass",
+   "detail": "index.html servible"
+  },
+  {
+   "id": "evidencia-integra",
+   "title": "La evidencia registrada es válida",
+   "status": "pass",
+   "detail": "sin evidencia todavía (los 7 gates están en `pending`)"
+  }
+ ]
+}

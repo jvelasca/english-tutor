@@ -120,7 +120,7 @@ def test_ensure_frontend_dist_falla_si_el_build_no_deja_artefacto(
         lambda cmd, **kwargs: _FakeCompleted(returncode=0),
     )
 
-    with pytest.raises(PreparationError, match="compilar"):
+    with pytest.raises(PreparationError, match="artefacto"):
         ProcessManager().ensure_frontend_dist()
 
 
@@ -139,6 +139,8 @@ def test_prepare_hace_certificado_y_dist_en_orden(monkeypatch):
 
 def test_start_backend_no_arranca_dos_veces(monkeypatch, tmp_path):
     monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
+    # V3.73: arrancar el producto exige la UI compilada (fail-closed).
+    monkeypatch.setattr("process_manager.frontend_dist_available", lambda: True)
     lanzados: list[list[str]] = []
 
     class _FakePopen:

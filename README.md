@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.72.0**.
+- Última versión estable: **v3.73.0**.
 
 ## Estructura
 
@@ -235,6 +235,18 @@ npm run dev         # Vite en https://localhost:5173 con proxy /api
   compila una vez con `npm run build` (lo hace el lanzador si falta) y después lo sirve el
   propio backend. Solo hacen falta para compilar (`npm run build`) o para el modo de
   desarrollo (`npm run dev`).
+- **El launcher es fail-closed (V3.73):** arranca el producto con
+  `ENGLISH_TUTOR_REQUIRE_UI=1` y **no arranca** si falta `frontend/dist/index.html`; en
+  ese caso dice qué hacer (`npm run build`). Un `uvicorn main:app` a mano sigue siendo
+  fail-open: sirve solo la API.
+- **Descubrimiento de la LAN sin salir a la red (V3.73):** la IP con la que se anuncia la
+  app se obtiene enumerando las direcciones de este equipo
+  (`backend/services/net_interfaces.py`), **sin consultar ninguna dirección pública**. Si
+  el equipo tiene varias tarjetas o VPN y elige la interfaz equivocada, se puede fijar a
+  mano con la variable de entorno `ENGLISH_TUTOR_LAN_IP`.
+- **Certificado TLS autofirmado:** el navegador avisará la primera vez; hay que aceptarlo
+  para que funcione el micrófono (sin HTTPS, `getUserMedia` no existe fuera del propio
+  host). Se genera solo en `backend/data/certs/` (no versionado).
 
 ## Tests
 

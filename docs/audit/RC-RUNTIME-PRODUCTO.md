@@ -92,8 +92,15 @@ Lo que hay ahora, medido:
   Node no hay `dist`, pero con el `dist` construido la app arranca sin Node.
 - `npm run dev` (Vite en `:5173`) se conserva como **modo de desarrollo** con HMR
   (proxy `/api`), no como runtime de producto.
-- El montaje es **fail-open**: sin `dist` el backend arranca igual (solo API) y el
-  launcher lo muestra como «Interfaz no compilada».
+- El montaje es **fail-open en desarrollo**: sin `dist` el backend arranca igual
+  (solo API) si se lanza a mano (`uvicorn main:app`).
+- **V3.73 — fail-closed en producto (cierre del P2 de la auditoría externa):** el
+  launcher arranca el backend con `ENGLISH_TUTOR_REQUIRE_UI=1` y (a) **no lo
+  arranca** si falta `frontend/dist/index.html` (`ProcessManager.start_backend`
+  eleva `PreparationError`) y (b) con la variable activa, la falta del artefacto
+  es un `RuntimeError` accionable en `mount_frontend` (dice `npm run build`), no
+  una app que parece lista y se ve vacía. Un `uvicorn main:app` manual sigue
+  siendo fail-open a propósito: es el modo desarrollo.
 - Firewall: solo se abre el **8000** (`launcher/allow-firewall.ps1`); el puerto de
   la UI anunciada por `/api/network` (y el QR de `ConnectDeviceCard`) es el mismo.
 - **La ruta raíz de la API (`GET /`) se movió a `GET /api`** (`routers/models.py`):
@@ -101,13 +108,18 @@ Lo que hay ahora, medido:
   *fallback* no enmascara endpoints inexistentes).
 
 **Tests que lo fijan:** `backend/tests/test_serve_frontend_v372.py` (14),
-`test_tls_cert_v372.py` (14), `test_docs_drift_v372.py`, y los actualizados de
-`launcher/tests/` (`test_core`, `test_process_manager`, `test_status`) y
+`test_serve_frontend_v373.py` (fail-closed de producto),
+`launcher/tests/test_preflight_v373.py` (la otra mitad, en el launcher),
+`test_tls_cert_v372.py` (14), `test_docs_drift_v372.py`,
+`test_docs_drift_v373.py`, y los actualizados de `launcher/tests/`
+(`test_core`, `test_process_manager`, `test_status`) y
 `backend/tests/test_network.py`/`test_cors.py`/`test_security.py`.
 
 **Honestidad del cierre:** queda fuera el **progreso de descarga real** y el
 empaquetado (no hay instalador). La frase «Node no es requisito de ejecución» es
-correcta solo **después** de haber compilado el artefacto al menos una vez.
+correcta solo **después** de haber compilado el artefacto al menos una vez, y por
+eso V3.73 hace que su ausencia sea un **fallo explícito** en el runtime de
+producto en vez de un arranque silencioso sin interfaz.
 
 ### RC-02 — La sonda de Ollama no tenía cota y el launcher solo espera 1,5 s (P2, **cerrado**)
 
@@ -204,11 +216,16 @@ test que impide que entre por descuido.
   (runtime de producto: Node como requisito de ejecución y el `dist` que nadie
   servía — cerrado en V3.72, eje UA)**.
 - **Declarado sin cambio de código:** RC-04 (significado de `ready`).
+- **V3.73 — endurecimiento del cierre de RC-01:** el montaje del artefacto pasa a
+  ser **fail-closed en producto** (el launcher lo exige y no arranca sin él) y
+  sigue siendo fail-open en desarrollo. Es lo que faltaba para que «Node no es
+  requisito de ejecución» no se pueda leer como «el producto puede arrancar sin
+  interfaz».
 - **La frontera de producto, en una frase:** el producto es **un solo backend
   uvicorn que sirve la API y la UI compilada por HTTPS en `:8000`**, arrancado por
   el launcher; Node solo hace falta para **compilar** el artefacto, y la salud es
   honesta en las tres superficies que la consultan (backend `/ready`, launcher e
-  indicador web).
+  indicador web). **Sin el artefacto, el producto no arranca** (V3.73).
 
 ## Deriva documental que este eje cierra
 
