@@ -69,8 +69,10 @@
 > **Tests:** backend **2694 passed** (2643 → **+51**, 5 ficheros `*_v372.py`),
 > frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
 > `ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
-> orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs** (el nuevo
-> `product-origin` se estrena en el run de esta release).
+> orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs**, **8/8
+> verde** en el
+> [run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
+> (el nuevo `product-origin` se estrena ahí).
 > **Honestidad:** el certificado es **autofirmado** (el usuario acepta el aviso del
 > navegador; sin HTTPS no hay micrófono en LAN); **`RC-01` se cierra como «Node no
 > es requisito de EJECUCIÓN»**, **no** como «producto empaquetado y distribuible»
@@ -3432,8 +3434,10 @@ conserva el emisor de **`pre-a1`**.
 **Tests:** backend **2694 passed** (2643 → **+51**, los 5 ficheros `*_v372.py`),
 frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
 `ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
-orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs** (el nuevo
-`product-origin` se estrena en el run de esta release).
+orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs**, **8/8 verde**
+en el
+[run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
+(el nuevo `product-origin` se estrena ahí).
 
 **Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar):**
 
@@ -3473,8 +3477,22 @@ distribuible que haría literal el «sin Node».
 **PENDIENTE INMEDIATO:** **auditoría externa de release** (misma mecánica que en
 `v3.71.0`, cuyo punto de entrada sigue en
 `agentes/auditoria-externa-release-v371.md` y su informe `AH` pendiente de
-recibir). El punto de entrada de `v3.72.0` se elabora **tras el tag**, con el
-commit y el run de CI rellenados.
+recibir). El punto de entrada de `v3.72.0` se elabora con el commit, el tag y el
+run de CI ya rellenados: commit de release `096dcc4`, tag `v3.72.0` y
+[run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
+(**CI 8/8**).
+
+**CERRADA (2026-09-17):** commit de release **`096dcc4`**, tag anotado **`v3.72.0`**
+(objeto `da6fb6d`) publicado en `main` y **CI 8/8 verde** en
+[run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
+(sha `a36475a`), incluido el **job nuevo `Product origin (UI served over HTTPS)`**
+(`105121692280`) —que arranca uvicorn con TLS sobre el `dist` construido y comprueba
+que la raíz sirve HTML—, con `Backend` `105121692462`, `Frontend` `105121692317`,
+`Playwright` `105121691872`, `Content validation` `105121692417`, `Beta V3.0 gate`
+`105121692163`, `Release consistency` `105121692282` y `Launcher (ruff + pytest)`
+`105121692402`. **Auditoría externa de RELEASE de `v3.72.0`**: punto de entrada
+pendiente de elaborar (misma mecánica que la de `v3.71.0`, cuyo informe `AH` sigue
+pendiente de recibir).
 
 **Anterior:** `v3.71.0` **Runtime real, offline verificado e instalación limpia**
 (release de **VERIFICACIÓN con endurecimiento mínimo**: **SIN migración**, **SIN
