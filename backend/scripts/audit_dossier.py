@@ -344,7 +344,11 @@ MODALITY_ARTIFACTS: dict[str, dict[str, str | None]] = {
     "pronunciation": {"scorer": "pronunciation.py", "ui": "pronunciation"},
     "listening": {"scorer": "listening.py", "ui": "listening"},
     "speaking": {"scorer": "speaking.py", "ui": "speaking"},
-    "reading": {"scorer": "reading.py", "ui": "reading"},
+    # V3.73.1 (Opción A): la UI de `reading` dejó de ser el directorio de
+    # feature `features/reading` (retirado con `ReadingPractice`) y pasa a ser
+    # el **chat con destreza** `/chat/lectura`. La asimetría no cambia: UI sí,
+    # scorer propio no y corpus no (ver `UI_ARTIFACT_PATHS`).
+    "reading": {"scorer": "reading.py", "ui": "chat:lectura"},
     "writing": {"scorer": "writing.py", "ui": "writing"},
     "interaction": {"scorer": "interaction.py", "ui": "conversation"},
     "mediation": {"scorer": None, "ui": None},
@@ -352,6 +356,26 @@ MODALITY_ARTIFACTS: dict[str, dict[str, str | None]] = {
 
 SERVICES_DIR = BACKEND_DIR / "services"
 FRONTEND_FEATURES_DIR = REPO_DIR / "frontend" / "src" / "features"
+
+# Dónde se comprueba la existencia de cada artefacto de UI declarado. Por
+# defecto, un artefacto es un **directorio** de `frontend/src/features`; las
+# entradas de aquí lo sobreescriben con (tipo, ruta) porque su UI vive en otro
+# sitio. V3.73.1: `reading` se sirve desde el router de chat con destreza.
+UI_ARTIFACT_PATHS: dict[str, tuple[str, str]] = {
+    "chat:lectura": ("file", "frontend/src/router/chat.ts"),
+}
+
+
+def _ui_exists(ui: str | None) -> bool:
+    """Existencia real del artefacto de UI declarado (regla de medición)."""
+    if not ui:
+        return False
+    override = UI_ARTIFACT_PATHS.get(ui)
+    if override is not None:
+        kind, rel = override
+        path = REPO_DIR / rel
+        return path.is_dir() if kind == "dir" else path.is_file()
+    return (FRONTEND_FEATURES_DIR / str(ui)).is_dir()
 
 # Canal de corrección declarado por destreza (Eje 3): las dos vías del proyecto
 # son «determinista» y «LLM»; `None` = sin canal propio.
@@ -741,8 +765,7 @@ def skill_coverage() -> dict:
             "scorer_exists": bool(scorer)
             and (SERVICES_DIR / str(scorer)).exists(),
             "ui_feature": ui,
-            "ui_exists": bool(ui)
-            and (FRONTEND_FEATURES_DIR / str(ui)).is_dir(),
+            "ui_exists": _ui_exists(ui),
         }
         entry.update(content.get(modality, {}))
         per_modality[modality] = entry

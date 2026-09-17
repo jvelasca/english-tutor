@@ -18,6 +18,7 @@ una destreza tenga contenido, scorer y UI no demuestra que el alumno aprenda.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -37,6 +38,7 @@ REPO_DIR = Path(__file__).resolve().parents[2]
 BACKEND_DIR = REPO_DIR / "backend"
 SERVICES_DIR = BACKEND_DIR / "services"
 FRONTEND_FEATURES_DIR = REPO_DIR / "frontend" / "src" / "features"
+FRONTEND_ROUTER_DIR = REPO_DIR / "frontend" / "src" / "router"
 GENERATED_DIR = REPO_DIR / "docs" / "audit" / "generated"
 
 # Las 9 modalidades declaradas (mastery.MASTERY_SKILLS), en su orden canónico.
@@ -163,8 +165,15 @@ def test_reading_has_no_dedicated_scorer() -> None:
     assert not (SERVICES_DIR / "reading.py").exists()
     assert _reading_counts() == (15, 18)
     # La asimetría es explícita: contenido y UI sí, corpus y scorer no.
-    assert (FRONTEND_FEATURES_DIR / "reading").is_dir()
+    # V3.73.1 (Opción A): la UI de reading ya no es el directorio
+    # `frontend/src/features/reading` (retirado junto con `ReadingPractice`),
+    # sino el **chat con destreza** `/chat/lectura`. Se comprueba el cableado
+    # real —el router tiene que declarar el slug— y que el dossier generado
+    # siga viendo esa UI: si el router pierde `reading`, esto falla.
+    chat_router = (FRONTEND_ROUTER_DIR / "chat.ts").read_text(encoding="utf-8")
+    assert re.search(r'reading:\s*"lectura"', chat_router)
     entry = _generated()["modalities"]["reading"]
+    assert entry["ui_exists"] is True
     assert entry["scorer_exists"] is False
     assert entry["corpus"] == 0
 

@@ -67,7 +67,7 @@
    "evidence_channel": "receptive",
    "scorer_module": "reading.py",
    "scorer_exists": false,
-   "ui_feature": "reading",
+   "ui_feature": "chat:lectura",
    "ui_exists": true,
    "objectives": 15,
    "checks": 18,

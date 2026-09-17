@@ -11,7 +11,7 @@
 | pronunciation | 10 | NO | spoken | 38 | 0 | 120 | pronunciation.py | pronunciation |
 | listening | 24 | sí | receptive | 38 | 66 | 490 | listening.py | listening |
 | speaking | 18 | sí | spoken | 70 | 0 | 174 | speaking.py | speaking |
-| reading | 10 | sí | receptive | 15 | 18 | 0 | reading.py (AUSENTE) | reading |
+| reading | 10 | sí | receptive | 15 | 18 | 0 | reading.py (AUSENTE) | chat:lectura |
 | writing | 15 | sí | written | 67 | 0 | 0 | writing.py | writing |
 | interaction | 0 | sí | NO | 0 | 0 | 66 | interaction.py | conversation |
 | mediation | 0 | sí | NO | 0 | 0 | 0 | — (AUSENTE) | — (AUSENTE) |
