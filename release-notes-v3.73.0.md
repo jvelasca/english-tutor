@@ -93,7 +93,11 @@ excluyen los docstrings) de los cuatro ficheros implicados.
 una utilidad **de Windows** y el certificado TLS se genera con
 `cryptography`/rutas de Windows: **nada de eso se ejercitaba en CI**.
 
-**Lo que hay ahora:** de **8 a 11 jobs**.
+**Lo que hay ahora:** de **8 a 11 jobs**, **11/11 verde** en el
+[run de publicación 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
+—el primer run de los tres jobs nuevos—, incluidos `Launcher (Windows, ruff +
+pytest)` (**bloqueante**) y `Product origin (Windows, informativo)`, que se estrena
+en verde.
 
 | Job | Runner | Bloqueante | Qué prueba |
 |---|---|---|---|

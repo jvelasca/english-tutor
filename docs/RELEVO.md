@@ -89,7 +89,9 @@
 > producto; `tsc` limpio y `npm run build` OK), launcher **113** (93 → **+20**:
 > 7+13), `ruff` limpio en backend y launcher, `check_release_consistency` en los
 > **6 orígenes** (`3.73.0`), i18n `--strict` con **0 huérfanas**, `check_beta_v3` OK
-> y el CI con **11 jobs**. Humo local del arnés: `auto --require-dist` **10/10**,
+> y el CI con **11 jobs**, **11/11 verde** en el
+> [run de publicación 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522).
+> Humo local del arnés: `auto --require-dist` **10/10**,
 > `status` **7 pending** y `status --strict` **exit 1** (correcto: es la puerta).
 > **Honestidad:** los **7 gates siguen en `pending`** — V3.73 construye el
 > instrumento y hace el endurecimiento, **no** la validación física (corte de red
@@ -3573,15 +3575,26 @@ pantalla de nivelación (con la divulgación de `AE-04` que su candado ya exige)
 progreso real de descarga, `RA-02` y, si el gerente lo prioriza, el paquete
 distribuible que haría literal el «sin Node».
 
-**PENDIENTE INMEDIATO:** **auditoría externa de release** (misma mecánica que en
-`v3.71.0`, cuyo punto de entrada sigue en
+**PENDIENTE INMEDIATO:** **auditoría externa de release de `v3.73.0`** (misma
+mecánica que en `v3.71.0`, cuyo punto de entrada sigue en
 `agentes/auditoria-externa-release-v371.md` y su informe `AH` pendiente de
-recibir). El punto de entrada de `v3.72.0` se elabora con el commit, el tag y el
-run de CI ya rellenados: commit de release `096dcc4`, tag `v3.72.0` y
-[run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
-(**CI 8/8**).
+recibir). El punto de entrada de `v3.73.0` se elabora con el commit, el tag y el
+run de CI ya rellenados: commit de release `859c6c2`, tag anotado `v3.73.0`
+(objeto `8196ab7`) y
+[run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
+(**CI 11/11**).
 
-**CERRADA (2026-09-17):** commit de release **`096dcc4`**, tag anotado **`v3.72.0`**
+**CERRADA (2026-09-17) · v3.73.0:** commit de release **`859c6c2`**, tag anotado
+**`v3.73.0`** (objeto `8196ab7`) publicado en `main` —`origin/main` y el commit
+pelado del tag son el **mismo SHA**, verificado por git y por API— y **CI 11/11
+verde** en
+[run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
+(sha `859c6c2`), con los tres jobs nuevos en verde, incluidos `Launcher (Windows,
+ruff + pytest)` (**bloqueante**) y `Product origin (Windows, informativo)`, que se
+estrena en verde. **Los 7 gates de validación física siguen en `pending`**:
+`status --strict` sale **1** a propósito y **V4.0 no se declara** hasta que salga 0.
+
+**CERRADA (2026-09-17) · v3.72.0:** commit de release **`096dcc4`**, tag anotado **`v3.72.0`**
 (objeto `da6fb6d`) publicado en `main` y **CI 8/8 verde** en
 [run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
 (sha `a36475a`), incluido el **job nuevo `Product origin (UI served over HTTPS)`**
