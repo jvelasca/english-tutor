@@ -5,15 +5,22 @@ from core import (
     BACKEND_DIR,
     BACKEND_PORT,
     FRONTEND_DIR,
+    FRONTEND_DIST,
     FRONTEND_PORT,
     ICON_PATH,
     REPO_ROOT,
+    TLS_CERT_PATH,
+    TLS_KEY_PATH,
     app_summary,
     author_line,
     backend_command,
+    backend_python,
     backend_url,
     db_summary,
-    frontend_command,
+    ensure_cert_command,
+    frontend_build_command,
+    frontend_dev_command,
+    frontend_dist_available,
     frontend_url,
     health_status,
     icon_file,
@@ -43,6 +50,7 @@ def test_repo_root_contains_backend_and_frontend():
 def test_backend_command_uses_venv_python():
     cmd = backend_command()
     assert cmd[0].endswith("python.exe") or cmd[0].endswith("python")
+    assert cmd[0] == str(backend_python())
     assert "-m" in cmd
     assert "uvicorn" in cmd
     assert "main:app" in cmd
@@ -54,20 +62,72 @@ def test_backend_command_binds_lan():
     assert "0.0.0.0" in cmd
 
 
-def test_frontend_command_runs_dev():
-    cmd = frontend_command()
+def test_backend_command_serves_https_with_the_local_certificate():
+    """Sin *secure context* se rompe el micrófono desde otro equipo (V3.72)."""
+    cmd = backend_command()
+
+    assert cmd[cmd.index("--ssl-certfile") + 1] == str(TLS_CERT_PATH)
+    assert cmd[cmd.index("--ssl-keyfile") + 1] == str(TLS_KEY_PATH)
+    assert TLS_CERT_PATH.name == "cert.pem" and TLS_KEY_PATH.name == "key.pem"
+    # Artefacto de máquina: dentro de backend/data/ (ignorado por git).
+    assert TLS_CERT_PATH.parent == BACKEND_DIR / "data" / "certs"
+
+
+def test_ensure_cert_command_is_idempotent_script_of_the_backend():
+    cmd = ensure_cert_command()
+    assert cmd[0] == str(backend_python())
+    assert cmd[-2:] == ["-m", "scripts.ensure_tls_cert"]
+
+
+def test_frontend_build_command_compila_la_ui():
+    """Node deja de ser requisito de EJECUCIÓN: solo compila el artefacto."""
+    cmd = frontend_build_command()
+    assert "run" in cmd
+    assert cmd[-1] == "build"
+
+
+def test_frontend_dev_command_sigue_siendo_el_modo_desarrollo():
+    cmd = frontend_dev_command()
     assert "run" in cmd
     assert cmd[-1] == "dev"
+
+
+def test_frontera_de_runtime_un_solo_origen():
+    """V3.72 (RC-01): la UI y la API comparten origen; Node no es runtime."""
+    assert BACKEND_PORT == 8000
+    assert FRONTEND_PORT == BACKEND_PORT
+    assert FRONTEND_DIST == FRONTEND_DIR / "dist"
+
+
+def test_frontend_dist_available_refleja_si_existe_el_index(monkeypatch, tmp_path):
+    """`frontend/dist` no se versiona: el launcher lo compila si falta."""
+    import core
+
+    monkeypatch.setattr(core, "FRONTEND_DIST", tmp_path / "dist")
+    assert frontend_dist_available() is False
+
+    (tmp_path / "dist").mkdir()
+    (tmp_path / "dist" / "index.html").write_text("<html/>", encoding="utf-8")
+    assert frontend_dist_available() is True
+
+
+def test_urls():
+    assert backend_url() == f"https://127.0.0.1:{BACKEND_PORT}"
+    assert backend_url() == "https://127.0.0.1:8000"
+    assert frontend_url() == f"https://localhost:{FRONTEND_PORT}"
+    assert frontend_url() == "https://localhost:8000"
 
 
 def test_lan_url(monkeypatch):
     monkeypatch.setattr("core.lan_ip", lambda: "192.168.1.42")
     assert lan_url() == f"https://192.168.1.42:{FRONTEND_PORT}"
+    assert lan_url() == "https://192.168.1.42:8000"
 
 
 def test_local_url_uses_hostname(monkeypatch):
     monkeypatch.setattr("core.lan_hostname", lambda: "english-tutor-pc")
     assert local_url() == f"https://english-tutor-pc.local:{FRONTEND_PORT}"
+    assert local_url() == "https://english-tutor-pc.local:8000"
 
 
 def test_mdns_available_when_resolves(monkeypatch):
@@ -92,11 +152,6 @@ def test_mdns_available_false_when_no_mdns(monkeypatch):
 
     monkeypatch.setattr(core.socket, "getaddrinfo", _fail)
     assert mdns_available() is False
-
-
-def test_urls():
-    assert backend_url() == f"http://127.0.0.1:{BACKEND_PORT}"
-    assert frontend_url() == f"https://localhost:{FRONTEND_PORT}"
 
 
 def test_app_summary_on():

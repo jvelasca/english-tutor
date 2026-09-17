@@ -81,7 +81,7 @@ backend/
 ├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
 │   ├── __init__.py
 │   ├── academy.py       # mastery determinista (EMA+racha), gating, progresión, evaluación (puro)
-│   ├── cefr.py          # evaluate_cefr (multi-señal) + bandas + recommendations (puros, F4/F8)
+│   ├── cefr.py          # constantes CEFR + corte único de banda (level_for_numeric) + recommendations (puros)
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
 │   ├── curriculum.py    # carga/validación del currículum JSON + ASSESSABLE/PERFORMANCE_SKILLS
 │   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
@@ -280,22 +280,22 @@ frontend/src/
 
 ```
 launcher/
-├── launcher.py          # PUNTO DE ENTRADA: GUI mínima (tkinter), arranca/para la app
+├── launcher.py          # PUNTO DE ENTRADA: GUI mínima (tkinter), prepara y arranca/para la app
 ├── ui.py                # paleta, iconos, dots de estado y lectura de logs (puro, sin tkinter)
 ├── core.py              # lógica pura: rutas, comandos de arranque, normalización de estado
-├── process_manager.py   # subprocesos: arrancar/parar backend (uvicorn) y frontend (Vite)
+├── process_manager.py   # prepara el entorno (cert TLS + build si falta) y gestiona uvicorn
 ├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
 ├── browser_cookies.py   # diagnóstico de cookies de Chrome/Edge/Brave/Vivaldi/Opera/Firefox
 ├── state_store.py       # persistencia visual: tamaño/posición de ventana y paneles
 ├── make_icon.ps1        # genera icon.ico (System.Drawing, Windows)
 ├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
-├── allow-firewall.ps1   # abre TCP 5173/8000 en el firewall (requiere admin)
+├── allow-firewall.ps1   # abre TCP 8000 (API + UI) en el firewall (requiere admin)
 ├── icon.ico             # icono del acceso directo
 ├── pyproject.toml       # configuración de ruff (mismas reglas que el backend)
-├── logs/                # logs de backend/frontend (gitignored)
+├── logs/                # logs de backend/UI (gitignored)
 ├── state.json           # estado de la UI persistido (gitignored)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
-                         #         test_ui/test_state_store/test_process_manager) — 75 tests, en CI (job `launcher`)
+                         #         test_ui/test_state_store/test_process_manager) — 93 tests, en CI (job `launcher`)
 ```
 
 ### Responsabilidades launcher
@@ -305,8 +305,9 @@ launcher/
 - **`ui.py`**: constantes de estilo (colores, iconos, puntos de estado) y lectura de logs.
 - **`core.py`**: funciones puras y testables (resolver rutas, construir comandos, normalizar
   estado de salud y contadores).
-- **`process_manager.py`**: ciclo de vida de los dos subprocesos (backend/frontend), con
-  matado del árbol de procesos en Windows (`taskkill /T /F`).
+- **`process_manager.py`**: prepara el entorno (genera el certificado TLS autofirmado y
+  compila `frontend/dist` si falta) y gestiona el ciclo de vida del **proceso de
+  producto** (uvicorn), con matado del árbol de procesos en Windows (`taskkill /T /F`).
 - **`status.py`**: obtiene el estado real: `/api/health/dependencies` (HTTP) y consultas de
   solo lectura a la BD SQLite (contadores globales y usuarios).
 - **`browser_cookies.py`**: diagnóstico (solo lectura) de las cookies de los navegadores
@@ -316,21 +317,25 @@ launcher/
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
   puerto en el firewall.
 
-### Runtime de producto (declarado en V3.71, eje RC)
+### Runtime de producto (re-declarado en V3.72, eje UA — cierre de RC-01)
 
-El producto se ejecuta como **dos procesos** que arranca el launcher:
+El producto se ejecuta como **un solo proceso** que arranca el launcher:
 
 | Pieza | Se sirve con | Dónde |
 |---|---|---|
-| API | `uvicorn main:app --host 0.0.0.0 --port 8000` (un solo proceso, **sin** `--reload`) | `launcher/core.py::backend_command` |
-| UI | **dev server de Vite** (`npm run dev`, puerto 5173) | `launcher/core.py::frontend_command` |
+| API + UI | `uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-certfile … --ssl-keyfile …` (un solo proceso, **sin** `--reload`) | `launcher/core.py::backend_command` |
+| UI compilada (`frontend/dist`) | *StaticFiles* en `/assets` + *fallback* SPA, servidos por el backend | `backend/services/frontend_dist.py::mount_frontend` |
+| Certificado TLS autofirmado | Generado (idempotente) antes de arrancar | `backend/scripts/ensure_tls_cert.py` |
 
-- `npm run build` (`tsc && vite build`) sí produce `frontend/dist`, pero **nadie lo
-  sirve**: el backend no monta `StaticFiles` ni `FileResponse` sobre él.
-- **Consecuencia declarada:** **Node + npm son requisito de EJECUCIÓN** del
-  producto, no solo de compilación. Es deuda con fase y condición de salida en
-  `docs/audit/RC-RUNTIME-PRODUCTO.md` (RC-01), a reevaluar en V3.72/V3.73.
-- Fijado por test en `backend/tests/test_docs_drift_v371.py` (clase RC).
+- `npm run build` (`tsc && vite build`) produce `frontend/dist`, que **no se versiona**:
+  el launcher lo compila la primera vez si falta (`process_manager.ensure_frontend_dist`).
+- **Consecuencia declarada:** **Node + npm son requisito de COMPILACIÓN/instalación, no de
+  EJECUCIÓN**. `RC-01` queda **cerrado**; ver `docs/audit/RC-RUNTIME-PRODUCTO.md`.
+- `npm run dev` (dev server de Vite en `:5173` con proxy `/api`) se conserva como **modo de
+  desarrollo** con HMR (`.vscode/launch.json`), no como runtime de producto.
+- El montaje es **fail-open**: sin `dist` el backend arranca igual (solo API) y el launcher
+  lo muestra como «Interfaz no compilada».
+- Fijado por test en `backend/tests/test_docs_drift_v372.py`.
 
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en

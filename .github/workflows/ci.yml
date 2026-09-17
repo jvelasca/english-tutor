@@ -49,6 +49,11 @@ jobs:
         run: npx tsc --noEmit
       - name: Test (vitest)
         run: npm test
+      # V3.72 (§UE): el checker i18n pasa a ser gate real (`--strict` falla con
+      # claves huérfanas). Solo stdlib: no necesita las dependencias de `backend`.
+      - name: i18n coverage gate (huérfanas / duplicadas / vacías)
+        working-directory: .
+        run: python scripts/check_i18n_coverage.py --strict
       - name: Build
         run: npm run build
 
@@ -145,3 +150,59 @@ jobs:
         run: python -m ruff check .
       - name: Test (pytest)
         run: python -m pytest tests/ -q
+
+  product-origin:
+    name: Product origin (UI served over HTTPS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      # V3.72 (RC-01): el backend sirve la UI compilada. Este job arranca el
+      # producto de verdad — uvicorn con TLS sobre el `dist` construido — y
+      # comprueba que la raíz devuelve HTML, que la API responde en el mismo
+      # origen y que un `/api` inexistente sigue siendo 404 (el fallback SPA no
+      # enmascara endpoints).
+      - name: Build the UI artifact
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Serve the artifact over HTTPS and check the product origin
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          python -m scripts.ensure_tls_cert
+          python -m uvicorn main:app --host 127.0.0.1 --port 8000 \
+            --ssl-certfile data/certs/cert.pem \
+            --ssl-keyfile data/certs/key.pem &
+          server=$!
+          trap 'kill $server' EXIT
+          for _ in $(seq 1 30); do
+            if curl -sk https://127.0.0.1:8000/api/health >/dev/null; then break; fi
+            sleep 1
+          done
+          root=$(curl -sk https://127.0.0.1:8000/)
+          echo "$root" | head -c 200
+          echo "$root" | grep -qi "<html" \
+            || { echo "ERROR: la raíz no sirve HTML"; exit 1; }
+          curl -sk https://127.0.0.1:8000/api/health | grep -q '"version"' \
+            || { echo "ERROR: la API no responde en el origen de producto"; exit 1; }
+          code=$(curl -sk -o /dev/null -w '%{http_code}' \
+            https://127.0.0.1:8000/api/no-existe)
+          test "$code" = "404" \
+            || { echo "ERROR: /api inexistente devolvió $code (esperaba 404)"; exit 1; }
+          echo "OK: la UI compilada se sirve por HTTPS en el origen de producto"

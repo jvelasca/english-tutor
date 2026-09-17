@@ -12,9 +12,24 @@ from pathlib import Path
 from core import backend_url, frontend_url
 
 
+def _ssl_context() -> ssl.SSLContext:
+    """Contexto SSL que acepta el certificado autofirmado local.
+
+    El producto se sirve por HTTPS con certificado autofirmado (necesario para
+    `getUserMedia` en la LAN), así que la verificación por defecto rechazaría al
+    propio backend: el launcher comprueba el estado de *su propio* proceso local.
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def _get_json(url: str, timeout: float = 1.5) -> dict | None:
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
+        with urllib.request.urlopen(
+            url, timeout=timeout, context=_ssl_context()
+        ) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except Exception:  # noqa: BLE001
         return None
@@ -39,21 +54,22 @@ def fetch_server_status() -> dict | None:
     return _get_json(backend_url() + "/api/system/status")
 
 
-def _frontend_ssl_context() -> ssl.SSLContext:
-    """Contexto SSL que acepta el certificado autofirmado del frontend local."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
 def fetch_frontend() -> bool:
-    """True si el frontend responde (GET / sobre HTTPS autofirmado)."""
+    """True si la **UI compilada** responde en el origen de producto.
+
+    V3.72 (RC-01): la UI la sirve el backend en `https://…:8000/`. Se comprueba
+    que la raíz devuelve HTML (la página de la app) y no el JSON de la API, para
+    que el launcher pueda distinguir «API levantada pero sin UI compilada» de
+    «todo en marcha» — un estado real y frecuente en una instalación limpia.
+    """
     try:
         with urllib.request.urlopen(
-            frontend_url(), timeout=1.5, context=_frontend_ssl_context()
+            frontend_url(), timeout=1.5, context=_ssl_context()
         ) as resp:
-            return resp.status == 200
+            if resp.status != 200:
+                return False
+            body = resp.read(1024).lstrip().lower()
+            return body.startswith(b"<!doctype html") or body.startswith(b"<html")
     except Exception:  # noqa: BLE001
         return False
 

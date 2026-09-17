@@ -21,6 +21,14 @@ Fecha de evaluación: 2026-08-31. Versión: `2.0.0`.
 > `docs/BETA_V3.md` §4.4 y `docs/audit/G-DEVICES.md`) ⇒ **G5 no está cerrado**;
 > (iii) la fecha y la versión de cabecera (`2026-08-31` · `2.0.0`) corresponden a
 > la evaluación original, no al árbol actual.
+>
+> **V3.72 — runtime de producto (2026-09-17).** La fila **«LAN/HTTPS/mDNS»**
+> apoyaba la evidencia en `vite.config.ts` (dev server). El producto ya **no** es
+> el dev server: el backend sirve la UI compilada por HTTPS con certificado
+> autofirmado (`backend/scripts/ensure_tls_cert.py`) en un único origen
+> (`:8000`), y Node pasa a requisito de **compilación**. Evidencia del cierre de
+> `RC-01` en `docs/audit/RC-RUNTIME-PRODUCTO.md` y candado en
+> `backend/tests/test_docs_drift_v372.py`.
 
 ---
 
@@ -32,8 +40,8 @@ Infraestructura local-first, reproducible y protegida.
 |---|---|---|
 | Backend FastAPI + Pydantic, 100% local | ✅ | `backend/` con routers/services/schemas/domain; sin OAuth/cloud (premisa 2) |
 | SQLite local (perfiles, progreso, evidencia, settings, mastery) | ✅ | `repositories/db.py::DB_PATH`, migraciones idempotentes no destructivas |
-| Launcher de escritorio | ✅ | `launcher/` (tkinter) con icono y acceso directo; **75 tests** en el job `launcher` del CI (V3.71) |
-| LAN/HTTPS/mDNS | ✅ | `vite.config.ts` (`basicSsl`, `host: true`), `local_url_available`, QR de conexión |
+| Launcher de escritorio | ✅ | `launcher/` (tkinter) con icono y acceso directo; tests en el job `launcher` del CI (V3.71); desde V3.72 prepara el entorno (cert TLS + `npm run build`) y arranca un solo proceso |
+| LAN/HTTPS/mDNS | ✅ | **producto**: el backend sirve la UI compilada por HTTPS autofirmado en un único origen `:8000` (`services/frontend_dist.py`, `scripts/ensure_tls_cert.py`); modo dev: `vite.config.ts` (`basicSsl`, `host: true`). `local_url_available` + QR de conexión |
 | CI completa | ✅ | `.github/workflows/ci.yml`: `ruff` + `pytest` + `tsc` + `vitest` + `build` + `content-validation` + `playwright` + `release-consistency` + `launcher` (V3.71) |
 | Seguridad LAN | ✅ | `security.py::SecurityMiddleware` (origin-check CSRF-like + rate limiting por IP) |
 | Backup/restore/export + auto-backup | ✅ | `services/backup.py` + `routers/system.py`; auto-backup diario (keep 7) |
@@ -49,7 +57,7 @@ Currículo completo, secuenciado y validado end-to-end.
 
 | Criterio | Estado | Evidencia |
 |---|---|---|
-| Escalera CEFR Pre-A1→C2 con bandas "plus" | ✅ | `curriculum/cefr_descriptors.json` + `services/cefr_descriptors.py` |
+| Escalera CEFR Pre-A1→C2 con bandas "plus" | ✅ | `curriculum/cefr_descriptors.json` + `services/cefr_descriptors.py` (V3.72/AE-06: las `+` son descriptores; la posición «estás aquí» marca la etiqueta discreta) |
 | Can-Do por 9 dimensiones | ✅ | `services/cefr_matrix.py`, `/api/academy/cefr-ladder` |
 | Secuenciación Course→Unit→Lesson→Practice→Assessment→Review→Mastery | ✅ | `services/course.py` (gating por objetivo `available`/`review`/`locked`) |
 | Curso secuencial A1→C2 completo | ✅ | `curriculum/a1.json` … `c2.json` (A1/A2/B1/B2 + **C1/C2 nuevos en V2.1**), con módulo final de repaso por nivel |
@@ -85,7 +93,7 @@ Dominio como evidencia + readiness, no medias simples.
 
 | Criterio | Estado | Evidencia |
 |---|---|---|
-| Adaptive Engine 2.0 | ✅ | `services/adaptive.py` (Priority Engine + "Why this activity?") |
+| Adaptive Engine 2.0 | ✅ | `services/adaptive.py` (Priority Engine + "Why this activity?"); desde V3.72 el `why` declarado se pinta en la tarjeta protagonista, el pie «Next» de cada práctica y la cola de repaso (`components/WhyThisActivity.tsx`), sin recalcular señales en cliente |
 | `MasteryRecord` transversal (9 destrezas) | ✅ | `services/mastery.py` (score/confidence/evidence/retention/stability/review_due) |
 | CEFR readiness sin media simple | ✅ | `readiness_band` → banda cualitativa "B1 developing/approaching/ready" |
 | Curva de olvido conectada a todo el currículo | ✅ | `services/forgetting.py` → "review in N days" |

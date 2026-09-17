@@ -17,7 +17,20 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 DB_PATH = BACKEND_DIR / "data" / "tutor.db"
 
 BACKEND_PORT = 8000
-FRONTEND_PORT = 5173
+# V3.72 (RC-01): el producto sirve la UI y la API desde el MISMO origen, así que
+# no hay un segundo puerto. `npm run dev` (Vite en :5173) queda como **modo de
+# desarrollo**, no como runtime de producto. Se conserva el nombre como alias
+# para que las URLs anunciadas sigan siendo una sola.
+FRONTEND_PORT = BACKEND_PORT
+
+# Certificado TLS autofirmado con el que uvicorn sirve HTTPS. Lo genera
+# `backend/scripts/ensure_tls_cert.py` (invocado por el launcher) y es un
+# artefacto de máquina: vive en `backend/data/`, que está ignorado por git.
+TLS_CERT_PATH = BACKEND_DIR / "data" / "certs" / "cert.pem"
+TLS_KEY_PATH = BACKEND_DIR / "data" / "certs" / "key.pem"
+
+# Artefacto compilado de la UI (lo construye `npm run build`, no se versiona).
+FRONTEND_DIST = FRONTEND_DIR / "dist"
 
 AUTHOR_NAME = "José Alberto Velasco"
 AUTHOR_EMAIL = "josealberto.vel@gmail.com"
@@ -35,15 +48,27 @@ def icon_file() -> str:
     return str(ICON_PATH)
 
 
+def backend_python() -> Path:
+    """Intérprete del venv del backend (resuelto por `os.name`)."""
+    exe = "python.exe" if os.name == "nt" else "python"
+    return BACKEND_DIR / ".venv" / "Scripts" / exe
+
+
+def npm_command() -> str:
+    """Ejecutable de npm (solo se usa para COMPILAR la UI o en desarrollo)."""
+    return "npm.cmd" if os.name == "nt" else "npm"
+
+
 def backend_command() -> list[str]:
     """Comando para arrancar el backend con el venv del proyecto (uvicorn).
 
-    Se enlaza a ``0.0.0.0`` para que otros equipos de la LAN puedan acceder.
+    Se enlaza a ``0.0.0.0`` para que otros equipos de la LAN puedan acceder y se
+    sirve por **HTTPS autofirmado**: sin *secure context*, el navegador no expone
+    `navigator.mediaDevices` y se rompe la grabación (micrófono) desde otro
+    equipo. El backend sirve además la UI compilada (V3.72, RC-01).
     """
-    exe = "python.exe" if os.name == "nt" else "python"
-    python = BACKEND_DIR / ".venv" / "Scripts" / exe
     return [
-        str(python),
+        str(backend_python()),
         "-m",
         "uvicorn",
         "main:app",
@@ -51,24 +76,45 @@ def backend_command() -> list[str]:
         "0.0.0.0",
         "--port",
         str(BACKEND_PORT),
+        "--ssl-certfile",
+        str(TLS_CERT_PATH),
+        "--ssl-keyfile",
+        str(TLS_KEY_PATH),
     ]
 
 
-def frontend_command() -> list[str]:
-    """Comando para arrancar el frontend (Vite dev)."""
-    npm = "npm.cmd" if os.name == "nt" else "npm"
-    return [npm, "run", "dev"]
+def ensure_cert_command() -> list[str]:
+    """Comando que genera el certificado TLS autofirmado si falta (idempotente)."""
+    return [str(backend_python()), "-m", "scripts.ensure_tls_cert"]
+
+
+def frontend_build_command() -> list[str]:
+    """Comando para COMPILAR la UI (`frontend/dist`). No es el runtime."""
+    return [npm_command(), "run", "build"]
+
+
+def frontend_dev_command() -> list[str]:
+    """Comando del **modo desarrollo** (Vite dev server con HMR, puerto 5173).
+
+    Ya no lo usa el launcher: se conserva porque es el flujo de trabajo de
+    desarrollo (`.vscode/launch.json`) y la frontera está declarada por test.
+    """
+    return [npm_command(), "run", "dev"]
+
+
+def frontend_dist_available() -> bool:
+    """True si existe el artefacto compilado de la UI (index.html)."""
+    return (FRONTEND_DIST / "index.html").is_file()
 
 
 def backend_url() -> str:
-    return f"http://127.0.0.1:{BACKEND_PORT}"
+    return f"https://127.0.0.1:{BACKEND_PORT}"
 
 
 def frontend_url() -> str:
-    # El frontend (Vite) se sirve por HTTPS con certificado autofirmado
-    # (@vitejs/plugin-basic-ssl). Por HTTP no responde y el launcher lo
-    # detectaría como "Detenido".
-    return f"https://localhost:{FRONTEND_PORT}"
+    # V3.72: la UI la sirve el propio backend en el mismo origen HTTPS. Sigue
+    # siendo HTTPS con certificado autofirmado (por el micrófono en la LAN).
+    return f"https://localhost:{BACKEND_PORT}"
 
 
 def lan_ip() -> str:
@@ -95,7 +141,7 @@ def lan_url() -> str:
 
 
 def local_url() -> str:
-    """URL de acceso por nombre local mDNS (p. ej. https://mi-pc.local:5173)."""
+    """URL de acceso por nombre local mDNS (p. ej. https://mi-pc.local:8000)."""
     return f"https://{lan_hostname()}.local:{FRONTEND_PORT}"
 
 

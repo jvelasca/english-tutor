@@ -108,14 +108,14 @@ class _FakeResp:
     def __exit__(self, *args):
         return False
 
-    def read(self):
+    def read(self, _n=None):
         return self._payload
 
 
 def test_fetch_health_ok(monkeypatch):
     monkeypatch.setattr(
         "status.urllib.request.urlopen",
-        lambda url, timeout: _FakeResp(
+        lambda url, timeout, context=None: _FakeResp(
             b'{"database":"ok","ollama":"ok","stt":"ready","tts":"ready"}'
         ),
     )
@@ -123,7 +123,7 @@ def test_fetch_health_ok(monkeypatch):
 
 
 def test_fetch_health_unreachable(monkeypatch):
-    def boom(url, timeout):
+    def boom(url, timeout, context=None):
         raise OSError("refused")
 
     monkeypatch.setattr("status.urllib.request.urlopen", boom)
@@ -133,9 +133,22 @@ def test_fetch_health_unreachable(monkeypatch):
 def test_fetch_frontend_ok(monkeypatch):
     monkeypatch.setattr(
         "status.urllib.request.urlopen",
-        lambda url, timeout, context=None: _FakeResp(b"", 200),
+        lambda url, timeout, context=None: _FakeResp(
+            b"<!doctype html><html><body>app</body></html>", 200
+        ),
     )
     assert status.fetch_frontend() is True
+
+
+def test_fetch_frontend_solo_cuenta_html_no_el_json_de_la_api(monkeypatch):
+    """La UI y la API comparten origen: hay que distinguir «servida» de «no»."""
+    monkeypatch.setattr(
+        "status.urllib.request.urlopen",
+        lambda url, timeout, context=None: _FakeResp(
+            b'{"service":"english-tutor"}', 200
+        ),
+    )
+    assert status.fetch_frontend() is False
 
 
 def test_fetch_frontend_down(monkeypatch):
@@ -149,13 +162,15 @@ def test_fetch_frontend_down(monkeypatch):
 def test_fetch_version_ok(monkeypatch):
     monkeypatch.setattr(
         "status.urllib.request.urlopen",
-        lambda url, timeout: _FakeResp(b'{"status":"ok","version":"1.2.3"}'),
+        lambda url, timeout, context=None: _FakeResp(
+            b'{"status":"ok","version":"1.2.3"}'
+        ),
     )
     assert status.fetch_version() == "1.2.3"
 
 
 def test_fetch_version_unreachable(monkeypatch):
-    def boom(url, timeout):
+    def boom(url, timeout, context=None):
         raise OSError("refused")
 
     monkeypatch.setattr("status.urllib.request.urlopen", boom)
@@ -165,7 +180,7 @@ def test_fetch_version_unreachable(monkeypatch):
 def test_fetch_server_status_ok(monkeypatch):
     monkeypatch.setattr(
         "status.urllib.request.urlopen",
-        lambda url, timeout: _FakeResp(
+        lambda url, timeout, context=None: _FakeResp(
             b'{"generation":{"running":1,"jobs":[{"level":"A1"}]},'
             b'"rate_limited":{"rejected_last_minute":2}}'
         ),
@@ -176,11 +191,19 @@ def test_fetch_server_status_ok(monkeypatch):
 
 
 def test_fetch_server_status_unreachable(monkeypatch):
-    def boom(url, timeout):
+    def boom(url, timeout, context=None):
         raise OSError("refused")
 
     monkeypatch.setattr("status.urllib.request.urlopen", boom)
     assert status.fetch_server_status() is None
+
+
+def test_el_launcher_acepta_el_certificado_autofirmado_local():
+    """El producto se sirve por HTTPS autofirmado: el launcher debe aceptarlo."""
+    context = status._ssl_context()
+
+    assert context.check_hostname is False
+    assert context.verify_mode == status.ssl.CERT_NONE
 
 
 def test_human_size():

@@ -13,8 +13,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/api")
 async def root() -> dict[str, str]:
+    """Información de servicio.
+
+    V3.72 (RC-01): vivía en `GET /`, pero esa ruta la sirve ahora la **UI
+    compilada** (el backend monta `frontend/dist`). Se mueve a `/api` para que el
+    dato siga disponible sin competir con la página de la app.
+    """
     return {
         "service": "english-tutor",
         "version": VERSION,

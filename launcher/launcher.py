@@ -1,8 +1,13 @@
 """Launcher de escritorio de English Tutor (GUI con tkinter).
 
-Arranca/para el backend (uvicorn) y el frontend (Vite), y muestra el estado de
-la app, las dependencias, la base de datos, los usuarios y los logs recientes.
-100% local.
+Arranca/para el **proceso de producto** (uvicorn, que sirve la API y la UI
+compilada en el mismo origen HTTPS — V3.72/RC-01) y muestra el estado de la app,
+las dependencias, la base de datos, los usuarios y los logs recientes. 100%
+local.
+
+Antes de arrancar, prepara el entorno si hace falta: genera el certificado TLS
+autofirmado y compila `frontend/dist` con `npm run build` la primera vez (Node
+sigue siendo necesario para **compilar**, ya no para **ejecutar**).
 
 Uso:
     python launcher.py
@@ -77,7 +82,7 @@ WINDOW_W = 1160
 WINDOW_H = 800
 COLUMN_W = 540
 
-_SERVICE_ORDER = ["Backend", "Frontend", "Ollama", "STT", "TTS", "Base de datos"]
+_SERVICE_ORDER = ["Backend", "Interfaz", "Ollama", "STT", "TTS", "Base de datos"]
 
 
 class Collapsible(ttk.Frame):
@@ -683,12 +688,17 @@ class LauncherApp:
         elif kind == "stopped":
             self._action_running = False
             self.refresh()
+        elif kind == "prepared":
+            self._msg.set(str(item[1]))
         elif kind == "open_app":
             if item[1]:
                 webbrowser.open(frontend_url())
                 self._msg.set("Abriendo app…")
             else:
-                self._msg.set("El frontend no está activo. Pulsa 'Iniciar app'.")
+                self._msg.set(
+                    "La interfaz no está servida. Pulsa 'Iniciar app' para "
+                    "compilarla y arrancarla."
+                )
                 self.refresh()
 
     def _next_refresh(self) -> None:
@@ -784,8 +794,8 @@ class LauncherApp:
         self._svc_vars["Backend"].set(
             "🟢 Activo" if backend_up else "🔴 Detenido"
         )
-        self._svc_vars["Frontend"].set(
-            "🟢 Activo" if frontend_on else "🔴 Detenido"
+        self._svc_vars["Interfaz"].set(
+            "🟢 Servida" if frontend_on else "🔴 No compilada"
         )
         self._svc_vars["Ollama"].set(self._svc_text(svc["ollama"]))
         self._svc_vars["STT"].set(self._svc_text(svc["stt"]))
@@ -793,7 +803,7 @@ class LauncherApp:
         self._svc_vars["Base de datos"].set(self._svc_text(svc["database"]))
 
         self._color_service("Backend", "on" if backend_up else "off")
-        self._color_service("Frontend", "on" if frontend_on else "off")
+        self._color_service("Interfaz", "on" if frontend_on else "off")
         self._color_service("Ollama", svc["ollama"])
         self._color_service("STT", svc["stt"])
         self._color_service("TTS", svc["tts"])
@@ -1001,14 +1011,18 @@ class LauncherApp:
 
         def work() -> None:
             try:
+                preparado = False
                 with self._lock:
                     # No duplicar un servicio ya activo (p. ej. lanzado con F5).
                     backend_up = fetch_health() is not None
-                    frontend_up = fetch_frontend()
                     if not self.pm.backend_running() and not backend_up:
+                        self.pm.prepare()
+                        preparado = True
                         self.pm.start_backend()
-                    if not self.pm.frontend_running() and not frontend_up:
-                        self.pm.start_frontend()
+                if preparado:
+                    self._queue.put(
+                        ("prepared", "Certificado y UI listos; arrancando…")
+                    )
                 time.sleep(BROWSER_DELAY_S)
                 self._queue.put(("started", fetch_frontend()))
             except Exception as exc:  # noqa: BLE001
@@ -1043,11 +1057,9 @@ class LauncherApp:
                     self._wait_ports_free()
                     # Evita duplicar un servicio ya activo (p. ej. lanzado con F5).
                     backend_up = fetch_health() is not None
-                    frontend_up = fetch_frontend()
                     if not self.pm.backend_running() and not backend_up:
+                        self.pm.prepare()
                         self.pm.start_backend()
-                    if not self.pm.frontend_running() and not frontend_up:
-                        self.pm.start_frontend()
                 time.sleep(BROWSER_DELAY_S)
                 self._queue.put(("started", fetch_frontend()))
             except Exception as exc:  # noqa: BLE001
@@ -1057,7 +1069,7 @@ class LauncherApp:
 
     @staticmethod
     def _wait_ports_free(timeout: float = 15.0) -> None:
-        """Espera a que backend y frontend liberen sus puertos tras parar."""
+        """Espera a que el proceso de producto libere su puerto tras parar."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             if fetch_health() is None and not fetch_frontend():

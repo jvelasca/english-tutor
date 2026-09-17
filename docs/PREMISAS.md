@@ -18,12 +18,18 @@ completo.
 - **Backend:** Python + FastAPI + Pydantic (tipado fuerte).
 - **Frontend:** Vite + React + TypeScript (modo estricto).
 - **LLM:** Ollama (servicio local). Modelo por defecto: `llama3.1:8b` (`backend/config.py::DEFAULT_MODEL`); `qwen3.5:9b` está **vetado** en el código (`UNUSABLE_MODELS`).
-- **Runtime de producto (V3.71, eje RC):** el launcher arranca **dos** procesos: la API
-  con `uvicorn` (un solo proceso, sin `--reload`) y la UI con el **dev server de Vite**
-  (`npm run dev`). El backend **no** sirve `frontend/dist`: el artefacto de producción
-  existe (`npm run build`) pero nadie lo sirve. Consecuencia declarada: **Node + npm son
-  requisito de EJECUCIÓN**, no solo de compilación. Deuda con fase y condición de salida
-  en `docs/audit/RC-RUNTIME-PRODUCTO.md` (RC-01); se reevalúa en V3.72/V3.73.
+- **Runtime de producto (V3.72, eje UA — cierre de RC-01):** el launcher arranca **un
+  solo proceso**, `uvicorn` por **HTTPS** (`--ssl-certfile/--ssl-keyfile` con el
+  certificado autofirmado que genera `backend/scripts/ensure_tls_cert.py`), y ese proceso
+  sirve la **API** y la **UI compilada** (`frontend/dist`) en el **mismo origen**
+  (`https://<host>:8000`). El `dist` **no se versiona**: lo compila el launcher
+  (`npm run build`) la primera vez si falta. Consecuencia declarada: **Node + npm son
+  requisito de COMPILACIÓN/instalación, no de EJECUCIÓN**. `npm run dev` (dev server de
+  Vite en `:5173`) sigue existiendo como **modo de desarrollo** con HMR. HTTPS es
+  requisito de producto, no cosmético: sin *secure context* el navegador no expone
+  `navigator.mediaDevices` y se rompe el micrófono desde otro equipo de la LAN.
+  Cierre y evidencia en `docs/audit/RC-RUNTIME-PRODUCTO.md` (RC-01); fijado por test en
+  `backend/tests/test_docs_drift_v372.py`.
 
 ## 4. Voz local (fijado)
 - **Oído (STT):** `faster-whisper`, modelo `small`, en CPU.

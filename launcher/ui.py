@@ -30,7 +30,7 @@ COLORS = {
 # Iconos (emoji) por servicio, sección y acción. Renderizados con Segoe UI Emoji.
 SERVICE_ICONS = {
     "Backend": "🖥️",
-    "Frontend": "🌐",
+    "Interfaz": "🌐",
     "Ollama": "🦙",
     "STT": "🎙️",
     "TTS": "🔊",

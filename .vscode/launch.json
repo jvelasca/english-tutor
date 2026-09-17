@@ -2,14 +2,21 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Backend (uvicorn :8000)",
+      "name": "Backend solo API (uvicorn :8000)",
       "type": "node-terminal",
       "request": "launch",
       "command": ".venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload",
       "cwd": "${workspaceFolder}/backend"
     },
     {
-      "name": "Frontend (Vite :5173)",
+      "name": "App completa HTTPS :8000 (producto)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": ".venv\\Scripts\\python.exe -m scripts.ensure_tls_cert && .venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --ssl-certfile data\\certs\\cert.pem --ssl-keyfile data\\certs\\key.pem --reload",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "Frontend dev (Vite :5173)",
       "type": "node-terminal",
       "request": "launch",
       "command": "npm run dev -- --open",
@@ -18,8 +25,11 @@
   ],
   "compounds": [
     {
-      "name": "English Tutor (F5)",
-      "configurations": ["Backend (uvicorn :8000)", "Frontend (Vite :5173)"],
+      "name": "Desarrollo con HMR (Vite :5173 + API :8000)",
+      "configurations": [
+        "Backend solo API (uvicorn :8000)",
+        "Frontend dev (Vite :5173)"
+      ],
       "stopAll": true
     }
   ]

@@ -7,7 +7,11 @@ from services import network
 
 router = APIRouter()
 
-FRONTEND_PORT = 5173
+# V3.72 (RC-01): el backend sirve la API **y** la UI compilada, así que el
+# producto vive en un único origen HTTPS. Antes la UI la servía el dev server de
+# Vite en :5173 y este endpoint anunciaba ese puerto (que en el runtime de
+# producto ya no escucha).
+FRONTEND_PORT = 8000
 BACKEND_PORT = 8000
 
 

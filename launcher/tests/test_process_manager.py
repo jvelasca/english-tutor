@@ -1,5 +1,7 @@
-"""Tests de process_manager.py (partes puras)."""
-from process_manager import ProcessManager, taskkill_command
+"""Tests de process_manager.py (preparación del entorno y proceso de producto)."""
+import pytest
+
+from process_manager import PreparationError, ProcessManager, taskkill_command
 
 
 def test_taskkill_command():
@@ -9,6 +11,166 @@ def test_taskkill_command():
 def test_initial_state_not_running():
     pm = ProcessManager()
     assert pm.backend is None
-    assert pm.frontend is None
     assert pm.backend_running() is False
-    assert pm.frontend_running() is False
+
+
+def test_no_hay_segundo_proceso_de_producto():
+    """V3.72 (RC-01): la UI la sirve el backend, no un dev server de Vite."""
+    pm = ProcessManager()
+    assert not hasattr(pm, "frontend")
+    assert not hasattr(pm, "start_frontend")
+    assert not hasattr(pm, "frontend_running")
+
+
+class _FakeCompleted:
+    def __init__(self, returncode: int = 0, stderr: str = "", stdout: str = ""):
+        self.returncode = returncode
+        self.stderr = stderr
+        self.stdout = stdout
+
+
+def test_ensure_certificate_no_falla_si_el_certificado_ya_existe(monkeypatch):
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return _FakeCompleted()
+
+    monkeypatch.setattr("process_manager.subprocess.run", fake_run)
+    pm = ProcessManager()
+
+    pm.ensure_certificate()
+
+    assert len(calls) == 1
+    assert calls[0][-2:] == ["-m", "scripts.ensure_tls_cert"]
+
+
+def test_ensure_certificate_falla_con_mensaje_claro_si_el_python_no_existe(
+    monkeypatch,
+):
+    def boom(cmd, **kwargs):
+        raise FileNotFoundError("python.exe")
+
+    monkeypatch.setattr("process_manager.subprocess.run", boom)
+
+    with pytest.raises(PreparationError, match="venv"):
+        ProcessManager().ensure_certificate()
+
+
+def test_ensure_certificate_falla_si_el_script_devuelve_error(monkeypatch):
+    monkeypatch.setattr(
+        "process_manager.subprocess.run",
+        lambda cmd, **kwargs: _FakeCompleted(returncode=1, stderr="boom"),
+    )
+
+    with pytest.raises(PreparationError, match="certificado"):
+        ProcessManager().ensure_certificate()
+
+
+def test_ensure_frontend_dist_no_compila_si_el_artefacto_ya_existe(monkeypatch):
+    monkeypatch.setattr(
+        "process_manager.frontend_dist_available", lambda: True
+    )
+
+    def boom(*args, **kwargs):  # pragma: no cover — no debe llamarse
+        raise AssertionError("no debe compilar si el dist ya existe")
+
+    monkeypatch.setattr("process_manager.subprocess.run", boom)
+
+    assert ProcessManager().ensure_frontend_dist() is False
+
+
+def test_ensure_frontend_dist_compila_y_devuelve_que_lo_hizo(monkeypatch, tmp_path):
+    compilado = {"value": False}
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr(
+        "process_manager.frontend_dist_available", lambda: compilado["value"]
+    )
+
+    def fake_run(cmd, **kwargs):
+        compilado["value"] = True  # el build deja el artefacto en disco
+        assert cmd[-1] == "build"
+        return _FakeCompleted()
+
+    monkeypatch.setattr("process_manager.subprocess.run", fake_run)
+
+    assert ProcessManager().ensure_frontend_dist() is True
+
+
+def test_ensure_frontend_dist_falla_sin_npm(monkeypatch, tmp_path):
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr("process_manager.frontend_dist_available", lambda: False)
+
+    def boom(cmd, **kwargs):
+        raise FileNotFoundError("npm")
+
+    monkeypatch.setattr("process_manager.subprocess.run", boom)
+
+    with pytest.raises(PreparationError, match="Node"):
+        ProcessManager().ensure_frontend_dist()
+
+
+def test_ensure_frontend_dist_falla_si_el_build_no_deja_artefacto(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr("process_manager.frontend_dist_available", lambda: False)
+    monkeypatch.setattr(
+        "process_manager.subprocess.run",
+        lambda cmd, **kwargs: _FakeCompleted(returncode=0),
+    )
+
+    with pytest.raises(PreparationError, match="compilar"):
+        ProcessManager().ensure_frontend_dist()
+
+
+def test_prepare_hace_certificado_y_dist_en_orden(monkeypatch):
+    events: list[str] = []
+    pm = ProcessManager()
+    monkeypatch.setattr(pm, "ensure_certificate", lambda: events.append("cert"))
+    monkeypatch.setattr(
+        pm, "ensure_frontend_dist", lambda: events.append("dist")
+    )
+
+    pm.prepare()
+
+    assert events == ["cert", "dist"]
+
+
+def test_start_backend_no_arranca_dos_veces(monkeypatch, tmp_path):
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
+    lanzados: list[list[str]] = []
+
+    class _FakePopen:
+        def __init__(self, cmd, **kwargs):
+            lanzados.append(cmd)
+
+        def poll(self):
+            return None
+
+    monkeypatch.setattr("process_manager.subprocess.Popen", _FakePopen)
+    pm = ProcessManager()
+
+    pm.start_backend()
+    pm.start_backend()
+
+    assert len(lanzados) == 1
+    assert "uvicorn" in lanzados[0]
+
+
+def test_stop_all_limpia_el_proceso(monkeypatch):
+    pm = ProcessManager()
+
+    class _FakePopen:
+        pid = 4321
+
+        def poll(self):
+            return 0
+
+    pm.backend = _FakePopen()
+    monkeypatch.setattr(pm, "_stop", lambda proc: None)
+
+    pm.stop_all()
+
+    assert pm.backend is None
+    assert pm.backend_running() is False

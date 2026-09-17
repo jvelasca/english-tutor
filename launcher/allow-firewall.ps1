@@ -1,6 +1,10 @@
-# Abre los puertos de English Tutor (5173 frontend, 8000 backend) en el
-# firewall de Windows para que la app sea accesible desde cualquier dispositivo
-# de la red local (cableada y WiFi).
+# Abre el puerto de English Tutor (8000: API + interfaz) en el firewall de
+# Windows para que la app sea accesible desde cualquier dispositivo de la red
+# local (cableada y WiFi).
+#
+# V3.72 (RC-01): hasta V3.71 había dos puertos (5173 el dev server de Vite, 8000
+# la API). Ahora el backend sirve también la interfaz compilada, así que el
+# producto vive en un único origen HTTPS (:8000).
 #
 # Requiere ejecutarse como administrador:
 #   powershell -ExecutionPolicy Bypass -File launcher\allow-firewall.ps1
@@ -10,7 +14,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$ports = @(5173, 8000)
+$ports = @(8000)
 $prefix = "English Tutor"
 
 foreach ($port in $ports) {

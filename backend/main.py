@@ -46,6 +46,7 @@ from routers.vocabulary_routes import router as vocabulary_routes_router
 from routers.voices import router as voices_router
 from routers.voz import router as voz_router
 from security import SecurityMiddleware
+from services.frontend_dist import mount_frontend
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +119,11 @@ async def objective_locked_handler(
         },
     )
 
-# CORS para desarrollo local + acceso desde la LAN (frontend Vite en :5173,
-# accesible desde cualquier equipo de la red por su IP privada).
+# CORS para desarrollo local + acceso desde la LAN. En V3.72 el producto sirve
+# la UI y la API desde el MISMO origen (`https://<host>:8000`), así que CORS es
+# irrelevante en ese camino; se mantiene para el modo de desarrollo (`npm run
+# dev` en :5173, que habla con la API por el proxy de Vite) y para clientes
+# externos legítimos de la LAN.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -162,3 +166,9 @@ app.include_router(assessment_router)
 app.include_router(audio_library_router)
 app.include_router(system_router)
 app.include_router(speaking_routes_router)
+
+# V3.72 (RC-01): servir la UI compilada desde el mismo origen que la API. Va al
+# final a propósito: los routers registrados arriba tienen prioridad y el
+# *fallback* SPA nunca puede eclipsar un `/api/*`. Sin artefacto (clon limpio sin
+# `npm run build`) el arranque no se rompe: simplemente no se sirve UI.
+mount_frontend(app)

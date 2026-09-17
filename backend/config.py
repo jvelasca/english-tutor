@@ -29,10 +29,19 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 
-VERSION = "3.71.0"
+VERSION = "3.72.0"
 
-# Orígenes permitidos para CORS (frontend de desarrollo local).
-ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+# Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
+# mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo
+# (dev server de Vite en `:5173`) y clientes de la LAN.
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+    "https://localhost:8000",
+    "http://localhost:8000",
+]
 
 # Regex adicional para permitir el acceso desde cualquier equipo de la red local
 # (IPs privadas IPv4, por el puerto que sea) sin abrir CORS a dominios arbitrarios.
@@ -81,6 +90,19 @@ DEFAULT_VOICES: dict[str, str] = {"en": PIPER_VOICE, "es": SPANISH_VOICE}
 
 # Persistencia local (SQLite).
 DATA_DIR = Path(__file__).resolve().parent / "data"
+
+# V3.72: TLS autofirmado para servir la UI y la API por HTTPS en la LAN.
+# HTTPS es requisito de producto, no cosmético: sin *secure context* el navegador
+# no expone `navigator.mediaDevices` y se rompe `getUserMedia` (micrófono) desde
+# cualquier equipo que no sea el propio host. El certificado se genera una sola
+# vez con `scripts/ensure_tls_cert.py` y NO se versiona (`backend/data/` está
+# ignorado): es un artefacto de máquina.
+CERTS_DIR = DATA_DIR / "certs"
+TLS_CERT_PATH = CERTS_DIR / "cert.pem"
+TLS_KEY_PATH = CERTS_DIR / "key.pem"
+# Nombre público alternativo de la app en la LAN (coincide con el que usaba el
+# certificado del dev server de Vite, para que no cambien las URLs anunciadas).
+TLS_ALT_HOSTNAME = "english-tutor.local"
 
 # Modos de tutor (M4). Cada modo define su propio system prompt.
 DEFAULT_MODE = "conversation"

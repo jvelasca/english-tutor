@@ -8,9 +8,11 @@ from repositories import db
 from services import audio_library, llm, stt, tts
 
 
-def test_root():
+def test_api_info():
+    # V3.72 (RC-01): la raíz `/` sirve la UI compilada; la info del servicio
+    # se movió a `/api` para no eclipsar el artefacto.
     with TestClient(app) as client:
-        r = client.get("/")
+        r = client.get("/api")
         assert r.status_code == 200
         assert r.json()["service"] == "english-tutor"
         assert r.json()["version"] == VERSION

@@ -4,3 +4,7 @@ ollama==0.6.2
 python-multipart==0.0.32
 faster-whisper==1.2.1
 piper-tts==1.7.0
+# V3.72: generación del certificado TLS autofirmado con el que el backend sirve
+# la app (UI + API) por HTTPS en la LAN. Sin HTTPS no hay *secure context* y se
+# rompe `getUserMedia` (micrófono) desde otro dispositivo.
+cryptography==50.0.1

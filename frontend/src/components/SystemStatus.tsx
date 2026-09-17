@@ -27,8 +27,10 @@ function toDot(value: string | undefined): Dot {
 }
 
 function appUrl(): string {
+  // V3.72 (RC-01): la UI y la API comparten origen; el fallback refleja el
+  // puerto de producto (en desarrollo con Vite, `window.location.host` manda).
   if (typeof window === "undefined") return "";
-  return window.location.host || "localhost:5173";
+  return window.location.host || "localhost:8000";
 }
 
 const ITEMS: { key: keyof DependencyStatus; i18nKey: string }[] = [

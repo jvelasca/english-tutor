@@ -38,9 +38,9 @@
 
 ## Evidencia
 
-### RC-01 — El runtime de producto es el de desarrollo (P2, **declarado**)
+### RC-01 — El runtime de producto es el de desarrollo (P2, **CERRADO en V3.72**)
 
-Lo que hay, medido:
+Lo que había, medido (árbol `v3.71.0`):
 
 | Pieza | Comando real | Dónde |
 |---|---|---|
@@ -57,25 +57,57 @@ Hechos que sostienen la última fila:
   limpio **ni siquiera existe** hasta que alguien lo construya — y construirlo no
   cambia nada, porque nadie lo sirve.
 
-**Declaración (no defecto abierto):** hoy el producto son **dos procesos
+**Declaración (no defecto abierto en V3.71):** hoy el producto son **dos procesos
 arrancados por el launcher**, y el de la UI es un servidor que su propio
 fabricante declara para desarrollo (sin minificar, sin caché HTTP, con HMR y
 websocket de recarga). Consecuencia que el proyecto no declaraba en ninguna
 parte: **Node + npm son requisito de EJECUCIÓN del producto**, no solo de
 compilación.
 
-Por la **decisión A** del briefing, esto **se declara y no se implementa**: no
-hay bloqueo duro medido (el producto funciona así y es como se usa a diario), y
-añadir el servido de `dist` en un incremento de verificación sería capacidad
-nueva sin vector medido. Queda como **deuda con fase y condición de salida**:
+Por la **decisión A** del briefing de V3.71, esto **se declaró y no se
+implementó**: no había bloqueo duro medido. Quedó como **deuda con fase y
+condición de salida** con **reevaluación en V3.72** — y en V3.72 se cerró (abajo).
 
-- **se implementa** el servido de `frontend/dist` **si** (a) se decide que Node
-  deje de ser requisito de ejecución (instalación limpia sin toolchain de JS), o
-  (b) aparece un bloqueo duro (p. ej. el acceso desde móvil por la LAN depende de
-  que el dev server siga vivo);
-- **reevaluación:** V3.72/V3.73, junto con el eje RB (instalación limpia), que es
-  donde la pregunta «¿qué necesita el usuario tener instalado?» se responde de
-  verdad.
+#### Cierre (V3.72, eje UA — 2026-09-17)
+
+La condición de salida era: *«se implementa el servido de `frontend/dist` si (a)
+se decide que Node deje de ser requisito de ejecución»*. **La decisión se tomó
+(Decisión A del briefing `agentes/v372-ux-product-completion.md`) y se
+implementó**, con un motivo además del higiénico: el acceso desde la LAN necesita
+**HTTPS** para que el navegador exponga `navigator.mediaDevices` (micrófono), y
+servir la UI desde el propio backend da **un único origen** con el TLS bajo
+control del proyecto.
+
+Lo que hay ahora, medido:
+
+| Pieza | Comando real | Dónde |
+|---|---|---|
+| API + UI | `uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-certfile … --ssl-keyfile …` | `launcher/core.py::backend_command` |
+| UI compilada | `StaticFiles /assets` + *fallback* SPA (*fail-open*) | `backend/services/frontend_dist.py::mount_frontend` |
+| Certificado TLS | Generado (idempotente, con SANs de LAN) antes de arrancar | `backend/scripts/ensure_tls_cert.py` |
+| Build del artefacto | `npm run build` **solo si falta** `frontend/dist` | `launcher/process_manager.py::ensure_frontend_dist` |
+
+- **Node deja de ser requisito de EJECUCIÓN**: pasa a ser requisito de
+  **COMPILACIÓN** (la primera vez que se instala). Es la afirmación honesta: sin
+  Node no hay `dist`, pero con el `dist` construido la app arranca sin Node.
+- `npm run dev` (Vite en `:5173`) se conserva como **modo de desarrollo** con HMR
+  (proxy `/api`), no como runtime de producto.
+- El montaje es **fail-open**: sin `dist` el backend arranca igual (solo API) y el
+  launcher lo muestra como «Interfaz no compilada».
+- Firewall: solo se abre el **8000** (`launcher/allow-firewall.ps1`); el puerto de
+  la UI anunciada por `/api/network` (y el QR de `ConnectDeviceCard`) es el mismo.
+- **La ruta raíz de la API (`GET /`) se movió a `GET /api`** (`routers/models.py`):
+  `/` lo sirve ahora la UI. El `/api` sin ruta sigue siendo 404 real (el
+  *fallback* no enmascara endpoints inexistentes).
+
+**Tests que lo fijan:** `backend/tests/test_serve_frontend_v372.py` (14),
+`test_tls_cert_v372.py` (14), `test_docs_drift_v372.py`, y los actualizados de
+`launcher/tests/` (`test_core`, `test_process_manager`, `test_status`) y
+`backend/tests/test_network.py`/`test_cors.py`/`test_security.py`.
+
+**Honestidad del cierre:** queda fuera el **progreso de descarga real** y el
+empaquetado (no hay instalador). La frase «Node no es requisito de ejecución» es
+correcta solo **después** de haber compilado el artefacto al menos una vez.
 
 ### RC-02 — La sonda de Ollama no tenía cota y el launcher solo espera 1,5 s (P2, **cerrado**)
 
@@ -168,20 +200,25 @@ test que impide que entre por descuido.
 
 ## Resultado
 
-- **Cerrado:** RC-02 (sonda sin cota) y RC-03 (salud mentirosa en la UI).
-- **Declarado con condición de salida:** RC-01 (Node como requisito de ejecución
-  y el `dist` que nadie sirve), a reevaluar en V3.72/V3.73 con el eje RB.
+- **Cerrado:** RC-02 (sonda sin cota), RC-03 (salud mentirosa en la UI) y **RC-01
+  (runtime de producto: Node como requisito de ejecución y el `dist` que nadie
+  servía — cerrado en V3.72, eje UA)**.
 - **Declarado sin cambio de código:** RC-04 (significado de `ready`).
-- **La frontera de producto, en una frase:** hoy el producto es **un backend
-  uvicorn de un solo proceso + un servidor de desarrollo de Vite**, los dos
-  arrancados por el launcher, y la salud ya es honesta en las tres superficies
-  que la consultan (backend `/ready`, launcher e indicador web).
+- **La frontera de producto, en una frase:** el producto es **un solo backend
+  uvicorn que sirve la API y la UI compilada por HTTPS en `:8000`**, arrancado por
+  el launcher; Node solo hace falta para **compilar** el artefacto, y la salud es
+  honesta en las tres superficies que la consultan (backend `/ready`, launcher e
+  indicador web).
 
 ## Deriva documental que este eje cierra
 
-- `docs/PREMISAS.md` §3: declarar Node/npm como requisito de **ejecución** y que
-  la UI la sirve el dev server de Vite (antes no se decía en ninguna parte).
-- `docs/ARQUITECTURA.md`: quién sirve la UI y quién la API.
-- Fixado por test en `backend/tests/test_docs_drift_v371.py` (clase RC), de modo
-  que si alguien monta `frontend/dist` o cambia el comando del launcher, el test
-  obliga a actualizar la declaración.
+- `docs/PREMISAS.md` §3: V3.71 declaró Node/npm como requisito de **ejecución**;
+  **V3.72 lo re-declara** como requisito de **compilación** y documenta el servido
+  de `frontend/dist` desde el backend.
+- `docs/ARQUITECTURA.md`: quién sirve la UI y quién la API (re-declarado en V3.72:
+  un solo proceso, un solo origen HTTPS).
+- `README.md`: arranque manual re-escrito (compilar + `ensure_tls_cert` + uvicorn
+  con `--ssl-*`) y requisitos corregidos.
+- Fijado por test: `backend/tests/test_docs_drift_v371.py` fijó **la declaración
+  de V3.71**; su parte RC se sustituyó por `backend/tests/test_docs_drift_v372.py`
+  (nueva frontera), de modo que el candado sigue vivo apuntando a la verdad actual.

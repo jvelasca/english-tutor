@@ -26,10 +26,11 @@ def test_api_network_info(monkeypatch):
         body = r.json()
         assert body["ip"] == "192.168.1.42"
         assert body["hostname"] == "english-tutor-pc"
-        assert body["frontend_port"] == "5173"
+        assert body["frontend_port"] == "8000"
         assert body["backend_port"] == "8000"
-        assert body["url"] == "https://192.168.1.42:5173"
-        assert body["local_url"] == "https://english-tutor-pc.local:5173"
+        # V3.72 (RC-01): un único origen HTTPS sirve la UI y la API.
+        assert body["url"] == "https://192.168.1.42:8000"
+        assert body["local_url"] == "https://english-tutor-pc.local:8000"
         assert body["local_url_available"] is True
 
 

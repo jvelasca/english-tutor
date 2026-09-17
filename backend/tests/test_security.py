@@ -27,6 +27,10 @@ def test_origin_allowed():
     assert security.origin_allowed(None) is True
     assert security.origin_allowed("http://localhost:5173") is True
     assert security.origin_allowed("http://127.0.0.1:5173") is True
+    # V3.72 (RC-01): origen de producto (UI + API en el mismo HTTPS :8000).
+    assert security.origin_allowed("https://localhost:8000") is True
+    assert security.origin_allowed("http://localhost:8000") is True
+    assert security.origin_allowed("https://192.168.1.20:8000") is True
     assert security.origin_allowed("http://192.168.1.20:5173") is True
     assert security.origin_allowed("https://192.168.1.20") is True
     assert security.origin_allowed("http://10.0.0.5:3000") is True
