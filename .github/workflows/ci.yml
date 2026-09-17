@@ -76,7 +76,8 @@ jobs:
 
   # V3.73: comprobaciones estáticas del arnés de validación (fail-closed del
   # runtime de producto, descubrimiento de LAN sin referencias externas, jobs
-  # Windows, matriz de dispositivos en :8000, instrumento de red sin deriva).
+  # Windows, protocolos de los gates en :8000 y sin el dev server, instrumento de
+  # red sin deriva).
   # Stdlib pura: no necesita instalar dependencias. `--strict` NO corre aquí a
   # propósito: los 7 gates de validación física son acción humana y estarán
   # `pending` por diseño hasta que se ejecuten.

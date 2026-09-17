@@ -7,7 +7,7 @@
 
 ## Preparación (una vez)
 
-1. Arranca la app con el launcher (`launcher/launcher.py`) y anota la URL LAN que muestra (`https://<ip>:5173`).
+1. Arranca la app con el launcher (`launcher/launcher.py`) y anota la URL LAN que muestra (`https://<ip>:8000`; el puerto `5173` es el dev server de Vite y no es el runtime de producto).
 2. Comprueba en la barra inferior de estado: **HTTPS** ok (candado aceptado), **mDNS** disponible si `local_url_available` es `true`, micrófono «Test microphone» con nivel de entrada y «Test playback» con audio audible.
 3. Para móviles, coloca el dispositivo en la misma red Wi-Fi que el PC y apunta el navegador a la URL LAN. En Android/iOS Chrome el autofirmado exige *Avanzado → Continuar* la primera vez.
 

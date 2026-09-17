@@ -29,7 +29,7 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 
-VERSION = "3.73.2"
+VERSION = "3.73.3"
 
 # Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
 # mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo

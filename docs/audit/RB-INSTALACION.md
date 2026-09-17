@@ -157,7 +157,8 @@ El README mandaba a `download_models.py` pero **no** decía:
 **Cierre:** el runbook de `README.md` gana la verificación previa (`--check`), el
 paso explícito de Ollama con el comando exacto y el modelo real, y la nota de qué
 es descarga / qué es local. Se añadió además que **Node y npm son requisito de
-ejecución** (hallazgo RC-01), que la sección de requisitos tampoco declaraba.
+compilación** (hallazgo RC-01), no de ejecución: con el `dist` construido la app
+arranca sin Node, algo que la sección de requisitos tampoco declaraba.
 
 ### RB-05 — Lo que este eje NO puede demostrar (P3, **deuda declarada**)
 

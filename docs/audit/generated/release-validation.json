@@ -1,11 +1,11 @@
 {
- "version": "3.73.2",
+ "version": "3.73.3",
  "checks": [
   {
    "id": "release-consistency",
    "title": "La versión es consistente en todos los orígenes",
    "status": "pass",
-   "detail": "OK: Release consistency (3.73.2) en todos los orígenes"
+   "detail": "OK: Release consistency (3.73.3) en todos los orígenes"
   },
   {
    "id": "i18n-strict",
@@ -32,10 +32,10 @@
    "detail": "2 jobs en windows-latest"
   },
   {
-   "id": "device-matrix",
-   "title": "La matriz de dispositivos apunta al origen de producto",
+   "id": "gate-origins",
+   "title": "Los protocolos de los gates apuntan al origen de producto",
    "status": "pass",
-   "detail": ":8000 y sin rastro del dev server"
+   "detail": "3 protocolos en :8000 y sin dev server"
   },
   {
    "id": "runtime-audit",

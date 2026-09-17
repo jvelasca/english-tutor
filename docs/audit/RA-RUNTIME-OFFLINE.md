@@ -124,7 +124,7 @@ queda **pendiente** hasta ejecutar el protocolo de §5 con la red cortada.
 
 | # | Flujo | Dependencia real | Veredicto estático | En vivo |
 |---|---|---|---|---|
-| 1 | `frontend` | Vite dev server (Node) sirviendo `src/`; sin CDN ni fuentes externas | ✅ offline, pero **exige Node/Vite en marcha** (es el eje RC) | ⬜ |
+| 1 | `frontend` | El backend sirve `frontend/dist` en el origen de producto `:8000`; sin CDN ni fuentes externas | ✅ offline (Node solo hace falta para **compilar**, no para ejecutar; es el eje RC) | ⬜ |
 | 2 | `backend` | FastAPI local | ✅ offline | ⬜ |
 | 3 | `SQLite` | fichero local (`backend/data/`, gitignored) | ✅ offline | ⬜ |
 | 4 | `Ollama` | loopback `127.0.0.1:11434` | ✅ offline si el modelo está descargado (lo está) | ⬜ |
@@ -176,7 +176,7 @@ dependencias de Internet, no resolución de nombres.
 
 | # | Flujo | Qué ejecutar | Qué se considera FALLO |
 |---|---|---|---|
-| 1 | `frontend` | Abrir `https://localhost:5173`, navegar las 3 secciones | recursos que no cargan, fuentes por defecto |
+| 1 | `frontend` | Abrir `https://localhost:8000`, navegar las 3 secciones | recursos que no cargan, fuentes por defecto |
 | 2 | `backend` | `GET /api/health` y `GET /api/health/ready` | 5xx o timeout |
 | 3 | `SQLite` | abrir un perfil, crear un usuario | error de BD |
 | 4 | `Ollama` | un turno de chat real | respuesta vacía o timeout |

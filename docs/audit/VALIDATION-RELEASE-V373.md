@@ -9,6 +9,9 @@
 > `fail`/`skip` **exige notas**.
 > **Puerta de V4.0:** `python scripts/validation_gate.py status --strict` debe
 > salir 0 (los 7 gates en `pass`).
+> **Planilla de campo:** `docs/audit/KIT-VALIDACION-GATES.md` ordena la ejecución
+> (pre-vuelo, agrupación por sesión y el comando `record` exacto de cada gate) sin
+> duplicar los protocolos; este runbook sigue siendo la definición de los gates.
 
 ## Por qué existe este instrumento
 

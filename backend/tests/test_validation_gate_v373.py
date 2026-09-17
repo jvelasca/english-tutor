@@ -240,6 +240,61 @@ def test_el_artefacto_de_ui_falla_si_se_exige_y_no_esta(harness, monkeypatch, tm
     assert "npm run build" in check.detail
 
 
+# --- Los protocolos de los gates apuntan al producto ------------------------
+
+
+def test_los_protocolos_de_los_gates_existen(harness):
+    """Un protocolo que desaparece dejaría el guard ciego sin avisar."""
+    for relative in harness.GATE_PROTOCOLS:
+        assert (harness.DOCS / relative).is_file(), f"falta el protocolo {relative}"
+
+
+def test_un_protocolo_con_el_dev_server_falla(harness, monkeypatch, tmp_path):
+    monkeypatch.setattr(harness, "DOCS", tmp_path)
+    monkeypatch.setattr(harness, "GATE_PROTOCOLS", ("DEVICE_MATRIX.md",))
+    (tmp_path / "DEVICE_MATRIX.md").write_text(
+        "Abrir https://<ip>:5173 y tambien :8000", encoding="utf-8"
+    )
+
+    check = harness.check_gate_protocol_origins()
+
+    assert check.ok is False
+    assert ":5173" in check.detail
+
+
+def test_un_protocolo_sin_el_origen_de_producto_falla(harness, monkeypatch, tmp_path):
+    monkeypatch.setattr(harness, "DOCS", tmp_path)
+    monkeypatch.setattr(harness, "GATE_PROTOCOLS", ("DEVICE_MATRIX.md",))
+    (tmp_path / "DEVICE_MATRIX.md").write_text("Solo el dev server", encoding="utf-8")
+
+    check = harness.check_gate_protocol_origins()
+
+    assert check.ok is False
+    assert ":8000" in check.detail
+
+
+def test_un_protocolo_en_el_origen_de_producto_pasa(harness, monkeypatch, tmp_path):
+    monkeypatch.setattr(harness, "DOCS", tmp_path)
+    monkeypatch.setattr(harness, "GATE_PROTOCOLS", ("DEVICE_MATRIX.md",))
+    (tmp_path / "DEVICE_MATRIX.md").write_text(
+        "Abrir https://localhost:8000", encoding="utf-8"
+    )
+
+    check = harness.check_gate_protocol_origins()
+
+    assert check.ok is True
+
+
+def test_un_protocolo_ausente_falla(harness, monkeypatch, tmp_path):
+    monkeypatch.setattr(harness, "DOCS", tmp_path)
+    monkeypatch.setattr(harness, "GATE_PROTOCOLS", ("no-existe.md",))
+
+    check = harness.check_gate_protocol_origins()
+
+    assert check.ok is False
+    assert "falta" in check.detail
+
+
 def test_auto_solo_escribe_dentro_de_docs(harness):
     """El arnés no puede tocar código, currículum ni datos al medir."""
     for path in (harness.REPORT_MD, harness.REPORT_JSON, harness.EVIDENCE):

@@ -138,6 +138,15 @@ GATES: tuple[Gate, ...] = (
 
 GATES_BY_ID = {gate.id: gate for gate in GATES}
 
+# Protocolos funcionales que se ejecutan **a pie de máquina** durante la
+# validación física: el §5 de RA (G1) y la matriz y el runbook de dispositivos
+# (G4). Todos tienen que apuntar al origen de producto, no al dev server de Vite.
+GATE_PROTOCOLS = (
+    "DEVICE_MATRIX.md",
+    "audit/RA-RUNTIME-OFFLINE.md",
+    "audit/G-DEVICES.md",
+)
+
 
 def source_version() -> str:
     """Versión canónica del árbol (fuente de verdad: `backend/config.py`)."""
@@ -286,22 +295,34 @@ def check_ci_windows() -> Check:
     )
 
 
-def check_device_matrix() -> Check:
-    """La matriz no puede seguir documentando el dev server de Vite (:5173)."""
-    path = DOCS / "DEVICE_MATRIX.md"
-    if not path.is_file():
-        return Check("device-matrix", "Matriz de dispositivos", False, "no existe")
+def check_gate_protocol_origins() -> Check:
+    """Los protocolos de los gates apuntan al origen de producto, no al dev server.
 
-    text = path.read_text(encoding="utf-8")
-    problems = ["sigue documentando :5173"] if ":5173" in text else []
-    if ":8000" not in text:
-        problems.append("no documenta el puerto de producto :8000")
+    Los protocolos que se ejecutan **a pie de máquina** (el §5 de RA para G1, la
+    matriz de `DEVICE_MATRIX.md` y el runbook `G-DEVICES.md` para G4) tienen que
+    mandar al producto (`:8000`, el backend sirviendo `dist`), no al dev server de
+    Vite (`:5173`): seguir el protocolo literal probaría otro artefacto. El
+    chequeo es el mismo que se hacía solo sobre la matriz, generalizado a los
+    tres orígenes para que la deriva no vuelva por la puerta de al lado.
+    """
+    problems: list[str] = []
+    for relative in GATE_PROTOCOLS:
+        path = DOCS / relative
+        if not path.is_file():
+            problems.append(f"falta {relative}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        if ":5173" in text:
+            problems.append(f"{relative} sigue documentando :5173")
+        if ":8000" not in text:
+            problems.append(f"{relative} no documenta el puerto de producto :8000")
 
     return Check(
-        "device-matrix",
-        "La matriz de dispositivos apunta al origen de producto",
+        "gate-origins",
+        "Los protocolos de los gates apuntan al origen de producto",
         not problems,
-        "; ".join(problems) or ":8000 y sin rastro del dev server",
+        "; ".join(problems)
+        or f"{len(GATE_PROTOCOLS)} protocolos en :8000 y sin dev server",
     )
 
 
@@ -420,7 +441,7 @@ def run_checks(require_dist: bool) -> list[Check]:
         check_fail_closed(),
         check_lan_discovery(),
         check_ci_windows(),
-        check_device_matrix(),
+        check_gate_protocol_origins(),
         check_runtime_audit(),
         check_gates_declared(),
         check_dist_artifact(require_dist),
