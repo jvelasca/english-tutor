@@ -5,7 +5,9 @@ import { ArrowRight, BookOpen, CheckCircle2, Loader2, RefreshCw } from "lucide-r
 import {
   GrammarIcon,
   ListeningIcon,
+  ReadingIcon,
   SpeakingIcon,
+  WritingIcon,
 } from "../../components/Icons";
 import { NextBestCard } from "../../components/NextBestCard";
 import { Button } from "../../components/ui/button";
@@ -17,6 +19,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
 import { navigateTo } from "../../router/hash";
 import { learnActivityPath } from "../../router/paths";
+import { chatSkillPath, type ChatSkill } from "../../router/chat";
 import {
   GRAMMAR_ACTIVITY,
   LISTENING_ACTIVITY,
@@ -39,6 +42,27 @@ const ACTIVITIES: ActivityDef[] = [
   { id: SPEAKING_ACTIVITY, titleKey: "skill.speaking", descKey: "learn.desc.speaking", Icon: SpeakingIcon },
   { id: VOCABULARY_ACTIVITY, titleKey: "skill.vocabulary", descKey: "learn.desc.vocabulary", Icon: BookOpen },
   { id: GRAMMAR_ACTIVITY, titleKey: "skill.grammar", descKey: "learn.desc.grammar", Icon: GrammarIcon },
+];
+
+interface TutorSkillDef {
+  id: ChatSkill;
+  titleKey: string;
+  descKey: string;
+  Icon: IconType;
+}
+
+/**
+ * Reading y Writing no tienen motor propio de rutas (D4 revisado en V3.73.1):
+ * su práctica es conversacional con el tutor. Se ofrecen en un bloque
+ * SECUNDARIO del hub, separado de las 4 tarjetas, para que la destreza exista
+ * como superficie propia sin fingir una actividad de primer nivel ni competir
+ * con «Recomendado para ti». Cada entrada abre la URL canónica de la destreza
+ * (`/chat/lectura`, `/chat/escritura`) para que el contexto sobreviva a
+ * recarga y deep link.
+ */
+const TUTOR_SKILLS: TutorSkillDef[] = [
+  { id: "reading", titleKey: "skill.reading", descKey: "learn.desc.reading", Icon: ReadingIcon },
+  { id: "writing", titleKey: "skill.writing", descKey: "learn.desc.writing", Icon: WritingIcon },
 ];
 
 // Destrezas que el motor adaptativo puede sugerir, mapeadas a sección del
@@ -69,9 +93,12 @@ function sectionFor(step: NextBestActivity | null): Section | null {
   return null;
 }
 
-function SectionHeading({ children }: { children: ReactNode }) {
+function SectionHeading({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <h2
+      id={id}
+      className="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+    >
       {children}
     </h2>
   );
@@ -118,6 +145,52 @@ function ActivityCard({
         <span className="text-sm leading-relaxed text-muted-foreground">
           {t(activity.descKey)}
         </span>
+      </button>
+    </motion.div>
+  );
+}
+
+/**
+ * Entrada secundaria del bloque «Practica con el tutor»: más compacta que las 4
+ * tarjetas del hub (que son la elección principal) pero con el mismo contrato
+ * de tap target, foco visible y `aria-label` explícito.
+ */
+function TutorSkillCard({
+  skill,
+  onOpen,
+}: {
+  skill: TutorSkillDef;
+  onOpen: (id: ChatSkill) => void;
+}) {
+  const { t } = useI18n();
+  const Icon = skill.Icon;
+  return (
+    <motion.div variants={item} className="h-full">
+      <button
+        type="button"
+        onClick={() => onOpen(skill.id)}
+        aria-label={`${t("learn.activityAria")}: ${t(skill.titleKey)}`}
+        className={cn(
+          "group flex h-full min-h-[88px] w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-sm",
+          "transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          "active:scale-[0.995]",
+        )}
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+          <Icon size={20} className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold tracking-tight text-foreground">
+            {t(skill.titleKey)}
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+            {t(skill.descKey)}
+          </span>
+        </span>
+        <ArrowRight
+          className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+          aria-hidden="true"
+        />
       </button>
     </motion.div>
   );
@@ -186,11 +259,32 @@ export function LearnHub({ userId, onStart, refreshKey = 0 }: LearnHubProps) {
         </motion.header>
 
         <motion.section variants={item} aria-labelledby="learn-hub-grid-title">
-          <SectionHeading>{t("learn.pickActivity")}</SectionHeading>
-          <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+          <SectionHeading id="learn-hub-grid-title">
+            {t("learn.pickActivity")}
+          </SectionHeading>
+          <ul
+            data-testid="learn-hub-grid"
+            className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-4"
+          >
             {ACTIVITIES.map((activity) => (
               <li key={activity.id} className="flex">
                 <ActivityCard activity={activity} onOpen={openLearnActivity} />
+              </li>
+            ))}
+          </ul>
+        </motion.section>
+
+        <motion.section variants={item} aria-labelledby="learn-hub-tutor-title">
+          <SectionHeading id="learn-hub-tutor-title">
+            {t("learn.practiceWithTutor")}
+          </SectionHeading>
+          <ul
+            data-testid="learn-hub-tutor"
+            className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2"
+          >
+            {TUTOR_SKILLS.map((skill) => (
+              <li key={skill.id} className="flex">
+                <TutorSkillCard skill={skill} onOpen={openChatSkill} />
               </li>
             ))}
           </ul>
@@ -242,4 +336,9 @@ export function LearnHub({ userId, onStart, refreshKey = 0 }: LearnHubProps) {
 
 function openLearnActivity(id: LearnActivity): void {
   navigateTo(learnActivityPath(id));
+}
+
+/** Abre el chat del tutor con el contexto de una destreza sin motor propio. */
+function openChatSkill(skill: ChatSkill): void {
+  navigateTo(chatSkillPath(skill));
 }

@@ -69,4 +69,27 @@ describe("Navigation (V3.39)", () => {
         .getAttribute("aria-current"),
     ).toBe("page");
   });
+
+  it("la bottom-nav mantiene los 5 destinos con divisor y toque completo (V3.73.1)", () => {
+    const { getByTestId } = renderNav(
+      <Navigation route="home" onNavigate={() => {}} variant="bottom" />,
+    );
+
+    // Siguen estando los cinco: el diccionario no se esconde en un menú.
+    for (const name of ["Home", "Course", "Learn", "Dictionary", "Translator"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+
+    // La jerarquía se marca con un divisor real entre los 3 mundos y las 2
+    // utilidades.
+    expect(getByTestId("nav-divider")).toBeTruthy();
+
+    // Ningún destino pierde el tamaño de toque mínimo, auxiliares incluidos.
+    for (const name of ["Home", "Dictionary", "Translator"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button.className).toContain("min-h-14");
+      expect(button.className).toContain("flex-1");
+      expect(button.className).toContain("min-w-0");
+    }
+  });
 });

@@ -1,6 +1,7 @@
 import type { Route } from "../app/routes";
 import type { Path } from "./hash";
 import { joinPath, normalizeHash, parseSegments } from "./hash";
+import { isChatSkillSlug } from "./chat";
 import {
   CHAT_PATH,
   DICTIONARY_PATH,
@@ -69,7 +70,13 @@ export function pathToRoute(path: Path): Route {
       if (segments.length === 2 && leaf === "vocabulario") return "vocabulary";
       return "learn";
     case "chat":
-      return segments.length === 1 ? "chat" : "home";
+      // V3.73.1: el chat libre tiene raíz propia `/chat` y sub-rutas canónicas
+      // por destreza (`/chat/lectura`, `/chat/escritura`) para las prácticas
+      // conversacionales sin motor propio (Reading/Writing, D4). Cualquier otra
+      // hoja bajo `/chat` sigue degradando a home.
+      if (segments.length === 1) return "chat";
+      if (segments.length === 2 && isChatSkillSlug(leaf)) return "chat";
+      return "home";
     case "ayuda":
       return segments.length === 1 ? "help" : "home";
     case "diccionario":

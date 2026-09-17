@@ -69,6 +69,16 @@ describe("pathToRoute: hoja antes que prefijo", () => {
     expect(pathToRoute("/traductor/historial")).toBe("home");
   });
 
+  it("resuelve las sub-rutas de destreza del chat libre (V3.73.1)", () => {
+    // Reading/Writing no tienen motor propio: su práctica es el chat, y su
+    // destreza vive en la URL para que el contexto sobreviva a la recarga.
+    expect(pathToRoute("/chat/lectura")).toBe("chat");
+    expect(pathToRoute("/chat/escritura")).toBe("chat");
+    // Cualquier otra hoja bajo /chat sigue degradando a home.
+    expect(pathToRoute("/chat/otra")).toBe("home");
+    expect(pathToRoute("/chat/lectura/extra")).toBe("home");
+  });
+
   it("considera todo /formacion como course (cualquier sub-nivel)", () => {
     expect(pathToRoute("/formacion")).toBe("course");
     expect(pathToRoute("/formacion/b1")).toBe("course");

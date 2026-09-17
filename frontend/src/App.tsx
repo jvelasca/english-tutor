@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { MotionConfig } from "motion/react";
 import { useChat } from "./hooks/useChat";
 import { useHandsFree } from "./hooks/useHandsFree";
 import { useAppearance } from "./hooks/useAppearance";
@@ -9,7 +10,8 @@ import { Workspace } from "./app/Workspace";
 import type { Route } from "./app/routes";
 import { navigateTo, useHashPath } from "./router/hash";
 import { pathToRoute, routeToPath } from "./router/routeMap";
-import { CHAT_PATH, learnActivityPath } from "./router/paths";
+import { learnActivityPath } from "./router/paths";
+import { chatSkillFromPath, chatSkillPath, isChatSkill } from "./router/chat";
 import {
   SPEAKING_ACTIVITY,
   learnActivityFromPath,
@@ -48,9 +50,10 @@ const SECTION_ACTIVITY: Partial<Record<Section, LearnActivity>> = {
   pronunciation: SPEAKING_ACTIVITY,
 };
 
-// Secciones sin tarjeta propia en el hub (reading, writing — D4): su destino
-// es el chat libre con el tutor (raíz `/chat` desde V3.10).
-const FREE_CHAT_SECTIONS: readonly Section[] = ["reading", "writing"];
+// Secciones sin tarjeta propia en el hub (reading, writing — D4 revisado en
+// V3.73.1): su práctica es conversacional con el tutor, pero cada una conserva
+// su URL canónica bajo `/chat` (chatSkillPath) para que la sección activa y el
+// contexto del tutor se recuperen al recargar o compartir el enlace.
 
 // Estado (sección/modo) que cada sub-ruta de práctica impone como fuente de
 // verdad (deep-links: recargar `/aprender/listening` fuerza la sección aunque
@@ -95,6 +98,9 @@ export default function App() {
   const route = pathToRoute(path);
   // Sub-ruta de práctica activa dentro de APRENDER (null = hub u otra raíz).
   const learnActivity = learnActivityFromPath(path);
+  // Destreza del chat libre activa (`/chat/lectura`, `/chat/escritura`), o null
+  // si el chat es el genérico de conversación (V3.73.1, D4).
+  const chatSkill = chatSkillFromPath(path);
   // F4: las sub-rutas legadas de las antiguas tarjetas orales redirigen a la
   // página Speaking con su modo activo (decisión a de la decisión abierta nº 2
   // de DISENO-SPEAKING-UNICO): /aprender/pronunciacion -> /aprender/speaking/acento
@@ -131,7 +137,11 @@ export default function App() {
   // práctica correcta (sin parpadeo de otra sección persistida).
   useLayoutEffect(() => {
     if (route === "chat") {
-      if (chat.section !== "speaking") selectSection("speaking");
+      // La sub-ruta de destreza manda sobre la preferencia persistida: entrar en
+      // `/chat/escritura` abre el tutor en modo escritura (y `/chat` a secas,
+      // en conversación, como desde V3.10).
+      const target = chatSkill ?? "speaking";
+      if (chat.section !== target) selectSection(target);
       if (chat.mode !== "conversation") selectMode("conversation");
       return;
     }
@@ -147,6 +157,7 @@ export default function App() {
   }, [
     route,
     learnActivity,
+    chatSkill,
     chat.section,
     chat.mode,
     selectSection,
@@ -160,10 +171,11 @@ export default function App() {
       else if (next === "speaking" || next === "writing" || next === "reading") {
         selectMode("conversation");
       }
-      // Sin tarjeta propia en el hub (reading/writing — D4): el chat libre
-      // vive en su raíz `/chat` desde V3.10.
-      if (FREE_CHAT_SECTIONS.includes(next)) {
-        navigateTo(CHAT_PATH);
+      // Sin motor propio de rutas (reading/writing — D4 revisado en V3.73.1): la
+      // práctica es conversacional, pero cada destreza conserva su URL canónica
+      // bajo `/chat` para que el contexto sobreviva a recarga y deep link.
+      if (isChatSkill(next)) {
+        navigateTo(chatSkillPath(next));
         return;
       }
       const activity = SECTION_ACTIVITY[next];
@@ -229,8 +241,6 @@ export default function App() {
     go("course");
   }, [completeLesson, go]);
 
-  const handleOpenCourse = useCallback(() => go("course"), [go]);
-
   const handleOpenProgress = useCallback(() => go("progress"), [go]);
 
   const completeActiveStep = useCallback(() => {
@@ -263,70 +273,77 @@ export default function App() {
 
   return (
     <I18nProvider lang={lang} setLang={setLang}>
-      <AppShell
-        route={route}
-        onNavigate={navigate}
-        header={
-          <Header
-            route={route}
-            onNavigate={navigate}
-            users={users}
-            currentUserId={currentUserId}
-            onSelectUser={selectUser}
-            onAddUser={addUser}
-            onEditUser={editUser}
-            handsFreeEnabled={handsFree.enabled}
-            handsFreeStatus={handsFree.status}
-            handsFreeMicError={handsFree.micError}
-            onToggleHandsFree={handsFree.toggle}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-        }
-      >
-        <Workspace
+      {/* V3.73.1 (GUI-05): las animaciones de `motion/react` no pasan por CSS, así
+          que el bloque `@media (prefers-reduced-motion: reduce)` de la hoja no
+          las alcanza. `reducedMotion="user"` desactiva en un solo punto las
+          animaciones de transform y de layout (incluido el stagger del hub y la
+          píldora activa de la navegación) cuando el sistema lo pide. */}
+      <MotionConfig reducedMotion="user">
+        <AppShell
           route={route}
-          learnActivity={learnActivity}
-          chat={chat}
-          onAttempt={onAttempt}
-          onNextBestStart={handleNextBestStart}
-          onStep={handleSessionStep}
-          onStartLesson={handleStartLesson}
-          onFinishLesson={handleFinishLesson}
-          onOpenCourse={handleOpenCourse}
-          onOpenProgress={handleOpenProgress}
-          refreshKey={sessionVersion}
-        />
-      </AppShell>
+          onNavigate={navigate}
+          header={
+            <Header
+              route={route}
+              onNavigate={navigate}
+              users={users}
+              currentUserId={currentUserId}
+              onSelectUser={selectUser}
+              onAddUser={addUser}
+              onEditUser={editUser}
+              handsFreeEnabled={handsFree.enabled}
+              handsFreeStatus={handsFree.status}
+              handsFreeMicError={handsFree.micError}
+              onToggleHandsFree={handsFree.toggle}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+          }
+        >
+          <Workspace
+            route={route}
+            learnActivity={learnActivity}
+            chatSkill={chatSkill}
+            chat={chat}
+            onAttempt={onAttempt}
+            onNextBestStart={handleNextBestStart}
+            onStep={handleSessionStep}
+            onStartLesson={handleStartLesson}
+            onFinishLesson={handleFinishLesson}
+            onOpenProgress={handleOpenProgress}
+            refreshKey={sessionVersion}
+          />
+        </AppShell>
 
-      {/* V3.72 (RD-04): avisos globales de voz — uno solo para toda la app. El
-          aviso de degradación no bloquea nada; el diálogo pide consentimiento
-          antes de descargar una voz que falta (~60 MB). */}
-      <DegradedVoiceNotice />
-      <VoiceDownloadDialog />
+        {/* V3.72 (RD-04): avisos globales de voz — uno solo para toda la app. El
+            aviso de degradación no bloquea nada; el diálogo pide consentimiento
+            antes de descargar una voz que falta (~60 MB). */}
+        <DegradedVoiceNotice />
+        <VoiceDownloadDialog />
 
-      {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
-          cookie recordada y varios perfiles, o todavía sin perfiles), se pide
-          elegir o crear uno antes de usar la app. */}
-      {usersLoaded && !currentUserId && (
-        <ProfileGate users={users} onSelect={selectUser} onCreate={addUser} />
-      )}
+        {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
+            cookie recordada y varios perfiles, o todavía sin perfiles), se pide
+            elegir o crear uno antes de usar la app. */}
+        {usersLoaded && !currentUserId && (
+          <ProfileGate users={users} onSelect={selectUser} onCreate={addUser} />
+        )}
 
-      {settingsOpen && (
-        <SettingsDialog
-          appearance={appearance.appearance}
-          onUpdateAppearance={appearance.update}
-          onResetAppearance={appearance.reset}
-          lang={lang}
-          onSetLang={setLang}
-          model={chat.model}
-          models={models}
-          favoriteModel={favoriteModel}
-          onSelectModel={selectModel}
-          onFavoriteModel={makeFavorite}
-          userId={currentUserId}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
+        {settingsOpen && (
+          <SettingsDialog
+            appearance={appearance.appearance}
+            onUpdateAppearance={appearance.update}
+            onResetAppearance={appearance.reset}
+            lang={lang}
+            onSetLang={setLang}
+            model={chat.model}
+            models={models}
+            favoriteModel={favoriteModel}
+            onSelectModel={selectModel}
+            onFavoriteModel={makeFavorite}
+            userId={currentUserId}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+      </MotionConfig>
     </I18nProvider>
   );
 }

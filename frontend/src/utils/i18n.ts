@@ -46,6 +46,20 @@ const STRINGS: Record<string, Entry> = {
     es: "¿Qué quieres practicar hoy?",
   },
   "learn.recommended": { en: "Recommended for you", es: "Recomendado para ti" },
+  // V3.73.1 (D4 revisado): Reading y Writing no tienen motor propio de rutas,
+  // así que se ofrecen como práctica con el tutor, en un bloque secundario.
+  "learn.practiceWithTutor": {
+    en: "Practice with the tutor",
+    es: "Practica con el tutor",
+  },
+  "learn.desc.reading": {
+    en: "Read with the tutor: ask about a text, get corrections and work on comprehension in the chat.",
+    es: "Lee con el tutor: pregunta por un texto, pide correcciones y trabaja la comprensión en el chat.",
+  },
+  "learn.desc.writing": {
+    en: "Write with the tutor: draft texts and get corrections and rewrites in the chat.",
+    es: "Escribe con el tutor: redacta textos y recibe correcciones y reescrituras en el chat.",
+  },
   "learn.back": { en: "Back to Learn", es: "Volver a Aprender" },
   "learn.switchActivity": {
     en: "Switch activity",
@@ -103,10 +117,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Selected route",
     es: "Ruta seleccionada",
   },
-
-  // Grupos de destrezas
-  "group.primary": { en: "Primary skills", es: "Destrezas principales" },
-  "group.support": { en: "Support", es: "Apoyo" },
 
   // Marca
   "brand.subtitle": { en: "100% local · Ollama", es: "100% local · Ollama" },
@@ -1278,7 +1288,6 @@ const STRINGS: Record<string, Entry> = {
 
   // Cabecera / navegación
   "nav.aria": { en: "Main navigation", es: "Navegación principal" },
-  "nav.skills": { en: "Skills", es: "Destrezas" },
   "header.goHome": { en: "Go to Home", es: "Ir a Inicio" },
   "header.openSettings": { en: "Open settings", es: "Abrir ajustes" },
 
@@ -1634,6 +1643,7 @@ const STRINGS: Record<string, Entry> = {
 
   // Kickers de sección
   "kicker.speaking": { en: "Conversation practice", es: "Práctica de conversación" },
+  "kicker.reading": { en: "Reading practice", es: "Práctica de lectura" },
   "kicker.writing": { en: "Writing practice", es: "Práctica de escritura" },
   "kicker.grammar": { en: "Grammar practice", es: "Práctica de gramática" },
   "kicker.default": { en: "Practice", es: "Práctica" },
@@ -2123,23 +2133,10 @@ const STRINGS: Record<string, Entry> = {
     es: "Aún no hay escenarios disponibles.",
   },
 
-  // Lectura
-  "reading.status.mastered": { en: "Mastered", es: "Dominado" },
-  "reading.status.review": { en: "Review", es: "A repasar" },
-  "reading.status.available": { en: "Available", es: "Disponible" },
-  "reading.status.locked": { en: "Locked", es: "Bloqueado" },
-  "reading.title": { en: "Reading practice", es: "Práctica de lectura" },
-  "reading.subtitle": {
-    en: "CEFR curriculum guided reading",
-    es: "Lectura guiada por el currículum CEFR",
-  },
-  "reading.viewCourse": { en: "View course", es: "Ver curso" },
-  "reading.empty": {
-    en: "No reading objectives available for your level yet. Explore the course to enroll in a level.",
-    es: "Aún no hay objetivos de lectura disponibles para tu nivel. Explora el curso para matricularte en un nivel.",
-  },
-  "reading.start": { en: "Start", es: "Empezar" },
-  "reading.review": { en: "Review", es: "Repasar" },
+  // Lectura: V3.73.1 retira la familia `reading.*` junto con ReadingPractice.
+  // Reading es práctica conversacional con el tutor desde `/chat/lectura` (D4
+  // revisado), así que sus cadenas ya no tienen consumidor. Se recuperan de git
+  // si algún día llega la Opción B (motor propio de rutas de lectura).
 
   // Pronunciación
   "pron.title": { en: "Pronunciation practice", es: "Práctica de pronunciación" },

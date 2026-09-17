@@ -1,14 +1,15 @@
 {
   "name": "english-tutor-frontend",
   "private": true,
-  "version": "3.73.0",
+  "version": "3.73.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:visual": "playwright test"
+    "test:visual": "playwright test",
+    "audit:contrast": "node scripts/contrast_audit.mjs --strict"
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.16",

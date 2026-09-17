@@ -26,10 +26,22 @@
   --color-accent-2: #a855f7;
   --color-accent-hover: #7c7ff7;
   --color-accent-ring: rgba(99, 102, 241, 0.28);
-  /* Texto de acento legible sobre superficies oscuras (insignias CEFR, etc.).
-     El acento sólido (#6366f1) funciona como fondo con texto blanco, pero es
-     demasiado oscuro como color de texto en modo oscuro. */
-  --color-accent-soft: #a5b4fc;
+  /* Texto de acento. Se DERIVA del acento que elige el usuario en lugar de ser
+     un valor fijo: el acento sólido sirve de relleno (con --color-on-accent
+     encima) y de borde, pero como color de texto no llega a AA (índigo #6366f1
+     sobre #1a2029 = 3.67:1). Se mezcla hacia blanco en tema oscuro y hacia
+     negro en claro, y `--accent-soft-share` es el mayor porcentaje de acento
+     que MANTIENE AA (4.5:1) con margen para ese acento, medido sobre las
+     superficies y sobre los fondos compuestos donde vive este texto (anillo de
+     acento e tinte al 15 %). La medición y su guarda viven en
+     scripts/contrast_audit.mjs. */
+  --accent-soft-target: #ffffff;
+  --accent-soft-share: 64%;
+  --color-accent-soft: color-mix(
+    in srgb,
+    var(--color-accent) var(--accent-soft-share),
+    var(--accent-soft-target)
+  );
   --color-on-accent: #ffffff;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
@@ -93,13 +105,13 @@
 
   --color-text: #1c2433;
   --color-text-dim: #5a6678;
-  --color-text-faint: #6f7c90;
+  --color-text-faint: #616e84;
 
   --color-accent: #4f46e5;
   --color-accent-2: #9333ea;
   --color-accent-hover: #4338ca;
   --color-accent-ring: rgba(79, 70, 229, 0.18);
-  --color-accent-soft: #4338ca;
+  --accent-soft-target: #000000;
   --color-on-accent: #ffffff;
   --color-success: #16a34a;
   --color-warning: #b45309;
@@ -491,7 +503,7 @@ body.is-resizing {
 }
 
 .hands-free-status--transcribing {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .hands-free-status--thinking {
@@ -499,7 +511,7 @@ body.is-resizing {
 }
 
 .hands-free-status--speaking {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 /* V3.21 (V20-14): el ASR no entendió el último tramo; se avisa y se sigue
@@ -580,7 +592,7 @@ body.is-resizing {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .empty h2 {
@@ -812,13 +824,13 @@ body.is-resizing {
 }
 
 .mic-button.processing {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-ring);
 }
 
 .speak-button.speaking {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   border-color: var(--color-accent);
   animation: pulse-accent 1.2s infinite;
 }
@@ -893,7 +905,7 @@ body.is-resizing {
 
 .lesson-banner > button:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 /* ==========================================================================
@@ -1469,7 +1481,7 @@ body.is-resizing {
 
 .pd-event-type.message {
   background: color-mix(in srgb, var(--color-accent) 15%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .pd-event-type.exercise {
@@ -1770,7 +1782,7 @@ body.is-resizing {
 }
 
 .cefr-band.intermediate {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   background: var(--color-accent-ring);
 }
 
@@ -2425,7 +2437,7 @@ body.is-resizing {
 .dialog-link {
   background: none;
   border: none;
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   cursor: pointer;
   font-size: var(--text-sm);
 }
@@ -2563,7 +2575,7 @@ body.is-resizing {
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   background: var(--color-accent-ring);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .card__icon svg {
@@ -2655,6 +2667,12 @@ body.is-resizing {
 
 /* ==========================================================================
    Apariencia configurable (acento, tamaño de letra y densidad)
+   --------------------------------------------------------------------------
+   Cada acento declara su porcentaje de mezcla para el TEXTO de acento
+   (`--accent-soft-share`): es el mayor que mantiene AA con margen sobre las
+   superficies y los fondos compuestos de los dos temas. Se calcula con
+   `scripts/contrast_audit.mjs` (que además lo vigila). El índigo no necesita
+   bloque: usa el valor por defecto de `:root`.
    ========================================================================== */
 
 :root[data-accent="violet"] {
@@ -2662,6 +2680,7 @@ body.is-resizing {
   --color-accent-2: #8b5cf6;
   --color-accent-hover: #9333ea;
   --color-accent-ring: rgba(168, 85, 247, 0.25);
+  --accent-soft-share: 67%;
 }
 
 :root[data-accent="blue"] {
@@ -2669,6 +2688,7 @@ body.is-resizing {
   --color-accent-2: #2563eb;
   --color-accent-hover: #1d4ed8;
   --color-accent-ring: rgba(59, 130, 246, 0.25);
+  --accent-soft-share: 65%;
 }
 
 :root[data-accent="teal"] {
@@ -2676,6 +2696,7 @@ body.is-resizing {
   --color-accent-2: #0d9488;
   --color-accent-hover: #0f766e;
   --color-accent-ring: rgba(20, 184, 166, 0.25);
+  --accent-soft-share: 56%;
 }
 
 :root[data-accent="emerald"] {
@@ -2683,6 +2704,7 @@ body.is-resizing {
   --color-accent-2: #059669;
   --color-accent-hover: #047857;
   --color-accent-ring: rgba(16, 185, 129, 0.25);
+  --accent-soft-share: 56%;
 }
 
 :root[data-accent="rose"] {
@@ -2690,6 +2712,7 @@ body.is-resizing {
   --color-accent-2: #e11d48;
   --color-accent-hover: #be123c;
   --color-accent-ring: rgba(244, 63, 94, 0.25);
+  --accent-soft-share: 64%;
 }
 
 :root[data-accent="amber"] {
@@ -2698,6 +2721,7 @@ body.is-resizing {
   --color-accent-hover: #b45309;
   --color-accent-ring: rgba(245, 158, 11, 0.28);
   --color-on-accent: #1f2937;
+  --accent-soft-share: 52%;
 }
 
 :root[data-font="small"] {
@@ -2839,7 +2863,7 @@ body.is-resizing {
 }
 
 .help-link {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   font-size: var(--text-sm);
   text-decoration: none;
 }
@@ -2887,7 +2911,7 @@ body.is-resizing {
 .today-total {
   font-size: var(--text-xs);
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .session-headline {
@@ -2903,7 +2927,7 @@ body.is-resizing {
 
 .session-headline strong {
   font-size: var(--text-lg);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .session-headline span {
@@ -3006,7 +3030,7 @@ body.is-resizing {
   border: 1px solid var(--color-accent-ring);
   border-radius: var(--radius-lg);
   font-size: var(--text-xs);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .today-items {
@@ -3222,7 +3246,7 @@ body.is-resizing {
 
 .goal-summary button:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .goal-saved {
@@ -3360,7 +3384,7 @@ body.is-resizing {
 }
 
 .journey-steps__confidence {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   font-weight: 600;
 }
 
@@ -3530,7 +3554,7 @@ body.is-resizing {
   margin-left: auto;
   font-size: var(--text-xs);
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3624,7 +3648,7 @@ body.is-resizing {
   height: 42px;
   border-radius: var(--radius-lg);
   background: var(--color-accent-ring);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   flex-shrink: 0;
 }
 
@@ -3726,7 +3750,7 @@ body.is-resizing {
 
 .status-available .reading-card-status {
   background: var(--color-accent-ring);
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .reading-card-start {
@@ -3938,7 +3962,7 @@ body.is-resizing {
 .next-step__skill {
   font-size: var(--text-sm);
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
 }
 
 .next-step__title {
@@ -4003,7 +4027,7 @@ body.is-resizing {
 }
 
 .settings-tab.active {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   border-bottom-color: var(--color-accent);
 }
 
@@ -4069,7 +4093,7 @@ body.is-resizing {
 }
 
 .system-status__urls a {
-  color: var(--color-accent);
+  color: var(--color-accent-soft);
   text-decoration: none;
   word-break: break-all;
 }

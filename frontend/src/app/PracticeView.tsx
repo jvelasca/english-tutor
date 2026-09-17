@@ -7,7 +7,6 @@ import { Composer } from "../components/Composer";
 import { Button } from "../components/ui/button";
 import { ListeningPractice } from "../features/listening/ListeningPractice";
 import { PronunciationPractice } from "../components/PronunciationPractice";
-import { ReadingPractice } from "../features/reading/ReadingPractice";
 import { ResizeHandle } from "../components/ResizeHandle";
 import { Sidebar } from "../components/Sidebar";
 import { MenuIcon, PanelIcon } from "../components/Icons";
@@ -32,6 +31,7 @@ const SUGGESTIONS = [
 
 const SECTION_KICKER: Partial<Record<Section, string>> = {
   speaking: "kicker.speaking",
+  reading: "kicker.reading",
   writing: "kicker.writing",
   grammar: "kicker.grammar",
 };
@@ -44,14 +44,7 @@ interface PracticeViewProps {
   onAttempt: () => void;
   onNextBestStart: (section: Section | null, step: NextBestActivity) => void;
   onStep: (step: SessionStep) => void;
-  onStartLesson: (
-    objectiveId: string,
-    title: string,
-    levelId: string,
-    skills: string[],
-  ) => void;
   onFinishLesson: () => void;
-  onOpenCourse: () => void;
 }
 
 export function PracticeView({
@@ -60,9 +53,7 @@ export function PracticeView({
   activeActivity,
   onAttempt,
   onNextBestStart,
-  onStartLesson,
   onFinishLesson,
-  onOpenCourse,
 }: PracticeViewProps) {
   const { t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -88,7 +79,13 @@ export function PracticeView({
     clearLesson,
   } = chat;
 
-  const isChat = section === "speaking" || section === "writing" || section === "grammar";
+  // Práctica conversacional con el tutor: Speaking (conversación), Writing y
+  // Reading (D4 revisado en V3.73.1) y Grammar comparten el workspace de chat.
+  const isChat =
+    section === "speaking" ||
+    section === "writing" ||
+    section === "reading" ||
+    section === "grammar";
   // El historial de conversaciones vive solo en Conversar (ruta "chat") y sin
   // una lección de curso activa: mientras la lección está en curso el workspace
   // es el de la lección (sin historial; la envoltura de curso vive en la barra
@@ -305,14 +302,6 @@ export function PracticeView({
             userId={currentUserId}
             onAttempt={onAttempt}
             onNext={onNextBestStart}
-          />
-        )}
-
-        {section === "reading" && (
-          <ReadingPractice
-            userId={currentUserId}
-            onOpenCourse={onOpenCourse}
-            onStartLesson={onStartLesson}
           />
         )}
 

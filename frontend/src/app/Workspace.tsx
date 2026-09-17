@@ -12,6 +12,7 @@ import {
 import type { ChatApi } from "../hooks/useChat";
 import type { NextBestActivity, SessionStep } from "../types/api";
 import type { Section } from "../utils/sections";
+import type { ChatSkill } from "../router/chat";
 import type { Route } from "./routes";
 import { useI18n } from "../hooks/useI18n";
 
@@ -65,6 +66,11 @@ interface WorkspaceProps {
   route: Route;
   /** Sub-ruta de práctica activa dentro de APRENDER (null = hub u otra raíz). */
   learnActivity: LearnActivity | null;
+  /**
+   * Destreza del chat libre activa (`/chat/lectura`, `/chat/escritura`), o null
+   * si el chat es el genérico de conversación (V3.73.1).
+   */
+  chatSkill: ChatSkill | null;
   chat: ChatApi;
   onAttempt: () => void;
   onNextBestStart: (section: Section | null, step: NextBestActivity) => void;
@@ -76,7 +82,6 @@ interface WorkspaceProps {
     skills: string[],
   ) => void;
   onFinishLesson: () => void;
-  onOpenCourse: () => void;
   onOpenProgress: () => void;
   refreshKey: number;
 }
@@ -104,13 +109,13 @@ const WORKSPACE_ACTIVITIES: readonly LearnActivity[] = [
 export function Workspace({
   route,
   learnActivity,
+  chatSkill,
   chat,
   onAttempt,
   onNextBestStart,
   onStep,
   onStartLesson,
   onFinishLesson,
-  onOpenCourse,
   onOpenProgress,
   refreshKey,
 }: WorkspaceProps) {
@@ -227,9 +232,7 @@ export function Workspace({
           onAttempt={onAttempt}
           onNextBestStart={onNextBestStart}
           onStep={onStep}
-          onStartLesson={onStartLesson}
           onFinishLesson={onFinishLesson}
-          onOpenCourse={onOpenCourse}
         />
       );
     } else {
@@ -248,18 +251,18 @@ export function Workspace({
     // oculta el historial mientras la lección está activa y la propia barra de
     // contexto de PracticeView distingue el modo lección del modo libre (WS7).
     // Al llegar por URL el chat libre no trae sub-actividad: se marca Speaking
-    // en el atajo de actividades de la franja superior (DISENO-SPEAKING-UNICO).
+    // en el atajo de actividades de la franja superior (DISENO-SPEAKING-UNICO),
+    // salvo que la URL traiga una destreza de chat (Reading/Writing, V3.73.1),
+    // en cuyo caso ninguna tarjeta de APRENDER es la activa.
     content = (
       <PracticeView
         route="chat"
         chat={chat}
-        activeActivity={learnActivity ?? SPEAKING_ACTIVITY}
+        activeActivity={learnActivity ?? (chatSkill ? null : SPEAKING_ACTIVITY)}
         onAttempt={onAttempt}
         onNextBestStart={onNextBestStart}
         onStep={onStep}
-        onStartLesson={onStartLesson}
         onFinishLesson={onFinishLesson}
-        onOpenCourse={onOpenCourse}
       />
     );
   }

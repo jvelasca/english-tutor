@@ -5,6 +5,84 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-17 (UTC+2).
 >
+> **Nota (2026-09-17): V3.73.1 (cierre GUI pre-V4.0) — release de PARCHE, sin
+> capacidad pedagógica nueva y sin tocar backend ni launcher.**
+> Release **`v3.73.1`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**. Cierra
+> los **seis hallazgos GUI/UX (P2/P3)** que el dictamen externo de cierre de V3.73.0
+> dejó abiertos antes de V4.0 —el hub de APRENDER desordenado, Reading/Writing
+> huérfanos, la navegación móvil con utilidades compitiendo con el núcleo,
+> `prefers-reduced-motion` ignorado por las animaciones JS y el contraste de los 7
+> acentos sin medir— **sin abrir arquitectura** y **congelando el código**: los 7
+> gates físicos siguen `pending` y `status --strict` sigue **rojo por diseño**.
+> **(A) APRENDER (GUI-01/02/04, Opción A).** Las 4 tarjetas pasan a
+> `xl:grid-cols-4` (antes la cuarta quedaba aislada en un grid de 3 columnas); el
+> `aria-labelledby` del grid apuntaba a un `id` inexistente y `SectionHeading` pasa
+> a aceptar `id`; y **Reading/Writing dejan de ser huérfanos**: nuevo
+> `frontend/src/router/chat.ts` (`ChatSkill`, `chatSkillPath` → `/chat/lectura` y
+> `/chat/escritura`, `chatSkillFromPath`), `routeMap` acepta ese segundo segmento
+> (cualquier otro degrada a `home`, como antes), `App` selecciona la sección que
+> trae la URL —de modo que las **recomendaciones del motor** (`NextBestActivity`,
+> Home) también abren el chat con su contexto—, `PracticeView` incluye `reading` en
+> la rama de chat con su `kicker`, `Workspace` deja de resaltar Speaking cuando la
+> URL trae destreza, y `LearnHub` gana el bloque **«Practica con el tutor»**
+> (Reading y Writing) con tap target y `focus-visible`. **El síntoma medido:** antes,
+> elegir Reading abría **Speaking**, porque el efecto de `/chat` forzaba la sección.
+> **(B) Código muerto e i18n.** `components/SectionNav.tsx` (no se importaba) y
+> `features/reading/ReadingPractice.tsx` (inalcanzable) **borrados**, con sus claves
+> i18n huérfanas (`nav.skills`, `group.primary`, `group.support` y la familia
+> `reading.*`): `check_i18n_coverage.py --strict` sigue en **0/0/0** (1477 cadenas).
+> Se conservan `ReadingIcon`/`WritingIcon` (los usa `NextBestCard`) y
+> `WritingPanel`/`WritingJourney` (Progress > Recorridos). **Declarado:** el CSS
+> legacy `.reading-practice-*`/`.reading-card-*`/`.reading-academy-*` **no se toca**
+> (limpieza → V4.0.x). **(C) Navegación móvil (GUI-03/GUI-08).** Los **5 destinos**
+> se mantienen y los touch targets (`min-h-14`) también, pero el núcleo
+> (Inicio/Formación/Aprender) deja de competir con las utilidades
+> (Diccionario/Traductor): **divisor real** antes del bloque auxiliar y peso visual
+> menor (icono/etiqueta atenuados, etiqueta más pequeña en anchos estrechos).
+> **(D) `prefers-reduced-motion` (GUI-05).** `<MotionConfig reducedMotion="user">`
+> envuelve la app: **todas** las animaciones de `motion/react` (stagger del hub,
+> píldoras de la nav, transiciones) respetan la preferencia del sistema, que antes
+> solo atendía `legacy.css`; guarda en Playwright con `reducedMotion: "reduce"`.
+> **(E) Contraste (GUI-06).** Instrumento nuevo
+> `frontend/scripts/contrast_audit.mjs` (`npm run audit:contrast`, **en CI**) que lee
+> los tokens reales de `legacy.css`/`index.css` y mide **184 pares + 2 guardas** →
+> `docs/audit/generated/contrast-report.{json,md}`: **bloqueante** (tipografía base +
+> texto de acento) **0 fallos**; **reportado** (relleno + tinta y borde) **17 de 42,
+> con el máximo alcanzable de cada acento**. Se corrige `--color-text-faint` en
+> claro (`#6f7c90 → #616e84`; el par más ajustado, sobre `--color-bg-soft`, sube a
+> **4.55:1**) y **el texto de acento deja de ser un hex fijo**:
+> `--color-accent-soft` **se deriva del acento elegido** con
+> `color-mix(in srgb, var(--color-accent) var(--accent-soft-share), var(--accent-soft-target))`
+> (hacia blanco en oscuro, hacia negro en claro; 64/67/65/56/56/64/52 % según
+> acento), porque **no seguía al acento** —con turquesa el texto de acento salía
+> índigo— y con ámbar en tema claro quedaba en **2.02:1**; las ~20 reglas que usaban
+> el acento **sólido como color de texto** pasan a este token, y el sólido queda para
+> relleno, borde y anillo de foco. **Guardas:** prohibido `color:
+> var(--color-accent)` como texto, obligada la derivación, y
+> `tests/visual/accentContrast.spec.ts` verifica **en el navegador real** los 14
+> pares acento×tema (≥4.5:1 sobre las tres superficies), lo único que detecta un
+> `color-mix()` inválido en runtime. **Honestidad:** el **relleno de acento con su
+> tinta no puede llegar a AA** con la rampa actual (máximo alcanzable **4.19** índigo
+> oscuro, **3.96** violeta, **3.73** ámbar, **3.68** azul, **3.67** rosa, **3.42**
+> turquesa, **3.41** esmeralda) ni el acento como borde en tema claro (turquesa
+> **2.49**, esmeralda **2.54**, ámbar **2.15**, frente a 3:1): exige **re-rampar los
+> 7 acentos** (p. ej. 600/700 como relleno en claro y 400/500 en oscuro), decisión de
+> identidad visual que se toma en **V4.0.x** con la tabla delante. **No se declara
+> WCAG 2.2 AA certificado.** **(F) Teclado y zoom.** `keyboard.spec.ts` (el primer
+> `Tab` revela el skip link y enfoca `#main-content`; las tarjetas del hub, incluidas
+> las del tutor, se activan solo con teclado) y `reducedMotionAndZoom.spec.ts` (sin
+> desborde horizontal ≤1 px a 200 % de zoom con fuente grande).
+> **Tests:** `tsc` limpio, frontend **712 passed** (85 ficheros; 699 → **+13**),
+> Playwright **38 passed · 28 skipped · 0 failed** (13 specs × desktop/tablet/mobile,
+> a **4 workers**: la corrida a 16 workers dio 13 fallos **solo en desktop** por
+> contención del dev server en frío y los 13 pasan al repetirlos), `npm run build`
+> OK, `check_release_consistency` en los **6 orígenes** (`3.73.1`), i18n `--strict`
+> **0/0/0**, `validation_gate.py auto --require-dist` **10/10** y `status --strict`
+> **exit 1** (correcto: es la puerta de V4.0). Backend y launcher **no se tocan**.
+> **Congelación:** tras este tag no se abre otra ronda de arquitectura; el siguiente
+> hito es **ejecutar físicamente G1–G7**.
+
 > **Nota (2026-09-17): V3.73.0 (Validation release) — release de VALIDACIÓN, sin
 > capacidad pedagógica nueva.**
 > Release **`v3.73.0`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
@@ -3492,18 +3570,32 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.0` **Validation release** (release de
-**VALIDACIÓN**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
-`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum**,
-**SIN capacidad pedagógica nueva** y **SIN tocar el frontend**). Cierra el
-endurecimiento mínimo que el dictamen externo de V3.72 dejó como P2/P3 —**runtime de
-producto fail-closed** y **descubrimiento de la LAN sin direcciones públicas**— y
-construye el **arnés de los 7 gates** (`scripts/validation_gate.py`), que convierte
-una validación física que **nadie ha ejecutado todavía** en **estado registrado y
-exigible**: los 7 gates están en `pending` y **V4.0 no se declara** hasta que
-`status --strict` salga 0. Ver la nota de cabecera de este documento y
-`release-notes-v3.73.0.md` (commit de release `859c6c2`, tag anotado `v3.73.0`,
-CI 11/11 en el run `35204203522`).
+**Posición actual (2026-09-17):** `v3.73.1` **cierre GUI pre-V4.0** (release de
+**PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
+**SIN tocar backend ni launcher**). Cierra los **seis hallazgos GUI/UX (P2/P3)** que
+el dictamen externo de cierre de V3.73.0 dejó abiertos: grid del hub y
+`aria-labelledby` (GUI-01/02), **Reading/Writing explícitos como prácticas con el
+tutor** con rutas propias `/chat/lectura` y `/chat/escritura` (GUI-04, Opción A),
+jerarquía núcleo/auxiliares en la bottom-nav (GUI-03/08), `prefers-reduced-motion`
+respetado por las animaciones `motion/react` (GUI-05) y **contraste de los 7 acentos
+medido con instrumento propio** (GUI-06: texto de acento derivado del acento, con
+guarda en CSS y en navegador; relleno + tinta y borde **cuantificados** y aplazados a
+V4.0.x porque exigen re-rampar la paleta). **El código queda congelado:** los 7 gates
+siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` salga 0. Ver
+la nota de cabecera de este documento y `release-notes-v3.73.1.md`.
+
+**Release anterior — `v3.73.0` Validation release** (release de **VALIDACIÓN**: **SIN
+migración de BD**, **SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**,
+**SIN tocar el banco**, **SIN tocar el currículum**, **SIN capacidad pedagógica nueva**
+y **SIN tocar el frontend**). Cierra el endurecimiento mínimo que el dictamen externo
+de V3.72 dejó como P2/P3 —**runtime de producto fail-closed** y **descubrimiento de la
+LAN sin direcciones públicas**— y construye el **arnés de los 7 gates**
+(`scripts/validation_gate.py`), que convierte una validación física que **nadie ha
+ejecutado todavía** en **estado registrado y exigible**: los 7 gates están en
+`pending` y **V4.0 no se declara** hasta que `status --strict` salga 0.
+`release-notes-v3.73.0.md` (commit de release `859c6c2`, tag anotado `v3.73.0`, CI
+11/11 en el run `35204203522`).
 
 **Release anterior — `v3.72.0` UX / product completion** (release de **PRODUCTO**:
 **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni

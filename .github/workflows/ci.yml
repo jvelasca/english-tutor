@@ -54,6 +54,12 @@ jobs:
       - name: i18n coverage gate (huérfanas / duplicadas / vacías)
         working-directory: .
         run: python scripts/check_i18n_coverage.py --strict
+      # V3.73.1 (GUI-06): el contraste de la tipografía base sobre las superficies
+      # es un gate real. Los pares de acento se miden y se publican en
+      # docs/audit/generated/contrast-report.md, pero no bloquean: separar el
+      # acento-relleno del acento-texto es una decisión de diseño de V4.0.x.
+      - name: Contrast audit (WCAG AA tipografía base)
+        run: npm run audit:contrast
       - name: Build
         run: npm run build
 
