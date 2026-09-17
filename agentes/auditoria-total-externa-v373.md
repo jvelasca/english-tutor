@@ -2,12 +2,12 @@
 
 > **Qué es este archivo.** El prompt **autocontenido** para que un auditor externo
 > (que **solo ve el repositorio público** de GitHub) audite **el producto publicado
-> en `v3.73.4`**, no un plan ni un incremento aislado. La revisión es **de solo
+> en `v3.73.5`**, no un plan ni un incremento aislado. La revisión es **de solo
 > lectura**: no se cambia código, datos, configuración ni etiquetas publicadas.
 >
 > **Por qué una auditoría de CIERRE y no otra revisión incremental.** El gerente la
 > ha pedido explícitamente como **auditoría de cierre**: no se audita «qué añade
-> V3.73.4», sino **el conjunto del producto tal y como está publicado ahora**, porque
+> V3.73.5», sino **el conjunto del producto tal y como está publicado ahora**, porque
 > es el material sobre el que se decide **dar o no el salto a V4.0**. Por eso este
 > documento combina la mecánica del punto de entrada de RELEASE (estado de
 > publicación verificado contra GitHub) con el **alcance total** de las auditorías
@@ -19,9 +19,11 @@
 > fail-closed del runtime; V3.73.1 cerró los seis hallazgos GUI/UX que la auditoría
 > de V3.73.0 dejó abiertos; V3.73.2 corrigió su propia CI; V3.73.3 entregó el kit de
 > campo de los gates y un guard anti-deriva; V3.73.4 selló la evidencia del arnés con
-> el commit validado y añadió la puerta `--strict --same-tree`—. Si el auditor busca
+> el commit validado y añadió la puerta `--strict --same-tree`; V3.73.5 **cerró el
+> ancla de este propio punto de entrada**, que hasta entonces se publicaba fuera del
+> tag que declaraba—. Si el auditor busca
 > «qué se ha mejorado para el alumno», la respuesta honesta en
-> V3.73.0/V3.73.2/V3.73.3/V3.73.4 es **nada** (V3.73.1 sí ordenó la GUI, pero sin
+> V3.73.0/V3.73.2/V3.73.3/V3.73.4/V3.73.5 es **nada** (V3.73.1 sí ordenó la GUI, pero sin
 > capacidad nueva); si busca «qué se ha demostrado», el objeto de esta auditoría es
 > justamente **separar lo demostrado de lo declarado**.
 >
@@ -38,7 +40,7 @@
 
 Orden de lectura recomendado, de marco a evidencia:
 
-1. `docs/RELEVO.md` — **cabecera** (nota de la posición vigente: `v3.73.4`) y
+1. `docs/RELEVO.md` — **cabecera** (nota de la posición vigente: `v3.73.5`) y
    **§0 «START HERE»**.
 2. `PLAN.md` — §«Estado actual» (registro release a release) y la tabla de
    trazabilidad de briefings y auditorías.
@@ -72,63 +74,79 @@ git log --oneline -3 main
 ## 1. Punto de entrada verificado (contra GitHub, no contra un árbol local)
 
 - Repositorio: `jvelasca/english-tutor` (**público**), rama por defecto `main`.
-- **Commit de release auditado:** `5007c3a` (`5007c3a59127701932a0c1c21525da6936f9f7fa`),
-  `release(v3.73.4): recorder trazable, evidencia sellada con commit y run de CI, y
-  puerta --strict --same-tree`.
-- **Tag anotado `v3.73.4`:** objeto `3f2ec88`
-  (`3f2ec88623884c506eecd5e7b05f32154cf233bb`), que apunta a `5007c3a`.
-- **`main`:** `5007c3a` es el **commit de release**; `main` va **por delante** con
-  commits **solo documentales** —el cierre de esta release, que introduce el
-  re-anclaje de este mismo archivo—. Ese recuento crece por diseño y **no debe
-  tomarse como referencia**. Lo que sí es estable y obligatorio es el invariante de
-  abajo.
-- **Base de comparación:** `v3.73.3` → release `ae14dbd`, tag anotado `v3.73.3`
-  (objeto `7715fc2`). El código **sí** cambió entre `v3.73.3` y `v3.73.4` (es el
-  arnés de validación y sus tests), y por eso el tag de referencia de esta auditoría
-  es `v3.73.4`, no `v3.73.3`.
-- **Sin GitHub Release** para `v3.73.4`: es una decisión declarada del gerente (solo
+- **Release auditada: el tag anotado `v3.73.5`.** Los identificadores exactos se
+  **resuelven con git** en vez de fijarse aquí a mano:
+
+```bash
+git fetch --tags
+git rev-parse v3.73.5            # objeto del tag anotado
+git rev-parse v3.73.5^{commit}   # commit de release (el SHA exacto que se audita)
+git log -1 --format='%H %s' v3.73.5^{commit}
+```
+
+- **Por qué este documento NO fija el SHA ni el run a mano (V3.73.5).** Un commit
+  **no puede contener** su propio SHA ni el id de la run de CI que dispara su push:
+  son datos que solo existen **después** de publicar. Fijarlos obligaba a un commit
+  de re-anclaje **posterior al tag**, que quedaba a su vez fuera del tag siguiente,
+  y por eso `main` iba siempre por delante en documentación. Desde V3.73.5 el ancla
+  es el **tag** y el estado de publicación se **verifica por comando**: este archivo
+  es coherente **dentro de su propio tag** y el commit de release es **final**.
+- **`main`:** debe apuntar al **mismo commit** que el tag mientras no aterrice
+  trabajo nuevo. Lo que es obligatorio es el invariante de abajo.
+- **Base de comparación:** `v3.73.4` (el *recorder* trazable: `head_sha`, `--ci-run`
+  y la puerta `--strict --same-tree`). El código **sí** cambió entre `v3.73.3` y
+  `v3.73.4` (el arnés de validación y sus tests); entre `v3.73.4` y `v3.73.5` **no
+  cambia el código**, solo la documentación.
+- **Sin GitHub Release** para `v3.73.5`: es una decisión declarada del gerente (solo
   tag, que es la convención real del repo desde `v3.34.0`). El último Release object
   publicado es `v3.33.0`.
 
-**Aviso de `HEAD` e invariante del código.** `main` va por delante del commit
-auditado **solo** con commits documentales. Lo que es obligatorio es este invariante:
+**Aviso de `HEAD` e invariante del código.** El invariante se enuncia **entre el tag
+y `main`**, que es exactamente lo que el auditor puede comprobar al ejecutarlo:
 
 ```bash
-git diff --stat v3.73.4..main -- backend frontend launcher scripts
+git diff --stat v3.73.5..main -- backend frontend launcher scripts
 ```
 
-Debe salir **vacío** (comprobado en el momento de redactar este documento). Es
-decir: da igual clonar `main` o hacer `git checkout v3.73.4`; **el código de
-producto y el arnés citados aquí son los mismos**. Si el auditor encuentra una
-diferencia en esas cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
+Debe salir **vacío**. Es decir: da igual clonar `main` o hacer `git checkout
+v3.73.5`; **el código de producto y el arnés citados aquí son los mismos**. Si el
+auditor encuentra una diferencia en esas cuatro rutas entre el tag y `main`, tiene
+un hallazgo P0. Desde V3.73.5 el tag **contiene** este mismo documento, así que la
+comprobación no depende de ningún commit de cierre posterior.
 
-> **Nota de historial (para que no se confunda con un hallazgo).** Dos versiones
-> anteriores de este documento estuvieron ancladas a `v3.73.0` y luego a `v3.73.3`
-> afirmando este mismo invariante contra esos tags: en cada caso dejó de ser cierto
-> en la release siguiente (V3.73.1 frontend; V3.73.2 tests e instrumento del backend;
-> V3.73.3 y V3.73.4 arnés y tests), y habría producido un **P0 falso** en el primer
-> comando del auditor. Es un invariante **de la release vigente**, no del proyecto:
-> se re-ancla en cada cierre. La lección está admitida en `CHANGELOG.md` y en
-> `release-notes-v3.73.4.md`.
+> **Nota de historial (para que no se confunda con un hallazgo).** Tres versiones
+> anteriores de este documento estuvieron ancladas a `v3.73.0`, `v3.73.3` y
+> `v3.73.4`. En las tres, el documento se publicaba **fuera del tag que declaraba**
+> y fijaba a mano el SHA del commit de release, el objeto del tag y el id del run de
+> CI; como un commit no puede contener su propio SHA ni el id de la run que dispara
+> su push, el archivo nacía desfasado y cada cierre exigía un re-anclaje **posterior
+> al tag**. La lección se admitía como «se re-ancla en cada cierre» sin nombrar la
+> causa. **V3.73.5 cierra el problema en la raíz**: el ancla es el tag, el estado se
+> verifica por comando y el commit de release es final, de modo que el tag contiene
+> su propio punto de entrada. Si un futuro documento de este tipo vuelve a fijar un
+> SHA o un run a mano, es una regresión. La lección queda en `CHANGELOG.md` y en
+> `release-notes-v3.73.5.md`.
 
-**Estado de publicación (verificado, no declarado):**
+**Estado de publicación (verificado por comando, no fijado a mano):**
 
-- **CI 11/11 verde** en
-  [run 35251738073](https://github.com/jvelasca/english-tutor/actions/runs/35251738073)
-  (sha `5007c3a`, `success`), con los **11 jobs** en verde:
-  - `Backend (ruff + pytest)` `105305488535` · `Frontend (tsc + vitest + build)`
-    `105305488268` · `Release consistency` `105305488905` · `Validation gate (checks
-    automáticos)` `105305488802` · `Beta V3.0 gate` `105305488586` · `Content
-    validation` `105305488464` · `Playwright E2E (visual)` `105305488614` ·
-    `Launcher (ruff + pytest)` `105305488647` · `Product origin (UI served over
-    HTTPS)` `105305488683` · `Launcher (Windows, ruff + pytest)` `105305488585`
-    (**bloqueante**) · `Product origin (Windows, informativo)` `105305488660`
-    (**informativo declarado**, `continue-on-error: true`).
+```bash
+git rev-parse v3.73.5^{commit}      # SHA exacto del commit del tag
+gh run list --commit $(git rev-parse v3.73.5^{commit}) --limit 1
+```
+
+La run del commit del tag debe estar en **`success`** con los **11 jobs** en verde:
+`Backend (ruff + pytest)` · `Frontend (tsc + vitest + build)` · `Release
+consistency` · `Validation gate (checks automáticos)` · `Beta V3.0 gate` · `Content
+validation` · `Playwright E2E (visual)` · `Launcher (ruff + pytest)` · `Product
+origin (UI served over HTTPS)` · `Launcher (Windows, ruff + pytest)`
+(**bloqueante**) · `Product origin (Windows, informativo)` (**informativo
+declarado**, `continue-on-error: true`).
+
 - **Nota para el auditor:** el run se dispara con el **push de `main`**; el tag se
-  publicó en el mismo push y apunta al commit de release.
+  publica en el mismo push y apunta al commit de release.
 
 **Consistencia de versión:** `backend/config.py::VERSION` es la fuente única
-(`scripts/check_release_consistency.py`) y `3.73.4` debe aparecer en **6 orígenes**:
+(`scripts/check_release_consistency.py`) y `3.73.5` debe aparecer en **6 orígenes**:
 `backend/config.py`, `frontend/package.json`, `frontend/package-lock.json`,
 `README.md`, `CHANGELOG.md` y `PLAN.md`.
 
@@ -162,7 +180,7 @@ diferencia en esas cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
 | `frontend/scripts/contrast_audit.mjs` + `docs/audit/generated/contrast-report.{json,md}` | Instrumento propio de contraste WCAG AA de los **7 acentos**, **en CI** | Que el contraste está **medido**, no afirmado |
 | `frontend/tests/visual/{accentContrast,keyboard,reducedMotionAndZoom}.spec.ts` | Playwright: contraste, skip link y activación por teclado del hub, `prefers-reduced-motion` (GUI-05) y zoom 200 %/reflow (GUI-06) | Que hay **cuatro** contratos de UI con evidencia ejecutada (y que **no** hay motor de a11y tipo `axe`) |
 
-### 2.3 V3.73.2, V3.73.3 y V3.73.4 — la CI, el kit y la trazabilidad
+### 2.3 V3.73.2, V3.73.3, V3.73.4 y V3.73.5 — la CI, el kit y la trazabilidad
 
 | Ruta | Qué es | Qué afirma |
 |---|---|---|
@@ -208,7 +226,7 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py status              
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict      # declarado: exit 1
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict --same-tree  # declarado: exit 1
 backend\.venv\Scripts\python.exe scripts\check_i18n_coverage.py --strict         # declarado: 0 huérfanas
-backend\.venv\Scripts\python.exe scripts\check_release_consistency.py            # declarado: 3.73.4, 6 orígenes
+backend\.venv\Scripts\python.exe scripts\check_release_consistency.py            # declarado: 3.73.5, 6 orígenes
 backend\.venv\Scripts\python.exe scripts\check_beta_v3.py                        # declarado: OK
 cd backend
 .venv\Scripts\python.exe scripts\content_validation.py                           # declarado: OK
@@ -605,16 +623,15 @@ proyecto, que acotan lo que puede leerse como demostrado:
 **Estado del punto de entrada: CERRADO (2026-09-17).** Verificado contra GitHub, no
 contra el árbol local:
 
-- **Commit de release:** `5007c3a` (`5007c3a59127701932a0c1c21525da6936f9f7fa`).
-- **Tag anotado:** `v3.73.4` (objeto `3f2ec88`), apuntando a `5007c3a`.
-- **`main`:** `5007c3a` como ancla de código, más el commit de cierre documental que
-  re-ancla este archivo (solo documentación).
-- **CI 11/11 verde** en el
-  [run 35251738073](https://github.com/jvelasca/english-tutor/actions/runs/35251738073)
-  (sha `5007c3a`, `success`).
-- **Invariante del código:** `git diff --stat v3.73.4..main -- backend frontend
+- **Release auditada:** el tag anotado **`v3.73.5`**; el commit y el objeto del tag
+  se resuelven con `git rev-parse` (§1), no se fijan a mano.
+- **`main`:** el tag se publica sobre el mismo commit que `main`; desde V3.73.5
+  **no hay commit documental posterior al tag** (el punto de entrada viaja dentro).
+- **CI:** `success` con los **11 jobs** en verde en la run del commit del tag
+  (`gh run list --commit $(git rev-parse v3.73.5^{commit}) --limit 1`).
+- **Invariante del código:** `git diff --stat v3.73.5..main -- backend frontend
   launcher scripts` sale **vacío**.
-- **Consistencia de versión:** `3.73.4` en los **6 orígenes**
+- **Consistencia de versión:** `3.73.5` en los **6 orígenes**
   (`scripts/check_release_consistency.py`).
 
 **Informe esperado:** `docs/audit/AI-AUDITORIA-CIERRE-V373.md`.

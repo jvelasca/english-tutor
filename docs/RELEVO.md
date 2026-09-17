@@ -5,6 +5,32 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-17 (UTC+2).
 >
+> **Nota (2026-09-17): V3.73.5 (ancla del punto de entrada de la auditoría) —
+> release de PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.5`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos**, y **sin
+> tocar el arnés de validación, sus tests ni el contrato de los 7 gates** (el diff es
+> **documentación**). Cierra un defecto **estructural** de trazabilidad: el punto de
+> entrada de la auditoría externa (`agentes/auditoria-total-externa-v373.md`) se
+> publicaba **fuera del tag que él mismo declaraba**, porque fijaba a mano el SHA del
+> commit de release, el objeto del tag y el id del run de CI —tres datos que **no
+> pueden existir** cuando se escribe el commit: un commit no contiene su propio SHA
+> ni el id de la run que dispara su push—, así que cada cierre obligaba a un
+> re-anclaje **posterior al tag**. Desde V3.73.5 **el ancla es el tag** (commit y
+> objeto se resuelven con `git rev-parse`) y el **estado de publicación se verifica
+> por comando** (`gh run list --commit <sha>`), de modo que el documento es coherente
+> **dentro de su propio tag** y el commit de release es **final**: `main` deja de ir
+> por delante en documentación. El invariante del código se enuncia **entre el tag y
+> `main`** (`git diff --stat v3.73.5..main -- backend frontend launcher scripts`
+> debe salir vacío). **Verificación:** `check_release_consistency` en los **6
+> orígenes** (`3.73.5`); sin cambios de producto, las cifras de test son las de
+> V3.73.4 (backend **2796 passed · 2 skipped** en el worktree limpio, frontend vitest
+> **712**, launcher **113**), `ruff`/`tsc` limpios, i18n `--strict` **0/0/0** y
+> `validation_gate.py auto --require-dist` **10/10** con el informe regenerado
+> idéntico. **Los 7 gates siguen `pending`**: el siguiente hito sigue siendo
+> ejecutar físicamente G1–G7. Ver `release-notes-v3.73.5.md`.
+>
 > **Nota (2026-09-17): V3.73.4 (recorder trazable) — release de PARCHE, sin
 > capacidad pedagógica nueva y sin cambios de producto.**
 > Release **`v3.73.4`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
@@ -3664,7 +3690,34 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.4` **recorder trazable** (release
+**Posición actual (2026-09-17):** `v3.73.5` **ancla del punto de entrada de la
+auditoría** (release de **PARCHE**: **SIN migración de BD**, **SIN bump de
+`GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN
+tocar el currículum** y **SIN cambios de PRODUCTO**: backend de producto, frontend de
+producto y launcher intactos, y el arnés de validación, sus tests y el contrato de los
+7 gates sin tocar — el diff es **documentación**). Cierra un defecto **estructural** de
+trazabilidad que estaba admitido como rutina: el punto de entrada de la auditoría
+externa se publicaba **fuera del tag que declaraba**, porque fijaba a mano el SHA del
+commit de release, el objeto del tag anotado y el id del run de CI, y **esos tres datos
+no pueden existir** cuando se escribe el commit (un commit no contiene su propio SHA ni
+el id de la run que dispara su push). Consecuencia: cada cierre exigía un commit de
+re-anclaje **posterior al tag**, que a su vez quedaba fuera del tag siguiente, y `main`
+iba siempre por delante en documentación. **Desde V3.73.5 el ancla es el tag** —el commit
+y el objeto del tag se resuelven con `git rev-parse`, y el run con
+`gh run list --commit <sha>`—, así que el documento es coherente **dentro de su propio
+tag** y el commit de release es **final**: el tag **contiene** su punto de entrada.
+El invariante del código se enuncia **entre el tag y `main`** (`git diff --stat
+v3.73.5..main -- backend frontend launcher scripts` debe salir **vacío**), que es lo que
+el auditor puede comprobar al ejecutarlo. **Verificación:** `check_release_consistency`
+en los **6 orígenes** (`3.73.5`); sin cambios de producto, las cifras de test son las de
+V3.73.4 (backend **2796 passed · 2 skipped** (2798 casos) en el `git worktree` limpio,
+frontend vitest **712 passed**, launcher **113**), `ruff`/`tsc` limpios, i18n `--strict`
+**0/0/0** y `auto --require-dist` **10/10**. **El código sigue congelado:** los 7 gates
+siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` (y, con el
+árbol congelado, `status --strict --same-tree`) salga 0. Ver la nota de cabecera y
+`release-notes-v3.73.5.md`.
+
+**Release anterior — `v3.73.4` recorder trazable** (release
 de **PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
 `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
 **SIN cambios de PRODUCTO**: backend de producto, frontend de producto y launcher

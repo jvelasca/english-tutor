@@ -1,7 +1,7 @@
 {
   "name": "english-tutor-frontend",
   "private": true,
-  "version": "3.73.4",
+  "version": "3.73.5",
   "type": "module",
   "scripts": {
     "dev": "vite",

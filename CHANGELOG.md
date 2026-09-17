@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.73.5] — 2026-09-17
+
+**Cierre documental del punto de entrada de la auditoría externa. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (el backend de producto, el frontend de producto y el launcher quedan intactos: el diff es **documentación**). Ninguna capacidad pedagógica nueva.
+
+Hasta V3.73.4, el punto de entrada de la auditoría externa se publicaba **fuera del tag que él mismo declaraba**: el re-anclaje se hacía en un commit posterior al tag, y el documento fijaba a mano tres datos —el SHA del commit de release, el objeto del tag anotado y el id numérico del run de CI—. Esos tres datos **no pueden existir cuando se escribe el commit**: un commit no contiene su propio SHA ni el id de la run que ese mismo push va a disparar. El documento quedaba, por tanto, desfasado **por construcción**, y cada cierre obligaba a un commit de re-anclaje que a su vez quedaba fuera del tag siguiente. El ciclo no era un descuido de redacción: era estructural.
+
+- **El ancla pasa a ser el tag, no el SHA.** El documento declara la release auditada **por su tag** y da el comando que resuelve el commit y el objeto del tag (`git rev-parse`), en vez de fijar valores que solo se conocen después de publicar. El resultado es un documento **coherente dentro de su propio tag** y un commit de release **final**: no hace falta ningún commit posterior, así que el tag deja de ir por detrás de `main` en documentación.
+- **El estado de publicación se verifica por comando.** El run de CI y su SHA pasan de dato fijado a **comprobación reproducible** (`gh run list --commit <sha>`), con lo que el auditor obtiene el estado real del tag en el momento de auditar, no una foto que envejece.
+- **La nota de historial se renueva.** La lección deja de admitirse como «se re-ancla en cada cierre» y pasa a describir la causa raíz (datos imposibles de tener en el commit) y su cierre: el invariante de código se enuncia **entre el tag y `main`**, que es lo que el auditor puede comprobar.
+- **Sin cambios de producto ni de instrumento.** No se toca el arnés de validación, ni los tests, ni el contrato de los gates: `scripts/validation_gate.py`, sus tests y los siete gates quedan exactamente como en V3.73.4. El informe determinista `docs/audit/generated/release-validation.{md,json}` solo cambia en la versión que declara.
+- **Verificación.** Ver `release-notes-v3.73.5.md`.
+
 ## [3.73.4] — 2026-09-17
 
 **Recorder trazable. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (el backend de producto, el frontend de producto y el launcher quedan intactos: el diff es el **arnés de validación**, **tests** y **documentación**). Ninguna capacidad pedagógica nueva.
