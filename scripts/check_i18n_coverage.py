@@ -1,19 +1,30 @@
 """Checker de cobertura i18n del frontend (auditoría F, V3.0).
 
-Escanea `frontend/src` y cruza las claves usadas por `t(...)` con las definidas
-en `frontend/src/utils/i18n.ts` (STRINGS). Reporta:
+Escanea `frontend/src` y cruza las claves usadas con las definidas en
+`frontend/src/utils/i18n.ts` (STRINGS). Reporta:
 
 - claves definidas pero nunca usadas (warnings: candidatas a limpieza),
 - claves usadas pero NO definidas (error: rompería en runtime),
 - claves duplicadas en STRINGS (error),
 - entradas con `en` o `es` vacíos (error),
-- familias dinámicas `t(`prefix.${...}`)` (las marca como usadas por prefijo).
+- familias dinámicas (se marcan como usadas por prefijo). V3.72 reconoce tres
+  formas de indirección que antes se confundían con claves muertas:
+  1. `t(`prefix.${...}`)` — interpolación dentro de la llamada;
+  2. plantillas de helpers fuera de `t(...)` (`groupKey(state)` →
+     ``` `convRoutes.levelStates.${state}` ```);
+  3. namespace declarado en un config (`ns: "gramRoutes"`), que
+     `QuizRoutePage` combina como `` `${ns}.${key}` ``.
 
 Salida: stdout + `docs/audit/generated/i18n-report.{json,md}`.
 
 Uso:
     python scripts/check_i18n_coverage.py
     python scripts/check_i18n_coverage.py --strict   # exit 1 con warnings
+
+V3.72 (§UE): el informe está a **0 huérfanas / 0 duplicadas / 0 vacías** y el
+checker corre en el CI en modo `--strict` (job `frontend`), así que una clave
+muerta nueva vuelve a fallar el gate. Los candados que lo vigilan viven en
+`backend/tests/test_docs_drift_v372.py`.
 """
 from __future__ import annotations
 
@@ -38,6 +49,16 @@ _T_LIT = re.compile(r"""\bt\(\s*(['"])((?:\\.|(?!\1).)+?)\1\s*\)""")
 _T_TPL = re.compile(r"""\bt\(\s*`([^`]*)`(?:\s+as\s+[^)]*)?\s*\)""")
 # prefijo literal antes del primer ${ de un template
 _TPL_PREFIX = re.compile(r"^([A-Za-z0-9_.-]*)\$\{")
+# Cualquier template literal del código con prefijo literal (` `a.b.${x}` `),
+# no solo los que aparecen dentro de un `t(...)`: los helpers que construyen la
+# clave fuera de la llamada (p. ej. `groupKey(state)` → `convRoutes.levelStates.
+# ${state}`) también son familias dinámicas legítimas.
+_TPL_ANY = re.compile(r"`([A-Za-z0-9_.-]*)\$\{")
+# Indirección por NAMESPACE: la página compartida de quiz (`QuizRoutePage`) arma
+# la clave como `` `${ns}.${key}` `` a partir de `ns: "gramRoutes"`. El único
+# literal que aparece en el código es el namespace, así que sus familias completas
+# (`gramRoutes.*`) están vivas aunque el escáner no vea la clave final.
+_NS_LIT = re.compile(r"""\bns\s*[:=]\s*['"]([A-Za-z0-9_.-]+)['"]""")
 
 
 def _scan_balanced(text: str, open_index: int) -> int:
@@ -171,6 +192,19 @@ def main() -> int:
             dynamic_prefixes.add(prefix.group(1))
         else:
             dynamic_odd.add(raw)
+
+    # Familias dinámicas construidas por helpers (la clave no se arma dentro del
+    # `t(...)`, así que el escáner anterior no las ve). Sin esto, borrar las
+    # «huérfanas» se llevaría por delante claves vivas como
+    # `convRoutes.levelStates.mastered` (las usa `groupKey(state)`).
+    for m in _TPL_ANY.finditer(blob):
+        prefix = m.group(1)
+        if prefix:
+            dynamic_prefixes.add(prefix)
+
+    # Namespaces i18n declarados en configs (`ns: "gramRoutes"`).
+    for m in _NS_LIT.finditer(blob):
+        dynamic_prefixes.add(f"{m.group(1)}.")
 
     # Una clave se considera en uso si aparece como literal en el código fuente
     # (directo en `t(...)`, vía indirección como `i18nKey:`/`titleKey:`, o por

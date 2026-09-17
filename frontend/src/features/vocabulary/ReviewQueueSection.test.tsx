@@ -112,6 +112,68 @@ describe("ReviewQueueSection (V3.35)", () => {
     expect(screen.getByText("Understood but not produced yet")).toBeTruthy();
   });
 
+  it("declara el `why` del planner en la fila (V3.72: por qué esta tarjeta)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "recall",
+            reason: "no_recall_evidence",
+            why: "recognition without recall evidence; due for review (memory decayed)",
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    const line = await screen.findByText(/recognition without recall evidence/);
+    // El texto es del servidor: la UI solo añade la etiqueta traducida.
+    expect(line.textContent).toBe(
+      "Why? recognition without recall evidence; due for review (memory decayed)",
+    );
+  });
+
+  it("sin `why` declarado la fila no inventa un porqué (V3.72)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          {
+            word: "river",
+            lexical_unit: "river",
+            cefr: "A1",
+            kind: "word",
+            due_at: "",
+            state: "review",
+            stability: 1,
+            retrievability: 0.4,
+            elapsed_days: 9,
+            activity: "recognition",
+            reason: "weak_recognition",
+            competence: null,
+            evidence: null,
+          },
+        ],
+      }),
+    );
+    renderSection();
+
+    await screen.findByText("river");
+    expect(screen.queryByText("Why?")).toBeNull();
+  });
+
   it("solo revela la palabra cuando la actividad es Recognition", async () => {
     mocks.getReviewQueue.mockResolvedValue(
       queue({

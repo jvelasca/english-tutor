@@ -6,6 +6,7 @@ import type { Section } from "../utils/sections";
 import { SKILL_LABELS } from "../utils/learningLabels";
 import { useI18n } from "../hooks/useI18n";
 import { nextBestTitle } from "./NextBestCard";
+import { WhyThisActivity } from "./WhyThisActivity";
 import { Button } from "./ui/button";
 
 const SKILL_TO_SECTION: Record<string, Section> = {
@@ -139,6 +140,9 @@ export function NextStep({
           {t("home.continue")}
         </button>
       </div>
+      {/* V3.72: el pie también declara por qué propone esa actividad (mismo
+          contrato `why` que `NextBestCard`); sin `why` no pinta nada. */}
+      <WhyThisActivity variant="compact" why={next.why} />
     </div>
   );
 }

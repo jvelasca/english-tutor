@@ -11,6 +11,7 @@ import type {
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
+import { PanelState } from "../../components/PanelState";
 import { cn } from "../../lib/utils";
 
 interface AssessmentLadderProps {
@@ -40,20 +41,25 @@ export function AssessmentLadder({ userId, levelId }: AssessmentLadderProps) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // V3.72 (F4): un fallo de la escalera deja de ser invisible.
+  const [state, setState] = useState<"loading" | "error" | "done">("loading");
+  const [tick, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await getAssessmentV2Ladder(userId, levelId);
       setLadder(data);
+      setState("done");
     } catch {
-      /* backend no disponible */
+      setState("error");
     }
   }, [userId, levelId]);
 
   useEffect(() => {
+    setState("loading");
     void refresh();
-  }, [refresh]);
+  }, [refresh, tick]);
 
   if (!userId) return null;
 
@@ -104,13 +110,17 @@ export function AssessmentLadder({ userId, levelId }: AssessmentLadderProps) {
         </p>
       </div>
 
-      {error && (
+      {state !== "done" && (
+        <PanelState state={state} onRetry={() => setTick((n) => n + 1)} />
+      )}
+
+      {state === "done" && error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
 
-      {ladder && (
+      {state === "done" && ladder && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {KIND_ORDER.map((kind) => {

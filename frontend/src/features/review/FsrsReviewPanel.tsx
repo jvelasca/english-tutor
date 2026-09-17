@@ -4,6 +4,7 @@ import type { FsrsCard, FsrsDue } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
+import { PanelState } from "../../components/PanelState";
 import { cn } from "../../lib/utils";
 
 interface FsrsReviewProps {
@@ -31,6 +32,9 @@ export function FsrsReviewPanel({ userId }: FsrsReviewProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastExplain, setLastExplain] = useState<string | null>(null);
+  // V3.72 (F4): un fallo de la cola deja de ser invisible.
+  const [state, setState] = useState<"loading" | "error" | "done">("loading");
+  const [tick, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -38,14 +42,16 @@ export function FsrsReviewPanel({ userId }: FsrsReviewProps) {
       const data = await getFsrsDue(userId, 15);
       setQueue(data);
       setCurrent(data.cards[0] ?? null);
+      setState("done");
     } catch {
-      /* backend no disponible */
+      setState("error");
     }
   }, [userId]);
 
   useEffect(() => {
+    setState("loading");
     void refresh();
-  }, [refresh]);
+  }, [refresh, tick]);
 
   if (!userId) return null;
 
@@ -81,27 +87,34 @@ export function FsrsReviewPanel({ userId }: FsrsReviewProps) {
         <p className="text-sm text-muted-foreground">{t("fsrs.subtitle")}</p>
       </div>
 
-      {error && (
+      {state !== "done" && (
+        <PanelState
+          state={state}
+          onRetry={() => setTick((n) => n + 1)}
+        />
+      )}
+
+      {state === "done" && error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
 
-      {queue && (
+      {state === "done" && queue && (
         <p className="text-sm text-muted-foreground">
           {t("fsrs.dueCount")}: {queue.due_count}
         </p>
       )}
 
-      {lastExplain && (
+      {state === "done" && lastExplain && (
         <p className="text-xs text-muted-foreground">{lastExplain}</p>
       )}
 
-      {!current && (
+      {state === "done" && !current && (
         <p className="text-sm text-muted-foreground">{t("fsrs.empty")}</p>
       )}
 
-      {current && explain && (
+      {state === "done" && current && explain && (
         <Card className="space-y-3 p-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">

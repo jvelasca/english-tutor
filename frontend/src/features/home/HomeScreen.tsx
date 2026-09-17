@@ -171,6 +171,7 @@ export function HomeScreen({
   }
 
   const level = profile?.estimated_level ?? null;
+  const targetLevel = profile?.target_level ?? null;
   const streak = history?.streak;
 
   const hour = new Date().getHours();
@@ -202,7 +203,25 @@ export function HomeScreen({
           </h1>
           {(level || streak) && (
             <div className="flex flex-wrap items-center gap-2">
-              {level && <EstimatedLevelBadge level={level} />}
+              {level && (
+                // V3.72 (F3): ancla textual «estás aquí» + posición en la ruta
+                // (nivel estimado → nivel meta). El badge ya declara que el nivel
+                // es ESTIMADO, no certificado.
+                <span
+                  data-testid="home-level-anchor"
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1"
+                >
+                  <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                    {t("home.youAreHere")}
+                  </span>
+                  <EstimatedLevelBadge level={level} />
+                  {targetLevel && (
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {t("home.yourTarget").replace("{level}", targetLevel)}
+                    </span>
+                  )}
+                </span>
+              )}
               {streak && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                   <Flame className="size-3.5" aria-hidden="true" />

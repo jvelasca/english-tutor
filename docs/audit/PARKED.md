@@ -37,12 +37,9 @@
 
 ## UX (mejoras anotadas, no urgentes)
 
-- Depuración de las **50 claves i18n huérfanas** (candidatas legacy;
-  `docs/audit/generated/i18n-report.json`).
-- Decidir **consolidación de la doble lectura de readiness** en Home y ancla
-  textual «Estás aquí» (F2/F3).
-- Extender el **patrón loading/error** (aplicado en Home) a los paneles
-  profundos que hoy tragan errores en silencio (F4).
+> F2, F3, F4 y la depuración de claves i18n huérfanas **se cerraron en V3.72**
+> (ver su sección al final); ya no viven en esta lista.
+
 
 ## V3.70 — auditoría pedagógica (1 P0 · 15 P1 · 12 P2 · 5 P3)
 
@@ -103,12 +100,16 @@
   no se escala.
 - **P1 · Cuatro de seis niveles sin examen final** (A2, B2, C1, C2).
 - **P2 · Placement por reconocimiento/meta-lenguaje** para
-  listening/speaking/writing/pronunciation (lo declara su docstring).
+  listening/speaking/writing/pronunciation (lo declara su docstring). **V3.72**:
+  divulgado en el instrumento y en su contrato; la pantalla de nivelación no existe
+  (ningún componente consume el placement) → **V4.0.x**, con candado-tripwire.
 - **P2 · Sesgo de forma del placement**: correcta = más larga única en el **50 %**,
   más larga o empatada en el **75 %**, **70,8 %** en la posición 1 y la **posición
   3 nunca** correcta.
 - **P2 · Umbrales de banda triplicados** y sub-bandas `+` que **ningún estimador
-  emite**.
+  emite**. **Cerrado en V3.72** (un solo módulo del corte; `+` retiradas de la
+  emisión y conservadas como descriptores; `pre-a1` conserva su emisor):
+  `docs/audit/AE-PED-INSTRUMENTOS.md` §Cierre.
 - **P3 · `pronunciation` fuera de la matriz a propósito** y **escenarios de
   speaking con 1 en A1 y 1 en C1**.
 
@@ -155,11 +156,6 @@
   **consentimiento** del usuario, y consumo de `X-TTS-Voice`/`X-TTS-Degraded`. El
   backend **ya expone** el dato; el P1 quedó cerrado en sus otros dos vectores
   (timeout y degradación) y este **no puede volver al olvido** porque está fechado.
-- **RC-01 · Servido de `frontend/dist` → V3.72/V3.73.** Hoy la UI la sirve el dev
-  server de Vite y **Node + npm son requisito de EJECUCIÓN**; se declaró con
-  condición de salida en lugar de implementarse (decisión A del briefing de V3.71)
-  porque la pregunta «¿qué debe tener instalado el usuario?» se responde con el eje
-  RB y el empaquetado está vetado.
 
 ### Deuda aceptada (declarada, no se arregla sin datos o sin decisión)
 
@@ -177,6 +173,54 @@
   instalación lo declara `exists=None` a propósito (el modelo lo gestiona el
   servicio de Ollama). Si el usuario no lo ejecuta, la app degrada en el chat y el
   runtime no puede evitarlo.
+
+## V3.72 — UX / product completion
+
+> Origen: briefing `agentes/v372-ux-product-completion.md`. Aquí va lo que V3.72
+> **deja sin cerrar a propósito**. Lo cerrado en V3.72 no se aparca: ya no es
+> deuda.
+
+### Cerrado en V3.72 (deja de ser deuda)
+
+- **RC-01 · Servido de `frontend/dist`.** El backend sirve la UI compilada por HTTPS
+  en el mismo origen (`:8000`) y el launcher compila el artefacto si falta: **Node
+  pasa de requisito de EJECUCIÓN a requisito de COMPILACIÓN**. Cierre y evidencia en
+  `docs/audit/RC-RUNTIME-PRODUCTO.md` (§RC-01 · Cierre) y candados en
+  `backend/tests/test_docs_drift_v372.py`.
+
+### Cerrado en V3.72 (deuda UX)
+
+- **F2** (doble lectura de readiness en Home), **F3** («estás aquí» con nivel
+  estimado y objetivo) y **F4** (patrón loading/error/reintento en
+  `FsrsReviewPanel`, `EvidenceGraphPanel` y `AssessmentLadder`).
+- **«Por qué esta actividad» (Q5 de `F-UX-JOURNEY.md`)**: el `why` que el motor ya
+  declaraba se pinta también en el pie «Next» de cada práctica (`NextStep`) y en
+  las filas de la cola de repaso (`ReviewQueueSection`), con una sola pieza
+  compartida (`components/WhyThisActivity.tsx`) y **sin recalcular señales en
+  cliente** (premisa 21). Detalle en `docs/audit/F-UX-JOURNEY.md` §V3.72.
+- **i18n**: `docs/audit/generated/i18n-report.json` queda a **0 huérfanas / 0
+  duplicadas / 0 vacías**. El checker de V3.72 aprende dos indirecciones que
+  antes contaba como huérfanas — plantillas de helper fuera de `t(...)` y el
+  namespace `ns: "…"` de la página compartida de quiz — y eso reduce el residuo
+  real de **10 claves** (no 50: la cifra de la auditoría F incluía falsos
+  positivos de esas familias vivas). El checker corre ahora en el CI en
+  `--strict`, así que una huérfana nueva vuelve a fallar el gate.
+- **AE-04** (divulgación del placement): la limitación («mide reconocimiento/
+  meta-lenguaje, no producción») queda declarada en el instrumento y en su
+  contrato, y un candado avisa en cuanto el placement tenga pantalla: hoy **no
+  existe superficie** (ningún componente consume `api/academy.ts`), así que la
+  pantalla de nivelación sigue fuera de alcance (**→ V4.0.x**, con el onboarding
+  o donde se muestre el resultado).
+- **AE-06** (umbrales de banda): **cerrado**. Un solo módulo del corte
+  (`services/cefr.py`) y decisión declarada sobre sub-bandas: `pre-a1` se
+  conserva con su emisor; las `+` se retiran de la emisión y quedan como
+  contenido de descriptores (ver `docs/audit/AE-PED-INSTRUMENTOS.md` §Cierre).
+
+### Fuera de alcance declarado (no es deuda nueva)
+
+- **Progreso real de descarga de voces**: el endpoint es síncrono y bloqueante; V3.72
+  entrega consentimiento + aviso + progreso **indeterminado**.
+- **Empaquetado/instalador** (vetado) y **multiplataforma** (el launcher es Windows).
 
 ## Pendientes de acción humana (no aparcados, en curso)
 

@@ -1,10 +1,11 @@
 import type { ComponentType } from "react";
 import type { NextBestActivity } from "../types/api";
-import { SKILL_LABELS, SUBSKILL_LABELS, dimensionLabel } from "../utils/learningLabels";
+import { SKILL_LABELS, SUBSKILL_LABELS } from "../utils/learningLabels";
 import { useI18n } from "../hooks/useI18n";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { WhyThisActivity } from "./WhyThisActivity";
 import {
   GrammarIcon,
   ListeningIcon,
@@ -65,35 +66,15 @@ export function NextBestCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {t(`reason.${next.reason}`)} · {next.minutes} {t("home.min")}
           </p>
-          {next.why && (
-            <p className="mt-2 text-sm text-foreground/90">
-              <span className="font-semibold">
-                {t("home.whyThisActivity")}
-              </span>{" "}
-              {next.why}
-            </p>
-          )}
-          {next.because && next.because.length > 0 && (
-            <div className="mt-2 text-sm text-foreground/90">
-              <p className="font-semibold">{t("home.because")}</p>
-              <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-muted-foreground">
-                {next.because.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ol>
-              {next.limiting_factor && (
-                <p className="mt-1 text-xs">
-                  {t("home.limitingFactor")}:{" "}
-                  <span className="font-medium text-foreground">
-                    {dimensionLabel(next.limiting_factor.id)}
-                    {next.limiting_factor.missing
-                      ? ` (${t("home.missing")})`
-                      : ` · ${Math.round(next.limiting_factor.score * 100)}%`}
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
+          {/* V3.72: el «por qué» se presenta con la pieza compartida (la misma
+              que usan el pie «Next» y la cola de repaso) para que haya un solo
+              contrato visual del `why` declarado por el motor. */}
+          <WhyThisActivity
+            className="mt-2"
+            why={next.why}
+            because={next.because}
+            limitingFactor={next.limiting_factor}
+          />
         </div>
         <Button size="lg" className="shrink-0 gap-2" onClick={onStart}>
           {t("home.continue")}

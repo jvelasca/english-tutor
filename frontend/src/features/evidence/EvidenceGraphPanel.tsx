@@ -4,6 +4,7 @@ import type { EvidenceGraph, EvidenceGraphNode } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { Card } from "../../components/ui/card";
 import { ObjectiveNodeCard } from "../../components/ObjectiveNodeCard";
+import { PanelState } from "../../components/PanelState";
 import { dimensionLabel } from "../../utils/learningLabels";
 import { cn } from "../../lib/utils";
 
@@ -26,6 +27,9 @@ export function EvidenceGraphPanel({
   const { t } = useI18n();
   const [graph, setGraph] = useState<EvidenceGraph | null>(null);
   const [selected, setSelected] = useState<EvidenceGraphNode | null>(null);
+  // V3.72 (F4): un fallo del grafo deja de ser invisible.
+  const [state, setState] = useState<"loading" | "error" | "done">("loading");
+  const [tick, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -33,14 +37,16 @@ export function EvidenceGraphPanel({
       const data = await getEvidenceGraph(userId, levelId);
       setGraph(data);
       setSelected(data.nodes[0] ?? null);
+      setState("done");
     } catch {
-      /* backend no disponible */
+      setState("error");
     }
   }, [userId, levelId]);
 
   useEffect(() => {
+    setState("loading");
     void refresh();
-  }, [refresh]);
+  }, [refresh, tick]);
 
   if (!userId) return null;
 
@@ -53,7 +59,11 @@ export function EvidenceGraphPanel({
         </p>
       </div>
 
-      {graph && (
+      {state !== "done" && (
+        <PanelState state={state} onRetry={() => setTick((n) => n + 1)} />
+      )}
+
+      {state === "done" && graph && (
         <Card className="space-y-2 p-3 text-sm">
           <p>
             <span className="text-muted-foreground">
@@ -81,7 +91,7 @@ export function EvidenceGraphPanel({
         </Card>
       )}
 
-      {graph && graph.nodes.length > 0 && (
+      {state === "done" && graph && graph.nodes.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {/* V3.17/H2 (auditoría externa): listado COMPLETO de nodos del nivel,
               sin recorte a 12 — con niveles de 20 objetivos todos deben ser
@@ -104,7 +114,7 @@ export function EvidenceGraphPanel({
         </div>
       )}
 
-      {selected && (
+      {state === "done" && selected && (
         <ObjectiveNodeCard
           userId={userId}
           objectiveId={selected.objective_id}
@@ -112,7 +122,7 @@ export function EvidenceGraphPanel({
         />
       )}
 
-      {!graph && (
+      {state === "done" && !graph && (
         <p className="text-sm text-muted-foreground">{t("evidenceGraph.empty")}</p>
       )}
     </div>

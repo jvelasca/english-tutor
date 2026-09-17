@@ -192,4 +192,19 @@ describe("TodayPlan sesión enriquecida (V3.17, D6/M1)", () => {
     expect(note.textContent).not.toContain(": transfer ·");
     expect(note.textContent).toContain("30%");
   });
+
+  it("F2 (V3.72): el readiness se lee una sola vez en Home", async () => {
+    // `TodayPlan` es la ÚNICA superficie de readiness de Home desde V3.72: la
+    // tríada (`TriadCard`) se reserva a Progreso/Trayecto (hallazgo F2 de la
+    // auditoría UX). Si este test empieza a encontrar dos barras, la duplicidad
+    // ha vuelto.
+    routeFetch({ student_model: MODEL, session: SESSION_GRAPH, goal: GOAL });
+    renderPlan(<TodayPlan userId="u1" />);
+
+    await screen.findByText("Greetings");
+
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars).toHaveLength(1);
+    expect(bars[0].getAttribute("aria-valuenow")).toBe("55");
+  });
 });

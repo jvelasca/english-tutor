@@ -24,6 +24,7 @@ import type {
 import { useI18n } from "../../hooks/useI18n";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { WhyThisActivity } from "../../components/WhyThisActivity";
 import { WordDrill } from "./wordDrill";
 import { cn } from "../../lib/utils";
 
@@ -231,6 +232,9 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
                   <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                     {t(`dictionary.review.reason.${entry.reason}`)}
                   </p>
+                  {/* V3.72: el `why` que el planner ya declaraba para esta
+                      tarjeta deja de descartarse. Solo se renderiza. */}
+                  <WhyThisActivity variant="compact" why={entry.why} />
                   {entry.decision && (
                     <DecisionSignals decision={entry.decision} t={t} />
                   )}

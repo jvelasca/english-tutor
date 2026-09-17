@@ -23,7 +23,7 @@ Verificado en `HomeScreen.tsx`, `NextBestCard.tsx`, `TriadCard.tsx` y claves `ho
 | 2 | **How am I doing** | tarjeta progreso + `Stat` inferior + tríada | tendencia (chip Improving/Needs review/Stable), racha actual y mejor (`history.streak`), actividad reciente agregada, readiness% con barra animada | **Sí.** La sección está marcada `aria-label="home.yourProgress"`. |
 | 3 | **What is weak** | `home.nextFocus` + `SkillBar` × 6 | `profile.readiness.blocking_skills[0]` (primer skill bloqueante) + etiquetas de dominio por skill (`mastery.strong/developing/needsPractice` por umbral 0.75/0.5) | **Parcial en Home:** da el skill débil y el color por skill, pero la sub-destreza concreta y el `because[]` están en el panel Evidence Graph (accesible), no en Home. Aceptable por jerarquía de información. |
 | 4 | **What should I do now** | `NextBestCard` | única actividad de `GET /api/academy/next-best` con título, icono de skill, razón (`reason.*`), minutos y CTA «Continue»; si no hay nada → «All done for today» | **Sí**, acción dominante única (con matiz de estados: ver F1). |
-| 5 | **Why** | `NextBestCard` | `reason`, frase `why`, lista `because[]` y `limiting_factor` (id + score % o `missing`) | **Sí**, con la jerarquía recomendada: por qué → porque → factor limitante. |
+| 5 | **Why** | `NextBestCard` · `NextStep` · `ReviewQueueSection` | `reason`, frase `why`, lista `because[]` y `limiting_factor` (id + score % o `missing`) | **Sí, y desde V3.72 en todas las superficies que lo reciben:** el pie «Next» del bucle (`NextStep`, lo que ve el alumno al terminar cualquier práctica) y las filas de la cola de repaso pintan el `why` declarado por el motor con la pieza compartida `WhyThisActivity`; ninguna lo recalcula (premisa 21). |
 
 ## Evidencia — checker i18n (2026-09-02, exit 0)
 
@@ -56,12 +56,37 @@ Validación: `npx tsc --noEmit` (exit 0) y `npx vitest run` (31 ficheros / 245 t
 | # | Sev. | Hallazgo | Evidencia | Recomendación | Estado |
 |---|---|---|---|---|---|
 | F1 | media | Home mostraba «All done for today» (éxito) cuando el backend no respondía o no había usuario: positivo falso en el estado vacío más visible de la app. | `HomeScreen.tsx` pre-fix | Diferenciar loading/error/done; error neutro + reintento, éxito solo con respuesta real. | **fix aplicado** (2026-09-02) |
-| F2 | baja | Duplicidad de lectura de readiness en Home: `TriadCard` y la tarjeta inmediatamente inferior muestran el mismo readiness% casi yuxtapuestos. | `HomeScreen.tsx` (tríada + card) | Decidir consolidación: reservar la tríada para Progress y dejar en Home nivel + readiness hacia target, o unificar la fuente. No urgente (freeze). | abierto (decisión de diseño) |
-| F3 | info | Q1 no tiene ancla textual «estás aquí» ni posición en la ruta; `home.youAreHere` está definido y sin uso. | `i18n.ts`, `HomeScreen.tsx` | Opcional: anclar `LevelBadge`/posición de nivel con la etiqueta existente en Home o Journey. | abierto (mejora) |
-| F4 | info | Los paneles profundos (`FsrsReviewPanel`, `EvidenceGraphPanel`, `AssessmentLadder`) tragan errores de carga en silencio (catch vacío) y dejan la sección vacía sin explicación. | `FsrsReviewPanel.tsx`, `EvidenceGraphPanel.tsx` | Extender el patrón loading/error aplicado en Home (F1) a estos paneles. Fuera del alcance mínimo del freeze. | abierto (mejora) |
-| F5 | info | 50 claves i18n huérfanas (historial de UI) sin duplicados ni roturas. | `i18n-report.json` | Depuración posterior como limpieza; no bloquea. | abierto |
+| F2 | baja | Duplicidad de lectura de readiness en Home: `TriadCard` y la tarjeta inmediatamente inferior muestran el mismo readiness% casi yuxtapuestos. | `HomeScreen.tsx` (tríada + card) | Decidir consolidación: reservar la tríada para Progress y dejar en Home nivel + readiness hacia target, o unificar la fuente. No urgente (freeze). | abierto (decisión de diseño) — **cerrado en V3.72** (una sola lectura de readiness; ver §V3.72) |
+| F3 | info | Q1 no tiene ancla textual «estás aquí» ni posición en la ruta; `home.youAreHere` está definido y sin uso. | `i18n.ts`, `HomeScreen.tsx` | Opcional: anclar `LevelBadge`/posición de nivel con la etiqueta existente en Home o Journey. | **V3.72**: cerrado (ancla `home.youAreHere` + objetivo en la cabecera de Home) |
+| F4 | info | Los paneles profundos (`FsrsReviewPanel`, `EvidenceGraphPanel`, `AssessmentLadder`) tragan errores de carga en silencio (catch vacío) y dejan la sección vacía sin explicación. | `FsrsReviewPanel.tsx`, `EvidenceGraphPanel.tsx` | Extender el patrón loading/error aplicado en Home (F1) a estos paneles. Fuera del alcance mínimo del freeze. | **V3.72**: cerrado (patrón `loading / error / retry` con `PanelState`) |
+| F5 | info | 50 claves i18n huérfanas (historial de UI) sin duplicados ni roturas. | `i18n-report.json` | Depuración posterior como limpieza; no bloquea. | **V3.72**: cerrado (0 huérfanas; el residuo real era 10, el resto eran familias dinámicas vivas) |
 | F6 | info | Carga cognitiva de ladder/FSRS/Evidence Graph controlada (paso a paso, CTA única, drill-down). | código + revisión F | Mantener; validar con el protocolo de usuario real. | aceptado |
 | F7 | info | Checker i18n nuevo en `scripts/` (exit 0, informe reproducible). | `i18n-report.json` | Integrarlo en el gate de cierre junto a `check_beta_v3.py`. | aceptado |
+
+## V3.72 — cierre de F2/F3/F4 y extensión del «por qué» (2026-09-17)
+
+> Esta sección no reabre el audit: anota qué deuda declarada aquí **dejó de ser
+> deuda** en V3.72 y con qué evidencia. El detalle de release vive en
+> `docs/RELEVO.md`.
+
+- **F2** — Home lee el readiness **una sola vez** (`TodayPlan`); la tríada dejó de
+  pintarlo en Home y se reserva a Progress. Fijado por `HomeScreen.test.tsx` (la
+  tríada no se monta en Home) y `TodayPlan.test.tsx` (una sola barra de readiness).
+- **F3** — la cabecera de Home ancla `home.youAreHere` sobre el nivel estimado y
+  declara el objetivo (`home.yourTarget`): Q1 tiene ya su ancla textual.
+- **F4** — `FsrsReviewPanel`, `EvidenceGraphPanel` y `AssessmentLadder` usan el
+  patrón `loading → error → retry` de Home mediante `PanelState`
+  (`common.unavailable` + `common.retry`): ningún panel profundo vuelve a tragarse
+  un fallo de carga en silencio.
+- **Q5 (Why)** — el `why` que el motor **ya declaraba** se pinta ahora en todas las
+  superficies que lo reciben: `NextBestCard` (tarjeta protagonista), `NextStep` (el
+  pie «Next» que ve el alumno al terminar cualquier práctica) y las filas de
+  `ReviewQueueSection` (cola de repaso). Una sola pieza compartida
+  (`components/WhyThisActivity.tsx`) y ninguna señal recalculada en cliente
+  (premisa 21): sin `why` ni `because` no se pinta nada. Fijado por
+  `WhyThisActivity.test.tsx`, `NextStep.test.tsx` y `ReviewQueueSection.test.tsx`.
+- **F5** — 0 claves huérfanas (ver la sección V3.72 de `PARKED.md`); el checker
+  corre en CI en `--strict`.
 
 ## Estado de los checkboxes §4.3 (`docs/BETA_V3.md`)
 
