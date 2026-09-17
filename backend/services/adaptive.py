@@ -25,7 +25,7 @@ from services.academy import (
     effective_evidence_context_count,
     overall_cefr_score,
 )
-from services.cefr import CEFR_LEVELS, PRE_A1
+from services.cefr import CEFR_LEVELS, PRE_A1, level_for_numeric
 from services.cefr_matrix import requirements_for
 from services.curriculum import get_objective
 from services.forgetting import days_since, retrieval_probability
@@ -50,18 +50,11 @@ PRE_A1_NUMERIC = 0.5
 
 
 def numeric_to_level(numeric: float) -> str:
-    """Etiqueta CEFR de un nivel continuo (fronteras de media banda)."""
-    if numeric < 1.5:
-        return "A1"
-    if numeric < 2.5:
-        return "A2"
-    if numeric < 3.5:
-        return "B1"
-    if numeric < 4.5:
-        return "B2"
-    if numeric < 5.5:
-        return "C1"
-    return "C2"
+    """Etiqueta CEFR de un nivel continuo (fronteras de media banda).
+
+    Delega en `cefr.level_for_numeric`: el corte se declara en un solo módulo
+    (AE-06, V3.72)."""
+    return level_for_numeric(numeric)
 
 
 def estimated_level(

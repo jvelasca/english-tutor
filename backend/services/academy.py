@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
+from services.cefr import level_for_numeric
 from services.curriculum import (
     CANONICAL_SKILLS,
     CEFR_ORDER,
@@ -1031,18 +1032,11 @@ def ability_theta(responses: list[tuple[int, bool]]) -> float:
 
 
 def theta_to_level(theta: float) -> str:
-    """Mapea θ (escala ~dificultad 1..6) a nivel CEFR con fronteras de media banda."""
-    if theta < 1.5:
-        return "A1"
-    if theta < 2.5:
-        return "A2"
-    if theta < 3.5:
-        return "B1"
-    if theta < 4.5:
-        return "B2"
-    if theta < 5.5:
-        return "C1"
-    return "C2"
+    """Mapea θ (escala ~dificultad 1..6) a nivel CEFR con fronteras de media banda.
+
+    El corte vive en `cefr.level_for_numeric` (AE-06, V3.72): θ y el nivel continuo
+    del Student Model comparten la misma semántica de banda."""
+    return level_for_numeric(theta)
 
 
 def _item_information(theta: float, difficulty: int) -> float:

@@ -55,28 +55,49 @@ def level_descriptor(level: str) -> str:
     return _LEVEL_DESCRIPTORS.get(level, "")
 
 
+# Fronteras de media banda del eje continuo CEFR (A1 = 1.0 … C2 = 6.0). **Única
+# fuente del corte** (AE-06, V3.72): antes estaba triplicado en
+# `adaptive.numeric_to_level`, `academy.theta_to_level` y `heuristic_band`, con la
+# propiedad —correcta pero frágil— de coincidir en toda la rejilla.
+BAND_BOUNDARIES: tuple[float, ...] = (1.5, 2.5, 3.5, 4.5, 5.5)
+
+
+def numeric_for_score(score: float) -> float:
+    """Nivel continuo equivalente a un score de dominio 0..1 (0.0→A1 … 1.0→C2)."""
+    return 1.0 + 5.0 * score
+
+
+def score_for_numeric(numeric: float) -> float:
+    """Inversa de `numeric_for_score`, acotada a 0..1."""
+    return max(0.0, min(1.0, (numeric - 1.0) / 5.0))
+
+
+def level_for_numeric(numeric: float) -> str:
+    """Etiqueta CEFR **discreta** (A1..C2) de un nivel continuo, por media banda.
+
+    Decisión declarada (AE-06): los estimadores de **etiqueta** no emiten
+    sub-bandas `+` —afirmarían más precisión de la que la evidencia sostiene— ni
+    `Pre-A1` —que sí es una banda con emisor propio cuando no hay evidencia
+    (`adaptive.estimated_level`) o como **posición** en la escalera de
+    descriptores (`cefr_descriptors.band_for_numeric`)—.
+    """
+    for boundary, level in zip(BAND_BOUNDARIES, CEFR_LEVELS, strict=False):
+        if numeric < boundary:
+            return level
+    return CEFR_LEVELS[-1]
+
+
 def heuristic_band(score: float | None) -> str:
     """Banda CEFR-alineada **heurística** para un score de dominio continuo (0..1).
 
     Proxy interno de visualización (NO equivalencia oficial CEFR). Usa las mismas
-    fronteras de media banda que `adaptive.numeric_to_level`, de modo que un score
-    de destreza 0..1 mapea a A1..C2 de forma monotónica: 0.0→A1 … 1.0→C2. `None`
-    (sin observación) devuelve "—".
+    fronteras de media banda que el resto del sistema (`level_for_numeric`), de
+    modo que un score de destreza 0..1 mapea a A1..C2 de forma monotónica:
+    0.0→A1 … 1.0→C2. `None` (sin observación) devuelve "—".
     """
     if score is None:
         return "—"
-    numeric = 1.0 + 5.0 * score
-    if numeric < 1.5:
-        return "A1"
-    if numeric < 2.5:
-        return "A2"
-    if numeric < 3.5:
-        return "B1"
-    if numeric < 4.5:
-        return "B2"
-    if numeric < 5.5:
-        return "C1"
-    return "C2"
+    return level_for_numeric(numeric_for_score(score))
 
 
 def recommendations(profile: dict) -> list[str]:

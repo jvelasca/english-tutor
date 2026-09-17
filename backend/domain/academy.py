@@ -119,7 +119,6 @@ from services import course as course_svc
 from services import pronunciation as pronunciation_svc
 from services import speaking as speaking_svc
 from services import writing as writing_svc
-from services.cefr import PRE_A1
 from services.context import build_lesson_prompt
 from services.curriculum import (
     ASSESSMENT_VERSION,
@@ -767,17 +766,21 @@ async def get_cefr_ladder(user_id: str) -> dict:
     (V2.2) frente al dominio real del alumno: `mastered`/`in_progress`/
     `not_started` (✓/●/○), conectando el descriptor estático al Student Model.
     No certifica CEFR: es una referencia interna alineada al marco.
+
+    AE-06 (V3.72): `estimated_band` es la **etiqueta discreta** del estimado
+    (`estimated_level`: Pre-A1 o A1..C2), la misma que ve el alumno en el badge. Las
+    bandas `+` se conservan como contenido de descriptores, pero no se marcan como
+    actuales (ver `cefr_descriptors.band_for_numeric`).
     """
     fw = cefr_descriptors.load_framework()
     sm = await build_student_model(user_id)
     numeric = float(sm["estimated_numeric"])
-    # Sin evidencia el nivel estimado es `Pre-A1`: la escalera lo marca como banda
-    # actual aunque `numeric` se mantenga en el suelo (1.0) de la escala continua.
-    estimated_band = (
-        "pre-a1"
-        if sm["estimated_level"] == PRE_A1
-        else cefr_descriptors.band_for_numeric(numeric)
-    )
+    # AE-06 (V3.72): la posición es la MISMA etiqueta discreta que ve el alumno
+    # (`estimated_level`), no el mapeador a la banda más cercana. Así la escalera no
+    # marca una sub-banda `+` mientras el badge dice la banda principal (con
+    # `band_for_numeric`, un numeric 3.6 se etiqueta B2 y marcaba B1+). Sin
+    # evidencia `estimated_level` es `Pre-A1` → `pre-a1`, que es la banda del suelo.
+    estimated_band = (sm["estimated_level"] or "A1").lower()
     dims = cefr_descriptors.dimensions()
     mastery = [m.model_dump() for m in sm["mastery"]]
     return {

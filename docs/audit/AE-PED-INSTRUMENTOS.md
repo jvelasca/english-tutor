@@ -102,9 +102,9 @@ mejor cota con 8 ítems es `0,7071`. El placement siempre agota el presupuesto d
 | 1 | **P1** | **El criterio de parada por precisión del placement es inalcanzable**: exige `SE < 0,5` y la mejor cota con los 8 ítems declarados es `0,7071`. La constante existe y el criterio nunca puede dispararse. | `academy.py:989-995`, cota 1PL `1/sqrt(8·0,25)` | Elevar `MAX_PLACEMENT_ITEMS` (≥ 16 para `SE ≤ 0,5`) o rebajar el umbral a un valor alcanzable, y **declarar** cuál de los dos criterios manda | Abierto |
 | 2 | **P1** | **El examen de B1 tiene los 12 ítems en dificultad 1, igual que el de A1**: como instrumento no discrimina por encima de A1. | `assessment-instruments.json` → `exams.B1.difficulties {1: 12}` | Recalibrar el banco de B1 con dificultades ≥ 3 o declarar el examen como «de umbral mínimo» y no como certificación de nivel | Abierto |
 | 3 | **P1** | **Cuatro de los seis niveles no tienen examen final** (A2, B2, C1, C2): el producto certifica internamente A1 y B1 y no tiene instrumento de cierre para el resto. | `assessment-instruments.json` → `levels_without_exam` | Escribir los exámenes de A2/B2/C1/C2 → **V4.0.x** | Abierto |
-| 4 | **P2** | El placement **mide reconocimiento o meta-lenguaje** para listening, speaking, writing y pronunciation: lo declara el propio modelo («miden conciencia de la destreza, no su ejecución»). No captura audio ni producción libre. | `curriculum.py:375-382` (docstring de `PlacementTest`) | Declararlo en la UI del placement para no prometer una nivelación de producción que el instrumento no hace | Abierto |
+| 4 | **P2** | El placement **mide reconocimiento o meta-lenguaje** para listening, speaking, writing y pronunciation: lo declara el propio modelo («miden conciencia de la destreza, no su ejecución»). No captura audio ni producción libre. | `curriculum.py:375-382` (docstring de `PlacementTest`) | Declararlo en la UI del placement para no prometer una nivelación de producción que el instrumento no hace | **Declarado y re-declarado · V3.72** (ver abajo) |
 | 5 | **P2** | **Sesgo de forma del placement**: la opción correcta es la más larga (única) en el **50 %** de los 24 ítems y la más larga o empatada al máximo en el **75 %**; el **70,8 %** están en la posición 1 y la posición 3 **nunca** es correcta. Un alumno que siempre elija la opción más larga acierta tres cuartas partes del banco. | `assessment-instruments.json` → `placement.mc` | Reequilibrar posiciones y longitudes del banco | Abierto |
-| 6 | **P2** | **Los umbrales de banda están triplicados** (tres implementaciones del mismo corte) y las **sub-bandas `+` que la escalera declara no las emite ningún estimador**, igual que `pre-a1`. | `adaptive.py:52`, `academy.py:1033`, `cefr.py:58`, `cefr_descriptors.py:34-45` | Un solo módulo de bandas; decidir si las sub-bandas entran en la estimación o se retiran de la escalera | Abierto |
+| 6 | **P2** | **Los umbrales de banda están triplicados** (tres implementaciones del mismo corte) y las **sub-bandas `+` que la escalera declara no las emite ningún estimador**, igual que `pre-a1`. | `adaptive.py:52`, `academy.py:1033`, `cefr.py:58`, `cefr_descriptors.py:34-45` | Un solo módulo de bandas; decidir si las sub-bandas entran en la estimación o se retiran de la escalera | **Cerrado en V3.72** (ver abajo) |
 | 7 | **P3** | El banco de remediación de **`reading` tiene 3 ítems**, el más pequeño, y reading es justo la destreza sin scorer propio (eje 2) y sin canal de corrección (eje 3). | `assessments.remediation`, `assessment-instruments.json` | Ampliar remediación de reading junto con su scorer | Abierto |
 | 8 | **P3** | Propiedad positiva a preservar: los **tres estimadores coinciden** (0 desacuerdos en la rejilla 0,5–6,0) y el banco de placement **no tiene huecos de dificultad** (4 ítems por nivel 1..6). | `assessment-instruments.json` → `band_thresholds.disagreements: []`, `placement.difficulties` | Preservar; si se unifican los umbrales, mantener la equivalencia | **Correcto** |
 
@@ -131,12 +131,59 @@ coherencia entre lo declarado y lo producido).
 requiere comparar la banda estimada con una evaluación externa, y es
 precisamente lo que falta (`docs/audit/PARKED.md`).
 
+## Cierre en V3.72 (AE-04 y AE-06)
+
+### AE-06 · umbrales de banda — **cerrado**
+
+1. **Un solo módulo del corte**: `services/cefr.py` declara `BAND_BOUNDARIES`
+   (`1.5, 2.5, 3.5, 4.5, 5.5`) y `level_for_numeric`; `adaptive.numeric_to_level`,
+   `academy.theta_to_level` y `cefr.heuristic_band` (con `numeric_for_score` /
+   `score_for_numeric`) **delegan** en él. La equivalencia en toda la rejilla se
+   conserva (0 desacuerdos) y sigue fijada por `test_ped_instruments_v370.py`;
+   `test_las_fronteras_de_banda_se_declaran_en_un_solo_modulo` falla si alguien
+   reintroduce la tabla o comparaciones `x < 2.5` en otro servicio.
+2. **Decisión sobre `+` y `pre-a1`** — *se retiran de la emisión, se conservan
+   como contenido*:
+   - `pre-a1` **tiene emisor** (no era deuda): es la banda del estimado cuando no
+     hay evidencia (`adaptive.estimated_level`) y la que marca la escalera
+     (`/api/academy/cefr-ladder`). Se conserva tal cual.
+   - Las sub-bandas `+` (`a2+`, `b1+`, `b2+`) **dejan de emitirse**: siguen en la
+     escalera como **contenido de descriptores** (CEFR Companion Volume, con sus
+     Can-Do) y `cefr_descriptors.band_for_numeric` sigue sabiendo expresarlas,
+     pero **ningún estimador** las produce. Motivo doble: (a) afirmarían media
+     banda de precisión que la evidencia no sostiene; (b) su centro caía a caballo
+     del corte de etiqueta, así que un numeric 3.6 se **etiquetaba B2** y la
+     escalera **marcaba B1+** — dos niveles distintos para el mismo alumno. Ahora
+     la posición «estás aquí» es la **misma etiqueta discreta** que ve el badge
+     (`estimated_level`), y `is_current` nunca cae en una banda `+`.
+   - Lo que **no** se hace: borrar los descriptores `+` (son contenido real del
+     marco) ni cambiar el corte de bandas (la propiedad positiva se preserva).
+
+### AE-04 · divulgación del placement — **declarado y re-declarado**
+
+- Verificado que **no hay superficie**: `frontend/src/api/academy.ts` expone el
+  placement y **ningún componente lo consume** (la app no ejecuta ni muestra la
+  nivelación, así que no hay pantalla donde divulgar sin inventarla).
+- La divulgación va **en el instrumento**, que es lo que cualquier consumidor
+  recibe: la `description` de `curriculum/assessments.json` (y por tanto el
+  contrato `GET /api/academy/placement`) declara que mide reconocimiento por
+  opción múltiple y que **no** captura audio ni producción libre; el docstring de
+  `PlacementTest` mantiene la misma declaración.
+- **Candado-tripwire**:
+  `test_ninguna_superficie_consume_el_placement_sin_divulgarlo` falla el día que
+  alguien conecte el placement a la UI, obligando a divulgar allí la limitación (o
+  a retirar el consumo) antes de prometer una nivelación de producción que el
+  instrumento no hace.
+- La pantalla de nivelación en sí sigue **fuera de alcance** (no existe onboarding
+  que la use): el hallazgo queda re-declarado con fase en `docs/audit/PARKED.md`.
+
 ## Regenerar / Verificar
 
 ```powershell
 cd backend
 .\.venv\Scripts\python.exe -m scripts.audit_dossier assessment-instruments
 .\.venv\Scripts\python.exe -m pytest -q tests/test_ped_instruments_v370.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_band_thresholds_v372.py tests/test_placement_disclosure_v372.py
 ```
 
 ## Tests que respaldan
@@ -155,3 +202,18 @@ cd backend
 | `test_unit_gate_thresholds_are_pinned` | umbrales y 7 secciones |
 | `test_three_band_estimators_agree_on_the_whole_grid` | 0 desacuerdos (propiedad positiva) |
 | `test_plus_bands_are_declared_but_never_emitted` | `a2+`, `b1+`, `b2+` en la escalera y fuera de la salida |
+
+Cierre de V3.72 (AE-04/AE-06) — `backend/tests/test_band_thresholds_v372.py`
+(5 tests) y `backend/tests/test_placement_disclosure_v372.py` (4 tests):
+
+| Test | Qué pinnea |
+|---|---|
+| `test_las_fronteras_de_banda_se_declaran_en_un_solo_modulo` | la tabla y el corte viven solo en `services/cefr.py` |
+| `test_el_corte_unico_cubre_la_rejilla_y_los_tres_estimadores` | equivalencia en la rejilla + inversa score↔numeric |
+| `test_las_etiquetas_nunca_emiten_subbandas_plus` | las etiquetas son A1..C2 (ni `+` ni `Pre-A1`) |
+| `test_las_subbandas_plus_siguen_como_contenido_de_la_escalera` | `+`/`pre-a1` conservados como descriptores |
+| `test_la_escalera_marca_la_etiqueta_discreta_del_estimado` | numeric 3.6 → etiqueta B2 y `is_current == b2` |
+| `test_el_instrumento_declara_que_mide_reconocimiento_y_no_produccion` | la `description` del placement declara la limitación |
+| `test_el_modelo_del_instrumento_declara_la_limitacion` | docstring de `PlacementTest` |
+| `test_la_api_del_placement_expone_la_declaracion` | el contrato sirve la divulgación |
+| `test_ninguna_superficie_consume_el_placement_sin_divulgarlo` | tripwire: sin pantalla hoy; falla si aparece |

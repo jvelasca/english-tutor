@@ -124,11 +124,16 @@ def band_by_id(band_id: str) -> CefrBand | None:
 
 
 def band_for_numeric(numeric: float) -> str:
-    """Banda de la escalera más cercana a un nivel continuo (0..6).
+    """Banda de la escalera **más cercana** a un nivel continuo (0..6).
 
     Redondea al centro de banda más próximo; en empate gana la banda más baja
-    (conservador). Permite que una estimación 3.2 se exprese como `b1` y una 3.6
-    como `b1+`, en lugar de forzar la etiqueta discreta A1..C2.
+    (conservador). Puede expresar las sub-bandas `+` y `pre-a1`.
+
+    Decisión AE-06 (V3.72): este mapeador es la **capacidad de la escalera**, no la
+    etiqueta del producto. Los estimadores usan el corte discreto de media banda
+    (`cefr.level_for_numeric`, A1..C2) y la posición «estás aquí» de la escalera
+    marca esa misma etiqueta: marcar `b1+` (centro 3.5) mientras el badge dice B2
+    etiquetaba dos niveles distintos para el mismo numeric.
     """
     n = max(0.0, min(6.0, numeric))
     return min(CEFR_LADDER, key=lambda b: abs(BAND_NUMERIC[b] - n))

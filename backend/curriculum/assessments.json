@@ -2,7 +2,7 @@
   "placement": {
     "id": "placement-v1",
     "title": "English Tutor Placement Test",
-    "description": "Estimate your starting level (A1-C2) with a short adaptive test.",
+    "description": "Estimate your starting level (A1-C2) with a short adaptive test. It measures recognition of the language (multiple choice): it does not capture audio or free production, so read the result as a starting point, not as certification of what you can produce.",
     "items": [
       {
         "id": "pl-01",
