@@ -4,7 +4,20 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.73.2] — 2026-09-17
+
+**Corrección de la CI de V3.73.1. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (backend de producto, frontend de producto y launcher intactos: solo **tests e instrumento de auditoría** del backend más documentación). Ninguna capacidad pedagógica nueva; el contenido funcional de esta línea sigue siendo el de V3.73.1.
+
+V3.73.1 se publicó (commit `59e731d`, tag `v3.73.1`) con **10 de 11 jobs verdes y `Backend (ruff + pytest)` en rojo**: `1 failed, 2775 passed`.
+
+- **El fallo y por qué no se vio.** `backend/tests/test_ped_coverage_v370.py::test_reading_has_no_dedicated_scorer` afirmaba que existe `frontend/src/features/reading/` — la parte «UI sí» de la asimetría declarada de `reading`. El borrado de `ReadingPractice.tsx` (§6 de V3.73.1) dejó ese directorio **vacío**, y **git no versiona directorios vacíos**: en el disco del autor el directorio seguía existiendo (suite local: **2779 passed**), en un checkout limpio no existe (CI: **1 failed**). La verificación local era **estructuralmente incapaz** de detectarlo; la autoridad es el checkout limpio.
+- **El reapunte (no un debilitamiento).** Desde la Opción A, la UI de `reading` es el **chat con destreza** `/chat/lectura`. `backend/scripts/audit_dossier.py` declara `reading.ui = chat:lectura` y resuelve la existencia con la tabla explícita `UI_ARTIFACT_PATHS` (tipo + ruta) en vez de asumir siempre un directorio de `frontend/src/features`; los otros **8** artefactos conservan **exactamente** el `is_dir()` de antes. El test pasa a comprobar el **cableado real** (`frontend/src/router/chat.ts` declara `reading: "lectura"`, tolerante a formato) y que el dossier generado siga viendo esa UI (`ui_exists true`), manteniendo `scorer_exists false` y `corpus 0`.
+- **Dossier.** `docs/audit/generated/skill-coverage.{json,md}` regenerados: solo cambia la **procedencia** de la UI de `reading`; `ui_exists` sigue `true` y **no** aparece un gap espurio de «sin feature de UI» (que es lo que habría pasado sin reapuntar el instrumento). `docs/audit/AB-PED-COBERTURA.md` actualiza la evidencia del hallazgo 4.
+- **Verificación (sobre checkout limpio).** backend **2776 passed · 3 skipped** (2779 casos) en un `git worktree` **sin** el directorio vacío, con el dossier regenerado **estable** (0 diff); frontend `tsc` limpio, vitest **712 passed**, `audit:contrast` **0 fallos bloqueantes**, `npm run build` OK; `ruff` limpio; `check_release_consistency` en los **6 orígenes** (`3.73.2`); i18n `--strict` **0/0/0**; `validation_gate.py auto --require-dist` **10/10**; `status --strict` **exit 1** (correcto: los 7 gates siguen `pending`). Ver `release-notes-v3.73.2.md`.
+
 ## [3.73.1] — 2026-09-17
+
+> **Corregido en V3.73.2:** esta release salió con la CI en rojo (`Backend (ruff + pytest)`, `1 failed`) porque el borrado de `ReadingPractice` dejó vacío `frontend/src/features/reading/` y ese directorio no existe en un checkout limpio. Lo que V3.73.1 declara aquí sobre sí misma sigue siendo cierto (su commit no tocó backend); el invariante que rompió se reapuntó en V3.73.2, sin tocar producto. Ver `release-notes-v3.73.2.md`.
 
 **Cierre GUI pre-V4.0. Release de PARCHE: cierra los seis hallazgos GUI/UX (P2/P3) que el dictamen externo de cierre de V3.73.0 dejó abiertos antes de V4.0 —hub de APRENDER desordenado, Reading/Writing huérfanos, navegación móvil con auxiliares compitiendo con el núcleo, `prefers-reduced-motion` ignorado por las animaciones JS y contraste de acentos sin medir— y se publica con el código congelado. SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN tocar backend ni launcher: todo el cambio es frontend. Los 7 gates físicos siguen `pending` y `status --strict` sigue rojo por diseño.**
 

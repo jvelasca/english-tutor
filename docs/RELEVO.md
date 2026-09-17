@@ -5,7 +5,31 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-17 (UTC+2).
 >
-> **Nota (2026-09-17): V3.73.1 (cierre GUI pre-V4.0) — release de PARCHE, sin
+> **Nota (2026-09-17): V3.73.2 (corrección de la CI de V3.73.1) — release de PARCHE
+> correctiva, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.2`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos** (el diff es
+> tests e instrumento de auditoría del backend más documentación). **El motivo:** V3.73.1
+> se publicó con **la CI en rojo** —job `Backend (ruff + pytest)`, `1 failed, 2775
+> passed`— porque su §6 borró `frontend/src/features/reading/ReadingPractice.tsx` y dejó
+> ese directorio **vacío**, y **git no versiona directorios vacíos**: el test
+> `test_reading_has_no_dedicated_scorer` lo daba por existente en el disco del autor
+> (suite local **2779 passed**) y **fallaba en un checkout limpio** (CI). **Reapunte, no
+> debilitamiento:** la UI de `reading` es desde la Opción A el **chat con destreza**
+> `/chat/lectura`, así que `audit_dossier.py` declara `reading.ui = chat:lectura` y
+> resuelve su existencia con la tabla explícita `UI_ARTIFACT_PATHS` (los otros 8
+> artefactos conservan **exactamente** su `is_dir()`), mientras el test pasa a comprobar
+> el **cableado real** (`router/chat.ts` declara `reading: "lectura"`) y que el dossier
+> siga viendo la UI (`ui_exists true`), con `scorer_exists false` y `corpus 0`; el
+> dossier regenerado solo cambia la **procedencia** de esa UI y **no** inventa un gap de
+> «sin feature de UI». **Proceso:** la verificación local era **estructuralmente incapaz**
+> de ver el fallo, así que V3.73.2 se verifica en un **checkout limpio** (`git worktree`)
+> con el dossier **estable**. **Los 7 gates siguen `pending`** y `status --strict` sigue
+> **rojo por diseño**: eso no es un fallo, es la puerta de V4.0. Ver
+> `release-notes-v3.73.2.md`.
+>
+> **Nota anterior (2026-09-17): V3.73.1 (cierre GUI pre-V4.0) — release de PARCHE, sin
 > capacidad pedagógica nueva y sin tocar backend ni launcher.**
 > Release **`v3.73.1`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
 > `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**. Cierra
@@ -3570,7 +3594,30 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.1` **cierre GUI pre-V4.0** (release de
+**Posición actual (2026-09-17):** `v3.73.2` **corrección de la CI de V3.73.1** (release
+de **PARCHE correctiva**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y **SIN
+cambios de PRODUCTO**: backend de producto, frontend de producto y launcher intactos —
+solo **tests e instrumento de auditoría** del backend más documentación). V3.73.1
+(commit `59e731d`, tag `v3.73.1`) se publicó **con la CI en rojo**: el job `Backend (ruff
++ pytest)` falló (`1 failed, 2775 passed`) porque
+`test_ped_coverage_v370::test_reading_has_no_dedicated_scorer` afirmaba que existe
+`frontend/src/features/reading/` —la parte «UI sí» de la asimetría de `reading`— y el
+borrado de `ReadingPractice` (§6 de V3.73.1) dejó ese directorio **vacío**, que para git
+es lo mismo que **inexistente**: en el disco del autor seguía ahí (suite local **2779
+passed**) y en un checkout limpio no (CI **1 failed**). El invariante se **reapunta sin
+debilitarlo**: la UI de `reading` es el **chat con destreza** `/chat/lectura`, así que
+`audit_dossier.py` declara `reading.ui = chat:lectura` con la tabla explícita
+`UI_ARTIFACT_PATHS` (tipo + ruta; los otros 8 artefactos conservan su `is_dir()`) y el
+test comprueba el **cableado real** del router de chat (`reading: "lectura"`) más
+`ui_exists true` en el dossier; el dossier se regenera **sin** gap espurio de «sin
+feature de UI». **Lección de proceso, declarada:** un invariante que depende de rutas del
+árbol solo se verifica en un **checkout limpio**, no en el árbol de trabajo; V3.73.2 se
+verifica así (`git worktree`). **El código sigue congelado:** los 7 gates siguen en
+`pending` y **V4.0 no se declara** hasta que `status --strict` salga 0. Ver la nota de
+cabecera y `release-notes-v3.73.2.md`.
+
+**Release anterior — `v3.73.1` cierre GUI pre-V4.0** (release de
 **PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
 `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
 **SIN tocar backend ni launcher**). Cierra los **seis hallazgos GUI/UX (P2/P3)** que
@@ -3583,9 +3630,10 @@ medido con instrumento propio** (GUI-06: texto de acento derivado del acento, co
 guarda en CSS y en navegador; relleno + tinta y borde **cuantificados** y aplazados a
 V4.0.x porque exigen re-rampar la paleta). **El código queda congelado:** los 7 gates
 siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` salga 0. Ver
-la nota de cabecera de este documento y `release-notes-v3.73.1.md`.
+la nota de cabecera de este documento y `release-notes-v3.73.1.md` (**su CI salió roja**
+y se corrigió en V3.73.2 sin tocar producto).
 
-**Release anterior — `v3.73.0` Validation release** (release de **VALIDACIÓN**: **SIN
+**Release anterior a esa — `v3.73.0` Validation release** (release de **VALIDACIÓN**: **SIN
 migración de BD**, **SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**,
 **SIN tocar el banco**, **SIN tocar el currículum**, **SIN capacidad pedagógica nueva**
 y **SIN tocar el frontend**). Cierra el endurecimiento mínimo que el dictamen externo

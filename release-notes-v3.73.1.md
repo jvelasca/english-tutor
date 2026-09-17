@@ -8,6 +8,16 @@ capacidad pedagógica nueva) · **Versión de app:** `3.73.0 → 3.73.1`
 backend ni launcher.** Todo el cambio vive en el frontend, salvo el bump de versión
 y el bookkeeping documental.
 
+> **Corrección posterior (V3.73.2).** Esta release se publicó con **la CI en rojo**
+> (job `Backend (ruff + pytest)`: `1 failed, 2775 passed`). El borrado de
+> `features/reading/ReadingPractice.tsx` descrito en §1 dejó ese directorio
+> **vacío**, y **git no versiona directorios vacíos**: el test
+> `test_reading_has_no_dedicated_scorer` lo daba por existente en el árbol de
+> trabajo (suite local **2779 passed**) y **fallaba en un checkout limpio**. Nada de
+> lo que estas notas declaran **sobre sí mismas** deja de ser cierto —el commit de
+> V3.73.1 no tocó backend—, pero el invariante que rompió se reapuntó en V3.73.2
+> **sin tocar producto**. Ver `release-notes-v3.73.2.md`.
+
 ---
 
 ## Qué es esta release
