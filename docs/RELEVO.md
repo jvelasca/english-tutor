@@ -69,7 +69,8 @@
 > **Tests:** backend **2694 passed** (2643 → **+51**, 5 ficheros `*_v372.py`),
 > frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
 > `ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
-> orígenes** y **CI 8/8** con el job nuevo.
+> orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs** (el nuevo
+> `product-origin` se estrena en el run de esta release).
 > **Honestidad:** el certificado es **autofirmado** (el usuario acepta el aviso del
 > navegador; sin HTTPS no hay micrófono en LAN); **`RC-01` se cierra como «Node no
 > es requisito de EJECUCIÓN»**, **no** como «producto empaquetado y distribuible»
@@ -3431,7 +3432,8 @@ conserva el emisor de **`pre-a1`**.
 **Tests:** backend **2694 passed** (2643 → **+51**, los 5 ficheros `*_v372.py`),
 frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
 `ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
-orígenes** y **CI 8/8** con el job nuevo.
+orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs** (el nuevo
+`product-origin` se estrena en el run de esta release).
 
 **Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar):**
 

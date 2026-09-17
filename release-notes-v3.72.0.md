@@ -84,7 +84,10 @@ y `backend/tests/test_docs_drift_v372.py` (que PREMISAS/ARQUITECTURA/README/BETA
 declaren la frontera nueva, que el launcher **no** lance Vite en producto, que el
 firewall abra **solo** el 8000 y que el CI pruebe el servido estático por HTTPS).
 El job **`product-origin`** del CI arranca `uvicorn` con el certificado sobre el
-`dist` construido y comprueba que la **raíz devuelve HTML de la UI** ⇒ **CI 8/8**.
+`dist` construido y comprueba que la **raíz devuelve HTML de la UI** ⇒ el CI pasa a
+**8 jobs** (su primer run es el de esta release). El humo equivalente se ha
+verificado en local: `/` → HTML, assets 200, fallback SPA 200 en rutas profundas y
+`/api/*` inexistente → **404**.
 
 ## B · RD/RA — Voz/TTS en la UI (el vector que V3.71 fechó)
 
