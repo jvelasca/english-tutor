@@ -4,6 +4,19 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.73.4] — 2026-09-17
+
+**Recorder trazable. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (el backend de producto, el frontend de producto y el launcher quedan intactos: el diff es el **arnés de validación**, **tests** y **documentación**). Ninguna capacidad pedagógica nueva.
+
+La V3.73.3 entregó el kit de los 7 gates, pero la evidencia que producía `record` no decía **contra qué commit** se había probado cada gate: siete gates verdes en siete commits distintos se podían presentar como «los siete gates». Esta release sella la identidad del árbol en cada registro y añade la puerta fuerte `status --strict --same-tree`.
+
+- **La evidencia sella el commit.** `record` escribe `head_sha` (de `git rev-parse HEAD`) junto a estado, notas, fecha UTC y `VERSION`; acepta `--ci-run` con el id numérico o la URL de la run de CI (se guarda el id). Un **`pass` sin commit se rechaza**: sin git en el árbol no hay registro, porque un cierre que no dice de qué árbol es no es evidencia. `fail`/`skip`/`pending` sí se registran sin SHA: declaran un no-cierre.
+- **La puerta fuerte de V4.0.** `status` muestra el commit por gate y marca la evidencia de otro árbol; `--strict` sigue significando «7/7» (el CI no cambia) y **`--strict --same-tree`** exige además que los siete `head_sha` sean el commit actual. La cadena `commit → run → artefactos → gate records` queda dentro de la evidencia.
+- **`auto` vigila el formato.** La comprobación 10 (`evidencia-integra`) falla si un `pass` no trae `head_sha`, o si el `head_sha` (`40` hex) o el `ci_run` (dígitos) tienen formato inválido.
+- **Una sola cifra de gates humanos.** `Gate.human` se declara **gate a gate** (sin valor por defecto) y vale `True` en los **7**: el instrumento no ejecuta ningún flujo de la app. La expresión «7 gates (5 de ellos acción humana)» de notas históricas de V3.73.0 se refería a los cinco bloques físicos que V3.72 declaró; queda explicada en el runbook, sin dos cifras en circulación.
+- **Documentación.** `docs/audit/KIT-VALIDACION-GATES.md` y `docs/audit/VALIDATION-RELEASE-V373.md` explican qué sella la evidencia, la regla del `pass` con commit, la puerta `--same-tree` y la tabla de identidad (`VERSION` / `HEAD` / run) que se anota en el pre-vuelo; los 7 comandos `record` de la planilla llevan `--ci-run <run>`.
+- **Verificación.** Ver `release-notes-v3.73.4.md`.
+
 ## [3.73.3] — 2026-09-17
 
 **Kit de validación de los 7 gates. Release de PARCHE: SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN cambios de PRODUCTO** (el backend de producto, el frontend de producto y el launcher quedan intactos: el diff es el **arnés de validación**, **tests** y **documentación**). Ninguna capacidad pedagógica nueva.

@@ -5,7 +5,9 @@ falso**. Estos tests fijan lo que lo hace cumplir:
 
 - el conjunto de gates es **cerrado** (una errata de id no abre un gate fantasma),
 - registrar un gate exige notas (una evidencia vacía no vale),
-- `status --strict` **falla** mientras haya gates sin `pass`,
+- un `pass` **sella el commit** contra el que se probó y sin git se rechaza,
+- `status --strict` **falla** mientras haya gates sin `pass`, y `--same-tree`
+  exige además que la evidencia sea del commit actual,
 - `auto` no escribe nada fuera de `docs/`,
 - el informe es determinista y `auto` cubre todas las comprobaciones.
 
@@ -117,6 +119,46 @@ def test_registrar_guarda_estado_notas_fecha_y_version(harness, evidence_path):
     assert entry["tree_version"] == harness.source_version()
 
 
+def test_registrar_sella_el_commit_validado(harness, evidence_path):
+    """Un `pass` sin commit no dice de qué árbol es: no es evidencia."""
+    assert harness.record("launcher-windows", "pass", "launcher en Windows real") == 0
+
+    data = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert data["gates"]["launcher-windows"]["head_sha"] == harness.git_head()
+
+
+def test_un_pass_sin_git_se_rechaza(harness, evidence_path, monkeypatch, capsys):
+    monkeypatch.setattr(harness, "git_head", lambda: None)
+
+    assert harness.record("journeys", "pass", "sin repo git") == 1
+    assert "git" in capsys.readouterr().out
+    assert not evidence_path.exists()
+
+
+@pytest.mark.parametrize("status", ["fail", "skip", "pending"])
+def test_un_no_cierre_se_puede_registrar_sin_git(
+    harness, evidence_path, monkeypatch, status
+):
+    """`fail`/`skip`/`pending` declaran un no-cierre: no exigen commit."""
+    monkeypatch.setattr(harness, "git_head", lambda: None)
+
+    assert harness.record("journeys", status, "no ejecutado") == 0
+
+
+def test_la_run_de_ci_se_normaliza_a_su_id(harness, evidence_path):
+    url = "https://github.com/jvelasca/english-tutor/actions/runs/35219576565"
+
+    assert harness.record("offline-fisico", "pass", "ok", ci_run=url) == 0
+
+    data = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert data["gates"]["offline-fisico"]["ci_run"] == "35219576565"
+
+
+def test_una_run_de_ci_invalida_se_rechaza(harness, evidence_path):
+    assert harness.record("offline-fisico", "pass", "ok", ci_run="la de ayer") == 1
+    assert not evidence_path.exists()
+
+
 def test_la_evidencia_se_guarda_en_orden_de_gate(harness, evidence_path):
     harness.record("pedagogia", "pending", "sin empezar")
     harness.record("offline-fisico", "pending", "sin empezar")
@@ -158,6 +200,49 @@ def test_sin_strict_el_estado_pendiente_no_hace_fallar(harness, evidence_path):
     assert harness.status_report(strict=False) == 0
 
 
+# --- `status --strict --same-tree`: la puerta fuerte de V4.0 ----------------
+
+
+def test_same_tree_aprueba_con_la_evidencia_del_commit_actual(harness, evidence_path):
+    for gate in harness.GATES:
+        harness.record(gate.id, "pass", "verificado en hardware real")
+
+    assert harness.status_report(strict=True, same_tree=True) == 0
+
+
+def test_same_tree_falla_si_la_evidencia_es_de_otro_commit(
+    harness, evidence_path, monkeypatch
+):
+    """Siete gates verdes en siete commits distintos no son los siete gates."""
+    for gate in harness.GATES:
+        harness.record(gate.id, "pass", "verificado en hardware real")
+
+    monkeypatch.setattr(harness, "git_head", lambda: "0" * 40)
+
+    assert harness.status_report(strict=True, same_tree=True) == 1
+
+
+def test_same_tree_falla_si_el_arbol_no_tiene_git(
+    harness, evidence_path, monkeypatch
+):
+    for gate in harness.GATES:
+        harness.record(gate.id, "pass", "verificado en hardware real")
+
+    monkeypatch.setattr(harness, "git_head", lambda: None)
+
+    assert harness.status_report(strict=True, same_tree=True) == 1
+
+
+def test_sin_same_tree_el_commit_no_decide(harness, evidence_path, monkeypatch):
+    """`--strict` sigue significando «7/7»; lo fuerte es añadir `--same-tree`."""
+    for gate in harness.GATES:
+        harness.record(gate.id, "pass", "verificado en hardware real")
+
+    monkeypatch.setattr(harness, "git_head", lambda: "1" * 40)
+
+    assert harness.status_report(strict=True) == 0
+
+
 # --- La evidencia escrita a mano no cuela -----------------------------------
 
 
@@ -194,6 +279,60 @@ def test_un_estado_inventado_se_detecta(harness, evidence_path):
     )
 
     assert harness.check_evidence_not_invented().ok is False
+
+
+def test_un_pass_sin_commit_en_la_evidencia_se_detecta(harness, evidence_path):
+    """La evidencia escrita a mano tampoco puede cerrar un gate sin árbol."""
+    evidence_path.write_text(
+        json.dumps({"gates": {"journeys": {"status": "pass", "notes": "x"}}}),
+        encoding="utf-8",
+    )
+
+    check = harness.check_evidence_not_invented()
+
+    assert check.ok is False
+    assert "head_sha" in check.detail
+
+
+def test_un_commit_inventado_se_detecta(harness, evidence_path):
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "gates": {
+                    "journeys": {"status": "pass", "notes": "x", "head_sha": "dead"}
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = harness.check_evidence_not_invented()
+
+    assert check.ok is False
+    assert "head_sha inválido" in check.detail
+
+
+def test_una_run_inventada_se_detecta(harness, evidence_path):
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "gates": {
+                    "journeys": {
+                        "status": "pass",
+                        "notes": "x",
+                        "head_sha": "0" * 40,
+                        "ci_run": "la de ayer",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = harness.check_evidence_not_invented()
+
+    assert check.ok is False
+    assert "ci_run inválido" in check.detail
 
 
 # --- `auto`: cobertura, determinismo y alcance ------------------------------

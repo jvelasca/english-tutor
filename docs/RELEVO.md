@@ -5,6 +5,30 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-17 (UTC+2).
 >
+> **Nota (2026-09-17): V3.73.4 (recorder trazable) — release de PARCHE, sin
+> capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.4`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos** (el diff
+> es el **arnés de validación**, sus **tests** y **documentación**). Cierra el
+> eslabón que faltaba en la cadena de certificación: **la evidencia de un gate no
+> decía contra qué commit se había probado**. `record` sella ahora `head_sha` (y la
+> run de CI con `--ci-run`), un **`pass` sin commit se rechaza** (`fail`/`skip`/
+> `pending` sí se registran sin SHA, porque declaran un no-cierre), `status`
+> muestra el commit de cada gate y la puerta fuerte **`status --strict --same-tree`**
+> exige que los siete `head_sha` sean el commit actual; `auto` falla si el `pass`
+> no trae `head_sha` o si el `head_sha`/`ci_run` tienen formato inválido. Además
+> `Gate.human` se declara gate a gate y vale `True` en los **7** (el instrumento no
+> ejecuta ningún flujo de la app), lo que zanja la doble cifra «7 gates (5 de ellos
+> acción humana)» de notas históricas. **Tests:** backend **2798 passed** (0 skipped;
+> `test_validation_gate_v373.py` 29 → **43**), `ruff` limpio; frontend
+> sin cambios de producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK);
+> launcher **113**; `check_release_consistency` en los **6 orígenes** (`3.73.4`);
+> i18n `--strict` **0/0/0**; `validation_gate.py auto --require-dist` **10/10** y
+> `status --strict` **exit 1** (correcto: es la puerta de V4.0). **Los 7 gates
+> siguen `pending`**: el siguiente hito es ejecutar físicamente G1–G7. Ver
+> `release-notes-v3.73.4.md`.
+>
 > **Nota (2026-09-17): V3.73.3 (kit de validación de los 7 gates) — release de
 > PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
 > Release **`v3.73.3`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
@@ -3637,36 +3661,50 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.3` **kit de validación de los 7 gates** (release
+**Posición actual (2026-09-17):** `v3.73.4` **recorder trazable** (release
 de **PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
 `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
 **SIN cambios de PRODUCTO**: backend de producto, frontend de producto y launcher
 intactos — el diff es el **arnés de validación**, sus **tests** y **documentación**).
-Prepara lo único que falta para V4.0 —**ejecutar físicamente los 7 gates**— y corrige la
-deriva que habría hecho probar el artefacto equivocado. **(A) Kit de campo:**
-`docs/audit/KIT-VALIDACION-GATES.md` (pre-vuelo con la identidad del árbol que se sella
-en cada `record` y las URLs de producto, reglas del instrumento, **hoja por gate**
-G1–G7 con pasos, criterio de FALLO, evidencia y el comando `record` copiable, agrupación
-por sesión y cierre); **referencia** los protocolos en lugar de duplicarlos. **(B) Deriva
-de protocolo corregida (habría invalidado G1 y G4):** el §5 de
-`RA-RUNTIME-OFFLINE.md` (E5 flujo 1 incluido) y `G-DEVICES.md` mandaban al **dev server
-de Vite** (`:5173`), que desde V3.72 **no es el runtime de producto** (un solo origen
-HTTPS `:8000` con el backend sirviendo `dist`); `RB-INSTALACION.md` pasa a declarar
-Node/npm requisito de **compilación**, no de ejecución. **(C) Guard anti-deriva:**
-`check_device_matrix` se generaliza a `check_gate_protocol_origins` (id `gate-origins`),
-que recorre los **tres** protocolos funcionales (`DEVICE_MATRIX.md`,
-`RA-RUNTIME-OFFLINE.md`, `G-DEVICES.md`) y falla si alguno contiene `:5173` o no contiene
-`:8000` —el chequeo que vigilaba un solo documento ya no deja pasar la deriva por la
-puerta de al lado— (**5 tests nuevos**; `test_validation_gate_v373.py` 24 → 29).
-**(D) Punto de entrada de la auditoría externa re-anclado:**
-`agentes/auditoria-total-externa-v373.md` afirmaba un invariante (`git diff --stat
-v3.73.0..main -- backend frontend launcher scripts` **vacío**) que V3.73.1/V3.73.2 ya
-habían roto —un **P0 falso** en el primer comando del auditor, según sus propias
-reglas— y sus cifras y versión no eran las publicadas; queda anclado a `ae14dbd`
-(tag `v3.73.3`, objeto `7715fc2`), con el invariante **verificado**, el CI **11/11** en
-el run `35219576565` y el kit en el orden de lectura. **El código sigue congelado:** los
-7 gates siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` salga 0.
-Ver la nota de cabecera y `release-notes-v3.73.3.md`.
+Cierra el eslabón que faltaba en la cadena de certificación: la evidencia de un gate
+**no decía contra qué commit se había probado**, de modo que siete gates verdes en siete
+commits distintos se podían presentar como «los siete gates». **(A) La evidencia sella el
+commit:** `record` escribe `head_sha` (`git rev-parse HEAD`) junto a estado, notas, fecha
+UTC y `VERSION`, y acepta `--ci-run` (id numérico o URL de la run; se guarda el id)
+—la cadena `commit → run → artefactos → gate records` queda dentro de
+`docs/audit/validation-evidence.json`—; un **`pass` sin commit se rechaza** (sin git no
+hay registro) y `fail`/`skip`/`pending` sí se registran sin SHA, porque declaran un
+no-cierre. **(B) La puerta fuerte de V4.0:** `status` imprime el commit por gate y marca
+la evidencia de otro árbol; `--strict` sigue significando «7/7» (el CI no cambia) y
+**`--strict --same-tree`** exige además que los siete `head_sha` sean el commit actual.
+**(C) `auto` vigila el formato:** la comprobación 10 falla si un `pass` no trae
+`head_sha` o si el `head_sha` (40 hex) o el `ci_run` (dígitos) son inválidos. **(D) Una
+sola cifra de gates humanos:** `Gate.human` se declara gate a gate y vale `True` en los
+**7** —el instrumento no ejecuta ningún flujo de la app—, y la expresión «7 gates (5 de
+ellos acción humana)» de notas históricas de V3.73.0 (los cinco bloques físicos de
+V3.72) queda explicada en el runbook. **(E) Documentación:** el kit y el runbook explican
+qué sella la evidencia, la regla del `pass` con commit, `--same-tree` y la tabla de
+identidad (`VERSION`/`HEAD`/run) del pre-vuelo; los 7 comandos `record` de la planilla
+llevan `--ci-run <run>`. **(F) Verificación:** `test_validation_gate_v373.py` 29 → **43**;
+backend **2798 passed** (0 skipped) y `ruff` limpio; frontend sin cambios de
+producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK); launcher **113**;
+`check_release_consistency` en los **6 orígenes** (`3.73.4`); i18n `--strict` **0/0/0**;
+`auto --require-dist` **10/10**. **El código sigue congelado:** los 7 gates siguen en
+`pending` y **V4.0 no se declara** hasta que `status --strict` (y, con el árbol
+congelado, `status --strict --same-tree`) salga 0. Ver la nota de cabecera y
+`release-notes-v3.73.4.md`.
+
+**Release anterior — `v3.73.3` kit de validación de los 7 gates** (release de
+**PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
+**SIN cambios de PRODUCTO**). Entrega el **kit de campo**
+(`docs/audit/KIT-VALIDACION-GATES.md`) para ejecutar los 7 gates, corrige la **deriva de
+protocolo** que habría hecho probar el dev server de Vite (`:5173`) en lugar del
+producto (`:8000`) en G1 y G4, y generaliza el guard a `check_gate_protocol_origins`
+(id `gate-origins`) sobre los **tres** protocolos funcionales (**5 tests nuevos**;
+`test_validation_gate_v373.py` 24 → 29). Re-ancló el punto de entrada de la auditoría
+externa a `ae14dbd` (tag `v3.73.3`, objeto `7715fc2`), con el invariante **verificado** y
+el CI **11/11** en el run `35219576565`. Ver `release-notes-v3.73.3.md`.
 
 **Release anterior — `v3.73.2` corrección de la CI de V3.73.1** (release
 de **PARCHE correctiva**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni

@@ -8,7 +8,9 @@
 > **Companion de:** `docs/audit/VALIDATION-RELEASE-V373.md` (el runbook, que
 > define los 7 gates y cómo se usa el instrumento).
 > **Puerta de V4.0:** `python scripts/validation_gate.py status --strict` debe
-> salir **0** (los 7 gates en `pass`).
+> salir **0** (los 7 gates en `pass`) y, con el árbol congelado,
+> `status --strict --same-tree` debe salir **0** también: la puerta fuerte exige
+> que la evidencia **sea de este mismo commit**.
 > **Estado de partida (2026-09-17, `v3.73.2`):** `auto` **10/10** · 7 gates
 > `pending`. Nada de esta planilla está ejecutado todavía.
 
@@ -49,6 +51,7 @@ cd ..
 |---|---|
 | `VERSION` | |
 | `HEAD` (SHA) | |
+| Run de CI que publicó ese commit (id numérico) | |
 | Fecha de la sesión | |
 | Equipo / SO | |
 | Modelo de Ollama instalado (`ollama list`) | |
@@ -60,10 +63,15 @@ dev server de Vite y **no** forma parte del runtime de producto):
 - LAN: `https://<ip>:8000` (la muestra el launcher; también sirve
   `https://<hostname>.local:8000` si `local_url_available` es `true`)
 
-**Recordatorio del instrumento:** `record` sella estado, notas, fecha UTC y la
-`VERSION` del árbol en `docs/audit/validation-evidence.json`. La comprobación 10
-de `auto` valida después que la evidencia no tenga gates ni estados inventados ni
-notas vacías.
+**Recordatorio del instrumento:** `record` sella estado, notas, fecha UTC, la
+`VERSION` del árbol, **el commit validado (`head_sha`)** y, con `--ci-run <id>`,
+la run de CI que lo publicó: la cadena `commit → run → gates` queda dentro de la
+evidencia. Un **`pass` sin commit no se registra** (sin git en el árbol, el
+registro se rechaza); `fail`/`skip`/`pending` sí se pueden registrar sin SHA,
+porque declaran un no-cierre. El `<run>` de los comandos de esta planilla es el id
+anotado en la tabla de arriba. La comprobación 10 de `auto` valida después que la
+evidencia no tenga gates ni estados inventados ni notas vacías, y que el `pass`
+traiga `head_sha` con formato de commit.
 
 ---
 
@@ -119,7 +127,7 @@ flowchart LR
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record offline-fisico pass `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record offline-fisico pass --ci-run <run> `
   --notes "12/12 flujos OK con Wi-Fi y Ethernet desconectados (v3.73.2); Whisper/Piper desde disco, dictionary no cacheada degrada sin colgarse"
 ```
 
@@ -145,7 +153,7 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record offline-fisic
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record maquina-limpia pass `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record maquina-limpia pass --ci-run <run> `
   --notes "Clon limpio en VM Windows: Python+deps, ollama pull llama3.1:8b, download_models.py (~1,1 GB), npm run build y launcher OK; ningun paso tacito"
 ```
 
@@ -166,7 +174,7 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record maquina-limpi
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record launcher-windows pass `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record launcher-windows pass --ci-run <run> `
   --notes "Launcher en Windows 11: start, HTTPS :8000, navegador, microfono, TTS, STT, chat y persistencia tras reinicio OK"
 ```
 
@@ -188,7 +196,7 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record launcher-wind
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record dispositivos skip `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record dispositivos skip --ci-run <run> `
   --notes "Pendiente: no hay dispositivo movil fisico disponible en esta sesion (accion humana)"
 ```
 
@@ -207,7 +215,7 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record dispositivos 
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record audio-stt-tts pass `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record audio-stt-tts pass --ci-run <run> `
   --notes "Grabacion+transcripcion reales OK; TTS en EN y ES OK; aviso de voz degradada mostro la voz realmente usada"
 ```
 
@@ -224,7 +232,7 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record audio-stt-tts
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record journeys pass `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record journeys pass --ci-run <run> `
   --notes "12 recorridos completos sin bloqueo; el porque de la actividad aparece en Home, NextStep y cola de repaso"
 ```
 
@@ -263,7 +271,7 @@ cd backend
 - **Registro:**
 
 ```powershell
-backend\.venv\Scripts\python.exe scripts\validation_gate.py record pedagogia pass `
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record pedagogia pass --ci-run <run> `
   --notes "9 instrumentos regenerados; contenido en banda, sin afirmaciones sin evidencia; vocabulario NO se presenta como nivel CEFR"
 ```
 
@@ -277,9 +285,14 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py status
 
 # La puerta real de V4.0: sale 0 solo con los 7 gates en `pass`
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict
+
+# La puerta fuerte: además, la evidencia tiene que ser de ESTE commit
+backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict --same-tree
 ```
 
-- **7/7 en `pass`** → V4.0 puede declararse (y `auto` debe seguir en 10/10).
+- **7/7 en `pass`** → V4.0 puede declararse (y `auto` debe seguir en 10/10). Si
+  además `--same-tree` sale **0**, los siete gates se probaron contra el **mismo
+  commit**: es la forma de cierre que exige la certificación de V4.0.
 - **Algún `fail`** → se **deja registrado con su motivo** y se abre incidencia;
   no se reescribe a `pass`. El gate se puede volver a registrar cuando se
   corrija.
@@ -291,8 +304,10 @@ flowchart LR
     R["record de cada gate"] --> A["auto verifica la evidencia"]
     A --> ST["status"]
     ST --> STR{"status --strict"}
-    STR -->|"0"| V4["V4.0 declarable"]
+    STR -->|"0"| ST2{"status --strict --same-tree"}
     STR -->|"1"| Pend["Quedan gates sin pass: repetir la sesion que falte"]
+    ST2 -->|"0"| V4["V4.0 declarable: 7 gates contra el mismo commit"]
+    ST2 -->|"1"| Rep["Evidencia de otro commit: repetir el gate en el arbol congelado"]
 ```
 
 ---

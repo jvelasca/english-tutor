@@ -13,11 +13,15 @@ Tres subcomandos:
                   ``docs/audit/generated/release-validation.{md,json}`` y falla
                   (exit 1) si alguna comprobación no pasa.
 - ``record``    — registra el resultado de un gate humano en
-                  ``docs/audit/validation-evidence.json`` (con notas y la versión
-                  del árbol). Un gate no se puede cerrar sin decir quién/cuándo
-                  ni cómo.
+                  ``docs/audit/validation-evidence.json``: notas, fecha, versión
+                  del árbol y **el commit contra el que se probó** (más la run
+                  de CI si se indica con ``--ci-run``). Un ``pass`` sin commit
+                  no se registra: una evidencia que no dice de qué árbol es no
+                  es evidencia.
 - ``status``    — tabla de los gates y su estado. Con ``--strict`` sale 1 si
-                  algún gate no está en ``pass``: es la puerta real de V4.0.
+                  algún gate no está en ``pass``; con ``--same-tree`` exige
+                  además que la evidencia sea **de este mismo commit** (la
+                  puerta fuerte de V4.0: los 7 gates contra un árbol congelado).
 
 El script **no ejecuta** ningún flujo de la app: certifica lo que una persona
 hizo. Un ``pass`` sin evidencia es exactamente lo que este instrumento existe para
@@ -25,8 +29,9 @@ impedir.
 
 Uso:
     python scripts/validation_gate.py auto [--require-dist]
-    python scripts/validation_gate.py record G1 pass --notes "..."
-    python scripts/validation_gate.py status [--strict]
+    python scripts/validation_gate.py record offline-fisico pass --notes "..."
+    python scripts/validation_gate.py record launcher-windows pass --ci-run 123456
+    python scripts/validation_gate.py status [--strict] [--same-tree]
 """
 from __future__ import annotations
 
@@ -59,13 +64,19 @@ STATUSES = ("pending", "pass", "fail", "skip")
 
 @dataclass(frozen=True)
 class Gate:
-    """Un gate de validación física: qué se prueba, dónde y qué se registra."""
+    """Un gate de validación física: qué se prueba, dónde y qué se registra.
+
+    ``human`` se declara **gate a gate** (sin valor por defecto) porque es la
+    propiedad que define el instrumento: **los 7 gates exigen una persona**,
+    ya que ``auto`` no ejecuta ningún flujo de la app. Declararlo explícito
+    evita que la cifra dependa de un descuido del código.
+    """
 
     id: str
     title: str
     protocol: str
     evidence: str
-    human: bool = True
+    human: bool
 
 
 # --- Los 7 gates de la release de validación --------------------------------
@@ -79,6 +90,7 @@ GATES: tuple[Gate, ...] = (
             "Los 12 veredictos de la tabla E5 (✅/⚠️/❌) con fecha y VERSION. "
             "Un solo FALLO no declarado invalida el gate."
         ),
+        human=True,
     ),
     Gate(
         id="maquina-limpia",
@@ -88,6 +100,7 @@ GATES: tuple[Gate, ...] = (
             "Runbook ejecutado en un clon/sistema recién instalado: Python + "
             "dependencias + Ollama + modelo + `download_models.py --check` + build."
         ),
+        human=True,
     ),
     Gate(
         id="launcher-windows",
@@ -97,6 +110,7 @@ GATES: tuple[Gate, ...] = (
             "Inicio desde el launcher: HTTPS en :8000, navegador, micrófono, TTS, "
             "STT, chat y persistencia. Es el gate que el CI de Linux no puede dar."
         ),
+        human=True,
     ),
     Gate(
         id="dispositivos",
@@ -106,6 +120,7 @@ GATES: tuple[Gate, ...] = (
             "Filas de la matriz cubiertas con micrófono, audio, touch, viewport, "
             "teclado y orientación. No basta con capturas."
         ),
+        human=True,
     ),
     Gate(
         id="audio-stt-tts",
@@ -115,6 +130,7 @@ GATES: tuple[Gate, ...] = (
             "Grabación y transcripción reales, reproducción real y aviso de voz "
             "degradada con la voz realmente usada."
         ),
+        human=True,
     ),
     Gate(
         id="journeys",
@@ -124,6 +140,7 @@ GATES: tuple[Gate, ...] = (
             "Home, Today, Curso, Aprender, Listening, Vocabulary, Grammar, "
             "Reading, Speaking, Conversation, Review y Progress de principio a fin."
         ),
+        human=True,
     ),
     Gate(
         id="pedagogia",
@@ -133,9 +150,16 @@ GATES: tuple[Gate, ...] = (
             "Calidad del contenido (léxico, gramática, listening, speaking) y la "
             "regla de no confundir palabras conocidas con nivel CEFR."
         ),
+        human=True,
     ),
 )
 
+# Cifra vigente del instrumento: **7 de 7 gates son de acción humana** (ver
+# `Gate.human`). La expresión «7 gates (5 de ellos acción humana)» que aparece en
+# notas históricas de V3.73.0 se refiere a los **cinco bloques físicos que V3.72
+# declaró** (corte de red, máquina limpia, Windows real, dispositivos y audio):
+# el instrumento los cubre y añade `journeys` y `pedagogia`, que también exigen
+# una persona. No hay dos cifras válidas: son siete.
 GATES_BY_ID = {gate.id: gate for gate in GATES}
 
 # Protocolos funcionales que se ejecutan **a pie de máquina** durante la
@@ -155,6 +179,41 @@ def source_version() -> str:
     if not match:
         raise SystemExit("No se encontró VERSION en backend/config.py")
     return match.group(1)
+
+
+GIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
+
+
+def git_head() -> str | None:
+    """Commit que se está validando (``None`` si este árbol no tiene git).
+
+    La evidencia tiene que nombrar **su** árbol: sin este dato, «los 7 gates en
+    `pass`» puede significar siete gates probados en siete commits distintos.
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha if GIT_SHA_RE.fullmatch(sha) else None
+
+
+def normalize_ci_run(value: str) -> str | None:
+    """Id numérico de la run de CI, aceptando también la URL de la run.
+
+    Se guarda **solo el id**: una URL se puede escribir mal y el número es lo que
+    identifica el artefacto realmente publicado.
+    """
+    match = re.search(r"/runs/(\d+)", value)
+    if match:
+        return match.group(1)
+    stripped = value.strip()
+    return stripped if stripped.isdigit() else None
 
 
 # --- Comprobaciones automáticas ---------------------------------------------
@@ -396,7 +455,12 @@ def check_dist_artifact(require_dist: bool) -> Check:
 
 
 def check_evidence_not_invented() -> Check:
-    """La evidencia registrada no puede tener gates ni estados desconocidos."""
+    """La evidencia registrada no puede tener gates ni estados desconocidos.
+
+    Además vigila los dos datos que hacen trazable la evidencia: un ``pass`` sin
+    ``head_sha`` no dice contra qué commit se probó, y un ``head_sha``/``ci_run``
+    con formato inválido es una declaración que no se puede verificar.
+    """
     if not EVIDENCE.is_file():
         return Check(
             "evidencia-integra",
@@ -415,6 +479,14 @@ def check_evidence_not_invented() -> Check:
             problems.append(f"{gate_id}: estado desconocido {status}")
         if not str(entry.get("notes", "")).strip():
             problems.append(f"{gate_id}: sin notas (una evidencia vacía no vale)")
+        head_sha = entry.get("head_sha")
+        if status == "pass" and not head_sha:
+            problems.append(f"{gate_id}: `pass` sin head_sha (no dice de qué commit)")
+        if head_sha is not None and not GIT_SHA_RE.fullmatch(str(head_sha)):
+            problems.append(f"{gate_id}: head_sha inválido {head_sha}")
+        ci_run = entry.get("ci_run")
+        if ci_run is not None and not str(ci_run).isdigit():
+            problems.append(f"{gate_id}: ci_run inválido {ci_run}")
 
     return Check(
         "evidencia-integra",
@@ -482,7 +554,9 @@ def report_markdown(checks: list[Check], version: str) -> str:
     lines.append("")
     lines.append(
         "Los 7 gates de validación física se registran con "
-        "`validation_gate.py record` y se consultan con `status --strict`."
+        "`validation_gate.py record` (que sella el commit validado) y se consultan "
+        "con `status --strict`; con los 7 en `pass`, `status --strict --same-tree` "
+        "exige además que la evidencia sea de este mismo commit."
     )
     lines.append("")
     return "\n".join(lines)
@@ -529,10 +603,19 @@ def gate_status(evidence: dict, gate_id: str) -> dict:
         "notes": entry.get("notes", ""),
         "recorded_at": entry.get("recorded_at"),
         "tree_version": entry.get("tree_version"),
+        "head_sha": entry.get("head_sha"),
+        "ci_run": entry.get("ci_run"),
     }
 
 
-def record(gate_id: str, status: str, notes: str) -> int:
+def record(gate_id: str, status: str, notes: str, ci_run: str = "") -> int:
+    """Registra un gate sellando el commit (y, si se indica, la run de CI).
+
+    Un ``pass`` exige saber contra qué árbol se probó: sin git en el árbol el
+    registro se rechaza, porque «verde» sin commit es exactamente la evidencia
+    que este instrumento existe para no aceptar. ``fail``/``skip``/``pending``
+    sí se pueden registrar sin SHA (declaran un no-cierre, no una prueba).
+    """
     if gate_id not in GATES_BY_ID:
         print(f"FAIL: gate desconocido `{gate_id}`")
         print("Gates válidos: " + ", ".join(g.id for g in GATES))
@@ -544,49 +627,92 @@ def record(gate_id: str, status: str, notes: str) -> int:
         print("FAIL: registrar un gate exige --notes (no se cierra sin decir qué se observó)")
         return 1
 
+    sha = git_head()
+    if status == "pass" and not sha:
+        print("FAIL: un `pass` exige el commit validado y este árbol no tiene git")
+        return 1
+    run_id = ""
+    if ci_run.strip():
+        run_id = normalize_ci_run(ci_run) or ""
+        if not run_id:
+            print(f"FAIL: `--ci-run` no es un id ni una URL de run: {ci_run}")
+            return 1
+
     evidence = load_evidence()
     gates = evidence.setdefault("gates", {})
-    gates[gate_id] = {
+    entry: dict = {
         "status": status,
         "notes": notes.strip(),
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "tree_version": source_version(),
+        "head_sha": sha,
     }
+    if run_id:
+        entry["ci_run"] = run_id
+    gates[gate_id] = entry
     evidence["gates"] = {gate.id: gates[gate.id] for gate in GATES if gate.id in gates}
     EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
     EVIDENCE.write_text(
         json.dumps(evidence, indent=1, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    print(f"OK: gate `{gate_id}` → {status}")
+    where = sha[:8] if sha else "sin git"
+    suffix = f" · CI run {run_id}" if run_id else ""
+    print(f"OK: gate `{gate_id}` → {status} ({where}{suffix})")
     return 0
 
 
-def status_report(strict: bool) -> int:
+def status_report(strict: bool, same_tree: bool = False) -> int:
+    """Estado de los 7 gates. `--strict` = puerta de V4.0; `--same-tree` la endurece."""
     evidence = load_evidence()
     version = source_version()
-    print(f"Validación de la release · árbol v{version}")
+    head = git_head()
+    location = f" · {head[:8]}" if head else ""
+    print(f"Validación de la release · árbol v{version}{location}")
     print()
     pending = 0
+    foreign = 0
     for gate in GATES:
         entry = gate_status(evidence, gate.id)
         state = entry["status"]
         if state != "pass":
             pending += 1
-        stale = ""
+        marks: list[str] = []
         if entry["tree_version"] and entry["tree_version"] != version:
-            stale = f"  (grabado en v{entry['tree_version']})"
-        print(f"  [{state:>7}] {gate.title}{stale}")
+            marks.append(f"grabado en v{entry['tree_version']}")
+        sha = entry["head_sha"]
+        if sha and (not head or sha != head):
+            foreign += 1
+            marks.append(f"grabado en {sha[:8]}")
+        marker = f"  ({' · '.join(marks)})" if marks else ""
+        print(f"  [{state:>7}] {gate.title}{marker}")
         if entry["notes"]:
             print(f"            {entry['notes']}")
         print(f"            protocolo: {gate.protocol}")
+        if sha:
+            run = f" · CI run {entry['ci_run']}" if entry["ci_run"] else ""
+            print(f"            commit: {sha}{run}")
 
     print()
-    if pending == 0:
-        print("OK: los 7 gates están en `pass` — V4.0 puede declararse.")
+    ok = pending == 0 and (not same_tree or (head is not None and foreign == 0))
+    if ok:
+        suffix = " contra este mismo commit" if same_tree else ""
+        print(f"OK: los 7 gates están en `pass`{suffix} — V4.0 puede declararse.")
         return 0
-    print(f"PENDIENTE: {pending} de {len(GATES)} gates sin `pass`.")
-    if strict:
+
+    problems: list[str] = []
+    if pending:
+        problems.append(f"{pending} de {len(GATES)} gates sin `pass`")
+    if same_tree:
+        if not head:
+            problems.append("este árbol no tiene git: no se puede comprobar el commit")
+        elif foreign:
+            problems.append(f"{foreign} gates con evidencia de otro commit")
+    print(f"PENDIENTE: {'; '.join(problems)}.")
+    if strict and pending:
         print("FAIL: `--strict` exige los 7 gates en `pass`.")
+        return 1
+    if same_tree and (not head or foreign):
+        print("FAIL: `--same-tree` exige evidencia del commit actual.")
         return 1
     return 0
 
@@ -609,12 +735,22 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("gate", help="id del gate (ver `status`)")
     rec.add_argument("result", choices=list(STATUSES))
     rec.add_argument("--notes", default="", help="qué se hizo y qué se observó")
+    rec.add_argument(
+        "--ci-run",
+        default="",
+        help="id numérico o URL de la run de CI que publicó el commit validado",
+    )
 
     st = sub.add_parser("status", help="estado de los 7 gates de validación")
     st.add_argument(
         "--strict",
         action="store_true",
         help="sale 1 si algún gate no está en `pass` (puerta de V4.0)",
+    )
+    st.add_argument(
+        "--same-tree",
+        action="store_true",
+        help="exige además que la evidencia sea del commit actual (puerta fuerte)",
     )
 
     args = parser.parse_args(argv)
@@ -629,9 +765,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if any(c.ok is False for c in checks) else 0
 
     if args.command == "record":
-        return record(args.gate, args.result, args.notes)
+        return record(args.gate, args.result, args.notes, args.ci_run)
 
-    return status_report(args.strict)
+    return status_report(args.strict, args.same_tree)
 
 
 if __name__ == "__main__":

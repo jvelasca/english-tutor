@@ -261,8 +261,10 @@
   registrado (`auto` / `record` / `status --strict`), con evidencia en
   `docs/audit/validation-evidence.json` y runbook en
   `docs/audit/VALIDATION-RELEASE-V373.md`. `status --strict` es la puerta real de
-  V4.0: falla mientras algún gate no esté en `pass`. Candados:
-  `backend/tests/test_validation_gate_v373.py` y
+  V4.0: falla mientras algún gate no esté en `pass`; `--same-tree` la endurece
+  exigiendo que los siete `head_sha` sean el commit actual (V3.73.4). `record`
+  sella el commit validado y la run de CI: un `pass` sin commit se rechaza.
+  Candados: `backend/tests/test_validation_gate_v373.py` y
   `backend/tests/test_docs_drift_v373.py`.
 
 ### Sigue pendiente (acción humana) y sigue abierto

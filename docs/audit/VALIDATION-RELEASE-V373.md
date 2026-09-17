@@ -8,7 +8,9 @@
 > **Regla:** un gate no se cierra con una opinión. Se cierra con `record`, y un
 > `fail`/`skip` **exige notas**.
 > **Puerta de V4.0:** `python scripts/validation_gate.py status --strict` debe
-> salir 0 (los 7 gates en `pass`).
+> salir 0 (los 7 gates en `pass`); con el árbol congelado, la puerta fuerte
+> `status --strict --same-tree` exige además que la evidencia sea **de este mismo
+> commit**.
 > **Planilla de campo:** `docs/audit/KIT-VALIDACION-GATES.md` ordena la ejecución
 > (pre-vuelo, agrupación por sesión y el comando `record` exacto de cada gate) sin
 > duplicar los protocolos; este runbook sigue siendo la definición de los gates.
@@ -31,15 +33,38 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py auto --require-dist
 
 # 2. Ejecutar un gate humano y registrar el resultado
 backend\.venv\Scripts\python.exe scripts\validation_gate.py record offline-fisico pass `
-    --notes "12/12 flujos OK con Wi-Fi y Ethernet desconectados (v3.73.0)"
+    --notes "12/12 flujos OK con Wi-Fi y Ethernet desconectados (v3.73.0)" `
+    --ci-run 35219576565
 
 # 3. Consultar el estado (y la puerta de V4.0)
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict
+backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict --same-tree
 ```
 
 Ids válidos: `offline-fisico`, `maquina-limpia`, `launcher-windows`,
 `dispositivos`, `audio-stt-tts`, `journeys`, `pedagogia`.
+
+## Qué sella la evidencia
+
+Cada `record` escribe en `docs/audit/validation-evidence.json`: el estado, las
+notas, la fecha UTC, la `VERSION` del árbol, **el commit validado (`head_sha`)** y,
+con `--ci-run <id>`, la run de CI que lo publicó (se acepta el id o la URL; se
+guarda el id).
+
+- Un **`pass` sin commit no se registra**: sin git en el árbol, el instrumento
+  rechaza el cierre. Un `pass` que no dice de qué árbol es no es evidencia.
+- `fail`, `skip` y `pending` **sí** se registran sin SHA: declaran un no-cierre.
+- `--strict` exige los 7 en `pass`. `--same-tree` exige además que los siete
+  `head_sha` sean el commit actual: es lo que impide que siete gates verdes en
+  siete commits distintos se presenten como «los siete gates».
+
+**Los 7 gates son de acción humana.** La expresión «7 gates (5 de ellos acción
+humana)» de notas históricas de V3.73.0 se refería a los **cinco bloques físicos
+que V3.72 declaró** (corte de red, máquina limpia, Windows real, dispositivos y
+audio); el instrumento los cubre y añade `journeys` y `pedagogia`, que también
+exigen una persona. `Gate.human` se declara gate a gate y vale `True` en los
+siete: no hay dos cifras válidas.
 
 ## Los 7 gates
 
