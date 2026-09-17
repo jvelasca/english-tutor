@@ -97,7 +97,8 @@ dos cifras en circulación.
 ```powershell
 # Backend
 cd backend
-.venv\Scripts\python.exe -m pytest tests/ -q      # 2798 passed (0 skipped en el árbol de trabajo)
+.venv\Scripts\python.exe -m pytest tests/ -q      # 2796 passed, 2 skipped (2798 casos) en el worktree limpio
+                                                    # 2798 passed (0 skipped, mismos 2798 casos) en el árbol de trabajo
 .venv\Scripts\python.exe -m ruff check .           # limpio
 
 # Frontend (esta release NO toca producto: se comprueba que no ha derivado)
@@ -120,10 +121,24 @@ backend\.venv\Scripts\python.exe scripts\check_release_consistency.py           
 backend\.venv\Scripts\python.exe scripts\check_i18n_coverage.py --strict         # 0/0/0
 ```
 
-La cifra del **checkout limpio** (la autoridad, como en V3.73.2/V3.73.3) se
-confirma en el **pre-vuelo** de los gates, en un `git worktree` sobre el tag: es
-donde los 3 casos condicionales que el árbol de trabajo no salta se comportan como
-en V3.73.3, y ahí se registra la cifra definitiva junto a la identidad del árbol.
+La cifra del **checkout limpio** (la autoridad, como en V3.73.2/V3.73.3) es **2796
+passed · 2 skipped** (2798 casos), medida en el `git worktree` sobre el tag en el
+**pre-vuelo**; los 2 saltos son condicionales del banco de escenario, que en el
+worktree no tiene la BD local (no versionada). En el árbol de trabajo la misma suite
+da **2798 passed** (0 skipped): mismos 2798 casos, sin BD que los condicione.
+Además, en ese worktree el **manifiesto offline** y la **identidad del árbol** se
+comprobaron con valores reales:
+
+| Dato | Valor |
+|---|---|
+| `VERSION` | `3.73.4` |
+| `HEAD` (SHA) | `5007c3a59127701932a0c1c21525da6936f9f7fa` |
+| Run de CI del commit | `35251738073` (11/11, `success`) |
+| `git status --short` del worktree | limpio tras el pre-vuelo |
+| `auto --require-dist` en el worktree | **10/10**, y el informe regenerado **idéntico** al commiteado (0 diff) |
+| `scripts.audit_dossier runtime-audit` | **Ausentes: 0** |
+| `download_models.py --check` | falta solo la **BD** (se crea sola al arrancar); Ollama `llama3.1:8b` presente en `ollama list` |
+| Entorno del worktree (no versionado) | `.venv` y `models/` **enlazados** de la instalación local (no se descargan: eso es G2, que no se ejecuta hoy) |
 
 **Tests nuevos:** `backend/tests/test_validation_gate_v373.py` **29 → 43**
 (+14 casos): el SHA sellado en el `record`, el `pass` sin git rechazado, el

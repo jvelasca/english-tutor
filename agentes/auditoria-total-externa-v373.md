@@ -2,12 +2,12 @@
 
 > **Qué es este archivo.** El prompt **autocontenido** para que un auditor externo
 > (que **solo ve el repositorio público** de GitHub) audite **el producto publicado
-> en `v3.73.3`**, no un plan ni un incremento aislado. La revisión es **de solo
+> en `v3.73.4`**, no un plan ni un incremento aislado. La revisión es **de solo
 > lectura**: no se cambia código, datos, configuración ni etiquetas publicadas.
 >
 > **Por qué una auditoría de CIERRE y no otra revisión incremental.** El gerente la
 > ha pedido explícitamente como **auditoría de cierre**: no se audita «qué añade
-> V3.73.3», sino **el conjunto del producto tal y como está publicado ahora**, porque
+> V3.73.4», sino **el conjunto del producto tal y como está publicado ahora**, porque
 > es el material sobre el que se decide **dar o no el salto a V4.0**. Por eso este
 > documento combina la mecánica del punto de entrada de RELEASE (estado de
 > publicación verificado contra GitHub) con el **alcance total** de las auditorías
@@ -18,11 +18,12 @@
 > *validation line* —V3.73.0 construyó el instrumento de los 7 gates y el
 > fail-closed del runtime; V3.73.1 cerró los seis hallazgos GUI/UX que la auditoría
 > de V3.73.0 dejó abiertos; V3.73.2 corrigió su propia CI; V3.73.3 entregó el kit de
-> campo de los gates y un guard anti-deriva—. Si el auditor busca «qué se ha
-> mejorado para el alumno», la respuesta honesta en V3.73.0/V3.73.2/V3.73.3 es
-> **nada** (V3.73.1 sí ordenó la GUI, pero sin capacidad nueva); si busca «qué se ha
-> demostrado», el objeto de esta auditoría es justamente **separar lo demostrado de
-> lo declarado**.
+> campo de los gates y un guard anti-deriva; V3.73.4 selló la evidencia del arnés con
+> el commit validado y añadió la puerta `--strict --same-tree`—. Si el auditor busca
+> «qué se ha mejorado para el alumno», la respuesta honesta en
+> V3.73.0/V3.73.2/V3.73.3/V3.73.4 es **nada** (V3.73.1 sí ordenó la GUI, pero sin
+> capacidad nueva); si busca «qué se ha demostrado», el objeto de esta auditoría es
+> justamente **separar lo demostrado de lo declarado**.
 >
 > **Estado:** entregado 2026-09-17. **Informe esperado:**
 > `docs/audit/AI-AUDITORIA-CIERRE-V373.md`. Prefijo **`AI`** porque `AA`–`AF` los
@@ -37,7 +38,7 @@
 
 Orden de lectura recomendado, de marco a evidencia:
 
-1. `docs/RELEVO.md` — **cabecera** (nota de la posición vigente: `v3.73.3`) y
+1. `docs/RELEVO.md` — **cabecera** (nota de la posición vigente: `v3.73.4`) y
    **§0 «START HERE»**.
 2. `PLAN.md` — §«Estado actual» (registro release a release) y la tabla de
    trazabilidad de briefings y auditorías.
@@ -71,20 +72,21 @@ git log --oneline -3 main
 ## 1. Punto de entrada verificado (contra GitHub, no contra un árbol local)
 
 - Repositorio: `jvelasca/english-tutor` (**público**), rama por defecto `main`.
-- **Commit de release auditado:** `ae14dbd` (`ae14dbd58dec6bc72a6d9b6024ccdeb2c31e3ee4`),
-  `release(v3.73.3): kit de validacion de los 7 gates, guard anti-deriva de
-  protocolos y re-anclaje de la auditoria externa`.
-- **Tag anotado `v3.73.3`:** objeto `7715fc2`
-  (`7715fc246bade58e0f21ab09d836fb2959ced58f`), que apunta a `ae14dbd`.
-- **`main`:** `ae14dbd` es el **commit de release**; `main` va **por delante** con
-  commits **solo documentales** —el cierre de esta release, que introduce este mismo
-  archivo—. Ese recuento crece por diseño y **no debe tomarse como referencia**. Lo
-  que sí es estable y obligatorio es el invariante de abajo.
-- **Base de comparación:** `v3.73.2` → release `cdc9dd0`, tag anotado `v3.73.2`
-  (objeto `58a9ec1`). El código **sí** cambió entre `v3.73.2` y `v3.73.3` (es el
+- **Commit de release auditado:** `5007c3a` (`5007c3a59127701932a0c1c21525da6936f9f7fa`),
+  `release(v3.73.4): recorder trazable, evidencia sellada con commit y run de CI, y
+  puerta --strict --same-tree`.
+- **Tag anotado `v3.73.4`:** objeto `3f2ec88`
+  (`3f2ec88623884c506eecd5e7b05f32154cf233bb`), que apunta a `5007c3a`.
+- **`main`:** `5007c3a` es el **commit de release**; `main` va **por delante** con
+  commits **solo documentales** —el cierre de esta release, que introduce el
+  re-anclaje de este mismo archivo—. Ese recuento crece por diseño y **no debe
+  tomarse como referencia**. Lo que sí es estable y obligatorio es el invariante de
+  abajo.
+- **Base de comparación:** `v3.73.3` → release `ae14dbd`, tag anotado `v3.73.3`
+  (objeto `7715fc2`). El código **sí** cambió entre `v3.73.3` y `v3.73.4` (es el
   arnés de validación y sus tests), y por eso el tag de referencia de esta auditoría
-  es `v3.73.3`, no `v3.73.2`.
-- **Sin GitHub Release** para `v3.73.3`: es una decisión declarada del gerente (solo
+  es `v3.73.4`, no `v3.73.3`.
+- **Sin GitHub Release** para `v3.73.4`: es una decisión declarada del gerente (solo
   tag, que es la convención real del repo desde `v3.34.0`). El último Release object
   publicado es `v3.33.0`.
 
@@ -92,39 +94,41 @@ git log --oneline -3 main
 auditado **solo** con commits documentales. Lo que es obligatorio es este invariante:
 
 ```bash
-git diff --stat v3.73.3..main -- backend frontend launcher scripts
+git diff --stat v3.73.4..main -- backend frontend launcher scripts
 ```
 
 Debe salir **vacío** (comprobado en el momento de redactar este documento). Es
-decir: da igual clonar `main` o hacer `git checkout v3.73.3`; **el código de
+decir: da igual clonar `main` o hacer `git checkout v3.73.4`; **el código de
 producto y el arnés citados aquí son los mismos**. Si el auditor encuentra una
 diferencia en esas cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
 
-> **Nota de historial (para que no se confunda con un hallazgo).** Una versión
-> anterior de este documento estaba anclada a `v3.73.0` y afirmaba este mismo
-> invariante **contra `v3.73.0`**: eso dejó de ser cierto con V3.73.1 (frontend) y
-> V3.73.2 (tests e instrumento de auditoría del backend), y habría producido un
-> **P0 falso** en el primer comando del auditor. Se re-ancló al tag vigente. La
-> lección está admitida en `CHANGELOG.md` y en `release-notes-v3.73.3.md`.
+> **Nota de historial (para que no se confunda con un hallazgo).** Dos versiones
+> anteriores de este documento estuvieron ancladas a `v3.73.0` y luego a `v3.73.3`
+> afirmando este mismo invariante contra esos tags: en cada caso dejó de ser cierto
+> en la release siguiente (V3.73.1 frontend; V3.73.2 tests e instrumento del backend;
+> V3.73.3 y V3.73.4 arnés y tests), y habría producido un **P0 falso** en el primer
+> comando del auditor. Es un invariante **de la release vigente**, no del proyecto:
+> se re-ancla en cada cierre. La lección está admitida en `CHANGELOG.md` y en
+> `release-notes-v3.73.4.md`.
 
 **Estado de publicación (verificado, no declarado):**
 
 - **CI 11/11 verde** en
-  [run 35219576565](https://github.com/jvelasca/english-tutor/actions/runs/35219576565)
-  (sha `ae14dbd`, `success`), con los **11 jobs** en verde:
-  - `Backend (ruff + pytest)` `105196126221` · `Frontend (tsc + vitest + build)`
-    `105196126187` · `Release consistency` `105196126112` · `Validation gate (checks
-    automáticos)` `105196125712` · `Beta V3.0 gate` `105196126105` · `Content
-    validation` `105196126128` · `Playwright E2E (visual)` `105196126103` ·
-    `Launcher (ruff + pytest)` `105196125970` · `Product origin (UI served over
-    HTTPS)` `105196126156` · `Launcher (Windows, ruff + pytest)` `105196126272`
-    (**bloqueante**) · `Product origin (Windows, informativo)` `105196126122`
+  [run 35251738073](https://github.com/jvelasca/english-tutor/actions/runs/35251738073)
+  (sha `5007c3a`, `success`), con los **11 jobs** en verde:
+  - `Backend (ruff + pytest)` `105305488535` · `Frontend (tsc + vitest + build)`
+    `105305488268` · `Release consistency` `105305488905` · `Validation gate (checks
+    automáticos)` `105305488802` · `Beta V3.0 gate` `105305488586` · `Content
+    validation` `105305488464` · `Playwright E2E (visual)` `105305488614` ·
+    `Launcher (ruff + pytest)` `105305488647` · `Product origin (UI served over
+    HTTPS)` `105305488683` · `Launcher (Windows, ruff + pytest)` `105305488585`
+    (**bloqueante**) · `Product origin (Windows, informativo)` `105305488660`
     (**informativo declarado**, `continue-on-error: true`).
 - **Nota para el auditor:** el run se dispara con el **push de `main`**; el tag se
   publicó en el mismo push y apunta al commit de release.
 
 **Consistencia de versión:** `backend/config.py::VERSION` es la fuente única
-(`scripts/check_release_consistency.py`) y `3.73.3` debe aparecer en **6 orígenes**:
+(`scripts/check_release_consistency.py`) y `3.73.4` debe aparecer en **6 orígenes**:
 `backend/config.py`, `frontend/package.json`, `frontend/package-lock.json`,
 `README.md`, `CHANGELOG.md` y `PLAN.md`.
 
@@ -139,7 +143,7 @@ diferencia en esas cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
 | `backend/services/net_interfaces.py` | Descubrimiento de IP de LAN **sin referencias externas**: `select_lan_ipv4` (puro) + `candidate_addresses` + override `ENGLISH_TUTOR_LAN_IP` | Que el descubrimiento no consulta ninguna dirección pública y que es determinista y falsable sin red |
 | `backend/services/frontend_dist.py` | `mount_frontend(app, path, require_ui)`: en producto **fail-closed**, en desarrollo fail-open | Que el producto **no puede arrancar pareciendo listo y sin interfaz** |
 | `launcher/core.py` (`backend_env()`), `launcher/process_manager.py` | Inyecta `ENGLISH_TUTOR_REQUIRE_UI=1`; **no arranca** sin `frontend/dist/index.html` | Que la exigencia vive en el **runtime de producto**, no en quien lanza el comando |
-| `scripts/validation_gate.py` | Arnés de los **7 gates**: `auto`, `record`, `status [--strict]` | Que una validación física que nadie ha hecho todavía es **estado registrado y exigible** |
+| `scripts/validation_gate.py` | Arnés de los **7 gates**: `auto`, `record` (sella `head_sha` + `--ci-run`), `status [--strict] [--same-tree]` | Que una validación física que nadie ha hecho todavía es **estado registrado y exigible**, y que un `pass` **no se puede registrar sin decir contra qué commit se probó** |
 | `docs/audit/VALIDATION-RELEASE-V373.md` | Runbook de los 7 gates (protocolo + tabla de estado) | Que cada gate referencia un protocolo existente en vez de duplicarlo |
 | `docs/audit/generated/release-validation.{md,json}` | Informe **determinista** de las 10 comprobaciones estáticas | Que `auto` es reproducible y **no filtra rutas absolutas del equipo** |
 | `backend/tests/test_serve_frontend_v373.py` (**19**) | Candado del fail-closed, las dos mitades | Que renombrar la variable en un solo lado hace fallar el contrato |
@@ -158,14 +162,15 @@ diferencia en esas cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
 | `frontend/scripts/contrast_audit.mjs` + `docs/audit/generated/contrast-report.{json,md}` | Instrumento propio de contraste WCAG AA de los **7 acentos**, **en CI** | Que el contraste está **medido**, no afirmado |
 | `frontend/tests/visual/{accentContrast,keyboard,reducedMotionAndZoom}.spec.ts` | Playwright: contraste, skip link y activación por teclado del hub, `prefers-reduced-motion` (GUI-05) y zoom 200 %/reflow (GUI-06) | Que hay **cuatro** contratos de UI con evidencia ejecutada (y que **no** hay motor de a11y tipo `axe`) |
 
-### 2.3 V3.73.2 y V3.73.3 — la CI y el kit
+### 2.3 V3.73.2, V3.73.3 y V3.73.4 — la CI, el kit y la trazabilidad
 
 | Ruta | Qué es | Qué afirma |
 |---|---|---|
 | `backend/scripts/audit_dossier.py` (`UI_ARTIFACT_PATHS`) | La UI de `reading` se declara `chat:lectura` (tipo + ruta) en vez de asumir un directorio de `frontend/src/features` | Que el instrumento de cobertura **reapunta**, no se debilita: los otros 8 artefactos conservan su `is_dir()` |
-| `docs/audit/KIT-VALIDACION-GATES.md` | **Kit de campo** de los 7 gates (V3.73.3) | Que la ejecución física tiene planilla y comando exacto, y que el kit **referencia** los protocolos en vez de duplicarlos |
+| `docs/audit/KIT-VALIDACION-GATES.md` | **Kit de campo** de los 7 gates (V3.73.3; V3.73.4 le añade la identidad del árbol y el `--ci-run` de cada `record`) | Que la ejecución física tiene planilla y comando exacto, y que el kit **referencia** los protocolos en vez de duplicarlos |
 | `scripts/validation_gate.py` → `check_gate_protocol_origins` (id `gate-origins`) | El guard pasa de vigilar **un** documento a vigilar los **tres** protocolos funcionales (`DEVICE_MATRIX.md`, `RA-RUNTIME-OFFLINE.md`, `G-DEVICES.md`) | Que un protocolo que mande al **dev server de Vite** (`:5173`) o que no cite el origen de producto (`:8000`) **hace fallar el arnés** |
-| `backend/tests/test_validation_gate_v373.py` (**24 → 29**) | Candado del arnés (incluye los 5 tests del guard de protocolos) | Que un gate no se cierra sin notas, que `--strict` falla sin los 7 en `pass` y que la deriva de puertos no vuelve por un documento lateral |
+| `scripts/validation_gate.py` → `record` / `status_report` (V3.73.4) | La evidencia sella `head_sha` (y `ci_run` si se indica); un `pass` sin commit **se rechaza**; `--same-tree` exige que los siete `head_sha` sean el commit actual | Que siete gates verdes en siete commits distintos **no** se pueden presentar como «los siete gates», y que la cadena `commit → run → artefactos → gate records` queda en la evidencia |
+| `backend/tests/test_validation_gate_v373.py` (**24 → 29 → 43**) | Candado del arnés (5 tests del guard de protocolos + 14 del sellado del commit, `--ci-run` y `--same-tree`) | Que un gate no se cierra sin notas **ni sin commit**, que `--strict` falla sin los 7 en `pass`, que `--same-tree` distingue la evidencia ajena y que la deriva de puertos no vuelve por un documento lateral |
 | `docs/audit/RA-RUNTIME-OFFLINE.md` (§5 y E5), `docs/audit/G-DEVICES.md` | Corrección de la **deriva de protocolo**: de `:5173` al origen de producto `:8000` | Que los protocolos que se ejecutan **a pie de máquina** mandan al artefacto real (seguirlos antes habría probado **otro** artefacto) |
 | `docs/audit/RB-INSTALACION.md` | Node y npm como requisito de **compilación**, no de ejecución | Que la instalación limpia declara lo que de verdad hace falta para **ejecutar** |
 
@@ -179,9 +184,9 @@ la release (verificadas en el árbol publicado en el momento de redactar):
 ```powershell
 # Backend
 cd backend
-.venv\Scripts\python.exe -m pytest tests/ -q          # declarado: 2784 casos (2781 passed + 3 skipped en checkout limpio)
+.venv\Scripts\python.exe -m pytest tests/ -q          # declarado: 2796 passed + 2 skipped (2798 casos) en el worktree limpio del pre-vuelo; 2798 passed (0 skipped, mismos 2798 casos) en el árbol de trabajo
 .venv\Scripts\python.exe -m ruff check .               # declarado: limpio
-#   los 4 ficheros v373 suman 90 (19+23+29+19)
+#   los 4 ficheros v373 suman 104 (19+23+43+19)
 
 # Frontend
 cd ..\frontend
@@ -201,8 +206,9 @@ cd ..
 backend\.venv\Scripts\python.exe scripts\validation_gate.py auto --require-dist  # declarado: 10/10
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status               # declarado: 7 pending
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict      # declarado: exit 1
+backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict --same-tree  # declarado: exit 1
 backend\.venv\Scripts\python.exe scripts\check_i18n_coverage.py --strict         # declarado: 0 huérfanas
-backend\.venv\Scripts\python.exe scripts\check_release_consistency.py            # declarado: 3.73.3, 6 orígenes
+backend\.venv\Scripts\python.exe scripts\check_release_consistency.py            # declarado: 3.73.4, 6 orígenes
 backend\.venv\Scripts\python.exe scripts\check_beta_v3.py                        # declarado: OK
 cd backend
 .venv\Scripts\python.exe scripts\content_validation.py                           # declarado: OK
@@ -558,12 +564,15 @@ proyecto, que acotan lo que puede leerse como demostrado:
 - **Los 7 gates están en `pending`.** La línea V3.73 construye el instrumento y
   entrega su planilla de campo; **no** ejecuta la validación física. Nadie ha hecho
   el corte de red real (`RA-05`), ni una instalación en máquina limpia (`RB-05`), ni
-  pruebas en móvil real, ni pruebas con audio real. **Comprobación abierta:** el
-  código marca los **7** gates como `human: bool = True` (`scripts/validation_gate.py`)
-  sin ninguna entrada que lo sobrescriba, mientras `PLAN.md` y
-  `release-notes-v3.73.0.md` dicen «7 gates (5 de ellos acción humana)».
-  **Dictaminar cuál de las dos cifras es la correcta** y si la discrepancia es un
-  hallazgo documental.
+  pruebas en móvil real, ni pruebas con audio real. **Comprobación (resuelta en
+  V3.73.4):** el código marca los **7** gates como `human: bool = True`, y la cifra
+  vigente es **7 de 7** —el instrumento no ejecuta ningún flujo de la app, así que
+  todos exigen una persona—. La expresión «7 gates (5 de ellos acción humana)» de
+  `PLAN.md` y `release-notes-v3.73.0.md` describía los **cinco bloques físicos que
+  V3.72 declaró** (corte de red, máquina limpia, Windows real, dispositivos y audio);
+  V3.73.4 declara `human` **gate a gate** (sin valor por defecto) y deja la
+  explicación en `docs/audit/VALIDATION-RELEASE-V373.md`. El auditor debe comprobar
+  que ya **no** quedan dos cifras en circulación.
 - **El kit es una planilla, no una validación.** `docs/audit/KIT-VALIDACION-GATES.md`
   ordena y registra la ejecución humana; **no** mueve ningún gate a `pass` ni
   sustituye a los protocolos.
@@ -596,16 +605,16 @@ proyecto, que acotan lo que puede leerse como demostrado:
 **Estado del punto de entrada: CERRADO (2026-09-17).** Verificado contra GitHub, no
 contra el árbol local:
 
-- **Commit de release:** `ae14dbd` (`ae14dbd58dec6bc72a6d9b6024ccdeb2c31e3ee4`).
-- **Tag anotado:** `v3.73.3` (objeto `7715fc2`), apuntando a `ae14dbd`.
-- **`main`:** `ae14dbd` como ancla de código, más el commit de cierre documental que
-  introduce este archivo (solo documentación).
+- **Commit de release:** `5007c3a` (`5007c3a59127701932a0c1c21525da6936f9f7fa`).
+- **Tag anotado:** `v3.73.4` (objeto `3f2ec88`), apuntando a `5007c3a`.
+- **`main`:** `5007c3a` como ancla de código, más el commit de cierre documental que
+  re-ancla este archivo (solo documentación).
 - **CI 11/11 verde** en el
-  [run 35219576565](https://github.com/jvelasca/english-tutor/actions/runs/35219576565)
-  (sha `ae14dbd`, `success`).
-- **Invariante del código:** `git diff --stat v3.73.3..main -- backend frontend
+  [run 35251738073](https://github.com/jvelasca/english-tutor/actions/runs/35251738073)
+  (sha `5007c3a`, `success`).
+- **Invariante del código:** `git diff --stat v3.73.4..main -- backend frontend
   launcher scripts` sale **vacío**.
-- **Consistencia de versión:** `3.73.3` en los **6 orígenes**
+- **Consistencia de versión:** `3.73.4` en los **6 orígenes**
   (`scripts/check_release_consistency.py`).
 
 **Informe esperado:** `docs/audit/AI-AUDITORIA-CIERRE-V373.md`.

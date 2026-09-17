@@ -20,8 +20,11 @@
 > no trae `head_sha` o si el `head_sha`/`ci_run` tienen formato inválido. Además
 > `Gate.human` se declara gate a gate y vale `True` en los **7** (el instrumento no
 > ejecuta ningún flujo de la app), lo que zanja la doble cifra «7 gates (5 de ellos
-> acción humana)» de notas históricas. **Tests:** backend **2798 passed** (0 skipped;
-> `test_validation_gate_v373.py` 29 → **43**), `ruff` limpio; frontend
+> acción humana)» de notas históricas. **Tests:** backend **2796 passed · 2 skipped**
+> (2798 casos) en el `git worktree` limpio del pre-vuelo y **2798 passed** (0 skipped,
+> mismos 2798 casos) en el árbol de trabajo —los 2 saltos son condicionales del banco
+> de escenario, que en el worktree no tiene la BD local no versionada—
+> (`test_validation_gate_v373.py` 29 → **43**), `ruff` limpio; frontend
 > sin cambios de producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK);
 > launcher **113**; `check_release_consistency` en los **6 orígenes** (`3.73.4`);
 > i18n `--strict` **0/0/0**; `validation_gate.py auto --require-dist` **10/10** y
@@ -3686,8 +3689,10 @@ V3.72) queda explicada en el runbook. **(E) Documentación:** el kit y el runboo
 qué sella la evidencia, la regla del `pass` con commit, `--same-tree` y la tabla de
 identidad (`VERSION`/`HEAD`/run) del pre-vuelo; los 7 comandos `record` de la planilla
 llevan `--ci-run <run>`. **(F) Verificación:** `test_validation_gate_v373.py` 29 → **43**;
-backend **2798 passed** (0 skipped) y `ruff` limpio; frontend sin cambios de
-producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK); launcher **113**;
+backend **2796 passed · 2 skipped** (2798 casos) en el `git worktree` limpio del pre-vuelo
+sobre el tag y **2798 passed** (0 skipped, mismos 2798 casos) en el árbol de trabajo;
+`ruff` limpio; frontend sin cambios de producto (`tsc` limpio, vitest **712 passed**,
+`npm run build` OK); launcher **113**;
 `check_release_consistency` en los **6 orígenes** (`3.73.4`); i18n `--strict` **0/0/0**;
 `auto --require-dist` **10/10**. **El código sigue congelado:** los 7 gates siguen en
 `pending` y **V4.0 no se declara** hasta que `status --strict` (y, con el árbol
