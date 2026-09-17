@@ -3,7 +3,82 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-16 (UTC+2).
+> Actualizado por última vez: 2026-09-17 (UTC+2).
+>
+> **Nota (2026-09-17): V3.72.0 (UX / product completion) — release de PRODUCTO.**
+> Release **`v3.72.0`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**. Cierra
+> los **dos ítems que V3.71 dejó fechados** en vez de cerrados (`RC-01`: el servido
+> del artefacto con Node como requisito de EJECUCIÓN; y **RD-04**/mitad de
+> **RA-01**: el vector UI del P1 de TTS/offline), lo que V3.70 asignó a esta fase
+> (**AE-04**, **AE-06**) y la deuda UX declarada (`F2`, `F3`, `F4`, claves i18n
+> huérfanas y «por qué esta actividad»). El hilo conductor: **que el producto se
+> sirva de verdad, que diga la verdad sobre lo que descarga y suena, y que el
+> alumno entienda qué hace y por qué**.
+> **(A) Eje UA · servido real de la UI (`RC-01` CERRADO).** El backend monta
+> `frontend/dist` (`StaticFiles` para `/assets` + **fallback SPA** con
+> `/{full_path:path}` → `index.html`, **fail-open** si no hay artefacto) y el
+> producto pasa a **un solo proceso HTTPS en `:8000`**: la raíz sirve la UI y los
+> metadatos del servicio se mueven a **`/api`**. El **certificado TLS autofirmado**
+> se genera de forma **determinista e idempotente** (`services/tls_cert.py` +
+> `scripts/ensure_tls_cert.py`, dependencia nueva **`cryptography`**) con los SANs
+> de LAN/mDNS (`localhost`, `127.0.0.1`, `<hostname>`, `<hostname>.local`, IP de
+> LAN), vive en `backend/data/certs/` (**no versionado**) y es obligatorio porque en
+> HTTP por LAN `navigator.mediaDevices` es `undefined` y el micrófono se rompe. El
+> **launcher pasa de dos procesos a uno**: `backend_command()` añade
+> `--ssl-certfile/--ssl-keyfile`, desaparece `start_frontend`, aparece
+> `ensure_frontend_dist()` (`npm run build` **si falta**, con mensaje accionable sin
+> Node) y `allow-firewall.ps1` abre **solo el 8000**. El **CI** gana el job
+> **`product-origin`** (uvicorn + TLS sobre el `dist` construido, comprobando que la
+> **raíz devuelve el HTML** de la UI). **Node queda como requisito de COMPILACIÓN,
+> no de EJECUCIÓN** (`docs/audit/RC-RUNTIME-PRODUCTO.md` §Cierre, candado en
+> `backend/tests/test_docs_drift_v372.py`).
+> **(B) Eje RD/RA · voz/TTS en la UI (el vector que V3.71 fechó).** `voz.ts`
+> devuelve `{voice, degraded}` leyendo `X-TTS-Voice`/`X-TTS-Degraded`, **aborta de
+> verdad** (`AbortController` + timeout: el `withTimeout` de `client.ts` no
+> cancelaba el `fetch`) y el consumo se centraliza en **`speakWithVoice`**, así que
+> **todos** los puntos de TTS (botones de escucha/speaking, test de micrófono, manos
+> libres, listening, speaking y traductor) informan igual. **Aviso no bloqueante**
+> de voz degradada (`useDegradedVoice` + `DegradedVoiceNotice`, con la voz realmente
+> usada) y **consentimiento de descarga** (`useVoiceDownload` +
+> `VoiceDownloadDialog`: ~60 MB, una vez, con Internet y progreso **indeterminado**
+> porque el endpoint es síncrono). El **auto-download implícito del traductor
+> desaparece**: pasa por el mismo flujo.
+> **(C) Deuda UX declarada.** **F4**: `FsrsReviewPanel`, `EvidenceGraphPanel` y
+> `AssessmentLadder` dejan de **tragarse** los errores de carga (`catch` vacío) y
+> usan el patrón `loading → error → retry` de Home mediante `PanelState`. **F2**:
+> Home lee el readiness **una sola vez** (manda `TodayPlan`; la tríada queda para
+> Progress). **F3**: la cabecera ancla el «estás aquí» con `home.youAreHere` +
+> `home.yourTarget`. **i18n**: 0 huérfanas (el residuo real eran **10** claves: las
+> 50 de la auditoría incluían falsos positivos de familias dinámicas vivas), informe
+> regenerado y **checker en `--strict` dentro del CI**. **«Por qué esta actividad»**:
+> el `why` que el motor **ya declaraba** se pinta también en el **pie «Next» de cada
+> práctica** (`NextStep`) y en las **filas de la cola de repaso**, con una sola
+> pieza compartida (`WhyThisActivity`) y **sin recalcular señales en el cliente**
+> (premisa 21: sin `why` ni `because` no se pinta nada).
+> **(D) Instrumentos (`AE-04`, `AE-06`).** **AE-04**: la limitación del placement
+> («mide reconocimiento/meta-lenguaje, no producción») queda **divulgada en el
+> instrumento y en su contrato**; como **no existe pantalla de nivelación**, la
+> divulgación en UI queda declarada con fase (**→ V4.0.x**) y **fijada por un
+> candado-tripwire** que falla en cuanto exista superficie. **AE-06**: los umbrales
+> de banda **triplicados** pasan a **un solo módulo** (`services/cefr.py`:
+> `BAND_BOUNDARIES` + `level_for_numeric`), **retiran las sub-bandas `+` de la
+> emisión** (siguen como descriptores de contenido y como posición en la escalera)
+> y conservan el emisor de **`pre-a1`**; la equivalencia de la rejilla queda fijada
+> por test.
+> **Tests:** backend **2694 passed** (2643 → **+51**, 5 ficheros `*_v372.py`),
+> frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
+> `ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
+> orígenes** y **CI 8/8** con el job nuevo.
+> **Honestidad:** el certificado es **autofirmado** (el usuario acepta el aviso del
+> navegador; sin HTTPS no hay micrófono en LAN); **`RC-01` se cierra como «Node no
+> es requisito de EJECUCIÓN»**, **no** como «producto empaquetado y distribuible»
+> (el `dist` no se versiona y hay que compilarlo); el **progreso de descarga de voz
+> es indeterminado** (no hay progreso real que consumir); **`AE-04` no se muestra en
+> UI** porque no hay superficie que enseñe el resultado del placement; y
+> **RA-05** (corte de red real), **RB-05** (máquina físicamente limpia) y **G5**
+> (matriz de dispositivos) siguen siendo **acción humana**. Ver
+> `release-notes-v3.72.0.md`.
 >
 > **Nota (2026-09-16): V3.71.0 (Runtime real, offline verificado e instalación
 > limpia) — release de VERIFICACIÓN con endurecimiento mínimo.** Release
@@ -3313,46 +3388,50 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-16):** `v3.71.0` **Runtime real, offline verificado e
-instalación limpia** (release de **VERIFICACIÓN con endurecimiento mínimo**:
-**SIN migración**, **SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**,
-**SIN tocar el banco**, **SIN tocar el currículum** y **SIN capacidad pedagógica
-nueva**). V3.69 validó la **arquitectura** del motor adaptativo y V3.70 midió su
-**pedagogía**; V3.71 baja al **suelo físico**: qué necesita la máquina, qué toca
-Internet y qué le dice la app al usuario sobre sí misma cuando algo falla. **Seis
-ejes** (`RE` gates/CI/deriva · `RA` offline real · `RB` instalación limpia · `RC`
-runtime de producto y salud honesta · `RD` dependencias ocultas y degradación ·
-`RF` síntesis), con las **cuatro decisiones de alcance** del gerente aplicadas:
-**(A)** medir y **declarar** la frontera de `npm run dev` · **(B)** verificar y
-**guiar** el bootstrap de Ollama · **(C)** corregir la documentación **a favor de
-`config.py`** · **(D)** añadir el **job del launcher al CI**.
+**Posición actual (2026-09-17):** `v3.72.0` **UX / product completion** (release de
+**PRODUCTO**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
+**SIN capacidad pedagógica nueva**). V3.69 validó la **arquitectura** del motor
+adaptativo, V3.70 midió su **pedagogía** y V3.71 el **suelo físico**; V3.72 cierra
+el eslabón que ve el alumno: **que el producto se sirva de verdad, que diga la
+verdad sobre lo que descarga y suena, y que el alumno entienda qué hace y por qué**.
+**Cuatro ejes** (`UA` servido real de la UI · `RD`/`RA` voz/TTS en la UI · `UX`
+deuda declarada · `AE` instrumentos).
 
 **Lo que cambia de verdad en el producto** (todo con test que falla sin el cambio):
-**(RE)** el launcher deja de ser el único subsistema sin gate ⇒ **CI 7/7**, y las
-**4 derivas documentales** quedan corregidas y pinchadas por test (incluido el
-**modelo por defecto**: la documentación declaraba `qwen3.5:9b`, que el código
-**veta**; es `llama3.1:8b`). **(RD)** se cierra el **P1 de TTS/offline diferido 4
-veces desde V3.46**: el `timeout` de la descarga de voces era **código muerto**
-(`urlretrieve` no lo acepta), así que la **única dependencia de Internet en ruta de
-producto** estaba **sin límite** y su degradación era **muda**; ahora hay timeout
-**real** (15 s por operación de socket), descarga **atómica**, verificación de
-tamaño y degradación **observable** (`X-TTS-Voice`/`X-TTS-Degraded`). **(RC)** la
-**salud de la UI deja de mentir** (tres estados: **Conectado / Degradado /
-Desconectado**; antes decía «Conectado» con la BD o el modelo caídos porque leía
-`/api/health`, que responde **200 siempre**) y el **sondeo de Ollama queda acotado**
-(un Ollama **lento** se disfrazaba de «backend caído»). **(RB)** la **voz con la que
-la app da clase** se vuelve alcanzable por la vía de producto (antes
-`ensure_voice_for_language("en")` **salía sin intentar la descarga**: el español sí
-se auto-descargaba y el inglés no), el bootstrap deja de descargar sin timeout y
-gana una **verificación previa de solo lectura** (`--check`). **(RA)** nuevo
-instrumento de runtime **de solo lectura y determinista** + protocolo de los 12
-flujos.
+**(UA)** el backend **sirve `frontend/dist`** (`StaticFiles` + fallback SPA
+**fail-open**) y el producto pasa a **un solo proceso HTTPS en `:8000`** (la raíz
+sirve la UI; los metadatos del servicio se mueven a `/api`), con **certificado TLS
+autofirmado determinista** (`services/tls_cert.py` + `scripts/ensure_tls_cert.py`,
+dependencia nueva `cryptography`) que cubre los SANs de LAN/mDNS y **no se
+versiona**; el **launcher pasa de dos procesos a uno** (compila el `dist` si falta
+y añade `--ssl-certfile/--ssl-keyfile`), el firewall abre **solo el 8000** y el CI
+gana el job **`product-origin`** ⇒ **`RC-01` CERRADO** con la afirmación honesta
+«**Node no es requisito de EJECUCIÓN**» (el `dist` no se versiona: sigue siendo
+requisito de **compilación**). **(RD/RA)** la UI **deja de ser sorda** a la
+degradación: `voz.ts` devuelve `{voice, degraded}`, **aborta de verdad**
+(`AbortController`) y todo el TTS pasa por `speakWithVoice`, con **aviso no
+bloqueante** de voz degradada y **consentimiento de descarga** (~60 MB, una vez,
+con Internet, progreso **indeterminado** porque el endpoint es síncrono); el
+**auto-download implícito del traductor desaparece** ⇒ `RD-04` y la mitad de
+`RA-01` **cerrados**. **(UX)** **F4** (`PanelState` en los tres paneles que se
+tragaban los errores con un `catch` vacío), **F2** (Home lee el readiness **una
+sola vez**), **F3** («estás aquí» con `home.youAreHere` + objetivo), **i18n a 0
+huérfanas** (eran **10** reales, no 50: la auditoría contaba falsos positivos de
+familias dinámicas) con el checker en **`--strict` dentro del CI**, y **«por qué
+esta actividad»** extendido con una sola pieza (`WhyThisActivity`) al **pie «Next»
+de cada práctica** y a la **cola de repaso**, **sin recalcular señales en cliente**.
+**(AE)** **AE-04** divulga en el instrumento y su contrato que el placement mide
+**reconocimiento/meta-lenguaje** (no producción) —la UI queda **con fase a V4.0.x**
+y **candado tripwire** porque **no existe pantalla** que lo muestre— y **AE-06**
+unifica los **umbrales de banda triplicados** en `services/cefr.py`, **retira las
+sub-bandas `+` de la emisión** (siguen como descriptores y como posición) y
+conserva el emisor de **`pre-a1`**.
 
-**Hallazgos: P0 = 0 · P1 = 1 (cerrado) · P2 = 15 · P3 = 14** (dossier de síntesis:
-`docs/audit/RF-SINTESIS-RUNTIME-V371.md`). De los 15 P2: **8 cerrados**, **3
-declarados con fase o condición de salida**, **3 abiertos que exigen ACCIÓN
-HUMANA** y **1 parcial**. **Tests:** backend **2643 passed** (2600 → **+43**),
-frontend **661**, launcher **75** y **ahora en CI**, `ruff` limpio.
+**Tests:** backend **2694 passed** (2643 → **+51**, los 5 ficheros `*_v372.py`),
+frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
+`ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
+orígenes** y **CI 8/8** con el job nuevo.
 
 **Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar):**
 
@@ -3365,26 +3444,70 @@ frontend **661**, launcher **75** y **ahora en CI**, `ruff` limpio.
 3. **RA-02 — el endpoint de Ollama no está declarado en `config.py`** (se delega en
    el default de la librería y `OLLAMA_HOST` no se contempla).
 4. **G5 — matriz de dispositivos** sigue **10/10 en ⬜**.
-5. **RD-04 / mitad de RA-01 — UI/consentimiento de la descarga de voces.** Fase
-   **V3.72**; el backend **ya expone** el dato (`X-TTS-Degraded`).
-6. **RC-01 — Node + npm son requisito de EJECUCIÓN** (la UI la sirve el dev server
-   de Vite y `dist` no lo sirve nadie). Declarado con **condición de salida**: se
-   reevalúa en **V3.72/V3.73**.
+5. **AE-04 — divulgación en UI del placement: sin superficie.** No existe pantalla
+   de nivelación; la divulgación vive en el instrumento y hay un **candado
+   tripwire** que falla en cuanto alguien muestre el resultado sin divulgarlo
+   (fase declarada **→ V4.0.x**).
+6. **RC-01 (residuo honesto) — el `dist` no se versiona** ⇒ Node sigue siendo
+   requisito de **instalación/compilación**; «sin Node» solo es cierto una vez
+   compilado. Un **producto empaquetado y distribuible** (y el launcher fuera de
+   Windows) sigue **fuera de alcance**.
+7. **Progreso real de la descarga de voz** (exige rediseñar el endpoint síncrono a
+   streaming): declarado **fuera de alcance** en V3.72.
 
-**Honestidad:** «offline verificado» = «**sin dependencias de Internet
-declaradas**», **NO** «producto empaquetado y distribuible» (**el runtime sigue
-siendo el de desarrollo**); no se mide calidad acústica ni hardware móvil real. Ver
-`release-notes-v3.71.0.md`.
+**Honestidad:** el certificado es **autofirmado** (el navegador avisa y aceptarlo
+es un paso del usuario; **sin HTTPS no hay micrófono en LAN**); **`RC-01` se cierra
+como «Node no es requisito de EJECUCIÓN»**, **no** como «producto empaquetado»;
+el **progreso de descarga de voz es indeterminado** (no hay progreso real que
+consumir); **`AE-04` no se muestra en UI** porque no hay superficie; y **RA-05 /
+RB-05 / G5 siguen siendo acción humana**. V3.72 **no toca** banco, currículum ni
+umbrales de decisión del Planner. Ver `release-notes-v3.72.0.md`.
 
-**Siguiente incremento:** `V3.72` **UX / product completion** (recoge el **vector
-UI del P1 de TTS/offline** y la **reevaluación de RC-01**; los tracks P1–P6 de M13
-quedan **medidos y acotados, no cerrados**).
+**Siguiente incremento:** `V3.73 / V4.0` — la deuda que V3.72 deja declarada:
+pantalla de nivelación (con la divulgación de `AE-04` que su candado ya exige),
+progreso real de descarga, `RA-02` y, si el gerente lo prioriza, el paquete
+distribuible que haría literal el «sin Node».
 
-**PENDIENTE INMEDIATO:** lanzar la **auditoría externa desde GITHUB**. El punto de
-entrada autocontenido para el auditor está en
-**`agentes/auditoria-externa-release-v371.md`** (con el commit, el tag y el run de
-CI ya rellenados). El informe esperado es
-`docs/audit/AH-AUDITORIA-RELEASE-V371.md`.
+**PENDIENTE INMEDIATO:** **auditoría externa de release** (misma mecánica que en
+`v3.71.0`, cuyo punto de entrada sigue en
+`agentes/auditoria-externa-release-v371.md` y su informe `AH` pendiente de
+recibir). El punto de entrada de `v3.72.0` se elabora **tras el tag**, con el
+commit y el run de CI rellenados.
+
+**Anterior:** `v3.71.0` **Runtime real, offline verificado e instalación limpia**
+(release de **VERIFICACIÓN con endurecimiento mínimo**: **SIN migración**, **SIN
+bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**, **SIN tocar el banco**,
+**SIN tocar el currículum** y **SIN capacidad pedagógica nueva**). V3.69 validó la
+**arquitectura** del motor adaptativo y V3.70 midió su **pedagogía**; V3.71 baja al
+**suelo físico**: qué necesita la máquina, qué toca Internet y qué le dice la app
+al usuario sobre sí misma cuando algo falla. **Seis ejes** (`RE` gates/CI/deriva ·
+`RA` offline real · `RB` instalación limpia · `RC` runtime de producto y salud
+honesta · `RD` dependencias ocultas y degradación · `RF` síntesis), con las
+**cuatro decisiones de alcance** del gerente aplicadas: **(A)** medir y **declarar**
+la frontera de `npm run dev` · **(B)** verificar y **guiar** el bootstrap de Ollama
+· **(C)** corregir la documentación **a favor de `config.py`** · **(D)** añadir el
+**job del launcher al CI**. **Lo que cambió de verdad:** **(RE)** el launcher deja
+de ser el único subsistema sin gate ⇒ **CI 7/7** y **4 derivas documentales**
+corregidas y pinchadas por test (incluido el **modelo por defecto**: la doc
+declaraba `qwen3.5:9b`, que el código **veta**; es `llama3.1:8b`). **(RD)** se
+cierra el **P1 de TTS/offline diferido 4 veces desde V3.46**: el `timeout` de la
+descarga de voces era **código muerto** (`urlretrieve` no lo acepta), así que la
+**única dependencia de Internet en ruta de producto** estaba **sin límite** y su
+degradación era **muda**; ahora hay timeout **real** (15 s por operación de
+socket), descarga **atómica**, verificación de tamaño y degradación **observable**
+(`X-TTS-Voice`/`X-TTS-Degraded`). **(RC)** la **salud de la UI deja de mentir**
+(tres estados: **Conectado / Degradado / Desconectado**; antes decía «Conectado»
+con la BD o el modelo caídos porque leía `/api/health`, que responde **200
+siempre**) y el **sondeo de Ollama queda acotado**. **(RB)** la **voz con la que la
+app da clase** se vuelve alcanzable por la vía de producto (antes
+`ensure_voice_for_language("en")` **salía sin intentar la descarga**) y el
+bootstrap gana una **verificación previa de solo lectura** (`--check`). **(RA)**
+nuevo instrumento de runtime **de solo lectura y determinista** + protocolo de los
+12 flujos. **Hallazgos: P0 = 0 · P1 = 1 (cerrado) · P2 = 15 · P3 = 14**
+(`docs/audit/RF-SINTESIS-RUNTIME-V371.md`); de los 15 P2, **8 cerrados**, **3
+declarados con fase**, **3 abiertos que exigen ACCIÓN HUMANA** y **1 parcial**.
+**Tests:** backend **2643**, frontend **661**, launcher **75** (y **en CI**),
+`ruff` limpio.
 
 **CERRADA (2026-09-16):** commit de release **`2eff6ea`**, tag anotado **`v3.71.0`**
 (objeto `6ac22db`) publicado en `main` y **CI 7/7 verde** en

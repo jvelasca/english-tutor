@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.71.0**.
+- Última versión estable: **v3.72.0**.
 
 ## Estructura
 
@@ -47,6 +47,9 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
   confiar el certificado en Windows, Android e iPhone/iPad.
 - **Adaptive Engine 2.0**: siguiente mejor actividad con prioridad explicable y "¿por qué?"
   (recencia, retención, confianza, evidencia, transferencia/novedad) en la tarjeta de inicio.
+  **V3.72**: ese «por qué» (frase del motor, `because[]` y factor limitante) se pinta también en el
+  pie «Next» que aparece al terminar cualquier práctica y en las filas de la cola de repaso, con una
+  sola pieza compartida (`components/WhyThisActivity.tsx`) y sin recalcular señales en el cliente.
   **Knowledge Graph + Daily Adaptive Plan (V3.17)**: el plan diario deriva del Evidence Graph —
   la destreza débil se practica sobre el objetivo que su nodo señala, los pasos de la sesión
   traen `can_do`/`limiting_factor`/`graph_mastery` y el detalle del can-do con su nodo se ve
@@ -149,19 +152,23 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
    powershell -ExecutionPolicy Bypass -File launcher/install_shortcut.ps1
    ```
 2. Haz doble clic en el acceso directo **"English Tutor"** del escritorio.
-3. En la ventana del lanzador pulsa **"Iniciar app"** (arranca backend + frontend y abre
-   el navegador) y **"Detener app"** para pararlos. La ventana muestra el estado de los
-   servicios, la base de datos y los usuarios.
+3. En la ventana del lanzador pulsa **"Iniciar app"** (genera el certificado TLS, compila
+   la interfaz si es la primera vez, arranca el proceso y abre el navegador) y
+   **"Detener app"** para pararlo. La ventana muestra el estado de los servicios, la base
+   de datos y los usuarios.
 
 ### Con F5 (recomendado en Cursor)
 1. Abre el proyecto en Cursor.
 2. Pulsa **F5** (o *Run > Start Debugging*).
-3. La primera vez, elige la configuración **"English Tutor (F5)"** en el desplegable.
-4. Cursor arranca el backend (`:8000`) y el frontend (`:5173`) en dos terminales y
-   abre el navegador automáticamente.
+3. Elige la configuración que quieras:
+   - **"App completa HTTPS :8000 (producto)"**: un solo proceso que sirve la API y la UI
+     compilada (como en producción, con `--reload` para desarrollo).
+   - **"Desarrollo con HMR (Vite :5173 + API :8000)"**: dos terminales con recarga en
+     caliente del frontend (`npm run dev`) y proxy `/api` hacia el backend.
+4. Cursor abre el navegador automáticamente.
 
 > Configuración en `.vscode/launch.json`. Pulsar de nuevo **F5** o el botón de stop
-> detiene ambos servidores.
+> detiene los servidores.
 
 ### Manual (sin F5)
 
@@ -191,29 +198,43 @@ ollama pull llama3.1:8b    # el modelo por defecto (backend/config.py::DEFAULT_M
 Este paso es **manual y explícito** a propósito: el modelo lo gestiona el servicio
 de Ollama, no el proyecto (no se descarga solo). Compruébalo con `ollama list`.
 
-### Arranque del backend
-```powershell
-cd backend
-.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
-```
-
-### Frontend
+### Compilar la interfaz (solo la 1.ª vez)
 ```powershell
 cd frontend
 npm install
-npm run dev
+npm run build      # produce frontend/dist (no se versiona)
 ```
 
-Abre **http://localhost:5173** y empieza a conversar.
+### Arrancar la app (un solo proceso, HTTPS :8000)
+```powershell
+cd backend
+.venv\Scripts\python.exe -m scripts.ensure_tls_cert
+.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000 `
+    --ssl-certfile data\certs\cert.pem --ssl-keyfile data\certs\key.pem
+```
+
+Abre **https://localhost:8000** y empieza a conversar. La primera vez el navegador
+avisará de que el certificado es autofirmado: es el certificado local de la app (no se
+puede evitar y hace falta para que funcione el micrófono desde otros dispositivos).
+
+### Modo desarrollo con recarga en caliente
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
+# en otra terminal:
+cd frontend
+npm run dev         # Vite en https://localhost:5173 con proxy /api
+```
 
 ## Requisitos
 
 - [Ollama](https://ollama.com) instalado y corriendo en `http://127.0.0.1:11434`.
 - Python 3.11+ y Node.js 18+.
-- **Node y npm son requisito de EJECUCIÓN**, no solo de compilación: la UI la sirve
-  el dev server de Vite (`npm run dev`). El `npm run build` produce
-  `frontend/dist`, pero hoy nadie lo sirve (ver
-  `docs/audit/RC-RUNTIME-PRODUCTO.md`, RC-01).
+- **Node + npm son requisito de COMPILACIÓN/instalación, no de EJECUCIÓN**: el `dist` se
+  compila una vez con `npm run build` (lo hace el lanzador si falta) y después lo sirve el
+  propio backend. Solo hacen falta para compilar (`npm run build`) o para el modo de
+  desarrollo (`npm run dev`).
 
 ## Tests
 
@@ -266,7 +287,8 @@ Abre **http://localhost:5173** y empieza a conversar.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/` | Metadatos del servicio (nombre + versión) |
+| `GET` | `/` | Interfaz compilada (`frontend/dist`, fallback SPA); sin artefacto, 404 |
+| `GET` | `/api` | Metadatos del servicio (nombre + versión) |
 | `GET` | `/api/health` | Estado del servicio |
 | `GET` | `/api/health/live` | Liveness |
 | `GET` | `/api/health/ready` | Readiness (200/503 según dependencias) |
