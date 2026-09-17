@@ -2,23 +2,27 @@
 
 > **Qué es este archivo.** El prompt **autocontenido** para que un auditor externo
 > (que **solo ve el repositorio público** de GitHub) audite **el producto publicado
-> en `v3.73.0`**, no un plan ni un incremento aislado. La revisión es **de solo
+> en `v3.73.3`**, no un plan ni un incremento aislado. La revisión es **de solo
 > lectura**: no se cambia código, datos, configuración ni etiquetas publicadas.
 >
 > **Por qué una auditoría de CIERRE y no otra revisión incremental.** El gerente la
 > ha pedido explícitamente como **auditoría de cierre**: no se audita «qué añade
-> V3.73», sino **el conjunto del producto tal y como está publicado ahora**, porque
+> V3.73.3», sino **el conjunto del producto tal y como está publicado ahora**, porque
 > es el material sobre el que se decide **dar o no el salto a V4.0**. Por eso este
 > documento combina la mecánica del punto de entrada de RELEASE (estado de
 > publicación verificado contra GitHub) con el **alcance total** de las auditorías
 > `-total-` (batería completa sobre todo el stack) y termina en una **matriz de
 > cierre** de 15 áreas.
 >
-> **Aviso de encuadre.** V3.73 **no añade capacidad pedagógica**: es una *validation
-> release* que endurece dos fronteras y construye el instrumento de los 7 gates. Si
-> el auditor busca «qué se ha mejorado para el alumno», la respuesta honesta es
-> **nada**; si busca «qué se ha demostrado», el objeto de esta auditoría es
-> justamente **separar lo demostrado de lo declarado**.
+> **Aviso de encuadre.** La línea V3.73 **no añade capacidad pedagógica**: es una
+> *validation line* —V3.73.0 construyó el instrumento de los 7 gates y el
+> fail-closed del runtime; V3.73.1 cerró los seis hallazgos GUI/UX que la auditoría
+> de V3.73.0 dejó abiertos; V3.73.2 corrigió su propia CI; V3.73.3 entregó el kit de
+> campo de los gates y un guard anti-deriva—. Si el auditor busca «qué se ha
+> mejorado para el alumno», la respuesta honesta en V3.73.0/V3.73.2/V3.73.3 es
+> **nada** (V3.73.1 sí ordenó la GUI, pero sin capacidad nueva); si busca «qué se ha
+> demostrado», el objeto de esta auditoría es justamente **separar lo demostrado de
+> lo declarado**.
 >
 > **Estado:** entregado 2026-09-17. **Informe esperado:**
 > `docs/audit/AI-AUDITORIA-CIERRE-V373.md`. Prefijo **`AI`** porque `AA`–`AF` los
@@ -33,7 +37,7 @@
 
 Orden de lectura recomendado, de marco a evidencia:
 
-1. `docs/RELEVO.md` — **cabecera** (nota de la posición vigente: `v3.73.0`) y
+1. `docs/RELEVO.md` — **cabecera** (nota de la posición vigente: `v3.73.3`) y
    **§0 «START HERE»**.
 2. `PLAN.md` — §«Estado actual» (registro release a release) y la tabla de
    trazabilidad de briefings y auditorías.
@@ -41,13 +45,17 @@ Orden de lectura recomendado, de marco a evidencia:
 4. `docs/audit/PARKED.md` — lo **aparcado a propósito** por fase y los pendientes de
    acción humana (la lista de lo que **no** bloquea y de lo que **sí** espera).
 5. **Este documento**, hasta el final.
-6. Dossiers de evidencia: `docs/audit/VALIDATION-RELEASE-V373.md` (runbook de los 7
+6. `docs/audit/KIT-VALIDACION-GATES.md` — la **planilla de campo** de los 7 gates:
+   pre-vuelo, orden por sesión, pasos por gate y el comando `record` exacto de cada
+   uno. Es el manual de la única cosa que falta para V4.0; léelo antes que los
+   protocolos para saber **en qué orden** se ejecutan.
+7. Dossiers de evidencia: `docs/audit/VALIDATION-RELEASE-V373.md` (runbook de los 7
    gates), `docs/audit/RA-RUNTIME-OFFLINE.md`, `docs/audit/RC-RUNTIME-PRODUCTO.md`,
    `docs/audit/AF-SINTESIS-PEDAGOGICA-V370.md`, `docs/audit/B-LISTENING-CEFR.md`,
    `docs/audit/AB-PED-COBERTURA.md`, `docs/audit/AC-PED-FEEDBACK.md`.
-7. `docs/CONSTITUCION-PEDAGOGICA.md` — qué se considera «tener un nivel» (norma).
-8. `docs/audit/TEMPLATE.md` — **formato** del informe que se entrega.
-9. `docs/PREMISAS.md` y `CHANGELOG.md` — reglas del proyecto y relato de releases.
+8. `docs/CONSTITUCION-PEDAGOGICA.md` — qué se considera «tener un nivel» (norma).
+9. `docs/audit/TEMPLATE.md` — **formato** del informe que se entrega.
+10. `docs/PREMISAS.md` y `CHANGELOG.md` — reglas del proyecto y relato de releases.
 
 **Punto de partida git:**
 
@@ -63,60 +71,68 @@ git log --oneline -3 main
 ## 1. Punto de entrada verificado (contra GitHub, no contra un árbol local)
 
 - Repositorio: `jvelasca/english-tutor` (**público**), rama por defecto `main`.
-- **Commit de release auditado:** `859c6c2` (`859c6c2115a7675af2d657b179ae9bfc7f9f5fbf`),
-  `release(v3.73.0): validation release / fail-closed del runtime de producto, LAN
-  sin referencias externas, CI Windows y arnés de los 7 gates`.
-- **Tag anotado `v3.73.0`:** objeto `8196ab7`
-  (`8196ab7ddb4ce471a6718c86b0ab75cbcb839e30`), que apunta a `859c6c2`.
-- **`main`:** `9d815815c54dc7122a330674887949106253e407`
-  (`docs(v3.73.0): registrar el cierre (commit 859c6c2, tag v3.73.0 y CI 11/11)`).
-- **Base de comparación:** `v3.72.0` → release `096dcc4`, tag anotado `v3.72.0`
-  (objeto `da6fb6d`), cierre documental `7a8e5de`.
-- **Sin GitHub Release** para `v3.73.0`: es una decisión declarada del gerente (solo
+- **Commit de release auditado:** `ae14dbd` (`ae14dbd58dec6bc72a6d9b6024ccdeb2c31e3ee4`),
+  `release(v3.73.3): kit de validacion de los 7 gates, guard anti-deriva de
+  protocolos y re-anclaje de la auditoria externa`.
+- **Tag anotado `v3.73.3`:** objeto `7715fc2`
+  (`7715fc246bade58e0f21ab09d836fb2959ced58f`), que apunta a `ae14dbd`.
+- **`main`:** `ae14dbd` es el **commit de release**; `main` va **por delante** con
+  commits **solo documentales** —el cierre de esta release, que introduce este mismo
+  archivo—. Ese recuento crece por diseño y **no debe tomarse como referencia**. Lo
+  que sí es estable y obligatorio es el invariante de abajo.
+- **Base de comparación:** `v3.73.2` → release `cdc9dd0`, tag anotado `v3.73.2`
+  (objeto `58a9ec1`). El código **sí** cambió entre `v3.73.2` y `v3.73.3` (es el
+  arnés de validación y sus tests), y por eso el tag de referencia de esta auditoría
+  es `v3.73.3`, no `v3.73.2`.
+- **Sin GitHub Release** para `v3.73.3`: es una decisión declarada del gerente (solo
   tag, que es la convención real del repo desde `v3.34.0`). El último Release object
   publicado es `v3.33.0`.
+
+**Aviso de `HEAD` e invariante del código.** `main` va por delante del commit
+auditado **solo** con commits documentales. Lo que es obligatorio es este invariante:
+
+```bash
+git diff --stat v3.73.3..main -- backend frontend launcher scripts
+```
+
+Debe salir **vacío** (comprobado en el momento de redactar este documento). Es
+decir: da igual clonar `main` o hacer `git checkout v3.73.3`; **el código de
+producto y el arnés citados aquí son los mismos**. Si el auditor encuentra una
+diferencia en esas cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
+
+> **Nota de historial (para que no se confunda con un hallazgo).** Una versión
+> anterior de este documento estaba anclada a `v3.73.0` y afirmaba este mismo
+> invariante **contra `v3.73.0`**: eso dejó de ser cierto con V3.73.1 (frontend) y
+> V3.73.2 (tests e instrumento de auditoría del backend), y habría producido un
+> **P0 falso** en el primer comando del auditor. Se re-ancló al tag vigente. La
+> lección está admitida en `CHANGELOG.md` y en `release-notes-v3.73.3.md`.
 
 **Estado de publicación (verificado, no declarado):**
 
 - **CI 11/11 verde** en
-  [run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
-  (sha `859c6c2`, `success`), con **los tres jobs nuevos estrenándose en verde**:
-  - `Launcher (Windows, ruff + pytest)` `105145894473` ← **bloqueante**, el job nuevo
-  - `Validation gate (checks automáticos)` `105145894604` ← job nuevo
-  - `Product origin (Windows, informativo)` `105145894484` ← job nuevo, **informativo**
-  - `Backend (ruff + pytest)` `105145894648` · `Frontend (tsc + vitest + build)`
-    `105145894171` · `Playwright E2E (visual)` `105145894407` · `Content validation`
-    `105145894495` · `Beta V3.0 gate` `105145894504` · `Release consistency`
-    `105145894437` · `Launcher (ruff + pytest)` `105145894596` ·
-    `Product origin (UI served over HTTPS)` `105145894459`
-- **El commit de cierre también está verde:** **CI 11/11** en
-  [run 35205022773](https://github.com/jvelasca/english-tutor/actions/runs/35205022773)
-  (sha `9d81581`).
+  [run 35219576565](https://github.com/jvelasca/english-tutor/actions/runs/35219576565)
+  (sha `ae14dbd`, `success`), con los **11 jobs** en verde:
+  - `Backend (ruff + pytest)` `105196126221` · `Frontend (tsc + vitest + build)`
+    `105196126187` · `Release consistency` `105196126112` · `Validation gate (checks
+    automáticos)` `105196125712` · `Beta V3.0 gate` `105196126105` · `Content
+    validation` `105196126128` · `Playwright E2E (visual)` `105196126103` ·
+    `Launcher (ruff + pytest)` `105196125970` · `Product origin (UI served over
+    HTTPS)` `105196126156` · `Launcher (Windows, ruff + pytest)` `105196126272`
+    (**bloqueante**) · `Product origin (Windows, informativo)` `105196126122`
+    (**informativo declarado**, `continue-on-error: true`).
 - **Nota para el auditor:** el run se dispara con el **push de `main`**; el tag se
   publicó en el mismo push y apunta al commit de release.
 
-**Aviso de `HEAD` e invariante del código.** `main` va **por delante** del commit
-auditado con commits **solo documentales** (la nota de cierre y este mismo archivo).
-El recuento de commits por delante crece por diseño y **no debe tomarse como
-referencia**. Lo que sí es estable y obligatorio es este invariante:
-
-```bash
-git diff --stat v3.73.0..main -- backend frontend launcher scripts
-```
-
-Debe salir **vacío** (comprobado en el momento de redactar este documento). Es
-decir: da igual clonar `main` o hacer `git checkout v3.73.0`; **el código de
-producto citado aquí es el mismo**. Si el auditor encuentra una diferencia en esas
-cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
-
 **Consistencia de versión:** `backend/config.py::VERSION` es la fuente única
-(`scripts/check_release_consistency.py`) y `3.73.0` debe aparecer en **6 orígenes**:
+(`scripts/check_release_consistency.py`) y `3.73.3` debe aparecer en **6 orígenes**:
 `backend/config.py`, `frontend/package.json`, `frontend/package-lock.json`,
 `README.md`, `CHANGELOG.md` y `PLAN.md`.
 
 ---
 
-## 2. Artefactos que introduce V3.73 (objeto directo de la auditoría)
+## 2. Artefactos que introduce la línea V3.73 (objeto directo de la auditoría)
+
+### 2.1 V3.73.0 — el instrumento y las dos fronteras
 
 | Ruta | Qué es | Qué afirma |
 |---|---|---|
@@ -128,10 +144,30 @@ cuatro rutas entre el tag y `main`, tiene un hallazgo P0.
 | `docs/audit/generated/release-validation.{md,json}` | Informe **determinista** de las 10 comprobaciones estáticas | Que `auto` es reproducible y **no filtra rutas absolutas del equipo** |
 | `backend/tests/test_serve_frontend_v373.py` (**19**) | Candado del fail-closed, las dos mitades | Que renombrar la variable en un solo lado hace fallar el contrato |
 | `backend/tests/test_net_interfaces_v373.py` (**23**) | Candado del algoritmo puro + guard anti-deriva por **AST** | Que una IP pública que vuelva al **código** (no a la prosa) hace fallar el test |
-| `backend/tests/test_validation_gate_v373.py` (**24**) | Candado del arnés | Que un gate no se cierra sin notas y que `--strict` falla sin los 7 en `pass` |
-| `backend/tests/test_docs_drift_v373.py` (**19**) | Candado anti-deriva documental | Que `DEVICE_MATRIX.md` no vuelve a `:5173` y que las fronteras nuevas están declaradas |
+| `backend/tests/test_docs_drift_v373.py` (**19**) | Candado anti-deriva documental | Que las fronteras nuevas están declaradas y que la deriva de puertos no vuelve |
 | `launcher/tests/test_preflight_v373.py` (**7**) + `test_lan_ip_v373.py` (**13**) | Candados del launcher | El **contrato compartido** de la variable y el algoritmo replicado (el launcher no puede importar el backend) |
 | `.github/workflows/ci.yml` (**8 → 11 jobs**) | Cobertura Windows | Que el launcher y el origen de producto se ejercitan en Windows real |
+
+### 2.2 V3.73.1 — el cierre GUI (auditada aparte, pero **presente** en el árbol)
+
+| Ruta | Qué es | Qué afirma |
+|---|---|---|
+| `frontend/src/router/chat.ts` | `ChatSkill` + `chatSkillPath` → `/chat/lectura`, `/chat/escritura` + `chatSkillFromPath` | Que Reading y Writing dejan de ser un cajón indiferenciado y cada una tiene **URL canónica** que sobrevive a recarga y deep link |
+| `frontend/src/features/learn/LearnHub.tsx` | **4 tarjetas** primarias (`xl:grid-cols-4`) + bloque **secundario** `TUTOR_SKILLS` (Reading, Writing) | Que las destrezas sin motor propio existen como superficie **sin fingir** una actividad de primer nivel ni competir con «Recomendado para ti» |
+| `frontend/src/app/Navigation.tsx`, `PracticeView.tsx`, `Workspace.tsx` | Navegación móvil jerarquizada manteniendo **5 destinos**; `SectionNav.tsx` **eliminado** | Que los auxiliares no compiten con el núcleo |
+| `frontend/scripts/contrast_audit.mjs` + `docs/audit/generated/contrast-report.{json,md}` | Instrumento propio de contraste WCAG AA de los **7 acentos**, **en CI** | Que el contraste está **medido**, no afirmado |
+| `frontend/tests/visual/{accentContrast,keyboard,reducedMotionAndZoom}.spec.ts` | Playwright: contraste, skip link y activación por teclado del hub, `prefers-reduced-motion` (GUI-05) y zoom 200 %/reflow (GUI-06) | Que hay **cuatro** contratos de UI con evidencia ejecutada (y que **no** hay motor de a11y tipo `axe`) |
+
+### 2.3 V3.73.2 y V3.73.3 — la CI y el kit
+
+| Ruta | Qué es | Qué afirma |
+|---|---|---|
+| `backend/scripts/audit_dossier.py` (`UI_ARTIFACT_PATHS`) | La UI de `reading` se declara `chat:lectura` (tipo + ruta) en vez de asumir un directorio de `frontend/src/features` | Que el instrumento de cobertura **reapunta**, no se debilita: los otros 8 artefactos conservan su `is_dir()` |
+| `docs/audit/KIT-VALIDACION-GATES.md` | **Kit de campo** de los 7 gates (V3.73.3) | Que la ejecución física tiene planilla y comando exacto, y que el kit **referencia** los protocolos en vez de duplicarlos |
+| `scripts/validation_gate.py` → `check_gate_protocol_origins` (id `gate-origins`) | El guard pasa de vigilar **un** documento a vigilar los **tres** protocolos funcionales (`DEVICE_MATRIX.md`, `RA-RUNTIME-OFFLINE.md`, `G-DEVICES.md`) | Que un protocolo que mande al **dev server de Vite** (`:5173`) o que no cite el origen de producto (`:8000`) **hace fallar el arnés** |
+| `backend/tests/test_validation_gate_v373.py` (**24 → 29**) | Candado del arnés (incluye los 5 tests del guard de protocolos) | Que un gate no se cierra sin notas, que `--strict` falla sin los 7 en `pass` y que la deriva de puertos no vuelve por un documento lateral |
+| `docs/audit/RA-RUNTIME-OFFLINE.md` (§5 y E5), `docs/audit/G-DEVICES.md` | Corrección de la **deriva de protocolo**: de `:5173` al origen de producto `:8000` | Que los protocolos que se ejecutan **a pie de máquina** mandan al artefacto real (seguirlos antes habría probado **otro** artefacto) |
+| `docs/audit/RB-INSTALACION.md` | Node y npm como requisito de **compilación**, no de ejecución | Que la instalación limpia declara lo que de verdad hace falta para **ejecutar** |
 
 ---
 
@@ -143,20 +179,21 @@ la release (verificadas en el árbol publicado en el momento de redactar):
 ```powershell
 # Backend
 cd backend
-.venv\Scripts\python.exe -m pytest tests/ -q          # declarado: 2779 passed
+.venv\Scripts\python.exe -m pytest tests/ -q          # declarado: 2784 casos (2781 passed + 3 skipped en checkout limpio)
 .venv\Scripts\python.exe -m ruff check .               # declarado: limpio
-#   los 4 ficheros nuevos suman 85 (19+23+24+19)
+#   los 4 ficheros v373 suman 90 (19+23+29+19)
 
 # Frontend
 cd ..\frontend
-npx vitest run                                         # declarado: 699 passed (83 ficheros)
 npx tsc --noEmit                                       # declarado: limpio
+npx vitest run                                         # declarado: 712 passed (85 ficheros)
+npm run audit:contrast                                 # declarado: 0 fallos bloqueantes
 npm run build                                          # declarado: OK
 
 # Launcher
 cd ..\launcher
 ..\backend\.venv\Scripts\python.exe -m pytest tests/ -q  # declarado: 113 passed
-#   los 2 ficheros nuevos suman 20 (7+13)
+#   los 2 ficheros v373 suman 20 (7+13)
 ..\backend\.venv\Scripts\python.exe -m ruff check .      # declarado: limpio
 
 # Gates de release
@@ -165,16 +202,22 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py auto --require-dist 
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status               # declarado: 7 pending
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict      # declarado: exit 1
 backend\.venv\Scripts\python.exe scripts\check_i18n_coverage.py --strict         # declarado: 0 huérfanas
-backend\.venv\Scripts\python.exe scripts\check_release_consistency.py            # declarado: 3.73.0, 6 orígenes
+backend\.venv\Scripts\python.exe scripts\check_release_consistency.py            # declarado: 3.73.3, 6 orígenes
 backend\.venv\Scripts\python.exe scripts\check_beta_v3.py                        # declarado: OK
 cd backend
 .venv\Scripts\python.exe scripts\content_validation.py                           # declarado: OK
 .venv\Scripts\python.exe scripts\transfer_validation.py                          # declarado: OK (con avisos advisory)
 ```
 
-**Determinismo del informe (comprobación exigible):**
+**Prerrequisito del informe determinista (importante).** La comprobación 9 de `auto`
+(«el artefacto de la UI está construido») **exige `frontend/dist/index.html`**, que
+**no se versiona**. En un clon limpio, `auto --require-dist` **falla** hasta que se
+ejecuta `npm run build`; sin `--require-dist`, esa comprobación sale **`skip`** y el
+informe regenerado **no** será idéntico al commiteado. Compila antes de comprobar
+determinismo:
 
 ```powershell
+cd frontend; npm run build; cd ..
 backend\.venv\Scripts\python.exe scripts\validation_gate.py auto --require-dist
 git diff --stat -- docs/audit/generated/release-validation.md docs/audit/generated/release-validation.json
 # debe salir VACÍO: el informe regenerado es idéntico al commiteado
@@ -211,7 +254,8 @@ servicios y sin hardware. Se indica dónde mirar y **qué la falsaría**.
    `check_same_thread`, `WAL`, `timeout`, `pool`, `asyncio.Lock`. **Falsable:** la
    afirmación «multiusuario» sin ninguna serialización declarada.
 4. **¿La persistencia es **migrable** o hay que recrear la BD?** Buscar migraciones
-   aditivas y su guard. V3.73 **no** migra: confirmarlo (`VERSION` de BD sin cambio).
+   aditivas y su guard. La línea V3.73 **no** migra: confirmarlo (`VERSION` de BD sin
+   cambio).
 5. **¿El tratamiento de errores es honesto?** Buscar `except Exception: pass`,
    `return None` silenciosos en `backend/services` y `backend/routers`. Comparar con
    lo que la API devuelve. **Falsable:** un error que el cliente no puede distinguir
@@ -330,37 +374,48 @@ servicios y sin hardware. Se indica dónde mirar y **qué la falsaría**.
       └── APRENDER → Listening, Vocabulary, Reading, Grammar, Speaking, Chat
     ```
 
-    **Lo que el código dice hoy** (verificado al redactar este documento) es
-    **distinto**, y el auditor debe confirmarlo o refutarlo:
+    **Lo que el código dice hoy** (verificado al redactar este documento, ya con el
+    cierre GUI de V3.73.1 dentro) es **distinto**, y el auditor debe confirmarlo o
+    refutarlo:
 
     - La navegación raíz son **3 mundos hermanos** (Inicio, Formación, Aprender) más
-      **2 auxiliares** (Diccionario, Traductor). **No** hay un árbol donde Formación
-      y Aprender cuelguen de Inicio: `frontend/src/app/routes.ts` y
+      **2 auxiliares** (Diccionario, Traductor), **5 destinos** en total; los
+      auxiliares se derivan de `ROUTES.slice(DIVIDER_INDEX)` y V3.73.1 los separó
+      jerárquicamente: `frontend/src/app/routes.ts` y
       `frontend/src/app/Navigation.tsx`.
     - El hub de **Aprender tiene 4 tarjetas** (Listening, Speaking, Vocabulary,
-      Grammar), **no 6**: `frontend/src/features/learn/LearnHub.tsx` (`ACTIVITIES`).
-    - **Reading y Writing no tienen superficie en el hub** (Reading solo se pinta
-      dentro de la vista de práctica; Writing cae al chat libre). **Falsable:**
-      encontrar una tarjeta o URL de Reading/Writing en el hub.
+      Grammar) en `xl:grid-cols-4`, **no 6**: `frontend/src/features/learn/LearnHub.tsx`
+      (`ACTIVITIES`).
+    - **Reading y Writing ya no son superficies huérfanas, pero tampoco son tarjetas
+      de primer nivel:** viven en un bloque **secundario** del hub
+      (`TUTOR_SKILLS`) que abre las URLs canónicas **`/chat/lectura`** y
+      **`/chat/escritura`** (`frontend/src/router/chat.ts`). `LearnHub.test.tsx` fija
+      que ese bloque **no** está dentro de `learn-hub-grid`.
+    - **Reading no tiene directorio de feature versionado** (0 ficheros; su práctica
+      es el chat con destreza), mientras **Writing sí** tiene
+      `frontend/src/features/writing/{WritingJourney,WritingPanel}.tsx`. Es una
+      **asimetría real** que el auditor debe dictaminar.
     - La navegación es un **hash router propio**, no `react-router`:
       `frontend/src/router/hash.ts` y `frontend/src/App.tsx`.
     - **«Trayecto» no es una pantalla de primer nivel**: solo una **pestaña** de
       Progreso (`/progreso/trayectoria`) y hay un `JourneyScreen` que **no se importa
-      en ningún sitio** (código muerto): `frontend/src/features/journey/JourneyScreen.tsx`.
+      en ningún sitio** (`frontend/src/features/journey/JourneyScreen.tsx`): código
+      muerto, confirmado por búsqueda de importadores.
     - **«Ruta»/«route» significa nivel CEFR dentro de una práctica**, no navegación
       (`learn.routeSelected`, `useSelectedRoute`): una fuente real de confusión
       terminológica.
 
     **Pregunta falsable:** ¿existe todavía confusión entre **Curso / Aprender /
     Trayecto / Vocabulary / Chat**? En particular: Vocabulary existe **como sección
-    de unidad del curso y como página independiente**; Chat es una **ruta propia**
-    que fuerza `speaking/conversation`, **distinta** de la página de Speaking.
-    Dictaminar si eso es un problema de producto o una decisión declarada
-    (`docs/DISENO-SPEAKING-UNICO.md`).
+    de unidad del curso y como página independiente**; y `/chat` es una **ruta
+    propia** que fuerza `speaking/conversation`, **distinta** de la página de
+    Speaking y de sus modos. Dictaminar si eso es un problema de producto o una
+    decisión declarada (`docs/DISENO-SPEAKING-UNICO.md`).
 29. **¿Los estados loading/error/empty/success son consistentes?** El proyecto
-    declara un patrón compartido mínimo (`PanelState`, con `loading | error` +
-    reintento) y reconoce que **no hay** componentes compartidos de vacío/carga/error.
-    **Falsable:** una pantalla que muestre «vacío» cuando en realidad hay error.
+    declara un patrón compartido mínimo (`frontend/src/components/PanelState.tsx`,
+    con `loading | error` + reintento) y reconoce que **no hay** componentes
+    compartidos de vacío/carga/error. **Falsable:** una pantalla que muestre «vacío»
+    cuando en realidad hay error.
 30. **¿Hay errores silenciados?** Buscar `catch {}`, `.catch(() => {})` y comentarios
     «backend no disponible» en `frontend/src`. El proyecto reconoce varios casos
     (registro de sesión, persistencia de ajustes, escenarios de speaking, plan de
@@ -371,15 +426,18 @@ servicios y sin hardware. Se indica dónde mirar y **qué la falsaría**.
     link, `aria-current`, pestañas con `role="tablist"/"tab"/"tabpanel"`,
     `role="status"`/`aria-live` en cargas, `role="alert"` en errores y `sr-only`; y
     declara también que **no hay tests de accesibilidad automatizados** (ni
-    `axe-core`) y que los tests solo fijan contratos ARIA puntuales. **Falsable:**
-    encontrar una dependencia de a11y o, al contrario, que el proyecto afirme
+    `axe-core`). Desde V3.73.1 hay **cuatro** contratos de UI **ejecutados** en
+    Playwright —contraste de acentos, skip link + activación por teclado del hub
+    (incluido el bloque del tutor), `prefers-reduced-motion` y zoom 200 %/reflow—
+    pero siguen **sin** ser una auditoría de accesibilidad: **Falsable:** encontrar
+    una dependencia de a11y (`axe`) o, al contrario, que el proyecto afirme
     cobertura de accesibilidad.
 32. **¿Responsive/touch/teclado: hay verificación?** El proyecto declara 3 viewports
     en Playwright (1280×800, 768×1024, 390×844) pero **sin aserciones de tamaño
     táctil ni de layout numérico**, y **sin hook de breakpoints** (solo Tailwind).
     Comprobar overflow, scroll, jerarquía visual, tamaño de objetivos táctiles
     (44/48 px) y navegación por teclado. **Falsable:** declarar la matriz de
-    dispositivos como verificada: `docs/DEVICE_MATRIX.md` está **en ⬜**.
+    dispositivos como verificada: `docs/DEVICE_MATRIX.md` está **en ⬜** (todo `?`).
 33. **¿Los estados de la UI tienen feedback al usuario?** Comprobar que toda acción
     con efecto (descargar voz, grabar, enviar) informa de avance o de fallo, y
     buscar acciones mudas.
@@ -418,9 +476,11 @@ servicios y sin hardware. Se indica dónde mirar y **qué la falsaría**.
     humana: un CI que los exigiera sería rojo permanentemente). Hay un test que lo
     fija. **Falsable:** encontrar `validation_gate.py status --strict` en el workflow.
 41. **¿La reproducibilidad aguanta?** Regenerar el informe y el par de auditoría de
-    red y comprobar **diff vacío** e **idempotencia**:
+    red y comprobar **diff vacío** e **idempotencia** (recuerda compilar antes:
+    ver §3):
 
     ```powershell
+    cd frontend; npm run build; cd ..
     backend\.venv\Scripts\python.exe scripts\validation_gate.py auto --require-dist
     cd backend
     .venv\Scripts\python.exe -m scripts.audit_dossier runtime-audit
@@ -434,8 +494,11 @@ servicios y sin hardware. Se indica dónde mirar y **qué la falsaría**.
     `docs/audit/generated/`. **Falsable:** cualquier ruta absoluta de una máquina.
 43. **¿La documentación declara lo que el código hace?** Buscar **drift** entre docs
     y código, en particular en `docs/DEVICE_MATRIX.md` (debe apuntar a `:8000` y no
-    al dev server de Vite), `docs/PREMISAS.md`, `docs/ARQUITECTURA.md`, `README.md`
-    y `docs/RELEVO.md`. **Falsable:** la deriva ya corregida que reaparezca.
+    al dev server de Vite), los **tres protocolos funcionales de los gates**
+    (`docs/DEVICE_MATRIX.md`, `docs/audit/RA-RUNTIME-OFFLINE.md` §5 y
+    `docs/audit/G-DEVICES.md`), `docs/PREMISAS.md`, `docs/ARQUITECTURA.md`,
+    `README.md` y `docs/RELEVO.md`. **Falsable:** la deriva ya corregida que
+    reaparezca — y desde V3.73.3 hay un guard que la caza (`gate-origins`, §2.3).
 
 ---
 
@@ -482,8 +545,8 @@ la puerta declarada de V4.0 es `validation_gate.py status --strict` saliendo **0
 5. **Lo que no se pueda comprobar se declara NO COMPROBABLE**, con el motivo.
 6. **Sin cortesía:** si el producto no demuestra lo que dice, decirlo; si lo
    demuestra, decirlo también.
-7. **No confundir el instrumento con la validación.** Que exista un gate, un candado
-   o un informe **no** es evidencia de que el hecho esté verificado.
+7. **No confundir el instrumento con la validación.** Que exista un gate, un candado,
+   un kit o un informe **no** es evidencia de que el hecho esté verificado.
 
 ---
 
@@ -492,14 +555,21 @@ la puerta declarada de V4.0 es `validation_gate.py status --strict` saliendo **0
 El auditor debe pronunciarse **explícitamente** sobre estas declaraciones del propio
 proyecto, que acotan lo que puede leerse como demostrado:
 
-- **Los 7 gates están en `pending`.** V3.73 construye el instrumento; **no** ejecuta
-  la validación física. Nadie ha hecho el corte de red real (`RA-05`), ni una
-  instalación en máquina limpia (`RB-05`), ni pruebas en móvil real, ni pruebas con
-  audio real. **Comprobación abierta:** el código marca los **7** gates como
-  `human: bool = True` (`scripts/validation_gate.py`) sin ninguna entrada que lo
-  sobrescriba, mientras `PLAN.md` y `release-notes-v3.73.0.md` dicen «7 gates (5 de
-  ellos acción humana)». **Dictaminar cuál de las dos cifras es la correcta** y si la
-  discrepancia es un hallazgo documental.
+- **Los 7 gates están en `pending`.** La línea V3.73 construye el instrumento y
+  entrega su planilla de campo; **no** ejecuta la validación física. Nadie ha hecho
+  el corte de red real (`RA-05`), ni una instalación en máquina limpia (`RB-05`), ni
+  pruebas en móvil real, ni pruebas con audio real. **Comprobación abierta:** el
+  código marca los **7** gates como `human: bool = True` (`scripts/validation_gate.py`)
+  sin ninguna entrada que lo sobrescriba, mientras `PLAN.md` y
+  `release-notes-v3.73.0.md` dicen «7 gates (5 de ellos acción humana)».
+  **Dictaminar cuál de las dos cifras es la correcta** y si la discrepancia es un
+  hallazgo documental.
+- **El kit es una planilla, no una validación.** `docs/audit/KIT-VALIDACION-GATES.md`
+  ordena y registra la ejecución humana; **no** mueve ningún gate a `pass` ni
+  sustituye a los protocolos.
+- **El guard `gate-origins` es estático.** Comprueba que los **documentos** de los
+  gates apuntan al origen de producto (`:8000`) y no al dev server de Vite (`:5173`);
+  **no** comprueba que la app funcione, y no cubre la prosa de los protocolos.
 - **`product-origin-windows` es informativo**, no bloqueante, y así se declara: su
   verde en el run de publicación **no** certifica Windows.
 - **El fail-closed cubre el arranque, no la ejecución degradada.** Si el artefacto
@@ -513,7 +583,9 @@ proyecto, que acotan lo que puede leerse como demostrado:
   correctivo**, y su dificultad **no** es adaptativa. La biblioteca de audio humana
   está vacía.
 - **La accesibilidad y la matriz de dispositivos no tienen evidencia ejecutada:**
-  `docs/DEVICE_MATRIX.md` está **en ⬜** y no hay tests de accesibilidad.
+  `docs/DEVICE_MATRIX.md` está **en ⬜** (todo `?`) y no hay motor de accesibilidad
+  (`axe`). Lo que hay son **cuatro contratos de UI** en Playwright (contraste,
+  teclado, `prefers-reduced-motion`, zoom/reflow): acotado, no es una auditoría.
 - **Siguen abiertos:** `RA-02` (endpoint de Ollama sin declarar en `config.py`),
   `RA-07` y `RD-05` como deuda aceptada.
 
@@ -524,17 +596,16 @@ proyecto, que acotan lo que puede leerse como demostrado:
 **Estado del punto de entrada: CERRADO (2026-09-17).** Verificado contra GitHub, no
 contra el árbol local:
 
-- **Commit de release:** `859c6c2` (`859c6c2115a7675af2d657b179ae9bfc7f9f5fbf`).
-- **Tag anotado:** `v3.73.0` (objeto `8196ab7`), apuntando a `859c6c2`.
-- **`main`:** `9d81581` (cierre documental), con `859c6c2` como ancestro directo.
+- **Commit de release:** `ae14dbd` (`ae14dbd58dec6bc72a6d9b6024ccdeb2c31e3ee4`).
+- **Tag anotado:** `v3.73.3` (objeto `7715fc2`), apuntando a `ae14dbd`.
+- **`main`:** `ae14dbd` como ancla de código, más el commit de cierre documental que
+  introduce este archivo (solo documentación).
 - **CI 11/11 verde** en el
-  [run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
-  (publicación, sha `859c6c2`) y en el
-  [run 35205022773](https://github.com/jvelasca/english-tutor/actions/runs/35205022773)
-  (cierre, sha `9d81581`).
-- **Invariante del código:** `git diff --stat v3.73.0..main -- backend frontend
+  [run 35219576565](https://github.com/jvelasca/english-tutor/actions/runs/35219576565)
+  (sha `ae14dbd`, `success`).
+- **Invariante del código:** `git diff --stat v3.73.3..main -- backend frontend
   launcher scripts` sale **vacío**.
-- **Consistencia de versión:** `3.73.0` en los **6 orígenes**
+- **Consistencia de versión:** `3.73.3` en los **6 orígenes**
   (`scripts/check_release_consistency.py`).
 
 **Informe esperado:** `docs/audit/AI-AUDITORIA-CIERRE-V373.md`.

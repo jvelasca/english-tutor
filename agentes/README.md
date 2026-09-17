@@ -228,27 +228,31 @@ pedir más contexto.
 ## Estado de la biblioteca de briefings
 
 - `agentes/auditoria-total-externa-v373.md` — **auditoría EXTERNA de CIERRE del
-  producto, anclada en `v3.73.0` (entregada, 2026-09-17; informe PENDIENTE)**:
-  prompt autocontenido para un auditor que **solo ve GitHub**, con **alcance total**
-  (no incremental) porque es el material con el que se decide el salto a **V4.0**.
-  Punto de entrada **verificado contra GitHub**: commit de release `859c6c2`, tag
-  anotado `v3.73.0` (objeto `8196ab7`), `main` `9d81581`, base `v3.72.0` (`096dcc4`)
-  y CI **11/11** en
-  [35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
-  (publicación) y
-  [35205022773](https://github.com/jvelasca/english-tutor/actions/runs/35205022773)
-  (cierre). Declara el **invariante** `git diff --stat v3.73.0..main -- backend
-  frontend launcher scripts` = vacío, **43 preguntas falsables** en 7 áreas
+  producto, anclada en `v3.73.3` (entregada y re-anclada, 2026-09-17; informe
+  PENDIENTE)**: prompt autocontenido para un auditor que **solo ve GitHub**, con
+  **alcance total** (no incremental) porque es el material con el que se decide el
+  salto a **V4.0**. Punto de entrada **verificado contra GitHub**: commit de release
+  `ae14dbd`, tag anotado `v3.73.3` (objeto `7715fc2`), base `v3.73.2` (`cdc9dd0`) y
+  CI **11/11** en
+  [35219576565](https://github.com/jvelasca/english-tutor/actions/runs/35219576565).
+  Declara el **invariante** `git diff --stat v3.73.3..main -- backend frontend
+  launcher scripts` = vacío, **43 preguntas falsables** en 7 áreas
   (backend · Adaptive Engine/evidencia · pedagogía/contenido · listening · GUI ·
   runtime/instalación · CI-CD), una **matriz de cierre de 15 áreas** para rellenar
   por el auditor, **7 reglas duras** y una sección de honestidad que le obliga a
   pronunciarse sobre los 7 gates en `pending` y sobre las discrepancias declaradas
-  (hub de Aprender con **4** tarjetas, no 6; y los **7** gates marcados `human` en
-  el código frente al «5» de la documentación). Informe esperado:
-  `docs/audit/AI-AUDITORIA-CIERRE-V373.md` (el prefijo **`AI`** es el primero libre:
-  `AA`–`AF` son los dossiers de V3.70 y `AG`/`AH` siguen reservados por los puntos
-  de entrada de V3.70/V3.71, **sin informe recibido**). **Cubre además el hueco del
-  punto de entrada de `v3.72.0`, que nunca llegó a elaborarse.**
+  (hub de Aprender con **4** tarjetas primarias más un bloque secundario con
+  Reading/Writing, no 6, y con Reading **sin** directorio de feature versionado
+  frente a Writing; los **7** gates marcados `human` en el código frente al «5» de
+  la documentación; y `docs/DEVICE_MATRIX.md` **en ⬜**). **Re-anclaje:** la versión
+  anterior estaba anclada a `v3.73.0` y declaraba ese mismo invariante contra ese
+  tag, que V3.73.1 (frontend) y V3.73.2 (tests e instrumento de auditoría del
+  backend) ya habían roto: habría producido un **P0 falso** en el primer comando del
+  auditor. Informe esperado: `docs/audit/AI-AUDITORIA-CIERRE-V373.md` (el prefijo
+  **`AI`** es el primero libre: `AA`–`AF` son los dossiers de V3.70 y `AG`/`AH`
+  siguen reservados por los puntos de entrada de V3.70/V3.71, **sin informe
+  recibido**). **Cubre además el hueco del punto de entrada de `v3.72.0`, que nunca
+  llegó a elaborarse.**
 
 - `agentes/auditoria-externa-v362.md` — **auditoría EXTERNA de V3.62.0 (entregada,
   2026-09-14; informe PENDIENTE)**: prompt autocontenido para un auditor que **solo

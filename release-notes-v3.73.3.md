@@ -103,9 +103,9 @@ escribirse antes de publicar.
 ## Verificación (lo que se ejecutó)
 
 ```powershell
-# Backend
+# Backend, en un CHECKOUT LIMPIO de verdad (git worktree) y en el commit de release
 cd backend
-.venv\Scripts\python.exe -m pytest tests/ -q      # 2784 passed
+.venv\Scripts\python.exe -m pytest tests/ -q      # 2781 passed, 3 skipped (2784 casos)
 .venv\Scripts\python.exe -m ruff check .           # limpio
 
 # Frontend (esta release NO toca producto: se comprueba que no ha derivado)
@@ -129,7 +129,10 @@ backend\.venv\Scripts\python.exe scripts\check_i18n_coverage.py --strict        
 
 La autoridad final es el **checkout limpio del CI**: V3.73.2 dejó escrito que un
 invariante que depende de rutas del árbol solo se puede verificar ahí, así que la
-verificación no se da por buena hasta que el run de publicación sale verde.
+verificación no se da por buena hasta que el run de publicación sale verde. Por
+eso la suite se corrió también en un `git worktree` sobre el commit de release
+(**2781 passed · 3 skipped**, 2784 casos: en el árbol de trabajo los 3 no se
+saltan), y no solo en el disco del autor.
 
 ---
 

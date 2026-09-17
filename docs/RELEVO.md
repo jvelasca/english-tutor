@@ -36,9 +36,11 @@
 > afirmaba un invariante de código (`git diff --stat v3.73.0..main -- backend
 > frontend launcher scripts` **vacío**) que V3.73.1/V3.73.2 ya habían roto —bajo sus
 > propias reglas, un **P0 falso** en el primer comando del auditor— y sus cifras y
-> versión no eran las publicadas; se re-ancla al tag de esta release, con el
-> invariante **verificado** y el kit en el orden de lectura, una vez comprobado el
-> CI de publicación. **Tests:** backend **2784 passed** + `ruff` limpio; frontend
+> versión no eran las publicadas; se re-ancla **en el cierre** al tag de esta
+> release (`ae14dbd`, tag `v3.73.3` objeto `7715fc2`) con el invariante **verificado**
+> (`git diff --stat v3.73.3..main -- backend frontend launcher scripts` **vacío**),
+> el CI **11/11 verde** en el run `35219576565` y el kit en el orden de lectura. **Tests:** backend **2781 passed · 3 skipped** (2784 casos) en
+> un `git worktree` sobre el commit de release, más `ruff` limpio; frontend
 > sin cambios de producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK);
 > launcher **113**; `check_release_consistency` en los **6 orígenes** (`3.73.3`);
 > i18n `--strict` **0/0/0**; `validation_gate.py auto --require-dist` **10/10** y
@@ -3635,7 +3637,38 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.2` **corrección de la CI de V3.73.1** (release
+**Posición actual (2026-09-17):** `v3.73.3` **kit de validación de los 7 gates** (release
+de **PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
+**SIN cambios de PRODUCTO**: backend de producto, frontend de producto y launcher
+intactos — el diff es el **arnés de validación**, sus **tests** y **documentación**).
+Prepara lo único que falta para V4.0 —**ejecutar físicamente los 7 gates**— y corrige la
+deriva que habría hecho probar el artefacto equivocado. **(A) Kit de campo:**
+`docs/audit/KIT-VALIDACION-GATES.md` (pre-vuelo con la identidad del árbol que se sella
+en cada `record` y las URLs de producto, reglas del instrumento, **hoja por gate**
+G1–G7 con pasos, criterio de FALLO, evidencia y el comando `record` copiable, agrupación
+por sesión y cierre); **referencia** los protocolos en lugar de duplicarlos. **(B) Deriva
+de protocolo corregida (habría invalidado G1 y G4):** el §5 de
+`RA-RUNTIME-OFFLINE.md` (E5 flujo 1 incluido) y `G-DEVICES.md` mandaban al **dev server
+de Vite** (`:5173`), que desde V3.72 **no es el runtime de producto** (un solo origen
+HTTPS `:8000` con el backend sirviendo `dist`); `RB-INSTALACION.md` pasa a declarar
+Node/npm requisito de **compilación**, no de ejecución. **(C) Guard anti-deriva:**
+`check_device_matrix` se generaliza a `check_gate_protocol_origins` (id `gate-origins`),
+que recorre los **tres** protocolos funcionales (`DEVICE_MATRIX.md`,
+`RA-RUNTIME-OFFLINE.md`, `G-DEVICES.md`) y falla si alguno contiene `:5173` o no contiene
+`:8000` —el chequeo que vigilaba un solo documento ya no deja pasar la deriva por la
+puerta de al lado— (**5 tests nuevos**; `test_validation_gate_v373.py` 24 → 29).
+**(D) Punto de entrada de la auditoría externa re-anclado:**
+`agentes/auditoria-total-externa-v373.md` afirmaba un invariante (`git diff --stat
+v3.73.0..main -- backend frontend launcher scripts` **vacío**) que V3.73.1/V3.73.2 ya
+habían roto —un **P0 falso** en el primer comando del auditor, según sus propias
+reglas— y sus cifras y versión no eran las publicadas; queda anclado a `ae14dbd`
+(tag `v3.73.3`, objeto `7715fc2`), con el invariante **verificado**, el CI **11/11** en
+el run `35219576565` y el kit en el orden de lectura. **El código sigue congelado:** los
+7 gates siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` salga 0.
+Ver la nota de cabecera y `release-notes-v3.73.3.md`.
+
+**Release anterior — `v3.73.2` corrección de la CI de V3.73.1** (release
 de **PARCHE correctiva**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
 `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y **SIN
 cambios de PRODUCTO**: backend de producto, frontend de producto y launcher intactos —
