@@ -38,6 +38,11 @@ _ORIGIN_RE = re.compile(config.ALLOWED_ORIGIN_REGEX)
 # límites más estrictos a los endpoints sensibles (por prefijo). Los topes son
 # holgados a propósito (V3.6.2): la app es local y los falsos 429 por ráfagas de
 # pollers + reintentos eran más dañinos que el abuso que previenen.
+#
+# Cada clave debe ser **prefijo de una ruta real** de la app: la errata
+# `/api/voz/transcribe` (la ruta montada es `/api/transcribe`) mantuvo a Whisper
+# con el cupo general sin que nada fallara. `test_security.py` tiene el candado
+# que lo detecta (`test_path_limits_match_real_routes`).
 _RATE_WINDOW_SECONDS = 60.0
 _DEFAULT_LIMIT = 1200
 _PATH_LIMITS: dict[str, int] = {
@@ -45,7 +50,12 @@ _PATH_LIMITS: dict[str, int] = {
     "/api/system/restore": 20,
     "/api/system/backup": 60,
     "/api/chat": 240,
-    "/api/voz/transcribe": 180,
+    # Rutas de coste alto (CPU de Whisper/Piper/LLM, red y disco de las voces):
+    # antes caían las cuatro en el cupo general de 1200/min.
+    "/api/transcribe": 180,
+    "/api/tts": 240,
+    "/api/translate": 120,
+    "/api/voices/download": 10,
 }
 
 _clients: dict[str, deque[float]] = defaultdict(deque)

@@ -3,7 +3,39 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-17 (UTC+2).
+> Actualizado por última vez: 2026-09-18 (UTC+2).
+>
+> **Nota (2026-09-18): V3.73.7 (endurecimiento derivado de la verificación de
+> seguridad) — release de PARCHE, sin capacidad pedagógica nueva.** Release
+> **`v3.73.7`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, pero
+> **SÍ con cambios de PRODUCTO** (backend, frontend y un middleware nuevo), a
+> diferencia de V3.73.2–V3.73.6, que eran documentales. Nace del **triage interno**
+> de la sección de seguridad del informe externo
+> (`docs/audit/VERIFICACION-SEGURIDAD-V373.md`). **(A) Lo que estaba roto.** El
+> límite reforzado de transcripción apuntaba a `/api/voz/transcribe`, una ruta
+> **inexistente** (el router monta `/api/transcribe`), así que Whisper usó el cupo
+> **general** (1200/min) en vez del declarado (180/min); y el backup incluía
+> `data/certs/key.pem`, la **clave privada TLS**, en claro y multiplicada por las
+> **7** copias automáticas. **(B) Lo corregido.** Cupo propio para las cuatro rutas
+> de coste alto (`/api/transcribe` 180, `/api/tts` 240, `/api/translate` 120,
+> `/api/voices/download` 10); `certs/` fuera del ZIP **y conservado** al restaurar
+> (una sola constante gobierna ambos lados); cota de expansión del ZIP (4 GiB, 50 000
+> entradas y rechazo explícito de rutas inseguras); `UserCreate.name` con
+> `max_length=80`; `Secure` en la cookie de perfil cuando la página va por HTTPS;
+> middleware de cabeceras defensivas (`nosniff`, `X-Frame-Options`, `Referrer-Policy`,
+> `Permissions-Policy` y CSP acotada, **sin HSTS** por certificado autofirmado); y el
+> PIN de admin deja `localStorage` por `sessionStorage`. **(C) La causa raíz.** Las
+> claves de `_PATH_LIMITS` eran cadenas sin candado: ahora un test recorre la tabla de
+> rutas real (descendiendo por los `_IncludedRouter` de FastAPI) y falla si alguna no
+> corresponde a una ruta montada. **(D) Verificación.** Backend **2817 passed**,
+> frontend vitest **717**, launcher **113**, `ruff`/`tsc` limpios, `validation_gate
+> auto` **10/10**, `check_release_consistency` en los **6 orígenes**. **Honestidad.**
+> (i) **El P0 de identidad sigue abierto** (el `user_id` lo elige el cliente): esta
+> release cierra el lote barato, **no** el riesgo principal. (ii) La CSP es parcial a
+> propósito (el artefacto trae un script inline de tema). (iii) **Los 7 gates siguen
+> `pending`** y el kit conserva la identidad del pre-vuelo (`3.73.6` · `13cc30b`)
+> como historia. Ver `release-notes-v3.73.7.md`.
 >
 > **Nota (2026-09-17): V3.73.6 (reproducibilidad de las cifras declaradas) —
 > release de PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**

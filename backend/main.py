@@ -46,6 +46,7 @@ from routers.vocabulary_routes import router as vocabulary_routes_router
 from routers.voices import router as voices_router
 from routers.voz import router as voz_router
 from security import SecurityMiddleware
+from security_headers import SecurityHeadersMiddleware
 from services.frontend_dist import mount_frontend, require_ui_from_env
 
 logger = logging.getLogger(__name__)
@@ -138,6 +139,10 @@ app.add_middleware(
 
 # Protección de origen (CSRF) + rate limiting (V1.41).
 app.add_middleware(SecurityMiddleware)
+
+# Cabeceras defensivas (V3.73.x). Se añade en último lugar para quedar por FUERA
+# de `SecurityMiddleware` y decorar también sus 403/429.
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(chat_router)
 app.include_router(grammar_router)

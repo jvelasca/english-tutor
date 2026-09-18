@@ -8,19 +8,40 @@ import type {
 
 const PIN_KEY = "adminPin";
 
+/**
+ * Almacén del PIN de administración: **sesión**, no equipo.
+ *
+ * El PIN es una credencial, y en `localStorage` quedaba en claro y para siempre,
+ * compartido por todos los perfiles del navegador y arrastrado en cualquier
+ * copia/exportación de su almacenamiento. En `sessionStorage` muere al cerrar la
+ * pestaña: como mucho hay que volver a teclearlo, y solo para las operaciones de
+ * administración (biblioteca de audio, backups).
+ */
 function safeStorage(): Storage | null {
   try {
-    return typeof localStorage === "undefined" ? null : localStorage;
+    return typeof sessionStorage === "undefined" ? null : sessionStorage;
   } catch {
     return null;
   }
 }
 
+/** Borra la copia que versiones anteriores dejaban en `localStorage`. */
+function dropLegacyPin(): void {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.removeItem(PIN_KEY);
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
 export function getAdminPin(): string {
+  // Migración: la copia heredada en `localStorage` se borra al primer uso.
+  dropLegacyPin();
   return safeStorage()?.getItem(PIN_KEY) ?? "";
 }
 
 export function setAdminPin(pin: string): void {
+  dropLegacyPin();
   const storage = safeStorage();
   if (!storage) return;
   if (pin) storage.setItem(PIN_KEY, pin);

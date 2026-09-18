@@ -87,3 +87,25 @@ def test_api_hides_test_profiles_and_deletes_them(monkeypatch, tmp_path):
         # Un perfil real no se puede borrar por esta vía.
         assert client.delete(f"/api/users/{uid}").status_code == 404
         assert users_repo.get_user(uid) is not None
+
+
+def test_create_user_rejects_an_overlong_name(monkeypatch, tmp_path):
+    """`POST /api/users` no exige credencial: el nombre lleva tope (V3.73.x).
+
+    Antes solo `PATCH` acotaba `name`; crear un perfil con un nombre de tamaño
+    arbitrario era una vía trivial de crecimiento de la base de datos.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.post("/api/users", json={"name": "x" * 10_000})
+    assert r.status_code == 422
+
+
+def test_create_user_accepts_a_name_at_the_limit(monkeypatch, tmp_path):
+    """El tope no recorta el caso legítimo (80 caracteres)."""
+    _setup(monkeypatch, tmp_path)
+    nombre = "n" * 80
+    with TestClient(app) as client:
+        r = client.post("/api/users", json={"name": nombre})
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == nombre

@@ -44,4 +44,29 @@ describe("cookie", () => {
     writeUserIdCookie("u1");
     expect(readUserIdCookie()).toBe("u1");
   });
+
+  // V3.73.x: la cookie de perfil viaja por HTTPS en el runtime de producto y no
+  // debe poder salir en claro. En el modo de desarrollo por HTTP no se marca,
+  // porque el navegador la descartaría.
+  it("writeCookie añade Secure cuando la página va por HTTPS", () => {
+    vi.stubGlobal("document", { cookie: "" });
+    vi.stubGlobal("location", { protocol: "https:" });
+    writeCookie("k", "v");
+    expect(document.cookie).toContain("; Secure");
+  });
+
+  it("writeCookie no añade Secure en HTTP (modo desarrollo)", () => {
+    vi.stubGlobal("document", { cookie: "" });
+    vi.stubGlobal("location", { protocol: "http:" });
+    writeCookie("k", "v");
+    expect(document.cookie).not.toContain("Secure");
+  });
+
+  it("deleteCookie marca Secure en HTTPS para poder borrar la cookie", () => {
+    vi.stubGlobal("document", { cookie: "" });
+    vi.stubGlobal("location", { protocol: "https:" });
+    deleteCookie("k");
+    expect(document.cookie).toContain("k=;");
+    expect(document.cookie).toContain("; Secure");
+  });
 });

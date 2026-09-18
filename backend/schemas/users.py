@@ -21,7 +21,9 @@ class User(BaseModel):
 
 
 class UserCreate(BaseModel):
-    name: str = Field(min_length=1)
+    # `max_length` alineado con `UserUpdate`: `POST /api/users` no exige
+    # credencial, así que sin tope se pueden crear nombres de tamaño arbitrario.
+    name: str = Field(min_length=1, max_length=80)
     # Solo los tests lo marcan; la app siempre crea perfiles reales.
     is_test: bool = False
 

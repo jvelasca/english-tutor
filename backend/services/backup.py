@@ -9,6 +9,11 @@ El backup es un ZIP determinista con un `backup.json` de metadatos (versión de 
 app y timestamp). El auto-backup diario conserva los últimos `KEEP_BACKUPS` (7).
 Restaurar reemplaza el estado actual por el del ZIP (con checkpoint previo de
 SQLite para no perder el WAL). Todo stdlib, sin dependencias y sin red.
+
+Fuera del backup queda lo que **no es estado del alumno**: las copias antiguas
+(`backups/`) y el certificado TLS con su clave privada (`certs/`). La clave no
+debe salir del equipo dentro de un ZIP sin cifrar, y el certificado de transporte
+es del equipo, no del alumno: restaurar un backup viejo no debe revivirlo.
 """
 from __future__ import annotations
 
@@ -28,6 +33,22 @@ from services.audio_library import AUDIO_LIBRARY_DIR
 KEEP_BACKUPS = 7
 _BACKUP_MANIFEST_NAME = "backup.json"
 _DB_ARCNAME = "data/tutor.db"
+
+# Hijos directos de `DATA_DIR` que **no** viajan en el backup porque no son
+# estado del alumno:
+# - `backups/`: copias recursivas y bloat.
+# - `certs/`: el certificado TLS y su **clave privada** (`key.pem`), que no debe
+#   salir del equipo dentro de un ZIP sin cifrar.
+# En la restauración se conservan los dos: son estado del equipo, y borrarlos
+# dejaría al producto sin HTTPS (o sin copias) tras restaurar.
+_NON_PORTABLE_TOP_NAMES = frozenset({"backups", "certs"})
+
+# Cotas de la restauración. El tope de 512 MB del router es del ZIP
+# **comprimido**; sin cota del expandido, un ZIP de pocos MB con ratio alto llena
+# el disco de `%TEMP%`. Los valores tienen holgura sobre el caso legítimo
+# (SQLite + WAV de la biblioteca, que comprimen ~2x), no sobre un abuso.
+_MAX_UNCOMPRESSED_BYTES = 4 * 1024**3
+_MAX_ENTRIES = 50_000
 
 
 def _now() -> str:
@@ -55,10 +76,10 @@ def _write_zip(dest: Path) -> None:
     """Escribe el backup como ZIP (data/ + audio_library/ + backup.json)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Carpeta data/ completa, excluyendo la subcarpeta de backups (evita
-        # copias recursivas y bloat).
+        # Carpeta data/ completa, menos lo que no es estado del alumno
+        # (`backups/` y `certs/`, ver `_NON_PORTABLE_TOP_NAMES`).
         for p in sorted(DATA_DIR.iterdir()):
-            if p.name == "backups":
+            if p.name in _NON_PORTABLE_TOP_NAMES:
                 continue
             if p.is_file():
                 zf.write(p, arcname=f"data/{p.name}")
@@ -202,14 +223,41 @@ def _replace_tree(src: Path, dest: Path, keep_top: set[str]) -> None:
         _copy_path(child, dest / child.name)
 
 
+def _validate_archive(zf: zipfile.ZipFile) -> None:
+    """Rechaza ZIP con rutas inseguras, demasiadas entradas o expansión abusiva.
+
+    `extractall` de Python ya sanea los nombres (normaliza, descarta `..` y rutas
+    absolutas, así que no hay Zip Slip), pero se comprueba **de forma explícita**
+    para fallar con un mensaje claro y no depender del detalle del intérprete.
+    El tamaño declarado en el índice central es el que usa la extracción para
+    leer cada miembro, así que la cota de expansión es efectiva.
+    """
+    infos = zf.infolist()
+    if len(infos) > _MAX_ENTRIES:
+        raise ValueError(
+            f"El backup tiene demasiadas entradas (máximo {_MAX_ENTRIES})"
+        )
+    total = 0
+    for info in infos:
+        name = info.filename.replace("\\", "/")
+        parts = [p for p in name.split("/") if p not in ("", ".")]
+        drive = name.split("/", 1)[0].endswith(":")
+        if name.startswith("/") or drive or ".." in parts:
+            raise ValueError(f"El backup contiene una ruta insegura: {info.filename}")
+        total += info.file_size
+        if total > _MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("El backup expandido excede el tamaño máximo admitido")
+
+
 def restore_backup(zip_bytes: bytes) -> dict:
     """Restaura el estado desde un backup ZIP.
 
     Reemplaza `tutor.db` (con checkpoint y limpieza de WAL/SHM), la carpeta `data/`
-    (conservando `backups/` y la propia DB) y la biblioteca de audio (conservando
-    `_backups/`). Los archivos que no están en el backup se eliminan, de modo que
-    la restauración reproduce el estado guardado y no solo lo superpone. Devuelve
-    un resumen. Lanza `ValueError` si el ZIP no es un backup válido.
+    (conservando `backups/`, `certs/` y la propia DB) y la biblioteca de audio
+    (conservando `_backups/`). Los archivos que no están en el backup se eliminan,
+    de modo que la restauración reproduce el estado guardado y no solo lo
+    superpone. Devuelve un resumen. Lanza `ValueError` si el ZIP no es un backup
+    válido o si sus cotas (tamaño expandido, nº de entradas, rutas) no se cumplen.
     """
     try:
         zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
@@ -220,6 +268,7 @@ def restore_backup(zip_bytes: bytes) -> dict:
         names = set(zf.namelist())
         if _DB_ARCNAME not in names:
             raise ValueError("El backup no contiene la base de datos")
+        _validate_archive(zf)
         with tempfile.TemporaryDirectory() as tmp:
             zf.extractall(tmp)
             root = Path(tmp)
@@ -232,7 +281,11 @@ def restore_backup(zip_bytes: bytes) -> dict:
 
             data_src = root / "data"
             if data_src.exists():
-                _replace_tree(data_src, DATA_DIR, keep_top={"backups", DB_PATH.name})
+                _replace_tree(
+                    data_src,
+                    DATA_DIR,
+                    keep_top={*_NON_PORTABLE_TOP_NAMES, DB_PATH.name},
+                )
 
             audio_src = root / "audio_library"
             if audio_src.exists():

@@ -204,3 +204,92 @@ def test_backup_endpoints(monkeypatch, tmp_path):
         status = client.get("/api/system/backup/status", headers=_ADMIN_HEADERS)
         assert status.status_code == 200
         assert status.json()["keep_backups"] == 7
+
+
+# --- Endurecimiento de backup/restore (V3.73.x) ------------------------------
+
+
+def _archive(*entries: tuple[str, bytes]) -> bytes:
+    """ZIP en memoria con las entradas dadas (para probar los rechazos)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in entries:
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+def test_backup_excludes_tls_private_key(monkeypatch, tmp_path):
+    """La clave privada TLS no viaja en el ZIP: el backup no se cifra."""
+    data, _audio = _setup(monkeypatch, tmp_path)
+    certs = data / "certs"
+    certs.mkdir()
+    (certs / "cert.pem").write_text("CERT")
+    (certs / "key.pem").write_text("PRIVATE-KEY")
+
+    backup_svc.create_backup()
+    path = backup_svc.backups_dir() / backup_svc.list_backups()[0]["name"]
+    with zipfile.ZipFile(path) as zf:
+        names = set(zf.namelist())
+
+    assert not any(name.startswith("data/certs/") for name in names), (
+        "el backup sigue incluyendo el certificado TLS y su clave privada"
+    )
+    assert "data/tutor.db" in names  # el resto del estado sí viaja
+
+
+def test_restore_preserves_local_certs(monkeypatch, tmp_path):
+    """Restaurar no borra el certificado del equipo (no está en el backup)."""
+    data, _audio = _setup(monkeypatch, tmp_path)
+    certs = data / "certs"
+    certs.mkdir()
+    (certs / "key.pem").write_text("PRIVATE-KEY")
+    backup_svc.create_backup()
+    archive = backup_svc.read_backup(backup_svc.list_backups()[0]["name"])
+
+    backup_svc.restore_backup(archive)
+
+    assert (certs / "key.pem").read_text() == "PRIVATE-KEY", (
+        "restaurar borró la clave TLS: el producto se quedaría sin HTTPS"
+    )
+
+
+def test_restore_rejects_oversized_expansion(monkeypatch, tmp_path):
+    """Un ZIP pequeño que expande muy por encima de la cota se rechaza."""
+    _setup(monkeypatch, tmp_path)
+    archive = _archive(
+        ("data/tutor.db", b"SQLITE-DATA"),
+        ("data/relleno.bin", b"\0" * 100_000),
+    )
+    monkeypatch.setattr(backup_svc, "_MAX_UNCOMPRESSED_BYTES", 1_000)
+    with pytest.raises(ValueError, match="expandido"):
+        backup_svc.restore_backup(archive)
+
+
+def test_restore_rejects_too_many_entries(monkeypatch, tmp_path):
+    """Un ZIP con muchísimas entradas se rechaza antes de extraer."""
+    _setup(monkeypatch, tmp_path)
+    archive = _archive(
+        ("data/tutor.db", b"SQLITE-DATA"),
+        ("data/a.txt", b"a"),
+        ("data/b.txt", b"b"),
+    )
+    monkeypatch.setattr(backup_svc, "_MAX_ENTRIES", 2)
+    with pytest.raises(ValueError, match="entradas"):
+        backup_svc.restore_backup(archive)
+
+
+@pytest.mark.parametrize(
+    "evil",
+    [
+        "../evil.txt",
+        "data/../../evil.txt",
+        "/etc/evil.txt",
+        "C:/evil.txt",
+    ],
+)
+def test_restore_rejects_unsafe_member_path(monkeypatch, tmp_path, evil):
+    """Rutas que escapan del temporal se rechazan de forma explícita (CWE-22)."""
+    _setup(monkeypatch, tmp_path)
+    archive = _archive(("data/tutor.db", b"SQLITE-DATA"), (evil, b"x"))
+    with pytest.raises(ValueError, match="insegura"):
+        backup_svc.restore_backup(archive)

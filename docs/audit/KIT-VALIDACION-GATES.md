@@ -45,16 +45,17 @@ cd backend
 cd ..
 ```
 
-**Anotar aquí:**
+**Anotar aquí** (rellenado en el pre-vuelo de la campaña de certificación V4.0; es
+la identidad que debe quedar sellada en los **7** `record`):
 
 | Dato | Valor |
 |---|---|
-| `VERSION` | |
-| `HEAD` (SHA) | |
-| Run de CI que publicó ese commit (id numérico) | |
-| Fecha de la sesión | |
-| Equipo / SO | |
-| Modelo de Ollama instalado (`ollama list`) | |
+| `VERSION` | `3.73.6` |
+| `HEAD` (SHA) | `13cc30bb6d30c61a0c04708703f60f838f89d82d` |
+| Run de CI que publicó ese commit (id numérico) | `35268213802` (`success`, **11/11** jobs) |
+| Fecha de la sesión | 2026-09-17 |
+| Equipo / SO | PC del autor · Windows `10.0.26200` |
+| Modelo de Ollama instalado (`ollama list`) | `llama3.1:8b` (`46e0c10c039e`) |
 
 **URLs de producto** (desde V3.72 solo hay **un** origen; el puerto `5173` es el
 dev server de Vite y **no** forma parte del runtime de producto):

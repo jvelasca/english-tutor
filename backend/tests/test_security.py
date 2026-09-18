@@ -133,3 +133,97 @@ def test_rate_limit_snapshot_prunes_old_entries():
     security._rejections.append(time.monotonic())
     assert security.rate_limit_snapshot() == 1
     security._rejections.clear()
+
+
+# --- Candados de `_PATH_LIMITS` (V3.73.x) ------------------------------------
+#
+# Contexto: `_PATH_LIMITS` declaraba `/api/voz/transcribe` (una ruta que no
+# existe) mientras el router monta `/api/transcribe`, así que Whisper usó el cupo
+# general (1200/min) en vez del reforzado (180/min) sin que nada fallara. Estos
+# tests atan el mapa de límites a la app real: la siguiente errata (o la
+# siguiente ruta cara sin cupo) no pasa.
+
+# Rutas cuyo coste (CPU de Whisper/Piper/LLM, red y disco de las voces)
+# justifica un cupo propio y no el general. Es política declarada, no un detalle.
+COSTLY_ROUTES = (
+    "/api/transcribe",
+    "/api/tts",
+    "/api/translate",
+    "/api/voices/download",
+)
+
+# Mínimo de rutas que la app debe exponer: si FastAPI cambiara su forma de
+# diferir `include_router` y el recorrido devolviera casi nada, el candado de
+# abajo pasaría «por vacío» sin comprobar nada. Este suelo lo impide.
+MIN_APP_ROUTES = 100
+
+
+def _app_routes() -> set[str]:
+    """Todas las rutas reales de la app, incluidos los routers incluidos.
+
+    FastAPI no expande `include_router` en `app.routes`: deja un
+    `_IncludedRouter` con el router original dentro, así que hay que descender.
+    """
+    from main import app
+
+    found: set[str] = set()
+    pending = list(app.routes)
+    while pending:
+        route = pending.pop()
+        path = getattr(route, "path", None)
+        if isinstance(path, str):
+            found.add(path)
+        for attr in ("original_router", "router"):
+            sub = getattr(route, attr, None)
+            sub_routes = getattr(sub, "routes", None)
+            if sub_routes:
+                pending.extend(sub_routes)
+    return found
+
+
+def test_el_recorrido_de_rutas_ve_la_app_entera():
+    """El inventario de rutas no puede quedar vacío o a medias."""
+    assert len(_app_routes()) >= MIN_APP_ROUTES
+
+
+def test_path_limits_match_real_routes():
+    """Cada clave de `_PATH_LIMITS` es prefijo de una ruta REAL montada."""
+    paths = _app_routes()
+    for prefix in security._PATH_LIMITS:
+        assert any(path.startswith(prefix) for path in paths), (
+            f"`_PATH_LIMITS` declara {prefix!r}, que no es prefijo de ninguna "
+            f"ruta montada en la app: ese límite nunca se aplica"
+        )
+
+
+def test_costly_routes_have_own_rate_limit():
+    """Ninguna ruta de coste alto cae en el cupo general."""
+    for route in COSTLY_ROUTES:
+        own = [
+            limit
+            for prefix, limit in security._PATH_LIMITS.items()
+            if route.startswith(prefix)
+        ]
+        assert own, (
+            f"{route} no tiene cupo propio: cae en el general "
+            f"({security._DEFAULT_LIMIT}/min)"
+        )
+        assert min(own) < security._DEFAULT_LIMIT
+
+
+def test_transcribe_uses_its_own_limit(monkeypatch):
+    """`/api/transcribe` se limita con su cupo reforzado, no con el general.
+
+    Prueba de comportamiento: con el general (1200) la segunda petición pasaría.
+    """
+    monkeypatch.setitem(security._PATH_LIMITS, "/api/transcribe", 1)
+    app = FastAPI()
+
+    @app.post("/api/transcribe")
+    async def transcribe():
+        return {"ok": True}
+
+    app.add_middleware(security.SecurityMiddleware)
+    with TestClient(app) as client:
+        assert client.post("/api/transcribe").status_code == 200
+        assert client.post("/api/transcribe").status_code == 429

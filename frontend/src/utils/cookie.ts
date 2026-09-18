@@ -13,15 +13,26 @@ export function readCookie(name: string): string | null {
   return decodeURIComponent(row.slice(prefix.length));
 }
 
+/**
+ * Atributos comunes de las cookies. `Secure` se añade solo si la página ya se
+ * sirve por HTTPS (el runtime de producto, `https://<host>:8000`): en el modo de
+ * desarrollo por HTTP el navegador descartaría la cookie.
+ */
+function secureAttr(): string {
+  return typeof location !== "undefined" && location.protocol === "https:"
+    ? "; Secure"
+    : "";
+}
+
 export function writeCookie(name: string, value: string, days = 365): void {
   if (typeof document === "undefined") return;
   const expires = new Date(Date.now() + days * 86_400_000).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax${secureAttr()}`;
 }
 
 export function deleteCookie(name: string): void {
   if (typeof document === "undefined") return;
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax${secureAttr()}`;
 }
 
 export function readUserIdCookie(): string | null {
