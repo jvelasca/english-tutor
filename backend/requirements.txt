@@ -1,4 +1,8 @@
-fastapi==0.128.0
+# V3.75 (VG-N5): 0.128.0 arrastraba `starlette 0.50.0`, con 10 avisos conocidos
+# (`pip-audit`) cuyos parches solo existen en `starlette>=1.0.1`. 0.141.1 permite
+# `starlette>=0.46`, así que resuelve a 1.6.0 y el árbol de producto queda sin
+# vulnerabilidades conocidas. Verificado con la suite completa: 2875 passed.
+fastapi==0.141.1
 uvicorn[standard]==0.40.0
 ollama==0.6.2
 python-multipart==0.0.32

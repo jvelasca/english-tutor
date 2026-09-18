@@ -10,17 +10,17 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("progress api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getProgressHistory llama con user_id y bucket en la query", async () => {
+  it("getProgressHistory llama con bucket en la query", async () => {
     const fn = mockFetch(true, { user_id: "u1", bucket: "week", series: [] });
     await getProgressHistory("u1", "week");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/progress/history?user_id=u1&bucket=week");
+    expect(url).toBe("/api/progress/history?bucket=week");
   });
 
-  it("getProgress llama con user_id en la query", async () => {
+  it("getProgress llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { user_id: "u1", conversations: 0 });
     await getProgress("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/progress?user_id=u1");
+    expect(url).toBe("/api/progress");
   });
 });

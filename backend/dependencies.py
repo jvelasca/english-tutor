@@ -1,10 +1,11 @@
 """Dependencias HTTP compartidas (contexto de usuario local)."""
 from __future__ import annotations
 
-from fastapi import Header, HTTPException, Query, UploadFile
+from fastapi import Header, HTTPException, Request, UploadFile
 
 import config
 from domain import users as user_service
+from services import sessions
 
 
 async def require_admin(
@@ -27,20 +28,34 @@ async def require_admin(
         raise HTTPException(status_code=401, detail="PIN de administración requerido")
 
 
-async def current_user(user_id: str = Query(...)) -> dict:
-    """Resuelve y valida el perfil activo. 404 si no existe."""
+async def current_user(request: Request) -> dict:
+    """Resuelve el perfil activo desde la **sesión firmada** (V3.75, Fase 2 del P0).
+
+    Es el **único** sitio donde la API decide quién eres: los 138 usos de esta
+    dependencia en los 20 routers no cambian. 401 `SESSION_REQUIRED` si no hay
+    cookie o la firma no cuadra; 404 si el perfil de una sesión válida ya no
+    existe (mismo contrato que antes).
+
+    El `?user_id=` que aceptaba hasta V3.74 **ya no se lee**: era la
+    vulnerabilidad —cualquiera que alcanzara la API podía pedir los datos de otro
+    perfil con solo cambiar un parámetro—, y dejarlo como respaldo habría sido
+    cambiar la forma del arreglo sin arreglarlo (`PLAN-P0-IDENTIDAD.md` §4).
+    """
+    user_id = sessions.verify(request.cookies.get(sessions.SESSION_COOKIE))
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="SESSION_REQUIRED")
     user = await user_service.get_user(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
 
 
-async def current_user_optional(user_id: str | None = Query(None)) -> dict | None:
-    """Resuelve el perfil activo si se pasa `user_id`; None si no viene (el endpoint
-    queda en modo sin perfil). 404 si el usuario no existe."""
-    if user_id is None:
+async def current_user_optional(request: Request) -> dict | None:
+    """Igual que `current_user`, pero **sin** sesión resuelve `None` en vez de 401:
+    para los endpoints que saben funcionar sin perfil (su semántica no cambia)."""
+    if sessions.verify(request.cookies.get(sessions.SESSION_COOKIE)) is None:
         return None
-    return await current_user(user_id)
+    return await current_user(request)
 
 
 _ALLOWED_AUDIO_TYPES = {

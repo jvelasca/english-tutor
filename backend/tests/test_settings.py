@@ -51,9 +51,13 @@ def test_api_get_settings(monkeypatch, tmp_path):
 
 def test_api_save_settings(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
+    # V3.75 (Fase 2 del P0): `PUT /api/settings` exige sesión y exige que el
+    # `user_id` del cuerpo sea el de la sesión. El caso del 403 lo fija
+    # `test_users_self_only.py` junto al resto de bordes de autorización.
     with TestClient(app) as client:
         r = client.put(
             "/api/settings",
+            params={"user_id": uid},
             json={"user_id": uid, "settings": {"model": "llama3.1:8b"}},
         )
         assert r.status_code == 200
@@ -65,6 +69,7 @@ def test_api_save_settings_unknown_user(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.put(
             "/api/settings",
+            params={"user_id": "no-existe"},
             json={"user_id": "no-existe", "settings": {"model": "x"}},
         )
         assert r.status_code == 404

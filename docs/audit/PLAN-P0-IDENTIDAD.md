@@ -5,10 +5,10 @@
 > diseño concreto que se propone ejecutar, con su coste, su orden y sus criterios
 > de aceptación.
 >
-> **Estado:** **Fase 1 PUBLICADA como `v3.74.0`** (implementada, verificada y
-> revisada; incluye la **Fase 1b** —el botón del panel— que se añadió en la misma
-> revisión). Fase 2 **aprobada en diseño**, pendiente de arrancar sobre el árbol de
-> `v3.74.0`; **no** se toca hasta que el gerente dé el paso.
+> **Estado:** **Fase 1 PUBLICADA como `v3.74.0`** y **Fase 2 IMPLEMENTADA en el
+> árbol de `v3.75.0`** (§14), junto con los dos P3 que quedaban abiertos
+> (`VG-N5` y `VG-N6`). La **Fase 3** (autenticación real) sigue fuera y sigue
+> siendo una decisión de producto.
 >
 > **Punto de partida:** `v3.74.0` · árbol con el lote V3.73.7 (`v3.73.7`) **y** la
 > Fase 1 (`v3.74.0`) publicados **por separado**, cada uno medido en su propio
@@ -287,8 +287,14 @@ test: la GUI de `tkinter` no se puede probar sin pantalla.
 
 ### 6.4 Criterio de aceptación
 
-`rg "user_id" frontend/src/api --glob "!*.test.ts"` ⇒ **0 coincidencias**. Con una
-sesión de A, ninguna petición puede leer ni escribir datos de B.
+`rg "user_id=" frontend/src/api --glob "!*.test.ts"` ⇒ **0 coincidencias**: no queda
+ninguna URL con la identidad dentro. El `user_id` que **sí** sobrevive es el de
+cuerpo de dos contratos que lo exigen por diseño (`POST /api/session` —lo que pides
+abrir— y el `user_id` de `PUT /api/settings`, que el servidor contrasta con el de la
+sesión y rechaza con 403 si no coincide); buscarlo sin filtrar por `=` mezclaría
+ambos casos, y el criterio decía `user_id` a secas antes de que existieran.
+
+Con una sesión de A, ninguna petición puede leer ni escribir datos de B.
 
 ---
 
@@ -303,6 +309,14 @@ diagnóstico mudo** sin que ningún test lo note (lee bases reales del sistema, 
 en CI no existen). La Fase 2 debe actualizar ese diagnóstico a «sesión activa:
 sí/no», y el plan lo declara aquí porque es el tipo de acoplamiento que un plan
 centrado en el backend no ve.
+
+**Cómo se cerró (§14.1).** `APP_COOKIE_NAME = "et_session"` y el resumen devuelve
+presencia (`session_open: bool`), no identidad: **qué** perfil hay abierto lo sabe
+el servidor, y esta pantalla no descifra el token. Además se **enmascara su valor**
+(`_mask_value`): Firefox guarda las cookies en claro, así que sin eso el panel
+imprimiría la sesión firmada —una sesión copiable de una captura de pantalla—.
+El resto del diagnóstico (caducidad, `Secure`, `HttpOnly`, navegador y perfil de
+navegador) queda intacto: es para lo que sirve el panel.
 
 ### 7.2 El adaptador de `conftest` y su trampa
 
@@ -430,10 +444,14 @@ rg -n "Depends|async def" backend\routers\users.py
 | `backend/tests/test_lan_mode.py::test_las_dos_mitades_de_la_politica_de_origen_coinciden` | El 403 y el patrón de CORS no pueden divergir (Fase 1) | **implementado** |
 | `backend/tests/test_lan_mode.py::test_los_docs_declaran_la_frontera_de_loopback` | README/PREMISAS/ARQUITECTURA declaran la frontera (Fase 1) | **implementado** |
 | `frontend/src/components/ConnectDeviceCard.test.tsx` | La tarjeta no ofrece QR ni enlace muertos (Fase 1) | **implementado** |
-| `backend/tests/test_identity_source.py` | La identidad **no** la elige el cliente (Fase 2) | pendiente |
-| `backend/tests/test_sessions.py` | Firma, caducidad, atributos de la cookie y 401 (Fase 2) | pendiente |
-| `backend/tests/test_users_self_only.py` | Un perfil no edita a otro (Fase 2) | pendiente |
-| `backend/tests/test_backup.py::test_backup_excludes_session_secret` | El secreto de firma no sale en el ZIP (§7.4) | pendiente |
+| `backend/tests/test_identity_source.py` | La identidad **no** la elige el cliente (Fase 2) | **implementado** |
+| `backend/tests/test_sessions.py` | Firma, caducidad, atributos de la cookie y 401 (Fase 2) | **implementado** |
+| `backend/tests/test_users_self_only.py` | Un perfil no edita a otro (Fase 2) | **implementado** |
+| `backend/tests/test_backup.py::test_backup_excludes_session_secret` | El secreto de firma no sale en el ZIP (§7.4) | **implementado** |
+| `backend/tests/test_public_surface.py` | La superficie sin sesión está declarada y acotada (`VG-N6`) | **implementado** (§14.3) |
+| `backend/tests/test_supply_chain_v375.py` | Actions por SHA, auditoría de dependencias y Dependabot (`VG-N5`) | **implementado** (§14.3) |
+| `frontend/src/utils/session.test.ts` | `planSession`: adoptar o abrir sesión al arrancar (Fase 2) | **implementado** |
+| `launcher/tests/test_browser_cookies.py::test_read_firefox_masks_session_token` | El token de la sesión no se imprime en el panel (§7.1) | **implementado** |
 
 ---
 
@@ -479,3 +497,88 @@ Fase 2.
 **Siguiente paso (cuando el gerente lo dé):** Fase 2 — identidad derivada de una
 sesión firmada, retirada de `et_user_id` y cierre del borde de autorización por
 perfil. Cambia el **contrato de la API**, así que merece su propia release.
+
+---
+
+## 14. Estado de la Fase 2 (2026-09-18) — implementada en `v3.75.0`
+
+**Aprobada y ejecutada sobre el árbol de `v3.74.0`**, junto con los dos P3 que
+seguían abiertos (`VG-N5`, `VG-N6`). Cifras del árbol medido: backend **2882**
+(2840 → +42), frontend **721** (719 → +2 netos: +7 nuevos y −5 del `cookie.test.ts`
+retirado), launcher **142** (139 → +3), `ruff`/`tsc` limpios, i18n `--strict` 0/0/0,
+`validation_gate.py auto` 10/10, `check_release_consistency` en los **6** orígenes.
+
+### 14.1 Lo que se implementó, y dónde
+
+| Pieza | Fichero | Qué hace |
+|---|---|---|
+| Firma de sesión | `backend/services/sessions.py` (nuevo) | Secreto en `DATA_DIR/session.secret`; `issue`/`verify` con HMAC-SHA256 y `hmac.compare_digest`; `SESSION_TTL_SECONDS` |
+| Ciclo de sesión | `backend/routers/session.py` (nuevo) | `POST`/`GET`/`DELETE /api/session`; cookie `et_session` `HttpOnly`, `SameSite=Lax`, `Secure` si la petición es HTTPS |
+| Identidad | `backend/dependencies.py` | `current_user` verifica la cookie ⇒ 401 `SESSION_REQUIRED`; `current_user_optional` ⇒ `None` |
+| Autorización | `backend/routers/users.py`, `routers/settings.py` | editar perfil/preferencias exige sesión **y** que el id sea el de la sesión (403 si no) |
+| Backup | `backend/services/backup.py` | `session.secret` fuera del ZIP y **conservado** al restaurar (§7.4) |
+| Frontend | `api/session.ts`, `api/client.ts`, `hooks/useChat.ts`, `utils/session.ts`, 17 módulos de `api/` | la identidad sale de las URLs; al arrancar se pregunta `GET /api/session`; elegir o crear perfil **abre** sesión; `planSession` decide adoptar/abrir con test propio |
+| Retirada | `frontend/src/utils/cookie.ts` (+ su test) | se va `et_user_id`: la identidad ya no la escribe JavaScript |
+| Launcher | `browser_cookies.py`, `launcher.py` | «sesión abierta: sí/no» con el valor **enmascarado** (§7.1) |
+
+**Tres correcciones de diseño que no estaban en el plan y se encontraron
+implementando:**
+
+1. **`_secret()` con fichero vacío** entraba en bucle (existía pero no era secreto).
+   Ahora un `session.secret` vacío se considera «sin secreto» y se regenera.
+2. **La máscara del token no debía pisar las descripciones.** Chromium cifra sus
+   cookies y el panel muestra «(cifrado · N bytes)»: enmascarar eso diría «sesión
+   firmada» de algo que no se ha podido leer. La máscara respeta la descripción.
+3. **Los tests crudos no pueden usar `TestClient`.** El adaptador de `conftest.py`
+   convierte `?user_id=` en sesión, así que «sin sesión + `?user_id=`» era
+   inexpresable con él: los tests que fijan la vulnerabilidad van marcados
+   `identidad_cruda` (marcador de pytest, registrado en `backend/pyproject.toml`).
+   El primer intento usó `httpx.ASGITransport`, que es **solo asíncrono** y no
+   funciona con un `httpx.Client` síncrono.
+
+### 14.2 Alcance real de lo cerrado (no es «el P0 está cerrado»)
+
+Lo que cambia es **quién es la autoridad sobre la identidad**: antes el cliente
+(`?user_id=` en cada petición), ahora el servidor (cookie firmada). Lo que **no**
+cambia es que **no hay autenticación**: `POST /api/session` acepta cualquier
+`user_id` existente, `GET/POST /api/users` siguen sin credencial y, en modo LAN,
+quien alcanza la API puede abrir sesión para cualquier perfil. Lo que ya no puede
+es **forjar** una identidad sin el secreto del equipo ni elegirla por petición. La
+Frontera de red (Fase 1) sigue siendo la mitad que decide **quién llega**.
+
+### 14.3 Los dos P3 que quedaban
+
+- **`VG-N5` (dependencias y cadena de suministro).** Las Actions van **fijadas por
+  SHA** (`checkout@11bd719…`, `setup-python@a26af69…`, `setup-node@49933ea…`, con la
+  etiqueta en comentario), el workflow declara `permissions: contents: read` y hay
+  un job **bloqueante** `deps-audit` (`pip-audit -r requirements.txt` +
+  `npm audit --omit=dev --audit-level=high`). El escaneo **destapó** 10 avisos
+  conocidos en `starlette 0.50.0` (arrastrado por `fastapi==0.128.0`) cuyos parches
+  solo existen en `starlette>=1.0.1`: se sube `fastapi` a **0.141.1** (→
+  `starlette 1.6.0`) y la suite completa pasa idéntica (**2875 passed** en el árbol
+  intermedio, antes de los tests nuevos). Se añade **Dependabot** para pip, npm y
+  `github-actions` (que mantiene frescos los pines). Candado:
+  `backend/tests/test_supply_chain_v375.py`.
+- **`VG-N6` (superficie sin credencial).** Se **declara aceptada** y acotada, con
+  la lista escrita en `docs/ARQUITECTURA.md` (§«Superficie sin sesión») y un candado
+  en **las dos direcciones** (`backend/tests/test_public_surface.py`): lo declarado
+  sin sesión sigue respondiendo (si no, se rompe el launcher o la puerta de perfil)
+  y lo declarado con sesión **no** sale sin ella. La sección del documento es
+  obligatoria para el test: borrarla falla.
+
+### 14.4 Mordida de los candados (verificada)
+
+Cinco sabotajes controlados (aplicados y revertidos por script, cada uno contra su
+test): reintroducir una **etiqueta móvil** de Action, volver **informativo** el job
+de auditoría, borrar la **declaración** de superficie sin sesión, quitar
+`HttpOnly` de la cookie de sesión, y hacer que el adaptador de `conftest` traduzca
+**también** las peticiones crudas. Los cinco hicieron fallar su test.
+
+### 14.5 Siguiente paso (cuando el gerente lo dé)
+
+**Fase 3 — autenticación real** (y con ella, la política de quién puede abrir
+sesión: PIN por perfil, o credencial por dispositivo). Es una **decisión de
+producto**, no una fase técnica: contradice «sin cuentas, sin contraseñas» de
+`docs/PREMISAS.md` y hay que elegir con el gerente qué se rompe a cambio. Hasta
+entonces, la lista de §14.2 y la de `PARKED.md` son la declaración honesta del
+alcance.

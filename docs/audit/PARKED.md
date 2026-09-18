@@ -319,6 +319,56 @@
 - **La Fase 2 no está implementada ni aprobada en código**: el plan está aprobado
   **en diseño** y pendiente de revisión de la Fase 1.
 
+## V3.75 — la identidad la firma el servidor (Fase 2 del P0) + P3 VG-N5/VG-N6
+
+> Origen: las **dos mitades** que quedaban del P0 (`VG-01`: el cliente elegía la
+> identidad) y los dos hallazgos P3 abiertos en
+> `docs/audit/VERIFICACION-SEGURIDAD-V373.md` (`VG-N5`, `VG-N6`). Diseño y alcance
+> en `docs/audit/PLAN-P0-IDENTIDAD.md` §6 y §14; notas en
+> `release-notes-v3.75.0.md`.
+
+### Cerrado en V3.75 (deja de ser deuda)
+
+- **La identidad ya no viaja en la URL ni la elige el cliente.** `POST /api/session`
+  emite una cookie `et_session` **firmada por el servidor** (HMAC-SHA256,
+  `services/sessions.py`) y `HttpOnly`; `current_user` la verifica en cada petición
+  (sin cookie, manipulada o caducada ⇒ **401 `SESSION_REQUIRED`**). El `?user_id=`
+  de la URL **no significa nada** (fijado por `test_identity_source.py`, que manda
+  las dos cosas a la vez —sesión de A y `?user_id=B`— y exige los datos de A).
+  `et_user_id`, la cookie que escribía JavaScript, **se retira**.
+- **Un perfil ya no edita a otro.** `PATCH /api/users/{id}` y `PUT /api/settings`
+  exigen sesión **y** que el id sea el de la sesión (403 si no).
+- **El secreto de firma no viaja en los backups** (`_NON_PORTABLE_TOP_NAMES`), así
+  que restaurar el ZIP de otro equipo no permite forjar sesiones; restaurar
+  **no** borra el secreto local.
+- **`VG-N5`**: Actions fijadas por **SHA**, `permissions: contents: read` y job
+  bloqueante `deps-audit` (`pip-audit` + `npm audit`). El escaneo **destapó** 10
+  avisos en `starlette 0.50.0` (por `fastapi==0.128.0`), que se cierran subiendo a
+  `fastapi==0.141.1` (→ `starlette 1.6.0`). Se añade **Dependabot** (pip, npm,
+  `github-actions`).
+- **`VG-N6`**: la superficie que responde **sin sesión** queda **declarada** por
+  escrito y **acotada** por test en las dos direcciones
+  (`test_public_surface.py` + sección en `docs/ARQUITECTURA.md`).
+- **El panel del launcher ya no imprime el token**: informa de «sesión abierta:
+  sí/no» y enmascara el valor (Firefox guarda las cookies en claro).
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **No hay autenticación, y esta fase no la añade.** `POST /api/session` acepta
+  cualquier `user_id` **existente** sin credencial: quien pueda alcanzar la API
+  sigue pudiendo abrir sesión para cualquier perfil. Lo que ya no puede es
+  **forjar** una identidad (sin el secreto del equipo) ni **elegirla en cada
+  petición**. La frontera que decide **quién llega** sigue siendo la red (loopback
+  por defecto, LAN opt-in, V3.74).
+- **En modo LAN, `GET/POST /api/users` siguen sin credencial** (enumerar y crear
+  perfiles), porque la puerta de perfil los necesita antes de que exista sesión.
+- **Fase 3 (autenticación real) sigue sin decidir.** Contradice «sin cuentas, sin
+  contraseñas» de `docs/PREMISAS.md`: es una **decisión de producto** y no una fase
+  técnica pendiente.
+- **`/api/network`, `/api/models` y `/api/system/status` siguen sin sesión**: es
+  la decisión **aceptada** de `VG-N6` (reconocimiento barato, sin datos del alumno),
+  no un olvido. La lista viva está en `docs/ARQUITECTURA.md`.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Aplicar (tras tu aprobación) el **fix mecánico del sesgo posicional** en

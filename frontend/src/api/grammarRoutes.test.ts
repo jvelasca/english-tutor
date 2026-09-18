@@ -15,7 +15,7 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("grammarRoutes api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getGrammarQuestion llama con user_id en la query", async () => {
+  it("getGrammarQuestion llama sin user_id en la query", async () => {
     const fn = mockFetch(true, {
       check_id: "a1-m01-u01-l01-o01-c01",
       level: "A1",
@@ -25,7 +25,7 @@ describe("grammarRoutes api", () => {
     });
     await getGrammarQuestion("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/grammar/routes/question?user_id=u1");
+    expect(url).toBe("/api/grammar/routes/question");
   });
 
   it("getGrammarQuestion añade level y mode=failed solo cuando se piden", async () => {
@@ -38,7 +38,7 @@ describe("grammarRoutes api", () => {
     await getGrammarQuestion("u1", "A1", "failed");
     const [url] = fn.mock.calls[0];
     expect(url).toBe(
-      "/api/grammar/routes/question?user_id=u1&level=A1&mode=failed",
+      "/api/grammar/routes/question?level=A1&mode=failed",
     );
   });
 
@@ -51,17 +51,17 @@ describe("grammarRoutes api", () => {
     });
     await getGrammarQuestion("u1", "A1", "all");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/grammar/routes/question?user_id=u1&level=A1");
+    expect(url).toBe("/api/grammar/routes/question?level=A1");
   });
 
-  it("getGrammarStats llama con user_id en la query", async () => {
+  it("getGrammarStats llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { attempts: 1, passed: 1, accuracy: 100 });
     await getGrammarStats("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/grammar/routes/stats?user_id=u1");
+    expect(url).toBe("/api/grammar/routes/stats");
   });
 
-  it("getGrammarLevelItems llama a /items con user_id y level", async () => {
+  it("getGrammarLevelItems llama a /items solo con level", async () => {
     const fn = mockFetch(true, {
       level: "A1",
       total: 2,
@@ -73,7 +73,7 @@ describe("grammarRoutes api", () => {
     });
     await getGrammarLevelItems("u1", "A1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/grammar/routes/items?user_id=u1&level=A1");
+    expect(url).toBe("/api/grammar/routes/items?level=A1");
   });
 
   it("submitGrammarAttempt envía JSON con check_id y selected_index", async () => {
@@ -90,7 +90,7 @@ describe("grammarRoutes api", () => {
     });
     await submitGrammarAttempt("u1", "a1-m01-u01-l01-o01-c01", 0);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/grammar/routes/attempt?user_id=u1");
+    expect(url).toBe("/api/grammar/routes/attempt");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body)).toEqual({
       check_id: "a1-m01-u01-l01-o01-c01",

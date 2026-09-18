@@ -13,7 +13,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.74.0**.
+- Última versión estable: **v3.75.0**.
 
 ## Estructura
 
@@ -249,9 +249,11 @@ npm run dev         # Vite en https://localhost:5173 con proxy /api
   es alcanzable — ni siquiera estando en la misma WiFi. Para usarla desde el móvil hay
   que declararlo: el botón **«Activar red local»** del lanzador (reinicia el servidor
   para aplicarlo) o arrancar con `ENGLISH_TUTOR_LAN=1`, y abrir el puerto con
-  `launcher\allow-firewall.ps1`. Sin autenticación por perfil
-  (ver `docs/audit/PARKED.md`), exponerla en la red deja los datos del alumno al alcance
-  de cualquier equipo de esa red: por eso es una decisión explícita y no el
+  `launcher\allow-firewall.ps1`. Sigue **sin autenticación por perfil**
+  (`docs/audit/PARKED.md`): desde V3.75 la identidad ya no la elige el cliente en cada
+  URL —la firma el servidor (`et_session`)—, pero quien alcance la API puede pedir
+  sesión para un perfil existente. Exponerla en la red deja los datos del alumno al
+  alcance de cualquier equipo de esa red: por eso es una decisión explícita y no el
   comportamiento por defecto.
 - **Certificado TLS autofirmado:** el navegador avisará la primera vez; hay que aceptarlo
   para que funcione el micrófono (sin HTTPS, `getUserMedia` no existe fuera del propio
@@ -316,22 +318,32 @@ npm run dev         # Vite en https://localhost:5173 con proxy /api
 | `GET` | `/api/health/dependencies` | Estado por dependencia (BD, Ollama, STT, TTS) |
 | `GET` | `/api/network` | Acceso en red: `ip`, `hostname`, `url` (HTTPS), `local_url` y `local_url_available` (mDNS real) |
 | `GET` | `/api/models` | Modelos disponibles en Ollama |
-| `POST` | `/api/chat` | Diálogo con el modelo (acepta `mode`, `user_id`) |
+| `POST/GET/DELETE` | `/api/session` | Abrir / consultar / cerrar la **sesión** del perfil activo (cookie `et_session` firmada) |
+| `POST` | `/api/chat` | Diálogo con el modelo (acepta `mode`) |
 | `POST` | `/api/chat/stream` | Diálogo con streaming (SSE) |
 | `POST` | `/api/transcribe` | Audio → texto (Whisper) |
 | `POST` | `/api/tts` | Texto → audio WAV (Piper) |
 | `POST` | `/api/pronunciation` | Audio + texto esperado → puntuación + fluidez |
 | `GET/POST` | `/api/users` | Listar / crear perfiles de usuario |
-| `GET/POST` | `/api/conversations?user_id=<id>` | Listar / crear conversaciones del usuario |
+| `GET/POST` | `/api/conversations` | Listar / crear conversaciones del perfil de la sesión |
 | `GET/PUT/DELETE` | `/api/conversations/{id}` | Leer / guardar / borrar una conversación |
 | `POST/GET` | `/api/learning/events` | Registrar / listar eventos de aprendizaje |
 | `POST` | `/api/vocabulary/analyze` · `GET /api/vocabulary` | Extraer / listar vocabulario |
 | `POST` | `/api/grammar/analyze` · `GET /api/grammar/errors` | Detectar / listar errores recurrentes |
-| `GET` | `/api/profile?user_id=<id>` | Perfil de aprendizaje (nivel estimado + bandas + recomendaciones) |
-| `GET` | `/api/progress?user_id=<id>` | Resumen de progreso del alumno |
-| `GET` | `/api/progress/history?user_id=<id>` | Historial: tendencias, racha, dominio, hitos |
+| `GET` | `/api/profile` | Perfil de aprendizaje (nivel estimado + bandas + recomendaciones) |
+| `GET` | `/api/progress` | Resumen de progreso del alumno |
+| `GET` | `/api/progress/history` | Historial: tendencias, racha, dominio, hitos |
 | `GET` | `/api/listening/question` · `POST /api/listening/answer` · `GET /api/listening/stats` | Ejercicios de listening |
 | `GET` | `/api/academy/cefr-ladder` | Escalera CEFR completa (Pre-A1 → C2) con descriptores Can-Do por dimensión |
+
+> **El perfil activo no viaja en la URL.** Desde V3.75 la identidad la fija el
+> servidor al abrir sesión (`POST /api/session`, cookie `et_session` `HttpOnly` y
+> firmada) y los endpoints que antes llevaban `?user_id=<id>` la leen de ahí: sin
+> sesión válida responden **401 `SESSION_REQUIRED`**. Sigue **sin haber
+> autenticación**: cualquier cliente que alcance la API puede pedir sesión para un
+> perfil existente (es «sin cuentas» por diseño), y de ahí que la **frontera de
+> red** —loopback por defecto, LAN opt-in— sea la que decide quién alcanza la API
+> (`docs/audit/PLAN-P0-IDENTIDAD.md`).
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 

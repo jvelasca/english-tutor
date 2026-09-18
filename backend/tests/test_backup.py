@@ -237,6 +237,40 @@ def test_backup_excludes_tls_private_key(monkeypatch, tmp_path):
     assert "data/tutor.db" in names  # el resto del estado sí viaja
 
 
+def test_backup_excludes_session_secret(monkeypatch, tmp_path):
+    """El secreto de firma de sesiones no viaja en el ZIP (V3.75).
+
+    Es la misma familia de secreto que `key.pem`: un backup sin cifrar con esta
+    clave dentro permite **forjar sesiones** para cualquier perfil.
+    """
+    data, _audio = _setup(monkeypatch, tmp_path)
+    (data / "session.secret").write_text("SECRETO-DE-FIRMA")
+
+    backup_svc.create_backup()
+    path = backup_svc.backups_dir() / backup_svc.list_backups()[0]["name"]
+    with zipfile.ZipFile(path) as zf:
+        names = set(zf.namelist())
+
+    assert "data/session.secret" not in names, (
+        "el backup incluye la clave con la que se firman las sesiones"
+    )
+    assert "data/tutor.db" in names  # el resto del estado sí viaja
+
+
+def test_restore_preserves_local_session_secret(monkeypatch, tmp_path):
+    """Restaurar no borra el secreto: las sesiones abiertas siguen valiendo."""
+    data, _audio = _setup(monkeypatch, tmp_path)
+    (data / "session.secret").write_text("SECRETO-DE-FIRMA")
+    backup_svc.create_backup()
+    archive = backup_svc.read_backup(backup_svc.list_backups()[0]["name"])
+
+    backup_svc.restore_backup(archive)
+
+    assert (data / "session.secret").read_text() == "SECRETO-DE-FIRMA", (
+        "restaurar borró el secreto de sesión: invalidaría todas las sesiones abiertas"
+    )
+
+
 def test_restore_preserves_local_certs(monkeypatch, tmp_path):
     """Restaurar no borra el certificado del equipo (no está en el backup)."""
     data, _audio = _setup(monkeypatch, tmp_path)

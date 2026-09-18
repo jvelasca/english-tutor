@@ -1,0 +1,39 @@
+# V3.75 (VG-N5): la auditoría de V3.73 echó en falta Dependabot, y con razón —
+# `npm audit` se había ejecutado **a mano** y nada avisaba de una dependencia
+# vulnerable al día siguiente. El job `deps-audit` de `ci.yml` detecta; esto
+# propone el arreglo.
+#
+# Los tres ecosistemas que importan aquí:
+#   - `pip` en `backend/`: el árbol de **producto** (fastapi/starlette, uvicorn,
+#     faster-whisper, piper, cryptography).
+#   - `npm` en `frontend/`: la UI compilada y su cadena de build.
+#   - `github-actions`: mantiene frescas las Actions que `ci.yml` fija **por SHA**
+#     (Dependabot reescribe el SHA *y* el comentario de versión, que es lo que
+#     evita que el pin se quede en una versión vieja para siempre).
+#
+# Cadencia semanal y agrupado: este proyecto se audita por releases, no por
+# commits; un PR de dependencias por semana es revisable y 20 no lo son.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(backend)"
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(frontend)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(actions)"

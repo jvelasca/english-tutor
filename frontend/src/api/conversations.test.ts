@@ -10,18 +10,18 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("conversations api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getConversation llama con user_id en la query", async () => {
+  it("getConversation llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { id: "c1", messages: [] });
     await getConversation("c1", "u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/conversations/c1?user_id=u1");
+    expect(url).toBe("/api/conversations/c1");
   });
 
   it("saveConversation usa PUT con el body correcto", async () => {
     const fn = mockFetch(true, { id: "c1", title: "T", messages: [] });
     await saveConversation("c1", "u1", "T", [{ role: "user", content: "hi" }]);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/conversations/c1?user_id=u1");
+    expect(url).toBe("/api/conversations/c1");
     expect(init.method).toBe("PUT");
     expect(JSON.parse(init.body)).toEqual({
       title: "T",
@@ -29,11 +29,11 @@ describe("conversations api", () => {
     });
   });
 
-  it("deleteConversation usa DELETE con user_id", async () => {
+  it("deleteConversation usa DELETE sin user_id", async () => {
     const fn = mockFetch(true, { ok: true });
     await deleteConversation("c1", "u1");
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/conversations/c1?user_id=u1");
+    expect(url).toBe("/api/conversations/c1");
     expect(init.method).toBe("DELETE");
   });
 });

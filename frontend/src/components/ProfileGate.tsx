@@ -12,10 +12,10 @@ interface ProfileGateProps {
 
 /**
  * Puerta de perfil al arrancar la app en un navegador donde no hay ningún
- * usuario definido (sin cookie recordada y varios perfiles, o ningún perfil
+ * usuario definido (sin sesión abierta y varios perfiles, o ningún perfil
  * todavía). No se puede cerrar: el alumno elige un perfil existente o crea uno
- * nuevo; hasta entonces no tiene sentido abrir el resto de la app (todo cuelga
- * de `userId`).
+ * nuevo —y con ello se abre la sesión en el servidor—; hasta entonces no tiene
+ * sentido abrir el resto de la app (todo cuelga del perfil activo).
  */
 export function ProfileGate({ users, onSelect, onCreate }: ProfileGateProps) {
   const { t } = useI18n();

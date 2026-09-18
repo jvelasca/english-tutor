@@ -11,6 +11,13 @@ en claro y sí se puede leer el valor. Como los navegadores mantienen sus bases
 de cookies bloqueadas mientras están abiertos, se copian a un temporal antes de
 leerlas. Esto se degrada con elegancia: si un navegador no existe o su base no
 se puede leer, simplemente no aparece.
+
+**El valor de la cookie de sesión no se muestra** (V3.75). Antes se enseñaba el
+`et_user_id` en claro —el perfil activo, un dato inocuo—; ahora la cookie
+`et_session` es un **token firmado**: quien lo copie de la pantalla tiene una
+sesión válida hasta que caduque. Por eso se enmascara (``_mask_value``): el panel
+sigue sirviendo para lo que sirve —ver que la cookie existe, con qué caducidad y
+con qué atributos— sin convertir la pantalla en un sitio desde el que copiarla.
 """
 from __future__ import annotations
 
@@ -21,7 +28,11 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-APP_COOKIE_NAME = "et_user_id"
+APP_COOKIE_NAME = "et_session"
+
+# Marca con la que se describe un valor que no se ha podido leer (Chromium cifra
+# el suyo). Se usa para no enmascarar dos veces una descripción (ver `_mask_value`).
+_ENCRYPTED_PREFIX = "(cifrado"
 
 # Épocas usadas por los navegadores (días/segundos desde una fecha base).
 _WEBKIT_EPOCH = datetime(1601, 1, 1, tzinfo=timezone.utc)
@@ -185,12 +196,26 @@ def diagnose_stores() -> list[dict]:
 # --- Lectura de una base de cookies ---
 
 
+def _mask_value(name: str, value: str) -> str:
+    """Valor a mostrar de una cookie: el de la sesión se enmascara (V3.75).
+
+    `et_session` es un token firmado: verlo en pantalla es poder usarlo. Del resto
+    de cookies de la app no hay nada que esconder, así que se muestran tal cual. Si
+    el valor ya es una descripción —Chromium cifra las suyas y aquí se resume su
+    tamaño—, se respeta: enmascararla diría «sesión firmada» sobre algo que no se
+    ha podido leer.
+    """
+    if name != APP_COOKIE_NAME or value.startswith(_ENCRYPTED_PREFIX):
+        return value
+    return f"(sesión firmada · {len(value)} caracteres)"
+
+
 def _chromium_value(row: sqlite3.Row) -> str:
     """Valor de una cookie de Chromium (cifrada → tamaño en bytes)."""
     keys = row.keys()
     enc = row["encrypted_value"] if "encrypted_value" in keys else None
     if enc:
-        return f"(cifrado · {len(enc)} bytes)"
+        return f"{_ENCRYPTED_PREFIX} · {len(enc)} bytes)"
     value = row["value"] if "value" in keys else None
     return value or ""
 
@@ -208,15 +233,16 @@ def _read_chromium(conn: sqlite3.Connection, store: dict) -> list[dict]:
         host = r["host_key"] or ""
         if not _is_app_host(host):
             continue
+        name = r["name"] or ""
         out.append(
             {
                 "browser": store["browser"],
                 "profile": store["profile"],
-                "name": r["name"] or "",
+                "name": name,
                 "host": host,
                 "path": r["path"] or "",
                 "expires": _format_expiry_webkit(r["expires_utc"]),
-                "value": _chromium_value(r),
+                "value": _mask_value(name, _chromium_value(r)),
                 "secure": bool(r["is_secure"]),
                 "httponly": bool(r["is_httponly"]),
             }
@@ -236,15 +262,16 @@ def _read_firefox(conn: sqlite3.Connection, store: dict) -> list[dict]:
         host = r["host"] or ""
         if not _is_app_host(host):
             continue
+        name = r["name"] or ""
         out.append(
             {
                 "browser": store["browser"],
                 "profile": store["profile"],
-                "name": r["name"] or "",
+                "name": name,
                 "host": host,
                 "path": r["path"] or "",
                 "expires": _format_expiry_unix(r["expiry"]),
-                "value": r["value"] or "",
+                "value": _mask_value(name, r["value"] or ""),
                 "secure": bool(r["isSecure"]),
                 "httponly": bool(r["isHttpOnly"]),
             }
@@ -286,14 +313,18 @@ def read_store(store: dict) -> list[dict]:
 
 
 def cookie_summary(rows: list[dict]) -> dict:
-    """Resumen de las cookies leídas: total, por navegador y usuario recordado."""
+    """Resumen de las cookies leídas: total, por navegador y si hay sesión.
+
+    `session_open` es presencia, no identidad: **qué** perfil hay abierto lo sabe
+    el servidor (va dentro del token firmado), no esta pantalla (V3.75).
+    """
     browsers: dict[str, int] = {}
-    remembered: str | None = None
+    session_open = False
     for c in rows:
         browsers[c["browser"]] = browsers.get(c["browser"], 0) + 1
-        if c["name"] == APP_COOKIE_NAME and not c["value"].startswith("(cifrado"):
-            remembered = c["value"]
-    return {"total": len(rows), "browsers": browsers, "remembered": remembered}
+        if c["name"] == APP_COOKIE_NAME:
+            session_open = True
+    return {"total": len(rows), "browsers": browsers, "session_open": session_open}
 
 
 def collect_cookies() -> tuple[list[dict], dict]:

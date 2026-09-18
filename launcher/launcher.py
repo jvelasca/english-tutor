@@ -699,11 +699,11 @@ class LauncherApp:
         ttk.Label(wrap, textvariable=self._cookie_var, style="Service.TLabel").pack(
             anchor="w"
         )
-        self._remembered_var = tk.StringVar(value="")
-        self._remembered_label = ttk.Label(
-            wrap, textvariable=self._remembered_var, style="Status.TLabel"
+        self._session_var = tk.StringVar(value="")
+        self._session_label = ttk.Label(
+            wrap, textvariable=self._session_var, style="Status.TLabel"
         )
-        self._remembered_label.pack(anchor="w", pady=(4, 0))
+        self._session_label.pack(anchor="w", pady=(4, 0))
         self._cookie_diag_var = tk.StringVar(value="")
         self._cookie_diag_label = ttk.Label(
             wrap,
@@ -1013,13 +1013,15 @@ class LauncherApp:
             self._open_btn.configure(state="disabled")
 
     def _apply_cookies(self, rows: list[dict], summary: dict) -> None:
-        remembered = summary["remembered"]
-        if remembered:
-            self._remembered_label.configure(foreground=COLORS["success"])
-            self._remembered_var.set(f"👤 Usuario recordado: {remembered}")
+        # V3.75: se informa de **si hay sesión**, no de qué perfil es. El perfil va
+        # dentro del token firmado y esta pantalla no lo descifra (no debe: el token
+        # en claro sería una sesión copiable de la pantalla).
+        if summary["session_open"]:
+            self._session_label.configure(foreground=COLORS["success"])
+            self._session_var.set("🔑 Sesión abierta en el navegador")
         else:
-            self._remembered_label.configure(foreground=COLORS["text_dim"])
-            self._remembered_var.set("👤 Sin usuario recordado todavía")
+            self._session_label.configure(foreground=COLORS["text_dim"])
+            self._session_var.set("🔑 Sin sesión abierta todavía")
 
         self._cookie_var.set(format_cookie_summary(summary))
         self._cookie_diag_var.set(

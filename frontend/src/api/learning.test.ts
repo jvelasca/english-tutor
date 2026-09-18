@@ -53,36 +53,36 @@ const QUEUE: ReviewQueue = {
 describe("learning api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getProfile llama con user_id en la query", async () => {
+  it("getProfile llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { user_id: "u1", estimated_level: "A2" });
     await getProfile("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/profile?user_id=u1");
+    expect(url).toBe("/api/profile");
   });
 
   it("analyzeText llama a vocabulario y gramática con el texto", async () => {
     const fn = mockFetch(true, { words: [] });
     await analyzeText("hi", "u1");
     const urls = fn.mock.calls.map((c) => c[0] as string);
-    expect(urls).toContain("/api/vocabulary/analyze?user_id=u1");
-    expect(urls).toContain("/api/grammar/analyze?user_id=u1");
+    expect(urls).toContain("/api/vocabulary/analyze");
+    expect(urls).toContain("/api/grammar/analyze");
 
     const bodies = fn.mock.calls.map((c) => JSON.parse(c[1].body as string));
     expect(bodies.every((b) => b.text === "hi")).toBe(true);
   });
 
-  it("getEvents llama con user_id en la query", async () => {
+  it("getEvents llama sin user_id en la query", async () => {
     const fn = mockFetch(true, []);
     await getEvents("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/learning/events?user_id=u1");
+    expect(url).toBe("/api/learning/events");
   });
 
-  it("getReviewQueue pide la cola de repaso con user_id y límite", async () => {
+  it("getReviewQueue pide la cola de repaso con límite", async () => {
     const fn = mockFetch(true, QUEUE);
     const out = await getReviewQueue("u1", 5);
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/learning/review?user_id=u1&limit=5",
+      "/api/learning/review?limit=5",
     );
     expect(out).toEqual(QUEUE);
   });
@@ -91,7 +91,7 @@ describe("learning api", () => {
     const fn = mockFetch(true, { due_count: 0, items: [], fsrs_version: "" });
     await getReviewQueue("u1");
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/learning/review?user_id=u1&limit=20",
+      "/api/learning/review?limit=20",
     );
   });
 });

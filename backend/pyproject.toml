@@ -12,3 +12,11 @@ ignore = ["B008"]  # Query/Form/File/Depends de FastAPI son llamadas en default 
 "scripts/_corpus_frames_a1.py" = ["E501"]
 "scripts/_corpus_frames_a2.py" = ["E501"]
 
+[tool.pytest.ini_options]
+markers = [
+    # V3.75: el test manda la petición SIN el adaptador de identidad de
+    # `tests/conftest.py` (que traduce `?user_id=` a una sesión firmada). Lo usan
+    # los tests que comprueban que ese parámetro ya no significa nada.
+    "identidad_cruda: sin adaptador de identidad (Fase 2 del P0)",
+]
+

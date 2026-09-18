@@ -36,6 +36,7 @@ from routers.profile import router as profile_router
 from routers.progress import router as progress_router
 from routers.pronunciation import router as pronunciation_router
 from routers.pronunciation_routes import router as pronunciation_routes_router
+from routers.session import router as session_router
 from routers.settings import router as settings_router
 from routers.speaking_routes import router as speaking_routes_router
 from routers.system import router as system_router
@@ -167,6 +168,7 @@ app.include_router(grammar_routes_router)
 app.include_router(progress_router)
 app.include_router(conversations_router)
 app.include_router(settings_router)
+app.include_router(session_router)
 app.include_router(translate_router)
 app.include_router(users_router)
 app.include_router(voices_router)

@@ -16,34 +16,34 @@ const TIMEOUT_READ_MS = 10000;
 export type ConversationQuestionMode = "all" | "failed" | "mastered";
 
 export function getConversationQuestion(
-  userId: string,
+  _userId: string,
   level?: string | null,
   mode?: ConversationQuestionMode,
 ): Promise<ConversationDialogue> {
-  const params = new URLSearchParams({ user_id: userId });
+  const params = new URLSearchParams();
   if (level) params.set("level", level);
   if (mode && mode !== "all") params.set("mode", mode);
+  const query = params.toString();
   return withTimeout(
-    getJson<ConversationDialogue>(`/api/conversation/routes/question?${params.toString()}`),
+    getJson<ConversationDialogue>(`/api/conversation/routes/question${query ? `?${query}` : ""}`),
     TIMEOUT_QUESTION_MS,
     "get conversation question",
   );
 }
 
 export function getConversationLevelItems(
-  userId: string,
+  _userId: string,
   level: string,
 ): Promise<ConversationLevelItems> {
-  const params = new URLSearchParams({ user_id: userId, level });
+  const params = new URLSearchParams({ level });
   return getJson<ConversationLevelItems>(
     `/api/conversation/routes/items?${params.toString()}`,
   );
 }
 
-export function getConversationStats(userId: string): Promise<ConversationStats> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
+export function getConversationStats(_userId: string): Promise<ConversationStats> {
   return withTimeout(
-    getJson<ConversationStats>(`/api/conversation/routes/stats?${query}`),
+    getJson<ConversationStats>("/api/conversation/routes/stats"),
     TIMEOUT_READ_MS,
     "conversation stats",
   );
@@ -57,14 +57,13 @@ export function getConversationStats(userId: string): Promise<ConversationStats>
  * (task_type conversation) fusionando la señal objetiva de interacción.
  */
 export function submitConversationAttempt(
-  userId: string,
+  _userId: string,
   dialogueId: string,
   conversationId: string,
 ): Promise<ConversationAttempt> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
     postJson<ConversationAttempt>(
-      `/api/conversation/routes/attempt?${query}`,
+      "/api/conversation/routes/attempt",
       { dialogue_id: dialogueId, conversation_id: conversationId },
     ),
     TIMEOUT_SUBMIT_MS,

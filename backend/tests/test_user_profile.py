@@ -46,9 +46,16 @@ def test_update_user_unknown_returns_none(monkeypatch, tmp_path):
 
 def test_api_patch_user(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
+    # V3.75 (Fase 2 del P0): `PATCH /api/users/{id}` exige **sesión** y solo deja
+    # editar el perfil propio, así que el test declara con quién actúa (el
+    # adaptador de `conftest.py` lo traduce a una sesión firmada de verdad). El
+    # caso que faltaba —sesión de A editando a B ⇒ 403— vive en
+    # `test_users_self_only.py`.
     with TestClient(app) as client:
         r = client.patch(
-            f"/api/users/{uid}", json={"name": "Ana 2", "avatar_emoji": "🚀"}
+            f"/api/users/{uid}",
+            json={"name": "Ana 2", "avatar_emoji": "🚀"},
+            params={"user_id": uid},
         )
         assert r.status_code == 200
         body = r.json()
@@ -60,7 +67,11 @@ def test_api_patch_user_unknown(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
         assert (
-            client.patch("/api/users/no-existe", json={"name": "x"}).status_code
+            client.patch(
+                "/api/users/no-existe",
+                json={"name": "x"},
+                params={"user_id": "no-existe"},
+            ).status_code
             == 404
         )
 

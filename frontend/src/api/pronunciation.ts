@@ -3,15 +3,14 @@ import type { PronunciationResponse } from "../types/api";
 export async function checkPronunciation(
   blob: Blob,
   expected: string,
-  userId: string,
+  _userId: string,
 ): Promise<PronunciationResponse> {
   const form = new FormData();
   form.append("file", blob, "audio.webm");
   form.append("expected", expected);
   form.append("language", "en");
 
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  const res = await fetch(`/api/pronunciation?${query}`, {
+  const res = await fetch("/api/pronunciation", {
     method: "POST",
     body: form,
   });

@@ -37,18 +37,18 @@ function mockJsonFetch(data: unknown) {
 describe("academy api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getLevels incluye user_id en la query", async () => {
+  it("getLevels no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({ levels: [] });
     await getLevels("u1");
-    expect(fn.mock.calls[0][0]).toBe("/api/academy/levels?user_id=u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/levels");
   });
 
-  it("submitExam envía answers y user_id", async () => {
+  it("submitExam envía answers", async () => {
     const fn = mockJsonFetch({ passed: true, skills: {}, failed_skills: [] });
     await submitExam("u1", "a1", { "a1f-01": 1 });
     const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/exam/a1/submit?user_id=u1");
+    expect(url).toBe("/api/academy/exam/a1/submit");
     expect(body).toEqual({ answers: { "a1f-01": 1 } });
   });
 
@@ -57,7 +57,7 @@ describe("academy api", () => {
     await submitPlacement("u1", { "pl-01": 0 });
     const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/placement/submit?user_id=u1");
+    expect(url).toBe("/api/academy/placement/submit");
     expect(body).toEqual({ answers: { "pl-01": 0 } });
   });
 
@@ -70,7 +70,7 @@ describe("academy api", () => {
     await startAdaptivePlacement("u1");
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
-    expect(url).toBe("/api/academy/placement/start?user_id=u1");
+    expect(url).toBe("/api/academy/placement/start");
     expect(method).toBe("POST");
   });
 
@@ -87,7 +87,7 @@ describe("academy api", () => {
     await nextAdaptivePlacement("u1", { "pl-01": 0 }, 7);
     const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/placement/next?user_id=u1");
+    expect(url).toBe("/api/academy/placement/next");
     expect(body).toEqual({ answers: { "pl-01": 0 }, session_id: 7 });
   });
 
@@ -99,7 +99,7 @@ describe("academy api", () => {
       target_level: "B1",
     });
     await getGoal("u1");
-    expect(fn.mock.calls[0][0]).toBe("/api/academy/goal?user_id=u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/goal");
   });
 
   it("getSession llama al endpoint session", async () => {
@@ -110,7 +110,7 @@ describe("academy api", () => {
       practice_count: 1,
     });
     await getSession("u1");
-    expect(fn.mock.calls[0][0]).toBe("/api/academy/session?user_id=u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/session");
   });
 
   it("getEvidenceGraphNode: 404 → null, 200 → nodo (V3.18, D7.1)", async () => {
@@ -134,10 +134,10 @@ describe("academy api", () => {
       getEvidenceGraphNode("u1", "a1-m01-u01-l01-o01", "a1"),
     ).resolves.toEqual(node);
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/academy/evidence-graph/objective/a1-m01-u01-l01-o01?user_id=u1",
+      "/api/academy/evidence-graph/objective/a1-m01-u01-l01-o01",
     );
     expect(fn.mock.calls[1][0]).toBe(
-      "/api/academy/evidence-graph/objective/a1-m01-u01-l01-o01?user_id=u1&level_id=a1",
+      "/api/academy/evidence-graph/objective/a1-m01-u01-l01-o01?level_id=a1",
     );
   });
 
@@ -152,7 +152,7 @@ describe("academy api", () => {
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/session/complete?user_id=u1");
+    expect(url).toBe("/api/academy/session/complete");
     expect(method).toBe("POST");
     expect(body).toEqual({ step_key: "review:grammar" });
   });
@@ -173,7 +173,7 @@ describe("academy api", () => {
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/goal?user_id=u1");
+    expect(url).toBe("/api/academy/goal");
     expect(method).toBe("PUT");
     expect(body).toEqual({
       goal_type: "travel",
@@ -191,7 +191,7 @@ describe("academy api", () => {
     ]);
     const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/attempts?user_id=u1");
+    expect(url).toBe("/api/academy/attempts");
     expect(body).toEqual({
       level_id: "a1",
       objective_id: "o1",
@@ -207,11 +207,11 @@ describe("academy api", () => {
     await completeLesson("u1", "a1", "o1");
     const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/lessons/complete?user_id=u1");
+    expect(url).toBe("/api/academy/lessons/complete");
     expect(body).toEqual({ level_id: "a1", objective_id: "o1" });
   });
 
-  it("getSpeakingDiagnostic incluye user_id en la query", async () => {
+  it("getSpeakingDiagnostic no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({
       criteria: [],
       weak: [],
@@ -223,11 +223,11 @@ describe("academy api", () => {
     });
     await getSpeakingDiagnostic("u1");
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/academy/speaking/diagnostic?user_id=u1",
+      "/api/academy/speaking/diagnostic",
     );
   });
 
-  it("getSpeakingLevel incluye user_id en la query", async () => {
+  it("getSpeakingLevel no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({
       level: "B1",
       numeric: 3.1,
@@ -236,10 +236,10 @@ describe("academy api", () => {
       attempts: 12,
     });
     await getSpeakingLevel("u1");
-    expect(fn.mock.calls[0][0]).toBe("/api/academy/speaking/level?user_id=u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/speaking/level");
   });
 
-  it("getSpeakingJourney incluye user_id en la query", async () => {
+  it("getSpeakingJourney no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({
       current_level: "B1",
       current_numeric: 3.1,
@@ -249,11 +249,11 @@ describe("academy api", () => {
     });
     await getSpeakingJourney("u1");
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/academy/speaking/journey?user_id=u1",
+      "/api/academy/speaking/journey",
     );
   });
 
-  it("getWritingDiagnostic incluye user_id en la query", async () => {
+  it("getWritingDiagnostic no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({
       criteria: [],
       weak: [],
@@ -265,11 +265,11 @@ describe("academy api", () => {
     });
     await getWritingDiagnostic("u1");
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/academy/writing/diagnostic?user_id=u1",
+      "/api/academy/writing/diagnostic",
     );
   });
 
-  it("getWritingLevel incluye user_id en la query", async () => {
+  it("getWritingLevel no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({
       level: "B1",
       numeric: 3.1,
@@ -278,10 +278,10 @@ describe("academy api", () => {
       attempts: 12,
     });
     await getWritingLevel("u1");
-    expect(fn.mock.calls[0][0]).toBe("/api/academy/writing/level?user_id=u1");
+    expect(fn.mock.calls[0][0]).toBe("/api/academy/writing/level");
   });
 
-  it("getWritingJourney incluye user_id en la query", async () => {
+  it("getWritingJourney no incluye user_id en la query", async () => {
     const fn = mockJsonFetch({
       current_level: "B1",
       current_numeric: 3.1,
@@ -291,7 +291,7 @@ describe("academy api", () => {
     });
     await getWritingJourney("u1");
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/academy/writing/journey?user_id=u1",
+      "/api/academy/writing/journey",
     );
   });
 
@@ -306,7 +306,7 @@ describe("academy api", () => {
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/speaking/assessment/start?user_id=u1");
+    expect(url).toBe("/api/academy/speaking/assessment/start");
     expect(method).toBe("POST");
     expect(body).toEqual({});
   });
@@ -326,7 +326,7 @@ describe("academy api", () => {
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/speaking/assessment/part?user_id=u1");
+    expect(url).toBe("/api/academy/speaking/assessment/part");
     expect(method).toBe("POST");
     expect(body).toEqual({ session_id: 1, heard: "hello", duration_seconds: 12.5 });
   });
@@ -386,12 +386,12 @@ describe("academy api", () => {
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/speaking/assessment/finish?user_id=u1");
+    expect(url).toBe("/api/academy/speaking/assessment/finish");
     expect(method).toBe("POST");
     expect(body).toEqual({ session_id: 1 });
   });
 
-  it("getSpeakingAssessment usa el id en la ruta y user_id en la query", async () => {
+  it("getSpeakingAssessment usa el id en la ruta", async () => {
     const fn = mockJsonFetch({
       session_id: 1,
       status: "in_progress",
@@ -403,7 +403,7 @@ describe("academy api", () => {
     await getSpeakingAssessment("u1", 1);
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1]?.method;
-    expect(url).toBe("/api/academy/speaking/assessment/1?user_id=u1");
+    expect(url).toBe("/api/academy/speaking/assessment/1");
     expect(method).toBeUndefined();
   });
 
@@ -420,7 +420,7 @@ describe("academy api", () => {
     await submitObjectiveAssessment("u1", "a1", "o1", { c1: 1, c2: 0 });
     const url = fn.mock.calls[0][0] as string;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
-    expect(url).toBe("/api/academy/objective/assessment?user_id=u1");
+    expect(url).toBe("/api/academy/objective/assessment");
     expect(body).toEqual({
       level_id: "a1",
       objective_id: "o1",
@@ -428,11 +428,11 @@ describe("academy api", () => {
     });
   });
 
-  it("getUnitReviewPlan llama a review/unit-plan con user_id", async () => {
+  it("getUnitReviewPlan llama a review/unit-plan sin user_id", async () => {
     const fn = mockJsonFetch({ levels: [], due_count: 0 });
     await getUnitReviewPlan("u1");
     expect(fn.mock.calls[0][0]).toBe(
-      "/api/academy/review/unit-plan?user_id=u1",
+      "/api/academy/review/unit-plan",
     );
   });
 
@@ -447,7 +447,7 @@ describe("academy api", () => {
     await getUnitMicroReview("u1", "a1-u1", 7);
     const url = fn.mock.calls[0][0] as string;
     expect(url).toBe(
-      "/api/academy/review/unit/a1-u1/micro-review?user_id=u1&window_days=7",
+      "/api/academy/review/unit/a1-u1/micro-review?window_days=7",
     );
   });
 
@@ -462,7 +462,7 @@ describe("academy api", () => {
     await getUnitMicroReview("u1", "b1-u1", 7, "b1");
     const url = fn.mock.calls[0][0] as string;
     expect(url).toBe(
-      "/api/academy/review/unit/b1-u1/micro-review?user_id=u1&window_days=7&level_id=b1",
+      "/api/academy/review/unit/b1-u1/micro-review?window_days=7&level_id=b1",
     );
   });
 
@@ -477,7 +477,7 @@ describe("academy api", () => {
     await getUnitMicroReview("u1", "u/1", 30);
     const url = fn.mock.calls[0][0] as string;
     expect(url).toBe(
-      "/api/academy/review/unit/u%2F1/micro-review?user_id=u1&window_days=30",
+      "/api/academy/review/unit/u%2F1/micro-review?window_days=30",
     );
   });
 
@@ -498,7 +498,7 @@ describe("academy api", () => {
     const method = fn.mock.calls[0][1].method;
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
     expect(url).toBe(
-      "/api/academy/review/unit/a1-u1/micro-review?user_id=u1",
+      "/api/academy/review/unit/a1-u1/micro-review",
     );
     expect(method).toBe("POST");
     expect(body).toEqual({ window_days: 7, answers: { c1: 0, c2: 3 } });

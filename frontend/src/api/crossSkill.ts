@@ -9,9 +9,9 @@ import type { CrossSkillMatrix } from "../types/api";
  * transfer) y qué evidencia correcta acumula el usuario. Nunca escribe.
  */
 export function getCrossSkillMatrix(
-  userId: string,
+  _userId: string,
   level: string,
 ): Promise<CrossSkillMatrix> {
-  const query = new URLSearchParams({ user_id: userId, level }).toString();
+  const query = new URLSearchParams({ level }).toString();
   return getJson<CrossSkillMatrix>(`/api/cross-skill?${query}`);
 }

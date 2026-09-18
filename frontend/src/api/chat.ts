@@ -17,18 +17,14 @@ export function getModels(): Promise<ModelsResponse> {
   return getJson<ModelsResponse>("/api/models");
 }
 
-function userQuery(userId?: string | null): string {
-  return userId ? `?${new URLSearchParams({ user_id: userId }).toString()}` : "";
-}
-
 export function sendChat(
   messages: Message[],
   model: string,
   mode: TutorMode,
-  userId?: string | null,
+  _userId?: string | null,
   objectiveId?: string | null,
 ): Promise<ChatResponse> {
-  return postJson<ChatResponse>(`/api/chat${userQuery(userId)}`, {
+  return postJson<ChatResponse>(`/api/chat`, {
     model,
     messages,
     mode,
@@ -41,12 +37,12 @@ export async function streamChat(
   model: string,
   mode: TutorMode,
   callbacks: StreamCallbacks,
-  userId?: string | null,
+  _userId?: string | null,
   objectiveId?: string | null,
   conversationId?: string | null,
   messageId?: string | null,
 ): Promise<void> {
-  const res = await fetch(`/api/chat/stream${userQuery(userId)}`, {
+  const res = await fetch(`/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

@@ -68,8 +68,8 @@ function playBlob(blob: Blob): Promise<void> {
 
 /**
  * Sintetiza y reproduce `text` con Piper. `language` elige la voz del idioma
- * destino (`"en"` por defecto); con `userId` el backend respeta su voz guardada
- * si es de ese idioma (V3.39, Fase 2).
+ * destino (`"en"` por defecto); la sesión firmada decide la voz guardada del
+ * perfil activo si es de ese idioma (V3.39, Fase 2).
  *
  * V3.72 (RD-04): devuelve `{voice, degraded}` leyendo las cabeceras que el
  * backend ya enviaba y **aborta** de verdad (`AbortController` + timeout) en vez
@@ -77,13 +77,10 @@ function playBlob(blob: Blob): Promise<void> {
  */
 export async function speak(
   text: string,
-  userId?: string | null,
+  _userId?: string | null,
   language: VoiceLanguage = "en",
   options: SpeakOptions = {},
 ): Promise<SpeakResult> {
-  const query = userId
-    ? `?${new URLSearchParams({ user_id: userId }).toString()}`
-    : "";
   const timeoutMs = options.timeoutMs ?? TTS_TIMEOUT_MS;
   const controller = new AbortController();
   const abortExternal = () => controller.abort();
@@ -95,7 +92,7 @@ export async function speak(
 
   let res: Response;
   try {
-    res = await fetch(`/api/tts${query}`, {
+    res = await fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, language }),

@@ -4,12 +4,12 @@ import type { VoicesResponse } from "../types/api";
 /**
  * Catálogo de voces TTS instaladas + descargables (Configuración → Voces).
  *
- * `user_id` es opcional: con perfil se devuelve su voz seleccionada (`selected`);
- * sin perfil `selected` es la voz por defecto del sistema.
+ * El perfil activo lo resuelve el servidor desde la sesión firmada: con sesión
+ * se devuelve su voz seleccionada (`selected`); sin sesión `selected` es la voz
+ * por defecto del sistema.
  */
-export function getVoices(userId?: string | null): Promise<VoicesResponse> {
-  const query = userId ? new URLSearchParams({ user_id: userId }).toString() : "";
-  return getJson<VoicesResponse>(`/api/voices${query ? `?${query}` : ""}`);
+export function getVoices(_userId?: string | null): Promise<VoicesResponse> {
+  return getJson<VoicesResponse>("/api/voices");
 }
 
 /** Descarga una voz del catálogo curado desde Hugging Face (~60 MB). */

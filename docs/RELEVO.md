@@ -5,6 +5,66 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-18 (UTC+2).
 >
+> **Nota (2026-09-18): V3.75.0 (la identidad la firma el servidor + cierre de
+> VG-N5/VG-N6) — release de PRODUCTO (minor), sin capacidad pedagógica nueva.**
+> Release **`v3.75.0`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, pero
+> **cambia el contrato de la API**. Es la **Fase 2 del P0 de identidad**
+> (`docs/audit/PLAN-P0-IDENTIDAD.md` §6 y §14): V3.74.0 cerró la **superficie**;
+> esta cierra la **identidad**. **(A) El problema.** Hasta V3.74 el perfil activo
+> viajaba en **cada** URL (`?user_id=…`) y el servidor aceptaba el que le pidieras,
+> si existía; la cookie que recordaba la elección (`et_user_id`) la escribía
+> **JavaScript**, así que se reescribía desde la consola del navegador y no era una
+> credencial. **(B) Lo corregido.** `POST /api/session` comprueba que el perfil
+> existe y emite `et_session` = `base64url(payload).base64url(hmac_sha256(secreto,
+> payload))` con `payload = {iat, uid}`, **solo stdlib** y comparación en **tiempo
+> constante** (`hmac.compare_digest`); cookie **`HttpOnly`**, `SameSite=Lax` y
+> `Secure` en HTTPS, con el secreto en `data/session.secret`. `current_user` la
+> verifica en cada petición: sin cookie, manipulada o caducada ⇒ **401
+> `SESSION_REQUIRED`**. `?user_id=` deja de significar nada: el test clave manda
+> **sesión de A + `?user_id=B`** y exige los datos de **A**
+> (`test_identity_source.py`, con el marcador `identidad_cruda` para esquivar el
+> adaptador de `conftest.py` que traduce el `user_id` de las **109** suites
+> históricas a una sesión real). **(C) Autorización.** `PATCH /api/users/{id}` y
+> `PUT /api/settings` exigen sesión **y** que el id sea el de la sesión (**403** si
+> no): antes, con sesión de A, se editaba el perfil de B. **(D) Retirada y
+> frontend.** Se va `et_user_id` con su test; el frontend **pregunta**
+> (`GET /api/session`) en vez de creer, elegir o crear perfil **abre sesión** y la
+> decisión es una función pura con test (`utils/session.ts::planSession`); los
+> **17** módulos de `api/` dejan de añadir `?user_id=…`. **(E) El secreto no viaja
+> en los backups** (`_NON_PORTABLE_TOP_NAMES`), así que el ZIP de otro equipo no
+> permite forjar sesiones; restaurar no borra el secreto local. **(F) El launcher
+> deja de imprimir el token**: «sesión abierta: sí/no» y valor **enmascarado**
+> (Firefox guarda las cookies en claro). **(G) VG-N5.** Actions fijadas por
+> **SHA**, `permissions: contents: read`, job **bloqueante** `deps-audit`
+> (`pip-audit` + `npm audit`) y **Dependabot** (pip, npm, `github-actions`). El
+> escaneo destapó **10 avisos en `starlette 0.50.0`** (por `fastapi==0.128.0`) con
+> parche solo en `starlette>=1.0.1` ⇒ `fastapi` sube a **0.141.1** (`starlette`
+> **1.6.0**) y la suite pasa idéntica. **(H) VG-N6.** `/api/system/status`,
+> `/api/network` y `/api/models` se **declaran aceptados** por escrito
+> (`docs/ARQUITECTURA.md`), con candado en las dos direcciones
+> (`test_public_surface.py`: lo declarado sin sesión sigue respondiendo y lo
+> declarado con sesión no sale sin ella; borrar la sección falla). **(I)
+> Verificación.** Backend **2882 passed**, frontend vitest **721** (87 ficheros),
+> launcher **142**, `ruff`/`tsc` limpios, i18n `--strict` 0/0/0,
+> `validation_gate auto` **10/10**, `check_release_consistency` en los **6
+> orígenes** (`3.75.0`), `npm audit`/`pip-audit` sin vulnerabilidades y **CI de 12
+> jobs**; los recuentos suben exactamente por los tests nuevos (2840 + **42**,
+> 719 + **2** netos, 139 + **3**) y cinco candados nuevos se verificaron por
+> **sabotaje** controlado. **Honestidad.** (i) **Esto no es autenticación y la
+> Fase 3 sigue sin decidir:** `POST /api/session` acepta cualquier `user_id`
+> **existente** sin credencial y `GET/POST /api/users` siguen abiertos, así que en
+> modo LAN cualquiera que alcance la API puede **abrir sesión para cualquier
+> perfil**; lo que ya no puede es **forjar** una identidad ni **elegirla por
+> petición** (cerrarlo exige credencial y contradice «sin cuentas, sin
+> contraseñas»: decisión de producto). (ii) El token prueba que lo **emitió el
+> servidor**, no que quien lo pide tenga derecho al perfil. (iii) El salto a
+> `starlette` **1.6.0** es una versión mayor dentro de una release de seguridad.
+> (iv) `Secure` depende del esquema: por HTTP plano la cookie no lo lleva. (v) El
+> candado de VG-N6 fija una **lista**, no demuestra que sea completa. (vi) **Los 7
+> gates siguen `pending`** y el kit conserva la identidad del pre-vuelo (`3.73.6` →
+> `13cc30b`) como historia. Ver `release-notes-v3.75.0.md`.
+>
 > **Nota (2026-09-18): V3.74.0 (frontera de red: loopback por defecto y LAN
 > opt-in) — release de PRODUCTO (minor), sin capacidad pedagógica nueva.**
 > Release **`v3.74.0`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni

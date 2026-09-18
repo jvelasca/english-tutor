@@ -1,21 +1,18 @@
 import { getJson, postJson } from "./client";
 import type { LearningEvent, LearningProfile, ReviewQueue } from "../types/api";
 
-export function getProfile(userId: string): Promise<LearningProfile> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return getJson<LearningProfile>(`/api/profile?${query}`);
+export function getProfile(_userId: string): Promise<LearningProfile> {
+  return getJson<LearningProfile>("/api/profile");
 }
 
-export function getEvents(userId: string): Promise<LearningEvent[]> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return getJson<LearningEvent[]>(`/api/learning/events?${query}`);
+export function getEvents(_userId: string): Promise<LearningEvent[]> {
+  return getJson<LearningEvent[]>("/api/learning/events");
 }
 
-export async function analyzeText(text: string, userId: string): Promise<void> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
+export async function analyzeText(text: string, _userId: string): Promise<void> {
   await Promise.all([
-    postJson<unknown>(`/api/vocabulary/analyze?${query}`, { text }),
-    postJson<unknown>(`/api/grammar/analyze?${query}`, { text }),
+    postJson<unknown>("/api/vocabulary/analyze", { text }),
+    postJson<unknown>("/api/grammar/analyze", { text }),
   ]);
 }
 
@@ -23,11 +20,10 @@ export async function analyzeText(text: string, userId: string): Promise<void> {
  * recomendada por hueco de competencia. Sustituye la inyección de FSRS dentro
  * del speaking micro-drill. Señal, nunca puerta. */
 export function getReviewQueue(
-  userId: string,
+  _userId: string,
   limit = 20,
 ): Promise<ReviewQueue> {
   const query = new URLSearchParams({
-    user_id: userId,
     limit: String(limit),
   }).toString();
   return getJson<ReviewQueue>(`/api/learning/review?${query}`);

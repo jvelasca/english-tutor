@@ -15,11 +15,11 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("pronunciationRoutes api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getPronunciationQuestion llama con user_id en la query", async () => {
+  it("getPronunciationQuestion llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { id: "pr-A1-0001", level: "A1", script: "Hi" });
     await getPronunciationQuestion("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/pronunciation/routes/question?user_id=u1");
+    expect(url).toBe("/api/pronunciation/routes/question");
   });
 
   it("getPronunciationQuestion añade level y mode=failed solo cuando se piden", async () => {
@@ -27,7 +27,7 @@ describe("pronunciationRoutes api", () => {
     await getPronunciationQuestion("u1", "A1", "failed");
     const [url] = fn.mock.calls[0];
     expect(url).toBe(
-      "/api/pronunciation/routes/question?user_id=u1&level=A1&mode=failed",
+      "/api/pronunciation/routes/question?level=A1&mode=failed",
     );
   });
 
@@ -35,17 +35,17 @@ describe("pronunciationRoutes api", () => {
     const fn = mockFetch(true, { id: "pr-A1-0001", level: "A1", script: "Hi" });
     await getPronunciationQuestion("u1", "A1", "all");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/pronunciation/routes/question?user_id=u1&level=A1");
+    expect(url).toBe("/api/pronunciation/routes/question?level=A1");
   });
 
-  it("getPronunciationStats llama con user_id en la query", async () => {
+  it("getPronunciationStats llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { attempts: 1, passed: 1, accuracy: 100 });
     await getPronunciationStats("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/pronunciation/routes/stats?user_id=u1");
+    expect(url).toBe("/api/pronunciation/routes/stats");
   });
 
-  it("getPronunciationLevelItems llama a /items con user_id y level", async () => {
+  it("getPronunciationLevelItems llama a /items solo con level", async () => {
     const fn = mockFetch(true, {
       level: "A1",
       total: 2,
@@ -57,7 +57,7 @@ describe("pronunciationRoutes api", () => {
     });
     await getPronunciationLevelItems("u1", "A1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/pronunciation/routes/items?user_id=u1&level=A1");
+    expect(url).toBe("/api/pronunciation/routes/items?level=A1");
   });
 
   it("submitPronunciationAttempt envía FormData con file y phrase_id", async () => {
@@ -89,7 +89,7 @@ describe("pronunciationRoutes api", () => {
     const blob = new Blob(["audio"], { type: "audio/webm" });
     await submitPronunciationAttempt("u1", "pr-A1-0001", blob);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/pronunciation/routes/attempt?user_id=u1");
+    expect(url).toBe("/api/pronunciation/routes/attempt");
     expect(init.body).toBeInstanceOf(FormData);
     const form = init.body as FormData;
     expect(form.get("phrase_id")).toBe("pr-A1-0001");

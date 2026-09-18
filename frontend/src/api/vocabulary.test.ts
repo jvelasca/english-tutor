@@ -22,18 +22,18 @@ function mockFetch(data: unknown) {
 describe("vocabulary api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getLexicon llama con user_id en la query", async () => {
+  it("getLexicon llama sin user_id en la query", async () => {
     const fn = mockFetch({ summary: { total: 0 }, items: [] });
     await getLexicon("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/lexicon?user_id=u1");
+    expect(url).toBe("/api/vocabulary/lexicon");
   });
 
-  it("lookupDictionaryWord hace POST a /dictionary con user_id, body {word} y dirección", async () => {
+  it("lookupDictionaryWord hace POST a /dictionary, body {word} y dirección", async () => {
     const fn = mockFetch({});
     await lookupDictionaryWord("u1", "travel");
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/dictionary?user_id=u1");
+    expect(url).toBe("/api/vocabulary/dictionary");
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
       "application/json",
@@ -55,11 +55,11 @@ describe("vocabulary api", () => {
     });
   });
 
-  it("getDrillCandidates llama con user_id y limit", async () => {
+  it("getDrillCandidates llama con limit", async () => {
     const fn = mockFetch({ words: [] });
     await getDrillCandidates("u1", 6);
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/drill/candidates?user_id=u1&limit=6");
+    expect(url).toBe("/api/vocabulary/drill/candidates?limit=6");
   });
 
   it("submitDrillAttempt sube word + audio en multipart", async () => {
@@ -72,7 +72,7 @@ describe("vocabulary api", () => {
     const blob = new Blob(["fake"], { type: "audio/webm" });
     await submitDrillAttempt("u1", "travel", blob);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/drill/attempt?user_id=u1");
+    expect(url).toBe("/api/vocabulary/drill/attempt");
     expect(init.method).toBe("POST");
     expect(init.body).toBeInstanceOf(FormData);
     const form = init.body as FormData;
@@ -80,12 +80,12 @@ describe("vocabulary api", () => {
     expect(form.get("file")).not.toBeNull();
   });
 
-  it("getDrillSentenceContext llama con user_id y word", async () => {
+  it("getDrillSentenceContext llama con word", async () => {
     const fn = mockFetch({ word: "travel", phrase: "x", source: "template" });
     await getDrillSentenceContext("u1", "travel");
     const [url] = fn.mock.calls[0];
     expect(url).toBe(
-      "/api/vocabulary/drill/sentence-context?user_id=u1&word=travel",
+      "/api/vocabulary/drill/sentence-context?word=travel",
     );
   });
 
@@ -94,7 +94,7 @@ describe("vocabulary api", () => {
     const blob = new Blob(["fake"], { type: "audio/webm" });
     await submitDrillSentenceAttempt("u1", "travel", blob);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/drill/sentence-attempt?user_id=u1");
+    expect(url).toBe("/api/vocabulary/drill/sentence-attempt");
     expect(init.method).toBe("POST");
     const form = init.body as FormData;
     expect(form.get("word")).toBe("travel");
@@ -116,7 +116,7 @@ describe("vocabulary api", () => {
       "decision-1",
     );
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/drill/write-attempt?user_id=u1");
+    expect(url).toBe("/api/vocabulary/drill/write-attempt");
     expect(init.method).toBe("POST");
     // V3.68 (P1-02): el `decision_id` viaja siempre (vacío sin decisión servida).
     expect(JSON.parse(init.body as string)).toEqual({
@@ -162,7 +162,7 @@ describe("vocabulary api", () => {
       targetId: "travel",
     });
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/drill/decision-lifecycle?user_id=u1");
+    expect(url).toBe("/api/vocabulary/drill/decision-lifecycle");
     expect(JSON.parse(init.body as string)).toEqual({
       decision_id: "decision-1",
       event: "started",

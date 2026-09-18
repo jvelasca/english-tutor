@@ -16,16 +16,17 @@ const TIMEOUT_READ_MS = 10000;
 export type PronunciationQuestionMode = "all" | "failed" | "mastered";
 
 export function getPronunciationQuestion(
-  userId: string,
+  _userId: string,
   level?: string | null,
   mode?: PronunciationQuestionMode,
 ): Promise<PronunciationPhrase> {
-  const params = new URLSearchParams({ user_id: userId });
+  const params = new URLSearchParams();
   if (level) params.set("level", level);
   if (mode && mode !== "all") params.set("mode", mode);
+  const query = params.toString();
   return withTimeout(
     getJson<PronunciationPhrase>(
-      `/api/pronunciation/routes/question?${params.toString()}`,
+      `/api/pronunciation/routes/question${query ? `?${query}` : ""}`,
     ),
     TIMEOUT_QUESTION_MS,
     "get question",
@@ -33,21 +34,20 @@ export function getPronunciationQuestion(
 }
 
 export function getPronunciationLevelItems(
-  userId: string,
+  _userId: string,
   level: string,
 ): Promise<PronunciationLevelItems> {
-  const params = new URLSearchParams({ user_id: userId, level });
+  const params = new URLSearchParams({ level });
   return getJson<PronunciationLevelItems>(
     `/api/pronunciation/routes/items?${params.toString()}`,
   );
 }
 
 export function getPronunciationStats(
-  userId: string,
+  _userId: string,
 ): Promise<PronunciationStats> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
-    getJson<PronunciationStats>(`/api/pronunciation/routes/stats?${query}`),
+    getJson<PronunciationStats>("/api/pronunciation/routes/stats"),
     TIMEOUT_READ_MS,
     "pronunciation stats",
   );
@@ -60,17 +60,16 @@ export function getPronunciationStats(
  * scorer determinista `score_pronunciation` (sin LLM por intento).
  */
 export function submitPronunciationAttempt(
-  userId: string,
+  _userId: string,
   phraseId: string,
   blob: Blob,
 ): Promise<PronunciationAttempt> {
   const form = new FormData();
   form.append("file", blob, "audio.webm");
   form.append("phrase_id", phraseId);
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
     postForm<PronunciationAttempt>(
-      `/api/pronunciation/routes/attempt?${query}`,
+      "/api/pronunciation/routes/attempt",
       form,
     ),
     TIMEOUT_SUBMIT_MS,

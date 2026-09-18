@@ -46,7 +46,7 @@ def _make_chromium_db(path):
         )
         conn.execute(
             "INSERT INTO cookies VALUES "
-            "('localhost','et_user_id','/',0,0,0,X'0102',''),"
+            "('localhost','et_session','/',0,0,1,X'0102',''),"
             "('localhost','theme','/',133000000000000,1,0,X'0102',''),"
             "('.google.com','sid','/',133000000000000,1,1,X'0102','')"
         )
@@ -63,15 +63,15 @@ def test_read_chromium_filters_app_hosts(tmp_path):
     }
     rows = bc.read_store(store)
     assert len(rows) == 2
-    assert {r["name"] for r in rows} == {"et_user_id", "theme"}
-    et = next(r for r in rows if r["name"] == "et_user_id")
+    assert {r["name"] for r in rows} == {"et_session", "theme"}
+    et = next(r for r in rows if r["name"] == "et_session")
     assert et["host"] == "localhost"
     assert et["value"].startswith("(cifrado")
     assert et["browser"] == "Chrome"
     assert et["profile"] == "Default"
 
 
-def _make_firefox_db(path):
+def _make_firefox_db(path, session_value="TOKEN-FIRMADO"):
     with closing(sqlite3.connect(path)) as conn, conn:
         conn.execute(
             "CREATE TABLE moz_cookies (name TEXT, value TEXT, host TEXT, path TEXT, "
@@ -79,7 +79,7 @@ def _make_firefox_db(path):
         )
         conn.execute(
             "INSERT INTO moz_cookies VALUES "
-            "('et_user_id','u1','localhost','/',0,0,0),"
+            f"('et_session','{session_value}','localhost','/',0,0,1),"
             "('x','y','example.com','/',0,0,0)"
         )
 
@@ -90,9 +90,37 @@ def test_read_firefox_reads_clear_value(tmp_path):
     store = {"browser": "Firefox", "profile": "p", "kind": "firefox", "db": str(db)}
     rows = bc.read_store(store)
     assert len(rows) == 1
-    assert rows[0]["name"] == "et_user_id"
-    assert rows[0]["value"] == "u1"
+    assert rows[0]["name"] == "et_session"
     assert rows[0]["browser"] == "Firefox"
+
+
+def test_read_firefox_masks_session_token(tmp_path):
+    """El token de sesión no se imprime: verlo en pantalla es poder usarlo (V3.75).
+
+    Firefox guarda las cookies en claro, así que sin este enmascarado el panel del
+    launcher mostraría la sesión firmada en texto plano —una sesión copiable de una
+    captura de pantalla—.
+    """
+    db = tmp_path / "f.sqlite"
+    _make_firefox_db(db, session_value="TOKEN-FIRMADO")
+    rows = bc.read_store(
+        {"browser": "Firefox", "profile": "p", "kind": "firefox", "db": str(db)}
+    )
+    et = rows[0]
+    assert "TOKEN-FIRMADO" not in et["value"]
+    assert et["value"] == "(sesión firmada · 13 caracteres)"
+    assert et["httponly"] is True  # el resto del diagnóstico sigue intacto
+
+
+def test_mask_value_leaves_other_cookies_untouched():
+    """La máscara es solo para la cookie de sesión: el resto se ve tal cual."""
+    assert bc._mask_value("theme", "dark") == "dark"
+    assert bc._mask_value("et_session", "abc") == "(sesión firmada · 3 caracteres)"
+
+
+def test_mask_value_respeta_la_descripcion_de_una_cookie_cifrada():
+    """Si el valor no se pudo leer (cifrado), no se disfraza de «sesión firmada»."""
+    assert bc._mask_value("et_session", "(cifrado · 8 bytes)") == "(cifrado · 8 bytes)"
 
 
 def test_read_store_missing_db_returns_empty():
@@ -100,12 +128,12 @@ def test_read_store_missing_db_returns_empty():
     assert bc.read_store(store) == []
 
 
-def test_cookie_summary_counts_and_remembers():
+def test_cookie_summary_counts_and_detects_session():
     rows = [
         {
             "browser": "Chrome",
-            "name": "et_user_id",
-            "value": "u1",
+            "name": "et_session",
+            "value": "(sesión firmada · 40 caracteres)",
             "host": "localhost",
         },
         {
@@ -116,27 +144,21 @@ def test_cookie_summary_counts_and_remembers():
         },
         {
             "browser": "Firefox",
-            "name": "et_user_id",
-            "value": "(cifrado · 8 bytes)",
+            "name": "otra",
+            "value": "x",
             "host": "localhost",
         },
     ]
     summary = bc.cookie_summary(rows)
     assert summary["total"] == 3
     assert summary["browsers"] == {"Chrome": 2, "Firefox": 1}
-    assert summary["remembered"] == "u1"
+    assert summary["session_open"] is True
 
 
-def test_cookie_summary_ignores_encrypted_remembered():
-    rows = [
-        {
-            "browser": "Chrome",
-            "name": "et_user_id",
-            "value": "(cifrado · 8 bytes)",
-            "host": "localhost",
-        }
-    ]
-    assert bc.cookie_summary(rows)["remembered"] is None
+def test_session_cookie_without_session_is_reported_as_no_session():
+    """Sin `et_session` no hay sesión: el resumen no adivina un perfil (V3.75)."""
+    rows = [{"browser": "Chrome", "name": "theme", "value": "dark", "host": "l"}]
+    assert bc.cookie_summary(rows)["session_open"] is False
 
 
 def test_collect_cookies_returns_rows_and_summary(monkeypatch):
@@ -144,7 +166,7 @@ def test_collect_cookies_returns_rows_and_summary(monkeypatch):
     rows, summary = bc.collect_cookies()
     assert rows == []
     assert summary["total"] == 0
-    assert summary["remembered"] is None
+    assert summary["session_open"] is False
     assert isinstance(summary.get("diagnosis"), list)
 
 

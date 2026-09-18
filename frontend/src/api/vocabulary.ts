@@ -18,9 +18,8 @@ import type {
 } from "../types/api";
 
 /** Léxico personal del alumno (V2.3): resumen + ítems con estado y recall. */
-export function getLexicon(userId: string): Promise<Lexicon> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return getJson<Lexicon>(`/api/vocabulary/lexicon?${query}`);
+export function getLexicon(__userId: string): Promise<Lexicon> {
+  return getJson<Lexicon>("/api/vocabulary/lexicon");
 }
 
 /** Entrada del diccionario de consulta (V3.30): definición/traducción cacheada
@@ -32,14 +31,13 @@ export function getLexicon(userId: string): Promise<Lexicon> {
  * V3.39: `direction` (`en-es` por defecto) permite la búsqueda inversa ES→EN,
  * en la que `word` es el término español y `translation` el equivalente inglés. */
 export function lookupDictionaryWord(
-  userId: string,
+  _userId: string,
   word: string,
   direction: DictionaryDirection = "en-es",
 ): Promise<DictionaryEntry> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   const body: DictionaryLookupRequest = { word, direction };
   return withTimeout(
-    postJson<DictionaryEntry>(`/api/vocabulary/dictionary?${query}`, body),
+    postJson<DictionaryEntry>("/api/vocabulary/dictionary", body),
     // La primera consulta de una palabra paga la generación del modelo local
     // en CPU (el servidor además acota la espera de los waiters del
     // single-flight a 60 s); este tope evita que la tarjeta se quede en
@@ -52,11 +50,10 @@ export function lookupDictionaryWord(
 /** Candidatas al speaking micro-drill (V3.19): señal determinista en servidor
  * (expuestas y nunca producidas en speaking), por recuerdo ascendente. */
 export function getDrillCandidates(
-  userId: string,
+  _userId: string,
   limit = 8,
 ): Promise<DrillCandidates> {
   const query = new URLSearchParams({
-    user_id: userId,
     limit: String(limit),
   }).toString();
   return getJson<DrillCandidates>(`/api/vocabulary/drill/candidates?${query}`);
@@ -66,7 +63,7 @@ export function getDrillCandidates(
  * la dice (alineada como correcta), el servidor la marca `speaking_prod += 1`
  * y deja de ser candidata. No declara dominio (D5/E3). */
 export async function submitDrillAttempt(
-  userId: string,
+  _userId: string,
   word: string,
   audio: Blob,
 ): Promise<DrillAttempt> {
@@ -74,8 +71,7 @@ export async function submitDrillAttempt(
   form.append("file", audio, "audio.webm");
   form.append("word", word);
 
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  const res = await fetch(`/api/vocabulary/drill/attempt?${query}`, {
+  const res = await fetch("/api/vocabulary/drill/attempt", {
     method: "POST",
     body: form,
   });
@@ -94,11 +90,11 @@ export async function submitDrillAttempt(
  * (marca `served` y registra la actividad EJECUTADA). Sin él la petición es
  * idéntica a V3.67. */
 export function getDrillSentenceContext(
-  userId: string,
+  _userId: string,
   word: string,
   decisionId?: string,
 ): Promise<DrillSentenceContext> {
-  const params: Record<string, string> = { user_id: userId, word };
+  const params: Record<string, string> = { word };
   if (decisionId) params.decision_id = decisionId;
   const query = new URLSearchParams(params).toString();
   return getJson<DrillSentenceContext>(
@@ -112,7 +108,7 @@ export function getDrillSentenceContext(
  *
  * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export async function submitDrillSentenceAttempt(
-  userId: string,
+  _userId: string,
   word: string,
   audio: Blob,
   decisionId?: string,
@@ -122,8 +118,7 @@ export async function submitDrillSentenceAttempt(
   form.append("word", word);
   if (decisionId) form.append("decision_id", decisionId);
 
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  const res = await fetch(`/api/vocabulary/drill/sentence-attempt?${query}`, {
+  const res = await fetch("/api/vocabulary/drill/sentence-attempt", {
     method: "POST",
     body: form,
   });
@@ -145,11 +140,11 @@ export async function submitDrillSentenceAttempt(
  *
  * V3.68 (P1-02): `decisionId` declara el servicio del peldaño. */
 export function getDrillRecognitionQuestion(
-  userId: string,
+  _userId: string,
   word: string,
   decisionId?: string,
 ): Promise<DrillRecognitionQuestion> {
-  const params: Record<string, string> = { user_id: userId, word };
+  const params: Record<string, string> = { word };
   if (decisionId) params.decision_id = decisionId;
   const query = new URLSearchParams(params).toString();
   return getJson<DrillRecognitionQuestion>(
@@ -165,15 +160,14 @@ export function getDrillRecognitionQuestion(
  *
  * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillRecognitionAttempt(
-  userId: string,
+  _userId: string,
   word: string,
   selectedIndex: number,
   questionId: string,
   decisionId?: string,
 ): Promise<DrillRecognitionAttempt> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecognitionAttempt>(
-    `/api/vocabulary/drill/recognition-attempt?${query}`,
+    "/api/vocabulary/drill/recognition-attempt",
     {
       word,
       selected_index: selectedIndex,
@@ -195,12 +189,12 @@ export function submitDrillRecognitionAttempt(
  *
  * V3.68 (P1-02): `decisionId` declara el servicio del peldaño. */
 export function getDrillRecallPrompt(
-  userId: string,
+  _userId: string,
   word: string,
   cue?: string,
   decisionId?: string,
 ): Promise<DrillRecallPrompt> {
-  const params: Record<string, string> = { user_id: userId, word };
+  const params: Record<string, string> = { word };
   if (cue) params.cue = cue;
   if (decisionId) params.decision_id = decisionId;
   const query = new URLSearchParams(params).toString();
@@ -216,16 +210,15 @@ export function getDrillRecallPrompt(
  *
  * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillRecallAttempt(
-  userId: string,
+  _userId: string,
   word: string,
   answer: string,
   responseTimeMs?: number,
   cue?: string,
   decisionId?: string,
 ): Promise<DrillRecallAttempt> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillRecallAttempt>(
-    `/api/vocabulary/drill/recall-attempt?${query}`,
+    "/api/vocabulary/drill/recall-attempt",
     {
       word,
       answer,
@@ -245,15 +238,14 @@ export function submitDrillRecallAttempt(
  *
  * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillWriteAttempt(
-  userId: string,
+  _userId: string,
   word: string,
   text: string,
   responseTimeMs?: number,
   decisionId?: string,
 ): Promise<DrillWriteAttempt> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillWriteAttempt>(
-    `/api/vocabulary/drill/write-attempt?${query}`,
+    "/api/vocabulary/drill/write-attempt",
     {
       word,
       text,
@@ -273,11 +265,11 @@ export function submitDrillWriteAttempt(
  * INSTANCIA realmente servida (`context_id`/`context_instance`) y completar así
  * la clave de instancia de la decisión. */
 export function getDrillTransferContext(
-  userId: string,
+  _userId: string,
   word: string,
   decisionId?: string,
 ): Promise<DrillTransferContext> {
-  const params: Record<string, string> = { user_id: userId, word };
+  const params: Record<string, string> = { word };
   if (decisionId) params.decision_id = decisionId;
   const query = new URLSearchParams(params).toString();
   return getJson<DrillTransferContext>(
@@ -293,7 +285,7 @@ export function getDrillTransferContext(
  *
  * V3.68 (P1-02): `decisionId` cierra la decisión con el `outcome` del intento. */
 export function submitDrillTransferAttempt(
-  userId: string,
+  _userId: string,
   word: string,
   text: string,
   contextId: string,
@@ -305,9 +297,8 @@ export function submitDrillTransferAttempt(
   contextInstance?: string,
   decisionId?: string,
 ): Promise<DrillTransferAttempt> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<DrillTransferAttempt>(
-    `/api/vocabulary/drill/transfer-attempt?${query}`,
+    "/api/vocabulary/drill/transfer-attempt",
     {
       word,
       text,
@@ -328,16 +319,15 @@ export function submitDrillTransferAttempt(
  * `completed`) y NUNCA es un error — el drill no puede romperse por telemetría
  * del ciclo de vida. */
 export async function markDrillDecisionEvent(
-  userId: string,
+  _userId: string,
   decisionId: string,
   event: "started" | "abandoned",
   options: { targetId?: string; activity?: string } = {},
 ): Promise<boolean> {
   if (!decisionId) return false;
-  const query = new URLSearchParams({ user_id: userId }).toString();
   try {
     const out = await postJson<{ applied?: boolean }>(
-      `/api/vocabulary/drill/decision-lifecycle?${query}`,
+      "/api/vocabulary/drill/decision-lifecycle",
       {
         decision_id: decisionId,
         event,
@@ -354,11 +344,11 @@ export async function markDrillDecisionEvent(
 
 /** El alumno abrió el peldaño (V3.68, P1-02): `served → started`. */
 export function markDrillStarted(
-  userId: string,
+  _userId: string,
   decisionId: string,
   options: { targetId?: string; activity?: string } = {},
 ): Promise<boolean> {
-  return markDrillDecisionEvent(userId, decisionId, "started", options);
+  return markDrillDecisionEvent(_userId, decisionId, "started", options);
 }
 
 /** El alumno salió del peldaño sin completarlo (V3.68, P1-02):
@@ -366,9 +356,9 @@ export function markDrillStarted(
  * ya está `completed` (la terminalidad la decide la FSM, no el cliente), de modo
  * que un cierre tardío nunca borra una medición. */
 export function markDrillAbandoned(
-  userId: string,
+  _userId: string,
   decisionId: string,
   options: { targetId?: string; activity?: string } = {},
 ): Promise<boolean> {
-  return markDrillDecisionEvent(userId, decisionId, "abandoned", options);
+  return markDrillDecisionEvent(_userId, decisionId, "abandoned", options);
 }

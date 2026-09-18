@@ -33,3 +33,16 @@ class UserUpdate(BaseModel):
     avatar_color: str | None = Field(default=None, max_length=32)
     avatar_emoji: str | None = Field(default=None, max_length=16)
     avatar_image: str | None = Field(default=None, max_length=MAX_AVATAR_IMAGE_CHARS)
+
+
+class SessionCreate(BaseModel):
+    """Cuerpo de `POST /api/session`: el perfil que la petición **reclama**.
+
+    No es una credencial —el producto no tiene ninguna (Fase 3)— y conviene no
+    confundirlo: es la declaración de con quién quieres abrir sesión, y el
+    servidor la firma. Lo que cambia respecto a V3.73.x es que, a partir de ahí,
+    la identidad viaja en una cookie que el cliente **no puede forjar**, en vez
+    de en la URL (`docs/audit/PLAN-P0-IDENTIDAD.md` §4).
+    """
+
+    user_id: str = Field(min_length=1, max_length=64)

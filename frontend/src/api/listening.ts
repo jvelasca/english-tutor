@@ -22,11 +22,11 @@ const TIMEOUT_READ_MS = 10000;
 export type ListeningQuestionMode = "all" | "failed" | "mastered";
 
 export function getListeningQuestion(
-  userId: string,
+  _userId: string,
   level?: string | null,
   mode?: ListeningQuestionMode,
 ): Promise<ListeningQuestion> {
-  const params = new URLSearchParams({ user_id: userId });
+  const params = new URLSearchParams();
   // `level` entra en juego en el repaso de un nivel ya completado: el selector
   // rota por las frases del nivel en lugar de seguir al Student Model.
   if (level) params.set("level", level);
@@ -34,32 +34,32 @@ export function getListeningQuestion(
   // han intentado pero nunca acertado. `mode="mastered"` (repasar lo aprendido)
   // lo restringe a las acertadas alguna vez. Solo se envían cuando se indica.
   if (mode && mode !== "all") params.set("mode", mode);
+  const query = params.toString();
   return withTimeout(
-    getJson<ListeningQuestion>(`/api/listening/question?${params.toString()}`),
+    getJson<ListeningQuestion>(`/api/listening/question${query ? `?${query}` : ""}`),
     TIMEOUT_QUESTION_MS,
     "get question",
   );
 }
 
 export function getListeningLevelItems(
-  userId: string,
+  _userId: string,
   level: string,
 ): Promise<ListeningLevelItems> {
-  const params = new URLSearchParams({ user_id: userId, level });
+  const params = new URLSearchParams({ level });
   return getJson<ListeningLevelItems>(`/api/listening/items?${params.toString()}`);
 }
 
 export function submitListeningAnswer(
-  userId: string,
+  _userId: string,
   questionId: string,
   answerIndex: number,
   responseTimeMs: number | null = null,
   replayCount = 0,
   opts: ListeningSupportMetadata = {},
 ): Promise<ListeningAnswerResponse> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
-    postJson<ListeningAnswerResponse>(`/api/listening/answer?${query}`, {
+    postJson<ListeningAnswerResponse>("/api/listening/answer", {
       question_id: questionId,
       answer_index: answerIndex,
       response_time_ms: responseTimeMs,
@@ -80,10 +80,9 @@ export function submitListeningAnswer(
   );
 }
 
-export function getListeningStats(userId: string): Promise<ListeningStats> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
+export function getListeningStats(_userId: string): Promise<ListeningStats> {
   return withTimeout(
-    getJson<ListeningStats>(`/api/listening/stats?${query}`),
+    getJson<ListeningStats>("/api/listening/stats"),
     TIMEOUT_READ_MS,
     "listening stats",
   );
@@ -91,15 +90,14 @@ export function getListeningStats(userId: string): Promise<ListeningStats> {
 
 function submitProduction(
   endpoint: string,
-  userId: string,
+  _userId: string,
   questionId: string,
   transcript: string,
   opts: ListeningSupportMetadata = {},
   aux: ListeningShadowingAux = {},
 ): Promise<ListeningProductionResult> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
-    postJson<ListeningProductionResult>(`${endpoint}?${query}`, {
+    postJson<ListeningProductionResult>(endpoint, {
       question_id: questionId,
       transcript,
       ...(opts.stage !== undefined ? { stage: opts.stage } : {}),
@@ -123,14 +121,14 @@ function submitProduction(
 }
 
 export function submitListeningDictation(
-  userId: string,
+  _userId: string,
   questionId: string,
   transcript: string,
   opts: ListeningSupportMetadata = {},
 ): Promise<ListeningProductionResult> {
   return submitProduction(
     "/api/listening/dictation",
-    userId,
+    _userId,
     questionId,
     transcript,
     opts,
@@ -138,7 +136,7 @@ export function submitListeningDictation(
 }
 
 export function submitListeningShadowing(
-  userId: string,
+  _userId: string,
   questionId: string,
   transcript: string,
   opts: ListeningSupportMetadata = {},
@@ -146,7 +144,7 @@ export function submitListeningShadowing(
 ): Promise<ListeningProductionResult> {
   return submitProduction(
     "/api/listening/shadowing",
-    userId,
+    _userId,
     questionId,
     transcript,
     opts,
@@ -165,11 +163,10 @@ export interface ListeningShadowingAux {
 }
 
 export function getListeningDiagnostic(
-  userId: string,
+  _userId: string,
 ): Promise<ListeningDiagnostic> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
-    getJson<ListeningDiagnostic>(`/api/listening/diagnostic?${query}`),
+    getJson<ListeningDiagnostic>("/api/listening/diagnostic"),
     TIMEOUT_READ_MS,
     "listening diagnostic",
   );
@@ -177,14 +174,14 @@ export function getListeningDiagnostic(
 
 export function getListeningAudioUrl(
   questionId: string,
-  userId: string,
+  _userId: string,
   variant = "normal",
 ): string {
-  const params = new URLSearchParams({ user_id: userId });
   // Retrocompatible: sin `variant` (o con "normal") la URL es la misma de antes.
-  if (variant !== "normal") {
-    params.set("variant", variant);
+  if (variant === "normal") {
+    return `/api/listening/audio/${questionId}`;
   }
+  const params = new URLSearchParams({ variant });
   return `/api/listening/audio/${questionId}?${params.toString()}`;
 }
 
@@ -194,26 +191,24 @@ export function getListeningAudioUrl(
 // permite hacer polling hasta `done`/`error`.
 
 export function addRouteExtras(
-  userId: string,
+  _userId: string,
   level: string,
   count: number,
 ): Promise<ListeningExtrasJob> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return postJson<ListeningExtrasJob>(
-    `/api/listening/routes/${level}/extras?${query}`,
+    `/api/listening/routes/${level}/extras`,
     { count },
   );
 }
 
 export function getRouteExtrasJob(
-  userId: string,
+  _userId: string,
   level: string,
   jobId: string,
 ): Promise<ListeningExtrasJob> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return withTimeout(
     getJson<ListeningExtrasJob>(
-      `/api/listening/routes/${level}/extras/jobs/${jobId}?${query}`,
+      `/api/listening/routes/${level}/extras/jobs/${jobId}`,
     ),
     TIMEOUT_READ_MS,
     "extras job",
@@ -221,22 +216,20 @@ export function getRouteExtrasJob(
 }
 
 export function listRouteExtras(
-  userId: string,
+  _userId: string,
   level: string,
 ): Promise<ListeningRouteExtras> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return getJson<ListeningRouteExtras>(
-    `/api/listening/routes/${level}/extras?${query}`,
+    `/api/listening/routes/${level}/extras`,
   );
 }
 
 export function removeRouteExtra(
-  userId: string,
+  _userId: string,
   level: string,
   questionId: string,
 ): Promise<ListeningRouteExtras> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
   return deleteJson<ListeningRouteExtras>(
-    `/api/listening/routes/${level}/extras/${questionId}?${query}`,
+    `/api/listening/routes/${level}/extras/${questionId}`,
   );
 }

@@ -35,11 +35,11 @@ describe("resolveInitialUserId", () => {
     expect(resolveInitialUserId([])).toBeNull();
   });
 
-  it("prefiere el perfil recordado cuando existe", () => {
+  it("prefiere el perfil de la sesión cuando existe", () => {
     expect(resolveInitialUserId([user("a"), user("b")], "b")).toBe("b");
   });
 
-  it("ignora el perfil recordado si ya no existe", () => {
+  it("ignora el perfil de la sesión si ya no existe", () => {
     expect(resolveInitialUserId([user("a"), user("b")], "desaparecido")).toBeNull();
   });
 });

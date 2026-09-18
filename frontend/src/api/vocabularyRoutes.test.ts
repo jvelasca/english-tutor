@@ -15,7 +15,7 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("vocabularyRoutes api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getVocabularyQuestion llama con user_id en la query", async () => {
+  it("getVocabularyQuestion llama sin user_id en la query", async () => {
     const fn = mockFetch(true, {
       check_id: "a1-m01-u01-l01-o01-c01",
       level: "A1",
@@ -25,7 +25,7 @@ describe("vocabularyRoutes api", () => {
     });
     await getVocabularyQuestion("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/routes/question?user_id=u1");
+    expect(url).toBe("/api/vocabulary/routes/question");
   });
 
   it("getVocabularyQuestion añade level y mode=failed solo cuando se piden", async () => {
@@ -38,7 +38,7 @@ describe("vocabularyRoutes api", () => {
     await getVocabularyQuestion("u1", "A1", "failed");
     const [url] = fn.mock.calls[0];
     expect(url).toBe(
-      "/api/vocabulary/routes/question?user_id=u1&level=A1&mode=failed",
+      "/api/vocabulary/routes/question?level=A1&mode=failed",
     );
   });
 
@@ -51,17 +51,17 @@ describe("vocabularyRoutes api", () => {
     });
     await getVocabularyQuestion("u1", "A1", "all");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/routes/question?user_id=u1&level=A1");
+    expect(url).toBe("/api/vocabulary/routes/question?level=A1");
   });
 
-  it("getVocabularyStats llama con user_id en la query", async () => {
+  it("getVocabularyStats llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { attempts: 1, passed: 1, accuracy: 100 });
     await getVocabularyStats("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/routes/stats?user_id=u1");
+    expect(url).toBe("/api/vocabulary/routes/stats");
   });
 
-  it("getVocabularyLevelItems llama a /items con user_id y level", async () => {
+  it("getVocabularyLevelItems llama a /items solo con level", async () => {
     const fn = mockFetch(true, {
       level: "A1",
       total: 2,
@@ -73,7 +73,7 @@ describe("vocabularyRoutes api", () => {
     });
     await getVocabularyLevelItems("u1", "A1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/routes/items?user_id=u1&level=A1");
+    expect(url).toBe("/api/vocabulary/routes/items?level=A1");
   });
 
   it("submitVocabularyAttempt envía JSON con check_id y selected_index", async () => {
@@ -90,7 +90,7 @@ describe("vocabularyRoutes api", () => {
     });
     await submitVocabularyAttempt("u1", "a1-m01-u01-l01-o01-c01", 1);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/vocabulary/routes/attempt?user_id=u1");
+    expect(url).toBe("/api/vocabulary/routes/attempt");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body)).toEqual({
       check_id: "a1-m01-u01-l01-o01-c01",

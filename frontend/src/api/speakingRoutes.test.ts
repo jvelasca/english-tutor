@@ -20,11 +20,11 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("speakingRoutes api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getSpeakingQuestion llama con user_id en la query", async () => {
+  it("getSpeakingQuestion llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { id: "s1", level: "A1", phrase: "Hi" });
     await getSpeakingQuestion("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/question?user_id=u1");
+    expect(url).toBe("/api/speaking/question");
   });
 
   it("getSpeakingQuestion añade level y mode=failed solo cuando se piden", async () => {
@@ -32,7 +32,7 @@ describe("speakingRoutes api", () => {
     await getSpeakingQuestion("u1", "A1", "failed");
     const [url] = fn.mock.calls[0];
     expect(url).toBe(
-      "/api/speaking/question?user_id=u1&level=A1&mode=failed",
+      "/api/speaking/question?level=A1&mode=failed",
     );
   });
 
@@ -40,17 +40,17 @@ describe("speakingRoutes api", () => {
     const fn = mockFetch(true, { id: "s1", level: "A1", phrase: "Hi" });
     await getSpeakingQuestion("u1", "A1", "all");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/question?user_id=u1&level=A1");
+    expect(url).toBe("/api/speaking/question?level=A1");
   });
 
-  it("getSpeakingStats llama con user_id en la query", async () => {
+  it("getSpeakingStats llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { attempts: 1, passed: 1, accuracy: 100 });
     await getSpeakingStats("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/stats?user_id=u1");
+    expect(url).toBe("/api/speaking/stats");
   });
 
-  it("getSpeakingLevelItems llama a /items con user_id y level", async () => {
+  it("getSpeakingLevelItems llama a /items solo con level", async () => {
     const fn = mockFetch(true, {
       level: "A1",
       total: 2,
@@ -62,15 +62,15 @@ describe("speakingRoutes api", () => {
     });
     await getSpeakingLevelItems("u1", "A1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/items?user_id=u1&level=A1");
+    expect(url).toBe("/api/speaking/items?level=A1");
   });
 
-  it("getSpeakingAudioUrl construye la URL del audio con user_id y kind", () => {
+  it("getSpeakingAudioUrl construye la URL del audio con kind", () => {
     expect(getSpeakingAudioUrl("s1", "u1")).toBe(
-      "/api/speaking/audio/s1?user_id=u1&kind=opening",
+      "/api/speaking/audio/s1?kind=opening",
     );
     expect(getSpeakingAudioUrl("s1", "u1", "model")).toBe(
-      "/api/speaking/audio/s1?user_id=u1&kind=model",
+      "/api/speaking/audio/s1?kind=model",
     );
   });
 
@@ -89,7 +89,7 @@ describe("speakingRoutes api", () => {
     const blob = new Blob(["audio"], { type: "audio/webm" });
     await submitSpeakingAttempt("u1", "s1", blob);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/attempt?user_id=u1");
+    expect(url).toBe("/api/speaking/attempt");
     expect(init.body).toBeInstanceOf(FormData);
     const form = init.body as FormData;
     expect(form.get("phrase_id")).toBe("s1");
@@ -111,7 +111,7 @@ describe("speakingRoutes api", () => {
     });
     await addSpeakingRouteExtras("u1", "A1", 10);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/routes/A1/extras?user_id=u1");
+    expect(url).toBe("/api/speaking/routes/A1/extras");
     expect(JSON.parse(init.body as string)).toEqual({ count: 10 });
   });
 
@@ -126,20 +126,20 @@ describe("speakingRoutes api", () => {
     });
     await getSpeakingRouteExtrasJob("u1", "A1", "j1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/speaking/routes/A1/extras/jobs/j1?user_id=u1");
+    expect(url).toBe("/api/speaking/routes/A1/extras/jobs/j1");
   });
 
   it("listSpeakingRouteExtras y removeSpeakingRouteExtra usan DELETE", async () => {
     const fnList = mockFetch(true, { level: "A1", total: 1, phrase_ids: ["s2"] });
     await listSpeakingRouteExtras("u1", "A1");
     expect(fnList.mock.calls[0][0]).toBe(
-      "/api/speaking/routes/A1/extras?user_id=u1",
+      "/api/speaking/routes/A1/extras",
     );
 
     const fnDel = mockFetch(true, { level: "A1", total: 0, phrase_ids: [] });
     await removeSpeakingRouteExtra("u1", "A1", "s2");
     const [url, init] = fnDel.mock.calls[0];
-    expect(url).toBe("/api/speaking/routes/A1/extras/s2?user_id=u1");
+    expect(url).toBe("/api/speaking/routes/A1/extras/s2");
     expect(init.method).toBe("DELETE");
   });
 });

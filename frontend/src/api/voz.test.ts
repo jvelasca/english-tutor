@@ -71,14 +71,14 @@ describe("api/voz · V3.39 idioma de la voz", () => {
     await speak("¿Dónde está el hotel?", "u1", "es");
 
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/tts?user_id=u1");
+    expect(url).toBe("/api/tts");
     expect(JSON.parse(init.body as string)).toEqual({
       text: "¿Dónde está el hotel?",
       language: "es",
     });
   });
 
-  it("speak usa inglés por defecto y sin user_id no añade query", async () => {
+  it("speak usa inglés por defecto y no añade query", async () => {
     vi.stubGlobal("Audio", FakeAudio);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:fake");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});

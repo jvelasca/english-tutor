@@ -19,7 +19,7 @@ function mockFetch(ok: boolean, data: unknown) {
 describe("listening api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("getListeningQuestion llama con user_id en la query", async () => {
+  it("getListeningQuestion llama sin user_id en la query", async () => {
     const fn = mockFetch(true, {
       id: "l1",
       skill: "numbers",
@@ -30,7 +30,7 @@ describe("listening api", () => {
     });
     await getListeningQuestion("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/question?user_id=u1");
+    expect(url).toBe("/api/listening/question");
   });
 
   it("submitListeningAnswer envía question_id, answer_index y métricas", async () => {
@@ -42,7 +42,7 @@ describe("listening api", () => {
     });
     await submitListeningAnswer("u1", "l1", 1, 1200, 2);
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/answer?user_id=u1");
+    expect(url).toBe("/api/listening/answer");
     expect(JSON.parse(init.body as string)).toEqual({
       question_id: "l1",
       answer_index: 1,
@@ -51,14 +51,14 @@ describe("listening api", () => {
     });
   });
 
-  it("getListeningStats llama con user_id en la query", async () => {
+  it("getListeningStats llama sin user_id en la query", async () => {
     const fn = mockFetch(true, { attempts: 1, correct: 1, accuracy: 100 });
     await getListeningStats("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/stats?user_id=u1");
+    expect(url).toBe("/api/listening/stats");
   });
 
-  it("getListeningDiagnostic llama con user_id en la query", async () => {
+  it("getListeningDiagnostic llama sin user_id en la query", async () => {
     const fn = mockFetch(true, {
       subskills: [],
       weak: [],
@@ -66,24 +66,24 @@ describe("listening api", () => {
     });
     await getListeningDiagnostic("u1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/diagnostic?user_id=u1");
+    expect(url).toBe("/api/listening/diagnostic");
   });
 
   it("getListeningQuestion añade mode=failed solo cuando se pide", async () => {
     const fn = mockFetch(true, { id: "l1", level: "A1", script: "Hi" });
     await getListeningQuestion("u1", "A1", "failed");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/question?user_id=u1&level=A1&mode=failed");
+    expect(url).toBe("/api/listening/question?level=A1&mode=failed");
   });
 
   it("getListeningQuestion con level y sin mode no añade mode (retrocompatible)", async () => {
     const fn = mockFetch(true, { id: "l1", level: "A1", script: "Hi" });
     await getListeningQuestion("u1", "A1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/question?user_id=u1&level=A1");
+    expect(url).toBe("/api/listening/question?level=A1");
   });
 
-  it("getListeningLevelItems llama a /items con user_id y level", async () => {
+  it("getListeningLevelItems llama a /items solo con level", async () => {
     const fn = mockFetch(true, {
       level: "A1",
       total: 2,
@@ -95,22 +95,22 @@ describe("listening api", () => {
     });
     await getListeningLevelItems("u1", "A1");
     const [url] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/items?user_id=u1&level=A1");
+    expect(url).toBe("/api/listening/items?level=A1");
   });
 
-  it("getListeningAudioUrl construye la URL del audio con user_id", () => {
+  it("getListeningAudioUrl construye la URL del audio sin user_id", () => {
     expect(getListeningAudioUrl("l1", "u1")).toBe(
-      "/api/listening/audio/l1?user_id=u1",
+      "/api/listening/audio/l1",
     );
   });
 
   it("getListeningAudioUrl añade variant cuando se pasa (y omite normal)", () => {
     expect(getListeningAudioUrl("l1", "u1", "fast")).toBe(
-      "/api/listening/audio/l1?user_id=u1&variant=fast",
+      "/api/listening/audio/l1?variant=fast",
     );
     // La variante por defecto no cambia la URL (retrocompatible).
     expect(getListeningAudioUrl("l1", "u1", "normal")).toBe(
-      "/api/listening/audio/l1?user_id=u1",
+      "/api/listening/audio/l1",
     );
   });
 
@@ -123,7 +123,7 @@ describe("listening api", () => {
     });
     await submitListeningDictation("u1", "l18", "hello world");
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/dictation?user_id=u1");
+    expect(url).toBe("/api/listening/dictation");
     expect(JSON.parse(init.body as string)).toEqual({
       question_id: "l18",
       transcript: "hello world",
@@ -139,7 +139,7 @@ describe("listening api", () => {
     });
     await submitListeningShadowing("u1", "l19", "could you repeat that");
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/shadowing?user_id=u1");
+    expect(url).toBe("/api/listening/shadowing");
     expect(JSON.parse(init.body as string)).toEqual({
       question_id: "l19",
       transcript: "could you repeat that",
@@ -161,7 +161,7 @@ describe("listening api", () => {
       { durationMs: 2340, speechRate: 152 },
     );
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe("/api/listening/shadowing?user_id=u1");
+    expect(url).toBe("/api/listening/shadowing");
     expect(JSON.parse(init.body as string)).toEqual({
       question_id: "l19",
       transcript: "could you repeat that",

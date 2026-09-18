@@ -321,7 +321,7 @@ export default function App() {
         <VoiceDownloadDialog />
 
         {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
-            cookie recordada y varios perfiles, o todavía sin perfiles), se pide
+            sesión abierta y varios perfiles, o todavía sin perfiles), se pide
             elegir o crear uno antes de usar la app. */}
         {usersLoaded && !currentUserId && (
           <ProfileGate users={users} onSelect={selectUser} onCreate={addUser} />

@@ -13,6 +13,11 @@ function currentLang(): Lang {
 interface RequestOptions {
   /** 404 → resuelve `null` en vez de lanzar (V3.18, D7.1). */
   notFoundAsNull?: boolean;
+  /**
+   * 401 → resuelve `null` en vez de lanzar (V3.75). Lo usa `GET /api/session`:
+   * «no hay sesión» no es un error, es el estado normal del primer arranque.
+   */
+  unauthorizedAsNull?: boolean;
 }
 
 async function request<T>(
@@ -23,6 +28,9 @@ async function request<T>(
   const res = await fetch(url, init);
   if (!res.ok) {
     if (options?.notFoundAsNull && res.status === 404) {
+      return null as T;
+    }
+    if (options?.unauthorizedAsNull && res.status === 401) {
       return null as T;
     }
     // El rate limiter del backend devuelve un 429 con `code: RATE_LIMITED`
@@ -92,6 +100,19 @@ export function getJsonNullable<T>(
 ): Promise<T | null> {
   return request<T | null>(url, headers ? { headers } : undefined, {
     notFoundAsNull: true,
+  });
+}
+
+/**
+ * GET que resuelve `null` cuando el backend responde 401 (V3.75): sin sesión no
+ * es un error, es «todavía no hay perfil». Lo usa `api/session.ts`.
+ */
+export function getJsonOptional<T>(
+  url: string,
+  headers?: Record<string, string>,
+): Promise<T | null> {
+  return request<T | null>(url, headers ? { headers } : undefined, {
+    unauthorizedAsNull: true,
   });
 }
 

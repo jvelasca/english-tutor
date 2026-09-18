@@ -49,40 +49,36 @@ import type {
   WritingLevelOut,
 } from "../types/api";
 
-function userQuery(userId: string): string {
-  return `?${new URLSearchParams({ user_id: userId }).toString()}`;
-}
-
-export function getLevels(userId: string): Promise<LevelsResponse> {
-  return getJson<LevelsResponse>(`/api/academy/levels${userQuery(userId)}`);
+export function getLevels(_userId: string): Promise<LevelsResponse> {
+  return getJson<LevelsResponse>(`/api/academy/levels`);
 }
 
 export function getLevelDetail(
-  userId: string,
+  _userId: string,
   levelId: string,
 ): Promise<LevelDetail> {
   return getJson<LevelDetail>(
-    `/api/academy/levels/${levelId}${userQuery(userId)}`,
+    `/api/academy/levels/${levelId}`,
   );
 }
 
-export function getCourseMap(userId: string, levelId: string): Promise<CourseMap> {
+export function getCourseMap(_userId: string, levelId: string): Promise<CourseMap> {
   return getJson<CourseMap>(
-    `/api/academy/course/${levelId}${userQuery(userId)}`,
+    `/api/academy/course/${levelId}`,
   );
 }
 
-export function enroll(userId: string, levelId: string): Promise<Enrollment> {
-  return postJson<Enrollment>(`/api/academy/enroll${userQuery(userId)}`, {
+export function enroll(_userId: string, levelId: string): Promise<Enrollment> {
+  return postJson<Enrollment>(`/api/academy/enroll`, {
     level_id: levelId,
   });
 }
 
 export function getNextObjective(
-  userId: string,
+  _userId: string,
   levelId: string,
 ): Promise<NextObjective> {
-  const params = new URLSearchParams({ user_id: userId, level_id: levelId });
+  const params = new URLSearchParams({ level_id: levelId });
   return getJson<NextObjective>(`/api/academy/next?${params.toString()}`);
 }
 
@@ -91,29 +87,29 @@ export function getPlacement(): Promise<Placement> {
 }
 
 export function submitPlacement(
-  userId: string,
+  _userId: string,
   answers: Record<string, number>,
 ): Promise<PlacementResult> {
   return postJson<PlacementResult>(
-    `/api/academy/placement/submit${userQuery(userId)}`,
+    `/api/academy/placement/submit`,
     { answers },
   );
 }
 
-export function startAdaptivePlacement(userId: string): Promise<PlacementStart> {
+export function startAdaptivePlacement(_userId: string): Promise<PlacementStart> {
   return postJson<PlacementStart>(
-    `/api/academy/placement/start${userQuery(userId)}`,
+    `/api/academy/placement/start`,
     {},
   );
 }
 
 export function nextAdaptivePlacement(
-  userId: string,
+  _userId: string,
   answers: Record<string, number>,
   sessionId: number,
 ): Promise<PlacementAdaptive> {
   return postJson<PlacementAdaptive>(
-    `/api/academy/placement/next${userQuery(userId)}`,
+    `/api/academy/placement/next`,
     { answers, session_id: sessionId },
   );
 }
@@ -123,19 +119,19 @@ export function getExam(levelId: string): Promise<Exam> {
 }
 
 export function submitExam(
-  userId: string,
+  _userId: string,
   levelId: string,
   answers: Record<string, number>,
 ): Promise<ExamResult> {
   return postJson<ExamResult>(
-    `/api/academy/exam/${levelId}/submit${userQuery(userId)}`,
+    `/api/academy/exam/${levelId}/submit`,
     { answers },
   );
 }
 
-export function getLevelCompletions(userId: string): Promise<LevelCompletion[]> {
+export function getLevelCompletions(_userId: string): Promise<LevelCompletion[]> {
   return getJson<{ completions: LevelCompletion[] }>(
-    `/api/academy/level-completions${userQuery(userId)}`,
+    `/api/academy/level-completions`,
   ).then((r) => r.completions);
 }
 
@@ -152,99 +148,99 @@ export function getStudyPlan(
 }
 
 export function recordAttempts(
-  userId: string,
+  _userId: string,
   levelId: string,
   objectiveId: string,
   results: AttemptEntry[],
 ): Promise<AttemptResponse> {
   return postJson<AttemptResponse>(
-    `/api/academy/attempts${userQuery(userId)}`,
+    `/api/academy/attempts`,
     { level_id: levelId, objective_id: objectiveId, results },
   );
 }
 
 export function completeLesson(
-  userId: string,
+  _userId: string,
   levelId: string,
   objectiveId: string,
 ): Promise<LessonCompleted> {
   return postJson<LessonCompleted>(
-    `/api/academy/lessons/complete${userQuery(userId)}`,
+    `/api/academy/lessons/complete`,
     { level_id: levelId, objective_id: objectiveId },
   );
 }
 
 export function submitObjectiveAssessment(
-  userId: string,
+  _userId: string,
   levelId: string,
   objectiveId: string,
   answers: Record<string, number>,
 ): Promise<ObjectiveAssessmentResult> {
   return postJson<ObjectiveAssessmentResult>(
-    `/api/academy/objective/assessment${userQuery(userId)}`,
+    `/api/academy/objective/assessment`,
     { level_id: levelId, objective_id: objectiveId, answers },
   );
 }
 
-export function getStudentModel(userId: string): Promise<StudentModel> {
-  return getJson<StudentModel>(`/api/academy/student-model${userQuery(userId)}`);
+export function getStudentModel(_userId: string): Promise<StudentModel> {
+  return getJson<StudentModel>(`/api/academy/student-model`);
 }
 
-export function getCefrLadder(userId: string): Promise<CefrLadder> {
-  return getJson<CefrLadder>(`/api/academy/cefr-ladder${userQuery(userId)}`);
+export function getCefrLadder(_userId: string): Promise<CefrLadder> {
+  return getJson<CefrLadder>(`/api/academy/cefr-ladder`);
 }
 
 export function getSpeakingDiagnostic(
-  userId: string,
+  _userId: string,
 ): Promise<SpeakingDiagnostic> {
   return getJson<SpeakingDiagnostic>(
-    `/api/academy/speaking/diagnostic${userQuery(userId)}`,
+    `/api/academy/speaking/diagnostic`,
   );
 }
 
-export function getSpeakingLevel(userId: string): Promise<SpeakingLevelOut> {
+export function getSpeakingLevel(_userId: string): Promise<SpeakingLevelOut> {
   return getJson<SpeakingLevelOut>(
-    `/api/academy/speaking/level${userQuery(userId)}`,
+    `/api/academy/speaking/level`,
   );
 }
 
 export function getSpeakingJourney(
-  userId: string,
+  _userId: string,
 ): Promise<SpeakingJourneyOut> {
   return getJson<SpeakingJourneyOut>(
-    `/api/academy/speaking/journey${userQuery(userId)}`,
+    `/api/academy/speaking/journey`,
   );
 }
 
 export function getSpeakingEndurance(
-  userId: string,
+  _userId: string,
 ): Promise<ConversationEndurance> {
   return getJson<ConversationEndurance>(
-    `/api/academy/speaking/endurance${userQuery(userId)}`,
+    `/api/academy/speaking/endurance`,
   );
 }
 
 /** Catálogo de escenarios comunicativos (Speaking 3.0): contenido estático. */
-export function getSpeakingScenarios(userId: string): Promise<SpeakingScenarios> {
+export function getSpeakingScenarios(_userId: string): Promise<SpeakingScenarios> {
   return getJson<SpeakingScenarios>(
-    `/api/academy/speaking/scenarios${userQuery(userId)}`,
+    `/api/academy/speaking/scenarios`,
   );
 }
 
 /** Abre una misión de speaking (V2.9) desde un escenario. */
 export function startSpeakingMission(
-  userId: string,
+  _userId: string,
   scenarioId: string,
 ): Promise<SpeakingMissionState> {
   return postJson<SpeakingMissionState>(
-    `/api/academy/speaking/mission/start${userQuery(userId)}`,
+    `/api/academy/speaking/mission/start`,
     { scenario_id: scenarioId },
   );
 }
 
 /** Primer intento de la misión → evaluation + drills. */
 export function submitSpeakingMissionAttempt(
-  userId: string,
+  _userId: string,
   sessionId: number,
   heard: string,
   durationSeconds?: number,
@@ -255,14 +251,14 @@ export function submitSpeakingMissionAttempt(
   };
   if (durationSeconds != null) body.duration_seconds = durationSeconds;
   return postJson<SpeakingMissionState>(
-    `/api/academy/speaking/mission/attempt${userQuery(userId)}`,
+    `/api/academy/speaking/mission/attempt`,
     body,
   );
 }
 
 /** Retry tras el drill → improvement. */
 export function submitSpeakingMissionRetry(
-  userId: string,
+  _userId: string,
   sessionId: number,
   heard: string,
   durationSeconds?: number,
@@ -273,34 +269,35 @@ export function submitSpeakingMissionRetry(
   };
   if (durationSeconds != null) body.duration_seconds = durationSeconds;
   return postJson<SpeakingMissionState>(
-    `/api/academy/speaking/mission/retry${userQuery(userId)}`,
+    `/api/academy/speaking/mission/retry`,
     body,
   );
 }
 
 export function getSpeakingMission(
-  userId: string,
+  _userId: string,
   sessionId: number,
 ): Promise<SpeakingMissionState> {
   return getJson<SpeakingMissionState>(
-    `/api/academy/speaking/mission/${sessionId}${userQuery(userId)}`,
+    `/api/academy/speaking/mission/${sessionId}`,
   );
 }
 
 /** Escalera Assessment 2.0 (formative → retention). */
 export function getAssessmentV2Ladder(
-  userId: string,
+  _userId: string,
   levelId?: string,
 ): Promise<AssessmentV2Ladder> {
-  const params = new URLSearchParams({ user_id: userId });
+  const params = new URLSearchParams();
   if (levelId) params.set("level_id", levelId);
+  const query = params.toString();
   return getJson<AssessmentV2Ladder>(
-    `/api/academy/assessment/v2/ladder?${params.toString()}`,
+    `/api/academy/assessment/v2/ladder${query ? `?${query}` : ""}`,
   );
 }
 
 export function startAssessmentV2(
-  userId: string,
+  _userId: string,
   kind: string,
   levelId: string,
   opts?: {
@@ -319,64 +316,63 @@ export function startAssessmentV2(
     body.source_session_id = opts.sourceSessionId;
   }
   return postJson<AssessmentV2State>(
-    `/api/academy/assessment/v2/start${userQuery(userId)}`,
+    `/api/academy/assessment/v2/start`,
     body,
   );
 }
 
 export function submitAssessmentV2(
-  userId: string,
+  _userId: string,
   sessionId: number,
   answers: Record<string, number>,
 ): Promise<AssessmentV2State> {
   return postJson<AssessmentV2State>(
-    `/api/academy/assessment/v2/submit${userQuery(userId)}`,
+    `/api/academy/assessment/v2/submit`,
     { session_id: sessionId, answers },
   );
 }
 
 export function getAssessmentV2(
-  userId: string,
+  _userId: string,
   sessionId: number,
 ): Promise<AssessmentV2State> {
   return getJson<AssessmentV2State>(
-    `/api/academy/assessment/v2/${sessionId}${userQuery(userId)}`,
+    `/api/academy/assessment/v2/${sessionId}`,
   );
 }
 
 /** Cola FSRS due (V2.11). */
 export function getFsrsDue(
-  userId: string,
+  _userId: string,
   limit = 20,
 ): Promise<FsrsDue> {
   const params = new URLSearchParams({
-    user_id: userId,
     limit: String(limit),
   });
   return getJson<FsrsDue>(`/api/academy/fsrs/due?${params.toString()}`);
 }
 
-export function getFsrsSummary(userId: string): Promise<FsrsSummary> {
+export function getFsrsSummary(_userId: string): Promise<FsrsSummary> {
   return getJson<FsrsSummary>(
-    `/api/academy/fsrs/summary${userQuery(userId)}`,
+    `/api/academy/fsrs/summary`,
   );
 }
 
-export function syncFsrs(userId: string): Promise<FsrsSummary> {
+export function syncFsrs(_userId: string): Promise<FsrsSummary> {
   return postJson<FsrsSummary>(
-    `/api/academy/fsrs/sync${userQuery(userId)}`,
+    `/api/academy/fsrs/sync`,
     {},
   );
 }
 
 export function reviewFsrsCard(
-  userId: string,
+  _userId: string,
   targetType: string,
   targetId: string,
   grade: number,
 ): Promise<FsrsReview> {
   return postJson<FsrsReview>(
-    `/api/academy/fsrs/review${userQuery(userId)}`,
+    `/api/academy/fsrs/review`,
     { target_type: targetType, target_id: targetId, grade },
   );
 }
@@ -384,22 +380,21 @@ export function reviewFsrsCard(
 // --- Review/SRS por unidad (V3.16) ---
 
 /** Plan de repaso por unidad (V3.16; V3.18/O3: agregado por niveles). */
-export function getUnitReviewPlan(userId: string): Promise<UnitReviewPlan> {
+export function getUnitReviewPlan(_userId: string): Promise<UnitReviewPlan> {
   return getJson<UnitReviewPlan>(
-    `/api/academy/review/unit-plan${userQuery(userId)}`,
+    `/api/academy/review/unit-plan`,
   );
 }
 
 /** Sesión de micro-review (checks MC oficiales, sin correct_index). `levelId`
  *  opcional: nivel real donde vive la unidad (anterior al actual, O3). */
 export function getUnitMicroReview(
-  userId: string,
+  _userId: string,
   unitId: string,
   windowDays: number,
   levelId?: string,
 ): Promise<MicroReviewSession> {
   const params = new URLSearchParams({
-    user_id: userId,
     window_days: String(windowDays),
   });
   if (levelId) params.set("level_id", levelId);
@@ -411,14 +406,14 @@ export function getUnitMicroReview(
 /** Envía las respuestas del micro-review; el servidor puntúa (premisa 21).
  *  `levelId` opcional: nivel real donde vive la unidad (O3). */
 export function submitUnitMicroReview(
-  userId: string,
+  _userId: string,
   unitId: string,
   windowDays: number,
   answers: Record<string, number>,
   levelId?: string,
 ): Promise<MicroReviewResult> {
   return postJson<MicroReviewResult>(
-    `/api/academy/review/unit/${encodeURIComponent(unitId)}/micro-review${userQuery(userId)}`,
+    `/api/academy/review/unit/${encodeURIComponent(unitId)}/micro-review`,
     {
       window_days: windowDays,
       answers,
@@ -428,33 +423,33 @@ export function submitUnitMicroReview(
 }
 
 export function getWritingDiagnostic(
-  userId: string,
+  _userId: string,
 ): Promise<WritingDiagnostic> {
   return getJson<WritingDiagnostic>(
-    `/api/academy/writing/diagnostic${userQuery(userId)}`,
+    `/api/academy/writing/diagnostic`,
   );
 }
 
-export function getWritingLevel(userId: string): Promise<WritingLevelOut> {
+export function getWritingLevel(_userId: string): Promise<WritingLevelOut> {
   return getJson<WritingLevelOut>(
-    `/api/academy/writing/level${userQuery(userId)}`,
+    `/api/academy/writing/level`,
   );
 }
 
 export function getWritingJourney(
-  userId: string,
+  _userId: string,
 ): Promise<WritingJourneyOut> {
   return getJson<WritingJourneyOut>(
-    `/api/academy/writing/journey${userQuery(userId)}`,
+    `/api/academy/writing/journey`,
   );
 }
 
 /** Inicia una sesión de Speaking Assessment y devuelve la primera parte. */
 export function startSpeakingAssessment(
-  userId: string,
+  _userId: string,
 ): Promise<SpeakingAssessmentStart> {
   return postJson<SpeakingAssessmentStart>(
-    `/api/academy/speaking/assessment/start${userQuery(userId)}`,
+    `/api/academy/speaking/assessment/start`,
     {},
   );
 }
@@ -465,7 +460,7 @@ export function startSpeakingAssessment(
  * `conversationId` solo cuando la parte fue un role-play en vivo (turn-taking).
  */
 export function submitSpeakingAssessmentPart(
-  userId: string,
+  _userId: string,
   sessionId: number,
   heard: string,
   durationSeconds?: number | null,
@@ -475,100 +470,101 @@ export function submitSpeakingAssessmentPart(
   if (durationSeconds != null) body.duration_seconds = durationSeconds;
   if (conversationId) body.conversation_id = conversationId;
   return postJson<SpeakingAssessmentPart>(
-    `/api/academy/speaking/assessment/part${userQuery(userId)}`,
+    `/api/academy/speaking/assessment/part`,
     body,
   );
 }
 
 /** Finaliza la sesión y agrega el resultado CEFR continuo del assessment. */
 export function finishSpeakingAssessment(
-  userId: string,
+  _userId: string,
   sessionId: number,
 ): Promise<SpeakingAssessmentResult> {
   return postJson<SpeakingAssessmentResult>(
-    `/api/academy/speaking/assessment/finish${userQuery(userId)}`,
+    `/api/academy/speaking/assessment/finish`,
     { session_id: sessionId },
   );
 }
 
 /** Recupera el estado/resultado de una sesión de Speaking Assessment. */
 export function getSpeakingAssessment(
-  userId: string,
+  _userId: string,
   sessionId: number,
 ): Promise<SpeakingAssessmentState> {
   return getJson<SpeakingAssessmentState>(
-    `/api/academy/speaking/assessment/${sessionId}${userQuery(userId)}`,
+    `/api/academy/speaking/assessment/${sessionId}`,
   );
 }
 
 export function getReadiness(
-  userId: string,
+  _userId: string,
   targetLevel = "B1",
 ): Promise<Readiness> {
   const params = new URLSearchParams({
-    user_id: userId,
     target_level: targetLevel,
   });
   return getJson<Readiness>(`/api/academy/readiness?${params.toString()}`);
 }
 
 /** Tríada Progress / Mastery / Readiness (V2.2). */
-export function getDashboard(userId: string): Promise<Dashboard> {
-  return getJson<Dashboard>(`/api/academy/dashboard${userQuery(userId)}`);
+export function getDashboard(_userId: string): Promise<Dashboard> {
+  return getJson<Dashboard>(`/api/academy/dashboard`);
 }
 
-export function getSession(userId: string): Promise<Session> {
-  return getJson<Session>(`/api/academy/session${userQuery(userId)}`);
+export function getSession(_userId: string): Promise<Session> {
+  return getJson<Session>(`/api/academy/session`);
 }
 
 export function getNextBestActivity(
-  userId: string,
+  _userId: string,
 ): Promise<NextBestActivity | null> {
   return getJson<NextBestActivity | null>(
-    `/api/academy/next-best${userQuery(userId)}`,
+    `/api/academy/next-best`,
   );
 }
 
 /** Evidence Graph del nivel (V2.12). */
 export function getEvidenceGraph(
-  userId: string,
+  _userId: string,
   levelId?: string,
 ): Promise<EvidenceGraph> {
-  const params = new URLSearchParams({ user_id: userId });
+  const params = new URLSearchParams();
   if (levelId) params.set("level_id", levelId);
+  const query = params.toString();
   return getJson<EvidenceGraph>(
-    `/api/academy/evidence-graph?${params.toString()}`,
+    `/api/academy/evidence-graph${query ? `?${query}` : ""}`,
   );
 }
 
 export function getEvidenceGraphNode(
-  userId: string,
+  _userId: string,
   objectiveId: string,
   levelId?: string,
 ): Promise<EvidenceGraphNode | null> {
-  const params = new URLSearchParams({ user_id: userId });
+  const params = new URLSearchParams();
   if (levelId) params.set("level_id", levelId);
+  const query = params.toString();
   return getJsonNullable<EvidenceGraphNode>(
-    `/api/academy/evidence-graph/objective/${encodeURIComponent(objectiveId)}?${params.toString()}`,
+    `/api/academy/evidence-graph/objective/${encodeURIComponent(objectiveId)}${query ? `?${query}` : ""}`,
   );
 }
 
 export function completeSessionStep(
-  userId: string,
+  _userId: string,
   stepKey: string,
 ): Promise<Session> {
-  return postJson<Session>(`/api/academy/session/complete${userQuery(userId)}`, {
+  return postJson<Session>(`/api/academy/session/complete`, {
     step_key: stepKey,
   });
 }
 
-export function getGoal(userId: string): Promise<LearningGoal> {
-  return getJson<LearningGoal>(`/api/academy/goal${userQuery(userId)}`);
+export function getGoal(_userId: string): Promise<LearningGoal> {
+  return getJson<LearningGoal>(`/api/academy/goal`);
 }
 
 export function putGoal(
-  userId: string,
+  _userId: string,
   goal: LearningGoal,
 ): Promise<LearningGoal> {
-  return putJson<LearningGoal>(`/api/academy/goal${userQuery(userId)}`, goal);
+  return putJson<LearningGoal>(`/api/academy/goal`, goal);
 }

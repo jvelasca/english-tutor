@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getModels, streamChat } from "../api/chat";
 import { completeLesson as completeLessonRequest } from "../api/academy";
-import { readUserIdCookie, writeUserIdCookie } from "../utils/cookie";
+import { getSession, openSession } from "../api/session";
 import {
   createConversation,
   deleteConversation,
@@ -15,7 +15,8 @@ import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
 import { turnTelemetry } from "../utils/telemetry";
-import { nextDefaultUserName, resolveInitialUserId } from "../utils/users";
+import { nextDefaultUserName } from "../utils/users";
+import { planSession } from "../utils/session";
 import { fallbackChatModel } from "../utils/models";
 import {
   LAYOUT_DEFAULTS,
@@ -173,14 +174,28 @@ export function useChat() {
     let cancelled = false;
     (async () => {
       try {
-        const existing = await listUsers();
+        // V3.75 (Fase 2 del P0): quién es el perfil activo lo dice **el
+        // servidor**, no el navegador. La sesión viaja en una cookie
+        // `et_session` HttpOnly que JavaScript no puede leer (ese es el punto:
+        // antes bastaba con reescribir `et_user_id` para suplantar un perfil),
+        // así que se **pregunta** con `GET /api/session`.
+        const [existing, session] = await Promise.all([listUsers(), getSession()]);
         if (cancelled) return;
         setUsers(existing);
-        // Resolución del perfil inicial: cookie recordada → único perfil → si
-        // no, null (el usuario elige). Ya no se crea un perfil por defecto en
-        // silencio: si no hay ninguno, el App muestra el selector "Selecciona
-        // un usuario o crea uno nuevo".
-        setCurrentUserId(resolveInitialUserId(existing, readUserIdCookie()));
+        // Resolución del perfil inicial (sesión del servidor → perfil único → null)
+        // y, con ella, si hay que **abrir** sesión o basta con adoptarla. La
+        // decisión es pura y tiene test propio (`utils/session.ts`): es el punto
+        // donde un fallo se ve como «todo normal» mientras cada petición da 401.
+        const plan = planSession(existing, session?.id ?? null);
+        if (plan.action === "none") return;
+        if (plan.action === "adopt") {
+          setCurrentUserId(plan.userId);
+          return;
+        }
+        // Perfil resuelto **sin** sesión abierta (equipo recién instalado, o tras
+        // un `DELETE /api/session`): se abre aquí antes de pintar nada.
+        const opened = await openSession(plan.userId);
+        if (!cancelled) setCurrentUserId(opened.id);
       } catch {
         /* backend no disponible: se queda sin perfiles cargados */
       } finally {
@@ -353,8 +368,15 @@ export function useChat() {
   );
 
   const selectUser = useCallback((userId: string) => {
-    setCurrentUserId(userId);
-    writeUserIdCookie(userId);
+    // V3.75: elegir perfil es **abrir sesión** en el servidor. Antes esto
+    // escribía la cookie `et_user_id`, que el propio cliente podía reescribir
+    // para suplantar a otro perfil; ahora la firma el servidor y el estado local
+    // se fija con el perfil que **él** devuelve, no con lo que pide el cliente.
+    void openSession(userId)
+      .then((user) => setCurrentUserId(user.id))
+      .catch(() => {
+        /* backend no disponible: el selector no cambia de perfil */
+      });
   }, []);
 
   const selectModel = useCallback(
@@ -420,6 +442,10 @@ export function useChat() {
       try {
         const created = await createUser(finalName);
         setUsers((prev) => [...prev, created]);
+        // V3.75: crear un perfil **no** abre sesión. Sin este paso la app
+        // mostraría el perfil nuevo como activo y todas las peticiones
+        // responderían 401.
+        await openSession(created.id);
         setCurrentUserId(created.id);
         return true;
       } catch {

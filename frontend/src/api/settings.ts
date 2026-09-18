@@ -1,9 +1,8 @@
 import { getJson, putJson } from "./client";
 import type { Settings, SettingsResponse } from "../types/api";
 
-export function getSettings(userId: string): Promise<SettingsResponse> {
-  const query = new URLSearchParams({ user_id: userId }).toString();
-  return getJson<SettingsResponse>(`/api/settings?${query}`);
+export function getSettings(_userId: string): Promise<SettingsResponse> {
+  return getJson<SettingsResponse>("/api/settings");
 }
 
 export function saveSettings(

@@ -39,9 +39,12 @@ _DB_ARCNAME = "data/tutor.db"
 # - `backups/`: copias recursivas y bloat.
 # - `certs/`: el certificado TLS y su **clave privada** (`key.pem`), que no debe
 #   salir del equipo dentro de un ZIP sin cifrar.
-# En la restauración se conservan los dos: son estado del equipo, y borrarlos
-# dejaría al producto sin HTTPS (o sin copias) tras restaurar.
-_NON_PORTABLE_TOP_NAMES = frozenset({"backups", "certs"})
+# - `session.secret` (V3.75): la clave con la que se firman las sesiones. Un ZIP
+#   sin cifrar con esta clave dentro permite **forjar sesiones** para cualquier
+#   perfil, así que es la misma familia de secreto que `key.pem`.
+# En la restauración se conservan los tres: son estado del equipo, y borrarlos
+# dejaría al producto sin HTTPS, sin copias o sin poder validar una sesión abierta.
+_NON_PORTABLE_TOP_NAMES = frozenset({"backups", "certs", "session.secret"})
 
 # Cotas de la restauración. El tope de 512 MB del router es del ZIP
 # **comprimido**; sin cota del expandido, un ZIP de pocos MB con ratio alto llena

@@ -15,13 +15,13 @@ los detalles internos de otra.
 backend/
 ├── main.py              # PUNTO DE ENTRADA: crea la app, monta los routers. Código mínimo.
 ├── config.py            # Configuración: URLs, rutas de modelos, defaults, versión.
-├── dependencies.py      # current_user (perfil activo) y lectura de audio con límites.
+├── dependencies.py      # current_user: el perfil activo sale de la **sesión firmada** (V3.75)
 ├── routers/             # Capa HTTP: endpoints + validación. SIN lógica de negocio.
 │   ├── __init__.py
 │   ├── academy.py       # GET/POST /api/academy/levels, enroll, mastery, next, attempts, lessons, objective/assessment, speaking/{level,journey,assessment}
 │   ├── assessment.py    # /api/academy/placement*, /api/academy/exam/{level_id}*, /api/academy/level-completions
-│   ├── chat.py          # POST /api/chat, POST /api/chat/stream (mode + user_id opcional)
-│   ├── conversations.py # CRUD /api/conversations (filtrado por user_id) + /{cid}/interaction
+│   ├── chat.py          # POST /api/chat, POST /api/chat/stream (mode; perfil de la sesión)
+│   ├── conversations.py # CRUD /api/conversations (filtrado por el perfil de la sesión) + /{cid}/interaction
 │   ├── grammar.py       # POST /api/grammar/analyze, GET /api/grammar/errors (F4)
 │   ├── health.py        # /api/health/live, /ready, /dependencies
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
@@ -29,10 +29,11 @@ backend/
 │   ├── models.py        # GET /api/health, GET /api/models
 │   ├── network.py       # GET /api/network (IP, URLs de acceso y modo LAN)
 │   ├── profile.py       # GET /api/profile (F4)
-│   ├── progress.py      # GET /api/progress?user_id=<id>, GET /api/progress/history (F6)
+│   ├── progress.py      # GET /api/progress, GET /api/progress/history (F6; perfil de la sesión)
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
-│   ├── settings.py      # GET/PUT /api/settings (preferencias por usuario)
-│   ├── users.py         # GET /api/users, POST /api/users, PATCH /api/users/{id}
+│   ├── session.py       # POST/GET/DELETE /api/session (V3.75: firma la cookie et_session)
+│   ├── settings.py      # GET/PUT /api/settings (preferencias; solo las del propio perfil)
+│   ├── users.py         # GET/POST /api/users, PATCH /api/users/{id} (solo el propio perfil)
 │   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
 │   └── voz.py           # POST /api/transcribe, POST /api/tts
 ├── schemas/             # Contratos de datos (Pydantic).
@@ -48,7 +49,7 @@ backend/
 │   ├── pronunciation.py # PronunciationResponse, FluencyStats, PronunciationBreakdown (F7/F8)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
 │   ├── settings.py      # Settings* (preferencias por usuario)
-│   ├── users.py         # User, UserCreate, UserUpdate
+│   ├── users.py         # User, UserCreate, UserUpdate, SessionCreate
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
 │   └── voz.py           # TTSRequest, TranscribeResponse
 ├── domain/              # Servicios de dominio (async, orquestan la lógica).
@@ -95,6 +96,7 @@ backend/
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
 │   ├── phonetics.py     # evaluador compuesto: word_alignment + soundex + composite_score (F7)
 │   ├── pronunciation.py # score_pronunciation (puro, delega en phonetics)
+│   ├── sessions.py      # firma/verificación de la sesión (HMAC, stdlib; V3.75)
 │   ├── speaking.py      # rubric + scoring determinista de speaking + speaking_diagnostic (puro, V1.16)
 │   ├── speaking_llm.py  # extracción de evidencia de speaking con LLM (tarea libre)
 │   ├── speaking_assessment.py # instrumento Speaking Assessment 1.0 (versionado + agregación)
@@ -123,6 +125,7 @@ backend/
 │   ├── test_foreign_keys.py
 │   ├── test_grammar.py  # F4
 │   ├── test_health.py
+│   ├── test_identity_source.py # la identidad no la elige el cliente (V3.75)
 │   ├── test_learning_events.py # F4
 │   ├── test_listening.py # F8
 │   ├── test_mastery.py # F6
@@ -134,15 +137,19 @@ backend/
 │   ├── test_progress.py
 │   ├── test_progress_history.py # F6
 │   ├── test_pronunciation.py
+│   ├── test_public_surface.py # la superficie sin sesión, declarada (V3.75)
 │   ├── test_robustness.py
 │   ├── test_schemas.py
+│   ├── test_sessions.py # firma, cookie y 401 de la sesión (V3.75)
 │   ├── test_settings.py
 │   ├── test_store.py
 │   ├── test_store_append_only.py
 │   ├── test_store_isolation.py
+│   ├── test_supply_chain_v375.py # pines por SHA, auditoría y Dependabot (V3.75)
 │   ├── test_trends.py  # F6
 │   ├── test_user_profile.py
 │   ├── test_users.py
+│   ├── test_users_self_only.py # cada uno edita lo suyo (V3.75)
 │   └── test_vocabulary.py # F4
 ├── scripts/             # scripts de utilidad.
 │   ├── eval_model.py    # evalúa un modelo como tutor (M5)
@@ -204,13 +211,14 @@ frontend/src/
 ├── api/                 # Cliente HTTP (única capa que habla con el backend).
 │   ├── client.ts        # fetch base (manejo de errores, JSON).
 │   ├── academy.ts       # niveles, enroll, mastery, examen, attempts, objective/assessment.
-│   ├── chat.ts          # chat normal + streaming (envía mode + user_id).
-│   ├── conversations.ts # CRUD de conversaciones (pasa user_id).
+│   ├── chat.ts          # chat normal + streaming (envía mode; el perfil va en la sesión).
+│   ├── conversations.ts # CRUD de conversaciones (el perfil va en la sesión).
 │   ├── learning.ts      # getProfile + analyzeText + getEvents (F4/F6).
 │   ├── listening.ts     # getListeningQuestion + submitListeningAnswer + getListeningStats (F8).
-│   ├── pronunciation.ts # checkPronunciation (audio + texto → score; user_id opcional).
+│   ├── pronunciation.ts # checkPronunciation (audio + texto → score).
 │   ├── progress.ts      # getProgress + getProgressHistory (resumen + histórico) (F6).
-│   ├── settings.ts      # getSettings + putSettings (preferencias por usuario).
+│   ├── session.ts       # openSession + getSession + closeSession (V3.75).
+│   ├── settings.ts      # getSettings + putSettings (preferencias del perfil de la sesión).
 │   ├── users.ts         # listUsers, createUser, updateUser.
 │   └── voz.ts           # transcribe + tts.
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
@@ -243,13 +251,13 @@ frontend/src/
 │   ├── appearance.ts    # presets de acento/tamaño/densidad + parse/serialize (M16)
 │   ├── avatar.ts        # color/emoji/iniciales deterministas (M14)
 │   ├── cefr.ts          # cefrTone, cefrLabel, bandLabel (F4/F8)
-│   ├── cookie.ts        # cookies del launcher
 │   ├── fluency.ts       # wpmLabel, fluencyLevelLabel (F8)
 │   ├── image.ts         # resizeImageToDataUrl (M14)
 │   ├── layout.ts        # dimensiones de paneles + clamp/parse/serialize (M14)
 │   ├── modes.ts         # MODES + isTutorMode
 │   ├── progress.ts      # formatScore/formatAverage/pronunciationLevelLabel + bucketLabel/eventLabel (M9/F6)
 │   ├── pronunciationFeedback.ts # joinWords/feedbackHints/wordsCorrectLabel (puros, F7)
+│   ├── session.ts       # planSession: adoptar o abrir sesión al arrancar (puro, V3.75)
 │   ├── sse.ts           # parseo de eventos SSE
 │   ├── theme.ts         # resolveInitialTheme (M8)
 │   ├── title.ts         # deriveTitle
@@ -296,8 +304,8 @@ launcher/
 ├── state.json           # estado de la UI persistido (gitignored)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
                          #         test_ui/test_state_store/test_process_manager/
-                         #         test_preflight_v373/test_lan_ip_v373/test_lan_mode) — 122
-                         #         funciones de test (139 casos con parametrización), en CI
+                         #         test_preflight_v373/test_lan_ip_v373/test_lan_mode) — 125
+                         #         funciones de test (142 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 
@@ -314,7 +322,9 @@ launcher/
 - **`status.py`**: obtiene el estado real: `/api/health/dependencies` (HTTP) y consultas de
   solo lectura a la BD SQLite (contadores globales y usuarios).
 - **`browser_cookies.py`**: diagnóstico (solo lectura) de las cookies de los navegadores
-  soportados, para orientar problemas de acceso local.
+  soportados, para orientar problemas de acceso local. Informa de **si hay sesión**
+  (`et_session`) y **enmascara su valor**: es un token firmado y verlo en pantalla sería
+  poder usarlo (V3.75).
 - **`state_store.py`**: persistencia de la disposición visual (tamaño/posición de ventana y
   paneles colapsados) en `state.json`.
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
@@ -381,6 +391,68 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
 - Fijado por test en `backend/tests/test_lan_mode.py` y
   `launcher/tests/test_lan_mode.py` (incluida la deriva documental: si esta
   frontera desaparece de README/`PREMISAS.md`/este documento, fallan).
+
+### Identidad: la firma el servidor (V3.75)
+
+- **Hasta V3.74 la identidad la elegía el cliente.** El perfil activo viajaba en
+  **cada** URL (`?user_id=…`), así que quien alcanzara la API —otro equipo de la
+  LAN, con la Frontera de red arriba— leía y escribía los datos de cualquier
+  perfil. Además la cookie que recordaba la elección (`et_user_id`, hoy retirada)
+  la escribía **JavaScript**, no el servidor.
+- **Ahora la emite el servidor.** `POST /api/session` (`routers/session.py`)
+  comprueba que el perfil existe y devuelve una cookie `et_session`: token
+  `base64url(payload).base64url(hmac_sha256(secreto, payload))` (`services/sessions.py`,
+  stdlib, comparación en tiempo constante) con **`HttpOnly`**, `SameSite=Lax` y
+  `Secure` cuando la página va por HTTPS. `dependencies.current_user` la verifica
+  en cada petición: sin cookie, manipulada o caducada ⇒ **401 `SESSION_REQUIRED`**.
+  El `?user_id=` de la URL ya **no** significa nada.
+- **Qué cierra y qué no.** Cierra el **alcance** (el cliente no elige ni puede
+  forjar la identidad), **no** el acceso: `POST /api/session` acepta cualquier
+  `user_id` existente y `GET/POST /api/users` siguen sin credencial —el producto es
+  «sin cuentas, sin contraseñas» por diseño—. Autenticar de verdad es la Fase 3 del
+  P0, una decisión de producto (`docs/audit/PLAN-P0-IDENTIDAD.md`).
+- **Bordes de autorización:** `PATCH /api/users/{id}` y `PUT /api/settings` exigen
+  sesión y que el id coincida con el de la sesión del propio perfil (si no, **403**).
+- **El secreto de firma** vive en `backend/data/session.secret` (gitignored) y
+  **no** viaja en los backups: un ZIP restaurado no puede firmar sesiones. Restaurar
+  **no** borra el secreto del equipo receptor.
+- **El launcher** informa de **si hay sesión** en el navegador, con el valor
+  **enmascarado**: es un token y verlo en pantalla sería poder usarlo.
+- Fijado por test en `backend/tests/test_sessions.py` (firma, caducidad, atributos
+  de cookie, 401), `test_identity_source.py` (el `?user_id=` no manda) y
+  `test_users_self_only.py` (403 al editar lo ajeno). El adaptador de
+  `backend/tests/conftest.py` traduce el `?user_id=` de las suites históricas a una
+  sesión firmada, para que las 109 suites prueben el camino nuevo sin reescribirse.
+
+### Superficie sin sesión: declarada y acotada (V3.75, cierra VG-N6)
+
+La auditoría de V3.73 dejó abierto (`VG-N6`) que tres endpoints respondían **sin
+credencial**: `/api/system/status`, `/api/network` y `/api/models`. Se **aceptan de
+forma explícita** —y se fijan por test— por tres razones: (1) son **reconocimiento
+barato** (modelos instalados, IP/hostname de LAN, trabajos de generación en curso,
+rechazos por rate limit de 60 s) que **no** permite leer ni escribir datos de ningún
+alumno; (2) quien puede alcanzarlas ya está dentro para todo lo demás —la frontera
+real es la **red** (loopback por defecto, LAN opt-in), no esta lista—; y (3) el
+producto **no tiene cuentas** que exigirles (Fase 3 del P0).
+
+**Responden sin sesión** (y deben seguir haciéndolo: el launcher y la puerta de
+perfil las usan antes de que exista ningún perfil): `/` · `/api` · `/api/health` ·
+`/api/health/live` · `/api/health/ready` · `/api/health/dependencies` ·
+`/api/models` · `/api/network` · `/api/system/status` · `GET/POST /api/users` ·
+`POST /api/session` (abrir sesión es justo lo que aún no existe).
+
+**Exigen sesión firmada** (401 `SESSION_REQUIRED`): todo lo que lee o escribe datos
+del alumno (`/api/settings`, `/api/profile`, `/api/progress`, `/api/conversations`,
+`/api/vocabulary`, `/api/grammar/errors`, `/api/academy/*`, `/api/listening/*`,
+`/api/pronunciation`, `/api/chat`…). **Exigen PIN de administración**
+(`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*` y
+`/api/system/restore`.
+
+Cuando llegue la **Fase 3** (autenticación real), cada ruta de la primera lista
+recibe su credencial o pasa a admin; hasta entonces la lista está escrita aquí y
+`backend/tests/test_public_surface.py` la comprueba en las dos direcciones (que lo
+declarado sin sesión siga respondiendo, y que lo declarado con sesión **no** salga
+sin ella), además de fallar si esta sección desaparece del documento.
 
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en
