@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
+import { mockIdentitySession } from "./gateHelper";
 
 /**
  * Cobertura visual de la región del grafo tocada en V3.17/V3.18 (D7.3):
@@ -11,7 +12,8 @@ import path from "node:path";
  * El mock de red es determinista (mismo contrato que TodayPlan.test.tsx): se
  * interceptan `student-model`, `session`, `goal` y `next-best`; el backend no
  * interviene. El perfil se auto-selecciona mockeando `/api/users` con un único
- * usuario (patrón de `gateHelper.ts`).
+ * usuario (patrón de `gateHelper.ts`) y, desde V3.75, también `/api/session`:
+ * la identidad la firma el servidor y sin ese mock la ProfileGate tapa la home.
  */
 const VISUAL_TESTER = { id: "u-visual-graph", name: "Visual Tester" };
 
@@ -77,6 +79,9 @@ async function mockGraphHome(page: Page) {
       void route.continue();
     }
   });
+  // V3.75: la sesión de identidad la firma el servidor; se mockea con el MISMO
+  // perfil para que `planSession` la adopte (si no, la puerta no se cierra).
+  await mockIdentitySession(page, VISUAL_TESTER);
   const get = (url: string, data: unknown) =>
     page.route(`**${url}`, (route) => {
       if (route.request().method() === "GET") {

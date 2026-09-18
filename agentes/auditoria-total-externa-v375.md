@@ -452,6 +452,15 @@ servicios y sin hardware. Se indica dónde mirar y **qué la falsaría**.
     (ni `axe-core`). Hay **cuatro** contratos de UI en Playwright (contraste de los
     7 acentos, teclado, `prefers-reduced-motion`, zoom 200 %/reflow).
     **Falsable:** una dependencia de a11y, o que el proyecto afirme cobertura.
+    **Aviso (2026-09-18, corrección antes de publicar el tag):** el arnés visual
+    corre **sin backend** y, desde `frontend/tests/visual/gateHelper.ts::mockIdentitySession`,
+    mockea `/api/session` igual que ya mockeaba `/api/users`. Por tanto un verde de
+    `Playwright E2E (visual)` **no** es evidencia de que el servidor emita, firme y
+    verifique la sesión: eso vive en `backend/tests/test_sessions.py`,
+    `test_identity_source.py`, `test_users_self_only.py`, `test_public_surface.py`,
+    `frontend/src/utils/session.test.ts` y el humo de `product-origin`. La razón y
+    el detalle están en `release-notes-v3.75.0.md` §7.1 (la primera run real de CI
+    sobre el commit de release salió **11/12** justo por esto).
 32. **¿Responsive/touch/teclado: hay verificación?** Declara 3 viewports en
     Playwright (1280×800, 768×1024, 390×844) **sin** aserciones de tamaño táctil ni
     de layout numérico. **Falsable:** declarar verificada la matriz de dispositivos:

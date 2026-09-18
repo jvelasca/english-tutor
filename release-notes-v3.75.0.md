@@ -191,6 +191,12 @@ sección del documento **hace fallar** el test.
 6. **Los 7 gates siguen en `pending`.** Esta release no mueve la validación física;
    la identidad sellada en `docs/audit/KIT-VALIDACION-GATES.md` (`3.73.6` →
    `13cc30b`) es el registro del **pre-vuelo** y **no se reescribe**.
+7. **La suite visual mockea la sesión de identidad.** El arnés E2E corre **sin
+   backend** (mide layout y responsive) y resuelve `/api/session` en el navegador,
+   igual que ya resolvía `GET /api/users`; por tanto **no** demuestra que el
+   servidor emita y verifique la sesión. Esa parte se prueba donde corresponde
+   (backend, `session.test.ts` y el humo de `product-origin`). Ver §7.1: es una
+   corrección que se hizo **antes** de publicar el tag, no una deuda diferida.
 
 ---
 
@@ -223,6 +229,53 @@ volver **informativo** el job de auditoría, **borrar** la declaración de super
 sin sesión, quitar **`HttpOnly`** de la cookie de sesión, y hacer que el adaptador de
 `conftest` traduzca **también** las peticiones crudas. Los cinco hicieron **fallar**
 su test.
+
+---
+
+## 7.1 Corrección antes de publicar: el arnés visual no conocía la sesión
+
+La **primera ejecución real de CI** sobre el commit de release (run
+[`35393085610`](https://github.com/jvelasca/english-tutor/actions/runs/35393085610),
+2026-09-18) salió **11/12**: el job `Playwright E2E (visual)` falló con **27 casos**
+en rojo y **11** en verde, en los tres proyectos (desktop/tablet/mobile). No era un
+*flake*: era una **regresión en el arnés**. `git show --stat <commit> --
+frontend/tests` sale **vacío** — V3.75.0 cambió el contrato de identidad y **no tocó
+la suite visual**, que seguía suponiendo justo lo que esta release retira.
+
+La cadena es esta: el arnés visual corre **sin backend** por diseño (mide layout y
+responsive, y su `playwright.config.ts` declara que si la API no está la app degrada
+a estados vacíos). Hasta V3.74 eso bastaba porque el perfil se recordaba en una
+cookie que escribía **JavaScript**. Desde V3.75 la app **pregunta**
+`GET /api/session` y, sin sesión, la abre con `POST /api/session`: con la API
+ausente ambas fallan, `planSession` no resuelve perfil, la `ProfileGate` se queda
+abierta y **todo clic acaba interceptado por el `dialog-backdrop`**. El log de CI lo
+dice literalmente y repite `[vite] http proxy error: /api/session`.
+
+**Por qué no se detectó antes de publicar.** En el equipo de desarrollo hay un
+backend real escuchando en `127.0.0.1:8000` (es el destino del proxy de Vite), así
+que **en local la sesión se abre de verdad y la suite pasa**; solo CI, que no levanta
+backend, reproduce el fallo. Es exactamente la divergencia local/CI que este job
+existe para cazar, y era la primera vez que corría sobre este commit.
+
+**La corrección.** `frontend/tests/visual/gateHelper.ts` gana
+`mockIdentitySession(page, user)`, que resuelve `GET`/`POST /api/session` en el
+navegador —igual que ya se mockeaba `GET /api/users`— con el **mismo** perfil del
+arnés, de modo que `planSession` toma la rama `adopt` y la puerta no aparece. Se
+aplica desde `ensureProfile` y desde los cuatro specs que mockean perfiles por su
+cuenta (`analysis`, `drillProvenance`, `homeGraphChip`, `speaking`).
+
+**Lo que no prueba.** El mock no demuestra que el servidor emita, firme y verifique
+la sesión; eso vive en `backend/tests/test_sessions.py`, `test_identity_source.py`,
+`test_users_self_only.py` y `test_public_surface.py`, en
+`frontend/src/utils/session.test.ts` y en el humo real de `product-origin`. La suite
+visual fija **layout**, no identidad.
+
+**Evidencia local de que lo que arregla es el mock.** Los dos specs que fallaban
+**incluso con backend real** (`analysis` y `homeGraphChip` usan ids ficticios —`u1`,
+`u-visual-graph`— que el servidor rechaza al abrir sesión con 404) pasan con el mock.
+Y la suite visual **en local es inestable por contención de máquina**: el mismo árbol
+da 7, 14 y 18 fallos en ejecuciones sucesivas, con y sin la corrección, así que la
+validación de esta release es la **run de CI**, no el resultado local.
 
 ---
 

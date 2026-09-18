@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
+import { mockIdentitySession } from "./gateHelper";
 
 /**
  * MI PROGRESO (V3.1): pantalla consolidada de 5 pestañas accesibles en
@@ -10,6 +11,8 @@ import path from "node:path";
  *
  * Se mockea `/api/users` para que el shell de pestañas se renderice aunque el
  * resto de APIs fallen: la app debe degradar con estados vacíos sin romperse.
+ * Desde V3.75 hay que mockear también `/api/session` (la identidad la firma el
+ * servidor): sin ello la ProfileGate se abre y el tablist nunca aparece.
  */
 
 const USER = { id: "u1", name: "Test", created_at: "2026-01-01T00:00:00Z" };
@@ -27,6 +30,7 @@ async function mockUsers(page: import("@playwright/test").Page) {
   await page.route("**/api/users", (route) =>
     route.fulfill({ json: [USER] }),
   );
+  await mockIdentitySession(page, USER);
 }
 
 async function gotoProgress(

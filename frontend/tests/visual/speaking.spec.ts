@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockIdentitySession } from "./gateHelper";
 
 /**
  * Speaking 2.0 en MI PROGRESO (V3.1): el contenido que vivía en la pestaña
@@ -7,7 +8,8 @@ import { test, expect } from "@playwright/test";
  * diagnóstico renderiza la insignia "proxy" de pronunciación, el desglose de
  * Interaction Quality y los hitos de Conversation Endurance. Se mockea la API
  * con `page.route` para obtener datos deterministas sin depender de evidencia
- * real en la BD (el resto de llamadas degradan sin romper la pantalla).
+ * real en la BD (el resto de llamadas degradan sin romper la pantalla). Desde
+ * V3.75 se mockea también `/api/session`: la identidad la firma el servidor.
  */
 
 const DIAGNOSTIC = {
@@ -65,11 +67,11 @@ const ENDURANCE = {
 async function mockApi(page: import("@playwright/test").Page) {
   // Un único usuario para que la app lo auto-seleccione y el shell de pestañas
   // de MI PROGRESO se renderice aunque el resto de llamadas falle.
-  await page.route("**/api/users", (route) =>
-    route.fulfill({
-      json: [{ id: "u1", name: "Test", created_at: "2026-01-01T00:00:00Z" }],
-    }),
-  );
+  const user = { id: "u1", name: "Test", created_at: "2026-01-01T00:00:00Z" };
+  await page.route("**/api/users", (route) => route.fulfill({ json: [user] }));
+  // V3.75: la identidad la firma el servidor; se mockea `/api/session` con el
+  // MISMO perfil para que `planSession` la adopte y la puerta no se abra.
+  await mockIdentitySession(page, user);
   await page.route("**/api/academy/speaking/diagnostic*", (route) =>
     route.fulfill({ json: DIAGNOSTIC }),
   );

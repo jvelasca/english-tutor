@@ -51,7 +51,25 @@
 > orígenes** (`3.75.0`), `npm audit`/`pip-audit` sin vulnerabilidades y **CI de 12
 > jobs**; los recuentos suben exactamente por los tests nuevos (2840 + **42**,
 > 719 + **2** netos, 139 + **3**) y cinco candados nuevos se verificaron por
-> **sabotaje** controlado. **Honestidad.** (i) **Esto no es autenticación y la
+> **sabotaje** controlado. **(J) Corrección antes de publicar (el arnés visual).**
+> La **primera run real de CI** sobre el commit de release salió **11/12**
+> (run `35393085610`): `Playwright E2E (visual)` falló **27 de 38** casos en los
+> tres proyectos porque la suite visual —que corre **sin backend** por diseño— no
+> conocía el contrato nuevo: seguía suponiendo la cookie de perfil que escribía
+> JavaScript, así que con la API ausente `GET`/`POST /api/session` fallan,
+> `planSession` no resuelve perfil y la `ProfileGate` se queda abierta
+> interceptando cada clic (`http proxy error: /api/session` en el log).
+> `gateHelper.ts` gana `mockIdentitySession(page, user)` (mismo patrón que el mock
+> de `GET /api/users`) y lo aplican los cuatro specs que gestionan perfiles por su
+> cuenta (`analysis`, `drillProvenance`, `homeGraphChip`, `speaking`). **Lo que no
+> prueba:** que el servidor emita, firme y verifique la sesión; eso es de la suite
+> de backend, `frontend/src/utils/session.test.ts` y el humo de `product-origin`.
+> **Por qué escapó:** en local hay un backend real en `127.0.0.1:8000`, así que
+> allí la sesión se abre de verdad y la suite pasa; solo CI lo reproduce. La suite
+> visual local es además **inestable por contención de máquina** (7/14/18 fallos en
+> ejecuciones sucesivas, con y sin la corrección), de modo que la validación es la
+> **run de CI**, no el resultado local. Ver `release-notes-v3.75.0.md` §7.1.
+> **Honestidad.** (i) **Esto no es autenticación y la
 > Fase 3 sigue sin decidir:** `POST /api/session` acepta cualquier `user_id`
 > **existente** sin credencial y `GET/POST /api/users` siguen abiertos, así que en
 > modo LAN cualquiera que alcance la API puede **abrir sesión para cualquier

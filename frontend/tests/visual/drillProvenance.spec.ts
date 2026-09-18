@@ -104,6 +104,10 @@ async function mockApi(
     });
     const path = url.pathname;
     if (path === "/api/users") return route.fulfill({ json: [USER] });
+    // V3.75: la identidad la firma el servidor. Se responde con el MISMO perfil
+    // para que `planSession` la adopte; si no, la ProfileGate se abre y el drill
+    // no llega a montarse (la suite visual corre sin backend).
+    if (path === "/api/session") return route.fulfill({ json: USER });
     if (path === "/api/learning/review") {
       return route.fulfill({
         json: {
