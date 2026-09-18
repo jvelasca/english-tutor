@@ -44,6 +44,17 @@ completo.
   `8.8.8.8`, perezoso pero con una referencia externa dentro de una app 100 % local).
   Override declarado: `ENGLISH_TUTOR_LAN_IP`. Fijado por test en
   `backend/tests/test_net_interfaces_v373.py` y `launcher/tests/test_lan_ip_v373.py`.
+- **La red local es opt-in (V3.73.x):** por defecto el backend escucha en **loopback**
+  (`127.0.0.1`) y **no** acepta orígenes de red privada: exponerse a la LAN dejó de ser
+  el comportamiento por defecto y pasa a ser una decisión declarada. Se activa con el
+  botón **«Activar red local»** del panel de acceso del launcher (reinicia el servidor
+  para aplicarlo) o arrancando con `ENGLISH_TUTOR_LAN=1`; en los dos casos el launcher
+  propaga el modo en el entorno del backend, de modo que la interfaz a la que se enlaza
+  uvicorn y la política de orígenes no pueden discrepar. El modo se lee **fail-closed**
+  (ausente o no afirmativo ⇒ cerrado). Mientras no haya autenticación por perfil (P0,
+  ver `docs/audit/PARKED.md`), quien alcanza el puerto ve y escribe los datos del
+  alumno: por eso la frontera es explícita. Fijado por test en
+  `backend/tests/test_lan_mode.py` y `launcher/tests/test_lan_mode.py`.
 
 ## 4. Voz local (fijado)
 - **Oído (STT):** `faster-whisper`, modelo `small`, en CPU.

@@ -280,6 +280,45 @@
   divulgación de `AE-04`): → V4.0.x.
 - **Empaquetado/instalador** (vetado por premisa) y **launcher para macOS/Linux**.
 
+## V3.74 — frontera de red (loopback por defecto)
+
+> Origen: el **P0 de identidad** abierto por la auditoría (`R1`): el `user_id` lo
+> elige el cliente, los endpoints de perfil no exigen credencial y, encima, el
+> producto se exponía **solo** en la red local por defecto. Esta fase ataca la
+> **segunda** mitad (la superficie), **no** la primera. Plan por fases en
+> `docs/audit/PLAN-P0-IDENTIDAD.md`; notas en `release-notes-v3.74.0.md`.
+
+### Cerrado en V3.74 (deja de ser deuda)
+
+- **La exposición en red dejó de ser el comportamiento por defecto.** El backend se
+  enlazaba **siempre** a `0.0.0.0` y la regex de CORS aceptaba **cualquier** IP
+  privada, así que exponer los datos del alumno a la WiFi no lo había pedido nadie:
+  era la omisión del código. Ahora uvicorn se enlaza a `127.0.0.1` y la LAN es
+  **opt-in declarado** (`ENGLISH_TUTOR_LAN=1`, o el botón «Activar red local» del
+  panel de acceso del launcher, que lo declara y reinicia el servidor), leído
+  **fail-closed**. Una sola decisión gobierna el `--host` y la política de orígenes
+  (el launcher la propaga en el entorno del backend), de modo que las dos mitades no
+  pueden discrepar. Candados: `backend/tests/test_lan_mode.py`,
+  `launcher/tests/test_lan_mode.py` y
+  `test_las_dos_mitades_de_la_politica_de_origen_coinciden`.
+- **La trampa del patrón vacío.** `origin_allowed` comprobaba con `match`, así que
+  un patrón vacío casaba con cualquier cadena: «desactivar» la regex de la LAN
+  habría **abierto** CORS. Se sustituye por dos patrones (`LOCAL`/`LAN`), `fullmatch`
+  y consulta por petición.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El P0 de identidad sigue abierto, entero.** Lo que cambia es la superficie, no
+  el modelo: **en modo LAN, `/api/users` sigue enumerando y creando perfiles sin
+  credencial**, y el `user_id` lo sigue eligiendo el cliente. Quien active la LAN
+  sigue entregando los datos del alumno a cualquier equipo de esa red.
+- **`et_user_id` sigue siendo una cookie elegida por el cliente.** Su retirada
+  (identidad derivada de una sesión firmada) es la **Fase 2** del plan, y cambia el
+  **contrato de la API**: un cliente que hoy manda `?user_id=` dejará de funcionar.
+  Por eso va en su propia release, y por eso esta no la adelanta.
+- **La Fase 2 no está implementada ni aprobada en código**: el plan está aprobado
+  **en diseño** y pendiente de revisión de la Fase 1.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Aplicar (tras tu aprobación) el **fix mecánico del sesgo posicional** en

@@ -7,6 +7,10 @@ import { useI18n } from "../hooks/useI18n";
  * Tarjeta "Connect a device": QR para escanear con el móvil y URLs de acceso
  * (IP siempre, `.local` solo si mDNS resuelve). La guía de conexión y de
  * confianza del certificado vive en SystemStatus (Ajustes → Sistema).
+ *
+ * V3.73.x: si el **modo LAN** no está declarado, la app solo escucha en loopback
+ * y la URL de LAN no responde. En ese caso la tarjeta no ofrece ni QR ni enlace
+ * (serían un código y un enlace muertos) y explica el paso que falta.
  */
 export function ConnectDeviceCard() {
   const { t } = useI18n();
@@ -35,6 +39,25 @@ export function ConnectDeviceCard() {
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
           {t("connect.noNetwork")}
+        </p>
+      </div>
+    );
+  }
+
+  if (!network.lan_mode) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-sm font-semibold text-foreground">
+          {t("connect.cardTitle")}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t("connect.lanOff")}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t("connect.lanOffHow")}
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t("connect.localOnly")}
         </p>
       </div>
     );

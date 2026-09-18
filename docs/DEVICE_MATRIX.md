@@ -96,3 +96,8 @@ Marca la fila del dispositivo cuando esos cinco flujos pasen en LAN/HTTPS.
   y el test de micrófono funciona).
 - **mDNS**: la URL `.local` solo se ofrece si `local_url_available` es `true`.
   En Windows sin Bonjour/mDNS, usa la URL por IP (la vía fiable).
+- **Modo LAN (V3.73.x)**: desde otro dispositivo, la app solo responde si el modo
+  LAN está declarado (`ENGLISH_TUTOR_LAN=1`). Con el modo apagado el backend
+  escucha en loopback y `/api/network` devuelve `lan_mode: false` y `url: ""`, así
+  que la tarjeta de conexión no ofrece QR ni enlace. Si no hay QR, el primer paso
+  no es el certificado: es arrancar en modo LAN y abrir el puerto.

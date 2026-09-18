@@ -27,7 +27,7 @@ backend/
 │   ├── learning.py      # POST/GET /api/learning/events (F4)
 │   ├── listening.py     # GET /api/listening/question, POST /api/listening/answer, GET /api/listening/stats (F8; progresión A1→A2→B1)
 │   ├── models.py        # GET /api/health, GET /api/models
-│   ├── network.py       # GET /api/network (IP + URLs de acceso en LAN)
+│   ├── network.py       # GET /api/network (IP, URLs de acceso y modo LAN)
 │   ├── profile.py       # GET /api/profile (F4)
 │   ├── progress.py      # GET /api/progress?user_id=<id>, GET /api/progress/history (F6)
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
@@ -296,8 +296,9 @@ launcher/
 ├── state.json           # estado de la UI persistido (gitignored)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
                          #         test_ui/test_state_store/test_process_manager/
-                         #         test_preflight_v373/test_lan_ip_v373) — 108 funciones
-                         #         de test (113 casos con parametrización), en CI (job `launcher`)
+                         #         test_preflight_v373/test_lan_ip_v373/test_lan_mode) — 122
+                         #         funciones de test (139 casos con parametrización), en CI
+                         #         (job `launcher`)
 ```
 
 ### Responsabilidades launcher
@@ -325,7 +326,7 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
 
 | Pieza | Se sirve con | Dónde |
 |---|---|---|
-| API + UI | `uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-certfile … --ssl-keyfile …` (un solo proceso, **sin** `--reload`) | `launcher/core.py::backend_command` |
+| API + UI | `uvicorn main:app --host <127.0.0.1\|0.0.0.0> --port 8000 --ssl-certfile … --ssl-keyfile …` (un solo proceso, **sin** `--reload`) | `launcher/core.py::backend_command` |
 | UI compilada (`frontend/dist`) | *StaticFiles* en `/assets` + *fallback* SPA, servidos por el backend | `backend/services/frontend_dist.py::mount_frontend` |
 | Certificado TLS autofirmado | Generado (idempotente) antes de arrancar | `backend/scripts/ensure_tls_cert.py` |
 
@@ -355,6 +356,31 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
   el launcher replica el algoritmo puro (no puede importar el backend).
 - Fijado por test en `backend/tests/test_net_interfaces_v373.py`,
   `launcher/tests/test_lan_ip_v373.py` y `backend/tests/test_docs_drift_v373.py`.
+
+### Frontera de red: loopback por defecto, LAN opt-in (V3.73.x)
+
+- **Por defecto la app escucha en `127.0.0.1`** y **no** acepta orígenes de red
+  privada. Hasta V3.73.6 se enlazaba siempre a `0.0.0.0` y la regex de CORS
+  aceptaba cualquier IP privada: exponerse a la LAN era el comportamiento por
+  defecto sin que nadie lo hubiera pedido.
+- **El modo LAN se declara con `ENGLISH_TUTOR_LAN=1`** —o con el botón «Activar red
+  local» del panel de acceso del launcher, que lo declara y **reinicia el servidor**
+  para aplicarlo— y lo propaga el launcher en el entorno del backend
+  (`launcher/core.py::backend_env`), de modo que la interfaz a la que se enlaza uvicorn
+  (`backend_host`) y la política de orígenes salen de la **misma** decisión (`lan_mode`)
+  y no pueden discrepar. Se lee **fail-closed**: ausente o no afirmativo ⇒ cerrado.
+- Las dos mitades de la política de origen son `security.origin_allowed` (la que
+  corta con **403** en métodos no seguros) y el patrón de `CORSMiddleware`; un
+  candado comprueba que dicen lo mismo sobre los mismos orígenes. El propio
+  equipo (loopback) entra en los dos modos: la frontera es la LAN, no lo local.
+- Mientras no exista autenticación por perfil (**P0 abierto**, ver
+  `docs/audit/PARKED.md`), cualquiera que alcance el puerto ve y escribe los datos
+  del alumno: por eso exponerse es una decisión explícita. `/api/network` informa
+  del modo, y ni el panel del launcher ni `ConnectDeviceCard` anuncian una URL de
+  LAN cuando no responde.
+- Fijado por test en `backend/tests/test_lan_mode.py` y
+  `launcher/tests/test_lan_mode.py` (incluida la deriva documental: si esta
+  frontera desaparece de README/`PREMISAS.md`/este documento, fallan).
 
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en

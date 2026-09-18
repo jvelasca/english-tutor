@@ -1399,6 +1399,14 @@ const STRINGS: Record<string, Entry> = {
     en: "Local network only. No internet required.",
     es: "Solo red local. No requiere Internet.",
   },
+  "connect.lanOff": {
+    en: "Local network access is off: the app only answers on this device.",
+    es: "El acceso por red local está desactivado: la app solo responde en este equipo.",
+  },
+  "connect.lanOffHow": {
+    en: "To use it from your phone, start the app in LAN mode (ENGLISH_TUTOR_LAN=1) and open port 8000 in the firewall.",
+    es: "Para usarlo desde el móvil, arranca la app en modo LAN (ENGLISH_TUTOR_LAN=1) y abre el puerto 8000 en el firewall.",
+  },
   "connect.trustTitle": {
     en: "First connection: trust the local certificate",
     es: "Primera conexión: confiar el certificado local",

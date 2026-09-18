@@ -87,6 +87,14 @@ Lo que hay ahora, medido:
 | Certificado TLS | Generado (idempotente, con SANs de LAN) antes de arrancar | `backend/scripts/ensure_tls_cert.py` |
 | Build del artefacto | `npm run build` **solo si falta** `frontend/dist` | `launcher/process_manager.py::ensure_frontend_dist` |
 
+> **Corrección de deriva (V3.73.x).** La fila «API + UI» ya no es exacta: el
+> `--host` **no** es siempre `0.0.0.0`. Desde V3.73.x el launcher enlaza a
+> `127.0.0.1` salvo que el **modo LAN** esté declarado (`ENGLISH_TUTOR_LAN=1`), y
+> el modo viaja al backend en su entorno desde la misma decisión. La tabla de
+> arriba se deja como la midió este dossier (árbol `v3.72.0`): es la medición de
+> su momento, no el contrato vigente. La frontera vigente está en
+> `docs/ARQUITECTURA.md` → «Frontera de red: loopback por defecto, LAN opt-in».
+
 - **Node deja de ser requisito de EJECUCIÓN**: pasa a ser requisito de
   **COMPILACIÓN** (la primera vez que se instala). Es la afirmación honesta: sin
   Node no hay `dist`, pero con el `dist` construido la app arranca sin Node.

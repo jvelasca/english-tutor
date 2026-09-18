@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, VERSION
+from config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, VERSION, lan_mode
 from domain.errors import (
     EvidenceInvariantError,
     ObjectiveLockedError,
@@ -125,6 +125,11 @@ async def objective_locked_handler(
 # irrelevante en ese camino; se mantiene para el modo de desarrollo (`npm run
 # dev` en :5173, que habla con la API por el proxy de Vite) y para clientes
 # externos legítimos de la LAN.
+# V3.73.x: `ALLOWED_ORIGIN_REGEX` trae las IPs privadas **solo en modo LAN**
+# (`ENGLISH_TUTOR_LAN`, ver `config.py`). El patrón se resuelve al importar
+# porque este middleware lo compila una sola vez; el proceso arranca con el modo
+# ya declarado por el launcher. La comprobación que corta la petición con 403
+# (`security.origin_allowed`) sí vuelve a consultar el modo en cada llamada.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -180,3 +185,13 @@ app.include_router(speaking_routes_router)
 # ese modo la falta del artefacto es **fail-closed** (no una app vacía que parece
 # lista). Un `uvicorn main:app` manual sigue siendo fail-open (modo desarrollo).
 mount_frontend(app, require_ui=require_ui_from_env())
+
+# V3.73.x: el modo de red queda escrito en el arranque. Si un equipo de la red no
+# consigue entrar, la causa («escucho en loopback» frente a «escucho en la LAN»)
+# está en el log del backend en lugar de en una hipótesis. Ojo: esta línea
+# informa del modo **declarado**; la interfaz real la fija el launcher al elegir
+# el `--host`.
+logger.info(
+    "Modo de red: %s",
+    "LAN (acepta orígenes de la red local)" if lan_mode() else "solo loopback",
+)

@@ -17,6 +17,12 @@ def test_get_lan_hostname_returns_non_empty_string():
 
 
 def test_api_network_info(monkeypatch):
+    """Sin modo LAN, `/api/network` **no anuncia** una URL de LAN alcanzable.
+
+    V3.73.x: con el bind en loopback, `https://<ip>:8000` no responde. Anunciarla
+    igual convertiría el panel de conexión en un enlace muerto sin explicación.
+    """
+    monkeypatch.delenv("ENGLISH_TUTOR_LAN", raising=False)
     monkeypatch.setattr(network, "get_lan_ip", lambda: "192.168.1.42")
     monkeypatch.setattr(network, "get_lan_hostname", lambda: "english-tutor-pc")
     monkeypatch.setattr(network, "local_url_resolves", lambda: True)
@@ -28,10 +34,28 @@ def test_api_network_info(monkeypatch):
         assert body["hostname"] == "english-tutor-pc"
         assert body["frontend_port"] == "8000"
         assert body["backend_port"] == "8000"
-        # V3.72 (RC-01): un único origen HTTPS sirve la UI y la API.
-        assert body["url"] == "https://192.168.1.42:8000"
-        assert body["local_url"] == "https://english-tutor-pc.local:8000"
-        assert body["local_url_available"] is True
+        assert body["lan_mode"] is False
+        assert body["bind"] == "127.0.0.1"
+        assert body["url"] == ""
+        assert body["local_url_available"] is False
+
+
+def test_api_network_info_en_modo_lan(monkeypatch):
+    """En modo LAN sí se anuncia, y el puerto sigue siendo el origen de producto."""
+    monkeypatch.setenv("ENGLISH_TUTOR_LAN", "1")
+    monkeypatch.setattr(network, "get_lan_ip", lambda: "192.168.1.42")
+    monkeypatch.setattr(network, "get_lan_hostname", lambda: "english-tutor-pc")
+    monkeypatch.setattr(network, "local_url_resolves", lambda: True)
+    with TestClient(app) as client:
+        r = client.get("/api/network")
+        body = r.json()
+
+    assert body["lan_mode"] is True
+    assert body["bind"] == "0.0.0.0"
+    # V3.72 (RC-01): un único origen HTTPS sirve la UI y la API.
+    assert body["url"] == "https://192.168.1.42:8000"
+    assert body["local_url"] == "https://english-tutor-pc.local:8000"
+    assert body["local_url_available"] is True
 
 
 def test_local_url_resolves_when_mdns_present(monkeypatch):

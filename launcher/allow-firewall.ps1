@@ -6,6 +6,11 @@
 # la API). Ahora el backend sirve también la interfaz compilada, así que el
 # producto vive en un único origen HTTPS (:8000).
 #
+# V3.73.x: la app escucha SOLO en loopback salvo que el modo LAN esté declarado
+# (`ENGLISH_TUTOR_LAN=1`). Esta regla de firewall, por sí sola, no da acceso a
+# nadie: sin el modo activo el puerto no está escuchando en la interfaz de red.
+# Los dos pasos van juntos (ver README → "Usar la app desde otro dispositivo").
+#
 # Requiere ejecutarse como administrador:
 #   powershell -ExecutionPolicy Bypass -File launcher\allow-firewall.ps1
 #
@@ -16,6 +21,7 @@ $ErrorActionPreference = "Stop"
 
 $ports = @(8000)
 $prefix = "English Tutor"
+$lanEnv = "ENGLISH_TUTOR_LAN"
 
 foreach ($port in $ports) {
     $name = "$prefix ($port)"
@@ -39,6 +45,20 @@ foreach ($port in $ports) {
 }
 
 Write-Host ""
-Write-Host "Listo. Abre la app y accede desde tus dispositivos usando la URL LAN" `
-    -ForegroundColor Cyan
-Write-Host "que muestra la barra de estado inferior (o el launcher)." -ForegroundColor Cyan
+if ($env:ENGLISH_TUTOR_LAN -eq "1") {
+    Write-Host "Listo. Abre la app y accede desde tus dispositivos usando la URL LAN" `
+        -ForegroundColor Cyan
+    Write-Host "que muestra la barra de estado inferior (o el launcher)." -ForegroundColor Cyan
+} else {
+    Write-Host "Regla creada, pero la app todavia NO escucha en la red local." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "El modo LAN es opt-in. Para activarlo, abre el launcher y pulsa" -ForegroundColor Yellow
+    Write-Host "'Activar red local' en el panel 'Acceso a la app' (reinicia el servidor)." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Alternativa sin launcher: arranca con la variable puesta" -ForegroundColor DarkGray
+    Write-Host "    `$env:$lanEnv = `"1`"" -ForegroundColor White
+    Write-Host "(vale tambien dejarlo fijo con: setx $lanEnv 1)" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "Sin ese paso, la app solo responde en este equipo (loopback) y las" -ForegroundColor DarkGray
+    Write-Host "conexiones entrantes no encontraran nada escuchando en el puerto." -ForegroundColor DarkGray
+}

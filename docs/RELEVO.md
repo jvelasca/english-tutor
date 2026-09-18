@@ -5,6 +5,42 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-18 (UTC+2).
 >
+> **Nota (2026-09-18): V3.74.0 (frontera de red: loopback por defecto y LAN
+> opt-in) — release de PRODUCTO (minor), sin capacidad pedagógica nueva.**
+> Release **`v3.74.0`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, pero
+> **cambia el contrato de red del producto** (y la respuesta de `/api/network`).
+> **(A) El problema.** Hasta V3.73.6 el backend se enlazaba **siempre** a `0.0.0.0`
+> y la regex de CORS aceptaba **cualquier** IP privada: exponer los datos del alumno
+> a la WiFi era el **comportamiento por defecto** y nadie lo había pedido. Como el
+> P0 de identidad sigue abierto (el `user_id` lo elige el cliente y los endpoints de
+> perfil no exigen credencial), ese acceso era lectura **y escritura**. **(B) Lo
+> corregido.** Loopback por defecto (`127.0.0.1`) y LAN **opt-in declarado** con
+> `ENGLISH_TUTOR_LAN=1` o con el botón **«Activar red local»** del panel de acceso
+> del launcher (que lo declara y **reinicia el servidor** para aplicarlo); `lan_mode`
+> se lee **fail-closed** y el launcher lo propaga en el entorno del backend, así que
+> el `--host` de uvicorn (`backend_host`) y la política de orígenes salen de la
+> **misma** decisión y no pueden discrepar. **(C) La trampa que se evitó.**
+> `origin_allowed` comprobaba con `match`: un patrón **vacío** casa con cualquier
+> cadena, así que «desactivar» la regex de la LAN habría **abierto** CORS en lugar de
+> cerrarlo. Ahora hay dos patrones (`LOCAL`/`LAN`), `fullmatch` y consulta **por
+> petición**, con un candado que compara el patrón de `CORSMiddleware` con
+> `origin_allowed` sobre los mismos orígenes. **(D) Sin enlaces muertos.**
+> `/api/network` informa del modo (`lan_mode`, `bind`) y no anuncia la URL de LAN
+> cuando no responde; el panel muestra «desactivada (solo este equipo)» y
+> `ConnectDeviceCard` explica el paso que falta en lugar de pintar un QR inútil.
+> **(E) Verificación.** Backend **2840 passed**, frontend vitest **719** (86
+> ficheros), launcher **139**, `ruff`/`tsc` limpios, i18n `--strict` 0/0/0,
+> `validation_gate auto` **10/10** y `check_release_consistency` en los **6
+> orígenes**; los recuentos suben exactamente por los tests nuevos (2817 + **23**,
+> 717 + **2**, 113 + **26**). **Honestidad.** (i) **No es autenticación: el P0 sigue
+> abierto** y en modo LAN `/api/users` sigue enumerando y creando perfiles **sin
+> credencial**; el `et_user_id` no desaparece hasta la **Fase 2**
+> (`docs/audit/PLAN-P0-IDENTIDAD.md`). (ii) El modo **no se persiste** a propósito:
+> exponerse exige un acto explícito en cada arranque. (iii) **Los 7 gates siguen
+> `pending`** y el kit conserva la identidad del pre-vuelo (`3.73.6` → `13cc30b`)
+> como historia. Ver `release-notes-v3.74.0.md`.
+>
 > **Nota (2026-09-18): V3.73.7 (endurecimiento derivado de la verificación de
 > seguridad) — release de PARCHE, sin capacidad pedagógica nueva.** Release
 > **`v3.73.7`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni

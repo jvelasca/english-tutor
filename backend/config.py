@@ -1,6 +1,7 @@
 """Configuración del backend (sin lógica)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # Modelo por defecto del chat y de las tareas de IA. Debe ser *utilizable* en
@@ -29,11 +30,11 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 
-VERSION = "3.73.7"
+VERSION = "3.74.0"
 
 # Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
 # mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo
-# (dev server de Vite en `:5173`) y clientes de la LAN.
+# (dev server de Vite en `:5173`) y el acceso desde el propio equipo.
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -43,16 +44,69 @@ ALLOWED_ORIGINS = [
     "http://localhost:8000",
 ]
 
-# Regex adicional para permitir el acceso desde cualquier equipo de la red local
-# (IPs privadas IPv4, por el puerto que sea) sin abrir CORS a dominios arbitrarios.
-# La app es 100% local y se sirve en la LAN, así que aceptamos localhost + IPs.
-ALLOWED_ORIGIN_REGEX = (
-    r"^https?://(localhost|127\.0\.0\.1|"
+# --- Modo LAN (V3.73.x) ------------------------------------------------------
+#
+# Hasta V3.73.6 el producto se enlazaba **siempre** a `0.0.0.0` y aceptaba
+# cualquier origen de la red privada: exponerse a la LAN era el comportamiento
+# por defecto sin que nadie lo hubiera pedido. Ahora es **opt-in declarado** por
+# el launcher (`ENGLISH_TUTOR_LAN=1`), y el backend lo lee **fail-closed**: lo que
+# no está declarado, no se permite.
+LAN_MODE_ENV = "ENGLISH_TUTOR_LAN"
+
+# Mismo criterio que `launcher/core.py::_TRUTHY` y
+# `services/frontend_dist.py::_TRUTHY` (el nombre de la variable los une: ver
+# `tests/test_lan_mode.py`).
+_TRUTHY = frozenset({"1", "true", "yes", "on", "si", "sí"})
+
+
+def lan_mode(env: dict[str, str] | None = None) -> bool:
+    """¿Modo LAN activo? Se consulta al decidir, **no se cachea al importar**.
+
+    Cachearlo ataría la política al orden de importación de los módulos y haría
+    que la decisión dependiera de cuándo se leyó el entorno. Leerlo aquí la deja
+    comprobable sin recargar nada (`monkeypatch.setenv` en los tests) y es un
+    `os.environ.get` por petición: ruido frente al trabajo real de la ruta.
+    """
+    source = os.environ if env is None else env
+    return str(source.get(LAN_MODE_ENV, "")).strip().lower() in _TRUTHY
+
+
+# Orígenes del **propio equipo**, por cualquier puerto. No dependen del modo: el
+# dev server de Vite puede cambiar de puerto y el acceso local nunca es el riesgo
+# que este cambio cierra.
+LOCAL_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+
+# Orígenes de la **red local** (IPs privadas IPv4, por el puerto que sea). Solo
+# cuentan en modo LAN; la consulta la hace `security.origin_allowed`, que además
+# los rechaza con 403 en métodos no seguros.
+LAN_ORIGIN_REGEX = (
+    r"https?://("
     r"(10\.\d{1,3}\.\d{1,3}\.\d{1,3})|"
     r"(192\.168\.\d{1,3}\.\d{1,3})|"
     r"(172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})"
-    r")(:\d+)?$"
+    r")(:\d+)?"
 )
+
+# Lo que consume `CORSMiddleware` (`main.py`). **Fuera del modo LAN no incluye
+# las IPs privadas**, y el patrón se resuelve aquí al importar porque el
+# middleware lo compila una sola vez. Es seguro hacerlo así porque el launcher
+# declara el modo **antes** de arrancar el proceso, que es cuando esto se lee; la
+# comprobación de origen de `security.py` —la que corta la petición con 403—
+# vuelve a consultar `lan_mode()` en cada llamada, sin cachear.
+def cors_origin_regex(env: dict[str, str] | None = None) -> str:
+    """Patrón de orígenes para `CORSMiddleware` según el modo declarado.
+
+    Existe como función (y no solo como constante) para que el modo LAN sea
+    comprobable sin recargar módulos, y para que el candado de deriva pueda
+    comparar esta política con la de `security.origin_allowed` sobre los mismos
+    orígenes: las dos mitades tienen que decir lo mismo.
+    """
+    if lan_mode(env):
+        return f"^({LAN_ORIGIN_REGEX}|{LOCAL_ORIGIN_REGEX})$"
+    return f"^{LOCAL_ORIGIN_REGEX}$"
+
+
+ALLOWED_ORIGIN_REGEX = cors_origin_regex()
 
 # Límites de payload para evitar abusos de RAM/CPU/contexto.
 MAX_CHAT_MESSAGES = 100

@@ -3,8 +3,10 @@
 Sin OAuth/cloud (la app es 100% local), el cierre de seguridad LAN se limita a:
 - **Protección de origen (CSRF)**: rechazar peticiones de método no seguro
   (POST/PUT/PATCH/DELETE) cuyo encabezado `Origin` no coincide con los orígenes
-  permitidos (localhost o IPs privadas de la LAN). Mitiga que una web maliciosa
-  que el usuario visite en el mismo navegador dispare peticiones contra la app.
+  permitidos: el propio equipo (loopback) siempre, y las IPs privadas de la red
+  local **solo en modo LAN** (V3.73.x, opt-in declarado). Mitiga que una web
+  maliciosa que el usuario visite en el mismo navegador dispare peticiones contra
+  la app, y que otro equipo de la red se haga pasar por el alumno.
 - **Rate limiting**: límite de peticiones por IP y ventana de tiempo, más estricto
   en los endpoints sensibles (subida de audio, restauración, chat, transcripción).
   Todo en memoria (por proceso) y stdlib: suficiente para un servidor local de un
@@ -32,7 +34,15 @@ logger = logging.getLogger(__name__)
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
-_ORIGIN_RE = re.compile(config.ALLOWED_ORIGIN_REGEX)
+# Dos patrones, dos políticas (V3.73.x):
+# - `_LOCAL_ORIGIN_RE`: el propio equipo, por cualquier puerto. Siempre vale.
+# - `_LAN_ORIGIN_RE`: IPs privadas. **Solo cuenta en modo LAN**, y eso se decide
+#   en `origin_allowed` consultando `config.lan_mode()` en cada petición.
+# Se compila con `fullmatch` en la comprobación (no `match`): con `match`, un
+# patrón vacío casaría con cualquier cadena, así que «desactivar» una regex
+# vaciándola abriría CORS en lugar de cerrarlo. Aquí no hay patrón vacío posible.
+_LOCAL_ORIGIN_RE = re.compile(config.LOCAL_ORIGIN_REGEX)
+_LAN_ORIGIN_RE = re.compile(config.LAN_ORIGIN_REGEX)
 
 # Ventana y límites de rate limiting (peticiones por IP). `_PATH_LIMITS` aplica
 # límites más estrictos a los endpoints sensibles (por prefijo). Los topes son
@@ -71,12 +81,20 @@ _EXEMPT_PREFIXES = ("/api/health",)
 
 
 def origin_allowed(origin: str | None) -> bool:
-    """¿Un `Origin` es admisible? Ausente (mismo origen / no navegador) → sí."""
+    """¿Un `Origin` es admisible? Ausente (mismo origen / no navegador) → sí.
+
+    Los orígenes del propio equipo valen siempre. Los de la **red privada** solo
+    en modo LAN: sin esa decisión declarada, un equipo de la red no puede ni
+    leer ni escribir los datos del alumno (hasta que exista autenticación real,
+    ver P0 en `PARKED.md`).
+    """
     if not origin:
         return True
     if origin in config.ALLOWED_ORIGINS:
         return True
-    return bool(_ORIGIN_RE.match(origin))
+    if _LOCAL_ORIGIN_RE.fullmatch(origin):
+        return True
+    return config.lan_mode() and bool(_LAN_ORIGIN_RE.fullmatch(origin))
 
 
 def is_exempt(path: str) -> bool:

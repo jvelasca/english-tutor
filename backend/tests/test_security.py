@@ -23,20 +23,55 @@ def _app():
     return app
 
 
-def test_origin_allowed():
+def test_origin_allowed_del_propio_equipo():
+    """Loopback siempre vale, y a cualquier puerto (dev server de Vite)."""
     assert security.origin_allowed(None) is True
     assert security.origin_allowed("http://localhost:5173") is True
     assert security.origin_allowed("http://127.0.0.1:5173") is True
     # V3.72 (RC-01): origen de producto (UI + API en el mismo HTTPS :8000).
     assert security.origin_allowed("https://localhost:8000") is True
     assert security.origin_allowed("http://localhost:8000") is True
-    assert security.origin_allowed("https://192.168.1.20:8000") is True
-    assert security.origin_allowed("http://192.168.1.20:5173") is True
-    assert security.origin_allowed("https://192.168.1.20") is True
-    assert security.origin_allowed("http://10.0.0.5:3000") is True
-    assert security.origin_allowed("http://172.16.0.9") is True
+    assert security.origin_allowed("http://localhost:9999") is True
     assert security.origin_allowed("https://evil.example.com") is False
+
+
+def test_los_origenes_de_la_red_local_exigen_modo_lan(monkeypatch):
+    """V3.73.x: exponerse a la LAN es opt-in declarado, no el defecto.
+
+    Antes de este cambio, cualquier IP privada era un origen válido **siempre**:
+    un equipo de la misma red podía hablar con la API sin que nadie lo hubiera
+    pedido.
+    """
+    monkeypatch.delenv("ENGLISH_TUTOR_LAN", raising=False)
+    for origen in (
+        "https://192.168.1.20:8000",
+        "http://192.168.1.20:5173",
+        "https://192.168.1.20",
+        "http://10.0.0.5:3000",
+        "http://172.16.0.9",
+    ):
+        assert security.origin_allowed(origen) is False, (
+            f"{origen} sigue valiendo sin modo LAN: la red local entra sola"
+        )
+
+    monkeypatch.setenv("ENGLISH_TUTOR_LAN", "1")
+    for origen in (
+        "https://192.168.1.20:8000",
+        "http://192.168.1.20:5173",
+        "https://192.168.1.20",
+        "http://10.0.0.5:3000",
+        "http://172.16.0.9",
+    ):
+        assert security.origin_allowed(origen) is True, (
+            f"{origen} debería valer en modo LAN"
+        )
+
+
+def test_un_dominio_que_imita_una_ip_privada_no_cuela(monkeypatch):
+    """El patrón va anclado: `192.168.1.20.evil.com` no es una IP privada."""
+    monkeypatch.setenv("ENGLISH_TUTOR_LAN", "1")
     assert security.origin_allowed("https://192.168.1.20.evil.com") is False
+    assert security.origin_allowed("https://evil.example.com") is False
 
 
 def test_unsafe_method_bad_origin_rejected():

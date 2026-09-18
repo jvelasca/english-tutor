@@ -8,6 +8,7 @@ from core import (
     FRONTEND_DIST,
     FRONTEND_PORT,
     ICON_PATH,
+    LAN_ENV,
     REPO_ROOT,
     TLS_CERT_PATH,
     TLS_KEY_PATH,
@@ -57,9 +58,36 @@ def test_backend_command_uses_venv_python():
     assert str(BACKEND_PORT) in cmd
 
 
-def test_backend_command_binds_lan():
+def test_backend_command_binds_loopback_by_default(monkeypatch):
+    """V3.73.x: sin modo LAN declarado, la API **no** se expone en la red.
+
+    Antes se enlazaba siempre a `0.0.0.0`: exponerse a la LAN era el
+    comportamiento por defecto sin que nadie lo hubiera pedido, y con la
+    identidad viajando en la URL (P0 abierto) eso dejaba los datos del alumno al
+    alcance de cualquier equipo de la red.
+    """
+    monkeypatch.delenv(LAN_ENV, raising=False)
     cmd = backend_command()
-    assert "0.0.0.0" in cmd
+
+    assert cmd[cmd.index("--host") + 1] == "127.0.0.1"
+    assert "0.0.0.0" not in cmd
+
+
+def test_backend_command_binds_lan_when_declared(monkeypatch):
+    monkeypatch.setenv(LAN_ENV, "1")
+    cmd = backend_command()
+
+    assert cmd[cmd.index("--host") + 1] == "0.0.0.0"
+
+
+def test_backend_command_keeps_https_in_both_modes(monkeypatch):
+    """El TLS no depende del modo: en `localhost` también hace falta el micrófono."""
+    for valor in ("1", "0"):
+        monkeypatch.setenv(LAN_ENV, valor)
+        cmd = backend_command()
+        assert "--ssl-certfile" in cmd
+        assert cmd[cmd.index("--ssl-certfile") + 1] == str(TLS_CERT_PATH)
+        assert cmd[cmd.index("--ssl-keyfile") + 1] == str(TLS_KEY_PATH)
 
 
 def test_backend_command_serves_https_with_the_local_certificate():

@@ -69,25 +69,82 @@ REQUIRE_UI_ENV = "ENGLISH_TUTOR_REQUIRE_UI"
 # la elección automática puede no ser la interfaz de la app).
 LAN_IP_ENV = "ENGLISH_TUTOR_LAN_IP"
 
+# V3.73.x: el **modo LAN** es opt-in declarado. Sin esta variable (o con un valor
+# que no sea afirmativo) uvicorn escucha en loopback y el backend no acepta
+# orígenes de la red local: la app deja de ser alcanzable desde otro equipo.
+# El launcher es quien la declara al backend en `backend_env()`, así que la
+# interfaz a la que se enlaza y el entorno que recibe el proceso **no pueden
+# discrepar** (salen de la misma función, `lan_mode`).
+LAN_ENV = "ENGLISH_TUTOR_LAN"
+
+# Valores que activan un flag booleano. Se replica el criterio de
+# `backend/services/frontend_dist.py` (`_TRUTHY`) para que las dos mitades del
+# contrato lean igual; `launcher/tests/test_lan_mode.py` comprueba que el nombre
+# de la variable coincide en ambos lados.
+_TRUTHY = frozenset({"1", "true", "yes", "on", "si", "sí"})
+
+
+def lan_mode(env: dict[str, str] | None = None) -> bool:
+    """¿Modo LAN activo? **Fail-closed**: ausente o no reconocido ⇒ False.
+
+    Ausente ⇒ loopback. Es una decisión de producto, no un detalle: exponer la
+    API en la red local tiene que ser algo que el usuario declare, porque
+    mientras no haya autenticación (P0 abierto, ver `PARKED.md`) cualquiera que
+    alcance el puerto ve y escribe los datos del alumno.
+    """
+    source = os.environ if env is None else env
+    return str(source.get(LAN_ENV, "")).strip().lower() in _TRUTHY
+
 
 def backend_env(base: dict[str, str] | None = None) -> dict[str, str]:
-    """Entorno del proceso de producto: exige la UI compilada.
+    """Entorno del proceso de producto: exige la UI y declara el modo de red.
 
     Se copia el entorno (``os.environ`` o ``base``) para no perder PATH ni las
-    variables del usuario; solo se añade la exigencia de la UI.
+    variables del usuario; se añade la exigencia de la UI y se **canoniza** el
+    modo LAN a ``"1"``/``"0"``. Que el valor viaje siempre (aunque sea ``"0"``) y
+    no se borre es deliberado: el backend recibe una decisión explícita del
+    launcher en vez de deducirla de una variable ausente.
     """
     env = dict(os.environ) if base is None else dict(base)
     env[REQUIRE_UI_ENV] = "1"
+    env[LAN_ENV] = "1" if lan_mode(env) else "0"
     return env
+
+
+def backend_host(env: dict[str, str] | None = None) -> str:
+    """Interfaz a la que se enlaza uvicorn: la LAN solo si está declarada.
+
+    Se devuelve ``127.0.0.1`` (no ``localhost``) para no depender de la
+    resolución de nombres del equipo y dejar claro que es loopback.
+    """
+    return "0.0.0.0" if lan_mode(env) else "127.0.0.1"
+
+
+def set_lan_mode(enabled: bool, env: dict[str, str] | None = None) -> None:
+    """Declara (o retira) el modo LAN en el entorno del launcher.
+
+    Es lo que hace el botón del panel de acceso. Se escribe aquí, en `core`, y no
+    en la GUI porque la GUI no se puede probar sin pantalla: así la decisión que
+    cambia la frontera de red tiene test. El backend **no** ve este cambio hasta
+    que se reinicia (`backend_env` lee el entorno al arrancarlo).
+    """
+    source = os.environ if env is None else env
+    if enabled:
+        source[LAN_ENV] = "1"
+    else:
+        # Se retira en vez de escribir "0": el modo por defecto es cerrar, y un
+        # valor ausente no puede leerse mal (`lan_mode` es fail-closed).
+        source.pop(LAN_ENV, None)
 
 
 def backend_command() -> list[str]:
     """Comando para arrancar el backend con el venv del proyecto (uvicorn).
 
-    Se enlaza a ``0.0.0.0`` para que otros equipos de la LAN puedan acceder y se
-    sirve por **HTTPS autofirmado**: sin *secure context*, el navegador no expone
-    `navigator.mediaDevices` y se rompe la grabación (micrófono) desde otro
-    equipo. El backend sirve además la UI compilada (V3.72, RC-01).
+    Se enlaza a **loopback** salvo en modo LAN (``ENGLISH_TUTOR_LAN``): exponer
+    la API en la red local es opt-in. En los dos casos se sirve por **HTTPS
+    autofirmado**: sin *secure context* el navegador no expone
+    `navigator.mediaDevices` y se rompe la grabación (micrófono), también en el
+    propio equipo. El backend sirve además la UI compilada (V3.72, RC-01).
     """
     return [
         str(backend_python()),
@@ -95,7 +152,7 @@ def backend_command() -> list[str]:
         "uvicorn",
         "main:app",
         "--host",
-        "0.0.0.0",
+        backend_host(),
         "--port",
         str(BACKEND_PORT),
         "--ssl-certfile",
@@ -214,7 +271,12 @@ def lan_hostname() -> str:
 
 
 def lan_url() -> str:
-    """URL de acceso desde otros equipos de la red local (por IP)."""
+    """URL de acceso desde otros equipos de la red local (por IP).
+
+    Solo es alcanzable en **modo LAN** (`lan_mode()`): con el bind en loopback
+    esta URL no responde. Quien la muestre debe decir en qué modo está, o el
+    usuario verá un enlace muerto sin explicación.
+    """
     return f"https://{lan_ip()}:{FRONTEND_PORT}"
 
 

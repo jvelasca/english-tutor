@@ -40,9 +40,11 @@ from core import (
     frontend_url,
     health_status,
     icon_file,
+    lan_mode,
     lan_url,
     local_url,
     mdns_available,
+    set_lan_mode,
     user_overview,
 )
 from process_manager import ProcessManager
@@ -504,41 +506,145 @@ class LauncherApp:
         self._reject_label.pack(anchor="w", pady=(2, 0))
 
     def _build_access(self, parent: tk.Misc) -> None:
+        """Panel de acceso: este equipo siempre; la LAN **según el modo** (V3.73.x).
+
+        Con el bind en loopback la URL de LAN no responde, así que la fila no se
+        anuncia como si funcionara: dice el estado y ofrece el botón que cambia el
+        modo. El modo viaja al backend por su entorno, así que aplicarlo exige
+        volver a arrancarlo: `toggle_lan_mode` reutiliza el «Reiniciar» que ya
+        existe en la barra de acciones (con la app parada solo deja declarado el
+        modo, y lo dice).
+        """
         sec = self._section(parent, "Acceso a la app")
         grid = ttk.Frame(sec.body, style="Card.TFrame")
         grid.pack(fill="x", padx=14, pady=(4, 12))
-        mdns_ok = mdns_available()
-        mdns_label = (
-            "Nombre local (mDNS)"
-            if mdns_ok
-            else "Nombre local (mDNS) — no resuelve, usa la IP"
+
+        self._access_row(grid, 0, "🖥️", "Este equipo (HTTPS)", frontend_url())
+
+        # Fila de LAN: valor dinámico + botón de modo (las dos cosas se refrescan
+        # en `_refresh_access`, sin reconstruir el panel).
+        ttk.Label(grid, text="📡", style="Service.TLabel").grid(
+            row=1, column=0, sticky="w", padx=(0, 6), pady=3
         )
-        rows = [
-            ("🖥️", "Este equipo (HTTPS)", frontend_url()),
-            ("📡", "Red local (LAN)", lan_url()),
-            ("🏷️", mdns_label, local_url()),
-        ]
-        for i, (icon, label, url) in enumerate(rows):
-            ttk.Label(grid, text=icon, style="Service.TLabel").grid(
-                row=i, column=0, sticky="w", padx=(0, 6), pady=3
-            )
-            ttk.Label(grid, text=label, style="Service.TLabel").grid(
-                row=i, column=1, sticky="w", pady=3
-            )
-            self._link(grid, url).grid(
-                row=i, column=2, sticky="e", padx=(20, 0), pady=3
-            )
+        ttk.Label(grid, text="Red local (LAN)", style="Service.TLabel").grid(
+            row=1, column=1, sticky="w", pady=3
+        )
+        self._lan_value = ttk.Frame(grid, style="Card.TFrame")
+        self._lan_value.grid(row=1, column=2, sticky="e", padx=(20, 0), pady=3)
+        self._lan_toggle = ttk.Button(
+            grid, style="Ghost.TButton", command=self.toggle_lan_mode
+        )
+        self._lan_toggle.grid(row=1, column=3, sticky="e", padx=(10, 0), pady=3)
+        self._lan_toggle.bind("<Enter>", self._on_lan_toggle_hover)
+
+        ttk.Label(grid, text="🏷️", style="Service.TLabel").grid(
+            row=2, column=0, sticky="w", padx=(0, 6), pady=3
+        )
+        ttk.Label(grid, text="Nombre local (mDNS)", style="Service.TLabel").grid(
+            row=2, column=1, sticky="w", pady=3
+        )
+        self._mdns_value = ttk.Frame(grid, style="Card.TFrame")
+        self._mdns_value.grid(row=2, column=2, sticky="e", padx=(20, 0), pady=3)
         grid.columnconfigure(1, weight=1)
-        note = ttk.Label(
-            sec.body,
-            text=(
-                "🔐 Primera conexión desde un móvil: instala/confía el certificado "
-                "local (abre la app y ve a Ayuda → Conectar un dispositivo)."
-            ),
-            style="DimCard.TLabel",
-            wraplength=COLUMN_W - 30,
+
+        self._access_note = ttk.Label(
+            sec.body, style="DimCard.TLabel", wraplength=COLUMN_W - 30
         )
-        note.pack(anchor="w", fill="x", padx=14, pady=(0, 12))
+        self._access_note.pack(anchor="w", fill="x", padx=14, pady=(0, 12))
+        self._refresh_access()
+
+    # Aviso con el que se explica el botón (deja claro que reinicia el backend).
+    _LAN_TOGGLE_HINT = (
+        "Activa o desactiva el acceso desde otros equipos. Se aplica "
+        "reiniciando el servidor (la app se recarga)."
+    )
+
+    def _on_lan_toggle_hover(self, _event: object) -> None:
+        """Explica el botón al pasar el ratón, sin pisar un mensaje en curso."""
+        if not self._action_running:
+            self._msg.set(self._LAN_TOGGLE_HINT)
+
+    def _access_row(
+        self, grid: ttk.Frame, row: int, icon: str, label: str, url: str
+    ) -> None:
+        """Fila fija icono + texto + enlace (el propio equipo)."""
+        ttk.Label(grid, text=icon, style="Service.TLabel").grid(
+            row=row, column=0, sticky="w", padx=(0, 6), pady=3
+        )
+        ttk.Label(grid, text=label, style="Service.TLabel").grid(
+            row=row, column=1, sticky="w", pady=3
+        )
+        self._link(grid, url).grid(row=row, column=2, sticky="e", padx=(20, 0), pady=3)
+
+    def _set_access_value(self, frame: ttk.Frame, url: str | None, dim: str) -> None:
+        """Pinta la columna de valor: enlace si hay URL, texto apagado si no."""
+        for child in frame.winfo_children():
+            child.destroy()
+        if url is None:
+            ttk.Label(frame, text=dim, style="DimCard.TLabel").pack(anchor="e")
+            return
+        self._link(frame, url).pack(anchor="e")
+
+    def _refresh_access(self) -> None:
+        """Reescribe LAN y mDNS según el modo vigente (sin reconstruir el panel)."""
+        expuesta = lan_mode()
+        self._set_access_value(
+            self._lan_value,
+            lan_url() if expuesta else None,
+            "desactivada (solo este equipo)",
+        )
+        # `mdns_available()` resuelve un nombre: solo se consulta si la fila
+        # puede ofrecer algo.
+        if not expuesta:
+            self._set_access_value(self._mdns_value, None, "—")
+        elif mdns_available():
+            self._set_access_value(self._mdns_value, local_url(), "")
+        else:
+            self._set_access_value(self._mdns_value, None, "no resuelve, usa la IP")
+
+        self._lan_toggle.configure(
+            text="Desactivar red local" if expuesta else "Activar red local"
+        )
+        if expuesta:
+            self._access_note.configure(
+                text=(
+                    "🔓 Red local activa: cualquiera en esta red puede abrir la app "
+                    "y ver los perfiles (todavía no hay contraseñas). Primera "
+                    "conexión desde un móvil: instala/confía el certificado local "
+                    "(Ayuda → Conectar un dispositivo)."
+                )
+            )
+        else:
+            self._access_note.configure(
+                text=(
+                    "🔒 La red local está desactivada: la app solo responde en este "
+                    "equipo. Actívala para usarla desde el móvil y abre el puerto "
+                    "con launcher\\allow-firewall.ps1."
+                )
+            )
+
+    def toggle_lan_mode(self) -> None:
+        """Activa/desactiva el acceso desde la red local y lo aplica reiniciando.
+
+        El modo lo lee el **proceso del backend** de su entorno
+        (`core.backend_env`), así que cambiar la variable aquí no basta: hay que
+        volver a arrancarlo para que uvicorn se enlace a la interfaz nueva. Con la
+        app parada el modo queda declarado y se aplica al arrancar.
+        """
+        if self._action_running:
+            return
+        set_lan_mode(not lan_mode())
+        self._refresh_access()
+
+        en_marcha = self.pm.backend_running() or fetch_health() is not None
+        if not en_marcha:
+            self._msg.set(
+                "Modo de red guardado: se aplicará al arrancar la app."
+                if lan_mode()
+                else "Red local desactivada: se aplicará al arrancar la app."
+            )
+            return
+        self.restart()
 
     def _link(self, parent: tk.Misc, url: str) -> ttk.Label:
         """Etiqueta de enlace clicable que abre la URL en el navegador."""

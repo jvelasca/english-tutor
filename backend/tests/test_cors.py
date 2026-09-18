@@ -15,12 +15,17 @@ def test_cors_allows_127_0_0_1_5173():
         assert r.headers.get("access-control-allow-origin") == "http://127.0.0.1:5173"
 
 
-def test_cors_allows_lan_ip_origin():
+def test_cors_rejects_lan_ip_origin_without_lan_mode():
+    """V3.73.x: sin modo LAN declarado, la red local no recibe CORS.
+
+    Antes cualquier IP privada recibía `Access-Control-Allow-Origin`, así que un
+    equipo de la misma red podía leer respuestas de la API desde su navegador sin
+    que nadie hubiera pedido exponer la app.
+    """
     with TestClient(app) as client:
-        r = client.get(
-            "/api/health", headers={"Origin": "http://192.168.1.42:5173"}
-        )
-        assert r.headers.get("access-control-allow-origin") == "http://192.168.1.42:5173"
+        r = client.get("/api/health", headers={"Origin": "http://192.168.1.42:5173"})
+
+    assert "access-control-allow-origin" not in r.headers
 
 
 def test_cors_allows_the_product_origin_8000():
