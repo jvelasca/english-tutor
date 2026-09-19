@@ -64,7 +64,7 @@ Sin datos reales la justificación es provisional. Cuando exista una cohorte:
 
 1. Recoger overall por peldaño y `result` por ítem (ya se registra en evidencia).
 2. Comparar tasa de paso con retención a +7 días (`RETENTION_MIN_DAYS`) y ratio ≥ 0.9: si la retención cae por debajo de 0.9 con overall 0.80, el nivel 0.80 es insuficiente y hay que subirlo.
-3. Medir si el sesgo posicional (auditoría A/B) infla el overall en listening/vocabulary: corregir el sesgo **antes** de calibrar con alumnos.
+3. Medir si el sesgo posicional (auditoría A/B) infla el overall en listening/vocabulary: corregir el sesgo **antes** de calibrar con alumnos. **El sesgo del currículum se cerró en V3.75.1** (`mc-bias` ≤ 33,5 % por posición), así que este paso queda como **medición** de si el reequilibrio mueve el overall, no como corrección pendiente.
 4. Revisar el fallback C1/C2 con alumnos que certifican B2: ¿`READINESS_MINIMUMS` 0.70 es alcanzable/permissivo?
 
 ## Regenerar / Verificar

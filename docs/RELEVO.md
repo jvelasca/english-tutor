@@ -3,7 +3,51 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-18 (UTC+2).
+> Actualizado por última vez: 2026-09-19 (UTC+2).
+>
+> **Nota (2026-09-19): V3.75.1 (cierre del P0 del sesgo posicional del currículum)
+> — release de PARCHE y de CONTENIDO, sin capacidad pedagógica nueva.**
+> **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar las evaluaciones
+> (`assessments.json`), pero SÍ toca el currículum (`CURRICULUM_VERSION` 1.3.0 →
+> 1.3.1).** Cierra el **único P0** que quedaba abierto del motor pedagógico
+> (`docs/audit/AA-PED-CONTENIDO-CEFR.md` §3): **329 de 368 checks (89,4 %) tenían
+> la correcta en la posición 0** —y **A2, B2, C1 y C2 al 100 %**—, así que marcar
+> siempre la primera opción acertaba casi 9 de cada 10 sin leer el enunciado.
+> **(A) La regla.** En cada grupo de checks con el mismo nº de opciones `k`,
+> ordenados por `id` ascendente, el check en la posición `j` lleva la correcta a
+> **`j % k`**; se **mueve la correcta** y los distractores conservan su **orden
+> relativo** (una rotación cíclica lo rompía: el distractor que la precedía pasaba
+> a seguirla, y eso desordena opciones autoriadas en orden natural). **(B) El
+> instrumento.** `backend/scripts/rebalance_mc_positions.py` (`--check` /
+> `--write`), idempotente, con tres invariantes antes de escribir —forma canónica,
+> nº de líneas intacto y JSON válido— y reescritura **por líneas** para no
+> arrastrar formato: diff **614/614 líneas**. `--check` queda como **tripwire
+> re-ejecutable** para la reautoría de V4.0.x. **(C) El candado.**
+> `test_mc_position_bias_of_curriculum_checks_is_declared` se reescribe como
+> `test_mc_position_of_curriculum_checks_is_balanced`: **≤ 35 % por grupo de `k`**
+> y **ninguna posición muerta** (agregar los grupos escondería el 4.º distractor).
+> Su contrato anterior —fijar la cifra para forzar la re-auditoría al corregir— se
+> cumplió. **(D) Medición.** `mc-bias` pasa de `0:89,4 % · 1:10,1 % · 2:0,5 %` a
+> **`0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %`** (peor posición **33,5 %** por
+> grupo, bajo el límite del 35 %). **(E) `CURRICULUM_VERSION` 1.3.0 → 1.3.1**:
+> provenance pura —la constante se **sella** en evidencia y snapshots pero
+> **nunca se compara**—, así que no invalida el estado de ningún alumno.
+> **(F) Verificación.** Backend **2882 passed** (el **mismo** recuento que V3.75.0:
+> el test se reformuló **en sitio**, no se añadió ninguno), frontend vitest **721**
+> (87 ficheros), launcher **142**, `ruff` limpio, `check_release_consistency` en
+> los **6 orígenes** (`3.75.1`) y `validation_gate auto` **10/10**.
+> **Honestidad.** (i) **El P2 de longitud NO se cierra y es deliberado:** la
+> correcta sigue siendo la opción más larga en el **39,1 %** de los checks y en el
+> **50 %** del placement. (ii) **`assessments.json` no se toca**: sus 22 ítems
+> siguen con la correcta al **63,6 %** en la posición 0 (otro instrumento, con su
+> propio `ASSESSMENT_VERSION`). (iii) **Elimina el atajo, no mejora los ítems**:
+> mismos distractores y mismos enunciados. (iv) La asignación es estable **por
+> revisión de contenido**, no por ítem; `--check` es el candado que detecta la
+> desviación. (v) Que solo **10 de 368** checks tengan 4 opciones sigue siendo
+> deuda de forma. (vi) **Los 7 gates siguen `pending`** y el kit conserva la
+> identidad del pre-vuelo (`3.73.6` → `13cc30b`) como historia. Ver
+> `release-notes-v3.75.1.md`.
 >
 > **Nota (2026-09-18): V3.75.0 (la identidad la firma el servidor + cierre de
 > VG-N5/VG-N6) — release de PRODUCTO (minor), sin capacidad pedagógica nueva.**
@@ -3865,995 +3909,125 @@
 
 ## 0. START HERE — para el gerente que retoma ahora
 
-**Posición actual (2026-09-17):** `v3.73.6` **reproducibilidad de las cifras
-declaradas de la auditoría** (release de **PARCHE**, sin cambios de producto —ver la
-nota de cabecera—). Corrige la única cifra del punto de entrada que **no era
-reproducible en el entorno del auditor**: el recuento del backend. El **invariante
-son 2798 casos**; el reparto depende de artefactos **no versionados** (**2795 + 3** en
-un clon limpio sin `npm run build`, **2796 + 2** tras compilarlo, **2798 + 0** con
-`dist`, modelos Whisper y BD local), y los saltos son del `frontend/dist` (1) y del
-**modelo Whisper opt-in** (2), **no** «del banco de escenario» como se declaraba. El
-documento declara ahora invariante y reparto, marca la corrección como **errata** sin
-reescribir el histórico y pone los **11 nombres de job** uno por línea para que un
-`grep` literal funcione. **Verificación:** clon **nuevo desde GitHub** — `main` == tag,
-`git diff --stat v3.73.6..main -- backend frontend launcher scripts` **vacío**, run
-del commit del tag **11/11**, `check_release_consistency` en los **6 orígenes**
-(`3.73.6`), recuentos declarados comprobados uno a uno (43/19/23/19 = **104**;
-launcher **113** y **13 + 7 = 20**), frontend vitest **712 passed**, `ruff`/`tsc`
-limpios. **El código sigue congelado:** los 7 gates siguen en `pending` y **V4.0 no se
-declara** hasta que `status --strict` (y, con el árbol congelado, `status --strict
---same-tree`) salga 0. Ver la nota de cabecera y `release-notes-v3.73.6.md`.
+**Posición actual (2026-09-19):** `v3.75.1` **cierre del P0 del sesgo posicional del
+currículum** (release de **PARCHE y de CONTENIDO**, sin capacidad pedagógica nueva
+—ver la nota de cabecera—). **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar las evaluaciones
+(`assessments.json`), pero SÍ toca el currículum (`CURRICULUM_VERSION` 1.3.0 →
+1.3.1).** Cierra el **único P0** que quedaba abierto del motor pedagógico: **329 de
+368 checks (89,4 %) tenían la correcta en la posición 0** —y **A2, B2, C1 y C2 al
+100 %**—, así que marcar siempre la primera opción acertaba casi 9 de cada 10 sin leer
+el enunciado. El reparto pasa a `0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %` y el test
+que pinchaba el sesgo pasa a fijar el **invariante** (≤ 35 % por posición, sin
+posiciones muertas). **El código sigue congelado:** los 7 gates siguen en `pending` y
+**V4.0 no se declara** hasta que `status --strict` (y, con el árbol congelado,
+`status --strict --same-tree`) salga 0. Ver la nota de cabecera,
+`release-notes-v3.75.1.md` y `docs/audit/AA-PED-CONTENIDO-CEFR.md`.
 
-**Release anterior — `v3.73.5` ancla del punto de entrada de la
-auditoría** (release de **PARCHE**: **SIN migración de BD**, **SIN bump de
-`GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN
-tocar el currículum** y **SIN cambios de PRODUCTO**: backend de producto, frontend de
-producto y launcher intactos, y el arnés de validación, sus tests y el contrato de los
-7 gates sin tocar — el diff es **documentación**). Cierra un defecto **estructural** de
-trazabilidad que estaba admitido como rutina: el punto de entrada de la auditoría
-externa se publicaba **fuera del tag que declaraba**, porque fijaba a mano el SHA del
-commit de release, el objeto del tag anotado y el id del run de CI, y **esos tres datos
-no pueden existir** cuando se escribe el commit (un commit no contiene su propio SHA ni
-el id de la run que dispara su push). Consecuencia: cada cierre exigía un commit de
-re-anclaje **posterior al tag**, que a su vez quedaba fuera del tag siguiente, y `main`
-iba siempre por delante en documentación. **Desde V3.73.5 el ancla es el tag** —el commit
-y el objeto del tag se resuelven con `git rev-parse`, y el run con
-`gh run list --commit <sha>`—, así que el documento es coherente **dentro de su propio
-tag** y el commit de release es **final**: el tag **contiene** su punto de entrada.
-El invariante del código se enuncia **entre el tag y `main`** (`git diff --stat
-v3.73.5..main -- backend frontend launcher scripts` debe salir **vacío**), que es lo que
-el auditor puede comprobar al ejecutarlo. **Verificación:** `check_release_consistency`
-en los **6 orígenes** (`3.73.5`); sin cambios de producto, las cifras de test son las de
-V3.73.4 (frontend vitest **712 passed**, launcher **113**; el recuento del backend se
-**corrige en V3.73.6** —ver la nota de cabecera—), `ruff`/`tsc` limpios, i18n `--strict`
-**0/0/0** y `auto --require-dist` **10/10**. **El código sigue congelado:** los 7 gates
-siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` (y, con el
-árbol congelado, `status --strict --same-tree`) salga 0. Ver la nota de cabecera y
-`release-notes-v3.73.5.md`.
+> **El ancla de esta release es el tag `v3.75.1`, no un SHA escrito a mano.** Desde
+> V3.73.5, el commit y el objeto del tag se resuelven con `git rev-parse <tag>^{commit}`
+> y `git rev-parse <tag>` y el run con `gh run list --commit <sha>`, porque un commit no
+> puede contener su propio SHA ni el id de la run que dispara su push. El invariante del
+> código se enuncia **entre el tag y `main`**
+> (`git diff --stat v3.75.1..main -- backend frontend launcher scripts` debe salir
+> **vacío**), que es lo que el auditor puede comprobar al ejecutarlo.
 
-**Release anterior — `v3.73.4` recorder trazable** (release
-de **PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
-`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
-**SIN cambios de PRODUCTO**: backend de producto, frontend de producto y launcher
-intactos — el diff es el **arnés de validación**, sus **tests** y **documentación**).
-Cierra el eslabón que faltaba en la cadena de certificación: la evidencia de un gate
-**no decía contra qué commit se había probado**, de modo que siete gates verdes en siete
-commits distintos se podían presentar como «los siete gates». **(A) La evidencia sella el
-commit:** `record` escribe `head_sha` (`git rev-parse HEAD`) junto a estado, notas, fecha
-UTC y `VERSION`, y acepta `--ci-run` (id numérico o URL de la run; se guarda el id)
-—la cadena `commit → run → artefactos → gate records` queda dentro de
-`docs/audit/validation-evidence.json`—; un **`pass` sin commit se rechaza** (sin git no
-hay registro) y `fail`/`skip`/`pending` sí se registran sin SHA, porque declaran un
-no-cierre. **(B) La puerta fuerte de V4.0:** `status` imprime el commit por gate y marca
-la evidencia de otro árbol; `--strict` sigue significando «7/7» (el CI no cambia) y
-**`--strict --same-tree`** exige además que los siete `head_sha` sean el commit actual.
-**(C) `auto` vigila el formato:** la comprobación 10 falla si un `pass` no trae
-`head_sha` o si el `head_sha` (40 hex) o el `ci_run` (dígitos) son inválidos. **(D) Una
-sola cifra de gates humanos:** `Gate.human` se declara gate a gate y vale `True` en los
-**7** —el instrumento no ejecuta ningún flujo de la app—, y la expresión «7 gates (5 de
-ellos acción humana)» de notas históricas de V3.73.0 (los cinco bloques físicos de
-V3.72) queda explicada en el runbook. **(E) Documentación:** el kit y el runbook explican
-qué sella la evidencia, la regla del `pass` con commit, `--same-tree` y la tabla de
-identidad (`VERSION`/`HEAD`/run) del pre-vuelo; los 7 comandos `record` de la planilla
-llevan `--ci-run <run>`. **(F) Verificación:** `test_validation_gate_v373.py` 29 → **43**;
-backend **2798 casos** (invariante): **2795 + 3** en un clon limpio, **2796 + 2** tras
-`npm run build` y **2798 + 0** con `dist`, modelos Whisper y BD local —**errata
-(V3.73.6):** aquí se declaró «2796 passed · 2 skipped» y saltos «del banco de
-escenario»; ver `release-notes-v3.73.6.md`—;
-`ruff` limpio; frontend sin cambios de producto (`tsc` limpio, vitest **712 passed**,
-`npm run build` OK); launcher **113**;
-`check_release_consistency` en los **6 orígenes** (`3.73.4`); i18n `--strict` **0/0/0**;
-`auto --require-dist` **10/10**. **El código sigue congelado:** los 7 gates siguen en
-`pending` y **V4.0 no se declara** hasta que `status --strict` (y, con el árbol
-congelado, `status --strict --same-tree`) salga 0. Ver la nota de cabecera y
-`release-notes-v3.73.4.md`.
+### La línea V3.75, en dos releases
 
-**Release anterior — `v3.73.3` kit de validación de los 7 gates** (release de
-**PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
-`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
-**SIN cambios de PRODUCTO**). Entrega el **kit de campo**
-(`docs/audit/KIT-VALIDACION-GATES.md`) para ejecutar los 7 gates, corrige la **deriva de
-protocolo** que habría hecho probar el dev server de Vite (`:5173`) en lugar del
-producto (`:8000`) en G1 y G4, y generaliza el guard a `check_gate_protocol_origins`
-(id `gate-origins`) sobre los **tres** protocolos funcionales (**5 tests nuevos**;
-`test_validation_gate_v373.py` 24 → 29). Re-ancló el punto de entrada de la auditoría
-externa a `ae14dbd` (tag `v3.73.3`, objeto `7715fc2`), con el invariante **verificado** y
-el CI **11/11** en el run `35219576565`. Ver `release-notes-v3.73.3.md`.
+- **`v3.75.0` — la identidad la firma el servidor** (release de **PRODUCTO**: cambia el
+  contrato de la API; **SIN** migración de BD, bump de generador/política, banco ni
+  currículum). Fase 2 del P0 de identidad: `POST /api/session` emite `et_session`
+  firmada (HMAC, **solo stdlib**, comparación en tiempo constante) en cookie
+  `HttpOnly`/`SameSite=Lax`, y `?user_id=` **deja de significar nada** (`403` al editar
+  el perfil de otro). Cierra además `VG-N5` (Actions fijadas por SHA, `deps-audit`
+  bloqueante, Dependabot) y `VG-N6` (superficie sin sesión declarada por escrito). Ver
+  `release-notes-v3.75.0.md` y `docs/audit/PLAN-P0-IDENTIDAD.md` §14.
+- **`v3.75.1` — el P0 del sesgo posicional del currículum** (esta release, arriba).
 
-**Release anterior — `v3.73.2` corrección de la CI de V3.73.1** (release
-de **PARCHE correctiva**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
-`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y **SIN
-cambios de PRODUCTO**: backend de producto, frontend de producto y launcher intactos —
-solo **tests e instrumento de auditoría** del backend más documentación). V3.73.1
-(commit `59e731d`, tag `v3.73.1`) se publicó **con la CI en rojo**: el job `Backend (ruff
-+ pytest)` falló (`1 failed, 2775 passed`) porque
-`test_ped_coverage_v370::test_reading_has_no_dedicated_scorer` afirmaba que existe
-`frontend/src/features/reading/` —la parte «UI sí» de la asimetría de `reading`— y el
-borrado de `ReadingPractice` (§6 de V3.73.1) dejó ese directorio **vacío**, que para git
-es lo mismo que **inexistente**: en el disco del autor seguía ahí (suite local **2779
-passed**) y en un checkout limpio no (CI **1 failed**). El invariante se **reapunta sin
-debilitarlo**: la UI de `reading` es el **chat con destreza** `/chat/lectura`, así que
-`audit_dossier.py` declara `reading.ui = chat:lectura` con la tabla explícita
-`UI_ARTIFACT_PATHS` (tipo + ruta; los otros 8 artefactos conservan su `is_dir()`) y el
-test comprueba el **cableado real** del router de chat (`reading: "lectura"`) más
-`ui_exists true` en el dossier; el dossier se regenera **sin** gap espurio de «sin
-feature de UI». **Lección de proceso, declarada:** un invariante que depende de rutas del
-árbol solo se verifica en un **checkout limpio**, no en el árbol de trabajo; V3.73.2 se
-verifica así (`git worktree`). **El código sigue congelado:** los 7 gates siguen en
-`pending` y **V4.0 no se declara** hasta que `status --strict` salga 0. Ver la nota de
-cabecera y `release-notes-v3.73.2.md`.
+### Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar)
 
-**Release anterior — `v3.73.1` cierre GUI pre-V4.0** (release de
-**PARCHE**: **SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
-`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
-**SIN tocar backend ni launcher**). Cierra los **seis hallazgos GUI/UX (P2/P3)** que
-el dictamen externo de cierre de V3.73.0 dejó abiertos: grid del hub y
-`aria-labelledby` (GUI-01/02), **Reading/Writing explícitos como prácticas con el
-tutor** con rutas propias `/chat/lectura` y `/chat/escritura` (GUI-04, Opción A),
-jerarquía núcleo/auxiliares en la bottom-nav (GUI-03/08), `prefers-reduced-motion`
-respetado por las animaciones `motion/react` (GUI-05) y **contraste de los 7 acentos
-medido con instrumento propio** (GUI-06: texto de acento derivado del acento, con
-guarda en CSS y en navegador; relleno + tinta y borde **cuantificados** y aplazados a
-V4.0.x porque exigen re-rampar la paleta). **El código queda congelado:** los 7 gates
-siguen en `pending` y **V4.0 no se declara** hasta que `status --strict` salga 0. Ver
-la nota de cabecera de este documento y `release-notes-v3.73.1.md` (**su CI salió roja**
-y se corrigió en V3.73.2 sin tocar producto).
+**La lista viva, fase por fase, es `docs/audit/PARKED.md`** — su sección `V3.75`
+(identidad) y `V3.75.1` (contenido) es la declaración honesta de lo que esta línea
+**no** cierra; léela antes de buscar «lo que falta». Aquí queda solo lo que gobierna la
+planificación inmediata:
 
-**Release anterior a esa — `v3.73.0` Validation release** (release de **VALIDACIÓN**: **SIN
-migración de BD**, **SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**,
-**SIN tocar el banco**, **SIN tocar el currículum**, **SIN capacidad pedagógica nueva**
-y **SIN tocar el frontend**). Cierra el endurecimiento mínimo que el dictamen externo
-de V3.72 dejó como P2/P3 —**runtime de producto fail-closed** y **descubrimiento de la
-LAN sin direcciones públicas**— y construye el **arnés de los 7 gates**
-(`scripts/validation_gate.py`), que convierte una validación física que **nadie ha
-ejecutado todavía** en **estado registrado y exigible**: los 7 gates están en
-`pending` y **V4.0 no se declara** hasta que `status --strict` salga 0.
-`release-notes-v3.73.0.md` (commit de release `859c6c2`, tag anotado `v3.73.0`, CI
-11/11 en el run `35204203522`).
-
-**Release anterior — `v3.72.0` UX / product completion** (release de **PRODUCTO**:
-**SIN migración de BD**, **SIN bump de `GENERATOR_VERSION` ni
-`DECISION_POLICY_VERSION`**, **SIN tocar el banco**, **SIN tocar el currículum** y
-**SIN capacidad pedagógica nueva**). V3.69 validó la **arquitectura** del motor
-adaptativo, V3.70 midió su **pedagogía** y V3.71 el **suelo físico**; V3.72 cierra
-el eslabón que ve el alumno: **que el producto se sirva de verdad, que diga la
-verdad sobre lo que descarga y suena, y que el alumno entienda qué hace y por qué**.
-**Cuatro ejes** (`UA` servido real de la UI · `RD`/`RA` voz/TTS en la UI · `UX`
-deuda declarada · `AE` instrumentos).
-
-**Lo que cambia de verdad en el producto** (todo con test que falla sin el cambio):
-**(UA)** el backend **sirve `frontend/dist`** (`StaticFiles` + fallback SPA
-**fail-open**) y el producto pasa a **un solo proceso HTTPS en `:8000`** (la raíz
-sirve la UI; los metadatos del servicio se mueven a `/api`), con **certificado TLS
-autofirmado determinista** (`services/tls_cert.py` + `scripts/ensure_tls_cert.py`,
-dependencia nueva `cryptography`) que cubre los SANs de LAN/mDNS y **no se
-versiona**; el **launcher pasa de dos procesos a uno** (compila el `dist` si falta
-y añade `--ssl-certfile/--ssl-keyfile`), el firewall abre **solo el 8000** y el CI
-gana el job **`product-origin`** ⇒ **`RC-01` CERRADO** con la afirmación honesta
-«**Node no es requisito de EJECUCIÓN**» (el `dist` no se versiona: sigue siendo
-requisito de **compilación**). **(RD/RA)** la UI **deja de ser sorda** a la
-degradación: `voz.ts` devuelve `{voice, degraded}`, **aborta de verdad**
-(`AbortController`) y todo el TTS pasa por `speakWithVoice`, con **aviso no
-bloqueante** de voz degradada y **consentimiento de descarga** (~60 MB, una vez,
-con Internet, progreso **indeterminado** porque el endpoint es síncrono); el
-**auto-download implícito del traductor desaparece** ⇒ `RD-04` y la mitad de
-`RA-01` **cerrados**. **(UX)** **F4** (`PanelState` en los tres paneles que se
-tragaban los errores con un `catch` vacío), **F2** (Home lee el readiness **una
-sola vez**), **F3** («estás aquí» con `home.youAreHere` + objetivo), **i18n a 0
-huérfanas** (eran **10** reales, no 50: la auditoría contaba falsos positivos de
-familias dinámicas) con el checker en **`--strict` dentro del CI**, y **«por qué
-esta actividad»** extendido con una sola pieza (`WhyThisActivity`) al **pie «Next»
-de cada práctica** y a la **cola de repaso**, **sin recalcular señales en cliente**.
-**(AE)** **AE-04** divulga en el instrumento y su contrato que el placement mide
-**reconocimiento/meta-lenguaje** (no producción) —la UI queda **con fase a V4.0.x**
-y **candado tripwire** porque **no existe pantalla** que lo muestre— y **AE-06**
-unifica los **umbrales de banda triplicados** en `services/cefr.py`, **retira las
-sub-bandas `+` de la emisión** (siguen como descriptores y como posición) y
-conserva el emisor de **`pre-a1`**.
-
-**Tests:** backend **2694 passed** (2643 → **+51**, los 5 ficheros `*_v372.py`),
-frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
-`ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
-orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs**, **8/8 verde**
-en el
-[run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
-(el nuevo `product-origin` se estrena ahí).
-
-**Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar):**
-
-1. **RA-05 — corte de red real (ACCIÓN HUMANA).** Los 12 flujos tienen veredicto
-   **estático**. En CI es **imposible** por la premisa 12, así que «offline verde»
-   en CI sería **simulado**. Hay que ejecutar el protocolo de
-   `docs/audit/RA-RUNTIME-OFFLINE.md` §5 con la red desconectada.
-2. **RB-05 — máquina físicamente limpia (ACCIÓN HUMANA).** Existen el runbook y la
-   verificación previa, pero nadie los ha ejecutado en un sistema recién instalado.
-3. **RA-02 — el endpoint de Ollama no está declarado en `config.py`** (se delega en
-   el default de la librería y `OLLAMA_HOST` no se contempla).
-4. **G5 — matriz de dispositivos** sigue **10/10 en ⬜**.
-5. **AE-04 — divulgación en UI del placement: sin superficie.** No existe pantalla
-   de nivelación; la divulgación vive en el instrumento y hay un **candado
-   tripwire** que falla en cuanto alguien muestre el resultado sin divulgarlo
-   (fase declarada **→ V4.0.x**).
-6. **RC-01 (residuo honesto) — el `dist` no se versiona** ⇒ Node sigue siendo
+1. **Los 7 gates de validación física siguen `pending`.** **V4.0 no se declara** hasta
+   que `status --strict` (y `--strict --same-tree` con el árbol congelado) salga 0. Kit
+   y protocolo: `docs/audit/KIT-VALIDACION-GATES.md`.
+2. **Acción humana, no trabajo del proyecto** (detalle en `PARKED.md`): corte de red
+   real (`RA-05`, protocolo §5 de `docs/audit/RA-RUNTIME-OFFLINE.md`), máquina
+   físicamente limpia (`RB-05`), **matriz de dispositivos** (G, 10/10 en ⬜ →
+   `docs/DEVICE_MATRIX.md`) y **variabilidad LLM de speaking** con Ollama real
+   (`eval_speaking_variability`).
+3. **`AE-04` — divulgación del placement en UI: sin superficie.** No existe pantalla de
+   nivelación; la divulgación vive en el instrumento, con **candado tripwire** que falla
+   en cuanto alguien muestre el resultado sin divulgarlo (fase declarada **→ V4.0.x**).
+4. **`RA-02` — el endpoint de Ollama no está declarado** en `config.py` (se delega en el
+   default de la librería y `OLLAMA_HOST` no se contempla).
+5. **`RC-01` (residuo honesto) — el `dist` no se versiona** ⇒ Node sigue siendo
    requisito de **instalación/compilación**; «sin Node» solo es cierto una vez
-   compilado. Un **producto empaquetado y distribuible** (y el launcher fuera de
+   compilado, y un **producto empaquetado y distribuible** (y el launcher fuera de
    Windows) sigue **fuera de alcance**.
-7. **Progreso real de la descarga de voz** (exige rediseñar el endpoint síncrono a
-   streaming): declarado **fuera de alcance** en V3.72.
+6. **Progreso real de la descarga de voz** (exige rediseñar el endpoint síncrono a
+   streaming): declarado **fuera de alcance**.
+7. **`assessments.json` (exámenes y placement)** conserva su propio sesgo posicional
+   (**63,6 %** de sus 22 ítems en la posición 0) bajo su propio `ASSESSMENT_VERSION`: es
+   **otro instrumento** y su arreglo **no** se ha mezclado con el de V3.75.1. Igual que
+   el **P2 de longitud** (la correcta sigue siendo la opción más larga en el **39,1 %**
+   de los checks y el **50 %** del placement).
 
-**Honestidad:** el certificado es **autofirmado** (el navegador avisa y aceptarlo
-es un paso del usuario; **sin HTTPS no hay micrófono en LAN**); **`RC-01` se cierra
-como «Node no es requisito de EJECUCIÓN»**, **no** como «producto empaquetado»;
-el **progreso de descarga de voz es indeterminado** (no hay progreso real que
-consumir); **`AE-04` no se muestra en UI** porque no hay superficie; y **RA-05 /
-RB-05 / G5 siguen siendo acción humana**. V3.72 **no toca** banco, currículum ni
-umbrales de decisión del Planner. Ver `release-notes-v3.72.0.md`.
+**Honestidad:** el certificado es **autofirmado** (el navegador avisa y aceptarlo es un
+paso del usuario; **sin HTTPS no hay micrófono en LAN**); **V3.75.0 no es
+autenticación y la Fase 3 sigue sin decidir** —`POST /api/session` acepta cualquier
+`user_id` **existente** sin credencial, así que en modo LAN cualquiera que alcance la
+API puede **abrir sesión para cualquier perfil**; lo que ya no puede es **forjar** una
+identidad—; y **V3.75.1 elimina el atajo, no mejora los ítems** (mismos distractores y
+mismos enunciados, así que no sube la discriminación del ítem).
 
-**Siguiente incremento:** `V3.73 / V4.0` — la deuda que V3.72 deja declarada:
-pantalla de nivelación (con la divulgación de `AE-04` que su candado ya exige),
-progreso real de descarga, `RA-02` y, si el gerente lo prioriza, el paquete
-distribuible que haría literal el «sin Node».
+### PENDIENTE INMEDIATO
 
-**PENDIENTE INMEDIATO:** **auditoría externa de CIERRE del producto (antes de
-V4.0)**, anclada en `v3.73.0`. El punto de entrada **ya está elaborado y
-entregado**: `agentes/auditoria-total-externa-v373.md` (commit de release
-`859c6c2`, tag anotado `v3.73.0` objeto `8196ab7`, CI **11/11** en el
-[run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)),
-con **43 preguntas falsables** en 7 áreas y una **matriz de cierre de 15 áreas**.
-**Informe esperado:** `docs/audit/AI-AUDITORIA-CIERRE-V373.md` (el prefijo `AI` es
-el primero libre: `AG`/`AH` siguen reservados por los puntos de entrada de
-V3.70/V3.71, ambos **sin informe recibido**). Sustituye al punto de entrada de
-`v3.72.0`, que nunca llegó a elaborarse.
+**Auditoría externa de cierre del producto (antes de V4.0).** El punto de entrada
+vigente es `agentes/auditoria-total-externa-v375.md`, que **declara la posición
+`v3.75.0`**: si se lanza contra esta release hay que **re-anclarlo a `v3.75.1`** (la
+lección de V3.73.5 vale también para los puntos de entrada, no solo para el producto).
+**No se ha recibido informe**: el último archivado es `Y` (V3.68) y el prefijo previsto
+para el cierre era `AI`. La reserva de `AG`/`AH` para los puntos de entrada de
+V3.70/V3.71 sigue **sin consumir**.
 
-**CERRADA (2026-09-17) · v3.73.0:** commit de release **`859c6c2`**, tag anotado
-**`v3.73.0`** (objeto `8196ab7`) publicado en `main` —`origin/main` y el commit
-pelado del tag son el **mismo SHA**, verificado por git y por API— y **CI 11/11
-verde** en
-[run 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522)
-(sha `859c6c2`), con los tres jobs nuevos en verde, incluidos `Launcher (Windows,
-ruff + pytest)` (**bloqueante**) y `Product origin (Windows, informativo)`, que se
-estrena en verde. **Los 7 gates de validación física siguen en `pending`**:
-`status --strict` sale **1** a propósito y **V4.0 no se declara** hasta que salga 0.
+### Releases cerradas de la línea V3.7x — anclas verificables
 
-**CERRADA (2026-09-17) · v3.72.0:** commit de release **`096dcc4`**, tag anotado **`v3.72.0`**
-(objeto `da6fb6d`) publicado en `main` y **CI 8/8 verde** en
-[run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
-(sha `a36475a`), incluido el **job nuevo `Product origin (UI served over HTTPS)`**
-(`105121692280`) —que arranca uvicorn con TLS sobre el `dist` construido y comprueba
-que la raíz sirve HTML—, con `Backend` `105121692462`, `Frontend` `105121692317`,
-`Playwright` `105121691872`, `Content validation` `105121692417`, `Beta V3.0 gate`
-`105121692163`, `Release consistency` `105121692282` y `Launcher (ruff + pytest)`
-`105121692402`. **Auditoría externa de RELEASE de `v3.72.0`**: punto de entrada
-pendiente de elaborar (misma mecánica que la de `v3.71.0`, cuyo informe `AH` sigue
-pendiente de recibir).
+Resueltas del repositorio con `git for-each-ref`, **no** copiadas a mano. El detalle de
+cada una vive en su `release-notes-*.md`; el registro release a release, en
+`CHANGELOG.md` y `PLAN.md` (§«Estado actual»).
 
-**Anterior:** `v3.71.0` **Runtime real, offline verificado e instalación limpia**
-(release de **VERIFICACIÓN con endurecimiento mínimo**: **SIN migración**, **SIN
-bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`**, **SIN tocar el banco**,
-**SIN tocar el currículum** y **SIN capacidad pedagógica nueva**). V3.69 validó la
-**arquitectura** del motor adaptativo y V3.70 midió su **pedagogía**; V3.71 baja al
-**suelo físico**: qué necesita la máquina, qué toca Internet y qué le dice la app
-al usuario sobre sí misma cuando algo falla. **Seis ejes** (`RE` gates/CI/deriva ·
-`RA` offline real · `RB` instalación limpia · `RC` runtime de producto y salud
-honesta · `RD` dependencias ocultas y degradación · `RF` síntesis), con las
-**cuatro decisiones de alcance** del gerente aplicadas: **(A)** medir y **declarar**
-la frontera de `npm run dev` · **(B)** verificar y **guiar** el bootstrap de Ollama
-· **(C)** corregir la documentación **a favor de `config.py`** · **(D)** añadir el
-**job del launcher al CI**. **Lo que cambió de verdad:** **(RE)** el launcher deja
-de ser el único subsistema sin gate ⇒ **CI 7/7** y **4 derivas documentales**
-corregidas y pinchadas por test (incluido el **modelo por defecto**: la doc
-declaraba `qwen3.5:9b`, que el código **veta**; es `llama3.1:8b`). **(RD)** se
-cierra el **P1 de TTS/offline diferido 4 veces desde V3.46**: el `timeout` de la
-descarga de voces era **código muerto** (`urlretrieve` no lo acepta), así que la
-**única dependencia de Internet en ruta de producto** estaba **sin límite** y su
-degradación era **muda**; ahora hay timeout **real** (15 s por operación de
-socket), descarga **atómica**, verificación de tamaño y degradación **observable**
-(`X-TTS-Voice`/`X-TTS-Degraded`). **(RC)** la **salud de la UI deja de mentir**
-(tres estados: **Conectado / Degradado / Desconectado**; antes decía «Conectado»
-con la BD o el modelo caídos porque leía `/api/health`, que responde **200
-siempre**) y el **sondeo de Ollama queda acotado**. **(RB)** la **voz con la que la
-app da clase** se vuelve alcanzable por la vía de producto (antes
-`ensure_voice_for_language("en")` **salía sin intentar la descarga**) y el
-bootstrap gana una **verificación previa de solo lectura** (`--check`). **(RA)**
-nuevo instrumento de runtime **de solo lectura y determinista** + protocolo de los
-12 flujos. **Hallazgos: P0 = 0 · P1 = 1 (cerrado) · P2 = 15 · P3 = 14**
-(`docs/audit/RF-SINTESIS-RUNTIME-V371.md`); de los 15 P2, **8 cerrados**, **3
-declarados con fase**, **3 abiertos que exigen ACCIÓN HUMANA** y **1 parcial**.
-**Tests:** backend **2643**, frontend **661**, launcher **75** (y **en CI**),
-`ruff` limpio.
+| Versión | Objeto del tag | Commit | Fecha |
+|---|---|---|---|
+| `v3.75.0` | `6e9e136` | `aa9dbaa` | 2026-09-19 |
+| `v3.74.0` | `267b082` | `f51daf5` | 2026-09-18 |
+| `v3.73.7` | `907397d` | `3bf891a` | 2026-09-18 |
+| `v3.73.6` | `32b4d8e` | `13cc30b` | 2026-09-17 |
+| `v3.73.5` | `c252ee1` | `e10b24d` | 2026-09-17 |
+| `v3.73.4` | `3f2ec88` | `5007c3a` | 2026-09-17 |
+| `v3.73.3` | `7715fc2` | `ae14dbd` | 2026-09-17 |
+| `v3.73.2` | `58a9ec1` | `cdc9dd0` | 2026-09-17 |
+| `v3.73.1` | `b19d0dd` | `59e731d` | 2026-09-17 |
+| `v3.73.0` | `8196ab7` | `859c6c2` | 2026-09-17 |
+| `v3.72.0` | `da6fb6d` | `096dcc4` | 2026-09-17 |
+| `v3.71.0` | `6ac22db` | `2eff6ea` | 2026-09-16 |
+| `v3.70.0` | `219038f` | `9ba9c49` | 2026-09-15 |
 
-**CERRADA (2026-09-16):** commit de release **`2eff6ea`**, tag anotado **`v3.71.0`**
-(objeto `6ac22db`) publicado en `main` y **CI 7/7 verde** en
-[run 35136141089](https://github.com/jvelasca/english-tutor/actions/runs/35136141089)
-—incluido el **job nuevo `Launcher (ruff + pytest)`**
-(`104928880868`), que es la decisión **D** verificada en GitHub—, con `Backend`
-`104928881073`, `Frontend` `104928880539`, `Playwright` `104928880854`,
-`Content validation` `104928880771`, `Beta V3.0 gate` `104928880924` y
-`Release consistency` `104928880910`. **Auditoría externa de RELEASE** entregada
-como punto de entrada (informe `AH` pendiente de recibir).
+Comando para re-verificar la tabla entera:
 
-**Anterior:** `v3.70.0` **Auditoría pedagógica + CEFR** (release de **MEDICIÓN, no
-de capacidad**): **cinco ejes** AA→AE más síntesis AF, **1 P0 · 15 P1 · 12 P2 · 5
-P3** (33 hallazgos abiertos) y **4 propiedades positivas**; **cero líneas de lógica
-de producto** (solo **5 subcomandos de medición de SOLO LECTURA** en
-`backend/scripts/audit_dossier.py`, tests, bumps de versión y documentación).
-**V3.70 no corrige nada**: cada insuficiencia queda declarada y asignada a fase
-(**contenido → V4.0.x · motor y acreditación → Planner 4.0 · instrumentos →
-V4.0.x/V3.72**). **Los 6 P2 de la auditoría de V3.69 siguen abiertos** por decisión
-de alcance. **Tests:** **+48** (5 ficheros `test_ped_*_v370.py`), backend **2600
-passed**. Detalle completo en `release-notes-v3.70.0.md` y en la nota de la
-cabecera de este documento.
-**CERRADA (2026-09-16):** commit de release `9ba9c49` (+ documental `2db93ba`),
-tag anotado `v3.70.0` publicado en `main` y **CI 6/6** verde (run
-[35062382562](https://github.com/jvelasca/english-tutor/actions/runs/35062382562):
-Backend **2598 passed + 2 skipped**, Frontend **659 tests** + build, Playwright
-**25 passed + 26 skipped**). **Auditoría interna** por decisión de alcance (sin
-punto de entrada externo).
+```powershell
+git for-each-ref --sort=-creatordate --format='%(refname:short) | %(objectname:short) | %(*objectname:short) | %(creatordate:short)' refs/tags
+```
 
-Antes, `v3.69.0` **E2E + Adaptive Engine Validation** (release de **VALIDACIÓN,
-no de capacidad**: **SIN migración**, **SIN bump de `GENERATOR_VERSION`**, **SIN
-tocar el banco**, **SIN tocar el argmax del Planner** y con **cero líneas de
-lógica de PRODUCTO**). Demuestra **por HTTP** que la cadena
-`Evidence → Student State → Decision Projection → Task selection → Decision →
-Serving → Attempt → Outcome → Evidence` funciona como **una sola pieza**, con la
-batería **E01–E19** (`backend/tests/test_adaptive_e2e_v369.py`, **20 tests**,
-incluido el contrato del endpoint huérfano `GET /api/learning/decisions`) y el
-contrato de frontend con red mockeada
-(`frontend/tests/visual/drillProvenance.spec.ts`, **2 specs** de navegador).
-**Ningún escenario demostró que la arquitectura sea insuficiente ⇒ no se tocó
-producción.** **Cinco hallazgos medidos, aceptados como deuda declarada**
-(E01(a) arranque en frío sin provenance · E08 `abandoned_count` no cuenta el
-abandono del lifecycle · E15 la servida caducada se reabre · E17
-`SCAFFOLDING_PENALTY` suma al hueco en vez de penalizar la tarea · §F-1
-`abandoned` prematuro por doble montaje de `StrictMode`; tabla completa en
-`release-notes-v3.69.0.md` §C). **Verificada en local:** `pytest` backend
-**2552 passed** (+20), `ruff` limpio, `vitest` **659**, `tsc`/`build` OK,
-launcher OK, `check_release_consistency` **3.69.0**,
-`check_beta_v3`/`content_validation`/`transfer_validation` OK. **CERRADA:**
-commit `9a4e70a` + tag anotado `v3.69.0` + push (**CI 6/6** run
-[34978215154](https://github.com/jvelasca/english-tutor/actions/runs/34978215154)).
-Antes, `v3.68.0` **Adaptive Engine Hardening &
-Integrity** (release **SIN migración destructiva** —migración ADITIVA e
-idempotente de dos columnas en `decision_records`—, **SIN bump de
-`GENERATOR_VERSION`, SIN tocar el banco y SIN capacidad pedagógica nueva**, que
-cierra los **tres P1 de segunda generación** de la auditoría de V3.67 más el
-**P2-08** y es la primera release de la serie que toca el frontend por un motivo
-de **MEDICIÓN** y no de UI). **Auditada externamente** por el dossier
-`docs/audit/Y-AUDITORIA-TOTAL-V368.md`: **9,3 / 10 GLOBAL**, **0 P0 · 0 P1 · 6 P2
-· 5 P3**, con los tres P1 de V3.67 confirmados como **cerrados** y **el diseño
-del motor adaptativo declarado CONGELADO**. Commit `8acee38` + tag `v3.68.0`
-(**CI 6/6** run `34964205252`, declarado por el release). Detalle en
-`release-notes-v3.68.0.md`.
-Antes, `v3.67.0` **Task Identity 2.0 + Decision Lifecycle + Provenance
-Analytics** (cierre de los dos P1 de V3.66), `v3.66.0` **Task-Level Empirical
-Success + Decision Provenance**, `v3.65.0` **Observed Difficulty 3.0**
-(`P(éxito | alumno, tarea)` empírica), `v3.64.1` **Consistencia
-snapshot/fingerprint** y `v3.64.0` **Decision Projection + Planner 3.0**.
-Antes, `v3.63.0` **Observed Task Difficulty 2.0 y
-honestidad del Student Skill State** (release SIN migración destructiva —una columna
-aditiva idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN
-cambios de UI que cierra la deuda de **honestidad** que V3.62 dejó declarada por
-escrito más el **P1-02** y los **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la
-auditoría `U`: **identidad de evidencia y OCASIONES** (una evaluación expandida a N
-competencias es UNA ocasión y el dedup solo puede acreditar menos), **canal
-OBSERVADO** del evento por actividad declarada (`spontaneous_use` escrito →
-`interaction`; oral → `speaking`), **dificultad EMPÍRICA** en el módulo puro
-`services/observed_difficulty.py` (techos servido/acreditado, dependencia de
-andamiaje, carga experimentada y la MISMA puerta espaciada de V3.54),
-**confianza de EVALUACIÓN** separada de la estadística, **criterio declarado** de
-pronunciación, **capas declaradas** de listening reutilizando `SKILL_LAYER`, **seam
-de política** del gate (tabla vacía, cero umbrales nuevos) y **frescura** de la
-caché del estado —una caché vieja NUNCA se sirve como fresca—). **La decisión de
-tareas sigue BYTE-IDÉNTICA** y el guard estructural de V3.62 sigue verde sin
-tocarse. **Verificada en local** (`pytest` **2430 passed**, `ruff` limpio, launcher
-**75**, `tsc` OK, `vitest` **651**, `build` OK, `check_release_consistency`
-**3.63.0**, `check_beta_v3`/`content_validation` OK y `transfer_validation` OK).
-**CERRADA:** commit de release `73cebb4`, **CI 6/6** (run
-[34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
-y etiqueta anotada `v3.63.0` creada y empujada. Detalle en
-`release-notes-v3.63.0.md`. Antes, `v3.62.0` **Student Skill State 4.0
-(modalidad × competencia)** (release SIN migración explícita de BD —columna aditiva
-idempotente en `learning_profile`—, SIN bump de `GENERATOR_VERSION` y SIN cambios de
-UI que unificó los dos modelos del alumno en **UN** estado `{modalidad:
-{competencia: entry}}` alimentado por las CUATRO fuentes de evidencia con la MISMA
-puerta espaciada de V3.54 y el gate REUTILIZADO de `services/competence.py`, sin un
-solo umbral nuevo; cierra el P1-03 de `S` y es estrictamente ADITIVA: la decisión de
-tareas sigue leyendo EXACTAMENTE el estado de V3.61 y se prueba byte a byte).
-**CERRADA**: commit de release `f4bcee2`, **CI 6/6** (run
-[34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
-y etiqueta anotada `v3.62.0` creada y empujada. Detalle en
-`release-notes-v3.62.0.md`. Antes, `v3.61.0` **Instance-aware Evidence +
-Anti-spoiler Guard** (release SIN migración explícita de BD —columna aditiva
-idempotente en `learning_evidence`—, SIN bump de `GENERATOR_VERSION` y SIN
-cambios de UI que cierra los **dos defectos funcionales** de la auditoría `T` de
-V3.60 y la parte determinista de los P1 de `S`: guard anti-spoiler sobre la
-superficie SERVIDA, identidad inmutable de instancia GET→POST,
-`context_instance` aditivo en el ledger manteniendo `context_id = FAMILIA`,
-cap estratificado, rotación no secuencial y validador de contenido; banco
-**358 → 1020** superficies). **CERRADA**: commit `1b4af42`, **CI 6/6** (run
-[34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926))
-y etiqueta anotada `v3.61.0` empujada. Las **notas de la cabecera** de este
-documento son la fuente de verdad más reciente y detallan también la `v3.60.0`
-**Context Engine 4.0**
-(release
-SIN migración de BD, SIN bump de `GENERATOR_VERSION` y SIN cambios de UI que
-sustituye las 60 consignas escritas a mano por un ESPACIO de instancias
-PARAMETRIZADO por familia: FAMILIA → ESPECIFICACIÓN → INSTANCIA, con la
-identidad de evidencia intacta —`context_id` sigue siendo la familia—, el banco
-de 60 a 358 superficies y la carga de la superficie servida explícita y
-persistida de forma aditiva); las **notas de la cabecera** de este documento son
-la fuente de verdad más reciente y detallan también la `v3.59.0` **Context
-Engine 3.0 (Context Bank Family/Instance)**, la `v3.58.0` **Sense Engine 2.0**,
-la `v3.57.0` **Planner 2.0 (argmax `(skill, actividad)` sobre ELV)**, la
-`v3.56.0` **Planner 2.0 (`expected_learning_value`)** y la `v3.55.0` **Task
-Difficulty 3.0**. La sección siguiente se conserva como histórico del hilo V3.38
-(fecha original 2026-09-10, `v3.38.1`).
+### Histórico anterior a V3.70
 
-**Auditorías de V3.60 recibidas y aplicadas (2026-09-14).** Hay **dos** informes
-archivados con veredictos **divergentes**: `docs/audit/S-AUDITORIA-TOTAL-V360.md`
-(profunda: **9,6/10 APROBADA**, 0 P0, 3 P1, 5 P2, 2 P3) y
-`docs/audit/T-AUDITORIA-TOTAL-V360.md` (funcional: **2 defectos**, uno alta y otro
-media). El consolidado está en la **nota superior** de este documento: `S` acierta
-en la arquitectura pero acotó el anti-spoiler al `template` y no a los **valores
-de slot**, y ahí `T` encontró la **fuga del target** (`shopping`, índice 7 sirve
-«You are in **a supermarket**…», `backend/services/transfer.py:1074` y `:2978`) y
-la **identidad de instancia no inmutable** (`TransferAttemptIn` sin superficie,
-`backend/schemas/vocabulary.py:826`; POST que recalcula con el contador actual,
-`backend/domain/vocabulary.py:850`). El **CI 6/6** de V3.60 queda como
-**documentado, no verificado de forma independiente**. **V3.61 — Instance-aware
-Evidence + Anti-spoiler Guard** cierra ambos defectos más la parte determinista de
-los P1 de `S` (guard anti-spoiler por unidad objetivo, identidad inmutable de
-instancia GET→POST, `context_instance` aditivo en el ledger sin migración,
-cap **estratificado** en `_expand_spec`, rotación no secuencial a partir del tercer
-intento y **validador de contenido** del `instance_space`) y quedó **CERRADA**
-(`VERSION` `3.61.0`; `pytest` **2373
-passed**, `ruff` limpio, launcher **75 passed**, `tsc` OK, `vitest` **651**,
-`build` OK, `check_release_consistency` **3.61.0**, `check_beta_v3`/`content_validation`
-OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores**). Banco
-**358 → 1020 superficies**; en `shopping` el guard retira **12** superficies con la
-unidad `supermarket` y conserva **39** servibles. **Cerrada** con el commit de
-release `1b4af42`, **CI 6/6** (run
-[34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
-con el paso de validación del espacio **en verde** en el job Backend) y etiqueta
-anotada `v3.61.0` creada y empujada. Detalle en `release-notes-v3.61.0.md`
-(la nota superior de este documento tiene el resumen completo de V3.61).
-
-**Auditorías de V3.62 recibidas (2026-09-14).** Se archivan el informe profundo
-`docs/audit/U-AUDITORIA-TOTAL-V362.md` (**9,5 / 10 APROBADA**: 0 P0, **2 P1**, 5
-P2, 2 P3; letra `U`, porque la `R` sigue reservada al informe pendiente de V3.59) y
-el punto de entrada de la auditoría externa
-`agentes/auditoria-externa-v362.md` (informe esperado en
-`docs/audit/V-AUDITORIA-TOTAL-V362.md`). V3.62 **sí** cierra el problema
-arquitectónico (ya no hay dos modelos del alumno aislados) y evita tres errores
-graves (no convierte dificultad en competencia, no inventa competencias, no mezcla
-modalidades), pero **el estado nuevo todavía no gobierna la decisión de tareas**.
-Los dos P1: **P1-01** el Skill State es DESCRIPTIVO y debe volverse DECISIONAL por
-una capa intermedia (`Student Skill State → Decision Projection → Planner`, nunca
-`skill_state → planner` directamente), y **P1-02** la semántica
-`spontaneous_use → interaction` debe evolucionar cuando exista conversación oral
-real (distinguir interacción escrita y oral según el **CANAL** observado, no según
-la skill). Deuda P2 aceptada: competencia de pronunciación (P2-11), eje declarado de
-capas de listening (P2-12), granularidad por duplicación (P2-13), semántica del gate
-por pareja (P2-14), frescura de la caché del estado (P2-18), confianza de evaluación
-vs estadística (P2-19) y dificultad empírica (P2-20). El **CI 6/6** de V3.62 queda
-como **documentado, no verificado de forma independiente** (P3-02).
-
-> **Nota (2026-09-14): V3.63.0 (Observed Task Difficulty 2.0 y honestidad del
-> Student Skill State)** — release **v3.63.0**, **SIN migración destructiva** (una
-> columna aditiva idempotente más, `learning_profile.skill_state_source`), **SIN
-> bump de `GENERATOR_VERSION`, SIN tocar el banco y SIN cambios de UI**, que cierra
-> la deuda de **honestidad** que V3.62 dejó declarada por escrito y los hallazgos
-> **P1-02** y **P2-11/P2-12/P2-13/P2-14/P2-18/P2-19/P2-20** de la auditoría `U`.
-> **La invariante central de V3.62 se mantiene:** la decisión de tareas queda
-> **byte-idéntica** (ELV, planner, `difficulty` y `transfer.context_for`) y el guard
-> estructural (`test_skill_state_v362.py`, **sin tocarse**) sigue verde: V3.63 hace
-> el estado más **honesto**, no más **decisivo**.
-> **(A) Identidad y OCASIONES (P2-13).** La fila canónica gana `evidence_id`,
-> `activity_id`, `assessment_id` y `occasion_key`: una evaluación que se expande a
-> N competencias son **N muestras y UNA ocasión**. La entrada expone `observations`
-> (filas) y `occasions` (mediciones independientes) y el dedup **solo puede
-> acreditar menos**, nunca más; sin identidad declarada por la fuente la degradación
-> es **EXACTA** a V3.62 (`occasions == samples`).
-> **(B) Canal OBSERVADO (P1-02).** `MODALITIES_BY_ASSESSED_CHANNEL` se **deriva** de
-> `LEXICAL_MODALITY` × `ASSESSMENT_MODE_MODALITY` (sin vocabulario nuevo) y declara
-> dos entradas explícitas: `("spontaneous_use", "written") → interaction` (el
-> `chat`/transfer de hoy) y `("spontaneous_use", "spoken") → speaking` (el canal que
-> V3.62 no podía expresar). El canal sale de la actividad **declarada** en el evento
-> (`task_semantics.assessment_mode_for` sobre `activity_from_activity_id`) y solo se
-> cae al mapa por skill cuando la fila no declara canal: un evento oral alimenta el
-> canal evaluado por **expansión declarada**, nunca por reinterpretación.
-> **(C) Observed Task Difficulty 2.0 empírica (P2-20, núcleo).** Nuevo módulo
-> **puro** `services/observed_difficulty.py` (sin I/O, sin reloj, sin `hash()` ni
-> `random()`): `served_ceiling` (lo pedido), `credited_ceiling` (lo logrado),
-> `scaffolding_gap` (su distancia = dependencia de andamiaje), `experienced_load`
-> (carga servida modulada por coste OBSERVADO y ya persistido, con tablas
-> DECLARADAS y monótonas y las constantes `planner.SLOW_RECALL_MS`/
-> `LATENCY_CEILING_MS`) y `observed_task_difficulty_2(rows)` con la **MISMA puerta
-> espaciada** de V3.54: sin 2 éxitos en 2 días **no se declara ninguna medida**. Las
-> tres dificultades de V3.55 eran HECHOS de la tarea; esta cuarta pata mira el
-> RESULTADO y un coste desconocido **no modula** (no se imputa nada).
-> **(D) Confianza de EVALUACIÓN (P2-19).** `assessment_confidence` (banda mínima +
-> motivos) se deriva SOLO de hechos ya persistidos (canal, `support_level`,
-> transcripción, audio ralentizado, repeticiones, instancia de transferencia no
-> declarada) y queda **separada** de la `confidence` **estadística**, que no cambia
-> de fórmula: eran dos cosas y ahora se llaman distinto.
-> **(E) Pronunciación con criterio DECLARADO (P2-11).** `_academy_rows` usa `item_id`
-> como competencia cuando la ruta ya puntúa un criterio de rúbrica (sin expandir por
-> subdestrezas del objetivo ni inventar rúbrica); la **práctica libre** mantiene la
-> competencia `""` con el motivo escrito (`PRONUNCIATION_PRACTICE_REASON`).
-> **(F) Capas declaradas de listening (P2-12).** `COMPETENCE_LAYERS_BY_MODALITY`
-> **reutiliza** `services.listening.SKILL_LAYER`/`LISTENING_LAYERS` sin añadir una
-> sola cadena (16 de 18 competencias; `dictation`/`shadowing` fuera con motivo:
-> son PRODUCCIÓN) y `skill_state_summary` gana `layers`.
-> **(G) Seam de política del gate (P2-14).** `CompetenceGate` + `gate_for(...)` con
-> `COMPETENCE_GATE_POLICIES` **vacía** y un test que lo fija: parametrizar la puerta
-> por pareja es ahora una decisión explícita, **sin umbrales nuevos**.
-> **(H) Frescura del estado (P2-18).** `evidence_fingerprint(user_id)` sella las
-> cuatro fuentes, `skill_state_source` guarda el sello al escribir la caché y
-> `skill_state_is_fresh(user_id)` lo compara: una caché vieja, vacía o **sin sello**
-> (legacy) **NUNCA** se reporta como fresca. El «recomputar una vez si está vieja»
-> del camino de decisión es **V3.64**.
-> **Contrato aditivo:** la entrada gana `observations`, `occasions`,
-> `assessment_confidence` y `observed_task_difficulty_2`; el resumen gana `layers`;
-> **todas** las claves de V3.62 siguen ahí y con el mismo significado. Tests: nuevo
-> `backend/tests/test_observed_task_difficulty_v363.py` (**26**, escrito **antes**
-> del código) más un e2e HTTP de `/api/profile` que fija que el contrato es aditivo;
-> `test_skill_state_v362.py` sigue verde **sin tocarse**. Verificación local:
-> `pytest` **2430 passed**, `ruff` limpio, launcher **75**, `tsc` OK, `vitest` **651**
-> (76 ficheros), `build` OK, `check_release_consistency` **3.63.0**, `check_beta_v3`
-> y `content_validation` OK y `transfer_validation` OK. **CERRADA:** commit de
-> release `73cebb4`, **CI 6/6** (run
-> [34868713056](https://github.com/jvelasca/english-tutor/actions/runs/34868713056))
-> y etiqueta anotada `v3.63.0` creada y empujada. **Compromiso fechado que
-> sigue abierto:** **P1-01** se cierra en **V3.64** con **Decision Projection +
-> Planner 3.0**, y la proyección se calculará desde las **MISMAS filas canónicas**
-> que el estado (nunca desde la caché).
->
-> **Nota (2026-09-14): auditoría `W` de V3.63.0 archivada.** Se archiva el informe
-> profundo como `docs/audit/W-AUDITORIA-TOTAL-V363.md` (**9,6 / 10 APROBADA**; 0 P0,
-> **1 P1**, 4 P2, 2 P3; letra `W` porque la `R` sigue reservada al informe nunca
-> publicado de V3.59 y la `V` al informe externo de V3.62). Veredicto: V3.63 es una
-> de las releases **arquitectónicamente más importantes** del proyecto porque, más
-> allá de `observed_difficulty.py`, cierra la deuda de **honestidad epistemológica**
-> del Student Model (`NO SABEMOS → no inventamos`; una observación **no** es una
-> ocasión independiente; un éxito **no** implica confianza de evaluación alta; lo
-> ESCRITO **no** se convierte en `speaking`; la carga SERVIDA **no** se confunde con
-> competencia). **El P1-01 nuevo es conceptual y NO se parchea** (no hay V3.63.1):
-> `observed_task_difficulty_2()` sigue siendo *máxima carga servida/experimentada
-> superada bajo puerta espaciada* y **mezcla dificultad con esfuerzo**
-> (`DIFFICULTY ≠ EFFORT`); el seam creado (módulo puro, determinista, sin I/O, sin
-> reloj, sin `random()`, sin LLM y sin umbrales nuevos) es **el correcto**, así que
-> la solución definitiva corresponde a la **Decision Projection/Planner 3.0**
-> (V3.64) y a **Observed Difficulty 3.0** (V3.65), no a otra tabla de heurísticas
-> aislada. P2 aceptados como deuda del siguiente escalón: fingerprint `COUNT(*) +
-> MAX(id)` (P2-01; suficiente si las tablas son append-only por contrato),
-> `experienced_load()` mezcla coste con dificultad (P2-02), `error_type` como coste
-> homogéneo (P2-03; `ASR low_confidence` es incertidumbre de MEDIDA, no dificultad)
-> y el máximo por dimensión sobreestima capacidad (P2-04; formalizar
-> `highest_demonstrated_load` ≠ `empirical_task_difficulty`). P3: el estado nuevo
-> sigue **sin gobernar** el Planner (P3-01, el P1-01 heredado, comprometido a V3.64)
-> y el **CI 6/6** de V3.63 queda como **documentado, no verificado de forma
-> independiente** (la API devuelve `statuses: []`; P3-02). **Roadmap confirmado por
-> el auditor:** V3.64 → **V3.65 Observed Difficulty 3.0** → V3.66 Adaptive Instance
-> Selection → V3.67+ Sense Engine 2.0.
->
-> **Nota (2026-09-15): V3.65.0 (Observed Difficulty 3.0) — `P(éxito | alumno, tarea)` EMPÍRICA.**
-> Release **v3.65.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
-> tocar el banco y SIN cambios de UI**. Convierte la dificultad observada de MEDIDA
-> **DECLARADA** (V3.63) en una ESTIMACIÓN **EMPÍRICA** por pareja que, cuando existe,
-> gobierna el `p_success` del Planner 3.0 —sin romper la pureza del planner ni la
-> degradación byte-idéntica—. Hasta V3.64 el léxico devolvía SIEMPRE
-> `success_rate = 1.0` (`list_observed_rows` filtraba `success = 1` y `_lexicon_rows`
-> fijaba `success = True`): V3.65 cierra ese hueco con tres piezas ADITIVAS.
-> **(A) Telemetría completa (`repositories/evidence.py`):** nuevo lector
-> `list_attempt_rows` (éxitos Y fallos + identidad `target_id`/`surface_form`);
-> `list_observed_rows` queda **intacto** (sigue alimentando V3.53/V3.54 con solo
-> éxitos). **(B) Fila canónica (`services/skill_state.py`):** `_row` gana `target_id`
-> (aditivo) y `_lexicon_rows` procesa el fallo como INTENTO (`score 0.0`,
-> `dimensions {}`); la puerta espaciada del estado sigue leyendo SOLO `success`
-> (2/2 no cambia). **(C) Estimador puro (`services/observed_difficulty.py`):**
-> `empirical_success(rows)` agrupa por clave de tarea
-> (`target_id`/`actividad`/`dificultad servida`) → `{successes, attempts, p_success,
-> days}` reutilizando la MISMA puerta espaciada de V3.54; puro, determinista, sin
-> reloj/random/hash, sin umbrales nuevos; sin muestra espaciada NO declara.
-> **(D) Decision Projection (`services/decision_projection.py` + `domain/decision.py`):**
-> la celda expone `empirical_success` (derivado de la `confidence` YA calculada, que
-> NO se confunde con `assessment_confidence`) y `empirical_success_by_skill` por eje
-> léxico; `project_state` añade la clave aditiva `empirical_success`. **(E) Planner 3.0**
-> (`services/planner.py` + `services/lexicon.py`): `expected_learning_value` y
-> `select_task_by_elv` ganan el parámetro opcional `empirical_success` que, si es
-> válido (0..1), gobierna `p_success` (marcado `p_success_empirical`); sin él (o
-> inválido), la predicción es EXACTAMENTE la de V3.64 (margen declarado). **Tests:**
-> `test_observed_difficulty_v365.py` (**18**, test-first) fija la tasa empírica < 1.0
-> con fallos (premisa 12), la agrupación por tarea, la pureza, el `p_success`
-> acotado y la degradación byte-idéntica sin estimación. **Honestidad:** la
-> estimación se inyecta al NIVEL DE SKILL (cómo decide el planner), no por ítem; la
-> granularidad fina por pareja (`empirical_success` por `target_id`) queda
-> DISPONIBLE para V3.66 (Adaptive Instance Selection).
-
-> **Nota (2026-09-15): V3.64.1 (Consistencia snapshot/fingerprint) — P1-01/P1-02 del re-sellado CERRADOS.**
-> Patch **v3.64.1**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
-> tocar el banco y SIN cambios de UI**. Corrige los dos **P1** de la auditoría de
-> V3.64: **(P1-01)** la carrera durante el recálculo/sellado del estado —la huella
-> se tomaba DESPUÉS de leer las fuentes, así que una evidencia que entrara en la
-> ventana quedaba representada en el sello pero **no** en el estado sellado, y
-> `skill_state_is_fresh()` podía servir estado viejo como fresco—; **(P1-02)** el
-> TOCTOU de la caché, formalizado declarando la huella observada al inicio de la
-> decisión. **(A) Sellado estable (`domain/decision.py`):** `_recompute` toma la
-> huella ANTES y DESPUÉS de leer/calcular el estado y solo sella si coinciden
-> (reintento acotado `_SEAL_MAX_ATTEMPTS = 3`); si no coinciden devuelve la huella
-> ANTERIOR (más vieja que el estado), de modo que la caché se reporta **no fresca**
-> y se recomputa. **(B) Sello del perfil (`domain/profile.py`):** el sello se lee
-> ANTES de `_compute_profile` (garantiza huella ≤ estado) y se corrige el
-> comentario que razonaba la carrera al revés. **(C) Snapshot de decisión**
-> (`domain/decision.py`): `project_state`/`decision_projection` exponen
-> `snapshot_fingerprint` —la huella de las cuatro fuentes observada al INICIO de la
-> decisión—: token de trazabilidad, **no** el sello de caché; el camino del perfil
-> lo deja vacío. **Tests:** sellado estable y snapshot fingerprint en
-> `test_decision_projection_v364.py`; los 27 existentes verdes. **Honestidad:** no
-> es V3.65 (Observed Difficulty 3.0) ni Decision Provenance; los P2 de calibración
-> pedagógica quedan para V3.65+.
-
-> **Nota (2026-09-14): V3.64.0 (Decision Projection + Planner 3.0) — P1-01 CERRADO.**
-> Release **v3.64.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`, SIN
-> tocar el banco y SIN umbrales nuevos** (el único cambio de UI es la línea de
-> motivos DECLARADOS en la cola de repaso, con i18n en/es). Cierra el **P1-01** (heredado de las auditorías
-> de V3.62 y `W` de V3.63) y, por contrato, los **P2-02/P2-03/P2-04** del informe
-> `W`. **La invariante cambia aquí, pero con una frontera declarada:** el Student
-> Skill State deja de ser **descriptivo** y **gobierna la decisión de tareas**
-> SIEMPRE por la capa explícita `Student Skill State → DECISION PROJECTION →
-> Planner 3.0` y **NUNCA** `skill_state → planner`; el planner sigue **puro** y
-> **ciego** al estado persistido (recibe `capacity_by_skill`/`skill_values`/
-> `drivers`, que son proyecciones).
-> **(A) Módulo puro `services/decision_projection.py` (nuevo).** Mismo contrato que
-> `observed_difficulty.py` (sin I/O, sin reloj, sin `random()`/`hash()`, nunca
-> lanza). `project(state)` separa **carga** (`highest_demonstrated_load` —nombrado
-> como lo que es, P2-04—, `served_ceiling`, `credited_ceiling`,
-> `scaffolding_gap = servido − acreditado`) de **esfuerzo** (nivel declarado + carga
-> EXTRA `experimentado − servido`) (P2-02), con `confidence` (estadística) y
-> `assessment_confidence` (banda + motivos) **sin fusionar** y `retention`/
-> `transfer`/`novelty` como señales de primera clase. `error_type` se reparte con
-> una tabla DECLARADA en error de TAREA (señal de dificultad) e INCERTIDUMBRE DE
-> MEDIDA (baja la confianza de evaluación y **nunca** sube la carga: `low_confidence`
-> de ASR, `empty`, `semantic_doubt`) (P2-03). `capacity_by_skill` es el
-> **reemplazo directo** de `lexicon._capacity_by_skill` (mismas cuatro claves de
-> `LEXICAL_SKILLS`) con una celda PROVISIONAL **fuera de la comparabilidad** (el
-> argmax de V3.57 no premia la ignorancia); `skill_values` pondera
-> `gap`/`retention`/`transfer`/`effort` con pesos DECLARADOS que suman 1.0
-> (`assessment_confidence` **no** es un peso: es un filtro); `drivers` es el bloque
-> explicable del punto 26 del informe y `has_comparable_capacity` declara la
-> condición de degradación.
-> **(B) Hechos ADITIVOS del estado (`services/skill_state.py`).** `_entry` expone lo
-> que YA calculaba y no publicaba —`kinds`, `production_count`, `last_evidence`,
-> `contexts`, `error_types` y `review_due`— con **cero recálculo y cero cambio de
-> semántica**: el estado solo DECLARA los hechos; clasificarlos es de la proyección.
-> **(C) Planner 3.0 aditivo (`services/planner.py`).** `select_task_by_elv` gana
-> `skill_values`/`drivers` OPCIONALES y devuelve el bloque aditivo `decision`
-> (`expected_learning_value`, `p_success`, `margin`, `value`, `capacity_skill`,
-> `comparable`, `source` `argmax`/`cascade`, `projected`, `difficulty_fit` —encaje
-> declarado con las bandas YA existentes de V3.56, sin umbrales nuevos—, `drivers`,
-> `why` y las alternativas puntuadas), más `explain_drivers` y `explain_priority`
-> extendido de forma aditiva. **Invariante: sin `skill_values`/`drivers` NO se añade
-> ninguna clave y la respuesta es byte-idéntica a V3.63** (`_has_projection` lo fija
-> en el código).
-> **(D) `domain/decision.py` (nuevo, I/O).** `decision_projection(user_id, level,
-> now)` lee el perfil (que ya trae `skill_state` y su sello), usa la caché SOLO si
-> `skill_state_is_fresh` la valida y, si está VIEJA, vacía o es **legacy sin sello**,
-> **recomputa UNA vez** desde las CUATRO fuentes canónicas con el helper
-> `canonical_sources` **compartido** con `domain/profile.py` (la secuencia vive en un
-> solo sitio y no puede divergir del perfil) y la **re-sella**. `source`
-> (`cached`/`recomputed`) hace el comportamiento auditable. `project_state` es el
-> único punto donde el payload se ensambla (puro) y el perfil lo reutiliza.
-> **(E) Recableado declarado y degradable (`domain/review.py` + `services/lexicon.py`).**
-> La cola construye la proyección **UNA vez** y la pasa a sus DOS pasadas; con
-> proyección, `review_queue_item` usa su capacidad/valores/drivers y añade `decision`
-> al ítem. **Degradación declarada y probada:** si la proyección **no declara
-> capacidad comparable** (el estado calla), se conserva **EXACTAMENTE** el camino de
-> V3.54/V3.63 (estimador anterior, `skill_priorities` como valor y **sin** bloque
-> `decision`), de modo que **ninguna petición pierde señal ni cambia de tarea por el
-> solo hecho de existir la proyección**; sin `projection` el camino es el de V3.63,
-> byte a byte. `_queue_sort_key` no cambia: solo cambia **de dónde sale el ELV**.
-> **(F) Contrato aditivo.** `schemas/learning.py` (ítem → `decision`),
-> `schemas/profile.py` (`/api/profile` → `decision_projection`) y espejo en
-> `frontend/src/types/api.ts` (`ReviewDecision`, `ReviewDecisionAlternative`,
-> `ReviewDecisionDrivers`, `DifficultyFit`); **UI mínima declarada:** la cola de
-> repaso muestra una línea con las bandas de la proyección (encaje, hueco,
-> transferencia, retención, esfuerzo y confianza de evaluación) con su alcance en
-> el `title` y **nada** cuando el estado no declara medida, con claves i18n
-> `dictionary.review.decision.*` en en/es.
-> **Tests:** nuevo `backend/tests/test_decision_projection_v364.py` (**27**) que fija
-> pureza/determinismo, la forma de la proyección (carga vs esfuerzo, error vs
-> incertidumbre), la paridad y el filtro de comparabilidad de la capacidad, la
-> retención como señal de primera clase, los drivers, la degradación EXACTA a V3.63,
-> la **contraprueba positiva de que el estado AHORA SÍ gobierna** (la tarea servida
-> cambia y se explica), la frescura/recompute-once y el contrato aditivo e2e HTTP.
-> **`test_skill_state_v362.py` y `test_planner_argmax_v357.py` siguen verdes SIN
-> TOCARSE.** Verificación local: `pytest` **2458 passed**, `ruff` limpio, launcher
-> **75**, `tsc` OK, `vitest` **653** (76 ficheros), `build` OK,
-> `check_release_consistency` **3.64.0**, `check_beta_v3`/`content_validation` OK y
-> `transfer_validation` OK (la release NO toca el banco).
-> **CERRADA (2026-09-15):** commit de release `aa52d55`, **CI 6/6** (run
-> [34903883846](https://github.com/jvelasca/english-tutor/actions/runs/34903883846))
-> y etiqueta anotada `v3.64.0` creada y empujada.
-> **Honestidad (deuda declarada de V3.64):** `observed_task_difficulty_2` **no** se
-> convierte en `P(éxito | alumno, tarea)` empírica (V3.65), `highest_demonstrated_load`
-> **no** es dificultad empírica (P2-04), la proyección **solo gobierna cuando el
-> estado tiene algo que decir** (degradación visible en `decision.source`), el
-> fingerprint de frescura sigue siendo `COUNT(*) + MAX(id)` (P2-01) y el gate sigue
-> sin parametrizar por pareja.
->
-> **Relevo para el siguiente agente (2026-09-14): V3.65 — Observed Difficulty 3.0.**
-> V3.64 dejó el **P1-01 cerrado** y la frontera declarada por escrito: la proyección
-> ya gobierna, pero **cuando el estado calla la decisión sigue siendo la de
-> V3.54/V3.63**. El siguiente incremento convierte la **medida** declarada
-> (`observed_task_difficulty_2`: techos servido/acreditado/experimentado bajo puerta
-> espaciada) en una estimación **empírica** `P(éxito | alumno, tarea)` con la que
-> cerrar esa frontera — con dos reglas que la auditoría `W` dejó escritas y que
-> **no** se pueden relajar: (1) la carga máxima DEMOSTRADA
-> (`highest_demonstrated_load`) **no** es dificultad empírica y no debe renombrarse
-> como si lo fuera; (2) la estimación debe seguir separando **dificultad** de
-> **esfuerzo** y **error de tarea** de **incertidumbre de medida** (P2-02/P2-03), y
-> no puede introducir umbrales nuevos sin declararlos. Puntos de apoyo ya en el
-> árbol: `services/decision_projection.py` (celdas `load`/`effort`/`assessment_
-> confidence` y `has_comparable_capacity`), `services/observed_difficulty.py` (las
-> tres capas y sus tablas declaradas), `domain/decision.py` (caché validada +
-> recompute-una-vez) y el bloque `decision` del Planner 3.0, que es donde la
-> estimación tendría que entrar **sin** romper el invariante de no-regresión.
-> Verifica el estado real del árbol antes de empezar (premisas 8 y 12).
-
-**Histórico (2026-09-10):** `v3.38.1` **Cierre quirúrgico de los P1 del
-Planner + UI de diccionario y estado** — patch ADITIVO sobre V3.38.0 que cierra
-sus 4 P1 (planner globalmente óptimo, señales por modalidad, `skill_gap` parcial
-accionable y automaticidad robusta), endurece `situation` (nuevo módulo puro
-`services/situation.py`; `GENERATOR_VERSION` 1.2.1) y reubica en la UI el
-diccionario (ruta dedicada `/diccionario`) y el estado de conexión (cabecera,
-sin barra inferior). Sin migración de BD y sin tocar scoring, FSRS ni la
-semántica del intervalo de evidencia.
-
-**Base inmediata — V3.38.0, «La siguiente tarea óptima: `situación`, planner y
-automaticidad por skill».** V3.38.0 dejó la evidencia fina (modalidad, latencia,
-tipo de error, apoyo, contexto) USÁNDOSE para planificar y para hablar por
-modalidad: **(1)** El `skill` del ledger léxico deja de ser `""`
-(vocabulario canónico `LEXICAL_SKILLS` + mapeo canal→skill), el resumen segmenta
-los éxitos por skill (puro + SQL con paridad exacta) y `automatic_skills` mide
-automaticidad POR modalidad: un ítem no es "automático" por mezclar
-reconocimiento con producción. **(2)** Nuevo `services/planner.py` (Optimal Next
-Task): `planned_signals` (olvido, hueco, debilidad, dependencia de apoyo,
-latencia) + `priority_score` con pesos declarados + `evidence_reason`
-(`error_prone`, `skill_gap`, `slow_recall`); la cola de repaso se ordena por
-`priority` (desempate por `retrievability` y palabra) y expone
-`priority`/`signals`/`why`/`automatic_skills` sin spoiler. **(3)** `situación`:
-`GENERATOR_VERSION` 1.2.0 y columna `dictionary_entries.situation` (migración
-aditiva e idempotente) — un enunciado situacional con un único hueco `_____`,
-validado de forma determinista y descartado (sin invalidar definición/traducción)
-si no cumple; es el TECHO de la escalera de recall (`situation`, apoyo `guided`),
-servido por el drill y recomendado por la cola, degradando siempre hacia más
-apoyo. Contrato aditivo; sin tocar scoring, FSRS ni la semántica del intervalo de
-evidencia. Cerradas antes la **V3.37.1** (política de consolidación y regresión
-de la escalera: solo asciende con ≥2 éxitos en ≥2 días naturales distintos y
-RETROCEDE hacia más apoyo ante ≥2 fallos sin ningún éxito) y la **V3.37.0**
-(Learning Evidence 3.0: cues graduados `translation (cued) < definition (cued) <
-cloze (guided)` + automaticidad por evidencia espaciada), la **V3.36.0**
-(Learning Evidence 2.0: el ledger captura el CÓMO de cada evento) y la
-**V3.35.x** (Longitudinal Learning Evidence 1.0 + patch de integridad). La
-V3.38.1 tiene **CI 6/6 en verde** (run
-[34500794657](https://github.com/jvelasca/english-tutor/actions/runs/34500794657)
-sobre `856e115`). Versión en
-`config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`.
-**Las notas de la cabecera de este documento son la fuente de verdad más
-reciente**; si contradicen a esta sección, mandan las notas.
-
-**Siguiente incremento (V3.39) — arquitectura por skill del planner (definida,
-no implementada).** V3.38.1 dejó la SEGMENTACIÓN montada y consumida en parte: el
-planner ya recibe `planned_signals.skills[skill] = {attempts, successes,
-success_rate, weakness, support, latency}` (calculado por `planner.skill_signals`
-a partir de `skill_attempts`/`skill_successes`/`skill_independent_successes`/
-`skill_mean_response_time_ms`, con paridad pura↔SQL), y de ahí ya se derivan
-`automatic_skills`, el `skill_gap` PARCIAL (solo oral) y el `slow_recall` por
-latencia de `recall`. Lo que queda para V3.39 es la DECISIÓN, no la señal:
-
-- **Elegir skill + actividad óptima, no solo la razón.** Hoy `priority_score` es
-  GLOBAL y la actividad sale de `ACTIVITY_FOR_REASON` (razones cualitativas). El
-  paso siguiente es puntuar por (skill, actividad) —argmax sobre
-  `planned_signals.skills` con los mismos pesos declarados— para que el planner
-  pueda decir "la modalidad limitante es `spoken_production`, la tarea es
-  `sentence`" y no solo "hay un hueco oral".
-- **Routing de ESCRITURA para `written_production`.** Hoy el hueco simétrico
-  (`spoken ✓ / written ✗`) se expone en `signals.skill_gaps` pero NO emite razón
-  accionable: no hay un drill de escritura en la cola (el `sentence` del drill
-  actual es oral). V3.39 debe añadir esa ruta para que el hueco de escritura sea
-  accionable igual que el oral (P1-03 quedó cerrado solo para el oral, a
-  propósito).
-- **`spontaneous_use` sin actividad.** La cuarta modalidad se mide pero no tiene
-  tarea asociada (el canal legacy `chat` mapea a ella); decidir su actividad es
-  parte de la decisión por skill.
-- **Recencia ponderada de fallos y calibración de pesos.** `AUTOMATIC_MAX_WRONG_
-  WORD_ERRORS` es una aproximación determinista SIN recencia (documentada en
-  `services/evidence.py`) y `PRIORITY_WEIGHTS` no se ha optimizado: V3.39 los
-  convierte en señales ponderadas por tiempo/skill.
-- **`sense`/CEFR/contexto + transferencia real (V3.23).** La transferencia por
-  contexto sigue diferida (el `gap` de transferencia existe como señal, 0.5).
-- **Deudas menores:** `cloze_coverage` de corpus, `example_for_many` de la Review
-  Queue y refactor de `wordDrill.tsx`.
-
-Sin cambio de modelo de evidencia previsto: V3.38.0 ya dejó el ledger segmentado
-por modalidad y V3.38.1 dejó el planner leyendo la evidencia fina por modalidad,
-así que V3.39 puede atacar la decisión sin migración.
-
-**Histórico (hasta V2.4, 2026-08-31):** `v2.4.0` **CURRICULUM COVERAGE verificada en verde**
-(la versión está elevada a `2.4.0` en `config.py`/`package.json`/`package-lock.json`/`CHANGELOG`/`README`/`PLAN`).
-Cerrada la **V2.4 AUDITORÍA DE COBERTURA CURRICULAR** (instrumentación que responde con datos a
-"¿el alumno puede recorrer completo A1→C2?": servicio puro `services/curriculum_coverage.py` con
-`coverage_sections`/`bank_intersection`/tri-estado `complete`/`partial`/`empty`/`level_coverage`/
-`curriculum_coverage_report`, métrica **TOTAL CURRICULUM COVERAGE = 42/49 celdas (85,7%)** distinta de
-TOTAL VALIDATED LEARNING ITEMS = 189, integrada en `content_stats()` (anti-drift), CLI
-`scripts/curriculum_coverage.py` (`--strict` = exit 1 si hay huecos `empty`), tests
-`test_curriculum_coverage.py` (9 invariantes, backend 971 tests) y mapa `docs/CURRICULUM_COVERAGE.md`
-con los huecos priorizados; Pre-A1 solo marcado como hueco, sin contenido), y antes la
-**V2.3 PERSONAL DICTIONARY** (bajar el modelo de evidencia de "destreza" a "palabra/estructura":
-columnas `cefr`/`level_id`/`objective_id`/`source`/`lemma`/`kind` en `vocabulary` vía migración idempotente,
-siembra de `objective.vocabulary` + `objective.concepts` cableada en `submit_objective_assessment` y
-`record_lesson_completed`, servicio puro `services/lexicon.py` con `item_mastery`/`item_recall`/`item_status`
-(`mastered`/`known`/`learning`/`weak`)/`next_review_days`/`cefr_distribution`/`summary`/`recognized_not_produced`,
-endpoint `GET /api/vocabulary/lexicon`, pantalla `PersonalDictionary.tsx` con totales + barra CEFR + recall por
-ítem + señal micro-drill "reconoce pero no produce", y tests `test_lexicon.py` + `test_vocabulary.py` ampliado),
-y antes la **V2.2 ACADEMY/COURSE ENGINE** (métrica única "TOTAL VALIDATED LEARNING ITEMS" = 143,
-plantilla fija de 7 secciones por unidad, Learning Objectives "By the end of this unit…", contrato
-CEFR conectado al dominio ✓/●/○ por dimensión, Mastery Gates por unidad con umbrales compuestos,
-tríada Progress/Mastery/Readiness con endpoint `/api/academy/dashboard`, pantalla Learning Journey
-con marcador "YOU" + next milestone, y tests de regresión pedagógica `test_pedagogy.py`), y antes la
-**V2.1 CONTENT** (Content Quality Gate con umbrales de calidad + reporte + guard de CI, corpus de
-listening 40→100 ítems c041–c100, escenarios de speaking 8→20 A1–C1, niveles de curso C1/C2 y
-assessments finales por nivel) y, anteriormente, la **Beta 1.0** `v2.0.0` (gates de salida 10/10 en
-`docs/BETA_GATES.md`), la **gestión en-app de la biblioteca de audio humano** (V1.35), el **Audio Corpus 1.0** (V1.36),
-el **Audio QA + Content Audit** (V1.37), el **Course Engine** (V1.38), el **Mastery 2.0** (V1.39),
-el **Speaking 3.0** (V1.40), el **Beta Hardening** (V1.41) y la **Beta 1.0** (5 gates), además de
-las **FASE 1–5** de la auditoría externa a V1.29 (LAN/HTTPS/audio móvil):
-**V1.30** (LAN + Mobile 100%: mDNS real `local_url_available`, test de micrófono con medidor,
-tarjeta de conexión QR, `/help/connect`), **V1.31** (Adaptive Engine 2.0: Priority Engine con
-`priority_signals`/`priority_score`/`explain_priority` y "Why this activity?"), **V1.32**
-(Curriculum 2.0: escalera CEFR Pre-A1→C2 con bandas "plus" + Can-Do por 9 dimensiones y
-`/api/academy/cefr-ladder`), **V1.33** (Listening 2.0: `listening_resilience` por condición de
-escucha + `context` del corpus), **V1.34** (Speaking 2.0: `pronunciation` marcado como `proxy`,
-`interaction_quality` por sub-dimensión y `conversation_endurance` con
-`/api/academy/speaking/endurance`), **V1.35** (gestión en-app de la biblioteca de audio humano:
-subir/reemplazar/quitar WAV desde Ajustes → Audio), **V1.36** (Audio Corpus 1.0: corpus de audio
-humano versionado en `curriculum/listening_corpus.json` con 40 ítems A1–B2 + pipeline de grabación
-`generate_recording_pack.py` + importación masiva `import_audio.py --batch` + higiene de release),
-**V1.37** (Audio QA + Content Audit: QA acústica `PASS`/`WARNING`/`REJECT`, content integrity check
-end-to-end, Content Audit Dashboard, candado admin/PIN local, backup/auditoría de borrado y límites
-de tamaño/duración/MIME en la subida), **V1.38** (Course Engine: secuenciación
-Course→Unit→Lesson→Practice→Assessment→Review→Mastery con gating por objetivo + progreso visible
-"¿dónde estoy?" en `CourseScreen`), **V1.39** (Mastery 2.0: `MasteryRecord` transversal para las
-9 destrezas + CEFR readiness con banda cualitativa "B1 developing" + curva de olvido/review_due
-conectada a todo el currículo), **V1.40** (Speaking 3.0: catálogo de 8 escenarios comunicativos
-con objetivo comunicativo y métricas declaradas + honestidad del proxy de pronunciación en la UI)
-y **V1.41** (Beta Hardening: backup/restore/export local con auto-backup diario "keep 7", endpoints
-admin con PIN, seguridad LAN origin-check + rate limiting, panel de backup en Ajustes → Sistema,
-matriz de dispositivos ampliada, a11y skip-link + lang y code-splitting de vendors)
-y **Beta 1.0** (5 gates de salida 10/10 en `docs/BETA_GATES.md`: Infra / Curriculum /
-Listening+Speaking / Adaptive+Mastery / UX+Reliability).
-Ver CHANGELOG.
-Cerradas hasta ahora (histórico): Release Audit 1.1 (M12), M14–M16, Academy v2 + integridad
-curricular, hardening, Evidence & Performance Engine, Listening 1.0/2.0/3.0, Placement 1.0/2.0,
-Etapa 2 (pedagogía) **P1–P5**; **V1.12** → **V1.20**; **V1.21** (auditoría pedagógica A1→B2 + UI de
-3 paneles), **V1.22** (Learning UX 2.0), **V1.23** (UI 2.0: Tailwind v4 + shadcn/ui + Motion),
-**V1.24** (Analysis redesign + responsive 100% + tests visuales Playwright), **V1.25** (paneles del
-chat redimensionables + persistentes), **V1.26** (UI 2.0 fases 3–6), **V1.27** (code-splitting),
-**V1.28** (audio humano — código), **V1.29** (fiabilidad LAN/HTTPS + audio móvil P0 + launcher).
-**Todo lo pendiente está consolidado en la sección 37** (próximos incrementos). Lee esa sección antes
-de empezar el siguiente incremento.
-
-**Últimos commits:**
-- `feat: V1.30-V1.34 - FASE 1-5 auditoria externa (LAN/movil -> Speaking 2.0)` (`f876496`, HEAD)
-- `feat: V1.29 - fiabilidad LAN/HTTPS + audio movil (P0) + launcher` (`cb4eec5`)
-- `feat: V1.28 - listening: ocultar escalera de velocidad en items recorded`
-- `feat: V1.27 - code-splitting por rutas (React.lazy/Suspense + AnalysisPanel diferido)`
-- `feat: V1.26 - UI 2.0 fases 3-6 (listening/speaking/progress migrados + legacy.css podado)`
-- `feat: UI 2.0 (V1.22-V1.25) — Learning UX, design system, Analysis por pestañas y paneles redimensionables`
-- `feat: Learning Home (HOME como centro) con plan de hoy accionable`
-- `docs: V1.21 higiene de release + documentacion (1.21.0)`
-- `docs: briefings de agentes de la auditoria pedagogica A1-B2`
-- `feat: UI de 3 paneles (destrezas + desarrollo + analisis + barra de estado)`
-- `feat: validación determinista audio↔metadata`
-
-> **V2.4 implementada y verificada** (auditoría de cobertura curricular; aún sin commitear). Árbol de
-> trabajo limpio salvo los archivos de la V2.4. Ver sección 37.21 y `docs/CURRICULUM_COVERAGE.md`.
-
-> **V1.35 implementada y verificada** (gestión en-app de audio humano; aún sin commitear). Árbol de
-> trabajo limpio; solo queda pendiente 37.3 (incorporar WAV reales, ya desde la app) y 37.4 (Vercel,
-> diferido).
-
-**V1.15 commiteada** (S1 `2a182a8`, S2 `42602ca`, S3 `9be0f7f`) — Speaking 3.0. Ver sección 28.
-Resumen:
-- **Diagnóstico longitudinal** (`services/speaking.py::speaking_diagnostic`): agrupa la evidencia
-  de speaking por criterio (attempts/mean/min/max/review_due), deriva `weak` + `recommendation` y
-  expone `trend` global sobre las filas `overall` + `overall_mean`.
-- **`interaction` como séptimo criterio** del rubric: extraído del LLM en el flujo libre, no
-  observable en read-aloud.
-- **Endpoint** `GET /api/academy/speaking/diagnostic` + puente de sub-destrezas de speaking en el
-  Student Model (`_annotated_profile`).
-- **Frontend**: `SpeakingDiagnostic.tsx` (desglose por criterio + tendencia + a revisar).
-- **Higiene de release**: `config.py`/`package.json` → `1.15.0`; CHANGELOG con entrada 1.15.0.
-
-**V1.16 commiteada** (`c9021e3` backend S1-S6 + assessment, `399ce52` interaction, `fbd91fc`
-frontend, + `docs:` higiene 1.16.0) — Speaking Assessment & Evidence 2.0. Ver sección 29.
-Resumen:
-- **Scoring determinista S1–S6**: task_achievement continuo, GrammarEvidence 2.0, SpeakingTaskProfile
-  (dificultad declared/realized/verified + pesos por task_type), LexicalEvidence 2.0 (MSTTR),
-  FluencyEvidence 2.0 (WPM + smoothness/rhythm), InteractionEvidence 2.0 y diagnóstico por criterio
-  como vista del Student Model (EMA/confidence/stability).
-- **Speaking Assessment 1.0**: instrumento versionado (4 partes) + sesión trazable + endpoints
-  `/api/academy/speaking/assessment/*`.
-- **Interaction Evidence objetiva**: `services/interaction.py` + telemetría de turnos
-  (`duration_ms`/`latency_ms`) + `GET /api/conversations/{id}/interaction`.
-- **Speaking level + journey**: `GET /api/academy/speaking/level` y `/journey`.
-- **Frontend**: `SpeakingPanel` (NEXT FOCUS + PRACTICE NOW) + `SpeakingJourney` (barra A2→B1→B2).
-- **Higiene de release**: `config.py`/`package.json` → `1.16.0`; CHANGELOG con entrada 1.16.0.
-
-**V1.17 commiteada** (`012ec01` UI, `e679300` puente, `34e32e6` Writing 3.0) — cierre de tres
-incrementos naturales. Ver sección 30. Resumen:
-- **UI del Speaking Assessment** (`components/SpeakingAssessment.tsx`): start → 4 partes →
-  resultado, con micrófono y entrada manual (sin micrófono), sobre los endpoints ya existentes.
-- **Puente conversación→speaking**: `duration_ms`/`latency_ms` en `ChatMessage`; captura de la
-  telemetría del turno del alumno (`utils/telemetry.ts` + `useChat`) y envío de
-  `conversation_id`/`message_id` en `/api/chat/stream`; `conversation_id` opcional en
-  `submit_speaking_assessment_part`/`submit_speaking_task` inyecta
-  `evidence["interaction_objective"]` (señal objetiva de turnos) en el scorer.
-- **Writing 3.0**: `writing_diagnostic`/`writing_level`/`writing_journey` (espejo de speaking)
-  + endpoints `/api/academy/writing/diagnostic|level|journey` + frontend `WritingPanel`/
-  `WritingJourney`.
-- **Higiene de release**: `config.py`/`package.json` → `1.17.0`; CHANGELOG con entrada 1.17.0.
-
-**V1.18 commiteada** (`6071bca` retention, `2183849` dictado/shadowing, `26ae6c4` variantes) —
-P1 de listening de la auditoría V1.14. Ver sección 31. Resumen:
-- **Delayed retention (P1.2)**: `delayed_retention` (inmediata vs. retardada, buckets
-  0-2/2-7/7-30/30+ días) integrado en `listening_diagnostic` (clave `retention`) + frontend.
-- **Dictado y shadowing reales (P1.3/P1.4)**: sub-destrezas `dictation`/`shadowing` servidas como
-  tareas de producción (escribir/grablar) con scoring determinista vía `phonetics.composite_score`;
-  columnas `task_type`/`score`, `mean_score` en el diagnóstico y endpoints
-  `/api/listening/dictation|shadowing`.
-- **Escalera de variantes (P1.9)**: `slow`/`normal`/`fast` con cache por variante y botones en el
-  frontend (solo velocidad; acento/ruido quedan como límite de contenido).
-- **Higiene de release**: `config.py`/`package.json` → `1.18.0`; CHANGELOG con entrada 1.18.0.
-
-**V1.19 commiteada** (`feat:` UI + `docs:` higiene 1.19.0) — Refresco UI profesional (frontend).
-Ver sección 32. Resumen:
-- **Primitivas CSS** (`.card`, `.badge`, `.pill`, `.section-divider`) y tokens `--color-surface-3`/
-  `--shadow-card`; escala tipográfica por defecto afinada.
-- **`InsightCard`** colapsable (aria-expanded/aria-controls) envolviendo los 11 paneles del
-  análisis; expandidos por defecto `ProgressDashboard`, `TodayPlan` y `ListeningPractice`.
-- **Header** sticky con `backdrop-filter: blur()` + fondo translúcido y menú secundario a ≤768px.
-- **Chat** con avatar circular del tutor y estado vacío más rico.
-- **Responsive ≤480px** (header compacto, composer y drawer de análisis) sin romper 768/1024.
-- **Higiene de release**: `config.py`/`package.json` → `1.19.0`; CHANGELOG con entrada 1.19.0.
-
-**V1.20 commiteada** (P6 fonémica, turn-taking real y audio humano) — cierre de los tres pendientes
-de V1.19. Ver sección 33. Resumen:
-- **Pronunciación fonémica (P6)**: `phoneme_alignment`/`syllables`/`prosody_score` en
-  `services/phonemes.py`; `composite_score` rebalanceado (`word 0.35 / phoneme 0.35 / phonetic
-  0.15 / prosody 0.15`) y expone `prosody_score` + `phoneme_breakdown`; rubric de pronunciación
-  con 4 criterios (añade `prosody`) y UI con "Precisión de fonemas"/"Prosodia (ritmo)".
-- **Turn-taking real → Interaction**: `components/SpeakingRolePlay.tsx` (role-play en vivo con
-  telemetría de turnos) + bifurcación por `task_type` conversacional y envío de `conversation_id`
-  en `submitSpeakingAssessmentPart` para inyectar `interaction_objective`.
-- **Biblioteca de audio humano (P1.5–P1.8)**: `services/audio_library.py` + manifest versionado
-  (`backend/audio_library/manifest.json`) + servido de grabaciones sin Piper (`get_audio` 404 si
-  falta el WAV; `audio_ready` ya no depende solo de Piper).
-- **Higiene de release**: `config.py`/`package.json` → `1.20.0`; CHANGELOG con entrada 1.20.0.
-
-**Estado verde:** backend `843 tests` + `ruff` limpio; frontend `234 tests` + `tsc` OK + `build`
-OK; launcher `64 tests` + `ruff` limpio; Playwright `14 passed + 10 skipped`.
-
-**Acciones del nuevo gerente (en orden):**
-1. Leer `docs/PREMISAS.md` (fuente de verdad de reglas).
-2. Leer la **sección 37** de este documento (consolidado de próximos incrementos).
-3. Elegir el siguiente incremento y ejecutarlo con subagentes autocontenidos (`agentes/*.md`).
-   Quedan pendientes: **37.3 contenido** (WAV reales, del usuario; código listo), **37.4 Vercel**
-   (diferido por decisión) y el **commit `feat:` de cierre de V1.30–V1.34** (FASE 1–5, en árbol).
-   Si la auditoría define **FASE 6 (Beta)**, añadirla aquí como 37.6 antes de empezar.
-4. Verificar en verde antes de cada commit `feat:` (backend `pytest` + `ruff`, frontend
-   `tsc` + `vitest` + `build`, launcher `pytest` + `ruff`, Playwright `npm run test:visual`).
+**No se duplica aquí.** El registro release a release vive en `CHANGELOG.md` y `PLAN.md`
+(§«Estado actual»), y el detalle por milestone en las **secciones §1–§38 de este mismo
+documento**. Esta sección existe para **retomar** el trabajo, no para archivarlo: si
+necesitas la historia de V1.15–V3.69, esos tres sitios son la fuente.
 
 ## 1. Qué es el proyecto
 

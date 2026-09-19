@@ -93,33 +93,33 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "I have seen that film last week.",
                         "I saw that film last week.",
+                        "I have seen that film last week.",
                         "I have saw that film last week."
                       ],
-                      "correct_index": 1
+                      "correct_index": 0
                     },
                     {
                       "id": "b1-m01-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "She has never been to London.",
                         "She have never been to London.",
+                        "She has never been to London.",
                         "She never has been to London."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m01-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'hasta ahora' in 'I have not finished it ___'?",
                       "options": [
-                        "yet",
                         "already",
-                        "ever"
+                        "ever",
+                        "yet"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -198,22 +198,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "He has already eaten lunch.",
                         "He has eaten lunch yet.",
+                        "He has already eaten lunch.",
                         "He already has ate lunch."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m01-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word is used in negative sentences and questions to mean 'todavía'?",
                       "options": [
-                        "yet",
                         "already",
-                        "just"
+                        "just",
+                        "yet"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 }
@@ -306,11 +306,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'tener la misma opinión'?",
                       "options": [
-                        "agree",
                         "argue",
+                        "agree",
                         "avoid"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -384,11 +384,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase politely introduces a disagreement?",
                       "options": [
-                        "I see your point, but",
                         "You are wrong",
-                        "No way"
+                        "No way",
+                        "I see your point, but"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m01-u01-l02-o04-c02",
@@ -475,22 +475,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'I think working from home is great, but I see what you mean about missing colleagues.' How does the speaker feel?",
                       "options": [
-                        "Partly agrees",
                         "Completely disagrees",
+                        "Partly agrees",
                         "Has no opinion"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m01-u01-l02-o11-c02",
                       "skill": "listening",
                       "prompt": "You hear: 'That's a good point, actually.' What is the speaker doing?",
                       "options": [
-                        "Agreeing",
                         "Disagreeing",
-                        "Asking a question"
+                        "Asking a question",
+                        "Agreeing"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m01-u01-l02-o11-c03",
@@ -577,22 +577,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase introduces a contrast?",
                       "options": [
-                        "however",
                         "firstly",
+                        "however",
                         "for example"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m01-u01-l02-o12-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase gives an example?",
                       "options": [
-                        "for example",
                         "on the other hand",
-                        "firstly"
+                        "firstly",
+                        "for example"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m01-u01-l02-o12-c03",
@@ -700,22 +700,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence for a plan:",
                       "options": [
-                        "I am going to visit my aunt.",
                         "I will to visit my aunt.",
+                        "I am going to visit my aunt.",
                         "I am visit my aunt."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m02-u01-l01-o05-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence for a prediction:",
                       "options": [
-                        "I think it will rain tomorrow.",
                         "I think it is going rain tomorrow.",
-                        "I think it raining tomorrow."
+                        "I think it raining tomorrow.",
+                        "I think it will rain tomorrow."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m02-u01-l01-o05-c03",
@@ -795,22 +795,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "If it rains, I will stay at home.",
                         "If it will rain, I stay at home.",
+                        "If it rains, I will stay at home.",
                         "If it rained, I will stay at home."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m02-u01-l01-o06-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "Unless you hurry, you will miss the bus.",
                         "Unless you will hurry, you miss the bus.",
-                        "Unless you hurry, you miss the bus."
+                        "Unless you hurry, you miss the bus.",
+                        "Unless you hurry, you will miss the bus."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m02-u01-l01-o06-c03",
@@ -897,22 +897,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'I'm going to visit my aunt this weekend, and I'll probably stay until Sunday.' What is the speaker going to do?",
                       "options": [
-                        "Visit their aunt",
                         "Go to work",
+                        "Visit their aunt",
                         "Stay at home"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m02-u01-l01-o13-c02",
                       "skill": "listening",
                       "prompt": "You hear: 'We'll probably cancel the picnic if it rains.' What will they most likely do?",
                       "options": [
-                        "Cancel the picnic",
                         "Have the picnic",
-                        "Move the picnic indoors"
+                        "Move the picnic indoors",
+                        "Cancel the picnic"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m02-u01-l01-o13-c03",
@@ -1004,22 +1004,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (external rule):",
                       "options": [
-                        "You have to wear a uniform.",
                         "You must to wear a uniform.",
+                        "You have to wear a uniform.",
                         "You have wearing a uniform."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m02-u01-l02-o07-c02",
                       "skill": "grammar",
                       "prompt": "Choose the sentence that means there is NO obligation:",
                       "options": [
-                        "You don't have to come early.",
                         "You must come early.",
-                        "You have to come early."
+                        "You have to come early.",
+                        "You don't have to come early."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m02-u01-l02-o07-c03",
@@ -1105,22 +1105,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase makes a suggestion?",
                       "options": [
-                        "Why don't we go out?",
                         "I went out.",
+                        "Why don't we go out?",
                         "We are out."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m02-u01-l02-o14-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase politely refuses a suggestion?",
                       "options": [
-                        "I'd rather not",
                         "Of course",
-                        "Definitely"
+                        "Definitely",
+                        "I'd rather not"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m02-u01-l02-o14-c03",
@@ -1228,22 +1228,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'I'm gonna call you later.' What does 'gonna' mean?",
                       "options": [
-                        "going to",
                         "gone to",
+                        "going to",
                         "go to"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m03-u01-l01-o08-c02",
                       "skill": "listening",
                       "prompt": "You hear: 'Didja see the match?' What does 'didja' mean?",
                       "options": [
-                        "did you",
                         "do you",
-                        "did he"
+                        "did he",
+                        "did you"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m03-u01-l01-o08-c03",
@@ -1330,22 +1330,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Last weekend we drove to the coast and, although it rained, we still had a great time.' What is the main idea?",
                       "options": [
-                        "They enjoyed a trip to the coast.",
                         "They stayed at home.",
+                        "They enjoyed a trip to the coast.",
                         "They hated the coast."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m03-u01-l01-o09-c02",
                       "skill": "reading",
                       "prompt": "Read: 'Maria missed her train, but she caught the next one and arrived on time.' What happened?",
                       "options": [
-                        "She arrived on time despite missing the first train.",
                         "She arrived late.",
-                        "She never arrived."
+                        "She never arrived.",
+                        "She arrived on time despite missing the first train."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m03-u01-l01-o09-c03",
@@ -1426,22 +1426,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct reported speech:",
                       "options": [
-                        "She said that she was tired.",
                         "She said that she is tired.",
+                        "She said that she was tired.",
                         "She said she tired."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m03-u01-l01-o15-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct reported speech:",
                       "options": [
-                        "He told me that he would call later.",
                         "He told me that he will call later.",
-                        "He told that he would call later."
+                        "He told that he would call later.",
+                        "He told me that he would call later."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m03-u01-l01-o15-c03",
@@ -1530,22 +1530,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'First we boarded the train, then we found our seats, and finally we ordered lunch.' What happened right after boarding the train?",
                       "options": [
-                        "They found their seats",
                         "They ordered lunch",
+                        "They found their seats",
                         "They bought tickets"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m03-u01-l01-o16-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word signals the last event in a sequence?",
                       "options": [
-                        "finally",
                         "first",
-                        "then"
+                        "then",
+                        "finally"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1631,11 +1631,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase asks someone to continue their story?",
                       "options": [
-                        "What happened next?",
                         "I see.",
+                        "What happened next?",
                         "That's it."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1707,11 +1707,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "If I have time, I will call you.",
                         "If I will have time, I call you.",
-                        "If I have time, I call you."
+                        "If I have time, I call you.",
+                        "If I have time, I will call you."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c02",
@@ -1729,22 +1729,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'en mi opinión'?",
                       "options": [
-                        "in my opinion",
                         "by the way",
+                        "in my opinion",
                         "at least"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word is the informal contraction of 'going to'?",
                       "options": [
-                        "gonna",
                         "wanna",
-                        "didja"
+                        "didja",
+                        "gonna"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m04-u01-l01-o10-c05",
@@ -1762,11 +1762,11 @@
                       "skill": "listening",
                       "prompt": "Listen: 'Unless we hurry, we'll miss the start of the film.' What do they need to do?",
                       "options": [
-                        "Hurry",
                         "Slow down",
+                        "Hurry",
                         "Stay home"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1833,11 +1833,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "She told me that she would arrive soon.",
                         "She told me that she will arrive soon.",
-                        "She told that she would arrive soon."
+                        "She told that she would arrive soon.",
+                        "She told me that she would arrive soon."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b1-m04-u01-l01-o18-c02",
@@ -1855,11 +1855,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase makes a suggestion?",
                       "options": [
-                        "Why don't we try again?",
                         "We tried again.",
+                        "Why don't we try again?",
                         "Try again!"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }

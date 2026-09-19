@@ -199,7 +199,10 @@ CEFR_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 # Versión del esquema/contenido del currículum y las evaluaciones. Independiente
 # de la versión de la aplicación: identifica QUÉ contenido se evaluó.
-CURRICULUM_VERSION = "1.3.0"
+# 1.3.1 — V3.75.1 reposiciona la correcta de los 368 checks MC (P0 de
+# `docs/audit/AA-PED-CONTENIDO-CEFR.md`): mismo contenido y mismas respuestas,
+# distinta posición de la correcta.
+CURRICULUM_VERSION = "1.3.1"
 
 # Versiones de los instrumentos de evaluación (independientes de la versión de la
 # app y del currículum). Identifican QUÉ instrumento produjo cada resultado para

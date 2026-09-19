@@ -44,7 +44,7 @@ verificadas que deben preservarse.
 
 | # | Eje | Hallazgo | Evidencia |
 |---|---|---|---|
-| **P0-1** | 1 | **Sesgo posicional de los 368 checks del currículum**: la correcta está en la posición 0 en **329/368 (89,4 %)**. Un alumno que marque siempre la primera opción acierta casi 9 de cada 10. El corpus de listening sí está equilibrado (~25 % por posición). | `generated/mc-position-bias.json`; `a1.json:180`, `a1.json:579` |
+| **P0-1** | 1 | **Sesgo posicional de los 368 checks del currículum**: la correcta está en la posición 0 en **329/368 (89,4 %)**. Un alumno que marque siempre la primera opción acierta casi 9 de cada 10. El corpus de listening sí está equilibrado (~25 % por posición). **CERRADO en V3.75.1**: el reparto es `0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %` (ver `AA` §Cierre). | `generated/mc-position-bias.json`; `a1.json:180`, `a1.json:579` |
 
 Es un P0 **de instrumento**, no de motor: el contenido es correcto en dificultad
 (0 de 490 ítems fuera de banda) y la integridad estructural está limpia. Lo que
@@ -130,8 +130,8 @@ categorías formales; y el LLM **no** decide la nota (extrae evidencia, el score
 determinista puntúa).
 
 Lo que está **mal y medido**: un P0 de forma en los checks (89,4 % de respuestas
-correctas en la primera posición); dos destrezas declaradas evaluables que **no
-pueden** acreditar (`interaction`, `mediation`); `reading` sin scorer ni canal de
+correctas en la primera posición, **cerrado en V3.75.1**); dos destrezas
+declaradas evaluables que **no pueden** acreditar (`interaction`, `mediation`); `reading` sin scorer ni canal de
 corrección; cinco propiedades declaradas que la realidad no respalda
 (`connected_speech` en C1/C2, `novel_required`, sub-bandas, biblioteca de audio,
 `mediation`); un placement cuyo criterio de parada no puede dispararse y con

@@ -50,11 +50,11 @@
 
 ### Contenido y banco (→ V4.0.x)
 
-- **P0 · Posición de la correcta en los checks del currículum**: **329/368
-  checks (89,4 %)** tienen la respuesta correcta en la **posición 0**, así que
-  marcar siempre la primera opción acierta ~9/10. El corpus de listening **no**
-  tiene este defecto (~25 % por posición). Reproducir con
-  `python -m scripts.audit_dossier cefr-adequacy`.
+- **P0 · Posición de la correcta en los checks del currículum** — **CERRADO en
+  V3.75.1** (ver §V3.75.1). Medido en V3.70: **329/368 checks (89,4 %)** tenían la
+  respuesta correcta en la **posición 0**, así que marcar siempre la primera opción
+  acertaba ~9/10. El corpus de listening **no** tenía este defecto (~25 % por
+  posición). Reproducir con `python -m scripts.audit_dossier cefr-adequacy`.
 - **P1 · Velocidad de habla por nivel**: A1 entero **por encima** de su banda
   (86/200 por encima del techo de 115 wpm) y C1/C2 casi enteros **por debajo**
   (18/20 y 19/20).
@@ -369,14 +369,62 @@
   la decisión **aceptada** de `VG-N6` (reconocimiento barato, sin datos del alumno),
   no un olvido. La lista viva está en `docs/ARQUITECTURA.md`.
 
+## V3.75.1 — el P0 del sesgo posicional del currículum
+
+> Origen: el **único P0** que quedaba abierto del motor pedagógico, medido por la
+> auditoría pedagógica de V3.70 (`docs/audit/AA-PED-CONTENIDO-CEFR.md` §3 y
+> §Hallazgos #1) y aparcado con fase de contenido. Notas en
+> `release-notes-v3.75.1.md`.
+
+### Cerrado en V3.75.1 (deja de ser deuda)
+
+- **La correcta ya no se concentra en la posición 0.** Estaba en **329 de 368
+  checks (89,4 %)**, y **A2, B2, C1 y C2 estaban al 100 %** en la posición 0: un
+  alumno que marcase siempre la primera opción acertaba casi 9 de cada 10 sin
+  leer. Ahora el reparto es **`0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %`** (peor
+  posición **33,5 %** por grupo de `k`, bajo el límite del 35 % que pidió la
+  auditoría). El contenido es el mismo: mismo `id`, mismo enunciado, misma opción
+  correcta y mismos distractores.
+- **El instrumento es re-ejecutable, no un arreglo de una vez.**
+  `backend/scripts/rebalance_mc_positions.py` (`--check` / `--write`) reposiciona
+  la correcta de forma determinista —en cada grupo de `k` opciones, ordenado por
+  `id`, la posición destino es `j % k`— **moviendo solo la correcta** para que los
+  distractores conserven su orden relativo. Tiene **tres invariantes** antes de
+  escribir (forma canónica, nº de líneas intacto, JSON válido) y es
+  **idempotente**; el diff fueron **614/614 líneas**, sin formato.
+- **El candado muerde en las dos direcciones.**
+  `test_mc_position_of_curriculum_checks_is_balanced` mide el reparto **por grupo
+  de `k`**, exige **≤ 35 % por posición** y **ninguna posición muerta**, así que
+  también falla si una reautoría futura vuelve a concentrar la correcta. El test
+  anterior fijaba la cifra del defecto (329/368) y ya se reescribió: su contrato
+  —forzar la re-auditoría al corregir— se cumplió.
+- **`CURRICULUM_VERSION` 1.3.0 → 1.3.1.** Provenance pura: la constante se sella
+  en evidencia y snapshots pero **nunca se compara**, así que no invalida el
+  estado de ningún alumno.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El P2 de sesgo de forma/longitud.** La correcta sigue siendo la opción más
+  larga en el **39,1 %** de los checks y en el **50,0 %** del placement (hallazgo
+  `#7` de `AA`). Reposicionar no toca longitudes.
+- **`assessments.json` (exámenes y placement).** Siguen con la correcta en la
+  posición 0 en el **63,6 %** de sus 22 ítems, y el placement la concentra en la
+  posición 1 en **17/24**. Es **otro instrumento**, con su propio
+  `ASSESSMENT_VERSION`, y su arreglo no se ha mezclado con este.
+- **Los ítems en sí.** Esto elimina el atajo de marcar siempre la primera opción;
+  no cambia distractores ni enunciados, así que no mejora la discriminación del
+  ítem. Y que solo **10 de 368** checks tengan 4 opciones sigue siendo una
+  irregularidad de autoría.
+
+> **Corrección al enunciado del pendiente.** El pendiente decía «corpus de
+> listening (B1) y checks del currículo (A1)». La medición dice otra cosa: el
+> corpus de listening **ya estaba equilibrado** (máx. 30 % por posición, dentro
+> del ≤35 %) y A1 era el **único** nivel del currículum con variedad apreciable.
+> Lo que estaba roto era **todo el currículum** (368 checks) y no solo su nivel
+> A1. Se anota para que el registro no arrastre la imprecisión.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
-- Aplicar (tras tu aprobación) el **fix mecánico del sesgo posicional** en
-  corpus de listening (B1) y checks del currículo (A1): rotación determinista
-  por ítem, con `python -m scripts.audit_dossier mc-bias` para re-medir. **V3.70 lo
-  midió y lo elevó a P0** (`docs/audit/AA-PED-CONTENIDO-CEFR.md`: 329/368 checks
-  con la correcta en la posición 0); el test `test_ped_content_cefr_v370.py` fija
-  la cifra y **fallará** cuando se corrija, obligando a re-auditar el eje.
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
   `docs/DEVICE_MATRIX.md`.
 - Medir la **variabilidad LLM de speaking** con Ollama real (`eval_speaking_variability`).

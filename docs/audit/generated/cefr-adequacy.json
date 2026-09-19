@@ -297,9 +297,10 @@
    "correct_is_longest": 144,
    "correct_is_longest_pct": 39.1,
    "positions": {
-    "0": 329,
-    "1": 37,
-    "2": 2
+    "0": 123,
+    "1": 122,
+    "2": 121,
+    "3": 2
    }
   },
   "exams": {

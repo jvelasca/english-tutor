@@ -34,7 +34,7 @@
 | Fuente | N | correcta = opción más larga | reparto de posiciones |
 |---|---|---|---|
 | corpus | 490 | 195 (39.8%) | 0:125, 1:121, 2:122, 3:122 |
-| curriculum_checks | 368 | 144 (39.1%) | 0:329, 1:37, 2:2 |
+| curriculum_checks | 368 | 144 (39.1%) | 0:123, 1:122, 2:121, 3:2 |
 | exams | 22 | 8 (36.4%) | 0:14, 1:8 |
 | placement | 24 | 12 (50.0%) | 0:6, 1:17, 2:1 |
 

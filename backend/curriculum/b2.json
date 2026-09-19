@@ -93,11 +93,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which discourse marker introduces a contrast?",
                       "options": [
-                        "However",
                         "Moreover",
-                        "Therefore"
+                        "Therefore",
+                        "However"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m01-u01-l01-o01-c02",
@@ -115,11 +115,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'a pesar de'?",
                       "options": [
-                        "despite",
                         "besides",
+                        "despite",
                         "during"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -191,11 +191,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'como resultado'?",
                       "options": [
-                        "as a result",
                         "in spite of",
-                        "as long as"
+                        "as long as",
+                        "as a result"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m01-u01-l01-o02-c02",
@@ -290,22 +290,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (unreal past):",
                       "options": [
-                        "If I had studied, I would have passed.",
                         "If I studied, I would have passed.",
+                        "If I had studied, I would have passed.",
                         "If I had studied, I would passed."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m01-u01-l02-o03-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (unreal present):",
                       "options": [
-                        "If I had more time, I would travel more.",
                         "If I have more time, I would travel more.",
-                        "If I had more time, I will travel more."
+                        "If I had more time, I will travel more.",
+                        "If I had more time, I would travel more."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m01-u01-l02-o03-c03",
@@ -388,22 +388,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct reported sentence for 'I am tired' (he said):",
                       "options": [
-                        "He said he was tired.",
                         "He said he is tired.",
+                        "He said he was tired.",
                         "He said he has tired."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m01-u01-l02-o04-c02",
                       "skill": "vocabulary",
                       "prompt": "Which reporting verb means 'decir que algo es verdad'?",
                       "options": [
-                        "claim",
                         "deny",
-                        "ask"
+                        "ask",
+                        "claim"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m01-u01-l02-o04-c03",
@@ -490,22 +490,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Remote work saves time; however, it can be isolating.' What is the speaker's second point?",
                       "options": [
-                        "It can be isolating",
                         "It saves time",
+                        "It can be isolating",
                         "It is cheap"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m01-u01-l02-o10-c02",
                       "skill": "listening",
                       "prompt": "You hear an argument with three supporting points. What is the speaker trying to do?",
                       "options": [
-                        "Persuade the listener",
                         "Tell a story",
-                        "Give directions"
+                        "Give directions",
+                        "Persuade the listener"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m01-u01-l02-o10-c03",
@@ -613,22 +613,22 @@
                       "skill": "listening",
                       "prompt": "You hear three people planning a meeting. What do they finally agree?",
                       "options": [
-                        "To meet on Friday",
                         "To meet on Monday",
+                        "To meet on Friday",
                         "To cancel the meeting"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m02-u01-l01-o05-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'interrumpir'?",
                       "options": [
-                        "interrupt",
                         "interpret",
-                        "inspect"
+                        "inspect",
+                        "interrupt"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -715,11 +715,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which reduced form means 'kind of'?",
                       "options": [
-                        "kinda",
                         "wanna",
+                        "kinda",
                         "gotta"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -803,11 +803,11 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Oh great, another meeting.' What is the speaker's attitude?",
                       "options": [
-                        "Sarcastic",
                         "Enthusiastic",
-                        "Neutral"
+                        "Neutral",
+                        "Sarcastic"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m02-u01-l02-o07-c02",
@@ -825,11 +825,11 @@
                       "skill": "reading",
                       "prompt": "Read: 'Well, that went brilliantly,' she said, rolling her eyes. What does she really mean?",
                       "options": [
-                        "It went badly",
                         "It went well",
+                        "It went badly",
                         "She is excited"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -901,11 +901,11 @@
                       "skill": "reading",
                       "prompt": "Which phrase is the most formal?",
                       "options": [
-                        "I would be grateful if you could reply.",
                         "Can you reply?",
-                        "Reply soon!"
+                        "Reply soon!",
+                        "I would be grateful if you could reply."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m02-u01-l02-o08-c02",
@@ -987,22 +987,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (speculation):",
                       "options": [
-                        "He must have left early.",
                         "He must left early.",
+                        "He must have left early.",
                         "He must have leave early."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m02-u01-l02-o11-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "It might rain later.",
                         "It might to rain later.",
-                        "It might raining later."
+                        "It might raining later.",
+                        "It might rain later."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m02-u01-l02-o11-c03",
@@ -1088,22 +1088,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase responds politely to an opinion?",
                       "options": [
-                        "I see your point, but",
                         "You are wrong",
+                        "I see your point, but",
                         "No."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m02-u01-l02-o12-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'opinión'?",
                       "options": [
-                        "opinion",
                         "option",
-                        "operation"
+                        "operation",
+                        "opinion"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1185,11 +1185,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'en general'?",
                       "options": [
-                        "overall",
                         "under",
+                        "overall",
                         "before"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1276,11 +1276,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (mixed conditional):",
                       "options": [
-                        "If I had studied harder, I would be working there now.",
                         "If I studied harder, I would be worked there now.",
-                        "If I had studied harder, I would worked there now."
+                        "If I had studied harder, I would worked there now.",
+                        "If I had studied harder, I would be working there now."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m03-u01-l01-o09-c02",
@@ -1298,22 +1298,22 @@
                       "skill": "reading",
                       "prompt": "Read: 'He was hardly overjoyed by the news.' How did he feel?",
                       "options": [
-                        "Not very happy",
                         "Very happy",
+                        "Not very happy",
                         "Indifferent"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "b2-m03-u01-l01-o09-c04",
                       "skill": "listening",
                       "prompt": "Listen: 'I dunno what you mean.' What does 'dunno' mean?",
                       "options": [
-                        "don't know",
                         "do know",
-                        "did know"
+                        "did know",
+                        "don't know"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "b2-m03-u01-l01-o09-c05",

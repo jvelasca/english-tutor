@@ -111,7 +111,7 @@ interno las excluye explícitamente.
 | Fuente | N | correcta = opción más larga | reparto de posiciones |
 |---|---|---|---|
 | corpus de listening | 490 | 195 (39,8 %) | 0:125 · 1:121 · 2:122 · 3:122 (equilibrado) |
-| **checks del currículum** | 368 | 144 (39,1 %) | **0:329 (89,4 %) · 1:37 (10,1 %) · 2:2 (0,5 %)** |
+| **checks del currículum** | 368 | 144 (39,1 %) | V3.70: **0:329 (89,4 %) · 1:37 · 2:2** → V3.75.1: **0:123 (33,4 %) · 1:122 · 2:121 · 3:2** (P0 cerrado, §Cierre) |
 | exámenes (a1/b1) | 22 | 8 (36,4 %) | 0:14 (63,6 %) · 1:8 (36,4 %) |
 | placement | 24 | 12 (**50,0 %**) | 0:6 · 1:17 (70,8 %) · 2:1 |
 
@@ -149,11 +149,17 @@ falla es la integridad **de forma** (hallazgo 1).
 | Check con la correcta en posición 0 | `a1-m02-u01-l01-o02-c03` | `a1.json:579` | «Listen: 'quarter past eight'. What time is it?» → `["8:15", "8:30", "8:45"]` con `correct_index: 0`. |
 | Check con la correcta en posición 0 | `a1-m03-u01-l01-o01-c01` | `a1.json:781` | «Which word is a family member?» → `["sister", "table", "park"]` con `correct_index: 0`. |
 
+> **Nota (V3.75.1).** Las tres filas de «check con la correcta en posición 0» son
+> la evidencia cualitativa de la **medición de V3.70**: en el árbol actual esos tres
+> checks ya **no** tienen `correct_index: 0`, porque el P0 se cerró (§Cierre). Se
+> conservan tal cual como registro de lo medido, que es lo que documenta este
+> dossier.
+
 ## Hallazgos
 
 | # | Severidad | Hallazgo | Evidencia | Recomendación | Estado |
 |---|---|---|---|---|---|
-| 1 | **P0** | **Sesgo posicional de los 368 checks del currículum:** la respuesta correcta está en la posición 0 en 329/368 (**89,4 %**); un alumno que marque siempre la primera opción acierta casi 9 de cada 10. El corpus de listening, en cambio, está equilibrado (~25 % por posición). | `docs/audit/generated/mc-position-bias.json` (grupo «checks currículo») · `a1.json:180`, `a1.json:579`, `a1.json:781` | Reequilibrar `correct_index` de los 368 checks de forma determinista y añadir un test de invariante de reparto (≤ 35 % por posición). Remediar en la fase de contenido (V4.0.x), no aquí. | **abierto** |
+| 1 | **P0** | **Sesgo posicional de los 368 checks del currículum:** la respuesta correcta está en la posición 0 en 329/368 (**89,4 %**); un alumno que marque siempre la primera opción acierta casi 9 de cada 10. El corpus de listening, en cambio, está equilibrado (~25 % por posición). | `docs/audit/generated/mc-position-bias.json` (grupo «checks currículo») · `a1.json:180`, `a1.json:579`, `a1.json:781` | Reequilibrar `correct_index` de los 368 checks de forma determinista y añadir un test de invariante de reparto (≤ 35 % por posición). Remediar en la fase de contenido (V4.0.x), no aquí. | **cerrado en V3.75.1** (§Cierre) |
 | 2 | **P1** | **A1 sistemáticamente rápido:** 86 de 200 ítems (43 %) superan el techo de 115 wpm; *todo* el corpus A1 vive en [115, 125], es decir, el mínimo ya toca el techo y ninguno cae en la banda 80–115. | `cefr-adequacy.json` → `levels.A1.wpm_out_of_band = 86` · `listening_corpus.json:5` (`c001` 120 wpm), `:95` (`c003` 125), `:185` (`c005` 125) | Bajar `speech_rate` de los 200 ítems A1 a 80–115 wpm (TTS) y re-auditar. V4.0.x. | **abierto** |
 | 3 | **P1** | **C1/C2 sistemáticamente lentos:** 18 de 20 ítems C1 (90 %) y 19 de 20 C2 (95 %) quedan por debajo del suelo de su banda; la media está 9–11 wpm por debajo. Un C1 a 150 wpm no llega ni al suelo de su propia banda (165). | `cefr-adequacy.json` → `C1.wpm_out_of_band = 18`, `C2.wpm_out_of_band = 19` · `listening_corpus.json:4505` (`c101` 150 wpm, banda 165–195), `:5405` (`c121` 165 wpm, banda 175–200) | Subir la velocidad TTS de C1 a 165–195 y C2 a 175–200. V4.0.x. | **abierto** |
 | 4 | **P2** | **La escalera de velocidad no es monótona:** el ítem más rápido de B2 (185 wpm) supera al de C1 (170) y al de C2 (175). Además la dificultad media se invierte (C1 4,00 < B2 4,04) y C1 declara el mismo valor 4 en sus 20 ítems, sin alcanzar nunca el 5 de su banda. | `cefr-adequacy.json` → `monotonic_max_wpm = false`, `monotonic_mean_difficulty = false` · `C1.difficulty_max = 4` | Definir la escalera objetivo por nivel (wpm máx. y dificultad ≥) y validarla como invariante antes de añadir corpus. Diseño pedagógico (V4.0.x). | **abierto** |
@@ -174,8 +180,9 @@ contenido es correcta (0 de 490 ítems fuera de banda, integridad estructural
 limpia), pero la **velocidad** y las **propiedades declaradas** no lo son: A1
 entero por encima de su banda, C1/C2 casi enteros por debajo, escalera de
 velocidad no monótona y `connected_speech` sin respaldo textual en C1/C2. El
-hallazgo más severo es de forma, no de contenido: el **89,4 %** de los checks del
-currículum tiene la correcta en la posición 0.
+hallazgo más severo era de forma, no de contenido: el **89,4 %** de los checks del
+currículum tenía la correcta en la posición 0 (**P0 cerrado en V3.75.1**,
+§Cierre).
 
 **Qué demuestra y qué no.** Este eje ha medido **adecuación declarada frente al
 criterio interno** `docs/audit/CEFR-REFERENCE.md` (que **no** es un documento CEFR
@@ -184,6 +191,40 @@ alumnos: no hay aprendices en el bucle. En términos de la regla §28, aquí «e
 test **no demuestra**» validez empírica; lo que sí demuestra es que «el motor
 **no cumple**» su propia tabla interna en velocidad, `connected_speech` y sesgo
 posicional de los checks.
+
+## Cierre del P0 (V3.75.1)
+
+El P0 se cerró el **2026-09-19** (`release-notes-v3.75.1.md`, `CURRICULUM_VERSION`
+1.3.0 → 1.3.1). La recomendación se ejecutó con una variante **medida, no
+supuesta**:
+
+- **Regla.** Dentro de cada grupo de checks con el mismo nº de opciones `k`,
+  ordenados por `id` ascendente, el check en la posición `j` lleva la correcta a
+  **`j % k`**. Se agrupa por `k` porque una posición solo existe dentro de su
+  número de opciones: agregar los 368 escondería que el 4.º distractor (los 10
+  checks de 4 opciones) nunca fuese la correcta.
+- **Reposicionamiento, no rotación.** Se **mueve la correcta** y los distractores
+  conservan su **orden relativo**. La primera implementación fue una rotación
+  cíclica y se descartó al verificarla: al extraer la correcta, el distractor que
+  la precedía pasa a seguirla, así que se rompe el orden de las opciones
+  autoriadas en orden natural (`["8:15", "8:30", "8:45"]`).
+- **Instrumento.** `backend/scripts/rebalance_mc_positions.py` (`--check` /
+  `--write`), idempotente, con **tres invariantes** antes de escribir: forma
+  canónica (misma correcta y mismos distractores en el mismo orden relativo), nº
+  de líneas intacto y JSON válido. Diff: **614/614 líneas**, cero formato.
+- **Resultado medido** (`mc-bias`): `0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %`;
+  por grupo, `k=3` → `33,5 / 33,2 / 33,2 %` y `k=4` → `30 / 30 / 20 / 20 %`. Peor
+  posición **33,5 %**, bajo el límite del 35 %. **A2, B2, C1 y C2 dejan de estar
+  al 100 % en la posición 0.**
+- **Candados.** `--check` como tripwire re-ejecutable para la reautoría de
+  V4.0.x, y `test_mc_position_of_curriculum_checks_is_balanced` (≤ 35 % por
+  grupo y **sin posiciones muertas**).
+
+**Lo que este cierre NO toca** (y sigue abierto): el hallazgo **#7** (sesgo de
+longitud: 39,1 % de los checks y 50,0 % del placement) y las posiciones de
+`assessments.json` (exámenes al 63,6 % en la posición 0, placement al 70,8 % en la
+1), que son **otro instrumento**. Y no mejora los ítems: **elimina el atajo** de
+marcar siempre la primera opción, sin cambiar distractores ni enunciados.
 
 ## Regenerar / Verificar
 
@@ -204,14 +245,28 @@ cd backend
 Ninguno de estos comandos escribe en `backend/curriculum/` ni en `backend/data/`;
 solo dejan sus pares en `docs/audit/generated/`.
 
+El **candado del P0** (V3.75.1) es aparte y sí puede escribir, pero solo con
+`--write`:
+
+```powershell
+cd backend
+# Tripwire: no escribe nada; sale 1 si el reparto se desvió de la regla.
+.venv\Scripts\python.exe -m scripts.rebalance_mc_positions --check
+# Aplica el reposicionamiento (idempotente: repetirlo no mueve nada).
+.venv\Scripts\python.exe -m scripts.rebalance_mc_positions --write
+```
+
 ## Tests que respaldan
 
 `backend/tests/test_ped_content_cefr_v370.py` (8 tests, verdes) **pinnea lo
 medido**: si el contenido se corrige, fallan y obligan a re-auditar el hallazgo.
+La excepción es el test del P0: ya se corrigió y se reescribió para fijar el
+**invariante** en lugar del defecto (V3.75.1), de modo que ahora muerde en las dos
+direcciones — si la correcta vuelve a concentrarse, falla.
 
 | Test | Qué hallazgo fija |
 |---|---|
-| `test_mc_position_bias_of_curriculum_checks_is_declared` | #1 — 329/368 en la posición 0 (≥ 80 %) y corpus ≤ 35 % por posición. |
+| `test_mc_position_of_curriculum_checks_is_balanced` | #1 (**cerrado en V3.75.1**) — invariante ≤ 35 % **por grupo de `k`**, sin posiciones muertas, y corpus ≤ 35 % por posición. |
 | `test_a1_corpus_is_faster_than_its_reference_band` | #2 — 86/200 A1 por encima de 115 wpm y banda real [115, 125]. |
 | `test_c1_c2_corpus_is_slower_than_its_reference_band` | #3 — 18/20 C1 y 19/20 C2 por debajo del suelo de su banda. |
 | `test_speed_ladder_is_not_monotonic_is_declared` | #4 — máx. B2 185 > máx. C1 170 y dificultad media B2 > C1. |

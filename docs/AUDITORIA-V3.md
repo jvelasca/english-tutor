@@ -4,6 +4,15 @@
 > gates automáticos (`check_beta_v3.py`, `pytest`, `ruff`, `tsc`, `vitest`,
 > `content_validation`, `curriculum_coverage --quality`) y deja evidencia
 > reproducible en `docs/audit/` (dossieres) y `docs/audit/generated/` (informes).
+>
+> **Actualización (2026-09-19).** Este documento es el **snapshot** de la auditoría
+> del 2026-09-02 y **no se reescribe**. De las acciones que deja abiertas, **A1 (el
+> fix del sesgo posicional de los checks del currículo) quedó aprobado y aplicado
+> en V3.75.1**: `mc-bias` pasa de `0:89,4 % · 1:10,1 % · 2:0,5 %` a
+> `0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %` y el test que pinchaba el sesgo pasa a
+> fijar el invariante (≤ 35 % por posición, sin posiciones muertas). Siguen abiertas
+> las que dependen de personas o hardware (C: variabilidad LLM con Ollama real;
+> D/E: cohorte real; G: matriz de dispositivos). Ver `release-notes-v3.75.1.md`.
 
 ## 1. Resultado global
 

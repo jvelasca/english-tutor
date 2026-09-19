@@ -92,22 +92,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (inversion):",
                       "options": [
-                        "Never have I seen such a beautiful view.",
                         "Never I have seen such a beautiful view.",
+                        "Never have I seen such a beautiful view.",
                         "Never have I saw such a beautiful view."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (inversion):",
                       "options": [
-                        "Not only did she pass the exam, but she got top marks.",
                         "Not only she passed the exam, but she got top marks.",
-                        "Not only did she passed the exam, but she got top marks."
+                        "Not only did she passed the exam, but she got top marks.",
+                        "Not only did she pass the exam, but she got top marks."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c03",
@@ -125,22 +125,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'raras veces'?",
                       "options": [
-                        "rarely",
                         "usually",
+                        "rarely",
                         "always"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m01-u01-l01-o01-c05",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'apenas'?",
                       "options": [
-                        "hardly",
                         "easily",
-                        "clearly"
+                        "clearly",
+                        "hardly"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -219,22 +219,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct cleft sentence:",
                       "options": [
-                        "What I need is more time.",
                         "What I need it is more time.",
+                        "What I need is more time.",
                         "What I need are more time."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m01-u01-l01-o02-c03",
                       "skill": "grammar",
                       "prompt": "Choose the correct cleft sentence:",
                       "options": [
-                        "It is confidence that matters most.",
                         "It is confidence what matters most.",
-                        "Confidence it is that matters most."
+                        "Confidence it is that matters most.",
+                        "It is confidence that matters most."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -321,22 +321,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Never have I seen such dedication.' What is the speaker stressing?",
                       "options": [
-                        "How unusual the dedication is",
                         "That they were not dedicated",
+                        "How unusual the dedication is",
                         "A past routine"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m01-u01-l01-o03-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'enfatizar'?",
                       "options": [
-                        "emphasise",
                         "ignore",
-                        "simplify"
+                        "simplify",
+                        "emphasise"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -421,11 +421,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'no solo'?",
                       "options": [
-                        "not only",
                         "never have",
+                        "not only",
                         "it was"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -523,11 +523,11 @@
                       "skill": "vocabulary",
                       "prompt": "'She's on cloud nine' means she is...",
                       "options": [
-                        "very happy",
                         "very sad",
-                        "very tired"
+                        "very tired",
+                        "very happy"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m02-u01-l01-o01-c02",
@@ -545,22 +545,22 @@
                       "skill": "vocabulary",
                       "prompt": "'It happens once in a blue moon' means it...",
                       "options": [
-                        "rarely happens",
                         "happens often",
+                        "rarely happens",
                         "never happens"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m02-u01-l01-o01-c04",
                       "skill": "reading",
                       "prompt": "Read: 'She hit the nail on the head with her analysis.' What does the sentence mean?",
                       "options": [
-                        "Her analysis was exactly right",
                         "Her analysis was wrong",
-                        "She made a mistake"
+                        "She made a mistake",
+                        "Her analysis was exactly right"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -643,22 +643,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'ten en cuenta'?",
                       "options": [
-                        "bear in mind",
                         "keep an eye out",
+                        "bear in mind",
                         "run it by"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m02-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which idiom suits an informal chat?",
                       "options": [
-                        "to be over the moon",
                         "in the pipeline",
-                        "on balance"
+                        "on balance",
+                        "to be over the moon"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -739,22 +739,22 @@
                       "skill": "reading",
                       "prompt": "Read: 'His promotion was a double-edged sword.' The idiom suggests the promotion...",
                       "options": [
-                        "has both advantages and disadvantages",
                         "was certain",
+                        "has both advantages and disadvantages",
                         "was undeserved"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m02-u01-l01-o03-c03",
                       "skill": "vocabulary",
                       "prompt": "Which idiom means 'aceptar lo inevitable con valor'?",
                       "options": [
-                        "to bite the bullet",
                         "to pull strings",
-                        "to water down"
+                        "to water down",
+                        "to bite the bullet"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 }
@@ -843,22 +843,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which collocation is correct?",
                       "options": [
-                        "take a break",
                         "make a break",
+                        "take a break",
                         "do a break"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m02-u01-l02-o01-c03",
                       "skill": "grammar",
                       "prompt": "Choose the natural sentence:",
                       "options": [
-                        "We do business with several countries.",
                         "We make business with several countries.",
-                        "We do businesses with several countries."
+                        "We do businesses with several countries.",
+                        "We do business with several countries."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -946,22 +946,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'It happens once in a blue moon.' How often does it happen?",
                       "options": [
-                        "Very rarely",
                         "Very often",
+                        "Very rarely",
                         "Every day"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m02-u01-l02-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'expresión idiomática'?",
                       "options": [
-                        "idiom",
                         "idle",
-                        "ideal"
+                        "ideal",
+                        "idiom"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1046,11 +1046,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'hacer algo de forma descuidada'?",
                       "options": [
-                        "cut corners",
                         "break the ice",
+                        "cut corners",
                         "on cloud nine"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1119,11 +1119,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which is the formal collocation?",
                       "options": [
-                        "to award a contract",
                         "to hand over a deal",
-                        "to give the job"
+                        "to give the job",
+                        "to award a contract"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m02-u01-l02-o04-c02",
@@ -1141,11 +1141,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which collocation is correct in formal writing?",
                       "options": [
-                        "to reach an agreement",
                         "to arrive an agreement",
+                        "to reach an agreement",
                         "to do an agreement"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1242,11 +1242,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word makes the claim more cautious?",
                       "options": [
-                        "arguably",
                         "definitely",
-                        "obviously"
+                        "obviously",
+                        "arguably"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o01-c02",
@@ -1264,11 +1264,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase hedges an opinion?",
                       "options": [
-                        "It could be argued that...",
                         "It is absolutely certain that...",
+                        "It could be argued that...",
                         "There is no doubt that..."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1341,11 +1341,11 @@
                       "skill": "reading",
                       "prompt": "Read: 'Many claim the policy works; however, the evidence suggests otherwise.' What does 'otherwise' indicate?",
                       "options": [
-                        "A contrast",
                         "An agreement",
-                        "An example"
+                        "An example",
+                        "A contrast"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o02-c02",
@@ -1363,11 +1363,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'además'?",
                       "options": [
-                        "moreover",
                         "however",
+                        "moreover",
                         "although"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1444,11 +1444,11 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Arguably, the policy has some merit, but it is not without risks.' What is the speaker's attitude?",
                       "options": [
-                        "Cautious",
                         "Enthusiastic",
-                        "Hostile"
+                        "Hostile",
+                        "Cautious"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o03-c02",
@@ -1466,11 +1466,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'matizar una afirmación'?",
                       "options": [
-                        "hedge",
                         "hasten",
+                        "hedge",
                         "hinder"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1542,11 +1542,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct passive sentence:",
                       "options": [
-                        "The report was written by the team.",
                         "The report written by the team.",
-                        "The report was wrote by the team."
+                        "The report was wrote by the team.",
+                        "The report was written by the team."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o04-c02",
@@ -1564,11 +1564,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'análisis'?",
                       "options": [
-                        "analysis",
                         "analogy",
+                        "analysis",
                         "analytic"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1644,11 +1644,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word introduces a concession?",
                       "options": [
-                        "admittedly",
                         "therefore",
-                        "finally"
+                        "finally",
+                        "admittedly"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o05-c02",
@@ -1730,22 +1730,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase is the most tentative?",
                       "options": [
-                        "It is doubtful that...",
                         "It is certain that...",
+                        "It is doubtful that...",
                         "There is no question that..."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m03-u01-l01-o06-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase expresses strong evidence?",
                       "options": [
-                        "There is strong evidence that...",
                         "It might be the case that...",
-                        "One could argue that..."
+                        "One could argue that...",
+                        "There is strong evidence that..."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o06-c03",
@@ -1828,22 +1828,22 @@
                       "skill": "reading",
                       "prompt": "Read: 'To be fair, the proposal is well costed; nonetheless, it is unworkable.' What does the writer do first?",
                       "options": [
-                        "Concedes a point",
                         "Presents new evidence",
+                        "Concedes a point",
                         "Asks a question"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m03-u01-l01-o07-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'hay que admitir que'?",
                       "options": [
-                        "to be fair",
                         "on balance",
-                        "at first glance"
+                        "at first glance",
+                        "to be fair"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o07-c03",
@@ -1928,22 +1928,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase signals you are moving to a new stage?",
                       "options": [
-                        "Next, let me turn to...",
                         "To be honest...",
+                        "Next, let me turn to...",
                         "By the way..."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m03-u01-l01-o08-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'dicho esto'?",
                       "options": [
-                        "having said that",
                         "in the long run",
-                        "as a rule"
+                        "as a rule",
+                        "having said that"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m03-u01-l01-o08-c03",
@@ -2043,22 +2043,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "Rarely do we see such dedication.",
                         "Rarely we see such dedication.",
+                        "Rarely do we see such dedication.",
                         "Rarely we do see such dedication."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "It was the results that changed everything.",
                         "It was the results what changed everything.",
-                        "The results it was that changed everything."
+                        "The results it was that changed everything.",
+                        "It was the results that changed everything."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c03",
@@ -2076,22 +2076,22 @@
                       "skill": "reading",
                       "prompt": "Read: 'The proposal is, arguably, the strongest we have seen.' What does 'arguably' suggest?",
                       "options": [
-                        "A measured claim",
                         "An absolute fact",
+                        "A measured claim",
                         "An error"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c05",
                       "skill": "listening",
                       "prompt": "Listen: 'Rarely have I seen such dedication.' How does the speaker feel?",
                       "options": [
-                        "Impressed",
                         "Bored",
-                        "Angry"
+                        "Angry",
+                        "Impressed"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c1-m04-u01-l01-o01-c06",

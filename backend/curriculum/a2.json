@@ -94,11 +94,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (Past Simple):",
                       "options": [
-                        "Last year I went to France.",
                         "Last year I go to France.",
-                        "Last year I going to France."
+                        "Last year I going to France.",
+                        "Last year I went to France."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m01-u01-l01-o01-c02",
@@ -116,22 +116,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which word is the past of 'go'?",
                       "options": [
-                        "went",
                         "goed",
+                        "went",
                         "gone"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m01-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'hace un año'?",
                       "options": [
-                        "last year",
                         "next year",
-                        "this year"
+                        "this year",
+                        "last year"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -218,11 +218,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "She has never seen the sea.",
                         "She have never seen the sea.",
+                        "She has never seen the sea.",
                         "She has never saw the sea."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -298,11 +298,11 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Last year I went to Italy on holiday.' Where did the speaker go?",
                       "options": [
-                        "To Italy",
                         "To Spain",
-                        "To France"
+                        "To France",
+                        "To Italy"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m01-u01-l01-o03-c02",
@@ -320,11 +320,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'el año pasado'?",
                       "options": [
-                        "last year",
                         "next year",
+                        "last year",
                         "this year"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -421,11 +421,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "My city is bigger than yours.",
                         "My city is big than yours.",
-                        "My city is more big than yours."
+                        "My city is more big than yours.",
+                        "My city is bigger than yours."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m02-u01-l01-o01-c02",
@@ -443,22 +443,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'más grande'?",
                       "options": [
-                        "bigger",
                         "smaller",
+                        "bigger",
                         "cheaper"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m02-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'más barato'?",
                       "options": [
-                        "cheaper",
                         "bigger",
-                        "more"
+                        "more",
+                        "cheaper"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -544,22 +544,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "She is the most beautiful.",
                         "She is the beautifulest.",
+                        "She is the most beautiful.",
                         "She is most beautiful the."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m02-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'el mejor'?",
                       "options": [
-                        "the best",
                         "the worst",
-                        "the biggest"
+                        "the biggest",
+                        "the best"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m02-u01-l01-o02-c04",
@@ -646,22 +646,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'Madrid is bigger than my city, but it is also more expensive.' Which city is bigger?",
                       "options": [
-                        "Madrid",
                         "The speaker's city",
+                        "Madrid",
                         "Both"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m02-u01-l01-o03-c02",
                       "skill": "listening",
                       "prompt": "You hear: 'This is the best restaurant in town.' What does the speaker think?",
                       "options": [
-                        "It is better than the others",
                         "It is the worst",
-                        "It is closed"
+                        "It is closed",
+                        "It is better than the others"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m02-u01-l01-o03-c03",
@@ -767,22 +767,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "Next month I am going to start a course.",
                         "Next month I am going start a course.",
+                        "Next month I am going to start a course.",
                         "Next month I going to start a course."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m03-u01-l01-o01-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "I plan to visit my family.",
                         "I plan visit my family.",
-                        "I planning to visit my family."
+                        "I planning to visit my family.",
+                        "I plan to visit my family."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -867,11 +867,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "I will help you.",
                         "I will helps you.",
+                        "I will help you.",
                         "I helping will you."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -947,11 +947,11 @@
                       "skill": "listening",
                       "prompt": "You hear: 'I'm going to visit my family next month, and I think it will be great.' What is the speaker going to do next month?",
                       "options": [
-                        "Visit their family",
                         "Go to work",
-                        "Stay home"
+                        "Stay home",
+                        "Visit their family"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m03-u01-l01-o03-c02",
@@ -969,11 +969,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'probablemente'?",
                       "options": [
-                        "probably",
                         "maybe",
+                        "probably",
                         "soon"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1077,11 +1077,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'billete'?",
                       "options": [
-                        "ticket",
                         "train",
-                        "bus"
+                        "bus",
+                        "ticket"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m04-u01-l01-o01-c02",
@@ -1099,22 +1099,22 @@
                       "skill": "listening",
                       "prompt": "Listen: 'How much is a return ticket to London?' What does he want?",
                       "options": [
-                        "A return ticket",
                         "A single ticket",
+                        "A return ticket",
                         "A bus"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m04-u01-l01-o01-c04",
                       "skill": "listening",
                       "prompt": "Listen: 'The train leaves at ten.' What time does the train leave?",
                       "options": [
-                        "At ten",
                         "At nine",
-                        "At eleven"
+                        "At eleven",
+                        "At ten"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1199,11 +1199,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "You mustn't smoke here.",
                         "You mustn't to smoke here.",
+                        "You mustn't smoke here.",
                         "You don't mustn't smoke here."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1300,11 +1300,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'dolor de cabeza'?",
                       "options": [
-                        "headache",
                         "cold",
-                        "tired"
+                        "tired",
+                        "headache"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m05-u01-l01-o01-c02",
@@ -1322,22 +1322,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "You should rest.",
                         "You should to rest.",
+                        "You should rest.",
                         "You should resting."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m05-u01-l01-o01-c04",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "I have a cold.",
                         "I has a cold.",
-                        "I am have a cold."
+                        "I am have a cold.",
+                        "I have a cold."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1424,22 +1424,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'I have a headache.' What is the problem?",
                       "options": [
-                        "A headache",
                         "A cold",
+                        "A headache",
                         "A broken leg"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m05-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'consejo'?",
                       "options": [
-                        "advice",
                         "health",
-                        "rest"
+                        "rest",
+                        "advice"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1524,11 +1524,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'cita'?",
                       "options": [
-                        "appointment",
                         "advice",
+                        "appointment",
                         "health"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1626,11 +1626,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct linking word: 'First, ___ after that, we went home.'",
                       "options": [
-                        "then",
                         "than",
-                        "that"
+                        "that",
+                        "then"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m06-u01-l01-o01-c02",
@@ -1648,22 +1648,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'de repente'?",
                       "options": [
-                        "suddenly",
                         "first",
+                        "suddenly",
                         "finally"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m06-u01-l01-o01-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'finalmente'?",
                       "options": [
-                        "finally",
                         "then",
-                        "after that"
+                        "after that",
+                        "finally"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1750,22 +1750,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'A dog followed me home yesterday.' What is the story about?",
                       "options": [
-                        "A dog",
                         "A cat",
+                        "A dog",
                         "A car"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m06-u01-l01-o02-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'de repente'?",
                       "options": [
-                        "suddenly",
                         "first",
-                        "finally"
+                        "finally",
+                        "suddenly"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 }
@@ -1862,22 +1862,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "I am going to visit my family next week.",
                         "I am visit my family next week.",
+                        "I am going to visit my family next week.",
                         "I going to visit my family next week."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'billete'?",
                       "options": [
-                        "ticket",
                         "train",
-                        "station"
+                        "station",
+                        "ticket"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c04",
@@ -1895,22 +1895,22 @@
                       "skill": "listening",
                       "prompt": "Listen: 'I had a headache, so I went to bed early.' What did she do?",
                       "options": [
-                        "Went to bed early",
                         "Went to the doctor",
+                        "Went to bed early",
                         "Took a trip"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "a2-m07-u01-l01-o01-c06",
                       "skill": "listening",
                       "prompt": "Listen: 'We're going to visit Rome next summer.' When are they going?",
                       "options": [
-                        "Next summer",
                         "Last summer",
-                        "This winter"
+                        "This winter",
+                        "Next summer"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 }

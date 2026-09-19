@@ -38,10 +38,18 @@ Notas muestrales por nivel:
 
 | # | Sev. | Hallazgo | Evidencia | Recomendación | Estado |
 |---|---|---|---|---|---|
-| A1 | **alta** | Sesgo posicional en checks del currículo: **88,2 % de los 331 checks tienen la respuesta en la opción 0** (292/331). Mismo defecto que B1 pero en contenido de práctica/assessment. | `mc-bias` | Rebalancear checks (rotación determinista) igual que el corpus; **fix pendiente de tu aprobación**. | abierto |
+| A1 | **alta** | Sesgo posicional en checks del currículo: **88,2 % de los 331 checks tienen la respuesta en la opción 0** (292/331). Mismo defecto que B1 pero en contenido de práctica/assessment. | `mc-bias` | Rebalancear checks igual que el corpus, pero con **reposicionamiento determinista (`j % k`)** y no con rotación cíclica: se mueve la correcta **sin** alterar el orden relativo de los distractores. **Aplicado en V3.75.1** (`scripts/rebalance_mc_positions.py`). | **resuelto en V3.75.1** |
 | A2 | media | Speaking A1 se apoya en un único escenario (`introductions`) reutilizado por 22 objetivos; C1/C2 repiten pocos escenarios para muchos objetivos. No es un bug (cefr_target alineado) pero limita variedad comunicativa. | `curriculum-stats` + cruce escenarios | Autoría de 1–2 escenarios A1 adicionales y ampliar catálogo C1/C2 en fase de contenido. | abierto |
 | A3 | baja | Cobertura (85.7) y depth (84.2) son los dos puntos débiles del dashboard frente a los 100 de listening/assessment: hay huecos `partial` no `empty`. | quality dashboard | No urgente para Beta; revisar en la siguiente pasada de autoría. | abierto |
 | A4 | info | Todos los objetivos muestreados declaran exactamente 5 actividades (practice/retrieve/transfer/review/assess); el resto de fases del loop (introduce/listen/speak/interact) se distribuyen a nivel de unidad, no de objetivo. Diseño válido y verificado por `learning_loop`; no es defecto. | muestras | — | aceptado |
+
+> **Cierre de A1 (V3.75.1, 2026-09-19).** El reequilibrio se aplicó sobre el
+> currículum completo **a fecha de V3.70** (368 checks, más que los 331 de esta
+> auditoría porque el contenido creció): `mc-bias` pasa de
+> `0:89,4 % · 1:10,1 % · 2:0,5 %` a `0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %`.
+> La cifra histórica de la tabla (292/331) se conserva tal cual: es la medición
+> del 2026-09-02, no la del cierre. Detalle en `AA-PED-CONTENIDO-CEFR.md` §3 y
+> `release-notes-v3.75.1.md`.
 
 No se han detectado violaciones estructurales (`content_validation` y `validate_level` limpios), skills no canónicas, ni ids duplicados.
 

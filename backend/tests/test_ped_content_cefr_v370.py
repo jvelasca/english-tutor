@@ -1,10 +1,13 @@
 """Pinnea la adecuación CEFR del contenido medida en V3.70 · Eje 1 (`AA`).
 
 Tests de **medición**: afirman los hechos ya auditados en
-`docs/audit/AA-PED-CONTENIDO-CEFR.md`. Si alguien reequilibra el currículum,
-sube la velocidad de A1 o reduce la de C1/C2, estos tests **fallan** y obligan a
-re-auditar el hallazgo. No afirman que el contenido sea bueno: afirman lo que el
-contenido **es** hoy (regla dura de V3.70: solo medición).
+`docs/audit/AA-PED-CONTENIDO-CEFR.md`. Si alguien sube la velocidad de A1 o
+reduce la de C1/C2, estos tests **fallan** y obligan a re-auditar el hallazgo.
+El del sesgo posicional ya no declara el defecto: fija el **invariante** de
+reparto que lo cerró (V3.75.1), de modo que una reautoría del contenido que
+vuelva a concentrar la correcta en una posición también falla. No afirman que el
+contenido sea bueno: afirman lo que el contenido **es** hoy (regla dura de V3.70:
+solo medición).
 
 Criterio: `docs/audit/CEFR-REFERENCE.md`, referencia **INTERNA** del proyecto,
 no un documento CEFR normativo. Las bandas y los marcadores se replican aquí a
@@ -113,20 +116,34 @@ def _wpm_by_level() -> dict[str, list[float]]:
 # --- Hallazgo 1 · sesgo posicional de los checks ---------------------------
 
 
-def test_mc_position_bias_of_curriculum_checks_is_declared():
-    """La posición 0 concentra el 89,4 % de las respuestas correctas."""
-    positions = Counter(
-        check.correct_index
-        for level in load_all_levels()
-        for objective in level.objectives()
-        for check in objective.checks
-        if len(check.options) >= 2
-    )
-    total = sum(positions.values())
-    assert total == 368
-    assert positions[0] == 329
-    assert positions[0] / total >= 0.80
-    # El corpus de listening, en cambio, está equilibrado: una respuesta de
+def test_mc_position_of_curriculum_checks_is_balanced():
+    """Ninguna posición concentra más del 35 % de las respuestas correctas.
+
+    Hasta V3.70 la posición 0 acumulaba 329/368 (**89,4 %**): el P0 de
+    `AA-PED-CONTENIDO-CEFR.md`. V3.75.1 lo cierra reposicionando la correcta de
+    cada check (`scripts/rebalance_mc_positions.py`), y este test pasa de
+    **declarar el sesgo** a **fijar el invariante**.
+
+    El reparto se mide POR GRUPO DE Nº DE OPCIONES: una posición solo existe
+    dentro de su `k`, y agregar los grupos escondería que el 4.º distractor
+    (k=4) nunca es la correcta.
+    """
+    by_k: dict[int, Counter] = {}
+    for level in load_all_levels():
+        for objective in level.objectives():
+            for check in objective.checks:
+                if len(check.options) >= 2:
+                    by_k.setdefault(len(check.options), Counter())[
+                        check.correct_index
+                    ] += 1
+    assert sum(sum(counts.values()) for counts in by_k.values()) == 368
+    for k, counts in by_k.items():
+        total = sum(counts.values())
+        for index in range(k):
+            assert counts.get(index, 0) / total <= 0.35, (k, index, counts)
+        # Ninguna posición muerta: la correcta debe ejercerlas todas.
+        assert set(counts) == set(range(k)), (k, counts)
+    # El corpus de listening también está equilibrado: una respuesta de
     # 4 opciones no debe superar el 35 % en ninguna posición.
     corpus_positions = Counter(q["answer_index"] for q in _corpus())
     assert sum(corpus_positions.values()) == 490

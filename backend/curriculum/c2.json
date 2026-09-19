@@ -95,22 +95,22 @@
                       "skill": "vocabulary",
                       "prompt": "'The workload is a mountain' is an example of...",
                       "options": [
-                        "a metaphor",
                         "a simile with 'like'",
+                        "a metaphor",
                         "a statistic"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m01-u01-l01-o01-c02",
                       "skill": "vocabulary",
                       "prompt": "A rhetorical question is asked...",
                       "options": [
-                        "for effect, not for an answer",
                         "to get information",
-                        "to list facts"
+                        "to list facts",
+                        "for effect, not for an answer"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m01-u01-l01-o01-c03",
@@ -198,22 +198,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which word introduces a concession?",
                       "options": [
-                        "admittedly",
                         "therefore",
+                        "admittedly",
                         "finally"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m01-u01-l01-o02-c02",
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'aun así'?",
                       "options": [
-                        "that said",
                         "for example",
-                        "in conclusion"
+                        "in conclusion",
+                        "that said"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m01-u01-l01-o02-c03",
@@ -302,22 +302,22 @@
                       "skill": "listening",
                       "prompt": "You hear a speaker use a rhetorical question. What is its purpose?",
                       "options": [
-                        "To make a point, not to get an answer",
                         "To ask for information",
+                        "To make a point, not to get an answer",
                         "To end the speech"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m01-u01-l01-o03-c02",
                       "skill": "listening",
                       "prompt": "You hear: 'We have been patient; we have been generous; we have been ignored.' What device is this?",
                       "options": [
-                        "Parallelism",
                         "Hyperbole",
-                        "Irony"
+                        "Irony",
+                        "Parallelism"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m01-u01-l01-o03-c03",
@@ -401,22 +401,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (parallelism):",
                       "options": [
-                        "She likes running, swimming and hiking.",
                         "She likes running, swimming and to hike.",
+                        "She likes running, swimming and hiking.",
                         "She likes to run, swimming and hiking."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m01-u01-l01-o04-c02",
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence (ellipsis):",
                       "options": [
-                        "I can and will help you.",
                         "I can and I will to help you.",
-                        "I can and will to help you."
+                        "I can and will to help you.",
+                        "I can and will help you."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m01-u01-l01-o04-c03",
@@ -504,22 +504,22 @@
                       "skill": "vocabulary",
                       "prompt": "A rhetorical question is asked...",
                       "options": [
-                        "for effect, not for an answer",
                         "to get information",
+                        "for effect, not for an answer",
                         "to list facts"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m01-u01-l01-o05-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'persuadir'?",
                       "options": [
-                        "persuade",
                         "pursue",
-                        "perceive"
+                        "perceive",
+                        "persuade"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -605,11 +605,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'exageración'?",
                       "options": [
-                        "hyperbole",
                         "understatement",
+                        "hyperbole",
                         "hypothesis"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -702,11 +702,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word is more formal?",
                       "options": [
-                        "therefore",
                         "so",
-                        "anyway"
+                        "anyway",
+                        "therefore"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l01-o01-c02",
@@ -724,11 +724,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the more formal sentence:",
                       "options": [
-                        "It is recommended that you arrive early.",
                         "You should get there early.",
+                        "It is recommended that you arrive early.",
                         "Get there early, okay?"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -798,11 +798,11 @@
                       "skill": "grammar",
                       "prompt": "Which sentence uses ellipsis correctly?",
                       "options": [
-                        "The report was reviewed and approved.",
                         "The report was reviewed and was approved.",
-                        "The report reviewed and approved."
+                        "The report reviewed and approved.",
+                        "The report was reviewed and approved."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l01-o02-c02",
@@ -820,22 +820,22 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct formal sentence:",
                       "options": [
-                        "It is the methodology that requires scrutiny.",
                         "It is the methodology what requires scrutiny.",
+                        "It is the methodology that requires scrutiny.",
                         "The methodology it is that requires scrutiny."
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m02-u01-l01-o02-c04",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'omisión (de palabras)'?",
                       "options": [
-                        "ellipsis",
                         "ellipse",
-                        "eclipse"
+                        "eclipse",
+                        "ellipsis"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -918,22 +918,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'en vista de'?",
                       "options": [
-                        "in light of",
                         "in spite of",
+                        "in light of",
                         "in terms of"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m02-u01-l01-o03-c03",
                       "skill": "vocabulary",
                       "prompt": "Which marker is informal?",
                       "options": [
-                        "plus",
                         "moreover",
-                        "in addition"
+                        "in addition",
+                        "plus"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 }
@@ -1030,22 +1030,22 @@
                       "skill": "vocabulary",
                       "prompt": "A 'pun' is...",
                       "options": [
-                        "a play on words",
                         "a long speech",
+                        "a play on words",
                         "a serious argument"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m02-u01-l02-o01-c03",
                       "skill": "listening",
                       "prompt": "Listen: 'Well, that went well.' (said after a failure) What is the tone?",
                       "options": [
-                        "Irony",
                         "Genuine praise",
-                        "Excitement"
+                        "Excitement",
+                        "Irony"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1133,11 +1133,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'diplomático'?",
                       "options": [
-                        "diplomatic",
                         "dramatic",
+                        "diplomatic",
                         "didactic"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1213,11 +1213,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'mediar'?",
                       "options": [
-                        "mediate",
                         "meditate",
-                        "medicate"
+                        "medicate",
+                        "mediate"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l02-o03-c02",
@@ -1301,22 +1301,22 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'precisión'?",
                       "options": [
-                        "precision",
                         "pressure",
+                        "precision",
                         "presentation"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m02-u01-l02-o04-c02",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'matiz'?",
                       "options": [
-                        "nuance",
                         "nuisance",
-                        "nurture"
+                        "nurture",
+                        "nuance"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1406,22 +1406,22 @@
                       "skill": "listening",
                       "prompt": "You hear: 'It's her Achilles' heel.' What does this mean?",
                       "options": [
-                        "Her main weakness",
                         "Her shoe",
+                        "Her main weakness",
                         "Her strength"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m02-u01-l02-o05-c03",
                       "skill": "vocabulary",
                       "prompt": "Which word means 'alusión'?",
                       "options": [
-                        "allusion",
                         "illusion",
-                        "elusion"
+                        "elusion",
+                        "allusion"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     }
                   ]
                 },
@@ -1509,11 +1509,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'concesión'?",
                       "options": [
-                        "concession",
                         "confession",
+                        "concession",
                         "conclusion"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -1590,11 +1590,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct cleft sentence:",
                       "options": [
-                        "It was the funding that the project lacked.",
                         "It was the funding what the project lacked.",
-                        "The funding it was that the project lacked."
+                        "The funding it was that the project lacked.",
+                        "It was the funding that the project lacked."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l03-o01-c02",
@@ -1612,11 +1612,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'aplicación (de una medida)'?",
                       "options": [
-                        "implementation",
                         "implication",
+                        "implementation",
                         "impression"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1688,11 +1688,11 @@
                       "skill": "reading",
                       "prompt": "Read: 'The meeting was, shall we say, productive.' What does the writer imply?",
                       "options": [
-                        "It was not productive",
                         "It was very productive",
-                        "It was cancelled"
+                        "It was cancelled",
+                        "It was not productive"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l03-o02-c02",
@@ -1710,11 +1710,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which phrase means 'nada despreciable'?",
                       "options": [
-                        "no small feat",
                         "no big deal",
+                        "no small feat",
                         "not at all"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1789,11 +1789,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which is a euphemism for despedir empleados?",
                       "options": [
-                        "downsize",
                         "dismiss",
-                        "fire"
+                        "fire",
+                        "downsize"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l03-o03-c02",
@@ -1811,11 +1811,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'eufemismo'?",
                       "options": [
-                        "euphemism",
                         "emphasis",
+                        "euphemism",
                         "euphoria"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 },
@@ -1886,11 +1886,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the correct sentence:",
                       "options": [
-                        "Frankly, the proposal is weak.",
                         "Frankly the proposal is weak?",
-                        "The proposal frankly is weak."
+                        "The proposal frankly is weak.",
+                        "Frankly, the proposal is weak."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m02-u01-l03-o04-c02",
@@ -1908,11 +1908,11 @@
                       "skill": "vocabulary",
                       "prompt": "Which word means 'francamente'?",
                       "options": [
-                        "frankly",
                         "fairly",
+                        "frankly",
                         "firmly"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     }
                   ]
                 }
@@ -2002,11 +2002,11 @@
                       "skill": "grammar",
                       "prompt": "Choose the more formal sentence:",
                       "options": [
-                        "It is essential that the matter be addressed.",
                         "You need to fix this now.",
-                        "Sort it out, will you?"
+                        "Sort it out, will you?",
+                        "It is essential that the matter be addressed."
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c02",
@@ -2024,22 +2024,22 @@
                       "skill": "reading",
                       "prompt": "Read: 'Given the circumstances, the outcome was hardly a triumph.' What is the writer's view?",
                       "options": [
-                        "Disappointed",
                         "Celebratory",
+                        "Disappointed",
                         "Indifferent"
                       ],
-                      "correct_index": 0
+                      "correct_index": 1
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c04",
                       "skill": "listening",
                       "prompt": "Listen: 'That said, the results are promising.' What does 'that said' introduce?",
                       "options": [
-                        "A contrast or caveat",
                         "An example",
-                        "A summary"
+                        "A summary",
+                        "A contrast or caveat"
                       ],
-                      "correct_index": 0
+                      "correct_index": 2
                     },
                     {
                       "id": "c2-m03-u01-l01-o01-c05",
