@@ -472,6 +472,18 @@ como el eje del **cálculo**, frente a `AH`–`AL`, que miran la **forma de lo q
 ese cálculo sirve**. Con él incorporado, no queda ningún fichero sin declarar
 antes de sellar el baseline.
 
+**La política que ordena el cierre de esta deuda (2026-09-19).** La decisión de
+**cómo** se corrigen los 5 problemas —y no solo **cuándo**— queda fijada en el
+dossier de diseño **`docs/audit/AO-POLITICA-PSICOMETRICA-V40.md`**
+(`POLITICA_PSICOMETRICA_VERSION = "1.0.0 (V4.0)"`): **Regla A** (posición `≤ 35 %`
+por `k`, nivel y **destreza**, sin posiciones muertas, extensible a
+`assessments.json`), **Regla B** (longitud `≤ 1,5 × azar` de su `k` por lote, con
+excepciones enumeradas), **Regla C** (`k=3` en lo que gatea · `k=4` en el corpus
+de práctica · residuo de 10 checks alineado · `k=2` prohibido) y **Regla D**
+(rúbrica de plausibilidad del distractor). AO **no corrige nada ni añade
+candados**: ordena la reautoría de V4.0.x y fija sus criterios de aceptación.
+Las cinco filas de esta tabla siguen **abiertas** y con la misma fase asignada.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
