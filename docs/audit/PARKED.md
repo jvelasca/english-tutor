@@ -423,6 +423,55 @@
 > Lo que estaba roto era **todo el currículum** (368 checks) y no solo su nivel
 > A1. Se anota para que el registro no arrastre la imprecisión.
 
+## Pausa pedagógica pre-baseline — deuda de forma del banco (V3.75.1 · 2026-09-19)
+
+Esta sección **sustituye la frase genérica del pendiente anterior** («normalizar
+longitudes de opciones y reparto de posiciones al regenerar contenido») por el
+alcance **medido**. Auditoría de solo lectura sobre el baseline congelado
+**v3.75.1 = `7962d57`**; instrumento `item-form`, `distractor-signals` y el
+`mc-bias` extendido (`backend/scripts/audit_dossier.py`), artefactos en
+`docs/audit/generated/`. Dossiers: `AH`–`AL` y la síntesis
+`AM-SINTESIS-PSICOMETRIA-V3751.md`.
+
+**Resultado: 0 P0 · 4 P1 · 12 P2 · 9 P3** (25 hallazgos que describen **5
+problemas reales**; los ejes se solapan a propósito). **Nada de esta sección se
+ha corregido**: cada fila tiene su **fase** asignada y ninguna se implementa en
+la pausa.
+
+| # | Problema | Alcance medido | Fase propuesta |
+|---|---|---|---|
+| 1 | **Sesgo de longitud de la opción correcta** | Checks 39,1 % (144/368) · corpus 39,8 % (195/490) · exámenes 36,4 % · placement 50 %. **Concentrado por lote**: corpus C1/C2 **80 %**, B1 checks 50,9 %, C2 checks 56,1 %; A1 (25,7 %) por debajo del azar. Gradiente **no monótono** y sin banda en `CEFR-REFERENCE.md` ⇒ **deriva de autoría**, no incumplimiento CEFR | **V4.0.x contenido**, en la misma pasada que el reposicionamiento |
+| 2 | **Sesgo posicional de los instrumentos de evaluación** | Exámenes: 63,6 % en posición 0 (B1 9/12) y **posición 2 muerta en los 22**. Placement: posición 1 en **17/24 = 70,8 %**, posición 2 en 1/24, y «marcar siempre 1» simula **6/8 y banda C2** (latente: ningún componente lo consume). La posición del examen es función del **bloque de destreza** | **V4.0.x contenido**, **antes** de cualquier pantalla de nivelación; regla `j % k` **por destreza** y sin posiciones muertas |
+| 3 | **Heterogeneidad de forma (`k`)** | 358 checks `k=3` / 10 `k=4` (los 10 son un **residuo accidental** en A1 listening `o03`); corpus 100 % `k=4`; exámenes/placement 100 % `k=3`; **0 ítems `k=2`**. Suelo de azar distinto entre práctica (25 %) y evaluación (33,3 %) | **Decisión pedagógica de V4.0.x** antes de reautorar. **No** convertir todo a `k=4` por defecto |
+| 4 | **Puntos ciegos del instrumento de medición** | `quantity_literal` dispara **1/904** pese a 87 enunciados de cantidad (falso negativo); `prompt_keyword_echo` cuenta solo el **eco exclusivo** (la correcta contiene palabra del enunciado en 80/904 = 8,9 %, ~2,8× la cifra reportada) | **Instrumento (coste bajo)**: ampliar el léxico de cantidad y publicar el eco no exclusivo |
+| 5 | **Gradiente por nivel no monótono** | Checks 25,7→36,4→50,9→42,9→36,5→56,1 (ρ=0,77, rompe en B1→B2 y B2→C1); corpus 29,5→39,5→60,0→40,0→80,0→80,0 (ρ=0,93, rompe en B1→B2) | **Declaración, no corrección**: si se quiere progresión de forma, se diseña explícitamente |
+
+**Positivo (no requiere acción).** El invariante de reparto de V3.75.1
+(`≤ 35 %` por grupo de `k`) se cumple **también por nivel**, sin ninguna posición
+muerta — pero es **emergente**, no blindado: con n=20–35 un ítem mueve 3–5 pp y
+no existe candado por nivel.
+
+**Qué NO se hizo (y por qué).** No se corrigió ningún `.json`; **no se añadieron
+candados que fijen el defecto** —a diferencia del test de 329/368 de V3.70—,
+porque el invariante de forma correcto todavía no se conoce: se diseñará **con**
+la corrección. Tampoco se decide aquí la política de `k` ni el arreglo de
+`assessments.json`.
+
+**Honestidad.** (i) Mide **acierto explotable**, no aprendizaje. (ii) No mide
+plausibilidad semántica de distractores (exigiría hablantes) ni la **tasa real**
+del atajo (la estrategia se **simula**, no se observa). (iii) Los instrumentos de
+evaluación son **46 ítems, no 904**; no se generalizan con la confianza de los
+368.
+
+**Árbol de la entrega (decisión sobre los ficheros hoy sin seguimiento).** El
+árbol queda **limpio** incorporando, como parte de esta entrega del baseline, el
+dossier **`docs/audit/AG-AUDITORIA-MOTOR-V375.md`** (auditoría del motor de
+dominio/pedagogía sobre V3.75.0): es el **eje de motor** de la misma serie y su
+lugar correcto es `docs/audit/`, junto a `AH`–`AM`. `AM` no lo repite y lo cita
+como el eje del **cálculo**, frente a `AH`–`AL`, que miran la **forma de lo que
+ese cálculo sirve**. Con él incorporado, no queda ningún fichero sin declarar
+antes de sellar el baseline.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

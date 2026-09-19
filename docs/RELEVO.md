@@ -5,6 +5,69 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-19 (UTC+2).
 >
+> **Nota (2026-09-19 · tarde): V3.75.2 — release DOCUMENTAL y de INSTRUMENTO que
+> publica la PAUSA PEDAGÓGICA pre-baseline (auditoría psicométrica del banco,
+> AH–AM) y la deja auditable desde GitHub.** **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar
+> el currículum y SIN una sola línea de código de producto** (el diff de producto
+> es **cero**). El gerente decide **no publicar una V3.75.2 de corrección** para el
+> sesgo de longitud: tocar el banco otra vez sin entender el patrón completo sería
+> contraproducente. Se abre una **pausa de medición** sobre el baseline congelado
+> **v3.75.1 = `7962d57`** (el commit al que apunta el tag anotado) para decidir
+> **con datos** qué se cierra y en qué fase, y esa medición se **publica con ancla
+> estable** porque sin commit ni tag GitHub no la ve.
+> **(A′) El ancla de la auditoría externa se repara en la misma release.** La
+> entrada vigente (`agentes/auditoria-total-externa-v375.md`) declaraba un
+> invariante —`git diff --stat v3.75.0..main -- backend frontend launcher scripts`
+> **vacío**— que **V3.75.1 ya había roto** al tocar `backend/`, así que seguirla al
+> pie de la letra producía un **P0 falso en el primer comando del auditor** (la
+> regresión que V3.73.3/V3.73.6 documentan y que V3.73.5 declaró cerrada). Se
+> publica **`agentes/auditoria-total-externa-v3751.md`**, anclado a **`v3.75.1`** y
+> verificado por comando, con el invariante **honesto**: producto y contenido sin
+> cambios, y el diff real declarado como **lista cerrada**. **(A) El instrumento (solo
+> lectura).** `backend/scripts/audit_dossier.py` gana `item-form` (nº de opciones,
+> posición y longitud de la correcta por banco, nivel y grupo de `k`, con
+> posiciones muertas) y `distractor-signals` (tres heurísticas declaradas + muestra
+> determinista), y `mc-bias` **separa exámenes de placement**: hasta ahora el grupo
+> llamado «exámenes level/placement» **solo contaba los 22 exámenes** y el
+> **placement (24 ítems) no aparecía** en esa medición — el «63,6 % en posición 0»
+> de V3.75.1 es de **exámenes**, no del conjunto. `cefr-adequacy` **no cambia**.
+> **(B) Cinco ejes en paralelo**, cada uno con su dossier y la regla de evidencia
+> `[D]`/`[A]`/`[R]`: `AH` longitud · `AI` instrumentos de evaluación · `AJ` forma ·
+> `AK` distractores · `AL` niveles, más la síntesis
+> **`AM-SINTESIS-PSICOMETRIA-V3751.md`**. **(C) Resultado: 0 P0 · 4 P1 · 12 P2 ·
+> 9 P3** (25 hallazgos que describen **5 problemas reales** tras deduplicar los
+> cruces). **V3.75.1 sigue siendo la base correcta** para sellar, y esta auditoría
+> es su **acta de deuda de forma**: **(1)** sesgo de longitud real, **concentrado
+> por lote** (corpus C1/C2 **80 %**, B1 checks 50,9 %, C2 checks 56,1 %, placement
+> 50 %; checks globales 39,1 %, +6,0 pp sobre el azar) y **no monótono por nivel**,
+> sin banda en `CEFR-REFERENCE.md` ⇒ **deriva de autoría**, no incumplimiento
+> CEFR; **(2)** los **instrumentos de evaluación conservan sus dos sesgos** porque
+> V3.75.1 no los tocó: en los exámenes la **posición 2 está muerta** (0/22) y la 0
+> concentra el 63,6 %; en el placement la **posición 1 concentra 17/24 = 70,8 %**
+> (marcar siempre 1 simula **6/8 y banda C2**), latente porque **ningún componente
+> consume el placement** y contenido por umbrales en el examen; **(3)** la forma
+> del banco es **heterogénea por residuo**: los **10 checks de `k=4`** son un
+> accidente de autoría en A1 listening `o03`, corpus entero `k=4` y
+> checks/exámenes `k=3`, sin ningún `k=2`; **(4)** **dos de las tres señales del
+> instrumento subestiman** lo que dicen medir (`quantity_literal` dispara **1/904**
+> pese a 87 enunciados de cantidad; `prompt_keyword_echo` solo cuenta el **eco
+> exclusivo**: la correcta contiene palabra del enunciado en 80/904 = 8,9 %,
+> ~2,8× la cifra reportada), declarado para que nadie lea un `0 %` como «sin
+> problema»; **(5)** **el invariante de V3.75.1 aguanta también por nivel**
+> (ninguna posición muerta), pero es **emergente**, no blindado. **(D) Lo que NO
+> hace la pausa.** No corrige nada, **no añade candados que fijen el defecto** (los
+> invariantes de forma se diseñan **con** la corrección) y **no decide** la
+> política de `k` ni el arreglo de `assessments.json`: **propone la fase**, no el
+> cambio. Todo queda registrado con su fase en `docs/audit/PARKED.md`.
+> **Honestidad.** (i) Mide **tasa de acierto explotable**, no aprendizaje: un ítem
+> con la correcta más larga no es por sí solo un ítem malo. (ii) **No mide** la
+> plausibilidad semántica de un distractor (exigiría hablantes) ni la **tasa real**
+> del atajo (el motor guarda acierto, no posición marcada: la estrategia se
+> **simula**). (iii) Los instrumentos de evaluación son **46 ítems, no 904**
+> (placement 17/24 → IC95 % ≈ [52,6 %, 89,0 %]): no se generalizan con la confianza
+> de los 368. (iv) El P0 de V3.75.1 **no se reabre**.
+>
 > **Nota (2026-09-19): V3.75.1 (cierre del P0 del sesgo posicional del currículum)
 > — release de PARCHE y de CONTENIDO, sin capacidad pedagógica nueva.**
 > **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni

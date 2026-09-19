@@ -19,6 +19,14 @@ Genera las métricas reproducibles que sustentan los dossieres `docs/audit/*.md`
     python -m scripts.audit_dossier speaking-stats
         Distribución de escenarios speaking por cefr_target y tipo de tarea.
 
+    python -m scripts.audit_dossier item-form
+        Forma de los ítems de opción múltiple (V3.75.1): número de opciones,
+        posición y longitud de la opción correcta, por banco y por nivel.
+
+    python -m scripts.audit_dossier distractor-signals
+        Señales deterministas de distractor inferible y muestra para revisión
+        cualitativa (V3.75.1).
+
 Salida legible en stdout y versionada en `docs/audit/generated/` para que las
 cifras de los dossieres sean reproducibles (sección "Regenerar").
 """
@@ -54,6 +62,18 @@ DEFAULT_SEED = 7
 def _mean(values) -> float:
     values = list(values)
     return round(sum(values) / len(values), 2) if values else 0.0
+
+
+def _median(values) -> float:
+    """Mediana de una lista de números (0.0 si está vacía)."""
+    values = sorted(values)
+    n = len(values)
+    if not n:
+        return 0.0
+    mid = n // 2
+    if n % 2:
+        return float(values[mid])
+    return (values[mid - 1] + values[mid]) / 2.0
 
 
 def corpus_items() -> list[dict]:
@@ -242,37 +262,37 @@ def speaking_stats() -> dict:
 
 
 def mc_position_bias() -> dict:
-    """Distribución de la posición de la respuesta correcta en los ítems MC."""
-    corpus = corpus_items()
+    """Distribución de la posición de la respuesta correcta en los ítems MC.
+
+    V3.75.1: el grupo que se llamaba «exámenes level/placement» **solo contaba
+    los exámenes** (22 ítems) y el placement (24 ítems) no aparecía en
+    `mc-bias`. Ahora se separa en «exámenes finales» (con su desglose por nivel)
+    y «placement», y cada grupo declara el reparto de `k`: una posición solo
+    existe dentro de su número de opciones.
+    """
+    banks = mc_banks()
     groups: list[dict] = [
-        {"name": "corpus listening (c*)", "items": len(corpus),
-         "counts": dict(Counter(q["answer_index"] for q in corpus))},
+        _bias_group("corpus listening (c*)", banks["corpus_listening"]),
     ]
     for lv in LEVELS:
-        qs = [q for q in corpus if q["level"] == lv]
         groups.append(
-            {"name": f"corpus {lv}", "items": len(qs),
-             "counts": dict(Counter(q["answer_index"] for q in qs))}
+            _bias_group(
+                f"corpus {lv}",
+                [r for r in banks["corpus_listening"] if r["level"] == lv],
+            )
         )
-    ck = Counter()
-    for lv in load_all_levels():
-        for o in lv.objectives():
-            for c in o.checks:
-                if len(c.options) >= 2:
-                    ck[c.correct_index] += 1
-    groups.append({"name": "checks currículo (niveles)", "items": sum(ck.values()),
-                   "counts": dict(sorted(ck.items()))})
-    # Exámenes/placement de assessments.json (sin tocar; solo medir).
-    from services.curriculum import load_assessments
-
-    ad = load_assessments()
-    ex = Counter()
-    for exam in ad.exams.values():
-        for it in exam.items:
-            ex[it.correct_index] += 1
-    total_ex = sum(ex.values())
-    groups.append({"name": "exámenes level/placement", "items": total_ex,
-                   "counts": dict(sorted(ex.items()))})
+    groups.append(
+        _bias_group("checks currículo (niveles)", banks["checks_curriculum"])
+    )
+    groups.append(_bias_group("exámenes finales", banks["exams"]))
+    for lid in sorted({r["level"] for r in banks["exams"]}):
+        groups.append(
+            _bias_group(
+                f"examen {lid}",
+                [r for r in banks["exams"] if r["level"] == lid],
+            )
+        )
+    groups.append(_bias_group("placement", banks["placement"]))
     return {"area": "mc-bias", "groups": groups}
 
 
@@ -1281,6 +1301,473 @@ def assessment_instruments_markdown(data: dict) -> str:
 
 
 # =============================================================================
+# V3.75.1 · Auditoría psicométrica del banco (SOLO LECTURA)
+# =============================================================================
+# Instrumento de la pausa pedagógica pre-baseline (dossieres AH–AM). Mide la
+# FORMA de los instrumentos de evaluación —número de opciones, posición y
+# longitud de la correcta, y señales de inferibilidad—, nunca su contenido ni el
+# motor. No escribe en `data/` ni en `curriculum/`: lee contenido y emite el par
+# `.md`/`.json` en `docs/audit/generated/`.
+#
+# Los dos subcomandos comparten `mc_banks()`, de modo que `item-form` y
+# `distractor-signals` miden exactamente el mismo conjunto de ítems.
+
+# Señales de inferibilidad que el instrumento mide de forma determinista. Son
+# HEURÍSTICAS declaradas, no veredictos: marcan ítems que permiten acertar sin
+# comprender, y la parte cualitativa la cierra la muestra del propio comando.
+DISTRACTOR_SIGNALS: dict[str, str] = {
+    "prompt_keyword_echo": (
+        "El enunciado comparte una palabra de contenido con la opción correcta "
+        "y con ninguna otra: la correcta se puede emparejar sin comprender."
+    ),
+    "shape_outlier": (
+        "La opción correcta es el outlier de longitud: se desvía de la mediana "
+        "de los distractores en >= 50 % y esa desviación es la mayor del ítem."
+    ),
+    "quantity_literal": (
+        "El enunciado pide una cantidad o un momento (how many, what time, "
+        "when...) y solo la opción correcta contiene una cifra, un número "
+        "escrito o un día de la semana."
+    ),
+}
+
+# Enunciados que piden una cantidad, un momento o una duración.
+_QUANTITY_PROMPT_RE = re.compile(
+    r"\b(how many|how much|how long|how far|how old|what time|what date|when)\b",
+    re.IGNORECASE,
+)
+# Cantidad/momento LITERAL: cifra, número escrito o día de la semana. Se incluye
+# el número en palabras porque las opciones de estos bancos se autoriaron así
+# («At eight», no «At 8»): sin esta ampliación la señal nunca dispararía.
+_NUMBER_OR_DAY_RE = re.compile(
+    r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
+    r"thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+    re.IGNORECASE,
+)
+
+
+def _all_content_words(text: object) -> set[str]:
+    return set(_content_words(text))
+
+
+def _option_lengths(options) -> list[int]:
+    return [len(str(o)) for o in (options or [])]
+
+
+def _length_profile(options, correct_index) -> dict | None:
+    """Forma de un MC: longitud relativa de la correcta y su `k`.
+
+    `None` si el ítem no es un MC válido (menos de 2 opciones, índice ausente o
+    fuera de rango): el instrumento mide lo que puede y no inventa un `k`.
+    """
+    lengths = _option_lengths(options)
+    k = len(lengths)
+    if k < 2 or not isinstance(correct_index, int) or isinstance(correct_index, bool):
+        return None
+    if not 0 <= correct_index < k:
+        return None
+    longest = max(lengths)
+    n_longest = lengths.count(longest)
+    correct_len = lengths[correct_index]
+    distractors = [ln for j, ln in enumerate(lengths) if j != correct_index]
+    distractor_mean = sum(distractors) / len(distractors) if distractors else 0.0
+    distractor_median = _median(distractors)
+    deviation = abs(correct_len - distractor_median)
+    other_deviation = max(
+        (abs(ln - distractor_median) for ln in distractors), default=0
+    )
+    return {
+        "k": k,
+        "index": correct_index,
+        "correct_len": correct_len,
+        "longest_len": longest,
+        "distractor_mean_len": round(distractor_mean, 2),
+        "correct_is_longest": n_longest == 1 and correct_len == longest,
+        "correct_is_longest_or_tied": correct_len == longest,
+        "length_ratio_to_distractors": (
+            round(correct_len / distractor_mean, 3) if distractor_mean else 0.0
+        ),
+        "shape_outlier": bool(
+            distractor_median
+            and deviation >= 0.5 * distractor_median
+            and deviation > other_deviation
+        ),
+    }
+
+
+def mc_banks() -> dict[str, list[dict]]:
+    """Los cuatro bancos MC como filas homogéneas.
+
+    Cada fila es `{id, level, prompt, options, correct_index}`. Es la fuente
+    única de `item-form`, `distractor-signals` y `mc-bias`, de modo que los tres
+    ejes miden el mismo conjunto de ítems.
+    """
+    from services.curriculum import load_assessments
+
+    checks: list[dict] = []
+    for level in load_all_levels():
+        for objective in level.objectives():
+            for check in objective.checks:
+                if len(check.options) >= 2:
+                    checks.append(
+                        {
+                            "id": check.id,
+                            "level": level.level,
+                            "prompt": check.prompt,
+                            "options": list(check.options),
+                            "correct_index": check.correct_index,
+                        }
+                    )
+    corpus = [
+        {
+            "id": str(q["id"]),
+            "level": q["level"],
+            "prompt": q.get("question") or "",
+            "options": list(q.get("options") or []),
+            "correct_index": q.get("answer_index"),
+        }
+        for q in corpus_items()
+    ]
+    assessments = load_assessments()
+    exams = [
+        {
+            "id": item.id,
+            "level": level_id,
+            "prompt": item.prompt,
+            "options": list(item.options),
+            "correct_index": item.correct_index,
+        }
+        for level_id, exam in assessments.exams.items()
+        for item in exam.items
+    ]
+    placement = [
+        {
+            "id": item.id,
+            "level": "placement",
+            "prompt": item.prompt,
+            "options": list(item.options),
+            "correct_index": item.correct_index,
+        }
+        for item in assessments.placement.items
+    ]
+    return {
+        "checks_curriculum": checks,
+        "corpus_listening": corpus,
+        "exams": exams,
+        "placement": placement,
+    }
+
+
+def _bias_group(name: str, rows: list[dict]) -> dict:
+    """Grupo de `mc-bias`: posición de la correcta y reparto de `k`."""
+    valid = [r for r in rows if isinstance(r.get("correct_index"), int)]
+    k_dist = Counter(len(r["options"]) for r in valid if len(r["options"]) >= 2)
+    return {
+        "name": name,
+        "items": len(valid),
+        "counts": dict(sorted(Counter(r["correct_index"] for r in valid).items())),
+        "options_count_distribution": {str(k): k_dist[k] for k in sorted(k_dist)},
+    }
+
+
+def _profile_summary(profiles: list[dict]) -> dict:
+    """Resumen de forma de un conjunto de perfiles (`_length_profile`)."""
+    n = len(profiles)
+    if not n:
+        return {"n": 0}
+    k = max(p["k"] for p in profiles)
+    longest = sum(1 for p in profiles if p["correct_is_longest"])
+    longest_tied = sum(1 for p in profiles if p["correct_is_longest_or_tied"])
+    positions = Counter(p["index"] for p in profiles)
+    ratios = [p["length_ratio_to_distractors"] for p in profiles]
+    return {
+        "n": n,
+        "correct_is_longest": longest,
+        "correct_is_longest_pct": round(100.0 * longest / n, 1),
+        "correct_is_longest_or_tied": longest_tied,
+        "correct_is_longest_or_tied_pct": round(100.0 * longest_tied / n, 1),
+        "mean_length_ratio": round(sum(ratios) / n, 3),
+        "positions": {str(i): positions.get(i, 0) for i in range(k)},
+        "dead_positions": [i for i in range(k) if positions.get(i, 0) == 0],
+    }
+
+
+def _form_summary(rows: list[dict]) -> dict:
+    """Resumen de forma de un grupo: agregado y desglose por número de opciones.
+
+    Una posición solo existe dentro de su `k`: el agregado se da siempre
+    acompañado del reparto por grupo, que es donde vive el invariante.
+    """
+    profiles = []
+    for row in rows:
+        profile = _length_profile(row.get("options"), row.get("correct_index"))
+        if profile is not None:
+            profiles.append(profile)
+    if not profiles:
+        return {"n": 0}
+    k_dist = Counter(p["k"] for p in profiles)
+    out = _profile_summary(profiles)
+    out["options_count_distribution"] = {
+        str(k): k_dist[k] for k in sorted(k_dist)
+    }
+    out["by_options_count"] = {
+        str(k): _profile_summary([p for p in profiles if p["k"] == k])
+        for k in sorted(k_dist)
+    }
+    return out
+
+
+def item_form() -> dict:
+    """Forma de los MC: número de opciones, posición y longitud de la correcta.
+
+    Un grupo por banco y por nivel; dentro de cada grupo, el desglose por `k`.
+    """
+    banks = mc_banks()
+    groups: list[dict] = []
+
+    def add(name: str, bank: str, rows: list[dict]) -> None:
+        groups.append({"name": name, "bank": bank, **_form_summary(rows)})
+
+    add(
+        "checks del currículum (todos)",
+        "checks_curriculum",
+        banks["checks_curriculum"],
+    )
+    for lv in LEVELS:
+        add(
+            f"checks {lv}",
+            "checks_curriculum",
+            [r for r in banks["checks_curriculum"] if r["level"] == lv],
+        )
+    add("corpus listening (todos)", "corpus_listening", banks["corpus_listening"])
+    for lv in LEVELS:
+        add(
+            f"corpus {lv}",
+            "corpus_listening",
+            [r for r in banks["corpus_listening"] if r["level"] == lv],
+        )
+    add("exámenes finales (todos)", "exams", banks["exams"])
+    for level_id in sorted({r["level"] for r in banks["exams"]}):
+        add(
+            f"examen {level_id}",
+            "exams",
+            [r for r in banks["exams"] if r["level"] == level_id],
+        )
+    add("placement", "placement", banks["placement"])
+    return {"area": "item-form", "groups": groups}
+
+
+def item_form_markdown(data: dict) -> str:
+    lines = [
+        "# Forma de los ítems de opción múltiple (V3.75.1 · pausa pedagógica)",
+        "",
+        "> Generado por `python -m scripts.audit_dossier item-form`. Solo lectura.",
+        "> Mide la FORMA (número de opciones, posición y longitud de la correcta),",
+        "> no la calidad del contenido. `más larga` cuenta solo la más larga única;",
+        "> `o empatada` incluye los empates a longitud máxima.",
+        "",
+        "## Posición y número de opciones",
+        "",
+        "| Grupo | N | k (reparto) | Posiciones de la correcta | Muertas |",
+        "|---|---|---|---|---|",
+    ]
+    for group in data["groups"]:
+        if not group.get("n"):
+            lines.append(f"| {group['name']} | 0 | — | — | — |")
+            continue
+        kdist = ", ".join(
+            f"k={k}:{v}" for k, v in group["options_count_distribution"].items()
+        )
+        positions = ", ".join(f"{k}:{v}" for k, v in group["positions"].items())
+        dead = ", ".join(str(i) for i in group["dead_positions"]) or "—"
+        lines.append(
+            f"| {group['name']} | {group['n']} | {kdist} | {positions} | {dead} |"
+        )
+    lines += [
+        "",
+        "## Longitud de la opción correcta",
+        "",
+        "| Grupo | N | más larga | o empatada | correcta / distractores |",
+        "|---|---|---|---|---|",
+    ]
+    for group in data["groups"]:
+        if not group.get("n"):
+            lines.append(f"| {group['name']} | 0 | — | — | — |")
+            continue
+        lines.append(
+            f"| {group['name']} | {group['n']} "
+            f"| {group['correct_is_longest']} "
+            f"({group['correct_is_longest_pct']}%) "
+            f"| {group['correct_is_longest_or_tied']} "
+            f"({group['correct_is_longest_or_tied_pct']}%) "
+            f"| {group['mean_length_ratio']} |"
+        )
+    lines += [
+        "",
+        "## Desglose por número de opciones (una posición solo existe en su k)",
+        "",
+        "| Grupo | k | N | Posiciones | Muertas | más larga |",
+        "|---|---|---|---|---|---|",
+    ]
+    for group in data["groups"]:
+        if not group.get("n"):
+            continue
+        for k, sub in group["by_options_count"].items():
+            positions = ", ".join(
+                f"{i}:{v}" for i, v in sub["positions"].items()
+            )
+            dead = ", ".join(str(i) for i in sub["dead_positions"]) or "—"
+            lines.append(
+                f"| {group['name']} | {k} | {sub['n']} | {positions} | {dead} "
+                f"| {sub['correct_is_longest_pct']}% |"
+            )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _prompt_keyword_echo(row: dict) -> bool:
+    prompt_words = _all_content_words(row.get("prompt"))
+    options = row.get("options") or []
+    index = row.get("correct_index")
+    if not prompt_words or not isinstance(index, int):
+        return False
+    if not 0 <= index < len(options):
+        return False
+    if not (_all_content_words(options[index]) & prompt_words):
+        return False
+    return all(
+        not (_all_content_words(opt) & prompt_words)
+        for j, opt in enumerate(options)
+        if j != index
+    )
+
+
+def _quantity_literal(row: dict) -> bool:
+    if not _QUANTITY_PROMPT_RE.search(str(row.get("prompt") or "")):
+        return False
+    options = row.get("options") or []
+    index = row.get("correct_index")
+    if not isinstance(index, int) or not 0 <= index < len(options):
+        return False
+    if not _NUMBER_OR_DAY_RE.search(str(options[index])):
+        return False
+    return all(
+        not _NUMBER_OR_DAY_RE.search(str(opt))
+        for j, opt in enumerate(options)
+        if j != index
+    )
+
+
+def _signals_for(row: dict) -> list[str]:
+    fired: list[str] = []
+    if _prompt_keyword_echo(row):
+        fired.append("prompt_keyword_echo")
+    profile = _length_profile(row.get("options"), row.get("correct_index"))
+    if profile is not None and profile["shape_outlier"]:
+        fired.append("shape_outlier")
+    if _quantity_literal(row):
+        fired.append("quantity_literal")
+    return fired
+
+
+def distractor_signals(sample_size: int = 5) -> dict:
+    """Señales deterministas de distractor inferible, por banco.
+
+    Tres heurísticas declaradas en `DISTRACTOR_SIGNALS` más una muestra
+    determinista (semilla fija) para la revisión cualitativa del eje.
+    """
+    banks = mc_banks()
+    out: dict[str, dict] = {}
+    for bank, rows in banks.items():
+        counts: Counter = Counter()
+        flagged: list[dict] = []
+        for row in rows:
+            fired = _signals_for(row)
+            if fired:
+                counts.update(fired)
+                flagged.append({**row, "signals": fired})
+        rng = random.Random(DEFAULT_SEED)
+        sample_idx = sorted(
+            rng.sample(range(len(flagged)), min(sample_size, len(flagged)))
+        )
+        out[bank] = {
+            "n": len(rows),
+            "n_flagged": len(flagged),
+            "signal_counts": {
+                name: counts.get(name, 0) for name in DISTRACTOR_SIGNALS
+            },
+            "signal_pct": {
+                name: (
+                    round(100.0 * counts.get(name, 0) / len(rows), 1)
+                    if rows
+                    else 0.0
+                )
+                for name in DISTRACTOR_SIGNALS
+            },
+            "sample": [flagged[i] for i in sample_idx],
+        }
+    return {
+        "area": "distractor-signals",
+        "signals": DISTRACTOR_SIGNALS,
+        "banks": out,
+    }
+
+
+def distractor_signals_markdown(data: dict) -> str:
+    names = list(data["signals"])
+    lines = [
+        "# Señales de distractor inferible (V3.75.1 · pausa pedagógica)",
+        "",
+        "> Generado por `python -m scripts.audit_dossier distractor-signals`.",
+        "> Solo lectura. Heurísticas DECLARADAS y deterministas: marcan ítems que",
+        "> permiten acertar por forma o por eco léxico, no ítems mal escritos.",
+        "> La parte cualitativa la cierra la muestra determinista.",
+        "",
+        "## Definición de las señales",
+        "",
+    ]
+    for name, text in data["signals"].items():
+        lines.append(f"- `{name}`: {text}")
+    lines += [
+        "",
+        "## Recuento por banco",
+        "",
+        "| Banco | N | con señal | " + " | ".join(names) + " |",
+        "|---|---|---|" + "---|" * len(names),
+    ]
+    for bank, summary in data["banks"].items():
+        cells = " | ".join(
+            f"{summary['signal_counts'][name]} ({summary['signal_pct'][name]}%)"
+            for name in names
+        )
+        lines.append(
+            f"| {bank} | {summary['n']} | {summary['n_flagged']} | {cells} |"
+        )
+    lines += [
+        "",
+        "## Muestra determinista (semilla fija) para revisión cualitativa",
+        "",
+    ]
+    for bank, summary in data["banks"].items():
+        lines.append(f"### {bank}")
+        lines.append("")
+        for item in summary["sample"]:
+            options = "; ".join(
+                f"{i}:{opt}" for i, opt in enumerate(item["options"])
+            )
+            lines.append(
+                f"- `{item['id']}` [{item['level']}] "
+                f"correcta={item['correct_index']} "
+                f"señales={', '.join(item['signals'])} — {item['prompt']}"
+            )
+            lines.append(f"  - {options}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+# =============================================================================
 # V3.71 · Eje RA — auditoría de offline real (SOLO LECTURA)
 # =============================================================================
 # Instrumento del eje RA: NO es ruta de producto. No abre conexiones salientes,
@@ -1635,6 +2122,15 @@ def main() -> int:
         "assessment-instruments",
         help="placement, exámenes y umbrales de banda (V3.70 · eje 5)",
     )
+    # V3.75.1 · pausa pedagógica pre-baseline (psicometría del banco).
+    sub.add_parser(
+        "item-form",
+        help="forma de los MC: k, posición y longitud de la correcta (V3.75.1)",
+    )
+    sub.add_parser(
+        "distractor-signals",
+        help="señales deterministas de distractor inferible (V3.75.1)",
+    )
     # V3.71 · eje RA — manifiesto de runtime y offline (solo lectura).
     p_ra = sub.add_parser(
         "runtime-audit",
@@ -1749,6 +2245,20 @@ def main() -> int:
         md = assessment_instruments_markdown(data)
         print(md)
         _write_generated("assessment-instruments", md, data)
+        return 0
+
+    if args.command == "item-form":
+        data = item_form()
+        md = item_form_markdown(data)
+        print(md)
+        _write_generated("item-form", md, data)
+        return 0
+
+    if args.command == "distractor-signals":
+        data = distractor_signals()
+        md = distractor_signals_markdown(data)
+        print(md)
+        _write_generated("distractor-signals", md, data)
         return 0
 
     if args.command == "runtime-audit":

@@ -11,9 +11,12 @@
    "items": 490,
    "counts": {
     "0": 125,
+    "1": 121,
     "2": 122,
-    "3": 122,
-    "1": 121
+    "3": 122
+   },
+   "options_count_distribution": {
+    "4": 490
    }
   },
   {
@@ -21,59 +24,77 @@
    "items": 200,
    "counts": {
     "0": 51,
+    "1": 49,
     "2": 49,
-    "3": 51,
-    "1": 49
+    "3": 51
+   },
+   "options_count_distribution": {
+    "4": 200
    }
   },
   {
    "name": "corpus A2",
    "items": 200,
    "counts": {
+    "0": 51,
     "1": 50,
-    "3": 49,
     "2": 50,
-    "0": 51
+    "3": 49
+   },
+   "options_count_distribution": {
+    "4": 200
    }
   },
   {
    "name": "corpus B1",
    "items": 25,
    "counts": {
-    "2": 7,
     "0": 7,
     "1": 5,
+    "2": 7,
     "3": 6
+   },
+   "options_count_distribution": {
+    "4": 25
    }
   },
   {
    "name": "corpus B2",
    "items": 25,
    "counts": {
-    "3": 6,
-    "1": 7,
     "0": 6,
-    "2": 6
+    "1": 7,
+    "2": 6,
+    "3": 6
+   },
+   "options_count_distribution": {
+    "4": 25
    }
   },
   {
    "name": "corpus C1",
    "items": 20,
    "counts": {
-    "3": 6,
-    "1": 4,
     "0": 5,
-    "2": 5
+    "1": 4,
+    "2": 5,
+    "3": 6
+   },
+   "options_count_distribution": {
+    "4": 20
    }
   },
   {
    "name": "corpus C2",
    "items": 20,
    "counts": {
+    "0": 5,
     "1": 6,
-    "3": 4,
     "2": 5,
-    "0": 5
+    "3": 4
+   },
+   "options_count_distribution": {
+    "4": 20
    }
   },
   {
@@ -84,14 +105,55 @@
     "1": 122,
     "2": 121,
     "3": 2
+   },
+   "options_count_distribution": {
+    "3": 358,
+    "4": 10
    }
   },
   {
-   "name": "exámenes level/placement",
+   "name": "exámenes finales",
    "items": 22,
    "counts": {
     "0": 14,
     "1": 8
+   },
+   "options_count_distribution": {
+    "3": 22
+   }
+  },
+  {
+   "name": "examen a1",
+   "items": 10,
+   "counts": {
+    "0": 5,
+    "1": 5
+   },
+   "options_count_distribution": {
+    "3": 10
+   }
+  },
+  {
+   "name": "examen b1",
+   "items": 12,
+   "counts": {
+    "0": 9,
+    "1": 3
+   },
+   "options_count_distribution": {
+    "3": 12
+   }
+  },
+  {
+   "name": "placement",
+   "items": 24,
+   "counts": {
+    "0": 6,
+    "1": 17,
+    "2": 1
+   },
+   "options_count_distribution": {
+    "3": 24
    }
   }
  ]

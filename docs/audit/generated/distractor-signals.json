@@ -1,0 +1,363 @@
+{
+ "area": "distractor-signals",
+ "signals": {
+  "prompt_keyword_echo": "El enunciado comparte una palabra de contenido con la opción correcta y con ninguna otra: la correcta se puede emparejar sin comprender.",
+  "shape_outlier": "La opción correcta es el outlier de longitud: se desvía de la mediana de los distractores en >= 50 % y esa desviación es la mayor del ítem.",
+  "quantity_literal": "El enunciado pide una cantidad o un momento (how many, what time, when...) y solo la opción correcta contiene una cifra, un número escrito o un día de la semana."
+ },
+ "banks": {
+  "checks_curriculum": {
+   "n": 368,
+   "n_flagged": 79,
+   "signal_counts": {
+    "prompt_keyword_echo": 22,
+    "shape_outlier": 59,
+    "quantity_literal": 0
+   },
+   "signal_pct": {
+    "prompt_keyword_echo": 6.0,
+    "shape_outlier": 16.0,
+    "quantity_literal": 0.0
+   },
+   "sample": [
+    {
+     "id": "a1-m05-u01-l01-o03-c01",
+     "level": "A1",
+     "prompt": "Listen: 'Maria eats an apple every day for breakfast.' What does Maria eat for breakfast?",
+     "options": [
+      "A banana",
+      "Bread",
+      "An apple",
+      "Eggs"
+     ],
+     "correct_index": 2,
+     "signals": [
+      "prompt_keyword_echo"
+     ]
+    },
+    {
+     "id": "a1-m06-u01-l01-o03-c02",
+     "level": "A1",
+     "prompt": "Listen: 'I'm looking for a jacket.' What does the customer want?",
+     "options": [
+      "A drink",
+      "A jacket",
+      "A ticket",
+      "A book"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "prompt_keyword_echo"
+     ]
+    },
+    {
+     "id": "a2-m02-u01-l01-o03-c03",
+     "level": "A2",
+     "prompt": "Which phrase means 'más caro'?",
+     "options": [
+      "more expensive",
+      "cheaper",
+      "bigger"
+     ],
+     "correct_index": 0,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "b1-m03-u01-l01-o17-c02",
+     "level": "B1",
+     "prompt": "Which phrase asks someone to continue their story?",
+     "options": [
+      "I see.",
+      "What happened next?",
+      "That's it."
+     ],
+     "correct_index": 1,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "c1-m01-u01-l01-o03-c02",
+     "level": "C1",
+     "prompt": "You hear: 'Never have I seen such dedication.' What is the speaker stressing?",
+     "options": [
+      "That they were not dedicated",
+      "How unusual the dedication is",
+      "A past routine"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "prompt_keyword_echo"
+     ]
+    }
+   ]
+  },
+  "corpus_listening": {
+   "n": 490,
+   "n_flagged": 104,
+   "signal_counts": {
+    "prompt_keyword_echo": 2,
+    "shape_outlier": 103,
+    "quantity_literal": 0
+   },
+   "signal_pct": {
+    "prompt_keyword_echo": 0.4,
+    "shape_outlier": 21.0,
+    "quantity_literal": 0.0
+   },
+   "sample": [
+    {
+     "id": "c020",
+     "level": "A2",
+     "prompt": "What did B think about the party?",
+     "options": [
+      "It was enjoyable but crowded",
+      "It was boring",
+      "It was too short",
+      "It was cancelled"
+     ],
+     "correct_index": 0,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "c097",
+     "level": "B2",
+     "prompt": "What does B suggest?",
+     "options": [
+      "Checking with the kitchen",
+      "Leaving the restaurant",
+      "Ordering more",
+      "Complaining"
+     ],
+     "correct_index": 0,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "c152",
+     "level": "A1",
+     "prompt": "What does the customer want to buy?",
+     "options": [
+      "A birthday card",
+      "A bag",
+      "A book",
+      "A pen"
+     ],
+     "correct_index": 0,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "c205",
+     "level": "A1",
+     "prompt": "When does the train arrive?",
+     "options": [
+      "At nine twenty",
+      "At eight",
+      "At nine",
+      "At eight twenty"
+     ],
+     "correct_index": 3,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "c388",
+     "level": "A2",
+     "prompt": "What does the woman want?",
+     "options": [
+      "A day off",
+      "The minutes sent to everyone",
+      "A new schedule",
+      "A shorter meeting"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "shape_outlier"
+     ]
+    }
+   ]
+  },
+  "exams": {
+   "n": 22,
+   "n_flagged": 7,
+   "signal_counts": {
+    "prompt_keyword_echo": 3,
+    "shape_outlier": 6,
+    "quantity_literal": 0
+   },
+   "signal_pct": {
+    "prompt_keyword_echo": 13.6,
+    "shape_outlier": 27.3,
+    "quantity_literal": 0.0
+   },
+   "sample": [
+    {
+     "id": "a1f-03",
+     "level": "a1",
+     "prompt": "Complete: 'There ___ two bedrooms in my house.'",
+     "options": [
+      "is",
+      "are",
+      "be"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "a1f-08",
+     "level": "a1",
+     "prompt": "Read: 'I get up at seven and I have breakfast at eight.' What does he do at eight?",
+     "options": [
+      "Gets up",
+      "Has breakfast",
+      "Goes to work"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "prompt_keyword_echo"
+     ]
+    },
+    {
+     "id": "b1f-06",
+     "level": "b1",
+     "prompt": "Which phrase introduces a personal opinion?",
+     "options": [
+      "In my opinion",
+      "By the way",
+      "At last"
+     ],
+     "correct_index": 0,
+     "signals": [
+      "prompt_keyword_echo",
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "b1f-07",
+     "level": "b1",
+     "prompt": "Read: 'Although the journey was long, they enjoyed every minute of it.' What does the sentence mean?",
+     "options": [
+      "They enjoyed the journey despite its length.",
+      "They hated the journey.",
+      "The journey was short."
+     ],
+     "correct_index": 0,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "b1f-08",
+     "level": "b1",
+     "prompt": "Read: 'She had never seen the ocean until she moved to the coast.' What happened?",
+     "options": [
+      "She saw the ocean for the first time after moving.",
+      "She saw the ocean before moving.",
+      "She never moved."
+     ],
+     "correct_index": 0,
+     "signals": [
+      "shape_outlier"
+     ]
+    }
+   ]
+  },
+  "placement": {
+   "n": 24,
+   "n_flagged": 6,
+   "signal_counts": {
+    "prompt_keyword_echo": 2,
+    "shape_outlier": 4,
+    "quantity_literal": 1
+   },
+   "signal_pct": {
+    "prompt_keyword_echo": 8.3,
+    "shape_outlier": 16.7,
+    "quantity_literal": 4.2
+   },
+   "sample": [
+    {
+     "id": "pl-04",
+     "level": "placement",
+     "prompt": "Read: 'I go to work at eight every day.' When does he go to work?",
+     "options": [
+      "At night",
+      "At eight",
+      "At noon"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "prompt_keyword_echo",
+      "quantity_literal"
+     ]
+    },
+    {
+     "id": "pl-10",
+     "level": "placement",
+     "prompt": "Which word is a synonym of 'ubiquitous'?",
+     "options": [
+      "rare",
+      "everywhere",
+      "hidden"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "pl-12",
+     "level": "placement",
+     "prompt": "Read: 'His argument, though subtle, was ultimately compelling.' What is the tone?",
+     "options": [
+      "Negative",
+      "Neutral-positive",
+      "Confused"
+     ],
+     "correct_index": 1,
+     "signals": [
+      "shape_outlier"
+     ]
+    },
+    {
+     "id": "pl-13",
+     "level": "placement",
+     "prompt": "You hear: 'She went to the market to buy some bread.' Where did she go?",
+     "options": [
+      "To the market",
+      "To the park",
+      "To the bank"
+     ],
+     "correct_index": 0,
+     "signals": [
+      "prompt_keyword_echo"
+     ]
+    },
+    {
+     "id": "pl-18",
+     "level": "placement",
+     "prompt": "Which opener is most idiomatic for disagreeing politely in a formal meeting?",
+     "options": [
+      "You're totally wrong.",
+      "I see your point, but I'd argue that...",
+      "Nah, that's dumb."
+     ],
+     "correct_index": 1,
+     "signals": [
+      "shape_outlier"
+     ]
+    }
+   ]
+  }
+ }
+}
