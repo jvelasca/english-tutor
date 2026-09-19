@@ -484,6 +484,90 @@ de práctica · residuo de 10 checks alineado · `k=2` prohibido) y **Regla D**
 candados**: ordena la reautoría de V4.0.x y fija sus criterios de aceptación.
 Las cinco filas de esta tabla siguen **abiertas** y con la misma fase asignada.
 
+## V3.75.2 — verificación de la release y fragilidad del arnés visual (2026-09-19)
+
+> Origen: verificación **completa y local** del árbol en `c9c234d` (`docs(v3.75.2):
+> politica psicometrica…`, sobre `0ff7488` = tag `v3.75.2`), replicando los trabajos
+> de `.github/workflows/ci.yml` en **Windows con PowerShell 5.1**, que es donde vive
+> el alumno. Se ejecuta porque la suite declarada (2900) y los jobs de script no se
+> habían corrido **desde el árbol real de la release**, solo desde el CI.
+
+### Cerrado en V3.75.2 (deja de ser deuda)
+
+- **El humo del origen de producto pasa en Windows, por HTTPS.** `product-origin` es
+  el único job que arranca el **producto de verdad** (uvicorn con TLS sirviendo el
+  `dist` construido) y **no se había ejecutado nunca en el sistema del alumno**: en
+  el CI corre en ubuntu y su gemelo Windows (`product-origin-windows`) está en
+  `continue-on-error: true`. En esta máquina: raíz sirve HTML, `/api/health` → `200`
+  con `version 3.75.2` y `/api/no-existe` → **404** (el fallback SPA no enmascara la
+  API). El certificado se reutilizó con sus SANs (`127.0.0.1`, LAN, `english-tutor.local`,
+  `localhost`). `[R]`
+- **La cadena de suministro está limpia.** `pip-audit -r backend/requirements.txt` →
+  *no known vulnerabilities*; `npm audit --omit=dev --audit-level=high` → 0. `[R]`
+- **Deriva del artefacto de validación automática.** `docs/audit/generated/release-validation.{json,md}`
+  estaba estampado con la versión `3.75.0`: lo genera `scripts/validation_gate.py auto`,
+  que **el CI ejecuta pero no commitea**, así que el artefacto versionado en el tag
+  `v3.75.2` declaraba una versión de árbol que ya no era la suya (ni V3.75.1 ni V3.75.2
+  lo regeneraron). Regenerado y commiteado (`4e99009`); el diff es **solo la estampa de
+  versión**, con los 10 checks igual. `[R]` Patrón a vigilar por la auditoría externa:
+  **un artefacto generado por el CI puede quedar obsoleto sin que ningún job falle**.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El arnés visual (`playwright`) es frágil bajo carga en Windows — no se pudo
+  reproducir una ejecución completa verde.** El job pasa en ubuntu, pero en esta
+  máquina: **1.ª tanda 14 fallos / 24 pasados / 28 skipped**; **`desktop` aislado
+  18 pasados / 4 skipped**; **tanda completa 10 fallos / 28 pasados / 28 skipped**.
+  `[R]`
+
+  **Evidencia de que no es el producto ni la API.** (i) El código es **idéntico byte
+  a byte** al del tag `v3.75.2` (la única diferencia del árbol es documentación). (ii)
+  El backend registró **776 peticiones, todas `200 OK`** durante la tanda que falló
+  (`/api/academy/session`, `/api/settings`, `/api/profile`, `/api/academy/student-model`…):
+  el proxy `/api` de Vite funciona. (iii) Entre los fallos hay specs **con `mock`**, que
+  interceptan `/api` sin tocar el backend, y aun así caen. (iv) El humo del origen pasa
+  entero (arriba).
+
+  **Diagnóstico.** Es **contención de recursos + arranque en frío**, no un fallo
+  funcional: el DOM del fallo muestra la carcasa renderizada con `status: Loading…`, es
+  decir una aserción **agotada por tiempo**, y las aserciones tienen **presupuesto de
+  15 s** mientras varias pruebas tardan **15,9–27 s** ya con la caché caliente. El
+  primer proyecto en ejecutarse (`desktop`) concentra los fallos. Hipótesis concreta
+  y verificable en Windows: `baseURL`/`webServer.url` son `https://localhost:5173`
+  mientras Vite escucha con `host: true` (IPv4), de modo que **`localhost` puede
+  resolverse primero a `::1` y cada petición paga el intento fallido antes de caer a
+  IPv4**; sumado a 3 proyectos en paralelo, empuja al filo del presupuesto. `[D]`
+
+  **Arreglos candidatos (decisión pendiente, no implementados).** (a) Fijar el extremo
+  a `https://127.0.0.1:5173` en `playwright.config.ts` (o `server.host`), que elimina
+  el fallback IPv6 y es el más barato; (b) acotar `workers` en local o añadir un
+  precalentamiento en `globalSetup`; (c) subir el presupuesto de las aserciones del
+  arnés. (a) y (b) atacan la causa; (c) tapa el síntoma. `[POL]`
+
+  **Por qué se aparca y no se arregla ahora.** No toca al alumno ni el runtime, y el
+  CI (ubuntu) es la ejecución autoritativa, donde el job está verde. Tocar
+  `frontend/tests/visual/**` es una decisión de diseño sobre **reproducibilidad del
+  arnés**, no una corrección de producto, y su fase natural es la próxima release que
+  toque el frontend o el **gate G3** (Windows real): este hallazgo **refuerza** que el
+  arnés visual en el sistema del alumno solo está probado de verdad en ubuntu.
+
+- **Los 7 avisos `advisory` de `transfer_validation`.** `demand_spread` avisa de
+  familias (`story`, `future`, `problem`, `routine`, `debate`, `academic`) cuya carga
+  efectiva cae fuera de su banda de demanda heurística **sin WSD**. Siguen
+  **advisory** por diseño (`ok: true`): no bloquean y su cierre exige la fase de
+  calibración con alumnos. `[R]`
+- **Cobertura `pre-a1` en 0/7 celdas.** `content_validation` cierra en 42/49 celdas
+  (**85,7 %**); el hueco entero es `pre-a1`, coherente con «Pre-A1 como producto»
+  (§Métricas). No es una regresión: es la decisión de catálogo sin tomar. `[R]`
+
+> **Nota de alcance.** Esta sección **no** reabre la pausa pedagógica: las cinco
+> filas de la tabla de arriba siguen **abiertas** con su fase asignada y su política
+> (AO). Aquí solo se registra qué quedó **verificado** al probar la release y qué
+> deuda **nueva** apareció al hacerlo. Ningún `.json` de banco, servicio, frontend ni
+> launcher se modificó para escribirla; el árbol quedó limpio y los artefactos de
+> Playwright (`tests/visual/.artifacts/`, `screenshots/`, `.tester.json`) están
+> ignorados por git.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
