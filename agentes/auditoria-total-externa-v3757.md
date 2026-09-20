@@ -30,6 +30,68 @@
 
 ---
 
+## 0.1 Errata declarada — 2026-09-20 · el rango tiene OCHO commits, no siete
+
+> **Qué es esta nota y por qué se añade después.** Es la corrección de la única
+> discrepancia de trazabilidad que destapó la revisión externa de esta release: el
+> rango `v3.75.2..v3.75.7` tiene **ocho** commits, no siete, y la evidencia CI del
+> SHA del tag **sí** es recuperable. Se **añade después** del tag porque un tag
+> publicado no se recrea; el cuerpo del documento (§1, §4, §7, §8) queda corregido
+> en su sitio, y esta nota declara **qué cambió, cómo se comprobó y qué precio tiene**.
+
+**(A) El recuento correcto.** `git rev-list --count v3.75.2..v3.75.7` y
+`gh api repos/jvelasca/english-tutor/compare/v3.75.2...v3.75.7` devuelven **`8`**
+(`ahead_by: 8`, `total_commits: 8`). Son los **siete commits previos al release**
+que este documento enumeraba en §1.2 **más el propio commit de release** (`2cb9676`,
+el del tag). La formulación anterior —«siete commits que post-datan el tag
+`v3.75.2`»— describía **solo** a los siete previos y no advertía de que el comando
+que el propio §1.2 manda ejecutar imprime **ocho** líneas: de ahí la discrepancia.
+La cifra se corrige en §1 (aviso de higiene), §1.2, §4-A.4, §7 y §8, y la lista de
+§1.2 pasa a ser **1:1 con la salida del comando**.
+
+**(B) La evidencia CI del SHA del tag es recuperable — registro fechado, NO ancla.**
+Resuelta **por comando** el 2026-09-20:
+
+| Dato | Valor |
+|---|---|
+| Release auditada | tag anotado `v3.75.7` (objeto `29e624d`) |
+| Commit del tag | `2cb967693a403f0d22e3d6edd571c14bd0d63535` |
+| Run de CI de ese commit | `35524108614` (evento `push` a `main`, `conclusion: success`) |
+| Jobs de esa run | **12 / 12** en verde |
+
+El endpoint `/repos/{owner}/{repo}/commits/{sha}/status` devuelve `state: pending`
+con `total_count: 0`. **No** es una contradicción: **GitHub Actions no publica
+commit statuses**, así que ese endpoint no es la fuente. La fuente es la **run** de
+Actions del SHA, que §1.4 sigue resolviendo con `gh run list --commit $(git rev-parse
+v3.75.7^{commit})`. Este apartado es un **registro fechado de una comprobación**,
+no un anclaje: fijar aquí un SHA o un run a mano sería la **regresión que V3.73.5
+cerró** y que §1 declara prohibida.
+
+**(C) Qué SHA sella G1–G7.** Esta errata se publica en un commit **posterior** al
+tag (un tag no se recrea), y esa decisión se declara con su precio:
+
+- los siete gates se registran sobre el SHA **del commit de esta errata**, resuelto
+  con `git rev-parse HEAD` en el árbol de certificación (no citado a mano);
+- la identidad de **producto** entre el tag y ese SHA es **demostrable**, no
+  prometida:
+
+```bash
+git diff --stat v3.75.7..HEAD -- backend frontend launcher scripts
+```
+
+Debe salir **vacío**: entre el tag `v3.75.7` y el commit de la errata solo cambian
+`agentes/`, `docs/` y `PLAN.md`. Si esa comprobación **no** sale vacía, el SHA de
+certificación no es equivalente al del tag y hay que decirlo.
+
+**(D) La deriva se asume y se declara, no se esconde.** Con esta errata, `main`
+vuelve a estar **por delante del tag en documentación** —exactamente el fenómeno que
+§1.2 denuncia para `v3.75.2`—. Es el precio de corregir un número **sin** recrear
+una etiqueta publicada, que sería peor. La regla de V3.73.5 se mantiene intacta:
+**el ancla es el tag y el estado se resuelve por comando**; un commit documental
+posterior **nunca** cambia lo que el tag publica.
+
+---
+
 ## 0. Cómo arrancar (auditor con contexto nuevo)
 
 Orden de lectura recomendado, de marco a evidencia:
@@ -92,13 +154,14 @@ git log -1 --format='%H %s' v3.75.7^{commit}
   estable) y `v3.75.1` (el baseline que la pausa pedagógica declaró como punto de
   reinicio).
 
-- **Una advertencia de higiene que el auditor debe conocer:** entre el tag
-  `v3.75.2` y el commit de release hay **siete commits ya en `main`** que
-  **post-datan** el tag `v3.75.2` —tres de ellos son documentación *etiquetada*
-  «v3.75.2»—. Es la deriva que V3.73.5 declaró cerrada y que **aquí se declara, no
-  se oculta**: su lista cerrada está en §1.2. Si el auditor considera que un commit
-  documental posterior al tag lo deja desfasado, **tiene razón por definición**, y
-  el hallazgo es de proceso, no de producto.
+- **Una advertencia de higiene que el auditor debe conocer:** el rango
+  `v3.75.2..v3.75.7` contiene **ocho commits**: los **siete** que post-datan el tag
+  `v3.75.2` —tres de ellos documentación *etiquetada* «v3.75.2»— **más el propio
+  commit de release** (`2cb9676`). El recuento está **corregido en §0.1** (una
+  versión anterior de este documento decía siete). Es la deriva que V3.73.5 declaró
+  cerrada y que **aquí se declara, no se oculta**: su lista cerrada está en §1.2. Si
+  el auditor considera que un commit documental posterior al tag lo deja desfasado,
+  **tiene razón por definición**, y el hallazgo es de proceso, no de producto.
 
 ### 1.1 Invariantes — los que se pueden cumplir, y solo esos
 
@@ -150,12 +213,32 @@ Las áreas de producto son exactamente: `backend/services`, `backend/routers`,
 `launcher`. **No** se toca `backend/data/`, `backend/models/`, `frontend/dist/`
 (no versionados) ni `backend/scripts/` de producto.
 
-### 1.2 Lista cerrada — los siete commits que post-datan `v3.75.2`
+### 1.2 Lista cerrada — los ocho commits del rango (siete previos + el de release)
 
 ```bash
 git log --oneline v3.75.2..v3.75.7
 git diff --stat v3.75.2..HEAD
 ```
+
+El comando imprime **ocho** líneas (no siete: la cifra está corregida en §0.1). La
+enumeración, en el orden en que las devuelve `git log` —más reciente primero—, es
+**esta y ninguna otra**:
+
+| # | Commit | Qué es |
+|---|---|---|
+| 1 | `2cb9676` `release(v3.75.7)` | **El commit de release** (el del tag). **No** es uno de los que «post-datan» el tag `v3.75.2`: es la release misma. |
+| 2 | `9f5fa5d` `docs(audit)` | Declara los hallazgos del launcher y la codificación del gate. |
+| 3 | `acc3fcc` `fix(launcher)` | El motivo del fallo llega a la ventana y el log deja de crecer. |
+| 4 | `d642c74` `fix(validation_gate)` | La evidencia no puede depender del entorno. |
+| 5 | `b40fcdc` `fix(launcher)` | El motivo real de «Detenido» y la etiqueta honesta de la interfaz. |
+| 6 | `19d46e7` `docs(v3.75.2)` | Registra la verificación local de la release y la fragilidad del arnés visual. |
+| 7 | `4e99009` `docs(v3.75.2)` | Regenera el artefacto de validación automática (deriva `3.75.0` → `3.75.2`). |
+| 8 | `c9c234d` `docs(v3.75.2)` | Política psicométrica del banco (AO) y enlaces desde `PARKED` y `PLAN`. |
+
+Los **siete previos** (todo menos `2cb9676`) son los que **post-datan** el tag
+`v3.75.2`; su detalle por ruta y por lo que afirman es la tabla que sigue. Si la
+salida de `git log` **no** coincide línea a línea con esta enumeración, es un
+hallazgo.
 
 | Ruta | Qué es | Qué afirma |
 |---|---|---|
@@ -169,9 +252,10 @@ git diff --stat v3.75.2..HEAD
 | `docs/audit/PARKED.md`, `PLAN.md`, `docs/ARQUITECTURA.md` | Documentación | El registro de lo anterior |
 | `docs/audit/generated/release-validation.{md,json}` | Artefacto determinista | Regenerado (deriva `3.75.0` → `3.75.2`) |
 
-Estos siete commits **no forman parte de las cinco iteraciones** de esta release: se
-publican con ella porque estaban en `main` sin tag. Se declaran para que el auditor
-pueda decidir si eso es un problema de proceso.
+Estos **siete commits previos** **no forman parte de las cinco iteraciones** de esta
+release: se publican con ella porque estaban en `main` sin tag. El **octavo** es la
+release misma. Se declaran para que el auditor pueda decidir si eso es un problema
+de proceso.
 
 ### 1.3 Lista cerrada — el diff de las cinco iteraciones
 
@@ -342,8 +426,10 @@ comprobar sin hardware o persona: **NO COMPROBABLE**.
    en 3 líneas, banco heredado en 2 etiquetas)? ¿O hay algo más movido?
 2. ¿Contiene el tag `v3.75.7` **este mismo documento** (y no un commit posterior)?
 3. ¿Es el commit del tag **final** (sin commits documentales posteriores)?
-4. **Los siete commits que post-datan `v3.75.2`** (§1.2): ¿es correcta la lista?
-   ¿Alguno cambia producto de una forma que esta release no declara?
+4. **Los ocho commits del rango `v3.75.2..v3.75.7`** (§1.2) —**siete** previos al
+   release más **el commit de release**; la cifra anterior (siete) está corregida en
+   §0.1—: ¿es correcta la lista 1:1 con `git log`? ¿Alguno cambia producto de una
+   forma que esta release no declara?
 5. **Cinco iteraciones, una etiqueta** (§1.4): ¿es defendible que `V3.75.3`–`V3.75.6`
    no tengan tag, habiendo entradas de `CHANGELOG` y `PLAN` con su nombre? El
    proyecto lo declara como decisión; dictamínala.
@@ -560,9 +646,10 @@ proyecto, que acotan lo que puede leerse como demostrado:
   registra la ejecución humana; **no** mueve ningún gate a `pass`. Y la identidad
   sellada en el kit sigue siendo la del pre-vuelo (`3.73.6` → `13cc30b`).
 - **`product-origin-windows` es informativo**, no bloqueante, y así se declara.
-- **Siete commits post-datan el tag `v3.75.2`** (§1.2). Se declaran; si eso invalida
-  la lectura de `v3.75.2` como «release documental cerrada», es un hallazgo de
-  proceso y debe decirlo.
+- **El rango `v3.75.2..v3.75.7` tiene ocho commits: siete post-datan el tag
+  `v3.75.2` y el octavo es la propia release** (§1.2; la cifra anterior —siete—
+  está corregida en §0.1). Se declaran; si eso invalida la lectura de `v3.75.2` como
+  «release documental cerrada», es un hallazgo de proceso y debe decirlo.
 - **La accesibilidad y la matriz de dispositivos no tienen evidencia ejecutada:**
   `docs/DEVICE_MATRIX.md` está **en ⬜** y no hay motor de accesibilidad (`axe`). Lo
   que hay son contratos de UI en Playwright: acotado, no es una auditoría.
@@ -585,12 +672,15 @@ proyecto, que acotan lo que puede leerse como demostrado:
 ## 8. Cierre
 
 **Estado del punto de entrada: entregado (2026-09-20), dentro del commit de release
-de `v3.75.7`.** Verificado por comando contra GitHub, no contra el árbol local:
+de `v3.75.7`; el recuento del rango y la evidencia CI se corrigen en la errata de
+§0.1, en un commit documental posterior y con el producto intacto.** Verificado por
+comando contra GitHub, no contra el árbol local:
 
 - **Release auditada:** el tag anotado **`v3.75.7`**; el commit y el objeto del tag
   se resuelven con `git rev-parse` (§1), **no** se fijan a mano.
-- **Base de comparación:** **`v3.75.2`**, con el aviso de que **siete commits** la
-  post-datan (§1.2).
+- **Base de comparación:** **`v3.75.2`**, con el aviso de que el rango contiene
+  **ocho commits** —**siete** que post-datan el tag `v3.75.2` más **el commit de
+  release**— (§1.2; la cifra anterior —siete— está corregida en §0.1).
 - **Los invariantes que sí se pueden declarar** son los tres acotados de §1.1
   (currículum y evaluaciones **vacíos**, corpus en **3 líneas**, banco heredado en
   **2 etiquetas**). El invariante clásico de «producto sin cambios» **no se declara

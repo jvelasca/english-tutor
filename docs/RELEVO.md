@@ -49,7 +49,9 @@
 > invariante clásico** («diff de producto vacío»): declara **tres invariantes
 > acotados** que sí pueden cumplirse —currículum y evaluaciones **vacíos**, corpus en
 > **3 líneas**, banco heredado en **2 etiquetas**— y una **lista cerrada** del diff,
-> incluidos **siete commits que post-datan el tag `v3.75.2`** (declarados). **Lo que
+> incluido el **rango `v3.75.2..v3.75.7` con ocho commits** —**siete** que
+> post-datan el tag `v3.75.2` más **el commit de release**; el recuento se corrige
+> en la errata §0.1 del punto de entrada— (declarados). **Lo que
 > NO cierra:** el **P0 de identidad sigue entero** —y `V3.75.3` le añadió una vía más
 > para arrancar expuesto al **persistir** la preferencia LAN—, el **provenance del
 > banco** (`LISTENING_BANK_VERSION` sigue `7.0.0` a propósito porque nombra la caché
