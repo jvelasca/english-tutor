@@ -491,7 +491,6 @@ Las cinco filas de esta tabla siguen **abiertas** y con la misma fase asignada.
 > de `.github/workflows/ci.yml` en **Windows con PowerShell 5.1**, que es donde vive
 > el alumno. Se ejecuta porque la suite declarada (2900) y los jobs de script no se
 > habían corrido **desde el árbol real de la release**, solo desde el CI.
-
 ### Cerrado en V3.75.2 (deja de ser deuda)
 
 - **El humo del origen de producto pasa en Windows, por HTTPS.** `product-origin` es
@@ -567,6 +566,79 @@ Las cinco filas de esta tabla siguen **abiertas** y con la misma fase asignada.
 > launcher se modificó para escribirla; el árbol quedó limpio y los artefactos de
 > Playwright (`tests/visual/.artifacts/`, `screenshots/`, `.tester.json`) están
 > ignorados por git.
+
+## El launcher no arrancaba la app y mentía sobre por qué (2026-09-20)
+
+> Origen: al probar la app, el launcher mostró «Backend: 🔴 Detenido» e «Interfaz:
+> 🔴 No compilada». **Ninguna de las dos cosas era cierta.** Síntoma de un conflicto
+> de puerto, pero el diagnóstico era imposible de deducir desde la GUI por cuatro
+> defectos propios del launcher. Fix: `b40fcdc` (D1/D2) y el commit de esta
+> declaración (D3/D4 y la codificación del gate). **Posterior al tag `v3.75.2`**: se
+> etiqueta `V3.75.3` en los comentarios de código.
+
+### Cerrado (deja de ser deuda)
+
+- **D1 · «No compilada» era mentira.** La etiqueta la decidía una **sonda de red**,
+  así que un origen que no responde se pintaba como un artefacto que falta. Con
+  `frontend/dist/index.html` presente y el puerto 8000 ocupado por un servidor HTTP,
+  la GUI decía «No compilada» y mandaba a compilar lo ya compilado. Ahora hay **tres**
+  estados —`🟢 Servida` · `🔴 No responde` · `🔴 No compilada`— y el artefacto se
+  comprueba **en disco** (`ui.interface_state`, pura). Mismo arreglo en el mensaje de
+  «Abrir app». `[R]`
+- **D2 · La guardia anti-duplicado era ciega al esquema.** Detectaba un backend ya
+  activo **solo por HTTPS** (`fetch_health`), así que un backend HTTP en el mismo
+  puerto era invisible: el launcher arrancaba el suyo y moría contra el puerto
+  ocupado (`WinError 10048`). Ahora se comprueba el **socket** (`core.port_in_use`)
+  antes de preparar nada y se explica el motivo (`ProcessManager.ensure_port_free`).
+  `_wait_ports_free` espera al socket, no a las sondas, que daban por libre un puerto
+  todavía ocupado. `[R]`
+- **D3 · El motivo del fallo no llegaba al usuario.** Un backend que moría al
+  arrancar dejaba «🔴 Detenido» y el motivo quedaba enterrado en `logs/backend.log`.
+  Ahora se espera a que el producto **sirva la UI** y, si no lo hace, se traduce el
+  tramo de log de **este** arranque a una frase accionable
+  (`ui.backend_failure_hint`). Verificado contra el fallo real: el
+  `WinError 10048` del log de 87 MB se traduce a «El puerto ya estaba ocupado por
+  otro proceso justo al arrancar». `[R]`
+- **D4 · El log crecía sin límite y se leía entero.** `backend.log` estaba en
+  **87,3 MB / 1,3 M de líneas** sin rotación, y `read_log_tail` hacía `read_text()`
+  completo **cada 2 s** (refresco de la GUI) para quedarse con 250 líneas: **334 ms
+  medidos por lectura**, y creciendo. Ahora hay rotación de una generación (5 MB) en
+  el único punto de escritura y la lectura se hace **por cola** (`TAIL_BYTES`):
+  **0,5 ms, 731× más rápido**, con el mismo contenido. `[R]`
+- **El artefacto de validación se corrompía según el entorno.** `validation_gate.py`
+  capturaba la salida de sus sub‑scripts con `text=True` y **sin `encoding`**, así
+  que el texto dependía del *locale* del equipo: la misma comprobación daba
+  `orígenes` o `orÃ­genes`, y el mojibake acababa en un fichero **versionado**. El
+  fix fija la codificación en **los dos lados** (el hijo recibe
+  `PYTHONIOENCODING=utf-8`), porque fijar solo el padre convierte la salida cp1252 del
+  hijo en `U+FFFD` —que además no se puede imprimir en consola cp1252 y **hacía morir
+  el gate al imprimir**, devolviendo un fallo inexistente—. La salida propia del gate
+  también se hace resiliente. `[R]` Es la misma familia que la deriva de versión de
+  arriba: **la evidencia no registraba fielmente lo que pasó**.
+
+**Verificación del fix (el camino real de «Iniciar app»).** Ejercitado el
+`ProcessManager` completo: `ensure_port_free` OK → `prepare` OK → `start_backend` OK →
+**sirve la UI en 2,1 s** (la GUI diría `🟢 Servida` + `🟢 Activo`), `/api/health` → 200
+con `3.75.2`, HTTPS sirve HTML, el log rotó de **87,3 MB a 0,4 KB** dejando su
+generación `.1`, y `stop_all` dejó el puerto libre. `[R]` Launcher: **162 tests**
+(eran 142; +8 de D1/D2 y +12 de D3/D4), ruff limpio. Backend: 2899 pasados, y el
+candado `test_docs_drift_v371` obligó a actualizar el número de tests del launcher en
+`docs/ARQUITECTURA.md`. `[R]`
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El launcher no se prueba en su sistema real.** `launcher/tests/**` cubre los
+  módulos puros, pero **la GUI no tiene test** (necesita pantalla), así que los cuatro
+  defectos de arriba vivieron sin que ningún test los viera. Su fase natural es el
+  **gate G3** (Windows real) y, en general, es el argumento de que la lógica nueva se
+  haya puesto en `core`/`ui`/`process_manager`, que sí se testean. `[D]`
+- **`logs/frontend.log` conserva una generación antigua** (7,6 MB del 2026-09-15):
+  ahora rota igual que el del backend, pero **solo al escribir**; un log huérfano de
+  una versión anterior no se limpia solo. Se resolverá con el primer `npm run build`
+  que vuelva a escribir en él, o a mano. `[D]`
+- **La verificación de la rotación es de unidad, no de uso.** El umbral (5 MB, una
+  generación) es una decisión, no un hallazgo: si el diagnóstico real necesitase más
+  histórico, se revisa. `[POL]`
 
 ## Pendientes de acción humana (no aparcados, en curso)
 
