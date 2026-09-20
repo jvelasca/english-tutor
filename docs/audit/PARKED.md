@@ -1241,7 +1241,9 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   (`scrollWidth - innerWidth <= 0`). El spec **se borró** al cerrar la revisión.
   `[D]`
 - Sin cambios: el `dist` **no se versiona** (hay que recompilar para ver la UI nueva),
-  el P0 de identidad sigue entero y los **7 gates** siguen en `pending`. `[D]`
+  el P0 de identidad sigue entero —la congelación de esta candidata lo reverificó y
+  dejó su briefing de decisión en `docs/audit/PLAN-P0-IDENTIDAD.md` §15— y los
+  **7 gates** siguen en `pending`. `[D]`
 
 ### Lo que queda abierto de esta pantalla (aparcado)
 

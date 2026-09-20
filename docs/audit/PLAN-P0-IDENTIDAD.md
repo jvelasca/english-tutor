@@ -8,7 +8,8 @@
 > **Estado:** **Fase 1 PUBLICADA como `v3.74.0`** y **Fase 2 IMPLEMENTADA en el
 > árbol de `v3.75.0`** (§14), junto con los dos P3 que quedaban abiertos
 > (`VG-N5` y `VG-N6`). La **Fase 3** (autenticación real) sigue fuera y sigue
-> siendo una decisión de producto.
+> siendo una decisión de producto. La congelación de la candidata `v3.75.8`
+> (2026-09-20) volvió a verificarla: el briefing para cerrarla está en **§15**.
 >
 > **Punto de partida:** `v3.74.0` · árbol con el lote V3.73.7 (`v3.73.7`) **y** la
 > Fase 1 (`v3.74.0`) publicados **por separado**, cada uno medido en su propio
@@ -625,3 +626,62 @@ producto**, no una fase técnica: contradice «sin cuentas, sin contraseñas» d
 `docs/PREMISAS.md` y hay que elegir con el gerente qué se rompe a cambio. Hasta
 entonces, la lista de §14.2 y la de `PARKED.md` son la declaración honesta del
 alcance.
+
+---
+
+## 15 · Briefing de decisión — Fase 3 (2026-09-20)
+
+> **Origen:** la congelación de la candidata `v3.75.8` (`6e4888f` → `c858e88`, tag
+> `v3.75.8`) volvió a verificar que **el P0 sigue abierto** y que la campaña de los
+> 7 gates **no lo toca**. Este apartado no decide: ordena la decisión para que se
+> pueda tomar sin volver a medir. Los datos de abajo son del árbol congelado.
+
+**Lo que ya está cerrado (y no se reabre aquí).**
+
+| Fase | Release | Qué cerró |
+|---|---|---|
+| 1 · Superficie | `v3.74.0` | El producto se enlaza a `127.0.0.1` por defecto; la LAN es **opt-in declarado** y la política de CORS no puede discrepar del `--host`. |
+| 2 · Identidad | `v3.75.0` | La cookie `et_session` la **firma el servidor** (HMAC, `HttpOnly`); `?user_id=` deja de significar nada; editar perfil/preferencias exige que el id sea el de la sesión. |
+| 2b · Modo LAN | `v3.75.3` | La preferencia de red se **persiste** en `launcher/config.json`: atrás queda la decisión de sesión, no la de instalación. |
+
+**Lo que sigue abierto, medido, sin adornos.**
+
+1. **`POST /api/session` no exige credencial.** Acepta cualquier `user_id`
+   **existente** y devuelve una cookie válida. Quien alcanza la API puede abrir
+   sesión para el perfil de otro; lo que ya **no** puede es **forjar** una identidad
+   (sin el secreto del equipo) ni **elegirla** en cada petición.
+2. **`GET/POST /api/users` siguen sin credencial** (enumerar y crear perfiles). Es
+   deliberado: la puerta de perfil los necesita **antes** de que exista sesión.
+3. **Sin sesión siguen respondiendo** `/api/network`, `/api/models` y
+   `/api/system/status`: decisión **aceptada** de `VG-N6` (reconocimiento barato,
+   sin datos del alumno), no un olvido.
+4. **La frontera que decide quién llega es la red**: loopback por defecto; en modo
+   LAN, `{"lan": true}` en `launcher/config.json` expone la API **sin que nadie lo
+   declare en esa sesión** (visible en el primer pintado y con default cerrado, pero
+   persistente).
+
+**Los dos caminos.**
+
+| | (a) Fase 3 — credencial real | (b) Aceptar el riesgo residual, declarado |
+|---|---|---|
+| **Qué es** | PIN por perfil o emparejamiento/credencial por dispositivo; `POST /api/session` deja de aceptar un id a secas | No se toca el modelo de identidad: se declara el P0 como **riesgo aceptado**, con su frontera y su disparador de reapertura |
+| **Qué cuesta** | Cambia el **contrato de la API** (abrir sesión exige credencial) y la **puerta de perfil** (hay que pedir el PIN antes de pintar la app); decisión sobre el secreto en **backup/restauración** (¿el PIN viaja en el ZIP?); release propia, **no** mezclada con la campaña de gates | Solo documentación: `PARKED.md`, `README.md` y este plan. No hay código nuevo |
+| **Qué rompe** | «Sin cuentas, sin contraseñas» de `docs/PREMISAS.md` (§1 y §15). El precio es real y hay que elegirlo **con** el gerente | El riesgo residual: en modo LAN, un equipo de esa red puede abrir sesión para cualquier perfil |
+| **Cuándo es la respuesta correcta** | Si el producto se va a usar con **varios alumnos en la misma red**, o si va a salir de la red de casa | Si el uso es **un alumno, un equipo, loopback**, que es el escenario para el que la frontera de V3.74 se diseñó |
+
+**Preguntas que cierran la decisión (una sola sesión).**
+
+1. ¿Se va a usar el producto con **varios alumnos** accediendo por LAN, o es
+   «un alumno, un equipo»? Si es lo primero, `(a)` es **requisito** y `(b)` es
+   decoración.
+2. Si `(a)`: ¿la credencial es por **perfil** (PIN) o por **dispositivo**
+   (emparejamiento)? Un PIN distingue alumnos; un emparejamiento distingue equipos y
+   deja el perfil elegible en la puerta.
+3. Si `(b)`: ¿cuál es el **disparador** que obliga a reabrir el P0? Se propone
+   dejarlo escrito: «el día que haya más de un alumno por LAN o que la app se
+   instale fuera de la red de casa».
+
+**Restricción de secuencia (no negociable en esta ventana).** Decida lo que decida,
+`(a)` **no** se implementa dentro de la campaña de certificación: cambiar el
+contrato de la API en medio de la validación invalidaría los 7 `record`. La campaña
+sella primero el árbol congelado; la Fase 3 va en su propia release.
