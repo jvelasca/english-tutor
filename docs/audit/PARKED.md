@@ -1162,7 +1162,10 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **(2) Sin consulta, la vista empieza con ejemplos.** Cuatro palabras por sentido
   (`travel/book/water/family` en EN→ES, `casa/viaje/comida/tiempo` en ES→EN) que
   **rellenan el campo y buscan** al pulsarlas, y un botón de borrado (`X`) dentro del
-  campo que **solo existe cuando hay texto**. Van marcadas con su `lang` (los
+  campo que **solo existe cuando hay texto** y que **solo vacía el campo**: el
+  resultado de la última consulta sigue a la vista —no es «nueva consulta»—, y esa
+  semántica queda fijada por test en `DictionaryLookup.test.tsx`, no abierta. Van
+  marcadas con su `lang` (los
   ejemplos de ES→EN se teclean en español, que es la lengua de la que se busca) y
   viven en `utils/dictionaryDirection.ts` como **contenido**, no como interfaz: no
   pasan por i18n. El precio: son **cuatro palabras fijas por sentido** que hay que

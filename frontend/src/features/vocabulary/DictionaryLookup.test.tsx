@@ -231,6 +231,34 @@ describe("DictionaryLookup (V3.30)", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
+  it("tras buscar, la X solo vacía el campo y conserva el resultado (V3.75.8)", async () => {
+    // Semántica fijada: la X prepara una consulta nueva, no la deshace. Borrar
+    // el texto no borra lo consultado, así que la tarjeta sigue a la vista
+    // (mientras no haya otra búsqueda, un error o una carga en curso).
+    const fn = routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    expect(
+      await screen.findByRole("heading", { name: "coffee" }),
+    ).toBeTruthy();
+
+    const input = screen.getByLabelText("Search the dictionary") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Clear the search" }));
+
+    expect(input.value).toBe("");
+    expect(screen.queryByRole("button", { name: "Clear the search" })).toBeNull();
+    // El resultado de la última consulta permanece: no es «nueva consulta».
+    expect(screen.getByRole("heading", { name: "coffee" })).toBeTruthy();
+    expect(
+      screen.getByText("A hot drink made from roasted coffee beans."),
+    ).toBeTruthy();
+    // Y borrar no dispara ninguna consulta nueva.
+    expect(fn.mock.calls.map((call) => String(call[0])).filter((url) =>
+      url.includes("/dictionary"),
+    ).length).toBe(1);
+  });
+
   it("el color de la dirección marca el conmutador y la tarjeta del resultado (V3.75.8)", async () => {
     routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
     renderPanel(<DictionaryLookup userId="u1" />);

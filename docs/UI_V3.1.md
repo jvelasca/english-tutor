@@ -300,9 +300,11 @@ distinguirse **de un vistazo por su color**.
     informando en vez de decorar.
   - **Sin consulta todavía, ejemplos.** El estado vacío ofrece cuatro palabras de arranque **por
     sentido** (`travel/book/water/family` en EN→ES, `casa/viaje/comida/tiempo` en ES→EN) que lanzan
-    la búsqueda al pulsarlas, y un botón de borrado (`X`) dentro del campo cuando hay texto. Las
-    palabras de ejemplo se marcan con su `lang`, y el campo también, porque la entrada es del otro
-    idioma.
+    la búsqueda al pulsarlas, y un botón de borrado (`X`) dentro del campo cuando hay texto. La `X`
+    **solo vacía el campo**: el resultado de la última consulta permanece a la vista hasta que se
+    lance otra, un error o una carga (borrar el texto no deshace lo consultado), y esa semántica es
+    contrato, no una decisión abierta. Las palabras de ejemplo se marcan con su `lang`, y el campo
+    también, porque la entrada es del otro idioma.
   - **Un solo `h1` en `/diccionario`.** La vista de consulta traía su propia cabecera y la pantalla
     la suya: salían **dos `h1`** en la misma página y el título repetido. `DictionaryLookup` recibe
     ahora `showHeader` (por defecto `true`, para las superficies que la montan suelta) y
@@ -318,8 +320,9 @@ distinguirse **de un vistazo por su color**.
   quedaría sin color y **ninguna otra prueba se enteraría**. En unidad, `dictionaryDirection.test.ts`
   fija el mapeo sentido→clase→clave i18n, y `DictionaryLookup.test.tsx` exige que la pastilla activa
   lleve la clase de **su** sentido, que la tarjeta se tiña del sentido **con el que se buscó** (no del
-  que esté puesto después), que el botón de borrado no exista en reposo y que pulsar un ejemplo
-  rellene el campo y dispare **una** consulta. La revisión visual se hizo con un spec temporal en los
+  que esté puesto después), que el botón de borrado no exista en reposo, que la `X` vacíe el campo
+  **sin** deshacer el resultado y que pulsar un ejemplo rellene el campo y dispare **una** consulta.
+  La revisión visual se hizo con un spec temporal en los
   **tres breakpoints** que midió lo que el usuario ve —campo de 48 px en móvil y 56 px en
   escritorio/tablet, conmutador con **dos colores computados distintos**, cero desbordamiento
   horizontal—, borrado después: midió el resultado, pero no se queda como prueba de producto. (Ojo con
