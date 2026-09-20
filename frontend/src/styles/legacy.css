@@ -87,6 +87,29 @@
   --level-unknown-bg: color-mix(in srgb, var(--level-unknown-fg) 15%, transparent);
   --level-unknown-border: color-mix(in srgb, var(--level-unknown-fg) 35%, transparent);
 
+  /* --- Color de DIRECCIÓN del diccionario (V3.75.8) ----------------------
+     El sentido de la consulta (inglés→español / español→inglés) se ve de un
+     vistazo por su color: azul para EN→ES y fucsia para ES→EN. La pareja está
+     elegida para ser **complementaria** (el máximo contraste entre los dos) y
+     para NO pisar los colores de estado —verde (dominada), ámbar (en curso) y
+     rojo (débil)—, que ya significan otra cosa en toda la app.
+
+     A diferencia de la rampa de niveles, esta pareja NO sigue el acento del
+     usuario: es una convención del diccionario (como la leyenda de un mapa), y
+     si cambiara con el acento, azul y fucsia podrían acabar pareciéndose entre
+     sí con acentos afines. En cambio sí sigue el patrón de la rampa en todo lo
+     demás: el relleno y el borde se DERIVAN de la tinta, y el contraste de cada
+     tinta sobre su relleno compuesto lo mide y lo vigila
+     `frontend/scripts/contrast_audit.mjs` (0 bloqueantes con `--strict`). Las
+     tintas se eligen con holgura y no al filo del 4.5:1 porque el relleno es
+     translúcido y sobre `--color-surface-2` el margen se estrecha. */
+  --dir-en-es-fg: #93c5fd;
+  --dir-es-en-fg: #f0abfc;
+  --dir-en-es-bg: color-mix(in srgb, var(--dir-en-es-fg) 15%, transparent);
+  --dir-en-es-border: color-mix(in srgb, var(--dir-en-es-fg) 35%, transparent);
+  --dir-es-en-bg: color-mix(in srgb, var(--dir-es-en-fg) 15%, transparent);
+  --dir-es-en-border: color-mix(in srgb, var(--dir-es-en-fg) 35%, transparent);
+
   /* Typography */
   --font-sans: "Segoe UI", system-ui, -apple-system, "Segoe UI Variable", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
@@ -168,6 +191,12 @@
   --level-c1-fg: #115e59;
   --level-c2-fg: #166534;
   --level-unknown-fg: #4b5563;
+
+  /* Dirección del diccionario en tema claro (V3.75.8): mismas familias que en
+     oscuro, tintas oscurecidas para que sigan llegando a AA sobre el relleno
+     claro. El relleno y el borde se re-derivan solos de la tinta. */
+  --dir-en-es-fg: #1e40af;
+  --dir-es-en-fg: #86198f;
 
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.08);
   --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.06);
@@ -4137,6 +4166,80 @@ body.is-resizing {
 
 .lv-quiet {
   background: var(--color-surface);
+}
+
+/* ==========================================================================
+   Color de dirección del diccionario (V3.75.8)
+   --------------------------------------------------------------------------
+   Mismo mecanismo que la rampa de niveles, para la pareja de direcciones de la
+   consulta: `directionClass(dir)` (utils/dictionaryDirection.ts) devuelve
+   `.dir-en-es` o `.dir-es-en`, ese paso declara sus tres tokens como variables
+   locales y los consumidores de abajo los pintan. Añadir un consumidor nuevo
+   nunca exige tocar un hex: el relleno y el borde salen de la tinta.
+   Modificadores aditivos (van después: mismo peso, ganan por orden):
+     - `.dir-chip`   → pastilla teñida (relleno + borde + tinta): la opción
+                       activa del conmutador y la marca de dirección del
+                       resultado;
+     - `.dir-ink`    → sólo la tinta (iconos, rótulos);
+     - `.dir-line`   → sólo el borde;
+     - `.dir-wash`   → sólo el relleno, para fondos y anillos de foco;
+     - `.dir-bar`    → barra sólida (la pestaña de color del buscador y de la
+                       tarjeta de resultado);
+     - `.dir-field`  → marco del buscador: el borde toma el color de la
+                       dirección activa y el anillo de foco sale de su relleno.
+   Van FUERA de `@layer base` por la misma razón que las `.lv-*`: el color de la
+   dirección no debe poder perderse por una utilidad de Tailwind de la misma
+   línea. El nombre lo compone `directionClass`, nunca una interpolación de
+   Tailwind, así que el escaneo de clases no las purga.
+   ========================================================================== */
+
+.dir-en-es {
+  --dir-ink: var(--dir-en-es-fg);
+  --dir-fill: var(--dir-en-es-bg);
+  --dir-edge: var(--dir-en-es-border);
+}
+.dir-es-en {
+  --dir-ink: var(--dir-es-en-fg);
+  --dir-fill: var(--dir-es-en-bg);
+  --dir-edge: var(--dir-es-en-border);
+}
+
+.dir-chip {
+  color: var(--dir-ink);
+  background: var(--dir-fill);
+  border-color: var(--dir-edge);
+}
+
+.dir-ink {
+  color: var(--dir-ink);
+}
+
+.dir-line {
+  border-color: var(--dir-edge);
+}
+
+.dir-wash {
+  background: var(--dir-fill);
+}
+
+.dir-bar {
+  background: var(--dir-ink);
+}
+
+.dir-field {
+  border-color: var(--dir-edge);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.dir-field:hover {
+  border-color: var(--dir-ink);
+}
+
+.dir-field:focus-within {
+  border-color: var(--dir-ink);
+  box-shadow: 0 0 0 4px var(--dir-fill);
 }
 
 /* ==========================================================================

@@ -1,5 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { Loader2, Mic, RefreshCw, Search } from "lucide-react";
+import {
+  ArrowLeftRight,
+  BookOpen,
+  Languages,
+  Loader2,
+  Mic,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { lookupDictionaryWord } from "../../api/vocabulary";
 import type {
   DictionaryDirection,
@@ -17,6 +26,12 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
+import {
+  DIRECTION_EXAMPLES,
+  DIRECTION_OPTIONS,
+  directionClass,
+  directionLabelKey,
+} from "../../utils/dictionaryDirection";
 import { WordDrill } from "./wordDrill";
 
 /** Colores de estado: misma taxonomía y paleta que `PersonalDictionary`. */
@@ -29,15 +44,17 @@ const STATUS_TONE: Record<LexicalStatus, string> = {
 
 const MAX_QUERY_LENGTH = 80;
 
-/** V3.39: direcciones ofrecidas por el conmutador del buscador. */
-const DIRECTIONS: Array<{ id: DictionaryDirection; labelKey: string }> = [
-  { id: "en-es", labelKey: "dictionary.lookup.direction.en-es" },
-  { id: "es-en", labelKey: "dictionary.lookup.direction.es-en" },
-];
-
 interface DictionaryLookupProps {
   userId: string | null;
+  /**
+   * Cabecera propia (`h1` + subtítulo). Por defecto `true`, que es lo que
+   * necesitan las superficies que montan la vista suelta. `DictionaryScreen`
+   * la apaga (`false`) porque la pantalla ya trae su `h1` y su subtítulo: sin
+   * esto habría **dos `h1`** en `/diccionario` y el título repetido dos veces.
+   */
+  showHeader?: boolean;
 }
+
 
 /** Diccionario de consulta (V3.30, D2/D3): busca CUALQUIER palabra (esté o no
  * en el léxico del alumno) y muestra definición/traducción cacheadas del modelo
@@ -46,8 +63,17 @@ interface DictionaryLookupProps {
  * lectura: nunca registra evidencia.
  * V3.32: el botón «Practicar esta palabra» abre la escalera de drill oral
  * (Recall → Sentence, `./wordDrill`) sobre la palabra consultada. Practicar es
- * una acción explícita del alumno: solo su resultado escribe evidencia. */
-export function DictionaryLookup({ userId }: DictionaryLookupProps) {
+ * una acción explícita del alumno: solo su resultado escribe evidencia.
+ *
+ * V3.75.8: el buscador pasa a ser el protagonista de la vista —campo grande,
+ * marco y botón de borrado, con el **color de la dirección** (azul EN→ES,
+ * fucsia ES→EN)— y el conmutador de sentido vive DENTRO del buscador, para no
+ * confundirse con las pestañas de la pantalla. Sin consulta todavía, la vista
+ * ofrece ejemplos para arrancar. */
+export function DictionaryLookup({
+  userId,
+  showHeader = true,
+}: DictionaryLookupProps) {
   const { t } = useI18n();
   const [direction, setDirection] = useState<DictionaryDirection>("en-es");
   const [query, setQuery] = useState("");
@@ -124,94 +150,200 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
       : entry.word
     : null;
 
+  // V3.75.8: color de la dirección ACTIVA (la del conmutador). El resultado usa
+  // el de SU dirección (`entry.direction`), que es la que produjo la tarjeta.
+  const activeDirClass = directionClass(direction);
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     void runLookup(query);
   }
 
+  function clearQuery() {
+    setQuery("");
+    setInvalidError(false);
+  }
+
+  function searchExample(word: string) {
+    setQuery(word);
+    void runLookup(word);
+  }
+
+  /** Nada que mostrar todavía: ni resultado, ni carga, ni error. */
+  const showExamples =
+    Boolean(userId) && !loading && !entry && !networkError && !invalidError;
+
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-      <header className="mb-5">
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-          <Search className="size-6 text-primary" aria-hidden="true" />
-          {t("dictionary.lookup.title")}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {t("dictionary.lookup.subtitle")}
-        </p>
-      </header>
+    <div className="flex flex-col gap-5">
+      {showHeader && (
+        <header className="flex flex-col gap-1.5">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
+            <Search className="size-6 text-primary" aria-hidden="true" />
+            {t("dictionary.lookup.title")}
+          </h1>
+          <p className="text-muted-foreground">{t("dictionary.lookup.subtitle")}</p>
+        </header>
+      )}
 
-      {/* V3.39: conmutador de dirección (EN→ES / ES→EN). */}
-      <div
-        role="group"
-        aria-label={t("dictionary.lookup.directionLabel")}
-        className="bg-secondary mb-3 flex w-fit items-center gap-1 rounded-md p-1"
+      {/* ---------------------------------------------------------------
+          El buscador. El color de la dirección vive aquí: barra superior,
+          borde y anillo de foco (`.dir-field`) y las dos pastillas del
+          conmutador de sentido, que se ofrecen dentro del propio buscador
+          para que no compitan con las pestañas de la pantalla.
+          --------------------------------------------------------------- */}
+      <form
+        role="search"
+        onSubmit={onSubmit}
+        className={cn(
+          "relative overflow-hidden rounded-2xl border-2 border-border bg-card p-2 shadow-sm sm:p-3",
+          activeDirClass,
+          "dir-field",
+        )}
       >
-        {DIRECTIONS.map((option) => {
-          const isActive = direction === option.id;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={isActive}
-              onClick={() => changeDirection(option.id)}
-              className={cn(
-                "inline-flex min-h-8 items-center rounded px-3 text-xs font-semibold transition-colors",
-                isActive
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t(option.labelKey)}
-            </button>
-          );
-        })}
-      </div>
-
-      <form role="search" onSubmit={onSubmit} className="flex flex-col gap-2 sm:flex-row">
-        <label className="sr-only" htmlFor="dictionary-lookup-input">
-          {t("dictionary.lookup.searchAria")}
-        </label>
-        <input
-          id="dictionary-lookup-input"
-          type="text"
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          lang={direction === "es-en" ? "es" : "en"}
-          value={query}
-          maxLength={MAX_QUERY_LENGTH}
-          disabled={!userId || loading}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setInvalidError(false);
-          }}
-          placeholder={
-            direction === "es-en"
-              ? t("dictionary.lookup.placeholder.es-en")
-              : t("dictionary.lookup.placeholder")
-          }
-          className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+        <span
+          className={cn("absolute inset-x-0 top-0 h-1", activeDirClass, "dir-bar")}
+          aria-hidden="true"
         />
-        <Button
-          type="submit"
-          disabled={!userId || loading || query.trim().length === 0}
-          className="shrink-0 gap-1.5"
+
+        {/* V3.39: conmutador de dirección (EN→ES / ES→EN), coloreado por sentido. */}
+        <div
+          role="group"
+          aria-label={t("dictionary.lookup.directionLabel")}
+          className="grid grid-cols-2 gap-2"
         >
-          <Search className="size-4" aria-hidden="true" />
-          {t("dictionary.lookup.button")}
-        </Button>
+          {DIRECTION_OPTIONS.map((option) => {
+            const isActive = direction === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => changeDirection(option.id)}
+                className={cn(
+                  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-semibold transition-colors sm:min-h-9 sm:px-3 sm:text-sm",
+                  isActive
+                    ? cn(directionClass(option.id), "dir-chip")
+                    : "border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
+                )}
+              >
+                <Languages className="size-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0">{t(option.labelKey)}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 flex flex-col gap-2 sm:mt-3 sm:flex-row sm:items-center">
+          <div className="relative flex min-w-0 flex-1 items-center">
+            <Search
+              className={cn(
+                "pointer-events-none absolute left-3.5 size-5",
+                activeDirClass,
+                "dir-ink",
+              )}
+              aria-hidden="true"
+            />
+            <label className="sr-only" htmlFor="dictionary-lookup-input">
+              {t("dictionary.lookup.searchAria")}
+            </label>
+            <input
+              id="dictionary-lookup-input"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              lang={direction === "es-en" ? "es" : "en"}
+              value={query}
+              maxLength={MAX_QUERY_LENGTH}
+              disabled={!userId || loading}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setInvalidError(false);
+              }}
+              placeholder={
+                direction === "es-en"
+                  ? t("dictionary.lookup.placeholder.es-en")
+                  : t("dictionary.lookup.placeholder")
+              }
+              className="h-12 w-full min-w-0 rounded-xl border border-input bg-background/60 pr-11 pl-12 text-base font-medium text-foreground outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-60 sm:h-14 sm:text-lg"
+            />
+            {query.length > 0 && (
+              <button
+                type="button"
+                aria-label={t("dictionary.lookup.clearAria")}
+                onClick={clearQuery}
+                className="absolute right-2 grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={!userId || loading || query.trim().length === 0}
+            className="h-12 shrink-0 gap-2 rounded-xl px-5 text-base sm:h-14"
+          >
+            <Search className="size-5" aria-hidden="true" />
+            {t("dictionary.lookup.button")}
+          </Button>
+        </div>
       </form>
 
       {!userId && (
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t("dictionary.lookup.noProfile")}
         </p>
       )}
 
+      {/* Sin consulta todavía: ejemplos para arrancar (como en los diccionarios
+          de referencia). Los ejemplos son contenido, no interfaz. */}
+      {showExamples && (
+        <section
+          className={cn(
+            "flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border px-5 py-8 text-center",
+            activeDirClass,
+          )}
+        >
+          <span
+            className={cn(
+              "grid size-14 place-items-center rounded-2xl",
+              activeDirClass,
+              "dir-wash",
+            )}
+          >
+            <BookOpen
+              className={cn("size-7", activeDirClass, "dir-ink")}
+              aria-hidden="true"
+            />
+          </span>
+          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {t("dictionary.lookup.tryExamples")}
+          </p>
+          <ul className="flex flex-wrap justify-center gap-2">
+            {DIRECTION_EXAMPLES[direction].map((word) => (
+              <li key={word}>
+                <button
+                  type="button"
+                  onClick={() => searchExample(word)}
+                  lang={direction === "es-en" ? "es" : "en"}
+                  className={cn(
+                    "inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium transition-transform active:scale-[0.98]",
+                    activeDirClass,
+                    "dir-chip",
+                  )}
+                >
+                  {word}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {userId && loading && (
         <p
-          className="mt-6 flex items-center gap-2 text-sm text-muted-foreground"
+          className="flex items-center gap-2 text-sm text-muted-foreground"
           role="status"
         >
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -220,13 +352,13 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
       )}
 
       {invalidError && (
-        <p className="mt-6 text-sm text-destructive" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {t("dictionary.lookup.error.invalid")}
         </p>
       )}
 
       {networkError && (
-        <div className="mt-6 flex flex-col items-start gap-2" role="alert">
+        <div className="flex flex-col items-start gap-2" role="alert">
           <p className="text-sm text-destructive">
             {t("dictionary.lookup.error.network")}
           </p>
@@ -243,7 +375,7 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
       )}
 
       {userId && !loading && !networkError && !invalidError && entry && (
-        <div className="mt-6 flex flex-col gap-5">
+        <div className="flex flex-col gap-5">
           <ResultCard
             entry={entry}
             userId={userId}
@@ -464,14 +596,32 @@ function ResultCard({
   const audioText = isReverse ? entry.translation ?? "" : entry.word;
   const alternatives = entry.alternatives ?? [];
 
+  // V3.75.8: la tarjeta se tiñe del color de SU dirección —barra superior, marca
+  // de sentido y bloque del equivalente—, así que un resultado dice de un
+  // vistazo en qué sentido se buscó (y no cambia al tocar el conmutador).
+  const dirClass = directionClass(entry.direction);
+
   return (
     <>
-      <Card className="gap-3 p-5">
+      <Card className={cn("relative gap-4 overflow-hidden p-5 pt-6", dirClass)}>
+        <span
+          className={cn("absolute inset-x-0 top-0 h-1", dirClass, "dir-bar")}
+          aria-hidden="true"
+        />
         {/* Palabra + badges de contexto */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-tight">
-              <span lang={isReverse ? "es" : "en"}>{entry.word}</span>
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                  dirClass,
+                  "dir-chip",
+                )}
+              >
+                <ArrowLeftRight className="size-3" aria-hidden="true" />
+                {t(directionLabelKey(entry.direction))}
+              </span>
               {entry.cefr && <LevelBadge level={entry.cefr} />}
               {pos && (
                 <Badge
@@ -486,6 +636,9 @@ function ResultCard({
                   {kindLabel}
                 </span>
               )}
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              <span lang={isReverse ? "es" : "en"}>{entry.word}</span>
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -513,25 +666,42 @@ function ResultCard({
         </div>
 
         {entry.definition_source === "llm" ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {entry.definition && (
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("dictionary.lookup.definitionLabel")}
                 </span>
-                <p className="text-sm leading-relaxed" lang="en">
+                <p className="text-base leading-relaxed" lang="en">
                   {entry.definition}
                 </p>
               </div>
             )}
             {entry.translation && (
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              /* El equivalente es la respuesta de la consulta: se destaca en el
+                 color de la dirección, con el rótulo también en esa tinta. */
+              <div
+                className={cn(
+                  "flex flex-col gap-1 rounded-xl border px-4 py-3",
+                  dirClass,
+                  "dir-wash dir-line",
+                )}
+              >
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold uppercase tracking-wide",
+                    dirClass,
+                    "dir-ink",
+                  )}
+                >
                   {isReverse
                     ? t("dictionary.lookup.englishLabel")
                     : t("dictionary.lookup.translationLabel")}
                 </span>
-                <p className="text-sm leading-relaxed" lang={isReverse ? "en" : "es"}>
+                <p
+                  className="text-lg font-semibold leading-snug"
+                  lang={isReverse ? "en" : "es"}
+                >
                   {entry.translation}
                 </p>
               </div>
@@ -561,11 +731,20 @@ function ResultCard({
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               {t("dictionary.lookup.exampleTitle")}
             </span>
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background/60 px-3 py-2">
-              <span className="text-sm font-medium" lang="en">
+            <div className="flex items-stretch gap-3 overflow-hidden rounded-xl border border-border bg-background/60">
+              <span
+                className={cn("w-1 shrink-0", dirClass, "dir-bar")}
+                aria-hidden="true"
+              />
+              <span
+                className="min-w-0 flex-1 py-2.5 text-base font-medium"
+                lang="en"
+              >
                 {entry.example.phrase}
               </span>
-              <ItemReplayButton prompt={entry.example.phrase} userId={userId} />
+              <span className="flex items-center pr-3">
+                <ItemReplayButton prompt={entry.example.phrase} userId={userId} />
+              </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
               {t("dictionary.lookup.exampleNote")}

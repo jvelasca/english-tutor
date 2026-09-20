@@ -194,6 +194,75 @@ describe("DictionaryLookup (V3.30)", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
+  it("estado vacío: ofrece ejemplos y el ejemplo lanza la consulta (V3.75.8)", async () => {
+    const fn = routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    expect(screen.getByText("Try an example")).toBeTruthy();
+    // Los ejemplos no consultan solos: rellenan el campo y buscan al pulsarlos.
+    expect(fn).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "travel" }));
+
+    expect(
+      (screen.getByLabelText("Search the dictionary") as HTMLInputElement).value,
+    ).toBe("travel");
+    expect(
+      await screen.findByText("A hot drink made from roasted coffee beans."),
+    ).toBeTruthy();
+    // Una sola consulta al diccionario (el audio puede pedir su catálogo aparte).
+    const calls = fn.mock.calls.map((call) => String(call[0]));
+    expect(calls.filter((call) => call.includes("/dictionary")).length).toBe(1);
+  });
+
+  it("el botón de borrar aparece con texto, vacía el campo y no consulta (V3.75.8)", () => {
+    const fn = routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    const input = screen.getByLabelText("Search the dictionary") as HTMLInputElement;
+    // Sin texto no hay botón que borrar: no es un botón muerto en reposo.
+    expect(screen.queryByRole("button", { name: "Clear the search" })).toBeNull();
+
+    fireEvent.change(input, { target: { value: "coffee" } });
+    expect(input.value).toBe("coffee");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear the search" }));
+    expect(input.value).toBe("");
+    expect(screen.queryByRole("button", { name: "Clear the search" })).toBeNull();
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("el color de la dirección marca el conmutador y la tarjeta del resultado (V3.75.8)", async () => {
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    // EN→ES activo por defecto: su pastilla lleva la clase de SU dirección y la
+    // opción inactiva no. La clase la pinta `styles/legacy.css` (`.dir-*`), cuyo
+    // contraste mide y vigila `scripts/contrast_audit.mjs`.
+    expect(
+      screen.getByRole("button", { name: "English → Spanish" }).className,
+    ).toContain("dir-en-es");
+    expect(
+      screen.getByRole("button", { name: "Spanish → English" }).className,
+    ).not.toContain("dir-es-en");
+
+    fillAndSubmit("coffee");
+
+    const headword = await screen.findByRole("heading", { name: "coffee" });
+    // La tarjeta se tiñe del color de la dirección con la que se buscó.
+    expect(headword.closest(".dir-en-es")).not.toBeNull();
+    expect(headword.closest(".dir-es-en")).toBeNull();
+  });
+
+  it("sin cabecera propia no repite el título de la pantalla (V3.75.8)", () => {
+    // `/diccionario` ya trae su `h1` y su subtítulo: la vista de consulta los
+    // apaga para no dejar dos `h1` en la misma página.
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" showHeader={false} />);
+
+    expect(screen.queryByText("Dictionary lookup")).toBeNull();
+    expect(screen.getByLabelText("Search the dictionary")).toBeTruthy();
+  });
+
   it("muestra definición, traducción, ejemplo y marca de uso de una palabra conocida", async () => {
     routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
     renderPanel(<DictionaryLookup userId="u1" />);
@@ -650,6 +719,22 @@ describe("DictionaryLookup · V3.39 diccionario reversible ES→EN", () => {
     // La petición viaja con la dirección inversa.
     const body = JSON.parse(fn.mock.calls[0][1].body as string);
     expect(body).toEqual({ word: "casa", direction: "es-en" });
+  });
+
+  it("en ES→EN la tarjeta se tiñe del color de la dirección inversa (V3.75.8)", async () => {
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: CASA_REVERSE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Spanish → English" }));
+    expect(
+      screen.getByRole("button", { name: "Spanish → English" }).className,
+    ).toContain("dir-es-en");
+
+    fillAndSubmit("casa");
+
+    const headword = await screen.findByRole("heading", { name: "casa" });
+    expect(headword.closest(".dir-es-en")).not.toBeNull();
+    expect(headword.closest(".dir-en-es")).toBeNull();
   });
 
   it("sin equivalente inglés no ofrece practicar ni audio", async () => {

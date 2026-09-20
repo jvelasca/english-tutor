@@ -5,6 +5,31 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-20 (UTC+2).
 >
+> **Nota (2026-09-20 · cierre de la sesión de UI): V3.75.8 — release DE PRODUCTO
+> (patch) del diccionario de consulta y de la identidad de la compilación.**
+> **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones, SIN tocar `LISTENING_BANK_VERSION` y SIN
+> endpoints nuevos:** el diff de producto es **frontend**. **Lo que cambia:** (1) el
+> **buscador** del diccionario de consulta pasa a ser **el protagonista** de su
+> pantalla —tarjeta-buscador con marco, barra y anillo de foco, campo de **48 px en
+> móvil y 56 px en escritorio/tablet** (medido), conmutador **EN→ES / ES→EN dentro
+> del buscador**, estado vacío con **cuatro ejemplos por sentido** y botón de
+> borrado que solo existe con texto—; (2) **un color por sentido** (azul EN→ES,
+> fucsia ES→EN), **derivado de la tinta** como la rampa de niveles y **no sujeto al
+> acento del perfil** porque es una **leyenda** —si el acento lo moviera, dos acentos
+> afines podrían dejar azul y fucsia casi iguales—; el buscador se tiñe del sentido
+> **activo** y la tarjeta del sentido **de su consulta**, así que conmutar después de
+> buscar no la repinta; (3) **un solo `h1` en `/diccionario`** (`showHeader`);
+> (4) la **Ayuda declara la versión de la compilación** (`utils/buildInfo.ts`, leída
+> del `package.json` al compilar, así que funciona **sin backend**) y su tarjeta de
+> vocabulario explica el sentido y su color. **Lo que NO cierra:** no hay **spec
+> visual permanente** del diccionario (la medición se hizo con un spec temporal que
+> se borró), la versión de la Ayuda es la **versión declarada** y no distingue dos
+> compilaciones de la misma versión, el `dist` **no se versiona** (hay que
+> recompilar), el **P0 de identidad sigue entero** y **los 7 gates siguen en
+> `pending`**. Detalle completo en **`release-notes-v3.75.8.md`**.
+>
 > **Nota (2026-09-20 · cierre de listening): V3.75.7 — release DE PRODUCTO que
 > publica CINCO ITERACIONES juntas (`V3.75.3`–`V3.75.7`) bajo UNA sola etiqueta.**
 > **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni

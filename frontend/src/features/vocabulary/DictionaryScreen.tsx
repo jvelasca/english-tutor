@@ -76,7 +76,11 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
           {view === "personal" ? (
             <PersonalDictionary userId={userId} />
           ) : (
-            <DictionaryLookup userId={userId} />
+            /* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
+               vista de consulta no repite cabecera (antes había dos `h1` en la
+               misma página) ni vuelve a aplicar el ancho y el relleno de
+               página, que ya pone este contenedor. */
+            <DictionaryLookup userId={userId} showHeader={false} />
           )}
         </div>
       </div>

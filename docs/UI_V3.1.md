@@ -269,6 +269,65 @@ donde hay información **y opciones**, es una **(...)**, y eso debe valer en tod
   trae opciones de verdad (las tres composiciones de la repetición). Verificado que la guarda tiene
   dientes: sin `pr-12`, la primera línea de las notas de ruta vuelve a fallar el test.
 
+### 3.6 El diccionario de consulta: buscador grande y un color por sentido (decisión posterior, V3.75.8)
+
+Decisión del propietario: el diccionario de consulta debía parecerse a los de las **apps de
+referencia** —el buscador como protagonista, cómodo en móvil— y el **sentido** de la consulta debía
+distinguirse **de un vistazo por su color**.
+
+- **El buscador es la vista, no un control más.** Antes era una fila de 40 px con un botón al lado,
+  perdida entre el `h1`, las pestañas de la pantalla y el conmutador de sentido, que flotaba
+  *encima* del campo sin relación visual con él. Ahora el campo vive **dentro de una tarjeta-buscador**
+  (`rounded-2xl` con marco de 2 px, barra superior de color y anillo de foco del mismo color) y mide
+  **48 px en móvil y 56 px en escritorio/tablet** (medido, no mirado), con `text-base`/`text-lg` y un
+  icono de lupa teñido del sentido activo. El **conmutador EN→ES / ES→EN pasa a estar dentro del
+  buscador**, en dos pastillas que ocupan el ancho: dentro del buscador no compite con las pestañas de
+  la pantalla y se lee como lo que es —una propiedad de la consulta—.
+- **Un color por sentido, y ese color es una convención.** EN→ES va en **azul** y ES→EN en
+  **fucsia**, con el relleno y el borde **derivados de la tinta** (`color-mix()` al 15 % y al 35 %),
+  igual que la rampa de niveles (3.2). La pareja es **complementaria** (máximo contraste entre los dos
+  sentidos) y **no pisa los colores de estado** —verde dominada, ámbar en curso, rojo débil—, que ya
+  significan otra cosa en toda la app. Y, a diferencia de la rampa, **no sigue el acento del perfil**:
+  si el color del sentido cambiara con el acento, dos acentos afines podrían dejar el azul y el fucsia
+  casi iguales, y la señal se perdería. Es una leyenda del diccionario: azul ↔ fucsia, en los dos temas.
+  - **Dónde se ve el color (y cuál manda).** El buscador se tiñe del sentido **activo** (barra,
+    marco, pastilla seleccionada y anillo de foco). El resultado se tiñe del sentido **de su propia
+    consulta** (`entry.direction`), con una marca de dirección («English → Spanish») junto a la
+    palabra: cambiar el conmutador después de buscar **no** repinta la tarjeta, y así el resultado
+    nunca miente sobre en qué sentido se pidió. Dentro de la tarjeta el color se concentra en el
+    **equivalente** (el bloque con más tinta y `text-lg font-semibold`, porque es la respuesta) y en
+    la pestaña de color del ejemplo; el resto de la ficha queda en neutro para que el color siga
+    informando en vez de decorar.
+  - **Sin consulta todavía, ejemplos.** El estado vacío ofrece cuatro palabras de arranque **por
+    sentido** (`travel/book/water/family` en EN→ES, `casa/viaje/comida/tiempo` en ES→EN) que lanzan
+    la búsqueda al pulsarlas, y un botón de borrado (`X`) dentro del campo cuando hay texto. Las
+    palabras de ejemplo se marcan con su `lang`, y el campo también, porque la entrada es del otro
+    idioma.
+  - **Un solo `h1` en `/diccionario`.** La vista de consulta traía su propia cabecera y la pantalla
+    la suya: salían **dos `h1`** en la misma página y el título repetido. `DictionaryLookup` recibe
+    ahora `showHeader` (por defecto `true`, para las superficies que la montan suelta) y
+    `DictionaryScreen` lo apaga; el ancho y el relleno de página los pone ya el contenedor de la
+    pantalla, así que la vista dejó de aplicarlos por segunda vez.
+- **Medido, no mirado.** El par de direcciones entra en el **arnés de contraste** (`--strict`, 0
+  bloqueantes de 444) midiendo la tinta de cada sentido **sobre su relleno compuesto** en los dos
+  temas y sobre los dos fondos, con el porcentaje **leído del CSS** en vez de supuesto: 5.99–8.02:1
+  frente al mínimo 4.5:1. El mismo script gana dos guardas con dientes —`direccion-completa` (las dos
+  tintas en los dos temas) y `direccion-clases-y-derivados` (relleno al 15 %, borde, las clases
+  `.dir-en-es`/`.dir-es-en` y los modificadores `.dir-chip`/`.dir-ink`/`.dir-line`/`.dir-wash`/`.dir-bar`
+  y el marco `.dir-field`)—: si `directionClass()` devolviera una clase que no existe, el buscador se
+  quedaría sin color y **ninguna otra prueba se enteraría**. En unidad, `dictionaryDirection.test.ts`
+  fija el mapeo sentido→clase→clave i18n, y `DictionaryLookup.test.tsx` exige que la pastilla activa
+  lleve la clase de **su** sentido, que la tarjeta se tiña del sentido **con el que se buscó** (no del
+  que esté puesto después), que el botón de borrado no exista en reposo y que pulsar un ejemplo
+  rellene el campo y dispare **una** consulta. La revisión visual se hizo con un spec temporal en los
+  **tres breakpoints** que midió lo que el usuario ve —campo de 48 px en móvil y 56 px en
+  escritorio/tablet, conmutador con **dos colores computados distintos**, cero desbordamiento
+  horizontal—, borrado después: midió el resultado, pero no se queda como prueba de producto. (Ojo con
+  el mock de esos specs: el patrón de ruta va **anclado al origen** (`/^https?:\/\/[^/]+\/api\//`, como
+  en `drillProvenance.spec.ts`), porque un glob con comodín final —`**/api/**`— casa también las rutas
+  del *dev-server* (`/src/api/…`), que se sirven como `application/json` y dejan la app **sin montar**:
+  el fallo se ve como una página en blanco, no como un error del test.)
+
 ---
 
 ## 4. Mapa maestro de pantallas (IA objetivo)

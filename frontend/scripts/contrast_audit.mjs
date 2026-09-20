@@ -15,7 +15,11 @@
  *   - la RAMPA DE NIVELES (V3.75.4): la tinta de cada paso (Pre-A1…C2 y «sin
  *     dato») sobre su propio relleno compuesto, en los 3 esquemas
  *     (`data-levels`), los 2 temas y —en «Monocromo», que sale del acento— los
- *     7 acentos.
+ *     7 acentos;
+ *   - el COLOR DE DIRECCIÓN del diccionario (V3.75.8): la tinta de EN→ES y de
+ *     ES→EN sobre su relleno compuesto, en los 2 temas. Esa pareja no sigue al
+ *     acento (es una convención del diccionario: azul ↔ fucsia), así que se mide
+ *     con un solo acento.
  *
  * Pares REPORTED (se miden y se publican, pero no bloquean): el relleno de
  * acento con su tinta encima (`--color-on-accent`) y el acento como borde/UI.
@@ -434,9 +438,70 @@ for (const scheme of LEVEL_SCHEMES) {
   }
 }
 
+/* ------------------ color de dirección del diccionario (V3.75.8) --------- */
+
+/**
+ * Las dos direcciones del diccionario de consulta, en el orden en que se
+ * ofrecen. Espejo de `frontend/src/utils/dictionaryDirection.ts`.
+ */
+const DIRECTION_STEPS = [
+  ["en-es", "EN→ES"],
+  ["es-en", "ES→EN"],
+];
+
+/**
+ * Reparto del relleno de dirección, leído del CSS
+ * (`--dir-en-es-bg: color-mix(in srgb, var(--dir-en-es-fg) N%, transparent)`).
+ * A diferencia de la rampa de niveles, aquí SÍ se lee el porcentaje real: si
+ * cambia la fórmula, la medición sigue midiendo lo que se pinta en vez de otro
+ * color. Devuelve `null` si el token no está declarado (lo denuncia la guarda
+ * `direccion-clases-y-derivados`).
+ */
+function dirFillShare() {
+  const m =
+    /--dir-en-es-bg:\s*color-mix\(\s*in srgb\s*,\s*var\(\s*--dir-en-es-fg\s*\)\s+([\d.]+)%\s*,\s*transparent\s*\)/i.exec(
+      legacy,
+    );
+  return m ? Number(m[1]) : null;
+}
+
+const DIR_FILL_SHARE = dirFillShare();
+
+// Las tintas de dirección no dependen del acento del usuario (son una
+// convención del diccionario), así que se miden una sola vez por tema.
+if (DIR_FILL_SHARE !== null) {
+  for (const theme of THEMES) {
+    for (const [key, label] of DIRECTION_STEPS) {
+      const fg = resolve(theme, ACCENTS[0], `--dir-${key}-fg`);
+      if (!fg) continue; // la guarda de completitud lo denuncia
+      for (const surfaceToken of LEVEL_SURFACES) {
+        const surface = resolve(theme, ACCENTS[0], surfaceToken);
+        const bg = over({ ...parseHex(fg), a: DIR_FILL_SHARE / 100 }, surface);
+        results.push({
+          scope: "dir-tint",
+          theme: theme.id,
+          accent: null,
+          direction: key,
+          direction_label: label,
+          surface: surfaceToken,
+          label:
+            `tinta de la dirección ${label} (--dir-${key}-fg) sobre su relleno ` +
+            `al ${DIR_FILL_SHARE} % sobre ${surfaceToken}`,
+          fg,
+          bg,
+          ratio: ratio(fg, bg),
+          min: AA_TEXT,
+          enforced: true,
+        });
+      }
+    }
+  }
+}
+
 // El acento sólido no puede usarse como color de texto: para eso está
 // `--color-accent-soft`, que se deriva del acento y sí cumple AA.
 const solidAsText = [...legacy.matchAll(/^\s+color:\s*var\(--color-accent\);/gm)].length;
+
 // La derivación de `--color-accent-soft` es un contrato: si desaparece, la
 // medición deja de corresponderse con lo que se pinta.
 const derivedSoft = /--color-accent-soft:\s*color-mix\(/s.test(legacy);
@@ -467,6 +532,41 @@ for (const [key] of LEVEL_STEPS) {
 for (const key of [...LEVEL_STEPS.map(([k]) => k), "outline", "ink", "quiet"]) {
   if (!new RegExp(`\\.lv-${key}\\s*\\{`).test(legacy)) {
     rampDerivedMissing.push(`.lv-${key}`);
+  }
+}
+// La dirección es el mismo contrato de tres piezas que la rampa: la tinta en
+// cada tema, el relleno/borde derivados y la clase estática que los consume.
+// `directionClass()` devuelve una clase: si esa clase no existe, el buscador se
+// queda sin color de dirección sin que ningún test unitario se entere.
+const dirMissing = [];
+for (const theme of THEMES) {
+  for (const [key] of DIRECTION_STEPS) {
+    if (!resolve(theme, ACCENTS[0], `--dir-${key}-fg`)) {
+      dirMissing.push(`${theme.id}/--dir-${key}-fg`);
+    }
+  }
+}
+const dirDerivedMissing = [];
+for (const [key] of DIRECTION_STEPS) {
+  for (const suffix of ["bg", "border"]) {
+    if (!baseTokens[`--dir-${key}-${suffix}`]) {
+      dirDerivedMissing.push(`--dir-${key}-${suffix}`);
+    }
+  }
+}
+// Clases consumidoras de `styles/legacy.css`: el paso (tinta/relleno/borde en
+// variables locales) y los modificadores que pintan.
+for (const cls of [
+  ...DIRECTION_STEPS.map(([key]) => `dir-${key}`),
+  "dir-chip",
+  "dir-ink",
+  "dir-line",
+  "dir-wash",
+  "dir-bar",
+  "dir-field",
+]) {
+  if (!new RegExp(`^\\.${cls}(\\s*[,{:])`, "m").test(legacy)) {
+    dirDerivedMissing.push(`.${cls}`);
   }
 }
 const guards = [
@@ -501,6 +601,25 @@ const guards = [
         ? "cada paso tiene relleno y borde derivados y su clase .lv-*, más los modificadores .lv-outline/.lv-ink/.lv-quiet"
         : `faltan piezas de la rampa: ${rampDerivedMissing.join(", ")}`,
   },
+  {
+    id: "direccion-completa",
+    ok: dirMissing.length === 0,
+    detail:
+      dirMissing.length === 0
+        ? "las dos direcciones (EN→ES, ES→EN) declaran su tinta en los 2 temas"
+        : `faltan tintas de dirección: ${dirMissing.join(", ")}`,
+  },
+  {
+    id: "direccion-clases-y-derivados",
+    ok: dirDerivedMissing.length === 0 && DIR_FILL_SHARE !== null,
+    detail:
+      dirDerivedMissing.length === 0 && DIR_FILL_SHARE !== null
+        ? `cada dirección tiene relleno (${DIR_FILL_SHARE} %) y borde derivados, su clase .dir-*, los modificadores .dir-chip/.dir-ink/.dir-line/.dir-wash/.dir-bar y el marco .dir-field`
+        : `faltan piezas de la dirección: ${[
+            ...dirDerivedMissing,
+            ...(DIR_FILL_SHARE === null ? ["--dir-en-es-bg (reparto ilegible)"] : []),
+          ].join(", ")}`,
+  },
 ];
 
 /* ------------------------------- report --------------------------------- */
@@ -512,7 +631,7 @@ const reportedFails = reported.filter((r) => r.ratio < r.min);
 const guardFails = guards.filter((g) => !g.ok);
 
 const payload = {
-  audit: "V3.75.4-rampa-niveles",
+  audit: "V3.75.8-rampa-niveles-direccion",
   standard: "WCAG 2.2 AA (1.4.3 texto 4.5:1 · 1.4.11 UI 3:1)",
   enforced_failures: enforcedFails.length + guardFails.length,
   reported_failures: reportedFails.length,
@@ -521,12 +640,12 @@ const payload = {
 };
 
 const md = [];
-md.push("# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4)");
+md.push("# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4 · dirección del diccionario V3.75.8)");
 md.push("");
 md.push("> Generado por `node frontend/scripts/contrast_audit.mjs`.");
 md.push("");
 md.push(
-  `- Pares que BLOQUEAN (tipografía base + texto de acento + guardas): **${enforcedFails.length + guardFails.length} fallos** de ${enforced.length + guards.length}.`,
+  `- Pares que BLOQUEAN (tipografía base + texto de acento + rampa de niveles + dirección + guardas): **${enforcedFails.length + guardFails.length} fallos** de ${enforced.length + guards.length}.`,
 );
 md.push(
   `- Pares de acento reportados (relleno + tinta y borde): **${reportedFails.length} fallos** de ${reported.length}.`,
@@ -599,6 +718,24 @@ md.push(`| --- | --- | --- | --- | ${LEVEL_STEPS.map(() => "---:").join(" | ")} 
       `| ${schemeLabel} | ${themeLabel} | ${accentId || "—"} | ${surface} | ${values.join(" | ")} |`,
     );
   }
+}
+md.push("");
+md.push("## Dirección de la consulta del diccionario (bloqueante)");
+md.push("");
+md.push(
+  "El sentido de la consulta se ve por su color —azul EN→ES, fucsia ES→EN— y ese " +
+    "color se mide igual que la rampa: cada dirección declara su tinta y el " +
+    `relleno se DERIVA de ella al ${DIR_FILL_SHARE} %. La pareja no sigue al acento ` +
+    "del usuario (es una convención del diccionario, no del perfil), así que se mide " +
+    "con un solo acento y en los dos temas.",
+);
+md.push("");
+md.push("| Tema | Dirección | Fondo | Razón | Mínimo | Estado |");
+md.push("| --- | --- | --- | ---: | ---: | --- |");
+for (const r of enforced.filter((x) => x.scope === "dir-tint")) {
+  md.push(
+    `| ${r.theme} | ${r.direction_label} | ${r.label.replace(/^.* % sobre /, "")} | ${r.ratio} | ${r.min} | ${r.ratio >= r.min ? "OK" : "FALLA"} |`,
+  );
 }
 md.push("");
 md.push("## Guardas");

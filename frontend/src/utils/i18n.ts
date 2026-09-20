@@ -857,6 +857,16 @@ const STRINGS: Record<string, Entry> = {
     en: "Spanish → English",
     es: "Español → Inglés",
   },
+  // V3.75.8: el buscador se agranda y se tiñe del color de la dirección; estas
+  // dos claves son lo único nuevo que dice la pantalla.
+  "dictionary.lookup.clearAria": {
+    en: "Clear the search",
+    es: "Borrar la búsqueda",
+  },
+  "dictionary.lookup.tryExamples": {
+    en: "Try an example",
+    es: "Prueba con un ejemplo",
+  },
   "dictionary.lookup.placeholder.es-en": {
     en: "Type a word… e.g. casa",
     es: "Escribe una palabra… p. ej. casa",
@@ -1446,8 +1456,8 @@ const STRINGS: Record<string, Entry> = {
   },
   "help.vocabulary.title": { en: "Vocabulary and dictionary", es: "Vocabulary y diccionario" },
   "help.vocabulary.body": {
-    en: "Level-by-level routes of word checks (A1–C2) with instant feedback, together with your personal dictionary. Every word you meet in the app is recorded with the contexts where you have produced or seen it, so you can review what you are learning and what you have already mastered.",
-    es: "Rutas de checks de palabras nivel a nivel (A1–C2) con feedback inmediato, junto a tu diccionario personal. Cada palabra que encuentras en la app queda registrada con los contextos en los que la has producido o visto, para que repases lo que estás aprendiendo y lo que ya dominas.",
+    en: "Level-by-level routes of word checks (A1–C2) with instant feedback, together with your personal dictionary. Every word you meet in the app is recorded with the contexts where you have produced or seen it, so you can review what you are learning and what you have already mastered. The lookup dictionary searches any word —whether or not it is in your lexicon— and you choose the direction (English → Spanish or Spanish → English): each direction has its own colour, so a glance tells you which way you searched.",
+    es: "Rutas de checks de palabras nivel a nivel (A1–C2) con feedback inmediato, junto a tu diccionario personal. Cada palabra que encuentras en la app queda registrada con los contextos en los que la has producido o visto, para que repases lo que estás aprendiendo y lo que ya dominas. El diccionario de consulta busca cualquier palabra —esté o no en tu léxico— y tú eliges el sentido (inglés → español o español → inglés): cada sentido tiene su color, así que de un vistazo sabes cómo has buscado.",
   },
   "help.grammar.title": { en: "Grammar", es: "Grammar" },
   "help.grammar.body": {
@@ -1460,6 +1470,11 @@ const STRINGS: Record<string, Entry> = {
     es: "MI PROGRESO muestra tu nivel CEFR con lo demostrado y lo estimado, tus fortalezas y debilidades por destreza, el repaso y la retención de lo aprendido, y la trayectoria de tu viaje. Todo se actualiza con evidencia real: ejercicios, conversaciones, misiones y evaluaciones.",
   },
   "help.author": { en: "About the author", es: "Sobre el autor" },
+  // V3.75.8: la Ayuda declara qué compilación está corriendo (utils/buildInfo.ts).
+  "help.buildVersion": {
+    en: "Build version",
+    es: "Versión de compilación",
+  },
   "help.authorBody": {
     en: "English Tutor is a personal, 100% local learning project. Comments, ideas and bug reports are welcome:",
     es: "English Tutor es un proyecto personal de aprendizaje, 100% local. Comentarios, ideas e informes de errores son bienvenidos:",

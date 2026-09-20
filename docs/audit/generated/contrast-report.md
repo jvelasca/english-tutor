@@ -1,8 +1,8 @@
-# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4)
+# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4 · dirección del diccionario V3.75.8)
 
 > Generado por `node frontend/scripts/contrast_audit.mjs`.
 
-- Pares que BLOQUEAN (tipografía base + texto de acento + guardas): **0 fallos** de 434.
+- Pares que BLOQUEAN (tipografía base + texto de acento + rampa de niveles + dirección + guardas): **0 fallos** de 444.
 - Pares de acento reportados (relleno + tinta y borde): **17 fallos** de 42.
 
 ## Tipografía base sobre superficies (bloqueante)
@@ -202,6 +202,21 @@ Cada paso (Pre-A1 → C2, más el cajón «sin dato») declara su tinta y el rel
 | Monocromo | Claro | amber | --color-bg | 4.69 | 4.77 | 4.9 | 5 | 5.02 | 5.08 | 5.09 | 4.65 |
 | Monocromo | Claro | amber | --color-surface | 4.95 | 5.05 | 5.19 | 5.29 | 5.31 | 5.38 | 5.39 | 4.92 |
 
+## Dirección de la consulta del diccionario (bloqueante)
+
+El sentido de la consulta se ve por su color —azul EN→ES, fucsia ES→EN— y ese color se mide igual que la rampa: cada dirección declara su tinta y el relleno se DERIVA de ella al 15 %. La pareja no sigue al acento del usuario (es una convención del diccionario, no del perfil), así que se mide con un solo acento y en los dos temas.
+
+| Tema | Dirección | Fondo | Razón | Mínimo | Estado |
+| --- | --- | --- | ---: | ---: | --- |
+| dark | EN→ES | --color-bg | 7.83 | 4.5 | OK |
+| dark | EN→ES | --color-surface | 6.51 | 4.5 | OK |
+| dark | ES→EN | --color-bg | 8.02 | 4.5 | OK |
+| dark | ES→EN | --color-surface | 6.69 | 4.5 | OK |
+| light | EN→ES | --color-bg | 6.37 | 4.5 | OK |
+| light | EN→ES | --color-surface | 6.75 | 4.5 | OK |
+| light | ES→EN | --color-bg | 5.99 | 4.5 | OK |
+| light | ES→EN | --color-surface | 6.35 | 4.5 | OK |
+
 ## Guardas
 
 | Guarda | Estado | Detalle |
@@ -210,6 +225,8 @@ Cada paso (Pre-A1 → C2, más el cajón «sin dato») declara su tinta y el rel
 | accent-soft-derivado | OK | --color-accent-soft se deriva del acento con color-mix() |
 | rampa-niveles-completa | OK | los 7 pasos (+ sin dato) declaran su tinta en los 3 esquemas y los 2 temas |
 | rampa-clases-y-derivados | OK | cada paso tiene relleno y borde derivados y su clase .lv-*, más los modificadores .lv-outline/.lv-ink/.lv-quiet |
+| direccion-completa | OK | las dos direcciones (EN→ES, ES→EN) declaran su tinta en los 2 temas |
+| direccion-clases-y-derivados | OK | cada dirección tiene relleno (15 %) y borde derivados, su clase .dir-*, los modificadores .dir-chip/.dir-ink/.dir-line/.dir-wash/.dir-bar y el marco .dir-field |
 
 ## Acento como relleno y como borde (reportado; decisión para V4.0.x)
 

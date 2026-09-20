@@ -1,5 +1,5 @@
 {
- "audit": "V3.75.4-rampa-niveles",
+ "audit": "V3.75.8-rampa-niveles-direccion",
  "standard": "WCAG 2.2 AA (1.4.3 texto 4.5:1 · 1.4.11 UI 3:1)",
  "enforced_failures": 0,
  "reported_failures": 17,
@@ -23,6 +23,16 @@
    "id": "rampa-clases-y-derivados",
    "ok": true,
    "detail": "cada paso tiene relleno y borde derivados y su clase .lv-*, más los modificadores .lv-outline/.lv-ink/.lv-quiet"
+  },
+  {
+   "id": "direccion-completa",
+   "ok": true,
+   "detail": "las dos direcciones (EN→ES, ES→EN) declaran su tinta en los 2 temas"
+  },
+  {
+   "id": "direccion-clases-y-derivados",
+   "ok": true,
+   "detail": "cada dirección tiene relleno (15 %) y borde derivados, su clase .dir-*, los modificadores .dir-chip/.dir-ink/.dir-line/.dir-wash/.dir-bar y el marco .dir-field"
   }
  ],
  "results": [
@@ -6451,6 +6461,118 @@
    "fg": "#606367",
    "bg": "#e7e8e8",
    "ratio": 4.92,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "dark",
+   "accent": null,
+   "direction": "en-es",
+   "direction_label": "EN→ES",
+   "surface": "--color-bg",
+   "label": "tinta de la dirección EN→ES (--dir-en-es-fg) sobre su relleno al 15 % sobre --color-bg",
+   "fg": "#93c5fd",
+   "bg": "#222c39",
+   "ratio": 7.83,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "dark",
+   "accent": null,
+   "direction": "en-es",
+   "direction_label": "EN→ES",
+   "surface": "--color-surface",
+   "label": "tinta de la dirección EN→ES (--dir-en-es-fg) sobre su relleno al 15 % sobre --color-surface",
+   "fg": "#93c5fd",
+   "bg": "#2c3949",
+   "ratio": 6.51,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "dark",
+   "accent": null,
+   "direction": "es-en",
+   "direction_label": "ES→EN",
+   "surface": "--color-bg",
+   "label": "tinta de la dirección ES→EN (--dir-es-en-fg) sobre su relleno al 15 % sobre --color-bg",
+   "fg": "#f0abfc",
+   "bg": "#302839",
+   "ratio": 8.02,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "dark",
+   "accent": null,
+   "direction": "es-en",
+   "direction_label": "ES→EN",
+   "surface": "--color-surface",
+   "label": "tinta de la dirección ES→EN (--dir-es-en-fg) sobre su relleno al 15 % sobre --color-surface",
+   "fg": "#f0abfc",
+   "bg": "#3a3549",
+   "ratio": 6.69,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "light",
+   "accent": null,
+   "direction": "en-es",
+   "direction_label": "EN→ES",
+   "surface": "--color-bg",
+   "label": "tinta de la dirección EN→ES (--dir-en-es-fg) sobre su relleno al 15 % sobre --color-bg",
+   "fg": "#1e40af",
+   "bg": "#d6dcef",
+   "ratio": 6.37,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "light",
+   "accent": null,
+   "direction": "en-es",
+   "direction_label": "EN→ES",
+   "surface": "--color-surface",
+   "label": "tinta de la dirección EN→ES (--dir-en-es-fg) sobre su relleno al 15 % sobre --color-surface",
+   "fg": "#1e40af",
+   "bg": "#dde2f3",
+   "ratio": 6.75,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "light",
+   "accent": null,
+   "direction": "es-en",
+   "direction_label": "ES→EN",
+   "surface": "--color-bg",
+   "label": "tinta de la dirección ES→EN (--dir-es-en-fg) sobre su relleno al 15 % sobre --color-bg",
+   "fg": "#86198f",
+   "bg": "#e6d7ea",
+   "ratio": 5.99,
+   "min": 4.5,
+   "enforced": true
+  },
+  {
+   "scope": "dir-tint",
+   "theme": "light",
+   "accent": null,
+   "direction": "es-en",
+   "direction_label": "ES→EN",
+   "surface": "--color-surface",
+   "label": "tinta de la dirección ES→EN (--dir-es-en-fg) sobre su relleno al 15 % sobre --color-surface",
+   "fg": "#86198f",
+   "bg": "#edddee",
+   "ratio": 6.35,
    "min": 4.5,
    "enforced": true
   }

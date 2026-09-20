@@ -1,4 +1,5 @@
 import { useI18n } from "../../hooks/useI18n";
+import { APP_VERSION } from "../../utils/buildInfo";
 
 const DOCS_BASE = "https://github.com/jvelasca/english-tutor";
 const DEV_DOCS = `${DOCS_BASE}/blob/main/docs/DESARROLLO.md`;
@@ -119,7 +120,10 @@ export function HelpScreen() {
         </section>
       ))}
 
-      {/* Autor (V3.27): autoría y contacto de la app. */}
+      {/* Autor (V3.27): autoría, contacto y versión de la compilación (V3.75.8).
+          La versión se lee del bundle (utils/buildInfo.ts), no de la API: la
+          Ayuda funciona sin backend y debe poder decir qué build está en disco
+          aunque no haya nada escuchando en el puerto. */}
       <section
         aria-label={t("help.author")}
         className="mt-6 rounded-xl border border-border bg-card p-4"
@@ -139,6 +143,9 @@ export function HelpScreen() {
         >
           {AUTHOR_EMAIL}
         </a>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {`${t("help.buildVersion")} v${APP_VERSION}`}
+        </p>
       </section>
 
       <footer className="mt-8 text-center">

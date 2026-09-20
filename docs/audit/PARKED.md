@@ -1135,6 +1135,125 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   paralelismo del arnés (medir con `--workers=1`) y el corpus en marcha no se recarga
   solo (reiniciar backend y recompilar `frontend/dist` para ver la UI nueva). `[D]`
 
+## V3.75.8 — el diccionario de consulta con buscador grande y un color por sentido (2026-09-20)
+
+> Origen: tres peticiones del gerente sobre la app **en uso**: «que la parte visual
+> sea más atractiva (como los diccionarios de apps top)», «que el espacio para meter
+> la palabra sea más grande y esté más claro, especialmente en el móvil» y «si está
+> en un sentido tiene un color y si está en otro, otro color, para que sea más
+> visual». Al cerrar la sesión pidió además que la **Ayuda** declare la **versión de
+> compilación** junto al autor.
+
+### Decisiones tomadas (y su precio)
+
+- **(1) El buscador es la vista, no un control más.** El campo era una fila de
+  **40 px** (`h-10 text-sm`) con el botón al lado, compitiendo con el `h1`, con las
+  pestañas de la pantalla y con el conmutador de sentido —que vivía **encima** del
+  campo, en una pastilla `bg-secondary`, sin relación visual con él—. Ahora el campo
+  vive dentro de una **tarjeta-buscador** (`rounded-2xl`, marco de 2 px, barra
+  superior de color y anillo de foco del mismo color) y mide **48 px en móvil y
+  56 px en escritorio/tablet**; el icono de lupa va teñido del sentido activo y el
+  **conmutador entra dentro del buscador**, en dos pastillas a ancho completo.
+  El precio, declarado: **la pantalla es más alta** (la tarjeta metida en el flujo
+  ocupa **132 px** en escritorio y **172 px** en móvil, medido) y el botón de
+  consulta deja de estar a la altura del campo en móvil, porque el campo y el botón
+  se apilan. A cambio, el objetivo táctil del campo sube por encima de los 44 px que
+  pide el estándar en el sitio donde el gerente lo pedía. `[UX]`
+- **(2) Sin consulta, la vista empieza con ejemplos.** Cuatro palabras por sentido
+  (`travel/book/water/family` en EN→ES, `casa/viaje/comida/tiempo` en ES→EN) que
+  **rellenan el campo y buscan** al pulsarlas, y un botón de borrado (`X`) dentro del
+  campo que **solo existe cuando hay texto**. Van marcadas con su `lang` (los
+  ejemplos de ES→EN se teclean en español, que es la lengua de la que se busca) y
+  viven en `utils/dictionaryDirection.ts` como **contenido**, no como interfaz: no
+  pasan por i18n. El precio: son **cuatro palabras fijas por sentido** que hay que
+  mantener a mano; no se generan del léxico del alumno ni del banco. `[UX]`
+- **(3) Un color por sentido, y el color es una convención —no una preferencia—.**
+  **Azul** para EN→ES y **fucsia** para ES→EN, con el relleno y el borde **derivados
+  de la tinta** (`color-mix()` al 15 % y 35 %), el mismo mecanismo que la rampa de
+  niveles de V3.75.4. La pareja es **complementaria** y **no pisa los colores de
+  estado** (verde dominada, ámbar en curso, rojo débil). **A diferencia de la rampa,
+  no sigue el acento del perfil** y no se ofrece en Ajustes: si el color del sentido
+  cambiara con el acento, dos acentos afines podrían dejar azul y fucsia casi iguales
+  y la señal se perdería; es una **leyenda del diccionario** (azul ↔ fucsia), y una
+  leyenda que se puede cambiar deja de ser una leyenda. El precio: **no es
+  consistente con la rampa** en ese punto —hay colores de la app que siguen al perfil
+  y este no—, y esa asimetría hay que declararla para que no se lea como un olvido.
+  `[D]`
+  - `directionClass()` devuelve el **nombre de una clase** (`.dir-en-es` /
+    `.dir-es-en`) y nunca una interpolación de Tailwind: el escaneo de clases
+    purgaría `text-${dir}` y el color desaparecería sin que ningún test se enterara.
+    Es el mismo contrato que `levelClass` para la rampa. `[D]`
+- **(4) Cuál manda: el buscador se tiñe del sentido ACTIVO; la tarjeta, del sentido
+  DE SU CONSULTA.** La tarjeta usa `entry.direction` y lleva una **marca de
+  dirección** («English → Spanish») junto a la palabra, de modo que **conmutar el
+  buscador después de buscar no repinta el resultado**: el resultado no puede mentir
+  sobre en qué sentido se pidió. Dentro de la ficha el color se concentra en el
+  **equivalente** —el bloque con más tinta y `text-lg font-semibold`, porque es la
+  respuesta— y en la pestaña del ejemplo; el resto queda en neutro para que el color
+  **informe** en vez de decorar. Precio: **dos convenciones de color en la misma
+  pantalla** (activo vs. resultado) que solo se entienden si el rótulo de dirección
+  está a la vista, y está. `[D]`
+- **(5) Un solo `h1` en `/diccionario` (defecto encontrado de paso).** La vista de
+  consulta traía cabecera propia (`h1` + subtítulo) y la pantalla la suya: había
+  **dos `h1`** en la misma página, el título repetido y el relleno de página aplicado
+  dos veces. `DictionaryLookup` recibe `showHeader` (**defecto `true`**, para quien la
+  monte suelta) y `DictionaryScreen` lo apaga. `[D]`
+- **(6) La Ayuda declara la versión de la compilación.** Nuevo
+  `utils/buildInfo.ts`: la versión se lee del `package.json` **en tiempo de
+  compilación** y viaja en el bundle —solo el campo `version`; el resto del fichero
+  no entra—. La razón no es cosmética: la única versión visible en la app era la del
+  **backend** (`GET /api/health` → `SystemStatus`), que es exactamente la que **no**
+  responde cuando el alumno pregunta «¿qué versión tengo?». La Ayuda es una pantalla
+  **sin red**, así que su versión no puede depender de la API.
+  `check_release_consistency.py` mantiene ese número igual al de los otros orígenes.
+  Precio, declarado: lo que muestra es la **versión**, no la fecha ni el `hash` del
+  build, así que **dos compilaciones de la misma versión se declaran igual**; y la
+  tarjeta de vocabulario de la Ayuda explica ahora el sentido y su color, con lo que
+  el texto de ayuda depende del diseño del diccionario. `[P]`
+- **(7) La ayuda se actualiza donde el diseño cambió, y solo ahí.** La tarjeta de
+  «Vocabulary y diccionario» decía «tu diccionario personal» y no mencionaba el
+  **diccionario de consulta** ni su conmutador de sentido: se le añade una frase
+  («…y tú eliges el sentido (inglés → español o español → inglés): cada sentido tiene
+  su color»). No se toca ninguna otra tarjeta porque ninguna otra describe algo que
+  haya cambiado. `[UX]`
+
+### Medición y contrato (V3.75.8)
+
+- **El color se mide, no se elige a ojo.** `scripts/contrast_audit.mjs` gana el par
+  de direcciones: tinta de cada sentido sobre su **relleno compuesto**, en los **2
+  temas** × **2 fondos** (`--color-bg`, `--color-surface`), con el **porcentaje de
+  mezcla leído del CSS** en vez de supuesto. Resultado: **5.76–8.02:1** frente al
+  mínimo **4.5:1** (**480 pares + 6 guardas, 0 bloqueantes** en `--strict`). `[D]`
+- **Dos guardas nuevas, y la que importa es la de las clases:** `direccion-completa`
+  (las dos tintas en los dos temas) y `direccion-clases-y-derivados` (relleno al
+  15 %, borde, las clases `.dir-*` y el marco `.dir-field`). Si `directionClass()`
+  devolviera una clase que **no** existe, el buscador se quedaría **sin color** y
+  ninguna otra prueba se enteraría: el unitario comprueba el **nombre** de la clase,
+  no que exista una regla CSS con ese nombre. `[D]`
+- **Contrato visual medido en los tres breakpoints, con spec temporal.** Campo de
+  **48 px** en móvil (**390×844**) y **56 px** en tablet (**768×1024**) y escritorio
+  (**1280×800**), conmutador con **dos colores computados distintos** al conmutar
+  (EN→ES computa `rgb(30, 64, 175)` en tema claro; el spec exigía que el segundo
+  **fuera distinto**, no un valor concreto) y **cero desbordamiento horizontal**
+  (`scrollWidth - innerWidth <= 0`). El spec **se borró** al cerrar la revisión.
+  `[D]`
+- Sin cambios: el `dist` **no se versiona** (hay que recompilar para ver la UI nueva),
+  el P0 de identidad sigue entero y los **7 gates** siguen en `pending`. `[D]`
+
+### Lo que queda abierto de esta pantalla (aparcado)
+
+- **No hay spec visual permanente del diccionario.** La medición se hizo con un spec
+  temporal que se borró al cerrar la revisión, así que una regresión de layout o de
+  color en `/diccionario` solo la volvería a ver una revisión manual. El contraste
+  **sí** está cubierto por guarda permanente (script), y la clase que se aplica por
+  unitario; lo que no está cubierto es **cómo se ve**. `[D]`
+- **El color no añade información, evita una confusión:** el sentido ya lo decía el
+  rótulo y el color solo lo adelanta. Quien no distinga azul de fucsia sigue teniendo
+  el rótulo; lo que no hay es una señal redundante **no cromática** más allá de él
+  (ni forma, ni icono distinto por sentido). `[UX]`
+- **Los ejemplos son fijos.** Cuatro palabras por sentido, escritas a mano. Generarlas
+  del léxico del alumno (o del banco) sería material para otra iteración. `[UX]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
