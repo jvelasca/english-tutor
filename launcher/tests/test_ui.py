@@ -27,6 +27,29 @@ def test_status_color_unknown_falls_back_to_neutral():
     assert ui.status_color("anything-else") == ui.COLORS["neutral"]
 
 
+def test_interface_state_servida():
+    assert ui.interface_state(served=True, dist_available=True) == "🟢 Servida"
+    # Aunque el artefacto falte, si responde se informa de lo observado.
+    assert ui.interface_state(served=True, dist_available=False) == "🟢 Servida"
+
+
+def test_interface_state_compilada_pero_sin_respuesta():
+    """V3.75.3: el caso que engañaba al usuario.
+
+    Con la UI compilada y el origen sin responder (puerto ocupado, o un servidor
+    HTTP donde se espera HTTPS) la GUI decía «🔴 No compilada» y mandaba a
+    compilar algo que ya estaba compilado.
+    """
+    estado = ui.interface_state(served=False, dist_available=True)
+
+    assert estado == "🔴 No responde"
+    assert "compilada" not in estado
+
+
+def test_interface_state_sin_artefacto():
+    assert ui.interface_state(served=False, dist_available=False) == "🔴 No compilada"
+
+
 def test_icons_have_expected_keys():
     assert ui.SERVICE_ICONS["Backend"] == "🖥️"
     assert ui.SERVICE_ICONS["Ollama"] == "🦙"

@@ -186,6 +186,31 @@ def frontend_dist_available() -> bool:
     return (FRONTEND_DIST / "index.html").is_file()
 
 
+def port_in_use(
+    host: str = "127.0.0.1",
+    port: int = BACKEND_PORT,
+    timeout: float = 0.5,
+) -> bool:
+    """True si algo acepta conexiones TCP en ``host:port``.
+
+    V3.75.3: distingue «no hay backend» de «el puerto está ocupado por otro
+    proceso». No es lo mismo y no se arreglan igual: si el puerto está tomado,
+    arrancar no sirve —uvicorn muere con ``WinError 10048`` y la GUI solo puede
+    decir «Detenido»— y lo que hay que hacer es liberar el puerto.
+
+    Se comprueba la **conexión TCP**, no el esquema: un backend HTTP en el mismo
+    puerto ocupa el socket igual, y las sondas del launcher son HTTPS
+    (`fetch_health`), así que serían ciegas a él. Cualquier fallo se lee como
+    «libre» para no bloquear un arranque legítimo.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            return sock.connect_ex((host, port)) == 0
+    except OSError:
+        return False
+
+
 def backend_url() -> str:
     return f"https://127.0.0.1:{BACKEND_PORT}"
 

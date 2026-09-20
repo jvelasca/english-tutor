@@ -37,6 +37,7 @@ from core import (
     app_summary,
     author_line,
     db_summary,
+    frontend_dist_available,
     frontend_url,
     health_status,
     icon_file,
@@ -44,6 +45,7 @@ from core import (
     lan_url,
     local_url,
     mdns_available,
+    port_in_use,
     set_lan_mode,
     user_overview,
 )
@@ -64,6 +66,7 @@ from ui import (
     COLORS,
     SECTION_ICONS,
     SERVICE_ICONS,
+    interface_state,
     read_log_tail,
     server_activity,
     status_color,
@@ -797,12 +800,20 @@ class LauncherApp:
         elif kind == "prepared":
             self._msg.set(str(item[1]))
         elif kind == "open_app":
-            if item[1]:
+            servida, dist_available = item[1]
+            if servida:
                 webbrowser.open(frontend_url())
                 self._msg.set("Abriendo app…")
+            elif dist_available:
+                # V3.75.3: compilada pero sin responder no es «sin compilar».
+                self._msg.set(
+                    "La interfaz está compilada pero no responde. Pulsa "
+                    "'Iniciar app' para arrancarla."
+                )
+                self.refresh()
             else:
                 self._msg.set(
-                    "La interfaz no está servida. Pulsa 'Iniciar app' para "
+                    "La interfaz no está compilada. Pulsa 'Iniciar app' para "
                     "compilarla y arrancarla."
                 )
                 self.refresh()
@@ -846,6 +857,10 @@ class LauncherApp:
                 frontend_up = fetch_frontend()
                 version = fetch_version()
                 server_status = fetch_server_status()
+                # V3.75.3: el estado de la interfaz se decide con DOS datos, no
+                # uno. «El artefacto no está compilado» y «el origen no responde»
+                # son problemas distintos y la GUI no puede confundirlos.
+                dist_available = frontend_dist_available()
                 counts = read_db_counts(str(DB_PATH))
                 details = read_db_details(str(DB_PATH))
                 db_info = read_db_info(str(DB_PATH))
@@ -862,6 +877,7 @@ class LauncherApp:
                     (
                         health,
                         frontend_up,
+                        dist_available,
                         version,
                         server_status,
                         counts,
@@ -882,6 +898,7 @@ class LauncherApp:
         self,
         health,
         frontend_up,
+        dist_available,
         version,
         server_status,
         counts,
@@ -900,8 +917,14 @@ class LauncherApp:
         self._svc_vars["Backend"].set(
             "🟢 Activo" if backend_up else "🔴 Detenido"
         )
+        # V3.75.3: la interfaz tiene TRES estados, no dos. `frontend_on` es el
+        # resultado de una sonda de red y su `False` significa «el origen no
+        # respondió», que puede ser un puerto ocupado, un servidor HTTP en vez de
+        # HTTPS o un arranque a medias. Llamarlo «No compilada» mandaba al usuario
+        # a compilar algo que ya estaba compilado: el artefacto se comprueba en
+        # disco, que es lo que sí sabe si falta.
         self._svc_vars["Interfaz"].set(
-            "🟢 Servida" if frontend_on else "🔴 No compilada"
+            interface_state(frontend_on, dist_available)
         )
         self._svc_vars["Ollama"].set(self._svc_text(svc["ollama"]))
         self._svc_vars["STT"].set(self._svc_text(svc["stt"]))
@@ -1124,6 +1147,11 @@ class LauncherApp:
                     # No duplicar un servicio ya activo (p. ej. lanzado con F5).
                     backend_up = fetch_health() is not None
                     if not self.pm.backend_running() and not backend_up:
+                        # V3.75.3: si el puerto responde pero la sonda HTTPS no,
+                        # lo que hay ahí es otro proceso. Se comprueba ANTES de
+                        # preparar nada: fallar rápido es mejor que compilar la UI
+                        # para morir contra el puerto ocupado.
+                        self.pm.ensure_port_free()
                         self.pm.prepare()
                         preparado = True
                         self.pm.start_backend()
@@ -1166,6 +1194,7 @@ class LauncherApp:
                     # Evita duplicar un servicio ya activo (p. ej. lanzado con F5).
                     backend_up = fetch_health() is not None
                     if not self.pm.backend_running() and not backend_up:
+                        self.pm.ensure_port_free()
                         self.pm.prepare()
                         self.pm.start_backend()
                 time.sleep(BROWSER_DELAY_S)
@@ -1177,16 +1206,24 @@ class LauncherApp:
 
     @staticmethod
     def _wait_ports_free(timeout: float = 15.0) -> None:
-        """Espera a que el proceso de producto libere su puerto tras parar."""
+        """Espera a que el proceso de producto libere su puerto tras parar.
+
+        V3.75.3: se espera al **socket**, no a las sondas HTTP. Las sondas
+        (`fetch_health`, `fetch_frontend`) son HTTPS y contra un servidor HTTP en
+        el mismo puerto devuelven «no hay nada», así que daban por libre un puerto
+        que seguía ocupado y el reinicio chocaba después.
+        """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if fetch_health() is None and not fetch_frontend():
+            if not port_in_use():
                 return
             time.sleep(0.3)
 
     def open_app(self) -> None:
         def work() -> None:
-            self._queue.put(("open_app", fetch_frontend()))
+            self._queue.put(
+                ("open_app", (fetch_frontend(), frontend_dist_available()))
+            )
 
         threading.Thread(target=work, daemon=True).start()
 

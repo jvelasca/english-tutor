@@ -118,6 +118,25 @@ def server_activity(status: dict | None) -> tuple[str, int]:
     return line, rejected
 
 
+def interface_state(served: bool, dist_available: bool) -> str:
+    """Etiqueta del servicio «Interfaz»: tres situaciones, no dos.
+
+    V3.75.3: «servida» lo decide una **sonda de red**, así que su ausencia no
+    significa «sin compilar». El artefacto se comprueba en **disco**
+    (`core.frontend_dist_available`), y confundir los dos casos manda al usuario a
+    arreglar lo que no está roto: un puerto ocupado, o un servidor HTTP donde se
+    espera HTTPS, se leían como «🔴 No compilada» con la UI perfectamente
+    compilada. Función pura para poder testearla sin abrir ventanas.
+
+    - `served` → la UI responde en el origen de producto.
+    - no servida, con artefacto → está compilada, pero el origen no responde.
+    - no servida, sin artefacto → falta de verdad: sí hay que compilar.
+    """
+    if served:
+        return "🟢 Servida"
+    return "🔴 No responde" if dist_available else "🔴 No compilada"
+
+
 
 def read_log_tail(name: str, max_lines: int = TAIL_LINES) -> str:
     """Últimas ``max_lines`` líneas de ``logs/<name>.log`` (``""`` si no existe)."""

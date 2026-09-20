@@ -28,6 +28,7 @@ from core import (
     lan_url,
     local_url,
     mdns_available,
+    port_in_use,
     user_overview,
 )
 
@@ -144,6 +145,44 @@ def test_urls():
     assert backend_url() == "https://127.0.0.1:8000"
     assert frontend_url() == f"https://localhost:{FRONTEND_PORT}"
     assert frontend_url() == "https://localhost:8000"
+
+
+def test_port_in_use_detecta_un_socket_escuchando():
+    """V3.75.3: el puerto ocupado se ve por TCP, no por HTTPS.
+
+    Es lo que distingue «no hay backend» de «hay otro proceso en el puerto»:
+    contra un servidor HTTP en el mismo puerto, las sondas HTTPS del launcher no
+    ven absolutamente nada, así que la ocupación tiene que mirarse en el socket.
+    """
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        ocupado = srv.getsockname()[1]
+        assert port_in_use(port=ocupado) is True
+
+
+def test_port_in_use_falso_si_nadie_escucha():
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonda:
+        sonda.bind(("127.0.0.1", 0))
+        libre = sonda.getsockname()[1]
+    # El socket se cerró al salir del `with`: el puerto está libre otra vez.
+    assert port_in_use(port=libre) is False
+
+
+def test_port_in_use_falso_si_la_comprobacion_falla(monkeypatch):
+    """Un fallo inesperado se lee como «libre» y no bloquea un arranque legítimo."""
+    import core
+
+    def _fail(*args, **kwargs):
+        raise OSError("sin pila de red")
+
+    monkeypatch.setattr(core.socket, "socket", _fail)
+
+    assert port_in_use() is False
 
 
 def test_lan_url(monkeypatch):

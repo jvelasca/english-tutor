@@ -137,6 +137,25 @@ def test_prepare_hace_certificado_y_dist_en_orden(monkeypatch):
     assert events == ["cert", "dist"]
 
 
+def test_ensure_port_free_falla_si_el_puerto_esta_ocupado(monkeypatch):
+    """V3.75.3: un puerto tomado se explica antes de arrancar, no después.
+
+    Antes, un `uvicorn --reload` de desarrollo olvidado en 8000 hacía que el
+    arranque *pareciera* correcto: el backend moría al enlazar (`WinError 10048`)
+    y la GUI solo decía «🔴 Detenido», sin motivo.
+    """
+    monkeypatch.setattr("process_manager.port_in_use", lambda **kwargs: True)
+
+    with pytest.raises(PreparationError, match="puerto 8000"):
+        ProcessManager().ensure_port_free()
+
+
+def test_ensure_port_free_pasa_si_el_puerto_esta_libre(monkeypatch):
+    monkeypatch.setattr("process_manager.port_in_use", lambda **kwargs: False)
+
+    assert ProcessManager().ensure_port_free() is None
+
+
 def test_start_backend_no_arranca_dos_veces(monkeypatch, tmp_path):
     monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
     # V3.73: arrancar el producto exige la UI compilada (fail-closed).

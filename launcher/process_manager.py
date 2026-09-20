@@ -19,12 +19,14 @@ from pathlib import Path
 
 from core import (
     BACKEND_DIR,
+    BACKEND_PORT,
     FRONTEND_DIR,
     backend_command,
     backend_env,
     ensure_cert_command,
     frontend_build_command,
     frontend_dist_available,
+    port_in_use,
 )
 
 _LOG_DIR = Path(__file__).resolve().parent / "logs"
@@ -130,6 +132,28 @@ class ProcessManager:
         """Deja el entorno listo para arrancar: certificado + UI compilada."""
         self.ensure_certificate()
         self.ensure_frontend_dist()
+
+    def ensure_port_free(self) -> None:
+        """Falla con un mensaje accionable si el puerto de producto está tomado.
+
+        V3.75.3: antes esto no se comprobaba. Si el puerto estaba ocupado —típico
+        con un `uvicorn ... --reload` de desarrollo olvidado— el arranque
+        *parecía* correcto y el backend moría al enlazar, dejando en la GUI un
+        «🔴 Detenido» sin motivo y en `logs/backend.log` un `WinError 10048`.
+
+        El launcher solo llama aquí cuando ya sabe que el backend **no** es suyo
+        (`fetch_health()` es `None`): si el puerto responde y la sonda HTTPS no,
+        lo que hay al otro lado es otro proceso, no el producto.
+        """
+        if port_in_use(port=BACKEND_PORT):
+            raise PreparationError(
+                f"El puerto {BACKEND_PORT} ya está en uso por otro proceso. "
+                "Suele ser un servidor de desarrollo que quedó abierto "
+                "(p. ej. `uvicorn main:app --port "
+                f"{BACKEND_PORT} --reload`). Ciérralo y vuelve a pulsar "
+                "«Iniciar app»: el producto necesita ese puerto libre para "
+                "servir la app por HTTPS."
+            )
 
     def start_backend(self) -> None:
         if self.backend_running():
