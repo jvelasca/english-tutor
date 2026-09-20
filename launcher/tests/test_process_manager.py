@@ -156,6 +156,86 @@ def test_ensure_port_free_pasa_si_el_puerto_esta_libre(monkeypatch):
     assert ProcessManager().ensure_port_free() is None
 
 
+def test_rotate_log_if_large_rota_una_generacion(tmp_path):
+    """V3.75.3: el log no puede crecer sin límite.
+
+    `backend.log` llegó a 87 MB (1,3 M de líneas) en el equipo del autor: nada lo
+    acotaba y cada refresco de la GUI lo leía entero.
+    """
+    from process_manager import rotate_log_if_large
+
+    log = tmp_path / "backend.log"
+    log.write_text("x" * 500, encoding="utf-8")
+
+    assert rotate_log_if_large(log, max_bytes=100) is True
+    assert not log.exists()
+    assert (tmp_path / "backend.log.1").read_text(encoding="utf-8") == "x" * 500
+
+
+def test_rotate_log_if_large_no_toca_un_log_pequeno(tmp_path):
+    from process_manager import rotate_log_if_large
+
+    log = tmp_path / "backend.log"
+    log.write_text("corto", encoding="utf-8")
+
+    assert rotate_log_if_large(log, max_bytes=10_000) is False
+    assert log.read_text(encoding="utf-8") == "corto"
+
+
+def test_rotate_log_if_large_sobrescribe_la_generacion_anterior(tmp_path):
+    from process_manager import rotate_log_if_large
+
+    (tmp_path / "backend.log.1").write_text("vieja", encoding="utf-8")
+    log = tmp_path / "backend.log"
+    log.write_text("nueva" * 100, encoding="utf-8")
+
+    assert rotate_log_if_large(log, max_bytes=10) is True
+    assert (tmp_path / "backend.log.1").read_text(encoding="utf-8") == "nueva" * 100
+
+
+def test_open_log_rota_al_abrir(monkeypatch, tmp_path):
+    """La rotación vive en el único punto de escritura, no en cada llamada."""
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path)
+    monkeypatch.setattr("process_manager._MAX_LOG_BYTES", 10)
+
+    (tmp_path / "backend.log").write_text("x" * 100, encoding="utf-8")
+
+    pm = ProcessManager()
+    with pm._open_log("backend") as handle:
+        handle.write(b"nuevo\n")
+
+    assert (tmp_path / "backend.log.1").read_text(encoding="utf-8") == "x" * 100
+    assert (tmp_path / "backend.log").read_bytes() == b"nuevo\n"
+
+
+def test_backend_log_since_lee_solo_el_tramo_nuevo(monkeypatch, tmp_path):
+    """No se atribuye a este arranque un fallo de un arranque anterior."""
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path)
+
+    pm = ProcessManager()
+    (tmp_path / "backend.log").write_text("FALLO-ANTIGUO\n", encoding="utf-8")
+    offset = pm.backend_log_size()
+    with open(tmp_path / "backend.log", "ab") as handle:
+        handle.write(b"arranque-de-ahora\n")
+
+    tramo = pm.backend_log_since(offset)
+
+    assert "arranque-de-ahora" in tramo
+    assert "FALLO-ANTIGUO" not in tramo
+
+
+def test_backend_log_since_resiste_una_rotacion(monkeypatch, tmp_path):
+    """Si el log rotó, el fichero es más pequeño que el offset: se lee su cola."""
+    monkeypatch.setattr("process_manager._LOG_DIR", tmp_path)
+
+    pm = ProcessManager()
+    (tmp_path / "backend.log").write_text("log-que-roto\n", encoding="utf-8")
+
+    tramo = pm.backend_log_since(offset=10_000)
+
+    assert "log-que-roto" in tramo
+
+
 def test_start_backend_no_arranca_dos_veces(monkeypatch, tmp_path):
     monkeypatch.setattr("process_manager._LOG_DIR", tmp_path / "logs")
     # V3.73: arrancar el producto exige la UI compilada (fail-closed).

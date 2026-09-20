@@ -66,6 +66,7 @@ from ui import (
     COLORS,
     SECTION_ICONS,
     SERVICE_ICONS,
+    backend_failure_hint,
     interface_state,
     read_log_tail,
     server_activity,
@@ -1143,6 +1144,7 @@ class LauncherApp:
         def work() -> None:
             try:
                 preparado = False
+                log_offset = 0
                 with self._lock:
                     # No duplicar un servicio ya activo (p. ej. lanzado con F5).
                     backend_up = fetch_health() is not None
@@ -1154,11 +1156,18 @@ class LauncherApp:
                         self.pm.ensure_port_free()
                         self.pm.prepare()
                         preparado = True
+                        log_offset = self.pm.backend_log_size()
                         self.pm.start_backend()
                 if preparado:
                     self._queue.put(
                         ("prepared", "Certificado y UI listos; arrancando…")
                     )
+                    # V3.75.3: se comprueba que el producto LLEGA a servir, en vez
+                    # de dar por bueno el arranque por haber lanzado el proceso.
+                    motivo = self._wait_product(log_offset)
+                    if motivo:
+                        self._queue.put(("error", motivo))
+                        return
                 time.sleep(BROWSER_DELAY_S)
                 self._queue.put(("started", fetch_frontend()))
             except Exception as exc:  # noqa: BLE001
@@ -1188,6 +1197,7 @@ class LauncherApp:
 
         def work() -> None:
             try:
+                log_offset = 0
                 with self._lock:
                     self.pm.stop_all()
                     self._wait_ports_free()
@@ -1196,13 +1206,47 @@ class LauncherApp:
                     if not self.pm.backend_running() and not backend_up:
                         self.pm.ensure_port_free()
                         self.pm.prepare()
+                        log_offset = self.pm.backend_log_size()
                         self.pm.start_backend()
+                motivo = self._wait_product(log_offset)
+                if motivo:
+                    self._queue.put(("error", motivo))
+                    return
                 time.sleep(BROWSER_DELAY_S)
                 self._queue.put(("started", fetch_frontend()))
             except Exception as exc:  # noqa: BLE001
                 self._queue.put(("error", str(exc)))
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _wait_product(self, offset: int, timeout: float = 20.0) -> str | None:
+        """Espera a que el producto sirva la UI. Devuelve el motivo si no lo hace.
+
+        V3.75.3: antes se dormían 2 s fijos y se daba el arranque por hecho, así
+        que un backend que moría (certificado ilegible, dependencia que falta,
+        puerto que se ocupó entre la comprobación y el *bind*) dejaba la GUI en
+        «🔴 Detenido» sin explicación. El motivo ya estaba en `logs/backend.log`;
+        ahora se lee y se muestra.
+
+        Si el proceso muere se sale enseguida (no tiene sentido esperar); si sigue
+        vivo pero no sirve, se agota el plazo. ``offset`` es el tamaño del log
+        antes de arrancar, para no atribuir a este arranque un fallo anterior.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if fetch_frontend():
+                return None
+            if self.pm.backend is not None and not self.pm.backend_running():
+                break
+            time.sleep(0.3)
+        if self.pm.backend is None or not self.pm.backend_running():
+            base = "El backend se cerró al arrancar."
+        else:
+            base = "El backend arrancó pero no llegó a servir la interfaz."
+        motivo = backend_failure_hint(self.pm.backend_log_since(offset))
+        if motivo:
+            return f"{base} {motivo}"
+        return f"{base} Revisa el registro del backend en el launcher."
 
     @staticmethod
     def _wait_ports_free(timeout: float = 15.0) -> None:

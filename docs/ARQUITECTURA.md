@@ -304,8 +304,8 @@ launcher/
 ├── state.json           # estado de la UI persistido (gitignored)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
                          #         test_ui/test_state_store/test_process_manager/
-                         #         test_preflight_v373/test_lan_ip_v373/test_lan_mode) — 125
-                         #         funciones de test (142 casos con parametrización), en CI
+                         #         test_preflight_v373/test_lan_ip_v373/test_lan_mode) — 145
+                         #         funciones de test (162 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 

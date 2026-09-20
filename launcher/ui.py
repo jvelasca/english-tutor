@@ -65,6 +65,10 @@ STATUS_DOT = {
 }
 
 TAIL_LINES = 250
+# V3.75.3: bytes como mucho que se leen del final del log por refresco. Es el
+# techo que hace que el coste de `read_log_tail` no dependa del tamaño del
+# fichero; con 250 líneas de uvicorn por delante, sobra de largo.
+TAIL_BYTES = 64 * 1024
 
 
 def status_dot(value: str) -> str:
@@ -137,13 +141,73 @@ def interface_state(served: bool, dist_available: bool) -> str:
     return "🔴 No responde" if dist_available else "🔴 No compilada"
 
 
+# V3.75.3: firmas conocidas de un fallo de arranque del backend. Se traducen a una
+# frase accionable. Gana la primera que casa, así que el orden importa. Las agujas
+# son deliberadamente específicas: una palabra genérica como «error» casaría con
+# cualquier log.
+_FAILURE_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (
+        ("10048", "address already in use", "only one usage of each socket"),
+        "El puerto ya estaba ocupado por otro proceso justo al arrancar.",
+    ),
+    (
+        ("load_cert_chain", "sslerror", "[ssl:"),
+        "El certificado TLS local no se pudo cargar. Bórralo en "
+        "`backend/data/certs/` y vuelve a pulsar «Iniciar app» para regenerarlo.",
+    ),
+    (
+        ("modulenotfounderror", "no module named", "importerror"),
+        "Falta una dependencia en el entorno del backend (`backend/.venv`). "
+        "Reinstala los requisitos para arreglarlo.",
+    ),
+    (
+        ("the system cannot find the file", "no such file or directory"),
+        "El backend no encontró un fichero necesario (o el Python de "
+        "`backend/.venv` no existe).",
+    ),
+)
+
+
+def backend_failure_hint(log_text: str) -> str | None:
+    """Traduce un fallo de arranque del backend a una frase accionable.
+
+    V3.75.3: cuando el backend moría al arrancar, la GUI solo mostraba «🔴
+    Detenido» y el motivo —que ya estaba en `logs/backend.log`— no llegaba nunca
+    al usuario. Devuelve ``None`` si el log no contiene ninguna firma conocida.
+    Función pura para poder testearla sin abrir ventanas.
+    """
+    lowered = log_text.lower()
+    for needles, message in _FAILURE_HINTS:
+        if any(needle in lowered for needle in needles):
+            return message
+    return None
+
+
 
 def read_log_tail(name: str, max_lines: int = TAIL_LINES) -> str:
-    """Últimas ``max_lines`` líneas de ``logs/<name>.log`` (``""`` si no existe)."""
+    """Últimas ``max_lines`` líneas de ``logs/<name>.log`` (``""`` si no existe).
+
+    V3.75.3: se lee **solo la cola** del fichero (``TAIL_BYTES``), no el fichero
+    entero. Antes se hacía ``read_text()`` completo y se descartaba todo menos
+    ``max_lines``: con `backend.log` en 87 MB y un refresco cada 2 s, eso era leer
+    87 MB de disco, decodificarlos y trocearlos en 1,3 M de líneas cada dos
+    segundos (586 ms medidos por lectura) para quedarse con 250 líneas. Con la
+    lectura por cola el coste **no depende del tamaño histórico** del log.
+
+    La primera línea del bloque leído puede estar cortada a media palabra: se
+    descarta cuando se ha hecho *seek*, para no mostrar una línea falsa.
+    """
     path = LOG_DIR / f"{name}.log"
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        size = path.stat().st_size
+        with open(path, "rb") as handle:
+            truncated = size > TAIL_BYTES
+            if truncated:
+                handle.seek(size - TAIL_BYTES)
+            data = handle.read()
     except OSError:
         return ""
-    lines = text.splitlines()
+    lines = data.decode("utf-8", errors="replace").splitlines()
+    if truncated and lines:
+        lines = lines[1:]
     return "\n".join(lines[-max_lines:])
