@@ -53,30 +53,28 @@ cd ..
 **Anotar aquí** (rellenado en el pre-vuelo de la campaña de certificación V4.0; es
 la identidad que debe quedar sellada en los **7** `record`):
 
-**Campaña de certificación V4.0 · pre-vuelo del 2026-09-20 (identidad vigente, la
-que se sella en los 7 `record`):**
+**Campaña de certificación V4.0 · pre-vuelo del 2026-09-20:**
+
+El árbol congelado es el que declara **`VERSION` `3.75.8`**. Sus tres commits y sus
+runs de CI (los tres `success`, **12/12** jobs) son:
 
 | Dato | Valor |
 |---|---|
-| `VERSION` | `3.75.8` |
-| `HEAD` (SHA) | `f9567e6394fa2abed67d551553a3e18166f81cd8` |
-| Run de CI que publicó ese commit (id numérico) | `35536208082` (`success`, **12/12** jobs) |
+| Commit base (tag `v3.75.8`) | `c858e88ae8d66a0fdc93263c490eecd0651570f8` · run `35535445951` |
+| Commit de congelación (test de la `X` + su declaración) | `f9567e6394fa2abed67d551553a3e18166f81cd8` · run `35536208082` |
+| Árbol congelado con el pre-vuelo sellado (**el que se certifica**) | `6e4888f4ed45404f5c3054b8fa9da0fe9b98f937` · run `35540647216` |
 | Fecha de la sesión | 2026-09-20 |
 | Equipo / SO | PC del autor · Windows `10.0.26200` |
 | Modelo de Ollama instalado (`ollama list`) | `llama3.1:8b` (`46e0c10c039e`) |
 
-> Este `HEAD` es el **commit de congelación** (`test(v3.75.8): la semantica de la
-> X…`): parte de `c858e88` (tag `v3.75.8`) y solo añade el caso de test de la `X` y
-> su declaración en `docs/UI_V3.1.md` y `docs/audit/PARKED.md`. No cambia producto,
-> así que la identidad de versión sigue siendo `3.75.8`.
->
-> **Cómo se sella.** El instrumento exige que los 7 `record` compartan `head_sha`
-> con el árbol que se valida (`status --strict --same-tree`). Si al grabar los gates
-> el `HEAD` ya incluye esta anotación (un descendiente **documental** del commit de
-> arriba, sin cambio de producto ni de artefacto), se sella el `head_sha` y el
-> `--ci-run` de **ese** `HEAD`, no los de esta fila: la fila documenta el commit
-> congelado y su run verde (`35536208082`, **12/12**), que es la evidencia de que el
-> árbol que se certifica pasó el CI completo.
+> **Qué se sella en los 7 `record`.** El `head_sha` **y** el `--ci-run` del `HEAD`
+> real en el momento de grabar (`git rev-parse HEAD`), **no** una fila fija de esta
+> tabla: el instrumento exige que los 7 `head_sha` sean el árbol validado
+> (`status --strict --same-tree`), y cualquier commit posterior que solo toque
+> documentación mueve el `HEAD` **sin** mover el artefacto. Estos tres commits
+> **no** cambian producto entre sí: el diff de los dos últimos es **solo** el caso
+> de test de la `X`, su declaración en `docs/UI_V3.1.md` y `docs/audit/PARKED.md`, y
+> esta misma anotación del pre-vuelo.
 
 **Pre-vuelo histórico (`v3.73.2`, 2026-09-17) — es historia y no se reescribe:**
 
