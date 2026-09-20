@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import re
 import subprocess
 import sys
@@ -195,6 +196,8 @@ def git_head() -> str | None:
         cwd=str(ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if result.returncode != 0:
@@ -232,11 +235,24 @@ def _run_script(check_id: str, title: str, relative: str, *args: str) -> Check:
     script = ROOT / relative
     if not script.is_file():
         return Check(check_id, title, False, f"{relative} no encontrado")
+    # V3.75.3: la codificación se fija en los DOS lados, no se hereda del entorno.
+    # Con `text=True` a secas, el padre decodificaba con el locale del equipo: la
+    # MISMA comprobación producía `orígenes` en un equipo y `orÃ­genes` en otro.
+    # Y fijar solo el padre tampoco vale —si el hijo emite cp1252, sus bytes de
+    # `í` no son UTF-8 válido y salen como U+FFFD, que ni siquiera se puede
+    # imprimir en una consola cp1252 (el gate moría en el `print`, no en la
+    # comprobación)—. Declarando UTF-8 al hijo, ambos hablan lo mismo en
+    # cualquier equipo, que es lo que exige un artefacto que se commitea.
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
     result = subprocess.run(
         [sys.executable, str(script), *args],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
         check=False,
     )
     detail = (result.stdout or result.stderr or "").strip().splitlines()
@@ -720,6 +736,22 @@ def status_report(strict: bool, same_tree: bool = False) -> int:
 # --- CLI --------------------------------------------------------------------
 
 
+def _configure_console() -> None:
+    """Hace que la salida del gate no dependa de la consola del equipo.
+
+    V3.75.3: los `print` finales escriben un detalle de comprobación que puede
+    contener caracteres que la consola de Windows (cp850/cp1252) no sabe pintar.
+    Sin esto, el gate **moría al imprimir** y devolvía un fallo que no existía: el
+    error estaba en el informe, no en el repositorio. Se degrada a U+FFFD en vez
+    de caerse. Si la salida no es un flujo reconfigurable, se sigue como estaba.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -754,6 +786,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+
+    _configure_console()
 
     if args.command == "auto":
         checks = run_checks(args.require_dist)
