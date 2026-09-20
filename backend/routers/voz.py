@@ -10,7 +10,12 @@ from dependencies import current_user_optional, read_audio_limited
 from domain import settings as settings_service
 from schemas.voz import TranscribeResponse, TTSRequest
 from services.stt import transcribe as transcribe_audio
-from services.tts import ensure_voice_for_language, resolve_voice, voice_language
+from services.tts import (
+    ensure_voice_for_language,
+    pick_requested_voice,
+    resolve_voice,
+    voice_language,
+)
 from services.tts import synthesize as synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -54,15 +59,21 @@ async def tts(
     idioma pedido, `resolve_voice` cae al fallback global (leer español con voz
     inglesa); ahora eso se registra en el log y se declara al cliente en las
     cabeceras `X-TTS-Voice` (voz realmente usada) y `X-TTS-Degraded` (0/1).
+
+    V3.75.5 (dos acentos): `req.voice` permite pedir una voz concreta para el
+    mismo texto. Solo se acepta instalada y del idioma pedido; si no, se ignora y
+    manda la preferencia del perfil (misma degradación honesta: las cabeceras
+    declaran lo que de verdad sonó).
     """
     language = (req.language or "en").strip().lower()[:2] or "en"
     await run_in_threadpool(ensure_voice_for_language, language)
-    voice: str | None = None
-    if user is not None:
-        prefs = await settings_service.get_settings(user["id"])
-        voice = resolve_voice(prefs, language)
-    else:
-        voice = resolve_voice(None, language)
+    voice: str | None = pick_requested_voice(req.voice, language)
+    if voice is None:
+        if user is not None:
+            prefs = await settings_service.get_settings(user["id"])
+            voice = resolve_voice(prefs, language)
+        else:
+            voice = resolve_voice(None, language)
     try:
         wav = await run_in_threadpool(synthesize_speech, req.text, 1.0, voice)
     except Exception:  # noqa: BLE001

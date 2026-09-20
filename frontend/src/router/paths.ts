@@ -34,6 +34,15 @@ export const DICTIONARY_PATH: Path = "/diccionario";
 export const TRANSLATOR_PATH: Path = "/traductor";
 
 /**
+ * Ruta raíz del destino AUXILIAR Análisis: "/analisis" (V3.75.3). Consolida la
+ * evolución del alumno (posición, actividad, destrezas, escalera CEFR y calidad
+ * del tutor) y se abre desde la cabecera, junto al usuario. Sustituye al panel
+ * flotante «Analysis» de la práctica, que en V3.1 se había quedado sin analítica
+ * propia (solo calidad del tutor y un enlace a MI PROGRESO).
+ */
+export const ANALYSIS_PATH: Path = "/analisis";
+
+/**
  * Ruta canónica de un nivel dentro de Formación para deep links, por ejemplo
  * formationLevelPath("b1") -> "/formacion/b1". El `levelId` se percent-codifica.
  */

@@ -1,11 +1,11 @@
 {
- "version": "3.75.2",
+ "version": "3.75.7",
  "checks": [
   {
    "id": "release-consistency",
    "title": "La versión es consistente en todos los orígenes",
    "status": "pass",
-   "detail": "OK: Release consistency (3.75.2) en todos los orígenes"
+   "detail": "OK: Release consistency (3.75.7) en todos los orígenes"
   },
   {
    "id": "i18n-strict",

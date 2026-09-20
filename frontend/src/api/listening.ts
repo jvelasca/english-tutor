@@ -172,17 +172,24 @@ export function getListeningDiagnostic(
   );
 }
 
+/**
+ * URL del audio cacheado del ítem. `variant` selecciona la variante de velocidad
+ * (la `normal` preserva la URL histórica) y `voice` (V3.75.5) pide una voz
+ * concreta —la B del comparador de acentos— sin cambiar la preferencia del
+ * perfil. Sin `voice` la URL es idéntica a la de antes, así que la caché del
+ * navegador y el controlador de audio no se invalidan por abrir el código nuevo.
+ */
 export function getListeningAudioUrl(
   questionId: string,
   _userId: string,
   variant = "normal",
+  voice?: string | null,
 ): string {
-  // Retrocompatible: sin `variant` (o con "normal") la URL es la misma de antes.
-  if (variant === "normal") {
-    return `/api/listening/audio/${questionId}`;
-  }
-  const params = new URLSearchParams({ variant });
-  return `/api/listening/audio/${questionId}?${params.toString()}`;
+  const params = new URLSearchParams();
+  if (variant && variant !== "normal") params.set("variant", variant);
+  if (voice) params.set("voice", voice);
+  const query = params.toString();
+  return `/api/listening/audio/${questionId}${query ? `?${query}` : ""}`;
 }
 
 // --- Práctica extra generada (V3.6) ------------------------------------------

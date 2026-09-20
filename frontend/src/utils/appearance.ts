@@ -13,11 +13,20 @@ export type FontScale = "small" | "medium" | "large";
 
 export type Density = "compact" | "comfortable";
 
+/**
+ * Esquema de color de la **rampa de niveles** (Pre-A1 → C2). Es una preferencia
+ * de apariencia más, así que viaja por el mismo camino que el tema o el acento:
+ * `data-levels` en `<html>`, localStorage por si el backend no responde, y la
+ * clave `level_scheme` en `PUT /api/settings` para que siga al perfil.
+ */
+export type LevelScheme = "traffic" | "spectrum" | "mono";
+
 export interface AppearanceSettings {
   theme: Theme;
   accent: AccentId;
   fontScale: FontScale;
   density: Density;
+  levelScheme: LevelScheme;
 }
 
 export interface AccentOption {
@@ -53,6 +62,38 @@ export const DENSITIES: ChoiceOption<Density>[] = [
   { id: "comfortable", label: "Cómodo" },
 ];
 
+export interface LevelSchemeOption extends ChoiceOption<LevelScheme> {
+  /**
+   * Vista previa del esquema: el orden es el de dificultad y las muestras se
+   * pintan leyendo `var(--level-<clave>-fg)`, así que la previa de Ajustes no
+   * puede mentir respecto a lo que se ve luego en la app.
+   */
+  preview: readonly LevelPreviewStep[];
+}
+
+export interface LevelPreviewStep {
+  /** Clave de paso (`pre-a1`…) para componer el token del color. */
+  key: string;
+  /** Etiqueta corta que se enseña en la muestra. */
+  label: string;
+}
+
+const LEVEL_PREVIEW: readonly LevelPreviewStep[] = [
+  { key: "pre-a1", label: "Pre" },
+  { key: "a1", label: "A1" },
+  { key: "a2", label: "A2" },
+  { key: "b1", label: "B1" },
+  { key: "b2", label: "B2" },
+  { key: "c1", label: "C1" },
+  { key: "c2", label: "C2" },
+];
+
+export const LEVEL_SCHEMES: LevelSchemeOption[] = [
+  { id: "traffic", label: "Semáforo", preview: LEVEL_PREVIEW },
+  { id: "spectrum", label: "Espectro", preview: LEVEL_PREVIEW },
+  { id: "mono", label: "Monocromo", preview: LEVEL_PREVIEW },
+];
+
 export const APPEARANCE_STORAGE_KEY = "english-tutor.appearance";
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -60,11 +101,13 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   accent: "indigo",
   fontScale: "medium",
   density: "comfortable",
+  levelScheme: "traffic",
 };
 
 const ACCENT_IDS: readonly string[] = ACCENTS.map((a) => a.id);
 const FONT_SCALE_IDS: readonly string[] = FONT_SCALES.map((f) => f.id);
 const DENSITY_IDS: readonly string[] = DENSITIES.map((d) => d.id);
+const LEVEL_SCHEME_IDS: readonly string[] = LEVEL_SCHEMES.map((l) => l.id);
 
 function isAccent(value: unknown): value is AccentId {
   return typeof value === "string" && ACCENT_IDS.includes(value);
@@ -76,6 +119,10 @@ function isFontScale(value: unknown): value is FontScale {
 
 function isDensity(value: unknown): value is Density {
   return typeof value === "string" && DENSITY_IDS.includes(value);
+}
+
+function isLevelScheme(value: unknown): value is LevelScheme {
+  return typeof value === "string" && LEVEL_SCHEME_IDS.includes(value);
 }
 
 function isTheme(value: unknown): value is Theme {
@@ -108,6 +155,7 @@ export function resolveAppearance(
     accent: stored.accent,
     fontScale: stored.fontScale,
     density: stored.density,
+    levelScheme: stored.levelScheme,
   };
 }
 
@@ -125,6 +173,9 @@ export function parseAppearance(raw: string | null | undefined): AppearanceSetti
       density: isDensity(parsed.density)
         ? parsed.density
         : DEFAULT_APPEARANCE.density,
+      levelScheme: isLevelScheme(parsed.levelScheme)
+        ? parsed.levelScheme
+        : DEFAULT_APPEARANCE.levelScheme,
     };
   } catch {
     return { ...DEFAULT_APPEARANCE };
@@ -144,6 +195,7 @@ export function appearanceToSettings(
     accent: appearance.accent,
     font_scale: appearance.fontScale,
     density: appearance.density,
+    level_scheme: appearance.levelScheme,
   };
 }
 
@@ -159,5 +211,8 @@ export function appearanceFromSettings(
   if (isAccent(settings.accent)) result.accent = settings.accent;
   if (isFontScale(settings.font_scale)) result.fontScale = settings.font_scale;
   if (isDensity(settings.density)) result.density = settings.density;
+  if (isLevelScheme(settings.level_scheme)) {
+    result.levelScheme = settings.level_scheme;
+  }
   return result;
 }

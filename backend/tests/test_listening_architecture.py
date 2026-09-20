@@ -37,9 +37,27 @@ def test_bank_vector_mean_matches_difficulty():
         assert difficulty_from_vector(q["difficulty_vector"]) in range(1, 7), q["id"]
 
 
-def test_bank_covers_every_subskill():
+def test_bank_covers_every_receptive_subskill():
+    """V3.75.7: el banco cubre todas las sub-destrezas **salvo las de producción**.
+
+    `dictation` y `shadowing` siguen siendo sub-destrezas servibles, pero **no**
+    pueden tener ítems en el banco: el esquema de `ListeningAsset` exige `question`,
+    `options` y `answer_index` en todos sus ítems, de modo que un ítem etiquetado de
+    dictado sería una pregunta de opción múltiple cuyo enunciado el flujo de
+    producción tira (es el defecto que impide
+    `test_production_items_do_not_carry_multiple_choice_options`). Esas dos se sirven
+    por el flujo de producción y por el catálogo derivado (`d-`).
+
+    La ausencia se exige **exacta**: ni una sub-destreza receptiva de menos, ni una
+    de producción de más. Así el test sigue mordiendo si una reautoría deja de
+    cubrir un skill receptivo o vuelve a colar una pregunta con opciones como
+    producción.
+    """
+    from services.listening_flow import PRODUCTION_SKILLS
+
+    production = set(PRODUCTION_SKILLS) & set(LISTENING_SUBSKILLS)
     skills = {q["skill"] for q in QUESTION_BANK}
-    assert skills == set(LISTENING_SUBSKILLS)
+    assert skills == set(LISTENING_SUBSKILLS) - production
 
 
 def test_bank_declares_valid_topic_on_every_item():

@@ -127,6 +127,20 @@ export function GearIcon(props: IconProps) {
   );
 }
 
+/**
+ * V3.75.3: icono del análisis de evolución (destino auxiliar `/analisis`). Es una
+ * línea que sube, no un gráfico de barras: lo que se pinta es la **tendencia**
+ * del alumno, y así no se confunde con `BarChart3` de la pestaña Habilidades.
+ */
+export function TrendIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <polyline points="3 17 9 11 13 15 21 7" />
+      <polyline points="15 7 21 7 21 13" />
+    </Svg>
+  );
+}
+
 export function MicIcon(props: IconProps) {
   return (
     <Svg {...props}>
@@ -142,16 +156,6 @@ export function BrainIcon(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M9.5 2a2.5 2.5 0 0 0-2.5 2.5v.55A2.5 2.5 0 0 0 4.5 7.5v.55A2.5 2.5 0 0 0 2 10.5v1a2.5 2.5 0 0 0 2.5 2.5v.55a2.5 2.5 0 0 0 2.5 2.45v.55a2.5 2.5 0 0 0 5 0V16.5h.5a2.5 2.5 0 0 0 2.5-2.5v-1A2.5 2.5 0 0 0 17.5 10.5v-.55A2.5 2.5 0 0 0 20 7.5v-.55A2.5 2.5 0 0 0 17.5 4.5v-.55a2.5 2.5 0 0 0-2.5-2.5z" />
-    </Svg>
-  );
-}
-
-export function PanelIcon(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-      <line x1="15" y1="3" x2="15" y2="21" />
     </Svg>
   );
 }

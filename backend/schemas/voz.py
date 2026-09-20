@@ -21,3 +21,14 @@ class TTSRequest(BaseModel):
             "permite que el Traductor lea la salida en el idioma destino."
         ),
     )
+    voice: str | None = Field(
+        default=None,
+        max_length=80,
+        description=(
+            "V3.75.5 (dos acentos): id de la voz Piper con la que sintetizar. Es "
+            "OPCIONAL y solo se acepta si está instalada Y es del idioma pedido "
+            "(`services.tts.pick_requested_voice`); si no, se ignora y manda la "
+            "voz del perfil. Permite oír el mismo texto con dos acentos sin "
+            "cambiar la preferencia guardada."
+        ),
+    )

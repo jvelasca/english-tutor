@@ -162,9 +162,11 @@ def test_answer_endpoint_persists_layer_and_support(monkeypatch, tmp_path):
     assert row["segments_replayed"] == 1
 
 
-def test_dictation_endpoint_persists_stage_and_transcript(monkeypatch, tmp_path):
+def test_dictation_endpoint_persists_stage_and_transcript(
+    monkeypatch, tmp_path, production_items
+):
     uid = _setup(monkeypatch, tmp_path)
-    q = _production_question("dictation")
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/dictation",

@@ -8,7 +8,7 @@ import type {
   PronunciationRouteState,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import {
   PhraseTranslateButton,
   usePhraseTranslation,
@@ -242,7 +242,11 @@ export function PronunciationLevelPanel({
                   </li>
                 ) : (
                   group.items.map((item) => (
-                    <PronunciationItemRow key={item.phrase_id} item={item} />
+                    <PronunciationItemRow
+                      key={item.phrase_id}
+                      item={item}
+                      userId={userId}
+                    />
                   ))
                 )}
               </ul>
@@ -326,7 +330,13 @@ export function PronunciationLevelPanel({
   );
 }
 
-function PronunciationItemRow({ item }: { item: PronunciationItem }) {
+function PronunciationItemRow({
+  item,
+  userId,
+}: {
+  item: PronunciationItem;
+  userId: string | null;
+}) {
   const { t } = useI18n();
   const phrase = usePhraseTranslation(item.script);
   return (
@@ -354,7 +364,8 @@ function PronunciationItemRow({ item }: { item: PronunciationItem }) {
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <PhraseTranslateButton state={phrase} />
-        <ListenButton text={item.script} label={t("speak.phrase")} />
+        {/* V3.75.5: altavoz consciente de la voz (A/B). */}
+        <ItemReplayButton prompt={item.script} userId={userId} />
       </div>
     </li>
   );

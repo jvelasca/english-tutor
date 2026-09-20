@@ -46,7 +46,6 @@ import {
 import { audioTypeKey, retentionBucketKey } from "../../utils/listeningLabels";
 import { ListeningLevelPanel } from "./ListeningLevelPanel";
 import { transcribe } from "../../api/voz";
-import { getVoices } from "../../api/voices";
 import {
   getMicrophoneStream,
   MicUnavailableError,
@@ -65,7 +64,12 @@ import type {
 } from "../../types/api";
 import type { Section } from "../../utils/sections";
 import { ActivityResult } from "../../components/ActivityResult";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
+import { VoicePicker } from "../../components/VoicePicker";
+import {
+  useVoiceChoice,
+  type VoiceAccent,
+} from "../../hooks/useVoiceChoice";
 import { speakWithVoice } from "../../hooks/useVoiceDownload";
 import { InfoDisclosure } from "../../components/InfoDisclosure";
 import {
@@ -75,6 +79,10 @@ import {
 import { NextStep } from "../../components/NextStep";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { ProgressRing } from "../../components/ProgressRing";
+// Insignia de nivel con la rampa (V3.75.4): el color del nivel lo pone
+// `levelClass` sobre los tokens de `styles/legacy.css`.
+import { LevelBadge } from "../../components/LevelBadge";
+import { levelClass } from "../../utils/cefr";
 // Playback de la grabación del alumno en el shadowing de listening (V3.28,
 // Bloque E): reutiliza el componente de Pronunciation/Speaking.
 import { RecordingPlayButton } from "../../components/RecordingPlayButton";
@@ -185,11 +193,14 @@ const WAVE_BARS = [0.45, 0.8, 0.55, 1, 0.65, 0.9, 0.5, 0.75, 0.4, 0.85, 0.6, 1, 
 
 function Waveform() {
   return (
-    <div className="flex h-10 items-center justify-center gap-1" aria-hidden="true">
+    <div
+      className="flex h-6 items-center justify-center gap-1 sm:h-10"
+      aria-hidden="true"
+    >
       {WAVE_BARS.map((h, i) => (
         <motion.span
           key={i}
-          className="w-1.5 origin-center rounded-full bg-primary"
+          className="w-1 origin-center rounded-full bg-primary sm:w-1.5"
           style={{ height: `${h * 100}%` }}
           animate={{ scaleY: [1, 0.45, 1.25, 1] }}
           transition={{
@@ -281,11 +292,16 @@ export function ListeningPractice({
   // backend: rutas adaptativa, por nivel (`level`) y drill (`failed`). Solo el
   // repaso `mastered` sigue en modo compacto (sin flow, decisión V3.28).
   const [flowState, setFlowState] = useState<MicroFlowState | null>(null);
-  // Voz TTS real del perfil (Configuración → Voces): nombre amigable de la voz
-  // seleccionada. Se muestra en ítems sintéticos en lugar del acento declarado
-  // (que para TTS no es real). Se refresca al cambiar de usuario y al abrir la
-  // tarjeta de ajustes de audio.
-  const [ttsVoiceName, setTtsVoiceName] = useState<string | null>(null);
+  // Voz TTS real del perfil y segunda voz (V3.75.5). El store de acentos vive en
+  // `useVoiceChoice`: él lee el catálogo una sola vez para toda la app, así que la
+  // etiqueta de voz, el selector del «...» y el altavoz de repetición ven lo
+  // mismo. La voz A (la del perfil) es la que usa PLAY: el flujo de escucha no
+  // cambia; la B existe para comparar acentos.
+  const voiceChoice = useVoiceChoice(userId);
+  const primaryVoiceName =
+    voiceChoice.voices.find((voice) => voice.id === voiceChoice.primary)?.name ??
+    voiceChoice.primary ??
+    null;
 
   // Trabajos de generación de práctica extra por ruta (V3.6). El POST crea el
   // trabajo y `pollExtrasJob` hace polling hasta `done`/`error`; al terminar se
@@ -448,6 +464,18 @@ export function ListeningPractice({
     const next = advanceToNext(flowState, flowSteps);
     setFlowState(next.finished ? null : next);
     if (next.finished) void load();
+  }
+
+  /** V3.75.3: pulsar PLAY declara «he escuchado» y abre la pregunta.
+   *
+   * La etapa `while1` («escucha global») ya no tiene tarjeta ni botón propio: la
+   * señal de que se ha escuchado es el propio PLAY. Solo aplica al flujo
+   * receptivo (en producción no hay `while1`) y `advanceToNext` no dispara
+   * `load()` porque el flujo no termina, así que avanza a la pregunta sin tocar
+   * el ítem.
+   */
+  function markListened() {
+    if (micro?.stage === "while1") continueStage();
   }
 
   /** Desde el resultado en `post` avanza al siguiente paso (shadowing) o, si el
@@ -721,30 +749,9 @@ export function ListeningPractice({
   }, [userId, selectedLevel]);
 
   // Voz TTS seleccionada del perfil (nombre amigable) para la etiqueta honesta de
-  // los ítems sintéticos. `showAudioSettings` fuerza un refresco cada vez que se
-  // abre la tarjeta de audio (p. ej. tras cambiar la voz en Configuración).
-  useEffect(() => {
-    if (!userId) {
-      setTtsVoiceName(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await getVoices(userId);
-        if (!cancelled) {
-          setTtsVoiceName(
-            res.voices.find((v) => v.id === res.selected)?.name ?? res.selected,
-          );
-        }
-      } catch {
-        /* backend no disponible: la etiqueta omite la voz */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, showAudioSettings]);
+  // los ítems sintéticos. V3.75.5: ya no se pide aquí el catálogo (lo trae el
+  // store de acentos), así que la etiqueta sigue a la voz elegida en el «...» sin
+  // volver a consultar el backend.
 
   async function play() {
     if (!question || !userId || playing) return;
@@ -753,20 +760,57 @@ export function ListeningPractice({
       if (question.audio_ready && audioController) {
         // Audio de referencia pre-renderizado (respeta speech_rate y repetición),
         // reproducido por el AudioController 4.0 (un solo elemento reutilizable).
+        // `play()` resuelve cuando **empieza** a sonar: es el momento de abrir la
+        // pregunta (V3.75.3), para poder leer las opciones mientras se escucha.
+        // V3.75.5: PLAY suena siempre en la voz A (la del perfil); cambiar de voz
+        // cambia la URL, y el controller recarga al no coincidir con la cargada,
+        // así que nunca sirve el WAV del acento anterior.
         await audioController.play(
-          getListeningAudioUrl(question.id, userId, variant),
+          getListeningAudioUrl(question.id, userId, variant, voiceChoice.primary),
         );
+        markListened();
       } else {
         // Degradación: TTS en vivo con el script del ítem (o sin API Audio).
         setTtsLivePlaying(true);
+        // `speakWithVoice` resuelve al **terminar** la locución, así que esperar
+        // aquí retrasaría la pregunta todo el audio: se marca al lanzarlo.
+        markListened();
         try {
-          await speakWithVoice(question.script, userId);
+          const voice = voiceChoice.voiceFor("a");
+          if (voice) await speakWithVoice(question.script, userId, "en", { voice });
+          else await speakWithVoice(question.script, userId);
         } finally {
           setTtsLivePlaying(false);
         }
       }
     } catch (e) {
       setTtsLivePlaying(false);
+      setError((e as Error).message);
+    }
+  }
+
+  /**
+   * «Probar A» / «Probar B» del selector de voz (V3.75.5): reproduce ESTE ítem
+   * con el acento pedido para poder comparar antes de elegir.
+   *
+   * No cuenta como repetición (`replayCount`): es configuración, no estudio, y
+   * contarla inflaría la evidencia de apoyo del intento. La primera vez que se
+   * pide la voz B, el backend sintetiza y alinea ese WAV (unos segundos); el chip
+   * muestra su spinner y después queda cacheado.
+   */
+  async function previewVoice(accent: VoiceAccent) {
+    if (!question || !userId) return;
+    const voice = voiceChoice.voiceFor(accent);
+    if (!voice) return;
+    try {
+      if (question.audio_ready && audioController) {
+        await audioController.play(
+          getListeningAudioUrl(question.id, userId, variant, voice),
+        );
+        return;
+      }
+      await speakWithVoice(question.script, userId, "en", { voice });
+    } catch (e) {
       setError((e as Error).message);
     }
   }
@@ -955,7 +999,7 @@ async function submitDictation() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 sm:px-6">
+    <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-y-auto px-3 py-4 sm:gap-4 sm:px-6 sm:py-6">
       {error && (
         <div
           role="alert"
@@ -991,6 +1035,43 @@ async function submitDictation() {
         </Card>
       ) : (
         <>
+          {/* Cabecera de la pantalla (V3.75.4): antes el ítem empezaba en seco
+              con tarjetas y la salida de emergencia vivía al pie, compitiendo
+              con las opciones. Aquí va la destreza, el nivel por el que va la
+              ruta con su cobertura, y «Otro ejercicio» (el antiguo
+              `listening.skip`) como botón fantasma discreto. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {t("skill.listening")}
+              </span>
+              {routeLevel && <LevelBadge level={routeLevel} />}
+              {currentLevelStat && currentLevelStat.total > 0 && (
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {t("listening.masteredOfTotal")
+                    .replace("{mastered}", String(currentLevelStat.mastered))
+                    .replace("{total}", String(currentLevelStat.total))}
+                  {" · "}
+                  {t("listening.coveragePct").replace(
+                    "{pct}",
+                    String(Math.round(currentLevelPct)),
+                  )}
+                </span>
+              )}
+            </div>
+            {!(result || productionResult) && session?.mode !== "drill" && (
+              <button
+                type="button"
+                className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+                onClick={() => void load()}
+                disabled={!userId}
+              >
+                <RefreshCw className="size-3.5" aria-hidden="true" />
+                {t("listening.anotherItem")}
+              </button>
+            )}
+          </div>
+
           {session && (
             <Card className="flex flex-row flex-wrap items-center justify-between gap-3 p-4">
               <span className="text-sm text-muted-foreground">
@@ -1022,30 +1103,16 @@ async function submitDictation() {
             </Card>
           )}
 
-          {/* Micro-flujo (V3.27): tarjetas de etapa Pre/While1/Shadowing del modo
+          {/* Micro-flujo (V3.27): tarjetas de etapa Shadowing del modo
               adaptativo. La tarjeta de audio queda siempre disponible; la pregunta
               solo se muestra en `while2`/`post`. */}
           {/* V3.48.1: la etapa `pre` («Antes de escuchar») se retira de la UI
               (microFlow salta los pasos `pre`); el contexto del ítem pasa a la
               tarjeta de audio como caption de una línea. */}
-
-          {micro?.stage === "while1" && !result && !productionResult && (
-            <Card className="gap-4 border-primary/25 p-5">
-              <p className="text-sm font-semibold text-foreground">
-                {t("listening.flow.while1Title")}
-              </p>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {t("listening.flow.while1Hint")}
-              </p>
-              <Button
-                type="button"
-                className="min-h-10 gap-2 self-start"
-                onClick={continueStage}
-              >
-                {t("listening.flow.listenDone")}
-              </Button>
-            </Card>
-          )}
+          {/* V3.75.3: la tarjeta `while1` («He escuchado — responder») también se
+              retira. La señal de que se ha escuchado es pulsar PLAY (`play()` llama
+              a `markListened`): así las opciones ocupan el hueco que gastaba ese
+              paso y en móvil no hace falta desplazarse para responder. */}
 
           {micro?.stage === "shadowing" && (
             <Card className="gap-4 border-primary/25 p-5">
@@ -1132,13 +1199,23 @@ async function submitDictation() {
             </Card>
           )}
 
-          <Card className="relative gap-5 p-5 sm:p-6">
+          {/* V3.75.4: la tarjeta de audio se separa del resto con un lavado suave
+              del acento (`.listening-audio`, sin capa) en vez de un color plano,
+              para que el PLAY sea el punto de mira de la pantalla. */}
+          <Card className="listening-audio relative gap-4 p-4 sm:gap-5 sm:p-6">
+            {/* V3.75.7: este desplegable sí trae **opciones** (velocidad, voz A/B,
+                lectura al repetir), así que conserva la «...» por la convención de
+                la app: (i) = solo información, (...) = información + opciones.
+                No usa `InfoDisclosure` porque su panel es una zona centrada de la
+                propia tarjeta, sin caja propia; el botón flota arriba a la derecha
+                y el panel nace muy por debajo de él, así que no puede taparlo. */}
             <button
               type="button"
               onClick={() => setShowAudioSettings((s) => !s)}
               aria-expanded={showAudioSettings}
               aria-controls="listening-audio-settings"
               aria-label={t("listening.audioSettings")}
+              title={t("listening.audioSettings")}
               className={cn(
                 "absolute top-3 right-3 z-10 grid size-9 place-items-center rounded-full border transition-colors",
                 showAudioSettings
@@ -1149,19 +1226,19 @@ async function submitDictation() {
               <MoreHorizontal className="size-4" aria-hidden="true" />
             </button>
 
-            <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex flex-col items-center gap-3 text-center sm:gap-4">
               <motion.button
                 type="button"
                 onClick={play}
                 disabled={playing || !userId}
                 whileTap={playing || !userId ? undefined : { scale: 0.94 }}
                 aria-label={playing ? t("listening.playing") : t("listening.play")}
-                className="grid size-20 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-colors hover:bg-primary/90 disabled:opacity-50"
+                className="grid size-16 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/20 ring-4 ring-primary/10 transition-colors hover:bg-primary/90 disabled:opacity-50 sm:size-20"
               >
                 {playing ? (
-                  <Loader2 className="size-8 animate-spin" aria-hidden="true" />
+                  <Loader2 className="size-7 animate-spin sm:size-8" aria-hidden="true" />
                 ) : (
-                  <Play className="size-8 translate-x-0.5" aria-hidden="true" />
+                  <Play className="size-7 translate-x-0.5 sm:size-8" aria-hidden="true" />
                 )}
               </motion.button>
 
@@ -1207,7 +1284,12 @@ async function submitDictation() {
                       {formatSeconds(audioDuration)}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
+                  {/* V3.75.3: los controles A/B son de precisión y en móvil
+                      ocupan una fila entera de botones; se ocultan por debajo de
+                      `sm` para dejar sitio a las opciones. El deslizador de
+                      posición se conserva siempre: es una sola línea y sirve
+                      para releer un tramo. */}
+                  <div className="hidden flex-wrap items-center justify-center gap-2 sm:flex">
                     <Button
                       variant={markStart !== null ? "secondary" : "outline"}
                       size="sm"
@@ -1262,7 +1344,7 @@ async function submitDictation() {
                     </Button>
                   </div>
                   {isLooping && markStart !== null && loopEnd !== null && (
-                    <p className="text-center text-[11px] text-muted-foreground">
+                    <p className="hidden text-center text-[11px] text-muted-foreground sm:block">
                       {t("listening.audio.loopingHint")
                         .replace("{start}", formatSeconds(markStart))
                         .replace("{end}", formatSeconds(loopEnd))}
@@ -1339,9 +1421,9 @@ async function submitDictation() {
                   {question.speech_rate > 0 && (
                     <p className="text-xs tabular-nums text-muted-foreground">
                       {question.audio_type === "tts" ? (
-                        ttsVoiceName ? (
+                        primaryVoiceName ? (
                           <span title={t("listening.ttsRealVoice")}>
-                            {ttsVoiceName} ·{" "}
+                            {primaryVoiceName} ·{" "}
                           </span>
                         ) : null
                       ) : (
@@ -1350,6 +1432,19 @@ async function submitDictation() {
                       {Math.round(question.speech_rate)} wpm ·{" "}
                       {question.duration.toFixed(1)}s
                     </p>
+                  )}
+
+                  {/* V3.75.5: el «...» deja de ser un cartel y pasa a configurar.
+                      Antes solo leía «Voz sintética local (TTS)» + el nombre de la
+                      voz: no había forma de cambiarla desde la práctica. */}
+                  {question.audio_type === "tts" && (
+                    <div className="mt-1 w-full max-w-md border-t border-border/60 pt-3 text-left">
+                      <VoicePicker
+                        userId={userId}
+                        onPreview={previewVoice}
+                        note={t("listening.ttsRealVoice")}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
@@ -1489,18 +1584,27 @@ async function submitDictation() {
                         key={opt}
                         type="button"
                         className={cn(
-                          "min-h-10 rounded-md border px-3 py-2.5 text-left text-sm transition-colors",
+                          "flex min-h-10 items-start gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                           isCorrect
                             ? "border-success bg-success/15 text-foreground"
                             : isWrong
                               ? "border-destructive bg-destructive/10 text-foreground"
-                              : "border-border bg-secondary text-secondary-foreground hover:border-primary/50",
+                              : "border-border bg-secondary text-secondary-foreground hover:border-primary/60 hover:bg-primary/10",
                           "disabled:cursor-default disabled:opacity-70",
                         )}
                         onClick={() => choose(i)}
                         disabled={!!result || submitting}
                       >
-                        {opt}
+                        {/* Insignia de letra (V3.75.4): da un ancla visual a cada
+                            opción y hace legible la referencia «A/B/C» al
+                            corregir, sobre todo en móvil. */}
+                        <span
+                          aria-hidden="true"
+                          className="mt-px grid size-6 shrink-0 place-items-center rounded-md bg-background/70 text-[11px] font-bold tabular-nums"
+                        >
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                        <span className="min-w-0 flex-1">{opt}</span>
                       </button>
                     );
                   })}
@@ -1623,18 +1727,26 @@ async function submitDictation() {
                   !result.correct &&
                   micro.transcript !== "full"
                 ) && (
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-2">
                   <span
                     className="text-foreground"
                     lang={scriptPhrase.isSpanish ? "es" : "en"}
                   >
                     {scriptPhrase.display}
                   </span>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <PhraseTranslateButton state={scriptPhrase} />
-                    <ListenButton
-                      text={question.script}
-                      label={t("speak.answer")}
+                    {/* V3.75.5: era un altavoz que releía solo el script con la voz
+                        del perfil. Ahora lee el ítem **compuesto** y ofrece los dos
+                        acentos instalados.
+                        V3.75.6: texto del ítem + clave, y la composición la elige el
+                        perfil en el «...» (ítem / ítem + opciones / solo la clave). */}
+                    <ItemReplayButton
+                      prompt={question.question}
+                      script={question.script}
+                      options={question.options}
+                      correctIndex={result.correct_index}
+                      userId={userId}
                     />
                   </div>
                 </div>
@@ -1670,9 +1782,10 @@ async function submitDictation() {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <PhraseTranslateButton state={referencePhrase} />
-                        <ListenButton
-                          text={productionResult.reference}
-                          label={t("speak.phrase")}
+                        {/* V3.75.5: la referencia se puede repetir en A o B. */}
+                        <ItemReplayButton
+                          prompt={productionResult.reference}
+                          userId={userId}
                         />
                       </div>
                     </div>
@@ -1831,7 +1944,11 @@ async function submitDictation() {
 
           {stats && (
             <Card className="relative gap-4 p-5">
-              {/* V3.48.1: notas CEFR/honestidad de la ruta al desplegable «...». */}
+              {/* V3.48.1: notas CEFR/honestidad de la ruta al desplegable.
+                  V3.75.7: solo notas ⇒ el disparador es una **(i)**, no una «...»:
+                  este panel no tiene nada que configurar. Y al abrirse reserva la
+                  columna del botón (`pr-12` en `InfoDisclosure`), que si no la
+                  primera línea quedaba tapada por el propio botón. */}
               <InfoDisclosure
                 variant="corner"
                 id="listening-route-notes"
@@ -1887,7 +2004,7 @@ async function submitDictation() {
                       value={currentLevelPct}
                       size={72}
                       strokeWidth={7}
-                      className="text-primary"
+                      className={cn(levelClass(routeLevel), "lv-ink")}
                       ariaLabel={`${t("listening.currentLevel")}: ${routeLevel}`}
                     >
                       <span className="text-sm font-bold text-foreground">
@@ -1956,36 +2073,15 @@ async function submitDictation() {
                 </div>
               </div>
 
-              <div className="flex flex-col border-t border-border pt-4">
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-                  {/* V3.48.1: «Auto» devuelve el nivel al motor. */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLevel(null)}
-                    aria-pressed={selectedLevel === null}
-                    aria-label={t("learn.routeAutoHint")}
-                    title={t("learn.routeAutoHint")}
-                    disabled={!!session}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                      selectedLevel === null && "bg-accent",
-                      session && "cursor-not-allowed opacity-60",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-11 place-items-center rounded-full border-2 border-dashed",
-                        selectedLevel === null
-                          ? "border-primary text-primary"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      <Sparkles className="size-4" aria-hidden="true" />
-                    </span>
-                    <span className="text-[11px] font-medium text-muted-foreground">
-                      {t("learn.routeAuto")}
-                    </span>
-                  </button>
+              <div className="flex flex-col gap-3">
+                {/* Separador fino entre el resumen (precisión · ruta actual) y
+                    el selector de rutas. */}
+                <div className="border-t border-border/60" aria-hidden="true" />
+
+                {/* Las seis rutas, dos por fila (A1·A2, B1·B2, C1·C2). La celda
+                    es horizontal —anillo + texto— para que quepa en dos columnas
+                    hasta en móvil sin empujar nada fuera de pantalla. */}
+                <div className="grid grid-cols-2 gap-2">
                   {stats.levels.map((lv) => {
                     const expanded = expandedLevel === lv.level;
                     const isSelected = selectedLevel === lv.level;
@@ -2006,23 +2102,18 @@ async function submitDictation() {
                         )}
                         disabled={!!session}
                         className={cn(
-                          "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                          expanded && "bg-accent",
-                          isSelected && "ring-2 ring-primary/60",
+                          "flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-2.5",
+                          levelClass(lv.level),
+                          "lv-outline",
+                          (expanded || isSelected) && "ring-2 ring-current",
                           session && "cursor-not-allowed opacity-60",
                         )}
                       >
                         <ProgressRing
                           value={lv.total > 0 ? (lv.mastered / lv.total) * 100 : 0}
-                          size={44}
-                          strokeWidth={5}
-                          className={
-                            lv.completed
-                              ? "text-success"
-                              : lv.mastered === lv.total
-                                ? "text-warning"
-                                : "text-primary"
-                          }
+                          size={40}
+                          strokeWidth={4.5}
+                          className={cn(levelClass(lv.level), "lv-ink")}
                           ariaLabel={t("listening.masteredOfTotal")
                             .replace("{mastered}", String(lv.mastered))
                             .replace("{total}", String(lv.total))}
@@ -2035,68 +2126,113 @@ async function submitDictation() {
                             </span>
                           )}
                         </ProgressRing>
-                        <span className="text-[11px] font-medium text-muted-foreground">
-                          {t("listening.routeLabel").replace("{level}", lv.level)}
-                        </span>
-                        <span className="text-[10px] font-semibold tabular-nums text-foreground">
-                          {t("listening.masteredOfTotal")
-                            .replace("{mastered}", String(lv.mastered))
-                            .replace("{total}", String(lv.total))}
-                        </span>
-                        {lv.total > 0 && (
-                          <span className="text-[10px] tabular-nums text-muted-foreground">
-                            {t("listening.coveragePct").replace(
-                              "{pct}",
-                              String(Math.round((lv.mastered / lv.total) * 100)),
-                            )}
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="truncate text-[11px] font-semibold text-foreground">
+                            {t("listening.routeLabel").replace("{level}", lv.level)}
                           </span>
-                        )}
-                        {(lv.extras ?? 0) > 0 && (
-                          <span className="max-w-[140px] text-center text-[9px] leading-tight tabular-nums text-muted-foreground">
-                            {t("listening.extraBreakdown")
-                              .replace(
-                                "{base}",
-                                String(lv.base_total ?? lv.total - (lv.extras ?? 0)),
-                              )
-                              .replace("{extras}", String(lv.extras))}
+                          <span className="text-[10px] leading-snug tabular-nums text-muted-foreground">
+                            {t("listening.masteredOfTotal")
+                              .replace("{mastered}", String(lv.mastered))
+                              .replace("{total}", String(lv.total))}
                           </span>
-                        )}
-                        {!lv.completed &&
-                          lv.mastered > 0 &&
-                          lv.gate &&
-                          lv.gate.coverage_required_pct > 0 && (
-                            <span className="max-w-[130px] text-center text-[9px] leading-tight text-warning">
-                              {t("listening.routeGateShort")
-                                .replace(
-                                  "{coverage}",
-                                  String(lv.gate.coverage_required_pct),
-                                )
-                                .replace(
-                                  "{min}",
-                                  String(
-                                    Math.ceil(
-                                      (lv.gate.total *
-                                        lv.gate.coverage_required_pct) /
-                                        100,
-                                    ),
-                                  ),
-                                )
-                                .replace("{total}", String(lv.gate.total))}
+                          {lv.total > 0 && (
+                            <span className="text-[10px] leading-snug tabular-nums text-muted-foreground">
+                              {t("listening.coveragePct").replace(
+                                "{pct}",
+                                String(
+                                  Math.round((lv.mastered / lv.total) * 100),
+                                ),
+                              )}
                             </span>
                           )}
-                        {isSelected && (
-                          <span className="text-[10px] font-semibold text-primary">
-                            {t("learn.routeSelected")}
-                          </span>
-                        )}
+                          {(lv.extras ?? 0) > 0 && (
+                            <span className="text-[9px] leading-snug tabular-nums text-muted-foreground">
+                              {t("listening.extraBreakdown")
+                                .replace(
+                                  "{base}",
+                                  String(
+                                    lv.base_total ?? lv.total - (lv.extras ?? 0),
+                                  ),
+                                )
+                                .replace("{extras}", String(lv.extras))}
+                            </span>
+                          )}
+                          {!lv.completed &&
+                            lv.mastered > 0 &&
+                            lv.gate &&
+                            lv.gate.coverage_required_pct > 0 && (
+                              <span className="text-[9px] leading-snug text-warning">
+                                {t("listening.routeGateShort")
+                                  .replace(
+                                    "{coverage}",
+                                    String(lv.gate.coverage_required_pct),
+                                  )
+                                  .replace(
+                                    "{min}",
+                                    String(
+                                      Math.ceil(
+                                        (lv.gate.total *
+                                          lv.gate.coverage_required_pct) /
+                                          100,
+                                      ),
+                                    ),
+                                  )
+                                  .replace("{total}", String(lv.gate.total))}
+                              </span>
+                            )}
+                          {isSelected && (
+                            <span className="text-[10px] font-semibold text-primary">
+                              {t("learn.routeSelected")}
+                            </span>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
+
+                {/* «Auto» devuelve el nivel al motor (V3.48.1). Fila propia a
+                    ancho completo: es la opción que **no** elige ruta, así que
+                    no compite dentro de la rejilla con las seis rutas. */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel(null)}
+                  aria-pressed={selectedLevel === null}
+                  aria-label={t("learn.routeAutoHint")}
+                  title={t("learn.routeAutoHint")}
+                  disabled={!!session}
+                  className={cn(
+                    "flex w-full items-center justify-center gap-2.5 rounded-xl border px-3 py-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    selectedLevel === null
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground",
+                    session && "cursor-not-allowed opacity-60",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-6 place-items-center rounded-full border-2 border-dashed",
+                      selectedLevel === null
+                        ? "border-primary text-primary"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    <Sparkles className="size-3.5" aria-hidden="true" />
+                  </span>
+                  <span className="text-xs font-medium">
+                    {t("learn.routeAuto")}
+                  </span>
+                  {selectedLevel === null && (
+                    <span className="text-[10px] font-semibold">
+                      {t("learn.routeSelected")}
+                    </span>
+                  )}
+                </button>
+
                 {expandedLevel !== null && !session && (
                   <div
                     id="listening-level-items"
-                    className="mt-4 border-t border-border pt-4"
+                    className="border-t border-border/60 pt-3"
                   >
                     <ListeningLevelPanel
                       userId={userId}
@@ -2336,24 +2472,16 @@ async function submitDictation() {
             </>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {stats?.completed && (
+          {/* El «Saltar» ya no vive aquí: se reubicó en la cabecera de la
+              pantalla como «Otro ejercicio» para no competir con las opciones
+              (V3.75.4). Al pie sólo queda el aviso de ruta completada. */}
+          {stats?.completed && (
+            <div className="flex flex-wrap items-center gap-3">
               <p className="text-sm font-semibold text-success">
                 {t("listening.completed")}
               </p>
-            )}
-            {!(result || productionResult) && session?.mode !== "drill" && (
-              <Button
-                variant="outline"
-                className="min-h-10 gap-2"
-                onClick={() => void load()}
-                disabled={!userId}
-              >
-                <RefreshCw className="size-4" aria-hidden="true" />
-                {t("listening.skip")}
-              </Button>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </section>

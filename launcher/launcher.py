@@ -35,6 +35,7 @@ from browser_cookies import (
 from core import (
     DB_PATH,
     app_summary,
+    apply_stored_lan_config,
     author_line,
     db_summary,
     frontend_dist_available,
@@ -46,7 +47,7 @@ from core import (
     local_url,
     mdns_available,
     port_in_use,
-    set_lan_mode,
+    toggle_lan_config,
     user_overview,
 )
 from process_manager import ProcessManager
@@ -140,6 +141,15 @@ class LauncherApp:
         self._queue: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
         self._state = load_state()
+        # V3.75.3: la configuración del launcher (hoy, el modo LAN) se lee y se
+        # declara ANTES de construir la interfaz: `_refresh_access` pinta el modo
+        # vigente en el primer pintado. La preferencia guardada manda sobre el
+        # entorno heredado —es lo que hace que «red local» sobreviva al cierre— y
+        # sin fichero el valor por defecto es cerrado (`lan: False`), así que una
+        # ausencia de preferencia nunca expone la API. La lectura y la aplicación
+        # van en una sola llamada de `core` para que su orden sea verificable sin
+        # pantalla (`toggle_lan_config` es la otra mitad).
+        self._config = apply_stored_lan_config()
         self._sections_map: dict[str, Collapsible] = {}
         self._spinner_id: str | None = None
         self._spinner_idx = 0
@@ -634,10 +644,17 @@ class LauncherApp:
         (`core.backend_env`), así que cambiar la variable aquí no basta: hay que
         volver a arrancarlo para que uvicorn se enlace a la interfaz nueva. Con la
         app parada el modo queda declarado y se aplica al arrancar.
+
+        V3.75.3: el cambio se **persiste en el acto** (`config.json`), no al
+        cerrar la ventana: es una preferencia de red y no debería depender de que
+        el launcher se cierre bien. Se relee `lan_mode()` para guardar lo que de
+        verdad quedó declarado, no lo que se creía declarar.
         """
         if self._action_running:
             return
-        set_lan_mode(not lan_mode())
+        # V3.75.3: invertir, declarar y persistir es una sola operación de `core`
+        # (con test sin pantalla); aquí solo se repinta el panel de acceso.
+        toggle_lan_config(self._config)
         self._refresh_access()
 
         en_marcha = self.pm.backend_running() or fetch_health() is not None

@@ -21,6 +21,21 @@
         } catch (e) {
           document.documentElement.setAttribute("data-theme", "dark");
         }
+        // Rampa de niveles: se adelanta el atributo para no ver un parpadeo del
+        // esquema por defecto cuando el usuario eligió «Espectro» o «Monocromo».
+        try {
+          var raw = localStorage.getItem("english-tutor.appearance");
+          var scheme = raw ? JSON.parse(raw).levelScheme : null;
+          if (
+            scheme === "traffic" ||
+            scheme === "spectrum" ||
+            scheme === "mono"
+          ) {
+            document.documentElement.setAttribute("data-levels", scheme);
+          }
+        } catch (e) {
+          /* sin apariencia guardada: el esquema por defecto ya es correcto */
+        }
       })();
     </script>
   </head>

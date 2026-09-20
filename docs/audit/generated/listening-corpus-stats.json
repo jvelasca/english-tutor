@@ -106,7 +106,7 @@
    },
    "connected_speech_items": 4,
    "skills": {
-    "phrase_recognition": 1,
+    "phrase_recognition": 2,
     "attitude": 2,
     "fast_speech": 2,
     "speaker_intention": 3,
@@ -116,9 +116,8 @@
     "note_taking": 2,
     "connected_speech": 3,
     "gist": 1,
-    "dictation": 1,
-    "inference": 2,
-    "shadowing": 1
+    "numbers": 1,
+    "inference": 2
    },
    "accent_variety": 8,
    "prosody": {

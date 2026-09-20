@@ -25,6 +25,7 @@ import {
   GraduationCap,
   Info,
   Loader2,
+  RefreshCw,
   Search,
   Sparkles,
   X,
@@ -43,6 +44,12 @@ import { ActivityResult } from "../../components/ActivityResult";
 import { LearnActivitySwitcher } from "../../components/LearnActivitySwitcher";
 import { ProgressRing } from "../../components/ProgressRing";
 import { InfoDisclosure } from "../../components/InfoDisclosure";
+// V3.75.5: el «...» de las rutas configura la voz y los altavoces de la tarjeta
+// leen el ítem completo en los dos acentos (mismo control que Listening).
+import { VoicePicker } from "../../components/VoicePicker";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
+import { LevelBadge } from "../../components/LevelBadge";
+import { levelClass } from "../../utils/cefr";
 import type { LearnActivity } from "../../router/learnHub";
 import type { NextBestActivity } from "../../types/api";
 import type { Section } from "../../utils/sections";
@@ -752,6 +759,44 @@ export function QuizRoutePage({
                 </ActivityResult>
               ) : (
                 <>
+                  {/* Cabecera de la pantalla (V3.75.5): la destreza, el nivel por
+                      el que va la práctica y «Saltar» como botón fantasma
+                      discreto. Antes el salto vivía al pie de la tarjeta,
+                      compitiendo con las opciones (misma convención que
+                      Listening, V3.75.4). */}
+                  {!config.scene && (
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                          {t(config.skillTitleKey)}
+                        </span>
+                        <LevelBadge
+                          level={
+                            (question as RouteQuestion | null)?.level ??
+                            selectedLevel ??
+                            stats.level
+                          }
+                        />
+                      </div>
+                      {/* V3.75.5: «Saltar» (= `nextCard`, pedir otro ítem del
+                          mismo bucket sin registrar evidencia) sigue disponible
+                          también dentro de una sesión, como antes en el pie; solo
+                          se oculta mientras se evalúa o cuando ya hay resultado,
+                          que es cuando manda «Continuar». */}
+                      {!result && !busy && (
+                        <button
+                          type="button"
+                          className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+                          onClick={nextCard}
+                          disabled={!userId}
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden="true" />
+                          {t(nk("skip"))}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {session && (
                     <Card className="flex flex-row flex-wrap items-center justify-between gap-3 p-3">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -832,8 +877,7 @@ export function QuizRoutePage({
                         }
                         if (result) advance(result.passed);
                       }}
-                      onSkip={nextCard}
-                      sessionActive={session !== null}
+                      userId={userId}
                       t={t}
                     />
                   )}
@@ -970,48 +1014,37 @@ function QuizRoutesSection({
         </div>
       </div>
 
-      {/* V3.48.1: notas del mapa/ruta al desplegable «...» (pantalla limpia). */}
+      {/* V3.48.1: notas del mapa/ruta al desplegable «...» (pantalla limpia).
+          V3.75.5: el mismo «...» gana el bloque de voz (A/B), espejo del que
+          Listening ofrece en su tarjeta de audio: una sola idea de acento en toda
+          la app y sin ocupar la pantalla de práctica.
+          V3.75.7: como trae **opciones** (voces, lectura al repetir) y no solo
+          notas, el disparador mantiene la «...» —no la (i)— y su etiqueta lo dice:
+          «Opciones e información». */}
       <InfoDisclosure
         align="end"
         id={`${ns}-route-notes`}
-        label={t("common.moreInfo")}
+        label={t("common.moreOptions")}
+        content="options"
       >
         <p>{t(nk("routesMapHint"))}</p>
         <p>{t(nk("routeNote")).replace("{level}", stats.level)}</p>
         <p>{t(nk("routeCertNote"))}</p>
         <p>{t(nk("routeRingHelp"))}</p>
+        <div className="border-t border-border/60 pt-3">
+          <VoicePicker userId={userId} />
+        </div>
       </InfoDisclosure>
 
-      <div className="flex flex-col border-t border-border pt-4">
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
-          {/* V3.48.1: «Auto» devuelve el nivel al motor (ruta recomendada). */}
-          <button
-            type="button"
-            onClick={() => setSelectedLevel(null)}
-            aria-pressed={selectedLevel === null}
-            aria-label={t("learn.routeAutoHint")}
-            title={t("learn.routeAutoHint")}
-            disabled={disabled}
-            className={cn(
-              "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              selectedLevel === null && "bg-accent",
-              disabled && "cursor-not-allowed opacity-60",
-            )}
-          >
-            <span
-              className={cn(
-                "grid size-[46px] place-items-center rounded-full border-2 border-dashed",
-                selectedLevel === null
-                  ? "border-primary text-primary"
-                  : "border-border text-muted-foreground",
-              )}
-            >
-              <Sparkles className="size-4" aria-hidden="true" />
-            </span>
-            <span className="text-[10px] font-medium text-muted-foreground">
-              {t("learn.routeAuto")}
-            </span>
-          </button>
+      <div className="flex flex-col gap-3">
+        {/* Separador fino entre el resumen (precisión · ruta actual) y el
+            selector de rutas, como en Listening. */}
+        <div className="border-t border-border/60" aria-hidden="true" />
+
+        {/* Las seis rutas, dos por fila (A1·A2, B1·B2, C1·C2). La celda es
+            horizontal —anillo + texto— para que quepa en dos columnas hasta en
+            móvil sin empujar nada fuera de pantalla. */}
+        <div className="grid grid-cols-2 gap-2">
           {stats.levels.map((lv) => {
             const expanded = expandedLevel === lv.level;
             // V3.48.1: la ruta seleccionada gobierna de qué nivel se practica.
@@ -1038,23 +1071,20 @@ function QuizRoutesSection({
                 )}
                 disabled={disabled}
                 className={cn(
-                  "flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                  expanded && "bg-accent",
-                  isSelected && "ring-2 ring-primary/60",
+                  "flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-2.5",
+                  // V3.75.4/V3.75.5: el escalón de la rampa pinta la celda y el
+                  // anillo (`lv-outline`/`lv-ink`), igual que en Listening.
+                  levelClass(lv.level),
+                  "lv-outline",
+                  (expanded || isSelected) && "ring-2 ring-current",
                   disabled && "cursor-not-allowed opacity-60",
                 )}
               >
                 <ProgressRing
                   value={pct}
-                  size={46}
-                  strokeWidth={5}
-                  className={
-                    lv.completed
-                      ? "text-success"
-                      : lv.mastered > 0
-                        ? "text-primary"
-                        : "text-muted-foreground"
-                  }
+                  size={40}
+                  strokeWidth={4.5}
+                  className={cn(levelClass(lv.level), "lv-ink")}
                   ariaLabel={t(nk("masteredOfTotal"))
                     .replace("{mastered}", String(lv.mastered))
                     .replace("{total}", String(lv.total))}
@@ -1062,41 +1092,79 @@ function QuizRoutesSection({
                   {lv.completed ? (
                     <Check className="size-4" aria-hidden="true" />
                   ) : (
-                    <span className="text-[11px] font-semibold tabular-nums text-foreground">
-                      {lv.level}
+                    <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                      {lv.mastered}
                     </span>
                   )}
                 </ProgressRing>
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {lv.completed ? lv.level : ""}
-                </span>
-                <span className="text-[10px] font-semibold tabular-nums text-foreground">
-                  {t(nk("masteredOfTotal"))
-                    .replace("{mastered}", String(lv.mastered))
-                    .replace("{total}", String(lv.total))}
-                </span>
-                {lv.total > 0 && lv.mastered > 0 && !lv.completed && (
-                  <span className="text-[10px] tabular-nums text-muted-foreground">
-                    {t(nk("coveragePct")).replace(
-                      "{pct}",
-                      String(Math.round((lv.mastered / lv.total) * 100)),
-                    )}
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-[11px] font-semibold text-foreground">
+                    {t("routes.levelLabel").replace("{level}", lv.level)}
                   </span>
-                )}
-                {isSelected && (
-                  <span className="text-[10px] font-semibold text-primary">
-                    {t("learn.routeSelected")}
+                  <span className="text-[10px] leading-snug tabular-nums text-muted-foreground">
+                    {t(nk("masteredOfTotal"))
+                      .replace("{mastered}", String(lv.mastered))
+                      .replace("{total}", String(lv.total))}
                   </span>
-                )}
+                  {lv.total > 0 && (
+                    <span className="text-[10px] leading-snug tabular-nums text-muted-foreground">
+                      {t(nk("coveragePct")).replace(
+                        "{pct}",
+                        String(Math.round((lv.mastered / lv.total) * 100)),
+                      )}
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="text-[10px] font-semibold text-primary">
+                      {t("learn.routeSelected")}
+                    </span>
+                  )}
+                </span>
               </button>
             );
           })}
         </div>
 
+        {/* V3.48.1: «Auto» devuelve el nivel al motor (ruta recomendada). Fila
+            propia a ancho completo: es la opción que **no** elige ruta, así que
+            no compite dentro de la rejilla con las seis rutas. */}
+        <button
+          type="button"
+          onClick={() => setSelectedLevel(null)}
+          aria-pressed={selectedLevel === null}
+          aria-label={t("learn.routeAutoHint")}
+          title={t("learn.routeAutoHint")}
+          disabled={disabled}
+          className={cn(
+            "flex w-full items-center justify-center gap-2.5 rounded-xl border px-3 py-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            selectedLevel === null
+              ? "border-primary/50 bg-primary/10 text-primary"
+              : "border-border text-muted-foreground",
+            disabled && "cursor-not-allowed opacity-60",
+          )}
+        >
+          <span
+            className={cn(
+              "grid size-6 place-items-center rounded-full border-2 border-dashed",
+              selectedLevel === null
+                ? "border-primary text-primary"
+                : "border-border text-muted-foreground",
+            )}
+          >
+            <Sparkles className="size-3.5" aria-hidden="true" />
+          </span>
+          <span className="text-xs font-medium">{t("learn.routeAuto")}</span>
+          {selectedLevel === null && (
+            <span className="text-[10px] font-semibold">
+              {t("learn.routeSelected")}
+            </span>
+          )}
+        </button>
+
         {expandedLevel !== null && !disabled && (
           <div
             id={ariaLevelItemsId}
-            className="mt-4 border-t border-border pt-4"
+            className="border-t border-border/60 pt-3"
           >
             <LevelPanel
               userId={userId}
@@ -1149,10 +1217,10 @@ interface PracticeCardProps {
   onPick: (optionIndex: number) => void;
   /** Envía una respuesta escrita (producción controlada, V3.13 P1). */
   onSubmitTyped: (answer: string) => void;
-  /** Continuar tras un resultado (avanza la sesión) o saltar sin responder. */
+  /** Continuar tras un resultado (avanza la sesión). */
   onAdvance: () => void;
-  onSkip: () => void;
-  sessionActive: boolean;
+  /** Perfil activo: el altavoz de la repetición lee con sus dos acentos. */
+  userId: string | null;
   t: TranslateFn;
 }
 
@@ -1168,8 +1236,7 @@ function PracticeCard({
   onPick,
   onSubmitTyped,
   onAdvance,
-  onSkip,
-  sessionActive,
+  userId,
   t,
 }: PracticeCardProps) {
   const [typedValue, setTypedValue] = useState("");
@@ -1234,12 +1301,25 @@ function PracticeCard({
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {t(nk("questionLabel"))}
               </span>
-              <p
-                className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm font-medium leading-relaxed text-foreground"
-                lang="en"
-              >
-                {result.prompt}
-              </p>
+              <div className="flex items-start gap-2">
+                <p
+                  className="flex-1 rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm font-medium leading-relaxed text-foreground"
+                  lang="en"
+                >
+                  {result.prompt}
+                </p>
+                {/* V3.75.5: el ítem se puede volver a oír en los dos acentos del
+                    perfil.
+                    V3.75.6: la composición la elige el alumno en el «...» (ítem /
+                    ítem + opciones / solo la clave). Un check de quiz no trae
+                    texto aparte: su `prompt` es también el texto del ítem. */}
+                <ItemReplayButton
+                  prompt={result.prompt}
+                  options={result.options}
+                  correctIndex={result.correct_index}
+                  userId={userId}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -1339,12 +1419,23 @@ function PracticeCard({
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t(nk("questionLabel"))}
             </span>
-            <p
-              className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm font-medium leading-relaxed text-foreground"
-              lang="en"
-            >
-              {result.prompt}
-            </p>
+            <div className="flex items-start gap-2">
+              <p
+                className="flex-1 rounded-lg border border-border bg-secondary/20 px-3 py-2 text-sm font-medium leading-relaxed text-foreground"
+                lang="en"
+              >
+                {result.prompt}
+              </p>
+              {/* V3.75.5: repetición del ítem en los dos acentos.
+                  V3.75.6: composición elegida por el perfil; sin texto aparte, el
+                  `prompt` del check hace de texto del ítem. */}
+              <ItemReplayButton
+                prompt={result.prompt}
+                options={result.options}
+                correctIndex={result.correct_index}
+                userId={userId}
+              />
+            </div>
           </div>
 
           <ul
@@ -1519,11 +1610,8 @@ function PracticeCard({
           <GraduationCap className="size-3.5 shrink-0" aria-hidden="true" />
           {t(nk("pickNote"))}
         </p>
-        {!sessionActive && !busy && (
-          <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
-            {t(nk("skip"))}
-          </Button>
-        )}
+        {/* V3.75.5: «Saltar» ya no vive al pie de la tarjeta (competía con las
+            opciones): es un botón fantasma en la cabecera de la pantalla. */}
       </div>
     </Card>
   );

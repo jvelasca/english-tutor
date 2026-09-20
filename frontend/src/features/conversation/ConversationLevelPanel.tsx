@@ -8,7 +8,7 @@ import type {
   ConversationRouteState,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import {
   PhraseTranslateButton,
   usePhraseTranslation,
@@ -242,7 +242,11 @@ export function ConversationLevelPanel({
                   </li>
                 ) : (
                   group.items.map((item) => (
-                    <ConversationItemRow key={item.dialogue_id} item={item} />
+                    <ConversationItemRow
+                      key={item.dialogue_id}
+                      item={item}
+                      userId={userId}
+                    />
                   ))
                 )}
               </ul>
@@ -326,7 +330,13 @@ export function ConversationLevelPanel({
   );
 }
 
-function ConversationItemRow({ item }: { item: ConversationItem }) {
+function ConversationItemRow({
+  item,
+  userId,
+}: {
+  item: ConversationItem;
+  userId: string | null;
+}) {
   const { t } = useI18n();
   const opening = usePhraseTranslation(item.opening_line);
   return (
@@ -349,10 +359,8 @@ function ConversationItemRow({ item }: { item: ConversationItem }) {
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <PhraseTranslateButton state={opening} />
-        <ListenButton
-          text={item.opening_line}
-          label={t("convRoutes.listenOpening")}
-        />
+        {/* V3.75.5: altavoz consciente de la voz (A/B). */}
+        <ItemReplayButton prompt={item.opening_line} userId={userId} />
       </div>
     </li>
   );

@@ -130,7 +130,10 @@ No hay modo: `0.0.0.0` es el único comportamiento, y `ALLOWED_ORIGIN_REGEX`
 1. **`ENGLISH_TUTOR_LAN`** (variable de entorno, `1`/`0`) es la **única** fuente de
    verdad del modo. Ausente ⇒ loopback. El launcher la exporta al backend en
    `backend_env()` (que ya existe y ya añade `ENGLISH_TUTOR_REQUIRE_UI`), de modo
-   que **backend y launcher no pueden discrepar**.
+   que **backend y launcher no pueden discrepar**. *(V3.75.3: la variable sigue
+   siendo la única fuente del **modo** —nada la relee por otra vía—, pero el
+   launcher ahora la **declara al arrancar** desde `launcher/config.json` en vez de
+   partir siempre de «ausente»; ver §5.9.)*
 2. `backend_command()` pasa a `--host 127.0.0.1` por defecto y `0.0.0.0` **solo**
    con la variable activa. El certificado TLS **se mantiene siempre**: en
    `localhost` también hace falta *secure context* para el micrófono (es la razón
@@ -225,6 +228,43 @@ que declara el modo (`core.set_lan_mode`), refresca la fila —enlace si respond
 que ya existía en la barra de acciones. Con la app parada solo deja el modo
 declarado, y lo dice. La decisión vive en `core.py`, no en la GUI, para que tenga
 test: la GUI de `tkinter` no se puede probar sin pantalla.
+
+> **V3.75.3 — §5.8 revisado.** El gerente decidió después (pregunta abierta nº 1 de
+> §9) que el launcher **recuerde** la última configuración. El modo LAN ya no vive
+> solo en el entorno del proceso: se persiste en `launcher/config.json`. El botón
+> se conserva y significa lo mismo, pero deja de ser una decisión de sesión. Las
+> consecuencias, en §5.9.
+
+### 5.9 V3.75.3 — la preferencia de red se persiste (reversión asumida)
+
+Pedido del gerente: «si se activa RED LOCAL, al abrir el launcher otra vez debe
+seguir activa». Se implementa como **ajuste persistido del launcher**, que es
+justo la opción que §5.8 descartaba. Queda escrito y con su porqué:
+
+- **`launcher/config_store.py`** (nuevo, calcado de `state_store.py`): lee y escribe
+  `launcher/config.json` con `{"lan": false}`. El valor por defecto es **cerrado**
+  (fichero ausente, corrupto o con un valor que no sea booleano ⇒ LAN desactivada).
+- **Arranque** (`LauncherApp.__init__`): `load_config()` + `core.apply_lan_config`
+  **antes** de `_build_ui()`, así que `_refresh_access` pinta el modo vigente en el
+  primer pintado. La preferencia guardada **manda sobre el entorno heredado** (un
+  `ENGLISH_TUTOR_LAN=1` de una consola no deja la casilla activada sin reflejarlo).
+- **Cambio** (`toggle_lan_mode`): se guarda **en el acto**, no al cerrar la ventana.
+  Una preferencia de red no debería depender de que el launcher se cierre bien.
+- `config.json` se ignora en git (preferencia por equipo, igual que `state.json`).
+- `apply_lan_config` abre **solo** con el booleano `True` (`is True`): un `1` o un
+  `"sí"` editados a mano en el JSON se leen como cerrado.
+
+**Lo que cambia en el análisis de riesgo de este plan:** el modo LAN pasa de
+decisión de sesión a **decisión de instalación**. Un equipo con `{"lan": true}`
+arranca con uvicorn en `0.0.0.0` y aceptando orígenes de red privada **sin que
+nadie lo declare en esa sesión**. Mientras no exista la Fase 3 (credencial o
+emparejamiento), el P0 sigue abierto y R5 (`GET /api/users` enumera perfiles sin
+credencial) sigue alcanzable para quien esté en esa red.
+
+**Mitigación honesta (no elimina el riesgo):** el modo es **visible** —la fila LAN
+muestra el enlace y el botón «Desactivar red local» desde el primer pintado, no hay
+modo silencioso—, el fichero es local, y desactivar se persiste igual de inmediato.
+Lo que **no** cambia: la superficie de la API en modo LAN y la prioridad de la Fase 3.
 
 ---
 
@@ -390,8 +430,11 @@ cambio** (stash temporal del fuente), como se hizo en V3.73.7.
 
 **Preguntas abiertas para el gerente:**
 
-1. ¿El modo LAN se activa con **variable de entorno** (como se propone), con un
-   **ajuste persistido** del launcher, o con un **flag de línea de comandos**?
+1. ~~¿El modo LAN se activa con **variable de entorno**, con un **ajuste
+   persistido** del launcher, o con un **flag de línea de comandos**?~~
+   **Respondida en V3.75.3: ajuste persistido del launcher** (`launcher/config.json`
+   + `launcher/config_store.py`, §5.9). La variable de entorno no desaparece: sigue
+   siendo el **transporte** hacia el backend (`ENGLISH_TUTOR_LAN`), que no cambia.
 2. ¿La Fase 2 debe **retirar** `et_user_id` (una sola fuente de verdad) o
    **conservarla** como pista inocua de «último perfil»? El plan propone retirarla.
 3. ¿`POST /api/users` (crear perfil) debe seguir **abierto** —es el flujo de primer

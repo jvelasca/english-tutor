@@ -8,7 +8,7 @@ import { Navigation } from "./Navigation";
 import { ConnectionIndicator } from "../components/ConnectionIndicator";
 import { HandsFreeToggle } from "../components/HandsFreeToggle";
 import { UserMenu } from "../components/UserMenu";
-import { GearIcon, HelpIcon } from "../components/Icons";
+import { GearIcon, HelpIcon, TrendIcon } from "../components/Icons";
 
 interface HeaderProps {
   route: Route;
@@ -23,6 +23,12 @@ interface HeaderProps {
   handsFreeMicError: MicUnavailableReason | null;
   onToggleHandsFree: () => void;
   onOpenSettings: () => void;
+  /**
+   * V3.75.3: abre el análisis de evolución (`/analisis`). Es una ruta auxiliar,
+   * no un destino de navegación: por eso vive aquí, junto al usuario, y no como
+   * píldora.
+   */
+  onOpenAnalysis: () => void;
 }
 
 export function Header({
@@ -38,6 +44,7 @@ export function Header({
   handsFreeMicError,
   onToggleHandsFree,
   onOpenSettings,
+  onOpenAnalysis,
 }: HeaderProps) {
   const { t } = useI18n();
   return (
@@ -80,6 +87,18 @@ export function Header({
           micError={handsFreeMicError}
           onToggle={onToggleHandsFree}
         />
+        {/* V3.75.3: análisis de evolución junto al usuario. Antes vivía en un
+            botón flotante dentro de la práctica (panel «Analysis»), donde no se
+            encontraba fuera del ejercicio. */}
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onOpenAnalysis}
+          title={t("analysis.open")}
+          aria-label={t("analysis.open")}
+        >
+          <TrendIcon size={18} />
+        </button>
         <button
           type="button"
           className="icon-button"

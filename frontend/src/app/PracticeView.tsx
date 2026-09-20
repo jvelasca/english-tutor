@@ -1,7 +1,7 @@
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import type { ChatApi } from "../hooks/useChat";
 import type { NextBestActivity } from "../types/api";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ChatMessage } from "../components/ChatMessage";
 import { Composer } from "../components/Composer";
 import { Button } from "../components/ui/button";
@@ -9,8 +9,8 @@ import { ListeningPractice } from "../features/listening/ListeningPractice";
 import { PronunciationPractice } from "../components/PronunciationPractice";
 import { ResizeHandle } from "../components/ResizeHandle";
 import { Sidebar } from "../components/Sidebar";
-import { MenuIcon, PanelIcon } from "../components/Icons";
-import { clampRight, clampSidebar, RIGHT_MAX, RIGHT_MIN, SIDEBAR_MAX, SIDEBAR_MIN } from "../utils/layout";
+import { MenuIcon } from "../components/Icons";
+import { clampSidebar, SIDEBAR_MAX, SIDEBAR_MIN } from "../utils/layout";
 import type { Section } from "../utils/sections";
 import type { SessionStep } from "../types/api";
 import { navigateTo } from "../router/hash";
@@ -18,10 +18,6 @@ import { FORMATION_PATH, LEARN_PATH } from "../router/paths";
 import type { LearnActivity } from "../router/learnHub";
 import { LearnActivitySwitcher } from "../components/LearnActivitySwitcher";
 import { useI18n } from "../hooks/useI18n";
-
-const AnalysisPanel = lazy(() =>
-  import("../components/AnalysisPanel").then((m) => ({ default: m.AnalysisPanel })),
-);
 
 const SUGGESTIONS = [
   "Let's have a conversation. Ask me anything!",
@@ -57,7 +53,6 @@ export function PracticeView({
 }: PracticeViewProps) {
   const { t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const {
     messages,
@@ -91,10 +86,6 @@ export function PracticeView({
   // es el de la lección (sin historial; la envoltura de curso vive en la barra
   // de contexto de esta pantalla, WS7).
   const showSidebar = route === "chat" && !activeObjective;
-  // En Aprender, las secciones de práctica pura (no conversación) usan todo el
-  // ancho: el panel de análisis nunca se acopla y se abre como drawer con el
-  // botón flotante. Las secciones conversacionales conservan su layout.
-  const drawerAnalysis = route === "learn" && !isChat;
 
   // Barra de contexto (WS7): una lección del curso solo está en curso cuando la
   // ruta es "chat" (Conversar) y hay un objetivo activo (las lecciones se
@@ -121,14 +112,6 @@ export function PracticeView({
     const max = Math.max(SIDEBAR_MIN, Math.floor(window.innerWidth * 0.35));
     const next = clampSidebar(layout.sidebarWidth + dx);
     setLayout({ ...layout, sidebarWidth: Math.min(next, max) });
-  };
-
-  const handleDragRight = (dx: number) => {
-    // Además del tope absoluto (RIGHT_MAX), limitamos el panel de análisis a
-    // ~60% del viewport para que la zona central conserve espacio en desktop.
-    const max = Math.max(RIGHT_MIN, Math.floor(window.innerWidth * 0.6));
-    const next = clampRight(layout.rightWidth - dx);
-    setLayout({ ...layout, rightWidth: Math.min(next, max) });
   };
 
   return (
@@ -186,7 +169,10 @@ export function PracticeView({
         )}
       </div>
 
-      <div className={`workspace${drawerAnalysis ? " workspace--learn" : ""}`}>
+      {/* V3.75.3: el panel de análisis se retiró de la práctica. Su contenido
+          experto vive en MI PROGRESO y el análisis de evolución se abre desde la
+          cabecera (`/analisis`), así que el ejercicio conserva todo el ancho. */}
+      <div className="workspace">
       {showSidebar && (
         <>
           <aside
@@ -313,69 +299,6 @@ export function PracticeView({
           />
         )}
       </main>
-
-      {!drawerAnalysis && (
-        <ResizeHandle
-          onDrag={handleDragRight}
-          label={t("chat.resizeInsights")}
-          value={layout.rightWidth}
-          min={RIGHT_MIN}
-          max={RIGHT_MAX}
-        />
-      )}
-
-      <aside
-        className={`pane pane--insights${insightsOpen ? " open" : ""}`}
-        style={{ width: layout.rightWidth }}
-      >
-        <div className="insights-header">
-          <span className="insights-title">{t("panels.analysis")}</span>
-          <button
-            type="button"
-            className="pane-close"
-            onClick={() => setInsightsOpen(false)}
-            aria-label={t("panels.closeAnalysis")}
-          >
-            {t("chat.close")}
-          </button>
-        </div>
-        <Suspense
-          fallback={
-            <div
-              role="status"
-              aria-busy="true"
-              className="flex flex-col items-center justify-center gap-3 py-10 text-muted-foreground"
-            >
-              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-              <span className="text-sm">{t("common.loading")}</span>
-            </div>
-          }
-        >
-          <AnalysisPanel messages={messages} />
-        </Suspense>
-      </aside>
-
-      {!insightsOpen && (
-        <button
-          type="button"
-          className="insights-toggle"
-          onClick={() => setInsightsOpen(true)}
-          aria-label={t("panels.openAnalysis")}
-          aria-expanded={insightsOpen}
-        >
-          <PanelIcon />
-        </button>
-      )}
-
-      <button
-        type="button"
-        className={`pane-backdrop pane-backdrop--insights${
-          insightsOpen ? " open" : ""
-        }`}
-        onClick={() => setInsightsOpen(false)}
-        aria-label={t("panels.closeAnalysis")}
-        tabIndex={-1}
-      />
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
 import { SkillBar } from "../../components/SkillBar";
 import { ActivityResult } from "../../components/ActivityResult";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { RecordingPlayButton } from "../../components/RecordingPlayButton";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import {
@@ -387,6 +387,7 @@ export function SpeakingScene({
       {micError && <MicUnavailableNotice reason={micError} />}
       <PracticeExchangeCard
         card={card}
+        userId={userId}
         cardLoading={itemLoading}
         cardError={itemError}
         result={result}
@@ -413,6 +414,7 @@ export function SpeakingScene({
 
 interface PracticeExchangeCardProps {
   card: SpeakingPhrase | null;
+  userId: string | null;
   cardLoading: boolean;
   cardError: boolean;
   result: SpeakingAttempt | null;
@@ -433,6 +435,7 @@ interface PracticeExchangeCardProps {
 /** Tarjeta del escenario de micro-conversación guiada (arriba, siempre visible). */
 function PracticeExchangeCard({
   card,
+  userId,
   cardLoading,
   cardError,
   result,
@@ -643,7 +646,8 @@ function PracticeExchangeCard({
               </p>
               <div className="flex items-center gap-1.5">
                 <PhraseTranslateButton state={appLine} />
-                <ListenButton text={card.app_line} label={t("speak.phrase")} />
+                {/* V3.75.5: el interlocutor suena en el acento A o B elegido. */}
+                <ItemReplayButton prompt={card.app_line} userId={userId} />
               </div>
             </div>
             <p

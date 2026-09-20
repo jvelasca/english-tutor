@@ -22,6 +22,11 @@ interface ListenButtonProps {
  * resultados. Reutiliza `speakWithVoice()` (consentimiento/descarga de voz y
  * aviso global de degradación, V3.72) y muestra un spinner mientras suena. Los
  * fallos de voz son silenciosos: nunca bloquean el flujo.
+ *
+ * V3.75.7: aquí **no** hay comparador de acentos. La lectura A/B (dos voces, una
+ * británica y otra americana) vive en `ItemReplayButton`, que es el único que la
+ * usa; una prop `accent` en este componente quedó sin consumidor desde V3.75.5 y
+ * dos sitios con la misma lógica son dos sitios donde puede discrepar.
  */
 export function ListenButton({
   text,

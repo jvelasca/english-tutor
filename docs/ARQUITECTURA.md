@@ -35,7 +35,7 @@ backend/
 │   ├── settings.py      # GET/PUT /api/settings (preferencias; solo las del propio perfil)
 │   ├── users.py         # GET/POST /api/users, PATCH /api/users/{id} (solo el propio perfil)
 │   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
-│   └── voz.py           # POST /api/transcribe, POST /api/tts
+│   └── voz.py           # POST /api/transcribe, POST /api/tts (voz opcional validada; V3.75.5)
 ├── schemas/             # Contratos de datos (Pydantic).
 │   ├── __init__.py
 │   ├── academy.py       # Enrollment*, Level*, Objective*, Mastery*, Assessment*, Attempt*
@@ -51,7 +51,7 @@ backend/
 │   ├── settings.py      # Settings* (preferencias por usuario)
 │   ├── users.py         # User, UserCreate, UserUpdate, SessionCreate
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
-│   └── voz.py           # TTSRequest, TranscribeResponse
+│   └── voz.py           # TTSRequest (text/language/voice), TranscribeResponse
 ├── domain/              # Servicios de dominio (async, orquestan la lógica).
 │   ├── __init__.py
 │   ├── academy.py       # orquestación Academy: niveles, mastery, examen, gating (async)
@@ -102,7 +102,7 @@ backend/
 │   ├── speaking_assessment.py # instrumento Speaking Assessment 1.0 (versionado + agregación)
 │   ├── stt.py           # faster-whisper
 │   ├── trends.py        # daily_activity + aggregate_series + compute_streak (puros, F6)
-│   ├── tts.py           # piper-tts
+│   ├── tts.py           # piper-tts (pick_requested_voice: valida la voz pedida; V3.75.5)
 │   └── vocabulary.py    # extract_words (puro, F4)
 ├── curriculum/          # contenido curricular versionado como JSON (a1.json, a2.json, assessments.json, speaking_assessment.json)
 ├── models/              # pesos descargados (Whisper/Piper). GITIGNORED.
@@ -214,13 +214,13 @@ frontend/src/
 │   ├── chat.ts          # chat normal + streaming (envía mode; el perfil va en la sesión).
 │   ├── conversations.ts # CRUD de conversaciones (el perfil va en la sesión).
 │   ├── learning.ts      # getProfile + analyzeText + getEvents (F4/F6).
-│   ├── listening.ts     # getListeningQuestion + submitListeningAnswer + getListeningStats (F8).
+│   ├── listening.ts     # getListeningQuestion + audio por voz + submitListeningAnswer (F8, V3.75.5).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score).
 │   ├── progress.ts      # getProgress + getProgressHistory (resumen + histórico) (F6).
 │   ├── session.ts       # openSession + getSession + closeSession (V3.75).
 │   ├── settings.ts      # getSettings + putSettings (preferencias del perfil de la sesión).
 │   ├── users.ts         # listUsers, createUser, updateUser.
-│   └── voz.ts           # transcribe + tts.
+│   └── voz.ts           # transcribe + tts (envía la voz pedida, validada en el backend).
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
 │   ├── Academy.tsx      # currículum CEFR: niveles, objetivos, mastery y examen (núcleo Academy)
 │   ├── AppearancePanel.tsx # panel de apariencia: tema, acento, tamaño, densidad (M16)
@@ -228,6 +228,7 @@ frontend/src/
 │   ├── Composer.tsx
 │   ├── HandsFreeToggle.tsx  # activar/parar modo manos libres + estado (M10)
 │   ├── HelpDialog.tsx   # ayuda para no ingenieros enlazada a docs/ (M16)
+│   ├── ItemReplayButton.tsx # altavoz de después de responder: ítem compuesto (texto+pregunta+opciones+clave) en acento A o B, con STOP (V3.75.5/V3.75.6)
 │   ├── LearningProfile.tsx  # panel del perfil: CEFR + bandas por destreza + recomendaciones (F4/F8)
 │   ├── ListeningPractice.tsx # comprensión auditiva: TTS + responder + nivel/progreso (F8)
 │   ├── MicButton.tsx
@@ -241,16 +242,18 @@ frontend/src/
 │   ├── TutorQualityPanel.tsx # panel de calidad del tutor (F9)
 │   ├── UserAvatar.tsx   # avatar (imagen → emoji → iniciales) (M14)
 │   └── UserMenu.tsx     # selector/perfil de usuario (M14)
+│   └── VoicePicker.tsx  # elige voz A (perfil), voz B (segundo acento), prueba A/B y lectura al repetir (V3.75.5/V3.75.6)
 ├── hooks/               # Estado y lógica de UI.
-│   ├── useAppearance.ts # apariencia por usuario: tema/acento/tamaño/densidad + persistencia (M16)
+│   ├── useAppearance.ts # apariencia por usuario: tema/acento/tamaño/densidad/esquema de niveles + persistencia (M16)
 │   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
-│   └── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
+│   ├── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
+│   └── useVoiceChoice.ts # store de módulo: catálogo + pareja A/B del perfil + lectura al repetir + persistencia (V3.75.5/V3.75.6)
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
 │   └── api.ts           # incluye User y user_id en ConversationMeta
 ├── utils/               # Funciones puras (testables, con su *.test.ts junto).
-│   ├── appearance.ts    # presets de acento/tamaño/densidad + parse/serialize (M16)
+│   ├── appearance.ts    # presets de acento/tamaño/densidad/esquema de niveles + parse/serialize (M16)
 │   ├── avatar.ts        # color/emoji/iniciales deterministas (M14)
-│   ├── cefr.ts          # cefrTone, cefrLabel, bandLabel (F4/F8)
+│   ├── cefr.ts          # cefrLevelKey/levelClass/bandToLevelKey, cefrLabel, bandLabel (F4/F8)
 │   ├── fluency.ts       # wpmLabel, fluencyLevelLabel (F8)
 │   ├── image.ts         # resizeImageToDataUrl (M14)
 │   ├── layout.ts        # dimensiones de paneles + clamp/parse/serialize (M14)
@@ -263,19 +266,50 @@ frontend/src/
 │   ├── title.ts         # deriveTitle
 │   ├── tutorEvaluation.ts # evaluador del tutor: ratios + scores + medias (puro, F9)
 │   ├── users.ts         # nextDefaultUserName
-│   └── vad.ts           # VAD: rms + shouldEndUtterance + constantes (M10)
+│   ├── vad.ts           # VAD: rms + shouldEndUtterance + constantes (M10)
+│   └── voices.ts        # locale/acento/etiqueta de voz, sugerencia de la B y texto de repetición con alcance (V3.75.5/V3.75.6)
 ├── scripts/             # scripts de utilidad.
 │   └── check.ps1        # tsc + vitest
 ├── vitest.config.ts
 └── index.css             # tokens de diseño, tema claro/oscuro, responsive (M8)
 ```
 
-> **Sistema de diseño (M8/M16):** los tokens viven en `:root` de `index.css`
-> (`--color-*`, `--font-*`, `--text-*`, `--space-*`, `--radius-*`, `--shadow-*`),
-> con el tema claro sobrescrito en `:root[data-theme="light"]`. El tema, el acento,
-> el tamaño de letra y la densidad se controlan desde `hooks/useAppearance.ts` +
-> `utils/appearance.ts` y se aplican vía `data-theme`/`data-accent`/`data-font`/`data-density`
-> en `<html>`. La apariencia se persiste por usuario (backend `settings` + `localStorage`).
+> **Sistema de diseño (M8/M16):** los tokens viven en `:root` de
+> `styles/legacy.css` (histórico) e `index.css` —`--color-*`, `--font-*`,
+> `--text-*`, `--space-*`, `--radius-*`, `--shadow-*`—, con el tema claro
+> sobrescrito en `:root[data-theme="light"]`. El tema, el acento, el tamaño de
+> letra, la densidad y el **esquema de color de los niveles** se controlan desde
+> `hooks/useAppearance.ts` + `utils/appearance.ts` y se aplican vía
+> `data-theme`/`data-accent`/`data-font`/`data-density`/`data-levels` en `<html>`.
+> La apariencia se persiste por usuario (backend `settings` + `localStorage`); el
+> backend no tiene que saber nada de estos campos: `PUT /api/settings` guarda
+> clave/valor libre.
+>
+> **Rampa de niveles (V3.75.4):** cada nivel CEFR —Pre-A1, A1, A2, B1, B2, C1, C2
+> y el cajón «sin dato»— tiene su propio color. `utils/cefr.ts::levelClass(nivel)`
+> devuelve la clase **estática** (`.lv-a2`) que consume tres tokens declarados por
+> paso (`--level-<paso>-fg/bg/border`); el relleno y el borde se **derivan** de la
+> tinta con `color-mix()`, así que un esquema nuevo son 7 hexes y no 21. Los tres
+> esquemas son `traffic` (por defecto, `data-levels` ausente), `spectrum` y `mono`
+> (siete intensidades del acento, sin un solo hex propio). Las clases `.lv-*` se
+> declaran **sin capa** al final de `legacy.css` a propósito: el color del nivel
+> no debe poder perderse frente a una utilidad de Tailwind de la misma línea.
+> `scripts/contrast_audit.mjs` mide cada paso sobre su relleno compuesto en los 3
+> esquemas, los 2 temas y los 7 acentos de «Monocromo», y es guarda de CI.
+
+> **Pantallas de característica (V3.75.3):** las prácticas y pantallas que crecieron
+> más allá de un componente viven en `frontend/src/features/<área>/` (p. ej.
+> `features/listening/`, `features/progress/`), no en `components/`. Ahí está la
+> nueva `features/analysis/AnalysisScreen.tsx`: el **análisis de evolución global**
+> (posición CEFR, actividad real con su agrupación temporal, tríada, destrezas y
+> escalera), en la ruta auxiliar `/analisis` (`router/paths.ts::ANALYSIS_PATH`),
+> abierta desde la cabecera junto al usuario. Sustituye al panel flotante
+> `components/AnalysisPanel.tsx`, **borrado** en esta versión: en V3.1 se había
+> quedado sin analítica propia (calidad del tutor y un enlace a MI PROGRESO) y solo
+> se encontraba dentro del ejercicio. Consume los endpoints que ya existían
+> (`student-model`, `progress/history`, `learning/events`, `cefr-ladder`) y el
+> `TutorQualityPanel` recibe los turns de la sesión en curso, que era lo único en
+> vivo que aportaba el panel retirado.
 
 ### Responsabilidades frontend
 - **`api/`**: único lugar donde se hace `fetch`. Expone funciones tipadas.
@@ -295,6 +329,7 @@ launcher/
 ├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
 ├── browser_cookies.py   # diagnóstico de cookies de Chrome/Edge/Brave/Vivaldi/Opera/Firefox
 ├── state_store.py       # persistencia visual: tamaño/posición de ventana y paneles
+├── config_store.py      # persistencia de preferencias: modo LAN (config.json, V3.75.3)
 ├── make_icon.ps1        # genera icon.ico (System.Drawing, Windows)
 ├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
 ├── allow-firewall.ps1   # abre TCP 8000 (API + UI) en el firewall (requiere admin)
@@ -302,10 +337,12 @@ launcher/
 ├── pyproject.toml       # configuración de ruff (mismas reglas que el backend)
 ├── logs/                # logs de backend/UI (gitignored)
 ├── state.json           # estado de la UI persistido (gitignored)
+├── config.json          # preferencias persistidas: modo LAN (gitignored, V3.75.3)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
-                         #         test_ui/test_state_store/test_process_manager/
-                         #         test_preflight_v373/test_lan_ip_v373/test_lan_mode) — 145
-                         #         funciones de test (162 casos con parametrización), en CI
+                         #         test_ui/test_state_store/test_config_store/
+                         #         test_process_manager/test_preflight_v373/
+                         #         test_lan_ip_v373/test_lan_mode) — 161
+                         #         funciones de test (178 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 
@@ -327,6 +364,13 @@ launcher/
   poder usarlo (V3.75).
 - **`state_store.py`**: persistencia de la disposición visual (tamaño/posición de ventana y
   paneles colapsados) en `state.json`.
+- **`config_store.py`** (V3.75.3): persistencia de las **preferencias** del launcher en
+  `config.json`, separada del estado visual a propósito. Hoy guarda una sola: el modo LAN
+  (`{"lan": false}` por defecto, fail-closed). Se lee **al arrancar**, antes de construir la
+  interfaz (`LauncherApp.__init__` → `core.apply_lan_config`), y se escribe **en cada cambio**
+  (`toggle_lan_mode`), no al cerrar: reabrir el launcher conserva el modo declarado y el panel
+  de acceso ya lo muestra. Reexpone la decisión de §5.8 de
+  `docs/audit/PLAN-P0-IDENTIDAD.md`; el detalle y su porqué están ahí.
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
   puerto en el firewall.
 
@@ -453,6 +497,83 @@ recibe su credencial o pasa a admin; hasta entonces la lista está escrita aquí
 `backend/tests/test_public_surface.py` la comprueba en las dos direcciones (que lo
 declarado sin sesión siga respondiendo, y que lo declarado con sesión **no** salga
 sin ella), además de fallar si esta sección desaparece del documento.
+
+### Voz: el cliente puede pedir una voz, y sólo una instalada (V3.75.5)
+
+- **Hasta V3.75.4 la voz la decidía el servidor.** `/api/tts` recibía `text`/`language` y
+  `/api/listening/audio/{id}` sólo `variant`; ambos resolvían la voz con
+  `tts.resolve_voice(prefs)` —la del perfil—. El «…» de la tarjeta de audio sólo podía
+  **mostrarla**, y no había forma de oír un ítem con otro acento.
+- **Ahora la petición puede pedir una voz, validada en el servidor.** `TTSRequest.voice`
+  (`schemas/voz.py`) y el query param `voice` de `/api/listening/audio` viajan hasta
+  `tts.pick_requested_voice`, que **sólo** acepta una voz *instalada* (`list_voices()`) **y**
+  del **mismo idioma** pedido. Si no pasa el filtro se ignora en silencio y manda
+  `resolve_voice`: una preferencia vieja no puede romper la reproducción (ni provocar un 400
+  que dejaría la UI muda).
+- **Por qué la validación no es negociable:** el id de voz **entra en rutas del disco** —
+  `PIPER_DIR / f"{voice_id}.onnx"` y la caché `data/listening/{banco}/{voz}/{id}-{digest}.wav`.
+  Aceptar un id arbitrario del cliente sería path traversal por construcción.
+- **El header sigue declarando la verdad.** `X-TTS-Voice` / `X-TTS-Degraded` dicen lo que
+  **realmente** sonó, no lo que se pidió: la UI puede ser honesta cuando degrada.
+- **Dos acentos, una sola lectura del catálogo.** La pareja A/B vive en el **store de módulo**
+  `hooks/useVoiceChoice.ts` (patrón de `useVoiceDownload`, `useSyncExternalStore`): una sola
+  lectura de `GET /api/voices` + `GET /api/settings` para toda la app aunque haya varios
+  altavoces en pantalla, y persistencia con el `PUT /api/settings` que ya existía
+  (`tts_voice` = A, `tts_voice_alt` = B). Un cambio de perfil **vacía** el store antes de
+  releer: la voz de un alumno no puede quedarse a la vista de otro.
+- **La caché no cambia de forma, sí de tamaño.** Cada ítem × voz × variante es un WAV propio
+  (~100 KB), y la primera vez que se pide la voz B hay que sintetizar **y** alinear (ASR) ese
+  WAV. Es el precio declarado de la función: unos segundos la primera vez, después cacheado, y
+  se puede borrar sin romper nada.
+- Fijado por test en `backend/tests/test_voices.py` (la voz pedida se honra; una no instalada o
+  de otro idioma se ignora) y `test_listening_audio.py` (voz por URL y **caché separada por
+  voz**), y en frontend por `hooks/useVoiceChoice.test.tsx`, `utils/voices.test.ts`,
+  `components/VoicePicker.test.tsx`, `components/ItemReplayButton.test.tsx` y
+  `components/ListenButton.test.tsx` (con `accent` se manda `voice`; **sin** `accent`, nada).
+
+### Repetición: STOP, una locución a la vez y la lectura que elige el perfil (V3.75.6)
+
+- **La locución en curso vive en un registro de módulo.** `api/voz.ts` guarda el
+  `<audio>` y su `AbortController` en `speaking` y expone `stopSpeaking()` /
+  `isSpeaking()`. Parar **pausa** el audio, **cancela** la síntesis si aún no había
+  sonado y **resuelve** la promesa en curso: cortar no es un error, así que el
+  botón que esperaba apaga su spinner sin tratarlo como fallo.
+- **Una sola locución a la vez.** `speak()` corta la anterior al empezar: antes dos
+  componentes podían solaparse (dos voces hablando encima). Es el mismo
+  comportamiento que ya se esperaba del PLAY, ahora garantizado en la capa HTTP.
+- **Un ítem tiene cuatro piezas y la lectura es una composición.** Texto del ítem
+  (el `script`, lo que suena), pregunta, opciones y respuesta correcta. `replay_scope`
+  elige la composición y vive en el mismo `PUT /api/settings` que las voces:
+  `"item"` (**por defecto**: texto + pregunta + respuesta), `"withOptions"` (texto +
+  pregunta + opciones + respuesta) y `"correct"` (pregunta + respuesta). El valor
+  histórico `"all"` —la única lectura que existió— se conserva como `"withOptions"`
+  para no cambiarle la elección a quien ya la había hecho.
+- **La composición vive en una función pura y con salvaguardas.**
+  `utils/voices.ts::buildReplayText` es el único sitio que decide el texto, y descarta
+  piezas ausentes en vez de inventarlas: sin `correct_index` no hay respuesta (no se
+  inventa), sin `script` la pregunta hace de texto, y si el alcance elegido dejara la
+  lectura vacía se cae a la composición completa —**nunca** una repetición muda—. Un
+  ítem cuyo script *es* la pregunta (habitual en A1) se lee una sola vez.
+- **Nunca puede filtrar la clave antes de tiempo.** Todo lo que suena sale de
+  `buildReplayText`, y su entrada `correct_index` sólo la aportan los sitios que ya
+  han respondido; hasta entonces el altavoz de repetición ni existe (`ListenButton`
+  es otra pieza).
+- **El corpus deja de mentir sobre sus destrezas.** `c071` y `c084` (los dos únicos
+  ítems etiquetados `dictation`/`shadowing`) estaban autorados como pregunta de
+  opción múltiple con `options` + `answer_index`, y `flow_for_skill` los llevaba al
+  flujo de **producción** tirando ese contenido. Reetiquetados a `numbers` y
+  `phrase_recognition` (corpus `3.0.1`): B1 se sirve como las otras cinco rutas.
+  El test `test_corpus_production_items_do_not_carry_multiple_choice_options`
+  impide que vuelva a colarse por etiqueta. Precio declarado: hoy **no hay ningún
+  ítem autorado de dictado** — el flujo y su endpoint siguen vivos y probados, pero
+  el esquema del corpus exige opciones y no puede representarlo.
+- **El arnés visual lo cubre de punta a punta.** `tests/visual/listeningReplayStop.spec.ts`
+  (3 breakpoints) navega a la RUTA B1, comprueba que no hay tarjeta de producción y que
+  el «…» ofrece las tres lecturas, responde, repite con el acento A y **lee del cuerpo
+  real del `POST /api/tts`** el texto compuesto (texto + pregunta + opciones + clave)
+  antes de cortar con el STOP. Medido: STOP 32×32 dentro del viewport y sin
+  desbordamiento horizontal en 390/768/1280.
+
 
 ## Regla de oro
 > Si vas a añadir una feature, su código va en su módulo. No se "pega" lógica nueva en

@@ -12,7 +12,7 @@ import {
   type MicUnavailableReason,
 } from "../utils/browserCapabilities";
 import { ActivityResult } from "./ActivityResult";
-import { ListenButton } from "./ListenButton";
+import { ItemReplayButton } from "./ItemReplayButton";
 import {
   PhraseTranslateButton,
   usePhraseTranslation,
@@ -149,7 +149,7 @@ export function PronunciationPractice({
           </p>
           <div className="flex shrink-0 items-center gap-2">
             <PhraseTranslateButton state={sentencePhrase} />
-            <ListenButton text={sentence} label={t("speak.phrase")} />
+            <ItemReplayButton prompt={sentence} userId={userId} />
           </div>
         </div>
 
@@ -238,7 +238,8 @@ export function PronunciationPractice({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <PhraseTranslateButton state={expectedPhrase} />
-                <ListenButton text={result.expected} label={t("speak.phrase")} />
+                {/* V3.75.5: la referencia esperada se puede oír en A o B. */}
+                <ItemReplayButton prompt={result.expected} userId={userId} />
               </div>
             </div>
             <div>

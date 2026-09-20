@@ -30,6 +30,10 @@ vi.mock("../api/voices", () => ({
   getVoices: vi.fn(),
   downloadVoice: vi.fn(),
 }));
+vi.mock("../api/settings", () => ({
+  getSettings: vi.fn(),
+  saveSettings: vi.fn(),
+}));
 
 const getVoicesMock = vi.mocked(getVoices);
 const downloadVoiceMock = vi.mocked(downloadVoice);
@@ -60,8 +64,7 @@ function renderSpeaker() {
   );
 }
 
-describe("ListenButton · V3.72 consentimiento y degradación", () => {
-  beforeEach(() => {
+describe("ListenButton · V3.72 consentimiento y degradación", () => {  beforeEach(() => {
     resetVoiceSession();
     vi.clearAllMocks();
     speakMock.mockResolvedValue({ voice: "es_ES-davefx-medium", degraded: false });
@@ -127,3 +130,10 @@ describe("ListenButton · V3.72 consentimiento y degradación", () => {
     expect(downloadVoiceMock).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * V3.75.7: el comparador de acentos (A/B) **no** vive aquí. Desde V3.75.5 este
+ * componente tuvo una prop `accent` que ninguna pantalla usaba —la lectura en dos
+ * voces se mudó a `ItemReplayButton`—, así que se retiró con sus tests: la
+ * cobertura de A/B está en `ItemReplayButton.test.tsx` y `VoicePicker.test.tsx`.
+ */

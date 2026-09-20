@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getWritingJourney } from "../../api/academy";
 import type { WritingJourneyOut } from "../../types/api";
-import { cefrTone } from "../../utils/cefr";
+import { levelClass } from "../../utils/cefr";
 import { formatConfidence, numericToCefr } from "../../utils/writing";
 import { useI18n } from "../../hooks/useI18n";
 
@@ -56,7 +56,7 @@ export function WritingJourney({ userId }: WritingJourneyProps) {
     <section className="writing-journey">
       <header className="writing-journey__header">
         {journey.current_level && (
-          <span className={`cefr-badge ${cefrTone(journey.current_level)}`}>
+          <span className={`cefr-badge ${levelClass(journey.current_level)}`}>
             {journey.current_level}
           </span>
         )}

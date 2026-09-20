@@ -46,6 +46,8 @@ test("capturar rutas principales", async ({ page }, testInfo) => {
     // conversationRoutesReview.spec.ts con mocks).
     { id: "chat", url: "/#/chat" },
     { id: "progress", url: "/#/progreso" },
+    // V3.75.3: análisis de evolución, destino auxiliar abierto desde la cabecera.
+    { id: "analysis", url: "/#/analisis" },
     { id: "help", url: "/#/ayuda" },
   ] as const;
   for (const route of deepRoutes) {

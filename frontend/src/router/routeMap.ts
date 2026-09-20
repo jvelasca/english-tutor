@@ -3,6 +3,7 @@ import type { Path } from "./hash";
 import { joinPath, normalizeHash, parseSegments } from "./hash";
 import { isChatSkillSlug } from "./chat";
 import {
+  ANALYSIS_PATH,
   CHAT_PATH,
   DICTIONARY_PATH,
   FORMATION_PATH,
@@ -33,6 +34,8 @@ const ROUTE_TO_PATH: Record<Route, Path> = {
   help: HELP_PATH,
   dictionary: DICTIONARY_PATH,
   translator: TRANSLATOR_PATH,
+  // V3.75.3: destino auxiliar de análisis, sin píldora de navegación.
+  analysis: ANALYSIS_PATH,
 };
 
 /**
@@ -83,6 +86,9 @@ export function pathToRoute(path: Path): Route {
       return segments.length === 1 ? "dictionary" : "home";
     case "traductor":
       return segments.length === 1 ? "translator" : "home";
+    case "analisis":
+      // V3.75.3: destino auxiliar sin sub-rutas, igual que diccionario/traductor.
+      return segments.length === 1 ? "analysis" : "home";
     default:
       return "home";
   }

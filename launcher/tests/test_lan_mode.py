@@ -14,6 +14,7 @@ de la variable con `backend/config.py` (que el launcher no puede importar).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -21,11 +22,14 @@ import pytest
 from core import (
     LAN_ENV,
     REQUIRE_UI_ENV,
+    apply_lan_config,
+    apply_stored_lan_config,
     backend_command,
     backend_env,
     backend_host,
     lan_mode,
     set_lan_mode,
+    toggle_lan_config,
 )
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
@@ -146,3 +150,130 @@ def test_el_script_de_firewall_avisa_de_que_hace_falta_el_modo():
         "allow-firewall.ps1 no menciona el modo LAN: el usuario abriría el puerto "
         "del firewall y seguiría sin poder entrar"
     )
+
+
+# --- V3.75.3: la preferencia guardada del launcher --------------------------
+
+
+def test_la_preferencia_guardada_se_aplica_al_arrancar():
+    """El modo LAN sobrevive al cierre: es lo que pidió el gerente.
+
+    Arrancar con `{"lan": true}` en `config.json` tiene que declarar el modo, y
+    el bind y el entorno del backend tienen que salir del mismo sitio (si no,
+    volvería la discrepancia que fija este fichero).
+    """
+    env: dict[str, str] = {}
+
+    apply_lan_config({"lan": True}, env)
+
+    assert lan_mode(env) is True
+    assert backend_host(env) == "0.0.0.0"
+    assert backend_env(env)[LAN_ENV] == "1"
+
+
+def test_sin_preferencia_guardada_el_arranque_no_expone_la_api():
+    """Ausencia de preferencia ⇒ loopback, igual que el fail-closed de `lan_mode`."""
+    for config in ({}, {"lan": False}):
+        env: dict[str, str] = {}
+
+        apply_lan_config(config, env)
+
+        assert lan_mode(env) is False
+        assert backend_host(env) == "127.0.0.1"
+        assert backend_env(env)[LAN_ENV] == "0"
+
+
+def test_un_valor_guardado_que_no_es_booleano_no_expone_la_api():
+    """`config.json` es un fichero de texto: editarlo a mano no puede abrir la LAN."""
+    for valor in ("sí", "true", 1, None):
+        env: dict[str, str] = {}
+
+        apply_lan_config({"lan": valor}, env)
+
+        assert lan_mode(env) is False, f"{valor!r} no es una preferencia declarada"
+
+
+def test_la_preferencia_guardada_manda_sobre_el_entorno_heredado():
+    """Decisión explícita: la preferencia del launcher gana al entorno del proceso.
+
+    La GUI es la que declara el modo, así que un `ENGLISH_TUTOR_LAN=1` heredado de
+    una consola no puede dejar la casilla activada sin que el panel lo refleje:
+    se desactiva y el usuario ve «desactivada (solo este equipo)».
+    """
+    env = {LAN_ENV: "1", "PATH": "/usr/bin"}
+
+    apply_lan_config({"lan": False}, env)
+
+    assert LAN_ENV not in env
+    assert lan_mode(env) is False
+
+    apply_lan_config({"lan": True}, env)
+    assert lan_mode(env) is True
+
+
+def test_el_arranque_lee_la_preferencia_y_la_declara(tmp_path):
+    """`apply_stored_lan_config` es la mitad de arranque, en una sola llamada.
+
+    La decisión pura ya está probada arriba; esto fija el cableado que hace la GUI
+    en su constructor (leer y aplicar **antes** de pintar), que era lo único que
+    ninguna prueba cubría: borrar la llamada dejaba la suite en verde.
+    """
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"lan": True}), encoding="utf-8")
+    env: dict[str, str] = {}
+
+    config = apply_stored_lan_config(path, env)
+
+    assert config["lan"] is True
+    assert lan_mode(env) is True
+    assert backend_host(env) == "0.0.0.0"
+    assert backend_env(env)[LAN_ENV] == "1"
+
+
+def test_el_arranque_sin_fichero_no_expone_la_api(tmp_path):
+    env: dict[str, str] = {}
+
+    config = apply_stored_lan_config(tmp_path / "no-existe.json", env)
+
+    assert config["lan"] is False
+    assert lan_mode(env) is False
+    assert backend_host(env) == "127.0.0.1"
+
+
+def test_el_boton_persiste_lo_que_declara(tmp_path):
+    """`toggle_lan_config` invierte, declara y **guarda**: las tres cosas juntas.
+
+    Si se saltara el guardado, el launcher dejaría de recordar el modo y la
+    promesa de V3.75.3 se rompería sin que ninguna prueba de la decisión pura lo
+    notara: el modo quedaría bien en memoria y se perdería al cerrar la ventana.
+    """
+    path = tmp_path / "config.json"
+    config = {"lan": False}
+    env: dict[str, str] = {}
+
+    toggle_lan_config(config, path, env)
+    assert config["lan"] is True
+    assert lan_mode(env) is True
+    assert json.loads(path.read_text(encoding="utf-8")) == {"lan": True}
+
+    toggle_lan_config(config, path, env)
+    assert config["lan"] is False
+    assert LAN_ENV not in env
+    assert json.loads(path.read_text(encoding="utf-8")) == {"lan": False}
+
+
+def test_el_boton_guarda_lo_declarado_y_no_lo_que_se_creia(tmp_path):
+    """Relee `lan_mode()` después de declarar: el fichero refleja el estado real.
+
+    Con `ENGLISH_TUTOR_LAN=1` heredado, invertir el modo **cierra** la LAN; el
+    fichero tiene que guardar ese cierre, no el `True` que el panel mostraba.
+    """
+    path = tmp_path / "config.json"
+    env = {LAN_ENV: "1"}
+    config = {"lan": True}
+
+    toggle_lan_config(config, path, env)
+
+    assert LAN_ENV not in env
+    assert json.loads(path.read_text(encoding="utf-8")) == {"lan": False}
+

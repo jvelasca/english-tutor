@@ -117,6 +117,9 @@ const STRINGS: Record<string, Entry> = {
     en: "Selected route",
     es: "Ruta seleccionada",
   },
+  // V3.75.5: etiqueta de ruta compartida por las páginas de quiz (Listening ya
+  // usaba `listening.routeLabel`); el nivel va dentro del nombre.
+  "routes.levelLabel": { en: "Route {level}", es: "Ruta {level}" },
 
   // Marca
   "brand.subtitle": { en: "100% local · Ollama", es: "100% local · Ollama" },
@@ -781,10 +784,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Listen to the sentence, then record yourself repeating it aloud.",
     es: "Escucha la frase y luego grábate repitiéndola en voz alta.",
   },
-  "dictionary.drill.sentenceListen": {
-    en: "Listen to the sentence",
-    es: "Escuchar la frase",
-  },
   "dictionary.drill.sentenceTemplateNote": {
     en: "There is no curated example with this word yet, so we use a neutral carrier sentence to place it in context.",
     es: "Aún no hay una frase curada con esta palabra; usamos una frase portadora neutra para ponerla en contexto.",
@@ -885,10 +884,6 @@ const STRINGS: Record<string, Entry> = {
     en: "A real sentence from the app's phrase bank.",
     es: "Una frase real del banco de frases de la app.",
   },
-  "dictionary.lookup.listenWord": {
-    en: "Hear the word",
-    es: "Escuchar la palabra",
-  },
   // V3.32: Dictionary → Learning Bridge (primer eslabón). «Practicar» abre la
   // escalera de drill oral (Recall → Sentence) sobre la palabra consultada.
   // Consultar sigue siendo solo lectura (D3): solo el resultado de ESA práctica
@@ -900,10 +895,6 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.lookup.practiceHint": {
     en: "Say the word (and repeat it inside a sentence) to feed it into your practice. This is a real speaking drill, not a look-up: your attempts count toward the word in your vocabulary.",
     es: "Di la palabra (y repítela dentro de una frase) para llevarla a tu práctica. Es un drill oral real, no una consulta: tus intentos cuentan para la palabra en tu vocabulario.",
-  },
-  "dictionary.lookup.listenExample": {
-    en: "Listen to the example",
-    es: "Escuchar el ejemplo",
   },
   "dictionary.lookup.usageTitle": {
     en: "This word in your learning",
@@ -1136,6 +1127,90 @@ const STRINGS: Record<string, Entry> = {
     en: "Current voice for this profile: {voice}. Changing the voice also affects listening practice: items without a human recording are regenerated with the new voice on first playback and then cached.",
     es: "Voz actual de este perfil: {voice}. Cambiar la voz afecta también a la práctica de listening: los ítems sin grabación humana se regeneran con la nueva voz en la primera reproducción y quedan en caché.",
   },
+
+  // V3.75.5: dos acentos. La voz del perfil es la A y `tts_voice_alt` la B; el
+  // mismo control vive en la tarjeta de audio de listening y en las rutas de quiz.
+  "voice.primary": { en: "Voice A — your profile", es: "Voz A — tu perfil" },
+  "voice.secondary": { en: "Voice B — second accent", es: "Voz B — segundo acento" },
+  "voice.accent.a": { en: "A", es: "A" },
+  "voice.accent.b": { en: "B", es: "B" },
+  "voice.accent.gb": { en: "British", es: "británica" },
+  "voice.accent.us": { en: "American", es: "americana" },
+  "voice.accent.au": { en: "Australian", es: "australiana" },
+  "voice.accent.ca": { en: "Canadian", es: "canadiense" },
+  "voice.accent.ie": { en: "Irish", es: "irlandesa" },
+  "voice.accent.nz": { en: "New Zealand", es: "neozelandesa" },
+  "voice.tryA": { en: "Try A", es: "Probar A" },
+  "voice.tryB": { en: "Try B", es: "Probar B" },
+  "voice.pickerHint": {
+    en: "Voices are local (Piper) and free: you can install more in Settings → Voices. The second voice lets you hear the same item with another accent.",
+    es: "Las voces son locales (Piper) y gratuitas: puedes instalar más en Ajustes → Voces. La segunda voz te deja oír el mismo ítem con otro acento.",
+  },
+  "voice.single": {
+    en: "You only have one voice installed. Install a second one in Settings → Voices to compare accents.",
+    es: "Solo tienes una voz instalada. Instala otra en Ajustes → Voces para comparar acentos.",
+  },
+  "voice.replayItem": {
+    en: "Repeat the item",
+    es: "Repetir el ítem",
+  },
+  "voice.replayPhrase": {
+    en: "Listen again",
+    es: "Volver a escuchar",
+  },
+  "voice.replayItemA": {
+    en: "Repeat with accent A",
+    es: "Repetir con el acento A",
+  },
+  "voice.replayItemB": {
+    en: "Repeat with accent B",
+    es: "Repetir con el acento B",
+  },
+  "voice.previewing": { en: "Testing…", es: "Probando…" },
+  // V3.75.6: el STOP de la repetición (lecturas largas) y la composición de lo
+  // que se lee —texto del ítem, pregunta, opciones y respuesta correcta— en el «...».
+  "voice.stop": {
+    en: "Stop the reading",
+    es: "Parar la lectura",
+  },
+  "voice.replayScope": {
+    en: "When repeating, read",
+    es: "Al repetir, leer",
+  },
+  "voice.replayScopeItem": {
+    en: "The whole item",
+    es: "El ítem completo",
+  },
+  "voice.replayScopeWithOptions": {
+    en: "The item plus the options",
+    es: "El ítem más las opciones",
+  },
+  "voice.replayScopeCorrect": {
+    en: "Only the correct answer",
+    es: "Solo la respuesta correcta",
+  },
+  // «Recibo» de la lectura activa: describe las piezas que entran, porque las tres
+  // etiquetas se parecen y lo que las distingue es exactamente eso.
+  "voice.replayScopeItemHint": {
+    en: "Reads: item text + question + correct answer.",
+    es: "Se lee: texto del ítem + pregunta + respuesta correcta.",
+  },
+  "voice.replayScopeWithOptionsHint": {
+    en: "Reads: item text + question + options + correct answer.",
+    es: "Se lee: texto del ítem + pregunta + opciones + respuesta correcta.",
+  },
+  "voice.replayScopeCorrectHint": {
+    en: "Reads: question + correct answer.",
+    es: "Se lee: pregunta + respuesta correcta.",
+  },
+  "voice.replayScopeHint": {
+    en: "Applies to the speaker shown after answering, where every item has one. It is saved in your profile.",
+    es: "Se aplica al altavoz que aparece tras responder, donde cada ítem tiene uno. Queda guardado en tu perfil.",
+  },
+  "voice.error": {
+    en: "Could not read the voice catalogue.",
+    es: "No se pudo leer el catálogo de voces.",
+  },
   "settings.interfaceLanguage": {
     en: "Interface language",
     es: "Idioma de la interfaz",
@@ -1285,6 +1360,13 @@ const STRINGS: Record<string, Entry> = {
   "common.edit": { en: "Edit", es: "Editar" },
   // V3.48.1: etiqueta del disparador «...» de las notas informativas.
   "common.moreInfo": { en: "More information", es: "Más información" },
+  // V3.75.7: el «...» cuando el panel trae **opciones** además de notas (voces,
+  // lectura al repetir). La (i) se queda con `common.moreInfo`: cada icono
+  // promete lo que de verdad hay dentro.
+  "common.moreOptions": {
+    en: "Options and information",
+    es: "Opciones e información",
+  },
 
   // Cabecera / navegación
   "nav.aria": { en: "Main navigation", es: "Navegación principal" },
@@ -1298,6 +1380,7 @@ const STRINGS: Record<string, Entry> = {
   "settings.accentColor": { en: "Accent color", es: "Color de acento" },
   "settings.fontSize": { en: "Font size", es: "Tamaño de letra" },
   "settings.density": { en: "Density", es: "Densidad" },
+  "settings.levelColors": { en: "Level colors", es: "Color de los niveles" },
   "settings.reset": { en: "Reset", es: "Restablecer" },
   "appearance.accent.indigo": { en: "Indigo", es: "Índigo" },
   "appearance.accent.violet": { en: "Violet", es: "Violeta" },
@@ -1311,6 +1394,13 @@ const STRINGS: Record<string, Entry> = {
   "appearance.font.large": { en: "Large", es: "Grande" },
   "appearance.density.compact": { en: "Compact", es: "Compacto" },
   "appearance.density.comfortable": { en: "Comfortable", es: "Cómodo" },
+  "appearance.levels.traffic": { en: "Traffic light", es: "Semáforo" },
+  "appearance.levels.spectrum": { en: "Spectrum", es: "Espectro" },
+  "appearance.levels.mono": { en: "Monochrome", es: "Monocromo" },
+  "appearance.levelsHint": {
+    en: "Each CEFR level (Pre-A1 → C2) gets its own shade, in badges, nodes and cards. Monochrome follows your accent color.",
+    es: "Cada nivel MCER (Pre-A1 → C2) tiene su propio tono en insignias, nodos y tarjetas. El monocromo sigue tu color de acento.",
+  },
 
   // Ayuda
   "help.title": { en: "Help", es: "Ayuda" },
@@ -1585,8 +1675,6 @@ const STRINGS: Record<string, Entry> = {
 
   // Voz / reproducción
   "speak.listen": { en: "Listen to reply", es: "Escuchar respuesta" },
-  "speak.phrase": { en: "Listen to the phrase", es: "Escuchar la frase" },
-  "speak.answer": { en: "Listen to the answer", es: "Escuchar la respuesta" },
   "speak.error": { en: "Error playing: ", es: "Error al reproducir: " },
   // V3.72 (RD-04): la degradación del TTS deja de ser silenciosa en la UI.
   "tts.degradedNotice": {
@@ -1627,20 +1715,31 @@ const STRINGS: Record<string, Entry> = {
     en: "Resize conversations panel",
     es: "Redimensionar panel de conversaciones",
   },
-  "chat.resizeInsights": {
-    en: "Resize analysis panel",
-    es: "Redimensionar panel de análisis",
-  },
   "chat.hello": { en: "Hello", es: "Hola" },
   "chat.intro": {
     en: "I'm your local English tutor. Write to me in English or Spanish to start practicing.",
     es: "Soy tu profesor de inglés local. Escríbeme en inglés o en español para empezar a practicar.",
   },
 
-  // Paneles de análisis
-  "panels.analysis": { en: "Analysis", es: "Análisis" },
-  "panels.closeAnalysis": { en: "Close analysis panel", es: "Cerrar panel de análisis" },
-  "panels.openAnalysis": { en: "Open analysis panel", es: "Abrir panel de análisis" },
+  // Análisis de evolución (V3.75.3): ruta auxiliar `/analisis`, abierta desde la
+  // cabecera. Retira el panel flotante «Analysis» de la práctica.
+  "analysis.open": { en: "Your analysis", es: "Tu análisis" },
+  "analysis.title": { en: "Your evolution", es: "Tu evolución" },
+  "analysis.subtitle": {
+    en: "Where you are, how you're progressing and what to work on next.",
+    es: "Dónde estás, cómo avanzas y qué conviene trabajar después.",
+  },
+  "analysis.position": { en: "Where you are", es: "Dónde estás" },
+  "analysis.confidence": { en: "confidence", es: "de confianza" },
+  "analysis.numericHint": {
+    en: "Estimated CEFR position: {n} on the A1–C2 scale (an estimate, not a certification).",
+    es: "Posición CEFR estimada: {n} en la escala A1–C2 (una estimación, no una certificación).",
+  },
+  "analysis.trendUp": { en: "improving", es: "mejorando" },
+  "analysis.trendDown": { en: "slipping", es: "bajando" },
+  "analysis.trendSteady": { en: "steady", es: "estable" },
+
+  // Paneles
   "panels.yourProfile": { en: "Your profile", es: "Tu perfil" },
   "panels.speaking": { en: "Speaking", es: "Expresión oral" },
   "panels.writing": { en: "Writing", es: "Escritura" },
@@ -2284,8 +2383,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Audio de referencia no disponible; usando voz generada en vivo.",
   },
   "listening.ttsRealVoice": {
-    en: "Actual local synthetic voice of your profile (Settings → Voices). Synthetic items have no real accent.",
-    es: "Voz local sintética real de tu perfil (Ajustes → Voces). Los ítems sintéticos no tienen un acento real.",
+    en: "Actual local synthetic voice of your profile (the «...» of the card lets you also hear it with a second accent). Synthetic items have no real accent.",
+    es: "Voz local sintética real de tu perfil (el «...» de la tarjeta te deja oírlo también con un segundo acento). Los ítems sintéticos no tienen un acento real.",
   },
   "listening.dictationPlaceholder": {
     en: "Write what you hear…",
@@ -2434,7 +2533,9 @@ const STRINGS: Record<string, Entry> = {
     en: "Level {level} history",
     es: "Historial del nivel {level}",
   },
-  "listening.skip": { en: "Skip", es: "Saltar" },
+  // V3.75.4: era `listening.skip` («Saltar»). Se renombró porque el botón dejó
+  // de ser un «saltar» al pie y pasó a ser una salida discreta en la cabecera.
+  "listening.anotherItem": { en: "Another exercise", es: "Otro ejercicio" },
   "listening.reviewProgress": {
     en: "Reviewing level {level} · {done}/{total}",
     es: "Repasando nivel {level} · {done}/{total}",
@@ -2609,19 +2710,9 @@ const STRINGS: Record<string, Entry> = {
   // Listening Engine 4.0 (V3.27): micro-flujo por ítem (While1/While2/Post/
   // shadowing) y perfil auditivo visible en la UI. V3.48.1 retira la etapa
   // «Antes de escuchar» (`preTitle`/`preHint`/`begin` eliminadas): el contexto
-  // pasa a caption de la tarjeta de audio.
-  "listening.flow.while1Title": {
-    en: "First listen",
-    es: "Primera escucha",
-  },
-  "listening.flow.while1Hint": {
-    en: "Listen for the general idea without reading the text.",
-    es: "Escucha la idea general sin leer el texto.",
-  },
-  "listening.flow.listenDone": {
-    en: "I've listened — answer",
-    es: "He escuchado — responder",
-  },
+  // pasa a caption de la tarjeta de audio. V3.75.3 retira también la tarjeta
+  // `while1` (`while1Title`/`while1Hint`/`listenDone` eliminadas): la señal de
+  // «he escuchado» es pulsar PLAY y las opciones aparecen solas.
   "listening.flow.tryAgainTitle": {
     en: "Not quite — try again",
     es: "Casi — inténtalo de nuevo",

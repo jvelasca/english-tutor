@@ -1,15 +1,10 @@
-import { cefrTone, cefrLabel, type CefrTone } from "@/utils/cefr";
+import { cefrLabel, levelClass } from "@/utils/cefr";
 import { useI18n } from "@/hooks/useI18n";
 import { cn } from "@/lib/utils";
 
-const TONE_CLASS: Record<CefrTone, string> = {
-  basic: "text-warning bg-warning/15",
-  intermediate: "text-primary bg-primary/15",
-  advanced: "text-success bg-success/15",
-};
-
 /**
- * Insignia de nivel CEFR con color según el tramo (básico/intermedio/avanzado).
+ * Insignia de nivel CEFR. El color lo pone la **rampa** (`.lv-*`, un escalón por
+ * nivel: Pre-A1 → C2) y es configurable por el usuario en Ajustes > Apariencia.
  * Muestra el código del nivel (A1…C2) y, opcionalmente, su descriptor.
  */
 export function LevelBadge({
@@ -21,13 +16,12 @@ export function LevelBadge({
   showLabel?: boolean;
   className?: string;
 }) {
-  const tone = cefrTone(level);
   const label = cefrLabel(level);
   return (
     <span
       className={cn(
         "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-wide",
-        TONE_CLASS[tone],
+        levelClass(level),
         className,
       )}
     >

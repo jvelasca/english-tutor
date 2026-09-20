@@ -132,12 +132,142 @@ App (estado route)
 | Duolingo | Simplicidad y acción inmediata | Home con un único CTA primario; navegación de 3 iconos en móvil |
 | Babbel / Busuu | Estructura pedagógica CEFR y árbol de niveles | Formación: escalera A1->C2, progreso por unidad con gating visible |
 | Busuu | Progresión por nivel CEFR | Indicador de nivel CEFR siempre visible (premisa #16) |
+| Babbel / Duolingo | El color como información de progresión, no como adorno | Cada nivel CEFR tiene su color en toda la app (§3.2) |
 | ELSA | Speaking/pronunciación con feedback inmediato | Pronunciation como práctica libre dentro de Aprender |
 | Anki | Repaso espaciado | Cola FSRS como tarjeta "Repaso" en INICIO (decisión D2) |
 | LingQ | Aprendizaje libre por contenido | "Práctica libre" que no bloquea ni califica |
 | ChatGPT | Conversación fluida | Conversar es un modo dentro de Aprender (y el vehículo de las lecciones del curso) |
 
 Alineado con `docs/PREMISAS.md` #16 (lo mejor de cada plataforma, adaptado a una app 100% local).
+
+### 3.2 Rampa de color por nivel (decisión posterior, V3.75.4)
+
+Decisión del propietario: **el nivel CEFR se ve de un vistazo por su color**, y ese color es
+**elegible por el alumno**. Extiende la fila anterior de la tabla: el color deja de ser decoración
+de un puñado de insignias y pasa a ser el mismo mecanismo en toda la app.
+
+- **De 3 tramos a 7 pasos.** El color de nivel era de tres tonos (`basic` / `intermediate` /
+  `advanced`), lo que hacía indistinguibles A1 y A2, o B1 y B2. Ahora hay **7 pasos**
+  (Pre-A1 → C2) más un cajón «sin dato», con `utils/cefr.ts::levelClass(nivel)` como única puerta y
+  las clases estáticas `.lv-*` de `styles/legacy.css` como única pintura (nada de clases Tailwind
+  interpoladas, que el escaneo de Tailwind purgaría).
+- **Elegible en Ajustes > Apariencia**, con tres esquemas y vista previa: **Semáforo** (por defecto;
+  reproduce los colores que ya había, ámbar → verde → azul), **Espectro** (cian → verde → ámbar →
+  violeta) y **Monocromo** (un solo tono del acento en 7 intensidades). El esquema vive en
+  `utils/appearance.ts` (`levelScheme`) y se aplica con el atributo `data-levels` en `<html>`, igual
+  que `data-theme` o `data-density`.
+- **Sin backend nuevo.** Se persiste por perfil con la clave `level_scheme` en el `PUT /api/settings`
+  que ya existía, con `localStorage` como copia para que un backend caído no borre la preferencia.
+- **El gate es la medición, no el gusto.** `frontend/scripts/contrast_audit.mjs` mide cada paso sobre
+  su relleno compuesto en los **3 esquemas × 2 temas** y **falla** (`--strict`) si un par no llega a
+  AA. Los hexes de la rampa se ajustaron hasta pasar; la rampa no se aprueba «a ojo».
+- **Alcance honesto:** el color describe la **banda** del contenido, no una medida de dominio del
+  alumno; en el perfil, las bandas por destreza (escala 0–6) se aproximan a un paso de la rampa para
+  que el color informe, y eso queda declarado como aproximación.
+
+### 3.3 Dos acentos por perfil (decisión posterior, V3.75.5)
+
+Decisión del propietario: **el mismo ítem se puede oír con dos acentos** (p. ej. una voz inglesa de
+Inglaterra y otra de EE. UU.), y esa pareja se elige **desde donde se escucha**, no en una pantalla
+de configuración aparte.
+
+- **Por qué existe.** Un alumno que sólo oye una voz confunde «no lo entiendo» con «no entiendo
+  *este* acento». Con A y B al lado, la dificultad se hace visible y trabajable, y el propio alumno
+  decide dónde está su techo. Es una decisión **pedagógica**, no un adorno de audio.
+- **Dónde vive el control.** El «…» de la tarjeta de audio de APRENDER/LISTENING deja de ser un
+  cartel («Voz sintética local (TTS) · <voz>») y pasa a **configurar**: dos filas de radios (Voz A =
+  la del perfil, `tts_voice`; Voz B = segundo acento, `tts_voice_alt`) y dos chips «Probar A» /
+  «Probar B» que reproducen **ese** ítem para comparar antes de decidir. El mismo bloque, tal cual,
+  cuelga del «…» de las rutas de quiz: una sola idea de acento en toda la app.
+- **La B se sugiere sola.** Sin configurar nada, `utils/voices.ts::suggestAltVoice` propone la mejor
+  candidata del **mismo idioma y otra locale** (US → GB y al revés), de modo que la función está viva
+  desde la primera sesión. Sólo se ofrecen voces del idioma de la voz A: mezclar idiomas haría que la
+  B leyera el ítem en otro idioma.
+- **PLAY no cambia de significado.** El botón grande suena **siempre en voz A** (la del perfil): la
+  escucha de estudio es una sola y el segundo acento está donde el alumno lo pide, que es después de
+  responder. **Tras responder**, el altavoz lee el ítem compuesto por el perfil —por defecto, texto
+  del ítem, pregunta y respuesta correcta; §3.4— y ofrece un botón por acento («A · británica»,
+  «B · americana"); con una sola voz instalada sólo aparece A, nunca un botón que no puede sonar.
+- **Cero configuración nueva en el backend.** La voz B es una clave más (`tts_voice_alt`) en el
+  `PUT /api/settings` que ya existía, y la caché de audio ya estaba separada por voz
+  (`data/listening/{banco}/{voz}/…`): el segundo acento es **una caché más**, no un motor nuevo.
+- **La etiqueta honesta se mantiene.** El acento de un ítem sintético lo **simula** Piper, no es un
+  hablante real; con dos voces eso se dice mejor, no se disimula, y el aviso sigue junto al selector.
+- **El mismo control, allí donde se escucha**: tarjeta de audio de listening, altavoz de después de
+  responder, paneles de nivel (listening, vocabulario, gramática, conversación, pronunciación,
+  speaking), escenarios de rutas de quiz, diccionario (palabra y ejemplo) y evaluación de speaking.
+
+### 3.4 STOP y composición de la repetición (decisión posterior, V3.75.6)
+
+Dos ajustes pedidos con la app en uso: la repetición de un ítem completo **puede durar**, y no
+siempre se quiere oír entera.
+
+- **STOP donde suena.** Mientras la repetición está en curso aparece un botón cuadrado junto a los
+  dos acentos; corta la locución al instante (y cancela la síntesis si aún no había sonado). Sólo
+  existe mientras hay algo que parar: no es un botón muerto en reposo. Parar **no** se trata como
+  error —el spinner se apaga y el resultado permanece en pantalla—.
+- **Una sola voz a la vez.** Empezar una repetición corta la anterior: dos locuciones solapadas eran
+  ruido, no información.
+- **Un ítem son cuatro piezas, y la lectura es la combinación que elige el alumno.** El ítem tiene
+  **texto** (el `script`, lo que suena), **pregunta**, **opciones** y **respuesta correcta**.
+  «Al repetir, leer» ofrece tres composiciones, de más a menos:
+  1. **El ítem completo** (defecto): texto + pregunta + respuesta correcta. Vuelve a oír lo que sonó
+     y confirma la clave sin leer los distractores.
+  2. **El ítem más las opciones**: texto + pregunta + opciones + respuesta correcta. La lectura
+     larga, que enumera las alternativas y cierra con la buena.
+  3. **Solo la respuesta correcta**: pregunta + respuesta correcta. La más corta; omite también el
+     texto.
+
+  Como las tres etiquetas se parecen, bajo los botones aparece un **recibo** que describe las piezas
+  de la lectura activa («Se lee: texto del ítem + pregunta + respuesta correcta»): la diferencia real
+  entre las opciones está exactamente ahí.
+- **No puede adelantar la respuesta.** Todo lo que suena sale de `buildReplayText`, y su entrada
+  `correct_index` sólo la aportan los sitios que ya han respondido. Donde no hay opciones —una
+  palabra del diccionario, la referencia de un dictado— la pregunta hace de texto: nunca una
+  repetición vacía ni una pieza inventada.
+- **La preferencia se recuerda por perfil.** `replay_scope` vive en el perfil y se guarda con el
+  mismo `PUT /api/settings` de las voces, así que vale para listening y para las rutas de quiz. Un
+  perfil que ya había elegido la lectura larga (el valor histórico `all`) la conserva.
+- **Por defecto, menos es más.** El defecto es la lectura **corta** (texto + pregunta + clave): quien
+  no toca nada oye lo que sonó y la respuesta, no las tres alternativas.
+- **El control no depende del catálogo de voces.** Si falla el catálogo, la voz no se puede elegir,
+  pero la lectura de la repetición sí: no tiene nada que ver con qué voces estén instaladas.
+- **La RUTA B1 no era un caso especial.** Dos ítems del corpus (`c071`, `c084`) estaban etiquetados
+  como dictado/shadowing pero eran preguntas de opción múltiple, así que la ruta mostraba una
+  tarjeta de escritura («Enviar dictado») distinta a las demás. Corregida la etiqueta
+  (`numbers` y `phrase_recognition`), B1 se comporta como el resto: audio → pregunta con opciones.
+
+### 3.5 El icono del desplegable dice qué hay dentro (decisión posterior, V3.75.7)
+
+Decisión del propietario: donde el desplegable **solo muestra información**, el botón es una **(i)**;
+donde hay información **y opciones**, es una **(...)**, y eso debe valer en toda la app.
+
+- **Dos iconos, dos promesas.** El «...» ya significaba en la app «abre para **configurar**» (la
+  tarjeta de audio de listening), así que un «...» que solo escondía un párrafo obligaba a pulsar
+  para descubrir que no había nada que decidir; y una (i) sobre controles ocultaba las opciones bajo
+  una promesa falsa. La regla vive en **un solo sitio**, `components/InfoDisclosure.tsx`
+  (`content: "info" | "options"`), y el valor por defecto es `"info"`: un panel nuevo que no declare
+  nada **no puede** prometer opciones que no tiene. La etiqueta accesible acompaña al icono
+  (`common.moreInfo` para la (i), `common.moreOptions` —«Opciones e información»— para el «...»).
+- **Inventario tras la revisión (V3.75.7).** Ocho desplegables con **(i)**: las notas de ruta de
+  APRENDER/LISTENING y las notas de los paneles de nivel de las seis destrezas (listening,
+  vocabulario, gramática, conversación, pronunciación y speaking, que tiene dos). Uno con **(...)**:
+  las notas de ruta de las rutas de quiz, porque cuelgan del mismo `VoicePicker` que las voces A/B.
+  Fuera del componente, el «...» de la tarjeta de audio de listening ya era «...» —y sigue— porque
+  trae velocidad, voces y composición de la repetición; el desplegable de texto «Cómo funcionan las
+  rutas» de las rutas de quiz ya era una (i) con etiqueta visible.
+- **El texto no puede quedar debajo del botón.** En la esquina (`variant="corner"`) el disparador
+  flota sobre la Card y el panel —que el llamador monta donde le conviene, a menudo como primer
+  hijo— nace justo debajo: su primera línea salía tapada por el botón que acababa de abrirla. El
+  panel reserva ahora la **columna** del botón (`pr-12` = los 36 px del botón + 12 px de aire) en vez
+  de reservar altura: el texto se estrecha y nunca coincide con él, tanto si el panel sube hasta el
+  borde superior (notas de ruta) como si vive más abajo. Reservar altura habría dejado un hueco muerto
+  en los paneles que no llegan arriba; reservar columna no cuesta nada en ninguno.
+- **Medido, no mirado.** `listeningReplayStop.spec.ts` abre los dos desplegables de la pantalla de
+  listening en los tres breakpoints y exige que **ningún nodo de texto del panel intersecte** el
+  rectángulo del disparador (y que cada uno lleve su icono). El mismo spec fija que el panel del «...»
+  trae opciones de verdad (las tres composiciones de la repetición). Verificado que la guarda tiene
+  dientes: sin `pr-12`, la primera línea de las notas de ruta vuelve a fallar el test.
 
 ---
 
@@ -318,6 +448,18 @@ calidad del tutor solo son alcanzables abriendo el panel derecho del workspace. 
 - `ProgressDashboard`, `LearningProfile`, `SpeakingPanel`, `WritingPanel`, `TutorQualityPanel`,
   `EvidenceGraphPanel`, `TodayPlan` y `AssessmentLadder` se reubican, no se borran.
 
+> **Resuelto en V3.75.3.** El panel flotante se **retiró** (`components/AnalysisPanel.tsx`
+> borrado): en V3.1 se había quedado sin analítica propia (calidad del tutor + enlace a
+> MI PROGRESO) y solo se encontraba dentro del ejercicio. En su lugar:
+> - el **contexto de la sesión** (calidad del tutor) se reubica en la pantalla de
+>   análisis, que recibe los turns en curso;
+> - la **evolución global** tiene ruta propia, `/analisis`
+>   (`features/analysis/AnalysisScreen.tsx`), y se abre desde la **cabecera**, junto
+>   al usuario —no como píldora de navegación, porque es un destino auxiliar—. Es una
+>   **síntesis**, no un calco de las pestañas de MI PROGRESO: posición, actividad con
+>   su agrupación temporal, tríada, destrezas y escalera CEFR, con los endpoints que
+>   ya existían.
+
 ---
 
 ## 5. Navegación desktop y móvil
@@ -416,7 +558,7 @@ Estas reglas se aplicarán al implementar y son **Definition of Done** (premisas
 | Ruta `progress` | MI PROGRESO (anidado) | Consolidar por pestañas |
 | Ruta `help` | AYUDA real (docs, premisa #17) + apartado "Conectar dispositivo" | Separar conceptos |
 | `PracticeView` (workspace) | Shared engine para Formación (lecciones) y Aprender (libre) | Envolver según contexto del mundo |
-| `AnalysisPanel` (7 pestañas) | MI PROGRESO + versión ligera contextual en práctica | Reubicar contenido por tab |
+| `AnalysisPanel` (7 pestañas) | MI PROGRESO + versión ligera contextual en práctica | Reubicar contenido por tab. **V3.75.3: panel retirado; la evolución vive en `/analisis` desde la cabecera y la calidad del tutor en la misma pantalla (§4.5)** |
 | `PersonalDictionary` | APRENDER -> Vocabulario | Mover |
 | `ListeningPractice` | APRENDER -> Listening y lecciones del curso | Reutilizar igual |
 | `PronunciationPractice` | APRENDER -> Pronunciación (tarjeta propia del hub, D6) | Reubicar |

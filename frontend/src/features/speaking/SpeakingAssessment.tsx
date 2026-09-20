@@ -29,7 +29,7 @@ import {
 } from "../../utils/speaking";
 import { SpeakingRolePlay } from "./SpeakingRolePlay";
 import { ActivityResult } from "../../components/ActivityResult";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import {
   PhraseTranslateButton,
   usePhraseTranslation,
@@ -372,7 +372,7 @@ export function SpeakingAssessment({
             </p>
             <div className="flex shrink-0 items-center gap-2">
               <PhraseTranslateButton state={promptPhrase} />
-              <ListenButton text={part.prompt} label={t("speak.phrase")} />
+              <ItemReplayButton prompt={part.prompt} userId={userId} />
             </div>
           </div>
         </>

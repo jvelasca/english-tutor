@@ -63,6 +63,59 @@ def test_corpus_items_declare_audio_and_metadata():
         assert int(q.get("speaker_count", 1)) >= 1
 
 
+def _production_items_with_options(items) -> list[str]:
+    """Ids de ítems que el flujo de producción serviría **descartando** su pregunta.
+
+    El conjunto de skills de producción no se escribe aquí: se importa del módulo
+    que decide el flujo (`services.listening_flow.PRODUCTION_SKILLS`), que es la
+    fuente única. Duplicarlo fue parte de por qué el defecto sobrevivió: el test
+    anterior filtraba por ids `c` y solo miraba el corpus.
+    """
+    from services.listening_flow import PRODUCTION_SKILLS
+
+    production_skills = set(PRODUCTION_SKILLS) & set(LISTENING_SUBSKILLS)
+    assert production_skills, (
+        "PRODUCTION_SKILLS no declara ningún skill servible: el barrido sería vacío"
+    )
+    return [
+        q["id"]
+        for q in items
+        if q.get("skill") in production_skills
+        and (q.get("options") or q.get("question"))
+    ]
+
+
+def test_production_items_do_not_carry_multiple_choice_options():
+    """V3.75.6/V3.75.7: un ítem de producción no puede ser una pregunta con opciones.
+
+    Los skills de `PRODUCTION_SKILLS` (`dictation`/`shadowing`) se sirven por el flujo
+    de **producción**: el alumno escribe o repite la frase y el enunciado con sus
+    opciones se descarta. El esquema del banco, en cambio, exige `options` +
+    `answer_index`, así que etiquetar una pregunta de opción múltiple como dictado no
+    la convierte en un dictado: deja a la ruta con una tarjeta que no se parece a las
+    demás y tira su contenido autorado. Era el caso de `c071` y `c084` en el corpus
+    (reetiquetados en V3.75.6 a `numbers` y `phrase_recognition`) y también el de
+    `l18` y `l19` en el **banco heredado** (V3.75.7), que la primera versión de este
+    test no miraba porque filtraba ids `c`.
+
+    El barrido es sobre **todo** `QUESTION_BANK`. Si alguien quiere dictado real,
+    primero tiene que autorarlo con un esquema que lo represente.
+    """
+    offenders = _production_items_with_options(QUESTION_BANK)
+    assert not offenders, (
+        "ítems de producción autorados como pregunta de opción múltiple "
+        f"(el flujo de producción los ignoraría): {offenders}"
+    )
+
+
+def test_production_guard_bites_on_a_synthetic_offender():
+    """Control del test anterior: hoy no queda ningún ítem de producción en el banco,
+    así que su barrido es vacío y podría pasar por estar roto. Esta inyección prueba
+    que la comprobación reconoce el defecto que dice impedir."""
+    injected = [dict(QUESTION_BANK[0], id="sabotaje-produccion", skill="dictation")]
+    assert _production_items_with_options(injected) == ["sabotaje-produccion"]
+
+
 def test_corpus_covers_all_levels_and_is_diverse():
     corpus = [q for q in QUESTION_BANK if q["id"].startswith("c")]
     levels = {q["level"] for q in corpus}

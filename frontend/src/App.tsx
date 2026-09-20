@@ -242,6 +242,9 @@ export default function App() {
   }, [completeLesson, go]);
 
   const handleOpenProgress = useCallback(() => go("progress"), [go]);
+  // V3.75.3: el análisis de evolución vive en su propia ruta auxiliar
+  // (`/analisis`) y se abre desde la cabecera, junto al usuario.
+  const handleOpenAnalysis = useCallback(() => go("analysis"), [go]);
 
   const completeActiveStep = useCallback(() => {
     const key = activeStepKeyRef.current;
@@ -296,6 +299,7 @@ export default function App() {
               handsFreeMicError={handsFree.micError}
               onToggleHandsFree={handsFree.toggle}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenAnalysis={handleOpenAnalysis}
             />
           }
         >

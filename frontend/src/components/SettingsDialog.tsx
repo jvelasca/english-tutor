@@ -6,8 +6,11 @@ import {
   ACCENTS,
   DENSITIES,
   FONT_SCALES,
+  LEVEL_SCHEMES,
   type AppearanceSettings,
+  type LevelScheme,
 } from "../utils/appearance";
+import { levelClass } from "../utils/cefr";
 import type { Theme } from "../utils/theme";
 import { ModelSelect } from "./ModelSelect";
 import { SystemStatus } from "./SystemStatus";
@@ -21,6 +24,11 @@ const THEME_OPTIONS: { id: Theme; labelKey: string }[] = [
   { id: "light", labelKey: "settings.theme.light" },
   { id: "dark", labelKey: "settings.theme.dark" },
 ];
+
+/** Pasos de la vista previa del esquema de niveles activo (Pre-A1 → C2). */
+function levelPreviewOf(scheme: LevelScheme) {
+  return (LEVEL_SCHEMES.find((s) => s.id === scheme) ?? LEVEL_SCHEMES[0]).preview;
+}
 
 interface SettingsDialogProps {
   appearance: AppearanceSettings;
@@ -183,6 +191,44 @@ export function SettingsDialog({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="field">
+                <span className="field-label">{t("settings.levelColors")}</span>
+                <div className="seg" role="group" aria-label={t("settings.levelColors")}>
+                  {LEVEL_SCHEMES.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      className={`seg-option${
+                        appearance.levelScheme === o.id ? " active" : ""
+                      }`}
+                      onClick={() => onUpdateAppearance({ levelScheme: o.id })}
+                      aria-pressed={appearance.levelScheme === o.id}
+                    >
+                      {t(`appearance.levels.${o.id}`)}
+                    </button>
+                  ))}
+                </div>
+                {/* Vista previa VIVA: lee los tokens del esquema aplicado
+                    (`--level-*-fg`), así que no puede prometer un color que
+                    luego no aparezca en la app. Al pulsar otra opción se
+                    repinta al instante porque el mecanismo es un atributo del
+                    `<html>`. Decorativa: el nombre de cada esquema ya está en
+                    el `seg` de arriba. */}
+                <div className="level-preview" aria-hidden="true">
+                  {levelPreviewOf(appearance.levelScheme).map((step) => (
+                    <span
+                      key={step.key}
+                      className={`level-preview__step ${levelClass(step.key)}`}
+                    >
+                      {step.label}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("appearance.levelsHint")}
+                </p>
               </div>
             </>
           )}

@@ -11,7 +11,11 @@
  *   - la tipografía base sobre las superficies del sistema, en los dos temas;
  *   - el TEXTO de acento (`--color-accent-soft`) sobre las superficies y sobre
  *     los fondos compuestos donde vive (anillo de acento y tinte al 15 %), en
- *     los 7 acentos y en los dos temas.
+ *     los 7 acentos y en los dos temas;
+ *   - la RAMPA DE NIVELES (V3.75.4): la tinta de cada paso (Pre-A1…C2 y «sin
+ *     dato») sobre su propio relleno compuesto, en los 3 esquemas
+ *     (`data-levels`), los 2 temas y —en «Monocromo», que sale del acento— los
+ *     7 acentos.
  *
  * Pares REPORTED (se miden y se publican, pero no bloquean): el relleno de
  * acento con su tinta encima (`--color-on-accent`) y el acento como borde/UI.
@@ -203,6 +207,99 @@ function composites(theme, accent) {
   return out;
 }
 
+/* ------------------------- rampa de niveles (V3.75.4) -------------------- */
+
+/**
+ * Los siete pasos del MCER más el cajón de «sin dato», en orden. Es el orden que
+ * usan `utils/cefr.ts` (`LEVEL_KEYS`) y las tablas del informe.
+ */
+const LEVEL_STEPS = [
+  ["pre-a1", "Pre-A1"],
+  ["a1", "A1"],
+  ["a2", "A2"],
+  ["b1", "B1"],
+  ["b2", "B2"],
+  ["c1", "C1"],
+  ["c2", "C2"],
+  ["unknown", "s/d"],
+];
+
+const LEVEL_SCHEMES = [
+  { id: "traffic", label: "Semáforo" },
+  { id: "spectrum", label: "Espectro" },
+  { id: "mono", label: "Monocromo" },
+];
+
+/** Relleno de la insignia: `color-mix(in srgb, <tinta> 15%, transparent)`. */
+const LEVEL_FILL_SHARE = 15;
+
+/** Superficies sobre las que se apoya una insignia o un chip teñido. */
+const LEVEL_SURFACES = ["--color-bg", "--color-surface"];
+
+/**
+ * Bloque de tokens donde vive la tinta de un paso. «Semáforo» es el esquema por
+ * defecto, así que sus siete hexes están en el bloque raíz / de tema; los otros
+ * dos se declaran con `data-levels`.
+ */function levelBlockTokens(scheme, theme) {
+  if (scheme === "traffic") return theme.tokens;
+  const themed = blockTokens(
+    legacy,
+    `:root[data-theme="${theme.id}"][data-levels="${scheme}"]`,
+  );
+  if (Object.keys(themed).length > 0) return themed;
+  // Los esquemas que no necesitan hexes por tema (Monocromo se deriva del
+  // acento, que ya es distinto en claro y oscuro) declaran un solo bloque.
+  return blockTokens(legacy, `:root[data-levels="${scheme}"]`);
+}
+
+/** Resuelve `var(--token)` a su valor real; deja el resto tal cual. */
+function deref(theme, accent, raw) {
+  const ref = /^var\(\s*(--[a-z0-9-]+)\s*\)$/i.exec(raw);
+  return ref ? resolve(theme, accent, ref[1]) : raw;
+}
+
+/**
+ * Tinta de un paso. En «Monocromo» la rampa NO son hexes: `legacy.css` la
+ * deriva del acento del usuario con `color-mix(in srgb, var(--color-accent-soft)
+ * N%, var(--color-text-dim))`, así que aquí se reproduce esa mezcla leyendo el
+ * porcentaje REAL del CSS (si allí cambia la fórmula, esto lanza en vez de medir
+ * otro color).
+ */
+function levelFg(theme, accent, scheme, key) {
+  const tokens = levelBlockTokens(scheme, theme);
+  const raw = tokens[`--level-${key}-fg`];
+  if (!raw) {
+    throw new Error(
+      `Falta --level-${key}-fg para el esquema «${scheme}» en tema ${theme.id}`,
+    );
+  }
+  if (!/color-mix\(/i.test(raw)) return deref(theme, accent, raw);
+  const m = /color-mix\(\s*in srgb\s*,\s*var\(\s*(--[a-z0-9-]+)\s*\)\s+([\d.]+)%\s*,\s*var\(\s*(--[a-z0-9-]+)\s*\)\s*\)/i.exec(
+    raw,
+  );
+  if (!m) {
+    throw new Error(
+      `color-mix() de --level-${key}-fg con forma inesperada: ${raw}`,
+    );
+  }
+  const [, fromToken, shareRaw, toToken] = m;
+  const share = Number(shareRaw);
+  const from =
+    fromToken === "--color-accent-soft"
+      ? accentSoft(theme, accent)
+      : resolve(theme, accent, fromToken);
+  const to = resolve(theme, accent, toToken);
+  if (!from || !to) {
+    throw new Error(`No se pudo resolver la mezcla de --level-${key}-fg`);
+  }
+  return mix(from, to, share);
+}
+
+/** Relleno compuesto real de la insignia sobre una superficie opaca. */
+function levelFill(fgHex, surfaceHex) {
+  return over({ ...parseHex(fgHex), a: LEVEL_FILL_SHARE / 100 }, surfaceHex);
+}
+
 /* ------------------------------- pairs ---------------------------------- */
 
 // Superficies sobre las que se pinta texto, por tema.
@@ -299,7 +396,43 @@ for (const theme of THEMES) {
   }
 }
 
-/* ------------------------------ guardas --------------------------------- */
+/* --------------------- rampa de niveles: medición ----------------------- */
+
+// La rampa de niveles se mide por esquema y por tema: cada paso declara su
+// tinta y de ella se DERIVA el relleno (`color-mix(..., 15%, transparent)`), así
+// que medir la tinta sobre el relleno compuesto es medir lo que ve el alumno.
+// «Monocromo» se mide en los 7 acentos porque su rampa entera sale del acento.
+for (const scheme of LEVEL_SCHEMES) {
+  const accents = scheme.id === "mono" ? ACCENTS : [ACCENTS[0]];
+  for (const theme of THEMES) {
+    for (const accent of accents) {
+      for (const [key, label] of LEVEL_STEPS) {
+        const fg = levelFg(theme, accent, scheme.id, key);
+        for (const surfaceToken of LEVEL_SURFACES) {
+          const surface = resolve(theme, accent, surfaceToken);
+          const bg = levelFill(fg, surface);
+          results.push({
+            scope: "level-ramp",
+            scheme: scheme.id,
+            step: key,
+            step_label: label,
+            theme: theme.id,
+            accent: scheme.id === "mono" ? accent.id : null,
+            surface: surfaceToken,
+            label:
+              `tinta del nivel ${label} (--level-${key}-fg) sobre su relleno ` +
+              `al ${LEVEL_FILL_SHARE} % sobre ${surfaceToken}`,
+            fg,
+            bg,
+            ratio: ratio(fg, bg),
+            min: AA_TEXT,
+            enforced: true,
+          });
+        }
+      }
+    }
+  }
+}
 
 // El acento sólido no puede usarse como color de texto: para eso está
 // `--color-accent-soft`, que se deriva del acento y sí cumple AA.
@@ -307,6 +440,35 @@ const solidAsText = [...legacy.matchAll(/^\s+color:\s*var\(--color-accent\);/gm)
 // La derivación de `--color-accent-soft` es un contrato: si desaparece, la
 // medición deja de corresponderse con lo que se pinta.
 const derivedSoft = /--color-accent-soft:\s*color-mix\(/s.test(legacy);
+// La rampa es un contrato de tres piezas: el token de cada paso en los tres
+// esquemas, el relleno/borde derivados y la clase estática que los consume. Si
+// alguna se cae, `levelClass()` devuelve una clase que no pinta nada y la app se
+// queda sin color de nivel sin que ningún test unitario se entere.
+const rampMissing = [];
+for (const scheme of LEVEL_SCHEMES) {
+  for (const theme of THEMES) {
+    const tokens = levelBlockTokens(scheme.id, theme);
+    for (const [key] of LEVEL_STEPS) {
+      if (!tokens[`--level-${key}-fg`]) {
+        rampMissing.push(`${scheme.id}/${theme.id}/--level-${key}-fg`);
+      }
+    }
+  }
+}
+const rampDerivedMissing = [];
+const baseTokens = blockTokens(legacy, ":root {");
+for (const [key] of LEVEL_STEPS) {
+  for (const suffix of ["bg", "border"]) {
+    if (!baseTokens[`--level-${key}-${suffix}`]) {
+      rampDerivedMissing.push(`--level-${key}-${suffix}`);
+    }
+  }
+}
+for (const key of [...LEVEL_STEPS.map(([k]) => k), "outline", "ink", "quiet"]) {
+  if (!new RegExp(`\\.lv-${key}\\s*\\{`).test(legacy)) {
+    rampDerivedMissing.push(`.lv-${key}`);
+  }
+}
 const guards = [
   {
     id: "acento-solido-no-es-texto",
@@ -323,6 +485,22 @@ const guards = [
       ? "--color-accent-soft se deriva del acento con color-mix()"
       : "falta la derivación `--color-accent-soft: color-mix(...)` en legacy.css",
   },
+  {
+    id: "rampa-niveles-completa",
+    ok: rampMissing.length === 0,
+    detail:
+      rampMissing.length === 0
+        ? "los 7 pasos (+ sin dato) declaran su tinta en los 3 esquemas y los 2 temas"
+        : `faltan tokens de la rampa: ${rampMissing.join(", ")}`,
+  },
+  {
+    id: "rampa-clases-y-derivados",
+    ok: rampDerivedMissing.length === 0,
+    detail:
+      rampDerivedMissing.length === 0
+        ? "cada paso tiene relleno y borde derivados y su clase .lv-*, más los modificadores .lv-outline/.lv-ink/.lv-quiet"
+        : `faltan piezas de la rampa: ${rampDerivedMissing.join(", ")}`,
+  },
 ];
 
 /* ------------------------------- report --------------------------------- */
@@ -334,7 +512,7 @@ const reportedFails = reported.filter((r) => r.ratio < r.min);
 const guardFails = guards.filter((g) => !g.ok);
 
 const payload = {
-  audit: "V3.73.1-cierre-gui",
+  audit: "V3.75.4-rampa-niveles",
   standard: "WCAG 2.2 AA (1.4.3 texto 4.5:1 · 1.4.11 UI 3:1)",
   enforced_failures: enforcedFails.length + guardFails.length,
   reported_failures: reportedFails.length,
@@ -343,7 +521,7 @@ const payload = {
 };
 
 const md = [];
-md.push("# Informe de contraste WCAG (cierre GUI pre-V4.0, V3.73.1)");
+md.push("# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4)");
 md.push("");
 md.push("> Generado por `node frontend/scripts/contrast_audit.mjs`.");
 md.push("");
@@ -378,6 +556,49 @@ for (const r of enforced.filter((x) => x.scope === "accent-text")) {
   md.push(
     `| ${r.theme} | ${r.accent} | ${r.label.replace("texto de acento (--color-accent-soft) sobre ", "")} | ${r.ratio} | ${r.min} | ${r.ratio >= r.min ? "OK" : "FALLA"} |`,
   );
+}
+md.push("");
+md.push("## Rampa de niveles por esquema y tema (bloqueante)");
+md.push("");
+md.push(
+  "Cada paso (Pre-A1 → C2, más el cajón «sin dato») declara su tinta y el " +
+    `relleno se DERIVA de ella al ${LEVEL_FILL_SHARE} %; se mide la tinta sobre ese ` +
+    "relleno compuesto sobre las dos superficies donde viven insignias, bandas y " +
+    "chips. «Monocromo» sale del acento del usuario, así que se mide en los 7. " +
+    "El relleno es translúcido: sobre otro fondo (p. ej. `--color-surface-2`, más " +
+    "cercano a la tinta) el margen se estrecha, y por eso las tintas de la rampa " +
+    "se eligen con holgura y no al filo del 4.5:1.",
+);
+md.push("");
+md.push(
+  `| Esquema | Tema | Acento | Fondo | ${LEVEL_STEPS.map(([, l]) => l).join(" | ")} |`,
+);
+md.push(`| --- | --- | --- | --- | ${LEVEL_STEPS.map(() => "---:").join(" | ")} |`);
+{
+  const levelRows = enforced.filter((r) => r.scope === "level-ramp");
+  const order = [];
+  const byRow = new Map();
+  for (const r of levelRows) {
+    const id = `${r.scheme}|${r.theme}|${r.accent ?? ""}|${r.surface}`;
+    if (!byRow.has(id)) {
+      byRow.set(id, new Map());
+      order.push(id);
+    }
+    byRow.get(id).set(r.step, r);
+  }
+  for (const id of order) {
+    const cells = byRow.get(id);
+    const [schemeId, themeId, accentId, surface] = id.split("|");
+    const schemeLabel = LEVEL_SCHEMES.find((s) => s.id === schemeId).label;
+    const themeLabel = THEMES.find((t) => t.id === themeId).label;
+    const values = LEVEL_STEPS.map(([key]) => {
+      const r = cells.get(key);
+      return r.ratio >= r.min ? `${r.ratio}` : `**${r.ratio} FALLA**`;
+    });
+    md.push(
+      `| ${schemeLabel} | ${themeLabel} | ${accentId || "—"} | ${surface} | ${values.join(" | ")} |`,
+    );
+  }
 }
 md.push("");
 md.push("## Guardas");

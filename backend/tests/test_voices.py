@@ -586,3 +586,95 @@ def test_tts_no_declara_degradacion_cuando_la_voz_es_del_idioma(monkeypatch, tmp
     assert r.status_code == 200
     assert r.headers["X-TTS-Voice"] == "es_ES-davefx-medium"
     assert r.headers["X-TTS-Degraded"] == "0"
+
+
+# --- V3.75.5: voz pedida en la petición (dos acentos) -------------------------
+
+
+def test_pick_requested_voice_accepts_only_installed_of_language(
+    monkeypatch, tmp_path,
+):
+    """Función pura: el id del cliente solo vale instalado Y del idioma pedido."""
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "en_GB-alan-medium",
+             "es_MX-ald-medium")
+
+    assert tts.pick_requested_voice("en_GB-alan-medium", "en") == "en_GB-alan-medium"
+    # Voz instalada pero de OTRO idioma: se ignora (no se lee inglés con voz ES).
+    assert tts.pick_requested_voice("es_MX-ald-medium", "en") is None
+    # Voz no instalada: el id entraría en el path de caché, así que no se acepta.
+    assert tts.pick_requested_voice("en_GB-ghost-medium", "en") is None
+    assert tts.pick_requested_voice("", "en") is None
+    assert tts.pick_requested_voice(None, "en") is None
+
+
+def test_tts_endpoint_honra_la_voz_pedida(monkeypatch, tmp_path):
+    """Dos acentos: la voz pedida manda sobre la preferencia guardada."""
+    uid = _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "en_GB-alan-medium")
+    settings_repo.set_settings(uid, {"tts_voice": tts.DEFAULT_VOICE})
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/tts",
+            json={"text": "Hello there", "voice": "en_GB-alan-medium"},
+            params={"user_id": uid},
+        )
+
+    assert r.status_code == 200
+    assert captured["voice"] == "en_GB-alan-medium"
+    # Y se declara la voz que de verdad sonó (no la preferida).
+    assert r.headers["X-TTS-Voice"] == "en_GB-alan-medium"
+
+
+def test_tts_endpoint_ignora_una_voz_no_instalada(monkeypatch, tmp_path):
+    """Una preferencia vieja / voz borrada no rompe: se cae a la del perfil."""
+    uid = _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE)
+    settings_repo.set_settings(uid, {"tts_voice": tts.DEFAULT_VOICE})
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/tts",
+            json={"text": "Hello there", "voice": "en_GB-ghost-medium"},
+            params={"user_id": uid},
+        )
+
+    assert r.status_code == 200
+    assert captured["voice"] == tts.DEFAULT_VOICE
+
+
+def test_tts_endpoint_ignora_una_voz_de_otro_idioma(monkeypatch, tmp_path):
+    uid = _setup_user(monkeypatch, tmp_path)
+    _install(monkeypatch, tmp_path, tts.DEFAULT_VOICE, "es_MX-ald-medium")
+    captured: dict = {}
+
+    def fake_synthesize(text, length_scale=1.0, voice=None):
+        captured["voice"] = voice
+        return b"RIFFfake"
+
+    monkeypatch.setattr("routers.voz.synthesize_speech", fake_synthesize)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/tts",
+            json={
+                "text": "Hello there",
+                "language": "en",
+                "voice": "es_MX-ald-medium",
+            },
+            params={"user_id": uid},
+        )
+
+    assert r.status_code == 200
+    assert captured["voice"] == tts.DEFAULT_VOICE

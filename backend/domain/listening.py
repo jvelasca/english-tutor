@@ -510,39 +510,57 @@ async def get_diagnostic(user_id: str) -> dict:
 
 
 async def get_audio(
-    user_id: str, question_id: str, variant: str = "normal"
-) -> tuple[bytes | None, int | None]:
+    user_id: str,
+    question_id: str,
+    variant: str = "normal",
+    voice: str | None = None,
+) -> tuple[bytes | None, int | None, str]:
     """Devuelve el audio WAV del ítem (grabado o sintetizado), o un código de error.
 
     Si el ítem es `recorded` (biblioteca de audio humano), sirve el WAV referenciado
     en el manifest; si está referenciado pero ausente, devuelve 404 (no cae a TTS).
     Si es `tts`, `variant` selecciona la variante de velocidad de la escalera
     (`AUDIO_VARIANTS`) y la voz es la preferida del usuario (Configuración → Voces;
-    default si no ha elegido o su voz no está instalada). Retorna `(bytes, None)`
-    con el audio en caso de éxito, o `(None, status)` donde `status` es 400
+    default si no ha elegido o su voz no está instalada). Retorna `(bytes, None,
+    voz)` con el audio en caso de éxito, o `(None, status, "")` donde `status` es 400
     (variante no válida), 404 (ítem inexistente o audio grabado ausente) o 503
     (Piper no disponible). El audio TTS se sintetiza en la primera petición de cada
     variante y voz, y se cachea en un path versionado
     (`DATA_DIR/listening/{bank_version}/{voice}/{id}-{digest}.wav`), con digest
     distinto por variante (la variante `normal` preserva el digest/cache actual).
+
+    V3.75.5 (dos acentos): `voice` permite pedir una voz concreta (la B del
+    comparador A/B) sin cambiar la preferencia del perfil. Solo se acepta si está
+    instalada y es inglesa (`pick_requested_voice`); si no, se ignora y manda la
+    voz del perfil — nunca un 400 por esto, porque una preferencia vieja no debe
+    romper la reproducción. La caché ya está separada por voz.
+
+    V3.75.7: la tercera pieza del retorno es la voz que se sirvió **de verdad**
+    (vacía en audio grabado). El router la publica en `X-TTS-Voice` porque la
+    pedida y la servida pueden no coincidir: sin esa señal, el comparador A/B podía
+    sonar dos veces con la misma voz y el cliente creer que oyó dos acentos.
     """
     question = await _resolve_question(question_id)
     if question is None:
-        return None, 404
+        return None, 404, ""
     if is_recorded(question):
         recorded = recorded_audio_path(question)
         if recorded is not None and recorded.exists():
-            return recorded.read_bytes(), None
-        return None, 404
+            return recorded.read_bytes(), None, ""
+        return None, 404, ""
     if variant not in AUDIO_VARIANTS:
-        return None, 400
-    prefs = await run_in_threadpool(settings_repo.get_settings, user_id)
-    voice = tts.resolve_voice(prefs)
+        return None, 400, ""
+    requested = tts.pick_requested_voice(voice, "en")
+    if requested is not None:
+        voice = requested
+    else:
+        prefs = await run_in_threadpool(settings_repo.get_settings, user_id)
+        voice = tts.resolve_voice(prefs)
     if not tts.is_ready(voice):
-        return None, 503
+        return None, 503, ""
     path = _audio_path(question, variant, voice)
     if path.exists():
-        return path.read_bytes(), None
+        return path.read_bytes(), None, voice
     length_scale = variant_length_scale(question, variant)
     data = await run_in_threadpool(
         tts.synthesize, spoken_text(question), length_scale, voice
@@ -555,4 +573,4 @@ async def get_audio(
     # demanda (voz no-default o variante no pre-renderizada). Solo se ejecuta en
     # la primera síntesis (cache miss); nunca rompe el flujo si el ASR no está.
     await run_in_threadpool(ensure_word_alignment, path, spoken_text(question))
-    return data, None
+    return data, None, voice

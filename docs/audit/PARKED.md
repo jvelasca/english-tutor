@@ -640,6 +640,501 @@ candado `test_docs_drift_v371` obligó a actualizar el número de tests del laun
   generación) es una decisión, no un hallazgo: si el diagnóstico real necesitase más
   histórico, se revisa. `[POL]`
 
+## V3.75.3 — preferencias del launcher, listening sin fricción y análisis global (2026-09-20)
+
+> Origen: tres peticiones del gerente sobre la app en uso —(1) que el launcher
+> **recuerde** la última configuración (en concreto «ACTIVADA RED LOCAL»), (2) que
+> la práctica de listening de móvil no gaste un paso entero en «He escuchado —
+> responder», y (3) que el **Análisis** esté en la cabecera junto al usuario y
+> muestre la evolución del alumno en su conjunto, en vez de un panel flotante
+> dentro del ejercicio. Plan: `lan, listening y análisis` (V3.75.3).
+
+### Decisiones tomadas (y su precio)
+
+- **La preferencia de red se persiste** en `launcher/config.json`
+  (`launcher/config_store.py`), se lee **al arrancar** antes de pintar la interfaz y
+  se guarda **en cada cambio**. Responde a la pregunta abierta nº 1 de
+  `docs/audit/PLAN-P0-IDENTIDAD.md` y **revierte §5.8** del mismo documento: el modo
+  LAN pasa de decisión de sesión a **decisión de instalación**. `[POL]`
+  - **Lo que esto reabre, dicho sin adornos:** un equipo con `{"lan": true}` arranca
+    con uvicorn en `0.0.0.0` y aceptando orígenes de red privada **sin que nadie lo
+    declare en esa sesión**. El P0 de identidad sigue abierto y, en modo LAN,
+    `GET/POST /api/users` siguen sin credencial (§V3.75). Antes de esta versión, ese
+    estado se perdía al cerrar el launcher.
+  - **Mitigación (no lo elimina):** el modo es **visible** desde el primer pintado
+    (fila LAN con el enlace + botón «Desactivar red local»), el fichero es local y se
+    ignora en git, el default es **cerrado**, y un valor editado a mano que no sea el
+    booleano `True` (`1`, `"sí"`) se lee como cerrado. Candados:
+    `launcher/tests/test_config_store.py` y las cuatro pruebas nuevas de
+    `launcher/tests/test_lan_mode.py` (aplicar al arrancar, sin preferencia,
+    valor no booleano, y preferencia **por encima** del entorno heredado).
+- **Listening sin el paso «He escuchado — responder».** La tarjeta `while1`
+  desaparece y la señal de «he escuchado» es **pulsar PLAY**: `play()` avanza la
+  etapa al **empezar** el audio (en el TTS, al lanzarlo —`speakWithVoice` resuelve al
+  terminar—), y en el `catch` **no** avanza, para que un fallo de audio deje el
+  ejercicio donde estaba. `[UX]` Efecto deliberado: sin pulsar PLAY no se ven las
+  opciones. Se retiran tres claves i18n huérfanas; `microFlow.ts` no se toca.
+- **Compactación móvil de la misma pantalla**: contenedor, tarjeta de audio, botón
+  PLAY, waveform y una fila de controles A/B que se oculta por debajo de `sm`. Se
+  **conserva** el deslizador de posición (una línea, sirve para releer un tramo) y
+  todos los objetivos táctiles (`min-h-10`). `[UX]` La comprobación visual sigue
+  pendiente de hardware (ver abajo).
+- **El Análisis se va a la cabecera y a su propia ruta.** `frontend/src/features/analysis/AnalysisScreen.tsx`
+  en `/analisis` (`ANALYSIS_PATH`), abierto con un botón en el bloque `ml-auto` del
+  `Header`. Es **destino auxiliar**: no lleva píldora en `Navigation` (por eso no
+  toca `ROUTES` ni rompe el test de las 5 píldoras). Sintetiza posición, actividad
+  real con su agrupación temporal, tríada, destrezas y escalera CEFR reutilizando
+  endpoints que ya existían, **sin crear ninguno**. `[UX]`
+  - **Se retira el panel flotante**: `components/AnalysisPanel.tsx` **borrado**,
+    fuera las reglas CSS muertas (`.pane--insights`, `.insights-header`,
+    `.insights-toggle`, `workspace--learn`, `chat.resizeInsights`, etc.) y el asa
+    derecha del workspace. El panel se había quedado sin analítica propia en V3.1
+    (calidad del tutor + enlace a MI PROGRESO) y solo se encontraba dentro del
+    ejercicio. La calidad del tutor no se pierde: la recibe la pantalla nueva desde
+    los turns de la sesión en curso.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El P0 de identidad, entero**, y ahora con una vía más para arrancar expuesto:
+  la preferencia persistida. La Fase 3 (credencial o emparejamiento) sigue sin
+  existir y **no cambia de prioridad** por esta decisión. Ver
+  `docs/audit/PLAN-P0-IDENTIDAD.md` §5.9. `[D]`
+- **El barrido visual de `/#/analisis` y del listening compacto no se ha ejecutado.**
+  Playwright en Windows es frágil (ya registrado en §V3.75.2) y el plan deja la
+  captura para la validación física. `resize.spec.ts` se reescribió sobre el asa del
+  **sidebar** —la que sobrevive— porque probaba la derecha, que ya no existe. `[D]`
+- **`layout.rightWidth` sigue existiendo y persistiéndose** (`utils/layout.ts`) sin
+  consumidor: el asa del panel de análisis se retiró, pero el contrato de layout
+  tiene sus propios tests y no se poda en esta release para no arrastrar cambios al
+  `useChat`. Es deuda de forma, no una fuga. `[D]`
+
+## V3.75.4 — listening pulido y rampa de niveles configurable (2026-09-20)
+
+> Origen: dos peticiones del gerente sobre la app en uso —(1) qué es el botón de
+> «SALTAR» de APRENDER/LISTENING y si se puede quitar, y (2) que los niveles
+> (A1, A2, …) tengan **color de fondo progresivo** para leerse de un vistazo, con
+> inspiración en las apps top y **elegible por perfil**. Plan:
+> `listening pulido y rampa de niveles` (V3.75.4).
+
+### Decisiones tomadas (y su precio)
+
+- **El «Saltar» del pie se conserva, discreto y reubicado.** Era `listening.skip`
+  (`ListeningPractice.tsx`) y llamaba a `load()`: **pide otro ítem sin responder**,
+  la única salida de una pregunta sin registrar evidencia (audio que no suena,
+  ítem incomprensible). Se retira del pie, donde competía con las opciones, y pasa
+  a la cabecera nueva como botón fantasma pequeño («Otro ejercicio», clave
+  `listening.anotherItem`, la anterior renombrada para no dejar huérfana). `[UX]`
+  No se confunde con el otro «Saltar» de la tarjeta de shadowing
+  (`listening.flow.skipStage`), que declina el paso **opcional** que el backend
+  marca con `allow_skip`.
+- **El color de nivel pasa de 3 tramos a 7 pasos, con un solo mecanismo.** Antes
+  `utils/cefr.ts::cefrTone` devolvía `basic|intermediate|advanced`, así que A1 y A2
+  (o B1 y B2) eran del mismo color y el color no decía nada. Ahora
+  `cefrLevelKey`/`levelClass` (Pre-A1 → C2 + «sin dato») son la única puerta y las
+  clases **estáticas** `.lv-*` de `styles/legacy.css` la única pintura: sin clases
+  Tailwind interpoladas (el escaneo las purgaría) y sin `inline style`. Las clases
+  se declaran **fuera de capa** a propósito, para que una utilidad de Tailwind de
+  la misma línea no borre el color del nivel. `[UX]`
+  - **Fallo previo que se arregla de paso:** `LearningProfile.tsx` llamaba
+    `cefrTone(profile.estimated_bands[skill])` con un **número** (escala 0–6), así
+    que caía siempre en `basic` y las filas del perfil se pintaban iguales.
+    `bandToLevelKey(numeric)` recupera el tramo, declarado como **aproximación de
+    color**, no como medida de dominio.
+- **La rampa es elegible por usuario (Ajustes > Apariencia), sin backend nuevo.**
+  Tres esquemas —**Semáforo** (por defecto, reproduce los colores que ya había),
+  **Espectro** y **Monocromo** (7 intensidades del acento, cero hexes propios)— con
+  vista previa en el propio diálogo. Se aplica con `data-levels` en `<html>` (igual
+  que `data-theme`/`data-accent`/`data-density`), se persiste por perfil con la
+  clave `level_scheme` en el `PUT /api/settings` que ya existía y `localStorage`
+  como copia para que un backend caído no pierda la preferencia. El relleno y el
+  borde se **derivan** de la tinta con `color-mix()`, así que un esquema nuevo son
+  7 hexes y no 21. `[UX]`
+- **El gate del color es la medición, no el gusto.** `contrast_audit.mjs` mide cada
+  paso sobre su **relleno compuesto** (sobre `--color-surface` y sobre `--color-bg`)
+  en los **3 esquemas × 2 temas** —y en Monocromo, por los **7 acentos**—, con
+  guardas de que la rampa esté completa. Hoy: **472 pares + 4 guardas, 0
+  bloqueantes con fallo** en `--strict`. Los hexes se ajustaron hasta AA; el precio
+  es que la paleta es tributaria del contraste, no al revés. `[D]`
+  - **Alcance honesto de la medición:** mide la tinta sobre el relleno compuesto en
+    esos dos fondos, no cada sitio donde se dibuja una insignia; y que un nivel
+    tenga color no implica que el alumno domine ese nivel.
+
+- **El selector de rutas del listening se agrupa de dos en dos.** La rejilla de
+  seis rutas (A1·A2 / B1·B2 / C1·C2) pasa a **dos columnas** en todos los anchos
+  —celda horizontal, anillo a la izquierda y datos a la derecha— y **«Auto»** sale
+  de ella a una **fila propia a ancho completo**, después de C2: es la opción que
+  **no** elige ruta y no debía competir con las seis que sí la eligen. Entre el
+  resumen (precisión · ruta actual) y la rejilla, y entre esta y el panel de nivel,
+  quedan **separadores finos** (`border-border/60`). La celda conserva el
+  `aria-label` «Level {nivel} history» y el objetivo táctil, así que el arnés
+  visual sigue encontrándola. `[UX]`
+  - **Medido, no estimado:** con el arnés (`playwright`, 3 viewports), las seis
+    celdas ocupan **3 filas de 2** y no hay desbordamiento horizontal
+    (`scrollWidth == clientWidth` en 390 / 768 / 1280). En móvil cada celda mide
+    158 px de ancho y entre 66 y 107 px de alto; «Auto» ocupa el ancho de la
+    tarjeta. `[D]`
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El barrido visual completo sigue sin hacerse.** De esta release se ha
+  ejecutado **solo la parte de listening**: `routeExtraReview` (pasa) y una
+  medición geométrica de la rejilla en 3 viewports, que es lo que respalda el
+  apartado anterior. El barrido de la **rampa en toda la app** y de **Ajustes**
+  sigue pendiente, y Playwright en Windows sigue frágil (V3.75.2 y V3.75.3): la
+  validación física no se declara hecha. `[D]`
+- **`cefrTone` sobrevive en documentos históricos** (`agentes/pedagogia/*`,
+  `agentes/endurecimiento/*`, `RELEVO.md`, `CHANGELOG.md`): son briefs y actas de
+  lo que se decidió entonces y **no se reescriben**. El código ya no tiene ninguna
+  referencia. `[D]`
+- **El P0 de identidad sigue entero** y este incremento no lo toca (ninguna ruta
+  nueva, ningún endpoint nuevo). `[D]`
+
+## V3.75.5 — voz configurable y dos acentos en listening y rutas de quiz (2026-09-20)
+
+> Origen: una petición del gerente sobre la app en uso —desde el «…» de la
+> tarjeta de audio **elegir** la voz (no sólo verla), y que el altavoz que
+> aparece tras responder leyera el **ítem completo** y dejara oírlo con **dos
+> acentos** (p. ej. inglés de Inglaterra y de EE. UU.)—, más la extensión de la
+> convención visual de V3.75.4 (niveles de dos en dos, «Auto» en fila propia,
+> rampa de color, separadores finos y «Saltar» discreto) a las **rutas de quiz**.
+> Plan: `voz configurable y dos acentos` (V3.75.5).
+
+### Decisiones tomadas (y su precio)
+
+- **El «…» deja de ser un cartel y pasa a configurar.** Antes sólo leía «Voz
+  sintética local (TTS) · <voz> · <wpm>» y no había ningún camino a la
+  configuración desde la práctica. Ahora abre el bloque `VoicePicker`: fila
+  **Voz A** (la del perfil, `tts_voice`), fila **Voz B** (segundo acento,
+  `tts_voice_alt`) y dos chips **«Probar A» / «Probar B»** que reproducen *ese*
+  ítem para comparar antes de decidir. El mismo bloque, tal cual, cuelga del
+  «…» de las rutas de quiz: una sola idea de acento en toda la app. `[UX]`
+- **Se puede pedir voz, y sólo una instalada.** `TTSRequest.voice` y el query
+  param `voice` de `/api/listening/audio/{id}` viajan hasta
+  `tts.pick_requested_voice`, que **sólo** acepta una voz instalada y del idioma
+  pedido; si no pasa el filtro **se ignora en silencio** y manda
+  `resolve_voice(prefs)`. No es laxitud: es que la UI no puede romperse por una
+  preferencia vieja (ni recibir un 400 por ella) y, sobre todo, el id de voz
+  **entra en rutas de disco** (`PIPER_DIR / "<voz>.onnx"` y
+  `data/listening/{banco}/{voz}/…`), así que aceptarlo sin validar sería path
+  traversal por construcción. `[D]`
+- **`X-TTS-Voice` / `X-TTS-Degraded` siguen declarando lo que realmente sonó**,
+  no lo que se pidió: la UI puede ser honesta cuando degrada. `[D]`
+- **Cero backend nuevo para la preferencia.** Voz A = `tts_voice` (ya existía),
+  voz B = `tts_voice_alt`, una clave más del mismo `PUT /api/settings`. La caché
+  de audio ya estaba separada por voz, así que el segundo acento es **una caché
+  más**, no un motor nuevo. `[D]`
+- **La B se sugiere sola, y nunca cruza idiomas.** `utils/voices.ts::suggestAltVoice`
+  propone la primera voz del **mismo idioma y otra locale** (US → GB y al revés),
+  de modo que «dos acentos» funciona recién instalada la app sin obligar a
+  configurar nada; el selector sólo ofrece voces del idioma de la voz A, porque
+  mezclar idiomas haría que la B leyera el ítem en otro idioma. `[UX]`
+- **Un store de módulo, no un contexto.** `hooks/useVoiceChoice.ts` (patrón de
+  `useVoiceDownload`, `useSyncExternalStore`) hace **una sola** lectura de
+  `GET /api/voices` + `GET /api/settings` para toda la app aunque haya varios
+  altavoces en pantalla, y **vacía el estado al cambiar de perfil** (la voz de un
+  alumno no puede quedarse a la vista de otro). Configuración → Voces escribe
+  `tts_voice` por su cuenta, así que el panel **relee** el store al elegir voz y
+  al instalar una nueva (`refreshVoiceChoice`): sin eso la voz A de la práctica
+  quedaba desincronizada. `[D]`
+- **`ListenButton` sin `accent` no cambia.** El componente histórico mantiene su
+  comportamiento (3 argumentos, sin tocar el store) cuando no se le pide acento:
+  es lo que hace que 40 y pico usos previos y sus tests sigan intactos. Donde el
+  altavoz lee un **ítem**, se usa `ItemReplayButton` (un botón por acento
+  disponible); donde lee texto arbitrario del alumno (traductor), sigue el
+  `ListenButton` de siempre. `[D]`
+- **PLAY sigue sonando en voz A.** El botón grande no cambia de significado: la
+  escucha de estudio es una sola y el segundo acento vive donde el alumno lo
+  pide, que es **después de responder**. `[UX]`
+- **El altavoz de después de responder lee el ítem entero** —enunciado y opciones
+  con su letra (`buildReplayText`: `"<enunciado>. A: …. B: …."`)— en voz A o B, y
+  con una sola voz instalada **sólo** aparece A: nunca un botón que no puede
+  sonar. La etiqueta cambia según el caso (`voice.replayOptions*` con opciones,
+  `voice.replayPhrase*` sin ellas): no promete opciones donde no las hay. `[UX]`
+  - **Actualizado en V3.75.6** (ver más abajo): la lectura pasa a ser una
+    **composición** que elige el perfil (`replay_scope`), así que «el ítem entero»
+    es sólo una de las tres; las claves `voice.replayOptions*` se sustituyen por
+    `voice.replayItem*`, que no prometen opciones porque el defecto ya no las lee.
+    `[D]`
+- **El mismo control, allí donde se escucha.** Además de listening y las rutas de
+  quiz, se sustituyó el altavoz mudo por el consciente de la voz en los paneles de
+  nivel de listening/vocabulario/gramática/conversación/pronunciación/speaking, en
+  los escenarios de pronunciation y speaking, en el drill de vocabulario, en el
+  diccionario (palabra y ejemplo) y en la evaluación de speaking. `[UX]`
+- **Rutas de quiz con la convención de V3.75.4.** Las seis rutas van **de dos en
+  dos** (A1·A2 / B1·B2 / C1·C2) con celda horizontal (anillo + datos), **«Auto» en
+  fila propia** a ancho completo —es la opción que *no* elige ruta y no debe
+  competir con las seis que sí—, **rampa de color** (`levelClass` + `lv-ink` /
+  `lv-outline` en el anillo), **separadores finos** y el `LevelBadge` con el mismo
+  mecanismo que listening. `[UX]`
+  - **El «Saltar» se muda a la cabecera, pero no se pierde.** Antes vivía al pie
+    de la tarjeta de práctica, compitiendo con las opciones; ahora es un botón
+    fantasma discreto en la cabecera de la pantalla (63×32 px medidos), visible
+    **también dentro de una sesión** —como estaba— y oculto sólo mientras se
+    evalúa o cuando ya hay resultado, que es cuando manda «Continuar». Retirarlo
+    durante las sesiones habría sido una regresión silenciosa: es la única salida
+    de un ítem sin registrar evidencia. `[UX]`
+- **Medido, no estimado.** El arnés (`playwright`, 3 viewports, mock determinista
+  de las rutas de gramática, spec temporal ya retirada) deja: **6 celdas en 3
+  filas de 2** en 390 / 768 / 1280, sin desbordamiento horizontal
+  (`scrollWidth == clientWidth`), celda de **154×66** px en móvil y **335×70** en
+  tablet/escritorio, «Auto» a ancho de tarjeta (316 / 678 px). En el mismo
+  recorrido se comprobó que el «…» muestra las dos filas de voz y que, tras
+  responder, aparecen los dos altavoces (A y B). `[D]`
+- **Verificación completa de la release:** `tsc --noEmit` limpio, `vitest run`
+  **777/777**, `npm run build` correcto, `audit:contrast --strict` **472 pares +
+  4 guardas, 0 bloqueantes** (sin colores nuevos: la rampa sigue siendo la de
+  V3.75.4 y el informe se regenera con esa etiqueta a propósito),
+  `check_i18n_coverage --strict` **1504 claves, 0 huérfanas**, `ruff` limpio,
+  `pytest` **2906/2906** y los 6 specs visuales de rutas (desktop) en verde. `[D]`
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **La primera reproducción en voz B cuesta unos segundos.** Sintetizar y alinear
+  (ASR) ese WAV es trabajo real la primera vez que se pide cada ítem × voz ×
+  variante; después queda cacheado. El chip muestra su spinner y no se queda
+  mudo, pero no es instantáneo y no se disimula. `[D]`
+- **La caché crece**: ~100 KB por ítem × voz × variante. Es disco local y se puede
+  borrar sin romper nada, pero no se recolecta sola. `[D]`
+- **El acento sigue siendo simulado.** Piper sintetiza; una voz «británica» no es
+  un hablante británico. Dos voces hacen la diferencia audible y la etiqueta
+  honesta sigue junto al selector, pero la promesa no crece. `[D]`
+- **El barrido visual completo sigue sin hacerse** (viene de V3.75.4): de esta
+  release se ha medido la rejilla de rutas y la presencia del control de voz, no
+  cada pantalla donde se sustituyó el altavoz. Playwright en Windows sigue
+  frágil; la validación física no se declara hecha. `[D]`
+- **El P0 de identidad sigue entero** y este incremento no lo toca: no añade
+  endpoints, sólo dos parámetros validados sobre rutas que ya exigían sesión. `[D]`
+
+## V3.75.6 — STOP en la repetición, lectura corta y la RUTA B1 que no se parecía a las demás (2026-09-20)
+
+> Origen: tres observaciones del gerente usando la app —(1) al elegir **RUTA B1**
+> el ítem no aparecía como en las otras rutas y mostraba «Enviar dictado»; (2) la
+> repetición en A/B está bien, pero una lectura larga necesita un **STOP**; (3) en
+> el «…» debe poder fijarse —y persistir— si esa repetición lee **solo la
+> respuesta correcta** o **todas las opciones**. Su petición de (3) se concretó el
+> mismo día, tras la primera entrega, en **tres composiciones** (ver abajo): la
+> primera versión del control ofrecía dos y el gerente precisó qué piezas entran
+> en cada una.
+
+### Decisiones tomadas (y su precio)
+
+- **(1) Era una etiqueta mal puesta, no un flujo nuevo.** `c071` y `c084` —los dos
+  únicos ítems del corpus (490) etiquetados `dictation`/`shadowing`— estaban
+  **autorados como pregunta de opción múltiple** (`question` + 4 `options` +
+  `answer_index`). El flujo se elige por `skill` (`flow_for_skill` → producción),
+  así que la app pedía **escribir a mano** una frase cuyo contenido autorado era
+  «Which time did you hear?» con opciones. Corregido **en el contenido**: `c071` →
+  `numbers`, `c084` → `phrase_recognition` (corpus `3.0.0` → `3.0.1`). B1 vuelve a
+  recibir lo mismo que las otras cinco rutas y **recupera dos ítems servibles**
+  que antes se tiraban. `[D]`
+  - **Precio declarado: hoy no queda ningún ítem de dictado.** El endpoint
+    `/api/listening/dictation` y el flujo de producción siguen vivos y probados,
+    pero el esquema del corpus **exige** `options` + `answer_index`, así que no
+    puede representar un dictado: es **deuda de contenido**, no de código. Quien
+    quiera dictado real tendrá que autorarlo con un esquema que lo represente. El
+    test `test_corpus_production_items_do_not_carry_multiple_choice_options` cierra
+    el atajo: una etiqueta no convierte una pregunta en un dictado. `[D]`
+  - El **shadowing** no desaparece de la práctica: sigue siendo el paso opcional
+    del micro-flujo receptivo (grabar y escucharse), que ya existía. `[D]`
+- **(2) STOP en la repetición, no en el PLAY.** `api/voz.ts` gana un registro de
+  módulo con la locución en curso: `stopSpeaking()` pausa el audio **y** cancela la
+  síntesis si aún no había sonado, y la promesa de `speak()` **resuelve** —parar no
+  es un error—, así el botón apaga su spinner sin tratar el corte como fallo.
+  Además, **una sola locución a la vez**: empezar otra corta la anterior (antes se
+  solapaban). El STOP sólo existe mientras suena y vive junto a los botones A/B. `[D]`
+- **(3) `replay_scope`, una clave más del mismo `PUT /api/settings`.** El «…» —el
+  mismo `VoicePicker` de listening y de las rutas de quiz— añade «Al repetir, leer»
+  con **tres composiciones** (corrección del gerente del mismo día: la primera
+  versión ofrecía dos y él concretó las piezas). Un ítem tiene cuatro: **texto** (el
+  `script`, lo que suena), **pregunta**, **opciones** y **respuesta correcta**. De
+  ahí salen `"item"` (**defecto**: texto + pregunta + respuesta), `"withOptions"`
+  (texto + pregunta + opciones + respuesta) y `"correct"` (pregunta + respuesta).
+  `[UX]`
+  - **Por defecto, menos es más:** quien no toca nada oye lo que sonó y la clave, no
+    las tres alternativas. Es un cambio de defecto **declarado**: hasta ahora la
+    única lectura era la larga. El valor histórico `"all"` se normaliza a
+    `"withOptions"`, así que quien la había elegido de forma explícita no pierde su
+    elección; ausente o desconocido cae a `"item"`. `[D]`
+  - **Una sola función decide el texto** (`buildReplayText`), con salvaguardas:
+    descarta piezas ausentes en vez de inventarlas, no repite el ítem cuando el
+    script *es* la pregunta (habitual en A1) y si el alcance elegido dejara la
+    lectura vacía cae a la composición completa —nunca una repetición muda—. `[D]`
+  - **No puede filtrar la respuesta antes de tiempo:** `correct_index` sólo lo
+    aportan los sitios que ya han respondido (listening y rutas de quiz); hasta
+    entonces el altavoz de repetición ni existe. `[D]`
+  - El control se muestra aunque falle el catálogo de voces: cómo se repite no
+    depende de qué voces estén instaladas. `[UX]`
+  - **El «recibo» nació de un problema real de diseño:** las tres etiquetas se
+    parecen («el ítem completo» / «el ítem más las opciones») y la diferencia está
+    en las piezas, no en las palabras. En vez de un párrafo que explique las tres,
+    bajo los botones se describe **la activa** («Se lee: texto del ítem + pregunta +
+    opciones + respuesta correcta»). `[UX]`
+- **Contrato de UI fijado en pantalla real:** `frontend/tests/visual/
+  listeningReplayStop.spec.ts` (mock-based, 3 breakpoints) navega a la RUTA B1 y
+  comprueba que las opciones están y la tarjeta de producción no, que el «…» ofrece
+  las tres lecturas con la primera activa, y que tras responder aparecen A/B y el
+  STOP. Además **lee el cuerpo real del `POST /api/tts`** y exige que el texto
+  compuesto sea texto + pregunta + opciones + clave: la composición del gerente
+  verificada de punta a punta, no sólo en unitarios. Medido: STOP **32×32** dentro
+  del viewport (x+w = 199 en 390) y **sin desbordamiento horizontal**
+  (390/390 · 768/768 · 1280/1280). Que el **banco** sirva una pregunta receptiva en
+  B1 lo fija `test_listening_corpus.py`: la suite visual mide la UI, no el
+  contenido. `[D]`
+- **Verificación de la release:** `tsc --noEmit` limpio, `vitest run` **805/805**,
+  `check_i18n_coverage --strict` **1511 claves, 0 huérfanas**, `audit:contrast
+  --strict` **472 pares + 4 guardas, 0 bloqueantes**, `ruff` limpio, `pytest`
+  **2907/2907**, `playwright test --workers=1` **41/41** y métricas del corpus
+  regeneradas (`docs/audit/generated/listening-corpus-stats.*`). `[D]`
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **La suite visual no aguanta el paralelismo del arnés.** `playwright test` con los
+  3 workers por defecto encadena fallos que **no** son del producto: en la misma
+  ejecución fallaron 14 specs ajenos (`resize`, `smoke`, `speaking`,
+  `pronunciationRoutesReview`…) con `page.goto` agotando los 30 s o elementos que no
+  aparecen, y **cada uno pasa en aislamiento**. Con `--workers=1` los **41/41** son
+  verdes. La causa probable es la saturación del dev server de Vite (transformación
+  en frío × 3 navegadores × 15 specs). La medición de este bloque se hizo con
+  `--workers=1`, y la de V3.75.4/5 con specs sueltos: conviene decidir si el arnés
+  fija un worker, sube el timeout o sirve `dist` compilado en vez de dev server. `[D]`
+- **El corpus no tiene dictado ni shadowing autorado** (arriba): hay endpoint,
+  flujo, UI y tests, pero ningún contenido que los dispare. `[D]`
+- **`docs/LISTENING_ENGINE_4.0.md` (2026-09-09)** citaba `c071`/`c084` como
+  evidencia de dictado y shadowing. Es una especificación fechada y no se
+  reescribe, pero se le añade la nota de corrección para no dejar una cita falsa
+  en un documento que se sigue leyendo. `[D]`
+- **El corpus en marcha no se recarga solo.** El backend lee el banco al importar:
+  quien tenga el servidor arrancado de antes seguirá viendo la tarjeta de dictado en
+  B1 hasta reiniciarlo (y `frontend/dist`, servido por el backend, necesita
+  recompilarse para ver la UI nueva). Es el precio de servir la UI compilada desde
+  el mismo proceso. `[D]`
+
+## V3.75.7 — el icono del desplegable y el texto que no queda debajo del botón (2026-09-20)
+
+> Origen: cierre de la pantalla de listening pedido por el gerente. (1) «Donde el
+> desplegable solo muestre información el botón tendrá una (i) y donde sea info y
+> posibles opciones será (...). Revísalo en toda la APP». (2) «Al desplegarse el
+> texto no debe tener partes cubiertas por el botón (...), como sucede ahora».
+
+### Decisiones tomadas (y su precio)
+
+- **(1) El icono es un contrato, no un adorno: una sola fuente de verdad.** El «...»
+  ya significaba «abre para configurar» (tarjeta de audio de listening); un «...» que
+  solo escondía un párrafo obligaba a pulsar para descubrir que no había nada que
+  decidir, y una (i) sobre controles escondía opciones bajo una promesa falsa. La
+  regla vive en `components/InfoDisclosure.tsx` (`content: "info" | "options"`) y el
+  **defecto es `"info"`**: un panel nuevo que no declare nada no puede prometer
+  opciones. La etiqueta accesible acompaña al icono (`common.moreOptions` =
+  «Opciones e información» para el «...»; `common.moreInfo` para la (i)). `[UX]`
+  - **Inventario de la revisión (11 disparadores, ninguno sin clasificar).** Ocho
+    `InfoDisclosure` con **(i)**: notas de ruta de listening y notas de los paneles de
+    nivel de las seis destrezas (speaking tiene dos). Uno con **(...)**: notas de ruta
+    de las rutas de quiz, que cuelgan del mismo `VoicePicker`. Y tres que no usan el
+    componente: el «...» de la tarjeta de audio (velocidad + voces + repetición, ya
+    era «...» y sigue), el desplegable de texto «Cómo funcionan las rutas» (ya era (i)
+    con etiqueta visible) y el propio botón de los paneles, que no se toca. `[D]`
+- **(2) El panel reserva la columna del botón, no altura.** En `variant="corner"` el
+  disparador flota sobre la Card y el panel se monta donde el llamador lo ponga —en
+  listening, como primer hijo—, así que su primera línea salía **tapada** por el botón
+  que acababa de abrirla: medido, el párrafo «A real CEFR B1 means…» quedaba dentro del
+  rectángulo del botón. El panel ahora reserva `pr-12` (36 px del botón + 12 px de
+  aire). Reservar altura (`pt`) habría dejado un hueco muerto en los paneles que no
+  llegan al borde superior; reservar columna no cuesta nada en ninguno y hace que el
+  botón se apoye en la esquina del panel sin tapar una sola letra, suba el panel o no.
+  `[D]`
+  - La composición de clases se hace explícita (`py-2 pl-3 pr-12` en la esquina frente
+    a `px-3 py-2` en el flujo) para **no depender del orden** en que Tailwind emita
+    `px-*` y `pr-*`. `[D]`
+- **El «...» de la tarjeta de audio no necesitaba corrección, y se comprueba.** Su
+  panel vive muy por debajo del botón (nace tras el PLAY), así que ningún nodo suyo
+  intersecta el disparador: se midió en los tres breakpoints en vez de darlo por hecho.
+  `[D]`
+- **Contrato de UI fijado en pantalla real:** nuevo test en `frontend/tests/visual/
+  listeningReplayStop.spec.ts` que en **desktop, tablet y móvil** (390/768/1280)
+  comprueba (a) que el disparador de notas lleva `lucide-info` y el de audio
+  `lucide-ellipsis`/`more-horizontal`, (b) que ningún nodo de texto del panel
+  intersecta el rectángulo del disparador —lista vacía en los tres— y (c) que el panel
+  del «...» contiene opciones de verdad (las tres composiciones de la repetición). Y en
+  unitario, `InfoDisclosure.test.tsx` fija el icono por defecto (i), el de `options`,
+  y la reserva de columna de la variante de esquina. `[D]`
+  - **La guarda tiene dientes, verificado:** revirtiendo `pr-12` a `px-3` el test
+    vuelve a fallar con `coveredNotes: ["p|A real CEFR B1 means hundreds of known w"]`.
+    Sin esa comprobación, un test verde no probaría nada. `[D]`
+
+### El P1 que destapó la auditoría de la tanda, y tres P3 (V3.75.7)
+
+La verificación de esta tanda se hizo en **dos auditorías independientes en
+paralelo** (frontend y backend/launcher). La de backend encontró un **P1 que
+contradecía el objetivo visible de la propia tanda**, y destapó tres P3.
+
+- **(P1) La RUTA B1 seguía sirviendo la tarjeta de dictado, y el defecto estaba en
+  el banco heredado.** `V3.75.6` corrigió `c071`/`c084` **en el corpus**, y su test
+  —`test_production_items_do_not_carry_multiple_choice_options`— **filtraba ids
+  `c`**: miraba solo el corpus. Los ítems **`l18` (`dictation`) y `l19`
+  (`shadowing`)** del `_LEGACY_BANK` seguían con `question` y `options`, así que el
+  flujo de producción los servía igual y B1 seguía mostrando «Enviar dictado».
+  Medido, no supuesto: `B1 prod [('l18','dictation',4), ('l19','shadowing',4)]`
+  frente a `corpus prod con opciones []`. `[D]`
+  - **Se cierra en la causa raíz, no en el síntoma.** (1) `PRODUCTION_SKILLS` se
+    declara **una sola vez** en `services/listening_flow.py` y la consume
+    `build_item_flow`: estaba **duplicado en tres sitios**, y esa duplicación fue
+    parte de por qué el defecto sobrevivió a su propio arreglo. (2) El barrido del
+    test es sobre **todo** `QUESTION_BANK`. (3) `l18` → `numbers` y `l19` →
+    `phrase_recognition`. **Cambia la etiqueta, no el contenido:** su `script`, sus
+    opciones y su audio son los mismos. `[D]`
+  - **El test que no mordía se arregla en los dos sentidos.** Hoy **no queda ningún
+    ítem de producción** en el banco, así que el barrido del test es **vacío** y
+    podría pasar **por estar roto**: se le añade un **control positivo**
+    (`test_production_guard_bites_on_a_synthetic_offender`) que inyecta un ítem de
+    producción **con opciones** y exige que la comprobación lo reconozca. `[D]`
+  - **La suite deja de apoyarse en ítems concretos del banco.** Nuevo fixture
+    `production_items` en `tests/conftest.py` (ítems de producción **sintéticos**:
+    copia de un ítem real con el `skill` cambiado) y migran a él
+    `test_listening_production.py`, `test_word_breakdown_v329.py`,
+    `test_listening_shadowing2_v328.py` y `test_listening_attempts_v327.py`, que se
+    rompían **cada vez** que el banco cambiaba. Y `test_bank_covers_every_subskill`
+    → **`test_bank_covers_every_receptive_subskill`**: el banco **no puede** contener
+    producción (el esquema exige `question` + `options` + `answer_index` en todos sus
+    ítems), así que la ausencia se exige **exacta** en vez de una igualdad que ya no
+    puede cumplirse. `[D]`
+- **(P3) La voz que suena no se declaraba en el audio de listening.**
+  `domain/listening.py::get_audio` devuelve ahora la voz **realmente usada** y
+  `routers/listening.py` la publica en **`X-TTS-Voice`**: el frontend ya no puede
+  creer que oyó **dos acentos** cuando, por falta de voz instalada, sonó la misma dos
+  veces. `[D]`
+- **(P3) `config.json` no se escribía de forma atómica.** `launcher/config_store.py::save_config`
+  escribe a un temporal y hace `os.replace`, así que un corte a mitad ya no puede
+  dejar el fichero de preferencias a medias. `[D]`
+- **(P3) La decisión que cambia la frontera de red no tenía test propio.** La lógica
+  de LAN se centraliza en `launcher/core.py` (`apply_stored_lan_config`,
+  `toggle_lan_config`) para que se pueda probar **fuera de `tkinter`**, que no se
+  puede ejecutar sin pantalla. `[D]`
+- **La deriva documental que la propia release creó.** El recuento de tests del
+  launcher en `docs/ARQUITECTURA.md` había quedado en `155` y el test de deriva lo
+  exige real: **161 funciones / 178 casos**. Se corrige el número, no el test. `[D]`
+
+**Lo que el P1 declara abierto.** (i) **El provenance del banco no distingue el
+antes del después:** `LISTENING_BANK_VERSION` sigue en **`7.0.0`** a propósito
+—la constante **también** nombra la caché de audio y ningún `script` ni `audio_id`
+cambió—, así que dos contenidos servidos distintos comparten `bank_version`. Es un
+hueco **declarado** y candidato a hallazgo del auditor, no una omisión: la política
+del proyecto sí bumpea provenance cuando el coste es cero (así se hizo con
+`CURRICULUM_VERSION` en V3.75.1) y aquí el coste es re-sintetizar el banco entero.
+(ii) **Hoy no queda ningún ítem de dictado autorado.** (iii) El corpus en marcha **no
+se recarga solo** ni la UI compilada en `dist`: sin reiniciar y recompilar, quien
+tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **Los paneles de nivel solo están verificados por estructura y en unitario.** Sus
+  desplegables son `inline` (el botón y el panel se apilan en un `flex-col`), así que
+  el solapamiento es imposible por construcción y el unitario fija icono y clases; pero
+  **no** se navegó a las seis pantallas para medir su geometría real como sí se hizo en
+  listening. Si alguna se cambia a `corner`, la guarda visual no la cubre. `[D]`
+- Sin cambios: el corpus no tiene dictado autorado, la suite visual no aguanta el
+  paralelismo del arnés (medir con `--workers=1`) y el corpus en marcha no se recarga
+  solo (reiniciar backend y recompilar `frontend/dist` para ver la UI nueva). `[D]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

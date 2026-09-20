@@ -61,6 +61,13 @@ const TranslatorScreen = lazy(() =>
     default: m.TranslatorScreen,
   })),
 );
+// V3.75.3: análisis de evolución (ruta auxiliar /analisis), abierto desde la
+// cabecera. Sustituye al panel flotante «Analysis» de la práctica.
+const AnalysisScreen = lazy(() =>
+  import("../features/analysis/AnalysisScreen").then((m) => ({
+    default: m.AnalysisScreen,
+  })),
+);
 
 interface WorkspaceProps {
   route: Route;
@@ -119,7 +126,7 @@ export function Workspace({
   onOpenProgress,
   refreshKey,
 }: WorkspaceProps) {
-  const { currentUserId } = chat;
+  const { currentUserId, messages } = chat;
   const userName = chat.users.find((u) => u.id === currentUserId)?.name;
 
   const backToHub = () => navigateTo(LEARN_PATH);
@@ -182,6 +189,16 @@ export function Workspace({
     // V3.39 (Fase 2): el Traductor es una utilidad auxiliar (ES↔EN por voz o
     // texto) que NO registra evidencia; es válida sin perfil.
     content = <TranslatorScreen userId={currentUserId} />;
+  } else if (route === "analysis") {
+    // V3.75.3: análisis de evolución. Recibe los turns de la sesión para la
+    // calidad del tutor, que era lo único en vivo que aportaba el panel retirado.
+    content = (
+      <AnalysisScreen
+        userId={currentUserId}
+        messages={messages}
+        refreshKey={refreshKey}
+      />
+    );
   } else if (route === "help") {
     content = <HelpScreen />;
   } else if (route === "learn") {

@@ -22,6 +22,12 @@ from services.listening import skill_layer
 
 FLOW_STAGES: tuple[str, ...] = ("pre", "while1", "while2", "post", "shadowing")
 
+# V3.75.7: los skills que se sirven por el flujo de **producción** (el alumno
+# escribe o repite la frase; el enunciado con opciones se descarta). Es la fuente
+# única: `build_item_flow` la consume y el test que impide etiquetar una pregunta
+# de opción múltiple como producción también, para que no puedan discrepar.
+PRODUCTION_SKILLS: tuple[str, ...] = ("dictation", "shadowing")
+
 REVELATION_MODES: tuple[str, ...] = (
     "on_first_fail",
     "on_second_fail",
@@ -158,12 +164,12 @@ def _receptive_flow(shadowing_optional: bool) -> list[dict]:
 def build_item_flow(question: dict, policy: dict | None = None) -> list[dict]:
     """Pasos del micro-flujo para un ítem.
 
-    Los ítems de producción (`skill` dictation/shadowing) se sirven directos a su
+    Los ítems de producción (`PRODUCTION_SKILLS`) se sirven directos a su
     tarea; el resto recibe la secuencia receptiva. `policy` (opcional) permite
     fijar `shadowing_optional` en `allow_skip`.
     """
     skill = question.get("skill", "")
-    if skill in ("dictation", "shadowing"):
+    if skill in PRODUCTION_SKILLS:
         return _production_flow()
     shadowing_optional = True
     if policy:

@@ -16,3 +16,5 @@ backend/models/
 backend/data/
 launcher/logs/
 launcher/state.json
+# V3.75.3: preferencias del launcher (modo LAN). Por equipo, como state.json.
+launcher/config.json

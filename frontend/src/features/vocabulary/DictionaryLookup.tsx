@@ -11,7 +11,7 @@ import type {
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -246,6 +246,7 @@ export function DictionaryLookup({ userId }: DictionaryLookupProps) {
         <div className="mt-6 flex flex-col gap-5">
           <ResultCard
             entry={entry}
+            userId={userId}
             onPractice={practiceTerm ? () => setPracticeWord(practiceTerm) : undefined}
           />
 
@@ -443,9 +444,11 @@ function CompetenceChips({ competence }: { competence: LexicalCompetence }) {
 
 function ResultCard({
   entry,
+  userId,
   onPractice,
 }: {
   entry: DictionaryEntry;
+  userId: string | null;
   onPractice?: () => void;
 }) {
   const { t } = useI18n();
@@ -487,10 +490,8 @@ function ResultCard({
           </div>
           <div className="flex items-center gap-2">
             {audioText && (
-              <ListenButton
-                text={audioText}
-                label={t("dictionary.lookup.listenWord")}
-              />
+              /* V3.75.5: la palabra se puede oír en A o B (dos acentos). */
+              <ItemReplayButton prompt={audioText} userId={userId} />
             )}
             {/* V3.32: «Practicar esta palabra» — abre la escalera de drill oral
                 (Recall → Sentence). Solo esta acción explícita escribe
@@ -564,10 +565,7 @@ function ResultCard({
               <span className="text-sm font-medium" lang="en">
                 {entry.example.phrase}
               </span>
-              <ListenButton
-                text={entry.example.phrase}
-                label={t("dictionary.lookup.listenExample")}
-              />
+              <ItemReplayButton prompt={entry.example.phrase} userId={userId} />
             </div>
             <p className="text-[11px] text-muted-foreground">
               {t("dictionary.lookup.exampleNote")}

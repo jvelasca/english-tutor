@@ -780,7 +780,11 @@ _LEGACY_BANK: list[dict] = [
         "id": "l18",
         "topic": "daily_routine",
         "level": "B1",
-        "skill": "dictation",
+        # V3.75.7: era `dictation`, pero su contenido autorado es una pregunta de
+        # opción múltiple («Which time did you hear?» con cuatro horas), así que el
+        # flujo de producción descartaba el enunciado y la tarjeta no se parecía a
+        # las demás. Mismo defecto y mismo arreglo que `c071` en el corpus.
+        "skill": "numbers",
         "difficulty_vector": {
             "speed": 3,
             "vocabulary": 3,
@@ -814,7 +818,10 @@ _LEGACY_BANK: list[dict] = [
         "id": "l19",
         "topic": "functional",
         "level": "B1",
-        "skill": "shadowing",
+        # V3.75.7: era `shadowing`, pero su contenido autorado es «Which sentence
+        # matches what you heard?» con cuatro opciones. Mismo defecto y mismo
+        # arreglo que `c084` en el corpus.
+        "skill": "phrase_recognition",
         "difficulty_vector": {
             "speed": 4,
             "vocabulary": 4,

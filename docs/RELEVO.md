@@ -3,7 +3,59 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-19 (UTC+2).
+> Actualizado por última vez: 2026-09-20 (UTC+2).
+>
+> **Nota (2026-09-20 · cierre de listening): V3.75.7 — release DE PRODUCTO que
+> publica CINCO ITERACIONES juntas (`V3.75.3`–`V3.75.7`) bajo UNA sola etiqueta.**
+> **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** SÍ
+> toca **producto** (backend de listening, frontend de listening/rutas/apariencia y
+> launcher) y **contenido de listening** en exactamente **tres líneas** del corpus
+> (`c071`, `c084`) más **dos etiquetas** del banco heredado (`l18`, `l19`). **Las
+> cinco iteraciones van registradas una a una en `CHANGELOG.md` y `PLAN.md`; solo
+> `v3.75.7` lleva tag** —`V3.75.3`–`V3.75.6` no tienen tag propio, y eso es una
+> **decisión declarada**, no un hueco: sus etiquetas se citan en el código y en
+> `PARKED.md`, y las cinco entradas las mantienen localizables—. Detalle completo en
+> **`release-notes-v3.75.7.md`**.
+> **(A) El cierre que pidió el gerente.** Listening pierde el paso «He escuchado —
+> responder» (la señal es **pulsar PLAY**), gana cabecera con «Otro ejercicio»
+> discreto, tarjeta de audio con `VoicePicker`, repetición con **dos acentos (A/B) y
+> STOP**, y **tres composiciones** de lectura (`replay_scope`: `"item"` por defecto,
+> `"withOptions"`, `"correct"`). La **RUTA B1** deja de mostrar «Enviar dictado». Los
+> niveles (Pre-A1 → C2) ganan una **rampa de color de 7 pasos**, elegible por perfil
+> en Ajustes > Apariencia (**Semáforo / Espectro / Monocromo**), con el color
+> **medido** por `contrast_audit.mjs` (**472 pares + 4 guardas, 0 bloqueantes**). El
+> **Análisis** sale del ejercicio y pasa a `/analisis` desde la cabecera (el panel
+> flotante `AnalysisPanel.tsx` **se borra**). El launcher **recuerda** su
+> configuración (modo LAN en `launcher/config.json`, escritura atómica).
+> **(B) El icono del desplegable es un contrato.** `InfoDisclosure` gana
+> `content: "info" | "options"` (**defecto `"info"`**): **(i)** cuando el panel solo
+> explica y **(...)** cuando trae opciones. Inventario revisado: **11 disparadores**,
+> 8 con (i), 1 con (...) y 3 sin cambio. En la variante de esquina el panel reserva
+> la **columna** del botón (`pr-12`) para que su primera línea **no** quede tapada.
+> **(C) El P1 que destapó la auditoría de la propia tanda.** Dos ítems del **banco
+> heredado** (`l18` `dictation`, `l19` `shadowing`) seguían con opciones, así que B1
+> **seguía** sirviendo la tarjeta de dictado: el test de `V3.75.6` **filtraba ids
+> `c`** y solo miraba el corpus, y `PRODUCTION_SKILLS` estaba **duplicado en tres
+> sitios**. Cerrado en la causa raíz (fuente única en
+> `services/listening_flow.py`, barrido sobre **todo** `QUESTION_BANK`,
+> reetiquetado de los dos ítems y **control positivo** del test, que hoy barre un
+> conjunto vacío). Con él, tres P3: `X-TTS-Voice` en el audio de listening, escritura
+> atómica de `config.json` y la decisión de LAN centralizada en `launcher/core.py`
+> para poder probarse sin `tkinter`. **(D) El ancla nueva.**
+> **`agentes/auditoria-total-externa-v3757.md`**, anclado al tag **`v3.75.7`** y
+> verificado por comando. Como esta release **sí** cambia producto, **no declara el
+> invariante clásico** («diff de producto vacío»): declara **tres invariantes
+> acotados** que sí pueden cumplirse —currículum y evaluaciones **vacíos**, corpus en
+> **3 líneas**, banco heredado en **2 etiquetas**— y una **lista cerrada** del diff,
+> incluidos **siete commits que post-datan el tag `v3.75.2`** (declarados). **Lo que
+> NO cierra:** el **P0 de identidad sigue entero** —y `V3.75.3` le añadió una vía más
+> para arrancar expuesto al **persistir** la preferencia LAN—, el **provenance del
+> banco** (`LISTENING_BANK_VERSION` sigue `7.0.0` a propósito porque nombra la caché
+> de audio), **no queda ningún ítem de dictado autorado**, el acento es **simulado**,
+> el **barrido visual completo sigue sin hacerse** y **los 7 gates siguen en
+> `pending`**.
 >
 > **Nota (2026-09-19 · tarde): V3.75.2 — release DOCUMENTAL y de INSTRUMENTO que
 > publica la PAUSA PEDAGÓGICA pre-baseline (auditoría psicométrica del banco,

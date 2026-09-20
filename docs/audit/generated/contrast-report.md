@@ -1,8 +1,8 @@
-# Informe de contraste WCAG (cierre GUI pre-V4.0, V3.73.1)
+# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4)
 
 > Generado por `node frontend/scripts/contrast_audit.mjs`.
 
-- Pares que BLOQUEAN (tipografía base + texto de acento + guardas): **0 fallos** de 144.
+- Pares que BLOQUEAN (tipografía base + texto de acento + guardas): **0 fallos** de 434.
 - Pares de acento reportados (relleno + tinta y borde): **17 fallos** de 42.
 
 ## Tipografía base sobre superficies (bloqueante)
@@ -159,12 +159,57 @@
 | light | amber | anillo de acento sobre --color-bg-soft | 4.94 | 4.5 | OK |
 | light | amber | tinte de acento al 15 % sobre --color-bg-soft | 5.4 | 4.5 | OK |
 
+## Rampa de niveles por esquema y tema (bloqueante)
+
+Cada paso (Pre-A1 → C2, más el cajón «sin dato») declara su tinta y el relleno se DERIVA de ella al 15 %; se mide la tinta sobre ese relleno compuesto sobre las dos superficies donde viven insignias, bandas y chips. «Monocromo» sale del acento del usuario, así que se mide en los 7. El relleno es translúcido: sobre otro fondo (p. ej. `--color-surface-2`, más cercano a la tinta) el margen se estrecha, y por eso las tintas de la rampa se eligen con holgura y no al filo del 4.5:1.
+
+| Esquema | Tema | Acento | Fondo | Pre-A1 | A1 | A2 | B1 | B2 | C1 | C2 | s/d |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Semáforo | Oscuro | — | --color-bg | 6.16 | 6.9 | 8.42 | 7.24 | 5.61 | 7.51 | 6.55 | 6.02 |
+| Semáforo | Oscuro | — | --color-surface | 5.25 | 5.8 | 7.03 | 6.04 | 4.71 | 6.27 | 5.5 | 5.04 |
+| Semáforo | Claro | — | --color-bg | 5.42 | 5.28 | 5.15 | 5.82 | 5.24 | 5.67 | 5.34 | 5.7 |
+| Semáforo | Claro | — | --color-surface | 5.74 | 5.59 | 5.46 | 6.16 | 5.54 | 5.99 | 5.66 | 6.04 |
+| Espectro | Oscuro | — | --color-bg | 7.92 | 7.73 | 8.1 | 9.04 | 6.61 | 5.76 | 5.61 | 6.02 |
+| Espectro | Oscuro | — | --color-surface | 6.59 | 6.44 | 6.75 | 7.51 | 5.56 | 4.91 | 4.71 | 5.04 |
+| Espectro | Claro | — | --color-bg | 5.45 | 5.67 | 5.34 | 5.15 | 5.42 | 5.7 | 5.24 | 5.7 |
+| Espectro | Claro | — | --color-surface | 5.77 | 5.99 | 5.66 | 5.46 | 5.74 | 6.03 | 5.54 | 6.04 |
+| Monocromo | Oscuro | indigo | --color-bg | 5.98 | 5.97 | 5.98 | 6.04 | 6.05 | 6.07 | 6.08 | 6.01 |
+| Monocromo | Oscuro | indigo | --color-surface | 5.01 | 5 | 5.05 | 5.06 | 5.07 | 5.08 | 5.09 | 5.04 |
+| Monocromo | Oscuro | violet | --color-bg | 6.01 | 5.97 | 5.94 | 5.99 | 6.01 | 6.04 | 6.1 | 5.93 |
+| Monocromo | Oscuro | violet | --color-surface | 5.02 | 5 | 5.03 | 5.02 | 5.08 | 5.06 | 5.15 | 5.02 |
+| Monocromo | Oscuro | blue | --color-bg | 6.08 | 6.13 | 6.2 | 6.27 | 6.35 | 6.49 | 6.52 | 6.08 |
+| Monocromo | Oscuro | blue | --color-surface | 5.14 | 5.19 | 5.18 | 5.24 | 5.31 | 5.43 | 5.5 | 5.08 |
+| Monocromo | Oscuro | teal | --color-bg | 6.39 | 6.62 | 6.93 | 7.21 | 7.54 | 7.89 | 8.26 | 6.35 |
+| Monocromo | Oscuro | teal | --color-surface | 5.4 | 5.58 | 5.84 | 6.06 | 6.34 | 6.63 | 6.92 | 5.31 |
+| Monocromo | Oscuro | emerald | --color-bg | 6.35 | 6.59 | 6.88 | 7.2 | 7.52 | 7.86 | 8.21 | 6.33 |
+| Monocromo | Oscuro | emerald | --color-surface | 5.37 | 5.55 | 5.8 | 6.07 | 6.25 | 6.54 | 6.83 | 5.3 |
+| Monocromo | Oscuro | rose | --color-bg | 5.94 | 5.87 | 5.94 | 6.02 | 6.02 | 6.16 | 6.28 | 5.98 |
+| Monocromo | Oscuro | rose | --color-surface | 4.98 | 4.98 | 4.97 | 5.05 | 5.11 | 5.18 | 5.29 | 5.01 |
+| Monocromo | Oscuro | amber | --color-bg | 6.57 | 6.92 | 7.29 | 7.69 | 8.15 | 8.69 | 9.2 | 6.41 |
+| Monocromo | Oscuro | amber | --color-surface | 5.49 | 5.77 | 6.06 | 6.45 | 6.84 | 7.21 | 7.62 | 5.36 |
+| Monocromo | Claro | indigo | --color-bg | 5.05 | 5.44 | 5.94 | 6.36 | 6.87 | 7.38 | 7.85 | 4.97 |
+| Monocromo | Claro | indigo | --color-surface | 5.35 | 5.75 | 6.29 | 6.74 | 7.28 | 7.81 | 8.3 | 5.25 |
+| Monocromo | Claro | violet | --color-bg | 4.78 | 4.94 | 5.1 | 5.23 | 5.34 | 5.46 | 5.52 | 4.72 |
+| Monocromo | Claro | violet | --color-surface | 5.06 | 5.21 | 5.4 | 5.54 | 5.66 | 5.78 | 5.85 | 5 |
+| Monocromo | Claro | blue | --color-bg | 4.7 | 4.81 | 4.99 | 5.12 | 5.2 | 5.38 | 5.47 | 4.68 |
+| Monocromo | Claro | blue | --color-surface | 4.97 | 5.09 | 5.28 | 5.42 | 5.5 | 5.69 | 5.78 | 4.96 |
+| Monocromo | Claro | teal | --color-bg | 4.68 | 4.79 | 4.88 | 4.91 | 4.98 | 5.03 | 5.07 | 4.64 |
+| Monocromo | Claro | teal | --color-surface | 4.95 | 5.06 | 5.17 | 5.19 | 5.27 | 5.32 | 5.36 | 4.9 |
+| Monocromo | Claro | emerald | --color-bg | 4.71 | 4.77 | 4.88 | 4.97 | 5.06 | 5.05 | 5.09 | 4.65 |
+| Monocromo | Claro | emerald | --color-surface | 4.98 | 5.04 | 5.16 | 5.27 | 5.36 | 5.35 | 5.39 | 4.92 |
+| Monocromo | Claro | rose | --color-bg | 4.91 | 5.19 | 5.4 | 5.57 | 5.63 | 5.62 | 5.55 | 4.83 |
+| Monocromo | Claro | rose | --color-surface | 5.2 | 5.48 | 5.72 | 5.9 | 5.95 | 5.95 | 5.88 | 5.11 |
+| Monocromo | Claro | amber | --color-bg | 4.69 | 4.77 | 4.9 | 5 | 5.02 | 5.08 | 5.09 | 4.65 |
+| Monocromo | Claro | amber | --color-surface | 4.95 | 5.05 | 5.19 | 5.29 | 5.31 | 5.38 | 5.39 | 4.92 |
+
 ## Guardas
 
 | Guarda | Estado | Detalle |
 | --- | --- | --- |
 | acento-solido-no-es-texto | OK | ningún `color: var(--color-accent)` (el texto de acento usa --color-accent-soft) |
 | accent-soft-derivado | OK | --color-accent-soft se deriva del acento con color-mix() |
+| rampa-niveles-completa | OK | los 7 pasos (+ sin dato) declaran su tinta en los 3 esquemas y los 2 temas |
+| rampa-clases-y-derivados | OK | cada paso tiene relleno y borde derivados y su clase .lv-*, más los modificadores .lv-outline/.lv-ink/.lv-quiet |
 
 ## Acento como relleno y como borde (reportado; decisión para V4.0.x)
 

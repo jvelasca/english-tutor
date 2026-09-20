@@ -48,6 +48,45 @@
   --color-error: #ef4444;
   --color-error-soft: rgba(239, 68, 68, 0.13);
 
+  /* --- Rampa de niveles CEFR (V3.75.4) ------------------------------------
+     Cada paso (Pre-A1…C2) tiene su propia TINTA y el relleno y el borde se
+     DERIVAN de ella, para no declarar tres hexes por nivel. El esquema por
+     defecto es «Semáforo» (`data-levels` ausente) y conserva el idioma que ya
+     usaba la app —ámbar para lo básico, índigo/violeta para lo intermedio y
+     verde para lo avanzado— pero con un escalón por nivel en lugar de los tres
+     tramos de V3.75.3. `data-levels="spectrum"` cambia la gama entera y
+     `data-levels="mono"` reduce la rampa a siete intensidades del acento que
+     elige el usuario, así que sigue al perfil sin declarar ni un hex más.
+     El contraste de cada tinta sobre su relleno compuesto se mide por esquema
+     y por tema en `scripts/contrast_audit.mjs`, que es guarda de CI. */
+  --level-pre-a1-fg: #e59409;
+  --level-a1-fg: #f59e0b;
+  --level-a2-fg: #fbbf24;
+  --level-b1-fg: #a5b4fc;
+  --level-b2-fg: #a78bfa;
+  --level-c1-fg: #34d399;
+  --level-c2-fg: #22c55e;
+  --level-unknown-fg: #9aa5b6;
+
+  /* Relleno y borde de la rampa: una sola declaración por paso que se
+     re-colorea sola cuando el esquema o el tema cambian la tinta. */
+  --level-pre-a1-bg: color-mix(in srgb, var(--level-pre-a1-fg) 15%, transparent);
+  --level-pre-a1-border: color-mix(in srgb, var(--level-pre-a1-fg) 35%, transparent);
+  --level-a1-bg: color-mix(in srgb, var(--level-a1-fg) 15%, transparent);
+  --level-a1-border: color-mix(in srgb, var(--level-a1-fg) 35%, transparent);
+  --level-a2-bg: color-mix(in srgb, var(--level-a2-fg) 15%, transparent);
+  --level-a2-border: color-mix(in srgb, var(--level-a2-fg) 35%, transparent);
+  --level-b1-bg: color-mix(in srgb, var(--level-b1-fg) 15%, transparent);
+  --level-b1-border: color-mix(in srgb, var(--level-b1-fg) 35%, transparent);
+  --level-b2-bg: color-mix(in srgb, var(--level-b2-fg) 15%, transparent);
+  --level-b2-border: color-mix(in srgb, var(--level-b2-fg) 35%, transparent);
+  --level-c1-bg: color-mix(in srgb, var(--level-c1-fg) 15%, transparent);
+  --level-c1-border: color-mix(in srgb, var(--level-c1-fg) 35%, transparent);
+  --level-c2-bg: color-mix(in srgb, var(--level-c2-fg) 15%, transparent);
+  --level-c2-border: color-mix(in srgb, var(--level-c2-fg) 35%, transparent);
+  --level-unknown-bg: color-mix(in srgb, var(--level-unknown-fg) 15%, transparent);
+  --level-unknown-border: color-mix(in srgb, var(--level-unknown-fg) 35%, transparent);
+
   /* Typography */
   --font-sans: "Segoe UI", system-ui, -apple-system, "Segoe UI Variable", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
@@ -118,10 +157,67 @@
   --color-error: #dc2626;
   --color-error-soft: rgba(220, 38, 38, 0.08);
 
+  /* Rampa de niveles en tema claro (V3.75.4): mismas familias que en oscuro,
+     tintas oscurecidas para que sigan llegando a AA sobre el relleno claro. El
+     relleno y el borde se re-derivan solos de la tinta. */
+  --level-pre-a1-fg: #9a3412;
+  --level-a1-fg: #92400e;
+  --level-a2-fg: #854d0e;
+  --level-b1-fg: #4338ca;
+  --level-b2-fg: #6d28d9;
+  --level-c1-fg: #115e59;
+  --level-c2-fg: #166534;
+  --level-unknown-fg: #4b5563;
+
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.08);
   --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.06);
   --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
   --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+}
+
+/* Esquema «Espectro»: gama fría→cálida que hace el salto de familia evidente
+   (cian → turquesa → verde → ámbar → naranja → rosa → violeta). */
+:root[data-levels="spectrum"] {
+  --level-pre-a1-fg: #22d3ee;
+  --level-a1-fg: #2dd4bf;
+  --level-a2-fg: #4ade80;
+  --level-b1-fg: #facc15;
+  --level-b2-fg: #fb923c;
+  --level-c1-fg: #f472b6;
+  --level-c2-fg: #a78bfa;
+  --level-unknown-fg: #9aa5b6;
+}
+
+:root[data-theme="light"][data-levels="spectrum"] {
+  --level-pre-a1-fg: #155e75;
+  --level-a1-fg: #115e59;
+  --level-a2-fg: #166534;
+  --level-b1-fg: #854d0e;
+  --level-b2-fg: #9a3412;
+  --level-c1-fg: #9d174d;
+  --level-c2-fg: #6d28d9;
+  --level-unknown-fg: #4b5563;
+}
+
+/* Esquema «Monocromo»: un solo tono, el del acento del usuario, en siete
+   intensidades. Se mezcla el texto de acento (ya AA) hacia el texto atenuado
+   (también AA), así que cualquier punto intermedio sigue pasando contraste y el
+   color sigue al acento sin declarar ni un hex por acento. El paso más bajo no
+   llega al 0 %: el atenuado puro se queda al filo de AA sobre su propio tinte
+   (4.48:1 en tema claro), así que la rampa arranca un poco más oscura.
+   Este bloque va DESPUÉS del de tema a propósito: en el tema claro tiene la
+   misma especificidad y tiene que ganar por orden. */
+:root[data-levels="mono"] {
+  --level-pre-a1-fg: color-mix(in srgb, var(--color-accent-soft) 20%, var(--color-text-dim));
+  --level-a1-fg: color-mix(in srgb, var(--color-accent-soft) 32%, var(--color-text-dim));
+  --level-a2-fg: color-mix(in srgb, var(--color-accent-soft) 45%, var(--color-text-dim));
+  --level-b1-fg: color-mix(in srgb, var(--color-accent-soft) 58%, var(--color-text-dim));
+  --level-b2-fg: color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-text-dim));
+  --level-c1-fg: color-mix(in srgb, var(--color-accent-soft) 86%, var(--color-text-dim));
+  --level-c2-fg: color-mix(in srgb, var(--color-accent-soft) 100%, var(--color-text-dim));
+  /* «Sin dato» no es un nivel, pero en este esquema hasta el neutro lleva un
+     toque de acento (si no, su tinte se queda al filo de AA en tema claro). */
+  --level-unknown-fg: color-mix(in srgb, var(--color-accent-soft) 15%, var(--color-text-dim));
 }
 
 /* ==========================================================================
@@ -218,12 +314,6 @@ button {
   border-right: 1px solid var(--color-border);
 }
 
-.pane--insights {
-  flex-shrink: 0;
-  background: var(--color-bg-soft);
-  border-left: 1px solid var(--color-border);
-}
-
 .pane--main {
   flex: 1;
   min-width: 0;
@@ -240,68 +330,6 @@ body.is-resizing {
 
 .pane-backdrop {
   display: none;
-}
-
-/* ==========================================================================
-   Aprender ("learn") — secciones de práctica: el análisis es un drawer
-   --------------------------------------------------------------------------
-   En las secciones de práctica de la ruta "learn" (listening/reading/
-   pronunciation, no conversación) el ejercicio ocupa todo el ancho; el panel
-   de análisis nunca se acopla a la derecha y se abre bajo demanda con el botón
-   flotante, como capa lateral sobre el contenido (igual que en ≤1024px, pero
-   aplicado también en desktop/tablet apaisada).
-   ========================================================================== */
-
-.workspace--learn .pane--insights {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 60;
-  width: min(420px, 92vw) !important;
-  transform: translateX(100%);
-  transition:
-    transform var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out);
-}
-
-.workspace--learn .pane--insights.open {
-  transform: translateX(0);
-  box-shadow: var(--shadow-lg);
-}
-
-.workspace--learn .pane-close {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  align-self: flex-end;
-  margin: var(--space-3) var(--space-3) 0;
-  padding: var(--space-1) var(--space-2);
-  background: transparent;
-  border: none;
-  color: var(--color-text-dim);
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
-
-.workspace--learn .pane-close:hover {
-  color: var(--color-text);
-}
-
-.workspace--learn .pane-backdrop--insights {
-  display: block;
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(0, 0, 0, 0.45);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--duration-base) var(--ease-out);
-}
-
-.workspace--learn .pane-backdrop--insights.open {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 /* ==========================================================================
@@ -1088,20 +1116,8 @@ body.is-resizing {
   line-height: 1;
 }
 
-.cefr-badge.basic {
-  color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-}
-
-.cefr-badge.intermediate {
-  color: var(--color-accent-soft);
-  background: var(--color-accent-ring);
-}
-
-.cefr-badge.advanced {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 15%, transparent);
-}
+/* El color lo pone la rampa de niveles (`.lv-*`, al final de este archivo),
+   un escalón por nivel en lugar de los tres tramos de V3.75.3. */
 
 .learning-grid {
   display: grid;
@@ -1594,24 +1610,6 @@ body.is-resizing {
     box-shadow: var(--shadow-lg);
   }
 
-  .pane--insights {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 60;
-    width: min(420px, 92vw) !important;
-    transform: translateX(100%);
-    transition:
-      transform var(--duration-base) var(--ease-out),
-      box-shadow var(--duration-base) var(--ease-out);
-  }
-
-  .pane--insights.open {
-    transform: translateX(0);
-    box-shadow: var(--shadow-lg);
-  }
-
   .pane-close {
     display: inline-flex;
     align-items: center;
@@ -1715,10 +1713,6 @@ body.is-resizing {
     gap: var(--space-2);
   }
 
-  .pane--insights {
-    width: 100vw !important;
-  }
-
   .card__body {
     padding: var(--space-3);
   }
@@ -1776,20 +1770,9 @@ body.is-resizing {
   font-weight: 700;
 }
 
-.cefr-band.basic {
-  color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-}
-
-.cefr-band.intermediate {
-  color: var(--color-accent-soft);
-  background: var(--color-accent-ring);
-}
-
-.cefr-band.advanced {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 15%, transparent);
-}
+/* El color de la banda lo pone la rampa de niveles (`.lv-*`): antes sólo había
+   tres tramos, así que las siete destrezas se veían iguales entre sí dentro de
+   su tramo. Ver `utils/cefr.ts`. */
 
 /* CEFR: confianza y evidencia por destreza (P5) */
 .cefr-confidence {
@@ -2306,37 +2289,6 @@ body.is-resizing {
 }
 
 /* ==========================================================================
-   Insights panel (right)
-   ========================================================================== */
-
-.insights-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.insights-title {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.insights-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-3) var(--space-4) var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* ==========================================================================
    Dialog
    ========================================================================== */
 
@@ -2843,6 +2795,28 @@ body.is-resizing {
 
 .accent-swatch.active {
   border-color: var(--color-text);
+}
+
+/* Vista previa del esquema de niveles (Ajustes > Apariencia). Cada paso se
+   pinta con `.lv-*`, es decir con los tokens del esquema ACTIVO: la muestra es
+   la app, no una copia de los hexes. */
+.level-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.level-preview__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* Ayuda. */
@@ -3825,33 +3799,6 @@ body.is-resizing {
   background: var(--color-bg-soft);
 }
 
-/* Botón flotante para abrir el panel de análisis. */
-.insights-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-  z-index: 30;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-dim);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition:
-    color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
-}
-
-.insights-toggle:hover {
-  color: var(--color-text);
-  border-color: var(--color-border-strong);
-}
-
 /* Botón flotante para abrir conversaciones en la ruta "chat". */
 .pane__menu-button {
   display: inline-flex;
@@ -4102,3 +4049,110 @@ body.is-resizing {
   text-decoration: underline;
 }
 }
+
+/* ==========================================================================
+   Rampa de niveles CEFR — clases estáticas (V3.75.4)
+   --------------------------------------------------------------------------
+   Van FUERA de `@layer base` a propósito. El color del nivel es la identidad
+   del escalón y no debe poder perderse por una utilidad de Tailwind de la misma
+   línea (`bg-card`, `text-muted-foreground`…), que es exactamente lo que pasa
+   con lo que vive dentro de una capa: las utilidades ganan siempre. Es la misma
+   razón por la que `.skip-link` vive sin capa en `index.css`.
+
+   `levelClass(nivel)` devuelve `.lv-<paso>` y ese paso declara sus tres tokens
+   como variables locales; el bloque siguiente los consume, así que añadir un
+   consumidor nunca exige tocar los 21 hexes. Modificadores aditivos:
+     - `.lv-outline` → borde del nivel, para pastillas y nodos;
+     - `.lv-ink`     → sólo la tinta (anillos de progreso, cifras): quita el
+                       relleno, que en un `<svg>` se pintaría como un cuadro;
+     - `.lv-quiet`   → relleno neutro, para el nodo «estás aquí» del recorrido,
+                       que debe distinguirse del completado.
+   El nombre del paso lo compone `utils/cefr.ts::levelClass`, nunca una
+   interpolación de Tailwind, así que el escaneo de clases no las purga.
+   ========================================================================== */
+
+.lv-pre-a1 {
+  --lv-ink: var(--level-pre-a1-fg);
+  --lv-fill: var(--level-pre-a1-bg);
+  --lv-edge: var(--level-pre-a1-border);
+}
+.lv-a1 {
+  --lv-ink: var(--level-a1-fg);
+  --lv-fill: var(--level-a1-bg);
+  --lv-edge: var(--level-a1-border);
+}
+.lv-a2 {
+  --lv-ink: var(--level-a2-fg);
+  --lv-fill: var(--level-a2-bg);
+  --lv-edge: var(--level-a2-border);
+}
+.lv-b1 {
+  --lv-ink: var(--level-b1-fg);
+  --lv-fill: var(--level-b1-bg);
+  --lv-edge: var(--level-b1-border);
+}
+.lv-b2 {
+  --lv-ink: var(--level-b2-fg);
+  --lv-fill: var(--level-b2-bg);
+  --lv-edge: var(--level-b2-border);
+}
+.lv-c1 {
+  --lv-ink: var(--level-c1-fg);
+  --lv-fill: var(--level-c1-bg);
+  --lv-edge: var(--level-c1-border);
+}
+.lv-c2 {
+  --lv-ink: var(--level-c2-fg);
+  --lv-fill: var(--level-c2-bg);
+  --lv-edge: var(--level-c2-border);
+}
+.lv-unknown {
+  --lv-ink: var(--level-unknown-fg);
+  --lv-fill: var(--level-unknown-bg);
+  --lv-edge: var(--level-unknown-border);
+}
+
+/* Consumo por defecto: tinta + relleno suave del paso. */
+.lv-pre-a1,
+.lv-a1,
+.lv-a2,
+.lv-b1,
+.lv-b2,
+.lv-c1,
+.lv-c2,
+.lv-unknown {
+  color: var(--lv-ink);
+  background: var(--lv-fill);
+}
+
+/* Modificadores. Van después: mismo peso y ganan por orden. */
+.lv-ink {
+  color: var(--lv-ink);
+  background: transparent;
+}
+
+.lv-outline {
+  border-color: var(--lv-edge);
+}
+
+.lv-quiet {
+  background: var(--color-surface);
+}
+
+/* ==========================================================================
+   Tarjeta de audio de APRENDER/LISTING (V3.75.4)
+   --------------------------------------------------------------------------
+   Lavado del acento en la mitad alta (el token de anillo, que ya existe por
+   acento y por tema) sobre la superficie de la tarjeta: separa el bloque de
+   audio del resto sin gradiente duro, sin color nuevo y sin `color-mix()`, que
+   Lightning CSS degrada a un fallback feo. El texto vive en la mitad baja, donde
+   el lavado ya se ha desvanecido, así que no toca el contraste medido.
+   Sin capa por el mismo motivo que la rampa: la tarjeta trae `bg-card` de
+   Tailwind y aquí se quiere ganar ese fondo.
+   ========================================================================== */
+.listening-audio {
+  background:
+    linear-gradient(180deg, var(--color-accent-ring) 0%, transparent 45%),
+    var(--color-surface);
+}
+

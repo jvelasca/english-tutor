@@ -1,4 +1,4 @@
-import { bandLabel, cefrTone } from "../utils/cefr";
+import { bandLabel, levelClass } from "../utils/cefr";
 import { formatAverage } from "../utils/progress";
 import type { LearningProfile as ProfileData } from "../types/api";
 import { useI18n } from "../hooks/useI18n";
@@ -66,7 +66,7 @@ export function LearningProfile({ profile }: LearningProfileProps) {
         {BANDS.map((skill) => (
           <span
             key={skill}
-            className={`cefr-band ${cefrTone(profile.estimated_bands[skill])}`}
+            className={`cefr-band ${levelClass(profile.estimated_bands[skill])}`}
             title={t("profile.bandTitle")}
           >
             <span className="cefr-band-label">{bandLabel(skill)}</span>

@@ -14,7 +14,6 @@ from main import app
 from repositories import db
 from repositories import listening as listening_repo
 from repositories import users as users_repo
-from services.listening import get_question
 
 
 def _setup(monkeypatch, tmp_path):
@@ -22,12 +21,6 @@ def _setup(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
     return users_repo.create_user("A")["id"]
-
-
-def _shadowing_question() -> dict:
-    q = get_question("l19")
-    assert q and q["skill"] == "shadowing"
-    return q
 
 
 def _shadowing_mean(diag: dict) -> dict:
@@ -41,9 +34,11 @@ def _shadowing_mean(diag: dict) -> dict:
 
 # --- Persistencia aditiva de las señales -------------------------------------
 
-def test_shadowing_aux_signals_persist_on_attempt(monkeypatch, tmp_path):
+def test_shadowing_aux_signals_persist_on_attempt(
+    monkeypatch, tmp_path, production_items
+):
     uid = _setup(monkeypatch, tmp_path)
-    q = _shadowing_question()
+    q = production_items("shadowing")["prod-shadowing"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/shadowing",
@@ -66,10 +61,12 @@ def test_shadowing_aux_signals_persist_on_attempt(monkeypatch, tmp_path):
     assert row["score"] == 1.0
 
 
-def test_aux_signals_are_optional_and_default_to_null(monkeypatch, tmp_path):
+def test_aux_signals_are_optional_and_default_to_null(
+    monkeypatch, tmp_path, production_items
+):
     """Sin señales en el request el intento guarda NULL (retrocompatible)."""
     uid = _setup(monkeypatch, tmp_path)
-    q = _shadowing_question()
+    q = production_items("shadowing")["prod-shadowing"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/shadowing",
@@ -82,11 +79,13 @@ def test_aux_signals_are_optional_and_default_to_null(monkeypatch, tmp_path):
     assert row["shadowing_speech_rate"] is None
 
 
-def test_aux_signals_only_persist_for_shadowing(monkeypatch, tmp_path):
+def test_aux_signals_only_persist_for_shadowing(
+    monkeypatch, tmp_path, production_items
+):
     """Un dictado que envía señales no las persiste: solo el intento shadowing
     las declara (la puerta de las señales vive en submit_production)."""
     uid = _setup(monkeypatch, tmp_path)
-    q = get_question("l18")
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/dictation",
@@ -105,11 +104,11 @@ def test_aux_signals_only_persist_for_shadowing(monkeypatch, tmp_path):
     assert row["shadowing_speech_rate"] is None
 
 
-def test_migration_is_idempotent(monkeypatch, tmp_path):
+def test_migration_is_idempotent(monkeypatch, tmp_path, production_items):
     """El patrón aditivo de migración tolera reinicializar la base (V3.27)."""
     uid = _setup(monkeypatch, tmp_path)
     db.init_db()  # segunda pasada: columnas ya existen, sin error
-    q = _shadowing_question()
+    q = production_items("shadowing")["prod-shadowing"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/shadowing",
@@ -128,12 +127,14 @@ def test_migration_is_idempotent(monkeypatch, tmp_path):
 
 # --- Las señales NO alteran mastery/gate -------------------------------------
 
-def test_aux_signals_do_not_change_stats_or_gate(monkeypatch, tmp_path):
+def test_aux_signals_do_not_change_stats_or_gate(
+    monkeypatch, tmp_path, production_items
+):
     """Dos usuarios idénticos salvo las señales auxiliares producen el mismo
     diagnóstico y la misma puerta de ruta: las señales son informativas."""
     uid_a = _setup(monkeypatch, tmp_path)
     uid_b = users_repo.create_user("B")["id"]
-    q = _shadowing_question()
+    q = production_items("shadowing")["prod-shadowing"]
     with TestClient(app) as client:
         for uid, aux in (
             (uid_a, {"shadowing_duration_ms": 2340, "shadowing_speech_rate": 152.0}),

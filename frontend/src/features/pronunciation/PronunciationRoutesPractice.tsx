@@ -18,7 +18,7 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
 import { ActivityResult } from "../../components/ActivityResult";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { RecordingPlayButton } from "../../components/RecordingPlayButton";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import {
@@ -222,6 +222,7 @@ export function PronunciationScene({
       {micError && <MicUnavailableNotice reason={micError} />}
       <PracticeReadCard
         phrase={phrase}
+        userId={userId}
         cardLoading={itemLoading}
         cardError={itemError}
         result={result}
@@ -244,6 +245,7 @@ export function PronunciationScene({
 
 interface PracticeReadCardProps {
   phrase: PronunciationPhrase | null;
+  userId: string | null;
   cardLoading: boolean;
   cardError: boolean;
   result: PronunciationAttempt | null;
@@ -341,6 +343,7 @@ function PhraseWordChips({
 /** Tarjeta del escenario de read-aloud (arriba, siempre visible). */
 function PracticeReadCard({
   phrase,
+  userId,
   cardLoading,
   cardError,
   result,
@@ -464,7 +467,8 @@ function PracticeReadCard({
                 label={t("pronRoutes.playMine")}
               />
             )}
-            <ListenButton text={result.script} label={t("speak.phrase")} />
+            {/* V3.75.5: la frase modelo se puede repetir en los dos acentos. */}
+            <ItemReplayButton prompt={result.script} userId={userId} />
           </div>
 
           <PhraseWordChips script={result.script} heard={result.heard} t={t} />
@@ -556,7 +560,8 @@ function PracticeReadCard({
               </p>
               <div className="flex items-center gap-1.5">
                 <PhraseTranslateButton state={phraseText} />
-                <ListenButton text={phrase.script} label={t("speak.phrase")} />
+                {/* V3.75.5: escucha la frase modelo en A o B antes de leerla. */}
+                <ItemReplayButton prompt={phrase.script} userId={userId} />
               </div>
             </div>
             <p

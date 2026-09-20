@@ -4,7 +4,7 @@
  * audio y `speak` lo envía al TTS para que el Traductor use voces españolas.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { speak, transcribe } from "./voz";
+import { isSpeaking, speak, stopSpeaking, transcribe } from "./voz";
 
 function mockFetch(data: unknown) {
   const fn = vi.fn().mockResolvedValue({
@@ -162,5 +162,116 @@ describe("api/voz · V3.72 (RD-04) voz declarada y degradación", () => {
     await assertion;
 
     expect(fn.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe("api/voz · V3.75.6 STOP de la locución", () => {
+  /** Audio que suena hasta que se le llama `pause()` (no termina solo). */
+  class LoopingAudio {
+    onended: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    src = "";
+    paused = false;
+    constructor(url: string) {
+      this.src = url;
+    }
+    play() {
+      return Promise.resolve();
+    }
+    pause() {
+      this.paused = true;
+    }
+  }
+
+  /** `Audio` que se apunta a sí mismo para poder inspeccionarlo desde el test. */
+  function trackAudios(audios: LoopingAudio[]) {
+    vi.stubGlobal(
+      "Audio",
+      class extends LoopingAudio {
+        constructor(url: string) {
+          super(url);
+          audios.push(this);
+        }
+      },
+    );
+  }
+
+  beforeEach(() => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:fake");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    stopSpeaking();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("`stopSpeaking` corta el audio en curso y resuelve la espera", async () => {
+    const audios: LoopingAudio[] = [];
+    trackAudios(audios);
+    mockTtsResponse({ "X-TTS-Voice": "en_GB-alan-medium" });
+
+    const pending = speak("a long sentence with four options");
+    await vi.waitFor(() => expect(audios.length).toBe(1));
+    expect(isSpeaking()).toBe(true);
+
+    stopSpeaking();
+
+    // Parar no es un fallo: la promesa resuelve (el spinner del botón se apaga).
+    await expect(pending).resolves.toEqual({
+      voice: "en_GB-alan-medium",
+      degraded: false,
+    });
+    expect(audios[0]?.paused).toBe(true);
+    expect(isSpeaking()).toBe(false);
+  });
+
+  it("`stopSpeaking` también cancela la síntesis antes de que llegue el audio", async () => {
+    trackAudios([]);
+    let aborted = false;
+    const fn = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            aborted = true;
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        }),
+    );
+    vi.stubGlobal("fetch", fn);
+
+    const pending = speak("hello");
+    stopSpeaking();
+
+    await expect(pending).resolves.toEqual({ voice: "", degraded: false });
+    expect(aborted).toBe(true);
+    expect(isSpeaking()).toBe(false);
+  });
+
+  it("una locución nueva corta la anterior (nunca suenan dos a la vez)", async () => {
+    const audios: LoopingAudio[] = [];
+    trackAudios(audios);
+    mockTtsResponse({ "X-TTS-Voice": "en_US-lessac-medium" });
+
+    const first = speak("first");
+    await vi.waitFor(() => expect(audios.length).toBe(1));
+
+    const second = speak("second");
+    await vi.waitFor(() => expect(audios.length).toBe(2));
+
+    // La primera quedó pausada y la segunda es la única que suena.
+    expect(audios[0]?.paused).toBe(true);
+    expect(audios[1]?.paused).toBe(false);
+
+    stopSpeaking();
+    await expect(first).resolves.toEqual({
+      voice: "en_US-lessac-medium",
+      degraded: false,
+    });
+    await expect(second).resolves.toEqual({
+      voice: "en_US-lessac-medium",
+      degraded: false,
+    });
   });
 });

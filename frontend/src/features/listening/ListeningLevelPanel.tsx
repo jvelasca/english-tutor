@@ -10,7 +10,7 @@ import type {
   ListeningRouteState,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import {
   PhraseTranslateButton,
   usePhraseTranslation,
@@ -354,7 +354,7 @@ export function ListeningLevelPanel({
                   </li>
                 ) : (
                   group.items.map((item) => (
-                    <ListeningItemRow key={item.question_id} item={item} />
+                    <ListeningItemRow key={item.question_id} item={item} userId={userId} />
                   ))
                 )}
               </ul>
@@ -403,7 +403,13 @@ export function ListeningLevelPanel({
   );
 }
 
-function ListeningItemRow({ item }: { item: ListeningItem }) {
+function ListeningItemRow({
+  item,
+  userId,
+}: {
+  item: ListeningItem;
+  userId: string | null;
+}) {
   const { t } = useI18n();
   const phrase = usePhraseTranslation(item.script);
   return (
@@ -436,7 +442,9 @@ function ListeningItemRow({ item }: { item: ListeningItem }) {
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <PhraseTranslateButton state={phrase} />
-        <ListenButton text={item.script} label={t("speak.phrase")} />
+        {/* V3.75.5: el altavoz de la frase es consciente de la voz y ofrece el
+            segundo acento (mismo control que en la tarjeta de práctica). */}
+        <ItemReplayButton prompt={item.script} userId={userId} />
       </div>
     </li>
   );

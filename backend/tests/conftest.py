@@ -197,3 +197,38 @@ def _identidad_por_sesion(request, monkeypatch, _session_secret_aislado: None) -
             self.cookies.delete(sessions.SESSION_COOKIE)
 
     monkeypatch.setattr(TestClient, "request", request_with_session)
+
+
+@pytest.fixture
+def production_items(monkeypatch):
+    """Fábrica de **ítems de producción** sintéticos para los endpoints de producción.
+
+    El banco no puede contener un ítem de producción: `ListeningAsset` exige
+    `question`, `options` y `answer_index` en **todos** sus ítems. Un ítem con
+    opciones etiquetado de dictado es una pregunta de opción múltiple a la que el
+    flujo de producción tira el enunciado (el defecto que impide
+    `test_production_items_do_not_carry_multiple_choice_options`) y uno sin ellas
+    no valida. Los skills `dictation`/`shadowing` se sirven por la capa derivada
+    bottom-up (`d-`).
+
+    Para ejercitar el camino **del banco** del endpoint, esta fábrica inyecta ítems
+    con la forma que tendrían si el esquema los representara: la copia de un ítem
+    real con el `skill` cambiado. Uso: `items = production_items("dictation",
+    "shadowing")` → `{id: ítem}`, y esos ids se resuelven durante el test.
+    """
+    from domain import listening as listening_domain
+    from services.listening import get_question
+
+    def _build(*kinds: str) -> dict[str, dict]:
+        items = {
+            f"prod-{kind}": dict(get_question("l18"), id=f"prod-{kind}", skill=kind)
+            for kind in kinds
+        }
+        monkeypatch.setattr(
+            listening_domain,
+            "get_question",
+            lambda qid: items.get(qid) or get_question(qid),
+        )
+        return items
+
+    return _build

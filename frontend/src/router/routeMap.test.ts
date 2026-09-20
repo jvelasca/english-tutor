@@ -13,6 +13,7 @@ const ALL_ROUTES: Route[] = [
   "help",
   "dictionary",
   "translator",
+  "analysis",
 ];
 
 describe("routeToPath", () => {
@@ -27,11 +28,12 @@ describe("routeToPath", () => {
     expect(routeToPath("help")).toBe("/ayuda");
     expect(routeToPath("dictionary")).toBe("/diccionario");
     expect(routeToPath("translator")).toBe("/traductor");
+    expect(routeToPath("analysis")).toBe("/analisis");
   });
 });
 
 describe("round-trip routeToPath + pathToRoute", () => {
-  it("devuelve la misma pantalla para los 10 valores de Route", () => {
+  it("devuelve la misma pantalla para los 11 valores de Route", () => {
     for (const route of ALL_ROUTES) {
       expect(pathToRoute(routeToPath(route))).toBe(route);
     }
@@ -67,6 +69,12 @@ describe("pathToRoute: hoja antes que prefijo", () => {
     expect(pathToRoute("/traductor")).toBe("translator");
     // No hay sub-rutas: cualquier hoja cae en home.
     expect(pathToRoute("/traductor/historial")).toBe("home");
+  });
+
+  it("resuelve la raíz del análisis auxiliar (V3.75.3)", () => {
+    expect(pathToRoute("/analisis")).toBe("analysis");
+    // No hay sub-rutas: cualquier hoja cae en home.
+    expect(pathToRoute("/analisis/detalle")).toBe("home");
   });
 
   it("resuelve las sub-rutas de destreza del chat libre (V3.73.1)", () => {
@@ -120,6 +128,7 @@ describe("pathToRoute: normalización de la entrada", () => {
     expect(pathToRoute("/ayuda/")).toBe("help");
     expect(pathToRoute("/diccionario/")).toBe("dictionary");
     expect(pathToRoute("/traductor/")).toBe("translator");
+    expect(pathToRoute("/analisis/")).toBe("analysis");
   });
 
   it("tolera valores con '#' del hash de la URL", () => {

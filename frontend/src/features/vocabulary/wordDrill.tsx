@@ -54,7 +54,7 @@ import type {
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { useRecordingSession } from "../../hooks/useRecordingSession";
-import { ListenButton } from "../../components/ListenButton";
+import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { Card } from "../../components/ui/card";
 import {
@@ -710,7 +710,8 @@ export function WordDrill({
               <span className="text-lg font-semibold" lang="en">
                 {word}
               </span>
-              <ListenButton text={word} label={t("speak.phrase")} />
+              {/* V3.75.5: la palabra suena en A o B (mismo control que el resto). */}
+              <ItemReplayButton prompt={word} userId={userId} />
             </>
           )}
         </div>
@@ -803,10 +804,7 @@ export function WordDrill({
             <span className="text-sm font-medium" lang="en">
               {sentence.phrase}
             </span>
-            <ListenButton
-              text={sentence.phrase}
-              label={t("dictionary.drill.sentenceListen")}
-            />
+            <ItemReplayButton prompt={sentence.phrase} userId={userId} />
           </div>
           {sentence.source === "template" && (
             <p className="text-[11px] text-muted-foreground">

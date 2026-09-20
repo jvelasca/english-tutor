@@ -5,7 +5,7 @@ import type {
   WritingDiagnostic as WritingDiagnosticData,
   WritingLevelOut,
 } from "../../types/api";
-import { cefrTone } from "../../utils/cefr";
+import { levelClass } from "../../utils/cefr";
 import {
   formatTrendDelta,
   writingCriterionLabel,
@@ -86,7 +86,7 @@ export function WritingPanel({ userId, onPractice }: WritingPanelProps) {
     <section className="writing-panel">
       <header className="writing-panel__header">
         {level?.level && (
-          <span className={`cefr-badge ${cefrTone(level.level)}`}>
+          <span className={`cefr-badge ${levelClass(level.level)}`}>
             {level.level}
           </span>
         )}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACCENTS,
   DEFAULT_APPEARANCE,
+  LEVEL_SCHEMES,
   appearanceFromSettings,
   appearanceToSettings,
   parseAppearance,
@@ -16,6 +17,7 @@ describe("appearance", () => {
     expect(a.accent).toBe(DEFAULT_APPEARANCE.accent);
     expect(a.fontScale).toBe("medium");
     expect(a.density).toBe("comfortable");
+    expect(a.levelScheme).toBe("traffic");
   });
 
   it("prioriza el tema persistido sobre el del sistema", () => {
@@ -38,6 +40,7 @@ describe("appearance", () => {
     expect(a.accent).toBe(DEFAULT_APPEARANCE.accent);
     expect(a.fontScale).toBe(DEFAULT_APPEARANCE.fontScale);
     expect(a.theme).toBe(DEFAULT_APPEARANCE.theme);
+    expect(a.levelScheme).toBe(DEFAULT_APPEARANCE.levelScheme);
   });
 
   it("serializa y parsea de vuelta la misma apariencia", () => {
@@ -46,6 +49,7 @@ describe("appearance", () => {
       accent: "rose" as const,
       fontScale: "large" as const,
       density: "compact" as const,
+      levelScheme: "spectrum" as const,
     };
     expect(parseAppearance(serializeAppearance(original))).toEqual(original);
   });
@@ -57,12 +61,14 @@ describe("appearance", () => {
         accent: "teal",
         fontScale: "small",
         density: "compact",
+        levelScheme: "mono",
       }),
     ).toEqual({
       theme: "dark",
       accent: "teal",
       font_scale: "small",
       density: "compact",
+      level_scheme: "mono",
     });
   });
 
@@ -73,6 +79,7 @@ describe("appearance", () => {
         accent: "emerald",
         font_scale: "large",
         density: "compact",
+        level_scheme: "spectrum",
         model: "qwen3.5:9b",
         otra_clave: "ignorada",
       }),
@@ -81,6 +88,7 @@ describe("appearance", () => {
       accent: "emerald",
       fontScale: "large",
       density: "compact",
+      levelScheme: "spectrum",
     });
   });
 
@@ -90,8 +98,33 @@ describe("appearance", () => {
     ).toEqual({});
   });
 
+  it("ignora un esquema de niveles desconocido en vez de inventarlo", () => {
+    expect(appearanceFromSettings({ level_scheme: "arcoiris" })).toEqual({});
+    expect(parseAppearance(JSON.stringify({ levelScheme: "arcoiris" })).levelScheme)
+      .toBe(DEFAULT_APPEARANCE.levelScheme);
+  });
+
   it("expone un conjunto razonable de acentos", () => {
     expect(ACCENTS.length).toBeGreaterThanOrEqual(5);
     expect(new Set(ACCENTS.map((a) => a.id)).size).toBe(ACCENTS.length);
+  });
+
+  it("expone los tres esquemas de niveles con sus siete pasos de vista previa", () => {
+    expect(LEVEL_SCHEMES.map((s) => s.id)).toEqual([
+      "traffic",
+      "spectrum",
+      "mono",
+    ]);
+    for (const scheme of LEVEL_SCHEMES) {
+      expect(scheme.preview.map((step) => step.key)).toEqual([
+        "pre-a1",
+        "a1",
+        "a2",
+        "b1",
+        "b2",
+        "c1",
+        "c2",
+      ]);
+    }
   });
 });

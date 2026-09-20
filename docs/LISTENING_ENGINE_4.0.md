@@ -125,6 +125,17 @@ Tabla de veredictos para cada mejora candidata (la pregunta "¿implementar de ce
 | SRS/FSRS de ítems de audio | No | FSRS hoy solo cubre cartas de objetivos (`services/fsrs.py` + `unit_review`) | **Crear de cero**, acotado (§10) |
 | Audio humano real (acentos/ruido/multi-hablante) | Infraestructura sí, contenido no | `backend/services/audio_library.py`, `manifest.json` = `entries: []`, corpus 100 % TTS | **Contenido** (deuda); además nuevo atajo con 11 voces Piper (§3.5) |
 
+> **Corrección posterior (V3.75.6, 2026-09-20).** Las filas «Dictado de frase
+> completa» y «Shadowing con grabación + ASR» citaban como evidencia los ítems
+> `c071` y `c084`: eran los **dos únicos** ítems del corpus etiquetados
+> `dictation`/`shadowing`, pero estaban **autorados como pregunta de opción
+> múltiple** (`question` + `options` + `answer_index`). El flujo de producción los
+> servía ignorando ese contenido y pidiendo escribir/repetir la frase, lo que hacía
+> que la RUTA B1 no se pareciera a las demás. Reetiquetados a `numbers` y
+> `phrase_recognition` (corpus `3.0.1`). Los *endpoints* siguen existiendo y
+> probados; lo que hoy **no hay** es ningún ítem autorado de dictado: es deuda de
+> contenido, no de código. Ver `docs/audit/PARKED.md` (V3.75.6).
+
 ### 3.4 La deuda real es de contenido, no de código
 
 1. **Corpus 100 % TTS Piper.** De los 513 ítems del banco (`QUESTION_BANK`, `backend/services/listening.py:971`), todos son `audio_type="tts"`. El `listening_corpus.json` (490 ítems: A1=200, A2=200, B1=25, B2=25, C1=20, C2=20) declara metadatos ricos (`accent`, `speaker_count`, `noise_level`, `region`, `spontaneity`…) que el audio Piper no realiza. El sistema ya es **honesto** sobre esto: `realized_vector`/`realization_status`/`realization_gap_factors` (`backend/services/listening.py:1124-1205`) marcan los factores no realizados, y el diagnóstico expone `realization` y `realization_gap` por sub-destreza.

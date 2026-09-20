@@ -12,7 +12,11 @@ export type Route =
   | "dictionary"
   // V3.39 (Fase 2): destino AUXILIAR Traductor (ruta `/traductor`), utilidad
   // bidireccional ES↔EN por voz que NO registra evidencia.
-  | "translator";
+  | "translator"
+  // V3.75.3: destino AUXILIAR Análisis (ruta `/analisis`), la evolución del
+  // alumno en su conjunto. Se abre desde la cabecera, junto al usuario, y no es
+  // un destino raíz de la navegación (no lleva píldora en `ROUTES`).
+  | "analysis";
 
 export interface RouteOption {
   id: Route;

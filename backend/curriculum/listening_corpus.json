@@ -1,5 +1,5 @@
 {
-  "version": "3.0.0",
+  "version": "3.0.1",
   "items": [
     {
       "id": "c001",
@@ -3154,7 +3154,7 @@
     {
       "id": "c071",
       "level": "B1",
-      "skill": "dictation",
+      "skill": "numbers",
       "topic": "daily_routine",
       "context": "message",
       "task_type": "message",
@@ -3739,7 +3739,7 @@
     {
       "id": "c084",
       "level": "B1",
-      "skill": "shadowing",
+      "skill": "phrase_recognition",
       "topic": "functional",
       "context": "message",
       "task_type": "message",

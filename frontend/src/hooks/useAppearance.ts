@@ -50,6 +50,10 @@ function applyAppearance(appearance: AppearanceSettings): void {
   root.setAttribute("data-accent", appearance.accent);
   root.setAttribute("data-font", appearance.fontScale);
   root.setAttribute("data-density", appearance.density);
+  // La rampa de niveles se resuelve entera en CSS a partir de este atributo
+  // (`styles/legacy.css`): cambiarlo repinta insignias, nodos y chips sin que
+  // ningún componente vuelva a renderizarse.
+  root.setAttribute("data-levels", appearance.levelScheme);
 }
 
 export function useAppearance(userId: string | null) {

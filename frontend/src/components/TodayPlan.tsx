@@ -8,7 +8,7 @@ import type {
   SkillProfile,
   StudentModel,
 } from "../types/api";
-import { cefrLabel, cefrTone } from "../utils/cefr";
+import { cefrLabel, levelClass } from "../utils/cefr";
 import {
   SKILL_LABELS,
   SUBSKILL_LABELS,
@@ -239,13 +239,13 @@ export function TodayPlan({ userId, onStep, refreshKey = 0 }: TodayPlanProps) {
       )}
 
       <div className="today-milestone">
-        <span className={`cefr-badge ${cefrTone(model.current_level)}`}>
+        <span className={`cefr-badge ${levelClass(model.current_level)}`}>
           {model.current_level}
         </span>
         <span className="today-arrow" aria-hidden="true">
           →
         </span>
-        <span className={`cefr-badge ${cefrTone(model.target_level)}`}>
+        <span className={`cefr-badge ${levelClass(model.target_level)}`}>
           {model.target_level}
         </span>
         <span className="today-milestone-label">

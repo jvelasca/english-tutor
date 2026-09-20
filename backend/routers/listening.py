@@ -80,10 +80,11 @@ async def level_items(
 async def audio(
     question_id: str,
     variant: str = "normal",
+    voice: str | None = None,
     user: dict = Depends(current_user),
 ) -> Response:
-    data, status = await listening_service.get_audio(
-        user["id"], question_id, variant
+    data, status, voice_used = await listening_service.get_audio(
+        user["id"], question_id, variant, voice
     )
     if status is not None:
         detail = (
@@ -94,7 +95,13 @@ async def audio(
             else "Pregunta no encontrada"
         )
         raise HTTPException(status_code=status, detail=detail)
-    return Response(content=data, media_type="audio/wav")
+    # V3.75.7: se publica la voz que se sirvió **de verdad**, no la pedida —
+    # `pick_requested_voice` ignora una voz no instalada o de otro idioma y manda la
+    # del perfil. Sin esta señal, el comparador A/B podía sonar dos veces con la
+    # misma voz y el cliente creer que había oído dos acentos. Vacío = audio grabado.
+    return Response(
+        content=data, media_type="audio/wav", headers={"X-TTS-Voice": voice_used}
+    )
 
 
 @router.post("/api/listening/answer", response_model=ListeningAnswerResponse)

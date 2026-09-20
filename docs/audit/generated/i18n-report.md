@@ -5,14 +5,15 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1479,
- "literal_uses": 1020,
- "referenced_keys": 1170,
+ "defined": 1512,
+ "literal_uses": 1028,
+ "referenced_keys": 1194,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",
   "appearance.density.",
   "appearance.font.",
+  "appearance.levels.",
   "asr.message.",
   "assessmentV2.kind.",
   "audio.state.",
@@ -47,6 +48,7 @@
   "listening.profile.intervention.",
   "listening.resilience.",
   "listening.routeState.",
+  "lv-",
   "mic-button",
   "mic.unavailable.",
   "model-star",
@@ -80,7 +82,7 @@
   "voc-demonstrate-note-",
   "vocRoutes.",
   "vocRoutes.levelStates.",
-  "workspace",
+  "voice.accent.",
   "writing-panel__criterion"
  ],
  "unused_keys": [],

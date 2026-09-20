@@ -137,6 +137,61 @@ def set_lan_mode(enabled: bool, env: dict[str, str] | None = None) -> None:
         source.pop(LAN_ENV, None)
 
 
+def apply_lan_config(config: dict, env: dict[str, str] | None = None) -> None:
+    """Declara en el entorno el modo LAN que el launcher dejó guardado (V3.75.3).
+
+    Es el arranque de la GUI, y por eso vive aquí y no en `launcher.py`: la
+    decisión que cambia la frontera de red tiene que poder probarse sin pantalla
+    (la GUI no se testea). La preferencia persistida **manda** sobre el entorno
+    heredado —es lo que hace que «red local» sobreviva al cierre— y cualquier
+    valor que no sea `True` se lee como cerrado, con el mismo criterio
+    fail-closed que `lan_mode`.
+    """
+    # `is True` y no `bool(...)`: una cadena no vacía (`"sí"`) es *truthy*, y aquí
+    # «declarado» tiene que significar el booleano `True`, no «algo que suena
+    # afirmativo». `config.json` es un fichero de texto que se puede editar a mano.
+    set_lan_mode(config.get("lan") is True, env)
+
+
+def apply_stored_lan_config(
+    path: Path | None = None, env: dict[str, str] | None = None
+) -> dict:
+    """Arranque del launcher: lee la preferencia guardada y la declara en el entorno.
+
+    Es `load_config` + `apply_lan_config` en **una sola llamada** a propósito: la
+    GUI no puede reordenar las dos mitades ni saltarse una, y el orden que importa
+    —leer **antes** de pintar, porque el panel de acceso muestra el modo vigente—
+    queda fijado por un test que no necesita pantalla. Devuelve la config cargada,
+    que es la que la GUI conserva en memoria para escribirla al cambiarla.
+    """
+    # Import diferido: `config_store` es el módulo de E/S y `core` el núcleo puro;
+    # se importa aquí para que el núcleo siga pudiéndose importar sin tocar disco.
+    from config_store import load_config
+
+    config = load_config(path)
+    apply_lan_config(config, env)
+    return config
+
+
+def toggle_lan_config(
+    config: dict, path: Path | None = None, env: dict[str, str] | None = None
+) -> dict:
+    """Invierte el modo LAN, lo declara y **persiste** la preferencia (V3.75.3).
+
+    Es el único sitio donde la preferencia se escribe, y vive aquí —y no en la
+    GUI— porque el cableado «invertir → declarar → guardar» tiene que poder
+    probarse sin pantalla: si se saltara el guardado, el launcher dejaría de
+    recordar el modo y ninguna prueba pura lo notaría. Se relee `lan_mode()` para
+    guardar lo que **de verdad** quedó declarado, no lo que se creía declarar.
+    """
+    from config_store import save_config
+
+    set_lan_mode(not lan_mode(env), env)
+    config["lan"] = lan_mode(env)
+    save_config(config, path)
+    return config
+
+
 def backend_command() -> list[str]:
     """Comando para arrancar el backend con el venv del proyecto (uvicorn).
 

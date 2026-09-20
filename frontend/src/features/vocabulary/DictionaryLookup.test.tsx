@@ -206,10 +206,13 @@ describe("DictionaryLookup (V3.30)", () => {
     ).toBeTruthy();
     expect(screen.getByText("café")).toBeTruthy();
     expect(screen.getByText("Definition")).toBeTruthy();
-    // Frase de ejemplo determinista con su botón de audio + audio de la palabra.
+    // Frase de ejemplo determinista con su altavoz + audio de la palabra.
+    // V3.75.5: el altavoz deja de ser un `ListenButton` mudo y pasa a ser el
+    // control de repetición con acentos (aquí solo A: no hay catálogo en el test).
     expect(screen.getByText("I drink coffee every morning.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Hear the word" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Listen to the example" })).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: /^Repeat with accent A/ }).length,
+    ).toBe(2);
     // Badge POS + CEFR.
     expect(screen.getByText("Noun")).toBeTruthy();
 

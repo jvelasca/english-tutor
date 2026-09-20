@@ -32,13 +32,6 @@ def _columns() -> set[str]:
     }
 
 
-def _production_question(kind: str) -> dict:
-    for q in QUESTION_BANK:
-        if q["skill"] == kind:
-            return q
-    raise AssertionError(f"banco sin ítems {kind}")
-
-
 def _cloze_question() -> dict:
     for q in DERIVED_BY_ID.values():
         if q.get("task_type") == "cloze":
@@ -86,10 +79,10 @@ def test_record_attempt_without_breakdown_stores_null(monkeypatch, tmp_path):
 
 # --- Caminos de dominio (endpoints) ------------------------------------------
 
-def test_dictation_fallido_persiste_breakdown(monkeypatch, tmp_path):
+def test_dictation_fallido_persiste_breakdown(monkeypatch, tmp_path, production_items):
     """Un dictado incorrecto persiste su breakdown de `word_alignment`."""
     uid = _setup(monkeypatch, tmp_path)
-    q = _production_question("dictation")
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/dictation",

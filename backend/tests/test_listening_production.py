@@ -13,7 +13,6 @@ from repositories import listening as listening_repo
 from repositories import users as users_repo
 from services.listening import (
     dictation_score,
-    get_question,
     listening_diagnostic,
     production_reference,
     production_score,
@@ -93,14 +92,16 @@ def test_production_reference_priority():
 # --- submit_production vía API ----------------------------------------------
 
 
-def test_dictation_correct_persists_task_type_and_score(monkeypatch, tmp_path):
+def test_dictation_correct_persists_task_type_and_score(
+    monkeypatch, tmp_path, production_items
+):
     uid = _setup(monkeypatch, tmp_path)
-    q = get_question("l18")
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/dictation",
             params={"user_id": uid},
-            json={"question_id": "l18", "transcript": q["transcript"]},
+            json={"question_id": q["id"], "transcript": q["transcript"]},
         )
     assert r.status_code == 200
     body = r.json()
@@ -116,14 +117,15 @@ def test_dictation_correct_persists_task_type_and_score(monkeypatch, tmp_path):
     assert row["score"] == 1.0
 
 
-def test_dictation_wrong_is_not_correct(monkeypatch, tmp_path):
+def test_dictation_wrong_is_not_correct(monkeypatch, tmp_path, production_items):
     uid = _setup(monkeypatch, tmp_path)
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/dictation",
             params={"user_id": uid},
             json={
-                "question_id": "l18",
+                "question_id": q["id"],
                 "transcript": "completely unrelated words here",
             },
         )
@@ -133,14 +135,16 @@ def test_dictation_wrong_is_not_correct(monkeypatch, tmp_path):
     assert body["score"] < 80
 
 
-def test_shadowing_correct_persists_task_type_and_score(monkeypatch, tmp_path):
+def test_shadowing_correct_persists_task_type_and_score(
+    monkeypatch, tmp_path, production_items
+):
     uid = _setup(monkeypatch, tmp_path)
-    q = get_question("l19")
+    q = production_items("shadowing")["prod-shadowing"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/shadowing",
             params={"user_id": uid},
-            json={"question_id": "l19", "transcript": q["transcript"]},
+            json={"question_id": q["id"], "transcript": q["transcript"]},
         )
     assert r.status_code == 200
     body = r.json()
@@ -150,24 +154,29 @@ def test_shadowing_correct_persists_task_type_and_score(monkeypatch, tmp_path):
     assert attempts[0]["task_type"] == "shadowing"
 
 
-def test_dictation_skill_mismatch_404(monkeypatch, tmp_path):
+def test_dictation_skill_mismatch_404(monkeypatch, tmp_path, production_items):
     uid = _setup(monkeypatch, tmp_path)
+    # Un ítem de producción etiquetado `shadowing`: pedirlo como dictado es un 404.
+    # Con l18/l19 dejó de poder probarse con el banco (ya no hay ítems de
+    # producción: ver el fixture `production_items`).
+    q = production_items("shadowing")["prod-shadowing"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/dictation",
             params={"user_id": uid},
-            json={"question_id": "l19", "transcript": "x"},  # l19 es shadowing
+            json={"question_id": q["id"], "transcript": "x"},
         )
     assert r.status_code == 404
 
 
-def test_shadowing_skill_mismatch_404(monkeypatch, tmp_path):
+def test_shadowing_skill_mismatch_404(monkeypatch, tmp_path, production_items):
     uid = _setup(monkeypatch, tmp_path)
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         r = client.post(
             "/api/listening/shadowing",
             params={"user_id": uid},
-            json={"question_id": "l18", "transcript": "x"},  # l18 es dictation
+            json={"question_id": q["id"], "transcript": "x"},
         )
     assert r.status_code == 404
 
@@ -206,14 +215,16 @@ def test_diagnostic_mean_score_none_without_production():
     assert by_skill["detail"]["mean_score"] is None
 
 
-def test_diagnostic_endpoint_exposes_mean_score(monkeypatch, tmp_path):
+def test_diagnostic_endpoint_exposes_mean_score(
+    monkeypatch, tmp_path, production_items
+):
     uid = _setup(monkeypatch, tmp_path)
-    q = get_question("l18")
+    q = production_items("dictation")["prod-dictation"]
     with TestClient(app) as client:
         client.post(
             "/api/listening/dictation",
             params={"user_id": uid},
-            json={"question_id": "l18", "transcript": q["transcript"]},
+            json={"question_id": q["id"], "transcript": q["transcript"]},
         )
         r = client.get("/api/listening/diagnostic", params={"user_id": uid})
     assert r.status_code == 200

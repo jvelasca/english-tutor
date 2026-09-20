@@ -156,6 +156,29 @@ def resolve_voice(prefs: dict[str, str] | None, language: str = "en") -> str:
     return _fallback_voice()
 
 
+def pick_requested_voice(voice: str | None, language: str = "en") -> str | None:
+    """Voz pedida EXPLÍCITAMENTE por el cliente, validada contra lo instalado.
+
+    V3.75.5 (dos acentos): la UI puede pedir una voz concreta para oír el mismo
+    ítem con dos acentos distintos. El id que llega del cliente **entra en el
+    path de caché** (`DATA_DIR/listening/{banco}/{voz}/…`) y en
+    `PIPER_DIR / f"{id}.onnx"`, así que no se acepta nada que no esté instalado y
+    sea del idioma pedido. Devuelve `None` cuando la petición no es servible: el
+    llamador resuelve entonces con `resolve_voice` (una preferencia vieja o una
+    voz borrada del disco **no** rompe la reproducción, solo se ignora).
+
+    Función pura salvo el scan de voces instaladas.
+    """
+    if not voice:
+        return None
+    lang = (language or "en").strip().lower()[:2]
+    if voice not in list_voices():
+        return None
+    if voice_language(voice) != lang:
+        return None
+    return voice
+
+
 def ensure_voice_for_language(language: str) -> bool:
     """Garantiza que hay una voz instalada del idioma (auto-descarga si falta).
 

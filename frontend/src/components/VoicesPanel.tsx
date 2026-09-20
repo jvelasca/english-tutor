@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Download, Loader2 } from "lucide-react";
 import { downloadVoice, getVoices } from "../api/voices";
 import { saveSettings } from "../api/settings";
+import { refreshVoiceChoice } from "../hooks/useVoiceChoice";
 import { useI18n } from "../hooks/useI18n";
 import type { VoicesResponse } from "../types/api";
 import { cn } from "../lib/utils";
@@ -53,6 +54,10 @@ export function VoicesPanel({ userId }: { userId: string | null }) {
     setSaveError(false);
     try {
       await saveSettings(userId, { tts_voice: voiceId });
+      // V3.75.5: la misma preferencia alimenta la tarjeta de audio y los dos
+      // altavoces de repetición, así que el store de acentos se relee aquí: si no,
+      // la voz A de la práctica seguiría siendo la anterior.
+      void refreshVoiceChoice(userId);
       // Devuelve el catálogo con la nueva selección resuelta por el backend.
       setData(await getVoices(userId));
     } catch {
@@ -69,6 +74,9 @@ export function VoicesPanel({ userId }: { userId: string | null }) {
     try {
       await downloadVoice(voiceId);
       await refresh();
+      // Una voz recién instalada puede ser la B que faltaba (otro acento): el
+      // store vuelve a emparejar A/B con el catálogo completo.
+      void refreshVoiceChoice(userId);
     } catch (e) {
       setDownloadError((e as Error).message);
     } finally {
