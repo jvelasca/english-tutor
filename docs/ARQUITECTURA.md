@@ -488,7 +488,8 @@ perfil las usan antes de que exista ningún perfil): `/` · `/api` · `/api/heal
 **Exigen sesión firmada** (401 `SESSION_REQUIRED`): todo lo que lee o escribe datos
 del alumno (`/api/settings`, `/api/profile`, `/api/progress`, `/api/conversations`,
 `/api/vocabulary`, `/api/grammar/errors`, `/api/academy/*`, `/api/listening/*`,
-`/api/pronunciation`, `/api/chat`…). **Exigen PIN de administración**
+`/api/pronunciation`, `/api/chat`…) y **`PUT /api/session/pin`** (V3.76: cambiar un
+secreto del perfil). **Exigen PIN de administración**
 (`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*` y
 `/api/system/restore`.
 
@@ -497,6 +498,39 @@ recibe su credencial o pasa a admin; hasta entonces la lista está escrita aquí
 `backend/tests/test_public_surface.py` la comprueba en las dos direcciones (que lo
 declarado sin sesión siga respondiendo, y que lo declarado con sesión **no** salga
 sin ella), además de fallar si esta sección desaparece del documento.
+`PUT /api/session/pin` se comprueba en un **test aparte** y no en esa lista: se
+recorre con `GET` y esa ruta responde **405**, no 401, así que mezclarlas habría
+debilitado el candado.
+
+### PIN opcional por perfil (V3.76 · Fase 3 del P0, mitigación y no autenticación)
+
+`POST /api/session` acepta un `pin` **opcional**. Si el perfil tiene PIN
+(`users.pin_hash != ''`) y no se envía o no cuadra, responde **`401
+PIN_REQUIRED` / `401 PIN_INVALID`**; con el freno de intentos activo,
+**`429 PIN_THROTTLED`** con `Retry-After`. Un perfil **sin** PIN abre como siempre:
+es una **mitigación opt-in**, no un cambio del modelo de identidad.
+
+- **El hash**: `backend/services/pins.py`, **PBKDF2-HMAC-SHA256** (200 000
+  iteraciones, sal por perfil, iteraciones dentro del valor) y comparación con
+  `hmac.compare_digest`. Stdlib puro. `User.has_pin` es lo único que viaja; el
+  repositorio **saca el hash** del diccionario del perfil (`_row_to_user`) para que
+  no pueda serializarse por descuido.
+- **El freno**: 5 fallos no frenan; después el retardo dobla (1 s, 2 s, 4 s…) con
+  techo de 300 s, **por perfil** y **se limpia al acertar**. Es la pieza que
+  sostiene un PIN de 4-6 dígitos; `/api/session` entra además en `_PATH_LIMITS`
+  (120/min) como primera valla, no como defensa.
+- **Poner, cambiar y retirar**: `PUT /api/session/pin`, **bajo la sesión** y sin
+  `{id}` en la ruta; cambiar o retirar **exige el PIN anterior**. El hash **sí**
+  viaja en el backup (es estado del perfil, dentro de la BD) mientras
+  `session.secret` seguirá sin viajar.
+- **Lo que NO es** (y está declarado en `docs/audit/PARKED.md`): no hay identidad de
+  persona ni recuperación, la cookie de un año protege ante otro equipo sin la
+  cookie y no ante quien use tu equipo desbloqueado, `GET /api/users` sigue
+  enumerando nombres, el freno vive en memoria del proceso y el **P0 sigue abierto
+  para el producto** porque quien no active el PIN entra sin credencial.
+- Fijado por test en `backend/tests/test_pin.py` (31 casos), y en frontend por
+  `api/session.test.ts`, `utils/session.test.ts`, `utils/pin.test.ts`,
+  `components/ProfileGate.test.tsx` y `hooks/useChat.test.tsx`.
 
 ### Voz: el cliente puede pedir una voz, y sólo una instalada (V3.75.5)
 

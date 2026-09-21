@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getModels, streamChat } from "../api/chat";
 import { completeLesson as completeLessonRequest } from "../api/academy";
-import { getSession, openSession } from "../api/session";
+import { getSession, openSession, SessionPinError, setSessionPin } from "../api/session";
 import {
   createConversation,
   deleteConversation,
@@ -48,6 +48,12 @@ const TUTOR_MODES: TutorMode[] = [
   "pronunciation",
 ];
 
+/**
+ * Por qué la puerta está pidiendo el PIN (V3.76). `null` = pidiéndolo por
+ * primera vez (o tras un arranque, que es el caso normal de un perfil con PIN).
+ */
+export type PinFeedback = "pin-invalid" | "pin-throttled" | null;
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -64,6 +70,13 @@ export function useChat() {
   // true cuando la lista de perfiles ya se ha cargado del backend (permite al
   // App distinguir "cargando" de "no hay ningún perfil seleccionado").
   const [usersLoaded, setUsersLoaded] = useState(false);
+  // V3.76 (Fase 3 del P0): perfil que está esperando su PIN y por qué. Que el
+  // PIN se pida es un estado de la **app**, no de un componente: así los tres
+  // caminos que abren sesión (arranque, selector y alta) piden lo mismo y la
+  // puerta solo tiene que pintarlo.
+  const [pinPromptUserId, setPinPromptUserId] = useState<string | null>(null);
+  const [pinFeedback, setPinFeedback] = useState<PinFeedback>(null);
+  const [pinRetryAfter, setPinRetryAfter] = useState(0);
   const [history, setHistory] = useState<ProgressHistory | null>(null);
   const [events, setEvents] = useState<LearningEvent[]>([]);
   const [bucket, setBucket] = useState<Bucket>("week");
@@ -170,6 +183,50 @@ export function useChat() {
     if (favoriteModel && !models.includes(favoriteModel)) setFavoriteModel(null);
   }, [models, model, favoriteModel]);
 
+  /**
+   * Abre sesión para un perfil y, si el servidor pide PIN, deja la app en el
+   * paso de PIN en vez de fallar en silencio (V3.76).
+   *
+   * Es el **único** camino que abre sesión: el arranque, el selector de perfil y
+   * el alta comparten esta función, así que la política del PIN no puede quedar
+   * despareja entre ellos. Devuelve si el perfil quedó activo.
+   */
+  const openProfile = useCallback(
+    async (userId: string, pin?: string): Promise<boolean> => {
+      try {
+        const user = await openSession(userId, pin);
+        setPinPromptUserId(null);
+        setPinFeedback(null);
+        setPinRetryAfter(0);
+        setCurrentUserId(user.id);
+        return true;
+      } catch (err) {
+        if (err instanceof SessionPinError) {
+          // «Falta el PIN» no es un error que pintar: es el paso siguiente.
+          setPinPromptUserId(userId);
+          setPinFeedback(
+            err.reason === "pin-required"
+              ? null
+              : err.reason === "pin-throttled"
+                ? "pin-throttled"
+                : "pin-invalid",
+          );
+          setPinRetryAfter(err.retryAfterSeconds);
+          return false;
+        }
+        /* backend no disponible: no se cambia de perfil ni se pide PIN */
+        return false;
+      }
+    },
+    [],
+  );
+
+  const cancelPin = useCallback(() => {
+    setPinPromptUserId(null);
+    setPinFeedback(null);
+    setPinRetryAfter(0);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -192,10 +249,16 @@ export function useChat() {
           setCurrentUserId(plan.userId);
           return;
         }
+        if (plan.action === "pin") {
+          // V3.76: el perfil tiene PIN. No se lanza un `POST` condenado a 401
+          // —su error lo tragaría el `catch` de abajo y el arranque se vería
+          // como «no ha pasado nada»—: se pide el PIN y se espera.
+          setPinPromptUserId(plan.userId);
+          return;
+        }
         // Perfil resuelto **sin** sesión abierta (equipo recién instalado, o tras
         // un `DELETE /api/session`): se abre aquí antes de pintar nada.
-        const opened = await openSession(plan.userId);
-        if (!cancelled) setCurrentUserId(opened.id);
+        await openProfile(plan.userId);
       } catch {
         /* backend no disponible: se queda sin perfiles cargados */
       } finally {
@@ -205,7 +268,7 @@ export function useChat() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [openProfile]);
 
   // Carga las preferencias persistidas del usuario (modelo, modo, layout).
   useEffect(() => {
@@ -367,17 +430,18 @@ export function useChat() {
     [currentUserId],
   );
 
-  const selectUser = useCallback((userId: string) => {
-    // V3.75: elegir perfil es **abrir sesión** en el servidor. Antes esto
-    // escribía la cookie `et_user_id`, que el propio cliente podía reescribir
-    // para suplantar a otro perfil; ahora la firma el servidor y el estado local
-    // se fija con el perfil que **él** devuelve, no con lo que pide el cliente.
-    void openSession(userId)
-      .then((user) => setCurrentUserId(user.id))
-      .catch(() => {
-        /* backend no disponible: el selector no cambia de perfil */
-      });
-  }, []);
+  const selectUser = useCallback(
+    (userId: string) => {
+      // V3.75: elegir perfil es **abrir sesión** en el servidor. Antes esto
+      // escribía la cookie `et_user_id`, que el propio cliente podía reescribir
+      // para suplantar a otro perfil; ahora la firma el servidor y el estado local
+      // se fija con el perfil que **él** devuelve, no con lo que pide el cliente.
+      // V3.76: si el perfil tiene PIN, el servidor responde 401 `PIN_REQUIRED` y
+      // `openProfile` deja la app en el paso de PIN.
+      void openProfile(userId);
+    },
+    [openProfile],
+  );
 
   const selectModel = useCallback(
     (next: string) => {
@@ -435,6 +499,33 @@ export function useChat() {
     [],
   );
 
+  /**
+   * Pone, cambia o retira el PIN del perfil de la sesión (V3.76).
+   *
+   * Devuelve el resultado para que Ajustes pueda decir qué pasó sin inventarse
+   * los mensajes: `ok`, PIN actual incorrecto, freno activo o avería. El perfil
+   * devuelto trae `has_pin` ya actualizado, y con él se refresca la lista local:
+   * la puerta tiene que saber si preguntar sin volver a pedir `GET /api/users`.
+   */
+  const setProfilePin = useCallback(
+    async (
+      currentPin: string | null,
+      newPin: string,
+    ): Promise<"ok" | "pin-invalid" | "pin-throttled" | "error"> => {
+      try {
+        const updated = await setSessionPin(currentPin, newPin);
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        return "ok";
+      } catch (err) {
+        if (err instanceof SessionPinError) {
+          return err.reason === "pin-throttled" ? "pin-throttled" : "pin-invalid";
+        }
+        return "error";
+      }
+    },
+    [],
+  );
+
   const addUser = useCallback(
     async (name: string): Promise<boolean> => {
       const trimmed = name.trim();
@@ -445,15 +536,16 @@ export function useChat() {
         // V3.75: crear un perfil **no** abre sesión. Sin este paso la app
         // mostraría el perfil nuevo como activo y todas las peticiones
         // responderían 401.
-        await openSession(created.id);
-        setCurrentUserId(created.id);
-        return true;
+        // V3.76: se abre por el mismo camino que el resto. Un perfil recién
+        // creado no puede tener PIN, pero si algún día lo tuviera, este punto ya
+        // sabe pedirlo en vez de tragarse el error.
+        return await openProfile(created.id);
       } catch {
         /* backend no disponible */
         return false;
       }
     },
-    [users],
+    [users, openProfile],
   );
 
   const sendText = useCallback(
@@ -606,6 +698,14 @@ export function useChat() {
     users,
     currentUserId,
     usersLoaded,
+    // V3.76 (Fase 3 del P0): estado del paso de PIN y las acciones que lo
+    // cierran. La puerta de perfil los pinta; el resto de la app no los toca.
+    pinPromptUserId,
+    pinFeedback,
+    pinRetryAfter,
+    submitPin: openProfile,
+    cancelPin,
+    setProfilePin,
     bottomRef,
     send,
     sendText,

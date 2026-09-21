@@ -18,6 +18,11 @@
 > **0 ausentes**, manifiesto offline completo y `llama3.1:8b` instalado. Los 7
 > gates siguen `pending`: la campaña **no** se ha ejecutado (exige hardware, corte
 > de red real y una máquina limpia).
+> **RE-CONGELACIÓN (2026-09-21, `v3.76.0`):** el árbol que se certifica pasa a ser
+> el de `v3.76.0` (Fase 3 del P0: PIN opcional por perfil), porque **no había
+> ningún `record` grabado** y por tanto nada que invalidar. El pre-vuelo se
+> repitió y también dio **10/10**. **Leer la sección «Re-congelación» en §A antes
+> de empezar.** Los 7 gates siguen `pending`.
 
 **Regla de oro:** un gate no se cierra con una opinión. Se cierra con `record`, y
 **sin `--notes` el instrumento rechaza el registro**. Un `fail` o un `skip` son
@@ -75,6 +80,52 @@ runs de CI (los tres `success`, **12/12** jobs) son:
 > **no** cambian producto entre sí: el diff de los dos últimos es **solo** el caso
 > de test de la `X`, su declaración en `docs/UI_V3.1.md` y `docs/audit/PARKED.md`, y
 > esta misma anotación del pre-vuelo.
+
+### Re-congelación del 2026-09-21 — el árbol que se certifica pasa a ser `v3.76.0`
+
+La Fase 3 del P0 (**PIN opcional por perfil**, `release-notes-v3.76.0.md`) abre el
+contrato de `POST /api/session` y migra la BD, así que **es producto**, no
+documentación. La regla de arriba («un commit documental mueve el `HEAD` sin mover
+el artefacto») **no** la cubre, y por eso se declara aquí aparte.
+
+**No invalida nada, y la razón es medible:** la campaña tenía **0 `record`** —los 7
+gates en `pending`— cuando el árbol se movió. No había evidencia que desmentir. Si
+se hubiera movido con `record` ya grabados, `--same-tree` los habría marcado como
+de otro árbol, y ese es exactamente el motivo por el que el PIN entró **después**
+de congelar y no en medio.
+
+Lo que sí cambia, y hay que leerlo antes de empezar la campaña:
+
+- **El árbol certificado es el de ahora**, no `6e4888f`: el `head_sha` de los 7
+  `record` es el **`HEAD` real en el momento de grabar** y `--same-tree` exige que
+  los siete coincidan. La identidad de `v3.75.8` de la tabla de arriba queda como
+  **historia del pre-vuelo**, no como el árbol a validar.
+- **El pre-vuelo se repitió sobre `v3.76.0`** (abajo), porque el árbol cambió de
+  producto y el pre-vuelo anterior describía otro.
+- **La matriz de los 9 ejes de G7 no se re-deriva**, y esto se comprobó en vez de
+  argumentarse: los dossiers se regeneraron **después** del diff del PIN y
+  `docs/audit/generated/` quedó **igual** (cero diferencia en los nueve). La
+  release no toca currículum, corpus, evaluaciones ni banco de listening, y los
+  instrumentos del dossier no leen identidad, sesión ni seguridad, así que las
+  cifras son de este árbol.
+- **El contrato de la API cambia respecto a `v3.75.8`**: `POST /api/session` puede
+  responder `401 PIN_REQUIRED` / `401 PIN_INVALID` / `429 PIN_THROTTLED`, y existe
+  `PUT /api/session/pin`. Cualquier protocolo de campo que abra sesión **debe**
+  tenerlo en cuenta: un perfil **sin** PIN abre como siempre, que es el caso de
+  todos los perfiles existentes salvo que alguien active la mitigación.
+
+**Pre-vuelo de `v3.76.0` (2026-09-21):**
+
+| Comprobación | Resultado |
+|---|---|
+| `npm run build` | correcto; el bundle publica `3.76.0` |
+| `python scripts/validation_gate.py auto --require-dist` | **10/10** |
+| `.venv\Scripts\python.exe -m scripts.audit_dossier runtime-audit` | **Ausentes: 0** |
+| `.venv\Scripts\python.exe download_models.py --check` | todo lo que debe estar en disco, en disco |
+| `ollama list` | `llama3.1:8b` (`46e0c10c039e`) instalado |
+| Dossiers de G7 regenerados tras el diff del PIN | **cero diferencia** |
+| 7 gates | **`pending`** (la campaña sigue sin ejecutarse: exige hardware, corte de red real y una máquina limpia) |
+
 
 **Pre-vuelo histórico (`v3.73.2`, 2026-09-17) — es historia y no se reescribe:**
 

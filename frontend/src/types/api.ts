@@ -36,6 +36,11 @@ export interface User {
   avatar_image?: string;
   /** V3.52.1: perfil de prueba (tests visuales); el backend no lo lista. */
   is_test?: boolean;
+  /**
+   * V3.76 (Fase 3 del P0): el perfil tiene PIN. La puerta lo usa para saber si
+   * hay que pedirlo **antes** de abrir sesión; el hash no viaja nunca.
+   */
+  has_pin?: boolean;
   created_at: string;
 }
 

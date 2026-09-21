@@ -20,6 +20,41 @@ interface RequestOptions {
   unauthorizedAsNull?: boolean;
 }
 
+/**
+ * Error de la API con su código HTTP y el `detail` del backend (V3.76).
+ *
+ * `detail` es el canal por el que el backend distingue desenlaces que comparten
+ * código (`401 SESSION_REQUIRED` vs `401 PIN_REQUIRED` vs `401 PIN_INVALID`).
+ * Antes esa distinción se perdía al convertirlo todo en un `Error` de texto: la
+ * UI solo podía decir «algo falló». Se conserva el `message` legible, así que
+ * quien capturaba `Error` sigue funcionando igual.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: string;
+  /** Segundos de espera sugeridos por el backend (`Retry-After`), si los manda. */
+  readonly retryAfterSeconds: number;
+
+  constructor(
+    status: number,
+    detail: string,
+    options?: { message?: string; retryAfterSeconds?: number },
+  ) {
+    super(options?.message ?? detail);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+    this.retryAfterSeconds = options?.retryAfterSeconds ?? 0;
+  }
+}
+
+/** `Retry-After` en segundos → número. Ignora cabeceras ausentes o basura. */
+function _retryAfter(res: Response): number {
+  const raw = res.headers?.get?.("retry-after");
+  const value = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 async function request<T>(
   url: string,
   init?: RequestInit,
@@ -42,12 +77,19 @@ async function request<T>(
         code?: string;
       };
       if (err.code === "RATE_LIMITED") {
-        throw new Error(translate(currentLang(), "errors.rateLimited"));
+        throw new ApiError(429, "RATE_LIMITED", {
+          message: translate(currentLang(), "errors.rateLimited"),
+          retryAfterSeconds: _retryAfter(res),
+        });
       }
-      throw new Error(err.detail ?? `HTTP ${res.status}`);
+      throw new ApiError(429, err.detail ?? `HTTP ${res.status}`, {
+        retryAfterSeconds: _retryAfter(res),
+      });
     }
     const err = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new Error(err.detail ?? `HTTP ${res.status}`);
+    throw new ApiError(res.status, err.detail ?? `HTTP ${res.status}`, {
+      retryAfterSeconds: _retryAfter(res),
+    });
   }
   return (await res.json()) as T;
 }

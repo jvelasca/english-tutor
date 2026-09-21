@@ -8,6 +8,19 @@ from repositories.db import _conn, _now
 
 _COLUMNS = "id, name, avatar_color, avatar_emoji, avatar_image, is_test, created_at"
 
+# V3.76: `pin_hash` se LEE para saber si el perfil tiene PIN, pero **nunca** sale
+# en el diccionario del perfil: de él solo se deriva `has_pin`. Exponerlo en
+# `GET /api/users` no aporta nada y le da material al atacante.
+_PIN_COLUMN = "pin_hash"
+
+
+def _row_to_user(row: object) -> dict:
+    """Fila de `users` → perfil de la API, con `has_pin` en vez del hash."""
+    data = dict(row)  # type: ignore[arg-type]
+    pin_hash = data.pop(_PIN_COLUMN, "") or ""
+    data["has_pin"] = bool(pin_hash)
+    return data
+
 
 def create_user(name: str, is_test: bool = False) -> dict:
     uid = uuid.uuid4().hex
@@ -24,6 +37,7 @@ def create_user(name: str, is_test: bool = False) -> dict:
         "avatar_emoji": "",
         "avatar_image": "",
         "is_test": is_test,
+        "has_pin": False,
         "created_at": now,
     }
 
@@ -39,17 +53,42 @@ def list_users(include_test: bool = False) -> list[dict]:
     where = "" if include_test else " WHERE is_test = 0"
     with closing(_conn()) as conn:
         rows = conn.execute(
-            f"SELECT {_COLUMNS} FROM users{where} ORDER BY created_at ASC"
+            f"SELECT {_COLUMNS}, {_PIN_COLUMN} FROM users{where} "
+            "ORDER BY created_at ASC"
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_row_to_user(r) for r in rows]
 
 
 def get_user(uid: str) -> dict | None:
     with closing(_conn()) as conn:
         row = conn.execute(
-            f"SELECT {_COLUMNS} FROM users WHERE id = ?", (uid,)
+            f"SELECT {_COLUMNS}, {_PIN_COLUMN} FROM users WHERE id = ?", (uid,)
         ).fetchone()
-    return dict(row) if row is not None else None
+    return _row_to_user(row) if row is not None else None
+
+
+def get_pin_hash(uid: str) -> str | None:
+    """Hash del PIN del perfil (`""` si no tiene), o `None` si no existe.
+
+    Consulta aparte a propósito: separa «quién es este perfil» (lo que la API
+    sirve) de «con qué secreto entra» (lo que solo mira la apertura de sesión).
+    """
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_PIN_COLUMN} FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+    if row is None:
+        return None
+    return row[_PIN_COLUMN] or ""
+
+
+def set_pin_hash(uid: str, pin_hash: str) -> bool:
+    """Escribe (o retira, con `""`) el hash del PIN. `False` si no existe."""
+    if get_user(uid) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute("UPDATE users SET pin_hash = ? WHERE id = ?", (pin_hash, uid))
+    return True
 
 
 def update_user(

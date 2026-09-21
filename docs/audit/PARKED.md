@@ -364,7 +364,10 @@
   perfiles), porque la puerta de perfil los necesita antes de que exista sesión.
 - **Fase 3 (autenticación real) sigue sin decidir.** Contradice «sin cuentas, sin
   contraseñas» de `docs/PREMISAS.md`: es una **decisión de producto** y no una fase
-  técnica pendiente.
+  técnica pendiente. **Actualización (V3.76.0):** se decidió e implementó el **PIN
+  opcional por perfil** como **mitigación**, no como autenticación real; la
+  decisión de fondo —si el producto tendrá cuentas— **sigue abierta** y se ve en la
+  sección `V3.76.0` de este documento.
 - **`/api/network`, `/api/models` y `/api/system/status` siguen sin sesión**: es
   la decisión **aceptada** de `VG-N6` (reconocimiento barato, sin datos del alumno),
   no un olvido. La lista viva está en `docs/ARQUITECTURA.md`.
@@ -1258,6 +1261,67 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   (ni forma, ni icono distinto por sentido). `[UX]`
 - **Los ejemplos son fijos.** Cuatro palabras por sentido, escritas a mano. Generarlas
   del léxico del alumno (o del banco) sería material para otra iteración. `[UX]`
+
+## V3.76.0 — el PIN opcional por perfil (Fase 3 del P0 de identidad) y G7 preparado (2026-09-21)
+
+> Origen: la Fase 3 del P0 (`docs/audit/PLAN-P0-IDENTIDAD.md` §15) —`POST
+> /api/session` aceptaba cualquier `user_id` existente **sin credencial**— y la
+> preparación de G7 sobre el árbol congelado. Decisión del gerente: **PIN opcional
+> por perfil**, 4-6 dígitos, hash PBKDF2 stdlib y cookie de un año; y **regenerar
+> los 9 dossiers** para que la revisión humana de G7 sea leer y firmar. Notas en
+> `release-notes-v3.76.0.md`.
+
+### Cerrado en V3.76.0 (deja de ser deuda)
+
+- **El perfil que activa PIN deja de abrirse sin credencial.** `POST /api/session`
+  responde `401 PIN_REQUIRED` / `401 PIN_INVALID` / `429 PIN_THROTTLED` y existe
+  `PUT /api/session/pin` bajo la sesión (sin `{id}` en la ruta) para poner, cambiar
+  y retirar el PIN. Cambiar o retirar exige el anterior.
+- **El freno de intentos por perfil** (5 fallos libres; después retardo que dobla
+  con techo de 300 s; se limpia al acertar). Es la pieza que sostiene un PIN de 4
+  dígitos, y está declarado así en el código.
+- **El arranque con PIN deja de fallar en silencio.** `planSession` gana el
+  desenlace `pin` y `useChat` centraliza la apertura en `openProfile`, compartido
+  por arranque, selector y alta.
+- **Los 9 dossiers de G7 son reproducibles.** Regenerados sobre el árbol congelado
+  (`v3.75.8` · `7134e538`) con `docs/audit/generated/` **sin un byte de
+  diferencia**. `record pedagogia` **no** se ha ejecutado: G7 se cierra con la
+  revisión, no con una regeneración.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El P0 sigue abierto para el producto.** Un perfil **sin** PIN sigue entrando
+  sin credencial, que es el defecto: la mitigación es **opt-in** y el P0 queda
+  cerrado **para los perfiles que la usan**, no para la app. `[SEGURIDAD]`
+- **No hay autenticación de persona: ni identidad, ni recuperación.** Quien olvide
+  el PIN **no puede demostrar que es él**; el único camino es perder el acceso al
+  perfil (o editar la BD a mano). Decisión declarada, no un olvido. `[SEGURIDAD]`
+- **La cookie de un año es un tecleo por navegador.** Protege ante *otro equipo
+  sin la cookie*; **no** protege ante quien se sienta delante del tuyo, ni ante un
+  navegador ya autenticado, ni ante quien pueda leer el fichero de la BD (el hash
+  viaja en el backup a propósito). `[SEGURIDAD]`
+- **`GET/POST /api/users` siguen sin credencial** (enumerar y crear perfiles), con
+  `has_pin` como único añadido: la puerta de perfil los necesita antes de que
+  exista sesión. La puerta muestra **qué perfiles están protegidos**. `[SEGURIDAD]`
+- **El freno vive en memoria del proceso.** Un reinicio del backend lo vacía; con
+  un servidor local de un solo usuario es suficiente, y el cupo por IP
+  (`/api/session`, 120/min) es la primera valla, no la defensa. `[SEGURIDAD]`
+- **La decisión de fondo sigue abierta: ¿tendrá el producto cuentas?** El PIN
+  responde «¿cómo mitigo el acceso mientras no las tenga?», no «¿las tendrá?».
+  Sigue contradiciendo «sin cuentas, sin contraseñas» de `docs/PREMISAS.md` y es
+  una decisión **de producto**. `[PRODUCTO]`
+- **El hash viaja en el backup.** Es estado del perfil (dentro de la BD) y se
+  declaró que **sí** debe viajar, mientras `session.secret` sigue sin viajar. Quien
+  reciba un ZIP sin cifrar puede atacar el PIN **con el freno desactivado** (fuera
+  de línea, sin la API). La única defensa real es la entropía del hash, no la
+  longitud del PIN. `[SEGURIDAD]`
+- **G7 no está cerrado.** Los dossiers son reproducibles, pero la **revisión
+  humana** de la matriz de los 9 ejes sigue pendiente, y `record pedagogia` sin
+  ejecutar. **Los 7 gates siguen en `pending`.** `[VALIDACIÓN]`
+- **La matriz de lectura de los 9 ejes no queda versionada como documento.** Se
+  entrega para la revisión de G7 y se sella con el `record`; si no se copia a
+  `docs/audit/`, la próxima campaña tendrá que volver a derivarla de los
+  artefactos. `[VALIDACIÓN]`
 
 ## Pendientes de acción humana (no aparcados, en curso)
 

@@ -109,6 +109,20 @@ def test_la_superficie_con_sesion_no_responde_sin_sesion(monkeypatch, tmp_path):
         )
 
 
+def test_la_ruta_del_pin_es_de_datos_y_exige_sesion(monkeypatch, tmp_path):
+    """`PUT /api/session/pin` (V3.76) cambia un secreto del perfil: no es pública.
+
+    Va aparte de `CON_SESION` porque el diccionario de arriba se recorre con
+    `GET` y esta ruta no admite `GET` (405, no 401): mezclarlas debilitaría el
+    candado del otro lado sin avisar.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.put("/api/session/pin", json={"new_pin": "1234"})
+        assert r.status_code == 401
+        assert r.json()["detail"] == "SESSION_REQUIRED"
+
+
 def test_la_superficie_sin_sesion_esta_declarada_por_escrito():
     """Candado anti-deriva documental: lo aceptado tiene que estar escrito.
 

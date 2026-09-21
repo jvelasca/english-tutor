@@ -1560,6 +1560,54 @@ const STRINGS: Record<string, Entry> = {
     es: "No se pudo crear el perfil. ¿Está activo el servidor?",
   },
 
+  // PIN opcional por perfil (V3.76, Fase 3 del P0 de identidad).
+  // Honestidad en el propio texto: no es una contraseña de cuenta ni una
+  // identidad, es una llave de la puerta que el dueño del perfil activa.
+  "pin.title": { en: "Enter your PIN", es: "Introduce tu PIN" },
+  "pin.prompt": {
+    en: "This profile asks for a PIN. It is 4 to 6 digits.",
+    es: "Este perfil pide un PIN. Tiene entre 4 y 6 dígitos.",
+  },
+  "pin.label": { en: "PIN", es: "PIN" },
+  "pin.submit": { en: "Continue", es: "Continuar" },
+  "pin.back": { en: "Back to profiles", es: "Volver a los perfiles" },
+  "pin.invalid": {
+    en: "That PIN is not right.",
+    es: "Ese PIN no es correcto.",
+  },
+  "pin.throttled": {
+    en: "Too many attempts. Wait a moment and try again.",
+    es: "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
+  },
+  "pin.format": {
+    en: "The PIN must be 4 to 6 digits.",
+    es: "El PIN debe tener entre 4 y 6 dígitos.",
+  },
+
+  // Ajustes → PIN del perfil activo.
+  "settings.pin.title": { en: "PIN for this profile", es: "PIN de este perfil" },
+  "settings.pin.explain": {
+    en: "Optional. When a PIN is set, this profile asks for it before opening a session in a browser that does not have it saved yet. It is a lock on the door, not an account: there is no recovery, and it does not protect against someone using your own unlocked device.",
+    es: "Opcional. Con PIN, este perfil lo pide antes de abrir sesión en un navegador que todavía no lo tenga guardado. Es una llave de la puerta, no una cuenta: no hay recuperación y no protege frente a quien use tu propio equipo desbloqueado.",
+  },
+  "settings.pin.current": { en: "Current PIN", es: "PIN actual" },
+  "settings.pin.new": { en: "New PIN (blank removes it)", es: "PIN nuevo (vacío lo retira)" },
+  "settings.pin.save": { en: "Save PIN", es: "Guardar PIN" },
+  "settings.pin.active": {
+    en: "PIN active: this profile asks for it when a session is opened.",
+    es: "PIN activo: este perfil lo pide al abrir sesión.",
+  },
+  "settings.pin.inactive": {
+    en: "No PIN: this profile opens without asking for anything.",
+    es: "Sin PIN: este perfil entra sin pedir nada.",
+  },
+  "settings.pin.saved": { en: "PIN saved.", es: "PIN guardado." },
+  "settings.pin.removed": { en: "PIN removed.", es: "PIN retirado." },
+  "settings.pin.error": {
+    en: "Could not save the PIN. Is the server running?",
+    es: "No se pudo guardar el PIN. ¿Está activo el servidor?",
+  },
+
   // Diálogo de perfil
   "profile.editTitle": { en: "Edit profile", es: "Editar perfil" },
   "profile.uploadImage": { en: "Upload image", es: "Subir imagen" },

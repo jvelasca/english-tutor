@@ -17,6 +17,9 @@ class User(BaseModel):
     # V3.52.1: perfil de PRUEBA (tests visuales). Nunca aparece en el selector
     # de la app; se expone para que los tests puedan localizar y limpiar el suyo.
     is_test: bool = False
+    # V3.76 (Fase 3 del P0): ¿este perfil tiene PIN? La puerta necesita saber si
+    # preguntarlo. Se expone el **booleano**, jamás el hash.
+    has_pin: bool = False
     created_at: str
 
 
@@ -38,11 +41,34 @@ class UserUpdate(BaseModel):
 class SessionCreate(BaseModel):
     """Cuerpo de `POST /api/session`: el perfil que la petición **reclama**.
 
-    No es una credencial —el producto no tiene ninguna (Fase 3)— y conviene no
-    confundirlo: es la declaración de con quién quieres abrir sesión, y el
-    servidor la firma. Lo que cambia respecto a V3.73.x es que, a partir de ahí,
-    la identidad viaja en una cookie que el cliente **no puede forjar**, en vez
-    de en la URL (`docs/audit/PLAN-P0-IDENTIDAD.md` §4).
+    No es una credencial por sí mismo —desde V3.76 puede acompañarse de una
+    (`pin`) si el perfil la tiene— y conviene no confundirlo: es la declaración
+    de con quién quieres abrir sesión, y el servidor la firma. Lo que cambia
+    respecto a V3.73.x es que, a partir de ahí, la identidad viaja en una cookie
+    que el cliente **no puede forjar**, en vez de en la URL
+    (`docs/audit/PLAN-P0-IDENTIDAD.md` §4).
+
+    V3.76: si el perfil tiene PIN y no se envía (o no cuadra), la respuesta es
+    401 con `PIN_REQUIRED` / `PIN_INVALID` para que la UI pueda pedirlo. Un
+    perfil sin PIN sigue abriendo con el cuerpo de siempre.
     """
 
     user_id: str = Field(min_length=1, max_length=64)
+    # 4-6 dígitos. El tope de longitud lo valida `services/pins.is_valid_pin`,
+    # que es también quien da formato al freno de intentos.
+    pin: str | None = Field(default=None, max_length=16)
+
+
+class PinSet(BaseModel):
+    """Poner, cambiar o retirar el PIN del perfil **de la sesión**.
+
+    `current_pin` solo es obligatorio al cambiar o retirar un PIN que ya existía:
+    pedirlo es lo que impide que quien se siente delante de un equipo con sesión
+    abierta ponga su propio PIN y se quede el perfil. `new_pin` vacío retira el
+    PIN (el perfil vuelve a entrar sin credencial, con su consecuencia
+    declarada).
+    """
+
+    current_pin: str | None = Field(default=None, max_length=16)
+    new_pin: str = Field(default="", max_length=16)
+

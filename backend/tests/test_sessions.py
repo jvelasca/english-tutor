@@ -158,6 +158,32 @@ def test_abrir_sesion_de_un_perfil_inexistente_da_404(monkeypatch, tmp_path):
         assert r.status_code == 404
 
 
+def test_el_perfil_de_la_sesion_declara_has_pin_y_nunca_el_hash(monkeypatch, tmp_path):
+    """V3.76: la puerta necesita saber si preguntar; el hash no sale de aquí.
+
+    Se comprueba en las dos caras del contrato —`POST /api/session` y
+    `GET /api/session`— porque la lista de perfiles y la sesión son superficies
+    distintas y ninguna de las dos debe filtrarlo.
+    """
+    from services import pins
+
+    uid = _setup(monkeypatch, tmp_path)
+    assert users_repo.set_pin_hash(uid, pins.hash_pin("4821")) is True
+    pins.reset_state()
+
+    with TestClient(app) as client:
+        abierta = client.post(
+            "/api/session", json={"user_id": uid, "pin": "4821"}
+        )
+        assert abierta.status_code == 200
+        assert abierta.json()["has_pin"] is True
+        assert "pin_hash" not in abierta.text
+
+        leida = client.get("/api/session")
+        assert leida.json()["has_pin"] is True
+        assert "pbkdf2" not in leida.text
+
+
 def test_sin_cookie_no_hay_sesion(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:

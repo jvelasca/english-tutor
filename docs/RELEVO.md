@@ -3,7 +3,42 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-20 (UTC+2).
+> Actualizado por última vez: 2026-09-21 (UTC+2).
+>
+> **Nota (2026-09-21 · cierre de la sesión del P0): V3.76.0 — release DE PRODUCTO
+> (minor) con el PIN opcional por perfil (Fase 3 del P0 de identidad) y con G7
+> preparado.** **CON migración de BD** —la única del ciclo pre-V4.0—: `users` gana
+> `pin_hash TEXT NOT NULL DEFAULT ''` con el `ALTER` idempotente que ya existía,
+> aditiva y con defecto vacío, así que **una BD de V3.75.8 se actualiza sin que
+> nadie pierda el acceso**. **SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`**.
+> **Lo que cambia:** (1) `POST /api/session` acepta un `pin` opcional y responde
+> **`401 PIN_REQUIRED` / `401 PIN_INVALID` / `429 PIN_THROTTLED`** (con
+> `Retry-After`), distinguibles a propósito y sin revelar si el PIN estaba cerca;
+> un perfil **sin** PIN abre como siempre; (2) el hash es **PBKDF2-HMAC-SHA256**
+> con 200 000 iteraciones y sal por perfil (`services/pins.py`, stdlib puro) y
+> **solo viaja `has_pin`** —el hash no se serializa en ninguna respuesta—; (3) la
+> pieza que sostiene la decisión es el **freno de intentos por perfil** (5 fallos
+> libres, después retardo que dobla con techo de 300 s, se limpia al acertar, y
+> **el PIN correcto tampoco pasa mientras frena**); (4) **`PUT /api/session/pin`**
+> pone, cambia y retira el PIN **bajo la sesión** (sin `{id}` en la ruta), y
+> cambiar o retirar **exige el anterior**; (5) el **arranque deja de fallar en
+> silencio**: `planSession` gana el desenlace `pin` y `useChat` centraliza la
+> apertura en `openProfile`, compartido por arranque, selector y alta; (6) los
+> **9 dossiers de G7** se regeneraron sobre el árbol congelado y son
+> **reproducibles byte a byte** (también tras el diff del PIN). **Lo que NO
+> cierra, y es lo que hay que leer:** un perfil **sin PIN sigue entrando sin
+> credencial** —es una mitigación **opt-in**—, **no es autenticación de persona**
+> (ni identidad ni recuperación), la cookie de un año es **un tecleo por
+> navegador** (no protege ante quien use tu equipo desbloqueado), `GET /api/users`
+> sigue enumerando nombres, el freno vive **en memoria** y el hash **sí viaja en
+> el backup**. **El P0 sigue abierto para el producto** y la decisión de fondo
+> —¿tendrá cuentas?— sigue en `PARKED.md`. **Los 7 gates siguen en `pending`** y el
+> árbol que se certifica pasa a ser el de `v3.76.0` (el PIN entró con **0
+> `record`** grabados, así que no invalidó nada): ver la sección
+> **«Re-congelación»** de `docs/audit/KIT-VALIDACION-GATES.md`. Detalle completo en
+> **`release-notes-v3.76.0.md`**.
 >
 > **Nota (2026-09-20 · cierre de la sesión de UI): V3.75.8 — release DE PRODUCTO
 > (patch) del diccionario de consulta y de la identidad de la compilación.**

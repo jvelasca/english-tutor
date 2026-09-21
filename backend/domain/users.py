@@ -18,6 +18,17 @@ async def get_user(uid: str) -> dict | None:
     return await run_in_threadpool(users_repo.get_user, uid)
 
 
+# V3.76 (Fase 3 del P0): el PIN no forma parte del perfil que la API sirve
+# (`has_pin` sí), así que tiene su propio par de operaciones, y **fuera** del
+# diccionario del perfil: así es imposible serializarlo por descuido.
+async def get_pin_hash(uid: str) -> str | None:
+    return await run_in_threadpool(users_repo.get_pin_hash, uid)
+
+
+async def set_pin_hash(uid: str, pin_hash: str) -> bool:
+    return await run_in_threadpool(users_repo.set_pin_hash, uid, pin_hash)
+
+
 async def update_user(uid: str, fields: dict) -> dict | None:
     return await run_in_threadpool(users_repo.update_user, uid, **fields)
 

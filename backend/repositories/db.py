@@ -68,7 +68,13 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                is_test INTEGER NOT NULL DEFAULT 0
+                is_test INTEGER NOT NULL DEFAULT 0,
+                -- V3.76 (Fase 3 del P0): hash del PIN del perfil. Cadena vacía =
+                -- perfil SIN PIN, que es el defecto y la compatibilidad hacia
+                -- atrás: los perfiles anteriores a esta columna entran como
+                -- siempre. El valor en claro no se guarda nunca (ver
+                -- `services/pins.py`) y la columna no se serializa en la API.
+                pin_hash TEXT NOT NULL DEFAULT ''
             )
             """
         )
@@ -847,6 +853,15 @@ def init_db() -> None:
         if "is_test" not in user_cols:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0"
+            )
+        # V3.76 (Fase 3 del P0 de identidad): PIN del perfil, opcional. Cadena
+        # vacía = sin PIN. La columna se añade con el mismo idioma idempotente
+        # que el resto: una BD de una versión anterior la recibe aquí y sus
+        # perfiles siguen entrando sin credencial (nadie queda bloqueado por
+        # actualizar).
+        if "pin_hash" not in user_cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN pin_hash TEXT NOT NULL DEFAULT ''"
             )
 
         # V3.25 (F-K7/P2-01, fase 6): renombrado canónico de los contadores de

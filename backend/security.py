@@ -66,6 +66,12 @@ _PATH_LIMITS: dict[str, int] = {
     "/api/tts": 240,
     "/api/translate": 120,
     "/api/voices/download": 10,
+    # V3.76: abrir sesión pasa a ser un punto con secreto (el PIN opcional del
+    # perfil). Este tope **no** es la defensa —lo es el freno por perfil de
+    # `services/pins.py`, porque el cupo por IP es holgado a propósito y una
+    # familia tras un NAT comparte IP—: es la primera valla, para que una
+    # máquina que barre PINs a toda velocidad ni siquiera llegue al KDF.
+    "/api/session": 120,
 }
 
 _clients: dict[str, deque[float]] = defaultdict(deque)

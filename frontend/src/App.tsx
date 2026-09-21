@@ -88,7 +88,17 @@ export default function App() {
     refreshEvents,
     startLesson,
     completeLesson,
+    // V3.76 (Fase 3 del P0): paso de PIN de la puerta de perfil.
+    pinPromptUserId,
+    pinFeedback,
+    submitPin,
+    cancelPin,
+    setProfilePin,
   } = chat;
+
+  const pinUser = pinPromptUserId
+    ? (users.find((u) => u.id === pinPromptUserId) ?? null)
+    : null;
 
   const appearance = useAppearance(currentUserId);
   const handsFree = useHandsFree(chat.sendText);
@@ -326,9 +336,22 @@ export default function App() {
 
         {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
             sesión abierta y varios perfiles, o todavía sin perfiles), se pide
-            elegir o crear uno antes de usar la app. */}
-        {usersLoaded && !currentUserId && (
-          <ProfileGate users={users} onSelect={selectUser} onCreate={addUser} />
+            elegir o crear uno antes de usar la app.
+
+            V3.76: la misma puerta se muestra cuando hay un perfil esperando su
+            PIN (`pinPromptUserId`), incluso si ya había uno activo: cambiar de
+            perfil en el selector es una acción del alumno y el paso de PIN no
+            puede quedar invisible detrás de la app. */}
+        {usersLoaded && (!currentUserId || pinPromptUserId) && (
+          <ProfileGate
+            users={users}
+            onSelect={selectUser}
+            onCreate={addUser}
+            pinUser={pinUser}
+            pinFeedback={pinFeedback}
+            onSubmitPin={submitPin}
+            onCancelPin={cancelPin}
+          />
         )}
 
         {settingsOpen && (
@@ -344,6 +367,8 @@ export default function App() {
             onSelectModel={selectModel}
             onFavoriteModel={makeFavorite}
             userId={currentUserId}
+            hasPin={Boolean(users.find((u) => u.id === currentUserId)?.has_pin)}
+            onSetPin={setProfilePin}
             onClose={() => setSettingsOpen(false)}
           />
         )}

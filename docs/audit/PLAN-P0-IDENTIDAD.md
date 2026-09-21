@@ -685,3 +685,54 @@ alcance.
 `(a)` **no** se implementa dentro de la campaña de certificación: cambiar el
 contrato de la API en medio de la validación invalidaría los 7 `record`. La campaña
 sella primero el árbol congelado; la Fase 3 va en su propia release.
+
+---
+
+## 15.1 · Decisión tomada e implementada (2026-09-21)
+
+> **Estado: CERRADO el briefing.** El gerente eligió `(a)` **mitigada**: **PIN
+> opcional por perfil**, como **decisión de producto** y **por encima de las
+> preguntas 2 y 3**, que quedan archivadas abajo. Se implementa en una release
+> propia (`v3.76.0`), **después** de congelar el árbol en `v3.75.8` y de preparar
+> G7, tal como exigía la restricción de secuencia. Notas completas en
+> `release-notes-v3.76.0.md`.
+
+**Lo decidido, en cinco líneas.**
+
+1. **Credencial por perfil** (PIN), no por dispositivo: distingue **alumnos**, que
+   es el caso que el gerente quiere cubrir.
+2. **Opcional por perfil.** Los perfiles existentes (sin PIN) siguen entrando sin
+   credencial; el PIN es una mitigación que el alumno **activa**.
+3. **4-6 dígitos + cookie de sesión de un año.** El PIN se teclea **una vez por
+   navegador**.
+4. **La pieza que sostiene la decisión es el freno de intentos por perfil**, no la
+   longitud: 4 dígitos son fuerza bruta trivial sin él.
+5. **El hash viaja en el backup** (es estado del perfil, dentro de la BD);
+   `session.secret` sigue sin viajar.
+
+**Lo que esto significa para el P0 — y es lo que hay que leer con cuidado.**
+
+El P0 **queda cerrado para los perfiles que activan el PIN** y **sigue abierto para
+el producto**: quien no active el PIN sigue entrando sin credencial. La decisión de
+fondo —**¿tendrá el producto cuentas?**— **no** se ha tomado y sigue en
+`PARKED.md`. El PIN responde «¿cómo mitigo el acceso mientras no las tenga?», no
+«¿las tendrá?».
+
+**Preguntas archivadas (no descartadas).**
+
+- *Pregunta 2 (¿perfil o dispositivo?)* — resuelta: **perfil**. El emparejamiento
+  por dispositivo queda **descartado** y no se reabre sin una decisión nueva.
+- *Pregunta 3 (¿cuál es el disparador de reapertura?)* — sigue vigente y **hoy es
+  más útil que antes**: el PIN cubre «varios alumnos en LAN», así que el disparador
+  se estrecha a **«que el producto tenga que saber quién es una persona»** —
+  recuperación de acceso, identidad entre equipos, evaluación con valor
+  certificativo—. Todo eso el PIN **no** lo hace y está declarado en `PARKED.md`.
+
+**Lo que la implementación NO resuelve (declarado, con test cuando se pudo).**
+
+- No hay **recuperación**: quien olvide el PIN no puede demostrar que es él.
+- La cookie protege ante *otro equipo sin la cookie*, no ante quien use **tu**
+  equipo desbloqueado.
+- `GET /api/users` sigue enumerando nombres (ahora con `has_pin`).
+- El freno vive **en memoria del proceso**: un reinicio lo vacía.
+- Quien reciba un backup puede atacar el PIN **sin el freno** (fuera de línea).
