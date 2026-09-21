@@ -27,7 +27,9 @@
 > silencio**: `planSession` gana el desenlace `pin` y `useChat` centraliza la
 > apertura en `openProfile`, compartido por arranque, selector y alta; (6) los
 > **9 dossiers de G7** se regeneraron sobre el árbol congelado y son
-> **reproducibles byte a byte** (también tras el diff del PIN). **Lo que NO
+> **reproducibles byte a byte** (también tras el diff del PIN) y su lectura queda
+> ordenada en **`docs/audit/G7-MATRIZ-LECTURA.md`**: nueve ejes con su cifra de
+> cabecera y la decisión que le toca a quien firma. **Lo que NO
 > cierra, y es lo que hay que leer:** un perfil **sin PIN sigue entrando sin
 > credencial** —es una mitigación **opt-in**—, **no es autenticación de persona**
 > (ni identidad ni recuperación), la cookie de un año es **un tecleo por

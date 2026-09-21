@@ -322,6 +322,13 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record journeys pass
 
 - **Protocolo:** `docs/CONSTITUCION-PEDAGOGICA.md` ·
   `docs/audit/AF-SINTESIS-PEDAGOGICA-V370.md`.
+- **Matriz de lectura (V3.76, atajo de la revisión):**
+  `docs/audit/G7-MATRIZ-LECTURA.md` — los 9 ejes con su cifra de cabecera, las
+  cuatro cosas que hay que leer antes de firmar y la decisión que le toca a quien
+  firma. Está **escrita sobre este árbol** (`v3.76.0` · `d7fbfabb`) y se comprobó
+  que el diff del PIN no mueve ninguno de los nueve dossiers, así que las cifras
+  **no** hay que re-derivarlas: los comandos de abajo son para verificar, no para
+  empezar de cero.
 - **Pasos:** regenerar los instrumentos de solo lectura y revisar la matriz de
   hallazgos:
 
