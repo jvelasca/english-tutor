@@ -1402,6 +1402,46 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **El `dist` no se versiona** (`.gitignore`): hay que recompilar y reiniciar el
   backend para ver la UI nueva. `[OPERACIÓN]`
 
+## V3.77.1 — el diccionario personal no puede morir por un campo que falta (2026-09-21)
+
+> Origen: **el job `Playwright E2E (visual)` de CI, quince minutos después de
+> publicar la V3.77.0.** Es un fallo **real de la release publicada** que los tests
+> unitarios no podían ver por construcción: ninguna unidad se había pedido qué pasa
+> con un **contrato incompleto**. Notas en `release-notes-v3.77.1.md`.
+
+### Cerrado en V3.77.1 (deja de ser deuda)
+
+- **Un campo que falta ya no tumba la pantalla del diccionario personal.**
+  `AddVocabSection` guardaba `data.collections` sin comprobar la forma; con la
+  respuesta sin ese campo, el estado quedaba en `undefined` y el `packs.filter` de
+  la lista de temas **lanzaba al pintar**, lo que no rompe la lista sino el **árbol
+  de React entero**. Ahora el estado se queda **siempre** con un array
+  (`Array.isArray(data?.collections) ? … : []`) y los avisos de alta usan `?.` y
+  `?? 0`. **Falla la lista, no la pantalla.**
+- **La sonda de contrato queda formalizada, no tapada.** El `mockApi` de la spec
+  sigue devolviendo **vacío** a lo que no conoce: era lo que destapaba el defecto.
+  Se descartaron los dos atajos (mocked nuevos para poner el CI verde y aflojar el
+  localizador) por la misma razón: **el mismo camino lo recorre un servidor que
+  cambie el contrato**.
+- **Candado con mordida comprobada.** `AddVocabSection.test.tsx` fija los tres
+  casos y se verificó revirtiendo la línea: con el código anterior, el caso de la
+  respuesta sin `collections` **falla**.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **La fragilidad del arnés visual bajo carga en Windows sigue aparcada** (§V3.75.2)
+  y **no** es lo que falló aquí: en local, la tanda completa volvió a dar fallos en
+  specs que esta release **no toca**, mientras que `drillProvenance` pasa aislado.
+  La autoridad sigue siendo el CI. `[R]`
+- **La sonda es oportunista, no sistemática.** Que el harness destapara este defecto
+  fue **suerte con método**: no hay ninguna prueba que recorra *todas* las respuestas
+  del producto con la forma vacía. Un defecto del mismo tipo en una pantalla que
+  ninguna spec visita seguiría sin verse. `[VALIDACIÓN]`
+- **Ningún invariante exige «una respuesta completa» en el cliente.** La defensa de
+  cada componente es local; no hay un tipo/validador compartido que convierta
+  «contrato incompleto» en un error visible en vez de en un render raro o vacío.
+  `[PRODUCTO]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

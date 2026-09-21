@@ -4,6 +4,40 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.77.1] — 2026-09-21
+
+**Release de PRODUCTO (patch) que arregla un fallo REAL de la V3.77.0 publicada, encontrado por el CI
+y no por los tests unitarios: el diccionario personal podía morir ENTERO —no una tarjeta, la
+pantalla— si `GET /api/vocabulary/collections` no traía el campo `collections`.** `AddVocabSection`
+guardaba la respuesta sin comprobar la forma (`setPacks(data.collections)`), así que el estado quedaba
+en `undefined` y el `packs.filter` de la lista de temas **lanzaba al pintar**; un fallo al pintar no
+rompe «la lista de packs», rompe el árbol de React entero, y con él todo lo que el alumno tenía
+delante. Se arregla en el sitio donde se guarda (`Array.isArray(data?.collections) ? … : []`) y se
+extiende la misma defensa a los avisos de alta (`out.added?.[0] ?? word`, `out.count ?? 0`), que
+habrían fallado igual con una respuesta incompleta. **SIN migración de BD, SIN bump de
+`GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+`1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** Los **7 gates siguen
+`pending`** y el árbol que se certifica sigue siendo el de `v3.75.8`.
+
+- **Cómo se encontró, que es la parte que hay que contar.** El job `Playwright E2E (visual)` pasó de
+  verde a **2 fallos** con la V3.77.0: `drillProvenance.spec.ts` abre el drill desde la cola de repaso
+  del diccionario y dejó de encontrar el ítem. No era el drill: era que **la pantalla ya no existía**
+  para cuando el test miraba. El harness mockea `/api/**` con respuestas vacías, así que sirvió de
+  sonda de contrato sin proponérselo. La release se había publicado quince minutos antes.
+- **Se arregla la causa, no el síntoma.** La tentación era añadir los endpoints nuevos al `mockApi` de
+  la spec (que es lo que hace «verde» al CI) o aflojar el localizador. Las dos cosas habrían dejado la
+  pantalla rompible: el mismo camino lo recorre un servidor que cambie el contrato. El mock se queda
+  como está —vacío a propósito, que es lo que lo hace útil— y lo que cambia es que **el componente no
+  confía en la forma**.
+- **Candado nuevo:** `frontend/src/features/vocabulary/AddVocabSection.test.tsx` fija los tres casos
+  (respuesta sin `collections` → la sección sigue en pie; packs servidos → se pintan y se inscriben;
+  respuesta sin `added` → el aviso cae al término tecleado). **Comprobado que muerde**: con el código
+  anterior, el primer caso **falla**.
+- **Un fallo que los tests unitarios no podían ver por construcción.** Ninguna unidad se había pedido
+  qué pasa con un contrato incompleto; la suite visual sí, porque su mock **no** es el backend. Es la
+  misma lección que dejó V3.75.2 con el arnés, en la dirección contraria: allí la fragilidad tapaba el
+  resultado, aquí la sonda destapó el defecto.
+
 ## [3.77.0] — 2026-09-21
 
 **Release de PRODUCTO (minor) que publica DOS TRABAJOS EN UNA SOLA ETIQUETA: (A) la retención léxica

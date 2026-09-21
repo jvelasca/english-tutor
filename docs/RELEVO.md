@@ -5,6 +5,37 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-21 (UTC+2).
 >
+> **Nota (2026-09-21 · cierre de la sesión de retención léxica y perfiles): V3.77.1 —
+> release DE PRODUCTO (patch) que arregla un fallo REAL de la V3.77.0 publicada,
+> encontrado por el CI quince minutos después de publicarla y no por los tests
+> unitarios: el diccionario personal podía morir ENTERO —no una tarjeta, la
+> pantalla— si `GET /api/vocabulary/collections` no traía el campo `collections`.**
+> `AddVocabSection` guardaba la respuesta sin comprobar la forma
+> (`setPacks(data.collections)`), así que el estado quedaba en `undefined` y el
+> `packs.filter` de la lista de temas **lanzaba al pintar**; un fallo al pintar no
+> rompe «la lista de packs», rompe el árbol de React entero. El job
+> **`Playwright E2E (visual)`** pasó de verde a 2 fallos en
+> `drillProvenance.spec.ts`, que abre el drill desde la cola de repaso del
+> diccionario: no era el drill, era que **la pantalla ya no existía**; el harness
+> mockea `/api/**` con respuestas vacías y sirvió de **sonda de contrato** sin
+> proponérselo. **Se arregla la causa, no el síntoma** (`Array.isArray(data
+> ?.collections) ? … : []`, y la misma defensa en los avisos de alta) y el **mock
+> se queda vacío a propósito**, porque es lo que lo hace útil: el mismo camino lo
+> recorre un servidor que cambie el contrato. **Candado nuevo**
+> (`AddVocabSection.test.tsx`), **comprobado que muerde**: con el código anterior el
+> caso «respuesta sin `collections`» falla. **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION`, `DECISION_POLICY_VERSION` ni `LISTENING_BANK_VERSION`,
+> currículum intacto.** **Lo que NO cambia:** nada de la V3.77.0 —retención léxica,
+> perfiles con autorización del webmaster, doble candado y borrado en dos pasos
+> siguen exactamente como se publicaron—, y **la V3.77.0 no se reescribe**: el tag
+> se queda como está y la corrección viaja en su propia etiqueta. **En el producto
+> con el backend de verdad el campo siempre viaja**, así que el defecto no se
+> habría visto en uso normal; lo que se arregla es que un contrato incompleto **no
+> pueda tumbar la pantalla**. La **fragilidad del arnés visual bajo carga en
+> Windows** (`PARKED.md` §V3.75.2) **sigue aparcada y no es lo que falló aquí**.
+> **Los 7 gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+> `v3.75.8`. Detalle completo en **`release-notes-v3.77.1.md`**.
+>
 > **Nota (2026-09-21 · cierre de la sesión de retención léxica y perfiles): V3.77.0 —
 > release DE PRODUCTO (minor) que publica DOS TRABAJOS BAJO UNA SOLA ETIQUETA: (A) la
 > retención léxica del diccionario personal y (B) los perfiles con autorización del

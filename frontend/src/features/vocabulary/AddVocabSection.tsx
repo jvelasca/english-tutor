@@ -36,7 +36,13 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
   const refreshPacks = useCallback(async () => {
     try {
       const data = await listVocabCollections(userId);
-      setPacks(data.collections);
+      // V3.77: el estado se queda SIEMPRE con un array. Fiarse de la forma de la
+      // respuesta (y hacer `packs.filter` con `undefined` si el campo no viene)
+      // no rompe esta tarjeta: **tira la pantalla entera**, porque el fallo
+      // ocurre al pintar. Lo encontró la suite visual, que mockea `/api/**` con
+      // respuestas vacías; el mismo camino es el de un servidor que cambie el
+      // contrato. Falla la lista, no la pantalla.
+      setPacks(Array.isArray(data?.collections) ? data.collections : []);
       setError(false);
     } catch {
       setError(true);
@@ -59,7 +65,7 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
       setWord("");
       setTranslation("");
       setMessage(
-        t("dictionary.add.wordOk").replace("{word}", out.added[0] ?? word),
+        t("dictionary.add.wordOk").replace("{word}", out.added?.[0] ?? word),
       );
       onChanged?.();
       void refreshPacks();
@@ -82,7 +88,7 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
       setListText("");
       setListTitle("");
       setMessage(
-        t("dictionary.add.bulkOk").replace("{n}", String(out.count)),
+        t("dictionary.add.bulkOk").replace("{n}", String(out.count ?? 0)),
       );
       onChanged?.();
       void refreshPacks();
@@ -101,7 +107,7 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
       const out = await enrollVocabCollection(userId, pack.id);
       setMessage(
         t("dictionary.add.enrollOk")
-          .replace("{n}", String(out.count))
+          .replace("{n}", String(out.count ?? 0))
           .replace("{title}", lang === "es" && pack.title_es ? pack.title_es : pack.title),
       );
       onChanged?.();
