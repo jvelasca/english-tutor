@@ -6,6 +6,8 @@ import type { LexicalItem, LexicalStatus, Lexicon } from "../../types/api";
 import { cefrBarValue, sortLexicalItems } from "./dictionary";
 import { ReviewQueueSection } from "./ReviewQueueSection";
 import { SpeakingDrillSection } from "./wordDrill";
+import { RetentionSession } from "./RetentionSession";
+import { AddVocabSection } from "./AddVocabSection";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
@@ -111,7 +113,51 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
       >
         <DictionaryHeader total={summary.total} />
 
+        {/* Practicar hoy: retención (Anki-lite) + cola de competencia (drill). */}
+        {userId && (
+          <motion.section
+            variants={item}
+            aria-label={t("dictionary.practiceToday")}
+            className="flex flex-col gap-4"
+          >
+            <h2 className="text-sm font-semibold tracking-tight">
+              {t("dictionary.practiceToday")}
+            </h2>
+            <RetentionSession userId={userId} onFinished={() => void refresh()} />
+            <ReviewQueueSection userId={userId} />
+            {(candidates.length > 0 || drillWord !== null) && (
+              <SpeakingDrillSection
+                userId={userId}
+                words={candidates}
+                drillWord={drillWord}
+                onDrillChange={setDrillWord}
+                onProduced={(word) => {
+                  setCandidates((prev) => prev.filter((w) => w !== word));
+                  void refresh();
+                }}
+              />
+            )}
+          </motion.section>
+        )}
+
+        {/* Añadir palabras / listas / temas. */}
+        {userId && (
+          <motion.section
+            variants={item}
+            aria-label={t("dictionary.add.section")}
+            className="flex flex-col gap-3"
+          >
+            <h2 className="text-sm font-semibold tracking-tight">
+              {t("dictionary.add.section")}
+            </h2>
+            <AddVocabSection userId={userId} onChanged={() => void refresh()} />
+          </motion.section>
+        )}
+
         <motion.section variants={item} aria-label={t("dictionary.title")}>
+          <h2 className="mb-3 text-sm font-semibold tracking-tight">
+            {t("dictionary.myLexicon")}
+          </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
               label={t("dictionary.known")}
@@ -199,22 +245,6 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
               </ul>
             </Card>
           </motion.section>
-        )}
-
-        {userId && <ReviewQueueSection userId={userId} />}
-
-        {userId && (candidates.length > 0 || drillWord !== null) && (
-          <SpeakingDrillSection
-            userId={userId}
-            words={candidates}
-            drillWord={drillWord}
-            onDrillChange={setDrillWord}
-            onProduced={(word) => {
-              // La palabra ya no es candidata: refrescar léxico + señal.
-              setCandidates((prev) => prev.filter((w) => w !== word));
-              void refresh();
-            }}
-          />
         )}
 
         <motion.section variants={item} aria-label={t("dictionary.items")}>

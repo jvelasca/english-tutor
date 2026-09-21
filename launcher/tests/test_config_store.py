@@ -43,12 +43,42 @@ def test_load_config_descarta_valores_que_no_son_booleanos(tmp_path):
 
 def test_save_then_load_roundtrip(tmp_path):
     path = tmp_path / "config.json"
-    config = {"lan": True}
+    # V3.77: `load_config` devuelve siempre el juego completo de preferencias
+    # (defaults + lo guardado), así que lo que se guarda es el juego completo.
+    config = {**config_store.DEFAULTS, "lan": True}
 
     config_store.save_config(config, path)
     loaded = config_store.load_config(path)
 
     assert loaded == config
+
+
+def test_el_pin_de_administracion_se_guarda_y_se_lee(tmp_path):
+    """El PIN es una preferencia más, y sin él la administración queda cerrada."""
+    path = tmp_path / "config.json"
+    assert config_store.load_config(path)["admin_pin"] == ""
+
+    config_store.save_config({"lan": False, "admin_pin": "secreto-largo"}, path)
+
+    assert config_store.load_config(path)["admin_pin"] == "secreto-largo"
+
+
+def test_un_pin_que_no_es_cadena_se_descarta(tmp_path):
+    """El lector es un parser: no convierte tipos, descarta lo que no es cadena.
+
+    La **forma** del PIN la juzga `core.is_valid_admin_pin` (ver
+    `test_admin_pin.py`); aquí solo se comprueba que un JSON tocado a mano no
+    metamorfosea un número en cadena por el camino.
+    """
+    path = tmp_path / "config.json"
+
+    for valor in (123, None, ["x"], {"pin": "x"}, True):
+        path.write_text(
+            json.dumps({"lan": False, "admin_pin": valor}), encoding="utf-8"
+        )
+        assert config_store.load_config(path)["admin_pin"] == "", (
+            f"un valor que no es cadena ({valor!r}) no puede quedar declarado"
+        )
 
 
 def test_save_config_ignora_errores_de_escritura(tmp_path):

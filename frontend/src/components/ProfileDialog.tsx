@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
+import type {
+  ProfileRequestFailure,
+  ProfileRequestOutcome,
+} from "../api/profileRequests";
 import { AVATAR_COLORS, AVATAR_EMOJIS, avatarColor } from "../utils/avatar";
 import { resizeImageToDataUrl } from "../utils/image";
 import { useI18n } from "../hooks/useI18n";
@@ -9,9 +13,20 @@ interface ProfileDialogProps {
   user: User;
   onClose: () => void;
   onSave: (patch: UserPatch) => Promise<User | null>;
+  /**
+   * V3.77: pide la baja del perfil. **No** lo borra ni lo desactiva: deja una
+   * solicitud que el webmaster resuelve desde el lanzador. El diálogo cuenta el
+   * desenlace porque es lo último que el alumno ve de su perfil.
+   */
+  onRequestDelete?: (note: string) => Promise<ProfileRequestOutcome>;
 }
 
-export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
+export function ProfileDialog({
+  user,
+  onClose,
+  onSave,
+  onRequestDelete,
+}: ProfileDialogProps) {
   const { t } = useI18n();
   const [name, setName] = useState(user.name);
   const [emoji, setEmoji] = useState(user.avatar_emoji ?? "");
@@ -19,6 +34,10 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
   const [image, setImage] = useState(user.avatar_image ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteFailure, setDeleteFailure] = useState<ProfileRequestFailure | null>(
+    null,
+  );
+  const [deleteSent, setDeleteSent] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,6 +55,19 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
     } catch {
       setError(t("profile.imageError"));
     }
+  }
+
+  /**
+   * Pide la baja del perfil. Ni borra ni desactiva: la solicitud entra en la cola
+   * del webmaster, y por eso la pantalla lo dice así en vez de dar por hecho que
+   * el perfil desaparece.
+   */
+  async function submitDelete() {
+    if (!onRequestDelete || deleteSent) return;
+    setDeleteFailure(null);
+    const outcome = await onRequestDelete("");
+    if (outcome.ok) setDeleteSent(true);
+    else setDeleteFailure(outcome.reason);
   }
 
   async function submit() {
@@ -185,6 +217,28 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
           </div>
 
           {error && <p className="dialog-error">{error}</p>}
+
+          {onRequestDelete && (
+            <div className="field border-t border-border pt-3">
+              <span className="field-label">{t("profile.deleteSection")}</span>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {deleteSent ? t("profile.deleteSent") : t("profile.deleteExplain")}
+              </p>
+              {deleteFailure && (
+                <p className="dialog-error">
+                  {t(deleteErrorKey(deleteFailure))}
+                </p>
+              )}
+              <button
+                type="button"
+                className="dialog-secondary"
+                disabled={deleteSent}
+                onClick={() => void submitDelete()}
+              >
+                {t("profile.requestDelete")}
+              </button>
+            </div>
+          )}
         </div>
 
         <footer className="dialog-footer">
@@ -207,6 +261,23 @@ export function ProfileDialog({ user, onClose, onSave }: ProfileDialogProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Qué decir ante cada desenlace fallido de la baja. Mismo criterio que en la
+ * puerta: claves de i18n, no frases sueltas aquí dentro.
+ */
+function deleteErrorKey(failure: ProfileRequestFailure): string {
+  switch (failure) {
+    case "duplicate":
+      return "profile.deleteDuplicate";
+    case "full":
+      return "profile.deleteFull";
+    case "throttled":
+      return "errors.rateLimited";
+    default:
+      return "profile.deleteError";
+  }
 }
 
 function AvatarPreview({

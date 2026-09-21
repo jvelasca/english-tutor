@@ -42,6 +42,7 @@ SECTION_ICONS = {
     "Actividad del servidor": "📊",
     "Acceso a la app": "📡",
     "Base de datos": "💾",
+    "Perfiles": "🔐",
     "Usuarios": "👥",
     "Cookies navegador": "🍪",
     "Registros": "📄",
@@ -120,6 +121,74 @@ def server_activity(status: dict | None) -> tuple[str, int]:
         (status.get("rate_limited") or {}).get("rejected_last_minute", 0) or 0
     )
     return line, rejected
+
+
+# --- Perfiles y solicitudes (V3.77) -----------------------------------------
+#
+# Vistas puras de lo que el webmaster ve en la sección «Perfiles». Se separan de
+# la GUI por la razón de siempre: la disposición de la ventana no se puede probar
+# sin pantalla, pero **lo que dice cada fila sí**, y es justo donde un cambio
+# puede mentir al usuario («Desactivado» pintado como activo, una baja mostrada
+# sin nombre de perfil, un contador mal).
+REQUEST_KIND_LABELS = {"create": "🆕 Alta", "delete": "🗑️ Baja"}
+PROFILE_STATUS_LABELS = {"active": "Activo", "disabled": "Desactivado"}
+
+
+def pending_summary(count: int) -> str:
+    """Frase del contador de solicitudes pendientes (concordancia incluida)."""
+    if count <= 0:
+        return "Sin solicitudes pendientes"
+    if count == 1:
+        return "1 solicitud pendiente"
+    return f"{count} solicitudes pendientes"
+
+
+def request_row(
+    request: dict, names: dict[str, str] | None = None
+) -> tuple[str, str, str]:
+    """Fila de una solicitud: (tipo, a quién se refiere, cuándo llegó).
+
+    En una baja, la solicitud guarda el `user_id`, no el nombre: se traduce con
+    `names` (el mapa de la lista de perfiles ya cargada) para que el webmaster no
+    tenga que decidir sobre un identificador. Si el perfil ya no está, se dice
+    «(perfil que ya no existe)» en vez de enseñar el id crudo.
+    """
+    kind = REQUEST_KIND_LABELS.get(str(request.get("kind")), str(request.get("kind")))
+    if request.get("kind") == "delete":
+        uid = str(request.get("user_id") or "")
+        target = (names or {}).get(uid) or "(perfil que ya no existe)"
+    else:
+        target = str(request.get("display_name") or "")
+        if request.get("note"):
+            target = f"{target} — {request['note']}"
+    when = str(request.get("requested_at") or "").replace("T", " ")[:16]
+    return (kind, target, when)
+
+
+def profile_row(profile: dict) -> tuple[str, str, str, str]:
+    """Fila de un perfil: (nombre, estado, PIN, creado).
+
+    El PIN se informa como booleano —«Con PIN» / «Sin PIN»— y nunca como valor:
+    el backend no lo manda en claro ni hasheado, y esta pantalla no inventa una
+    forma de mostrarlo.
+    """
+    status = str(profile.get("status") or "active")
+    return (
+        "👤 " + str(profile.get("name") or ""),
+        PROFILE_STATUS_LABELS.get(status, status),
+        "🔑 Con PIN" if profile.get("has_pin") else "Sin PIN",
+        str(profile.get("created_at") or "").replace("T", " ")[:16],
+    )
+
+
+def admin_state_label(pin_set: bool) -> str:
+    """Estado del candado de administración, en una frase."""
+    if pin_set:
+        return "🔐 Administración habilitada (PIN configurado)"
+    return (
+        "🔒 Administración deshabilitada: define un PIN para poder crear, "
+        "desactivar o borrar perfiles"
+    )
 
 
 def interface_state(served: bool, dist_available: bool) -> str:

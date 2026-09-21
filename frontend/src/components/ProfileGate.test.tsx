@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { I18nProvider } from "../hooks/useI18n";
-import type { User } from "../types/api";
+import type { ProfileRequest, User } from "../types/api";
 import { ProfileGate } from "./ProfileGate";
 
 function user(id: string, name: string, hasPin = false): User {
@@ -40,12 +40,26 @@ function renderGate(props: Partial<Parameters<typeof ProfileGate>[0]> = {}) {
       <ProfileGate
         users={[ANA, BETO]}
         onSelect={() => {}}
-        onCreate={async () => true}
+        onRequest={async () => ({ ok: true, request: PEDIDA })}
         {...props}
       />
     </I18nProvider>,
   );
 }
+
+/** La solicitud tal como la devuelve el backend, para el caso de éxito. */
+const PEDIDA: ProfileRequest = {
+  id: 1,
+  kind: "create",
+  display_name: "Ana",
+  user_id: "",
+  note: "",
+  requested_at: "2026-09-21T22:00:00Z",
+  status: "pending",
+  decided_at: "",
+  decided_note: "",
+  resolved_user_id: "",
+};
 
 describe("ProfileGate · lista de perfiles", () => {
   it("elegir un perfil avisa con su id", () => {
@@ -114,5 +128,92 @@ describe("ProfileGate · paso de PIN (V3.76)", () => {
     renderGate({ pinUser: ANA, onCancelPin });
     fireEvent.click(screen.getByRole("button", { name: "Back to profiles" }));
     expect(onCancelPin).toHaveBeenCalled();
+  });
+});
+
+describe("ProfileGate · pedir un perfil (V3.77)", () => {
+  const nameInput = () => screen.getByLabelText("Name") as HTMLInputElement;
+  const submit = () => screen.getByRole("button", { name: "Ask for a profile" });
+
+  it("no ofrece «crear»: la app pide, no crea", () => {
+    // La ruta que creaba perfiles desde el navegador ya no es la del alumno
+    // (el backend la cierra fuera del equipo), así que la puerta no la promete.
+    renderGate();
+    expect(screen.queryByRole("button", { name: "Create profile" })).toBeNull();
+    expect(submit()).toBeTruthy();
+  });
+
+  it("manda el nombre recortado y cuenta que la solicitud está enviada", async () => {
+    const onRequest = vi.fn().mockResolvedValue({ ok: true, request: PEDIDA });
+    renderGate({ onRequest });
+
+    fireEvent.change(nameInput(), { target: { value: "  Ana  " } });
+    fireEvent.click(submit());
+
+    expect(onRequest).toHaveBeenCalledWith("Ana");
+    expect(await screen.findByText(/Request sent/)).toBeTruthy();
+    // Y no desaparece: no hay perfil al que entrar todavía, así que la puerta se
+    // queda explicando que falta la autorización del webmaster.
+    expect(nameInput().disabled).toBe(true);
+    expect((submit() as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("no deja pedir con el campo vacío", () => {
+    renderGate();
+    expect((submit() as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(nameInput(), { target: { value: "   " } });
+    expect((submit() as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("un nombre ya pedido se explica como espera, no como fallo", async () => {
+    renderGate({
+      onRequest: async () => ({ ok: false, reason: "duplicate" }),
+    });
+    fireEvent.change(nameInput(), { target: { value: "Ana" } });
+    fireEvent.click(submit());
+    expect(
+      await screen.findByText("There is already a pending request with that name."),
+    ).toBeTruthy();
+  });
+
+  it("la cola llena y la caída del servidor dicen cosas distintas", async () => {
+    const { unmount } = renderGate({
+      onRequest: async () => ({ ok: false, reason: "full" }),
+    });
+    fireEvent.change(nameInput(), { target: { value: "Ana" } });
+    fireEvent.click(submit());
+    expect(
+      await screen.findByText(/too many pending requests/i),
+    ).toBeTruthy();
+    unmount();
+
+    renderGate({ onRequest: async () => ({ ok: false, reason: "offline" }) });
+    fireEvent.change(nameInput(), { target: { value: "Ana" } });
+    fireEvent.click(submit());
+    expect(await screen.findByText(/Could not send the request/)).toBeTruthy();
+  });
+
+  it("tras un fallo se puede rectificar sin recargar", async () => {
+    const onRequest = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, reason: "invalid" })
+      .mockResolvedValueOnce({ ok: true, request: PEDIDA });
+    renderGate({ onRequest });
+
+    fireEvent.change(nameInput(), { target: { value: "Ana" } });
+    fireEvent.click(submit());
+    expect(await screen.findByText("That name is not valid.")).toBeTruthy();
+
+    fireEvent.change(nameInput(), { target: { value: "Ana María" } });
+    // Al escribir, el error viejo se retira: dejaría de hablar del nombre actual.
+    expect(screen.queryByText("That name is not valid.")).toBeNull();
+    fireEvent.click(submit());
+    expect(onRequest).toHaveBeenLastCalledWith("Ana María");
+    expect(await screen.findByText(/Request sent/)).toBeTruthy();
+  });
+
+  it("la puerta dice a quién hay que pedirle la autorización", () => {
+    renderGate();
+    expect(screen.getByText(/webmaster/)).toBeTruthy();
   });
 });

@@ -9,7 +9,12 @@ import {
   listConversations,
   saveConversation,
 } from "../api/conversations";
-import { createUser, listUsers, updateUser as updateUserApi, type UserPatch } from "../api/users";
+import { listUsers, updateUser as updateUserApi, type UserPatch } from "../api/users";
+import {
+  requestProfile,
+  requestProfileDelete,
+  type ProfileRequestOutcome,
+} from "../api/profileRequests";
 import { getProgressHistory } from "../api/progress";
 import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
@@ -526,26 +531,28 @@ export function useChat() {
     [],
   );
 
-  const addUser = useCallback(
-    async (name: string): Promise<boolean> => {
+  // V3.77: la app ya no crea perfiles. Lo que hace es **pedirlos**, y el
+  // desenlace se devuelve tal cual para que la puerta pueda contarlo (una
+  // solicitud no abre sesión: no hay perfil al que abrirla). El nombre por
+  // defecto sigue teniendo sentido aquí —«Alumno 2» es más útil en la cola del
+  // webmaster que una fila vacía—, pero se resuelve solo si no escribieron nada.
+  const requestProfileForGate = useCallback(
+    async (name: string): Promise<ProfileRequestOutcome> => {
       const trimmed = name.trim();
       const finalName = trimmed || nextDefaultUserName(users.map((u) => u.name));
-      try {
-        const created = await createUser(finalName);
-        setUsers((prev) => [...prev, created]);
-        // V3.75: crear un perfil **no** abre sesión. Sin este paso la app
-        // mostraría el perfil nuevo como activo y todas las peticiones
-        // responderían 401.
-        // V3.76: se abre por el mismo camino que el resto. Un perfil recién
-        // creado no puede tener PIN, pero si algún día lo tuviera, este punto ya
-        // sabe pedirlo en vez de tragarse el error.
-        return await openProfile(created.id);
-      } catch {
-        /* backend no disponible */
-        return false;
-      }
+      return requestProfile(finalName);
     },
-    [users, openProfile],
+    [users],
+  );
+
+  /**
+   * El perfil de la sesión pide su baja. **No** desactiva ni borra nada: deja la
+   * solicitud en la cola del webmaster, que es quien decide (y quien, si
+   * aprueba, desactiva el perfil — la evidencia sigue intacta y reversible).
+   */
+  const requestProfileRemoval = useCallback(
+    (note = ""): Promise<ProfileRequestOutcome> => requestProfileDelete(note),
+    [],
   );
 
   const sendText = useCallback(
@@ -713,7 +720,8 @@ export function useChat() {
     loadConversation,
     removeConversation,
     selectUser,
-    addUser,
+    requestProfileForGate,
+    requestProfileRemoval,
     editUser,
     history,
     events,

@@ -3,6 +3,7 @@ import type { HandsFreeStatus } from "../hooks/useHandsFree";
 import type { MicUnavailableReason } from "../utils/browserCapabilities";
 import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
+import type { ProfileRequestOutcome } from "../api/profileRequests";
 import type { Route } from "./routes";
 import { Navigation } from "./Navigation";
 import { ConnectionIndicator } from "../components/ConnectionIndicator";
@@ -16,8 +17,10 @@ interface HeaderProps {
   users: User[];
   currentUserId: string | null;
   onSelectUser: (id: string) => void;
-  onAddUser: (name: string) => void;
+  onRequestUser: (name: string) => Promise<ProfileRequestOutcome>;
   onEditUser: (id: string, patch: UserPatch) => Promise<User | null>;
+  /** V3.77: el perfil de la sesión pide su baja (la resuelve el webmaster). */
+  onRequestDeleteUser?: (note: string) => Promise<ProfileRequestOutcome>;
   handsFreeEnabled: boolean;
   handsFreeStatus: HandsFreeStatus;
   handsFreeMicError: MicUnavailableReason | null;
@@ -37,8 +40,9 @@ export function Header({
   users,
   currentUserId,
   onSelectUser,
-  onAddUser,
+  onRequestUser,
   onEditUser,
+  onRequestDeleteUser,
   handsFreeEnabled,
   handsFreeStatus,
   handsFreeMicError,
@@ -122,8 +126,9 @@ export function Header({
           users={users}
           currentUserId={currentUserId}
           onSelect={onSelectUser}
-          onAdd={onAddUser}
+          onRequest={onRequestUser}
           onEdit={onEditUser}
+          {...(onRequestDeleteUser ? { onRequestDelete: onRequestDeleteUser } : {})}
         />
       </div>
     </header>

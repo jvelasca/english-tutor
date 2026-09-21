@@ -4,6 +4,131 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.77.0] — 2026-09-21
+
+**Release de PRODUCTO (minor) que publica DOS TRABAJOS EN UNA SOLA ETIQUETA: (A) la retención léxica
+del diccionario personal (añadir palabras sueltas, listas y temas, y practicarlas con tarjetas y
+repetición espaciada) y (B) los perfiles con autorización del webmaster (el alumno **pide** un perfil
+o su baja y el webmaster lo resuelve desde el lanzador). CON migración de BD aditiva: dos tablas
+nuevas de colecciones y retención, y la tabla `profile_requests`, más la columna `users.status`
+(`ALTER` idempotente con `DEFAULT 'active'`). SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar
+las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** El árbol se congeló en `v3.75.8` y sus **7
+gates siguen `pending`**: esta release no los toca ni los adelanta. Se publica **una sola release**
+a propósito: la retención léxica no salía sin el control de perfiles, porque un módulo que escribe
+vocabulario personal en la BD de un perfil no puede llegar al producto mientras cualquiera en la LAN
+pueda crear perfiles.
+
+### (A) Retención léxica: el diccionario personal deja de ser un archivo y pasa a ser un plan
+
+- **Unidades léxicas, no solo palabras.** El motor de retención trabaja sobre **unidades léxicas**:
+  una palabra suelta **o una frase funcional** («how long does it take»). Es la diferencia entre
+  acumular vocabulario y acumular **lengua**: las frases de alta frecuencia son las que sostienen una
+  conversación, y un módulo que solo acepta palabras las tiraba a la basura. Cada unidad guarda su
+  forma, su sentido y **el contexto donde apareció**.
+- **El puente con el resto de la app.** Lo trabajado en las otras partes (conversación, escritura,
+  lectura, drill de vocabulario) llega al diccionario personal como **candidato**, con su procedencia
+  declarada, y es el alumno quien decide qué entra a la cola de retención. Nada entra «solo»: el
+  diccionario no puede llenarse de palabras que nadie eligió estudiar.
+- **Añadir de tres formas, y las tres son la misma puerta.** Palabra suelta, **lista pegada** (una
+  por línea, tolerante a formato) y **pack por tema** (comida, viaje, trabajo). La lista y el pack son
+  azúcar sobre la misma entrada, así que la validación, el deduplicado y el tope viven **en un solo
+  sitio** (`repositories/vocabulary.py::seed_study_items`) y no tres veces.
+- **Los packs son contenido, y el contenido se versiona.** Vivían en `backend/data/vocab_packs/`,
+  que está **ignorado por git** —el contenido se habría quedado fuera del repositorio y de la release—;
+  se mueven a `backend/curriculum/vocab_packs/`, que es donde vive el currículum que sí se audita.
+  Es el arreglo de una fuga que se descubrió al comprobar la release, no un cambio de gusto.
+- **Sesión de tarjetas (Anki-like) sobre un planificador declarado.** `domain/retention.py` programa
+  el repaso con **FSRS-lite** (documentado en `docs/FSRS.md`), no con un SM-2 improvisado: cada
+  unidad tiene su intervalo, su facilidad y su fecha de vencimiento, y el desenlace de la tarjeta
+  («otra vez», «difícil», «bien», «fácil») mueve el intervalo en consecuencia. `RetentionSession.tsx`
+  es la pantalla; la lógica que decide **qué toca hoy** es una función pura con test propio.
+- **Retención ≠ dominio.** Retener una palabra (recordarla a largo plazo) y **demostrar dominio**
+  (usarla bien en contexto) son dos cosas distintas y se miden por separado. El evento de repaso
+  entra en la evidencia clasificado como **papel de retención** (`services/evidence.py`), no como una
+  prueba de competencia: si se contara como dominio, la matriz de destrezas subiría por recordar
+  tarjetas. Es la decisión de fondo de este bloque y está en el código, no solo en la intención.
+
+### (B) Perfiles con autorización del webmaster
+
+- **El principio: el webmaster no es un rol, es quien ejecuta el lanzador.** No se inventan cuentas,
+  contraseñas, roles ni correo. La autoridad viene de **tener el equipo**, y la decisión de fondo
+  —¿tendrá cuentas el producto?— sigue **aparcada** (`docs/audit/PARKED.md`): esto no la prejuzga.
+- **El alumno pide; el webmaster decide.** Nuevas `POST /api/profile-requests` (**sin sesión**: quien
+  pide un perfil todavía no tiene ninguno) y `POST /api/profile-requests/delete` (**con sesión**, sin
+  `{id}` en la ruta: no existe la forma de pedir la baja de otro). Una petición es **inerte**: lo peor
+  que puede pasar es que la cola crezca.
+- **El alta anónima por LAN se cierra.** `POST /api/users` pasa a exigir **loopback**: hasta V3.76
+  estaba abierto a propósito y eso significaba que **cualquier equipo de la red podía crear perfiles**
+  en la BD del alumno. El primer arranque en el propio equipo sigue funcionando igual, y los tests
+  visuales conservan su perfil `is_test`.
+- **Desactivar primero, purgar después y a mano.** Aprobar una baja **desactiva** el perfil: sale del
+  selector y no puede abrir sesión (`403 PROFILE_DISABLED`), pero su evidencia queda **intacta** y se
+  puede reactivar. Purgar —borrar de verdad— es un acto aparte, exige el **nombre exacto** y un
+  **snapshot ZIP previo**, y además **exige que el perfil ya esté desactivado**: así el borrado
+  irreversible tiene siempre un momento anterior en que la decisión se podía deshacer. Si la copia
+  falla, no se purga.
+- **Doble candado en la administración.** `/api/admin/*` exige **loopback Y** el PIN de administración
+  (`X-Admin-Pin`), y es **fail-closed**: sin PIN declarado la administración está deshabilitada, no
+  abierta. Ninguno de los dos basta solo — el PIN viaja en una cabecera y en una red compartida eso
+  es material expuesto; estar en el equipo sin el PIN no debería bastar para borrarle el historial a
+  nadie. El PIN es el que **ya existía** (V1.37) para la biblioteca de audio: lo que faltaba no era
+  otro secreto, sino **poder declararlo**, y ahora el lanzador lo guarda en su `config.json` (ignorado
+  por git) y lo declara en `ENGLISH_TUTOR_ADMIN_PIN` del entorno del backend que él mismo arranca.
+- **El lanzador gana la sección «Perfiles»**, que es donde el webmaster trabaja: contador de
+  pendientes con **refresco periódico** (para que «la solicitud llega al webmaster» sea verdad sin ir
+  a mirar), aprobar/rechazar con nota, crear perfil con PIN opcional, desactivar/reactivar, purgar con
+  confirmación por nombre y el estado del candado a la vista. `launcher/admin.py` es el **único** sitio
+  del lanzador que escribe en el producto, y lo hace por HTTP —no tocando la BD— para que el borrado
+  pase por el mismo sitio que todo lo demás.
+- **La app deja de «crear» y pasa a «pedir»**, y lo dice: «solicitud enviada; el webmaster tiene que
+  autorizarla desde el lanzador». Antes, la puerta de perfil ofrecía crear y **no** contaba que a
+  partir de ahora eso no basta.
+
+### Verificación
+
+- `pytest` backend **2967/2967** (0 skipped), launcher **205/205** (0 skipped), `vitest run`
+  **872/872** (100 ficheros), `tsc --noEmit` limpio, `npm run build` correcto (el `package.json`
+  del frontend queda en `3.77.0`; la versión que pinta la app la sirve `/api/health` desde
+  `backend/config.py`), `ruff` limpio en backend y launcher, i18n `--strict` **1581 claves / 0
+  huérfanas / 0 sin definir**, contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes**
+  (17 pares de acento reportados, no bloqueantes), `check_release_consistency` OK en los **6
+  orígenes** (`3.77.0`) y `validation_gate.py auto` **10/10**.
+- Tests nuevos: `backend/tests/test_retention_personal_v377.py` (retención léxica y su puente con la
+  evidencia), `backend/tests/test_profile_requests_v377.py` (la petición inerte, aprobar crea
+  **exactamente uno**, el doble candado, el borrado en dos pasos, el alta desde la LAN cerrada y el
+  perfil desactivado que no abre sesión), `frontend/src/api/profileRequests.test.ts` (la traducción de
+  desenlaces), `launcher/tests/test_admin_pin.py` y `launcher/tests/test_admin_client.py`.
+- `test_public_surface.py` declara la superficie nueva **sin sesión** y el candado muerde en las dos
+  direcciones: lo declarado responde sin sesión y lo declarado con sesión no sale sin ella.
+- **Corregido durante la verificación de la release (y por eso se cuenta):** la suite de documentación
+  detectable por deriva pedía que `launcher/admin.py` estuviera documentado en `ARQUITECTURA.md`, y los
+  packs de vocabulario estaban en una carpeta ignorada por git. Las dos cosas se arreglaron **antes**
+  de publicar; la segunda habría dejado el contenido de los temas fuera del repositorio.
+- **Un fallo real que encontró un test, no una lectura:** `core.apply_admin_config` declaraba en el
+  entorno el PIN *heredado* cuando la preferencia se retiraba, así que el botón «Retirar» del lanzador
+  decía «retirado» con la administración **todavía abierta**. Ahora retirar retira también del entorno
+  (`_declare_admin_pin`), y `test_admin_pin.py` lo fija.
+
+### Honestidad
+
+(i) **Los packs por tema son tres** (comida, viaje, trabajo) y no cubren un currículum: son un punto de
+partida, no una biblioteca. (ii) **FSRS-lite no es FSRS**: es una versión declarada y simplificada del
+planificador, con las mismas cuatro salidas y sin los parámetros por alumno que FSRS completo ajusta
+con el historial; llamarlo «FSRS» a secas daría más crédito del que tiene. (iii) **La retención no
+mide dominio**, y el evento está clasificado para que no lo parezca. (iv) **Esto no cierra el P0 de
+identidad por defecto:** un perfil sin PIN sigue entrando sin credencial, y sigue sin haber
+autenticación de persona; lo que cambia es que **crear y borrar perfiles ya no es algo que cualquiera
+en la red pueda hacer**. (v) **Desactivar sale del selector pero no protege los datos**: quien tenga
+una sesión abierta de ese perfil pierde el acceso (`403 PROFILE_DISABLED`), y la evidencia sigue en la
+BD hasta que se purgue. (vi) **Purgar es irreversible** y la copia previa es la única red; el ZIP no
+está cifrado. (vii) **La administración vive en el lanzador**: sin el lanzador delante, no hay forma de
+crear un perfil (es el precio declarado de no tener cuentas). (viii) **`POST /api/users` sigue
+existiendo** para el primer arranque del propio equipo: la frontera es el loopback, no la eliminación
+de la ruta. (ix) **Los 7 gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+`v3.75.8`. (x) **El orden de los pasos importa y está declarado**: la retención léxica se publica
+**junto** al control de perfiles, no antes, porque escribe vocabulario personal en la BD de un perfil.
+
 ## [3.76.0] — 2026-09-21
 
 **Release de PRODUCTO (minor) con la ÚNICA migración de BD del ciclo pre-V4.0: la columna `users.pin_hash` (`ALTER` idempotente, aditiva y con `DEFAULT ''`). Es la Fase 3 del P0 de identidad, y es una mitigación OPCIONAL que el alumno activa: un perfil sin PIN entra como siempre. SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** El árbol se congeló en `v3.75.8` y sus **7 gates siguen `pending`**: esta release **no** los toca ni los adelanta. Además, en la misma sesión se regeneraron los **9 dossiers de G7**, que resultaron **reproducibles byte a byte** sobre el árbol congelado.

@@ -68,6 +68,12 @@ async def open_session(
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    # V3.77: un perfil desactivado no abre sesión. Se comprueba **antes** del PIN
+    # a propósito: no tiene sentido gastar KDF en un perfil fuera de servicio, y
+    # el freno por perfil no debe contar intentos de algo que no puede entrar.
+    if user_service.is_disabled(user):
+        raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
+
     await _require_pin_if_set(body.user_id, body.pin)
 
     _set_session_cookie(response, request, sessions.issue(user["id"]))
@@ -109,6 +115,10 @@ async def read_session(request: Request) -> dict:
         # El perfil se borró con la sesión abierta: se responde igual que en el
         # resto de la API (404), no se finge una sesión válida.
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user_service.is_disabled(user):
+        # V3.77: desactivado es «no hay sesión que valga»; la UI desmonta la
+        # sesión y vuelve a la puerta de perfil, que ya no lo lista.
+        raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
     return user
 
 

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
+import type {
+  ProfileRequestFailure,
+  ProfileRequestOutcome,
+} from "../api/profileRequests";
 import { ProfileDialog } from "./ProfileDialog";
 import { UserAvatar } from "./UserAvatar";
 import { useI18n } from "../hooks/useI18n";
@@ -9,21 +13,30 @@ interface UserMenuProps {
   users: User[];
   currentUserId: string | null;
   onSelect: (id: string) => void;
-  onAdd: (name: string) => void;
+  /**
+   * V3.77: **pide** un perfil (ya no lo crea). El menú cuenta el desenlace en el
+   * propio desplegable porque no hay otra pantalla donde contarlo.
+   */
+  onRequest: (name: string) => Promise<ProfileRequestOutcome>;
   onEdit: (id: string, patch: UserPatch) => Promise<User | null>;
+  /** Pedir la baja del perfil de la sesión (el webmaster la resuelve). */
+  onRequestDelete?: (note: string) => Promise<ProfileRequestOutcome>;
 }
 
 export function UserMenu({
   users,
   currentUserId,
   onSelect,
-  onAdd,
+  onRequest,
   onEdit,
+  onRequestDelete,
 }: UserMenuProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
+  const [requested, setRequested] = useState(false);
+  const [failure, setFailure] = useState<ProfileRequestFailure | null>(null);
   const [editing, setEditing] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -51,12 +64,19 @@ export function UserMenu({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  function submit() {
+  async function submit() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    onAdd(trimmed);
-    setName("");
-    setAdding(false);
+    setFailure(null);
+    const outcome = await onRequest(trimmed);
+    if (outcome.ok) {
+      // Pedido, no creado: se dice a quién le toca ahora, en vez de dejar el
+      // desplegable como si el perfil ya existiera.
+      setRequested(true);
+      setName("");
+      return;
+    }
+    setFailure(outcome.reason);
   }
 
   return (
@@ -110,32 +130,49 @@ export function UserMenu({
               <input
                 className="field-input"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setFailure(null);
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") submit();
+                  if (e.key === "Enter") void submit();
                   if (e.key === "Escape") setAdding(false);
                 }}
                 placeholder={t("user.name")}
                 autoFocus
+                disabled={requested}
                 aria-label={t("user.name")}
               />
               <button
                 type="button"
                 className="dialog-primary"
-                onClick={submit}
-                disabled={!name.trim()}
+                onClick={() => void submit()}
+                disabled={!name.trim() || requested}
               >
-                {t("user.add")}
+                {t("user.requestProfile")}
               </button>
             </div>
           ) : (
             <button
               type="button"
               className="user-menu-action"
-              onClick={() => setAdding(true)}
+              onClick={() => {
+                setAdding(true);
+                setRequested(false);
+                setFailure(null);
+              }}
             >
-              + {t("user.newProfile")}
+              + {t("user.requestProfile")}
             </button>
+          )}
+
+          {failure && (
+            <p className="user-menu-note user-menu-note--error">
+              {t(requestErrorKey(failure))}
+            </p>
+          )}
+          {requested && (
+            <p className="user-menu-note">{t("user.requestSent")}</p>
           )}
 
           <button
@@ -157,10 +194,27 @@ export function UserMenu({
           user={current}
           onClose={() => setEditing(false)}
           onSave={(patch) => onEdit(current.id, patch)}
+          {...(onRequestDelete ? { onRequestDelete } : {})}
         />
       )}
     </div>
   );
+}
+
+/** Qué decir ante cada desenlace fallido de la petición (mismo criterio que la puerta). */
+function requestErrorKey(failure: ProfileRequestFailure): string {
+  switch (failure) {
+    case "duplicate":
+      return "user.requestDuplicate";
+    case "full":
+      return "user.requestFull";
+    case "throttled":
+      return "errors.rateLimited";
+    case "invalid":
+      return "user.requestInvalid";
+    default:
+      return "user.requestError";
+  }
 }
 
 function ChevronIcon() {

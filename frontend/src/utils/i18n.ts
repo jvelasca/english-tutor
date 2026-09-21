@@ -817,8 +817,156 @@ const STRINGS: Record<string, Entry> = {
     es: "No se pudo acceder al micrófono: ",
   },
   "dictionary.empty": {
-    en: "No words yet. Complete course objectives to grow your dictionary.",
-    es: "Aún no hay palabras. Completa objetivos del curso para hacer crecer tu diccionario.",
+    en: "No words yet. Add a word, paste a list, or activate a theme pack — or keep practising in the rest of the app.",
+    es: "Aún no hay palabras. Añade una, pega una lista o activa un tema — o sigue practicando en el resto de la app.",
+  },
+  "dictionary.practiceToday": {
+    en: "Practice today",
+    es: "Practicar hoy",
+  },
+  "dictionary.myLexicon": {
+    en: "My lexicon",
+    es: "Mi léxico",
+  },
+  "dictionary.retention.title": {
+    en: "Retention session",
+    es: "Sesión de retención",
+  },
+  "dictionary.retention.hint": {
+    en: "Quick flashcards with spaced repetition (FSRS). Grades only schedule the next review — they do not certify mastery.",
+    es: "Tarjetas rápidas con repetición espaciada (FSRS). Los grades solo programan el próximo repaso — no certifican dominio.",
+  },
+  "dictionary.retention.empty": {
+    en: "Nothing due right now. Add words or come back later.",
+    es: "Nada pendiente ahora. Añade palabras o vuelve más tarde.",
+  },
+  "dictionary.retention.start": {
+    en: "Start session ({n})",
+    es: "Empezar sesión ({n})",
+  },
+  "dictionary.retention.finished": {
+    en: "Session done — {n} cards reviewed.",
+    es: "Sesión terminada — {n} tarjetas repasadas.",
+  },
+  "dictionary.retention.back": {
+    en: "Back",
+    es: "Volver",
+  },
+  "dictionary.retention.flip": {
+    en: "Flip card",
+    es: "Voltear tarjeta",
+  },
+  "dictionary.retention.tapReveal": {
+    en: "Tap to reveal",
+    es: "Toca para revelar",
+  },
+  "dictionary.retention.reveal": {
+    en: "Show answer",
+    es: "Mostrar respuesta",
+  },
+  "dictionary.retention.noFace": {
+    en: "No translation cached yet — grade to schedule the review anyway.",
+    es: "Aún no hay traducción en caché — puedes graduar para programar el repaso.",
+  },
+  "dictionary.retention.exit": {
+    en: "End session",
+    es: "Terminar sesión",
+  },
+  "dictionary.add.section": {
+    en: "Add vocabulary",
+    es: "Añadir vocabulario",
+  },
+  "dictionary.add.wordTitle": {
+    en: "Single word",
+    es: "Palabra suelta",
+  },
+  "dictionary.add.wordPlaceholder": {
+    en: "English word",
+    es: "Palabra en inglés",
+  },
+  "dictionary.add.translationPlaceholder": {
+    en: "Translation (optional)",
+    es: "Traducción (opcional)",
+  },
+  "dictionary.add.wordCta": {
+    en: "Add",
+    es: "Añadir",
+  },
+  "dictionary.add.wordOk": {
+    en: "Added “{word}” to your personal dictionary.",
+    es: "Se añadió «{word}» a tu diccionario personal.",
+  },
+  "dictionary.add.listTitle": {
+    en: "Paste a list",
+    es: "Pegar una lista",
+  },
+  "dictionary.add.listHint": {
+    en: "One word per line. Optional: word,translation",
+    es: "Una palabra por línea. Opcional: palabra,traducción",
+  },
+  "dictionary.add.listNamePlaceholder": {
+    en: "List name",
+    es: "Nombre de la lista",
+  },
+  "dictionary.add.listPlaceholder": {
+    en: "airport\npassport, pasaporte\n…",
+    es: "airport\npassport, pasaporte\n…",
+  },
+  "dictionary.add.listCta": {
+    en: "Import list",
+    es: "Importar lista",
+  },
+  "dictionary.add.bulkOk": {
+    en: "Imported {n} words.",
+    es: "Se importaron {n} palabras.",
+  },
+  "dictionary.add.defaultList": {
+    en: "My list",
+    es: "Mi lista",
+  },
+  "dictionary.add.packsTitle": {
+    en: "Theme packs",
+    es: "Packs por tema",
+  },
+  "dictionary.add.packsHint": {
+    en: "Activate a pack to study its words with retention flashcards.",
+    es: "Activa un pack para estudiar sus palabras con tarjetas de retención.",
+  },
+  "dictionary.add.enroll": {
+    en: "Activate",
+    es: "Activar",
+  },
+  "dictionary.add.reenroll": {
+    en: "Refresh",
+    es: "Actualizar",
+  },
+  "dictionary.add.enrolled": {
+    en: "Active",
+    es: "Activo",
+  },
+  "dictionary.add.enrollOk": {
+    en: "Added {n} words from “{title}”.",
+    es: "Se añadieron {n} palabras de «{title}».",
+  },
+  "dictionary.add.myLists": {
+    en: "My lists",
+    es: "Mis listas",
+  },
+  "dictionary.add.error": {
+    en: "Could not save. Try again.",
+    es: "No se pudo guardar. Inténtalo de nuevo.",
+  },
+  "dictionary.lookup.addCta": {
+    en: "Add to Personal",
+    es: "Añadir a Personal",
+  },
+  "dictionary.lookup.addOk": {
+    en: "Added to your personal dictionary.",
+    es: "Añadida a tu diccionario personal.",
+  },
+  "dictionary.lookup.addError": {
+    en: "Could not add the word.",
+    es: "No se pudo añadir la palabra.",
   },
   // V3.38.1: pantalla dedicada del diccionario (ruta `/diccionario`), con las
   // mismas dos vistas que el conmutador incrustado de Vocabulary.
@@ -1540,24 +1688,46 @@ const STRINGS: Record<string, Entry> = {
   "user.profile": { en: "Profile", es: "Perfil" },
   "user.profiles": { en: "Profiles", es: "Perfiles" },
   "user.profileTitle": { en: "User profile", es: "Perfil de usuario" },
-  "user.newProfile": { en: "New profile", es: "Nuevo perfil" },
   "user.editProfile": { en: "Edit profile", es: "Editar perfil" },
   "user.name": { en: "Name", es: "Nombre" },
-  "user.add": { en: "Add", es: "Añadir" },
   // Puerta de perfil al arrancar en un navegador sin usuario definido.
   "user.chooseTitle": { en: "Choose your profile", es: "Elige tu perfil" },
   "user.choosePrompt": {
-    en: "Select a user or create a new one to start.",
-    es: "Selecciona un usuario o crea uno nuevo para empezar.",
+    en: "Select a user or ask for a new one to start.",
+    es: "Selecciona un usuario o pide uno nuevo para empezar.",
   },
   "user.noProfilesYet": {
-    en: "There are no profiles yet. Create the first one below.",
-    es: "Todavía no hay perfiles. Crea el primero abajo.",
+    en: "There are no profiles yet. Ask for the first one below.",
+    es: "Todavía no hay perfiles. Pide el primero abajo.",
   },
-  "user.createProfile": { en: "Create profile", es: "Crear perfil" },
-  "user.createError": {
-    en: "Could not create the profile. Is the server running?",
-    es: "No se pudo crear el perfil. ¿Está activo el servidor?",
+  // V3.77: un perfil nuevo lo autoriza el webmaster desde el lanzador, así que
+  // la app **pide** en vez de crear. Los textos lo dicen sin rodeos: quien lee
+  // «solicitud enviada» tiene que saber que todavía no puede entrar y a quién
+  // tiene que pedírselo.
+  "user.requestProfile": { en: "Ask for a profile", es: "Pedir un perfil" },
+  "user.requestHint": {
+    en: "A new profile is approved by the webmaster from the launcher, on the computer that runs the app.",
+    es: "Un perfil nuevo lo autoriza el webmaster desde el lanzador, en el equipo donde corre la app.",
+  },
+  "user.requestSent": {
+    en: "Request sent. The webmaster has to approve it from the launcher before you can use it.",
+    es: "Solicitud enviada. El webmaster tiene que autorizarla desde el lanzador para que puedas usarla.",
+  },
+  "user.requestDuplicate": {
+    en: "There is already a pending request with that name.",
+    es: "Ya hay una solicitud pendiente con ese nombre.",
+  },
+  "user.requestFull": {
+    en: "There are too many pending requests. Try again later.",
+    es: "Hay demasiadas solicitudes pendientes. Prueba más tarde.",
+  },
+  "user.requestInvalid": {
+    en: "That name is not valid.",
+    es: "Ese nombre no es válido.",
+  },
+  "user.requestError": {
+    en: "Could not send the request. Is the server running?",
+    es: "No se pudo enviar la solicitud. ¿Está activo el servidor?",
   },
 
   // PIN opcional por perfil (V3.76, Fase 3 del P0 de identidad).
@@ -1626,6 +1796,34 @@ const STRINGS: Record<string, Entry> = {
   "profile.saveError": {
     en: "Could not save the profile.",
     es: "No se pudo guardar el perfil.",
+  },
+  // V3.77: pedir la baja. Ni la app ni el alumno borran nada: la solicitud va al
+  // webmaster, y aprobarla **desactiva** (reversible). El texto no promete más de
+  // lo que pasa, porque el alumno ya no ve el final del proceso.
+  "profile.deleteSection": { en: "Remove this profile", es: "Dar de baja este perfil" },
+  "profile.deleteExplain": {
+    en: "The webmaster can remove this profile from the launcher. Your progress is kept unless the data is purged, which is a separate step.",
+    es: "El webmaster puede dar de baja este perfil desde el lanzador. Tu progreso se conserva salvo que se purgue, que es un paso aparte.",
+  },
+  "profile.requestDelete": {
+    en: "Ask to remove my profile",
+    es: "Pedir dar de baja mi perfil",
+  },
+  "profile.deleteSent": {
+    en: "Request sent. The webmaster will see it in the launcher.",
+    es: "Solicitud enviada. El webmaster la verá en el lanzador.",
+  },
+  "profile.deleteDuplicate": {
+    en: "You have already asked for this profile to be removed.",
+    es: "Ya has pedido dar de baja este perfil.",
+  },
+  "profile.deleteFull": {
+    en: "There are too many pending requests. Try again later.",
+    es: "Hay demasiadas solicitudes pendientes. Prueba más tarde.",
+  },
+  "profile.deleteError": {
+    en: "Could not send the request. Is the server running?",
+    es: "No se pudo enviar la solicitud. ¿Está activo el servidor?",
   },
 
   // Micrófono
@@ -2203,6 +2401,10 @@ const STRINGS: Record<string, Entry> = {
   "fsrs.whyReason.manual-review": {
     en: "manual review",
     es: "repaso manual",
+  },
+  "fsrs.whyReason.retention-import": {
+    en: "added for retention",
+    es: "añadida para retención",
   },
   "fsrs.whyReason.new": { en: "new card", es: "carta nueva" },
   "fsrs.whyReason.evidence": { en: "from evidence", es: "desde evidencia" },

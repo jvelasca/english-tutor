@@ -15,6 +15,13 @@ import type {
   DrillTransferContext,
   DrillWriteAttempt,
   Lexicon,
+  RetentionDue,
+  RetentionReviewResult,
+  VocabBulkAddResult,
+  VocabCollection,
+  VocabCollections,
+  VocabEnrollResult,
+  VocabItemAddResult,
 } from "../types/api";
 
 /** Léxico personal del alumno (V2.3): resumen + ítems con estado y recall. */
@@ -361,4 +368,81 @@ export function markDrillAbandoned(
   options: { targetId?: string; activity?: string } = {},
 ): Promise<boolean> {
   return markDrillDecisionEvent(_userId, decisionId, "abandoned", options);
+}
+
+/** Añade una palabra suelta al léxico personal + carta FSRS (sin mastery). */
+export function addVocabularyItem(
+  _userId: string,
+  word: string,
+  options: { translation?: string; collectionId?: number } = {},
+): Promise<VocabItemAddResult> {
+  return postJson<VocabItemAddResult>("/api/vocabulary/items", {
+    word,
+    translation: options.translation ?? "",
+    collection_id: options.collectionId ?? null,
+  });
+}
+
+/** Pega una lista de palabras (una por línea; opcional word,translation). */
+export function addVocabularyBulk(
+  _userId: string,
+  text: string,
+  options: { title?: string; collectionId?: number } = {},
+): Promise<VocabBulkAddResult> {
+  return postJson<VocabBulkAddResult>("/api/vocabulary/items/bulk", {
+    text,
+    title: options.title ?? "",
+    collection_id: options.collectionId ?? null,
+  });
+}
+
+export function listVocabCollections(
+  _userId: string,
+): Promise<VocabCollections> {
+  return getJson<VocabCollections>("/api/vocabulary/collections");
+}
+
+export function createVocabCollection(
+  _userId: string,
+  title: string,
+): Promise<VocabCollection> {
+  return postJson<VocabCollection>("/api/vocabulary/collections", { title });
+}
+
+export function enrollVocabCollection(
+  _userId: string,
+  collectionId: number,
+): Promise<VocabEnrollResult> {
+  return postJson<VocabEnrollResult>(
+    `/api/vocabulary/collections/${collectionId}/enroll`,
+    {},
+  );
+}
+
+/** Cola due de retención (sesión tarjetas estilo Anki). */
+export function getRetentionDue(
+  _userId: string,
+  options: { limit?: number; collectionId?: number } = {},
+): Promise<RetentionDue> {
+  const params = new URLSearchParams();
+  if (options.limit != null) params.set("limit", String(options.limit));
+  if (options.collectionId != null) {
+    params.set("collection_id", String(options.collectionId));
+  }
+  const q = params.toString();
+  return getJson<RetentionDue>(
+    `/api/vocabulary/retention/due${q ? `?${q}` : ""}`,
+  );
+}
+
+/** Grade 1–4 (Again/Hard/Good/Easy) → reprograma FSRS lexicon. */
+export function reviewRetentionCard(
+  _userId: string,
+  word: string,
+  grade: number,
+): Promise<RetentionReviewResult> {
+  return postJson<RetentionReviewResult>("/api/vocabulary/retention/review", {
+    word,
+    grade,
+  });
 }

@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { User } from "../types/api";
+import type {
+  ProfileRequestFailure,
+  ProfileRequestOutcome,
+} from "../api/profileRequests";
 import { UserAvatar } from "./UserAvatar";
 import { useI18n } from "../hooks/useI18n";
 import { isValidPin, sanitizePinInput } from "../utils/pin";
@@ -7,8 +11,12 @@ import { isValidPin, sanitizePinInput } from "../utils/pin";
 interface ProfileGateProps {
   users: User[];
   onSelect: (id: string) => void;
-  /** Crea un perfil nuevo; devuelve `false` si el backend no responde. */
-  onCreate: (name: string) => Promise<boolean>;
+  /**
+   * V3.77: **pide** un perfil nuevo (no lo crea). Devuelve el desenlace para que
+   * la puerta pueda decir qué pasó: quien pide un perfil puede no tener ninguno
+   * todavía, así que la pantalla es su único canal.
+   */
+  onRequest: (name: string) => Promise<ProfileRequestOutcome>;
   /**
    * V3.76: perfil que está esperando su PIN. Si viene, la puerta muestra el paso
    * de PIN en lugar de la lista. `null`/ausente = puerta normal.
@@ -25,19 +33,25 @@ interface ProfileGateProps {
 /**
  * Puerta de perfil al arrancar la app en un navegador donde no hay ningún
  * usuario definido (sin sesión abierta y varios perfiles, o ningún perfil
- * todavía). No se puede cerrar: el alumno elige un perfil existente o crea uno
- * nuevo —y con ello se abre la sesión en el servidor—; hasta entonces no tiene
- * sentido abrir el resto de la app (todo cuelga del perfil activo).
+ * todavía). No se puede cerrar: el alumno elige un perfil existente o **pide** uno
+ * nuevo; hasta entonces no tiene sentido abrir el resto de la app (todo cuelga
+ * del perfil activo).
  *
  * V3.76: si el perfil elegido tiene PIN, la puerta se queda en el **paso de
  * PIN**. Quién lo pide es el **servidor** (401 `PIN_REQUIRED`), no una
  * suposición del cliente: la lista puede estar desactualizada y `has_pin` solo
  * se usa para no lanzar un `POST` condenado en el arranque automático.
+ *
+ * V3.77: crear un perfil ya no es algo que la app haga —lo autoriza el webmaster
+ * desde el lanzador—, así que el formulario **pide** y lo dice. La solicitud no
+ * abre sesión ni crea nada: deja una fila que el webmaster verá. Por eso la
+ * pantalla cambia de estado a «pedido» en vez de desaparecer, y por eso explica
+ * a quién hay que pedirle el desbloqueo.
  */
 export function ProfileGate({
   users,
   onSelect,
-  onCreate,
+  onRequest,
   pinUser = null,
   pinFeedback = null,
   onSubmitPin,
@@ -46,7 +60,8 @@ export function ProfileGate({
   const { t } = useI18n();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [failure, setFailure] = useState<ProfileRequestFailure | null>(null);
+  const [requested, setRequested] = useState(false);
   const [pin, setPin] = useState("");
   const [pinBusy, setPinBusy] = useState(false);
 
@@ -54,10 +69,16 @@ export function ProfileGate({
     const trimmed = name.trim();
     if (!trimmed || busy) return;
     setBusy(true);
-    setError(false);
-    const ok = await onCreate(trimmed);
+    setFailure(null);
+    const outcome = await onRequest(trimmed);
     setBusy(false);
-    if (!ok) setError(true); // si ok, el perfil se crea y auto-selecciona
+    if (outcome.ok) {
+      // Pedido, no creado: no hay perfil al que abrir sesión, así que la puerta
+      // se queda y cuenta lo que falta (que el webmaster lo autorice).
+      setRequested(true);
+      return;
+    }
+    setFailure(outcome.reason);
   }
 
   async function submitPin() {
@@ -198,7 +219,7 @@ export function ProfileGate({
             }}
           >
             <label htmlFor="profile-gate-name" className="field-label">
-              {t("user.newProfile")}
+              {t("user.requestProfile")}
             </label>
             <div className="flex gap-2">
               <input
@@ -207,26 +228,58 @@ export function ProfileGate({
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
-                  setError(false);
+                  setFailure(null);
                 }}
                 placeholder={t("user.name")}
                 autoFocus
-                disabled={busy}
+                disabled={busy || requested}
                 aria-label={t("user.name")}
               />
               <button
                 type="submit"
                 className="dialog-primary"
-                disabled={!name.trim() || busy}
+                disabled={!name.trim() || busy || requested}
               >
-                {t("user.createProfile")}
+                {t("user.requestProfile")}
               </button>
             </div>
           </form>
 
-          {error && <p className="dialog-error">{t("user.createError")}</p>}
+          {failure && <p className="dialog-error">{t(requestErrorKey(failure))}</p>}
+
+          {requested && (
+            <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+              {t("user.requestSent")}
+            </p>
+          )}
+
+          {!requested && (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t("user.requestHint")}
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Qué decir ante cada desenlace fallido. Se traduce a una clave de i18n y no a
+ * texto aquí dentro: las frases viven todas en `utils/i18n.ts`, que es donde se
+ * revisan juntas y donde el test de paridad las vigila.
+ */
+function requestErrorKey(failure: ProfileRequestFailure): string {
+  switch (failure) {
+    case "duplicate":
+      return "user.requestDuplicate";
+    case "full":
+      return "user.requestFull";
+    case "throttled":
+      return "errors.rateLimited";
+    case "invalid":
+      return "user.requestInvalid";
+    default:
+      return "user.requestError";
+  }
 }

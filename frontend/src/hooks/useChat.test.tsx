@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { User } from "../types/api";
 import { SessionPinError } from "../api/session";
+import type { ProfileRequestOutcome } from "../api/profileRequests";
 import { useChat } from "./useChat";
 
 vi.mock("../api/session", async (importOriginal) => {
@@ -43,9 +44,12 @@ vi.mock("../api/conversations", () => ({
   saveConversation: vi.fn(),
 }));
 vi.mock("../api/users", () => ({
-  createUser: vi.fn(),
   listUsers: vi.fn(),
   updateUser: vi.fn(),
+}));
+vi.mock("../api/profileRequests", () => ({
+  requestProfile: vi.fn(),
+  requestProfileDelete: vi.fn(),
 }));
 vi.mock("../api/progress", () => ({
   getProgressHistory: vi.fn().mockResolvedValue(null),
@@ -62,10 +66,13 @@ vi.mock("../api/learning", () => ({
 
 import { getSession, openSession } from "../api/session";
 import { listUsers } from "../api/users";
+import { requestProfile, requestProfileDelete } from "../api/profileRequests";
 
 const openSessionMock = vi.mocked(openSession);
 const getSessionMock = vi.mocked(getSession);
 const listUsersMock = vi.mocked(listUsers);
+const requestProfileMock = vi.mocked(requestProfile);
+const requestProfileDeleteMock = vi.mocked(requestProfileDelete);
 
 function user(id: string, name: string, hasPin = false): User {
   return {
@@ -191,5 +198,86 @@ describe("useChat · arranque con PIN (V3.76)", () => {
     expect(result.current.pinFeedback).toBeNull();
     expect(result.current.currentUserId).toBeNull();
     expect(openSessionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("useChat · pedir un perfil (V3.77)", () => {
+  it("pedir un perfil no lo crea ni abre sesión: deja la solicitud", async () => {
+    // La app dejó de crear perfiles: por LAN solo se puede **pedir**, y una
+    // solicitud no es un perfil. Si esto abriera sesión, la app se pintaría con
+    // un `currentUserId` que no existe y todas las peticiones darían 401.
+    listUsersMock.mockResolvedValue([]);
+    requestProfileMock.mockResolvedValue({
+      ok: true,
+      request: {
+        id: 1,
+        kind: "create",
+        display_name: "Ana",
+        user_id: "",
+        note: "",
+        requested_at: "2026-09-21T22:00:00Z",
+        status: "pending",
+        decided_at: "",
+        decided_note: "",
+        resolved_user_id: "",
+      },
+    });
+
+    const { result } = await boot();
+    let outcome: ProfileRequestOutcome | undefined;
+    await act(async () => {
+      outcome = await result.current.requestProfileForGate("  Ana  ");
+    });
+
+    expect(requestProfileMock).toHaveBeenCalledWith("Ana");
+    expect(outcome).toEqual({ ok: true, request: expect.objectContaining({ id: 1 }) });
+    expect(openSessionMock).not.toHaveBeenCalled();
+    expect(result.current.currentUserId).toBeNull();
+    expect(result.current.users).toEqual([]);
+  });
+
+  it("un nombre ya pedido se cuenta como tal, no como error del servidor", async () => {
+    listUsersMock.mockResolvedValue([]);
+    requestProfileMock.mockResolvedValue({ ok: false, reason: "duplicate" });
+
+    const { result } = await boot();
+    let outcome: ProfileRequestOutcome | undefined;
+    await act(async () => {
+      outcome = await result.current.requestProfileForGate("Ana");
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: "duplicate" });
+  });
+
+  it("sin nombre se propone el siguiente nombre por defecto", async () => {
+    // En la cola del webmaster «Usuario 2» es más útil que una fila vacía.
+    listUsersMock.mockResolvedValue([user("b", "Usuario")]);
+    requestProfileMock.mockResolvedValue({ ok: true, request: {} as never });
+
+    const { result } = await boot();
+    await act(async () => {
+      await result.current.requestProfileForGate("   ");
+    });
+
+    expect(requestProfileMock).toHaveBeenCalledWith("Usuario 2");
+  });
+
+  it("pedir la baja no borra nada: solo registra la solicitud", async () => {
+    listUsersMock.mockResolvedValue([BETO]);
+    requestProfileDeleteMock.mockResolvedValue({
+      ok: true,
+      request: { id: 9, kind: "delete", status: "pending" } as never,
+    });
+
+    const { result } = await boot();
+    let outcome: ProfileRequestOutcome | undefined;
+    await act(async () => {
+      outcome = await result.current.requestProfileRemoval("ya no lo uso");
+    });
+
+    expect(requestProfileDeleteMock).toHaveBeenCalledWith("ya no lo uso");
+    expect(outcome?.ok).toBe(true);
+    // El perfil sigue en la lista: la baja la resuelve el webmaster, no la app.
+    expect(result.current.users.map((u) => u.id)).toContain("b");
   });
 });

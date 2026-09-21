@@ -72,6 +72,12 @@ _PATH_LIMITS: dict[str, int] = {
     # familia tras un NAT comparte IP—: es la primera valla, para que una
     # máquina que barre PINs a toda velocidad ni siquiera llegue al KDF.
     "/api/session": 120,
+    # V3.77: pedir un perfil es la única escritura de la app que **no** exige
+    # sesión (quien la pide no tiene perfil todavía). Es una petición humana de
+    # teclado, no una ruta de sondeo, así que un cupo estrecho no molesta a nadie
+    # legítimo y convierte el barrido de la cola en algo caro. El tope de
+    # pendientes (`config.PROFILE_REQUEST_MAX_PENDING`) es la segunda valla.
+    "/api/profile-requests": 5,
 }
 
 _clients: dict[str, deque[float]] = defaultdict(deque)

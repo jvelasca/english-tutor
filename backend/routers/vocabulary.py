@@ -9,6 +9,7 @@ from starlette.concurrency import run_in_threadpool
 import config
 from dependencies import current_user, read_audio_limited
 from domain import learning as learning_service
+from domain import retention as retention_service
 from domain import vocabulary as vocabulary_service
 from repositories import decision_records as decision_records_repo
 from schemas.vocabulary import (
@@ -25,11 +26,22 @@ from schemas.vocabulary import (
     RecognitionAttemptIn,
     RecognitionAttemptOut,
     RecognitionQuestionOut,
+    RetentionDueOut,
+    RetentionReviewIn,
+    RetentionReviewOut,
     SentenceAttemptOut,
     SentenceContextOut,
     TransferAttemptIn,
     TransferAttemptOut,
     TransferContextOut,
+    VocabBulkAddIn,
+    VocabBulkAddOut,
+    VocabCollectionCreateIn,
+    VocabCollectionOut,
+    VocabCollectionsOut,
+    VocabEnrollOut,
+    VocabItemAddIn,
+    VocabItemAddOut,
     VocabularyAnalyzeRequest,
     VocabularyAnalyzeResponse,
     VocabularyEventOut,
@@ -670,3 +682,95 @@ async def drill_decision_lifecycle(
         "decision_id": body.decision_id,
         "event": body.event,
     }
+
+
+# --- Retención Personal (ingestión + sesión tarjetas) ---------------------
+
+
+@router.post("/api/vocabulary/items", response_model=VocabItemAddOut)
+async def add_vocabulary_item(
+    body: VocabItemAddIn, user: dict = Depends(current_user)
+) -> dict:
+    """Añade una palabra suelta al léxico personal + carta FSRS (sin mastery)."""
+    result = await retention_service.add_item(
+        user["id"],
+        body.word,
+        translation=body.translation,
+        collection_id=body.collection_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Palabra no válida")
+    return result
+
+
+@router.post("/api/vocabulary/items/bulk", response_model=VocabBulkAddOut)
+async def add_vocabulary_bulk(
+    body: VocabBulkAddIn, user: dict = Depends(current_user)
+) -> dict:
+    """Pega una lista de palabras (una por línea; opcional word,translation)."""
+    result = await retention_service.add_bulk(
+        user["id"],
+        body.text,
+        title=body.title,
+        collection_id=body.collection_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Lista no válida")
+    return result
+
+
+@router.get("/api/vocabulary/collections", response_model=VocabCollectionsOut)
+async def list_vocab_collections(user: dict = Depends(current_user)) -> dict:
+    return await retention_service.list_collections(user["id"])
+
+
+@router.post(
+    "/api/vocabulary/collections", response_model=VocabCollectionOut
+)
+async def create_vocab_collection(
+    body: VocabCollectionCreateIn, user: dict = Depends(current_user)
+) -> dict:
+    result = await retention_service.create_collection(user["id"], body.title)
+    if result is None:
+        raise HTTPException(status_code=400, detail="No se pudo crear la lista")
+    return result
+
+
+@router.post(
+    "/api/vocabulary/collections/{collection_id}/enroll",
+    response_model=VocabEnrollOut,
+)
+async def enroll_vocab_collection(
+    collection_id: int, user: dict = Depends(current_user)
+) -> dict:
+    result = await retention_service.enroll_collection(user["id"], collection_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Colección no encontrada")
+    return result
+
+
+@router.get("/api/vocabulary/retention/due", response_model=RetentionDueOut)
+async def retention_due(
+    limit: int = Query(20, ge=1, le=20),
+    collection_id: int | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Cola due de cartas lexicon para la sesión de retención (estilo Anki)."""
+    return await retention_service.retention_due(
+        user["id"], limit=limit, collection_id=collection_id
+    )
+
+
+@router.post(
+    "/api/vocabulary/retention/review", response_model=RetentionReviewOut
+)
+async def retention_review(
+    body: RetentionReviewIn, user: dict = Depends(current_user)
+) -> dict:
+    """Grade 1–4 (Again/Hard/Good/Easy) → reprograma FSRS; evento informativo."""
+    result = await retention_service.retention_review(
+        user["id"], body.word, body.grade
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Review de retención no válido")
+    return result

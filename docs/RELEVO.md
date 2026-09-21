@@ -5,6 +5,64 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-21 (UTC+2).
 >
+> **Nota (2026-09-21 · cierre de la sesión de retención léxica y perfiles): V3.77.0 —
+> release DE PRODUCTO (minor) que publica DOS TRABAJOS BAJO UNA SOLA ETIQUETA: (A) la
+> retención léxica del diccionario personal y (B) los perfiles con autorización del
+> webmaster.** **CON migración de BD aditiva**: dos tablas nuevas de
+> colecciones/retención, la tabla `profile_requests` y la columna `users.status`
+> (`ALTER` idempotente con `DEFAULT 'active'`), así que **una BD de V3.76.0 se
+> actualiza sin que nadie pierda el acceso ni su vocabulario**. **SIN bump de
+> `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el currículum
+> (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar las evaluaciones y SIN tocar
+> `LISTENING_BANK_VERSION`.** No añade ni retira gate: **G1–G7 siguen `pending`**.
+> **(A) Lo que cambia en el diccionario personal:** el motor trabaja sobre **unidades
+> léxicas** (palabra **o frase funcional**, con su forma, su sentido y **el contexto
+> donde apareció**), no sobre palabras sueltas; lo trabajado en el resto de la app
+> llega como **candidato** con su procedencia y **el alumno decide** qué entra a la
+> cola; se añade de **tres formas** (palabra suelta, **lista pegada** y **pack por
+> tema**) que pasan por **una sola puerta** de validación/deduplicado/tope
+> (`repositories/vocabulary.py::seed_study_items`); los **packs** se mueven de
+> `backend/data/vocab_packs/` (**ignorado por git**: el contenido se habría quedado
+> fuera del repositorio) a `backend/curriculum/vocab_packs/`; la sesión de **tarjetas**
+> (`RetentionSession.tsx`) se programa con **FSRS-lite** declarado en `docs/FSRS.md`
+> (no un SM-2 improvisado) y **lo que toca hoy** es lógica pura con test; y —la
+> decisión de fondo— **retención ≠ dominio**: el evento de repaso entra en la evidencia
+> con **papel de retención** (`services/evidence.py`), no como prueba de competencia,
+> porque recordar tarjetas no puede subir la matriz de destrezas. **(B) Lo que cambia
+> en perfiles:** el **webmaster no es un rol, es quien ejecuta el lanzador** (siguen sin
+> haber cuentas, contraseñas ni roles, y `PARKED.md` sigue mandando); el alumno **pide**
+> (`POST /api/profile-requests` **sin sesión** —quien pide un perfil todavía no tiene
+> ninguno— y `POST /api/profile-requests/delete` **con sesión** y sin `{id}` en la ruta)
+> y el webmaster decide **desde el lanzador**; una petición es **inerte** (no crea ni
+> borra nada); el **alta anónima por LAN se cierra** (`POST /api/users` exige
+> **loopback**, porque hasta V3.76 cualquier equipo de la red podía crear perfiles en la
+> BD del alumno); el borrado va **en dos pasos** —**desactivar** (sale del selector, no
+> abre sesión: **`403 PROFILE_DISABLED`**, evidencia intacta, reversible) y **purgar**
+> como acto aparte con **nombre exacto**, **snapshot ZIP previo** y **exigencia de que
+> ya esté desactivado**, y si la copia falla **no se purga**—; `/api/admin/*` lleva
+> **doble candado** (**loopback Y** PIN de administración `X-Admin-Pin`) y es
+> **fail-closed** (sin PIN, deshabilitado, no abierto); y el lanzador gana la sección
+> **«Perfiles»** (pendientes con contador y refresco periódico, aprobar/rechazar,
+> crear con PIN, desactivar/reactivar, purgar, y el estado del candado a la vista),
+> con `launcher/admin.py` como **único** sitio del lanzador que escribe en el producto y
+> **por HTTP** (no tocando la BD). **La app ya no «crea» perfiles: los «pide», y lo
+> dice** («solicitud enviada; el webmaster tiene que autorizarla desde el lanzador»).
+> **Lo que NO cierra, y es lo que hay que leer:** **no hay autenticación de persona** y
+> un perfil sin PIN sigue entrando sin credencial; **desactivar saca del selector y
+> corta el acceso, pero no protege los datos** (la evidencia sigue en la BD hasta que se
+> purgue); **purgar es irreversible** y el ZIP **no está cifrado**; **la administración
+> vive en el lanzador**, así que sin el lanzador delante **nadie crea un perfil** (es el
+> precio declarado de no tener cuentas); el PIN es **credencial compartida**, no por
+> persona; **`POST /api/users` sigue existiendo** para el primer arranque del propio
+> equipo (la frontera es el loopback, no la eliminación de la ruta); los **packs por
+> tema son tres** (comida, viaje, trabajo) y no cubren un currículum; **FSRS-lite no es
+> FSRS** (mismas cuatro salidas, sin los parámetros por alumno del completo); y el
+> `dist` **no se versiona** (hay que recompilar y reiniciar para ver la UI nueva). **Los
+> 7 gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+> `v3.75.8`: ver la sección **«Re-congelación»** de
+> `docs/audit/KIT-VALIDACION-GATES.md`. Detalle completo en
+> **`release-notes-v3.77.0.md`**.
+>
 > **Nota (2026-09-21 · cierre de la sesión del P0): V3.76.0 — release DE PRODUCTO
 > (minor) con el PIN opcional por perfil (Fase 3 del P0 de identidad) y con G7
 > preparado.** **CON migración de BD** —la única del ciclo pre-V4.0—: `users` gana

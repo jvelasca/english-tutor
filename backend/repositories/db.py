@@ -74,7 +74,14 @@ def init_db() -> None:
                 -- atrás: los perfiles anteriores a esta columna entran como
                 -- siempre. El valor en claro no se guarda nunca (ver
                 -- `services/pins.py`) y la columna no se serializa en la API.
-                pin_hash TEXT NOT NULL DEFAULT ''
+                pin_hash TEXT NOT NULL DEFAULT '',
+                -- V3.77: `active` | `disabled`. **No** es un rol (el webmaster
+                -- no es un perfil: es quien ejecuta el lanzador, ver
+                -- `agentes/v377-perfiles-webmaster.md`); es el estado de
+                -- servicio del perfil. Desactivar es la mitad reversible de un
+                -- borrado: el perfil desaparece del selector y no puede abrir
+                -- sesión, pero su evidencia sigue intacta y se puede reactivar.
+                status TEXT NOT NULL DEFAULT 'active'
             )
             """
         )
@@ -862,6 +869,13 @@ def init_db() -> None:
         if "pin_hash" not in user_cols:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN pin_hash TEXT NOT NULL DEFAULT ''"
+            )
+        # V3.77: estado de servicio del perfil. Una BD anterior a esta columna
+        # recibe `active` en todas sus filas, que es exactamente lo que eran:
+        # esta migración no desactiva a nadie.
+        if "status" not in user_cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
             )
 
         # V3.25 (F-K7/P2-01, fase 6): renombrado canónico de los contadores de
@@ -1727,6 +1741,103 @@ def init_db() -> None:
             "ON grammar_route_attempts(user_id)"
         )
 
+        # Colecciones léxicas (retención Personal): packs temáticos globales
+        # (`user_id` = '' vacío) y listas del alumno. Los ítems del catálogo
+        # viven en `vocab_collection_items`; la membresía del alumno (palabra ↔
+        # colección) en `vocab_collection_membership`. Activar un pack
+        # materializa filas en `vocabulary` + carta FSRS `lexicon` sin escribir
+        # mastery/Assessment.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vocab_collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL DEFAULT '',
+                kind TEXT NOT NULL,
+                slug TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                title_es TEXT NOT NULL DEFAULT '',
+                cefr_hint TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                UNIQUE (user_id, slug)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vocab_collection_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                collection_id INTEGER NOT NULL,
+                word TEXT NOT NULL,
+                lemma TEXT NOT NULL DEFAULT '',
+                translation TEXT NOT NULL DEFAULT '',
+                pos TEXT NOT NULL DEFAULT '',
+                order_index INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (collection_id, word),
+                FOREIGN KEY (collection_id) REFERENCES vocab_collections(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vocab_collection_membership (
+                user_id TEXT NOT NULL,
+                collection_id INTEGER NOT NULL,
+                word TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, collection_id, word),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (collection_id) REFERENCES vocab_collections(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vocab_collection_enrollments (
+                user_id TEXT NOT NULL,
+                collection_id INTEGER NOT NULL,
+                enrolled_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, collection_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (collection_id) REFERENCES vocab_collections(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vocab_collection_items_coll "
+            "ON vocab_collection_items(collection_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vocab_membership_user "
+            "ON vocab_collection_membership(user_id, collection_id)"
+        )
+
+        # V3.77: solicitudes de perfil. Son **estado del producto**, no un aviso
+        # efímero: por eso viven en la BD y no en un fichero suelto — sobreviven
+        # a reinicios, viajan en el backup y el lanzador (que ya abre esta BD en
+        # solo-lectura) puede contar las pendientes antes de que el backend
+        # conteste. Una solicitud es **inerte**: pedir no crea ni borra nada;
+        # solo el webmaster resuelve, y solo desde el lanzador.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS profile_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                display_name TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                requested_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                decided_at TEXT NOT NULL DEFAULT '',
+                decided_note TEXT NOT NULL DEFAULT '',
+                resolved_user_id TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_profile_requests_status "
+            "ON profile_requests(status, requested_at)"
+        )
+
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
         if default is None:
@@ -1744,6 +1855,14 @@ def init_db() -> None:
         _migrate_conversations_fk(conn)
         _migrate_pronunciation_fk(conn)
         _migrate_certificates_table(conn)
+
+    # Packs temáticos globales (idempotente; sin usuario).
+    try:
+        from repositories import collections as collections_repo
+
+        collections_repo.ensure_theme_packs_seeded()
+    except Exception:  # noqa: BLE001 — init nunca debe fallar por packs
+        pass
 
 
 def _has_user_fk(conn: sqlite3.Connection, table: str) -> bool:

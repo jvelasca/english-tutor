@@ -13,19 +13,50 @@ async def require_admin(
 ) -> None:
     """Candado local de administración (V1.37; fail-closed desde ADMIN-01 V3.19).
 
-    Secure-by-default: si `config.ADMIN_PIN` está vacío, los endpoints admin quedan
-    DESHABILITADOS (401) porque no hay secreto configurado con el que autenticarse.
-    Con `ADMIN_PIN` definido, exige la cabecera `X-Admin-Pin` coincidente. Sin
-    OAuth/cloud: separa `student` (aprender) de `admin` (gestionar
-    audio/curriculum/diagnostics). Nunca abre la gestión por defecto (fail-open).
+    Secure-by-default: si el PIN de administración está vacío, los endpoints admin
+    quedan DESHABILITADOS (401) porque no hay secreto configurado con el que
+    autenticarse. Con PIN definido, exige la cabecera `X-Admin-Pin` coincidente.
+    Sin OAuth/cloud: separa el rol `student` (aprender) del rol `admin`
+    (gestionar audio, copias y, desde V3.77, perfiles). Nunca abre la gestión por
+    defecto (fail-open).
+
+    V3.77: el PIN ya no sale solo de una constante sin fuente —
+    `config.admin_pin()` resuelve entorno primero—, así que el lanzador puede
+    declararlo al arrancar el backend que él mismo lanza.
     """
-    if not config.ADMIN_PIN:
+    admin_pin = config.admin_pin()
+    if not admin_pin:
         raise HTTPException(
             status_code=401,
             detail="Administración deshabilitada (configurar ADMIN_PIN)",
         )
-    if x_admin_pin != config.ADMIN_PIN:
+    if x_admin_pin != admin_pin:
         raise HTTPException(status_code=401, detail="PIN de administración requerido")
+
+
+async def require_admin_local(
+    request: Request,
+    x_admin_pin: str | None = Header(default=None),
+) -> None:
+    """`require_admin` **más** la frontera de equipo (V3.77).
+
+    La usan las acciones que gestionan perfiles (crear, desactivar, purgar), que
+    son las más destructivas de la app: purgar se lleva la evidencia entera de un
+    alumno. Dos candados en serie, porque cubren cosas distintas — el PIN es
+    «quién eres» y el loopback es «desde dónde» — y ninguno de los dos basta
+    solo: un PIN que viaja por la LAN está expuesto, y estar en el equipo sin el
+    PIN no debería bastar para borrarle el historial a nadie.
+
+    Fail-closed en las dos direcciones: sin PIN configurado no pasa (lo decide
+    `require_admin`), y con el PIN correcto pero desde fuera del equipo tampoco.
+    """
+    await require_admin(x_admin_pin=x_admin_pin)
+    client_host = request.client.host if request.client else None
+    if not config.is_admin_loopback_host(client_host):
+        raise HTTPException(
+            status_code=403,
+            detail="La administración de perfiles solo se ejerce desde el equipo",
+        )
 
 
 async def current_user(request: Request) -> dict:
@@ -47,6 +78,12 @@ async def current_user(request: Request) -> dict:
     user = await user_service.get_user(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user_service.is_disabled(user):
+        # V3.77: un perfil desactivado deja de poder usar su sesión, aunque la
+        # cookie siga siendo válida — desactivar tiene que surtir efecto **ya**,
+        # no cuando caduque la sesión. Se distingue de `SESSION_REQUIRED` para
+        # que la UI pueda decir por qué y no parezca que se ha caído la conexión.
+        raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
     return user
 
 

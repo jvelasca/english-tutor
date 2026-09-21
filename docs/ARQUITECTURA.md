@@ -327,9 +327,10 @@ launcher/
 ├── core.py              # lógica pura: rutas, comandos de arranque, normalización de estado
 ├── process_manager.py   # prepara el entorno (cert TLS + build si falta) y gestiona uvicorn
 ├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
+├── admin.py             # escritura de administración: cliente de `/api/admin/*` (V3.77)
 ├── browser_cookies.py   # diagnóstico de cookies de Chrome/Edge/Brave/Vivaldi/Opera/Firefox
 ├── state_store.py       # persistencia visual: tamaño/posición de ventana y paneles
-├── config_store.py      # persistencia de preferencias: modo LAN (config.json, V3.75.3)
+├── config_store.py      # persistencia de preferencias: modo LAN + PIN admin (config.json)
 ├── make_icon.ps1        # genera icon.ico (System.Drawing, Windows)
 ├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
 ├── allow-firewall.ps1   # abre TCP 8000 (API + UI) en el firewall (requiere admin)
@@ -337,12 +338,13 @@ launcher/
 ├── pyproject.toml       # configuración de ruff (mismas reglas que el backend)
 ├── logs/                # logs de backend/UI (gitignored)
 ├── state.json           # estado de la UI persistido (gitignored)
-├── config.json          # preferencias persistidas: modo LAN (gitignored, V3.75.3)
+├── config.json          # preferencias: modo LAN + PIN admin (gitignored, V3.77)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
                          #         test_ui/test_state_store/test_config_store/
                          #         test_process_manager/test_preflight_v373/
-                         #         test_lan_ip_v373/test_lan_mode) — 161
-                         #         funciones de test (178 casos con parametrización), en CI
+                         #         test_lan_ip_v373/test_lan_mode/
+                         #         test_admin_pin/test_admin_client) — 188
+                         #         funciones de test (205 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 
@@ -358,6 +360,12 @@ launcher/
   producto** (uvicorn), con matado del árbol de procesos en Windows (`taskkill /T /F`).
 - **`status.py`**: obtiene el estado real: `/api/health/dependencies` (HTTP) y consultas de
   solo lectura a la BD SQLite (contadores globales y usuarios).
+- **`admin.py`** (V3.77): el **único** sitio del launcher que escribe en el producto. Habla
+  con `/api/admin/*` con el PIN en la cabecera `X-Admin-Pin`, y devuelve `AdminResult` en vez
+  de lanzar, para que la GUI pueda enseñar «no se pudo» sin que se le caiga el hilo. No toca
+  la BD directamente aunque tenga el fichero a mano: el borrado de un perfil tiene que pasar
+  por el mismo sitio que el resto (validación, copia previa, tabla de solicitudes) o habría dos
+  definiciones de «purgar» y la del launcher sería la que nadie prueba.
 - **`browser_cookies.py`**: diagnóstico (solo lectura) de las cookies de los navegadores
   soportados, para orientar problemas de acceso local. Informa de **si hay sesión**
   (`et_session`) y **enmascara su valor**: es un token firmado y verlo en pantalla sería
@@ -365,11 +373,14 @@ launcher/
 - **`state_store.py`**: persistencia de la disposición visual (tamaño/posición de ventana y
   paneles colapsados) en `state.json`.
 - **`config_store.py`** (V3.75.3): persistencia de las **preferencias** del launcher en
-  `config.json`, separada del estado visual a propósito. Hoy guarda una sola: el modo LAN
-  (`{"lan": false}` por defecto, fail-closed). Se lee **al arrancar**, antes de construir la
-  interfaz (`LauncherApp.__init__` → `core.apply_lan_config`), y se escribe **en cada cambio**
-  (`toggle_lan_mode`), no al cerrar: reabrir el launcher conserva el modo declarado y el panel
-  de acceso ya lo muestra. Reexpone la decisión de §5.8 de
+  `config.json`, separada del estado visual a propósito. Hoy guarda dos: el modo LAN
+  (`{"lan": false}` por defecto, fail-closed) y el **PIN de administración** (`{"admin_pin":
+  ""}`, también fail-closed, V3.77). Se lee **al arrancar**, antes de construir la interfaz
+  (`LauncherApp.__init__` → `core.apply_lan_config` / `core.apply_admin_config`), y se escribe
+  **en cada cambio** (`toggle_lan_mode`, `set_admin_pin`), no al cerrar: reabrir el launcher
+  conserva el modo declarado y el panel de acceso ya lo muestra. El PIN se declara además en el
+  entorno para que `backend_env()` lo herede al arrancar uvicorn: sin eso, el launcher tendría
+  un PIN y el backend otro. Reexpone la decisión de §5.8 de
   `docs/audit/PLAN-P0-IDENTIDAD.md`; el detalle y su porqué están ahí.
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
   puerto en el firewall.
@@ -492,6 +503,29 @@ del alumno (`/api/settings`, `/api/profile`, `/api/progress`, `/api/conversation
 secreto del perfil). **Exigen PIN de administración**
 (`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*` y
 `/api/system/restore`.
+
+**V3.77 — la única escritura sin sesión, y por qué se acepta.**
+`POST /api/profile-requests` responde **sin sesión** porque quien pide un perfil
+todavía no tiene ninguno: exigirle identidad para pedir identidad sería un círculo.
+Se acepta con cuatro acotaciones, todas activas y con test propio
+(`backend/tests/test_profile_requests_v377.py`): cupo estrecho por IP
+(`security._PATH_LIMITS`, 5/min), tope de pendientes (20), una petición por nombre
+y longitudes máximas. Y sobre todo: **es inerte** — registra una fila y **no crea
+ningún perfil**, no toca la evidencia de nadie y solo el webmaster, desde el
+lanzador, la resuelve. Lo peor que consigue quien la llame es que el webmaster vea
+una petición que puede rechazar. La de baja (`POST /api/profile-requests/delete`)
+**sí** exige sesión, y no lleva `{id}` en la ruta: no existe la forma de pedir la
+baja del perfil de otro.
+
+**V3.77 — la administración de perfiles es local por construcción.**
+`/api/admin/*` (crear, desactivar, purgar y resolver solicitudes) exige **dos**
+llaves: el PIN de administración **y** que la petición llegue del propio equipo
+(`dependencies.require_admin_local`). El PIN, además, deja de salir solo de una
+constante sin fuente: `config.admin_pin()` lee `ENGLISH_TUTOR_ADMIN_PIN`, que es
+como lo declara el lanzador al arrancar el backend. Sigue siendo **fail-closed**:
+sin PIN declarado, la administración está deshabilitada, no abierta. Y `POST
+/api/users` deja de ser un alta abierta por LAN: crear un perfil es una decisión
+del webmaster; por la red se pasa a **solicitar**.
 
 Cuando llegue la **Fase 3** (autenticación real), cada ruta de la primera lista
 recibe su credencial o pasa a admin; hasta entonces la lista está escrita aquí y

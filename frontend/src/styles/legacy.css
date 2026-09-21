@@ -2207,6 +2207,20 @@ body.is-resizing {
   box-shadow: 0 0 0 3px var(--color-accent-ring);
 }
 
+/* V3.77: desenlace de «pedir un perfil» dentro del desplegable. Vive aquí y no
+   en un diálogo porque el menú es el único sitio donde se cuenta: si la
+   solicitud se queda sin respuesta visible, parece que no pasó nada. */
+.user-menu-note {
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-dim);
+}
+
+.user-menu-note--error {
+  color: var(--color-danger, #dc2626);
+}
+
 /* Selector de modelo IA con favorito (desplegable personalizado). */
 .model-picker {
   position: relative;

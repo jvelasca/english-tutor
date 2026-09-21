@@ -185,3 +185,88 @@ def test_backend_failure_hint_devuelve_none_si_no_reconoce():
     """Sin firma conocida se devuelve None: no se inventa un diagnóstico."""
     assert ui.backend_failure_hint("INFO: todo fue bien\n") is None
     assert ui.backend_failure_hint("") is None
+
+
+# --- Perfiles (V3.77): el webmaster lee la cola en el lanzador -----------------
+
+
+def test_pending_summary_concuerda_en_singular_y_plural():
+    assert ui.pending_summary(0) == "Sin solicitudes pendientes"
+    assert ui.pending_summary(1) == "1 solicitud pendiente"
+    # Un contador negativo no existe, pero si llegara no puede decir «-1 solicitud».
+    assert ui.pending_summary(-3) == "Sin solicitudes pendientes"
+    assert ui.pending_summary(4) == "4 solicitudes pendientes"
+
+
+def test_la_seccion_perfiles_tiene_icono_y_etiquetas_de_estado():
+    """La sección se pinta desde `SECTION_ICONS`: sin clave, sale sin icono."""
+    assert "Perfiles" in ui.SECTION_ICONS
+    assert ui.PROFILE_STATUS_LABELS["active"] == "Activo"
+    assert ui.PROFILE_STATUS_LABELS["disabled"] == "Desactivado"
+    assert set(ui.REQUEST_KIND_LABELS) == {"create", "delete"}
+
+
+def test_request_row_de_una_alta_muestra_el_nombre_y_la_nota():
+    kind, target, when = ui.request_row(
+        {
+            "kind": "create",
+            "display_name": "Marta",
+            "note": "3.º ESO",
+            "requested_at": "2026-09-21T22:34:00Z",
+        }
+    )
+
+    assert kind == "🆕 Alta"
+    assert target == "Marta — 3.º ESO"
+    assert when == "2026-09-21 22:34"
+
+
+def test_request_row_de_una_baja_traduce_el_id_a_nombre():
+    """El webmaster decide sobre un nombre, no sobre un identificador."""
+    kind, target, _ = ui.request_row(
+        {"kind": "delete", "user_id": "abc123", "requested_at": "2026-09-21T10:00:00Z"},
+        {"abc123": "Marta"},
+    )
+
+    assert kind == "🗑️ Baja"
+    assert target == "Marta"
+
+
+def test_request_row_de_una_baja_de_un_perfil_que_ya_no_esta():
+    """Ni un id crudo en pantalla: se dice que el perfil ya no existe."""
+    _, target, _ = ui.request_row({"kind": "delete", "user_id": "abc123"}, {})
+
+    assert target == "(perfil que ya no existe)"
+
+
+def test_request_row_de_un_tipo_desconocido_no_se_traga_la_fila():
+    """Un `kind` nuevo del backend tiene que verse, no desaparecer."""
+    kind, _, _ = ui.request_row({"kind": "traslado"})
+
+    assert kind == "traslado"
+
+
+def test_profile_row_informa_del_pin_sin_ensenarlo():
+    fila = ui.profile_row(
+        {
+            "name": "Marta",
+            "status": "disabled",
+            "has_pin": True,
+            "created_at": "2026-09-21T22:34:00Z",
+        }
+    )
+
+    assert fila == ("👤 Marta", "Desactivado", "🔑 Con PIN", "2026-09-21 22:34")
+    # Y un perfil sin credencial lo dice explícitamente: es una consecuencia
+    # declarada que el webmaster debe poder ver de un vistazo.
+    assert ui.profile_row({"name": "Luis", "has_pin": False})[2] == "Sin PIN"
+
+
+def test_admin_state_label_dice_las_dos_caras_del_candado():
+    habilitada = ui.admin_state_label(True)
+    cerrada = ui.admin_state_label(False)
+
+    assert "habilitada" in habilitada
+    assert "deshabilitada" in cerrada
+    # Y cierra diciendo qué hacer, no solo qué falta.
+    assert "PIN" in cerrada

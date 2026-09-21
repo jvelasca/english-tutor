@@ -20,6 +20,10 @@ class User(BaseModel):
     # V3.76 (Fase 3 del P0): ¿este perfil tiene PIN? La puerta necesita saber si
     # preguntarlo. Se expone el **booleano**, jamás el hash.
     has_pin: bool = False
+    # V3.77: `active` | `disabled`. La app y el selector solo ven perfiles
+    # activos (el repositorio los filtra), así que este campo lo lee el lanzador
+    # para poder mostrar y reactivar los desactivados.
+    status: str = "active"
     created_at: str
 
 

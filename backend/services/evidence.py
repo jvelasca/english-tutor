@@ -951,6 +951,10 @@ def classify_event_role(event_type: str, detail: str) -> str:
     event_type = (event_type or "").strip()
     detail = (detail or "").strip()
     if event_type != "exercise" or not detail.startswith("drill:"):
+        # Sesión de retención Personal: grade FSRS etiquetado, no acredita
+        # mastery/Assessment (D5/E3). `retention:<word>:<1-4>`.
+        if event_type == "exercise" and detail.startswith("retention:"):
+            return "informative"
         return "telemetry"
     parts = detail[len("drill:") :].split(":")
     outcome = parts[-1] if parts else ""

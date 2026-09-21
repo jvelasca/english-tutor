@@ -1323,6 +1323,85 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   `docs/audit/`, la próxima campaña tendrá que volver a derivarla de los
   artefactos. `[VALIDACIÓN]`
 
+## V3.77.0 — retención léxica del diccionario personal y perfiles con autorización del webmaster (2026-09-21)
+
+> Origen: dos peticiones del gerente en la misma sesión —(a) que el diccionario
+> **personal** sirviera para **añadir** vocabulario (palabra suelta, lista o tema) y
+> **practicarlo** con enfoque de tarjetas para retención a largo plazo, mirando a
+> Anki/Memrise/Drops/Lingvist; (b) que los **perfiles** se creen y se borren **desde
+> el lanzador**, con la solicitud del alumno llegando al **webmaster** y siendo él
+> quien autoriza—. Decisiones: unidades léxicas, FSRS-lite, «añadir a personal» como
+> acto explícito, petición **inerte**, **desactivar** antes de **purgar**, y
+> administración con **doble candado** (loopback + PIN) **fail-closed**. Corrección
+> registrada en `agentes/v377-perfiles-webmaster.md` §4bis: el candado es el **PIN**
+> de V1.37 (declarado por el lanzador), no un token nuevo en fichero. Notas en
+> `release-notes-v3.77.0.md`.
+
+### Cerrado en V3.77.0 (deja de ser deuda)
+
+- **El diccionario personal deja de ser un archivo y pasa a ser un plan.** Se
+  guardan **unidades léxicas** (palabra **o frase funcional**, con forma, sentido y
+  **contexto**), se añaden de tres formas por **una sola puerta** y se repasan con
+  una sesión de tarjetas programada por **FSRS-lite** (`docs/FSRS.md`).
+- **Retención ≠ dominio, y está en el código.** El evento de repaso entra en la
+  evidencia con **papel de retención** (`services/evidence.py`), no como prueba de
+  competencia: recordar tarjetas no puede subir la matriz de destrezas.
+- **Los packs de vocabulario son contenido versionado.** Estaban en
+  `backend/data/vocab_packs/` (**ignorado por git**), así que el contenido se
+  habría quedado **fuera del repositorio y de la release**; pasan a
+  `backend/curriculum/vocab_packs/`. Se descubrió al verificar la release.
+- **El alta de perfiles desde la LAN deja de estar abierta.** `POST /api/users`
+  exige **loopback**: hasta V3.76 **cualquier equipo de la red podía crear perfiles**
+  en la BD del alumno. El primer arranque en el propio equipo sigue igual y los
+  tests visuales conservan su perfil `is_test`.
+- **El borrado de un perfil deja de ser un clic irreversible.**
+  **Desactivar** primero (sale del selector, no abre sesión: `403
+  PROFILE_DISABLED`, evidencia intacta y reactivable) y **purgar** después como acto
+  aparte, con **nombre exacto**, **snapshot ZIP previo** y la exigencia de que el
+  perfil **ya esté desactivado**; si la copia falla, **no se purga**.
+- **La administración de perfiles tiene doble candado.** `/api/admin/*` exige
+  **loopback Y** PIN (`X-Admin-Pin`) y es **fail-closed**: sin PIN declarado está
+  **deshabilitada**, no abierta. El PIN se puede **declarar y retirar** desde el
+  lanzador, que es lo que faltaba para que el candado de V1.37 fuera real.
+- **El webmaster tiene dónde trabajar.** Sección **«Perfiles»** en el lanzador:
+  contador de pendientes con **refresco periódico**, aprobar/rechazar con nota, crear
+  con PIN, desactivar/reactivar, purgar y **el estado del candado a la vista**.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **No hay autenticación de persona y el P0 sigue abierto.** Un perfil **sin** PIN
+  entra sin credencial y **no hay identidad ni recuperación**; lo que cambia es que
+  crear y borrar perfiles **ya no** es algo que cualquiera en la red pueda hacer.
+  `[SEGURIDAD]`
+- **Desactivar corta el acceso, no protege los datos.** La evidencia sigue en la
+  BD hasta que se purgue; una sesión abierta de ese perfil recibe `403`. `[SEGURIDAD]`
+- **Purgar es irreversible y la copia es la única red.** El ZIP **no está
+  cifrado**: quien lo reciba tiene los datos, incluido el hash del PIN. `[SEGURIDAD]`
+- **El PIN de administración es una credencial compartida, no por persona.** Quien
+  lo sepa y esté en el equipo administra; no hay registro de quién aprobó qué más
+  allá de la nota de la decisión. `[SEGURIDAD]`
+- **Sin el lanzador delante nadie crea un perfil.** Es el precio declarado de no
+  tener cuentas: la administración vive en la máquina. `[PRODUCTO]`
+- **La decisión de fondo sigue abierta: ¿tendrá el producto cuentas?** Esta release
+  responde «¿quién puede crear y borrar perfiles?», no «¿habrá cuentas?». Sigue
+  contradiciendo «sin cuentas, sin contraseñas» de `docs/PREMISAS.md`. `[PRODUCTO]`
+- **FSRS-lite no es FSRS.** Cuatro salidas y un planificador declarado, **sin** los
+  parámetros por alumno que FSRS completo ajusta con el historial. El ítem «FSRS por
+  tipo de memoria» **sigue aparcado** y no se ha tocado el scheduler más de lo
+  necesario. `[MOTOR]`
+- **Los packs por tema son tres** (comida, viaje, trabajo) y **no cubren un
+  currículum**: son un punto de partida, no una biblioteca. `[CONTENIDO]`
+- **No hay drills de producción por aspecto** sobre lo añadido al diccionario
+  (sigue aparcado arriba, en «Motor»). `[MOTOR]`
+- **El orden de publicación importa.** La retención léxica se publica **junto** al
+  control de perfiles, no antes: escribe vocabulario personal en la BD de un perfil
+  y no podía salir mientras cualquiera en la LAN pudiera crear perfiles.
+  `[PRODUCTO]`
+- **Los 7 gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+  `v3.75.8`. `[VALIDACIÓN]`
+- **El `dist` no se versiona** (`.gitignore`): hay que recompilar y reiniciar el
+  backend para ver la UI nueva. `[OPERACIÓN]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

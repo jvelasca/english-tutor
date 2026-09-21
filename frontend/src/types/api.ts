@@ -41,7 +41,35 @@ export interface User {
    * hay que pedirlo **antes** de abrir sesión; el hash no viaja nunca.
    */
   has_pin?: boolean;
+  /**
+   * V3.77: estado de servicio. La app y el selector solo reciben perfiles
+   * **activos** (los desactivados los filtra el backend), así que este campo es
+   * para el lanzador. Un perfil desactivado no abre sesión: el servidor responde
+   * `403 PROFILE_DISABLED`.
+   */
+  status?: "active" | "disabled";
   created_at: string;
+}
+
+/**
+ * V3.77: una **solicitud** de perfil. No es un perfil: es una fila de la cola que
+ * el webmaster resuelve desde el lanzador. La app solo la crea y la lee; no hay
+ * ninguna ruta del alumno que la resuelva.
+ */
+export interface ProfileRequest {
+  id: number;
+  /** `create` (alta) | `delete` (baja). */
+  kind: "create" | "delete" | string;
+  /** Nombre pedido, en un alta. */
+  display_name: string;
+  /** Perfil afectado, en una baja. */
+  user_id: string;
+  note: string;
+  requested_at: string;
+  status: "pending" | "approved" | "rejected" | string;
+  decided_at: string;
+  decided_note: string;
+  resolved_user_id: string;
 }
 
 export interface Settings {
@@ -907,6 +935,68 @@ export interface Lexicon {
   coverage?: LexiconCoverage | null;
   // V3.25.1 (P1-02): agregado por `lexical_unit` (aditivo, contrato intacto).
   units?: LexicalUnit[];
+}
+
+/** Colecciones léxicas (packs temáticos + listas de usuario). */
+export interface VocabCollection {
+  id: number;
+  kind: string;
+  slug: string;
+  title: string;
+  title_es: string;
+  cefr_hint: string;
+  item_count: number;
+  enrolled: boolean;
+  is_global: boolean;
+}
+
+export interface VocabCollections {
+  collections: VocabCollection[];
+}
+
+export interface VocabItemAddResult {
+  added: string[];
+  item: { word: string; translation: string; definition: string };
+}
+
+export interface VocabBulkAddResult {
+  added: string[];
+  collection_id: number | null;
+  count: number;
+}
+
+export interface VocabEnrollResult {
+  collection_id: number;
+  added: string[];
+  count: number;
+}
+
+export interface RetentionCard {
+  word: string;
+  translation: string;
+  definition: string;
+  due_at: string;
+  stability: number;
+  retrievability: number;
+  why: string;
+  reps: number;
+}
+
+export interface RetentionDue {
+  due_count: number;
+  limit: number;
+  items: RetentionCard[];
+  fsrs_version: string;
+}
+
+export interface RetentionReviewResult {
+  word: string;
+  grade: number;
+  due_at: string;
+  next_in_days: number;
+  stability: number;
+  retrievability: number;
+  reps: number;
 }
 
 export type Bucket = "day" | "week" | "month";

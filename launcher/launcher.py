@@ -25,8 +25,17 @@ import threading
 import time
 import tkinter as tk
 import webbrowser
-from tkinter import ttk
+from tkinter import messagebox, simpledialog, ttk
 
+from admin import (
+    approve_request,
+    create_profile,
+    list_profiles,
+    pending_requests,
+    purge_profile,
+    reject_request,
+    set_profile_status,
+)
 from browser_cookies import (
     collect_cookies,
     format_cookie_diagnosis,
@@ -34,12 +43,15 @@ from browser_cookies import (
 )
 from core import (
     DB_PATH,
+    admin_pin,
     app_summary,
+    apply_admin_config,
     apply_stored_lan_config,
     author_line,
     db_summary,
     frontend_dist_available,
     frontend_url,
+    generate_admin_pin,
     health_status,
     icon_file,
     lan_mode,
@@ -47,6 +59,7 @@ from core import (
     local_url,
     mdns_available,
     port_in_use,
+    set_admin_pin,
     toggle_lan_config,
     user_overview,
 )
@@ -67,9 +80,13 @@ from ui import (
     COLORS,
     SECTION_ICONS,
     SERVICE_ICONS,
+    admin_state_label,
     backend_failure_hint,
     interface_state,
+    pending_summary,
+    profile_row,
     read_log_tail,
+    request_row,
     server_activity,
     status_color,
     status_dot,
@@ -77,6 +94,13 @@ from ui import (
 
 REFRESH_MS = 2000
 POLL_MS = 100
+# V3.77: cada cuánto se pregunta al backend si han llegado solicitudes de perfil.
+# Es un solo GET y es lo que hace que «la solicitud llegue al webmaster» de
+# verdad: sin esto habría que pulsar «Actualizar» para enterarse. Más lento que
+# el refresco general a propósito —una cola de solicitudes no cambia cada dos
+# segundos— y lo bastante vivo para que el contador no se quede viejo mientras
+# alguien la mira.
+PROFILES_MS = 15000
 BROWSER_DELAY_S = 2.0
 
 # Reloj animado mostrado en la cabecera mientras se arranca/para/reinicia.
@@ -150,10 +174,20 @@ class LauncherApp:
         # van en una sola llamada de `core` para que su orden sea verificable sin
         # pantalla (`toggle_lan_config` es la otra mitad).
         self._config = apply_stored_lan_config()
+        # V3.77: el PIN de administración guardado se declara en el entorno antes
+        # de nada, para que el backend que arranque este launcher lo reciba
+        # (`backend_env` copia este entorno). Sin PIN no hay administración, y el
+        # launcher lo dice en la propia sección en vez de fallar al pulsar.
+        apply_admin_config(self._config)
         self._sections_map: dict[str, Collapsible] = {}
         self._spinner_id: str | None = None
         self._spinner_idx = 0
         self._action_running = False
+        # Estado de la sección «Perfiles»: lo que hay pintado (para saber sobre
+        # qué fila actúa un botón) y lo que vamos a pedirle al backend.
+        self._pending_rows: list[dict] = []
+        self._profile_rows: list[dict] = []
+        self._profiles_busy = False
         root.title("English Tutor — Launcher")
         # La ventana es redimensionable; el tamaño y la posición del divisor se
         # restauran del estado persistido (state.json) y se guardan al cerrar.
@@ -166,6 +200,8 @@ class LauncherApp:
         # Programar desde el hilo principal (antes de mainloop es seguro).
         root.after(0, self.refresh)
         root.after(POLL_MS, self._poll_queue)
+        # V3.77: la cola de solicitudes se refresca sola (ver `PROFILES_MS`).
+        root.after(PROFILES_MS, self._poll_profiles)
 
     def _apply_window_icon(self) -> None:
         """Icono de la ventana (icon.ico); si falta, se usa el icono por defecto."""
@@ -445,6 +481,9 @@ class LauncherApp:
         self._build_activity(self._col_left)
         self._build_access(self._col_left)
         self._build_database(self._col_left)
+        # V3.77: «Perfiles» va arriba de «Usuarios» porque es donde el webmaster
+        # tiene algo que hacer; «Usuarios» es el recuento de lo que hay.
+        self._build_profiles(self._col_right)
         self._build_users(self._col_right)
         self._build_cookies(self._col_right)
         self._build_logs(self._col_right)
@@ -698,6 +737,438 @@ class LauncherApp:
         )
         self._db_file_label.pack(anchor="w", fill="x", pady=(6, 0))
 
+    def _build_profiles(self, parent: tk.Misc) -> None:
+        """Perfiles (V3.77): solicitudes que resolver y perfiles que gestionar.
+
+        Es la mitad visible de la decisión de producto: **el webmaster no es un rol
+        de la app, es quien ejecuta este launcher**. Aquí están las cuatro cosas que
+        solo él puede hacer: resolver solicitudes, crear un perfil, desactivarlo o
+        reactivarlo, y purgarlo.
+
+        Todo lo que escribe pasa por `admin.py` (HTTP con el PIN), nunca por la BD
+        directamente, aunque el launcher tenga el fichero a mano: el borrado tiene
+        que pasar por el mismo sitio que el resto (validación, copia previa, tabla
+        de solicitudes) o habría dos definiciones de «purgar» y la de aquí sería la
+        que nadie prueba.
+        """
+        sec = self._section(parent, "Perfiles")
+
+        # --- Candado: el PIN de administración ---
+        pin_box = ttk.Frame(sec.body, style="Card.TFrame")
+        pin_box.pack(fill="x", padx=14, pady=(4, 0))
+        self._admin_state_var = tk.StringVar(
+            value=admin_state_label(bool(admin_pin(self._config)))
+        )
+        self._admin_state_label = ttk.Label(
+            pin_box,
+            textvariable=self._admin_state_var,
+            style="Service.TLabel",
+            wraplength=COLUMN_W - 30,
+        )
+        self._admin_state_label.pack(anchor="w")
+
+        pin_row = ttk.Frame(sec.body, style="Card.TFrame")
+        pin_row.pack(fill="x", padx=14, pady=(6, 0))
+        self._admin_pin_var = tk.StringVar(value="")
+        self._admin_pin_entry = ttk.Entry(
+            pin_row, textvariable=self._admin_pin_var, show="•", width=24
+        )
+        self._admin_pin_entry.pack(side="left")
+        self._admin_pin_entry.bind("<Return>", lambda _e: self.save_admin_pin())
+        ttk.Button(
+            pin_row,
+            text="💾 Guardar PIN",
+            style="Ghost.TButton",
+            command=self.save_admin_pin,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            pin_row,
+            text="🎲 Generar",
+            style="Ghost.TButton",
+            command=self.generate_admin_pin_value,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            pin_row,
+            text="🧹 Retirar",
+            style="Ghost.TButton",
+            command=self.clear_admin_pin,
+        ).pack(side="left", padx=(6, 0))
+
+        # --- Solicitudes pendientes ---
+        self._pending_var = tk.StringVar(value="Solicitudes: …")
+        ttk.Label(
+            sec.body, textvariable=self._pending_var, style="Service.TLabel"
+        ).pack(anchor="w", padx=14, pady=(10, 0))
+
+        pending_wrap = ttk.Frame(sec.body, style="Card.TFrame")
+        pending_wrap.pack(fill="both", expand=True, padx=14, pady=(4, 0))
+        self._pending_tree = ttk.Treeview(
+            pending_wrap, columns=("kind", "who", "when"), show="headings", height=4
+        )
+        for column, title, width, anchor in (
+            ("kind", "Tipo", 90, "w"),
+            ("who", "Perfil", 250, "w"),
+            ("when", "Llegó", 130, "e"),
+        ):
+            self._pending_tree.heading(column, text=title)
+            self._pending_tree.column(column, width=width, anchor=anchor)
+        self._pending_tree.pack(fill="both", expand=True)
+
+        decision_row = ttk.Frame(sec.body, style="Card.TFrame")
+        decision_row.pack(fill="x", padx=14, pady=(6, 0))
+        ttk.Button(
+            decision_row,
+            text="✅ Aprobar",
+            style="Success.TButton",
+            command=self.approve_selected_request,
+        ).pack(side="left")
+        ttk.Button(
+            decision_row,
+            text="🚫 Rechazar",
+            style="Ghost.TButton",
+            command=self.reject_selected_request,
+        ).pack(side="left", padx=(6, 0))
+
+        # --- Perfiles existentes ---
+        ttk.Label(
+            sec.body, text="Perfiles", style="Service.TLabel"
+        ).pack(anchor="w", padx=14, pady=(12, 0))
+        profiles_wrap = ttk.Frame(sec.body, style="Card.TFrame")
+        profiles_wrap.pack(fill="both", expand=True, padx=14, pady=(4, 0))
+        self._profiles_tree = ttk.Treeview(
+            profiles_wrap,
+            columns=("name", "status", "pin", "created"),
+            show="headings",
+            height=6,
+        )
+        for column, title, width, anchor in (
+            ("name", "Nombre", 190, "w"),
+            ("status", "Estado", 100, "w"),
+            ("pin", "Credencial", 90, "w"),
+            ("created", "Creado", 120, "e"),
+        ):
+            self._profiles_tree.heading(column, text=title)
+            self._profiles_tree.column(column, width=width, anchor=anchor)
+        self._profiles_tree.pack(fill="both", expand=True)
+
+        profile_row_buttons = ttk.Frame(sec.body, style="Card.TFrame")
+        profile_row_buttons.pack(fill="x", padx=14, pady=(6, 0))
+        ttk.Button(
+            profile_row_buttons,
+            text="➕ Crear…",
+            style="Ghost.TButton",
+            command=self.create_profile_dialog,
+        ).pack(side="left")
+        ttk.Button(
+            profile_row_buttons,
+            text="⏸️ Desactivar / ▶️ Reactivar",
+            style="Ghost.TButton",
+            command=self.toggle_profile_status,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            profile_row_buttons,
+            text="🗑️ Purgar…",
+            style="Danger.TButton",
+            command=self.purge_selected_profile,
+        ).pack(side="left", padx=(6, 0))
+
+        self._profiles_note_var = tk.StringVar(
+            value=(
+                "Purgar es irreversible: se lleva toda la evidencia del perfil. "
+                "Se toma una copia de seguridad antes de borrar."
+            )
+        )
+        ttk.Label(
+            sec.body,
+            textvariable=self._profiles_note_var,
+            style="DimCard.TLabel",
+            wraplength=COLUMN_W - 30,
+        ).pack(anchor="w", fill="x", padx=14, pady=(6, 12))
+
+    # --- Perfiles: candado de administración (V3.77) ---
+    def _refresh_admin_state(self) -> None:
+        self._admin_state_var.set(admin_state_label(bool(admin_pin(self._config))))
+        activated = bool(admin_pin(self._config))
+        self._admin_state_label.configure(
+            foreground=COLORS["success"] if activated else COLORS["warning"]
+        )
+
+    def save_admin_pin(self) -> None:
+        """Guarda el PIN del campo (o retira la administración si está vacío)."""
+        pin = self._admin_pin_var.get().strip()
+        if pin == "":
+            self.clear_admin_pin()
+            return
+        if set_admin_pin(pin, self._config) is None:
+            self._msg.set(
+                "El PIN de administración debe tener entre 6 y 64 caracteres y no "
+                "llevar espacios en los extremos."
+            )
+            return
+        self._admin_pin_var.set("")
+        self._refresh_admin_state()
+        self._msg.set(
+            "PIN de administración guardado. Reinicia el servidor para que el "
+            "backend lo aplique."
+        )
+        self.refresh()
+
+    def generate_admin_pin_value(self) -> None:
+        """Rellena el campo con un PIN aleatorio (lo guarda quien lo confirme)."""
+        self._admin_pin_var.set(generate_admin_pin())
+        self._msg.set("PIN generado. Pulsa «Guardar PIN» y apunta el valor.")
+
+    def clear_admin_pin(self) -> None:
+        """Retira la administración (vuelve a estar deshabilitada, no abierta)."""
+        if not messagebox.askyesno(
+            "Retirar el PIN de administración",
+            "Sin PIN, la administración de perfiles queda DESHABILITADA (fallar "
+            "cerrado): no podrás crear, desactivar ni borrar perfiles hasta que "
+            "pongas otro.\n\n¿Retirar el PIN?",
+            parent=self.root,
+        ):
+            return
+        set_admin_pin("", self._config)
+        self._admin_pin_var.set("")
+        self._refresh_admin_state()
+        self._msg.set("Administración deshabilitada (sin PIN).")
+        self.refresh()
+
+    # --- Perfiles: lectura ---
+    def _poll_profiles(self) -> None:
+        """Refresco periódico de la cola de solicitudes, sin bloquear la ventana."""
+        self._load_profiles()
+        self.root.after(PROFILES_MS, self._poll_profiles)
+
+    def _load_profiles(self) -> None:
+        if self._profiles_busy:
+            return
+        self._profiles_busy = True
+        pin = admin_pin(self._config)
+
+        def work() -> None:
+            # Sin PIN no se llama al backend: la administración está deshabilitada
+            # y pedirla solo generaría un 401 cada quince segundos.
+            if not pin:
+                self._queue.put(("profiles", (None, None, None)))
+                return
+            pending = pending_requests(pin)
+            profiles = list_profiles(pin)
+            self._queue.put(("profiles", (pending, profiles, None)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _run_admin_action(self, call, success_message) -> None:
+        """Ejecuta una acción admin en un hilo y refresca la sección al terminar."""
+        if self._profiles_busy:
+            return
+        self._profiles_busy = True
+        pin = admin_pin(self._config)
+
+        def work() -> None:
+            if not pin:
+                self._queue.put(
+                    ("admin_msg", ("Define un PIN de administración primero."))
+                )
+                return
+            result = call(pin)
+            message = success_message if result.ok else result.message()
+            if result.ok:
+                # Tras escribir, se relee: el contador y las filas tienen que
+                # reflejar el estado del backend, no lo que creíamos que iba a pasar.
+                pending = pending_requests(pin)
+                profiles = list_profiles(pin)
+                self._queue.put(("profiles", (pending, profiles, message)))
+            else:
+                self._queue.put(("admin_msg", (message,)))
+                # La lista puede haberse quedado vieja (p. ej. si la solicitud ya
+                # estaba resuelta desde otro sitio): se relee igual.
+                self._queue.put(
+                    (
+                        "profiles",
+                        (pending_requests(pin), list_profiles(pin), None),
+                    )
+                )
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_profiles(self, pending, profiles, message) -> None:
+        """Pinta la sección «Perfiles» (hilo principal)."""
+        self._profiles_busy = False
+
+        if pending is None or profiles is None:
+            self._pending_var.set(
+                pending_summary(0) if pending is None else ""
+            )
+            if pending is None and profiles is None:
+                self._pending_var.set("Solicitudes: administración deshabilitada")
+            self._pending_rows = []
+            self._profile_rows = []
+            self._pending_tree.delete(*self._pending_tree.get_children())
+            self._profiles_tree.delete(*self._profiles_tree.get_children())
+            if message:
+                self._msg.set(str(message))
+            return
+
+        # Las bajas guardan el `user_id`: se traduce a nombre con los perfiles ya
+        # cargados para que la cola se pueda leer sin descifrar identificadores.
+        names = {
+            str(u.get("id")): str(u.get("name")) for u in profiles.data.get("users", [])
+        }
+        self._pending_rows = list(pending.data.get("requests", []))
+        self._profile_rows = list(profiles.data.get("users", []))
+
+        self._pending_tree.delete(*self._pending_tree.get_children())
+        for request in self._pending_rows:
+            self._pending_tree.insert("", "end", values=request_row(request, names))
+
+        self._profiles_tree.delete(*self._profiles_tree.get_children())
+        for profile in self._profile_rows:
+            self._profiles_tree.insert("", "end", values=profile_row(profile))
+
+        self._pending_var.set(pending_summary(int(pending.data.get("pending", 0))))
+        if message:
+            self._msg.set(str(message))
+
+    def _selected_pending(self) -> dict | None:
+        selection = self._pending_tree.selection()
+        if not selection:
+            self._msg.set("Selecciona una solicitud de la lista.")
+            return None
+        index = self._pending_tree.index(selection[0])
+        return self._pending_rows[index] if index < len(self._pending_rows) else None
+
+    def _selected_profile(self) -> dict | None:
+        selection = self._profiles_tree.selection()
+        if not selection:
+            self._msg.set("Selecciona un perfil de la lista.")
+            return None
+        index = self._profiles_tree.index(selection[0])
+        return self._profile_rows[index] if index < len(self._profile_rows) else None
+
+    # --- Perfiles: acciones ---
+    def approve_selected_request(self) -> None:
+        request = self._selected_pending()
+        if request is None:
+            return
+        request_id = int(request["id"])
+        if request.get("kind") == "delete":
+            nombre = next(
+                (
+                    str(u.get("name"))
+                    for u in self._profile_rows
+                    if str(u.get("id")) == str(request.get("user_id"))
+                ),
+                "(perfil ya inexistente)",
+            )
+            if not messagebox.askyesno(
+                "Aprobar la baja",
+                f"Se DESACTIVARÁ el perfil «{nombre}»: dejará de aparecer y no "
+                "podrá abrir sesión, pero su evidencia se conserva y se puede "
+                "reactivar.\n\nPara borrarla de verdad hay que purgar el perfil, "
+                "que es un paso aparte.\n\n¿Aprobar la baja?",
+                parent=self.root,
+            ):
+                return
+        self._run_admin_action(
+            lambda pin: approve_request(pin, request_id),
+            "Solicitud aprobada.",
+        )
+
+    def reject_selected_request(self) -> None:
+        request = self._selected_pending()
+        if request is None:
+            return
+        request_id = int(request["id"])
+        note = simpledialog.askstring(
+            "Rechazar la solicitud",
+            "Motivo (opcional, se guarda con la solicitud):",
+            parent=self.root,
+        )
+        if note is None:
+            return
+        self._run_admin_action(
+            lambda pin: reject_request(pin, request_id, note=note),
+            "Solicitud rechazada.",
+        )
+
+    def create_profile_dialog(self) -> None:
+        name = simpledialog.askstring(
+            "Crear un perfil", "Nombre del perfil:", parent=self.root
+        )
+        if not name or not name.strip():
+            return
+        pin = simpledialog.askstring(
+            "PIN del perfil (opcional)",
+            "PIN de 4-6 dígitos para que el perfil pida credencial al entrar.\n"
+            "Déjalo vacío si no quieres PIN:",
+            parent=self.root,
+        )
+        if pin is None:
+            return
+        self._run_admin_action(
+            lambda configured: create_profile(
+                configured, name.strip(), profile_pin=pin.strip()
+            ),
+            f"Perfil «{name.strip()}» creado.",
+        )
+
+    def toggle_profile_status(self) -> None:
+        profile = self._selected_profile()
+        if profile is None:
+            return
+        user_id = str(profile["id"])
+        if str(profile.get("status")) == "active":
+            if not messagebox.askyesno(
+                "Desactivar el perfil",
+                f"«{profile.get('name')}» saldrá del selector y no podrá abrir "
+                "sesión. Su evidencia se conserva y puedes reactivarlo cuando "
+                "quieras.\n\n¿Desactivar?",
+                parent=self.root,
+            ):
+                return
+            target = "disabled"
+            message = f"Perfil «{profile.get('name')}» desactivado."
+        else:
+            target = "active"
+            message = f"Perfil «{profile.get('name')}» reactivado."
+        self._run_admin_action(
+            lambda pin: set_profile_status(pin, user_id, target),
+            message,
+        )
+
+    def purge_selected_profile(self) -> None:
+        """Purga irreversible: confirmación por nombre + copia que hace el backend."""
+        profile = self._selected_profile()
+        if profile is None:
+            return
+        user_id = str(profile["id"])
+        name = str(profile.get("name") or "")
+        if str(profile.get("status")) == "active":
+            messagebox.showinfo(
+                "Desactiva antes de purgar",
+                "Purgar se lleva toda la evidencia del perfil. Desactívalo primero "
+                "y comprueba que nadie lo echa de menos; después, purga.",
+                parent=self.root,
+            )
+            return
+        typed = simpledialog.askstring(
+            "Purgar el perfil",
+            f"Esto borra «{name}» y TODA su evidencia (progreso, mastery, "
+            "conversaciones, grabaciones). Es irreversible.\n\nEl backend tomará "
+            "una copia de seguridad antes de borrar.\n\nEscribe el nombre exacto "
+            "del perfil para confirmar:",
+            parent=self.root,
+        )
+        if typed is None or typed.strip() != name:
+            if typed is not None:
+                self._msg.set("El nombre no coincide: no se ha purgado nada.")
+            return
+        self._run_admin_action(
+            lambda pin: purge_profile(pin, user_id, name),
+            f"Perfil «{name}» purgado (con copia de seguridad previa).",
+        )
+
     def _build_users(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Usuarios")
         wrap = ttk.Frame(sec.body, style="Card.TFrame")
@@ -799,6 +1270,14 @@ class LauncherApp:
         if kind == "refresh":
             self._apply(*item[1])
             self.root.after(REFRESH_MS, self._next_refresh)
+        elif kind == "profiles":
+            # V3.77: resultado de una lectura/acción de la sección «Perfiles».
+            self._apply_profiles(*item[1])
+        elif kind == "admin_msg":
+            # Solo el mensaje: lo usa el guardado del PIN, que no cambia datos del
+            # backend y por tanto no necesita volver a pedir la lista.
+            self._profiles_busy = False
+            self._msg.set(str(item[1]))
         elif kind == "error":
             self._action_running = False
             self._stop_spinner()

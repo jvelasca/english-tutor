@@ -5,13 +5,33 @@ from starlette.concurrency import run_in_threadpool
 
 from repositories import users as users_repo
 
+# La lista canónica de estados vive en el repositorio, que es quien la valida al
+# escribir; el dominio la reexpone para que las capas de arriba no tengan que
+# importar el repositorio solo por dos cadenas.
+STATUS_ACTIVE = users_repo.STATUS_ACTIVE
+STATUS_DISABLED = users_repo.STATUS_DISABLED
+
+
+def is_disabled(user: dict | None) -> bool:
+    """¿Este perfil está fuera de servicio? Cerrado por defecto: un perfil que no
+    existe tampoco está activo."""
+    return user is None or user.get("status") == STATUS_DISABLED
+
 
 async def create_user(name: str, is_test: bool = False) -> dict:
     return await run_in_threadpool(users_repo.create_user, name, is_test)
 
 
-async def list_users(include_test: bool = False) -> list[dict]:
-    return await run_in_threadpool(users_repo.list_users, include_test)
+async def list_users(
+    include_test: bool = False, include_disabled: bool = False
+) -> list[dict]:
+    """Perfiles locales. V3.77: `include_disabled` los devuelve también a los
+    desactivados, que es lo que necesita el lanzador para poder reactivarlos."""
+    return await run_in_threadpool(
+        users_repo.list_users,
+        include_test=include_test,
+        include_disabled=include_disabled,
+    )
 
 
 async def get_user(uid: str) -> dict | None:

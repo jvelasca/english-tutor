@@ -19,6 +19,7 @@ from domain.errors import (
 )
 from repositories.db import init_db
 from routers.academy import router as academy_router
+from routers.admin import router as admin_router
 from routers.assessment import router as assessment_router
 from routers.audio_library import router as audio_library_router
 from routers.chat import router as chat_router
@@ -151,6 +152,7 @@ app.add_middleware(SecurityMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(chat_router)
+app.include_router(admin_router)
 app.include_router(grammar_router)
 app.include_router(health_router)
 app.include_router(learning_router)

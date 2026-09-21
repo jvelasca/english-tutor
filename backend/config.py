@@ -30,7 +30,7 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 
-VERSION = "3.76.0"
+VERSION = "3.77.0"
 
 # Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
 # mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo
@@ -119,8 +119,60 @@ MAX_AUDIO_DURATION_SECONDS = 120.0  # duración máxima aceptada por grabación
 # FAIL-CLOSED: si está vacío, los endpoints de administración de la biblioteca
 # de audio quedan DESHABILITADOS (401 `Administración deshabilitada`); si se
 # define, exigen la cabecera `X-Admin-Pin`. Sin OAuth/cloud: es un candado
-# local para separar el rol `student` (aprender) del `admin` (gestionar audio).
+# local para separar el rol `student` (aprender) del rol `admin` (gestionar
+# audio, copias y, desde V3.77, perfiles).
+#
+# V3.77: la constante deja de ser el **único** sitio del que puede salir el PIN
+# y pasa a ser el valor por defecto, porque hasta ahora no había **ninguna**
+# forma de fijarlo en el producto y la administración estaba deshabilitada de
+# facto (una honestidad declarada en `agentes/v371-runtime-offline-instalacion.md`).
+# El lanzador es quien lo declara (`ENGLISH_TUTOR_ADMIN_PIN` en el entorno del
+# backend que él mismo arranca) y quien lo usa en sus llamadas. La precedencia
+# es: entorno > constante, y se resuelve **en cada llamada**, no al importar
+# (misma doctrina que `lan_mode()`: una decisión de entorno no se cachea al
+# importar un módulo).
 ADMIN_PIN = ""
+ADMIN_PIN_ENV = "ENGLISH_TUTOR_ADMIN_PIN"
+
+
+def admin_pin(env: dict[str, str] | None = None) -> str:
+    """PIN de administración vigente (`""` = administración deshabilitada)."""
+    source = os.environ if env is None else env
+    value = source.get(ADMIN_PIN_ENV)
+    if value is not None:
+        return value.strip()
+    # El global se lee en cada llamada a propósito: así un test puede seguir
+    # haciendo `monkeypatch.setattr(config, "ADMIN_PIN", ...)` sin ceremonia.
+    return str(ADMIN_PIN).strip()
+
+
+# Hosts desde los que se acepta administración de PERFILES (V3.77). No es una
+# lista de IPs permitidas en el sentido de la red: es «el lanzador, que corre en
+# este equipo». La administración de perfiles crea, desactiva y **purga** la
+# evidencia de un alumno, así que no se sirve a la LAN ni con el PIN correcto: el
+# PIN viaja en una cabecera y en una red compartida eso es material expuesto.
+#
+# `testclient` está en la lista a propósito y no debilita nada: es el nombre de
+# cliente del `TestClient` de Starlette, **no** una IP ni un nombre resolvable
+# desde una conexión real, así que ningún cliente de red puede presentarlo. Lo
+# que permite es que la suite ejerza el camino verdadero en vez de un atajo.
+ADMIN_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+
+
+def is_admin_loopback_host(host: str | None) -> bool:
+    """¿La petición llega desde el propio equipo? (fail-closed: `None` no)."""
+    return str(host or "").strip().lower() in ADMIN_LOOPBACK_HOSTS
+
+
+# V3.77: topes de las solicitudes de perfil. Son la valla de un endpoint que
+# responde **sin sesión** (quien pide un perfil aún no tiene ninguno), así que
+# sin ellos la cola de pendientes sería un sumidero de disco y una tarea
+# molesta para el webmaster en vez de una petición legible. El cupo por minuto y
+# por IP **no** se declara aquí: vive en `security._PATH_LIMITS`, que es el único
+# sitio donde el rate limiting se decide (una sola fuente de verdad).
+PROFILE_REQUEST_MAX_PENDING = 20
+PROFILE_REQUEST_NOTE_MAX = 200
+PROFILE_REQUEST_NAME_MAX = 80
 
 SYSTEM_PROMPT = (
     "You are a friendly, patient English tutor. Help the user practice English: "

@@ -526,3 +526,61 @@ def seed_curriculum_items(
                     ),
                 )
     return True
+
+
+def seed_study_items(
+    user_id: str,
+    items: list[dict],
+    *,
+    source: str = "user",
+) -> list[str]:
+    """Siembra ítems de estudio (palabra suelta / lista / pack) sin evidencia.
+
+    Crea la fila si no existe con `production_count=0` / `exposure_count=0`.
+    Si ya existe, no toca contadores ni pisa `source=curriculum`. Devuelve las
+    superficies normalizadas efectivamente tocadas (nuevas o ya presentes).
+    """
+    if get_user(user_id) is None:
+        return []
+    if source not in ("user", "imported"):
+        source = "user"
+    touched: list[str] = []
+    with closing(_conn()) as conn, conn:
+        for it in items:
+            word = str(it.get("word") or "").strip().lower()
+            if not word:
+                continue
+            lemma = str(it.get("lemma") or word).strip().lower()
+            unit = lexical_unit_key(word, lemma)
+            cefr = str(it.get("cefr") or "").strip()
+            kind = str(it.get("kind") or "word").strip() or "word"
+            row = conn.execute(
+                "SELECT word, source FROM vocabulary "
+                "WHERE user_id = ? AND word = ?",
+                (user_id, word),
+            ).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO vocabulary "
+                    "(user_id, word, production_count, first_seen, last_seen, "
+                    "exposure_count, last_exposed_at, production_days, "
+                    "cefr, level_id, objective_id, source, lemma, kind, "
+                    "lexical_unit) "
+                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, '', '', ?, ?, ?, ?)",
+                    (user_id, word, cefr, source, lemma, kind, unit),
+                )
+            else:
+                conn.execute(
+                    "UPDATE vocabulary SET "
+                    "lemma = CASE WHEN lemma = '' THEN ? ELSE lemma END, "
+                    "cefr = CASE WHEN cefr = '' THEN ? ELSE cefr END, "
+                    "lexical_unit = CASE WHEN lexical_unit = '' "
+                    "THEN ? ELSE lexical_unit END, "
+                    "source = CASE WHEN source = 'user' AND ? = 'imported' "
+                    "THEN 'imported' ELSE source END "
+                    "WHERE user_id = ? AND word = ?",
+                    (lemma, cefr, unit, source, user_id, word),
+                )
+            touched.append(word)
+    return touched
+

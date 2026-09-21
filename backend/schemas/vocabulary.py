@@ -951,3 +951,94 @@ class TransferAttemptOut(BaseModel):
     instance_count: int = 0
     instance_matched: bool = False
     instance_suppressed: int = 0
+
+
+# --- Retención Personal (colecciones + sesión tarjetas) --------------------
+
+
+class VocabItemAddIn(BaseModel):
+    word: str = Field(min_length=1, max_length=80)
+    translation: str = Field(default="", max_length=200)
+    collection_id: int | None = None
+
+
+class VocabItemFaceOut(BaseModel):
+    word: str
+    translation: str = ""
+    definition: str = ""
+
+
+class VocabItemAddOut(BaseModel):
+    added: list[str]
+    item: VocabItemFaceOut
+
+
+class VocabBulkAddIn(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+    title: str = Field(default="", max_length=120)
+    collection_id: int | None = None
+
+
+class VocabBulkAddOut(BaseModel):
+    added: list[str]
+    collection_id: int | None = None
+    count: int = 0
+
+
+class VocabCollectionOut(BaseModel):
+    id: int
+    kind: str
+    slug: str
+    title: str
+    title_es: str = ""
+    cefr_hint: str = ""
+    item_count: int = 0
+    enrolled: bool = False
+    is_global: bool = False
+
+
+class VocabCollectionsOut(BaseModel):
+    collections: list[VocabCollectionOut]
+
+
+class VocabCollectionCreateIn(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+
+
+class VocabEnrollOut(BaseModel):
+    collection_id: int
+    added: list[str]
+    count: int = 0
+
+
+class RetentionCardOut(BaseModel):
+    word: str
+    translation: str = ""
+    definition: str = ""
+    due_at: str = ""
+    stability: float = 0.0
+    retrievability: float = 0.0
+    why: str = ""
+    reps: int = 0
+
+
+class RetentionDueOut(BaseModel):
+    due_count: int
+    limit: int
+    items: list[RetentionCardOut]
+    fsrs_version: str = ""
+
+
+class RetentionReviewIn(BaseModel):
+    word: str = Field(min_length=1, max_length=80)
+    grade: int = Field(ge=1, le=4)
+
+
+class RetentionReviewOut(BaseModel):
+    word: str
+    grade: int
+    due_at: str = ""
+    next_in_days: float = 0.0
+    stability: float = 0.0
+    retrievability: float = 0.0
+    reps: int = 0

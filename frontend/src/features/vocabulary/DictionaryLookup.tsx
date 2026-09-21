@@ -5,11 +5,12 @@ import {
   Languages,
   Loader2,
   Mic,
+  Plus,
   RefreshCw,
   Search,
   X,
 } from "lucide-react";
-import { lookupDictionaryWord } from "../../api/vocabulary";
+import { addVocabularyItem, lookupDictionaryWord } from "../../api/vocabulary";
 import type {
   DictionaryDirection,
   DictionaryEntry,
@@ -89,6 +90,8 @@ export function DictionaryLookup({
   // tarjeta. La escalera vive debajo de la tarjeta de resultado. V3.39: en
   // ES→EN se practica siempre el EQUIVALENTE INGLÉS, nunca el término español.
   const [practiceWord, setPracticeWord] = useState<string | null>(null);
+  const [addStatus, setAddStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [adding, setAdding] = useState(false);
 
   async function runLookup(raw: string, dir: DictionaryDirection = direction) {
     if (!userId) return;
@@ -109,6 +112,7 @@ export function DictionaryLookup({
     setLastQuery(word);
     setLastDirection(dir);
     setPracticeWord(null);
+    setAddStatus("idle");
     try {
       const data = await lookupDictionaryWord(userId, word, dir);
       setEntry(data);
@@ -117,6 +121,23 @@ export function DictionaryLookup({
       setNetworkError(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAddToPersonal() {
+    if (!userId || !practiceTerm || adding) return;
+    setAdding(true);
+    setAddStatus("idle");
+    try {
+      const translation =
+        entry?.direction === "en-es" ? entry.translation ?? "" : entry?.word ?? "";
+      await addVocabularyItem(userId, practiceTerm, { translation });
+      setAddStatus("ok");
+      void refreshEntry(lastQuery, lastDirection);
+    } catch {
+      setAddStatus("error");
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -380,6 +401,9 @@ export function DictionaryLookup({
             entry={entry}
             userId={userId}
             onPractice={practiceTerm ? () => setPracticeWord(practiceTerm) : undefined}
+            onAdd={practiceTerm ? () => void handleAddToPersonal() : undefined}
+            adding={adding}
+            addStatus={addStatus}
           />
 
           {/* V3.32: escalera de drill oral de la palabra consultada. Practicar
@@ -578,10 +602,16 @@ function ResultCard({
   entry,
   userId,
   onPractice,
+  onAdd,
+  adding = false,
+  addStatus = "idle",
 }: {
   entry: DictionaryEntry;
   userId: string | null;
   onPractice?: () => void;
+  onAdd?: () => void;
+  adding?: boolean;
+  addStatus?: "idle" | "ok" | "error";
 }) {
   const { t } = useI18n();
   const kindLabel = lexicalKindLabel(entry.kind, t);
@@ -646,6 +676,19 @@ function ResultCard({
               /* V3.75.5: la palabra se puede oír en A o B (dos acentos). */
               <ItemReplayButton prompt={audioText} userId={userId} />
             )}
+            {onAdd && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={onAdd}
+                disabled={adding}
+                className="gap-1.5"
+              >
+                <Plus className="size-3.5" aria-hidden="true" />
+                {t("dictionary.lookup.addCta")}
+              </Button>
+            )}
             {/* V3.32: «Practicar esta palabra» — abre la escalera de drill oral
                 (Recall → Sentence). Solo esta acción explícita escribe
                 evidencia; el lookup no (D3). V3.39: sin equivalente inglés
@@ -664,6 +707,17 @@ function ResultCard({
             )}
           </div>
         </div>
+
+        {addStatus === "ok" ? (
+          <p className="text-xs text-success" role="status">
+            {t("dictionary.lookup.addOk")}
+          </p>
+        ) : null}
+        {addStatus === "error" ? (
+          <p className="text-xs text-destructive" role="status">
+            {t("dictionary.lookup.addError")}
+          </p>
+        ) : null}
 
         {entry.definition_source === "llm" ? (
           <div className="flex flex-col gap-4">

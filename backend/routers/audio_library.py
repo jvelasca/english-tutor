@@ -84,7 +84,7 @@ def _slots() -> list[dict]:
 async def status() -> dict:
     """Estado de la biblioteca: si requiere PIN de admin y versión del manifest."""
     return {
-        "admin_required": bool(config.ADMIN_PIN),
+        "admin_required": bool(config.admin_pin()),
         "version": AUDIO_LIBRARY_VERSION,
     }
 

@@ -28,6 +28,11 @@ DEFAULTS: dict = {
     # Fail-closed: sin preferencia guardada, modo LAN desactivado. Es el mismo
     # criterio que `core.lan_mode`, que trata ausencia y valores raros como False.
     "lan": False,
+    # V3.77: PIN de administración. Vacío por defecto —y fail-closed en el
+    # backend—: de fábrica la administración está deshabilitada, y el webmaster la
+    # habilita poniendo uno aquí. Vive en este fichero, que está ignorado por git y
+    # no viaja en los backups (`launcher/config.json`), nunca en el repositorio.
+    "admin_pin": "",
 }
 
 
@@ -47,6 +52,17 @@ def load_config(path: Path | None = None) -> dict:
     lan = data.get("lan")
     if isinstance(lan, bool):
         config["lan"] = lan
+
+    # V3.77: el PIN de administración se acepta solo como cadena. Un número en el
+    # JSON (alguien escribiendo `"admin_pin": 123456` a mano) se **ignora** en vez
+    # de convertirse: así el valor guardado es siempre exactamente lo que el
+    # webmaster escribió, sin sorpresas de formato al compararlo. La **forma** del
+    # PIN (longitud, espacios pegados) no se juzga aquí —este fichero parsea, no
+    # decide—: la juzga `core.is_valid_admin_pin`, por la que pasa todo valor antes
+    # de usarse.
+    admin_pin = data.get("admin_pin")
+    if isinstance(admin_pin, str):
+        config["admin_pin"] = admin_pin
 
     return config
 

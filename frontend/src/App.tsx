@@ -82,7 +82,10 @@ export default function App() {
     currentUserId,
     usersLoaded,
     selectUser,
-    addUser,
+    // V3.77: la app ya no crea perfiles; los pide, y el webmaster los autoriza
+    // desde el lanzador.
+    requestProfileForGate,
+    requestProfileRemoval,
     editUser,
     refreshHistory,
     refreshEvents,
@@ -302,8 +305,9 @@ export default function App() {
               users={users}
               currentUserId={currentUserId}
               onSelectUser={selectUser}
-              onAddUser={addUser}
+              onRequestUser={requestProfileForGate}
               onEditUser={editUser}
+              onRequestDeleteUser={requestProfileRemoval}
               handsFreeEnabled={handsFree.enabled}
               handsFreeStatus={handsFree.status}
               handsFreeMicError={handsFree.micError}
@@ -346,7 +350,7 @@ export default function App() {
           <ProfileGate
             users={users}
             onSelect={selectUser}
-            onCreate={addUser}
+            onRequest={requestProfileForGate}
             pinUser={pinUser}
             pinFeedback={pinFeedback}
             onSubmitPin={submitPin}

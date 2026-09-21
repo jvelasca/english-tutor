@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import secrets
 import socket
 from pathlib import Path
 
@@ -104,6 +105,11 @@ def backend_env(base: dict[str, str] | None = None) -> dict[str, str]:
     modo LAN a ``"1"``/``"0"``. Que el valor viaje siempre (aunque sea ``"0"``) y
     no se borre es deliberado: el backend recibe una decisión explícita del
     launcher en vez de deducirla de una variable ausente.
+
+    El PIN de administración viaja por aquí igual: lo declara
+    `apply_admin_config` en el entorno del launcher y esta copia lo lleva al
+    backend, que es lo que hace que **la misma** credencial sirva para las
+    acciones del lanzador y para las pantallas admin de la app (V3.77).
     """
     env = dict(os.environ) if base is None else dict(base)
     env[REQUIRE_UI_ENV] = "1"
@@ -188,6 +194,121 @@ def toggle_lan_config(
 
     set_lan_mode(not lan_mode(env), env)
     config["lan"] = lan_mode(env)
+    save_config(config, path)
+    return config
+
+
+# --- PIN de administración (V3.77) ------------------------------------------
+#
+# Hasta V3.77 el candado admin del backend (`dependencies.require_admin`) leía
+# una constante sin fuente: `config.ADMIN_PIN = ""`, y por tanto la administración
+# estaba **deshabilitada de facto** en el producto (honestidad declarada en
+# `agentes/v371-runtime-offline-instalacion.md`). El lanzador es ahora quien la
+# declara, y esta es la mitad pura de esa decisión: qué PIN vale, de dónde sale y
+# cómo viaja al backend. La GUI solo pinta el campo y llama aquí.
+ADMIN_PIN_ENV = "ENGLISH_TUTOR_ADMIN_PIN"
+# Seis caracteres: por debajo, el PIN es un adorno; por encima de 64, ya no es un
+# secreto que nadie teclee. El máximo también acota lo que se guarda en el JSON.
+_ADMIN_PIN_MIN = 6
+_ADMIN_PIN_MAX = 64
+
+
+def is_valid_admin_pin(pin: object) -> bool:
+    """¿Sirve como PIN de administración?
+
+    Se admite cualquier carácter (no solo dígitos, al contrario que el PIN de un
+    perfil): este no se teclea en el móvil de un alumno, se configura una vez. Lo
+    que sí se exige es que no lleve espacios en los extremos: un espacio pegado no
+    es un secreto más fuerte, es un error de tecleo que produce «PIN incorrecto»
+    sin que nadie entienda por qué.
+    """
+    if not isinstance(pin, str):
+        return False
+    if pin != pin.strip():
+        return False
+    return _ADMIN_PIN_MIN <= len(pin) <= _ADMIN_PIN_MAX
+
+
+def generate_admin_pin() -> str:
+    """PIN de administración aleatorio (lo ofrece el botón «Generar»)."""
+    return secrets.token_urlsafe(18)
+
+
+def admin_pin(config: dict | None = None, env: dict[str, str] | None = None) -> str:
+    """PIN vigente: manda la preferencia guardada; si no la hay, el entorno.
+
+    El orden no es un detalle. La preferencia guardada manda porque es la decisión
+    explícita del webmaster y tiene que sobrevivir al cierre (igual que el modo
+    LAN); el entorno queda como vía para un arranque manual
+    (`ENGLISH_TUTOR_ADMIN_PIN=… python launcher.py`) y para los tests. Y si no hay
+    ninguna de las dos, `""`: **fail-closed**, la administración no se abre sola.
+
+    Las dos fuentes pasan por la misma criba: devolver un valor con mala forma
+    equivaldría a declararlo en el entorno del backend y tener administración con
+    un PIN que nadie puede teclear bien. Un `config.json` editado a mano entra por
+    aquí, así que la criba no es un lujo.
+    """
+    source = os.environ if env is None else env
+    saved = (config or {}).get("admin_pin")
+    if isinstance(saved, str) and is_valid_admin_pin(saved):
+        return saved
+    inherited = str(source.get(ADMIN_PIN_ENV, "") or "")
+    return inherited if is_valid_admin_pin(inherited) else ""
+
+
+def _declare_admin_pin(pin: str, env: dict[str, str]) -> None:
+    """Declara (o retira) el PIN en el entorno. `pin` ya viene cribado.
+
+    Retirar se hace con `pop` y no escribiendo `""`: un valor ausente no se puede
+    leer mal, y el backend también es fail-closed.
+    """
+    if pin:
+        env[ADMIN_PIN_ENV] = pin
+    else:
+        env.pop(ADMIN_PIN_ENV, None)
+
+
+def apply_admin_config(config: dict, env: dict[str, str] | None = None) -> None:
+    """Declara en el entorno el PIN vigente al arrancar, para que el backend lo reciba.
+
+    `backend_env()` copia este entorno al arrancar el backend, así que declararlo
+    aquí es lo que hace que el PIN del lanzador y el del backend sean el mismo.
+    Declara el **vigente**, no solo el guardado: un arranque manual
+    (`ENGLISH_TUTOR_ADMIN_PIN=… python launcher.py`) tiene que seguir sirviendo
+    sin escribir ninguna preferencia.
+    """
+    source = os.environ if env is None else env
+    _declare_admin_pin(admin_pin(config, source), source)
+
+
+def set_admin_pin(
+    pin: str,
+    config: dict,
+    path: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> dict | None:
+    """Guarda (o retira, con `""`) el PIN de administración. `None` si no vale.
+
+    Es el único sitio donde se escribe, y vive aquí —no en la GUI— por la misma
+    razón que `toggle_lan_config`: el cableado «validar → declarar → guardar»
+    tiene que poder probarse sin pantalla.
+
+    Retirar retira **de verdad**, también en el entorno: si solo se vaciara la
+    preferencia, un `ENGLISH_TUTOR_ADMIN_PIN` que este mismo proceso hubiera
+    declarado al guardar seguiría ahí y la administración no se habría cerrado —
+    el botón diría «retirado» y el candado seguiría abierto.
+    """
+    from config_store import save_config
+
+    source = os.environ if env is None else env
+    if pin == "":
+        config["admin_pin"] = ""
+        _declare_admin_pin("", source)
+    elif is_valid_admin_pin(pin):
+        config["admin_pin"] = pin
+        _declare_admin_pin(pin, source)
+    else:
+        return None
     save_config(config, path)
     return config
 

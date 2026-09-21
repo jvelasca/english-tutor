@@ -69,9 +69,16 @@ const LEXICON: Lexicon = {
 /** Mock de fetch por URL; `data` puede ser un valor o una función evaluada en
  * el momento de la llamada (para mutar estado entre llamadas). */
 function routeFetch(routes: Array<{ url: string; data: unknown }>) {
+  const defaults: Array<{ url: string; data: unknown }> = [
+    { url: "/api/vocabulary/retention/due", data: { due_count: 0, items: [], limit: 15, fsrs_version: "" } },
+    { url: "/api/vocabulary/collections", data: { collections: [] } },
+    { url: "/api/learning/review", data: { items: [], units: [] } },
+  ];
   const fn = vi.fn().mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
-    const hit = routes.find((r) => url.includes(r.url));
+    const hit =
+      routes.find((r) => url.includes(r.url)) ??
+      defaults.find((r) => url.includes(r.url));
     if (!hit) return Promise.reject(new Error(`unexpected fetch: ${url}`));
     const data = typeof hit.data === "function" ? hit.data() : hit.data;
     return Promise.resolve({ ok: true, json: async () => data });
@@ -148,7 +155,42 @@ describe("PersonalDictionary (V3.19 drill)", () => {
       if (url.includes("/api/vocabulary/lexicon")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ({ summary: { total: 0, by_cefr: [] }, items: [] }),
+          json: async () => ({
+            summary: {
+              total: 0,
+              known: 0,
+              learning: 0,
+              weak: 0,
+              mastered: 0,
+              by_cefr: [],
+              recognized: 0,
+              produced: 0,
+              transfer: 0,
+              retention: 0,
+              spaced_exposure: 0,
+              production_gap: 0,
+              transfer_gap: 0,
+            },
+            items: [],
+          }),
+        });
+      }
+      if (url.includes("/api/vocabulary/retention/due")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ due_count: 0, items: [], limit: 15 }),
+        });
+      }
+      if (url.includes("/api/vocabulary/collections")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ collections: [] }),
+        });
+      }
+      if (url.includes("/api/learning/review")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [], units: [] }),
         });
       }
       return Promise.resolve({ ok: true, json: async () => ({ words: [] }) });

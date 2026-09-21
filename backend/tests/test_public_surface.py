@@ -123,6 +123,29 @@ def test_la_ruta_del_pin_es_de_datos_y_exige_sesion(monkeypatch, tmp_path):
         assert r.json()["detail"] == "SESSION_REQUIRED"
 
 
+def test_la_peticion_de_perfil_es_la_unica_escritura_sin_sesion(monkeypatch, tmp_path):
+    """`POST /api/profile-requests` (V3.77): sin sesión **y** sin efecto.
+
+    Es la única escritura de la app que no exige credencial, porque quien pide un
+    perfil no tiene ninguno todavía. Se comprueba en el mismo test que lo que
+    consigue es exactamente una fila en la cola: si algún día empezara a crear un
+    perfil, este es el test que lo dice.
+    """
+    _setup(monkeypatch, tmp_path)
+    antes = len(users_repo.list_users(include_disabled=True))
+    with TestClient(app) as client:
+        r = client.post("/api/profile-requests", json={"display_name": "Nueva"})
+    assert r.status_code == 201
+    assert len(users_repo.list_users(include_disabled=True)) == antes
+
+    # Y la de baja, que es la otra mitad, sí exige sesión.
+    with TestClient(app) as client:
+        assert (
+            client.post("/api/profile-requests/delete", json={"note": ""}).status_code
+            == 401
+        )
+
+
 def test_la_superficie_sin_sesion_esta_declarada_por_escrito():
     """Candado anti-deriva documental: lo aceptado tiene que estar escrito.
 
@@ -138,5 +161,11 @@ def test_la_superficie_sin_sesion_esta_declarada_por_escrito():
     assert "Superficie sin sesión" in doc, (
         "ARQUITECTURA.md no declara la superficie que responde sin sesión"
     )
-    for ruta in ("/api/system/status", "/api/network", "/api/models"):
+    for ruta in (
+        "/api/system/status",
+        "/api/network",
+        "/api/models",
+        # V3.77: la única escritura sin sesión y su justificación.
+        "/api/profile-requests",
+    ):
         assert ruta in doc, f"ARQUITECTURA.md no declara {ruta} como aceptada"

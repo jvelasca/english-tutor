@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  addVocabularyBulk,
+  addVocabularyItem,
+  enrollVocabCollection,
   getDrillCandidates,
   getDrillRecallPrompt,
   getDrillSentenceContext,
   getLexicon,
+  getRetentionDue,
+  listVocabCollections,
   lookupDictionaryWord,
   markDrillAbandoned,
   markDrillStarted,
+  reviewRetentionCard,
   submitDrillAttempt,
   submitDrillRecallAttempt,
   submitDrillSentenceAttempt,
@@ -181,5 +187,54 @@ describe("vocabulary api", () => {
     vi.stubGlobal("fetch", empty);
     expect(await markDrillStarted("u1", "")).toBe(false);
     expect(empty).not.toHaveBeenCalled();
+  });
+
+  it("addVocabularyItem POST /items", async () => {
+    const fn = mockFetch({ added: ["ticket"], item: { word: "ticket" } });
+    await addVocabularyItem("u1", "ticket", { translation: "billete" });
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/items");
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "ticket",
+      translation: "billete",
+      collection_id: null,
+    });
+  });
+
+  it("addVocabularyBulk POST /items/bulk", async () => {
+    const fn = mockFetch({ added: ["a"], count: 1, collection_id: 1 });
+    await addVocabularyBulk("u1", "a\nb", { title: "Basics" });
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/items/bulk");
+    expect(JSON.parse(init.body as string).title).toBe("Basics");
+  });
+
+  it("listVocabCollections y enrollVocabCollection", async () => {
+    const listFn = mockFetch({ collections: [] });
+    await listVocabCollections("u1");
+    expect(listFn.mock.calls[0][0]).toBe("/api/vocabulary/collections");
+
+    const enrollFn = mockFetch({ collection_id: 3, added: [], count: 0 });
+    await enrollVocabCollection("u1", 3);
+    expect(enrollFn.mock.calls[0][0]).toBe(
+      "/api/vocabulary/collections/3/enroll",
+    );
+  });
+
+  it("getRetentionDue y reviewRetentionCard", async () => {
+    const dueFn = mockFetch({ due_count: 0, items: [], limit: 15 });
+    await getRetentionDue("u1", { limit: 15, collectionId: 2 });
+    expect(dueFn.mock.calls[0][0]).toBe(
+      "/api/vocabulary/retention/due?limit=15&collection_id=2",
+    );
+
+    const reviewFn = mockFetch({ word: "ticket", grade: 3, reps: 1 });
+    await reviewRetentionCard("u1", "ticket", 3);
+    const [url, init] = reviewFn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/retention/review");
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "ticket",
+      grade: 3,
+    });
   });
 });

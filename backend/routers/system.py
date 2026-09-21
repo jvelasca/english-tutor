@@ -69,7 +69,7 @@ async def server_status() -> dict:
 async def backup_status(_: None = Depends(require_admin)) -> dict:
     """Estado del subsistema de backup: si exige PIN y cuántos se conservan."""
     return {
-        "admin_required": bool(config.ADMIN_PIN),
+        "admin_required": bool(config.admin_pin()),
         "keep_backups": backup.KEEP_BACKUPS,
         "backup_count": len(backup.list_backups()),
     }
