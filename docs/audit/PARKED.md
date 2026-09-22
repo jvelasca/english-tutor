@@ -1442,6 +1442,72 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   «contrato incompleto» en un error visible en vez de en un render raro o vacío.
   `[PRODUCTO]`
 
+## V3.77.2 — el endurecimiento del diccionario personal (2026-09-22)
+
+> Origen: **una auditoría externa sobre el tag `v3.77.1`**, que reprodujo lo que la
+> release anterior decía haber cerrado y encontró que **el padre tenía el mismo
+> defecto sin arreglar** (H4) y que faltaba una pieza que ninguna release note
+> mencionaba: **un `ErrorBoundary`**. A eso se sumó un **P0 de backend** que no
+> venía de la UI. Notas en `release-notes-v3.77.2.md`.
+
+### Cerrado en V3.77.2 (deja de ser deuda)
+
+- **El invariante compartido que V3.77.1 declaró abierto ahora existe**
+  (`[PRODUCTO]` de §V3.77.1: «ningún invariante exige una respuesta completa en el
+  cliente»). `frontend/src/api/normalize.ts` normaliza **por contrato** y se aplica
+  en la frontera de API **y** en los componentes. Cierra el caso concreto que
+  V3.77.1 dejó abierto: `PersonalDictionary` guardaba `setLexicon(data)` /
+  `setCandidates(drill.words)` sin comprobar la forma, así que un contrato
+  incompleto mataba **la pantalla del diccionario y a sus tres hijos**, incluido el
+  `AddVocabSection` que V3.77.1 ya había parcheado. **Parcial, ver abajo.**
+- **El `ErrorBoundary` que no existía.** Un `throw` en render desmontaba el árbol
+  entero. Ahora hay dos radios (`app` en `main.tsx`, `route` en el `Workspace`) y
+  un panel de recuperación i18n. **Este era el multiplicador de radio**, no el
+  defecto: es lo que hacía que un campo que faltaba dejara al alumno en blanco.
+- **Las hermanas del mismo defecto.** `ReviewQueueSection` usaba
+  `queue?.items ?? []` (**más débil** que el `Array.isArray(...)` de
+  `AddVocabSection`: deja pasar un `items` truthy que no sea array),
+  `DictionaryLookup` guardaba `entry` sin normalizar y `wordDrill`/`wordDrillSteps`
+  hacían `.map` sobre `options` sin guardia.
+- **El spinner infinito de `userId === null`.** `refresh()` salía temprano y
+  `lexicon` se quedaba en `null` para siempre, así que la vista giraba sin pedir
+  nada. Ahora pide elegir perfil.
+- **El cierre de sesión de retención no se veía nunca.** El camino de fin llamaba a
+  `load()` y reseteaba `index`/`done`: el resumen no aparecía jamás.
+- **El doble `h1` del diccionario.** `DictionaryScreen` es dueño del layout y
+  `PersonalDictionary` lo repetía. Candado nuevo que monta el componente **real**:
+  `DictionaryScreen.test.tsx` mockea la vista, así que podía verificar que la
+  pantalla monta pero **no** que haya un solo `h1`.
+- **La mordida, comprobada revirtiendo.** Guardia neutralizada → los **3** tests de
+  seguridad fallan (y el de la colección inexistente con un
+  `sqlite3.IntegrityError` sin capturar, es decir un **500** en mitad de la
+  escritura); `normalizeLexicon`/`normalizeDrillCandidates` hechos passthrough →
+  el test del componente **muere en `PersonalDictionary.tsx:130`, en render**, el
+  mismo sitio que describe el hallazgo.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **La normalización es un contrato de FORMA, no de SIGNIFICADO.** Un léxico
+  incompleto ya no tumba la pantalla pero **se degrada al estado vacío**: un fallo
+  **silencioso** donde antes había uno **ruidoso**. Lo que lo mitigaría es
+  distinguir «vacío porque no hay» de «vacío porque no entendí»; hoy `loadError`
+  solo cubre el fallo de red, no el contrato raro. Intercambio declarado a
+  propósito, y **deuda**, no cierre. `[PRODUCTO]`
+- **La sonda sigue siendo oportunista, no sistemática** (§V3.77.1). No se ha añadido
+  ninguna prueba que recorra *todas* las respuestas del producto con la forma
+  vacía: el `normalize.ts` cubre las pantallas que se han tocado, no «cualquier
+  contrato de cualquier endpoint». `[VALIDACIÓN]`
+- **La suite visual no se ha corrido en local para esta release** (la autoridad es
+  el CI). Añadido a eso: los botones nuevos de «Repasar» usan `aria-expanded` y
+  **no** `aria-pressed` **a propósito**, porque `drillProvenance.spec.ts` localiza
+  la entrada al drill con `li:has(button[aria-pressed]) button[aria-pressed]`; que
+  eso no rompa la spec **lo tiene que confirmar el CI**. `[R]`
+- **La fragilidad del arnés visual bajo carga en Windows sigue aparcada**
+  (§V3.75.2), igual que en V3.77.1. `[R]`
+- **El P0 de identidad sigue abierto** (`docs/audit/PLAN-P0-IDENTIDAD.md`): esta
+  release cierra **una** autorización que faltaba en **dos** endpoints, no el
+  modelo de identidad. `[PRODUCTO]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

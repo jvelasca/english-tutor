@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { getDrillCandidates, getLexicon } from "../../api/vocabulary";
+import { normalizeDrillCandidates, normalizeLexicon } from "../../api/normalize";
 import type { LexicalItem, LexicalStatus, Lexicon } from "../../types/api";
 import { cefrBarValue, sortLexicalItems } from "./dictionary";
 import { ReviewQueueSection } from "./ReviewQueueSection";
@@ -39,6 +40,14 @@ const STATUS_TONE: Record<LexicalStatus, string> = {
 
 interface PersonalDictionaryProps {
   userId: string | null;
+  /**
+   * V3.77.2: dueño del layout. `DictionaryScreen` ya pinta el `h1`, el subtítulo
+   * y el ancho de página (igual que hace con `DictionaryLookup`), así que la
+   * vista incrustada no debe repetirlos: con `showHeader={false}` no emite su
+   * propio `h1` ni el contenedor `max-w-3xl/px-4/py-8` (antes había dos `h1` en
+   * la misma página y el ancho quedaba reducido dos veces).
+   */
+  showHeader?: boolean;
 }
 
 /** Diccionario personal (V2.3): evidencia por ítem léxico con estado y recall.
@@ -47,7 +56,10 @@ interface PersonalDictionaryProps {
  * acción de micro-práctica oral dentro del panel. V3.32: la escalera de drill
  * (Recall → Sentence) vive en `./wordDrill` y se comparte con el diccionario
  * de consulta («Practicar esta palabra»). */
-export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
+export function PersonalDictionary({
+  userId,
+  showHeader = true,
+}: PersonalDictionaryProps) {
   const { t } = useI18n();
   const [lexicon, setLexicon] = useState<Lexicon | null>(null);
   const [candidates, setCandidates] = useState<string[]>([]);
@@ -61,8 +73,13 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
         getLexicon(userId),
         getDrillCandidates(userId),
       ]);
-      setLexicon(data);
-      setCandidates(drill.words);
+      // V3.77.2: el ESTADO nunca guarda una forma sin comprobar. La frontera de
+      // API ya normaliza, pero se aplica también aquí para que el componente sea
+      // seguro aunque se monte con un cliente sustituido. Antes `setLexicon({})`
+      // + `setCandidates(undefined)` dejaban `items`/`summary` sin forma y el
+      // `.map` al pintar tumbaba (sin ErrorBoundary) la app entera.
+      setLexicon(normalizeLexicon(data));
+      setCandidates(normalizeDrillCandidates(drill).words);
       setLoadError(false);
     } catch {
       /* backend no disponible */
@@ -77,9 +94,20 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
 
   if (!lexicon) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-        <DictionaryHeader />
-        {loadError ? (
+      <div
+        className={
+          showHeader ? "mx-auto w-full max-w-3xl px-4 py-8 sm:px-6" : "w-full"
+        }
+      >
+        {showHeader && <DictionaryHeader />}
+        {!userId ? (
+          /* V3.77.2: sin perfil no hay léxico que pedir. Antes `refresh` salía
+             temprano y `lexicon` se quedaba en `null` para siempre: la vista
+             mostraba «Cargando…» de forma indefinida. */
+          <p className="mt-4 text-sm text-muted-foreground">
+            {t("dictionary.noProfile")}
+          </p>
+        ) : loadError ? (
           <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
             {t("dictionary.loadError")}
             <button
@@ -104,14 +132,18 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
   const maxCefr = Math.max(1, ...summary.by_cefr.map((b) => b.count));
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div
+      className={
+        showHeader ? "mx-auto w-full max-w-3xl px-4 py-8 sm:px-6" : "w-full"
+      }
+    >
       <motion.div
         variants={container}
         initial="hidden"
         animate="show"
         className="flex flex-col gap-5"
       >
-        <DictionaryHeader total={summary.total} />
+        {showHeader && <DictionaryHeader total={summary.total} />}
 
         {/* Practicar hoy: retención (Anki-lite) + cola de competencia (drill). */}
         {userId && (
@@ -155,9 +187,18 @@ export function PersonalDictionary({ userId }: PersonalDictionaryProps) {
         )}
 
         <motion.section variants={item} aria-label={t("dictionary.title")}>
-          <h2 className="mb-3 text-sm font-semibold tracking-tight">
-            {t("dictionary.myLexicon")}
-          </h2>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight">
+              {t("dictionary.myLexicon")}
+            </h2>
+            {/* Incrustado no hay cabecera que muestre el total, así que el
+                contador viaja aquí para no perder la información. */}
+            {!showHeader && (
+              <Badge variant="secondary" className="shrink-0">
+                {summary.total} {t("dictionary.total")}
+              </Badge>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
               label={t("dictionary.known")}

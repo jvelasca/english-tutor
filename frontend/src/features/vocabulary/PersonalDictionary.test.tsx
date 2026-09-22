@@ -322,6 +322,54 @@ describe("PersonalDictionary (V3.19 drill)", () => {
   });
 });
 
+describe("PersonalDictionary · contratos incompletos (V3.77.2)", () => {
+  beforeEach(() => stubMediaRecorder());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("un léxico y unas candidatas sin forma no tumban la pantalla", async () => {
+    // El fallo de H4: `setLexicon(data)` con `{}` dejaba `items`/`summary` en
+    // `undefined` y el `.map` al pintar reventaba. Sin ErrorBoundary eso
+    // desmontaba la app entera, no solo la pantalla del diccionario.
+    routeFetch([
+      { url: "/api/vocabulary/lexicon", data: {} },
+      { url: "/api/vocabulary/drill/candidates", data: {} },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+
+    // La pantalla sigue viva y ofrece su estado vacío honesto.
+    expect(await screen.findByText(/No words yet/)).toBeTruthy();
+    expect(screen.getByText("My lexicon")).toBeTruthy();
+    // Sin léxico no hay candidatas que pintar.
+    expect(screen.queryByRole("button", { name: /^Say / })).toBeNull();
+  });
+
+  it("un `items` no-array tampoco lo tumba", async () => {
+    routeFetch([
+      { url: "/api/vocabulary/lexicon", data: { summary: "raro", items: {} } },
+      { url: "/api/vocabulary/drill/candidates", data: { words: "go" } },
+    ]);
+
+    renderPanel(<PersonalDictionary userId="u1" />);
+
+    expect(await screen.findByText(/No words yet/)).toBeTruthy();
+  });
+
+  it("sin perfil activo no se queda en «Cargando…» indefinidamente", () => {
+    renderPanel(<PersonalDictionary userId={null} />);
+
+    expect(
+      screen.getByText(
+        "Select a learning profile to see your personal dictionary.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Loading…")).toBeNull();
+  });
+});
+
 describe("PersonalDictionary · V3.33 paso Recognition", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {

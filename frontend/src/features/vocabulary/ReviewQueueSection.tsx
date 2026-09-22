@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, type Variants } from "motion/react";
 import { CalendarClock, RefreshCw } from "lucide-react";
 import { getReviewQueue } from "../../api/learning";
+import { asArray, normalizeReviewQueue } from "../../api/normalize";
 import type {
   ReviewActivity,
   ReviewDecision,
@@ -133,7 +134,9 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
 
   const refresh = useCallback(async () => {
     try {
-      setQueue(await getReviewQueue(userId));
+      // V3.77.2: se normaliza en la frontera del estado. El `queue?.items ?? []`
+      // de antes no protegía contra un `items` no-array pero *truthy*.
+      setQueue(normalizeReviewQueue(await getReviewQueue(userId)));
       setLoadError(false);
     } catch {
       /* backend no disponible */
@@ -145,7 +148,7 @@ export function ReviewQueueSection({ userId }: ReviewQueueSectionProps) {
     void refresh();
   }, [refresh]);
 
-  const items = queue?.items ?? [];
+  const items = asArray<ReviewQueueItem>(queue?.items);
 
   return (
     <motion.section variants={item} aria-label={t("dictionary.review.title")}>

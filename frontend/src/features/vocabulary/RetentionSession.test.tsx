@@ -80,4 +80,77 @@ describe("RetentionSession", () => {
       expect(reviewRetentionCard).toHaveBeenCalledWith("u1", "airport", 3);
     });
   });
+
+  it("al gradear la última tarjeta se ve el resumen, no una recarga silenciosa", async () => {
+    // V3.77.2: antes `setActive(false)` + `load()` recargaban la cola y
+    // reseteaban `index`/`done`, así que la pantalla de fin nunca aparecía y el
+    // alumno no veía cuántas tarjetas había repasado.
+    const card = (word: string) => ({
+      word,
+      translation: `${word}-es`,
+      definition: "",
+      due_at: "",
+      stability: 0.1,
+      retrievability: 1,
+      why: "retention-import",
+      reps: 0,
+    });
+    vi.mocked(getRetentionDue).mockResolvedValue({
+      due_count: 2,
+      limit: 15,
+      fsrs_version: "test",
+      items: [card("airport"), card("ticket")],
+    });
+    vi.mocked(reviewRetentionCard).mockResolvedValue({
+      word: "airport",
+      grade: 3,
+      due_at: "",
+      next_in_days: 2,
+      stability: 1,
+      retrievability: 1,
+      reps: 1,
+    });
+    const onFinished = vi.fn();
+
+    renderSession(<RetentionSession userId="u1" onFinished={onFinished} />);
+
+    fireEvent.click(await screen.findByText(/Start session/i));
+    // Primera tarjeta.
+    fireEvent.click(screen.getByText(/Show answer/i));
+    fireEvent.click(screen.getByText("Good"));
+    // Segunda tarjeta.
+    await screen.findByText("ticket");
+    fireEvent.click(screen.getByText(/Show answer/i));
+    fireEvent.click(screen.getByText("Good"));
+
+    expect(
+      await screen.findByText("Session done — 2 cards reviewed."),
+    ).toBeTruthy();
+    expect(onFinished).toHaveBeenCalledTimes(1);
+    // El resumen se pinta SIN recargar la cola (una sola petición inicial).
+    expect(getRetentionDue).toHaveBeenCalledTimes(1);
+    // Y ofrece salida: volver o refrescar.
+    expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeTruthy();
+  });
+
+  it("acota la cola a una colección cuando recibe `collectionId`", async () => {
+    // V3.77.2: así «Repasar lista» / «Repasar pack» funcionan de verdad y no
+    // abren una sesión sobre TODO el léxico.
+    vi.mocked(getRetentionDue).mockResolvedValue({
+      due_count: 0,
+      limit: 15,
+      fsrs_version: "test",
+      items: [],
+    });
+
+    renderSession(<RetentionSession userId="u1" collectionId={42} />);
+
+    await waitFor(() =>
+      expect(getRetentionDue).toHaveBeenCalledWith("u1", {
+        limit: 15,
+        collectionId: 42,
+      }),
+    );
+  });
 });

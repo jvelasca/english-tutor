@@ -811,3 +811,59 @@ describe("DictionaryLookup · V3.39 diccionario reversible ES→EN", () => {
     expect(String(recognitionCall?.[0])).toContain("word=house");
   });
 });
+
+describe("DictionaryLookup · contratos incompletos (V3.77.2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("una entrada sin `usage` no revienta la tarjeta de resultado", async () => {
+    // El `setEntry(data)` sin validar dejaba `entry.usage.surface` a `undefined`
+    // y la marca de uso `.tracked` lanzaba al pintar la tarjeta.
+    routeFetch([
+      {
+        url: "/api/vocabulary/dictionary",
+        data: {
+          word: "coffee",
+          kind: "word",
+          cefr: "A1",
+          definition_source: "llm",
+          pos: "noun",
+          definition: "A hot drink.",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+    fillAndSubmit("coffee");
+
+    expect(await screen.findByText("A hot drink.")).toBeTruthy();
+    // `usage` ausente se degrada a «no registrada»: bloque informativo vacío,
+    // no un acceso a `.tracked` de `undefined`.
+    expect(screen.getByText("This word in your learning")).toBeTruthy();
+    expect(screen.getByText("Not met yet")).toBeTruthy();
+  });
+
+  it("una entrada con `usage` no-objeto y sin `alternatives` tampoco", async () => {
+    routeFetch([
+      {
+        url: "/api/vocabulary/dictionary",
+        data: {
+          word: "coffee",
+          kind: "word",
+          cefr: "A1",
+          definition_source: "llm",
+          pos: "noun",
+          definition: "A hot drink.",
+          translation: "café",
+          usage: "raro",
+          alternatives: "café",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+    fillAndSubmit("coffee");
+
+    expect(await screen.findByText("A hot drink.")).toBeTruthy();
+  });
+});

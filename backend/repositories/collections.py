@@ -238,6 +238,38 @@ def add_membership(
     return True
 
 
+def add_memberships(
+    user_id: str, collection_id: int, words: list[str]
+) -> int:
+    """Alta de membresías en UNA transacción (V3.77.2).
+
+    `add_membership` abría una conexión (más su comprobación de usuario) por
+    palabra: enrolar un pack o pegar una lista de N palabras hacía N idas y
+    vueltas a la BD, dentro de un `to_thread` cada una. Aquí se agrupa con un
+    solo `executemany`, con la MISMA semántica (`INSERT OR IGNORE`, duplicados
+    dentro del lote incluidos). Devuelve las filas realmente insertadas.
+    """
+    if get_user(user_id) is None:
+        return 0
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in words:
+        w = str(raw).strip().lower()
+        if w and w not in seen:
+            seen.add(w)
+            cleaned.append(w)
+    if not cleaned:
+        return 0
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.executemany(
+            "INSERT OR IGNORE INTO vocab_collection_membership "
+            "(user_id, collection_id, word, created_at) VALUES (?, ?, ?, ?)",
+            [(user_id, collection_id, w, now) for w in cleaned],
+        )
+        return int(cur.rowcount or 0)
+
+
 def words_in_collection(user_id: str, collection_id: int) -> set[str]:
     with closing(_conn()) as conn:
         rows = conn.execute(

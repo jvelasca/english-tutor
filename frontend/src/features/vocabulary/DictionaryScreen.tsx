@@ -74,7 +74,10 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
 
         <div className="min-h-0 flex-1">
           {view === "personal" ? (
-            <PersonalDictionary userId={userId} />
+            /* V3.77.2: la pantalla es la única dueña del layout (un solo `h1`
+               y un solo contenedor de ancho), igual que ya hacía con la vista
+               de consulta. */
+            <PersonalDictionary userId={userId} showHeader={false} />
           ) : (
             /* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
                vista de consulta no repite cabecera (antes había dos `h1` en la

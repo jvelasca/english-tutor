@@ -24,10 +24,20 @@ const GRADES = [
 
 interface RetentionSessionProps {
   userId: string;
+  /**
+   * V3.77.2: acota la cola a una colección (`?collection_id=`), para poder
+   * repasar una lista o un pack concreto desde «Añadir». Sin él la sesión
+   * cubre todo el léxico, como hasta ahora.
+   */
+  collectionId?: number;
   onFinished?: () => void;
 }
 
-export function RetentionSession({ userId, onFinished }: RetentionSessionProps) {
+export function RetentionSession({
+  userId,
+  collectionId,
+  onFinished,
+}: RetentionSessionProps) {
   const { t } = useI18n();
   const [queue, setQueue] = useState<RetentionCard[]>([]);
   const [index, setIndex] = useState(0);
@@ -42,7 +52,7 @@ export function RetentionSession({ userId, onFinished }: RetentionSessionProps) 
     setLoading(true);
     setError(false);
     try {
-      const data = await getRetentionDue(userId, { limit: 15 });
+      const data = await getRetentionDue(userId, { limit: 15, collectionId });
       setQueue(Array.isArray(data?.items) ? data.items : []);
       setIndex(0);
       setFlipped(false);
@@ -53,7 +63,7 @@ export function RetentionSession({ userId, onFinished }: RetentionSessionProps) 
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, collectionId]);
 
   useEffect(() => {
     void load();
@@ -71,9 +81,14 @@ export function RetentionSession({ userId, onFinished }: RetentionSessionProps) 
       setFlipped(false);
       const next = index + 1;
       if (next >= queue.length) {
-        setActive(false);
+        // V3.77.2: la sesión NO se cierra recargando. Antes se hacía
+        // `setActive(false)` + `load()`, que reseteaba `index`/`done` y
+        // recargaba la cola: la pantalla de fin («N tarjetas repasadas») era
+        // inalcanzable y el alumno nunca veía cuánto había hecho. Ahora se
+        // avanza el índice para que `current` sea null y la tarjeta de resumen
+        // se pinte con el contador intacto.
+        setIndex(next);
         onFinished?.();
-        await load();
       } else {
         setIndex(next);
       }
@@ -138,12 +153,38 @@ export function RetentionSession({ userId, onFinished }: RetentionSessionProps) 
   if (!current) {
     return (
       <Card className="gap-3 p-5">
-        <p className="text-sm text-muted-foreground">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Layers className="size-4 text-primary" aria-hidden="true" />
+          {t("dictionary.retention.title")}
+        </h2>
+        <p className="text-sm font-medium">
           {t("dictionary.retention.finished").replace("{n}", String(done))}
         </p>
-        <Button type="button" size="sm" variant="outline" onClick={() => setActive(false)}>
-          {t("dictionary.retention.back")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setActive(false)}
+          >
+            {t("dictionary.retention.back")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              // Vuelve al estado plegado: si han entrado cartas nuevas, la
+              // tarjeta ofrece empezar; si no, el mensaje honesto de «nada
+              // pendiente». No se resetea `done` (ya se muestra el resumen).
+              void load();
+              setActive(false);
+            }}
+          >
+            <RefreshCw className="size-3.5" aria-hidden="true" />
+            {t("dictionary.retention.refresh")}
+          </Button>
+        </div>
       </Card>
     );
   }

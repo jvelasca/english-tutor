@@ -1,4 +1,5 @@
 import { getJson, postJson } from "./client";
+import { normalizeReviewQueue } from "./normalize";
 import type { LearningEvent, LearningProfile, ReviewQueue } from "../types/api";
 
 export function getProfile(_userId: string): Promise<LearningProfile> {
@@ -26,5 +27,7 @@ export function getReviewQueue(
   const query = new URLSearchParams({
     limit: String(limit),
   }).toString();
-  return getJson<ReviewQueue>(`/api/learning/review?${query}`);
+  return getJson<unknown>(`/api/learning/review?${query}`).then(
+    normalizeReviewQueue,
+  );
 }

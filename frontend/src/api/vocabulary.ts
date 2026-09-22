@@ -1,4 +1,14 @@
 import { getJson, postJson, withTimeout } from "./client";
+import {
+  normalizeDictionaryEntry,
+  normalizeDrillCandidates,
+  normalizeLexicon,
+  normalizeRetentionDue,
+  normalizeVocabBulkAdd,
+  normalizeVocabCollections,
+  normalizeVocabEnroll,
+  normalizeVocabItemAdd,
+} from "./normalize";
 import type {
   DictionaryDirection,
   DictionaryEntry,
@@ -26,7 +36,7 @@ import type {
 
 /** Léxico personal del alumno (V2.3): resumen + ítems con estado y recall. */
 export function getLexicon(__userId: string): Promise<Lexicon> {
-  return getJson<Lexicon>("/api/vocabulary/lexicon");
+  return getJson<unknown>("/api/vocabulary/lexicon").then(normalizeLexicon);
 }
 
 /** Entrada del diccionario de consulta (V3.30): definición/traducción cacheada
@@ -44,7 +54,9 @@ export function lookupDictionaryWord(
 ): Promise<DictionaryEntry> {
   const body: DictionaryLookupRequest = { word, direction };
   return withTimeout(
-    postJson<DictionaryEntry>("/api/vocabulary/dictionary", body),
+    postJson<unknown>("/api/vocabulary/dictionary", body).then(
+      normalizeDictionaryEntry,
+    ),
     // La primera consulta de una palabra paga la generación del modelo local
     // en CPU (el servidor además acota la espera de los waiters del
     // single-flight a 60 s); este tope evita que la tarjeta se quede en
@@ -63,7 +75,9 @@ export function getDrillCandidates(
   const query = new URLSearchParams({
     limit: String(limit),
   }).toString();
-  return getJson<DrillCandidates>(`/api/vocabulary/drill/candidates?${query}`);
+  return getJson<unknown>(
+    `/api/vocabulary/drill/candidates?${query}`,
+  ).then(normalizeDrillCandidates);
 }
 
 /** Intento de speaking micro-drill: sube el audio de la palabra. Si el alumno
@@ -376,11 +390,11 @@ export function addVocabularyItem(
   word: string,
   options: { translation?: string; collectionId?: number } = {},
 ): Promise<VocabItemAddResult> {
-  return postJson<VocabItemAddResult>("/api/vocabulary/items", {
+  return postJson<unknown>("/api/vocabulary/items", {
     word,
     translation: options.translation ?? "",
     collection_id: options.collectionId ?? null,
-  });
+  }).then(normalizeVocabItemAdd);
 }
 
 /** Pega una lista de palabras (una por línea; opcional word,translation). */
@@ -389,17 +403,19 @@ export function addVocabularyBulk(
   text: string,
   options: { title?: string; collectionId?: number } = {},
 ): Promise<VocabBulkAddResult> {
-  return postJson<VocabBulkAddResult>("/api/vocabulary/items/bulk", {
+  return postJson<unknown>("/api/vocabulary/items/bulk", {
     text,
     title: options.title ?? "",
     collection_id: options.collectionId ?? null,
-  });
+  }).then(normalizeVocabBulkAdd);
 }
 
 export function listVocabCollections(
   _userId: string,
 ): Promise<VocabCollections> {
-  return getJson<VocabCollections>("/api/vocabulary/collections");
+  return getJson<unknown>("/api/vocabulary/collections").then(
+    normalizeVocabCollections,
+  );
 }
 
 export function createVocabCollection(
@@ -413,10 +429,10 @@ export function enrollVocabCollection(
   _userId: string,
   collectionId: number,
 ): Promise<VocabEnrollResult> {
-  return postJson<VocabEnrollResult>(
+  return postJson<unknown>(
     `/api/vocabulary/collections/${collectionId}/enroll`,
     {},
-  );
+  ).then(normalizeVocabEnroll);
 }
 
 /** Cola due de retención (sesión tarjetas estilo Anki). */
@@ -430,9 +446,9 @@ export function getRetentionDue(
     params.set("collection_id", String(options.collectionId));
   }
   const q = params.toString();
-  return getJson<RetentionDue>(
+  return getJson<unknown>(
     `/api/vocabulary/retention/due${q ? `?${q}` : ""}`,
-  );
+  ).then(normalizeRetentionDue);
 }
 
 /** Grade 1–4 (Again/Hard/Good/Easy) → reprograma FSRS lexicon. */

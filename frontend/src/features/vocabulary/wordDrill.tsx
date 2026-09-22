@@ -54,6 +54,7 @@ import type {
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { useRecordingSession } from "../../hooks/useRecordingSession";
+import { asArray } from "../../api/normalize";
 import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { MicUnavailableNotice } from "../../components/MicUnavailableNotice";
 import { Card } from "../../components/ui/card";
@@ -980,7 +981,9 @@ export function WordDrill({
             ? t("dictionary.drill.recognitionCorrect")
             : t("dictionary.drill.recognitionIncorrect").replace(
                 "{correct}",
-                recognition?.options[recognitionOutcome.correct_index] ?? "—",
+                asArray<string>(recognition?.options)[
+                  recognitionOutcome.correct_index
+                ] ?? "—",
               )}
         </div>
       )}

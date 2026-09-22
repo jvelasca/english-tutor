@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { navigateTo } from "../router/hash";
 import { LEARN_PATH } from "../router/paths";
 import {
@@ -284,5 +285,15 @@ export function Workspace({
     );
   }
 
-  return <Suspense fallback={<RouteFallback />}>{content}</Suspense>;
+  return (
+    // V3.77.2: segundo radio de contención. Un fallo de una pantalla se queda
+    // en esa pantalla (cabecera, navegación y perfil siguen utilizables); al
+    // cambiar de destino el boundary se remonta y el aviso desaparece.
+    <ErrorBoundary
+      scope="route"
+      key={`${route}:${learnActivity ?? ""}:${chatSkill ?? ""}`}
+    >
+      <Suspense fallback={<RouteFallback />}>{content}</Suspense>
+    </ErrorBoundary>
+  );
 }

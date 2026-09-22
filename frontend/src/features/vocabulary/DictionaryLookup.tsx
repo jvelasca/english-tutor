@@ -10,6 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { normalizeDictionaryEntry } from "../../api/normalize";
 import { addVocabularyItem, lookupDictionaryWord } from "../../api/vocabulary";
 import type {
   DictionaryDirection,
@@ -115,7 +116,7 @@ export function DictionaryLookup({
     setAddStatus("idle");
     try {
       const data = await lookupDictionaryWord(userId, word, dir);
-      setEntry(data);
+      setEntry(normalizeDictionaryEntry(data));
     } catch {
       setEntry(null);
       setNetworkError(true);
@@ -148,7 +149,7 @@ export function DictionaryLookup({
     if (!userId) return;
     try {
       const data = await lookupDictionaryWord(userId, word, dir);
-      setEntry(data);
+      setEntry(normalizeDictionaryEntry(data));
     } catch {
       /* conserva la entrada actual */
     }

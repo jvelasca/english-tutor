@@ -17,6 +17,7 @@ import { motion } from "motion/react";
 
 import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../lib/utils";
+import { asArray } from "../../api/normalize";
 import type {
   DrillRecallAttempt,
   DrillRecallPrompt,
@@ -154,7 +155,7 @@ export function RecognitionStep({
         aria-label={t("dictionary.drill.recognitionPrompt")}
         className="flex flex-col gap-1.5"
       >
-        {question.options.map((option, i) => (
+        {asArray<string>(question.options).map((option, i) => (
           <li key={`${i}-${option}`}>
             <button
               type="button"

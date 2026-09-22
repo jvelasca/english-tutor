@@ -65,20 +65,34 @@ def _parse_bulk_lines(text: str) -> list[dict]:
 
 
 def _ensure_fsrs_lexicon(user_id: str, words: list[str], *, why: str) -> None:
-    """Siembra cartas lexicon due ahora si no existen (o reps==0)."""
+    """Siembra cartas lexicon due ahora si no existen (o reps==0).
+
+    V3.77.2: en LOTE. Antes hacía `get_fsrs_card` + `upsert_fsrs_card` por
+    palabra (dos conexiones cada una, más su `get_user`), así que importar un
+    pack de 40 palabras abría ~120 conexiones. Ahora son dos: una consulta con
+    `IN (...)` y un `executemany`.
+    """
+    candidates = [w for w in words if w]
+    if not candidates:
+        return
     now_iso = datetime.now(timezone.utc).isoformat()
-    for word in words:
-        prev = academy_repo.get_fsrs_card(user_id, "lexicon", word)
+    previous = academy_repo.fsrs_cards_by_ids(user_id, "lexicon", candidates)
+    pending: list[dict] = []
+    for word in candidates:
+        prev = previous.get(str(word))
         if prev and int(prev.get("reps") or 0) > 0:
             continue
-        card = fsrs.empty_card(
-            target_type="lexicon",
-            target_id=word,
-            label=word,
-            why=why,
-            now=now_iso,
+        pending.append(
+            fsrs.empty_card(
+                target_type="lexicon",
+                target_id=word,
+                label=word,
+                why=why,
+                now=now_iso,
+            )
         )
-        academy_repo.upsert_fsrs_card(user_id, card)
+    if pending:
+        academy_repo.upsert_fsrs_cards(user_id, pending)
 
 
 def _card_face(word: str, collection_id: int | None = None) -> dict:
@@ -97,6 +111,29 @@ def _card_face(word: str, collection_id: int | None = None) -> dict:
     }
 
 
+def _collection_writable(coll: dict | None, user_id: str) -> bool:
+    """Predicado puro: ¿puede `user_id` escribir en el catálogo de esa colección?
+
+    La misma puerta que ya aplicaba `enroll_collection` (V3.77.1) se extiende a
+    la ingestión: un pack global (`user_id=''`) es de todos, pero la lista
+    privada de otro perfil no es un destino válido. Sin esto, `collection_id`
+    —que es entrada pública del cliente— permitía inyectar palabras y
+    traducciones en el catálogo de un pack global o en la lista de otro usuario.
+    La colección inexistente tampoco es un destino válido.
+    """
+    if coll is None:
+        return False
+    owner = str(coll.get("user_id") or "")
+    return not owner or owner == user_id
+
+
+async def _collection_writable_by(user_id: str, collection_id: int) -> bool:
+    coll = await run_in_threadpool(
+        collections_repo.get_collection, collection_id
+    )
+    return _collection_writable(coll, user_id)
+
+
 async def add_item(
     user_id: str,
     word: str,
@@ -107,6 +144,10 @@ async def add_item(
     """Añade una palabra suelta al léxico personal + FSRS. Sin evidencia de skill."""
     normalized = _normalize_word(word)
     if not normalized:
+        return None
+    if collection_id is not None and not await _collection_writable_by(
+        user_id, collection_id
+    ):
         return None
     items = [
         {
@@ -153,6 +194,10 @@ async def add_bulk(
     items = _parse_bulk_lines(text)
     if not items:
         return {"added": [], "collection_id": collection_id, "count": 0}
+    if collection_id is not None and not await _collection_writable_by(
+        user_id, collection_id
+    ):
+        return None
 
     coll_id = collection_id
     if coll_id is None:
@@ -175,10 +220,11 @@ async def add_bulk(
         user_id,
         items,
     )
-    for w in touched:
-        await run_in_threadpool(
-            collections_repo.add_membership, user_id, coll_id, w
-        )
+    # V3.77.2: una sola transacción para todas las membresías (antes: una
+    # conexión por palabra).
+    await run_in_threadpool(
+        collections_repo.add_memberships, user_id, coll_id, touched
+    )
     await run_in_threadpool(collections_repo.mark_enrolled, user_id, coll_id)
     await run_in_threadpool(
         partial(_ensure_fsrs_lexicon, why="retention-import"),
@@ -234,7 +280,7 @@ async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
     if coll is None:
         return None
     owner = str(coll.get("user_id") or "")
-    if owner and owner != user_id:
+    if not _collection_writable(coll, user_id):
         return None
     catalog = await run_in_threadpool(
         collections_repo.list_collection_items, collection_id
@@ -262,10 +308,10 @@ async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
         user_id,
         items,
     )
-    for w in touched:
-        await run_in_threadpool(
-            collections_repo.add_membership, user_id, collection_id, w
-        )
+    # V3.77.2: una sola transacción para todas las membresías del pack.
+    await run_in_threadpool(
+        collections_repo.add_memberships, user_id, collection_id, touched
+    )
     await run_in_threadpool(
         collections_repo.mark_enrolled, user_id, collection_id
     )

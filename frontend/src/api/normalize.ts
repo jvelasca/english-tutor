@@ -1,0 +1,387 @@
+/**
+ * Normalización de contratos HTTP en runtime (V3.77.2).
+ *
+ * Lección de V3.77.0/V3.77.1: el frontend **no puede** asumir que un JSON HTTP
+ * tiene exactamente la forma que declara su tipo. `as Lexicon` no valida nada en
+ * runtime, así que un campo ausente llega al estado de React y revienta al
+ * pintar (`undefined.map`, spread de `undefined`…). Y, sin `ErrorBoundary`, ese
+ * throw desmontaba la app entera.
+ *
+ * La tubería correcta es:
+ *
+ *   HTTP → api client → normalización runtime → objeto de dominio → React
+ *
+ * Estas funciones hacen cumplir la forma en la **frontera** (el cliente de API),
+ * de modo que el estado de React nunca recibe `undefined` donde el tipo promete
+ * un array o un objeto. No "adivinan" datos: si algo falta, aplican el valor
+ * neutro (array vacío, 0, "") y descartan los elementos que ni son objetos. El
+ * contrato se degrada a un estado vacío honesto, nunca a un crash.
+ *
+ * Los campos desconocidos se conservan (`...raw`) para no romper el contrato
+ * aditivo del backend conforme crece.
+ */
+import type {
+  CefrBucket,
+  DictionaryEntry,
+  DictionaryExample,
+  DictionarySurfaceUsage,
+  DictionaryUnitUsage,
+  DrillCandidates,
+  LexicalItem,
+  LexicalStatus,
+  Lexicon,
+  RetentionCard,
+  RetentionDue,
+  ReviewActivity,
+  ReviewQueue,
+  ReviewQueueItem,
+  VocabBulkAddResult,
+  VocabCollection,
+  VocabCollections,
+  VocabEnrollResult,
+  VocabItemAddResult,
+} from "../types/api";
+
+type Raw = Record<string, unknown>;
+
+export function isRecord(value: unknown): value is Raw {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Array garantizado: lo que no sea array se convierte en `[]`. */
+export function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/** Array de objetos: descarta los elementos que no son registros. */
+function asRecordArray(value: unknown): Raw[] {
+  return asArray<unknown>(value).filter(isRecord);
+}
+
+export function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+export function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+/** `string | null`: conserva el null (distinto de "ausente" en varios contratos). */
+export function asNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+export function asBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+/** `string[]` garantizado: descarta elementos no-cadena. */
+export function asStringArray(value: unknown): string[] {
+  return asArray<unknown>(value).filter(
+    (item): item is string => typeof item === "string",
+  );
+}
+
+function asRecordOrNull(value: unknown): Raw | null {
+  return isRecord(value) ? value : null;
+}
+
+const LEXICAL_STATUSES: readonly LexicalStatus[] = [
+  "mastered",
+  "known",
+  "learning",
+  "weak",
+];
+
+function asLexicalStatus(value: unknown): LexicalStatus {
+  return LEXICAL_STATUSES.includes(value as LexicalStatus)
+    ? (value as LexicalStatus)
+    : "learning";
+}
+
+const REVIEW_ACTIVITIES: readonly ReviewActivity[] = [
+  "recognition",
+  "recall",
+  "sentence",
+  "write",
+  "transfer",
+];
+
+function asReviewActivity(value: unknown): ReviewActivity {
+  return REVIEW_ACTIVITIES.includes(value as ReviewActivity)
+    ? (value as ReviewActivity)
+    : "recognition";
+}
+
+// --- Léxico personal -------------------------------------------------------
+
+function normalizeLexicalItem(raw: Raw): LexicalItem {
+  const out = {
+    ...(raw as unknown as LexicalItem),
+    word: asString(raw.word),
+    lemma: asString(raw.lemma),
+    cefr: asString(raw.cefr),
+    kind: asString(raw.kind, "word"),
+    source: asString(raw.source),
+    status: asLexicalStatus(raw.status),
+    recall: asNumber(raw.recall),
+    next_review_days: asNumber(raw.next_review_days),
+    production_count: asNumber(raw.production_count),
+    exposure_count: asNumber(raw.exposure_count),
+    chat_prod: asNumber(raw.chat_prod),
+    speaking_prod: asNumber(raw.speaking_prod),
+    writing_prod: asNumber(raw.writing_prod),
+    conversation_prod: asNumber(raw.conversation_prod),
+  };
+  // Los campos opcionales solo se tocan si vienen: así no se convierte
+  // «ausente» en `undefined`/`null` y el contrato aditivo se conserva.
+  if ("lexical_unit" in raw) out.lexical_unit = asString(raw.lexical_unit);
+  if ("competence" in raw) {
+    out.competence = asRecordOrNull(raw.competence) as LexicalItem["competence"];
+  }
+  return out;
+}
+
+function normalizeCefrBucket(raw: Raw): CefrBucket {
+  return { cefr: asString(raw.cefr), count: asNumber(raw.count) };
+}
+
+/** `GET /api/vocabulary/lexicon`: `summary` e `items` siempre presentes. */
+export function normalizeLexicon(raw: unknown): Lexicon {
+  const data = isRecord(raw) ? raw : {};
+  const summary = asRecordOrNull(data.summary) ?? {};
+  const out = {
+    ...(data as unknown as Lexicon),
+    summary: {
+      ...(summary as unknown as Lexicon["summary"]),
+      total: asNumber(summary.total),
+      known: asNumber(summary.known),
+      learning: asNumber(summary.learning),
+      weak: asNumber(summary.weak),
+      mastered: asNumber(summary.mastered),
+      by_cefr: asRecordArray(summary.by_cefr).map(normalizeCefrBucket),
+      recognized: asNumber(summary.recognized),
+      produced: asNumber(summary.produced),
+      transfer: asNumber(summary.transfer),
+      retention: asNumber(summary.retention),
+      spaced_exposure: asNumber(summary.spaced_exposure),
+      production_gap: asNumber(summary.production_gap),
+      transfer_gap: asNumber(summary.transfer_gap),
+    },
+    items: asRecordArray(data.items).map(normalizeLexicalItem),
+  };
+  if ("coverage" in data) {
+    out.coverage = asRecordOrNull(data.coverage) as Lexicon["coverage"];
+  }
+  return out;
+}
+
+/** `GET /api/vocabulary/drill/candidates`: `words` siempre es un array de cadenas. */
+export function normalizeDrillCandidates(raw: unknown): DrillCandidates {
+  const data = isRecord(raw) ? raw : {};
+  return { ...(data as unknown as DrillCandidates), words: asStringArray(data.words) };
+}
+
+// --- Colecciones léxicas ---------------------------------------------------
+
+function normalizeVocabCollection(raw: Raw): VocabCollection {
+  return {
+    ...(raw as unknown as VocabCollection),
+    id: asNumber(raw.id),
+    kind: asString(raw.kind),
+    slug: asString(raw.slug),
+    title: asString(raw.title),
+    title_es: asString(raw.title_es),
+    cefr_hint: asString(raw.cefr_hint),
+    item_count: asNumber(raw.item_count),
+    enrolled: asBoolean(raw.enrolled),
+    is_global: asBoolean(raw.is_global),
+  };
+}
+
+/** `GET /api/vocabulary/collections`: el fallo de V3.77.0 nace aquí. */
+export function normalizeVocabCollections(raw: unknown): VocabCollections {
+  const data = isRecord(raw) ? raw : {};
+  return { collections: asRecordArray(data.collections).map(normalizeVocabCollection) };
+}
+
+/** `POST /api/vocabulary/items`: `added` siempre array. */
+export function normalizeVocabItemAdd(raw: unknown): VocabItemAddResult {
+  const data = isRecord(raw) ? raw : {};
+  const item = asRecordOrNull(data.item);
+  return {
+    ...(data as unknown as VocabItemAddResult),
+    added: asStringArray(data.added),
+    item: {
+      word: asString(item?.word),
+      translation: asString(item?.translation),
+      definition: asString(item?.definition),
+    },
+  };
+}
+
+/** `POST /api/vocabulary/items/bulk`. */
+export function normalizeVocabBulkAdd(raw: unknown): VocabBulkAddResult {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    ...(data as unknown as VocabBulkAddResult),
+    added: asStringArray(data.added),
+    count: asNumber(data.count),
+  };
+}
+
+/** `POST /api/vocabulary/collections/{id}/enroll`. */
+export function normalizeVocabEnroll(raw: unknown): VocabEnrollResult {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    ...(data as unknown as VocabEnrollResult),
+    added: asStringArray(data.added),
+    count: asNumber(data.count),
+  };
+}
+
+// --- Retención -------------------------------------------------------------
+
+function normalizeRetentionCard(raw: Raw): RetentionCard {
+  return {
+    ...(raw as unknown as RetentionCard),
+    word: asString(raw.word),
+    translation: asString(raw.translation),
+    definition: asString(raw.definition),
+    due_at: asString(raw.due_at),
+    stability: asNumber(raw.stability),
+    retrievability: asNumber(raw.retrievability),
+    why: asString(raw.why),
+    reps: asNumber(raw.reps),
+  };
+}
+
+/** `GET /api/vocabulary/retention/due`: `items` siempre array. */
+export function normalizeRetentionDue(raw: unknown): RetentionDue {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    ...(data as unknown as RetentionDue),
+    due_count: asNumber(data.due_count),
+    limit: asNumber(data.limit),
+    items: asRecordArray(data.items).map(normalizeRetentionCard),
+    fsrs_version: asString(data.fsrs_version),
+  };
+}
+
+// --- Diccionario de consulta -----------------------------------------------
+
+function normalizeDictionaryExample(raw: Raw): DictionaryExample {
+  return {
+    phrase: asString(raw.phrase),
+    source: asString(raw.source),
+    level: asString(raw.level),
+  };
+}
+
+function normalizeSurfaceUsage(raw: Raw): DictionarySurfaceUsage {
+  return {
+    ...(raw as unknown as DictionarySurfaceUsage),
+    status: raw.status == null ? null : asLexicalStatus(raw.status),
+    mastery: asNumber(raw.mastery),
+    recall: asNumber(raw.recall),
+    next_review_days: asNumber(raw.next_review_days),
+    production_count: asNumber(raw.production_count),
+    exposure_count: asNumber(raw.exposure_count),
+    production_channels: asStringArray(raw.production_channels),
+    competence:
+      asRecordOrNull(raw.competence) as DictionarySurfaceUsage["competence"],
+    last_activity_at: asString(raw.last_activity_at),
+  };
+}
+
+function normalizeUnitUsage(raw: Raw): DictionaryUnitUsage {
+  return {
+    ...(raw as unknown as DictionaryUnitUsage),
+    lexical_unit: asString(raw.lexical_unit),
+    status: raw.status == null ? null : asLexicalStatus(raw.status),
+    mastery: asNumber(raw.mastery),
+    recall: asNumber(raw.recall),
+    surface_count: asNumber(raw.surface_count),
+    mastered_surfaces: asNumber(raw.mastered_surfaces),
+    recognized: asBoolean(raw.recognized),
+    produced: asBoolean(raw.produced),
+    transfer: asBoolean(raw.transfer),
+    production_count: asNumber(raw.production_count),
+    exposure_count: asNumber(raw.exposure_count),
+  };
+}
+
+/** `POST /api/vocabulary/dictionary`: la tarjeta de resultado lee `usage.*` y
+ *  `pos[0]`; `usage` siempre sale como objeto y `alternatives` como array. */
+export function normalizeDictionaryEntry(raw: unknown): DictionaryEntry {
+  const data = isRecord(raw) ? raw : {};
+  const usage = asRecordOrNull(data.usage) ?? {};
+  const surface = asRecordOrNull(usage.surface);
+  const unit = asRecordOrNull(usage.unit);
+  const example = asRecordOrNull(data.example);
+  const direction = data.direction === "es-en" ? "es-en" : "en-es";
+  return {
+    ...(data as unknown as DictionaryEntry),
+    word: asString(data.word),
+    kind: asString(data.kind, "word"),
+    cefr: asString(data.cefr),
+    definition_source: data.definition_source === "llm" ? "llm" : "none",
+    pos: asString(data.pos),
+    definition: asNullableString(data.definition),
+    translation: asNullableString(data.translation),
+    direction,
+    alternatives: asStringArray(data.alternatives),
+    example: example ? normalizeDictionaryExample(example) : null,
+    usage: {
+      tracked: asBoolean(usage.tracked),
+      surface: surface ? normalizeSurfaceUsage(surface) : null,
+      unit: unit ? normalizeUnitUsage(unit) : null,
+    },
+  };
+}
+
+// --- Cola de repaso (learning) ---------------------------------------------
+
+function normalizeReviewQueueItem(raw: Raw): ReviewQueueItem {
+  const out = {
+    ...(raw as unknown as ReviewQueueItem),
+    word: asString(raw.word),
+    lexical_unit: asString(raw.lexical_unit),
+    cefr: asString(raw.cefr),
+    kind: asString(raw.kind, "word"),
+    due_at: asString(raw.due_at),
+    state: asString(raw.state),
+    stability: asNumber(raw.stability),
+    retrievability:
+      typeof raw.retrievability === "number" ? raw.retrievability : null,
+    elapsed_days: typeof raw.elapsed_days === "number" ? raw.elapsed_days : null,
+    activity: asReviewActivity(raw.activity),
+    reason: asString(raw.reason),
+  };
+  // Opcionales: solo se tocan si vienen (no se inventa su presencia).
+  if ("why" in raw) out.why = asString(raw.why) || undefined;
+  if ("competence" in raw) {
+    out.competence = asRecordOrNull(raw.competence) as ReviewQueueItem["competence"];
+  }
+  if ("transfer_confidence" in raw) {
+    out.transfer_confidence = asRecordOrNull(
+      raw.transfer_confidence,
+    ) as ReviewQueueItem["transfer_confidence"];
+  }
+  if ("decision" in raw) {
+    out.decision = asRecordOrNull(raw.decision) as ReviewQueueItem["decision"];
+  }
+  return out;
+}
+
+/** `GET /api/learning/review`: `items` siempre array (el `?? []` anterior no
+ *  protegía contra un `items` no-array pero *truthy*). */
+export function normalizeReviewQueue(raw: unknown): ReviewQueue {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    ...(data as unknown as ReviewQueue),
+    due_count: asNumber(data.due_count),
+    items: asRecordArray(data.items).map(normalizeReviewQueueItem),
+    fsrs_version: asString(data.fsrs_version),
+  };
+}

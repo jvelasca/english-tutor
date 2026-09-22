@@ -4,6 +4,90 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.77.2] — 2026-09-22
+
+**Release de PRODUCTO (patch) de ENDURECIMIENTO sobre lo que la V3.77.1 dejó abierto alrededor del
+diccionario personal: siete cosas, y la primera no es de UI. SIN migración de BD, SIN bump de
+`GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+`1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** Los **7 gates siguen
+`pending`** y el árbol que se certifica sigue siendo el de `v3.75.8`. No añade producto: ni pantalla
+nueva, ni endpoint nuevo, ni tabla nueva.
+
+- **P0 — control de acceso roto en `collection_id` (IDOR).** `enroll_collection` comprobaba de quién
+  era la colección antes de escribir en ella; **la ingestión no**. `POST /api/vocabulary/items` y
+  `POST /api/vocabulary/items/bulk` —los dos endpoints nuevos de la V3.77.0— aceptaban el
+  `collection_id` que mandara el cliente, así que **un perfil podía escribir en la lista privada de
+  otro**. No es lectura ajena: es **escritura** en el vocabulario de otro alumno, persistente y
+  sufrida por quien no la provoca, y `collection_id` es entrada pública del cliente. El arreglo es la
+  puerta que ya existía extraída a un predicado puro (`_collection_writable`) que usan los **tres**
+  sitios, para que la ingestión tenga **exactamente** el mismo criterio que la inscripción. Un pack
+  global sigue siendo destino de todos (eso es lo que significa «global», y no se cierra lo que no
+  estaba roto).
+- **P1 — `ErrorBoundary` en el root y por ruta.** No había **ninguno**: un `throw` en render no rompía
+  «la tarjeta», desmontaba el árbol entero y dejaba al alumno en blanco —que es lo que convirtió un
+  campo que faltaba en una respuesta HTTP en una pantalla muerta—. Dos radios porque el coste de
+  fallar no es el mismo: `scope="app"` en `main.tsx` (lee las cadenas con `translate()` del idioma
+  **persistido**, porque no hay contexto de i18n por encima de `<App />`) y `scope="route"` en el
+  `Workspace` (un fallo deja navegación, cabecera y perfil utilizables).
+- **P1 — normalización runtime de contratos (H4 y hermanas), que era el hallazgo de fondo.** La
+  V3.77.1 arregló una frontera y **el padre tenía el mismo defecto sin tocar**: `PersonalDictionary`
+  guardaba `setLexicon(data)` y `setCandidates(drill.words)` sin comprobar la forma y pintaba
+  `summary.by_cefr.map(...)` / `sortLexicalItems(items)`, así que un contrato incompleto mataba **la
+  pantalla del diccionario y a sus tres hijos** —incluido el `AddVocabSection` ya parcheado: el parche
+  del hijo nunca llegaba a actuar porque el árbol moría en el padre—. Nuevo `frontend/src/api/normalize.ts`
+  (normalizadores por contrato) aplicado **en la frontera de API y otra vez en los componentes**, y
+  cerradas las hermanas: `ReviewQueueSection` usaba `queue?.items ?? []`, que es **más débil** que el
+  `Array.isArray(...)` de `AddVocabSection` porque deja pasar un `items` truthy que no sea array;
+  `DictionaryLookup` guardaba `entry` sin normalizar; `wordDrill`/`wordDrillSteps` hacían `.map` sin
+  guardia. Y **`userId === null` dejaba un spinner infinito**: `refresh()` salía temprano y `lexicon`
+  se quedaba en `null` para siempre.
+- **P1 — `PersonalDictionary` en modo incrustado.** `DictionaryScreen` ya es dueño del layout y pinta
+  `h1` + subtítulo + ancho de página; el diccionario hacía lo mismo, así que la pantalla tenía **dos
+  `h1`** y el ancho reducido dos veces. La prop `showHeader` replica el patrón que `DictionaryLookup`
+  ya usaba.
+- **P2 — el cierre de sesión de retención no se veía nunca.** Al calificar la última tarjeta, el
+  camino de fin llamaba a `load()` y reseteaba `index`/`done`: el resumen «N tarjetas revisadas» **no
+  se veía jamás** y el alumno volvía a la cola sin saber qué había pasado. Ahora el índice avanza
+  hasta el resumen, con acción de actualizar.
+- **P2 — «Mis listas» y packs, interactivos.** Eran badges decorativos: decían que existían y no
+  ofrecían camino. Ahora son filas con `item_count` y una acción que abre una `RetentionSession`
+  acotada a esa colección, y «Re-enroll» se sustituye por el estado real («En mi diccionario») más
+  «Repasar»: inscribirse dos veces siempre fue idempotente, así que la etiqueta prometía un efecto
+  que no existía.
+- **P3 — batch de membresías y siembra FSRS.** `add_membership` y `_ensure_fsrs_lexicon` abrían **una
+  conexión por palabra**. Ahora las membresías van en **una sola transacción** y la siembra FSRS en un
+  solo paso: con 40 palabras, **≤ 2 conexiones** y **≤ 3** respectivamente, constantes y no
+  proporcionales al lote.
+- **Los candados nuevos muerden, y los dos primeros se comprobaron revirtiendo el código.** (a)
+  Neutralizada la guardia en `add_item`/`add_bulk`, los **3** tests de seguridad fallan —y el de la
+  colección inexistente no falla por aserción, sino con un `sqlite3.IntegrityError: FOREIGN KEY
+  constraint failed` sin capturar, es decir **un 500 en mitad de la escritura**—. (b) Hechos
+  `normalizeLexicon`/`normalizeDrillCandidates` un passthrough (el comportamiento exacto de la
+  V3.77.1), el test del componente **muere en `PersonalDictionary.tsx:130`, en render**, que es el
+  mismo sitio y el mismo modo que describe el hallazgo. (c) Devuelta la rama de `userId === null` a
+  «Cargando…», su test falla.
+- **La suite visual no se corrió en local para esta release** y se declara en vez de disimularse: la
+  autoridad es el CI. Hay además **una decisión tomada contra esa suite a propósito**: los botones
+  nuevos de «Repasar» exponen `aria-expanded` y **no** `aria-pressed`, porque `drillProvenance.spec.ts`
+  localiza la entrada al drill con `li:has(button[aria-pressed]) button[aria-pressed]`; `aria-expanded`
+  describe mejor lo que hace el botón —abre un panel— y no compite por un selector del que el test no
+  es dueño.
+- **La normalización es un contrato de FORMA, no de SIGNIFICADO, y tiene un precio declarado.** Un
+  léxico incompleto ya no tumba la pantalla pero se degrada al estado vacío: un fallo **silencioso**
+  donde antes había uno **ruidoso**. El intercambio es deliberado —una pantalla en blanco lo pierde
+  todo y no se recupera; un estado vacío engaña pero se navega y se reintenta— y lo que lo mitigaría
+  es distinguir «vacío porque no hay» de «vacío porque no entendí»; hoy `loadError` solo cubre el
+  fallo de red. Queda como deuda, no como resuelto.
+- **La regresión de layout la habría dejado pasar `DictionaryScreen.test.tsx`**, porque mockea la
+  vista: puede verificar que la pantalla monta, no que haya un solo `h1`. El test de layout nuevo
+  monta el componente **real** y cuenta encabezados.
+- **Verificación:** `pytest` backend **2972/2972** + `ruff` limpio + `transfer_validation OK=True` ·
+  `tsc` limpio · `vitest` **910/910** (104 ficheros) · `npm run build` correcto · i18n `--strict`
+  1590 cadenas con **0 huérfanas / 0 usadas sin definir / 0 duplicadas** · contraste 480 pares con
+  **0 bloqueantes** · `check_release_consistency` OK en los **6 orígenes** · `validation_gate.py auto`
+  **10/10** · `check_beta_v3` OK · `content_validation OK=True quality=True` · launcher **205/205** +
+  `ruff` limpio.
+
 ## [3.77.1] — 2026-09-21
 
 **Release de PRODUCTO (patch) que arregla un fallo REAL de la V3.77.0 publicada, encontrado por el CI

@@ -12,6 +12,22 @@ vi.mock("../../api/vocabulary", () => ({
   enrollVocabCollection: vi.fn(),
 }));
 
+// V3.77.2: la sesión de repaso acotada se aísla para verificar que «Repasar»
+// abre la colección correcta sin montar el motor de FSRS.
+vi.mock("./RetentionSession", () => ({
+  RetentionSession: ({
+    userId,
+    collectionId,
+  }: {
+    userId: string;
+    collectionId?: number;
+  }) => (
+    <div data-testid="retention-session">
+      scoped:{collectionId ?? "all"}:{userId}
+    </div>
+  ),
+}));
+
 import {
   addVocabularyItem,
   enrollVocabCollection,
@@ -97,5 +113,55 @@ describe("AddVocabSection", () => {
     expect(
       await screen.findByText(/Added “river” to your personal dictionary\./),
     ).toBeTruthy();
+  });
+
+  it("Mis listas son filas con recuento y repaso acotado", async () => {
+    const USER_LIST = {
+      id: 3,
+      kind: "user_list",
+      slug: "",
+      title: "My basics",
+      title_es: "",
+      cefr_hint: "",
+      item_count: 4,
+      enrolled: true,
+      is_global: false,
+    };
+    vi.mocked(listVocabCollections).mockResolvedValue({
+      collections: [USER_LIST],
+    } as never);
+
+    renderSection(<AddVocabSection userId="u1" />);
+
+    // Antes: una insignia «My basics (4)» sin ninguna acción.
+    expect(await screen.findByText("My basics")).toBeTruthy();
+    expect(screen.getByText("4 items")).toBeTruthy();
+    expect(screen.queryByTestId("retention-session")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Review list" }));
+
+    // La sesión se abre ACOTADA a esa lista (`collection_id`) y declara el ámbito.
+    expect(screen.getByTestId("retention-session").textContent).toBe(
+      "scoped:3:u1",
+    );
+    expect(screen.getByText(/Reviewing/)).toBeTruthy();
+  });
+
+  it("un pack ya activo declara el estado y se repasa en vez de reactivarse", async () => {
+    vi.mocked(listVocabCollections).mockResolvedValue({
+      collections: [{ ...PACK, enrolled: true }],
+    } as never);
+
+    renderSection(<AddVocabSection userId="u1" />);
+
+    expect(await screen.findByText("In my dictionary")).toBeTruthy();
+    // Reactivar era idempotente (añadía 0): ya no se ofrece como acción.
+    expect(screen.queryByText("Activate")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+
+    expect(screen.getByTestId("retention-session").textContent).toBe(
+      "scoped:7:u1",
+    );
   });
 });

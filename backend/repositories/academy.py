@@ -1014,49 +1014,112 @@ def upsert_fsrs_card(user_id: str, card: dict) -> dict | None:
     """Inserta o actualiza una carta FSRS. None si el usuario no existe."""
     if get_user(user_id) is None:
         return None
-    now = _now()
     with closing(_conn()) as conn, conn:
-        conn.execute(
-            "INSERT INTO fsrs_cards "
-            "(user_id, target_type, target_id, label, state, difficulty, "
-            "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
-            "last_grade, why, fsrs_version, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET "
-            "label = excluded.label, "
-            "state = excluded.state, "
-            "difficulty = excluded.difficulty, "
-            "stability = excluded.stability, "
-            "reps = excluded.reps, "
-            "lapses = excluded.lapses, "
-            "due_at = excluded.due_at, "
-            "last_review_at = excluded.last_review_at, "
-            "last_evidence_at = excluded.last_evidence_at, "
-            "last_grade = excluded.last_grade, "
-            "why = excluded.why, "
-            "fsrs_version = excluded.fsrs_version, "
-            "updated_at = excluded.updated_at",
-            (
-                user_id,
-                card["target_type"],
-                card["target_id"],
-                card.get("label") or card["target_id"],
-                card.get("state") or "new",
-                float(card.get("difficulty") or 5.0),
-                float(card.get("stability") or 0.1),
-                int(card.get("reps") or 0),
-                int(card.get("lapses") or 0),
-                card.get("due_at") or now,
-                card.get("last_review_at") or "",
-                card.get("last_evidence_at") or "",
-                card.get("last_grade"),
-                card.get("why") or "",
-                card.get("fsrs_version") or "",
-                now,
-                now,
-            ),
-        )
+        conn.execute(_FSRS_UPSERT_SQL, _fsrs_row(user_id, card, _now()))
     return get_fsrs_card(user_id, card["target_type"], card["target_id"])
+
+
+_FSRS_CARD_COLUMNS = (
+    "user_id, target_type, target_id, label, state, difficulty, "
+    "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
+    "last_grade, why, fsrs_version, created_at, updated_at"
+)
+
+_FSRS_UPSERT_SQL = (
+    "INSERT INTO fsrs_cards "
+    "(user_id, target_type, target_id, label, state, difficulty, "
+    "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
+    "last_grade, why, fsrs_version, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET "
+    "label = excluded.label, "
+    "state = excluded.state, "
+    "difficulty = excluded.difficulty, "
+    "stability = excluded.stability, "
+    "reps = excluded.reps, "
+    "lapses = excluded.lapses, "
+    "due_at = excluded.due_at, "
+    "last_review_at = excluded.last_review_at, "
+    "last_evidence_at = excluded.last_evidence_at, "
+    "last_grade = excluded.last_grade, "
+    "why = excluded.why, "
+    "fsrs_version = excluded.fsrs_version, "
+    "updated_at = excluded.updated_at"
+)
+
+
+def _fsrs_row(user_id: str, card: dict, now: str) -> tuple:
+    return (
+        user_id,
+        card["target_type"],
+        card["target_id"],
+        card.get("label") or card["target_id"],
+        card.get("state") or "new",
+        float(card.get("difficulty") or 5.0),
+        float(card.get("stability") or 0.1),
+        int(card.get("reps") or 0),
+        int(card.get("lapses") or 0),
+        card.get("due_at") or now,
+        card.get("last_review_at") or "",
+        card.get("last_evidence_at") or "",
+        card.get("last_grade"),
+        card.get("why") or "",
+        card.get("fsrs_version") or "",
+        now,
+        now,
+    )
+
+
+def fsrs_cards_by_ids(
+    user_id: str, target_type: str, target_ids: list[str]
+) -> dict[str, dict]:
+    """Cartas FSRS de varios objetivos en UNA consulta (V3.77.2).
+
+    Sustituye el `get_fsrs_card` por palabra de la siembra de retención. Trocea
+    la lista porque SQLite acota el número de variables de un `IN (...)`
+    (`SQLITE_MAX_VARIABLE_NUMBER`).
+    """
+    ids: list[str] = []
+    seen: set[str] = set()
+    for raw in target_ids:
+        value = str(raw)
+        if value and value not in seen:
+            seen.add(value)
+            ids.append(value)
+    if not ids:
+        return {}
+    found: dict[str, dict] = {}
+    chunk = 400
+    with closing(_conn()) as conn:
+        for start in range(0, len(ids), chunk):
+            batch = ids[start : start + chunk]
+            placeholders = ",".join("?" for _ in batch)
+            rows = conn.execute(
+                f"SELECT {_FSRS_CARD_COLUMNS} FROM fsrs_cards "
+                f"WHERE user_id = ? AND target_type = ? "
+                f"AND target_id IN ({placeholders})",
+                (user_id, target_type, *batch),
+            ).fetchall()
+            for row in rows:
+                found[str(row["target_id"])] = dict(row)
+    return found
+
+
+def upsert_fsrs_cards(user_id: str, cards: list[dict]) -> int:
+    """Siembra/actualiza VARIAS cartas FSRS en UNA transacción (V3.77.2).
+
+    Misma semántica que `upsert_fsrs_card` (upsert por
+    `(user_id, target_type, target_id)`) pero con un único `executemany`: la
+    siembra de una lista de N palabras pasaba de 2N conexiones a 1. Devuelve
+    cuántas filas se escribieron.
+    """
+    if not cards or get_user(user_id) is None:
+        return 0
+    now = _now()
+    rows = [_fsrs_row(user_id, card, now) for card in cards]
+    with closing(_conn()) as conn, conn:
+        conn.executemany(_FSRS_UPSERT_SQL, rows)
+    return len(rows)
 
 
 def get_fsrs_card(

@@ -3,7 +3,7 @@
  * packs temáticos. Solo materializa léxico + FSRS; no escribe mastery.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Plus, ListPlus, Package } from "lucide-react";
+import { ListPlus, Package, Plus } from "lucide-react";
 import {
   addVocabularyBulk,
   addVocabularyItem,
@@ -16,6 +16,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
+import { RetentionSession } from "./RetentionSession";
 
 interface AddVocabSectionProps {
   userId: string;
@@ -32,6 +33,16 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  /**
+   * V3.77.2: colección que se está repasando con una sesión de retención
+   * ACOTADA (`?collection_id=`). Antes «Mis listas» eran insignias mudas sin
+   * ninguna acción: el alumno veía sus listas y no podía hacer nada con ellas.
+   */
+  const [reviewing, setReviewing] = useState<VocabCollection | null>(null);
+
+  const toggleReview = useCallback((collection: VocabCollection) => {
+    setReviewing((prev) => (prev?.id === collection.id ? null : collection));
+  }, []);
 
   const refreshPacks = useCallback(async () => {
     try {
@@ -222,17 +233,31 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
                         {t("dictionary.add.enrolled")}
                       </Badge>
                     ) : null}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={pack.enrolled ? "outline" : "default"}
-                      disabled={busy}
-                      onClick={() => void handleEnroll(pack)}
-                    >
-                      {pack.enrolled
-                        ? t("dictionary.add.reenroll")
-                        : t("dictionary.add.enroll")}
-                    </Button>
+                    {pack.enrolled ? (
+                      /* V3.77.2: un pack ya activo no se «reactiva» (la
+                         activación es idempotente y añadía 0). La acción útil
+                         es repasarlo; «Actualizar» se retira para no prometer
+                         una operación que no cambia nada. */
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        aria-expanded={reviewing?.id === pack.id}
+                        onClick={() => toggleReview(pack)}
+                      >
+                        {t("dictionary.add.review")}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void handleEnroll(pack)}
+                      >
+                        {t("dictionary.add.enroll")}
+                      </Button>
+                    )}
                   </div>
                 </li>
               );
@@ -244,16 +269,59 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               {t("dictionary.add.myLists")}
             </span>
-            <ul className="flex flex-wrap gap-2">
+            {/* V3.77.2: filas con recuento y acción. Antes eran insignias
+                `title (n)` sin ninguna forma de trabajar la lista. */}
+            <ul className="flex flex-col gap-2">
               {lists.map((list) => (
-                <Badge key={list.id} variant="outline">
-                  {list.title} ({list.item_count})
-                </Badge>
+                <li
+                  key={list.id}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-sm font-medium">
+                      {list.title}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {list.item_count} {t("dictionary.total")}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy || list.item_count === 0}
+                    aria-expanded={reviewing?.id === list.id}
+                    onClick={() => toggleReview(list)}
+                  >
+                    {t("dictionary.add.reviewList")}
+                  </Button>
+                </li>
               ))}
             </ul>
           </div>
         ) : null}
       </Card>
+
+      {/* Sesión acotada a la colección elegida. La clave remonta el estado al
+          cambiar de lista para no arrastrar la cola anterior. */}
+      {reviewing ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold text-muted-foreground">
+            {t("dictionary.add.reviewScope").replace(
+              "{title}",
+              reviewing.title_es && lang === "es"
+                ? reviewing.title_es
+                : reviewing.title,
+            )}
+          </p>
+          <RetentionSession
+            key={reviewing.id}
+            userId={userId}
+            collectionId={reviewing.id}
+            onFinished={onChanged}
+          />
+        </div>
+      ) : null}
 
       {message ? (
         <p className="text-sm text-muted-foreground" role="status">

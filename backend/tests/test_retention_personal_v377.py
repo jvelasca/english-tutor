@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from main import app
 from repositories import academy as academy_repo
+from repositories import collections as collections_repo
 from repositories import db
 from repositories import learning as learning_repo
 from repositories import users as users_repo
@@ -159,3 +160,153 @@ def test_add_isolated_between_users(monkeypatch, tmp_path):
             "/api/vocabulary/retention/due", params={"user_id": b}
         )
         assert due_b.json()["due_count"] == 0
+
+
+# --- Control de acceso al catálogo de colecciones (V3.77.2, P0) -----------
+#
+# `collection_id` es entrada pública del cliente (body de `/items` y
+# `/items/bulk`) y escribe en el CATÁLOGO de la colección. Antes de V3.77.2
+# solo `enroll_collection` comprobaba el propietario: la ingestión aceptaba
+# cualquier id, de modo que un perfil podía inyectar palabras y traducciones en
+# un pack global (visible para todos) o en la lista privada de otro usuario
+# (ids enumerables). Estas pruebas fijan la puerta extendida.
+
+
+def _create_list(client: TestClient, user_id: str, title: str) -> int:
+    res = client.post(
+        "/api/vocabulary/collections",
+        params={"user_id": user_id},
+        json={"title": title},
+    )
+    assert res.status_code == 200, res.text
+    return int(res.json()["id"])
+
+
+def test_add_item_rejects_collection_of_another_user(monkeypatch, tmp_path):
+    a, b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        private = _create_list(client, a, "Solo de A")
+
+        res = client.post(
+            "/api/vocabulary/items",
+            params={"user_id": b},
+            json={
+                "word": "intruder",
+                "translation": "intruso",
+                "collection_id": private,
+            },
+        )
+        assert res.status_code == 400, res.text
+        # Ni léxico ni catálogo ajenos se tocan.
+        assert vocabulary_repo.get_vocabulary(b) == []
+        assert collections_repo.list_collection_items(private) == []
+
+
+def test_bulk_rejects_collection_of_another_user(monkeypatch, tmp_path):
+    a, b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        private = _create_list(client, a, "Solo de A")
+
+        res = client.post(
+            "/api/vocabulary/items/bulk",
+            params={"user_id": b},
+            json={"text": "sneaky\nwords", "collection_id": private},
+        )
+        assert res.status_code == 400, res.text
+        assert vocabulary_repo.get_vocabulary(b) == []
+        assert collections_repo.list_collection_items(private) == []
+
+
+def test_bulk_rejects_missing_collection(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        res = client.post(
+            "/api/vocabulary/items/bulk",
+            params={"user_id": a},
+            json={"text": "ghost", "collection_id": 999_999},
+        )
+        assert res.status_code == 400, res.text
+        assert collections_repo.list_collection_items(999_999) == []
+
+
+def test_ingestion_accepts_own_list_and_global_pack(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        own = _create_list(client, a, "Mía")
+
+        into_own = client.post(
+            "/api/vocabulary/items",
+            params={"user_id": a},
+            json={"word": "mine", "translation": "mío", "collection_id": own},
+        )
+        assert into_own.status_code == 200, into_own.text
+        assert [i["word"] for i in collections_repo.list_collection_items(own)] == [
+            "mine"
+        ]
+
+        # Un pack global es de todos: mismo comportamiento que `enroll`.
+        travel = next(
+            c
+            for c in client.get(
+                "/api/vocabulary/collections", params={"user_id": a}
+            ).json()["collections"]
+            if c["slug"] == "travel"
+        )
+        into_global = client.post(
+            "/api/vocabulary/items",
+            params={"user_id": a},
+            json={"word": "jetlag", "collection_id": travel["id"]},
+        )
+        assert into_global.status_code == 200, into_global.text
+
+
+# --- P3: la importación en lote no abre una conexión por palabra -------------
+#
+# `add_membership` y `_ensure_fsrs_lexicon` abrían conexión (y `get_user`) por
+# palabra: importar un pack de N palabras hacía O(N) idas y vueltas a la BD,
+# cada una dentro de su propio `to_thread`. V3.77.2 las agrupa en una
+# transacción. Este test fija el COSTE, no solo el resultado: contar filas no
+# habría detectado la regresión.
+
+
+def test_bulk_membership_and_fsrs_seed_open_constant_connections(
+    monkeypatch, tmp_path
+):
+    a, _b = _setup(monkeypatch, tmp_path)
+    from domain import retention as retention_domain
+
+    created = collections_repo.create_user_list(a, title="Lote")
+    assert created is not None
+    coll_id = int(created["id"])
+    words = [f"pack{i}" for i in range(40)]
+
+    calls = {"membership": 0, "fsrs": 0}
+    real_collections_conn = collections_repo._conn
+    real_academy_conn = academy_repo._conn
+
+    def collections_conn(*args, **kwargs):
+        calls["membership"] += 1
+        return real_collections_conn(*args, **kwargs)
+
+    def academy_conn(*args, **kwargs):
+        calls["fsrs"] += 1
+        return real_academy_conn(*args, **kwargs)
+
+    monkeypatch.setattr(collections_repo, "_conn", collections_conn)
+    monkeypatch.setattr(academy_repo, "_conn", academy_conn)
+
+    collections_repo.add_memberships(a, coll_id, words)
+    # Una transacción para las 40 membresías (más, como mucho, una lectura).
+    assert calls["membership"] <= 2, calls
+    assert collections_repo.words_in_collection(a, coll_id) == set(words)
+
+    # Idempotente: repetir no duplica ni dispara conexiones extra.
+    collections_repo.add_memberships(a, coll_id, words)
+    assert len(collections_repo.words_in_collection(a, coll_id)) == 40
+
+    retention_domain._ensure_fsrs_lexicon(a, words, why="retention-import")
+    # Un `IN (...)` + un `executemany`: constante, no proporcional a 40.
+    assert calls["fsrs"] <= 3, calls
+    seeded = academy_repo.fsrs_cards_by_ids(a, "lexicon", words)
+    assert set(seeded) == set(words)
+    assert all(int(card["reps"] or 0) == 0 for card in seeded.values())

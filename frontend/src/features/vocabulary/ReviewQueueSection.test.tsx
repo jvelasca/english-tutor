@@ -556,3 +556,37 @@ describe("ReviewQueueSection (V3.35)", () => {
     expect(screen.queryByText(/Large gap/)).toBeNull();
   });
 });
+
+describe("ReviewQueueSection · contratos incompletos (V3.77.2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("un `items` no-array pero truthy no llega al render", async () => {
+    // El `queue?.items ?? []` de antes solo cubría null/undefined: un objeto o
+    // una cadena *truthy* pasaba la guardia y reventaba en `items.map`.
+    mocks.getReviewQueue.mockResolvedValue({
+      due_count: 3,
+      items: { 0: "river" },
+      fsrs_version: "2.11.0-lite",
+    } as never);
+
+    renderSection();
+
+    // Cae al estado vacío honesto en vez de tumbar la pantalla.
+    expect(await screen.findByText(/Nothing to review/)).toBeTruthy();
+  });
+
+  it("elementos no-objeto dentro del array se descartan", async () => {
+    mocks.getReviewQueue.mockResolvedValue({
+      due_count: 2,
+      items: ["basura", 7, null],
+      fsrs_version: "2.11.0-lite",
+    } as never);
+
+    renderSection();
+
+    expect(await screen.findByText(/Nothing to review/)).toBeTruthy();
+  });
+});

@@ -3,7 +3,75 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-21 (UTC+2).
+> Actualizado por última vez: 2026-09-22 (UTC+2).
+>
+> **Nota (2026-09-22 · cierre de la auditoría externa de V3.77.1): V3.77.2 —
+> release DE PRODUCTO (patch) de ENDURECIMIENTO sobre lo que la V3.77.1 dejó
+> abierto alrededor del diccionario personal.** Siete cosas, y **la primera no es
+> de UI: control de acceso roto en `collection_id` (IDOR, P0)**. `enroll_collection`
+> comprobaba de quién era la colección antes de escribir en ella y **la ingestión
+> no**: `POST /api/vocabulary/items` y `/items/bulk` —los dos endpoints nuevos de
+> la V3.77.0— aceptaban el `collection_id` que mandara el cliente, así que **un
+> perfil podía escribir en la lista privada de otro** (escritura, no lectura: el
+> daño es persistente y lo sufre quien no lo provoca). El arreglo es la puerta que
+> ya existía extraída a un predicado puro (`_collection_writable`) que usan los
+> **tres** sitios, para que la ingestión tenga **exactamente** el mismo criterio
+> que la inscripción; **un pack global sigue siendo destino de todos**, porque eso
+> es lo que significa «global» y no se cierra lo que no estaba roto. **P1:
+> `ErrorBoundary` en el root y por ruta** —no había **ninguno**, así que un `throw`
+> en render desmontaba el árbol entero y dejaba al alumno en blanco, que es lo que
+> convirtió un campo que faltaba en una respuesta HTTP en una pantalla muerta—.
+> **P1: normalización runtime de contratos (H4 y hermanas), que era el hallazgo de
+> fondo**, porque la V3.77.1 arregló una frontera y **el padre tenía el mismo
+> defecto sin tocar**: `PersonalDictionary` guardaba `setLexicon(data)` y
+> `setCandidates(drill.words)` sin comprobar la forma y pintaba
+> `summary.by_cefr.map(...)` / `sortLexicalItems(items)`, así que un contrato
+> incompleto mataba **la pantalla del diccionario y a sus tres hijos** —incluido el
+> `AddVocabSection` ya parcheado: el parche del hijo nunca llegaba a actuar porque
+> el árbol moría en el padre—. Nuevo `frontend/src/api/normalize.ts` aplicado **en
+> la frontera de API y otra vez en los componentes**, y cerradas las hermanas
+> (`ReviewQueueSection` usaba `queue?.items ?? []`, **más débil** que el
+> `Array.isArray(...)` de `AddVocabSection` porque deja pasar un `items` truthy que
+> no sea array; `DictionaryLookup` guardaba `entry` sin normalizar;
+> `wordDrill`/`wordDrillSteps` hacían `.map` sin guardia). Y el camino que no se
+> había contado: **`userId === null` dejaba un spinner infinito**, porque
+> `refresh()` salía temprano y `lexicon` se quedaba en `null` para siempre. **P1:
+> `PersonalDictionary` en modo incrustado** —`DictionaryScreen` ya es dueño del
+> layout, así que la pantalla tenía **dos `h1`** y el ancho reducido dos veces; la
+> prop `showHeader` replica el patrón que `DictionaryLookup` ya usaba—. **P2: el
+> cierre de sesión de retención no se veía nunca**, porque al calificar la última
+> tarjeta el camino de fin llamaba a `load()` y reseteaba `index`/`done`, así que
+> el resumen «N tarjetas revisadas» no aparecía jamás; ahora el índice avanza hasta
+> el resumen, con acción de actualizar. **P2: «Mis listas» y packs, interactivos**
+> —eran badges decorativos—: filas con `item_count` y una acción que abre una
+> `RetentionSession` acotada a esa colección, y «Re-enroll» se sustituye por el
+> estado real («En mi diccionario») más «Repasar», porque inscribirse dos veces
+> siempre fue idempotente. **P3: batch de membresías y siembra FSRS**, que abrían
+> **una conexión por palabra**: ahora las membresías van en **una sola transacción**
+> y la siembra FSRS en un solo paso (**≤ 2** y **≤ 3** conexiones para 40 palabras,
+> constantes y no proporcionales al lote). **Los candados nuevos muerden, y los dos
+> primeros se comprobaron revirtiendo el código:** neutralizada la guardia, los
+> **3** tests de seguridad fallan —y el de la colección inexistente no falla por
+> aserción sino con un `sqlite3.IntegrityError: FOREIGN KEY constraint failed` sin
+> capturar, es decir **un 500 en mitad de la escritura**—; hechos
+> `normalizeLexicon`/`normalizeDrillCandidates` un passthrough (el comportamiento
+> exacto de la V3.77.1), el test del componente **muere en
+> `PersonalDictionary.tsx:130`, en render**, que es el mismo sitio y el mismo modo
+> que describe el hallazgo; y devuelta la rama de `userId === null` a
+> «Cargando…», su test falla. **La suite visual NO se ha corrido en local para esta
+> release** (la autoridad es el CI) y hay además **una decisión tomada contra esa
+> suite a propósito**: los botones nuevos de «Repasar» exponen `aria-expanded` y
+> **no** `aria-pressed`, porque `drillProvenance.spec.ts` localiza la entrada al
+> drill con `li:has(button[aria-pressed]) button[aria-pressed]`. **Deuda
+> declarada:** la normalización es un contrato de **forma**, no de significado, así
+> que un léxico incompleto ya no tumba la pantalla pero se degrada al estado vacío;
+> distinguir «vacío porque no hay» de «vacío porque no entendí» queda pendiente (hoy
+> `loadError` solo cubre el fallo de red). **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, currículum intacto
+> (`1.3.1`), evaluaciones intactas y `LISTENING_BANK_VERSION` intacto.** **No añade
+> producto**: ni pantalla nueva, ni endpoint nuevo, ni tabla nueva. **Los 7 gates
+> siguen en `pending`** y el árbol que se certifica sigue siendo el de `v3.75.8`.
+> Detalle completo en **`release-notes-v3.77.2.md`**.
 >
 > **Nota (2026-09-21 · cierre de la sesión de retención léxica y perfiles): V3.77.1 —
 > release DE PRODUCTO (patch) que arregla un fallo REAL de la V3.77.0 publicada,

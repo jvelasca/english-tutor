@@ -582,6 +582,12 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not load your dictionary. ",
     es: "No se pudo cargar tu diccionario. ",
   },
+  // V3.77.2: sin perfil activo no hay léxico que pedir; antes esta rama no
+  // existía y la vista se quedaba en «Cargando…» indefinidamente.
+  "dictionary.noProfile": {
+    en: "Select a learning profile to see your personal dictionary.",
+    es: "Selecciona un perfil de aprendizaje para ver tu diccionario personal.",
+  },
   "dictionary.drill.sayWord": {
     en: "Say {word}",
     es: "Di {word}",
@@ -852,6 +858,12 @@ const STRINGS: Record<string, Entry> = {
     en: "Back",
     es: "Volver",
   },
+  // V3.77.2: acción de la pantalla de fin de sesión (antes inalcanzable porque
+  // `load()` recargaba la cola y borraba el contador justo al terminar).
+  "dictionary.retention.refresh": {
+    en: "Refresh",
+    es: "Actualizar",
+  },
   "dictionary.retention.flip": {
     en: "Flip card",
     es: "Voltear tarjeta",
@@ -936,13 +948,18 @@ const STRINGS: Record<string, Entry> = {
     en: "Activate",
     es: "Activar",
   },
-  "dictionary.add.reenroll": {
-    en: "Refresh",
-    es: "Actualizar",
-  },
   "dictionary.add.enrolled": {
-    en: "Active",
-    es: "Activo",
+    en: "In my dictionary",
+    es: "En mi diccionario",
+  },
+  // V3.77.2: la activación es idempotente (reactivar añadía 0). En su lugar, un
+  // pack o una lista ya activos se REPASAN con una sesión acotada a su
+  // `collection_id`.
+  "dictionary.add.review": { en: "Review", es: "Repasar" },
+  "dictionary.add.reviewList": { en: "Review list", es: "Repasar lista" },
+  "dictionary.add.reviewScope": {
+    en: "Reviewing “{title}”",
+    es: "Repasando «{title}»",
   },
   "dictionary.add.enrollOk": {
     en: "Added {n} words from “{title}”.",
@@ -1525,6 +1542,21 @@ const STRINGS: Record<string, Entry> = {
     en: "Options and information",
     es: "Opciones e información",
   },
+
+  // V3.77.2: panel de recuperación de un `ErrorBoundary`. Sin boundary, un solo
+  // throw durante el render desmontaba la app entera (React no atrapa errores
+  // de render sin uno), así que estas cadenas son la última red de la UI.
+  "error.boundary.title": { en: "Something went wrong", es: "Algo ha fallado" },
+  "error.boundary.app.hint": {
+    en: "The app hit an unexpected state. Reload to continue where you left off — your progress is saved.",
+    es: "La app ha llegado a un estado inesperado. Recarga para continuar donde lo dejaste: tu progreso está guardado.",
+  },
+  "error.boundary.route.hint": {
+    en: "This screen couldn't be shown. The rest of the app still works, so you can try again or move on.",
+    es: "Esta pantalla no se ha podido mostrar. El resto de la app sigue funcionando, así que puedes reintentar o continuar.",
+  },
+  "error.boundary.reload": { en: "Reload the app", es: "Recargar la app" },
+  "error.boundary.details": { en: "Technical detail", es: "Detalle técnico" },
 
   // Cabecera / navegación
   "nav.aria": { en: "Main navigation", es: "Navegación principal" },
