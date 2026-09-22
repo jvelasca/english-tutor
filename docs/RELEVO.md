@@ -5,6 +5,60 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-22 (UTC+2).
 >
+> **Nota (2026-09-22 · cierre de la sesión del perfil): V3.79.0 — release DE
+> PRODUCTO (patch) que cierra los DOS fallos que el alumno reportó usando el
+> perfil.** Ninguno era de pintura, y en los dos el mensaje que veía describía mal
+> lo que pasaba. **(A) La baja del perfil devolvía 429 por un bug del rate
+> limiter.** `backend/security.py` guardaba **una sola cola por equipo** y la
+> comparaba contra el cupo de la ruta concreta: `/api/profile-requests` tiene
+> 5/min —un tope antibarrido para una ruta **sin** sesión—, así que cinco
+> peticiones cualesquiera (abrir el diccionario son varias) dejaban la cola por
+> encima de 5 y el primer clic en «pedir la baja» recibía 429 → «El servidor local
+> está saturado». **El cupo por ruta medía el tráfico de todo el equipo.** Ahora
+> la ventana se parte por **`(host, clase de ruta)`**, `_route_class` elige el
+> **prefijo más largo** que casa —con `break` en el primero, que
+> `/api/profile-requests` sea prefijo de `/api/profile-requests/delete` convertía
+> **el orden de escritura** del diccionario en una trampa silenciosa— y la baja
+> gana **cupo propio (30/min)**: es una escritura autenticada, idempotente y de un
+> clic, y no puede medirse con la vara de una ruta sin sesión. `rate_limit_snapshot`
+> y `/api/system/status` no cambian de forma. **(B) El diálogo de perfil se
+> recortaba por arriba, y la causa raíz NO era el CSS.** Era de **contención**: el
+> diálogo se abre desde el menú de usuario, dentro del `<header>`, y ese header
+> lleva `backdrop-blur-xl`; **`backdrop-filter` crea bloque contenedor para
+> `position: fixed`**, así que el `inset: 0` del backdrop no medía el viewport
+> sino la franja del header (~80 px), y el diálogo —más alto— se recortaba por
+> arriba con su asa de cerrar fuera. Medido en el navegador: `rect=0,0 520x76` en
+> el backdrop y `y = -186` en el diálogo **incluso con el CSS arreglado**. El
+> arreglo es un **portal a `document.body`**. El CSS se endurece además por su
+> cuenta porque protege a los otros **tres** diálogos que comparten clases y sí se
+> montan fuera del header: fuera `align-items: center` (el centrado lo da
+> `margin: auto`, que respeta el área desplazable), `dvh` con respaldo `vh` (en
+> móvil `vh` mide el viewport con la barra oculta) y scroll en el **cuerpo** con
+> cabecera y pie fijos (`flex-shrink: 0` + `min-height: 0`). **(C) La baja gastaba
+> su propio cupo a base de clics.** El botón se deshabilitaba solo *después* del
+> éxito; ahora hay estado `busy` en vuelo y un 429 dice **los segundos** que
+> faltan, usando el `Retry-After` que `ApiError` ya exponía y se tiraba. **Los
+> cuatro candados muerden, comprobado revirtiendo el código:** la cola compartida
+> vuelve a dar `assert 429 == 200` (el fallo literal del alumno), sin el portal el
+> test del DOM falla y el de cota vuelve a `y = -186`, sin el `busy` tres clics
+> son tres peticiones, y con `align-items: center` el candado de fuente falla.
+> Verificación: `pytest` **2992/2992** + `ruff` limpio + `transfer_validation
+> OK=True` · `tsc` limpio · `vitest` **948/948** (108 ficheros) · build correcto ·
+> i18n `--strict` **1680** cadenas con 0 huérfanas / 0 usadas sin definir / 0
+> duplicadas · contraste 480 pares con 0 bloqueantes · `check_release_consistency`
+> OK en los **6 orígenes** · `validation_gate.py auto` **10/10** · launcher
+> **205/205** · Playwright `profileDialog` **2/2 en los tres proyectos**.
+> **Honestidad:** el CSS de fuente es un candado de **fuente**, no de píxeles (en
+> escritorio `vh == dvh`, así que el recorte del móvil no es reproducible en un
+> test de navegador, y se dice); el portal **cambia dónde vive el diálogo en el
+> DOM** (pasa a ser hijo directo de `<body>`); **nada comprueba** que otro
+> `position: fixed` no viva dentro de un ancestro con `backdrop-filter` —montar un
+> diálogo nuevo dentro del header reproduce el recorte—; y **queda flakiness local
+> preexistente en el barrido visual** (con backend apagado el conjunto de specs de
+> desktop que falla cambia de una ejecución a otra y pasan en aislamiento sobre un
+> árbol limpio, comprobado con `git stash`): la autoridad es el CI. Detalle en
+> `release-notes-v3.79.0.md`.
+>
 > **Nota (2026-09-22 · cierre de la sesión del diccionario en tres modos): V3.78.0 —
 > release DE PRODUCTO (minor) que reorganiza el diccionario en TRES MODOS
 > (Consultar · Personal · Flashcards) y separa posesión de estudio.** El cambio de

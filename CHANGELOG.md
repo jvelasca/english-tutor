@@ -4,6 +4,49 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.79.0] — 2026-09-22
+
+**Release de PRODUCTO (patch) que cierra los DOS fallos que el alumno reportó en el perfil: el diálogo
+de edición que se salía de pantalla por arriba y la baja del perfil que respondía «el servidor local
+está saturado». SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN
+tocar el currículum (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar las evaluaciones y SIN tocar
+`LISTENING_BANK_VERSION`. No añade ni retira un gate: G1–G7 siguen `pending`.** Los dos fallos eran de
+fondo, no de pintura. **(A) La baja del perfil fallaba por un bug del rate limiter, y el mensaje decía
+otra cosa.** En `backend/security.py`, `_clients` guardaba **una sola cola por equipo** y la comparaba
+contra el cupo de la ruta concreta: `/api/profile-requests` tiene 5/min —es un tope antibarrido para una
+ruta **sin** sesión—, así que cualquier ráfaga de cinco peticiones a rutas que no son esa (abrir el
+diccionario son varias) hacía que el primer clic en «pedir la baja» recibiera 429. El cupo por ruta no
+medía lo suyo: contaba el tráfico de todo el equipo. Ahora la ventana se parte por **(host, clase de
+ruta)**, `_route_class` elige el **prefijo más largo** que casa —con `break` en el primero, que
+`/api/profile-requests` sea prefijo de `/api/profile-requests/delete` convertía el orden de escritura del
+diccionario en una trampa silenciosa— y la baja gana **cupo propio (30/min)**: es una escritura
+autenticada, idempotente y de un solo clic, y no puede compartir la vara de una ruta sin sesión.
+`rate_limit_snapshot` y `/api/system/status` no cambian de forma. **(B) El diálogo de perfil se recortaba
+por arriba, y la causa no era el CSS.** La causa raíz era de **contención**: el diálogo se abre desde el
+menú de usuario, que vive dentro de un `<header>` con `backdrop-blur-xl`, y `backdrop-filter` **crea
+bloque contenedor para `position: fixed`**, así que el `inset: 0` del backdrop no medía el viewport sino
+la franja del header (~80 px): el diálogo, más alto que esa franja, se recortaba por arriba y su asa de
+cerrar quedaba inalcanzable. El arreglo es montarlo con un **portal a `document.body`**. El CSS se
+endurece además por su cuenta, porque protege a los otros tres diálogos que comparten clases: fuera
+`align-items: center` (el centrado lo da `margin: auto`, que respeta el área desplazable), `dvh` con
+respaldo `vh` en vez de `vh` a secas (en móvil `vh` mide el viewport con la barra oculta), y scroll en el
+**cuerpo** con cabecera y pie fijos (`flex-shrink: 0` + `min-height: 0`), para que el asa de cerrar no se
+vaya con el scroll. **(C) La baja deja de quemar su propio cupo.** `submitDelete` tiene estado `busy` y
+el botón se deshabilita **mientras la petición está en vuelo** —antes solo se deshabilitaba *después* del
+éxito, así que la impaciencia mandaba otra petición justo cuando el backend pedía esperar—, y un 429 dice
+**cuántos segundos** reintentar usando el `retryAfterSeconds` que `ApiError` ya exponía. **(D) Los
+candados muerden, comprobado revirtiendo el código.** Devuelta la cola compartida, el test de la baja
+falla con `assert 429 == 200` —el fallo exacto del alumno—; quitado el portal, el test que exige que el
+backdrop sea hijo directo de `document.body` falla; quitado el `busy`, los tres clics se convierten en
+tres peticiones; y devuelto `align-items: center` al CSS, el candado de fuente falla. Verificación:
+`pytest` **2992/2992** (20 en `test_security.py`, +4 nuevos) + `ruff` limpio · `tsc` limpio · `vitest`
+**948/948** (108 ficheros, +9) · build correcto · i18n `--strict` **1680** cadenas con 0 huérfanas / 0
+usadas sin definir / 0 duplicadas · contraste 480 pares con 0 bloqueantes · `check_release_consistency`
+OK en los **6 orígenes** · `validation_gate.py auto` **10/10**. Tests nuevos:
+`backend/tests/test_security.py` (**4**), `frontend/src/components/ProfileDialog.test.tsx` (**5**),
+`frontend/src/styles/dialogLayout.test.ts` (**4**) y `frontend/tests/visual/profileDialog.spec.ts`
+(**2** × 3 proyectos). Ver `release-notes-v3.79.0.md`.
+
 ## [3.78.0] — 2026-09-22
 
 **Release de PRODUCTO (minor) que reorganiza el diccionario en TRES MODOS —Consultar · Personal ·

@@ -1604,6 +1604,48 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - Mover `ReviewQueueSection`/`wordDrill`: son la superficie de **producción**, no
   la de tarjetas, y se quedan donde están.
 
+## V3.79.0 — el perfil: el diálogo recortado y la baja «saturada» (2026-09-22)
+
+> Origen: **el alumno usando la app**, no una auditoría. «Al editar un perfil, el
+> cuadro de selección de icono se sale de pantalla por arriba. También al pulsar
+> "PEDIR DAR DE BAJA MI PERFIL" sale en rojo: "El servidor local está saturado…"
+> y no funciona.» Notas en `release-notes-v3.79.0.md`.
+
+### Cerrado en V3.79.0 (deja de ser deuda)
+
+- **El rate limiter medía rutas ajenas.** Una sola cola por equipo comparada
+  contra el cupo de cada ruta: cinco peticiones cualesquiera agotaban el 5/min de
+  `/api/profile-requests` y la baja del perfil devolvía 429 sin que nadie hubiera
+  saturado nada. Ahora la ventana es por `(host, clase de ruta)`, con el prefijo
+  **más largo** ganando (para que una ruta que es prefijo de otra no dependa del
+  orden de escritura del diccionario) y **cupo propio para la baja**.
+- **El diálogo de perfil no cabía en la pantalla.** La causa no era el CSS sino la
+  contención: `backdrop-filter` en el `<header>` crea bloque contenedor para
+  `position: fixed`, así que el `inset: 0` del backdrop medía la franja del header
+  (~80 px) y no el viewport. Se cierra con un **portal a `document.body`**, más el
+  endurecimiento del CSS que protege a los otros tres diálogos.
+- **La baja gastaba su propio cupo a base de clics impacientes.** El botón se
+  deshabilitaba solo tras el éxito; ahora hay estado `busy` y un 429 dice los
+  segundos que faltan, usando el `Retry-After` que ya se recibía y se tiraba.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **Nada comprueba que un `position: fixed` no viva dentro de un ancestro con
+  `transform`/`filter`/`backdrop-filter`/`contain`/`will-change`.** El caso del
+  header se arregló para el diálogo de perfil y se revisaron a mano los otros
+  tres, pero montar un diálogo nuevo dentro del header **vuelve a reproducir el
+  recorte** y hoy ningún test lo impide. Un candado general sería caro; queda
+  aparcado con el motivo escrito. `[UI]`
+- **Los otros tres diálogos no se portalan** —no cuelgan del header y no sufren el
+  problema—, así que la mitad de la protección es todavía «el CSS es correcto» y
+  no «es imposible montarlo mal». `[UI]`
+- **El `busy` es del cliente.** Evita el clic repetido, no es una clave de
+  idempotencia del servidor; el 409 se sigue leyendo como «ya pedida». `[PRODUCTO]`
+- **La fragilidad del arnés visual bajo carga en Windows sigue aparcada** (ver
+  §V3.75.2 y V3.78.0): con el backend apagado el conjunto de specs de desktop que
+  falla cambia de una ejecución a otra, y las mismas specs pasan en aislamiento
+  sobre un árbol limpio. La autoridad es el CI. `[VALIDACIÓN]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

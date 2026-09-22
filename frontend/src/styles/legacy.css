@@ -2341,16 +2341,33 @@ body.is-resizing {
   z-index: 80;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
+  /* El centrado lo hace `margin: auto` en `.dialog`, NO `align-items: center`.
+     Con `align-items: center` un hijo más alto que el contenedor se desborda
+     por ARRIBA y esa parte queda fuera del área desplazable: en un viewport
+     bajo (móvil en LAN, ventana pequeña) el asa de cerrar se volvía
+     inalcanzable. Con `margin: auto` el desbordamiento va a los dos lados y el
+     backdrop, que sí scrollea, lo alcanza. V3.79.0. */
   justify-content: center;
+  /* El backdrop es el que desplaza cuando el diálogo no cabe: sin esto, un
+     diálogo alto deja el borde superior inalcanzable aunque esté centrado. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-4);
 }
 
 .dialog {
   width: 100%;
   max-width: 460px;
-  max-height: 90vh;
-  overflow-y: auto;
+  /* `auto` en los cuatro lados + `flex` en el backdrop: el diálogo se centra
+     mientras cabe y deja de irse por arriba cuando no cabe. */
+  margin: auto;
+  /* V3.79.0: `dvh` (alto del viewport DINÁMICO) en vez de `vh`. En móvil `vh`
+     mide el viewport con la barra del navegador OCULTA, así que `90vh` puede ser
+     más alto que el área realmente visible y el recorte vuelve. El respaldo en
+     `vh` es para navegadores sin `dvh`; `flex-start` + `stretch` lo resuelven. */
+  max-height: calc(100vh - 2 * var(--space-4));
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -2365,6 +2382,10 @@ body.is-resizing {
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
+  /* V3.79.0: cabecera y pie no se encogen; el que cede es el cuerpo. Así el asa
+     de cerrar (aquí) y las acciones (abajo) siguen visibles aunque el contenido
+     no quepa. */
+  flex-shrink: 0;
 }
 
 .dialog-header h2 {
@@ -2390,6 +2411,12 @@ body.is-resizing {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* V3.79.0: es el cuerpo el que scrollea cuando el diálogo no cabe. Antes el
+     scroll estaba en `.dialog` entero, así que al desplazar se iba también la
+     cabecera —de ahí que el asa de cerrar se perdiera de vista—. `min-height: 0`
+     es lo que permite a un hijo flex encogerse por debajo de su contenido. */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .dialog-footer {
@@ -2398,6 +2425,10 @@ body.is-resizing {
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+  /* El pie se queda pegado abajo cuando el cuerpo scrollea: las acciones
+     («Cancelar» / «Guardar») no pueden quedar tras el scroll. */
+  background: var(--color-surface);
 }
 
 .dialog-primary {

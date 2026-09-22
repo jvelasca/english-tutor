@@ -109,6 +109,87 @@ def test_rate_limit_rejects_after_limit(monkeypatch):
     security._clients.clear()
 
 
+def test_una_ruta_no_gasta_el_cupo_de_otra():
+    """V3.79.0: cada clase de ruta tiene su propia ventana.
+
+    Es el fallo que vio el alumno: «Pedir dar de baja mi perfil» respondía «El
+    servidor local está saturado» sin que nadie hubiera saturado nada. Con una
+    sola cola por equipo, cualquier tráfico reciente —abrir el diccionario son
+    varias peticiones— dejaba la cola por encima del cupo estrecho de la ruta de
+    la baja, y la baja fallaba.
+
+    Se reproduce con el cupo general REAL (1200), sin monkeypatch: seis
+    peticiones normales pasan sin problema y bastan para que el cupo heredado de
+    5/min rechace la baja. Con la ventana compartida, la de abajo es 429.
+    """
+    security._clients.clear()
+    app = FastAPI()
+
+    @app.post("/api/vocabulary/lexicon")
+    async def lexicon():
+        return {"ok": True}
+
+    @app.post("/api/profile-requests/delete")
+    async def baja():
+        return {"ok": True}
+
+    app.add_middleware(security.SecurityMiddleware)
+    with TestClient(app) as client:
+        # Tráfico normal y corriente: todas pasan, ninguna es la baja.
+        for _ in range(6):
+            assert client.post("/api/vocabulary/lexicon").status_code == 200
+        # ...y la baja sigue pasando: no comparte ventana con lo de arriba.
+        assert client.post("/api/profile-requests/delete").status_code == 200
+    security._clients.clear()
+
+
+def test_la_baja_no_hereda_el_cupo_antibarrido():
+    """V3.79.0: `/api/profile-requests/delete` no comparte el 5/min del alta.
+
+    Candado de configuración: si alguien retira la clave específica, la baja
+    vuelve a caer bajo el prefijo corto (`/api/profile-requests`) y el fallo
+    original reaparece sin que ningún test de comportamiento lo note —porque el
+    cupo seguiría existiendo, solo que prestado—.
+    """
+    clase, limite = security._route_class("/api/profile-requests/delete")
+    assert clase == "/api/profile-requests/delete"
+    # El alta defiende una ruta SIN sesión de un barrido de la cola; la baja es
+    # una escritura autenticada de un clic. No pueden medirse con la misma vara.
+    assert limite > security._PATH_LIMITS["/api/profile-requests"]
+
+
+def test_el_cupo_de_la_baja_sigue_mordiendo(monkeypatch):
+    """No se afloja lo que protege: su propia ventana también rechaza."""
+    monkeypatch.setitem(security._PATH_LIMITS, "/api/profile-requests/delete", 1)
+    security._clients.clear()
+    app = FastAPI()
+
+    @app.post("/api/profile-requests/delete")
+    async def baja():
+        return {"ok": True}
+
+    app.add_middleware(security.SecurityMiddleware)
+    with TestClient(app) as client:
+        assert client.post("/api/profile-requests/delete").status_code == 200
+        assert client.post("/api/profile-requests/delete").status_code == 429
+    security._clients.clear()
+
+
+def test_gana_el_prefijo_mas_largo_no_el_orden_del_diccionario(monkeypatch):
+    """El cupo aplicado no puede depender de dónde se escribió cada clave.
+
+    Con `break` en el primer acierto, en cuanto una ruta pasó a ser prefijo de
+    otra (`/api/profile-requests` lo es de `/api/profile-requests/delete`) el
+    cupo que se aplicaba dependía del orden de inserción. El más largo manda.
+    """
+    monkeypatch.setitem(security._PATH_LIMITS, "/api/a", 7)
+    monkeypatch.setitem(security._PATH_LIMITS, "/api/a/b", 11)
+    assert security._route_class("/api/a/b/c") == ("/api/a/b", 11)
+    assert security._route_class("/api/a/zzz") == ("/api/a", 7)
+    # Sin coincidencia, la clase general.
+    assert security._route_class("/api/otra") == ("", security._DEFAULT_LIMIT)
+
+
 def test_health_exempt_never_rate_limited(monkeypatch):
     """Las sondas /api/health no consumen cupo ni pueden recibir 429 (V3.6.2)."""
     monkeypatch.setattr(security, "_DEFAULT_LIMIT", 1)

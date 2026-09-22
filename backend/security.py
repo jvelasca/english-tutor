@@ -78,9 +78,25 @@ _PATH_LIMITS: dict[str, int] = {
     # legítimo y convierte el barrido de la cola en algo caro. El tope de
     # pendientes (`config.PROFILE_REQUEST_MAX_PENDING`) es la segunda valla.
     "/api/profile-requests": 5,
+    # V3.79.0: la BAJA (**con** sesión) no puede compartir el 5/min de arriba.
+    # Aquel cupo defiende una ruta sin sesión de un barrido de la cola; esta es
+    # una escritura autenticada, idempotente y de un solo clic del alumno. Con el
+    # cupo heredado, el primer clic de una baja podía recibir 429 por peticiones
+    # ajenas a esta ruta (ver `_rate_limit_ok`). El prefijo más largo la separa.
+    "/api/profile-requests/delete": 30,
 }
 
-_clients: dict[str, deque[float]] = defaultdict(deque)
+# Ventanas por CLASE de ruta, no por host a secas (V3.79.0).
+#
+# Antes había **una sola cola por equipo** y se comparaba contra el cupo de la
+# ruta concreta: con 5 peticiones cualesquiera en el último minuto —abrir el
+# diccionario son varias— el primer clic en «pedir la baja» recibía 429 con el
+# texto «el servidor está saturado». El cupo por ruta no medía lo suyo.
+#
+# La clave es `(host, clase)`, donde `clase` es el prefijo de `_PATH_LIMITS` que
+# casa (o `""` para el cupo general). Cada clase cuenta solo sus peticiones, que
+# es lo que el comentario de arriba lleva prometiendo desde V3.77.
+_clients: dict[tuple[str, str], deque[float]] = defaultdict(deque)
 
 # Marca de tiempo (monotónica) de cada rechazo 429, para exponer la saturación
 # en `/api/system/status` (rate_limit_snapshot). Solo lectura desde los routers.
@@ -122,14 +138,31 @@ def rate_limit_snapshot(window_seconds: float = _RATE_WINDOW_SECONDS) -> int:
     return len(_rejections)
 
 
+def _route_class(path: str) -> tuple[str, int]:
+    """Clase de cupo de una ruta: `(prefijo, límite)`.
+
+    Se elige el prefijo **más largo** que casa, no el primero del diccionario.
+    El orden literal de `_PATH_LIMITS` dejaba de ser inocente en cuanto una ruta
+    pasó a ser prefijo de otra (`/api/profile-requests` lo es de
+    `/api/profile-requests/delete`, V3.79.0): con `break` en el primer acierto,
+    el cupo que se aplicaba dependía de dónde hubiera quedado cada clave al
+    escribirlas. Con el más largo, la ruta más específica manda siempre.
+
+    Devuelve `("", _DEFAULT_LIMIT)` cuando ninguna casa: esa es la clase general.
+    """
+    best_prefix = ""
+    best_limit = _DEFAULT_LIMIT
+    for prefix, path_limit in _PATH_LIMITS.items():
+        if path.startswith(prefix) and len(prefix) > len(best_prefix):
+            best_prefix = prefix
+            best_limit = path_limit
+    return best_prefix, best_limit
+
+
 def _rate_limit_ok(host: str, path: str) -> bool:
     now = time.monotonic()
-    limit = _DEFAULT_LIMIT
-    for prefix, path_limit in _PATH_LIMITS.items():
-        if path.startswith(prefix):
-            limit = path_limit
-            break
-    queue = _clients[host]
+    bucket, limit = _route_class(path)
+    queue = _clients[(host, bucket)]
     while queue and now - queue[0] > _RATE_WINDOW_SECONDS:
         queue.popleft()
     if len(queue) >= limit:

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
 import type {
@@ -37,6 +38,8 @@ export function ProfileDialog({
   const [deleteFailure, setDeleteFailure] = useState<ProfileRequestFailure | null>(
     null,
   );
+  const [deleteRetryAfter, setDeleteRetryAfter] = useState(0);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteSent, setDeleteSent] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -61,13 +64,28 @@ export function ProfileDialog({
    * Pide la baja del perfil. Ni borra ni desactiva: la solicitud entra en la cola
    * del webmaster, y por eso la pantalla lo dice así en vez de dar por hecho que
    * el perfil desaparece.
+   *
+   * V3.79.0: `deleteBusy` deshabilita el botón MIENTRAS la petición está en
+   * vuelo. Antes solo se deshabilitaba *después* del éxito, así que un segundo
+   * clic de impaciencia mandaba otra petición y gastaba cupo justo cuando el
+   * backend estaba diciendo «espera».
    */
   async function submitDelete() {
-    if (!onRequestDelete || deleteSent) return;
+    if (!onRequestDelete || deleteSent || deleteBusy) return;
     setDeleteFailure(null);
-    const outcome = await onRequestDelete("");
-    if (outcome.ok) setDeleteSent(true);
-    else setDeleteFailure(outcome.reason);
+    setDeleteRetryAfter(0);
+    setDeleteBusy(true);
+    try {
+      const outcome = await onRequestDelete("");
+      if (outcome.ok) {
+        setDeleteSent(true);
+      } else {
+        setDeleteFailure(outcome.reason);
+        setDeleteRetryAfter(outcome.retryAfterSeconds ?? 0);
+      }
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   async function submit() {
@@ -102,7 +120,16 @@ export function ProfileDialog({
     avatar_image: image,
   };
 
-  return (
+  // V3.79.0: se monta en `document.body` con un portal, y **este** es el arreglo
+  // de verdad del recorte. El diálogo se abre desde el menú de usuario, que vive
+  // dentro del `<header>`; ese header lleva `backdrop-blur-xl`
+  // (`backdrop-filter`), y `backdrop-filter` **crea bloque contenedor para
+  // `position: fixed`**. Con el diálogo dentro del header, el `inset: 0` del
+  // backdrop no medía el viewport sino la franja del header (~80 px de alto): el
+  // diálogo, más alto que esa franja, se recortaba por arriba y su asa de cerrar
+  // quedaba fuera. El CSS de `.dialog-backdrop` (scroll + `dvh`) es correcto y
+  // ayuda, pero no puede arreglar una contención mal ubicada.
+  return createPortal(
     <div className="dialog-backdrop" onClick={onClose}>
       <div
         className="dialog"
@@ -226,13 +253,18 @@ export function ProfileDialog({
               </p>
               {deleteFailure && (
                 <p className="dialog-error">
-                  {t(deleteErrorKey(deleteFailure))}
+                  {deleteFailure === "throttled" && deleteRetryAfter > 0
+                    ? t("profile.deleteThrottled").replace(
+                        "{n}",
+                        String(deleteRetryAfter),
+                      )
+                    : t(deleteErrorKey(deleteFailure))}
                 </p>
               )}
               <button
                 type="button"
                 className="dialog-secondary"
-                disabled={deleteSent}
+                disabled={deleteSent || deleteBusy}
                 onClick={() => void submitDelete()}
               >
                 {t("profile.requestDelete")}
@@ -259,7 +291,8 @@ export function ProfileDialog({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

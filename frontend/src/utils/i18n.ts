@@ -2072,6 +2072,13 @@ const STRINGS: Record<string, Entry> = {
     en: "There are too many pending requests. Try again later.",
     es: "Hay demasiadas solicitudes pendientes. Prueba más tarde.",
   },
+  // V3.79.0: el 429 del cupo por IP decía «el servidor está saturado» y se
+  // quedaba ahí: sin decir cuándo reintentar, un aviso de espera es
+  // indistinguible de un fallo. El backend manda `Retry-After` y se usa.
+  "profile.deleteThrottled": {
+    en: "The server asked to wait {n}s before trying again.",
+    es: "El servidor pide esperar {n} s antes de reintentarlo.",
+  },
   "profile.deleteError": {
     en: "Could not send the request. Is the server running?",
     es: "No se pudo enviar la solicitud. ¿Está activo el servidor?",

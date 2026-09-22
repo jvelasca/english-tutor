@@ -15,7 +15,18 @@ import type { ProfileRequest } from "../types/api";
  */
 export type ProfileRequestOutcome =
   | { ok: true; request: ProfileRequest }
-  | { ok: false; reason: ProfileRequestFailure };
+  | {
+      ok: false;
+      reason: ProfileRequestFailure;
+      /**
+       * V3.79.0: segundos que el backend pide esperar (`Retry-After`), solo
+       * cuando los manda. Sin esto, un 429 por cupo llegaba a la pantalla sin
+       * nada que decir salvo «algo falló»: el alumno no sabía si reintentar ya
+       * o dentro de un minuto. Se omite cuando vale 0 para que el desenlace
+       * normal siga siendo `{ok: false, reason}` y nada más.
+       */
+      retryAfterSeconds?: number;
+    };
 
 /**
  * Motivos por los que una solicitud no llega a registrarse.
@@ -34,16 +45,18 @@ export type ProfileRequestFailure =
 
 function _outcomeFromError(err: unknown): ProfileRequestOutcome {
   if (err instanceof ApiError) {
-    if (err.status === 409) return { ok: false, reason: "duplicate" };
-    if (err.status === 422) return { ok: false, reason: "invalid" };
+    const retryAfter = err.retryAfterSeconds > 0 ? err.retryAfterSeconds : undefined;
+    const failure = (reason: ProfileRequestFailure): ProfileRequestOutcome =>
+      retryAfter === undefined
+        ? { ok: false, reason }
+        : { ok: false, reason, retryAfterSeconds: retryAfter };
+    if (err.status === 409) return failure("duplicate");
+    if (err.status === 422) return failure("invalid");
     if (err.status === 429) {
       // Dos 429 distintos: el del cupo por IP (`RATE_LIMITED`, delimitador de
       // seguridad) y el de la cola llena (solicitudes pendientes de más). El
       // relato para el alumno no es el mismo, así que no se juntan.
-      return {
-        ok: false,
-        reason: err.detail === "RATE_LIMITED" ? "throttled" : "full",
-      };
+      return failure(err.detail === "RATE_LIMITED" ? "throttled" : "full");
     }
   }
   return { ok: false, reason: "offline" };
